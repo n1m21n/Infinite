@@ -4,9 +4,17 @@
 #include <algorithm>
 #include <cfloat>
 #include "GLUtil.h"
+#include "Transport.h"
+#include <cmath>
+#include <cstdio>
 
 namespace
 {
+   // Beyond this a loop has run away (a Transform scaling above 1 every frame).
+   constexpr float kMaxExtent = 1.0e6f;
+
+   bool SaneValue(float v) { return std::isfinite(v) && std::fabs(v) <= kMaxExtent; }
+
    void TransformPoint(const Mat4& m, float& x, float& y, float& z)
    {
       const float px = x, py = y, pz = z;
@@ -38,6 +46,30 @@ void GeometryFeedbackNode::CookIfNeeded(int frameId)
    if (auto* n = dynamic_cast<INode*>(loopSrc))
       n->CookIfNeeded(frameId);
 
+   // The loop follows the transport like Particle System: a rewind (or sitting
+   // at beat 0, which is where an offline render starts) puts it back on the
+   // seed, and a clock that did not move holds the last capture instead of
+   // running the loop again. Without this a Transform in the loop kept
+   // accumulating while paused and after every rewind.
+   const double beats = Transport::Instance().Beats();
+   const bool rewound = mLastBeats >= 0.0 && beats < mLastBeats;
+   const bool paused = mLastBeats >= 0.0 && beats == mLastBeats && beats > 0.0;
+   mLastBeats = beats;
+   if (rewound || (beats <= 0.0 && mGeneration > 0))
+      mNeedsSeed = true;
+   if (paused && !mNeedsSeed && seed != nullptr && seed == mSeededFrom && loopSrc != nullptr)
+   {
+      // Held. The one thing that still restarts it is the user editing what
+      // feeds seed: the capture would otherwise show the old shape.
+      if (SeedChanged())
+         mNeedsSeed = true;
+      else
+      {
+         mLooping = true;
+         return;
+      }
+   }
+
    // Seed on the first cook, on Reset, when the seed cable moves, and every
    // cook while nothing closes the loop (a pass-through of the seed).
    const bool reseed = mNeedsSeed || seed != mSeededFrom || loopSrc == nullptr || seed == nullptr;
@@ -50,13 +82,63 @@ void GeometryFeedbackNode::CookIfNeeded(int frameId)
       if (force)
          mGeneration = 0;
       Capture(seed, force);
+      NoteSeed();
       return;
    }
    mLooping = true;
    const unsigned long long meshRev = mMeshRevision, cloudRev = mCloudRevision;
    Capture(loopSrc, false);
+   if ((mMeshRevision != meshRev || mCloudRevision != cloudRev) && !CaptureSane())
+   {
+      if (!mWarnedRunaway)
+      {
+         mWarnedRunaway = true;
+         std::fprintf(stderr, "Feedback 3D: the loop produced non-finite or runaway geometry (beyond 1e6); reset to the seed\n");
+      }
+      mGeneration = 0;
+      mLooping = false;
+      Capture(seed, true);
+      NoteSeed();
+      return;
+   }
    if (mMeshRevision != meshRev || mCloudRevision != cloudRev)
       mGeneration++;
+}
+
+void GeometryFeedbackNode::NoteSeed()
+{
+   if (seed == nullptr)
+      return;
+   mSeedMeshRev = seed->MeshRevision();
+   mSeedCloudRev = seed->PointCloudRevision();
+   mSeedMatrix = seed->GetModelMatrix();
+}
+
+bool GeometryFeedbackNode::SeedChanged() const
+{
+   return seed->MeshRevision() != mSeedMeshRev || seed->PointCloudRevision() != mSeedCloudRev ||
+          seed->GetModelMatrix() != mSeedMatrix;
+}
+
+bool GeometryFeedbackNode::CaptureSane() const
+{
+   for (const Vertex& v : mMesh.vertices)
+      if (!SaneValue(v.px) || !SaneValue(v.py) || !SaneValue(v.pz))
+         return false;
+   if (!mHasCloud)
+      return true;
+   if (mCloudOnGpu)
+   {
+      if (mGpu.hasBounds)
+         for (int i = 0; i < 3; i++)
+            if (!SaneValue(mGpu.lo[i]) || !SaneValue(mGpu.hi[i]))
+               return false;
+      return true;
+   }
+   for (const Particle& p : mCloud)
+      if (!SaneValue(p.px) || !SaneValue(p.py) || !SaneValue(p.pz))
+         return false;
+   return true;
 }
 
 void GeometryFeedbackNode::Capture(IGeometrySource* src, bool force)

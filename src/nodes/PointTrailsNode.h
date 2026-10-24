@@ -32,6 +32,7 @@ class PointTrailsNode : public INode, public IGeometrySource
 {
 public:
    static INode* Create() { return new PointTrailsNode(); }
+   ~PointTrailsNode() override;
 
    static constexpr int kMaxSamples = 1000000;
 
@@ -107,10 +108,17 @@ public:
    int TrackedPoints() const { return mSlots; }
    // Samples taken since the last clear.
    int SamplesTaken() const { return mSamples; }
+   // True when the points arrive as GPU textures (a GPU Particle System, Image
+   // to Points): each sample reads back the first TrackedPoints() of them, not
+   // the whole cloud, so a big source costs a bounded read per sample.
+   bool ReadsBackFromGpu() const { return mReadback; }
 
 private:
    void Sample(const std::vector<Particle>* cloud, const Mesh* mesh, const Mat4& model);
    void BuildMesh();
+   // Reads the first `n` texels of `gp` (position + colour textures, nothing
+   // else) into mReadCloud. False when the read could not be set up.
+   bool ReadGpuPoints(const GpuPoints& gp, int n);
 
    struct Slot
    {
@@ -141,6 +149,13 @@ private:
    int mBuiltColorMode = -1;
    float mBuiltHead[3] = { -1, -1, -1 }, mBuiltTail[3] = { -1, -1, -1 };
    bool mDirty = false;
+
+   // GPU sources: a framebuffer to read their textures through, and the
+   // bounded read-back as a cloud.
+   unsigned int mReadFbo = 0;
+   bool mReadback = false;
+   std::vector<Particle> mReadCloud;
+   std::vector<float> mReadPos, mReadCol;
 
    Mesh mMesh;
    unsigned long long mMeshRevision = 0;

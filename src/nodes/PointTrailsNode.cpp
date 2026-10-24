@@ -1,6 +1,11 @@
 #include "PointTrailsNode.h"
+
+#include "gl3.h"
+
 #include <algorithm>
 #include <cmath>
+
+#include "BenchReport.h"
 
 namespace
 {
@@ -21,6 +26,65 @@ namespace
       }
       return l;
    }
+}
+
+PointTrailsNode::~PointTrailsNode()
+{
+   if (mReadFbo != 0)
+      glDeleteFramebuffers(1, &mReadFbo);
+}
+
+bool PointTrailsNode::ReadGpuPoints(const GpuPoints& gp, int n)
+{
+   mReadCloud.clear();
+   const int texW = std::max(1, gp.texW);
+   const int rows = std::min(gp.texH, (n + texW - 1) / texW);
+   if (n <= 0 || rows <= 0 || gp.posTex == 0 || gp.colorTex == 0)
+      return false;
+   if (mReadFbo == 0)
+      glGenFramebuffers(1, &mReadFbo);
+   const size_t texels = (size_t)rows * (size_t)texW;
+   mReadPos.resize(texels * 4);
+   mReadCol.resize(texels * 4);
+
+   GLint prevFbo = 0, prevRead = 0;
+   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+   glGetIntegerv(GL_READ_BUFFER, &prevRead);
+   glBindFramebuffer(GL_FRAMEBUFFER, mReadFbo);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gp.posTex, 0);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gp.colorTex, 0);
+   bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+   if (ok)
+   {
+      glPixelStorei(GL_PACK_ALIGNMENT, 4);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
+      glReadPixels(0, 0, texW, rows, GL_RGBA, GL_FLOAT, mReadPos.data());
+      glReadBuffer(GL_COLOR_ATTACHMENT1);
+      glReadPixels(0, 0, texW, rows, GL_RGBA, GL_FLOAT, mReadCol.data());
+      Bench::GpuMem::NoteReadback((mReadPos.size() + mReadCol.size()) * sizeof(float));
+   }
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
+   glReadBuffer((GLenum)prevRead);
+   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+   if (!ok)
+      return false;
+
+   const size_t count = (size_t)std::min<long long>(n, (long long)texels);
+   mReadCloud.resize(count);
+   for (size_t i = 0; i < count; i++)
+   {
+      Particle& p = mReadCloud[i];
+      const float* sp = &mReadPos[i * 4];
+      const float* sc = &mReadCol[i * 4];
+      p.px = sp[0]; p.py = sp[1]; p.pz = sp[2];
+      p.alive = sp[3] > 0.0f;      // w == 0 hides the point (dead particle, cell under threshold)
+      p.scale = p.alive ? 1.0f : 0.0f;
+      p.r = sc[0]; p.g = sc[1]; p.b = sc[2];
+      p.age = sc[3];               // life fraction: goes back to 0 when a slot is reborn
+      p.hasColor = true;
+   }
+   return true;
 }
 
 void PointTrailsNode::CookIfNeeded(int frameId)
@@ -50,10 +114,17 @@ void PointTrailsNode::CookIfNeeded(int frameId)
       return;
    }
 
-   const std::vector<Particle>* cloud = input->GetPointCloud();
+   // GPU points (a GPU Particle System, Image to Points) are read back
+   // through their textures, only as many as are tracked: GetPointCloud() on
+   // such a source would read back every particle, four textures, per frame.
+   const GpuPoints* gpu = GpuPointsGL::Enabled() ? input->GetGpuPoints() : nullptr;
+   if (gpu != nullptr && (gpu->count <= 0 || gpu->posTex == 0 || gpu->colorTex == 0))
+      gpu = nullptr;
+   mReadback = gpu != nullptr;
+   const std::vector<Particle>* cloud = gpu ? &mReadCloud : input->GetPointCloud();
    const Mesh* mesh = cloud ? nullptr : &input->GetMesh();
-   const unsigned long long rev = cloud ? input->PointCloudRevision() : input->MeshRevision();
-   const Mat4 model = input->GetModelMatrix();
+   const unsigned long long rev = gpu ? gpu->revision : cloud ? input->PointCloudRevision() : input->MeshRevision();
+   const Mat4 model = gpu ? Mat4::Multiply(input->GetModelMatrix(), gpu->pointMatrix) : input->GetModelMatrix();
 
    // The ring is sized from length and the point limit; changing either starts over.
    const int len = std::clamp(length, 2, 240);
@@ -80,6 +151,8 @@ void PointTrailsNode::CookIfNeeded(int frameId)
       mFromMatrix = model;
       if (mClear || ++mFramesSinceSample >= std::clamp(sampleEvery, 1, 10))
       {
+         if (gpu)
+            ReadGpuPoints(*gpu, std::min(mSlots, gpu->count));   // empty on failure: tails break, no stale data
          Sample(cloud, mesh, model);
          mFramesSinceSample = 0;
       }

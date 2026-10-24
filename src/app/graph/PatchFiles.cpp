@@ -138,7 +138,8 @@ namespace app
 
    // Save with media: asks where, copies every file the patch reads into "<name> media"
    // next to it, writes the patch with those paths relative, then opens the saved copy
-   // so later edits and saves belong to the movable one.
+   // so later edits and saves belong to the movable one (the live nodes are repointed in
+   // place; nothing is reloaded).
    bool SavePatchWithMediaTo(const std::string& path, std::string& report)
    {
       const size_t slash = path.find_last_of("/\\");
@@ -149,6 +150,7 @@ namespace app
       }
       const std::string patchDir = path.substr(0, slash);
       Patch::Data data = BuildPatchData();
+      const Patch::Data before = data; // the live (absolute) values, to find what Plan rewrote
       const std::vector<MediaCollect::Item> items = MediaCollect::Plan(data, MediaCollect::MediaDirFor(path));
       int copied = 0, duplicates = 0, missing = 0;
       std::string error;
@@ -167,6 +169,31 @@ namespace app
          report = error;
          return false;
       }
+      // The patch on disk is now the movable copy. Point the live nodes at the copied files too, in
+      // place, so the session keeps its undo history, routing mode and view (re-opening the file
+      // would reset all three) and a later plain Save keeps writing the paths relative.
+      {
+         Patch::Data live = data; // still relative
+         MediaCollect::ResolveRelative(live, patchDir);
+         for (size_t n = 0; n < data.nodes.size() && n < before.nodes.size() && n < live.nodes.size(); n++)
+         {
+            std::vector<std::pair<std::string, std::string>> changed;
+            for (size_t k = 0; k < live.nodes[n].params.size() && k < before.nodes[n].params.size(); k++)
+               if (live.nodes[n].params[k].second != before.nodes[n].params[k].second)
+                  changed.push_back(live.nodes[n].params[k]);
+            if (changed.empty())
+               continue;
+            if (GraphNode* gn = FindNodeByIndex(data.nodes[n].index))
+            {
+               Patch::LoadParams(gn->node.get(), changed);
+               ReloadDerivedState(gn->node.get());
+            }
+         }
+      }
+      gPatchPath = path;
+      gPatchDirty = false;
+      NotePatchFileStamp(path);
+      Patch::NoteRecent(path);
       report = std::to_string(copied) + (copied == 1 ? " file copied" : " files copied");
       if (duplicates > 0)
          report += ", " + std::to_string(duplicates) + " used twice";
@@ -196,7 +223,6 @@ namespace app
                        report + ". Your patch is still open and unchanged.");
          return;
       }
-      LoadPatchFrom(path);
       gPatchStatus = "Saved with media: " + report;
       Notices::Post(Notices::Level::Info, "patch.savemedia", "Saved with media", report + ".", "Reveal",
                     [path]() { Platform::RevealInFileManager(path); });

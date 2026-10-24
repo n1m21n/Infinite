@@ -106,6 +106,16 @@ public:
    void SetPadHeld(int pad, bool held, float velocity = 1.0f);
 
    bool PadLoaded(int pad) const { return !padPath[Clamp(pad)].empty() && mDuration[Clamp(pad)] > 0.0; }
+   // A path is set (even when the file would not open: a missing clip keeps its
+   // reference so a re-save does not lose it). Such a pad can be cleared and
+   // dropped onto, unlike a loaded one it plays nothing.
+   bool PadHasPath(int pad) const { return !padPath[Clamp(pad)].empty(); }
+   // The filmstrip is still being built on the worker thread.
+   bool PadLoading(int pad) const { return mThumbLoading[Clamp(pad)]; }
+   // The soundtrack was left out (over the decoded-audio budget); the card says so.
+   bool PadSoundSkipped(int pad) const { return mSoundSkipped[Clamp(pad)]; }
+   // Total decoded soundtrack memory across the pads, in bytes (queued + decoded).
+   static constexpr size_t kSoundBudgetBytes = 256u * 1024u * 1024u;
    bool PadPlaying(int pad) const { return mRun[Clamp(pad)].playing; }
    // Where the pad is in its clip, 0..1 of the whole clip (not the window), -1 when idle.
    float PadCursor(int pad) const;
@@ -173,7 +183,7 @@ public:
       for (int i = 0; i < kPads; i++)
       {
          const int p = (Clamp(from) + i) % kPads;
-         if (padPath[p].empty())
+         if (!PadLoaded(p))
             return p;
       }
       return -1;
@@ -194,6 +204,7 @@ private:
       uint64_t order = 0;     // trigger order; the highest playing pad is on top
       float env = 0.0f;       // opacity x pass x release, as of the last step
       uint32_t serial = 0;    // bumped on every new pass or wrap (the soundtrack snaps to it)
+      bool holdEnd = false;   // synced loop shorter than its division: holds its last frame until the next line
    };
 
    void Engine(double dt);
@@ -202,8 +213,9 @@ private:
    void StartPass(int pad);
    void Window(int pad, double& s, double& e) const;
    void Composite(int frameId);
-   void BuildThumbs(int pad, const std::string& path);
+   void QueueThumbs(int pad);
    void DecodeSoundtracks();
+   void PumpWorker();
 
    std::unique_ptr<AudioVmpcNode> mAudioNode;
    std::unique_ptr<VideoSourceNode> mPlayer[kPads];
@@ -213,7 +225,14 @@ private:
    std::vector<unsigned char> mThumbPx[kPads];
    unsigned int mThumbTex[kPads] = {};
    bool mThumbDirty[kPads] = {};
-   bool mSoundDecoded[kPads] = {};
+   bool mSoundDecoded[kPads] = {};  // requested (queued, decoded, skipped or no audio track)
+   bool mSoundSkipped[kPads] = {};  // over budget: left silent
+   size_t mSoundBytes[kPads] = {};  // reserved (estimate) or actual decoded bytes
+   bool mThumbLoading[kPads] = {};
+
+   // Background thread for filmstrips and soundtrack decodes (see VmpcNode.cpp).
+   struct Worker;
+   std::unique_ptr<Worker> mWorker;
 
    PadRun mRun[kPads];
    bool mHeld[kPads] = {};

@@ -2400,6 +2400,33 @@ void RunHistoryTest()
    PushUndoCheckpoint("Edit");
    Check("a new edit clears redo", gRedoStack.empty());
 
+   // Save with media keeps the live session: undo depth, routing mode and node paths repointed in place.
+   {
+      namespace fs = std::filesystem;
+      std::error_code mec;
+      const fs::path mroot = fs::temp_directory_path() / "infinite_history_media";
+      fs::remove_all(mroot, mec);
+      fs::create_directories(mroot / "src", mec);
+      fs::create_directories(mroot / "out", mec);
+      { std::ofstream f(mroot / "src" / "kick.wav", std::ios::binary); f << "A"; }
+      Call("create_node", { {"typeName", "Sampler"}, {"category", "Audio"}, {"x", 200.0f}, {"y", 200.0f} }, r, e);
+      const int samplerIdx = r.value("index", -1);
+      if (GraphNode* gn = FindNodeByIndex(samplerIdx))
+         Patch::LoadParams(gn->node.get(), { { "s path", (mroot / "src" / "kick.wav").u8string() } });
+      gAudioMode = AudioMode::Timeline;
+      const size_t undoBefore = gUndoStack.size(), redoBefore = gRedoStack.size();
+      std::string report;
+      const bool saved = SavePatchWithMediaTo((mroot / "out" / "Set.inf").u8string(), report);
+      Check("save with media succeeds", saved);
+      Check("save with media keeps undo and redo", gUndoStack.size() == undoBefore && gRedoStack.size() == redoBefore);
+      Check("save with media keeps the audio mode", gAudioMode == AudioMode::Timeline);
+      Check("save with media adopts the new patch path", gPatchPath == (mroot / "out" / "Set.inf").u8string() && !gPatchDirty);
+      Check("save with media repoints the live node at the copy",
+            fs::is_regular_file(mroot / "out" / "Set media" / "kick.wav") && FindNodeByIndex(samplerIdx) != nullptr);
+      gAudioMode = AudioMode::Canvas;
+      fs::remove_all(mroot, mec);
+   }
+
    SavePatchTo(path);
    Check("loading clears history", LoadPatchFrom(path) && gUndoStack.empty() && gRedoStack.empty());
    remove(path.c_str());

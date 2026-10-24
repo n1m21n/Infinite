@@ -168,7 +168,7 @@ private:
    void BirthShape(unsigned int& rng, float pos[3], float nrm[3]) const;
 
    // GPU path (fragment-shader ping-pong; GL 4.1 has no compute).
-   bool EnsureGpu(int cap);
+   bool EnsureGpu(int alloc, int cap);
    void ReleaseGpu();
    void ClearGpuState();
    void GpuStep(float dt, int births);
@@ -209,8 +209,10 @@ private:
    bool mGpuActive = false;        // this run is simulated on the GPU
    bool mGpuFailed = false;        // shaders or targets unavailable: CPU from now on
    bool mGpuClearPending = true;   // Reset() ran: clear the state textures at the next cook
-   int mGpuCap = 0;                // slots in the state textures
+   int mGpuCap = 0;                // active particle slots (the ring); slots past it are dead
+   int mGpuAlloc = 0;              // slots the state textures hold (a size tier, >= mGpuCap)
    int mGpuTexH = 0;
+   bool mCapShrunk = false;        // the active cap fell inside the textures: clear the dropped slots
    unsigned int mSimFbo[2] = { 0, 0 };
    unsigned int mSimTex[2][3] = { { 0, 0, 0 }, { 0, 0, 0 } };   // pos+age, vel+life, colour
    int mSimRead = 0;               // which of the pair holds the current state

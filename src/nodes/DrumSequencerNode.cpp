@@ -1158,15 +1158,25 @@ int DrumSequencerNode::ApplyMidiSong(const MidiFile::Song& song, const std::stri
       for (int st = 0; st < kMaxSteps; st++)
          stepVel[lane][st] = 0.0f;
    int placed = 0;
+   int truncated = 0;
    bool laneUsed[kNumLanes] = {};
    for (const MidiFile::Event& e : song.events)
    {
       if (e.velocity == 0)
          continue;
       const int lane = laneOf[e.note];
-      const int st = (int)std::lround(e.beat * kStepsPerBeat);
-      if (lane < 0 || st < 0 || st >= steps)
+      int st = (int)std::lround(e.beat * kStepsPerBeat);
+      // A pickup just before the end of the pattern rounds onto the step past
+      // it: it belongs to the top of the loop, not to the bin.
+      if (st == steps)
+         st = 0;
+      if (lane < 0)
          continue;
+      if (st < 0 || st >= steps)
+      {
+         truncated++;
+         continue;
+      }
       const float v = std::clamp((float)e.velocity / 127.0f, 0.05f, 1.0f);
       if (stepVel[lane][st] == 0.0f)
          placed++;
@@ -1174,12 +1184,38 @@ int DrumSequencerNode::ApplyMidiSong(const MidiFile::Song& song, const std::stri
       laneUsed[lane] = true;
    }
 
+   // Velocity 127 would read as an accent (>= 0.99 steps play the lane's accent
+   // pitch / level) on every hit of a file that simply plays loud. Only a hit
+   // above its lane's median velocity keeps the full-velocity accent.
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      float vals[kMaxSteps];
+      int cnt = 0;
+      for (int st = 0; st < steps; st++)
+         if (stepVel[lane][st] > 0.0f)
+            vals[cnt++] = stepVel[lane][st];
+      if (cnt == 0)
+         continue;
+      std::sort(vals, vals + cnt);
+      const float median = vals[cnt / 2];
+      for (int st = 0; st < steps; st++)
+         if (stepVel[lane][st] >= 0.99f && stepVel[lane][st] <= median)
+            stepVel[lane][st] = 0.98f;
+   }
+
+   if (truncated > 0)
+      fprintf(stderr, "Drum Sequencer: '%s' is longer than 2 bars; %d hit(s) past the end were left out\n", name.c_str(),
+              truncated);
+
    rate = MusicTime::kSixteenth;
    swing = 0.0f;
    numSteps = steps;
    editPage = 0;
    for (int lane = 0; lane < kNumLanes; lane++)
+   {
       laneAccentPitch[lane] = 0.0f;
+      laneAccentLevel[lane] = 0.0f;
+   }
    patternName = name;
    patternPart = 0;
 

@@ -86,6 +86,9 @@ private:
    void Capture(IGeometrySource* src, bool force);
    bool CopyGpu(const GpuPoints& src, const Mat4& bake);
    void ReadBack();
+   void NoteSeed();
+   bool SeedChanged() const;
+   bool CaptureSane() const;
 
    Mesh mMesh;
    unsigned long long mMeshRevision = 0;
@@ -108,6 +111,12 @@ private:
    bool mLooping = false;
    int mGeneration = 0;
    int mLastCookFrame = -1;
+   // Transport follow: last cooked beat (-1 before the first cook), and what
+   // the seed looked like when the loop last started from it.
+   double mLastBeats = -1.0;
+   unsigned long long mSeedMeshRev = 0, mSeedCloudRev = 0;
+   Mat4 mSeedMatrix;
+   bool mWarnedRunaway = false;
 
    // GPU state. mCloudOnGpu: the capture is in mTargets[mFront] and mCloud is
    // filled from it on demand (mCpuStale). Otherwise mCloud is the capture and

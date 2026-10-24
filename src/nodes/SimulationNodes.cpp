@@ -335,7 +335,19 @@ void ParticleSystemNode::PullEmitSamples()
 
    if (mGpuActive)
    {
-      if (const GpuPoints* gp = emitSource->GetGpuPoints())
+      // The GPU textures carry no normals, and a normal only matters for
+      // "speed along normal". With that on and a CPU cloud to read, take the
+      // table path so the points' own normals are used, as on the CPU run.
+      // Sources with no CPU cloud (Image to Points) keep the GPU path, whose
+      // normal is +Z.
+      const GpuPoints* gp = emitSource->GetGpuPoints();
+      if (gp != nullptr && speedAlongNormal != 0.0f)
+      {
+         const std::vector<Particle>* withNormals = emitSource->GetPointCloud();
+         if (withNormals != nullptr && !withNormals->empty())
+            gp = nullptr;
+      }
+      if (gp != nullptr)
       {
          if (gp->count > 0)
          {
@@ -846,10 +858,11 @@ void ParticleSystemNode::ReleaseGpu()
    mCountQuery = 0;
    mCountPending = false;
    mGpuCap = 0;
+   mGpuAlloc = 0;
    mGpuPoints = GpuPoints();
 }
 
-bool ParticleSystemNode::EnsureGpu(int cap)
+bool ParticleSystemNode::EnsureGpu(int alloc, int cap)
 {
    if (mSimProgram == 0 || mPresentProgram == 0 || mBoundsProgram == 0)
    {
@@ -862,11 +875,15 @@ bool ParticleSystemNode::EnsureGpu(int cap)
       if (mSimProgram == 0 || mPresentProgram == 0 || mBoundsProgram == 0)
          return false;
    }
-   if (mGpuCap == cap && mSimFbo[0] != 0)
+   if (mGpuAlloc == alloc && mSimFbo[0] != 0)
+   {
+      mGpuCap = cap;
+      mGpuPoints.count = cap;
       return true;
+   }
    ReleaseGpu();
 
-   const int slots = std::max(1, cap);
+   const int slots = std::max(1, alloc);
    const int texW = std::min(1024, slots);
    const int texH = (slots + texW - 1) / texW;
    static const char* const kSimOutputs[3] = { "outA", "outB", "outC" };
@@ -913,6 +930,7 @@ bool ParticleSystemNode::EnsureGpu(int cap)
    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
    glGenQueries(1, &mCountQuery);
 
+   mGpuAlloc = alloc;
    mGpuCap = cap;
    mGpuTexH = texH;
    mGpuPoints = GpuPoints();
@@ -1305,9 +1323,29 @@ void ParticleSystemNode::CookIfNeeded(int frameId)
    // new cap the textures do not hold) starts the run over.
    const bool wantGpu = GpuPointsGL::Enabled() && !mGpuFailed;
    const int wantCap = std::max(0, std::min(maxParticles, wantGpu ? kGpuMaxParticles : kCpuMaxParticles));
-   if (wantGpu != mGpuActive || (wantGpu && wantCap != mGpuCap))
+   // The textures are sized to a tier (next power of two, at least 1024), so
+   // dragging or modulating max particles only changes the active count; the
+   // run restarts only when the cap outgrows the textures or falls under a
+   // quarter of them.
+   int wantAlloc = 1024;
+   while (wantAlloc < wantCap && wantAlloc < kGpuMaxParticles)
+      wantAlloc *= 2;
+   const bool capFits = mGpuActive && mGpuAlloc > 0 && wantCap <= mGpuAlloc && wantCap * 4 >= mGpuAlloc;
+   if (wantGpu && capFits && wantCap != mGpuCap)
    {
-      mGpuActive = wantGpu && EnsureGpu(wantCap);
+      const bool shrank = wantCap < mGpuCap;
+      mGpuCap = wantCap;
+      mGpuPoints.count = wantCap;
+      mCountStale = true;
+      mRevision = NextMeshRevision();
+      mCpuRevision = 0;        // the CPU copy (if any) covered the old count
+      mGpuPoints.revision = mRevision;
+      if (shrank)
+         mCapShrunk = true;
+   }
+   else if (wantGpu != mGpuActive || (wantGpu && !capFits))
+   {
+      mGpuActive = wantGpu && EnsureGpu(wantAlloc, wantCap);
       if (wantGpu && !mGpuActive)
       {
          mGpuFailed = true;
@@ -1329,6 +1367,19 @@ void ParticleSystemNode::CookIfNeeded(int frameId)
    }
 
    PullEmitSamples();
+
+   // The cap fell: slots past it die at the next sim pass. A zero-length pass
+   // clears them now, so a paused patch does not keep showing them.
+   if (mCapShrunk && mGpuActive)
+   {
+      const GLboolean blend = glIsEnabled(GL_BLEND);
+      glDisable(GL_BLEND);
+      GpuStep(0.0f, 0);
+      GpuPresent();
+      if (blend)
+         glEnable(GL_BLEND);
+   }
+   mCapShrunk = false;
 
    const double beats = Transport::Instance().Beats();
    const float bpm = std::max(1.0f, Transport::Instance().Tempo());

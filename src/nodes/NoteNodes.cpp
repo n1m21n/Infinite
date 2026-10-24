@@ -1,6 +1,7 @@
 #include "NoteNodes.h"
 
 #include <algorithm>
+#include <chrono>
 #include <atomic>
 #include <cassert>
 #include <climits>
@@ -307,6 +308,22 @@ namespace
       double mGrid = 0.0;
       double mTarget = 0.0;
    };
+}
+
+// The Restart glyph reports its held level once per drawn frame. A node that is
+// culled (scrolled away, panel closed) while the button is held stops reporting,
+// so a release goes unseen and the stored level stays high: the next press would
+// then never look like a rising edge. A level older than this counts as released.
+static bool RestartRisingEdge(bool level, bool& stored, long long& stampMs)
+{
+   const long long now = (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch()).count();
+   if (stored && now - stampMs > 250)
+      stored = false;
+   const bool rising = level && !stored;
+   stored = level;
+   stampMs = now;
+   return rising;
 }
 
 // ------------------------------------------------------------------ MIDI Notes
@@ -2779,6 +2796,7 @@ public:
       mCurrentOutNote = -1;
       mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
+      mRestart.Cancel(); // a rebuild/reset drops a waiting press
       mGridStepReadout.store(-1, std::memory_order_relaxed);
    }
 
@@ -2859,14 +2877,25 @@ public:
       const bool accurate = mStepTiming.load(std::memory_order_relaxed) != 0;
       if (!accurate)
          flushOff(mSamplePos + (uint64_t)numFrames);
-      mRestart.Poll(Transport::Instance().BlockStartBeats(), Transport::Instance().IsPlaying());
+      // A press only means something while the transport runs: a stopped
+      // transport never reaches the grid line, so the press must not stay
+      // armed and fire at some later play.
+      const bool restartPlaying = Transport::Instance().IsPlaying();
+      if (restartPlaying)
+         mRestart.Poll(Transport::Instance().BlockStartBeats(), true);
+      else
+         mRestart.Cancel();
       StepTick ticks[StepClock::kMaxTicks];
       const int nTicks = mClock.Ticks(rateBeats, bpm, mSampleRate, numFrames, accurate, ticks);
       for (int t = 0; t < nTicks; t++)
       {
          const int frame = ticks[t].frame;
          flushOff(mSamplePos + (uint64_t)frame + 1);
-         if (mRestart.Due((double)ticks[t].step * rateBeats))
+         // The launch grid is the Transport's (beats), whatever the rate mode:
+         // a tick's transport beat is step * rateBeats in sample-accurate mode
+         // (rateBeats is the seconds rate at this tempo in free mode) and the
+         // block start in block-start mode.
+         if (mRestart.Due(accurate ? (double)ticks[t].step * rateBeats : Transport::Instance().BlockStartBeats()))
          {
             // The pattern and the gate grid both start over on this tick.
             mStepCounter = 0;
@@ -3221,8 +3250,7 @@ AudioNode* ArpeggiatorNode::GetAudioNode()
 
 void ArpeggiatorNode::SetRestartLevel(bool level)
 {
-   const bool rising = level && !mRestartLevel;
-   mRestartLevel = level;
+   const bool rising = RestartRisingEdge(level, mRestartLevel, mRestartLevelStamp);
    if (rising)
       RequestRestart();
 }
@@ -3325,6 +3353,7 @@ public:
       mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
       mStepOffset = 0;
+      mRestart.Cancel();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -3334,9 +3363,15 @@ public:
       // offset lasts until the transport stops (or is reset).
       const unsigned long long epoch = Transport::Instance().ResetEpoch();
       if (epoch != mEpoch)
+      {
          mStepOffset = 0;
+         mRestart.Cancel();
+      }
       mEpoch = epoch;
-      mRestart.Poll(Transport::Instance().BlockStartBeats(), Transport::Instance().IsPlaying());
+      if (Transport::Instance().IsPlaying())
+         mRestart.Poll(Transport::Instance().BlockStartBeats(), true);
+      else
+         mRestart.Cancel(); // a stopped transport never reaches the grid line
       const int steps = std::clamp(mSteps.load(std::memory_order_relaxed), 1, NoteSequencerNode::kMaxSteps);
       const int rateMode = mRateMode.load(std::memory_order_relaxed);
       const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
@@ -3372,7 +3407,7 @@ public:
          const long long step = ticks[t].step;
          const int frame = ticks[t].frame;
          flushOff(mSamplePos + (uint64_t)frame + 1);
-         if (mRestart.Due((double)step * rateBeats))
+         if (mRestart.Due(accurate ? (double)step * rateBeats : Transport::Instance().BlockStartBeats()))
             mStepOffset = step; // this tick plays step 1
          const long long rel = step - mStepOffset;
          const int idx = (int)(((rel % steps) + steps) % steps);
@@ -3522,8 +3557,7 @@ AudioNode* NoteSequencerNode::GetAudioNode()
 
 void NoteSequencerNode::SetRestartLevel(bool level)
 {
-   const bool rising = level && !mRestartLevel;
-   mRestartLevel = level;
+   const bool rising = RestartRisingEdge(level, mRestartLevel, mRestartLevelStamp);
    if (rising)
       RequestRestart();
 }
@@ -3819,6 +3853,27 @@ public:
       mPrevTickStep = LLONG_MIN;
       mHoldUntilStep = LLONG_MIN;
       mCurrentCell.store(-1, std::memory_order_relaxed);
+      // A rebuild must not strand a sounding chord: every pending note-off whose
+      // note-on already went out is sent now, then the queue is cleared.
+      for (int i = 0; i < kMaxPending; i++)
+      {
+         const Pending& off = mPending[i];
+         if (!off.active || off.isNoteOn)
+            continue;
+         bool onStillPending = false;
+         for (int j = 0; j < kMaxPending; j++)
+            onStillPending = onStillPending || (mPending[j].active && mPending[j].isNoteOn && mPending[j].voiceId == off.voiceId);
+         if (onStillPending)
+            continue;
+         NoteEvent out;
+         out.note = off.note;
+         out.velocity = 0.0f;
+         out.isNoteOn = false;
+         out.frameOffset = 0;
+         out.source = this;
+         out.voiceId = off.voiceId;
+         mOutbox.Push(out);
+      }
       for (int i = 0; i < kMaxPending; i++)
          mPending[i].active = false;
    }
@@ -3927,25 +3982,29 @@ public:
             if (humanizeVel > 0.0f)
                vel = std::clamp(vel + mRng.Next() * (humanizeVel / 100.0f) * 0.5f, 0.05f, 1.0f);
 
+            // Both slots or neither: a note-on without its note-off would hang.
+            Pending* on = FreeSlot();
+            if (!on)
+               continue;
+            on->active = true; // reserve it so FreeSlot() hands out a different one
+            Pending* off = FreeSlot();
+            if (!off)
+            {
+               on->active = false;
+               continue;
+            }
             const int noteVoiceId = NextVoiceId();
-            if (Pending* on = FreeSlot())
-            {
-               on->active = true;
-               on->note = notes[i];
-               on->velocity = vel;
-               on->isNoteOn = true;
-               on->voiceId = noteVoiceId;
-               on->targetSample = onset;
-            }
-            if (Pending* off = FreeSlot())
-            {
-               off->active = true;
-               off->note = notes[i];
-               off->velocity = 0.0f;
-               off->isNoteOn = false;
-               off->voiceId = noteVoiceId;
-               off->targetSample = onset + SampleCount(gateSamples);
-            }
+            on->note = notes[i];
+            on->velocity = vel;
+            on->isNoteOn = true;
+            on->voiceId = noteVoiceId;
+            on->targetSample = onset;
+            off->active = true;
+            off->note = notes[i];
+            off->velocity = 0.0f;
+            off->isNoteOn = false;
+            off->voiceId = noteVoiceId;
+            off->targetSample = onset + SampleCount(gateSamples);
          }
       }
 
@@ -5164,6 +5223,7 @@ public:
       mSampleRate = sampleRate;
       mHeldCount = 0;
       mLastTransport = -1.0;
+      mRestart.Cancel();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -5429,8 +5489,7 @@ AudioNode* MidiFileNode::GetAudioNode()
 
 void MidiFileNode::SetRestartLevel(bool level)
 {
-   const bool rising = level && !mRestartLevel;
-   mRestartLevel = level;
+   const bool rising = RestartRisingEdge(level, mRestartLevel, mRestartLevelStamp);
    if (rising)
       RequestRestart();
 }

@@ -782,6 +782,7 @@ public:
 private:
    std::unique_ptr<AudioArpeggiatorNode> mAudioNode;
    bool mRestartLevel = false;
+   long long mRestartLevelStamp = 0; // ms of the last SetRestartLevel call (a culled button stops calling it)
    int mRestartPresses = 0;
    int mLastCookFrame = -1;
 };
@@ -840,6 +841,7 @@ public:
 private:
    std::unique_ptr<AudioNoteSequencerNode> mAudioNode;
    bool mRestartLevel = false;
+   long long mRestartLevelStamp = 0; // ms of the last SetRestartLevel call (a culled button stops calling it)
    int mRestartPresses = 0;
    int mLastCookFrame = -1;
 };
@@ -1205,6 +1207,7 @@ public:
 private:
    std::unique_ptr<AudioMidiFileNode> mAudioNode;
    bool mRestartLevel = false;
+   long long mRestartLevelStamp = 0; // ms of the last SetRestartLevel call (a culled button stops calling it)
    int mRestartPresses = 0;
    std::vector<std::unique_ptr<MidiFile::Song>> mSongs; // every loaded song stays alive: the audio thread may still hold the old pointer
    const MidiFile::Song* mSong = nullptr;

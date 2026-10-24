@@ -7,8 +7,12 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
+#include <deque>
 #include <filesystem>
+#include <mutex>
+#include <thread>
 
 #include "HapReader.h"
 #include "Transport.h"
@@ -27,6 +31,35 @@ namespace
    constexpr int kDecodeSet = 4;          // pads decoded per frame, at most
    constexpr double kSnapSeconds = 0.15;  // soundtrack drift beyond this snaps to the picture
    constexpr double kMinWindow = 0.02;    // a narrower start..end window falls back to the whole clip
+
+   // GL names whose owner died (or cleared) with no context current; freed the
+   // next time any VMPC has one.
+   std::mutex gGraveMu;
+   std::vector<unsigned int> gGrave;
+
+   void ReleaseTex(unsigned int& t)
+   {
+      if (t == 0)
+         return;
+      if (glfwGetCurrentContext() != nullptr)
+         glDeleteTextures(1, &t);
+      else
+      {
+         std::lock_guard<std::mutex> lk(gGraveMu);
+         gGrave.push_back(t);
+      }
+      t = 0;
+   }
+
+   void FlushGrave()
+   {
+      if (glfwGetCurrentContext() == nullptr)
+         return;
+      std::lock_guard<std::mutex> lk(gGraveMu);
+      for (unsigned int& t : gGrave)
+         glDeleteTextures(1, &t);
+      gGrave.clear();
+   }
 
    struct PadEvt
    {
@@ -220,7 +253,178 @@ private:
 };
 
 // ------------------------------------------------------------------ VmpcNode
-VmpcNode::VmpcNode() : mAudioNode(std::make_unique<AudioVmpcNode>())
+
+// One background thread, two kinds of job: a pad's filmstrip (eight exact
+// seeks on its own handle) and its soundtrack decode. Thumbnails run first. A
+// job carries the pad's generation; a pad that is reloaded or cleared bumps it,
+// so stale work is skipped (or abandoned between frames) and its result is
+// dropped. Results are published to the main thread through `done`; the audio
+// thread only ever sees a finished buffer via SampleSlot's atomic swap.
+struct VmpcNode::Worker
+{
+   struct Job
+   {
+      bool thumbs = true;
+      int pad = 0;
+      uint32_t gen = 0;
+      std::string path;
+      double duration = 0.0;
+   };
+   struct Result
+   {
+      bool thumbs = true;
+      int pad = 0;
+      uint32_t gen = 0;
+      bool ok = false;
+      std::vector<unsigned char> px;
+      std::unique_ptr<Platform::SampleBuffer> buf;
+   };
+
+   std::atomic<uint32_t> gen[kPads];
+   std::mutex mu;
+   std::condition_variable cv;
+   std::deque<Job> jobs;
+   std::vector<Result> done;
+   bool stop = false;
+   std::atomic<bool> stopFlag { false };
+   std::thread th;
+
+   Worker()
+   {
+      for (auto& g : gen)
+         g.store(0, std::memory_order_relaxed);
+   }
+   ~Worker() { Stop(); }
+
+   void Stop()
+   {
+      {
+         std::lock_guard<std::mutex> lk(mu);
+         stop = true;
+         jobs.clear();
+      }
+      stopFlag.store(true, std::memory_order_release);
+      cv.notify_all();
+      if (th.joinable())
+         th.join();
+   }
+
+   void Enqueue(Job&& j)
+   {
+      {
+         std::lock_guard<std::mutex> lk(mu);
+         if (stop)
+            return;
+         if (j.thumbs)
+         {
+            auto it = std::find_if(jobs.begin(), jobs.end(), [](const Job& o) { return !o.thumbs; });
+            jobs.insert(it, std::move(j));
+         }
+         else
+            jobs.push_back(std::move(j));
+         if (!th.joinable())
+            th = std::thread([this]() { Run(); });
+      }
+      cv.notify_one();
+   }
+
+   bool Stale(int pad, uint32_t g) const
+   {
+      return stopFlag.load(std::memory_order_acquire) || gen[pad].load(std::memory_order_acquire) != g;
+   }
+
+   void Run()
+   {
+      for (;;)
+      {
+         Job job;
+         {
+            std::unique_lock<std::mutex> lk(mu);
+            cv.wait(lk, [this]() { return stop || !jobs.empty(); });
+            if (stop)
+               return;
+            job = std::move(jobs.front());
+            jobs.pop_front();
+         }
+         if (Stale(job.pad, job.gen))
+            continue;
+         Result r;
+         r.thumbs = job.thumbs;
+         r.pad = job.pad;
+         r.gen = job.gen;
+         if (job.thumbs)
+            r.ok = BuildAtlas(job, r.px);
+         else
+         {
+            r.buf = std::make_unique<Platform::SampleBuffer>();
+            std::string error;
+            r.ok = Platform::DecodeVideoAudioTrackToBuffer(job.path, *r.buf, error); // no audio track: a normal case
+            if (!r.ok)
+               r.buf.reset();
+         }
+         std::lock_guard<std::mutex> lk(mu);
+         if (!stop)
+            done.push_back(std::move(r));
+      }
+   }
+
+   // Eight frames across the clip, cover-cropped to 16:9 and nearest sampled
+   // into one atlas. Rows stay in the decoder's order.
+   bool BuildAtlas(const Job& job, std::vector<unsigned char>& out)
+   {
+      std::string error;
+      Platform::VideoHandle* h = Platform::VideoOpen(job.path, error);
+      if (h == nullptr)
+         return false;
+      bool ok = false;
+      const int w = Platform::VideoWidth(h), hgt = Platform::VideoHeight(h);
+      const double dur = Platform::VideoDuration(h) > 0.0 ? Platform::VideoDuration(h) : job.duration;
+      if (w > 0 && hgt > 0 && dur > 0.0)
+      {
+         const int aw = kThumbW * kThumbs;
+         std::vector<unsigned char> atlas((size_t)aw * kThumbH * 4, 0);
+         double cw = (double)w, ch = (double)hgt;
+         const double ta = (double)kThumbW / (double)kThumbH;
+         if (cw / ch > ta)
+            cw = ch * ta;
+         else
+            ch = cw / ta;
+         const double cx = ((double)w - cw) * 0.5, cy = ((double)hgt - ch) * 0.5;
+         std::vector<unsigned char> px;
+         for (int i = 0; i < kThumbs; i++)
+         {
+            if (Stale(job.pad, job.gen))
+               break;
+            const double t = ((double)i + 0.5) / (double)kThumbs * dur;
+            if (!Platform::VideoFrameAtExact(h, t, px) || px.size() < (size_t)w * hgt * 4)
+               continue;
+            for (int y = 0; y < kThumbH; y++)
+            {
+               const int sy = std::clamp((int)(cy + ((double)y + 0.5) / kThumbH * ch), 0, hgt - 1);
+               for (int x = 0; x < kThumbW; x++)
+               {
+                  const int sx = std::clamp((int)(cx + ((double)x + 0.5) / kThumbW * cw), 0, w - 1);
+                  const unsigned char* sp = &px[((size_t)sy * w + sx) * 4];
+                  unsigned char* d = &atlas[((size_t)y * aw + (size_t)(i * kThumbW + x)) * 4];
+                  d[0] = sp[0];
+                  d[1] = sp[1];
+                  d[2] = sp[2];
+                  d[3] = 255;
+               }
+            }
+         }
+         if (!Stale(job.pad, job.gen))
+         {
+            out.swap(atlas);
+            ok = true;
+         }
+      }
+      Platform::VideoClose(h);
+      return ok;
+   }
+};
+
+VmpcNode::VmpcNode() : mAudioNode(std::make_unique<AudioVmpcNode>()), mWorker(std::make_unique<Worker>())
 {
    for (int p = 0; p < kPads; p++)
    {
@@ -234,13 +438,13 @@ VmpcNode::VmpcNode() : mAudioNode(std::make_unique<AudioVmpcNode>())
 
 VmpcNode::~VmpcNode()
 {
+   // Cancel and join first: a result must not outlive the buffers it would be handed to.
+   mWorker->Stop();
+   for (unsigned int& t : mThumbTex)
+      ReleaseTex(t); // deferred when no context is current
+   ReleaseTex(mBlackTex);
    if (glfwGetCurrentContext() != nullptr)
    {
-      for (unsigned int& t : mThumbTex)
-         if (t != 0)
-            glDeleteTextures(1, &t);
-      if (mBlackTex != 0)
-         glDeleteTextures(1, &mBlackTex);
       if (mProg != 0)
          glDeleteProgram(mProg);
       GLUtil::DestroyFbo(mOut);
@@ -303,9 +507,12 @@ bool VmpcNode::LoadPad(int pad, const std::string& path)
    const uint64_t order = mRun[pad].order;
    mRun[pad] = PadRun();
    mRun[pad].order = order;
-   BuildThumbs(pad, path);
+   mWorker->gen[pad].fetch_add(1, std::memory_order_acq_rel); // abandons the old clip's jobs
+   QueueThumbs(pad);
    // The old clip's soundtrack is gone; the new one decodes when the toggle wants it.
    mSoundDecoded[pad] = false;
+   mSoundSkipped[pad] = false;
+   mSoundBytes[pad] = 0;
    mAudioNode->PushBuffer(pad, new Platform::SampleBuffer());
    return true;
 }
@@ -346,11 +553,23 @@ void VmpcNode::ClearPad(int pad)
    mHap[pad] = false;
    padPath[pad].clear();
    padName[pad].clear();
+   mWorker->gen[pad].fetch_add(1, std::memory_order_acq_rel);
    mThumbPx[pad].clear();
    mThumbDirty[pad] = false;
+   mThumbLoading[pad] = false;
+   ReleaseTex(mThumbTex[pad]);
    mRun[pad] = PadRun();
    mSoundDecoded[pad] = false;
+   mSoundSkipped[pad] = false;
+   mSoundBytes[pad] = 0;
    mAudioNode->PushBuffer(pad, new Platform::SampleBuffer());
+   // Memory came back: pads that were over budget get another go.
+   for (int q = 0; q < kPads; q++)
+      if (mSoundSkipped[q])
+      {
+         mSoundSkipped[q] = false;
+         mSoundDecoded[q] = false;
+      }
 }
 
 void VmpcNode::ReloadFromPaths()
@@ -369,71 +588,66 @@ void VmpcNode::ReloadFromPaths()
    }
 }
 
-// Eight frames across the clip, cover-cropped to 16:9 and box-free nearest
-// sampled into one atlas. Rows stay in the decoder's order. A HAP clip has no
-// platform handle to read stills from, so it has no filmstrip.
-void VmpcNode::BuildThumbs(int pad, const std::string& path)
+// The filmstrip is built on the worker (a HAP clip has no platform handle to
+// read stills from, so it has none). Until it lands the pad shows a loading state.
+void VmpcNode::QueueThumbs(int pad)
 {
    mThumbPx[pad].clear();
    mThumbDirty[pad] = true;
+   mThumbLoading[pad] = false;
    if (mHap[pad])
       return;
-   std::string error;
-   Platform::VideoHandle* h = Platform::VideoOpen(path, error);
-   if (h == nullptr)
-      return;
-   const int w = Platform::VideoWidth(h), hgt = Platform::VideoHeight(h);
-   const double dur = Platform::VideoDuration(h) > 0.0 ? Platform::VideoDuration(h) : mDuration[pad];
-   if (w > 0 && hgt > 0 && dur > 0.0)
+   Worker::Job j;
+   j.thumbs = true;
+   j.pad = pad;
+   j.gen = mWorker->gen[pad].load(std::memory_order_acquire);
+   j.path = padPath[pad];
+   j.duration = mDuration[pad];
+   mThumbLoading[pad] = true;
+   mWorker->Enqueue(std::move(j));
+}
+
+// Main thread, once per frame: adopt finished worker jobs. Results for a pad
+// that was reloaded or cleared since are dropped.
+void VmpcNode::PumpWorker()
+{
+   std::vector<Worker::Result> got;
    {
-      const int aw = kThumbW * kThumbs;
-      std::vector<unsigned char> atlas((size_t)aw * kThumbH * 4, 0);
-      // Cover-crop the source to the thumbnail's aspect.
-      double cw = (double)w, ch = (double)hgt;
-      const double ta = (double)kThumbW / (double)kThumbH;
-      if (cw / ch > ta)
-         cw = ch * ta;
-      else
-         ch = cw / ta;
-      const double cx = ((double)w - cw) * 0.5, cy = ((double)hgt - ch) * 0.5;
-      std::vector<unsigned char> px;
-      for (int i = 0; i < kThumbs; i++)
+      std::lock_guard<std::mutex> lk(mWorker->mu);
+      got.swap(mWorker->done);
+   }
+   for (Worker::Result& r : got)
+   {
+      if (r.gen != mWorker->gen[r.pad].load(std::memory_order_acquire))
+         continue;
+      if (r.thumbs)
       {
-         const double t = ((double)i + 0.5) / (double)kThumbs * dur;
-         if (!Platform::VideoFrameAtExact(h, t, px) || px.size() < (size_t)w * hgt * 4)
-            continue;
-         for (int y = 0; y < kThumbH; y++)
+         mThumbLoading[r.pad] = false;
+         if (r.ok)
          {
-            const int sy = std::clamp((int)(cy + ((double)y + 0.5) / kThumbH * ch), 0, hgt - 1);
-            for (int x = 0; x < kThumbW; x++)
-            {
-               const int sx = std::clamp((int)(cx + ((double)x + 0.5) / kThumbW * cw), 0, w - 1);
-               const unsigned char* s = &px[((size_t)sy * w + sx) * 4];
-               unsigned char* d = &atlas[((size_t)y * aw + (size_t)(i * kThumbW + x)) * 4];
-               d[0] = s[0];
-               d[1] = s[1];
-               d[2] = s[2];
-               d[3] = 255;
-            }
+            mThumbPx[r.pad].swap(r.px);
+            mThumbDirty[r.pad] = true;
          }
       }
-      mThumbPx[pad].swap(atlas);
+      else if (r.ok && r.buf)
+      {
+         mSoundBytes[r.pad] = r.buf->channelData.size() * sizeof(float);
+         mAudioNode->PushBuffer(r.pad, r.buf.release());
+      }
+      else
+         mSoundBytes[r.pad] = 0;
    }
-   Platform::VideoClose(h);
 }
 
 unsigned int VmpcNode::ThumbTexture(int pad)
 {
    pad = Clamp(pad);
+   FlushGrave();
    if (mThumbDirty[pad] && glfwGetCurrentContext() != nullptr)
    {
       mThumbDirty[pad] = false;
       if (mThumbPx[pad].empty())
-      {
-         if (mThumbTex[pad] != 0)
-            glDeleteTextures(1, &mThumbTex[pad]);
-         mThumbTex[pad] = 0;
-      }
+         ReleaseTex(mThumbTex[pad]);
       else
       {
          if (mThumbTex[pad] == 0)
@@ -478,6 +692,7 @@ void VmpcNode::StartPass(int pad)
    r.pos = padSpeed[pad] < 0.0f ? e : s;
    r.playing = true;
    r.relT = -1.0;
+   r.holdEnd = false;
    r.serial++;
 }
 
@@ -592,10 +807,18 @@ void VmpcNode::Engine(double dt)
                r.pos += range;
             r.serial++;
          }
+         else if (r.loopOn && synced && trPlaying && r.relT < 0.0)
+         {
+            // A synced loop shorter than its division: hold the last frame (and
+            // keep the pad on top) until the next line restarts it, instead of
+            // flashing black every cycle.
+            r.pos = e;
+            r.holdEnd = true;
+         }
          else
          {
             r.pos = std::clamp(r.pos, s, e);
-            r.playing = false; // a synced loop waits here for its next line
+            r.playing = false;
          }
       }
       const double fo = std::max(0.0, (double)padFadeOut[p] / 1000.0);
@@ -614,8 +837,9 @@ void VmpcNode::Engine(double dt)
       const double fi = std::max(0.0, (double)padFadeIn[p] / 1000.0);
       const double dIn = sp >= 0.0 ? r.pos - s : e - r.pos;
       const double dOut = sp >= 0.0 ? e - r.pos : r.pos - s;
-      const float eIn = (fi > 0.0 && a > 1e-6) ? (float)std::clamp(dIn / (a * fi), 0.0, 1.0) : 1.0f;
-      const float eOut = (fo > 0.0 && a > 1e-6) ? (float)std::clamp(dOut / (a * fo), 0.0, 1.0) : 1.0f;
+      const bool held = r.holdEnd;
+      const float eIn = (!held && fi > 0.0 && a > 1e-6) ? (float)std::clamp(dIn / (a * fi), 0.0, 1.0) : 1.0f;
+      const float eOut = (!held && fo > 0.0 && a > 1e-6) ? (float)std::clamp(dOut / (a * fo), 0.0, 1.0) : 1.0f;
       r.env = std::clamp(padOpacity[p], 0.0f, 1.0f) * eIn * eOut * rel;
    }
 
@@ -691,6 +915,8 @@ void VmpcNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
    mAudioNode->DrainRetired();
+   FlushGrave();
+   PumpWorker();
 
    PadEvt ev;
    while (mAudioNode->PopEvent(ev))
@@ -720,28 +946,43 @@ void VmpcNode::CookIfNeeded(int frameId)
    {
       float gain = 0.0f;
       if (soundtrack && mRun[p].playing)
-         gain = p == mTop ? mWt : (p == mUnder ? mWb : 0.0f);
+         gain = mRun[p].holdEnd ? 0.0f : (p == mTop ? mWt : (p == mUnder ? mWb : 0.0f));
       mAudioNode->Publish(p, mRun[p].pos, padSpeed[p], gain, mRun[p].serial);
    }
    Composite(frameId);
 }
 
-// One soundtrack per frame, so turning the toggle on with 16 clips loaded
-// never stalls a single frame by sixteen decodes.
+// Soundtracks decode on the worker, one at a time, so turning the toggle on
+// with 16 clips loaded never stalls a frame and never holds more than the
+// budget (kSoundBudgetBytes across all pads: queued reservations plus decoded
+// buffers). The platform decode is whole-track, so a clip is sized from its
+// duration first (stereo 48 kHz floats as the upper bound); one that would not
+// fit is left silent, and the card says so. Clearing a pad retries those.
 void VmpcNode::DecodeSoundtracks()
 {
+   size_t used = 0;
+   for (int p = 0; p < kPads; p++)
+      used += mSoundBytes[p];
    for (int p = 0; p < kPads; p++)
    {
       if (mSoundDecoded[p] || !PadLoaded(p))
          continue;
       mSoundDecoded[p] = true;
-      auto* buf = new Platform::SampleBuffer();
-      std::string error;
-      if (Platform::DecodeVideoAudioTrackToBuffer(padPath[p], *buf, error))
-         mAudioNode->PushBuffer(p, buf);
-      else
-         delete buf; // no audio track: a normal case
-      return;
+      const size_t est = (size_t)(mDuration[p] * 48000.0) * 2u * sizeof(float);
+      if (used + est > kSoundBudgetBytes)
+      {
+         mSoundSkipped[p] = true;
+         continue;
+      }
+      mSoundBytes[p] = est;
+      used += est;
+      Worker::Job j;
+      j.thumbs = false;
+      j.pad = p;
+      j.gen = mWorker->gen[p].load(std::memory_order_acquire);
+      j.path = padPath[p];
+      j.duration = mDuration[p];
+      mWorker->Enqueue(std::move(j));
    }
 }
 
@@ -789,7 +1030,7 @@ void VmpcNode::Composite(int frameId)
       const int p = set[i];
       VideoSourceNode* pl = mPlayer[p].get();
       // A stopped pad's picture is already the frame it stopped on.
-      if (!mRun[p].playing && pl->FrameUpdateCount() > 0)
+      if ((!mRun[p].playing || mRun[p].holdEnd) && pl->FrameUpdateCount() > 0)
          continue;
       pl->SeekTo(std::clamp(mRun[p].pos, 0.0, std::max(0.0, mDuration[p] - 1e-3)));
       pl->CookIfNeeded(frameId);
