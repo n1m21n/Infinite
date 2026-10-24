@@ -38,8 +38,8 @@ NEW_NODES = sum(len(c["cards"]) for c in NEW_CHAPTERS)
 OLD_CHAPTERS = [
     ("2D Sources & Visual Generators", "pictures, video, shapes, noise, paint"),
     ("Typography & Text", "flat and extruded 3D lettering"),
-    ("2D Image Effects — Blur, Warp & Glow", "the hand-picked favorites"),
-    ("2D Image Effects — The Full Filter Shelf", "all 34 filters, one-line reference"),
+    ("2D Image Effects: Blur, Warp & Glow", "the hand-picked favorites"),
+    ("2D Image Effects: The Full Filter Shelf", "all 34 filters, one-line reference"),
     ("Color Grading & Tone Mapping", "grade, curve, LUT, gradient map"),
     ("Compositing & Layering", "blending, layers, routing, organization"),
     ("Feedback, Trails & AI Vision", "background removal, feedback, mutation"),
@@ -51,11 +51,11 @@ OLD_CHAPTERS = [
     ("Audio Utility & Routing", "gain, mixing, splitting, in/out"),
     ("MIDI & Note Shaping", "filter, transpose, humanize, quantize"),
     ("Generative & Physical Note Nodes", "arpeggios, chords, merging, bouncing-ball melodies"),
-    ("Modulators — Shape & Combine", "LFO, random, math, curves"),
-    ("Modulators — Control & Performance", "knobs, pads, MIDI CC, palettes"),
-    ("Modulators — Audio/Note Bridges & Analysis", "CV converters, envelopes, analysis"),
+    ("Modulators: Shape & Combine", "LFO, random, math, curves"),
+    ("Modulators: Control & Performance", "knobs, pads, MIDI CC, palettes"),
+    ("Modulators: Audio/Note Bridges & Analysis", "CV converters, envelopes, analysis"),
     ("Output & Sharing", "screen, speakers, Syphon, projection mapping, OSC"),
-    ("The Field Language — Programmable Nodes", "kernels, per-element code, custom nodes"),
+    ("The Field Language: Programmable Nodes", "kernels, per-element code, custom nodes"),
 ]
 NEW_BLURBS = {
     21: "slideshow and nine more vector shapes",
