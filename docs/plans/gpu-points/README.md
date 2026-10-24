@@ -187,8 +187,10 @@ points land inside that cloud; 600,000 alive at 600k/s, past the CPU cap. Parity
 is GL 3.0-3.3 core and in glad; shaders stay `#version 150`; no `Platform::` code.
 
 **Patch facts.** `tools/gen-patch-skill.py` re-run against the Release build (2026-10-24): 16 s, no
-hang. The 9+ minute spin in `Sketch3DNode::CookIfNeeded` seen on the Debug build does not happen in
-Release, so it is a Debug-only cost (freeing a very large mesh unoptimised), not a hang.
+hang. The 9+ minute spin in `Sketch3DNode::CookIfNeeded` on the Debug build was memory corruption,
+not a slow free: the 2D and 3D sketch engines each defined a global `struct Program` with a different
+layout, and the linker merged their inline members. Fixed in 41b94296 (Program moved into each file's
+anonymous namespace); Debug BYPASSSWEEPTEST now passes.
 
 ### B11 scene B, particles (Mac14,7 Release universal, 1080p, 2026-10-24, two rounds each)
 
@@ -226,6 +228,38 @@ cook ms p50.
 Phase 3 kept the earlier gains: A 2.4x at 230k and B 2.3x at 200k, as in steps 1-4 and 7. C and D
 are unchanged within noise (C 100k p99 is lower on, p50 a little higher). D is bound by triangle
 count, not by the points path.
+
+### B11 full cost: memory, GPU time, bytes moved (Mac14,7 Release universal, 1080p, 2026-10-24)
+
+`tools/bench.py b11` now prints, besides frame and cook times: **gpu ms** (sum of the GPU stage
+timers, p50), **foot MB** (process footprint at the end; on Apple silicon it includes GPU
+allocations), **gpu MB** (the tracked textures and buffers), and **up / down MB/f** (CPU→GPU and
+GPU→CPU bytes per frame: `RecordBuffer`, the GPU points upload, the point readbacks). The run found
+one bug, fixed before the "on" column: `DescribeGeometryMismatch` asked for the CPU cloud, so
+Instance on Points read the whole GPU cloud back every cook (6.2 MB/frame at 100k; C and D).
+
+| Row | off: fps, cook, gpu ms, foot, gpu MB, up/down MB/f | on |
+|---|---|---|
+| A video→points 57.6k | 49, 5.2, 16.8, 645, 161, 6.9 / 0.22 | 107, 0.4, 7.1, 655, 156, 0 / 0 |
+| A video→points 230k | 28, 10.9, 27.7, 844, 182, 27.5 / 0.89 | 61, 1.3, 12.7, 776, 162, 0 / 0 |
+| A video→points 262k | 28, 11.5, 30.0, 883, 186, 31.3 / 1.01 | 61, 2.3, 14.0, 794, 163, 0 / 0 |
+| B particles 10k | 138, 1.2, 4.1, 576, 154, 0.6 / 0 | 153, 0.8, 4.9, 571, 155, 0 / 0 |
+| B particles 100k | 82, 3.4, 6.3, 937, 161, 7.2 / 0 | 106, 1.0, 7.3, 675, 164, 0 / 0 |
+| B particles 200k | 66, 5.4, 7.2, 1179, 168, 14.6 / 0 | 92, 1.4, 8.4, 734, 175, 0 / 0 |
+| C instanced cubes 10k | 96, 1.3, 7.2, 651, 155, 1.3 / 0 | 102, 0.8, 7.6, 671, 155, 0 / 0 |
+| C instanced cubes 100k | 31, 7.2, 28.0, 869, 167, 13.4 / 0 | 30, 1.7, 29.3, 711, 165, 0 / 0 |
+| D 57.6k (6.2M tris) | 3.2, 10.9, 313, 1216, 165, 10.4 / 0.22 | 3.6, 2.9, 274, 1333, 157, 0 / 0 |
+| D 230k (24.9M tris) | 0.9, 30.9, 1095, 981, 162, 41.7 / 0.89 | 0.9, 3.1, 1086, 740, 162, 0 / 0 |
+
+- **Bytes moved:** with GPU points on, nothing crosses the bus per frame in any row; off, up to
+  42 MB/frame goes up and ~1 MB/frame comes back.
+- **GPU time drops too** where points were uploaded (A: 27.7 → 12.7 ms at 230k): no `glGetTexImage`
+  stall, no 230k `Mat4` upload. Where the cost is fill (B, C, D) it stays within ~1 ms.
+- **Memory:** tracked GPU memory moves by at most ±20 MB; the process footprint is lower on in
+  every large row (B 200k 1179 → 734 MB, A 230k 844 → 776 MB: no CPU `Particle` and `Mat4` copies).
+  D 57.6k is the one row higher on (+117 MB); one round each, so its spread is not measured.
+- **What still bounds it:** C 100k (10.8M triangles) and D are fill / triangle bound; GPU points
+  do not touch that.
 
 ## Step 8: Mesh to Points outputs GPU points (2026-10-24, dev build)
 
@@ -606,5 +640,5 @@ Trails). Every step in this file is done.
 - Feedback 3D: patch load does not refuse a geometry cycle written by hand into a `.inf`.
 - Feedback 3D runs every cook, including while the transport is paused, like the 2D Feedback.
 - Feedback 3D: the life attribute reads back as a fraction of a one-second life (see `ReadBack`).
-- Sketch 3D hangs `--describe` (seen while updating facts; not investigated).
+- Sketch 3D hang on Debug `--describe`: fixed in 41b94296 (duplicate `struct Program`, see Patch facts).
 - Colour from an image (for points) is not shipped.
