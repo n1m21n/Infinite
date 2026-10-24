@@ -295,8 +295,17 @@ namespace EquationDsp
    class Parser
    {
    public:
+      static constexpr size_t kMaxLength = 4096;
       static bool Parse(const std::string& expr, AstNodePtr& outRoot, std::string& outError)
       {
+         // "1+1+1+..." parses without recursion but builds an AST as deep as it
+         // is long, and Evaluate and the destructor recurse down it (B-K-040).
+         if (expr.size() > kMaxLength)
+         {
+            outError = "formula is too long";
+            outRoot = nullptr;
+            return false;
+         }
          Parser p(expr);
          outRoot = p.ParseExpression();
          if (!p.mError.empty())
@@ -415,8 +424,27 @@ namespace EquationDsp
          }
       }
 
+      // Both recursion points (parens and call arguments via ParseExpression,
+      // prefix chains via ParseUnary) count their depth, so a pasted
+      // "((((..." is a parse error and not a stack overflow (B-K-040).
+      static constexpr int kMaxDepth = 200;
+
+      struct DepthGuard
+      {
+         explicit DepthGuard(Parser& p) : mP(p) { mOk = ++mP.mDepth <= kMaxDepth; }
+         ~DepthGuard() { --mP.mDepth; }
+         Parser& mP;
+         bool mOk;
+      };
+
       AstNodePtr ParseExpression()
       {
+         DepthGuard guard(*this);
+         if (!guard.mOk)
+         {
+            if (mError.empty()) mError = "formula is nested too deeply";
+            return nullptr;
+         }
          return ParseOr();
       }
 
@@ -525,6 +553,12 @@ namespace EquationDsp
 
       AstNodePtr ParseUnary()
       {
+         DepthGuard guard(*this);
+         if (!guard.mOk)
+         {
+            if (mError.empty()) mError = "formula is nested too deeply";
+            return nullptr;
+         }
          if (mCurToken.type == TokenType::Minus || mCurToken.type == TokenType::Plus || mCurToken.type == TokenType::Not)
          {
             TokenType op = mCurToken.type;
@@ -636,6 +670,7 @@ namespace EquationDsp
       size_t mPos = 0;
       Token mCurToken;
       std::string mError;
+      int mDepth = 0;
    };
 
    // -------------------------------------------------------------------------
