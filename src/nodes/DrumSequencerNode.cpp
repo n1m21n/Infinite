@@ -1185,21 +1185,24 @@ int DrumSequencerNode::ApplyMidiSong(const MidiFile::Song& song, const std::stri
    }
 
    // Velocity 127 would read as an accent (>= 0.99 steps play the lane's accent
-   // pitch / level) on every hit of a file that simply plays loud. Only a hit
-   // above its lane's median velocity keeps the full-velocity accent.
+   // pitch / level) on every hit of a file that simply plays loud. When most of
+   // a lane's hits are at full velocity, full velocity is the norm there, not
+   // an accent, so those hits drop just below the accent threshold. A lane
+   // with a few full-velocity hits among softer ones keeps them as accents.
    for (int lane = 0; lane < kNumLanes; lane++)
    {
-      float vals[kMaxSteps];
       int cnt = 0;
+      int loud = 0;
       for (int st = 0; st < steps; st++)
          if (stepVel[lane][st] > 0.0f)
-            vals[cnt++] = stepVel[lane][st];
-      if (cnt == 0)
+         {
+            cnt++;
+            loud += stepVel[lane][st] >= 0.99f ? 1 : 0;
+         }
+      if (cnt < 2 || loud * 2 <= cnt)
          continue;
-      std::sort(vals, vals + cnt);
-      const float median = vals[cnt / 2];
       for (int st = 0; st < steps; st++)
-         if (stepVel[lane][st] >= 0.99f && stepVel[lane][st] <= median)
+         if (stepVel[lane][st] >= 0.99f)
             stepVel[lane][st] = 0.98f;
    }
 
