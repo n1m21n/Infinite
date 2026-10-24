@@ -33,7 +33,9 @@ cmake -S "$ROOT" -B "$BUILD" ${GENERATOR[@]+"${GENERATOR[@]}"} \
     -DCMAKE_BUILD_TYPE=Release >/dev/null
 
 echo "==> building"
-cmake --build "$BUILD" -j"$(sysctl -n hw.ncpu)"
+# Capped: a bare -j froze the 8 GB Mac (2026-10-23). Two arches at once need the memory.
+JOBS=$(( $(sysctl -n hw.ncpu) > 4 ? 4 : $(sysctl -n hw.ncpu) ))
+nice cmake --build "$BUILD" -j"$JOBS"
 
 APP="$BUILD/Infinite.app"
 [ -d "$APP" ] || { echo "build produced no .app"; exit 1; }

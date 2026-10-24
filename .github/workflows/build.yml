@@ -93,6 +93,10 @@ jobs:
       # W1: Windows reads narrow paths in the ANSI code page; every open goes through AppPaths.
       - name: No narrow file opens (UTF-8 paths on Windows)
         run: python3 scripts/check_utf8_paths.py
+      # Drift between sources of truth and their copies: driver and CI test lists vs src/, baselines,
+      # translations, workflow syntax. Same command as tools/ci/preflight.py --fast on the Mac.
+      - name: Drift checks (test lists, baselines, translations, workflows)
+        run: python3 tools/ci/preflight.py --fast
 
   macos:
     name: macOS (arm64)
@@ -110,6 +114,10 @@ jobs:
 
       - name: Build
         run: cmake --build build -j3
+
+      # A release job must never carry the dev-only menu items (UI Debugger / Style Editor).
+      - name: Release binary has no debug-only UI
+        run: python3 scripts/check_release_binary.py build/Infinite.app
 
       - name: Headless self-tests
         run: ./.github/scripts/headless-tests.sh build/Infinite.app/Contents/MacOS/Infinite

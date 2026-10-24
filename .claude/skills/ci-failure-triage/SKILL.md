@@ -15,6 +15,9 @@ Paths are relative to the repo root.
 
 ## Step 1: read, do not guess (2 minutes)
 
+First `python3 tools/ci/classify.py <run-id | branch> --record` (skill `ci-preflight`): it names every
+failed job's cause from the signature catalog. Use `triage.sh` below for compiler-crash detail.
+
 ```bash
 .claude/skills/ci-failure-triage/triage.sh <run-id | branch>
 ```

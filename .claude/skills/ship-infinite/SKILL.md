@@ -113,6 +113,12 @@ release before this policy). Going forward, every version is its own tag
 with its own notes page — see [What's new](#whats-new) below for the
 release-notes format.
 
+## Release gates
+
+`driver.sh release` refuses without a green Build run for the exact HEAD (`ci-gate`; the run may come from the
+branch that was fast-forwarded into main) and refuses a debug app. After the uploads run
+`driver.sh verify-assets <tag>`: it fails if the DMG, either Windows zip or the AppImage is missing. See `ci-preflight`.
+
 ## Release (DMG)
 
 `release` runs `package.sh` unmodified — see that file for what it does
