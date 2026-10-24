@@ -317,6 +317,10 @@ namespace Platform
       RevealInFileManager(file);
    }
 
+   bool GpuPreferenceSupported() { return false; }
+   int GpuPreference() { return 0; }
+   void SetGpuPreference(int) {}
+
    void ShowFatalError(const std::string& title, const std::string& message)
    {
       fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());

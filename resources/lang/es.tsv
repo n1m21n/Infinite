@@ -1654,3 +1654,9 @@ Separate process (safer)	Proceso aparte (más seguro)
 Within Infinite (compatible)	Dentro de Infinite (compatible)
 Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	Vuelve a analizar los plugins tras cambiar esto. Dentro de Infinite, un plugin que falla cierra Infinite una vez y después se omite.
 The separate scanner could not start, so the last scan ran within Infinite.	El analizador independiente no pudo iniciarse, así que el último análisis se hizo dentro de Infinite.
+Graphics	Gráficos
+unknown	desconocido
+Power saving (integrated GPU)	Bajo consumo (GPU integrada)
+High performance (discrete GPU)	Alto rendimiento (GPU dedicada)
+Graphics processor	Procesador gráfico
+For computers with more than one GPU. Takes effect the next time Infinite starts.	Para equipos con más de una GPU. Se aplica la próxima vez que se inicie Infinite.

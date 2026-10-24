@@ -149,6 +149,14 @@ namespace Platform
    // created empty first so there is always something to select). Same file AppendLogLine writes on every platform.
    void RevealLogs();
 
+   // Which graphics processor Infinite runs on, for machines with more than one (a laptop with an integrated and
+   // a discrete GPU). 0 = let the system decide, 1 = power saving (integrated), 2 = high performance (discrete).
+   // Only Windows can honour it (Graphics Settings, per executable) and only at the next launch; elsewhere
+   // GpuPreferenceSupported() is false and the setter does nothing.
+   bool GpuPreferenceSupported();
+   int GpuPreference();
+   void SetGpuPreference(int preference);
+
    // Reports a fatal startup failure through every channel a user might
    // actually see: stderr (unconditionally, matches prior behavior) and,
    // on Windows only, a MessageBoxW plus AppendLogLine. macOS relies on the

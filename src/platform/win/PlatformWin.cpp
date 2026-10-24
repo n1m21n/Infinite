@@ -1539,6 +1539,61 @@ namespace Platform
       return args;
    }
 
+   // Windows keeps a per-executable GPU choice under UserGpuPreferences (the same entry Settings > Display >
+   // Graphics writes), read when the process starts, so a change here applies at the next launch.
+   namespace
+   {
+      const wchar_t* const kGpuPrefKey = L"Software\\Microsoft\\DirectX\\UserGpuPreferences";
+
+      std::wstring GpuPrefExePath()
+      {
+         wchar_t path[MAX_PATH * 2] = {};
+         const DWORD n = GetModuleFileNameW(nullptr, path, (DWORD)(sizeof(path) / sizeof(path[0])));
+         return std::wstring(path, n);
+      }
+   }
+
+   bool GpuPreferenceSupported() { return true; }
+
+   int GpuPreference()
+   {
+      const std::wstring exe = GpuPrefExePath();
+      HKEY key = nullptr;
+      int result = 0;
+      if (RegOpenKeyExW(HKEY_CURRENT_USER, kGpuPrefKey, 0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS)
+      {
+         wchar_t value[64] = {};
+         DWORD size = sizeof(value) - sizeof(wchar_t);
+         DWORD type = 0;
+         if (RegQueryValueExW(key, exe.c_str(), nullptr, &type, (LPBYTE)value, &size) == ERROR_SUCCESS && type == REG_SZ)
+         {
+            const wchar_t* tag = wcsstr(value, L"GpuPreference=");
+            if (tag)
+               result = _wtoi(tag + 14);
+         }
+         RegCloseKey(key);
+      }
+      return (result == 1 || result == 2) ? result : 0;
+   }
+
+   void SetGpuPreference(int preference)
+   {
+      const std::wstring exe = GpuPrefExePath();
+      if (exe.empty())
+         return;
+      HKEY key = nullptr;
+      if (RegCreateKeyExW(HKEY_CURRENT_USER, kGpuPrefKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
+         return;
+      if (preference == 1 || preference == 2)
+      {
+         const std::wstring value = std::wstring(L"GpuPreference=") + (preference == 1 ? L"1" : L"2") + L";";
+         RegSetValueExW(key, exe.c_str(), 0, REG_SZ, (const BYTE*)value.c_str(), (DWORD)((value.size() + 1) * sizeof(wchar_t)));
+      }
+      else
+         RegDeleteValueW(key, exe.c_str());
+      RegCloseKey(key);
+   }
+
    // Defined here, not in PluginHostWin.cpp: infinite-vst3-scanner compiles
    // PluginVST3Win.cpp and PlatformWin.cpp but not PluginHostWin.cpp. Platform.h
    // declares it for every build; the main loop uses it around glfwPollEvents().

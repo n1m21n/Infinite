@@ -1654,3 +1654,9 @@ Separate process (safer)	別プロセス(より安全)
 Within Infinite (compatible)	Infinite内(互換性重視)
 Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	変更後はプラグインを再スキャンしてください。Infinite内では、クラッシュするプラグインがあるとInfiniteが一度終了し、その後はスキップされます。
 The separate scanner could not start, so the last scan ran within Infinite.	別プロセスのスキャナーを起動できなかったため、直前のスキャンはInfinite内で実行されました。
+Graphics	グラフィックス
+unknown	不明
+Power saving (integrated GPU)	省電力（内蔵GPU）
+High performance (discrete GPU)	高パフォーマンス（外付けGPU）
+Graphics processor	グラフィックプロセッサ
+For computers with more than one GPU. Takes effect the next time Infinite starts.	GPUが複数あるコンピュータ向け。次回Infinite起動時に反映されます。

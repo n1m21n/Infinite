@@ -4,6 +4,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "core/gl3.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/LibraryParts.h"
 
@@ -729,6 +730,24 @@ namespace app
             {
                SetCanvasSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
+            }
+
+            {
+               const char* renderer = (const char*)glGetString(GL_RENDERER);
+               ImGui::TextDisabled("%s: %s", T("Graphics"), renderer ? renderer : T("unknown"));
+               if (Platform::GpuPreferenceSupported())
+               {
+                  const char* gpuLabels[] = { T("System default"), T("Power saving (integrated GPU)"), T("High performance (discrete GPU)") };
+                  const int gpu = Platform::GpuPreference();
+                  if (FormParts::BeginCombo(L("Graphics processor"), gpuLabels[gpu]))
+                  {
+                     for (int i = 0; i < 3; i++)
+                        if (MenuParts::Choice(gpuLabels[i], gpu == i))
+                           Platform::SetGpuPreference(i);
+                     FormParts::EndCombo();
+                  }
+                  ImGui::TextDisabled("%s", T("For computers with more than one GPU. Takes effect the next time Infinite starts."));
+               }
             }
 
             ImGui::Spacing();
