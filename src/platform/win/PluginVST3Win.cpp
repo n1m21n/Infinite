@@ -781,7 +781,7 @@ namespace
          const std::string path = VST3ScanModePath();
          if (!path.empty())
          {
-            if (FILE* f = fopen(path.c_str(), "rb"))
+            if (FILE* f = AppPaths::OpenFile(path, "rb"))
             {
                char buf[16] = {};
                const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
@@ -1027,7 +1027,7 @@ namespace Platform
          return;
       if (inProcess)
       {
-         if (FILE* f = fopen(path.c_str(), "wb"))
+         if (FILE* f = AppPaths::OpenFile(path, "wb"))
          {
             fputs("inprocess", f);
             fclose(f);
