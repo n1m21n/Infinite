@@ -58,7 +58,7 @@ The sweep measures frames and audio, not note pairing. A note node that leaves n
 
 Float values are ±1e30, nan, inf, 1e9 and -1. 1e9 casts to int fine but can size a buffer. -1 is UB once it's cast to an unsigned seed.
 
-Resumable: re-running skips rows already written. `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
+Resumable: re-running skips rows already written. `--values 1e9,-1` runs only those values (the float rows that still reach a node since B-K-026). `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
 
 ## INFINITE_PARAMFUZZ — every audio node, in process
 
