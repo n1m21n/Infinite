@@ -302,7 +302,11 @@ jobs:
           path: dist/Infinite
           if-no-files-found: error
 
+      # Signing is best-effort: if the SignPath app is unavailable the build
+      # still publishes the unsigned binaries instead of failing the run.
       - name: Submit signing request to SignPath
+        id: signpath
+        continue-on-error: true
         if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
         uses: signpath/github-action-submit-signing-request@v3
         with:
@@ -316,7 +320,7 @@ jobs:
           output-artifact-directory: dist-signed
 
       - name: Extract signed binaries
-        if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
+        if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != '' && steps.signpath.outcome == 'success'
         shell: bash
         run: |
           if compgen -G "dist-signed/*.zip" > /dev/null; then
