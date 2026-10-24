@@ -527,6 +527,8 @@ private:
    // resampling-quality claim.
    static float ReadSample(const Platform::SampleBuffer& buf, double pos)
    {
+      if (!(pos >= 0.0 && pos < buf.numFrames))
+         return 0.0f; // also keeps the cast below defined (B-K-039)
       const int i0 = (int)pos;
       if (i0 < 0 || i0 >= buf.numFrames - 1)
          return (i0 >= 0 && i0 < buf.numFrames) ? buf.channelData[i0] : 0.0f;
@@ -727,6 +729,9 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    finetune = std::clamp(finetune, -50.0f, 50.0f);
    speed = std::clamp(speed, -2.0f, 2.0f);
    volume = std::clamp(volume, 0.0f, 1.0f);
+   start = std::clamp(start, 0.0f, 1.0f); // B-K-039: start 1e9 read frame ~1e14
+   end = std::clamp(end, 0.0f, 1.0f);
+   position = std::clamp(position, 0.0f, 1.0f);
    v.Bool("pingpong", pingpong);
 }
 
