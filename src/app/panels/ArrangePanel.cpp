@@ -1841,6 +1841,11 @@ namespace app
             const unsigned int tex = gArrangeMonitorTarget.result.tex;
             if (tex != 0)
                monDl->AddImage((ImTextureID)(intptr_t)tex, monOrigin, monBR, ImVec2(0, 1), ImVec2(1, 0));
+            // In Session audio mode the monitor plays launched Session clips,
+            // not the timeline's: say so, or an empty timeline looks wrong.
+            if (gAudioMode == AudioMode::Session)
+               monDl->AddText(ImVec2(monOrigin.x + 6.0f, monOrigin.y + 4.0f), IM_COL32(255, 255, 255, 170),
+                              L("Session clip"));
          }
 
          ImGui::Dummy(monAvail);
