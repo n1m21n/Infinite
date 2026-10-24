@@ -116,7 +116,7 @@ Show canvas grid	显示画布网格
 Snap to grid	吸附到网格
 Solid Color	纯色
 Standard (shared)	标准（共享）
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	标准：Windows 共享模式（默认）。\n低延迟：以驱动支持的最小周期运行共享模式（Windows 10+）。\n独占：从其他应用手中接管设备，以获得最低延迟。\n若某模式不可用，Infinite 会逐步退回到“标准”。点击“应用音频设置”后生效。
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	标准：Windows 共享模式（默认）。\n低延迟：以驱动支持的最小周期运行共享模式（Windows 10+）。\n独占：从其他应用手中接管设备，以获得最低延迟。\nASIO：音频接口自带的驱动，延迟最低（需要安装其 ASIO 驱动）。\n若某模式不可用，Infinite 会逐步退回到“标准”。点击“应用音频设置”后生效。
 Start Audio	启动音频
 Stop Audio	停止音频
 System default	系统默认
@@ -1624,3 +1624,8 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	在下一个量化点停止所有正在播放的片段
 Session at Bottom	会话置于底部
 Session at Top	会话置于顶部
+ASIO	ASIO
+ASIO driver	ASIO 驱动
+None installed	未安装
+ASIO driver in use: %s	正在使用的 ASIO 驱动：%s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	ASIO 驱动同时负责输入和输出。请在“ASIO 驱动”中选择。

@@ -116,7 +116,7 @@ Show canvas grid	Mostrar cuadrícula del lienzo
 Snap to grid	Ajustar a la cuadrícula
 Solid Color	Color sólido
 Standard (shared)	Estándar (compartido)
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Estándar: modo compartido de Windows (predeterminado).\nBaja latencia: modo compartido con el período más pequeño del controlador (Windows 10+).\nExclusivo: toma el dispositivo de otras aplicaciones para obtener la menor latencia.\nSi un modo no está disponible, Infinite vuelve hacia Estándar. Pulsa Aplicar ajustes de audio para usarlo.
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Estándar: modo compartido de Windows (predeterminado).\nBaja latencia: modo compartido con el período más pequeño del controlador (Windows 10+).\nExclusivo: toma el dispositivo de otras aplicaciones para obtener la menor latencia.\nASIO: el controlador propio de tu interfaz de audio, para la latencia más baja (requiere su controlador ASIO instalado).\nSi un modo no está disponible, Infinite vuelve hacia Estándar. Pulsa Aplicar ajustes de audio para usarlo.
 Start Audio	Iniciar audio
 Stop Audio	Detener audio
 System default	Predeterminado del sistema
@@ -1624,3 +1624,8 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	Detiene cada clip que suena en el siguiente punto de cuantización
 Session at Bottom	Sesión abajo
 Session at Top	Sesión arriba
+ASIO	ASIO
+ASIO driver	Controlador ASIO
+None installed	Ninguno instalado
+ASIO driver in use: %s	Controlador ASIO en uso: %s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	Un controlador ASIO es un único dispositivo de entrada y salida. Elígelo en Controlador ASIO.

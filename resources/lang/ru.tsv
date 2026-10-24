@@ -116,7 +116,7 @@ Show canvas grid	Показывать сетку холста
 Snap to grid	Привязка к сетке
 Solid Color	Сплошной цвет
 Standard (shared)	Стандартный (общий)
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Стандартный: общий режим Windows (по умолчанию).\nНизкая задержка: общий режим с наименьшим периодом драйвера (Windows 10+).\nМонопольный: забирает устройство у других программ ради минимальной задержки.\nЕсли режим недоступен, Infinite переключается в сторону «Стандартного». Нажмите «Применить настройки звука», чтобы использовать его.
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Стандартный: общий режим Windows (по умолчанию).\nНизкая задержка: общий режим с наименьшим периодом драйвера (Windows 10+).\nМонопольный: забирает устройство у других программ ради минимальной задержки.\nASIO: собственный драйвер вашего аудиоинтерфейса, для минимальной задержки (нужен установленный драйвер ASIO).\nЕсли режим недоступен, Infinite переключается в сторону «Стандартного». Нажмите «Применить настройки звука», чтобы использовать его.
 Start Audio	Запустить звук
 Stop Audio	Остановить звук
 System default	По умолчанию в системе
@@ -1624,3 +1624,8 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	Остановить все играющие клипы в следующей точке квантования
 Session at Bottom	Сессия снизу
 Session at Top	Сессия сверху
+ASIO	ASIO
+ASIO driver	Драйвер ASIO
+None installed	Не установлен
+ASIO driver in use: %s	Используемый драйвер ASIO: %s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	Драйвер ASIO — одно устройство для входа и выхода. Выберите его в разделе «Драйвер ASIO».

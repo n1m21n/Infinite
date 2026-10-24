@@ -189,3 +189,18 @@ plutovg and lunasvg (Sketch drawing and SVG import, all platforms)
 `external/lunasvg/`). MIT licence; Copyright (c) 2020-2026 (plutovg) and
 2020-2025 (lunasvg) Samuel Ugochukwu. Full text in the `LICENSE` file of each
 folder.
+
+Steinberg ASIO SDK (Windows, optional)
+--------------------------------------
+
+Used by the native ASIO audio driver support (`src/platform/win/AudioDeviceWin.cpp`).
+Only the interface header `common/iasiodrv.h` and the headers it includes are
+compiled in.
+
+ASIO is a trademark and software of Steinberg Media Technologies GmbH. The SDK
+is NOT part of this repository: CMake downloads ASIO SDK 2.3.4
+(`ASIO-SDK_2.3.4_2025-10-15.zip`, SHA-512 pinned in `CMakeLists.txt`) from
+download.steinberg.net at configure time when `INFINITE_ENABLE_ASIO=ON`, and
+builds without ASIO if the download is unavailable or does not match. Use of
+the SDK is under Steinberg's own licence agreement, which the project owner
+has accepted; it is not relicensed under Infinite's licence.

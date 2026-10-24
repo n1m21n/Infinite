@@ -116,7 +116,7 @@ Show canvas grid	Canvas-Raster anzeigen
 Snap to grid	Am Raster ausrichten
 Solid Color	Einfarbig
 Standard (shared)	Standard (geteilt)
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Standard: gemeinsamer Windows-Modus (Voreinstellung).\nNiedrige Latenz: gemeinsamer Modus mit der kleinsten Periode des Treibers (Windows 10+).\nExklusiv: belegt das Gerät für sich, für die niedrigste Latenz.\nIst ein Modus nicht verfügbar, fällt Infinite Richtung Standard zurück. Zum Übernehmen „Audioeinstellungen anwenden“ klicken.
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Standard: gemeinsamer Windows-Modus (Voreinstellung).\nNiedrige Latenz: gemeinsamer Modus mit der kleinsten Periode des Treibers (Windows 10+).\nExklusiv: belegt das Gerät für sich, für die niedrigste Latenz.\nASIO: der eigene Treiber deiner Audio-Schnittstelle für die niedrigste Latenz (ASIO-Treiber muss installiert sein).\nIst ein Modus nicht verfügbar, fällt Infinite Richtung Standard zurück. Zum Übernehmen „Audioeinstellungen anwenden“ klicken.
 Start Audio	Audio starten
 Stop Audio	Audio stoppen
 System default	Systemstandard
@@ -1624,3 +1624,8 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	Jeden laufenden Clip am nächsten Quantisierungspunkt stoppen
 Session at Bottom	Session unten
 Session at Top	Session oben
+ASIO	ASIO
+ASIO driver	ASIO-Treiber
+None installed	Keiner installiert
+ASIO driver in use: %s	Verwendeter ASIO-Treiber: %s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	Ein ASIO-Treiber ist ein Gerät für Ein- und Ausgang. Wähle ihn unter ASIO-Treiber.
