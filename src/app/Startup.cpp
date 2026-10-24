@@ -1296,12 +1296,18 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    std::string settingsDir = AppPaths::AppSupportDir();
    // Restores whatever was indexed last run with no rescan - scanning only
    // ever happens from an explicit Refresh click in the Samples/Media panel.
-   gSampleScanner.LoadFromDisk();
-   gMediaScanner.LoadFromDisk();
+   // A cached index is a convenience, never a reason the app fails to open: one that cannot be read is skipped.
+   const auto loadIndex = [](auto& scanner)
+   {
+      try { scanner.LoadFromDisk(); }
+      catch (const std::exception&) {}
+   };
+   loadIndex(gSampleScanner);
+   loadIndex(gMediaScanner);
    // Never a scan at launch, for the same reason the two above aren't:
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
-   gPluginScanner.LoadFromDisk();
+   loadIndex(gPluginScanner);
    tScanners = Bench::ScopedStageTimer::NowMs();
 
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.

@@ -101,6 +101,15 @@ namespace
 
    // Lowercased, no leading dot - what SampleScanner::Entry::extension
    // stores (see SampleScanner.h), matching MediaExtensions.h's convention.
+   std::string ExtensionOfName(const std::string& path)
+   {
+      const size_t nameStart = path.find_last_of("/\\") == std::string::npos ? 0 : path.find_last_of("/\\") + 1;
+      const size_t dot = path.rfind('.');
+      if (dot == std::string::npos || dot <= nameStart)
+         return {};
+      return ToLower(path.substr(dot + 1));
+   }
+
    std::string ExtensionNoDot(const fs::path& p)
    {
       const std::string ext = ToLower(p.extension().string());
@@ -334,7 +343,10 @@ void SampleScanner::LoadFromDisk()
                // Derived from the path rather than read from disk (see the
                // field comment in SampleScanner.h) - the on-disk index
                // predates this field and never wrote it.
-               e.extension = ExtensionNoDot(fs::path(e.path));
+               // Plain string work, not fs::path: on Windows fs::path(std::string) throws for bytes the active code page
+               // rejects (an index written by an older build, or a name with an unmappable character), and that threw
+               // out of startup before the window opened.
+               e.extension = ExtensionOfName(e.path);
                mIndex.push_back(std::move(e));
             }
          }
