@@ -42,10 +42,15 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const Mesh& GetMesh() override { return mMesh; }
-   unsigned long long MeshRevision() override { return mMeshRevision; }
+   // Bypassed, the input's points go straight through.
+   const Mesh& GetMesh() override { return bypassed && input ? input->GetMesh() : mMesh; }
+   unsigned long long MeshRevision() override { return bypassed && input ? input->MeshRevision() : mMeshRevision; }
+   const std::vector<Particle>* GetPointCloud() override { return bypassed && input ? input->GetPointCloud() : nullptr; }
+   unsigned long long PointCloudRevision() override { return bypassed && input ? input->PointCloudRevision() : 0; }
+   const GpuPoints* GetGpuPoints() override { return bypassed && input ? input->GetGpuPoints() : nullptr; }
+   const Polyline* GetCurve() override { return bypassed && input ? input->GetCurve() : nullptr; }
    // The tails are baked into world space.
-   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   Mat4 GetModelMatrix() const override { return bypassed && input ? input->GetModelMatrix() : Mat4::Identity(); }
    Material GetMaterial() const override { return input ? input->GetMaterial() : Material(); }
    unsigned long long MaterialRevision() const override { return input ? input->MaterialRevision() : 0; }
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }

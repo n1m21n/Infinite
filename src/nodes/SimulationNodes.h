@@ -46,10 +46,18 @@ public:
 
    // No mesh of its own - a pure point cloud. See GetPointCloud() below for
    // the component that actually carries its data.
-   const Mesh& GetMesh() override { static Mesh empty; return empty; }
-   unsigned long long MeshRevision() override { return 0; }
-   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
-   Material GetMaterial() const override { return Material(); }
+   // Bypassed with an emit input wired, that input goes straight through.
+   INode* BypassSource() override { return dynamic_cast<INode*>(emitSource); }
+   const Mesh& GetMesh() override
+   {
+      static Mesh empty;
+      return bypassed && emitSource ? emitSource->GetMesh() : empty;
+   }
+   unsigned long long MeshRevision() override { return bypassed && emitSource ? emitSource->MeshRevision() : 0; }
+   Mat4 GetModelMatrix() const override { return bypassed && emitSource ? emitSource->GetModelMatrix() : Mat4::Identity(); }
+   Material GetMaterial() const override { return bypassed && emitSource ? emitSource->GetMaterial() : Material(); }
+   unsigned int GetSurfaceTexture() override { return bypassed && emitSource ? emitSource->GetSurfaceTexture() : 0; }
+   const Polyline* GetCurve() override { return bypassed && emitSource ? emitSource->GetCurve() : nullptr; }
 
    // On the GPU path the particles live in textures (GetGpuPoints()); these
    // read them back the first time a CPU consumer asks in a cook.
@@ -58,11 +66,14 @@ public:
    const std::vector<Particle>* GetPointCloud() override
    {
       if (bypassed)
-         return nullptr;
+         return emitSource ? emitSource->GetPointCloud() : nullptr;
       EnsureCpuParticles();
       return &mParticles;
    }
-   unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
+   unsigned long long PointCloudRevision() override
+   {
+      return bypassed ? (emitSource ? emitSource->PointCloudRevision() : 0) : mRevision;
+   }
    const GpuPoints* GetGpuPoints() override;
 
    // Alive particles. On the GPU path it comes from an occlusion query and

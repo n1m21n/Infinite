@@ -93,7 +93,9 @@ size_t ParticleSystemNode::AliveCount() const
 
 const GpuPoints* ParticleSystemNode::GetGpuPoints()
 {
-   return (bypassed || !mGpuActive) ? nullptr : &mGpuPoints;
+   if (bypassed)
+      return emitSource ? emitSource->GetGpuPoints() : nullptr;
+   return mGpuActive ? &mGpuPoints : nullptr;
 }
 
 void ParticleSystemNode::BirthShape(unsigned int& rng, float pos[3], float nrm[3]) const
