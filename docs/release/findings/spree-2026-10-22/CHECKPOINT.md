@@ -1,4 +1,40 @@
-# Spree checkpoint, 2026-10-23 (evening)
+# Spree closed, 2026-10-24
+
+**The spree is closed.** Everything is merged into local **main**. Nothing is pushed: pushing needs the owner's word.
+
+## Final state
+
+- **57 findings** (B-A-001 … B-K-039). 54 are fixed. Three are not fixed:
+
+  | Finding | Decision |
+  |---|---|
+  | B-G-001, B-H-001 (P3 timing) | Moved to the perf initiative (docs/plans/perf/README.md). A quiet-Mac re-run is not possible while other sessions build. |
+  | B-J-001 (Windows headless hang) | Deferred: the self-test hang is gone, and the smoke and render steps are re-checked on the next push. See the finding. |
+
+- **Closing work on 2026-10-24:**
+  - **B-K-039:** Sampler start, end and position, and Bouncing Balls ballSize, at 1e9 hit float-to-int UB (UBSan abort). Clamped in each node, and ReadSample also guards its position.
+  - **CI fix merged:** `bugfix/ci-selftest-failures` (4ad61191) fixes Windows RESTARTTEST, a gcc13 miscompile, a Linux ASan clamp abort in Sampler and the PNG chunk order. This covers all 4 red main jobs; it is unconfirmed until a push.
+  - **Tools:**
+    - `code_lint.py` has a new rule, `clamp-bounds`: `std::clamp` with two runtime bounds aborts under the Linux hardened library but not on Mac.
+    - `param_fuzz.py` has three new flags:
+      - `--values` picks only the values to run.
+      - `--budget MIN`, default 20 min, caps wall time and is resumable.
+      - After 3 nodes time out on the same value, the rest get a 5 s probe.
+- **Final sweep (float at 1e9 and -1, part of signal), 1116 rows.** It found the B-K-039 crashes. The other non-ok rows were triaged and are not bugs:
+  - **Saturator, Transient Shaper (hot audio):** this is the knob at max (+12 dB output, +24 dB attack). The defs already clamp, and the output stays finite.
+  - **28 shape nodes plus Text and Texture (timeout under ASan):** on release they take 3.7 s at the B-K-038 8192² cap. The time is ASan slowdown, not a hang.
+  - **Difference, Intersect, Distribute Points on Faces (slow under ASan):** these are perf, not crashes.
+  - **Projection (E_RENDER):** setting every warp point to 1e9 collapses the mesh. The app reports a handled "no image" error.
+- **Dropped:**
+  - The coverage report: it only measures.
+  - The mod and text sweeps: B-K-026 and the per-node clamps cover them, and the yield did not justify hours.
+  - LSan, RTSan and libFuzzer: Linux-only, follow-ups for a later spree.
+  - The old RELEASE_BUGHUNT_PLAN.md: superseded by this folder.
+- **Lessons from the spree:** see the end of `tools/bughunt/README.md`. Before any long job, budget it: estimate rows × seconds and what it can find that the last run did not, then stop once new rows only repeat known classes.
+
+---
+
+## Earlier checkpoint, 2026-10-23 (evening)
 
 Resume from here. Everything below is merged into local **main**. Nothing is pushed.
 
