@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Sat, 24 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Sun, 25 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Automatic visuals for DJ sets: hands-free live visuals in Infinite</title><link>https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html</guid>
+    <pubDate>Sun, 25 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Generate hands-free, audio-reactive visuals for DJ sets in Infinite using live audio analysis, frequency-split modulation, and hardware projection.</description></item>
   <item><title>Every note node in Infinite: generative arpeggiators and algorithmic sequencing</title><link>https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html</guid>
     <pubDate>Sat, 24 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.</description></item>
   <item><title>Every synthesizer node in Infinite: the complete sound design guide</title><link>https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html</guid>

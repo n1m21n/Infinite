@@ -1,5 +1,14 @@
 [
  {
+  "slug": "automatic-visuals-for-dj-sets",
+  "title": "Automatic visuals for DJ sets: hands-free live visuals in Infinite",
+  "description": "Generate hands-free, audio-reactive visuals for DJ sets in Infinite using live audio analysis, frequency-split modulation, and hardware projection.",
+  "date": "2026-10-25",
+  "updated": "2026-10-25",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html"
+ },
+ {
   "slug": "every-note-node-in-infinite-generative-sequencing-guide",
   "title": "Every note node in Infinite: generative arpeggiators and algorithmic sequencing",
   "description": "Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.",
