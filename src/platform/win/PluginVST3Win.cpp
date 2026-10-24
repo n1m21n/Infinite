@@ -322,10 +322,15 @@ namespace
       return dir.empty() ? std::string() : dir + "\\PluginScanSentinel.txt";
    }
 
+   // "2": the first blocklist file filled with every plugin whenever the
+   // scanner exe itself could not run (blocked download, antivirus, missing
+   // DLL), and unblocking the exe never cleared it. Starting a fresh file
+   // drops those false entries; a plugin that really crashes is re-listed on
+   // its next scan.
    std::string VST3BlocklistPath()
    {
       const std::string dir = SettingsDirForVST3();
-      return dir.empty() ? std::string() : dir + "\\PluginVST3Blocklist.json";
+      return dir.empty() ? std::string() : dir + "\\PluginVST3Blocklist2.json";
    }
 
    std::mutex gVST3SafetyMutex; // guards gBlocklist and every sentinel/failure op below
@@ -613,7 +618,7 @@ namespace
    // CreateProcessW + pipe + PeekNamedPipe.
    bool RunProbeChild(const std::string& exe, const std::vector<std::string>& args,
                        std::chrono::seconds timeout, std::string& outOutput, bool& outTimedOut,
-                       bool& outCleanExit)
+                       bool& outCleanExit, DWORD* outExitCode = nullptr)
    {
       outOutput.clear();
       outTimedOut = false;
@@ -687,6 +692,8 @@ namespace
       DWORD exitCode = 1;
       GetExitCodeProcess(pi.hProcess, &exitCode);
       outCleanExit = !outTimedOut && exitCode == 0;
+      if (outExitCode != nullptr)
+         *outExitCode = exitCode;
 
       CloseHandle(pi.hProcess);
       CloseHandle(pi.hThread);
@@ -731,6 +738,30 @@ namespace
       return ProbeOutcome::Success;
    }
 
+   // Can the scanner exe run at all? "--selftest" answers "@ok" without
+   // loading any plugin. When it cannot (SmartScreen / Mark of the Web, an
+   // antivirus quarantine, a missing runtime DLL) every bundle "fails" in the
+   // same way, and that must never be blamed on the plugins.
+   bool ScannerCanRun(const std::string& exe)
+   {
+      std::string output;
+      bool timedOut = false;
+      bool cleanExit = false;
+      DWORD exitCode = 0;
+      if (!RunProbeChild(exe, {"--selftest"}, std::chrono::seconds(15), output, timedOut, cleanExit, &exitCode))
+      {
+         VST3Trace("scanner could not be started: %s (error %lu)", exe.c_str(), (unsigned long)GetLastError());
+         return false;
+      }
+      if (!cleanExit || output.find("@ok") == std::string::npos)
+      {
+         VST3Trace("scanner started but failed its self-test (exit code 0x%08lX): %s", (unsigned long)exitCode,
+                   exe.c_str());
+         return false;
+      }
+      return true;
+   }
+
    void ProbeVST3BundlesBatch(std::vector<std::string> bundlesToScan, std::vector<Platform::PluginDesc>& out)
    {
       const std::string exe = Platform::ScannerExecutablePath();
@@ -760,6 +791,13 @@ namespace
             }
          }
          return;
+      }
+
+      if (!ScannerCanRun(exe))
+      {
+         for (const auto& b : bundlesToScan)
+            RecordScanFailure(b);
+         return; // nothing blocklisted: the scanner is the problem, not the plugins
       }
 
       // Hard bound on the loop below. Every pass removes at least one bundle
@@ -859,6 +897,15 @@ namespace
             }
          if (offender.empty())
             continue;
+
+         // Died before finishing a single bundle: make sure it was the plugin
+         // and not the scanner (e.g. quarantined mid-scan) before the ban.
+         if (!timedOut && donePaths.empty() && !ScannerCanRun(exe))
+         {
+            for (const auto& b : bundlesToScan)
+               RecordScanFailure(b);
+            return;
+         }
 
          RecordScanFailure(offender);
          if (timedOut)
