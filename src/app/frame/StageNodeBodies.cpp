@@ -433,6 +433,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<GeometryFeedbackNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<AudioDisplacementNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<AudioRibbonNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr ||
@@ -500,6 +501,13 @@ void DrawNodeBodies(FrameCtx& fc)
                snprintf(line, sizeof(line), T("%zu triangles"), mat->TriangleCount());
             else if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu triangles"), disp->TriangleCount());
+            else if (auto* fb3 = dynamic_cast<GeometryFeedbackNode*>(gn.node.get()))
+            {
+               if (fb3->PointCount() > 0)
+                  snprintf(line, sizeof(line), T("%zu points"), fb3->PointCount());
+               else
+                  snprintf(line, sizeof(line), T("%zu triangles"), fb3->TriangleCount());
+            }
             else if (auto* adisp = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu triangles"), adisp->TriangleCount());
             else if (auto* arib = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
@@ -993,6 +1001,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawGeometryOpParams(n);
                else if (auto* n = dynamic_cast<DisplacementNode*>(gn.node.get()))
                   DrawDisplacementParams(n);
+               else if (auto* n = dynamic_cast<GeometryFeedbackNode*>(gn.node.get()))
+                  DrawGeometryFeedbackParams(n);
                else if (auto* n = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                   DrawAudioDisplacementParams(n);
                else if (auto* n = dynamic_cast<AudioRibbonNode*>(gn.node.get()))

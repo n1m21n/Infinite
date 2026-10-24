@@ -744,6 +744,7 @@ set(COMMON_SOURCES
     src/nodes/LSystemNode.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp

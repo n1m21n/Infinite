@@ -2554,6 +2554,8 @@ bool WouldCreateAudioCycle(INode* src, INode* dst);
 
 bool WouldCreateNoteCycle(INode* src, INode* dst);
 
+bool WouldCreateGeometryCycle(INode* src, INode* dst, int dstSlot);
+
 bool ConnectNodes(int srcIndex, int srcOutputIndex, int dstIndex, int dstSlot, std::string& outError);
 
 
@@ -4113,6 +4115,7 @@ void DrawGeometryParams(GeometryNode* n);
 void DrawGeometryOpParams(GeometryOpNode* n);
 
 void DrawDisplacementParams(DisplacementNode* n);
+void DrawGeometryFeedbackParams(GeometryFeedbackNode* n);
 
 void DrawAudioDisplacementParams(AudioDisplacementNode* n);
 

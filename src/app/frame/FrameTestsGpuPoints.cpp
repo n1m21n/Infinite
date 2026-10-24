@@ -1545,6 +1545,166 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
+   // Step 5b: Feedback 3D. A Transform inside the loop moves the cloud a
+   // step further every cook, on the GPU exactly as on the CPU; Reset and a
+   // missing loop both fall back to the seed; a mesh loop accumulates the
+   // same way; and the wiring refuses a geometry loop that does not close
+   // through the loop pin, while a cycle through it cooks without recursing.
+   {
+      std::vector<Particle> seedPts;
+      for (int k = 0; k < 64; k++)
+      {
+         Particle p;
+         p.px = (float)(k % 8) * 0.1f; p.py = (float)(k / 8) * 0.1f; p.pz = 0.0f;
+         p.scale = 1.0f; p.r = 0.2f; p.g = 0.4f; p.b = 0.8f; p.hasColor = true;
+         seedPts.push_back(p);
+      }
+      struct SeedCloud : IGeometrySource
+      {
+         std::vector<Particle> points;
+         unsigned long long revision = NextMeshRevision();
+         Mesh empty;
+         const Mesh& GetMesh() override { return empty; }
+         unsigned long long MeshRevision() override { return 0; }
+         Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+         Material GetMaterial() const override { return Material(); }
+         const std::vector<Particle>* GetPointCloud() override { return &points; }
+         unsigned long long PointCloudRevision() override { return revision; }
+      };
+
+      auto runLoop = [&](bool gpu, int cooks, float& meanX, size_t& count)
+      {
+         GpuPointsGL::SetEnabledForTest(gpu);
+         SeedCloud seed;
+         seed.points = seedPts;
+         GeometryFeedbackNode fb;
+         GeometryOpNode step;
+         step.op = GeometryOpNode::kTransform;
+         step.offsetX = 0.25f;
+         step.input = &fb;
+         fb.seed = &seed;
+         fb.loop = &step;
+         for (int i = 0; i < cooks; i++)
+         {
+            step.CookIfNeeded(frame++);
+            fb.GetGpuPoints(); // what a GPU Render 3D would pull
+         }
+         const std::vector<Particle>* c = fb.GetPointCloud();
+         count = c ? c->size() : 0;
+         meanX = 0.0f;
+         if (c)
+            for (const Particle& p : *c)
+               meanX += p.px;
+         meanX = count ? meanX / (float)count : 0.0f;
+         return fb.Generation();
+      };
+      float cpuX = 0.0f, gpuX = 0.0f;
+      size_t cpuN = 0, gpuN = 0;
+      const int cpuGen = runLoop(false, 5, cpuX, cpuN);
+      const int gpuGen = runLoop(true, 5, gpuX, gpuN);
+      // Seed mean x is 0.35; cook 1 seeds, cooks 2..5 each add one 0.25 step.
+      printf("feedback 3D: cpu mean x %.4f (%zu pts, gen %d), gpu mean x %.4f (%zu pts, gen %d)\n", cpuX, cpuN,
+             cpuGen, gpuX, gpuN, gpuGen);
+      report("Feedback 3D accumulates a Transform each cook (CPU)",
+             cpuN == seedPts.size() && std::fabs(cpuX - (0.35f + 4 * 0.25f)) < 1e-4f && cpuGen == 4);
+      report("Feedback 3D on the GPU matches the CPU", gpuN == cpuN && std::fabs(gpuX - cpuX) < 1e-4f);
+
+      // Reset and pass-through.
+      {
+         GpuPointsGL::SetEnabledForTest(false);
+         SeedCloud seed;
+         seed.points = seedPts;
+         GeometryFeedbackNode fb;
+         GeometryOpNode step;
+         step.op = GeometryOpNode::kTransform;
+         step.offsetX = 0.25f;
+         step.input = &fb;
+         fb.seed = &seed;
+         fb.loop = &step;
+         for (int i = 0; i < 3; i++)
+            step.CookIfNeeded(frame++);
+         fb.Reset();
+         fb.CookIfNeeded(frame++);
+         const std::vector<Particle>* c = fb.GetPointCloud();
+         const bool reseeded = c && c->size() == seedPts.size() && std::fabs((*c)[9].px - seedPts[9].px) < 1e-6f &&
+                               fb.Generation() == 0;
+         report("Feedback 3D Reset starts over from the seed", reseeded);
+         fb.loop = nullptr;
+         fb.CookIfNeeded(frame++);
+         c = fb.GetPointCloud();
+         report("Feedback 3D with no loop passes the seed through",
+                !fb.Looping() && c && std::fabs((*c)[9].px - seedPts[9].px) < 1e-6f);
+      }
+
+      // A mesh loop: a box nudged up each cook.
+      {
+         GeometryNode box;
+         GeometryFeedbackNode fb;
+         GeometryOpNode step;
+         step.op = GeometryOpNode::kTransform;
+         step.offsetY = 0.5f;
+         step.input = &fb;
+         fb.seed = &box;
+         fb.loop = &step;
+         box.CookIfNeeded(frame);
+         const Mesh seedMesh = box.GetMesh();
+         for (int i = 0; i < 4; i++)
+            step.CookIfNeeded(frame++);
+         const Mesh& out = fb.GetMesh();
+         float dy = 0.0f;
+         if (!out.vertices.empty() && out.vertices.size() == seedMesh.vertices.size())
+         {
+            const Mat4 bm = box.GetModelMatrix();
+            float sy = bm.m[1] * seedMesh.vertices[0].px + bm.m[5] * seedMesh.vertices[0].py +
+                       bm.m[9] * seedMesh.vertices[0].pz + bm.m[13];
+            dy = out.vertices[0].py - sy;
+         }
+         printf("feedback 3D mesh: %zu vertices, moved up %.3f after 3 loops\n", out.vertices.size(), dy);
+         report("Feedback 3D accumulates a mesh loop", std::fabs(dy - 1.5f) < 1e-4f);
+      }
+
+      // Wiring: a geometry loop is refused unless it closes through the
+      // loop pin; the legal cycle cooks once per frame and does not recurse.
+      {
+         const size_t before = gNodes.size();
+         // Read each index at once: a later spawn can grow gNodes and move the earlier ones.
+         auto spawn = [](const char* type, float x)
+         {
+            GraphNode* gn = SpawnNode(type, "3D", x, 0.0f);
+            return gn ? gn->index : -1;
+         };
+         const int ai = spawn("Feedback 3D", 0.0f);
+         const int bi = spawn("Transform", 200.0f);
+         const int ci = spawn("Twist", 400.0f);
+         std::string err;
+         bool ok = ai >= 0 && bi >= 0 && ci >= 0;
+         ok = ok && ConnectNodes(ai, 0, bi, 0, err);  // fb -> transform
+         ok = ok && ConnectNodes(bi, 0, ci, 0, err);  // transform -> twist
+         const bool refused = ok && !ConnectNodes(ci, 0, bi, 0, err) && !ConnectNodes(ci, 0, ai, 0, err);
+         const bool loopOk = ok && ConnectNodes(ci, 0, ai, GeometryFeedbackNode::kLoopSlot, err);
+         printf("feedback 3D wiring: chain %d, plain cycle refused %d, loop pin accepted %d (%s)\n", ok, refused,
+                loopOk, err.c_str());
+         report("A geometry cycle is refused outside Feedback 3D's loop pin", refused);
+         report("A cycle through Feedback 3D's loop pin is accepted", loopOk);
+         if (loopOk)
+         {
+            auto* fbn = dynamic_cast<GeometryFeedbackNode*>(FindNodeByIndex(ai)->node.get());
+            FindNodeByIndex(ci)->node->CookIfNeeded(frame++);
+            FindNodeByIndex(ci)->node->CookIfNeeded(frame++);
+            report("The legal geometry cycle cooks without recursing", fbn != nullptr);
+         }
+         // Leave the graph as it was.
+         for (int idx : { ci, bi, ai })
+            for (size_t k = before; k < gNodes.size(); k++)
+               if (gNodes[k].index == idx)
+               {
+                  gNodes.erase(gNodes.begin() + (long)k);
+                  break;
+               }
+      }
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 

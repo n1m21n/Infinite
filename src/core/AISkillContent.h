@@ -735,6 +735,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Explode` | geo:geometry | out:geometry | 72 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 72 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 72 | bypass |
+| `Feedback 3D` | seed:geometry, loop:geometry | out:geometry | 0 |  |
 | `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
 | `Field Primitive` | none | out:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 51 | bypass |

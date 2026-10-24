@@ -455,3 +455,67 @@ same order of operations. Change one, change the other: GPUPOINTSTEST compares t
 **Parity.** GLSL stays `#version 150`, with `uint` and bit operations (core since GLSL 1.30). The
 C++ uses only `<cmath>` and fixed-width unsigned arithmetic, so the hash wraps the same on every
 compiler. There is no `Platform::` code and no `#ifdef`.
+
+## Phase 3, 5b: Feedback 3D (2026-10-24, dev build)
+
+A new 3D node, **Feedback 3D**: a one-frame delay for geometry, so the end of a chain can be
+patched back into its start. The owner picked a separate node over making the 2D Feedback carry
+geometry (2026-10-24). The 2D Feedback is unchanged: it is an image source at about 33
+`dynamic_cast<IGeometrySource*>` sites, which would have started treating it as 3D.
+
+**Pins.** `seed` (slot 0) is where the loop starts. `loop` (slot 1) is the end of the chain that
+reads this node. Each cook the node outputs what `loop` made from the previous capture. It re-seeds
+on the first cook, on **Reset**, and when the seed cable moves. With nothing in `loop` it passes the
+seed through. No params; the node face shows "looping, frame N" and a Reset button.
+
+**How a cycle stays safe.**
+- The node stamps its cook frame before cooking upstream, so the loop's nodes find it cooked.
+- `GetMesh`, `GetPointCloud` and `GetGpuPoints` hand out the stored capture and never pull `loop`.
+- Material, texture and mapping forward from the seed only; `PassthroughSource` is null.
+- New `WouldCreateGeometryCycle` (`src/app/graph/Wiring.cpp`), used by the drag path
+  (`StageLinks.cpp`) and `ConnectNodes` (RPC, headless): a geometry cycle is refused unless it
+  closes through a Feedback 3D's loop pin. Before this, nothing checked geometry cycles.
+- Patch load does not run the check (no other cycle check does either).
+
+**What is captured.** The capture is baked to world space (the source's model matrix applied), so
+the node's own matrix is identity and a Transform inside the loop accumulates. A capture is taken
+only when the source's revision or matrix changes, so a loop that settles stops moving.
+
+**Points on the GPU.** If the loop offers GPU points, the capture is a copy pass (with the bake)
+into one of two ping-pong targets, so the loop never reads the texture being written. The CPU
+cloud is read back only when a CPU consumer asks. A CPU capture is uploaded once per revision.
+
+**Checks.**
+- `GPUPOINTSTEST` 5b section, all pass:
+  - A 64-point seed with a Transform (+0.25 in x) in the loop: after 5 cooks the mean x is 1.35 on
+    both paths (seed 0.35 + 4 steps), 64 points, generation 4. GPU and CPU agree (error 0).
+  - Reset starts over from the seed (generation 0); with no loop the seed passes through.
+  - A box mesh in a loop nudged up 0.5 a cook has moved up 1.5 after 3 loops.
+  - Wiring: a plain geometry cycle is refused (both into the Transform and into the seed pin);
+    the same cycle closed through the loop pin is accepted and cooks without recursing.
+- `run-infinite-hygiene --group 3d` 23/23 and `render-pipeline-sweep` 23/23, against `build-dev`.
+
+**Parity.** The node is plain C++ and GLSL 150 with no `Platform::` code and no `#ifdef`. It reads
+textures back with `glGetTexImage`, which Step 9 already uses on all three platforms.
+
+## Handoff (2026-10-24)
+
+Commits on `feature/p8-gpu-points` (not merged, not pushed): 093bb6b6, 283f9757, a03c9dd0,
+7e2267c4, 45094715, 7656ee6e, dcbfc000 (5a), and the 5b commit (Feedback 3D).
+
+**Not started: 5c Point Trails** (plan: `claude-context/P8_POINTS_PLAN.md` §5c). A new 3D node,
+geometry in, lines out.
+- Params: Length 2..240 (30), Sample every 1..10 (1), Width 0..0.2 (0.01), Fade 0..1 (1),
+  Taper 0..1 (0.5), Colour (From points / Gradient over age), Match by (Particle ID / Index),
+  Point limit up to 100k.
+- Follow `new-geometry-node`. Add a GPUPOINTSTEST section, a facts row in the three facts tables,
+  and a README section like the ones above.
+
+**Open limits and follow-ups.**
+- Feedback 3D: patch load does not refuse a geometry cycle written by hand into a `.inf`.
+- Feedback 3D runs every cook, including while the transport is paused, like the 2D Feedback.
+- Feedback 3D: the life attribute reads back as a fraction of a one-second life (see `ReadBack`).
+- Sketch 3D hangs `--describe` (seen while updating facts; not investigated).
+- Colour from an image (for points) is not shipped.
+- B11 numbers for Phase 3 have not been taken (dev build only).
+- To merge: the Pro merges `main` after the owner says so (`docs/plans/two-laptops/README.md`).

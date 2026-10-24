@@ -1425,6 +1425,19 @@ namespace app
    }
 
 
+   void DrawGeometryFeedbackParams(GeometryFeedbackNode* n)
+   {
+      if (n->seed == nullptr)
+         ImGui::TextDisabled("patch a shape into seed");
+      else if (!n->Looping())
+         ImGui::TextDisabled("passing the seed through");
+      else
+         ImGui::TextDisabled("looping, frame %d", n->Generation());
+      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize, 0)))
+         n->Reset();
+   }
+
+
    void DrawAudioDisplacementParams(AudioDisplacementNode* n)
    {
       if (n->input != nullptr)

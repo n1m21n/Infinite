@@ -330,6 +330,14 @@ void DrawLinks(FrameCtx& fc)
                         valid = false;
                         rejectReason = T("Cannot connect: this would create a note feedback loop");
                      }
+                     if (valid && srcGeometry != nullptr &&
+                         dstNode->node->GeometryInputSlot(GraphNode::InputSlotFromPin(b)) != nullptr &&
+                         WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get(),
+                                                  GraphNode::InputSlotFromPin(b)))
+                     {
+                        valid = false;
+                        rejectReason = T("Cannot connect: this would loop geometry - close it through Feedback 3D's loop pin");
+                     }
                   }
                }
 

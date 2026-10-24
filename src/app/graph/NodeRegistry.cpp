@@ -48,6 +48,7 @@ namespace app
       REGISTER_NODE(MaterialNode, Material, "3D");
       REGISTER_NODE(DisplacementNode, Displacement, "3D");
       REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
+      REGISTER_NODE(GeometryFeedbackNode, Feedback 3D, "3D");
       REGISTER_NODE(AudioRibbonNode, Audio Ribbon, "3D");
       REGISTER_NODE(MappingNode, Mapping, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");
