@@ -647,7 +647,11 @@ namespace app
    void ArrangeSeekVideoSampleSources(double beat)
    {
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
-      for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
+      // The Timeline's own clips too: in Session audio mode the playback model
+      // holds only launched slots, but the Timeline monitor still plays gArrange.
+      const Arrange::Model* models[2] = { &gArrange, &ArrangePlaybackModel() };
+      for (int mi = 0; mi < (models[1] == models[0] ? 1 : 2); mi++)
+      for (const Arrange::Lane& lane : models[mi]->lanes)
       {
          if (lane.type != Arrange::kLaneVideo)
             continue;

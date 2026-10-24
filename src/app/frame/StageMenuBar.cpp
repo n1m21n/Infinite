@@ -16,38 +16,38 @@
 
 namespace app
 {
-// The rail of panel toggles down the right edge. Library sits on the top bar's centre line; the four
-// panels follow below a hairline, one tile apart.
+// The rail of panel toggles down the right edge. Settings sits on the top bar's centre line; Library and
+// the panels follow below a hairline, one tile apart.
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
    const float first = (tok::bar_h - tok::tile) * 0.5f;
    const float step = tok::tile + tok::space_3;
-   if (PanelRail::Item("##railLibrary", first, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
-                       T("Library - search modules, samples, media and plugins")))
-      gNodePanelOpen = !gNodePanelOpen;
-   const float groupTop = tok::bar_h + tok::space_2;
-   if (PanelRail::Item("##railViewport", groupTop, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
-                       T("Viewport panel")))
-      gViewportPanelOpen = !gViewportPanelOpen;
-   if (PanelRail::Item("##railModMatrix", groupTop + step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
-                       T("Modulation matrix")))
-      gModMatrixOpen = !gModMatrixOpen;
-   if (PanelRail::Item("##railPerf", groupTop + 2.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
-                       T("Performance mode")))
-      gPerfPanelOpen = !gPerfPanelOpen;
-   if (PanelRail::Item("##railArrange", groupTop + 3.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
-                       T("Arrangement timeline")))
-      gArrangePanelOpen = !gArrangePanelOpen;
-   if (PanelRail::Item("##railSession", groupTop + 4.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
-                       T("Session - launch clips by scene")))
-      gSessionPanelOpen = !gSessionPanelOpen;
-   if (PanelRail::Item("##railHistory", groupTop + 5.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
-                       T("Edit history - jump back to any earlier edit")))
-      gHistoryOpen = !gHistoryOpen;
-   if (PanelRail::Item("##railSettings", groupTop + 6.0f * step, IconsInfinite::Settings, nullptr, gSettingsOpen,
+   if (PanelRail::Item("##railSettings", first, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
       gSettingsOpen = !gSettingsOpen;
+   const float groupTop = tok::bar_h + tok::space_2;
+   if (PanelRail::Item("##railLibrary", groupTop, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
+                       T("Library - search modules, samples, media and plugins")))
+      gNodePanelOpen = !gNodePanelOpen;
+   if (PanelRail::Item("##railViewport", groupTop + step, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
+                       T("Viewport panel")))
+      gViewportPanelOpen = !gViewportPanelOpen;
+   if (PanelRail::Item("##railModMatrix", groupTop + 2.0f * step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
+                       T("Modulation matrix")))
+      gModMatrixOpen = !gModMatrixOpen;
+   if (PanelRail::Item("##railPerf", groupTop + 3.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
+                       T("Performance mode")))
+      gPerfPanelOpen = !gPerfPanelOpen;
+   if (PanelRail::Item("##railArrange", groupTop + 4.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
+                       T("Arrangement timeline")))
+      gArrangePanelOpen = !gArrangePanelOpen;
+   if (PanelRail::Item("##railSession", groupTop + 5.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
+                       T("Session - launch clips by scene")))
+      gSessionPanelOpen = !gSessionPanelOpen;
+   if (PanelRail::Item("##railHistory", groupTop + 6.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
+                       T("Edit history - jump back to any earlier edit")))
+      gHistoryOpen = !gHistoryOpen;
    PanelRail::End();
 }
 
