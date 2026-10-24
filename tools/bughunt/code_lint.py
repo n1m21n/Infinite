@@ -44,6 +44,14 @@ shader-loop     A GLSL loop (inside a C++ string literal) whose bound is not an
                 the bound to its upload and check it is clamped there (or that
                 its node clamps the param on load), then --update-baseline.
 
+clamp-bounds    std::clamp(v, lo, hi) in a node, its body or the DSP where lo and
+                hi are both runtime values (start..end, minPos..maxPos). A patch
+                can store start > end, and std::clamp with hi < lo is undefined:
+                release returns a bound, but the hardened library in sanitizer
+                builds aborts (Sampler's clamp turned Linux ASan CI red). Order
+                the bounds first, e.g. std::max(start + eps, end), or check the
+                pair can't invert, then --update-baseline.
+
 Exit 1 on any hit not in the baseline (--all: on any hit). Test: `code_lint.py selftest`.
 """
 import glob
@@ -163,6 +171,45 @@ def shader_loop(path, text):
     return hits
 
 
+CLAMP_CALL = re.compile(r"std::clamp\s*\(")
+CLAMP_BOUND = re.compile(r"^\(?(\(\w+\))?\s*(n->|this->)?[a-z]\w*(\.\w+|->\w+)?\)?$")
+CLAMP_DIRS = ("/nodes/", "/audio/", "/app/bodies/")
+
+
+def call_args(s):
+    """Top-level comma-separated arguments of a call whose '(' was just consumed."""
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+            continue
+        cur += ch
+    out.append(cur.strip())
+    return out
+
+
+def clamp_bounds(path, text):
+    if not any(d in path for d in CLAMP_DIRS):
+        return []
+    hits = []
+    for i, line in enumerate(text.splitlines()):
+        for m in CLAMP_CALL.finditer(line):
+            a = call_args(line[m.end():])
+            if len(a) < 3:
+                continue
+            lo, hi = a[1], a[2]
+            if all(CLAMP_BOUND.match(b) and not re.match(r"^\(?(\(\w+\))?\s*k[A-Z]", b) for b in (lo, hi)):
+                hits.append(("clamp-bounds", f"{rel(path)}:{i + 1}", f"{lo} .. {hi}"))
+    return hits
+
+
 def run(paths=None):
     files = paths or src_files()
     texts = {p: open(p, encoding="utf-8", errors="replace").read() for p in files}
@@ -175,6 +222,7 @@ def run(paths=None):
     hits += loaded_loop(files, texts)
     for p in files:
         hits += shader_loop(p, texts[p])
+        hits += clamp_bounds(p, texts[p])
     return hits
 
 
@@ -216,6 +264,7 @@ void Push(const X& n) { mVoices.store(std::clamp(n.voices, 1, 16)); }
 int Steps() const { return steps < 1 ? 1 : steps; }
 void Build() { v.Int("generation", gen); for (int i = 0; i < gen; ++i) Mutate(); }
 float t[4]; float g() { return t[count]; }
+void Play(float& p) { p = std::clamp(p, start, end); p = std::clamp(p, 0.0f, end); p = std::clamp(p, (int)kLo, (int)kHi); }
 const char* kFrag = "uniform int uMode;\\n"
     "   for (int i = 0; i < uMode; i++) {\\n"
     "   for (int k = 0; k < 16; k++) {\\n";
@@ -234,6 +283,7 @@ const char* kFrag = "uniform int uMode;\\n"
     assert not any(r[0] == "unbounded-int" and r[1] in ("voices", "steps") for r in rules), hits
     assert ("shader-loop", "i") in rules, hits
     assert len([r for r in rules if r[0] == "shader-loop"]) == 1, hits
+    assert [r for r in rules if r[0] == "clamp-bounds"] == [("clamp-bounds", "start")], hits
     print("code_lint selftest ok")
 
 
