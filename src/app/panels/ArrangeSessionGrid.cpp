@@ -1399,7 +1399,8 @@ namespace app
          const ImVec2 br(origin.x + avail.x, origin.y + avail.y);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          DrawCheckerboardBackdrop(dl, origin, br);
-         if (CountActiveArrangeVideoClips(Transport::Instance().Beats()) > 0)
+         // Outside Session audio mode the playback model is the Timeline's own: the Session monitor stays empty.
+         if (gAudioMode == AudioMode::Session && CountActiveArrangeVideoClips(Transport::Instance().Beats()) > 0)
          {
             gArrangeMonitorTarget.requestW = std::max(16, (int)avail.x);
             gArrangeMonitorTarget.requestH = std::max(16, (int)avail.y);

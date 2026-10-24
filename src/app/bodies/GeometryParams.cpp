@@ -897,6 +897,8 @@ namespace app
       ImGui::TextDisabled("%zu tails, %d points tracked", n->TrailCount(), n->TrackedPoints());
       if (n->input != nullptr && n->TrailCount() == 0)
          ImGui::TextDisabled("no trails yet: the points are not moving");
+      else if (n->input != nullptr)
+         ImGui::TextDisabled("outputs only the tails: patch the source into Render 3D too");
       ModSliderInt("length", &n->length, 2, 240);
       ModSliderInt("sample every", &n->sampleEvery, 1, 10);
       ModSlider("width", &n->width, 0.0005f, 0.2f, "%.4f");

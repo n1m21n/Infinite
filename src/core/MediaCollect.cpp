@@ -194,6 +194,9 @@ namespace MediaCollect
          std::error_code ec;
          std::filesystem::create_directories(to.parent_path(), ec);
          const std::filesystem::path from = AppPaths::FsPath(item.source);
+         if (std::filesystem::equivalent(from, to, ec))   // second save into the same media folder
+            continue;
+         ec.clear();
          if (item.isFolder)
             std::filesystem::copy(from, to,
                                   std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, ec);

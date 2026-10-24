@@ -1624,3 +1624,7 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	Jeden laufenden Clip am nächsten Quantisierungspunkt stoppen
 Session at Bottom	Session unten
 Session at Top	Session oben
+Play Notes	Noten spielen
+Keyboard Octave	Keyboard-Oktave
+With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing	Mit der Maus über einem Keyboard-Node (oder als einziger ausgewählter Node) und angehaktem numpad-Feld spielen die Buchstabenreihen Noten: die Z-Reihe die untere Oktave, die Q-Reihe die obere. Umschalt, Strg, Cmd oder Alt plus Buchstabe spielt nichts
+Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)	Die Oktave des Keyboard-Nodes unter der Maus nach unten oder oben schalten (gleiche Regel wie Noten spielen)

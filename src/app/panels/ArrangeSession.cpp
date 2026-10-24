@@ -841,8 +841,8 @@ namespace app
             st.playing = true;
             const Arrange::Lane* lane = Arrange::FindLane(gArrange, laneId);
             const Arrange::SessionSlot* ss = lane ? SlotAt(*lane, slot) : nullptr;
-            if (ss != nullptr && ss->clip.length > 0)
-               st.progress = (float)((double)((now - r.from) % ss->clip.length) / (double)ss->clip.length);
+            if (ss != nullptr && ss->LoopLen() > 0)
+               st.progress = (float)((double)((now - r.from) % ss->LoopLen()) / (double)ss->LoopLen());
          }
          else if (r.from > now && r.explicitStart)
             st.queued = true;
