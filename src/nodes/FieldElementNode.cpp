@@ -368,7 +368,7 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
       // Point jobs (docs/plans/gpu-points step 12). Meant for point clouds
       // (Image/Mesh to Points, Model 3D .ply, Particle System), where `size`
       // is each sprite's size and `life` how far through its life a particle
-      // is; on a mesh both are plain attribs and only Cd/P show. All four
+      // is; on a mesh both are plain attribs and only Cd/P show. All of them
       // compile to GLSL, so over GPU points they run on the GPU.
       { "Points: Random Size",
         "param float smallest = 0.3 [0.0, 2.0]\n"
@@ -412,7 +412,33 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
         "Cd = mix(mix(young, mid, clamp(life * 2.0, 0.0, 1.0)), old, clamp(life * 2.0 - 1.0, 0.0, 1.0))\n"
         "size *= 1.0 - life * shrink\n"
         "P.y += life * life * rise\n"
-        "publish = shrink\n" }
+        "publish = shrink\n" },
+      // The fork's Limit and Projection operators, as presets (gpu-points plan,
+      // Phase 3). `mode` and `shape` pick by number: 0, 1, 2.
+      { "Points: Limit to Box",
+        "param float mode = 0.0 [0.0, 2.0]\n"
+        "param float size = 0.6 [0.05, 10.0]\n"
+        "u = (P + vec3(size, size, size)) / (2.0 * size)\n"
+        "inClamp = 1.0 - step(0.5, mode)\n"
+        "inWrap = step(0.5, mode) * (1.0 - step(1.5, mode))\n"
+        "inMirror = step(1.5, mode)\n"
+        "v = clamp(u, 0.0, 1.0) * inClamp + fract(u) * inWrap + (1.0 - abs(mod(u, 2.0) - 1.0)) * inMirror\n"
+        "P = v * (2.0 * size) - vec3(size, size, size)\n"
+        "publish = size\n" },
+      { "Points: Project onto Shape",
+        "param float shape = 1.0 [0.0, 2.0]\n"
+        "param float radius = 1.0 [0.05, 10.0]\n"
+        "param float amount = 1.0 [0.0, 1.0]\n"
+        "plane = vec3(P.x, 0.0, P.z)\n"
+        "ball = normalize(P + vec3(0.00001, 0.00002, 0.00001)) * radius\n"
+        "tube = normalize(vec3(P.x + 0.00001, 0.0, P.z)) * radius\n"
+        "tube.y = P.y\n"
+        "onPlane = 1.0 - step(0.5, shape)\n"
+        "onBall = step(0.5, shape) * (1.0 - step(1.5, shape))\n"
+        "onTube = step(1.5, shape)\n"
+        "target = plane * onPlane + ball * onBall + tube * onTube\n"
+        "P = mix(P, target, amount)\n"
+        "publish = amount\n" }
    };
    return kPresets;
 }

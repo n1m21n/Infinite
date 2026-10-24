@@ -7,6 +7,7 @@
 #include "GpuPoints.h"
 #include "PlyPoints.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -1154,7 +1155,7 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       }
 
       const char* const names[] = { "Points: Random Size", "Points: Random Colour", "Points: Stagger over Index",
-                                    "Points: Age to Colour" };
+                                    "Points: Age to Colour", "Points: Limit to Box", "Points: Project onto Shape" };
       for (const char* name : names)
       {
          int index = -1;
@@ -1248,6 +1249,30 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
                }
                promise = near < 0.01f && far > 0.1f;
                what = "neighbour diff " + std::to_string(near) + ", far diff " + std::to_string(far);
+            }
+            else if (nm == "Points: Limit to Box")
+            {
+               // Clamp (the default) to a 0.6 box: everything inside, inside points untouched.
+               float outside = 0.0f, insideMoved = 0.0f;
+               for (int k = 0; k < n; k++)
+               {
+                  const Particle& a = cloud.points[k];
+                  const Particle& b = cpuCloud[k];
+                  outside = std::max({ outside, std::fabs(b.px) - 0.6f, std::fabs(b.py) - 0.6f, std::fabs(b.pz) - 0.6f });
+                  if (std::fabs(a.px) < 0.6f && std::fabs(a.py) < 0.6f && std::fabs(a.pz) < 0.6f)
+                     insideMoved = std::max(insideMoved, std::fabs(a.px - b.px) + std::fabs(a.py - b.py) + std::fabs(a.pz - b.pz));
+               }
+               promise = outside < 1e-5f && insideMoved < 1e-5f;
+               what = "outside the box by " + std::to_string(outside) + ", inside points moved " + std::to_string(insideMoved);
+            }
+            else if (nm == "Points: Project onto Shape")
+            {
+               // Sphere of radius 1 (the default) at amount 1: every point lands on it.
+               float off = 0.0f;
+               for (const Particle& p : cpuCloud)
+                  off = std::max(off, std::fabs(std::sqrt(p.px * p.px + p.py * p.py + p.pz * p.pz) - 1.0f));
+               promise = off < 1e-4f;
+               what = "off the sphere by " + std::to_string(off);
             }
             else
             {

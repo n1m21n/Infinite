@@ -401,6 +401,23 @@ an image.
 **Parity.** GLSL stays `#version 150`. There is no `Platform::` code and no `#ifdef`. The presets
 are Field source, which is the same on every platform.
 
+## Phase 3: Limit and Projection presets (2026-10-24, dev build)
+
+The fork's Limit and Projection operators become two more Field Modifier presets, as the plan
+decided. Phaser was already step 12's Stagger over Index.
+- **Points: Limit to Box.** Keeps points inside a box of half-size `size` around the origin.
+  `mode` 0 clamps to the walls, 1 wraps (out one side, in the other), 2 mirrors back.
+- **Points: Project onto Shape.** Pulls points onto a shape by `amount` (0 leaves them, 1 lands
+  them on it). `shape` 0 is the XZ plane, 1 a sphere and 2 a Y-axis cylinder, both of `radius`.
+
+Left out from the fork's params: the attribute picker (both act on P) and the mask (any Field
+Modifier kernel can be masked by editing it). Normals are not set: points carry none on the GPU.
+
+**Checks.** `GPUPOINTSTEST` step 12 section now covers both: they compile to GLSL, GPU texels
+equal the CPU cloud, Limit (clamp, 0.6) leaves no point outside and inside points untouched, and
+Projection (sphere, radius 1) puts every point on the sphere (error under 1e-4). 139 checks pass.
+`FIELDELEMENTTEST` and `FIELDTEST` pass.
+
 ## Phase 3, 5a: Displacement's Noise source (2026-10-24, dev build)
 
 Displacement has a new **source** dropdown: Texture (the default, so saved patches are unchanged)
