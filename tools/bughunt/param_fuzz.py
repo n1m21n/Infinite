@@ -239,6 +239,9 @@ def _wake_stamp():
         return ""
 
 
+_bad_param_lines = {}   # tag -> patch line numbers the last run rejected as E_BAD_PARAM
+
+
 def run_case(binp, out, tag, text, audio, timeout, signal=False):
     """run_case_once, re-run if the machine slept during it.
 
@@ -248,6 +251,16 @@ def run_case(binp, out, tag, text, audio, timeout, signal=False):
     for _ in range(3):
         w0 = _wake_stamp()
         res = run_case_once(binp, out, tag, text, audio, timeout, signal)
+        # A mod line for a control the node only registers in another mode
+        # (Array `radial`) is E_BAD_PARAM and fails the whole row. Drop those
+        # lines and run again, so the type's other controls still get tested.
+        for _ in range(3):
+            lines = _bad_param_lines.pop(tag, [])
+            if "E_BAD_PARAM" not in res[1] or not lines:
+                break
+            kept = [l for i, l in enumerate(text.split("\n"), 1) if i not in lines]
+            text = "\n".join(kept)
+            res = run_case_once(binp, out, tag, text, audio, timeout, signal)
         if _wake_stamp() == w0:
             return res
         for f in os.listdir(out):
@@ -283,6 +296,8 @@ def run_case_once(binp, out, tag, text, audio, timeout, signal=False):
                 try:
                     j = json.loads(line)
                     codes = ",".join(sorted({e.get("code", "?") for e in j.get("errors", [])}))
+                    _bad_param_lines[tag] = [e["line"] for e in j.get("errors", [])
+                                             if e.get("code") == "E_BAD_PARAM" and e.get("line")]
                 except ValueError:
                     pass
                 break
