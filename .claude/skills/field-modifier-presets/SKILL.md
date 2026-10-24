@@ -38,7 +38,12 @@ Anything else (`a`, `disp`, `hit`, `factor`...) is a plain local, no
 declaration needed - exactly like the pixel domain. `param float name =
 default [lo, hi]` declares a slider; `attrib float name = init` declares a
 per-element persistent value (see "Attrib Ramp" for the pattern: declare,
-then assign, then read back in the same kernel). House style in this file:
+then assign, then read back in the same kernel). Two attrib names are
+special on point clouds (`ElementStore.h`): `attrib float size = 1` is the
+point's size scale (read+write, 0 hides the point), and `attrib float life =
+0` is the particle's age / life clamped to 0..1 (read only; 0 for immortal
+points and non-particles). Both run on the GPU path too - see the "Points:"
+presets. House style in this file:
 statements end with a bare newline, no `;` (unlike Field Pixel's presets -
 the grammar accepts either, this file's presets just don't use `;`).
 

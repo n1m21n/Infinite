@@ -588,6 +588,8 @@ namespace Bench
 
       if (!mediaIo.is_null())
          j["media_io"] = mediaIo;
+      if (!points.is_null())
+         j["points"] = points;
       if (!slowFrames.is_null())
          j["slow_frames"] = slowFrames;
       if (!edits.is_null())

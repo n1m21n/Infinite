@@ -466,6 +466,7 @@ set(COMMON_SOURCES
     src/app/frame/FrameTests2.cpp
     src/app/frame/FrameTests3.cpp
     src/app/frame/FrameTests4.cpp
+    src/app/frame/FrameTestsGpuPoints.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
     src/app/frame/StageBenchHarness.cpp
@@ -568,6 +569,9 @@ set(COMMON_SOURCES
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/GpuPoints.cpp
+    src/core/PlyPoints.cpp
+    src/core/DisplaceNoise.cpp
     src/core/Delaunay.cpp
     src/core/CurveOps.cpp
     src/core/SweepRevolve.cpp
@@ -599,6 +603,7 @@ set(COMMON_SOURCES
     src/core/field/FieldSwizzle.cpp
     src/core/field/ElementStore.cpp
     src/core/field/ElementBackend.cpp
+    src/core/field/ElementGlslBackend.cpp
     src/core/field/FieldState.cpp
     src/core/field/FieldCycles.cpp
     src/core/field/ParamTable.cpp
@@ -739,6 +744,7 @@ set(COMMON_SOURCES
     src/nodes/LSystemNode.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp
@@ -748,6 +754,7 @@ set(COMMON_SOURCES
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/ProximityLinesNode.cpp
+    src/nodes/PointTrailsNode.cpp
     src/nodes/DelaunayNodes.cpp
     src/nodes/CurveOpsNode.cpp
     src/nodes/SweepRevolveNodes.cpp

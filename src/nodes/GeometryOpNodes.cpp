@@ -83,6 +83,21 @@ const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, Inst
    return instancer->InstanceTransforms();
 }
 
+const GpuPoints* ResolveGpuInstances(IGeometrySource* source, InstanceOnPointsNode* instancer)
+{
+   const GpuPoints* gp = instancer ? instancer->GpuInstancePoints() : nullptr;
+   if (gp == nullptr || gp->count <= 0)
+      return nullptr;
+   for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+   {
+      if (s == static_cast<IGeometrySource*>(instancer))
+         break;
+      if (s->InstanceTransformOverride() != nullptr || s->InstanceSelection() != nullptr)
+         return nullptr;
+   }
+   return gp;
+}
+
 const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
 {
    for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
@@ -459,7 +474,7 @@ const Mesh& GeometryOpNode::GetMesh()
          // touching face does - MeshOps::VertexSelectionFromFaces), rather
          // than the split/rejoin restricted() uses for per-face operators.
          const std::vector<unsigned char> vertexMask = MeshOps::VertexSelectionFromFaces(src);
-         mCache = MeshOps::Twist(src, amount * 3.14159265f / 180.0f * 3.0f, axis,
+         mCache = MeshOps::Twist(src, TwistAngle(), axis,
                                  (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr);
          break;
       }
@@ -554,18 +569,61 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
    const std::vector<Particle>* src = input->GetPointCloud();
    if (src == nullptr)
       return nullptr;
-   if (op != kTransform)
+   if (!ActsOnPoints())
       return src;
 
    const unsigned long long upstreamRev = input->PointCloudRevision();
-   const Mat4 m = TransformMatrix();
+   const Mat4 key = PointOpKey();
+   StampPointCloudRevision(upstreamRev, key);
    if (mHasPointCloudCache && mPointCloudBuiltUpstream == input &&
-       mPointCloudBuiltUpstreamRevision == upstreamRev && mPointCloudBuiltMatrix == m)
+       mPointCloudBuiltUpstreamRevision == upstreamRev && mPointCloudBuiltMatrix == key)
       return &mPointCloudCache;
 
+   mPointCloudCache = *src;
+   if (op == kTwist)
+   {
+      // MeshOps::Twist's maths per particle (and the GLSL in GetGpuPoints).
+      // The normal turns by the same angle; a mesh recomputes its normals
+      // from the faces instead, which a cloud does not have.
+      const float angle = TwistAngle();
+      auto turn = [&](float& x, float& y, float& z, float a)
+      {
+         const float s = std::sin(a), c = std::cos(a);
+         if (axis == 1)
+         {
+            const float nx = x * c - z * s;
+            const float nz = x * s + z * c;
+            x = nx; z = nz;
+         }
+         else if (axis == 0)
+         {
+            const float ny = y * c - z * s;
+            const float nz = y * s + z * c;
+            y = ny; z = nz;
+         }
+         else
+         {
+            const float nx = x * c - y * s;
+            const float ny = x * s + y * c;
+            x = nx; y = ny;
+         }
+      };
+      for (Particle& p : mPointCloudCache)
+      {
+         const float a = angle * ((axis == 0) ? p.px : (axis == 1) ? p.py : p.pz);
+         turn(p.px, p.py, p.pz, a);
+         turn(p.nx, p.ny, p.nz, a);
+      }
+      mHasPointCloudCache = true;
+      mPointCloudBuiltUpstream = input;
+      mPointCloudBuiltUpstreamRevision = upstreamRev;
+      mPointCloudBuiltMatrix = key;
+      return &mPointCloudCache;
+   }
+
+   const Mat4& m = key;
    float normalMatrix[9];
    m.NormalMatrix(normalMatrix);
-   mPointCloudCache = *src;
    for (Particle& p : mPointCloudCache)
    {
       const float px = m.m[0]*p.px + m.m[4]*p.py + m.m[8]*p.pz + m.m[12];
@@ -583,9 +641,143 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
    mHasPointCloudCache = true;
    mPointCloudBuiltUpstream = input;
    mPointCloudBuiltUpstreamRevision = upstreamRev;
-   mPointCloudBuiltMatrix = m;
-   mPointCloudRevision = NextMeshRevision();
+   mPointCloudBuiltMatrix = key;
    return &mPointCloudCache;
+}
+
+// A cloud without building the CPU copy of GPU points to find out.
+static bool HasPoints(IGeometrySource* source)
+{
+   if (source->GetGpuPoints() != nullptr)
+      return true;
+   const std::vector<Particle>* cloud = source->GetPointCloud();
+   return cloud != nullptr && !cloud->empty();
+}
+
+Mat4 GeometryOpNode::PointOpKey() const
+{
+   if (op == kTransform)
+      return TransformMatrix();
+   // Twist: angle and axis in a matrix whose m[15] is 0, which no transform
+   // has, so switching between the two ops always moves the stamp.
+   Mat4 k;
+   for (float& v : k.m)
+      v = 0.0f;
+   k.m[0] = TwistAngle();
+   k.m[1] = (float)axis;
+   return k;
+}
+
+GeometryOpNode::~GeometryOpNode()
+{
+   GpuPointsGL::DestroyTarget(mGpuTarget);
+   if (mTwistProgram != 0)
+      glDeleteProgram(mTwistProgram);
+}
+
+void GeometryOpNode::StampPointCloudRevision(unsigned long long upstreamRev, const Mat4& m)
+{
+   if (mHasPointCloudStamp && mPointCloudStampUpstream == input &&
+       mPointCloudStampUpstreamRevision == upstreamRev && mPointCloudStampMatrix == m)
+      return;
+   mHasPointCloudStamp = true;
+   mPointCloudStampUpstream = input;
+   mPointCloudStampUpstreamRevision = upstreamRev;
+   mPointCloudStampMatrix = m;
+   mPointCloudRevision = NextMeshRevision();
+}
+
+const GpuPoints* GeometryOpNode::GetGpuPoints()
+{
+   if (input == nullptr)
+      return nullptr;
+   const GpuPoints* src = input->GetGpuPoints();
+   if (src == nullptr || bypassed || !ActsOnPoints())
+      return src;
+   StampPointCloudRevision(input->PointCloudRevision(), PointOpKey());
+   if (op == kTransform)
+   {
+      // Same matrix GetPointCloud() bakes into each position, and like it, the
+      // sprite size is left alone (Render 3D sizes from the model matrix only).
+      mGpuPoints = *src;
+      mGpuPoints.pointMatrix = Mat4::Multiply(TransformMatrix(), src->pointMatrix);
+      mGpuPoints.revision = mPointCloudRevision;
+      return &mGpuPoints;
+   }
+
+   // kTwist.
+   if (mTwistProgram == 0 && !mTwistShaderTried)
+   {
+      mTwistShaderTried = true;
+      const std::string fs = std::string(GpuPointsGL::kPointPassHeader) +
+         "uniform float uAngle;\n"
+         "uniform int uAxis;\n"
+         "vec2 Turn(vec2 v, float a) { float s = sin(a), c = cos(a); return vec2(v.x * c - v.y * s, v.x * s + v.y * c); }\n"
+         "void main() {\n"
+         "   LoadPoint();\n"
+         "   if (uAxis == 1) P.xz = Turn(P.xz, uAngle * P.y);\n"
+         "   else if (uAxis == 0) P.yz = Turn(P.yz, uAngle * P.x);\n"
+         "   else P.xy = Turn(P.xy, uAngle * P.z);\n"
+         "   outPos = vec4(P, W);\n"
+         "   outColor = vec4(Cd, Life);\n"
+         "}\n";
+      mTwistProgram = GLUtil::CompileProgram(fs.c_str());
+   }
+   if (mTwistProgram == 0)
+      return nullptr; // consumers fall back to the CPU cloud, which twists
+   if (!mGpuBuiltValid || mGpuBuiltRevision != mPointCloudRevision)
+   {
+      const float angle = TwistAngle();
+      const int ax = axis;
+      mGpuBuiltRevision = mPointCloudRevision;
+      mGpuBuiltValid = GpuPointsGL::RunPointPass(mGpuTarget, mGpuPoints, *src, mTwistProgram, [&]()
+      {
+         glUniform1f(glGetUniformLocation(mTwistProgram, "uAngle"), angle);
+         glUniform1i(glGetUniformLocation(mTwistProgram, "uAxis"), ax);
+      }, "Twist_GpuPoints");
+      if (!mGpuBuiltValid)
+         return nullptr;
+
+      // Bounds without a readback: the twist turns each point about the axis
+      // through the origin, so the extent along the axis is kept and the two
+      // others fit inside the largest radius of the source box's corners.
+      mGpuPoints.hasBounds = src->hasBounds;
+      if (src->hasBounds)
+      {
+         const int a0 = (ax == 0) ? 1 : 0;
+         const int a1 = (ax == 2) ? 1 : 2;
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         float r2 = 0.0f;
+         const Mat4& pm = src->pointMatrix;
+         for (int c = 0; c < 8; c++)
+         {
+            const float x = (c & 1) ? src->hi[0] : src->lo[0];
+            const float y = (c & 2) ? src->hi[1] : src->lo[1];
+            const float z = (c & 4) ? src->hi[2] : src->lo[2];
+            float w[3];
+            for (int k = 0; k < 3; k++)
+               w[k] = pm.m[k] * x + pm.m[4 + k] * y + pm.m[8 + k] * z + pm.m[12 + k];
+            for (int k = 0; k < 3; k++)
+            {
+               lo[k] = std::min(lo[k], w[k]);
+               hi[k] = std::max(hi[k], w[k]);
+            }
+            r2 = std::max(r2, w[a0] * w[a0] + w[a1] * w[a1]);
+         }
+         const float r = std::sqrt(r2);
+         mGpuPoints.lo[ax] = lo[ax];
+         mGpuPoints.hi[ax] = hi[ax];
+         mGpuPoints.lo[a0] = mGpuPoints.lo[a1] = -r;
+         mGpuPoints.hi[a0] = mGpuPoints.hi[a1] = r;
+      }
+   }
+   // Carried every call: a producer's occlusion count lands a cook later
+   // without moving its revision.
+   mGpuPoints.liveCount = src->liveCount;
+   mGpuPoints.maxHalfSize = src->maxHalfSize;
+   mGpuPoints.count = src->count;
+   mGpuPoints.revision = mPointCloudRevision;
+   return &mGpuPoints;
 }
 
 const Polyline* GeometryOpNode::GetCurve()
@@ -640,9 +832,11 @@ unsigned long long GeometryOpNode::PointCloudRevision()
       return 0;
    if (bypassed)
       return input->PointCloudRevision();
-   if (op != kTransform)
+   if (!ActsOnPoints())
       return input->PointCloudRevision();
-   GetPointCloud();
+   // Stamped from (upstream, revision, op key) without building the CPU copy:
+   // asking whether the cloud changed must not cost the copy itself.
+   StampPointCloudRevision(input->PointCloudRevision(), PointOpKey());
    return mPointCloudRevision;
 }
 
@@ -653,9 +847,12 @@ void GeometryOpNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
-   // Transform moves a mesh, cloud or curve; every other op reshapes a mesh and
-   // would otherwise hand a cloud or curve through unchanged without saying so.
+   // Transform moves a mesh, cloud or curve and Twist twists a mesh or a
+   // cloud; every other op reshapes a mesh and would otherwise hand a cloud or
+   // curve through unchanged without saying so.
    if (bypassed || op == kTransform)
+      mCookWarning.clear();
+   else if (op == kTwist && input != nullptr && input->GetMesh().vertices.empty() && HasPoints(input))
       mCookWarning.clear();
    else
       mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshVertices);
@@ -667,6 +864,49 @@ DisplacementNode::~DisplacementNode()
 {
    if (mReadFbo != 0)
       glDeleteFramebuffers(1, &mReadFbo);
+   GpuPointsGL::DestroyTarget(mGpuTarget);
+   if (mGpuProgram != 0)
+      glDeleteProgram(mGpuProgram);
+}
+
+const std::vector<std::string>& DisplacementNode::NoiseTypeNames()
+{
+   static const std::vector<std::string> k = { "Smooth", "Fractal", "Curl (flow)", "Ridged", "Cells" };
+   return k;
+}
+
+const std::vector<std::string>& DisplacementNode::AffectsNames()
+{
+   static const std::vector<std::string> k = { "Position", "Colour (points)", "Size (points)" };
+   return k;
+}
+
+DisplacementNode::NoiseKey DisplacementNode::CurrentNoiseKey() const
+{
+   NoiseKey k;
+   if (source != kNoise)
+      return k;
+   k.source = source;
+   k.type = noiseType;
+   k.octaves = octaves;
+   k.affects = affects;
+   k.seed = seed;
+   k.frequency = frequency;
+   k.w = mNoiseW;
+   k.roughness = noiseRoughness;
+   return k;
+}
+
+DisplaceNoise::Params DisplacementNode::NoiseParams() const
+{
+   DisplaceNoise::Params p;
+   p.type = noiseType;
+   p.frequency = frequency;
+   p.w = mNoiseW;
+   p.octaves = octaves;
+   p.roughness = noiseRoughness;
+   p.seed = (unsigned int)seed;
+   return p;
 }
 
 DisplacementNode::Signature DisplacementNode::CurrentSignature() const
@@ -680,7 +920,8 @@ DisplacementNode::Signature DisplacementNode::CurrentSignature() const
    s.selectionOnly = selectionOnly;
    s.upstream = input;
    s.upstreamRevision = input ? input->MeshRevision() : 0;
-   s.texGeneration = mTexGeneration;
+   s.texGeneration = source == kNoise ? 0 : mTexGeneration;
+   s.noise = CurrentNoiseKey();
    return s;
 }
 
@@ -691,7 +932,15 @@ const Mesh& DisplacementNode::GetMesh()
       mCookWarning.clear();
       return kEmptyMesh;
    }
-   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
+   // A cloud is displaced too (GetPointCloud / GetGpuPoints), so it is not
+   // a mismatch; asked first so GPU points are not read back to find out.
+   if (input->GetMesh().vertices.empty() && HasPoints(input))
+      mCookWarning.clear();
+   else
+      mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
+   if (mCookWarning.empty() && source == kNoise && affects != DisplaceNoise::kPosition &&
+       !input->GetMesh().vertices.empty())
+      mCookWarning = "Colour and Size act on points; a mesh is passed through unchanged";
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)
@@ -699,9 +948,14 @@ const Mesh& DisplacementNode::GetMesh()
 
    const Mesh& src = input->GetMesh();
    const std::vector<unsigned char> vertexMask = MeshOps::VertexSelectionFromFaces(src);
-   mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
-                              flatShade, flipNormals,
-                              (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr);
+   const std::vector<unsigned char>* mask = (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr;
+   if (source == kNoise)
+      mCache = DisplaceNoise::DisplaceMesh(src, NoiseParams(), mode,
+                                           affects == DisplaceNoise::kPosition ? strength : 0.0f,
+                                           flatShade, flipNormals, mask);
+   else
+      mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
+                                 flatShade, flipNormals, mask);
 
    mBuilt = sig;
    mHasBuilt = true;
@@ -756,6 +1010,12 @@ unsigned int DisplacementNode::GetSurfaceTexture()
    return input ? input->GetSurfaceTexture() : 0;
 }
 
+bool DisplacementNode::TakesGpuPoints()
+{
+   return input != nullptr && GpuPointsGL::Enabled() && input->GetMesh().vertices.empty() &&
+          input->GetGpuPoints() != nullptr;
+}
+
 void DisplacementNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -764,49 +1024,34 @@ void DisplacementNode::CookIfNeeded(int frameId)
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
 
+   // Noise reads the transport clock, so it pauses and scrubs with it; the
+   // texture pin is not pulled at all while Source is Noise.
+   mNoiseW = source == kNoise ? (float)(Transport::Instance().Seconds() * (double)speed) : 0.0f;
+   if (source == kNoise)
+      return;
+
    if (mTextureInput.IsConnected())
    {
       const unsigned int tex = mTextureInput.Pull(frameId);
       const int w = mTextureInput.Width();
       const int h = mTextureInput.Height();
-      // The readback is a full GPU->CPU copy of the input (tens of ms at
-      // 1080p), so it is skipped while the input still carries the revision
-      // it was read at. A source that stamps a fresh revision on every pull
-      // never matches and keeps reading, with the hash below as its guard.
       const unsigned long long rev = mTextureInput.Revision();
-      if (rev != 0 && rev == mTexReadRev && tex == mTexReadTex && w == mTexW && h == mTexH &&
-          !mTexPixels.empty())
+      if (rev == 0 || rev != mTexTexRev || tex != mTexTex || w != mTexTexW || h != mTexTexH)
+         mTexKey++;
+      mTexTex = tex;
+      mTexTexW = w;
+      mTexTexH = h;
+      mTexTexRev = rev;
+      // GPU points sample the texture where it is; the readback waits until
+      // a CPU consumer asks for the cloud (GetPointCloud).
+      if (TakesGpuPoints())
+      {
+         mTexPixelsStale = true;
          return;
-      if (tex != 0 && w > 0 && h > 0 &&
-          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
-      {
-         mTexW = w; mTexH = h;
-         mTexReadRev = rev;
-         mTexReadTex = tex;
       }
-      else
-      {
-         mTexPixels.clear();
-         mTexW = mTexH = 0;
-         mTexReadRev = 0;
-         mTexReadTex = 0;
-      }
-      // Bumped only when the pixels actually differ from last frame - there is
-      // no per-texture revision stamp to compare against instead, so content
-      // is hashed directly. A static texture (Clouds with no animated seed,
-      // the common case) now leaves the signature alone instead of forcing a
-      // mesh rebuild - and resetting any simulation downstream, like Cloth -
-      // every single frame. An animated source (Noise with time, Voronoi with
-      // a modulated seed) still drives the mesh every frame its pixels change.
-      const unsigned long long hash = HashFloats(mTexPixels);
-      if (!mHasTexHash || hash != mTexHash)
-      {
-         mTexGeneration++;
-         mTexHash = hash;
-         mHasTexHash = true;
-      }
+      ReadTexture();
    }
-   else if (mTexW != 0 || mTexH != 0)
+   else if (mTexW != 0 || mTexH != 0 || mTexTex != 0)
    {
       mTexPixels.clear();
       mTexW = mTexH = 0;
@@ -814,7 +1059,245 @@ void DisplacementNode::CookIfNeeded(int frameId)
       mHasTexHash = false;
       mTexReadRev = 0;
       mTexReadTex = 0;
+      mTexTex = 0;
+      mTexTexW = mTexTexH = 0;
+      mTexTexRev = 0;
+      mTexPixelsStale = false;
+      mTexKey++;
    }
+}
+
+void DisplacementNode::ReadTexture()
+{
+   mTexPixelsStale = false;
+   const unsigned int tex = mTexTex;
+   const int w = mTexTexW;
+   const int h = mTexTexH;
+   // The readback is a full GPU->CPU copy of the input (tens of ms at
+   // 1080p), so it is skipped while the input still carries the revision
+   // it was read at. A source that stamps a fresh revision on every pull
+   // never matches and keeps reading, with the hash below as its guard.
+   const unsigned long long rev = mTexTexRev;
+   if (rev != 0 && rev == mTexReadRev && tex == mTexReadTex && w == mTexW && h == mTexH &&
+       !mTexPixels.empty())
+      return;
+   if (tex != 0 && w > 0 && h > 0 &&
+       GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
+   {
+      mTexW = w; mTexH = h;
+      mTexReadRev = rev;
+      mTexReadTex = tex;
+   }
+   else
+   {
+      mTexPixels.clear();
+      mTexW = mTexH = 0;
+      mTexReadRev = 0;
+      mTexReadTex = 0;
+   }
+   // Bumped only when the pixels actually differ from last frame - there is
+   // no per-texture revision stamp to compare against instead, so content
+   // is hashed directly. A static texture (Clouds with no animated seed,
+   // the common case) now leaves the signature alone instead of forcing a
+   // mesh rebuild - and resetting any simulation downstream, like Cloth -
+   // every single frame. An animated source (Noise with time, Voronoi with
+   // a modulated seed) still drives the mesh every frame its pixels change.
+   const unsigned long long hash = HashFloats(mTexPixels);
+   if (!mHasTexHash || hash != mTexHash)
+   {
+      mTexGeneration++;
+      mTexHash = hash;
+      mHasTexHash = true;
+   }
+}
+
+unsigned long long DisplacementNode::PointCloudRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->PointCloudRevision();
+   PointSignature sig;
+   sig.upstream = input;
+   sig.upstreamRevision = input->PointCloudRevision();
+   sig.mode = mode;
+   sig.strength = strength;
+   sig.midlevel = midlevel;
+   sig.texKey = source == kNoise ? 0 : mTexKey;
+   sig.noise = CurrentNoiseKey();
+   if (!mHasPointStamp || !(sig == mPointStamp))
+   {
+      mPointStamp = sig;
+      mHasPointStamp = true;
+      mPointRevision = NextMeshRevision();
+   }
+   return mPointRevision;
+}
+
+const std::vector<Particle>* DisplacementNode::GetPointCloud()
+{
+   if (input == nullptr)
+      return nullptr;
+   const std::vector<Particle>* src = input->GetPointCloud();
+   if (src == nullptr || bypassed)
+      return src;
+   const unsigned long long rev = PointCloudRevision();
+   if (mPointCacheRevision == rev)
+      return &mPointCache;
+   mPointCache = *src;
+   if (source == kNoise)
+      DisplaceNoise::DisplacePoints(mPointCache, NoiseParams(), mode, strength, affects);
+   else
+   {
+      if (mTexPixelsStale)
+         ReadTexture();
+      MeshOps::DisplacePoints(mPointCache, mTexPixels, mTexW, mTexH, mode, strength, midlevel);
+   }
+   mPointCacheRevision = rev;
+   return &mPointCache;
+}
+
+const GpuPoints* DisplacementNode::GetGpuPoints()
+{
+   if (input == nullptr)
+      return nullptr;
+   const GpuPoints* src = input->GetGpuPoints();
+   if (src == nullptr || bypassed)
+      return src;
+   if (mGpuProgram == 0 && !mGpuShaderTried)
+   {
+      mGpuShaderTried = true;
+      // MeshOps::DisplacePoints, with its wrapped bilinear sample done by
+      // hand on texelFetch so it reads the texels the CPU readback holds.
+      const std::string fs = std::string(GpuPointsGL::kPointPassHeader) + DisplaceNoise::kGlsl +
+         "uniform int uSource;\n"
+         "uniform sampler2D uTex;\n"
+         "uniform ivec2 uTexSize;\n"
+         "uniform int uHasTex;\n"
+         "uniform int uMode;\n"
+         "uniform float uStrength;\n"
+         "uniform float uMidlevel;\n"
+         "vec4 Fetch(int x, int y) {\n"
+         "   if (x < 0) x += uTexSize.x; if (x >= uTexSize.x) x -= uTexSize.x;\n"
+         "   if (y < 0) y += uTexSize.y; if (y >= uTexSize.y) y -= uTexSize.y;\n"
+         "   return texelFetch(uTex, ivec2(x, y), 0);\n"
+         "}\n"
+         "void main() {\n"
+         "   LoadPoint();\n"
+         "   if (uSource == 1) DnApply(P, Cd, W);\n"
+         "   else if (uHasTex == 1) {\n"
+         "      vec2 uv = P.xy * 0.5 + 0.5;\n"
+         "      uv = uv - floor(uv);\n"
+         "      vec2 f = uv * vec2(uTexSize) - 0.5;\n"
+         "      ivec2 i0 = ivec2(floor(f));\n"
+         "      vec2 t = f - vec2(i0);\n"
+         "      vec4 a = Fetch(i0.x, i0.y) * (1.0 - t.x) + Fetch(i0.x + 1, i0.y) * t.x;\n"
+         "      vec4 b = Fetch(i0.x, i0.y + 1) * (1.0 - t.x) + Fetch(i0.x + 1, i0.y + 1) * t.x;\n"
+         "      vec4 s = a * (1.0 - t.y) + b * t.y;\n"
+         "      if (uMode == 1) P += (s.rgb - 0.5) * 2.0 * uStrength;\n"
+         "      else P.z += (0.299 * s.r + 0.587 * s.g + 0.114 * s.b - uMidlevel) * uStrength;\n"
+         "   }\n"
+         "   outPos = vec4(P, W);\n"
+         "   outColor = vec4(Cd, Life);\n"
+         "}\n";
+      mGpuProgram = GLUtil::CompileProgram(fs.c_str());
+   }
+   if (mGpuProgram == 0)
+      return nullptr; // consumers fall back to the CPU cloud, which displaces
+   const unsigned long long rev = PointCloudRevision();
+   if (!mGpuBuiltValid || mGpuBuiltRevision != rev)
+   {
+      mGpuBuiltRevision = rev;
+      const bool hasTex = mTexTex != 0 && mTexTexW > 0 && mTexTexH > 0;
+      mGpuBuiltValid = GpuPointsGL::RunPointPass(mGpuTarget, mGpuPoints, *src, mGpuProgram, [&]()
+      {
+         glActiveTexture(GL_TEXTURE2);
+         glBindTexture(GL_TEXTURE_2D, hasTex ? mTexTex : 0);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uTex"), 2);
+         glUniform2i(glGetUniformLocation(mGpuProgram, "uTexSize"), mTexTexW, mTexTexH);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uHasTex"), hasTex ? 1 : 0);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uMode"), mode);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uStrength"), strength);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uMidlevel"), midlevel);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uSource"), source == kNoise ? 1 : 0);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnType"), noiseType);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnFreq"), frequency);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnW"), mNoiseW);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnOctaves"), octaves);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnRough"), noiseRoughness);
+         glUniform1ui(glGetUniformLocation(mGpuProgram, "uDnSeed"), (unsigned int)seed);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnMode"), mode);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnStrength"), strength);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnAffects"), affects);
+      }, "Displacement_GpuPoints");
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE0);
+      if (!mGpuBuiltValid)
+         return nullptr;
+
+      // Bounds without a readback: the source box after its matrix, grown by
+      // the most a 0..1 texel can move a point (a float texture past 1 can
+      // move it further; the bounds only frame the view, they never cull).
+      mGpuPoints.hasBounds = src->hasBounds;
+      if (src->hasBounds)
+      {
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         const Mat4& pm = src->pointMatrix;
+         for (int c = 0; c < 8; c++)
+         {
+            const float x = (c & 1) ? src->hi[0] : src->lo[0];
+            const float y = (c & 2) ? src->hi[1] : src->lo[1];
+            const float z = (c & 4) ? src->hi[2] : src->lo[2];
+            for (int k = 0; k < 3; k++)
+            {
+               const float w = pm.m[k] * x + pm.m[4 + k] * y + pm.m[8 + k] * z + pm.m[12 + k];
+               lo[k] = std::min(lo[k], w);
+               hi[k] = std::max(hi[k], w);
+            }
+         }
+         if (source == kNoise)
+         {
+            // The noise stays within about -1..1 (curl a little past it).
+            if (affects == DisplaceNoise::kPosition)
+               for (int k = 0; k < 3; k++)
+               {
+                  lo[k] -= 2.0f * std::fabs(strength);
+                  hi[k] += 2.0f * std::fabs(strength);
+               }
+         }
+         else if (hasTex)
+         {
+            const float s = std::fabs(strength);
+            if (mode == kVector)
+            {
+               for (int k = 0; k < 3; k++)
+               {
+                  lo[k] -= s;
+                  hi[k] += s;
+               }
+            }
+            else
+            {
+               const float a = (0.0f - midlevel) * strength, b = (1.0f - midlevel) * strength;
+               lo[2] += std::min(a, b);
+               hi[2] += std::max(a, b);
+            }
+         }
+         for (int k = 0; k < 3; k++)
+         {
+            mGpuPoints.lo[k] = lo[k];
+            mGpuPoints.hi[k] = hi[k];
+         }
+      }
+   }
+   mGpuPoints.liveCount = src->liveCount;
+   mGpuPoints.maxHalfSize = src->maxHalfSize;
+   if (source == kNoise && affects == DisplaceNoise::kSize)
+      mGpuPoints.maxHalfSize *= 1.0f + 2.0f * std::fabs(strength);
+   mGpuPoints.count = src->count;
+   mGpuPoints.revision = rev;
+   return &mGpuPoints;
 }
 
 // ===================================================== Instance on Points
@@ -837,7 +1320,54 @@ size_t InstanceOnPointsNode::TriangleCount() const
 {
    if (instanceShape == nullptr)
       return 0;
-   return (const_cast<IGeometrySource*>(instanceShape)->GetMesh().indices.size() / 3) * mTransforms.size();
+   return (const_cast<IGeometrySource*>(instanceShape)->GetMesh().indices.size() / 3) * InstanceCount();
+}
+
+size_t InstanceOnPointsNode::InstanceCount() const
+{
+   if (mCloudStale)
+   {
+      if (const GpuPoints* gp = GpuInstancePoints())
+         return (size_t)(gp->liveCount >= 0 ? gp->liveCount : gp->count);
+   }
+   return InstanceTransforms().size();
+}
+
+const GpuPoints* InstanceOnPointsNode::GpuInstancePoints() const
+{
+   if (!mGpuCloud || cloudSource == nullptr || !GpuPointsGL::Enabled())
+      return nullptr;
+   return cloudSource->GetGpuPoints();
+}
+
+float InstanceOnPointsNode::GpuInstanceSizeScale() const
+{
+   const float base = cloudSource ? cloudSource->PointBaseSize() : 1.0f;
+   return base > 0.0f ? instanceScale / base : 0.0f;
+}
+
+void InstanceOnPointsNode::BuildCloudTransforms() const
+{
+   mCloudStale = false;
+   mTransforms.clear();
+   mColors.clear();
+   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
+   if (cloud == nullptr)
+      return;
+   mTransforms.reserve(cloud->size());
+   mColors.reserve(cloud->size() * 3);
+   for (const Particle& p : *cloud)
+   {
+      if (!p.alive)
+         continue;
+      const float s = instanceScale * p.scale;
+      Mat4 m = Mat4::Scale(s, s, s);
+      m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
+      mTransforms.push_back(Mat4::Multiply(m, mBuiltShapeModel));
+      mColors.push_back(p.r);
+      mColors.push_back(p.g);
+      mColors.push_back(p.b);
+   }
 }
 
 Material InstanceOnPointsNode::GetMaterial() const
@@ -899,23 +1429,17 @@ void InstanceOnPointsNode::Rebuild()
 
    // A patched point cloud replaces mesh sampling: the positions already exist,
    // so there is nothing to sample.
-   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
-   if (cloud != nullptr)
+   // On the GPU the copies are built by Render 3D's vertex shader; the CPU
+   // list waits until something asks (BuildCloudTransforms).
+   mGpuCloud = cloudSource != nullptr && GpuPointsGL::Enabled() && cloudSource->GetGpuPoints() != nullptr;
+   mCloudStale = false;
+   if (cloudSource != nullptr && (mGpuCloud || cloudSource->GetPointCloud() != nullptr))
    {
-      mTransforms.reserve(cloud->size());
-      mColors.reserve(cloud->size() * 3);
-      for (const Particle& p : *cloud)
-      {
-         if (!p.alive)
-            continue;
-         const float s = instanceScale * p.scale;
-         Mat4 m = Mat4::Scale(s, s, s);
-         m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
-         mTransforms.push_back(Mat4::Multiply(m, shapeModel));
-         mColors.push_back(p.r);
-         mColors.push_back(p.g);
-         mColors.push_back(p.b);
-      }
+      mBuiltShapeModel = shapeModel; // read by BuildCloudTransforms, stamped again by the cook
+      if (mGpuCloud)
+         mCloudStale = true;
+      else
+         BuildCloudTransforms();
       return;
    }
 
@@ -1029,7 +1553,10 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    // matrices baked into Rebuild() have to be compared directly to catch that.
    const Mat4 pointModel = pointSource ? pointSource->GetModelMatrix() : Mat4::Identity();
    const Mat4 shapeModel = instanceShape ? instanceShape->GetModelMatrix() : Mat4::Identity();
-   const bool poseDirty =
+   // Whether the cloud is on the GPU can change with no revision (its first
+   // cook, INFINITE_GPU_POINTS), and decides which list Rebuild() keeps.
+   const bool gpuCloud = cloudSource != nullptr && GpuPointsGL::Enabled() && cloudSource->GetGpuPoints() != nullptr;
+   const bool poseDirty = gpuCloud != mGpuCloud ||
       mBuiltPointSource != pointSource || mBuiltShape != instanceShape ||
       mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
       mBuiltPointRevision != pointRevision || mBuiltShapeRevision != shapeRevision ||

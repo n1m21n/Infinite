@@ -31,7 +31,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 BUILD_DIR="build"
-BIN="$BUILD_DIR/Infinite.app/Contents/MacOS/Infinite"
+# INFINITE_BIN runs another binary (a dev build in build-dev), as
+# run-infinite-hygiene's driver does; that binary is not built here.
+BIN="${INFINITE_BIN:-$BUILD_DIR/Infinite.app/Contents/MacOS/Infinite}"
 SKIP_BUILD=0
 for arg in "${SWEEP_ARGS[@]:-}"; do
   case "$arg" in
@@ -61,14 +63,13 @@ printf '=== %s ===\n' "${SWEEP_NAME:-sweep}"
 step "Build"
 if [ "$SKIP_BUILD" -eq 1 ]; then
   echo "skipped (--skip-build)"
-elif [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
-  if ! cmake --build "$BUILD_DIR" -j8 2>&1 | tee /tmp/infinite_build.log | tail -5; then
-    echo "BUILD FAILED - see /tmp/infinite_build.log"; exit 1
-  fi
+elif [ -n "${INFINITE_BIN:-}" ]; then
+  echo "skipped (INFINITE_BIN=$INFINITE_BIN)"
 else
-  echo "no existing build/, configuring fresh"
-  cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tee /tmp/infinite_build.log | tail -5
-  if ! cmake --build "$BUILD_DIR" -j8 2>&1 | tee -a /tmp/infinite_build.log | tail -5; then
+  # Through ibuild (build-discipline): the machine-wide lock, -j sized from
+  # free RAM, and no build at all when nothing is stale. build/ is the
+  # release tree.
+  if ! "$ROOT/scripts/ibuild.py" build --mode release 2>&1 | tee /tmp/infinite_build.log | tail -5; then
     echo "BUILD FAILED - see /tmp/infinite_build.log"; exit 1
   fi
 fi

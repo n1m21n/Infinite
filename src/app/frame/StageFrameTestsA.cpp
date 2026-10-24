@@ -2514,6 +2514,8 @@ void DrawFrameTestsA(FrameCtx& fc)
       // cloud by exactly the offset and rotates nothing it shouldn't, and
       // PointCloudRevision only moves when the points actually changed.
       FrameTest_POINTCLOUDSWEEPTEST(frameId, window);
+      // GPU points must draw what the CPU cloud draws (docs/plans/gpu-points).
+      FrameTest_GPUPOINTSTEST(frameId, window);
 
       // Phase 5 (geometry-domains audit): channels B (`Mesh::vertexColor`)
       // and C (`Particle::r/g/b`/`hasColor`) - built from scratch (no prior

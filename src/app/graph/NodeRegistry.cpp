@@ -48,6 +48,7 @@ namespace app
       REGISTER_NODE(OceanNode, Ocean, "3D");
       REGISTER_NODE(MaterialNode, Material, "3D");
       REGISTER_NODE(DisplacementNode, Displacement, "3D");
+      REGISTER_NODE(GeometryFeedbackNode, Feedback 3D, "3D");
       REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
       REGISTER_NODE(AudioRibbonNode, Audio Ribbon, "3D");
       REGISTER_NODE(MappingNode, Mapping, "3D");
@@ -101,6 +102,7 @@ namespace app
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
       REGISTER_NODE(ProximityLinesNode, Proximity Lines, "3D");
+      REGISTER_NODE(PointTrailsNode, Point Trails, "3D");
       REGISTER_NODE(CurveOpsNode, Curve Ops, "3D");
       REGISTER_NODE(SweepNode, Sweep, "3D");
       REGISTER_NODE(RevolveNode, Revolve, "3D");

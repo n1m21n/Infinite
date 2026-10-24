@@ -275,6 +275,17 @@ struct Particle
    bool alive = true;
 };
 
+// How far through its life a particle is, 0..1: what GpuPoints' colour alpha
+// and Field Modifier's `life` attrib carry. 0 for an immortal particle (and
+// for any point that is not a simulated particle).
+inline float PointLifeFraction(const Particle& p)
+{
+   if (p.life <= 0.0f)
+      return 0.0f;
+   const float f = p.age / p.life;
+   return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+}
+
 // An ordered chain of points in space. Curves, extracted mesh boundaries and
 // plane-slice contours all reduce to this, so anything that can follow one can
 // follow all of them.
@@ -532,6 +543,14 @@ namespace MeshOps
    Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
                  int mode, float strength, float midlevel, bool flat, bool flip,
                  const std::vector<unsigned char>* vertexMask = nullptr);
+   // Displace on a point cloud, which has no UVs: each point samples the
+   // texture at uv = (x, y) * 0.5 + 0.5 (the -1..1 square, which is Image to
+   // Points' default 2 x 2 grid), wrapped like Displace. Scalar mode pushes
+   // along +Z by (luma - midlevel) * strength; vector mode adds the RGB
+   // offset. Size and colour are left alone. The GLSL in DisplacementNode
+   // is the same maths; keep the two in step.
+   void DisplacePoints(std::vector<Particle>& points, const std::vector<float>& texRGBA, int texW, int texH,
+                       int mode, float strength, float midlevel);
 
    // Sampling for instancing: vertices, edge midpoints or face centres.
    //

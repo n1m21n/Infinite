@@ -63,6 +63,7 @@ public:
    {
       return input ? input->GetPointCloud() : nullptr;
    }
+   const GpuPoints* GetGpuPoints() override { return input ? input->GetGpuPoints() : nullptr; }
    unsigned long long PointCloudRevision() override
    {
       return input ? input->PointCloudRevision() : 0;

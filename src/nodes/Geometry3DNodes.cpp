@@ -4,7 +4,9 @@
 #include "gl3.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cmath>
+#include <string>
 
 #include "Transport.h"
 #include "BenchReport.h"
@@ -62,8 +64,23 @@ namespace
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform mat4 uLightViewProj;\n"
+      // GPU instances: the same matrix as kVertSrc's mesh branch builds.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   if (uGpuPoints == 1) {\n"
+      "      vec4 point = texelFetch(uPointPos, ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW), 0);\n"
+      "      float s = point.w * uPointSizeScale;\n"
+      "      vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "      model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                    vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "   }\n"
       "   gl_Position = uLightViewProj * model * vec4(aPos, 1.0);\n"
       "}\n";
 
@@ -310,6 +327,21 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform int uSpriteSizeMode;\n" // 0 world, 1 screen (constant pixel size)
       "uniform mat4 uView;\n"
+      // GPU points (core/GpuPoints.h): the sprite's position, size and colour
+      // come from two textures by instance index instead of from aInstance /
+      // aInstanceColor. uPointModel is the source's model x pointMatrix and
+      // uPointSizeScale the same factor the CPU path folds into each scale.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform sampler2D uPointColor;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
+      // GPU instances (Instance on Points over GPU points, mesh branch): each
+      // copy is uInstanceGroup * T(uPointModel * pos) * S(w * uPointSizeScale)
+      // * uShapeModel, the matrix InstanceOnPointsNode builds on the CPU.
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vLocalPos;\n"
@@ -320,9 +352,17 @@ namespace
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
+      "   vec3 instanceColor = aInstanceColor;\n"
       "   if (uIsSprite == 1) {\n"
       "      vec3 instancePos = aInstance[3].xyz;\n"
       "      float instanceScale = aInstance[0][0];\n"
+      "      if (uGpuPoints == 1) {\n"
+      "         ivec2 texel = ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW);\n"
+      "         vec4 point = texelFetch(uPointPos, texel, 0);\n"
+      "         instancePos = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "         instanceScale = point.w * uPointSizeScale;\n"
+      "         instanceColor = texelFetch(uPointColor, texel, 0).rgb;\n"
+      "      }\n"
       "      float sizeScale = instanceScale;\n"
       "      if (uSpriteSizeMode == 1) {\n"
       "         vec3 viewPos = (uView * vec4(instancePos, 1.0)).xyz;\n"
@@ -332,6 +372,15 @@ namespace
       "      worldNormal = normalize(uCamPos - worldPos);\n"
       "   } else {\n"
       "      mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "      if (uGpuPoints == 1) {\n"
+      "         ivec2 texel = ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW);\n"
+      "         vec4 point = texelFetch(uPointPos, texel, 0);\n"
+      "         float s = point.w * uPointSizeScale;\n"
+      "         vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "         model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                       vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "         instanceColor = texelFetch(uPointColor, texel, 0).rgb;\n"
+      "      }\n"
       "      vec4 world = model * vec4(aPos, 1.0);\n"
       "      worldPos = world.xyz;\n"
       "      worldNormal = (uInstanced == 1)\n"
@@ -344,7 +393,7 @@ namespace
       "   vUv = aUv;\n"
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
-      "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
+      "   vInstanceColor = (uInstanceColored == 1) ? instanceColor : vec3(1.0);\n"
       // Sprites carry their colour on aInstanceColor, not aVertexColor - the
       // mesh domain and the point-cloud domain never mix on the same draw.
       "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
@@ -352,8 +401,18 @@ namespace
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
       "}\n";
 
+   // Linked twice (EnsureShader): once as is, and once with INF_NO_DISCARD
+   // defined, for opaque mesh draws with no alpha cutoff. A shader that can
+   // discard at all stops a tile GPU (Apple) from removing hidden fragments
+   // before shading them, uniform branch or not; the variant draws the same
+   // pixels because those draws never take either discard.
    const char* kFragSrc =
       "#version 150\n"
+      "#ifdef INF_NO_DISCARD\n"
+      "#define KILL_FRAGMENT\n"
+      "#else\n"
+      "#define KILL_FRAGMENT discard\n"
+      "#endif\n"
       "in vec3 vWorldPos;\n"
       "in vec3 vLocalPos;\n"
       "in vec3 vNormal;\n"
@@ -655,11 +714,11 @@ namespace
       "   }\n"
       "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
       "      vec2 d = vUv * 2.0 - 1.0;\n"
-      "      if (dot(d, d) > 1.0) discard;\n"
+      "      if (dot(d, d) > 1.0) KILL_FRAGMENT;\n"
       "   }\n"
       "   float alpha = uOpacity;\n"
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
-      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) discard;\n"
+      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
@@ -791,11 +850,17 @@ namespace
       "      }\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
       "\n"
-      "      float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
-      "      float ccD = distributionGGX(nDotH, ccRough);\n"
-      "      float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
-      "      float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
-      "      float clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
+      // Every term is finite (ccRough >= 0.02), so with no clearcoat the lobe
+      // is exactly 0 and skipping it changes no pixel - it is a GGX, two
+      // Schlicks and a pow per light per pixel on every draw otherwise.
+      "      float clearcoatSpec = 0.0;\n"
+      "      if (cc != 0.0) {\n"
+      "         float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
+      "         float ccD = distributionGGX(nDotH, ccRough);\n"
+      "         float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
+      "         float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
+      "         clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
+      "      }\n"
       "\n"
       "      vec3 sheenSpec = vec3(0.0);\n"
       "      if (sh > 0.0) {\n"
@@ -1188,6 +1253,13 @@ bool Render3DNode::EnsureEnvBgShader()
    return true;
 }
 
+// GetGpuPoints() first: a GPU point producer builds its CPU cloud only when
+// someone asks for it, and a presence test must not be that someone.
+static bool IsCloudSource(IGeometrySource* s)
+{
+   return s->GetGpuPoints() != nullptr || s->GetPointCloud() != nullptr;
+}
+
 bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 {
    outLo[0] = outLo[1] = outLo[2] = 1e30f;
@@ -1204,7 +1276,7 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
       // its source's model matrix into every particle position before ever
       // touching mGpu[i].lo/hi), so pushing them through mDraw[i]'s model
       // matrix here too would double-transform them.
-      const bool isCloud = mDraw[i]->GetPointCloud() != nullptr;
+      const bool isCloud = IsCloudSource(mDraw[i]);
       const Mat4 model = isCloud ? Mat4::Identity() : mDraw[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
@@ -1249,7 +1321,8 @@ Render3DNode::~Render3DNode()
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
-   if (mProgram != 0) glDeleteProgram(mProgram);
+   if (mProgramFull != 0) glDeleteProgram(mProgramFull);
+   if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
    if (mEnvBgVao != 0) glDeleteVertexArrays(1, &mEnvBgVao);
@@ -1264,6 +1337,54 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.vertexColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.vertexColorVbo); glDeleteBuffers(1, &gpu.vertexColorVbo); gpu.vertexColorVbo = 0; }
    if (gpu.vao != 0) { glDeleteVertexArrays(1, &gpu.vao); gpu.vao = 0; }
    gpu = GpuMesh();
+}
+
+// GPUPOINTSTEST renders the same scene with and without the opaque variant
+// and requires the same pixels.
+// INFINITE_RENDER3D_OPAQUE_VARIANT=0 draws everything with the full program
+// (B11 A/B of step 5 in one binary).
+static bool sOpaqueVariantEnabled = []
+{
+   const char* v = getenv("INFINITE_RENDER3D_OPAQUE_VARIANT");
+   return v == nullptr || v[0] != '0';
+}();
+void Render3DSetOpaqueVariantForTest(bool enabled) { sOpaqueVariantEnabled = enabled; }
+// Draws that went through the opaque variant, so the test can tell "same
+// pixels" from "the variant never ran".
+static int sOpaqueVariantDraws = 0;
+int Render3DOpaqueVariantDrawsForTest() { return sOpaqueVariantDraws; }
+static int sGpuInstanceDraws = 0;
+int Render3DGpuInstanceDrawsForTest() { return sGpuInstanceDraws; }
+
+// GPU points step 6: ResolveGpuInstances, unless the blended draw needs its
+// copies sorted back to front (a CPU job). nullptr = upload InstanceTransforms().
+static const GpuPoints* GpuInstancesFor(IGeometrySource* source, InstanceOnPointsNode* instancer,
+                                        const Material& material)
+{
+   if ((material.opacity < 0.999f || material.textureAlpha) && material.transmission <= 0.001f)
+      return nullptr;
+   return ResolveGpuInstances(source, instancer);
+}
+
+// Points `program` at the GPU instances: textures on units 11/12 (as the
+// sprite path), the point matrix, the size factor, the wrapping group matrix
+// and the stamp's own model.
+static void BindGpuInstances(unsigned int program, const GpuPoints& gp, InstanceOnPointsNode& instancer,
+                             const Mat4& groupMatrix)
+{
+   glActiveTexture(GL_TEXTURE11);
+   glBindTexture(GL_TEXTURE_2D, gp.posTex);
+   glActiveTexture(GL_TEXTURE12);
+   glBindTexture(GL_TEXTURE_2D, gp.colorTex);
+   glActiveTexture(GL_TEXTURE0);
+   glUniform1i(glGetUniformLocation(program, "uPointPos"), 11);
+   glUniform1i(glGetUniformLocation(program, "uPointColor"), 12);
+   glUniform1i(glGetUniformLocation(program, "uPointTexW"), gp.texW);
+   glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gp.pointMatrix.m);
+   glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer.GpuInstanceSizeScale());
+   glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, groupMatrix.m);
+   const Mat4 shape = instancer.GpuInstanceShapeModel();
+   glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shape.m);
 }
 
 bool Render3DNode::EnsureShader()
@@ -1289,37 +1410,49 @@ bool Render3DNode::EnsureShader()
       return shader;
    };
 
+   auto link = [](unsigned int vert, unsigned int frag) -> unsigned int {
+      unsigned int program = glCreateProgram();
+      glBindAttribLocation(program, 0, "aPos");
+      glBindAttribLocation(program, 1, "aNormal");
+      glBindAttribLocation(program, 2, "aUv");
+      glBindAttribLocation(program, 3, "aInstance"); // occupies locations 3..6
+      glBindAttribLocation(program, 7, "aInstanceColor");
+      glBindAttribLocation(program, 8, "aVertexColor");
+      glAttachShader(program, vert);
+      glAttachShader(program, frag);
+      glLinkProgram(program);
+
+      GLint linked = 0;
+      glGetProgramiv(program, GL_LINK_STATUS, &linked);
+      if (!linked)
+      {
+         char log[1024];
+         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+         fprintf(stderr, "Render3D link error: %s\n", log);
+         glDeleteProgram(program);
+         return 0u;
+      }
+      return program;
+   };
+
    const unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
    const unsigned int frag = compile(GL_FRAGMENT_SHADER, kFragSrc);
-   if (vert == 0 || frag == 0)
-      return false;
-
-   mProgram = glCreateProgram();
-   glBindAttribLocation(mProgram, 0, "aPos");
-   glBindAttribLocation(mProgram, 1, "aNormal");
-   glBindAttribLocation(mProgram, 2, "aUv");
-   glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
-   glBindAttribLocation(mProgram, 7, "aInstanceColor");
-   glBindAttribLocation(mProgram, 8, "aVertexColor");
-   glAttachShader(mProgram, vert);
-   glAttachShader(mProgram, frag);
-   glLinkProgram(mProgram);
-   glDeleteShader(vert);
-   glDeleteShader(frag);
-
-   GLint linked = 0;
-   glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-   if (!linked)
+   // The same source with INF_NO_DISCARD defined after the #version line.
+   std::string opaqueSrc = kFragSrc;
+   opaqueSrc.insert(opaqueSrc.find('\n') + 1, "#define INF_NO_DISCARD\n");
+   const unsigned int opaqueFrag = compile(GL_FRAGMENT_SHADER, opaqueSrc.c_str());
+   if (vert != 0 && frag != 0)
    {
-      char log[1024];
-      glGetProgramInfoLog(mProgram, sizeof(log), nullptr, log);
-      fprintf(stderr, "Render3D link error: %s\n", log);
-      glDeleteProgram(mProgram);
-      mProgram = 0;
-      return false;
+      mProgramFull = link(vert, frag);
+      // Optional: without it every draw uses the full program, as before.
+      if (opaqueFrag != 0)
+         mProgramOpaque = link(vert, opaqueFrag);
    }
-
-   return true;
+   if (vert != 0) glDeleteShader(vert);
+   if (frag != 0) glDeleteShader(frag);
+   if (opaqueFrag != 0) glDeleteShader(opaqueFrag);
+   mProgram = mProgramFull;
+   return mProgram != 0;
 }
 
 bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
@@ -1552,6 +1685,13 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.material[i] = source->GetMaterial();
       sig.mapping[i] = source->GetMappingTransform();
       sig.modelMatrix[i] = source->GetModelMatrix();
+      // A Transform over GPU points moves them by pointMatrix, not by a new
+      // revision or model matrix, so the signature has to see it.
+      if (const GpuPoints* gp = source->GetGpuPoints())
+      {
+         sig.cloudRev[i] = gp->revision;
+         sig.modelMatrix[i] = Mat4::Multiply(sig.modelMatrix[i], gp->pointMatrix);
+      }
       if (auto* instancer = FindInstancer(source))
       {
          sig.instanceRev[i] = instancer->InstanceRevision();
@@ -1560,7 +1700,10 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
          // entries than the raw instancer - reflected here so a mask/override
          // change that happens not to bump meshRev[i] (it always does today,
          // but this is the honest count either way) still shows up.
-         sig.instanceCount[i] = ResolveInstanceTransforms(source, instancer).size();
+         // GPU instances: the texel count, without building the CPU list.
+         const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, sig.material[i]);
+         sig.instanceCount[i] = gpuInstances != nullptr ? (size_t)gpuInstances->count
+                                                        : ResolveInstanceTransforms(source, instancer).size();
          sig.instanceGroupMatrix[i] = source->GetInstanceGroupMatrix();
       }
       for (int m = kMapRoughness; m < kMapCount; m++)
@@ -1862,13 +2005,18 @@ void Render3DNode::CookOnce(int frameId)
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();
             auto* instancer = FindInstancer(source);
-            const bool instanced = instancer != nullptr && mGpu[i].instanceCount > 0 &&
-                                   mGpu[i].instanceAttribsOn;
+            const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, source->GetMaterial());
+            const int instanceCount = gpuInstances != nullptr ? gpuInstances->count : mGpu[i].instanceCount;
+            const bool instanced = instancer != nullptr && instanceCount > 0 &&
+                                   (mGpu[i].instanceAttribsOn || gpuInstances != nullptr);
             glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
             glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
+            glUniform1i(glGetUniformLocation(mShadowProgram, "uGpuPoints"), (instanced && gpuInstances) ? 1 : 0);
+            if (instanced && gpuInstances != nullptr)
+               BindGpuInstances(mShadowProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
             if (instanced)
                glDrawElementsInstanced(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT,
-                                       nullptr, (GLsizei)mGpu[i].instanceCount);
+                                       nullptr, (GLsizei)instanceCount);
             else
                glDrawElements(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT, nullptr);
          }
@@ -1979,58 +2127,67 @@ void Render3DNode::CookOnce(int frameId)
    glEnable(GL_BLEND);
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-   glUseProgram(mProgram);
+   mProgram = mProgramFull;
    mLastTriangles = 0;
    mLastDrawCalls = 0;
    mLastUploads = 0;
 
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
-   glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
-   glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
-   glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
-   glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kLightSlots, lightArea);
-   glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
-   glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
-   glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
-   glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
-   glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
-   glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
-   glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
-   glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
-   glActiveTexture(GL_TEXTURE1);
-   glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
-   glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
-   glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
-               lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
-               mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
-                      mLightViewProj.m);
-   glActiveTexture(GL_TEXTURE0);
+   // Frame-wide uniforms go to both programs, so a draw can switch between
+   // them (drawSlot) without re-sending any of this.
+   for (const unsigned int program : { mProgramOpaque, mProgramFull })
+   {
+      if (program == 0)
+         continue;
+      mProgram = program;
+      glUseProgram(mProgram);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
+      glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
+      glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
+      glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
+      glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kLightSlots, lightArea);
+      glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
+      glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
+      glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
+      glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
+      glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
+      glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
+                  lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
+                  mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
+                         mLightViewProj.m);
+      glActiveTexture(GL_TEXTURE0);
 
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
-   glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
-   glActiveTexture(GL_TEXTURE6);
-   glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
-   glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
-   glActiveTexture(GL_TEXTURE0);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+      glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
+      glActiveTexture(GL_TEXTURE6);
+      glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+      glActiveTexture(GL_TEXTURE0);
+   }
 
    // Point-cloud slots draw an instanced unit quad, billboarded against the
    // camera in the vertex shader (uIsSprite), instead of geometry[]'s
@@ -2038,9 +2195,20 @@ void Render3DNode::CookOnce(int frameId)
    // Shares the mesh path's instance-buffer layout (aInstance /
    // aInstanceColor) so it needs no new GPU upload machinery, just a
    // different way of filling that buffer.
+   auto useProgram = [&](unsigned int program)
+   {
+      if (program != mProgram)
+      {
+         mProgram = program;
+         glUseProgram(mProgram);
+      }
+   };
+
    auto drawCloudSlot = [&](int i, IGeometrySource* cloud)
    {
-      const std::vector<Particle>& points = *cloud->GetPointCloud();
+      // Round sprites discard their corners.
+      useProgram(mProgramFull);
+      const GpuPoints* gpuPoints = cloud->GetGpuPoints();
       GpuMesh& gpu = mGpu[i];
 
       const bool sourceChanged = gpu.source != (const void*)cloud;
@@ -2090,36 +2258,35 @@ void Render3DNode::CookOnce(int frameId)
       const Material material = cloud->GetMaterial();
       const unsigned int surface = cloud->GetSurfaceTexture();
 
-      const unsigned long long revision = cloud->PointCloudRevision();
-      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model))
-      {
-         // A billboard has no orientation of its own to carry the rest of the
-         // matrix, so only a uniform-ish scale - the length of the model's
-         // own X basis vector - survives a Scale node upstream.
-         const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
-         // p.scale is a relative multiplier (see IGeometrySource::PointBaseSize),
-         // not a world-space size - without this, Image to Points' default
-         // p.scale=1.0 draws a sprite ~100x too large next to its own
-         // mini-viewport, and at higher density/pointSize can push the total
-         // shaded fill far enough to trip Windows' GPU watchdog (TDR).
-         const float baseSize = cloud->PointBaseSize();
+      // A billboard has no orientation of its own to carry the rest of the
+      // matrix, so only a uniform-ish scale - the length of the model's
+      // own X basis vector - survives a Scale node upstream.
+      const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
+      // p.scale is a relative multiplier (see IGeometrySource::PointBaseSize),
+      // not a world-space size - without this, Image to Points' default
+      // p.scale=1.0 draws a sprite ~100x too large next to its own
+      // mini-viewport, and at higher density/pointSize can push the total
+      // shaded fill far enough to trip Windows' GPU watchdog (TDR).
+      const float baseSize = cloud->PointBaseSize();
+      static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
+      const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
 
-         // Defensive backstop, independent of the units fix above: estimate
-         // total shaded fragments this cloud will cost (instance count x
-         // screen-space sprite area x MSAA samples) and, if it blows past a
-         // budget, shrink the sprite radius rather than dropping instances -
-         // a visibly-small cloud beats a cloud that silently has fewer points
-         // than it actually contains. Windows has no equivalent of macOS's
-         // soft stall here: its GPU watchdog (TDR) hard-resets the driver
-         // (and the process with it) after ~2s of an unresponsive frame.
+      // Defensive backstop, independent of the units fix above: estimate
+      // total shaded fragments this cloud will cost (instance count x
+      // screen-space sprite area x MSAA samples) and, if it blows past a
+      // budget, shrink the sprite radius rather than dropping instances -
+      // a visibly-small cloud beats a cloud that silently has fewer points
+      // than it actually contains. Windows has no equivalent of macOS's
+      // soft stall here: its GPU watchdog (TDR) hard-resets the driver
+      // (and the process with it) after ~2s of an unresponsive frame.
+      auto fillClamp = [&](size_t pointCount)
+      {
          const float kDeg2Rad = 3.14159265358979323846f / 180.0f;
          const float visibleHeight = 2.0f * camDistance * std::tan(fov * 0.5f * kDeg2Rad);
          const float pixelsPerUnit = visibleHeight > 1e-6f ? (float)mHeight / visibleHeight : 0.0f;
-         static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
-         const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
          const float spriteRadiusPixels = baseSize * scaleX * pixelsPerUnit;
          const double perSpriteArea = 4.0 * (double)spriteRadiusPixels * (double)spriteRadiusPixels;
-         const double estimatedFill = (double)points.size() * perSpriteArea * sampleMult;
+         const double estimatedFill = (double)pointCount * perSpriteArea * sampleMult;
          const double kFillBudget = 5.0e8; // shaded samples/frame; the TDR-triggering case in the brief was ~2.5e10
          float clampScale = 1.0f;
          if (estimatedFill > kFillBudget && perSpriteArea > 0.0)
@@ -2134,6 +2301,74 @@ void Render3DNode::CookOnce(int frameId)
             }
          }
          mLastFillClamp = clampScale;
+         return clampScale;
+      };
+
+      // GPU points (core/GpuPoints.h): nothing to build or upload, the vertex
+      // shader reads each sprite from the source's textures by instance index.
+      // Same sizing, clamp and material as the CPU branch below.
+      const bool gpuDraw = gpuPoints != nullptr && gpuPoints->count > 0 && gpuPoints->posTex != 0 &&
+                           gpuPoints->colorTex != 0 && gpuPoints->texW > 0;
+      float gpuSizeScale = 0.0f;
+      Mat4 gpuPointModel = Mat4::Identity();
+      if (gpuPoints != nullptr)
+      {
+         if (gpu.instanceAttribsOn)
+         {
+            // The sprites come from textures; per-instance arrays left on
+            // here would be read past their end. Forget the CPU upload too,
+            // so falling back to it later rebuilds rather than reusing it.
+            for (int col = 0; col < 4; col++)
+            {
+               glDisableVertexAttribArray(3 + col);
+               glVertexAttribDivisor(3 + col, 0);
+            }
+            glDisableVertexAttribArray(7);
+            glVertexAttribDivisor(7, 0);
+            gpu.instanceAttribsOn = false;
+         }
+         gpu.instanceRevision = 0;
+         gpu.instanceCount = 0;
+         gpu.hasBounds = false;
+         if (!gpuDraw)
+            return;
+
+         const size_t live = gpuPoints->liveCount >= 0 ? (size_t)gpuPoints->liveCount : (size_t)gpuPoints->count;
+         gpuSizeScale = scaleX * fillClamp(live);
+         gpuPointModel = Mat4::Multiply(model, gpuPoints->pointMatrix);
+
+         // World bounds for SceneBounds: the point-space box through the
+         // full matrix, grown by the largest sprite radius.
+         if (gpuPoints->hasBounds)
+         {
+            gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
+            gpu.hi[0] = gpu.hi[1] = gpu.hi[2] = -1e30f;
+            const float r = gpuPoints->maxHalfSize * gpuSizeScale;
+            for (int corner = 0; corner < 8; corner++)
+            {
+               const float c[3] = {
+                  (corner & 1) ? gpuPoints->hi[0] : gpuPoints->lo[0],
+                  (corner & 2) ? gpuPoints->hi[1] : gpuPoints->lo[1],
+                  (corner & 4) ? gpuPoints->hi[2] : gpuPoints->lo[2]
+               };
+               for (int k = 0; k < 3; k++)
+               {
+                  const float w = gpuPointModel.m[k] * c[0] + gpuPointModel.m[4 + k] * c[1] +
+                                  gpuPointModel.m[8 + k] * c[2] + gpuPointModel.m[12 + k];
+                  gpu.lo[k] = std::min(gpu.lo[k], w - r);
+                  gpu.hi[k] = std::max(gpu.hi[k], w + r);
+               }
+            }
+            gpu.hasBounds = true;
+         }
+         gpu.instanceCount = gpuPoints->count;
+      }
+
+      const unsigned long long revision = gpuDraw ? 0 : cloud->PointCloudRevision();
+      if (!gpuDraw && (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model)))
+      {
+         const std::vector<Particle>& points = *cloud->GetPointCloud();
+         const float clampScale = fillClamp(points.size());
 
          std::vector<Mat4> xforms;
          std::vector<float> colors;
@@ -2219,6 +2454,22 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuDraw ? 1 : 0);
+      if (gpuDraw)
+      {
+         // Units 11/12: above every unit the material maps, env and shadow
+         // use (0-10), inside GL 3.3's guaranteed 16 vertex-shader units.
+         glActiveTexture(GL_TEXTURE11);
+         glBindTexture(GL_TEXTURE_2D, gpuPoints->posTex);
+         glActiveTexture(GL_TEXTURE12);
+         glBindTexture(GL_TEXTURE_2D, gpuPoints->colorTex);
+         glActiveTexture(GL_TEXTURE0);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointPos"), 11);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointColor"), 12);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointTexW"), gpuPoints->texW);
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPointModel"), 1, GL_FALSE, gpuPointModel.m);
+         glUniform1f(glGetUniformLocation(mProgram, "uPointSizeScale"), gpuSizeScale);
+      }
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
@@ -2271,12 +2522,24 @@ void Render3DNode::CookOnce(int frameId)
 
       // A source with both a mesh and a point cloud (Mesh to Points, Image
       // to Points) draws as sprites, not triangles - the cloud wins.
-      if (source->GetPointCloud() != nullptr)
+      if (IsCloudSource(source))
       {
          drawCloudSlot(i, source);
          return;
       }
+      {
+         // Blended, cutout and transmissive draws keep the full program; the
+         // rest never discard, so they take the variant without discard and
+         // the GPU may skip their hidden fragments.
+         const Material m = source->GetMaterial();
+         const bool opaque = m.alphaCutoff <= 0.0f && m.opacity >= 0.999f && !m.textureAlpha &&
+                             m.transmission <= 0.001f;
+         const bool variant = opaque && mProgramOpaque != 0 && sOpaqueVariantEnabled;
+         useProgram(variant ? mProgramOpaque : mProgramFull);
+         sOpaqueVariantDraws += variant ? 1 : 0;
+      }
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), 0);
 
       const Mesh& mesh = source->GetMesh();
       // HasGeometry(), not Empty(): a vertices-only mesh (Points to
@@ -2438,9 +2701,33 @@ void Render3DNode::CookOnce(int frameId)
       // Instanced sources upload a transform per copy and draw them all at
       // once; ten thousand instances stay a single draw call.
       auto* instancer = FindInstancer(source);
-      const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
+      const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, material);
+      const bool instanced = instancer != nullptr &&
+                             (gpuInstances != nullptr || instancer->InstanceCount() > 0);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
-      if (instanced)
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+      if (gpuInstances != nullptr)
+      {
+         // The copies come from the point textures; the per-instance
+         // attributes go off (they would read as constants) and the next CPU
+         // upload is forced by instanceAttribsOn.
+         if (gpu.instanceAttribsOn)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               glDisableVertexAttribArray(3 + col);
+               glVertexAttribDivisor(3 + col, 0);
+            }
+            glDisableVertexAttribArray(7);
+            glVertexAttribDivisor(7, 0);
+            gpu.instanceAttribsOn = false;
+         }
+         BindGpuInstances(mProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
+         gpu.instanceCount = gpuInstances->count;
+         gpu.instanceColored = true;
+         sGpuInstanceDraws++;
+      }
+      else if (instanced)
       {
          if (gpu.instanceVbo == 0)
             glGenBuffers(1, &gpu.instanceVbo);
@@ -2667,7 +2954,7 @@ void Render3DNode::CookOnce(int frameId)
    // same reason as above.
    auto isTranslucentMesh = [&](IGeometrySource* s)
    {
-      if (s == nullptr || s->GetPointCloud() != nullptr)
+      if (s == nullptr || IsCloudSource(s))
          return false;
       const Material m = s->GetMaterial();
       return (m.opacity < 0.999f || m.textureAlpha) && m.transmission <= 0.001f;
@@ -2677,7 +2964,7 @@ void Render3DNode::CookOnce(int frameId)
    for (int i = 0; i < (int)mDraw.size(); i++)
    {
       IGeometrySource* s = mDraw[i];
-      if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
+      if (s != nullptr && !IsCloudSource(s) && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
@@ -2692,7 +2979,7 @@ void Render3DNode::CookOnce(int frameId)
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (!IsCloudSource(s) && anyTransmissive && s->GetMaterial().transmission > 0.001f)
          continue;
       // Translucent (opacity < 1) meshes wait for the sorted pass below: drawn
       // in slot order with depth write on, a nearer one drawn first hides a
@@ -2721,6 +3008,7 @@ void Render3DNode::CookOnce(int frameId)
       glGenerateMipmap(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, 0);
 
+      mProgram = mProgramFull; // transmissive draws use the full program
       glUseProgram(mProgram);
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
@@ -2796,6 +3084,7 @@ void Render3DNode::CookOnce(int frameId)
                        [](const TranslucentDraw& a, const TranslucentDraw& b) { return a.depth < b.depth; });
       if (!translucent.empty())
       {
+         mProgram = mProgramFull; // blended draws use the full program
          glUseProgram(mProgram);
          glDepthMask(GL_FALSE);
          for (const TranslucentDraw& t : translucent)

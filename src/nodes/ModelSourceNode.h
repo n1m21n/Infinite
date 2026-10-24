@@ -11,6 +11,11 @@
 // Decoding goes through ModelIO in the platform shim rather than a bundled
 // importer, matching how images and video are handled: OBJ, PLY, STL, USD and
 // USDZ come free with the OS. glTF and FBX are not covered.
+//
+// A .ply with no faces (a scan, a Gaussian-splat export) loads as a point
+// cloud instead (core/PlyPoints.h, read the same on every platform): the mesh
+// is empty, GetPointCloud() carries the points with the file's colours, and
+// GetGpuPoints() uploads them once per load or point-size change.
 class ModelSourceNode : public INode, public IGeometrySource
 {
 public:
@@ -40,6 +45,10 @@ public:
    unsigned int GetSurfaceTexture() override;
    unsigned long long SurfaceTextureRevision() const override { return mTextureInput.Revision(); }
 
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
+   const GpuPoints* GetGpuPoints() override;
+
    ImageCable& TextureInput() { return mTextureInput; }
    const char* InputLabel(int) const override { return "texture"; }
 
@@ -47,6 +56,8 @@ public:
    const std::string& Path() const { return mPath; }
    const std::string& Status() const { return mStatus; }
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
+   bool IsPointCloud() const { return mIsPoints; }
+   size_t PointCount() const { return mIsPoints ? mPoints.size() : 0; }
 
    // Imported files arrive at wildly different scales - millimetres, metres,
    // whatever the authoring tool used. Fitting to a unit box on load means a
@@ -58,6 +69,9 @@ public:
    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
    float uniformScale = 1.0f;
    float spinY = 0.0f;
+   // Point clouds only: each point's sprite half-size, in the fitted model's
+   // units (a unit box when "fit to unit size" is on).
+   float pointSize = 0.005f;
 
    float color[3] = { 0.82f, 0.83f, 0.86f };
    float metallic = 0.1f;
@@ -96,6 +110,7 @@ public:
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scale", uniformScale); v.Float("spin", spinY);
+      v.Float("pointSize", pointSize);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
@@ -121,8 +136,20 @@ public:
 private:
    void Normalize();
 
+   // Writes pointSize into every point's scale when it changed since the
+   // last call, moving the point revision.
+   void ApplyPointSize();
+
    Mesh mMesh;
    unsigned long long mMeshRevision = 0;
+   bool mIsPoints = false;
+   std::vector<Particle> mPoints;
+   unsigned long long mPointRevision = 0;
+   float mAppliedPointSize = -1.0f;
+   GpuPointsGL::Target mGpuTarget;
+   GpuPoints mGpuPoints;
+   unsigned long long mGpuUploadedRevision = 0;
+   bool mGpuValid = false;
    mutable unsigned long long mMaterialRevision = 0;
    mutable size_t mLastMaterialHash = 0;
    std::string mPath;

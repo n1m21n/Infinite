@@ -8,6 +8,7 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 #include "Mesh.h"
+#include "GpuPoints.h"
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -286,6 +287,12 @@ public:
    // Points) returns 1.0f; a source that documents p.scale as a 0-1-ish
    // multiplier of its own cell size (Image to Points) returns that cell size.
    virtual float PointBaseSize() const { return 1.0f; }
+   // The same points as GetPointCloud(), already on the GPU (core/GpuPoints.h).
+   // nullptr by default, and that default is the safety rule: a node that
+   // changes points in a way it cannot express as GpuPoints::pointMatrix must
+   // not forward it, so Render 3D falls back to reading its GetPointCloud().
+   // Render 3D and the mini viewport prefer this; nothing else reads it.
+   virtual const GpuPoints* GetGpuPoints() { return nullptr; }
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };
@@ -968,7 +975,13 @@ private:
    unsigned int mSceneColorTex = 0;
    float mSceneMaxLod = 0.0f;
 
+   // The program draws go through, one of the two below: every uniform call
+   // names mProgram, so switching it switches where they land.
    unsigned int mProgram = 0;
+   unsigned int mProgramFull = 0;
+   // Same shader with both discards compiled out (INF_NO_DISCARD), for opaque
+   // mesh draws with no alpha cutoff; 0 if it failed to link.
+   unsigned int mProgramOpaque = 0;
    bool mShaderTried = false;
    unsigned int mEnvBgProgram = 0;
    bool mEnvBgShaderTried = false;

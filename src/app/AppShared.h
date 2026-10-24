@@ -2554,6 +2554,8 @@ bool WouldCreateAudioCycle(INode* src, INode* dst);
 
 bool WouldCreateNoteCycle(INode* src, INode* dst);
 
+bool WouldCreateGeometryCycle(INode* src, INode* dst, int dstSlot);
+
 bool ConnectNodes(int srcIndex, int srcOutputIndex, int dstIndex, int dstSlot, std::string& outError);
 
 
@@ -4095,6 +4097,7 @@ void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n);
 
 void DrawPointsToVerticesParams(PointsToVerticesNode* n);
 void DrawProximityLinesParams(ProximityLinesNode* n);
+void DrawPointTrailsParams(PointTrailsNode* n);
 void DrawDelaunayParams(DelaunayMeshNode* n);
 void DrawCurveOpsParams(CurveOpsNode* n);
 void DrawRevolveParams(RevolveNode* n);
@@ -4113,6 +4116,7 @@ void DrawGeometryParams(GeometryNode* n);
 void DrawGeometryOpParams(GeometryOpNode* n);
 
 void DrawDisplacementParams(DisplacementNode* n);
+void DrawGeometryFeedbackParams(GeometryFeedbackNode* n);
 
 void DrawAudioDisplacementParams(AudioDisplacementNode* n);
 
@@ -6333,6 +6337,14 @@ void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3
 void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx, int& outCamIdx, int& outLfoIdx);
 
 void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outMaxY, int& outDragNodeIdx);
+
+// B11 points (P8 phase 0): scene "a" video > Image to Points > Transform,
+// "b" Particle System, "c" Particle System > Instance on Points (cubes).
+// n is the point count asked for (the Image to Points grid is square, so "a"
+// rounds to the nearest density). outPointsIdx is the node whose cloud size
+// the report quotes.
+bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clipPath,
+                        int& outRender3DIdx, int& outOutputIdx, int& outPointsIdx, std::string& outError);
 
 bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool withSyphon, bool withCamera, int windows,
                               std::vector<int>& outClipIdx, std::vector<int>& outOutputIdx,

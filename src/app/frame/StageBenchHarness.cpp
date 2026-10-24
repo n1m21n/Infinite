@@ -197,6 +197,7 @@ void DrawBenchHarness(FrameCtx& fc)
    auto& isBenchB6 = fc.isBenchB6;
    auto& isBenchB9 = fc.isBenchB9;
    auto& isBenchB8 = fc.isBenchB8;
+   auto& isBenchB11 = fc.isBenchB11;
    auto& benchStagesSample = fc.benchStagesSample;
    auto& benchStagesCpuSample = fc.benchStagesCpuSample;
    auto& b6TrackVis = fc.b6TrackVis;
@@ -280,6 +281,93 @@ void DrawBenchHarness(FrameCtx& fc)
 
             report.Emit();
             printf(isBenchB4 ? "B4COMPLEX3D DONE\n" : "B2VISUALS DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B11 points fixture (P8 phase 0). Same report as B2/B4, but the sample
+      // window starts only once the cloud holds 95% of the points asked for
+      // (a Particle System fills over its lifetime; video needs a first
+      // frame), or after 30 s, in which case the report says not filled.
+      if (isBenchB11)
+      {
+         static double sFillStartS = -1.0;
+         static int sAsked = 0;
+         auto cloudSize = []() -> long long {
+            GraphNode* gn = FindNodeByIndex(sBenchB11PointsIdx);
+            if (gn == nullptr) return 0;
+            if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn->node.get())) return (long long)ps->AliveCount();
+            if (auto* ip = dynamic_cast<ImageToPointsNode*>(gn->node.get())) return (long long)ip->PointCount();
+            return 0;
+         };
+         if (frameId == 2)
+         {
+            gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0;
+            sBenchB2RssStartMb = Bench::ProcessRssMb();
+            sFillStartS = glfwGetTime();
+            const char* nEnv = getenv("INFINITE_BENCH_B11N");
+            sAsked = nEnv ? std::max(1, atoi(nEnv)) : 100000;
+            if (GraphNode* gn = FindNodeByIndex(sBenchB11PointsIdx))
+               if (auto* ip = dynamic_cast<ImageToPointsNode*>(gn->node.get()))
+                  sAsked = ip->density * ip->density; // the grid is square
+         }
+         static bool sFilled = false;
+         if (frameId >= 32 && sBenchB11SampleStart < 0)
+         {
+            sFilled = cloudSize() >= (long long)(0.95 * sAsked);
+            if (sFilled || glfwGetTime() - sFillStartS > 30.0)
+            {
+               sBenchB11SampleStart = frameId + 1;
+               sBenchB2FboAtF32 = GLUtil::FboAllocationCount();
+            }
+         }
+         const int s0 = sBenchB11SampleStart;
+         if (s0 >= 0 && frameId >= s0 && frameId < s0 + 120 && gLastFrameMs > 0.0)
+            sBenchB2FrameMs.Push(gLastFrameMs);
+         if (s0 >= 0 && frameId == s0 + 120)
+         {
+            Bench::BenchReport report;
+            report.bench = "B11_points";
+            report.fboAllocsSteady = (long long)(GLUtil::FboAllocationCount() - sBenchB2FboAtF32);
+            report.variant = sBenchB2Variant;
+            report.frames = 120;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB2FrameMs;
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+            report.memRssStartMb = sBenchB2RssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.points = {
+               { "asked", sAsked },
+               { "count", cloudSize() },
+               { "filled", sFilled },
+               { "fill_s", glfwGetTime() - sFillStartS },
+            };
+            if (GraphNode* gn = FindNodeByIndex(sBenchB2Render3DIdx))
+               if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))
+               {
+                  report.tris = (int)r->LastTriangleCount();
+                  report.drawCalls = (int)r->LastDrawCalls();
+               }
+            if (GraphNode* outGn = FindNodeByIndex(sBenchB2OutputIdx))
+               if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+               {
+                  glBindFramebuffer(GL_READ_FRAMEBUFFER, outNode->GetFbo().fbo);
+                  report.outputHash = Bench::HashFramebufferRGBA8(outNode->GetOutputWidth(), outNode->GetOutputHeight());
+                  glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+               }
+            report.Emit();
+            printf("B11POINTS DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

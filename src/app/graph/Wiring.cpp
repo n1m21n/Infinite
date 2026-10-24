@@ -376,6 +376,8 @@ namespace app
          return 1; // also covers Viewport, which derives from it
       if (dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<GeometryFeedbackNode*>(gn.node.get()) != nullptr)
+         return 2; // seed, loop
       if (dynamic_cast<MappingNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr)
@@ -388,6 +390,8 @@ namespace app
          return 2; // depth and optional color
       if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr)
+         return 1; // optional geometry to be born on
       if (dynamic_cast<RigidBodyNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr)
@@ -424,6 +428,8 @@ namespace app
       if (dynamic_cast<PointsToVerticesNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ProximityLinesNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<PointTrailsNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr)
          return 1;
@@ -962,6 +968,50 @@ namespace app
    }
 
 
+   // Geometry equivalent of the two walks above. Geometry cables are pulled
+   // (each node cooks and reads its inputs), so a cycle recurses until the
+   // stack runs out. Feedback 3D's loop pin is the one legal way round: it
+   // reads its loop input as last frame's capture and never pulls through it,
+   // so a cable into that pin is always allowed and the walk does not follow
+   // one either.
+   bool WouldCreateGeometryCycle(INode* src, INode* dst, int dstSlot)
+   {
+      if (dynamic_cast<GeometryFeedbackNode*>(dst) != nullptr && dstSlot == GeometryFeedbackNode::kLoopSlot)
+         return false;
+      if (src == dst)
+         return true;
+      std::vector<INode*> stack{ dst };
+      std::set<INode*> visited;
+      while (!stack.empty())
+      {
+         INode* cur = stack.back();
+         stack.pop_back();
+         if (!visited.insert(cur).second)
+            continue;
+         auto* curGeo = dynamic_cast<IGeometrySource*>(cur);
+         if (curGeo == nullptr)
+            continue;
+         for (GraphNode& gn : gNodes)
+         {
+            const bool isFeedback = dynamic_cast<GeometryFeedbackNode*>(gn.node.get()) != nullptr;
+            for (int slot = 0; slot < kMaxGeometrySlots; slot++)
+            {
+               if (isFeedback && slot == GeometryFeedbackNode::kLoopSlot)
+                  continue;
+               IGeometrySource** field = gn.node->GeometryInputSlot(slot);
+               if (field != nullptr && *field == curGeo)
+               {
+                  if (gn.node.get() == src)
+                     return true;
+                  stack.push_back(gn.node.get());
+               }
+            }
+         }
+      }
+      return false;
+   }
+
+
    // What a source node's output can be plugged into - the flags
    // IsInputSlotCompatible wants, gathered once so ConnectNodes and the patch
    // validator ask the same rule the same way.
@@ -1052,6 +1102,12 @@ namespace app
       if (srcIsNoteSource && WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
       {
          outError = "would create a note feedback loop";
+         return false;
+      }
+      if (caps.geometry != nullptr && dstNode->node->GeometryInputSlot(dstSlot) != nullptr &&
+          WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get(), dstSlot))
+      {
+         outError = "would create a geometry loop - close it through a Feedback 3D's loop pin";
          return false;
       }
 

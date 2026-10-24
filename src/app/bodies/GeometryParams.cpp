@@ -567,14 +567,14 @@ namespace app
 
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
-      ImGui::TextDisabled("%zu alive", n->AliveCount());
+      ImGui::TextDisabled(n->OnGpu() ? "%zu alive (GPU)" : "%zu alive", n->AliveCount());
       if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("emitter");
       DropdownButton("shape", ParticleSystemNode::EmitShapeNames(), n->emitShape,
                      [n](int i) { n->emitShape = i; });
-      ModSliderInt("max particles", &n->maxParticles, 16, 50000);
+      ModSliderInt("max particles", &n->maxParticles, 16, ParticleSystemNode::kGpuMaxParticles);
       ModSlider("rate / sec", &n->emitRate, 0.0f, 3000.0f);
       ModSlider("radius", &n->emitRadius, 0.0f, 3.0f);
       ModSlider("lifetime", &n->lifetime, 0.1f, 20.0f);
@@ -589,7 +589,7 @@ namespace app
       ModSlider("dir z", &n->dirZ, -1.0f, 1.0f);
 
       bool psSaved = false;
-      const bool psOpen = BeginAdvancedFold("showMoreParticles", 9, 2, psSaved);   // forces + over life
+      const bool psOpen = BeginAdvancedFold("showMoreParticles", 14, 2, psSaved);   // forces + over life + emit/time
       if (psOpen)
          NodeSeparator("forces");
       ModSlider("gravity x", &n->gravityX, -10.0f, 10.0f);
@@ -606,7 +606,25 @@ namespace app
       ColorSwatch("start colour", n->startColor, n);
       ColorSwatch("end colour", n->endColor, n);
       ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
+
+      // Appended after seed so every older row keeps its modulation slot.
+      if (psOpen)
+         NodeSeparator("emit & time");
+      ModCheckbox("emit from input", &n->emitFromInput);
+      ModSlider("speed along normal", &n->speedAlongNormal, -10.0f, 10.0f);
+      ModCheckbox("copy source colour", &n->copySourceColor);
+      ModSlider("mass", &n->mass, 0.1f, 10.0f);
+      ModSlider("time scale", &n->timeScale, 0.0f, 4.0f);
+      ModSlider("size curve", &n->sizeCurve, 0.1f, 10.0f);
+      ModSlider("colour curve", &n->colorCurve, 0.1f, 10.0f);
       gParamRegisterOnly = psSaved;
+
+      if (!n->CookWarning().empty())
+      {
+         PushTextWrapWidth(kPreviewSize);
+         ImGui::TextUnformatted(n->CookWarning().c_str());
+         PopTextWrapWidth();
+      }
    }
 
 
@@ -874,6 +892,29 @@ namespace app
    }
 
 
+   void DrawPointTrailsParams(PointTrailsNode* n)
+   {
+      ImGui::TextDisabled("%zu tails, %d points tracked", n->TrailCount(), n->TrackedPoints());
+      ModSliderInt("length", &n->length, 2, 240);
+      ModSliderInt("sample every", &n->sampleEvery, 1, 10);
+      ModSlider("width", &n->width, 0.0005f, 0.2f, "%.4f");
+      ModSlider("fade", &n->fade, 0.0f, 1.0f);
+      ModSlider("taper", &n->taper, 0.0f, 1.0f);
+      DropdownButton("colour", PointTrailsNode::ColorModeNames(), n->colorMode,
+                     [n](int i) { PushUndoCheckpoint(); n->colorMode = i; });
+      if (n->colorMode == PointTrailsNode::kColorGradient)
+      {
+         ColorSwatch("head", n->headColor, n);
+         ColorSwatch("tail", n->tailColor, n);
+      }
+      DropdownButton("match by", PointTrailsNode::MatchModeNames(), n->matchMode,
+                     [n](int i) { PushUndoCheckpoint(); n->matchMode = i; });
+      ModSliderInt("point limit", &n->pointLimit, 1, 100000);
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
+         n->Clear();
+   }
+
+
    void DrawCurveOpsParams(CurveOpsNode* n)
    {
       if (n->input != nullptr)
@@ -1017,6 +1058,13 @@ namespace app
          // Both are applied at load time, so changing them has to re-import.
          if (!n->Path().empty())
             n->Load(n->Path());
+      }
+
+      // A face-less .ply loads as points; their size is the only point knob.
+      if (n->IsPointCloud() || gParamRegisterOnly)
+      {
+         NodeSeparator("points");
+         ModSlider("point size", &n->pointSize, 0.0005f, 0.05f);
       }
    }
 
@@ -1371,14 +1419,45 @@ namespace app
       if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles", n->TriangleCount());
 
+      static const std::vector<std::string> kSourceNames = { "Texture", "Noise" };
+      DropdownButton("source", kSourceNames, n->source, [n](int i) { n->source = i; });
+      const bool noise = n->source == DisplacementNode::kNoise;
       static const std::vector<std::string> kModeNames = { "Scalar (along normal)", "Vector (RGB = XYZ)" };
-      DropdownButton("mode", kModeNames, n->mode, [n](int i) { n->mode = i; });
+      static const std::vector<std::string> kNoiseModeNames = { "Scalar (along normal)", "Vector (XYZ)" };
+      DropdownButton("mode", noise ? kNoiseModeNames : kModeNames, n->mode, [n](int i) { n->mode = i; });
       ModSlider("strength", &n->strength, -2.0f, 2.0f);
-      if (n->mode == DisplacementNode::kScalar)
+      if (n->mode == DisplacementNode::kScalar && !noise)
          ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
+      if (noise || gParamRegisterOnly)
+      {
+         NodeSeparator("noise");
+         DropdownButton("type", DisplacementNode::NoiseTypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
+         DropdownButton("affects", DisplacementNode::AffectsNames(), n->affects, [n](int i) { n->affects = i; });
+         ModSlider("frequency", &n->frequency, 0.01f, 20.0f);
+         ModSlider("speed", &n->speed, 0.0f, 10.0f);
+         // Detail and grain only shape the octave types.
+         ImGui::BeginDisabled(n->noiseType != 1 && n->noiseType != 3 && !gParamRegisterOnly);
+         ModSliderInt("detail", &n->octaves, 1, 8);
+         ModSlider("grain", &n->noiseRoughness, 0.0f, 1.0f);
+         ImGui::EndDisabled();
+         ModSliderInt("seed", &n->seed, 0, 999);
+      }
       ModCheckbox("flat shade", &n->flatShade);
       ModCheckbox("flip normals", &n->flipNormals);
       ModCheckbox("selection only", &n->selectionOnly);
+   }
+
+
+   void DrawGeometryFeedbackParams(GeometryFeedbackNode* n)
+   {
+      if (n->seed == nullptr)
+         ImGui::TextDisabled("patch a shape into seed");
+      else if (!n->Looping())
+         ImGui::TextDisabled("passing the seed through");
+      else
+         ImGui::TextDisabled("looping, frame %d", n->Generation());
+      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize, 0)))
+         n->Reset();
    }
 
 

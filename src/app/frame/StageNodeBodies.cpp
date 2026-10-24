@@ -433,6 +433,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   dynamic_cast<OceanNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<DisplacementNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<GeometryFeedbackNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<AudioDisplacementNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<AudioRibbonNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr ||
@@ -480,7 +481,12 @@ void DrawNodeBodies(FrameCtx& fc)
             else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu instances"), inst->InstanceCount());
             else if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), T("%zu triangles"), model->TriangleCount());
+            {
+               if (model->IsPointCloud())
+                  snprintf(line, sizeof(line), T("%zu points"), model->PointCount());
+               else
+                  snprintf(line, sizeof(line), T("%zu triangles"), model->TriangleCount());
+            }
             else if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu triangles"), t3d->TriangleCount());
             else if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
@@ -495,6 +501,13 @@ void DrawNodeBodies(FrameCtx& fc)
                snprintf(line, sizeof(line), T("%zu triangles"), mat->TriangleCount());
             else if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu triangles"), disp->TriangleCount());
+            else if (auto* fb3 = dynamic_cast<GeometryFeedbackNode*>(gn.node.get()))
+            {
+               if (fb3->PointCount() > 0)
+                  snprintf(line, sizeof(line), T("%zu points"), fb3->PointCount());
+               else
+                  snprintf(line, sizeof(line), T("%zu triangles"), fb3->TriangleCount());
+            }
             else if (auto* adisp = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                snprintf(line, sizeof(line), T("%zu triangles"), adisp->TriangleCount());
             else if (auto* arib = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
@@ -988,6 +1001,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawGeometryOpParams(n);
                else if (auto* n = dynamic_cast<DisplacementNode*>(gn.node.get()))
                   DrawDisplacementParams(n);
+               else if (auto* n = dynamic_cast<GeometryFeedbackNode*>(gn.node.get()))
+                  DrawGeometryFeedbackParams(n);
                else if (auto* n = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
                   DrawAudioDisplacementParams(n);
                else if (auto* n = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
@@ -1008,6 +1023,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawPointsToVerticesParams(n);
                else if (auto* n = dynamic_cast<ProximityLinesNode*>(gn.node.get()))
                   DrawProximityLinesParams(n);
+               else if (auto* n = dynamic_cast<PointTrailsNode*>(gn.node.get()))
+                  DrawPointTrailsParams(n);
                else if (auto* n = dynamic_cast<CurveOpsNode*>(gn.node.get()))
                   DrawCurveOpsParams(n);
                else if (auto* n = dynamic_cast<SweepNode*>(gn.node.get()))

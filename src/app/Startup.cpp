@@ -3640,6 +3640,20 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench11Arg = getenv("INFINITE_BENCH_B11"))
+      {
+         // B11 points fixture (P8 phase 0, docs/plans/perf/benchmark-suite.md §4).
+         // INFINITE_BENCH_B11=<a|b|c|d>, INFINITE_BENCH_B11N=<points>.
+         const std::string scene = bench11Arg;
+         const char* nEnv = getenv("INFINITE_BENCH_B11N");
+         const int n = nEnv ? std::max(1, atoi(nEnv)) : 100000;
+         const char* mediaEnv = getenv("INFINITE_BENCH_B8MEDIA");
+         const std::string clip = std::string((mediaEnv && *mediaEnv) ? mediaEnv : "bench/media") + "/b8_1080p30_0.mp4";
+         sBenchB2Variant = "scene=" + scene + ",n=" + std::to_string(n);
+         std::string err;
+         if (!BuildBenchB11Scene(scene, n, clip, sBenchB2Render3DIdx, sBenchB2OutputIdx, sBenchB11PointsIdx, err))
+            fprintf(stderr, "BENCH: B11 setup failed: %s\n", err.c_str());
+      }
       else if (const char* bench4Arg = getenv("INFINITE_BENCH_B4SCALE"))
       {
          // B4 Complex 3D fixture (docs/plans/perf/benchmark-suite.md §4).

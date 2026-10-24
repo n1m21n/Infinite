@@ -66,6 +66,7 @@ public:
    // cloud or curve source patched into any slot survives the switcher.
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   const GpuPoints* GetGpuPoints() override;
    float PointBaseSize() const override;
    const Polyline* GetCurve() override;
    unsigned long long CurveStamp() override;

@@ -795,6 +795,7 @@ class MeshToPointsNode : public INode, public IGeometrySource
 {
 public:
    static INode* Create() { return new MeshToPointsNode(); }
+   ~MeshToPointsNode() override;
    const std::string& CookWarning() const override { return mCookWarning; }
    // Registered three times under Points/Edges/Faces names sharing one class,
    // the same way the geometry operators are.
@@ -821,6 +822,9 @@ public:
    unsigned long long PointRevision();
    const std::vector<Particle>* GetPointCloud() override { return &GetPoints(); }
    unsigned long long PointCloudRevision() override { return PointRevision(); }
+   // The same samples, uploaded once per rebuild (GpuPointsGL::Upload), so
+   // Render 3D and Instance on Points draw them without a per-frame copy.
+   const GpuPoints* GetGpuPoints() override;
 
    // Forwarded for the same reason the geometry operators forward it: sampling
    // a mesh does not relocate it.
@@ -922,6 +926,11 @@ private:
    std::vector<Particle> mPoints;
    size_t mPointCount = 0;
    unsigned long long mMeshRevision = 0;
+
+   GpuPointsGL::Target mGpuTarget;
+   GpuPoints mGpuPoints;
+   unsigned long long mGpuUploadedRevision = 0;
+   bool mGpuValid = false;
 
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;

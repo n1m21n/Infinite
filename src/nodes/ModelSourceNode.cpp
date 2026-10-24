@@ -8,6 +8,7 @@
 #include "AssetCache.h"
 #include "GltfImport.h"
 #include "Platform.h"
+#include "PlyPoints.h"
 #include "Transport.h"
 
 namespace
@@ -27,11 +28,19 @@ namespace
       static AssetCache<RawModelData> cache(512ull * 1024 * 1024);
       return cache;
    }
+
+   // The same for .ply point clouds, before Normalize().
+   AssetCache<PlyPoints::Cloud>& GetPointDecodeCache()
+   {
+      static AssetCache<PlyPoints::Cloud> cache(512ull * 1024 * 1024);
+      return cache;
+   }
 }
 
 ModelSourceNode::~ModelSourceNode()
 {
    GLUtil::DestroyFbo(mPreview);
+   GpuPointsGL::DestroyTarget(mGpuTarget);
 }
 
 namespace
@@ -55,7 +64,37 @@ bool ModelSourceNode::Load(const std::string& path)
    const bool isGltf = HasLowerExtension(path, "gltf") || HasLowerExtension(path, "glb");
 
    std::string note;
-   if (isGltf)
+   // A face-less .ply is a point cloud. A .ply with faces, or one this reader
+   // skips, goes on to the mesh path below as before.
+   const PlyPoints::Cloud* cloud = nullptr;
+   PlyPoints::Cloud readCloud;
+   std::string plyError;
+   if (HasLowerExtension(path, "ply") && GetModelDecodeCache().Get(path) == nullptr)
+   {
+      auto& pointCache = GetPointDecodeCache();
+      if (const PlyPoints::Cloud* hit = pointCache.Get(path))
+         cloud = hit;
+      else if (PlyPoints::Read(path, readCloud, plyError) == PlyPoints::Kind::kPoints)
+      {
+         pointCache.Put(path, readCloud, readCloud.points.size() * sizeof(Particle));
+         cloud = &readCloud;
+      }
+   }
+
+   if (cloud != nullptr)
+   {
+      if (cloud->points.empty())
+      {
+         mStatus = "PLY has no points";
+         return false;
+      }
+      mMesh = Mesh();
+      mPoints = cloud->points;
+      mIsPoints = true;
+      if (!cloud->hasColor)
+         note += " (no colour)";
+   }
+   else if (isGltf)
    {
       std::string error;
       const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, error);
@@ -96,6 +135,8 @@ bool ModelSourceNode::Load(const std::string& path)
          std::string error;
          if (!Platform::LoadModel(path, decoded.vertices, decoded.indices, error))
          {
+            if (error.empty())
+               error = plyError;
             mStatus = error.empty() ? "could not load model" : error;
             return false;
          }
@@ -118,26 +159,35 @@ bool ModelSourceNode::Load(const std::string& path)
       }
    }
 
+   if (cloud == nullptr)
+   {
+      mIsPoints = false;
+      mPoints.clear();
+   }
    Normalize();
    mPath = path;
    mMeshRevision = NextMeshRevision();
+   mAppliedPointSize = -1.0f; // ApplyPointSize writes the scales and moves the point revision
 
    const size_t slash = path.find_last_of('/');
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
-   mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles" + note;
+   if (mIsPoints)
+      mStatus = name + " - " + std::to_string(mPoints.size()) + " points" + note;
+   else
+      mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles" + note;
    return true;
 }
 
 void ModelSourceNode::Normalize()
 {
-   if (mMesh.vertices.empty())
+   if (mMesh.vertices.empty() && mPoints.empty())
       return;
 
    float lo[3] = { 1e30f, 1e30f, 1e30f };
    float hi[3] = { -1e30f, -1e30f, -1e30f };
-   for (const Vertex& v : mMesh.vertices)
+   auto grow = [&](float x, float y, float z)
    {
-      const float p[3] = { v.px, v.py, v.pz };
+      const float p[3] = { x, y, z };
       for (int k = 0; k < 3; k++)
       {
          // A single NaN would poison the bounds and collapse the whole model,
@@ -147,7 +197,11 @@ void ModelSourceNode::Normalize()
          lo[k] = std::min(lo[k], p[k]);
          hi[k] = std::max(hi[k], p[k]);
       }
-   }
+   };
+   for (const Vertex& v : mMesh.vertices)
+      grow(v.px, v.py, v.pz);
+   for (const Particle& p : mPoints)
+      grow(p.px, p.py, p.pz);
 
    const float centre[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
    const float extent = std::max(hi[0] - lo[0], std::max(hi[1] - lo[1], hi[2] - lo[2]));
@@ -167,6 +221,59 @@ void ModelSourceNode::Normalize()
       v.py *= scale;
       v.pz *= scale;
    }
+   for (Particle& p : mPoints)
+   {
+      if (recenter)
+      {
+         p.px -= centre[0];
+         p.py -= centre[1];
+         p.pz -= centre[2];
+      }
+      p.px *= scale;
+      p.py *= scale;
+      p.pz *= scale;
+   }
+}
+
+void ModelSourceNode::ApplyPointSize()
+{
+   const float size = std::max(0.0f, pointSize);
+   if (size == mAppliedPointSize)
+      return;
+   mAppliedPointSize = size;
+   for (Particle& p : mPoints)
+      p.scale = size;
+   mPointRevision = NextMeshRevision();
+}
+
+const std::vector<Particle>* ModelSourceNode::GetPointCloud()
+{
+   if (bypassed || !mIsPoints)
+      return nullptr;
+   ApplyPointSize();
+   return &mPoints;
+}
+
+unsigned long long ModelSourceNode::PointCloudRevision()
+{
+   if (bypassed || !mIsPoints)
+      return 0;
+   ApplyPointSize();
+   return mPointRevision;
+}
+
+const GpuPoints* ModelSourceNode::GetGpuPoints()
+{
+   if (bypassed || !mIsPoints || !GpuPointsGL::Enabled())
+      return nullptr;
+   ApplyPointSize();
+   if (mGpuUploadedRevision != mPointRevision)
+   {
+      mGpuUploadedRevision = mPointRevision;
+      mGpuValid = GpuPointsGL::Upload(mGpuTarget, mGpuPoints, mPoints, PointBaseSize(), "Model3D_GpuPoints");
+      mGpuPoints.revision = mPointRevision;
+   }
+   return mGpuValid ? &mGpuPoints : nullptr;
 }
 
 Mat4 ModelSourceNode::GetModelMatrix() const

@@ -128,7 +128,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-338 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+342 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -155,13 +155,14 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Depth Projection` | depth:image, color:image | out:geometry | 35 |  |
 | `Difference` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Disc` | texture:image | out:geometry | 51 | bypass |
-| `Displacement` | geo:geometry, texture:image | out:geometry | 23 |  |
+| `Displacement` | geo:geometry, texture:image | out:geometry | 31 |  |
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |
 | `Explode` | geo:geometry | out:geometry | 72 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 72 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 72 | bypass |
+| `Feedback 3D` | seed:geometry, loop:geometry | out:geometry | 0 |  |
 | `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
 | `Field Primitive` | none | out:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 51 | bypass |
@@ -187,18 +188,19 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
 | `Mirror` | geo:geometry | out:geometry | 72 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
-| `Model 3D` | texture:image | out:geometry | 27 | bypass |
+| `Model 3D` | texture:image | out:geometry | 28 | bypass |
 | `Normals` | geo:geometry | out:geometry | 72 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
 | `Ocean` | texture:image | out:geometry | 29 | bypass |
 | `Octahedron` | texture:image | out:geometry | 51 | bypass |
-| `Particle System` | none | out:geometry | 23 | bypass |
+| `Particle System` | emit:geometry | out:geometry | 30 | bypass |
 | `Plane` | texture:image | out:geometry | 51 | bypass |
+| `Point Trails` | points:geometry | out:geometry | 10 | bypass |
 | `Points to Vertices` | points:geometry | out:geometry | 18 | bypass |
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 45 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 51 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -276,7 +278,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Feedback` | input:image | out:image | 1 | bypass |
 | `Fit` | input:image | out:image | 8 | bypass |
 | `Fluid` | image:image, force:image, obstacles:image | out:image | 12 |  |
-| `Group` | none | out:image | 4 | bypass |
+| `Group` | none | out:image | 5 | bypass |
 | `Layer Stack` | input:image, input_2:image, input_3:image, input_4:image | out:image | 12 |  |
 | `Null` | in:image | out:image | 0 | bypass |
 | `Optical Flow` | image:image | out:image | 6 | bypass |
@@ -401,13 +403,13 @@ first, then the type name), then `--describe "<type>"` for parameters.
 |---|---|---|---|---|
 | `Arpeggiator` | notes:note | out:note | 9 | bypass |
 | `Bouncing Balls` | none | out:note | 9 | bypass |
-| `Chorder` | none | out:note | 10 | bypass |
+| `Chorder` | none | out:note | 28 | bypass |
 | `Field Notes` | notes:note | notes:note | 6 | bypass |
 | `Gate` | notes:note | out:note | 1 | bypass |
 | `Glide` | notes:note | out:note | 1 | bypass |
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
-| `MIDI File` | none | out:note | 6 | bypass |
+| `MIDI File` | none | out:note | 7 | bypass |
 | `MIDI Notes` | none | out:note | 6 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |
@@ -451,7 +453,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Draw` | input:image | out:image | 13 | bypass |
 | `Ellipse` | none | out:image | 20 | bypass |
 | `FieldPixel` | none | out:image | 9 | bypass |
-| `Formula` | none | out:image | 8 | bypass |
+| `Formula` | none | out:image | 25 | bypass |
 | `Gear` | none | out:image | 20 | bypass |
 | `Heart` | none | out:image | 20 | bypass |
 | `Hexagon` | none | out:image | 20 | bypass |
@@ -464,6 +466,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Rectangle` | none | out:image | 20 | bypass |
 | `Ring` | none | out:image | 20 | bypass |
 | `Rounded Rect` | none | out:image | 20 | bypass |
+| `Shadertoy` | ichannel0:image, ichannel1:image, ichannel2:image, ichannel3:image | out:image | 25 |  |
 | `Shape` | none | out:image | 20 | bypass |
 | `Sketch` | none | out:image | 8 | bypass |
 | `Slideshow` | none | out:image | 7 | bypass |
@@ -473,6 +476,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Text` | none | out:image | 20 | bypass |
 | `Texture` | none | out:image | 47 | bypass |
 | `Triangle` | none | out:image | 20 | bypass |
+| `VMPC` | notes:note | video:image, audio:audio | 165 | bypass |
 | `Video` | none | video:image, audio:audio | 7 | bypass |
 | `Video In` | none | out:image | 4 | hardware: refused headless, bypass |
 

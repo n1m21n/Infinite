@@ -35,12 +35,28 @@ namespace
       "uniform mat3 uNormalMatrix;\n"
       "uniform int uInstanced;\n"
       "uniform int uHasVertexColor;\n"
+      // GPU instances (Instance on Points over GPU points): each copy's
+      // matrix from its point texel, as Render3DNode's vertex shader does.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "out vec3 vNormal;\n"
       "out vec3 vWorldPos;\n"
       "out vec2 vUv;\n"
       "out vec3 vVertexColor;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   if (uGpuPoints == 1) {\n"
+      "      vec4 point = texelFetch(uPointPos, ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW), 0);\n"
+      "      float s = point.w * uPointSizeScale;\n"
+      "      vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "      model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                    vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "   }\n"
       "   vec4 world = model * vec4(aPos, 1.0);\n"
       "   vWorldPos = world.xyz;\n"
       // Per-instance matrices skip the CPU-computed inverse-transpose
@@ -129,6 +145,32 @@ namespace
       "   vec2 c = gl_PointCoord - vec2(0.5);\n"
       "   if (dot(c, c) > 0.25) discard;\n"
       "   fragColor = vec4(vColor, 1.0);\n"
+      "}\n";
+
+   // The same points from GPU textures (core/GpuPoints.h): point i at texel
+   // (i % uPointTexW, i / uPointTexW); w == 0 hides it. Positions go through
+   // pointMatrix only, as the CPU path above uses each particle's position
+   // as is (a Transform's CPU cloud has its matrix baked in).
+   const char* kGpuPointVertSrc =
+      "#version 150\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform sampler2D uPointColor;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointMatrix;\n"
+      "uniform mat4 uViewProj;\n"
+      "uniform float uPointSize;\n"
+      "out vec3 vColor;\n"
+      "void main() {\n"
+      "   ivec2 texel = ivec2(gl_VertexID % uPointTexW, gl_VertexID / uPointTexW);\n"
+      "   vec4 point = texelFetch(uPointPos, texel, 0);\n"
+      "   vColor = texelFetch(uPointColor, texel, 0).rgb;\n"
+      "   if (point.w <= 0.0) {\n"
+      "      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);\n" // outside the clip volume
+      "      gl_PointSize = 1.0;\n"
+      "      return;\n"
+      "   }\n"
+      "   gl_Position = uViewProj * (uPointMatrix * vec4(point.xyz, 1.0));\n"
+      "   gl_PointSize = uPointSize;\n"
       "}\n";
 
    // Bound in place of a real surface texture when a geometry has none, same
@@ -232,9 +274,9 @@ namespace
       return program;
    }
 
-   unsigned int LinkPointProgram()
+   unsigned int LinkPointProgram(const char* vertSrc = kPointVertSrc)
    {
-      const unsigned int vert = CompileShader(GL_VERTEX_SHADER, kPointVertSrc, "point");
+      const unsigned int vert = CompileShader(GL_VERTEX_SHADER, vertSrc, "point");
       const unsigned int frag = CompileShader(GL_FRAGMENT_SHADER, kPointFragSrc, "point");
       if (vert == 0 || frag == 0)
          return 0u;
@@ -274,6 +316,7 @@ NodeViewport::~NodeViewport()
    if (mVertexColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(mVertexColorVbo); glDeleteBuffers(1, &mVertexColorVbo); }
    if (mPointVbo != 0) { Bench::GpuMem::ReleaseBuffer(mPointVbo); glDeleteBuffers(1, &mPointVbo); }
    if (mPointVao != 0) glDeleteVertexArrays(1, &mPointVao);
+   if (mGpuPointVao != 0) glDeleteVertexArrays(1, &mGpuPointVao);
    if (mSelInstanceOverrideVbo != 0) { Bench::GpuMem::ReleaseBuffer(mSelInstanceOverrideVbo); glDeleteBuffers(1, &mSelInstanceOverrideVbo); }
 }
 
@@ -540,8 +583,13 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // offers both; the mesh wins there, matching drawCloudSlot's "a cloud wins
    // over triangles" rule being moot since this thumbnail has no triangles to
    // lose in that case anyway - hasMesh already covers it.
-   const std::vector<Particle>* cloud = hasMesh ? nullptr : geo->GetPointCloud();
-   bool hasCloud = false;
+   // GPU points first, and then the CPU cloud is never asked for: a GPU
+   // producer builds it only on demand.
+   const GpuPoints* gpuPoints = hasMesh ? nullptr : geo->GetGpuPoints();
+   const bool useGpuPoints = gpuPoints != nullptr && gpuPoints->count > 0 && gpuPoints->posTex != 0 &&
+                             gpuPoints->colorTex != 0 && gpuPoints->texW > 0;
+   const std::vector<Particle>* cloud = (hasMesh || gpuPoints != nullptr) ? nullptr : geo->GetPointCloud();
+   bool hasCloud = useGpuPoints;
    if (cloud != nullptr)
    {
       for (const Particle& p : *cloud)
@@ -557,7 +605,9 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    w = std::max(16, w);
    h = std::max(16, h);
 
-   const unsigned long long revision = usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision();
+   const unsigned long long revision = useGpuPoints ? gpuPoints->revision
+                                     : usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision();
+   const Mat4 pointMatrix = useGpuPoints ? gpuPoints->pointMatrix : Mat4::Identity();
    const Mat4 model = geo->GetModelMatrix();
    const Material material = geo->GetMaterial();
    const unsigned int surfaceTexture = geo->GetSurfaceTexture();
@@ -571,7 +621,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // Position/rotation/scale sliders move GetModelMatrix() without touching
    // the mesh at all, so MeshRevision() alone would miss them - a static mesh
    // patch through a moving Transform node has to be caught here instead.
-   const bool modelChanged = !(model == mLastModel);
+   const bool modelChanged = !(model == mLastModel) || !(pointMatrix == mLastPointMatrix);
    const bool materialChanged =
       material.color[0] != mLastMaterial.color[0] || material.color[1] != mLastMaterial.color[1] ||
       material.color[2] != mLastMaterial.color[2] || material.metallic != mLastMaterial.metallic ||
@@ -610,14 +660,46 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    // not per instance, so N nodes with viewports open cost one compile total.
    static const unsigned int program = LinkLitProgram();
    static const unsigned int pointProgram = LinkPointProgram();
-   if ((usePointCloud && pointProgram == 0) || (!usePointCloud && program == 0))
+   static const unsigned int gpuPointProgram = LinkPointProgram(kGpuPointVertSrc);
+   if ((useGpuPoints && gpuPointProgram == 0) || (usePointCloud && !useGpuPoints && pointProgram == 0) ||
+       (!usePointCloud && program == 0))
       return 0;
    static const unsigned int selectionProgram = LinkSelectionProgram();
 
    if (!EnsureFbo(w, h))
       return 0;
 
-   if (usePointCloud)
+   if (useGpuPoints)
+   {
+      if (mGpuPointVao == 0)
+         glGenVertexArrays(1, &mGpuPointVao);
+      // Framing bounds from the producer's own box through pointMatrix, so
+      // no point is ever read back.
+      mHasBounds = gpuPoints->hasBounds;
+      if (mHasBounds)
+      {
+         mLo[0] = mLo[1] = mLo[2] = 1e30f;
+         mHi[0] = mHi[1] = mHi[2] = -1e30f;
+         for (int corner = 0; corner < 8; corner++)
+         {
+            const float c[3] = {
+               (corner & 1) ? gpuPoints->hi[0] : gpuPoints->lo[0],
+               (corner & 2) ? gpuPoints->hi[1] : gpuPoints->lo[1],
+               (corner & 4) ? gpuPoints->hi[2] : gpuPoints->lo[2]
+            };
+            for (int k = 0; k < 3; k++)
+            {
+               const float p = pointMatrix.m[k] * c[0] + pointMatrix.m[4 + k] * c[1] +
+                               pointMatrix.m[8 + k] * c[2] + pointMatrix.m[12 + k];
+               mLo[k] = std::min(mLo[k], p);
+               mHi[k] = std::max(mHi[k], p);
+            }
+         }
+      }
+      // The CPU upload is stale now; rebuild it if the source falls back.
+      mLastPointRevision = (unsigned long long)-1;
+   }
+   else if (usePointCloud)
       UploadPoints(*cloud, revision);
    else
       UploadMesh(mesh, revision);
@@ -731,7 +813,31 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glCullFace(GL_BACK);
    glDisable(GL_BLEND);
 
-   if (usePointCloud)
+   if (useGpuPoints)
+   {
+      glUseProgram(gpuPointProgram);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gpuPoints->posTex);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, gpuPoints->colorTex);
+      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointPos"), 0);
+      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointColor"), 1);
+      glUniform1i(glGetUniformLocation(gpuPointProgram, "uPointTexW"), gpuPoints->texW);
+      glUniformMatrix4fv(glGetUniformLocation(gpuPointProgram, "uPointMatrix"), 1, GL_FALSE, pointMatrix.m);
+      glUniformMatrix4fv(glGetUniformLocation(gpuPointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniform1f(glGetUniformLocation(gpuPointProgram, "uPointSize"), 6.0f); // as the CPU path below
+      glEnable(GL_PROGRAM_POINT_SIZE);
+      glBindVertexArray(mGpuPointVao);
+      glDrawArrays(GL_POINTS, 0, gpuPoints->count);
+      glBindVertexArray(0);
+      glDisable(GL_PROGRAM_POINT_SIZE);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glUseProgram(0);
+   }
+   else if (usePointCloud)
    {
       glUseProgram(pointProgram);
       glUniformMatrix4fv(glGetUniformLocation(pointProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
@@ -763,8 +869,40 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glUniform1i(glGetUniformLocation(program, "uTexture"), 0);
    glUniform1i(glGetUniformLocation(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
 
+   // A stamp with its own face selection keeps the CPU matrices: the overlay
+   // below reads them through aInstance.
+   const GpuPoints* gpuInstances =
+      (instanced && mesh.faceMask.empty()) ? ResolveGpuInstances(geo, instancer) : nullptr;
+   glUniform1i(glGetUniformLocation(program, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+
    glBindVertexArray(mVao);
-   if (instanced)
+   if (gpuInstances != nullptr)
+   {
+      if (mInstanceAttribsOn)
+      {
+         for (int col = 0; col < 4; col++)
+         {
+            glDisableVertexAttribArray(2 + col);
+            glVertexAttribDivisor(2 + col, 0);
+         }
+         mInstanceAttribsOn = false;
+      }
+      // Unit 1: unit 0 holds the surface texture.
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, gpuInstances->posTex);
+      glActiveTexture(GL_TEXTURE0);
+      glUniform1i(glGetUniformLocation(program, "uPointPos"), 1);
+      glUniform1i(glGetUniformLocation(program, "uPointTexW"), gpuInstances->texW);
+      glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gpuInstances->pointMatrix.m);
+      glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer->GpuInstanceSizeScale());
+      glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, instanceGroupMatrix.m);
+      const Mat4 shapeModel = instancer->GpuInstanceShapeModel();
+      glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shapeModel.m);
+      mInstanceCount = gpuInstances->count;
+      glDrawElementsInstanced(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr,
+                              (GLsizei)mInstanceCount);
+   }
+   else if (instanced)
    {
       if (mInstanceVbo == 0)
          glGenBuffers(1, &mInstanceVbo);
@@ -997,6 +1135,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    mLastElevation = cam.elevation;
    mLastDistance = mDistance;
    mLastModel = model;
+   mLastPointMatrix = pointMatrix;
    mLastMaterial = material;
    mLastSurfaceTexture = surfaceTexture;
    mLastSurfaceTextureRevision = surfaceTextureRevision;

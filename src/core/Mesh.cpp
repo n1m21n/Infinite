@@ -2584,6 +2584,29 @@ namespace MeshOps
       return RecalculateNormals(out, flat, flip);
    }
 
+   void DisplacePoints(std::vector<Particle>& points, const std::vector<float>& texRGBA, int texW, int texH,
+                       int mode, float strength, float midlevel)
+   {
+      if (texRGBA.empty() || texW <= 0 || texH <= 0)
+         return;
+      for (Particle& p : points)
+      {
+         float s[4];
+         SampleBilinearRGBA(texRGBA, texW, texH, p.px * 0.5f + 0.5f, p.py * 0.5f + 0.5f, s);
+         if (mode == 1)
+         {
+            p.px += (s[0] - 0.5f) * 2.0f * strength;
+            p.py += (s[1] - 0.5f) * 2.0f * strength;
+            p.pz += (s[2] - 0.5f) * 2.0f * strength;
+         }
+         else
+         {
+            const float height = 0.299f * s[0] + 0.587f * s[1] + 0.114f * s[2];
+            p.pz += (height - midlevel) * strength;
+         }
+      }
+   }
+
    // Averages three (or two) component-wise normals and renormalises, falling
    // back to the un-normalised sum (or +Y) when opposed normals cancel out.
    static void NormalizeOrFallback(float& nx, float& ny, float& nz)

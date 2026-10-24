@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "DisplaceNoise.h"
 #include "Geometry3DNodes.h"
 #include "Palette.h"
 
@@ -15,6 +16,11 @@ InstanceOnPointsNode* FindInstancer(IGeometrySource* source);
 bool WrapsInstancer(IGeometrySource* source);
 const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer);
 const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source);
+// The instancer's GPU points (InstanceOnPointsNode::GpuInstancePoints) when
+// nothing between `source` and it edits the copies on the CPU - a selection or
+// an override list - so a drawer may build them in its vertex shader.
+// nullptr = draw ResolveInstanceTransforms() instead.
+const GpuPoints* ResolveGpuInstances(IGeometrySource* source, InstanceOnPointsNode* instancer);
 
 // Bakes what a Group 3D carries into one mesh: nested groups expanded, each leaf placed by its own model matrix
 // (or realized through its instancer), a tinted leaf's colour baked into vertex colour. `signature` is the
@@ -60,6 +66,7 @@ public:
    };
 
    static INode* Create() { return new GeometryOpNode(); }
+   ~GeometryOpNode() override;
    // Each operator is registered as its own spawnable node, all sharing this
    // class - the spawn menu shows ten named nodes, and the dropdown still lets
    // you switch operation without rewiring.
@@ -124,12 +131,20 @@ public:
    unsigned long long CurveStamp() override;
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    // Point cloud forwards unchanged for every op except kTransform, which
-   // applies TransformMatrix() to each particle. Deliberately NOT applied for
-   // kArray: array's semantics on a point cloud (replicate the whole cloud N
-   // times? offset each copy?) are ambiguous and nobody has asked for it, so
-   // it passes the cloud through untouched rather than guessing.
+   // applies TransformMatrix() to each particle, and kTwist, which twists
+   // each particle's position (and turns its normal) exactly as it twists a
+   // mesh vertex; size and colour are left alone. Deliberately NOT applied
+   // for kArray: array's semantics on a point cloud (replicate the whole
+   // cloud N times? offset each copy?) are ambiguous and nobody has asked
+   // for it, so it passes the cloud through untouched rather than guessing.
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   // Transform hands GPU points on with its matrix folded into pointMatrix,
+   // no copy; Twist runs one pass over them into its own textures (the
+   // upstream pointMatrix baked in, since a twist is not a matrix); every
+   // other op (and bypass) forwards the input's as is, the same way
+   // GetPointCloud() forwards the input's cloud.
+   const GpuPoints* GetGpuPoints() override;
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -402,6 +417,25 @@ private:
    unsigned long long mPointCloudBuiltUpstreamRevision = 0;
    Mat4 mPointCloudBuiltMatrix;
    unsigned long long mPointCloudRevision = 0;
+   // What mPointCloudRevision was stamped for: it moves iff these do, whether
+   // or not the CPU copy above was ever built (GPU points never need it).
+   bool mHasPointCloudStamp = false;
+   const void* mPointCloudStampUpstream = nullptr;
+   unsigned long long mPointCloudStampUpstreamRevision = 0;
+   Mat4 mPointCloudStampMatrix;
+   void StampPointCloudRevision(unsigned long long upstreamRev, const Mat4& m);
+   // The ops that change a point cloud, and what their cloud revision is
+   // stamped on: Transform's matrix, or Twist's angle and axis.
+   bool ActsOnPoints() const { return op == kTransform || op == kTwist; }
+   Mat4 PointOpKey() const;
+   float TwistAngle() const { return amount * 3.14159265f / 180.0f * 3.0f; }
+   GpuPoints mGpuPoints;
+   // kTwist's GPU points: its own textures, rebuilt when the stamp moves.
+   GpuPointsGL::Target mGpuTarget;
+   unsigned int mTwistProgram = 0;
+   bool mTwistShaderTried = false;
+   unsigned long long mGpuBuiltRevision = 0;
+   bool mGpuBuiltValid = false;
    // kTransform's curve cache - see GetCurve().
    Polyline mCurveCache;
    bool mHasCurveCache = false;
@@ -439,13 +473,19 @@ private:
 // GeometryOpNode table, since none of the other operators need a texture
 // input and giving every one of them an unused pin would be a worse fit than
 // its own small class (see MaterialNode for the same geometry+texture shape).
+// Source = Noise swaps the texture for 3D noise sampled at each vertex or
+// point (DisplaceNoise.h), animated over transport time, so a surface or a
+// cloud moves with no noise texture made and mapped first.
 class DisplacementNode : public INode, public IGeometrySource
 {
 public:
    const std::string& CookWarning() const override { return mCookWarning; }
    enum Mode { kScalar = 0, kVector };
+   enum Source { kTexture = 0, kNoise };
 
    static INode* Create() { return new DisplacementNode(); }
+   static const std::vector<std::string>& NoiseTypeNames();
+   static const std::vector<std::string>& AffectsNames();
    ~DisplacementNode() override;
 
 
@@ -503,6 +543,15 @@ public:
       return input ? input->InstanceTransformOverride() : nullptr;
    }
 
+   // A point cloud is displaced too (MeshOps::DisplacePoints: it samples the
+   // texture at its x, y, having no UVs). GPU points take one pass that reads
+   // the texture where it is, so a cloud on the GPU never waits on the
+   // readback the mesh path needs; the CPU cloud reads it back on first ask.
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
+   const GpuPoints* GetGpuPoints() override;
+
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mTextureInput; }
@@ -516,6 +565,16 @@ public:
    int mode = kScalar;
    float strength = 1.0f;
    float midlevel = 0.5f;
+   // Noise source (DisplaceNoise::Type / ::Affects). Old patches have no
+   // "source" key and load as Texture, today's behaviour.
+   int source = kTexture;
+   int noiseType = 2; // Curl
+   float frequency = 1.0f;
+   float speed = 0.5f;
+   int octaves = 3;
+   float noiseRoughness = 0.5f; // 'roughness' is the material's
+   int seed = 0;
+   int affects = 0; // Position; Colour and Size act on points only
    bool flatShade = false, flipNormals = false;
    bool inheritMaterial = true;
    // See GeometryOpNode::selectionOnly - same convention, restricted here to
@@ -557,6 +616,9 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("mode", mode); v.Float("strength", strength); v.Float("midlevel", midlevel);
+      v.Int("source", source); v.Int("noiseType", noiseType); v.Float("frequency", frequency);
+      v.Float("speed", speed); v.Int("octaves", octaves); v.Float("noiseRoughness", noiseRoughness);
+      v.Int("seed", seed); v.Int("affects", affects);
       v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
       v.Bool("inherit", inheritMaterial);
       v.Bool("selectionOnly", selectionOnly);
@@ -574,6 +636,21 @@ public:
 
 private:
    std::string mCookWarning;
+   // Everything the Noise source reads, time included (`w` = transport
+   // seconds x speed, taken once per cook); all zero for the Texture source.
+   struct NoiseKey
+   {
+      int source = 0, type = 0, octaves = 0, affects = 0, seed = 0;
+      float frequency = 0, w = 0, roughness = 0;
+      bool operator==(const NoiseKey& o) const
+      {
+         return source == o.source && type == o.type && octaves == o.octaves && affects == o.affects &&
+                seed == o.seed && frequency == o.frequency && w == o.w && roughness == o.roughness;
+      }
+   };
+   NoiseKey CurrentNoiseKey() const;
+   DisplaceNoise::Params NoiseParams() const;
+   float mNoiseW = 0.0f;
    struct Signature
    {
       int mode = -1;
@@ -586,12 +663,13 @@ private:
       // CookIfNeeded), so a static texture doesn't fake a change every frame
       // while a Noise/Voronoi with real animation still keeps driving the mesh.
       unsigned long long texGeneration = 0;
+      NoiseKey noise;
       bool operator==(const Signature& o) const
       {
          return mode == o.mode && strength == o.strength && midlevel == o.midlevel &&
                 flat == o.flat && flip == o.flip && selectionOnly == o.selectionOnly &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
-                texGeneration == o.texGeneration;
+                texGeneration == o.texGeneration && noise == o.noise;
       }
    };
 
@@ -617,6 +695,46 @@ private:
    // What the last readback was taken from, so an unchanged input skips it.
    unsigned long long mTexReadRev = 0;
    unsigned int mTexReadTex = 0;
+
+   // The texture as pulled this cook. The points paths key on mTexKey, which
+   // moves when the texture's revision, id or size does (every cook for a
+   // source with no revision), so asking whether the cloud changed never
+   // costs a readback. mTexPixelsStale: Cook skipped the readback because
+   // only GPU points read the texture; ReadTexture() catches up on demand.
+   void ReadTexture();
+   bool TakesGpuPoints();
+   unsigned int mTexTex = 0;
+   int mTexTexW = 0, mTexTexH = 0;
+   unsigned long long mTexTexRev = 0;
+   bool mTexPixelsStale = false;
+   unsigned long long mTexKey = 0;
+
+   struct PointSignature
+   {
+      const void* upstream = nullptr;
+      unsigned long long upstreamRevision = 0;
+      int mode = -1;
+      float strength = 0, midlevel = 0;
+      unsigned long long texKey = 0;
+      NoiseKey noise;
+      bool operator==(const PointSignature& o) const
+      {
+         return upstream == o.upstream && upstreamRevision == o.upstreamRevision && mode == o.mode &&
+                strength == o.strength && midlevel == o.midlevel && texKey == o.texKey && noise == o.noise;
+      }
+   };
+   PointSignature mPointStamp;
+   bool mHasPointStamp = false;
+   unsigned long long mPointRevision = 0;
+   std::vector<Particle> mPointCache;
+   unsigned long long mPointCacheRevision = 0;
+
+   GpuPoints mGpuPoints;
+   GpuPointsGL::Target mGpuTarget;
+   unsigned int mGpuProgram = 0;
+   bool mGpuShaderTried = false;
+   unsigned long long mGpuBuiltRevision = 0;
+   bool mGpuBuiltValid = false;
 };
 
 // --- Mesh to Points / Instance on Points --------------------------------
@@ -683,13 +801,27 @@ public:
    // Per-instance colours, parallel to InstanceTransforms(). Empty when the
    // instances all share the node's own material, which is the mesh-sampling
    // case; a point cloud fills it so particles can vary.
-   const std::vector<float>& InstanceColors() const { return mColors; }
+   const std::vector<float>& InstanceColors() const { EnsureCloudTransforms(); return mColors; }
 
    // Instanced draw data, consumed by Render3DNode. The transforms carry their
    // own stamp, separate from the mesh one: nudging the scatter re-uploads a few
    // hundred matrices without touching the instanced mesh itself.
-   const std::vector<Mat4>& InstanceTransforms() const { return mTransforms; }
-   size_t InstanceCount() const { return mTransforms.size(); }
+   const std::vector<Mat4>& InstanceTransforms() const { EnsureCloudTransforms(); return mTransforms; }
+   // While the cloud is on the GPU (below) and nothing has asked for the
+   // matrices, this is the GPU point count, so a node label or a "> 0" test
+   // does not build them.
+   size_t InstanceCount() const;
+
+   // GPU points (docs/plans/gpu-points step 6): when the cloud input offers
+   // them, Render 3D builds each copy's matrix in its vertex shader from the
+   // point's texel - T(pointMatrix * pos) * S(GpuInstanceSizeScale() * w) *
+   // GpuInstanceShapeModel(), the same matrix Rebuild() makes on the CPU - and
+   // InstanceTransforms() / InstanceColors() are built only when a CPU
+   // consumer asks. nullptr = use InstanceTransforms().
+   const GpuPoints* GpuInstancePoints() const;
+   // instanceScale / the cloud's PointBaseSize(): w is p.scale * base.
+   float GpuInstanceSizeScale() const;
+   Mat4 GpuInstanceShapeModel() const { return mBuiltShapeModel; }
    unsigned long long InstanceRevision() const { return mInstanceRevision; }
    size_t TriangleCount() const;
 
@@ -760,9 +892,15 @@ private:
    // rotation) and the per-point scale jitter are cached so a scale-only change
    // skips mesh transform, welding, sampling and random generation.
    void ApplyScale();
+   // The cloud path's matrices, from GetPointCloud(); deferred while the
+   // cloud is on the GPU (mCloudStale) until a CPU consumer asks.
+   void BuildCloudTransforms() const;
+   void EnsureCloudTransforms() const { if (mCloudStale) BuildCloudTransforms(); }
 
-   std::vector<Mat4> mTransforms;
-   std::vector<float> mColors; // rgb triples, or empty for a uniform material
+   mutable std::vector<Mat4> mTransforms;
+   mutable std::vector<float> mColors; // rgb triples, or empty for a uniform material
+   bool mGpuCloud = false;          // this cook's cloud came with GPU points
+   mutable bool mCloudStale = false; // mTransforms not yet built for it
    std::vector<Mat4> mPoses;       // mesh-sampling path only
    std::vector<float> mScaleJitter; // 1 + (r0 - 0.5) * 2 * scaleRandom, per pose
    bool mPosesValid = false;

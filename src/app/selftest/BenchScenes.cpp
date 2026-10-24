@@ -431,6 +431,145 @@ void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr
       gn.showParams = true;
 }
 
+bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clipPath,
+                        int& outRender3DIdx, int& outOutputIdx, int& outPointsIdx, std::string& outError)
+{
+   auto nodeAt = [](int idx) { return FindNodeByIndex(idx)->node.get(); };
+   n = std::max(1, n);
+
+   // The point chain's last node, whatever the scene; Render 3D draws it.
+   IGeometrySource* chainEnd = nullptr;
+
+   if (scene == "a" || scene == "d")
+   {
+      // A moving picture re-cooks Image to Points every frame (readback +
+      // rebuild + upload), and Transform's spin moves the whole cloud on top:
+      // the "animated points" worst case on main. Displacement and Field
+      // Modifier pass a point cloud through untouched, so neither can be the
+      // animated stage here.
+      GraphNode* vidGn = SpawnNode("Video", "Source", 0.0f, 0.0f);
+      if (vidGn == nullptr) { outError = "could not spawn Video node"; return false; }
+      auto* vid = static_cast<VideoSourceNode*>(vidGn->node.get());
+      vid->loop = true;
+      if (!vid->Open(clipPath)) { outError = "could not open " + clipPath + ": " + vid->LastError(); return false; }
+
+      const int ptsIdx = SpawnNode("Image to Points", "3D", 260.0f, 0.0f)->index;
+      auto* pts = static_cast<ImageToPointsNode*>(nodeAt(ptsIdx));
+      pts->Input().Connect(vid);
+      // Square grid, capped at 512 by the node (262,144 points).
+      pts->density = std::max(2, std::min(512, (int)std::lround(std::sqrt((double)n))));
+      pts->threshold = 0.0f; // keep every cell, so the count is the grid
+      pts->width = 3.2f;
+      pts->height = 1.8f;
+      outPointsIdx = ptsIdx;
+
+      const int xfIdx = SpawnNode("Transform", "3D", 520.0f, 0.0f)->index;
+      auto* xf = static_cast<GeometryOpNode*>(nodeAt(xfIdx));
+      xf->input = pts;
+      xf->op = GeometryOpNode::kTransform;
+      xf->spin = 0.25f;
+      chainEnd = xf;
+
+      if (scene == "d")
+      {
+         // The same moving cloud stamped with cubes: Instance on Points
+         // rebuilds a matrix per point every frame unless it reads the
+         // cloud's GPU points (P8 step 6).
+         const int cubeIdx = SpawnNode("Cube", "3D", 520.0f, 260.0f)->index;
+         const int instIdx = SpawnNode("Instance on Points", "3D", 780.0f, 260.0f)->index;
+         auto* inst = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         inst->cloudSource = xf;
+         inst->instanceShape = static_cast<GeometryNode*>(nodeAt(cubeIdx));
+         inst->instanceScale = 0.8f;
+         chainEnd = inst;
+      }
+   }
+   else if (scene == "b" || scene == "c")
+   {
+      const int psIdx = SpawnNode("Particle System", "3D", 0.0f, 0.0f)->index;
+      auto* ps = static_cast<ParticleSystemNode*>(nodeAt(psIdx));
+      // Steady state: births per second x life = cap, with 5% headroom so the
+      // cap (not the rate) sets the count. The harness waits for it to fill.
+      ps->maxParticles = n;
+      ps->lifetime = 4.0f;
+      ps->lifetimeRandom = 0.0f;
+      ps->emitRate = (float)n / ps->lifetime * 1.05f;
+      ps->emitRadius = 0.5f;
+      ps->turbulence = 0.6f;
+      ps->gravityY = -0.3f;
+      outPointsIdx = psIdx;
+      chainEnd = ps;
+
+      if (scene == "c")
+      {
+         const int cubeIdx = SpawnNode("Cube", "3D", 0.0f, 260.0f)->index;
+         const int instIdx = SpawnNode("Instance on Points", "3D", 260.0f, 0.0f)->index;
+         auto* inst = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         inst->cloudSource = ps;
+         inst->instanceShape = static_cast<GeometryNode*>(nodeAt(cubeIdx));
+         inst->instanceScale = 0.5f;
+         chainEnd = inst;
+      }
+   }
+   else
+   {
+      outError = "unknown B11 scene '" + scene + "' (a, b, c or d)";
+      return false;
+   }
+
+   const int camIdx = SpawnNode("Camera", "3D", 520.0f, 260.0f)->index;
+   auto* cam = static_cast<CameraNode*>(nodeAt(camIdx));
+   cam->distance = 5.0f;
+   cam->elevation = 15.0f;
+   cam->azimuth = 30.0f;
+
+   const int lightIdx = SpawnNode("Light", "3D", 520.0f, 520.0f)->index;
+   auto* light = static_cast<LightNode*>(nodeAt(lightIdx));
+   light->intensity = 1.8f;
+
+   const int renderIdx = SpawnNode("Render 3D", "3D", 780.0f, 0.0f)->index;
+   auto* render = static_cast<Render3DNode*>(nodeAt(renderIdx));
+   render->geometry[0] = chainEnd;
+   render->camera = cam;
+   render->lights[0] = light;
+   render->width = 1920.0f;
+   render->height = 1080.0f;
+   outRender3DIdx = renderIdx;
+
+   // Cost-split knobs (P8): which part of the GPU time is fill, samples or
+   // shading. INFINITE_BENCH_B11_SAMPLES is Render 3D's sample index (0 off,
+   // 2 = 4x, the default); INFINITE_BENCH_B11_SIZE multiplies the point size.
+   if (const char* s = getenv("INFINITE_BENCH_B11_SAMPLES"))
+      render->samples = std::max(0, std::min(3, atoi(s)));
+   if (const char* s = getenv("INFINITE_BENCH_B11_SIZE"))
+   {
+      const float k = std::max(0.01f, (float)atof(s));
+      if (auto* pts = dynamic_cast<ImageToPointsNode*>(nodeAt(outPointsIdx)))
+         pts->pointSize *= k;
+      if (auto* ps = dynamic_cast<ParticleSystemNode*>(nodeAt(outPointsIdx)))
+      {
+         ps->startSize *= k;
+         ps->endSize *= k;
+      }
+   }
+
+   const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
+   if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
+      in->Connect(nodeAt(renderIdx));
+   outOutputIdx = outIdx;
+
+   for (GraphNode& gn : gNodes)
+      gn.showParams = true;
+   // The point node's own sliders clamp past what a user can reach (Image to
+   // Points density 400 = 160k points, max particles 50,000), and a drawn
+   // slider writes its clamp back. Collapse that one body so the engine's own
+   // caps (512², 200k) are what the run measures.
+   if (GraphNode* gn = FindNodeByIndex(outPointsIdx))
+      gn->showParams = false;
+   Transport::Instance().SetPlaying(true);
+   return true;
+}
+
 void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outMaxY, int& outDragNodeIdx)
 {
    struct B6Type { const char* type; const char* cat; };

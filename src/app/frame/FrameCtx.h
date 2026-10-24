@@ -50,6 +50,7 @@ struct FrameCtx
    bool isBenchB6{};
    bool isBenchB9{};
    bool isBenchB8{};
+   bool isBenchB11{};
    bool benchB6Stages{};
    bool benchStagesSample{};
    bool benchStagesCpuSample{};
@@ -87,6 +88,10 @@ extern int sBenchB2OutputIdx;
 extern std::string sBenchB2Variant;
 extern int sBenchB4CamIdx;
 extern int sBenchB4LfoIdx;
+// B11 points: the node whose cloud the report counts, and the first frame of
+// the 120-frame sample window (-1 until the cloud has filled).
+extern int sBenchB11PointsIdx;
+extern int sBenchB11SampleStart;
 extern std::string sBenchB9Scene;
 extern std::string sBenchB9Variant;
 extern double sBenchB9RssBuiltMb;
