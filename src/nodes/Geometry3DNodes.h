@@ -324,8 +324,10 @@ inline std::string DescribeGeometryMismatch(IGeometrySource* source, GeometryReq
    const Mesh& mesh = source->GetMesh();
    const bool hasVerts = !mesh.vertices.empty();
    const bool hasSurface = hasVerts && !mesh.indices.empty();
-   const std::vector<Particle>* cloud = source->GetPointCloud();
-   const bool hasCloud = cloud != nullptr && !cloud->empty();
+   // GPU points first: asking a GPU producer for its CPU cloud reads it back.
+   const GpuPoints* gpuCloud = source->GetGpuPoints();
+   const std::vector<Particle>* cloud = gpuCloud != nullptr ? nullptr : source->GetPointCloud();
+   const bool hasCloud = (gpuCloud != nullptr && gpuCloud->count > 0) || (cloud != nullptr && !cloud->empty());
    const bool hasCurve = source->GetCurve() != nullptr;
 
    switch (requirement)
