@@ -4416,9 +4416,14 @@ bool IsNodeAudioCompatible(const GraphNode& gn);
       // composite. 0 = the panel did not draw the monitor this frame.
       int requestW = 0;
       int requestH = 0;
+      // The Timeline monitor: composites the timeline's own clips (gArrange)
+      // even in Session audio mode, so it never shows a launched Session clip.
+      bool timelineOwn = false;
    };
 
 extern ArrangeCompositeTarget gArrangeMonitorTarget;
+// The Timeline panel's own monitor; gArrangeMonitorTarget belongs to the Session panel.
+extern ArrangeCompositeTarget gArrangeTimelineMonitorTarget;
 
 extern ArrangeCompositeTarget gArrangeRenderTarget;
 
@@ -4553,7 +4558,7 @@ extern std::map<uint64_t, ArrangeClipThumb> gArrangeClipThumbs;
 
 void ArrangeSyncClipVisuals();
 
-int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle = nullptr);
+int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle = nullptr, bool timelineOwn = false);
 
 void ArrangeSeekVideoSampleSources(double beat);
 

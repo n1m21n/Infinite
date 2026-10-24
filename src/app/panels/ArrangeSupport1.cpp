@@ -537,10 +537,10 @@ namespace app
    // Reads gArrange directly (WP5b). Clip ticks convert to beats with no
    // tempo, so the playhead is Transport::Beats() - the axis the audio
    // envelope uses - and a tempo change moves nothing.
-   void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out)
+   void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out, bool timelineOwn = false)
    {
       out.clear();
-      const Arrange::Model& playModel = ArrangePlaybackModel();
+      const Arrange::Model& playModel = timelineOwn ? gArrange : ArrangePlaybackModel();
       for (size_t li = playModel.lanes.size(); li-- > 0;)
       {
          const Arrange::Lane& lane = playModel.lanes[li];
@@ -603,10 +603,10 @@ namespace app
    }
 
 
-   int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle)
+   int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle, bool timelineOwn)
    {
       static std::vector<ArrangeVideoLayer> sLayers;
-      CollectArrangeVideoLayers(beat, sLayers);
+      CollectArrangeVideoLayers(beat, sLayers, timelineOwn);
       if (outFrontTitle != nullptr && !sLayers.empty())
          *outFrontTitle = NodeTitle(*sLayers.back().gn);
       return (int)sLayers.size();
@@ -778,7 +778,7 @@ namespace app
          return 0;
 
       static std::vector<ArrangeVideoLayer> sLayers;
-      CollectArrangeVideoLayers(beat, sLayers);
+      CollectArrangeVideoLayers(beat, sLayers, target.timelineOwn);
 
       struct ResolvedLayer
       {
@@ -922,11 +922,14 @@ namespace app
    // records a request and draws target.result; ImGui renders after this.
    void CompositeArrangeMonitorIfRequested()
    {
-      ArrangeCompositeTarget& t = gArrangeMonitorTarget;
-      if (t.requestW > 1 && t.requestH > 1)
-         CompositeArrangeTimelineVideo(t, nullptr, Transport::Instance().Beats(), t.requestW, t.requestH);
-      t.requestW = 0;
-      t.requestH = 0;
+      for (ArrangeCompositeTarget* tp : { &gArrangeMonitorTarget, &gArrangeTimelineMonitorTarget })
+      {
+         ArrangeCompositeTarget& t = *tp;
+         if (t.requestW > 1 && t.requestH > 1)
+            CompositeArrangeTimelineVideo(t, nullptr, Transport::Instance().Beats(), t.requestW, t.requestH);
+         t.requestW = 0;
+         t.requestH = 0;
+      }
    }
 
 
