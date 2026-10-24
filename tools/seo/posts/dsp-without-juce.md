@@ -2,7 +2,7 @@
 title: writing audio dsp without juce: notes from infinite
 description: why infinite's audio engine is written in modern c++ without a framework, and what that changes for real-time safety.
 date: 2026-10-19
-category: engineering
+category: product
 tags: [c++, dsp, audio, architecture]
 image: assets/nodegraph.webp
 image_alt: infinite modular audio graph canvas and node dsp architecture

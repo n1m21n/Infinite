@@ -240,6 +240,7 @@ def main():
     parser = argparse.ArgumentParser(description="Infinite Interactive Web Embed Generator")
     parser.add_argument("--field", help="Path to .field file")
     parser.add_argument("--glsl", help="Path to raw GLSL file")
+    parser.add_argument("--style", help="Art taxonomy style id (from art_taxonomy.py)")
     parser.add_argument("--out", help="Destination HTML file")
     parser.add_argument("--all", action="store_true", help="Generate embeds for all field devices in website/assets/library/pixel")
     parser.add_argument("--out-dir", default="website/embeds", help="Output directory for --all")
@@ -285,10 +286,19 @@ def main():
         data = json.load(open(args.field))
         shader_body = data["device"]["code"]
         title = data["meta"].get("name", title)
+    elif args.style:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from art_taxonomy import TAXONOMY
+        st = TAXONOMY.get(args.style)
+        if not st:
+            print(f"[!] Unknown style: {args.style}")
+            sys.exit(1)
+        shader_body = st.get("field_pixel", "")
+        title = st.get("name", args.style)
     elif args.glsl:
         shader_body = open(args.glsl).read()
     else:
-        print("[!] Must provide either --field or --glsl")
+        print("[!] Must provide either --field, --style, or --glsl")
         sys.exit(1)
 
     # Basic parameter translation if from Field

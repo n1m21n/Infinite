@@ -821,65 +821,63 @@ def get_styles_for_family(family):
     return [sid for sid, d in TAXONOMY.items() if d["family"] == family]
 
 
-def build_patch_for_style(style_id):
-    """Builds a complete, validated Infinite patch (.inf) for any given style."""
+def build_patch_for_style(style_id, visual_type="pixel", with_audio=False):
+    """Builds a complete, validated Infinite patch (.inf) for any given style.
+    Supports authentic visual mediums: 'pixel' (Field Pixel), 'sketch_2d' (2D vector), 'sketch_3d'.
+    Audio reactivity is completely optional - visuals stand strongly on their own art style.
+    """
     style = TAXONOMY.get(style_id, TAXONOMY["y2k_acid"])
     synth = style["synth"]
     note_source = style["note_source"]
-    js_code = style["sketch_2d"].replace('\\', '\\\\').replace('\n', '\\n')
 
-    if note_source == "Arpeggiator":
-        return f"""infinite-patch 1
-node 1 Notes Random Note Generator
-  id notes
-end
-node 2 Notes Arpeggiator
-  id arp
-end
-node 3 Synths {synth}
-  id synth
-end
-node 4 Utility Audio Out
-  id speaker
-end
-node 5 Source Sketch
-  id visuals
-  f width 720
-  f height 720
-  s code {js_code}
-end
-node 6 Utility Output
-  id out
-end
-note arp 0 notes
-note synth 0 arp
-aud speaker 0 synth
-cable out 0 visuals
-"""
+    lines = ["infinite-patch 1"]
+    nid = 1
+
+    # Optional audio track
+    if with_audio:
+        if note_source == "Arpeggiator":
+            lines.append(f"node {nid} Notes Random Note Generator\n  id notes\nend")
+            nid += 1
+            lines.append(f"node {nid} Notes Arpeggiator\n  id arp\nend")
+            nid += 1
+            lines.append(f"node {nid} Synths {synth}\n  id synth\nend")
+            nid += 1
+            lines.append(f"node {nid} Utility Audio Out\n  id speaker\nend")
+            nid += 1
+        else:
+            lines.append(f"node {nid} Notes {note_source}\n  id notes\nend")
+            nid += 1
+            lines.append(f"node {nid} Synths {synth}\n  id synth\nend")
+            nid += 1
+            lines.append(f"node {nid} Utility Audio Out\n  id speaker\nend")
+            nid += 1
+
+    # Visual node based on chosen medium
+    if visual_type == "pixel" and "field_pixel" in style:
+        code = style["field_pixel"].replace('\\', '\\\\').replace('\n', ' ')
+        lines.append(f"node {nid} Source FieldPixel\n  id visuals\n  f width 720\n  f height 720\n  s code {code}\nend")
+    elif visual_type == "sketch_3d" and "sketch_3d" in style:
+        js_code = style["sketch_3d"].replace('\\', '\\\\').replace('\n', '\\n')
+        lines.append(f"node {nid} Source Sketch 3D\n  id visuals\n  f width 720\n  f height 720\n  s code {js_code}\nend")
     else:
-        return f"""infinite-patch 1
-node 1 Notes {note_source}
-  id notes
-end
-node 2 Synths {synth}
-  id synth
-end
-node 3 Utility Audio Out
-  id speaker
-end
-node 4 Source Sketch
-  id visuals
-  f width 720
-  f height 720
-  s code {js_code}
-end
-node 5 Utility Output
-  id out
-end
-note synth 0 notes
-aud speaker 0 synth
-cable out 0 visuals
-"""
+        js_code = style["sketch_2d"].replace('\\', '\\\\').replace('\n', '\\n')
+        lines.append(f"node {nid} Source Sketch\n  id visuals\n  f width 720\n  f height 720\n  s code {js_code}\nend")
+
+    vid = nid
+    nid += 1
+    lines.append(f"node {nid} Utility Output\n  id out\nend")
+
+    # Wires
+    if with_audio:
+        if note_source == "Arpeggiator":
+            lines.append("note arp 0 notes")
+            lines.append("note synth 0 arp")
+        else:
+            lines.append("note synth 0 notes")
+        lines.append("aud speaker 0 synth")
+
+    lines.append("cable out 0 visuals")
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":
