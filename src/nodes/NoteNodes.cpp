@@ -5134,6 +5134,7 @@ void BouncingBallsNode::VisitParams(ParamVisitor& v)
    v.Int("shape", shape);
    v.Int("numBalls", numBalls);
    v.Float("ballSize", ballSize);
+   ballSize = std::clamp(ballSize, 0.01f, 0.3f); // the sim's range; 1e9 overflowed the drawn radius (B-K-039)
    v.Float("ballSpeed", ballSpeed);
    v.Int("rangeLow", rangeLow);
    v.Int("rangeHigh", rangeHigh);
