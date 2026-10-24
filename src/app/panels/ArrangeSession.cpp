@@ -904,6 +904,35 @@ namespace app
    }
 
 
+   // A scene row dragged from `from` to `to` (the row it ends up at): everything scheduled follows its scene.
+   void ArrangeSessionMoveRow(int from, int to)
+   {
+      if (from < 0 || to < 0 || from == to)
+         return;
+      auto remap = [&](int slot) {
+         if (slot < 0)
+            return slot;
+         if (slot == from)
+            return to;
+         if (from < to && slot > from && slot <= to)
+            return slot - 1;
+         if (from > to && slot >= to && slot < from)
+            return slot + 1;
+         return slot;
+      };
+      for (auto& kv : sSchedule)
+         for (SessSeg& sg : kv.second)
+            sg.slot = remap(sg.slot);
+      for (SessRun& r : sRuns)
+         r.slot = remap(r.slot);
+      for (SessRecEntry& e : sRecLog)
+         e.slot = remap(e.slot);
+      if (sSceneNext.scene >= 0)
+         sSceneNext.scene = remap(sSceneNext.scene);
+      sDirty = true;
+   }
+
+
    // A clip moved from one cell to another: what was scheduled at `from`
    // follows it within its lane (stops if it left the lane), and a clip it
    // replaced stops. from < 0 = a copy landed; only the replaced clip stops.

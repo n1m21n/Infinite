@@ -99,10 +99,19 @@ namespace app
                ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, gid, false); });
             if (MenuParts::Item(L("Stop Track"), nullptr, false, ArrangeSessionLaneQuery(lid).playingSlot >= 0))
                ArrangeSessionStopLane(lid);
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Delete Track")))
+            {
+               ArrangeSessionStopLane(lid);
+               ArrangeEdit([&]() { Arrange::RemoveLane(gArrange, lid); });
+               gArrangeSel.clear();
+            }
          }
          MenuParts::EndPopup();
       }
       int sSceneCtxRow = -1;
+      int sTrackDragFrom = -1;   // track column being dragged to a new place
+      int sSceneDragFrom = -1;   // scene row being dragged to a new place
       char sSceneNameBuf[64] = {};
       float sSceneTempoEdit = 0.0f;
 
@@ -388,6 +397,33 @@ namespace app
          sSelScene = row + 1;
       }
 
+      // Drag a scene to a new row: its name, settings and every track's clip travel with it.
+      void MoveScene(int from, int to)
+      {
+         if (from < 0 || to < 0 || from == to)
+            return;
+         ArrangeEdit([&]() {
+            // Empty placeholder rows become real scenes so they can be dragged too.
+            while ((int)gArrange.scenes.size() <= std::max(from, to))
+               gArrange.scenes.push_back(Arrange::Scene{});
+            auto move = [&](auto& v) {
+               if ((int)v.size() <= std::max(from, to))
+                  v.resize((size_t)std::max(from, to) + 1);
+               auto item = std::move(v[(size_t)from]);
+               v.erase(v.begin() + from);
+               v.insert(v.begin() + to, std::move(item));
+            };
+            move(gArrange.scenes);
+            for (Arrange::Lane& l : gArrange.lanes)
+               if ((int)l.slots.size() > from)
+                  move(l.slots);
+            gArrange.revision++;
+         });
+         ArrangeSessionMoveRow(from, to);
+         gArrangeSel.clear();
+         sSelScene = to;
+      }
+
       void DeleteScene(int row)
       {
          if (row < 0 || row >= (int)gArrange.scenes.size())
@@ -585,7 +621,12 @@ namespace app
          const float x0 = o.x + kSceneColW + colW * (float)li;
          ImGui::SetCursorScreenPos(ImVec2(x0 + kGap, o.y + kGap));
          ImGui::PushID(li);
-         ImGui::InvisibleButton("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap), ImGuiButtonFlags_MouseButtonRight);
+         ImGui::InvisibleButton("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
+                                ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonLeft);
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+            sTrackDragFrom = li;
+         if (ImGui::IsItemHovered() && sTrackDragFrom < 0)
+            HelpTip("%s", T("Drag to reorder tracks. Right-click for more."));
          ImGui::PopID();
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
@@ -633,7 +674,10 @@ namespace app
          const bool hov = ImGui::IsItemHovered();
          // A click selects the scene (Delete removes it, Cmd+D duplicates it) and launches it, or stops it
          // when it is already playing or waiting to launch. Cmd-click only selects.
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+         // Acts on release, so a press that becomes a reorder drag does not launch the scene.
+         const ImVec2 sceneDragD(ImGui::GetMousePos().x - ImGui::GetIO().MouseClickedPos[0].x, ImGui::GetMousePos().y - ImGui::GetIO().MouseClickedPos[0].y);
+         if (ImGui::IsItemDeactivated() && hov && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+             sceneDragD.x * sceneDragD.x + sceneDragD.y * sceneDragD.y < 36.0f)
          {
             sSelScene = row;
             gArrangeSel.clear();
@@ -649,8 +693,10 @@ namespace app
             sSceneTempoEdit = realScene ? gArrange.scenes[(size_t)row].tempo : 0.0f;
             ImGui::OpenPopup("##sessionscenectx");
          }
-         if (hov)
-            HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.")
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+            sSceneDragFrom = row;
+         if (hov && sSceneDragFrom < 0)
+            HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.")
                                      : T("Right-click to rename this scene or set its tempo"));
          ImGui::PopID();
          dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_field);
@@ -690,6 +736,39 @@ namespace app
          dl->PushClipRect(a, ImVec2(rightEdge, b.y), true);
          dl->AddText(ImVec2(a.x + 26.0f, cy - th * 0.5f), realScene ? TextCol(0.85f) : TextCol(0.35f), label.c_str());
          dl->PopClipRect();
+      }
+
+      // Reorder: a line marks the drop row while a scene is dragged; releasing moves it there.
+      if (sSceneDragFrom >= 0)
+      {
+         const int target = std::clamp((int)std::floor((ImGui::GetMousePos().y - bodyTop) / kRowH), 0, std::max(0, rows - 1));
+         const float ly = bodyTop + kRowH * (float)(target + (target > sSceneDragFrom ? 1 : 0));
+         if (target != sSceneDragFrom)
+            dl->AddRectFilled(ImVec2(o.x + kGap, ly - 1.0f), ImVec2(o.x + kSceneColW - kGap, ly + 1.0f), TextCol(0.9f), 1.0f);
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            MoveScene(sSceneDragFrom, target);
+            sSceneDragFrom = -1;
+         }
+      }
+
+      // Reorder tracks: a line marks the drop column while a header is dragged; releasing moves it there.
+      if (sTrackDragFrom >= 0 && sTrackDragFrom < laneCount)
+      {
+         const int target = std::clamp((int)std::floor((ImGui::GetMousePos().x - o.x - kSceneColW) / colW), 0, laneCount - 1);
+         const float lx = o.x + kSceneColW + colW * (float)(target + (target > sTrackDragFrom ? 1 : 0));
+         if (target != sTrackDragFrom)
+            dl->AddRectFilled(ImVec2(lx - 1.0f, o.y + kGap), ImVec2(lx + 1.0f, o.y + kHeaderH - kGap), TextCol(0.9f), 1.0f);
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            if (target != sTrackDragFrom)
+            {
+               const uint64_t id = gArrange.lanes[(size_t)sTrackDragFrom].id;
+               const size_t anchor = (size_t)(target + (target > sTrackDragFrom ? 1 : 0));
+               ArrangeEdit([&]() { Arrange::MoveLanesBefore(gArrange, { id }, anchor); });
+            }
+            sTrackDragFrom = -1;
+         }
       }
 
       // ---- cells ----

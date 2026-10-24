@@ -3750,6 +3750,29 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       ArrangeSessionShiftRows(0, -1);
       ArrangeSessionTick();
       check(ArrangeSessionQuery(laneA1, 0).playing, "deleting the scene above keeps the clip playing on its new row");
+      // Dragging a scene to another row carries what is playing in it, and back again.
+      ArrangeEdit([&]() {
+         Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+         Arrange::SessionSlot sl = l->slots[0];
+         l->slots.erase(l->slots.begin() + 0);
+         l->slots.insert(l->slots.begin() + 2, sl);
+         gArrange.revision++;
+      });
+      ArrangeSessionMoveRow(0, 2);
+      ArrangeSessionTick();
+      check(ArrangeSessionQuery(laneA1, 2).playing && !ArrangeSessionQuery(laneA1, 0).playing,
+            "a scene dragged down takes its playing clip with it");
+      ArrangeEdit([&]() {
+         Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+         Arrange::SessionSlot sl = l->slots[2];
+         l->slots.erase(l->slots.begin() + 2);
+         l->slots.insert(l->slots.begin() + 0, sl);
+         gArrange.revision++;
+      });
+      ArrangeSessionMoveRow(2, 0);
+      ArrangeSessionTick();
+      check(ArrangeSessionQuery(laneA1, 0).playing && !ArrangeSessionQuery(laneA1, 2).playing,
+            "a scene dragged back up takes its playing clip with it");
       ArrangeSessionLaunch(laneA1, 0);
       check(ArrangeSessionLaneQuery(laneA1).stopQueued, "clicking the playing clip queues its stop on the next bar");
       ArrangeSessionLaunch(laneA2, 0);

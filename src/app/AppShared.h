@@ -5029,6 +5029,7 @@ bool ArrangeSessionMoveSlot(uint64_t srcLaneId, int srcRow, uint64_t dstLaneId, 
 // Row edits (insert/duplicate/delete scene) and clip moves keep the launch
 // schedule on the same clips.
 void ArrangeSessionShiftRows(int row, int delta);
+void ArrangeSessionMoveRow(int from, int to);
 void ArrangeSessionMoveScheduled(uint64_t fromLaneId, int from, uint64_t toLaneId, int to);
 
 bool StartAudioEngine(std::string& outError);
