@@ -4429,6 +4429,11 @@ namespace Platform
    // the HAL's own buffer size, so there is nothing to select here.
    void AudioSetOutputMode(int) {}
    int AudioOutputModeActive() { return 0; }
+   bool AudioAsioAvailable() { return false; }
+   std::vector<std::string> AudioAsioDrivers() { return {}; }
+   void AudioSetAsioDriver(const std::string&) {}
+   std::string AudioAsioActiveName() { return {}; }
+   std::string AudioDriverNote() { return {}; }
 
    bool AudioPcmConversionSelfTest()
    {

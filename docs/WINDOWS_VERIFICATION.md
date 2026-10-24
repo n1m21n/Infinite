@@ -569,3 +569,19 @@ both unrepresentative.
 
 6. **Two things not to bother testing yet:** PaulStretch (broken, 1.1) and
    external MIDI clock sync (dead code, 1.3).
+
+---
+
+## Ask Ricardo to verify: ASIO (feature/asio-driver)
+
+CI proves the build and the driver-free self-test (`INFINITE_ASIOTEST`).
+Everything below needs real hardware and has not been run:
+
+1. Settings > Audio > Output mode: pick **ASIO**, pick the audio interface's driver, click Apply. The "Active" line should say ASIO and the driver name.
+2. Read the round-trip latency readout; compare it with the driver's own control panel.
+3. Play for 10 minutes with no dropouts or clicks.
+4. Change the buffer size (32 up to 2048) and Apply; sound must continue each time.
+5. Change the buffer size from the driver's own control panel while playing; Infinite should restart the stream by itself.
+6. Unplug the interface while playing, then plug it back in. Infinite should fall back to WASAPI with a note, then return to ASIO after the replug.
+7. Audio In node: with ASIO on, it should show the interface's inputs.
+8. Uninstall/disable the ASIO driver (or pick a driver that is off): the app must run on WASAPI and show why.

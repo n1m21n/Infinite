@@ -416,6 +416,14 @@ namespace app
             for (const Platform::AudioDeviceInfo& d : devices)
                if (d.isInput && d.deviceId == gAudioInputDeviceId)
                   inputLabel = d.name;
+#if defined(_WIN32)
+            // An ASIO driver is one device for input and output.
+            const bool asioMode = Platform::AudioAsioAvailable() && gAudioOutputMode == 3;
+            if (asioMode)
+               ImGui::BeginDisabled();
+#else
+            const bool asioMode = false;
+#endif
             if (FormParts::BeginCombo(L("Input device"), inputLabel.c_str()))
             {
                if (MenuParts::Choice(L("System default"), gAudioInputDeviceId == 0))
@@ -435,6 +443,14 @@ namespace app
                }
                FormParts::EndCombo();
             }
+#if defined(_WIN32)
+            if (asioMode)
+            {
+               ImGui::EndDisabled();
+               if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+                  HelpTip("%s", T("An ASIO driver is one device for input and output. Pick it under ASIO driver."));
+            }
+#endif
 
             static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
             std::string rateLabel = (gAudioSampleRate == 0.0) ? T("Device default") : "";
@@ -445,7 +461,7 @@ namespace app
                rateLabel = buf;
             }
 #if defined(_WIN32)
-            ImGui::BeginDisabled();
+            ImGui::BeginDisabled(!asioMode);
 #endif
             if (FormParts::BeginCombo(L("Sample rate"), rateLabel.c_str()))
             {
@@ -462,15 +478,19 @@ namespace app
             }
 #if defined(_WIN32)
             ImGui::EndDisabled();
-            if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+            if (!asioMode && ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
                HelpTip("%s", T("Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there."));
 #endif
 
+#if defined(_WIN32)
+            static const int kBufferSizes[] = { 32, 64, 128, 256, 512, 1024, 2048 }; // 32 is for ASIO
+#else
             static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
+#endif
             char bufferLabel[16];
             snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
 #if defined(_WIN32)
-            ImGui::BeginDisabled();
+            ImGui::BeginDisabled(!asioMode);
 #endif
             if (FormParts::BeginCombo(L("Buffer size"), bufferLabel))
             {
@@ -485,7 +505,7 @@ namespace app
             }
 #if defined(_WIN32)
             ImGui::EndDisabled();
-            if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
+            if (!asioMode && ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
                HelpTip("%s", T("Windows shared-mode audio always runs at the device's own period. Change it in Sound settings."));
 #endif
 
@@ -495,11 +515,13 @@ namespace app
                // Standard if the device or driver refuses it, so choosing
                // one can never leave the app silent; takes effect on Apply.
                const char* kOutputModeLabels[] = { T("Standard (shared)"), T("Low latency (shared)"),
-                                                   T("Exclusive") };
-               gAudioOutputMode = std::clamp(gAudioOutputMode, 0, 2);
+                                                   T("Exclusive"), T("ASIO") };
+               // ASIO is only offered in a build that has it.
+               const int modeCount = Platform::AudioAsioAvailable() ? 4 : 3;
+               gAudioOutputMode = std::clamp(gAudioOutputMode, 0, modeCount - 1);
                if (FormParts::BeginCombo(L("Output mode"), kOutputModeLabels[gAudioOutputMode]))
                {
-                  for (int i = 0; i < 3; i++)
+                  for (int i = 0; i < modeCount; i++)
                      if (MenuParts::Choice(kOutputModeLabels[i], gAudioOutputMode == i))
                      {
                         gAudioOutputMode = i;
@@ -508,7 +530,26 @@ namespace app
                   FormParts::EndCombo();
                }
                if (ImGui::IsItemHovered())
-                  HelpTip("%s", T("Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it."));
+                  HelpTip("%s", T("Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it."));
+               if (modeCount == 4 && gAudioOutputMode == 3)
+               {
+                  const std::vector<std::string> drivers = Platform::AudioAsioDrivers();
+                  std::string driverLabel = gAudioAsioDriver.empty() ? (drivers.empty() ? T("None installed") : drivers[0])
+                                                                       : gAudioAsioDriver;
+                  if (FormParts::BeginCombo(L("ASIO driver"), driverLabel.c_str()))
+                  {
+                     for (const std::string& name : drivers)
+                        if (MenuParts::Choice(name.c_str(), name == driverLabel))
+                        {
+                           gAudioAsioDriver = name;
+                           SaveAudioSettings();
+                        }
+                     FormParts::EndCombo();
+                  }
+               }
+               const std::string driverNote = Platform::AudioDriverNote();
+               if (!driverNote.empty())
+                  ImGui::TextColored(app::AccentEmphasisSelected(), "%s", driverNote.c_str());
             }
 #endif
 
@@ -572,9 +613,13 @@ namespace app
                                    actualBufferFrames);
 #if defined(_WIN32)
                {
-                  const char* kActiveModeLabels[] = { T("standard"), T("low-latency shared"), T("exclusive") };
+                  const char* kActiveModeLabels[] = { T("standard"), T("low-latency shared"), T("exclusive"),
+                                                      T("ASIO") };
                   ImGui::TextDisabled(T("Output mode in use: %s"),
-                                      kActiveModeLabels[std::clamp(Platform::AudioOutputModeActive(), 0, 2)]);
+                                      kActiveModeLabels[std::clamp(Platform::AudioOutputModeActive(), 0, 3)]);
+                  const std::string activeDriver = Platform::AudioAsioActiveName();
+                  if (!activeDriver.empty())
+                     ImGui::TextDisabled(T("ASIO driver in use: %s"), activeDriver.c_str());
                }
 #endif
                // Round-trip (input to output) latency estimate: what a
@@ -602,6 +647,7 @@ namespace app
                AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
                AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
                AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+               Platform::AudioSetAsioDriver(gAudioAsioDriver);
                Platform::AudioSetOutputMode(gAudioOutputMode);
                SaveAudioSettings();
 

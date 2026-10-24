@@ -661,6 +661,11 @@ namespace Platform
    // Output modes are a Windows concept (WASAPI). Linux always runs mode 0.
    void AudioSetOutputMode(int /*mode*/) {}
    int AudioOutputModeActive() { return 0; }
+   bool AudioAsioAvailable() { return false; }
+   std::vector<std::string> AudioAsioDrivers() { return {}; }
+   void AudioSetAsioDriver(const std::string&) {}
+   std::string AudioAsioActiveName() { return {}; }
+   std::string AudioDriverNote() { return {}; }
 
    bool AudioDeviceConfigDidChange()
    {

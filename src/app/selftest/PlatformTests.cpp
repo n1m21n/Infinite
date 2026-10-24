@@ -1,6 +1,10 @@
 // Platform / patch-layout self-tests (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "core/SelfUpdate.h"
+#include "platform/common/AsioCore.h"
+#include <cmath>
+#include <filesystem>
+#include <fstream>
 #if defined(__linux__)
 #include "platform/linux/HostEnvironmentLinux.h"
 #endif
@@ -608,5 +612,134 @@ int RunSelfUpdateTest()
    }
    printf("SELFUPDATETEST STAGED\n");
    return 0;
+}
+
+// ===================================================== INFINITE_ASIOTEST
+// The parts of the ASIO host that need no driver and no Windows: sample
+// format conversion, the registry driver list, buffer-size picking and the
+// settings save/load round trip.
+int RunAsioTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      if (!cond)
+      {
+         printf("ASIOTEST FAIL: %s\n", what);
+         ok = false;
+      }
+   };
+
+   // ---- sample formats: float -> driver -> float within one LSB ----------
+   const int types[] = { AsioCore::kInt16LSB, AsioCore::kInt24LSB, AsioCore::kInt32LSB, AsioCore::kFloat32LSB,
+                         AsioCore::kFloat64LSB, AsioCore::kInt32LSB16, AsioCore::kInt32LSB18,
+                         AsioCore::kInt32LSB20, AsioCore::kInt32LSB24 };
+   const int bits[] = { 16, 24, 32, 0, 0, 16, 18, 20, 24 };
+   float src[257];
+   for (int i = 0; i < 257; i++)
+      src[i] = (float)(i - 128) / 128.0f * 0.999f;
+   for (size_t t = 0; t < sizeof(types) / sizeof(types[0]); t++)
+   {
+      const int type = types[t];
+      check(AsioCore::SampleTypeSupported(type), "format reported supported");
+      std::vector<uint8_t> raw((size_t)257 * AsioCore::BytesPerSample(type) + 8, 0);
+      float back[257];
+      AsioCore::FromFloat(type, src, raw.data(), 257);
+      AsioCore::ToFloat(type, raw.data(), back, 257);
+      const float tol = bits[t] == 0 ? 1e-6f : 1.5f / (float)(1 << (std::min(bits[t], 30) - 1));
+      float worst = 0.0f;
+      for (int i = 0; i < 257; i++)
+         worst = std::max(worst, std::fabs(back[i] - src[i]));
+      check(worst <= tol, "round trip within one step");
+   }
+   // Clipping, NaN, exact full-scale endpoints.
+   {
+      const float wild[4] = { 2.0f, -2.0f, std::nanf(""), 1.0f };
+      int16_t out[4];
+      AsioCore::FromFloat(AsioCore::kInt16LSB, wild, out, 4);
+      check(out[0] == 32767 && out[1] == -32768 && out[2] == 0 && out[3] == 32767, "int16 clips, NaN is silence");
+      uint8_t o24[3];
+      const float one = -1.0f;
+      AsioCore::FromFloat(AsioCore::kInt24LSB, &one, o24, 1);
+      float back = 0.0f;
+      AsioCore::ToFloat(AsioCore::kInt24LSB, o24, &back, 1);
+      check(back == -1.0f, "int24 negative full scale");
+   }
+   check(!AsioCore::SampleTypeSupported(0) && !AsioCore::SampleTypeSupported(1), "big-endian refused");
+
+   // ---- driver list ------------------------------------------------------
+   {
+      const std::string good = "{12345678-ABCD-4ef0-9a1b-0123456789AB}";
+      std::vector<std::pair<std::string, std::string>> raw = {
+         { "Zeta ASIO", good },
+         { " alpha driver ", good },
+         { "ALPHA DRIVER", good },        // duplicate, other case
+         { "Broken", "{not-a-clsid}" },   // bad id
+         { "", good },                    // no name
+         { "Mid", "{12345678-ABCD-4ef0-9a1b-0123456789ABC}" }, // too long
+      };
+      const auto list = AsioCore::BuildDriverList(raw);
+      check(list.size() == 2, "list keeps two valid unique drivers");
+      check(list.size() == 2 && list[0].name == "alpha driver" && list[1].name == "Zeta ASIO", "list sorted, trimmed");
+      check(AsioCore::FindDriver(list, "") == 0, "empty name picks the first");
+      check(AsioCore::FindDriver(list, "zeta asio") == 1, "name lookup ignores case");
+      check(AsioCore::FindDriver(list, "Gone") == -1, "missing driver is -1");
+      check(AsioCore::FindDriver({}, "") == -1, "no drivers is -1");
+   }
+
+   // ---- buffer size ------------------------------------------------------
+   check(AsioCore::PickBufferSize(64, 32, 2048, 256, -1) == 64, "power-of-two exact");
+   check(AsioCore::PickBufferSize(100, 32, 2048, 256, -1) == 128, "power-of-two nearest");
+   check(AsioCore::PickBufferSize(0, 32, 2048, 256, -1) == 256, "no request -> preferred");
+   check(AsioCore::PickBufferSize(1, 64, 512, 128, -1) == 64, "clamped up to min");
+   check(AsioCore::PickBufferSize(9999, 64, 512, 128, -1) == 512, "clamped down to max");
+   check(AsioCore::PickBufferSize(300, 64, 1024, 256, 64) == 320, "granular steps from min");
+   check(AsioCore::PickBufferSize(300, 480, 480, 480, 0) == 480, "fixed-size driver");
+
+   // ---- settings round trip ----------------------------------------------
+   {
+      const int savedMode = gAudioOutputMode;
+      const std::string savedDriver = gAudioAsioDriver;
+      const int savedFrames = gAudioBufferFrames;
+      const std::string path =
+         (std::filesystem::temp_directory_path() / "infinite-asiotest.audio-settings").string();
+      gAudioOutputMode = 3;
+      gAudioAsioDriver = "Focusrite USB ASIO";
+      gAudioBufferFrames = 32;
+      SaveAudioSettingsTo(path);
+      gAudioOutputMode = 0;
+      gAudioAsioDriver.clear();
+      gAudioBufferFrames = 512;
+      LoadAudioSettingsFrom(path);
+      check(gAudioOutputMode == 3, "output mode survives");
+      check(gAudioAsioDriver == "Focusrite USB ASIO", "driver name survives");
+      check(gAudioBufferFrames == 32, "buffer size survives");
+
+      // An old file (no asioDriver key, mode 1) loads as before.
+      {
+         std::ofstream old(path);
+         old << "outputMode=1\nbufferFrames=256\n";
+      }
+      gAudioAsioDriver = "stale";
+      gAudioOutputMode = 3;
+      LoadAudioSettingsFrom(path);
+      check(gAudioOutputMode == 1 && gAudioBufferFrames == 256, "old settings file loads unchanged");
+      check(gAudioAsioDriver == "stale", "missing key leaves the driver alone");
+      // A hand-edited out-of-range mode is clamped.
+      {
+         std::ofstream bad(path);
+         bad << "outputMode=9\n";
+      }
+      LoadAudioSettingsFrom(path);
+      check(gAudioOutputMode == 3, "out-of-range mode clamps to 3");
+      std::error_code ec;
+      std::filesystem::remove(path, ec);
+      gAudioOutputMode = savedMode;
+      gAudioAsioDriver = savedDriver;
+      gAudioBufferFrames = savedFrames;
+   }
+
+   printf("ASIOTEST %s\n", ok ? "PASS" : "FAIL");
+   return ok ? 0 : 1;
 }
 }

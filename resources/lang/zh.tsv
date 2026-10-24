@@ -116,7 +116,7 @@ Show canvas grid	显示画布网格
 Snap to grid	吸附到网格
 Solid Color	纯色
 Standard (shared)	标准（共享）
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	标准：Windows 共享模式（默认）。\n低延迟：以驱动支持的最小周期运行共享模式（Windows 10+）。\n独占：从其他应用手中接管设备，以获得最低延迟。\n若某模式不可用，Infinite 会逐步退回到“标准”。点击“应用音频设置”后生效。
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	标准：Windows 共享模式（默认）。\n低延迟：以驱动支持的最小周期运行共享模式（Windows 10+）。\n独占：从其他应用手中接管设备，以获得最低延迟。\nASIO：音频接口自带的驱动，延迟最低（需要安装其 ASIO 驱动）。\n若某模式不可用，Infinite 会逐步退回到“标准”。点击“应用音频设置”后生效。
 Start Audio	启动音频
 Stop Audio	停止音频
 System default	系统默认
@@ -1643,3 +1643,8 @@ Runs a shader pasted from shadertoy.com as it is: mainImage, buffers A-D and the
 Samples the input mesh's vertices as a point cloud, for feeding Instance on Points, Metaballs, Displacement, Twist or Point Trails. Max points caps the count, point size sets how big each point draws, and weld seams counts a corner shared by several faces once.	将输入网格的顶点采样为点云，可用于输入 Instance on Points、Metaballs、Displacement、Twist 或 Point Trails。Max points 限制点的数量，point size 设定每个点的绘制大小，weld seams 会把被多个面共用的角点只计一次。
 Stamps a shape at every point, drawn in one instanced call. The points pin takes a mesh to sample (the Points, Edges or Faces sampler nodes), and shape is the geometry stamped at each point. The optional cloud pin takes a point cloud (Particle System, Image to Points, Mesh to Points, a Model 3D .ply) and replaces the sampling: every point gets a copy, coloured by the point, and a GPU cloud stays on the GPU. Shape is always needed; points is needed only when nothing is in cloud. Any node chained after this one operates on the shape being stamped, once, not on the realized scatter - except Transform, which moves the whole scatter as one rigid group.	在每个点上盖印一个形状，通过一次实例化绘制调用完成。points 引脚接收要采样的网格（Points、Edges 或 Faces 采样节点），shape 是在每个点上盖印的几何体。可选的 cloud 引脚接收点云（Particle System、Image to Points、Mesh to Points、Model 3D 的 .ply），并取代采样：每个点都会得到一份副本，颜色取自该点，GPU 点云会一直留在 GPU 上。shape 始终需要；仅当 cloud 中没有连接时才需要 points。接在它后面的任何节点都只对被盖印的形状作用一次，而不是对展开后的散布结果——Transform 除外，它会把整个散布作为一个刚性整体移动。
 Twists the mesh, or a cloud's points, around a chosen Axis by Angle - the further a point is along that axis, the more it rotates. On GPU points it runs on the GPU.	围绕所选 Axis 按 Angle 扭转网格或点云的点——点沿该轴越远，旋转得越多。作用于 GPU 点时在 GPU 上运行。
+ASIO	ASIO
+ASIO driver	ASIO 驱动
+None installed	未安装
+ASIO driver in use: %s	正在使用的 ASIO 驱动：%s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	ASIO 驱动同时负责输入和输出。请在“ASIO 驱动”中选择。

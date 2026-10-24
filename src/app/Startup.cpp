@@ -763,6 +763,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunExtensionsTest();
    if (getenv("INFINITE_TRACKINGTEST") != nullptr)
       return RunTrackingTest();
+   if (getenv("INFINITE_ASIOTEST") != nullptr)
+      return RunAsioTest();
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
    if (getenv("INFINITE_CVRECTEST") != nullptr)
@@ -1409,6 +1411,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
    AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
    AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+   Platform::AudioSetAsioDriver(gAudioAsioDriver);
    Platform::AudioSetOutputMode(gAudioOutputMode);
    AudioEngine::Instance().SetAudioThreads(gAudioThreads);
    // The window was just created with vsync hardcoded on (above); apply the

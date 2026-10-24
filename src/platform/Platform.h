@@ -454,7 +454,8 @@ namespace Platform
 
    // Output-stream mode preference for the render device, applied on the next
    // AudioDeviceOpen. 0 = standard (default, the platform's normal path),
-   // 1 = low-latency shared, 2 = exclusive. Only Windows acts on this
+   // 1 = low-latency shared, 2 = exclusive, 3 = ASIO (Windows build with the SDK).
+   // Only Windows acts on this
    // (IAudioClient3 minimum-period shared stream / WASAPI exclusive); every
    // request degrades toward 0 rather than failing the open. macOS and Linux
    // ignore it and always run mode 0.
@@ -462,6 +463,15 @@ namespace Platform
    // The mode the currently open render device is actually running (after any
    // fallback); 0 when no device is open or the platform has no such modes.
    int AudioOutputModeActive();
+
+   // ASIO (Windows). AudioAsioAvailable is true only in a build with the ASIO
+   // SDK; the others are harmless no-ops elsewhere. Output mode 3 selects ASIO;
+   // when it cannot open, the app runs on WASAPI and AudioDriverNote says why.
+   bool AudioAsioAvailable();
+   std::vector<std::string> AudioAsioDrivers();
+   void AudioSetAsioDriver(const std::string& name);
+   std::string AudioAsioActiveName();
+   std::string AudioDriverNote();
 
    // Headless round-trip check for the WASAPI PCM<->float conversion helpers
    // (docs/plans/windows-render/FIX_BRIEF.md addendum A1: WASAPI shared mode

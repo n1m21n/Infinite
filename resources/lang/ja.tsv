@@ -116,7 +116,7 @@ Show canvas grid	キャンバスのグリッドを表示
 Snap to grid	グリッドにスナップ
 Solid Color	単色
 Standard (shared)	標準（共有）
-Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	標準：Windows の共有モード（デフォルト）。\n低レイテンシ：ドライバーの最小周期で動作する共有モード（Windows 10以降）。\n排他：他のアプリからデバイスを占有し、最小のレイテンシにします。\nモードが使えない場合、Infinite は標準の方向へ戻ります。使用するには「オーディオ設定を適用」を押してください。
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nASIO: your audio interface's own driver, for the lowest latency (needs its ASIO driver installed).\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	標準：Windows の共有モード（デフォルト）。\n低レイテンシ：ドライバーの最小周期で動作する共有モード（Windows 10以降）。\n排他：他のアプリからデバイスを占有し、最小のレイテンシにします。\nASIO：オーディオインターフェース専用のドライバーで、最小のレイテンシーを実現します（ASIO ドライバーのインストールが必要）。\nモードが使えない場合、Infinite は標準の方向へ戻ります。使用するには「オーディオ設定を適用」を押してください。
 Start Audio	オーディオ開始
 Stop Audio	オーディオ停止
 System default	システムのデフォルト
@@ -1643,3 +1643,8 @@ Runs a shader pasted from shadertoy.com as it is: mainImage, buffers A-D and the
 Samples the input mesh's vertices as a point cloud, for feeding Instance on Points, Metaballs, Displacement, Twist or Point Trails. Max points caps the count, point size sets how big each point draws, and weld seams counts a corner shared by several faces once.	入力メッシュの頂点をポイントクラウドとしてサンプリングし、Instance on Points、Metaballs、Displacement、Twist、Point Trails に渡せます。Max points は数の上限、point size は各ポイントの描画サイズを決め、weld seams は複数の面で共有されるコーナーを1回だけ数えます。
 Stamps a shape at every point, drawn in one instanced call. The points pin takes a mesh to sample (the Points, Edges or Faces sampler nodes), and shape is the geometry stamped at each point. The optional cloud pin takes a point cloud (Particle System, Image to Points, Mesh to Points, a Model 3D .ply) and replaces the sampling: every point gets a copy, coloured by the point, and a GPU cloud stays on the GPU. Shape is always needed; points is needed only when nothing is in cloud. Any node chained after this one operates on the shape being stamped, once, not on the realized scatter - except Transform, which moves the whole scatter as one rigid group.	すべてのポイントにシェイプをスタンプし、1回のインスタンス描画で描きます。points ピンにはサンプリングするメッシュ（Points、Edges、Faces のサンプラーノード）を接続し、shape は各ポイントにスタンプされるジオメトリです。省略可能な cloud ピンにはポイントクラウド（Particle System、Image to Points、Mesh to Points、Model 3D の .ply）を接続でき、サンプリングの代わりになります。すべてのポイントにコピーが置かれ、ポイントの色が付き、GPU のクラウドは GPU 上に留まります。shape は常に必要で、points は cloud に何も接続されていないときだけ必要です。このノードの後ろに続くノードは、実体化されたスキャッターではなくスタンプされるシェイプに対して1回だけ働きます。ただし Transform は例外で、スキャッター全体を1つの剛体グループとして動かします。
 Twists the mesh, or a cloud's points, around a chosen Axis by Angle - the further a point is along that axis, the more it rotates. On GPU points it runs on the GPU.	メッシュまたはポイントクラウドのポイントを、選んだ Axis を中心に Angle だけねじります。その軸に沿って遠いポイントほど大きく回転します。GPU ポイントでは GPU 上で実行されます。
+ASIO	ASIO
+ASIO driver	ASIO ドライバー
+None installed	インストールされていません
+ASIO driver in use: %s	使用中の ASIO ドライバー：%s
+An ASIO driver is one device for input and output. Pick it under ASIO driver.	ASIO ドライバーは入力と出力を兼ねる 1 台のデバイスです。「ASIO ドライバー」で選択してください。
