@@ -58,7 +58,25 @@ public:
       // S9: FXAA when TAA is off; 360 output (Render 3D's keys and modes).
       v.Bool("fxaa", fxaa);
       v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
+      // 0.71.1: PointZ points as spheres or as dots (grains of dotSize pixels).
+      v.Int("pointStyle", pointStyle); v.Float("dotSize", dotSize);
+      // 0.71.1: screen-space GI (off: patches before it look the same).
+      v.Bool("gi", gi); v.Float("giIntensity", giIntensity); v.Float("giRadius", giRadius);
    }
+
+   // 0.71.1: screen-space GI - light bounced off what is on screen, so an
+   // emissive object lights the floor and its neighbours (Filament has no GI).
+   // Off by default; ~1 ms at 1080p.
+   bool gi = false;
+   float giIntensity = 1.0f;
+   float giRadius = 1.5f;
+
+   // 0.71.1: how PointZ points are drawn - 0 spheres of PScale world units (the
+   // default, as in 0.71.0), 1 dots: grains dotSize x PScale pixels wide at
+   // any distance, lit as tiny spheres (sand, dust, a million particles).
+   static const std::vector<std::string>& PointStyleNames();
+   int pointStyle = 0;
+   float dotSize = 1.5f;
 
    // S8: the HQ's tonemaps - Render 3D's five, then Filament's ACES legacy
    // (Filament's default) and ACES.

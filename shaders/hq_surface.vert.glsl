@@ -15,6 +15,12 @@ layout(location = 4) in vec4 aInst1;
 layout(location = 5) in vec4 aInst2;
 layout(location = 6) in vec4 aInst3;
 layout(location = 7) in vec4 aInstColor;
+// 0.71.1: last frame's transform of the same copy (the current one when the
+// copies did not change), for its own velocity under TAA.
+layout(location = 8) in vec4 aPrevInst0;
+layout(location = 9) in vec4 aPrevInst1;
+layout(location = 10) in vec4 aPrevInst2;
+layout(location = 11) in vec4 aPrevInst3;
 uniform int uInstanced;
 uniform int uInstColored;
 out vec3 vInstColor;
@@ -53,7 +59,9 @@ void main()
    vUv = aUv;
    vLocalPos = aPos;
    vCurClip = uCurViewProj * world;
-   // Instances have no last-frame transform: their motion is the camera's.
-   vPrevClip = uPrevViewProj * ((uInstanced == 1 ? model : uPrevModel) * vec4(aPos, 1.0));
+   // 0.71.1: an instance moves by its own last-frame transform (until 0.71.0
+   // only the camera's motion: copies moved by noise left ghost trails).
+   mat4 prevModel = uInstanced == 1 ? mat4(aPrevInst0, aPrevInst1, aPrevInst2, aPrevInst3) : uPrevModel;
+   vPrevClip = uPrevViewProj * (prevModel * vec4(aPos, 1.0));
    gl_Position = uViewProj * world;
 }

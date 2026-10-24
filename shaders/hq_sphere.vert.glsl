@@ -27,6 +27,12 @@ uniform vec3 uCamPos;
 uniform float uRadiusScale; // PointBaseSize (x 0.02 without PScale) x the model's scale
 uniform int uOrtho;
 uniform vec3 uViewDir;      // camera forward (orthographic rays)
+// Turbo 0.71.1: "points as dots" - a grain uDotPixels x PScale pixels wide
+// at any distance (sand) instead of a sphere of PScale world units; 0 =
+// spheres. uPixelWorld: world size of one pixel at distance 1 (perspective)
+// or anywhere (orthographic).
+uniform float uDotPixels;
+uniform float uPixelWorld;
 
 out vec3 vWorldPos;
 flat out vec3 vCentre;
@@ -42,6 +48,8 @@ void main()
    float r = aPScale * uRadiusScale;
    vec3 toC = (uOrtho == 1) ? uViewDir : c - uCamPos;
    float d = length(toC);
+   if (uDotPixels > 0.0) // 0.71.1: the grain's pixels as a radius at its distance
+      r = 0.5 * uDotPixels * aPScale * uPixelWorld * ((uOrtho == 1) ? 1.0 : d);
    // Hidden, zero-sized, or the eye inside it: off screen.
    if (aActive < 0.5 || r <= 0.0 || (uOrtho == 0 && d <= r * 1.001))
    {

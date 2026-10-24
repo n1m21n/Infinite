@@ -103,7 +103,8 @@ namespace
    const int kUnitIrr = 0, kUnitPref = 1, kUnitDfg = 2, kUnitShadow = 3, kUnitMap0 = 4;
    const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitSsao = 14;
    const int kUnitSphereAlbedo = 15, kUnitSceneNormal = 16; // S7: deferred spheres
-   const int kUnitShadowMask = 17, kUnitLast = 17; // S9: screen-space shadow mask
+   const int kUnitShadowMask = 17; // S9: screen-space shadow mask
+   const int kUnitSsgi = 18, kUnitLast = 18; // 0.71.1: screen-space GI
    // S5: Filament's AmbientOcclusionOptions (resolution 0.5, bilateralThreshold
    // in metres, power) and the depth chain's levels (kLog2LodRate 3 reaches
    // level 4 at the largest GTAO radius on screen).
@@ -111,6 +112,10 @@ namespace
    const int kAoMaxLevels = 5;
    // S6: Filament's TemporalAntiAliasingOptions feedback (weight of the new frame).
    const float kTaaFeedback = 0.12f;
+   // 0.71.1: weight of each new screen-space GI estimate in its own history
+   // (about 16 frames of memory: smooth, and a moving light's glow follows
+   // within a quarter of a second at 60 fps).
+   const float kGiFeedback = 0.06f;
    // S7: frames a still scene keeps refining under TAA before the image is
    // reused (0.88^32: ~2% of the first frame left in the history).
    const int kStillFrames = 32;
@@ -119,6 +124,15 @@ namespace
    const float kPolygonOffsetConstant = 0.5f, kPolygonOffsetSlope = 2.0f;
    const float kNormalBiasTexels = 1.0f;
    const float kContactDistance = 0.3f;
+
+   // 0.71.1: world size of one pixel of the frame - at distance 1 in
+   // perspective (scaled by the distance in the shader), everywhere in
+   // orthographic. For "points as dots".
+   float PixelWorld(const HqFrame& f)
+   {
+      const float p5 = std::fabs(f.proj.m[5]);
+      return p5 > 1e-6f ? 2.0f / (p5 * (float)std::max(1, f.height)) : 0.0f;
+   }
 
    // S9: how a mesh slot composites, by Render 3D's rules for its Material
    // (alpha = opacity x the albedo map's alpha with textureAlpha; below the
@@ -208,6 +222,7 @@ namespace
       int shadowDepthRange = -1, shadowSoftness = -1, contactShadows = -1, projParams = -1;
       int shadowMaskOn = -1, shadowNoiseFrame = -1; // S9
       int ssao = -1, frameTexel = -1;
+      int ssgi = -1, ssgiIntensity = -1; // 0.71.1
 
       void Load(unsigned int p)
       {
@@ -255,6 +270,9 @@ namespace
          ssao = loc("uSsao");
          frameTexel = loc("uFrameTexel");
          glUniform1i(loc("uSsaoMap"), kUnitSsao);
+         ssgi = loc("uSsgi");
+         ssgiIntensity = loc("uSsgiIntensity");
+         glUniform1i(loc("uSsgiMap"), kUnitSsgi);
          // Samplers sit on fixed units (the program is bound by the caller).
          glUniform1i(loc("uIrrEnv"), kUnitIrr);
          glUniform1i(loc("uPrefEnv"), kUnitPref);
@@ -277,6 +295,13 @@ namespace
          glUniform4fv(projParams, 1, st.proj);
          glUniform1i(shadowMaskOn, st.mask);
          glUniform1i(shadowNoiseFrame, st.noiseFrame);
+      }
+
+      // 0.71.1: screen-space GI on (its map on kUnitSsgi) and its strength.
+      void SetGi(bool on, float intensity) const
+      {
+         glUniform1i(ssgi, on ? 1 : 0);
+         glUniform1f(ssgiIntensity, intensity);
       }
 
       // S5: 0 no SSAO, 1 on, 2 show it alone; the map is on kUnitSsao.
@@ -386,6 +411,12 @@ namespace
          std::shared_ptr<pop::AsyncBounds> instBounds;
          float instLo[3] = { 0, 0, 0 }, instHi[3] = { 0, 0, 0 }; // the points (source space)
          bool instHasBounds = false;
+         // 0.71.1: last frame's instance transforms (attributes 8-11), so a
+         // copy that moves on its own (noise on the points) has its own
+         // velocity under TAA instead of only the camera's (ghost trails).
+         // The current columns when the set did not change this frame.
+         std::vector<pop::BufferPtr> instPrev;
+         bool instPrevIsCurrent = false;
       };
       // Uniform locations, looked up once at link (none per frame).
       struct PrepassProgram
@@ -418,6 +449,7 @@ namespace
       {
          unsigned int id = 0;
          int viewProj = -1, model = -1, radiusScale = -1, texelsPerUnit = -1;
+         int dotPixels = -1, pixelWorld = -1, camPos = -1, ortho = -1; // 0.71.1
       };
       struct SphereProgram
       {
@@ -426,6 +458,7 @@ namespace
          int earlyDepth = -1;
          int curViewProj = -1, prevViewProj = -1, prevModel = -1, velDt = -1, frameSize = -1; // S6
          int slotId = -1; // S7
+         int dotPixels = -1, pixelWorld = -1; // 0.71.1: points as dots
          LitLocs lit;
       };
       // S7: one full-screen pass per sphere slot (hq_sphere_deferred.frag).
@@ -469,6 +502,16 @@ namespace
          int invViewProj = -1, viewMatrix = -1, lightDir = -1, size = -1, viewProj = -1;
          LitLocs lit; // the shadow uniforms of hq_shadows.glsl
       };
+      // 0.71.1: hq_ssgi.comp and its blur (hq_ssgi_blur.comp).
+      struct GiPrograms
+      {
+         unsigned int gi = 0, blur = 0, temporal = 0;
+         int tInvViewProj = -1, tPrevViewProj = -1, tPrevView = -1, tSize = -1, tFullSize = -1, tAlpha = -1;
+         int tHistValid = -1;
+         int viewProj = -1, invViewProj = -1, prevViewProj = -1, viewMatrix = -1, size = -1, fullSize = -1;
+         int radius = -1, thickness = -1, invExposure = -1, frame = -1;
+         int bSize = -1, bAxis = -1, bFarZ = -1, bEdgeInv = -1;
+      };
 
       bool EnsurePrograms();
       bool EnsureTargets(int w, int h, bool aoFullRes);
@@ -486,6 +529,8 @@ namespace
       bool EnsureShadowMask();
       void RunShadowMask(const HqFrame& f, const Mat4& viewProj, const ShadowState& st);
       unsigned int RunFxaa(unsigned int src, int w, int h);
+      bool EnsureGi();
+      void RunGi(const HqFrame& f, const Mat4& viewProj, const Mat4& prevViewProj);
       void Release();
 
       PrepassProgram mPre;
@@ -533,6 +578,19 @@ namespace
       unsigned int mShadowMask[2] = { 0, 0 };
       int mMaskW = 0, mMaskH = 0;
       int mShadowNoiseFrame = 0;
+      // 0.71.1: screen-space GI - the half-size pair (RGBA16F: light, view z;
+      // mGi[0] holds the result) and last frame's HDR colour it reads.
+      GiPrograms mGiProg;
+      bool mGiTried = false;
+      unsigned int mGi[2] = { 0, 0 }, mGiPrev = 0;
+      int mGiW = 0, mGiH = 0, mGiPrevW = 0, mGiPrevH = 0, mGiFrame = 0;
+      bool mGiPrevValid = false;
+      // The GI's own history (accumulated, unblurred; mGiHist[mGiHistCur] is
+      // the latest) and last frame's view matrix to check it.
+      unsigned int mGiHist[2] = { 0, 0 };
+      int mGiHistCur = 0;
+      bool mGiHistValid = false;
+      Mat4 mPrevView;
       // S9: FXAA (hq_fxaa.frag) into its own RGBA8 target.
       unsigned int mFxaaProg = 0, mFxaaOut = 0, mFxaaFbo = 0;
       int mFxaaTexel = -1, mFxaaW = 0, mFxaaH = 0;
@@ -630,6 +688,8 @@ namespace
       mSph.velDt = loc(mSph.id, "uVelDt");
       mSph.frameSize = loc(mSph.id, "uFrameSize");
       mSph.slotId = loc(mSph.id, "uSlotId");
+      mSph.dotPixels = loc(mSph.id, "uDotPixels");
+      mSph.pixelWorld = loc(mSph.id, "uPixelWorld");
       mSph.lit.Load(mSph.id);
 
       glUseProgram(mSphDef.id);
@@ -649,6 +709,10 @@ namespace
       mSphShadow.model = loc(mSphShadow.id, "uModel");
       mSphShadow.radiusScale = loc(mSphShadow.id, "uRadiusScale");
       mSphShadow.texelsPerUnit = loc(mSphShadow.id, "uTexelsPerUnit");
+      mSphShadow.dotPixels = loc(mSphShadow.id, "uDotPixels");
+      mSphShadow.pixelWorld = loc(mSphShadow.id, "uPixelWorld");
+      mSphShadow.camPos = loc(mSphShadow.id, "uCamPos");
+      mSphShadow.ortho = loc(mSphShadow.id, "uOrtho");
 
       // The shadow map read two ways: compared (PCF) and raw (blocker search).
       glGenSamplers(1, &mCmpSampler);
@@ -912,6 +976,153 @@ namespace
       return true;
    }
 
+   bool HqRendererGl::EnsureGi()
+   {
+      if (mGiTried)
+         return mGiProg.gi != 0 && mGiProg.blur != 0 && mGiProg.temporal != 0;
+      mGiTried = true;
+      GiPrograms& g = mGiProg;
+      g.gi = Render3DTemporal::BuildComputeShader("hq_ssgi.comp.glsl");
+      g.blur = Render3DTemporal::BuildComputeShader("hq_ssgi_blur.comp.glsl");
+      g.temporal = Render3DTemporal::BuildComputeShader("hq_ssgi_temporal.comp.glsl");
+      if (g.gi == 0 || g.blur == 0 || g.temporal == 0)
+         return false;
+      auto loc = [](unsigned int p, const char* n) { return glGetUniformLocation(p, n); };
+      glUseProgram(g.gi);
+      g.viewProj = loc(g.gi, "uViewProj");
+      g.invViewProj = loc(g.gi, "uInvViewProj");
+      g.prevViewProj = loc(g.gi, "uPrevViewProj");
+      g.viewMatrix = loc(g.gi, "uViewMatrix");
+      g.size = loc(g.gi, "uSize");
+      g.fullSize = loc(g.gi, "uFullSize");
+      g.radius = loc(g.gi, "uRadius");
+      g.thickness = loc(g.gi, "uThickness");
+      g.invExposure = loc(g.gi, "uInvExposure");
+      g.frame = loc(g.gi, "uFrame");
+      glUniform1i(loc(g.gi, "uDepth"), 0);
+      glUniform1i(loc(g.gi, "uNormalMap"), 1);
+      glUniform1i(loc(g.gi, "uPrevColor"), 2);
+      g.bSize = loc(g.blur, "uSize");
+      g.bAxis = loc(g.blur, "uAxis");
+      g.bFarZ = loc(g.blur, "uFarZ");
+      g.bEdgeInv = loc(g.blur, "uEdgeInv");
+      glUseProgram(g.temporal);
+      g.tInvViewProj = loc(g.temporal, "uInvViewProj");
+      g.tPrevViewProj = loc(g.temporal, "uPrevViewProj");
+      g.tPrevView = loc(g.temporal, "uPrevView");
+      g.tSize = loc(g.temporal, "uSize");
+      g.tFullSize = loc(g.temporal, "uFullSize");
+      g.tAlpha = loc(g.temporal, "uAlpha");
+      g.tHistValid = loc(g.temporal, "uHistValid");
+      glUniform1i(loc(g.temporal, "uCur"), 0);
+      glUniform1i(loc(g.temporal, "uHist"), 1);
+      glUniform1i(loc(g.temporal, "uDepth"), 2);
+      glUseProgram(0);
+      return true;
+   }
+
+   // 0.71.1: screen-space GI at half the frame size into mGi[0] - rays over
+   // each pixel's hemisphere through this frame's depth, the light where they
+   // hit read from last frame's HDR colour (mGiPrev) - then the bilateral blur.
+   void HqRendererGl::RunGi(const HqFrame& f, const Mat4& viewProj, const Mat4& prevViewProj)
+   {
+      GLUtil::DebugScope group("Render 3D HQ: SSGI");
+      const int w = std::max(1, (f.width + 1) / 2), h = std::max(1, (f.height + 1) / 2);
+      if (mGi[0] == 0 || mGiW != w || mGiH != h)
+      {
+         for (unsigned int& t : mGi)
+         {
+            if (t != 0)
+               glDeleteTextures(1, &t);
+            t = MakeTexture(w, h, 1, GL_RGBA16F, false, "Render 3D HQ: SSGI");
+         }
+         for (unsigned int& t : mGiHist)
+         {
+            if (t != 0)
+               glDeleteTextures(1, &t);
+            t = MakeTexture(w, h, 1, GL_RGBA16F, false, "Render 3D HQ: SSGI history");
+         }
+         mGiW = w;
+         mGiH = h;
+         mGiHistValid = false;
+      }
+      auto groups = [](int n) { return (GLuint)((n + 7) / 8); };
+      const GLbitfield barrier = GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT;
+      const GiPrograms& g = mGiProg;
+      glUseProgram(g.gi);
+      const Mat4 invViewProj = Mat4::Inverse(viewProj);
+      glUniformMatrix4fv(g.viewProj, 1, GL_FALSE, viewProj.m);
+      glUniformMatrix4fv(g.invViewProj, 1, GL_FALSE, invViewProj.m);
+      glUniformMatrix4fv(g.prevViewProj, 1, GL_FALSE, prevViewProj.m);
+      glUniformMatrix4fv(g.viewMatrix, 1, GL_FALSE, f.view.m);
+      glUniform2i(g.size, w, h);
+      glUniform2i(g.fullSize, f.width, f.height);
+      const float radius = std::max(0.05f, f.giRadius);
+      glUniform1f(g.radius, radius);
+      glUniform1f(g.thickness, 0.25f * radius);
+      glUniform1f(g.invExposure, f.exposure > 1e-6f ? 1.0f / f.exposure : 1.0f);
+      // The rays turn every frame: the GI's own history averages them (TAA or not).
+      glUniform1i(g.frame, mGiFrame++);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mDepthCopy);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mNormal);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, mGiPrev);
+      glBindImageTexture(0, mGi[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+      glDispatchCompute(groups(w), groups(h), 1);
+      glMemoryBarrier(barrier);
+
+      // The GI's own history: raw mGi[0] + last accumulation -> mGiHist[next].
+      const int next = mGiHistCur ^ 1;
+      glUseProgram(g.temporal);
+      glUniformMatrix4fv(g.tInvViewProj, 1, GL_FALSE, invViewProj.m);
+      glUniformMatrix4fv(g.tPrevViewProj, 1, GL_FALSE, prevViewProj.m);
+      glUniformMatrix4fv(g.tPrevView, 1, GL_FALSE, mPrevView.m);
+      glUniform2i(g.tSize, w, h);
+      glUniform2i(g.tFullSize, f.width, f.height);
+      glUniform1f(g.tAlpha, kGiFeedback);
+      glUniform1i(g.tHistValid, mGiHistValid ? 1 : 0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mGi[0]);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mGiHist[mGiHistCur]);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, mDepthCopy);
+      glBindImageTexture(0, mGiHist[next], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+      glDispatchCompute(groups(w), groups(h), 1);
+      glMemoryBarrier(barrier);
+      mGiHistCur = next;
+      mGiHistValid = true;
+
+      // The blur of the accumulation: X into mGi[1], Y into mGi[0] (the history
+      // itself stays unblurred, so it does not get softer frame after frame).
+      const Mat4& P = f.proj;
+      const bool ortho = P.m[15] == 1.0f;
+      const float farZ = ortho ? (1.0f - P.m[14]) / P.m[10] : -P.m[14] / (1.0f + P.m[10]);
+      glUseProgram(g.blur);
+      glUniform2i(g.bSize, w, h);
+      glUniform1f(g.bFarZ, farZ);
+      glUniform1f(g.bEdgeInv, 1.0f / kAoBilateralThreshold);
+      glActiveTexture(GL_TEXTURE0);
+      const unsigned int blurFrom[2] = { mGiHist[mGiHistCur], mGi[1] };
+      const unsigned int blurTo[2] = { mGi[1], mGi[0] };
+      for (int pass = 0; pass < 2; pass++)
+      {
+         glUniform2i(g.bAxis, pass == 0 ? 1 : 0, pass == 0 ? 0 : 1);
+         glBindTexture(GL_TEXTURE_2D, blurFrom[pass]);
+         glBindImageTexture(0, blurTo[pass], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+         glDispatchCompute(groups(w), groups(h), 1);
+         glMemoryBarrier(barrier);
+      }
+      glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+      for (int unit = 2; unit >= 0; unit--)
+      {
+         glActiveTexture(GL_TEXTURE0 + unit);
+         glBindTexture(GL_TEXTURE_2D, 0);
+      }
+   }
+
    // S9: FXAA over the finished RGBA8 image (frames without TAA). Returns
    // the anti-aliased texture, or 0 when the shader is missing.
    unsigned int HqRendererGl::RunFxaa(unsigned int src, int w, int h)
@@ -1155,6 +1366,8 @@ namespace
       slot.instanceCount = 0;
       slot.instRevision = 0;
       slot.instKeep.clear();
+      slot.instPrev.clear(); // 0.71.1
+      slot.instPrevIsCurrent = false;
       slot.instHasBounds = false;
       glGenVertexArrays(1, &slot.vao);
    }
@@ -1290,12 +1503,13 @@ namespace
          if (slot.instanced)
          {
             glBindVertexArray(slot.vao);
-            for (unsigned int a = 3; a <= 7; a++)
+            for (unsigned int a = 3; a <= 11; a++) // 0.71.1: + the previous transforms
             {
                glDisableVertexAttribArray(a);
                glVertexAttribDivisor(a, 0);
             }
             slot.instKeep.clear();
+            slot.instPrev.clear();
          }
          slot.instanced = false;
          slot.instanceCount = 0;
@@ -1304,10 +1518,27 @@ namespace
          return;
       }
       const Mat4 group = src->GetModelMatrix();
+      // 0.71.1: points the previous-transform attributes (8-11) at `cols`.
+      auto bindPrev = [&slot](const std::vector<pop::BufferPtr>& cols) {
+         slot.instPrev.assign(cols.begin(), cols.begin() + 4);
+         glBindVertexArray(slot.vao);
+         for (int col = 0; col < 4; col++)
+         {
+            glBindBuffer(GL_ARRAY_BUFFER, cols[(size_t)col]->Gpu());
+            glEnableVertexAttribArray(8 + col);
+            glVertexAttribPointer(8 + col, 4, GL_FLOAT, GL_FALSE, 4 * (GLsizei)sizeof(float), (void*)0);
+            glVertexAttribDivisor(8 + col, 1);
+         }
+      };
       if (!slot.instanced || slot.instRevision != inst->revision || !(slot.instGroup == group))
       {
          std::vector<pop::BufferPtr> cols;
          std::string err;
+         // Last frame's columns, kept alive for the velocity (only meaningful
+         // copy for copy while the count stays the same).
+         std::vector<pop::BufferPtr> last;
+         if (slot.instanced && slot.instKeep.size() >= 4 && slot.instanceCount == inst->pointCount)
+            last.assign(slot.instKeep.begin(), slot.instKeep.begin() + 4);
          slot.instKeep.clear();
          slot.instanceCount = 0;
          glBindVertexArray(slot.vao);
@@ -1331,6 +1562,10 @@ namespace
                glVertexAttribDivisor(7, 0);
             }
             slot.instanceCount = inst->pointCount;
+            // 0.71.1: last frame's transforms when there are as many copies,
+            // else these (no motion of their own this frame).
+            bindPrev(last.size() == 4 ? last : cols);
+            slot.instPrevIsCurrent = last.size() != 4;
          }
          slot.instRevision = inst->revision;
          slot.instGroup = group;
@@ -1338,6 +1573,13 @@ namespace
          slot.instanced = true;
          if (!slot.instBounds)
             slot.instBounds = std::make_shared<pop::AsyncBounds>();
+      }
+      else if (!slot.instPrevIsCurrent && slot.instKeep.size() >= 4)
+      {
+         // 0.71.1: the copies did not move since last frame: zero velocity
+         // of their own (not the step before, again).
+         bindPrev(slot.instKeep);
+         slot.instPrevIsCurrent = true;
       }
       if (inst->BoundsAsync(*slot.instBounds, slot.instLo, slot.instHi))
          slot.instHasBounds = true;
@@ -1456,6 +1698,14 @@ namespace
       sig.push_back((unsigned long long)size);
       for (float v : st.viewProj.m)
          pushF(v);
+      // 0.71.1: dots are as large as the camera sees them.
+      pushF(f.dotPixels);
+      if (f.dotPixels > 0.0f)
+      {
+         for (float v : f.eye)
+            pushF(v);
+         pushF(PixelWorld(f));
+      }
       for (size_t i = 0; i < draw.size(); i++)
       {
          const Slot& slot = mSlots[i];
@@ -1537,6 +1787,11 @@ namespace
             glUseProgram(mSphShadow.id);
             glUniformMatrix4fv(mSphShadow.viewProj, 1, GL_FALSE, st.viewProj.m);
             glUniform1f(mSphShadow.texelsPerUnit, 1.0f / texelWorld);
+            // 0.71.1: dots cast the grain they draw (their size depends on the camera).
+            glUniform1f(mSphShadow.dotPixels, std::max(0.0f, f.dotPixels));
+            glUniform1f(mSphShadow.pixelWorld, PixelWorld(f));
+            glUniform3fv(mSphShadow.camPos, 1, f.eye);
+            glUniform1i(mSphShadow.ortho, f.proj.m[15] == 1.0f ? 1 : 0);
             glEnable(GL_PROGRAM_POINT_SIZE);
             sphereSet = true;
          }
@@ -1653,7 +1908,8 @@ namespace
          pushFs(f.envGround, 3);
          pushFs(f.bg, 3);
          const float knobs[] = { f.exposure, f.bloom, f.bloomThreshold, f.bloomRadius, f.shadowSoftness, f.aoRadius,
-                                 f.aoIntensity, f.sharpness };
+                                 f.aoIntensity, f.sharpness, f.dotPixels, f.gi ? 1.0f : 0.0f, f.giIntensity,
+                                 f.giRadius };
          pushFs(knobs, (int)(sizeof(knobs) / sizeof(float)));
          // S8: bloom levels, the upscaled size, AO resolution.
          sig.push_back((unsigned long long)f.bloomLevels | ((unsigned long long)f.aoFullRes << 8) |
@@ -1715,7 +1971,14 @@ namespace
       // (it reads the depth copy and the GTAO's blur).
       const bool maskOn = shadow.light >= 0 && (shadow.softness > 0.0f || shadow.contact) && EnsureAo() &&
                           mAoProg.blur != 0 && EnsureShadowMask();
-      const bool depthCopy = shadow.contact || anySpheres || aoOn || maskOn;
+      // 0.71.1: screen-space GI - from the second frame of a size on (it reads
+      // last frame's colour, mGiPrev, copied at the end of the shading).
+      if (!f.gi || mGiPrevW != f.width || mGiPrevH != f.height)
+         mGiPrevValid = false;
+      const bool giOn = f.gi && mGiPrevValid && mHavePrevViewProj && EnsureGi();
+      if (!giOn)
+         mGiHistValid = false;
+      const bool depthCopy = shadow.contact || anySpheres || aoOn || maskOn || f.gi;
       // S6: TAA - every frame drawn with a different sub-pixel jitter (the
       // shared kit's Halton(2,3) x16) and blended into a history (RunTaa).
       const bool taaOn = f.taa && EnsureTaa();
@@ -1793,9 +2056,12 @@ namespace
          glUniform3fv(mSph.viewDir, 1, viewDir);
          glUniform1i(mSph.prepass, prepass);
          glUniform1i(mSph.earlyDepth, prepass == 0 && depthCopy ? 1 : 0);
+         glUniform1f(mSph.dotPixels, std::max(0.0f, f.dotPixels)); // 0.71.1
+         glUniform1f(mSph.pixelWorld, PixelWorld(f));
          mSph.lit.SetFrame(f, ibl);
          mSph.lit.SetShadow(shadow);
          mSph.lit.SetAo(aoMode, f.width, f.height);
+         mSph.lit.SetGi(giOn, f.giIntensity);
          glUniformMatrix4fv(mSph.curViewProj, 1, GL_FALSE, viewProjPlain.m);
          glUniformMatrix4fv(mSph.prevViewProj, 1, GL_FALSE, prevViewProj.m);
          glUniform1f(mSph.velDt, f.dt);
@@ -1903,6 +2169,8 @@ namespace
          RunShadowMask(f, viewProj, shadow);
          shadow.mask = 1;
       }
+      if (giOn) // 0.71.1
+         RunGi(f, viewProj, mPrevViewProj);
 
       const GLenum colourOnly[2] = { GL_COLOR_ATTACHMENT0, GL_NONE };
       glDrawBuffers(2, colourOnly);
@@ -1950,6 +2218,8 @@ namespace
          glBindTexture(GL_TEXTURE_2D, aoOn ? mAo[0] : 0);
          glActiveTexture(GL_TEXTURE0 + kUnitShadowMask); // S9
          glBindTexture(GL_TEXTURE_2D, shadow.mask ? mShadowMask[0] : 0);
+         glActiveTexture(GL_TEXTURE0 + kUnitSsgi); // 0.71.1
+         glBindTexture(GL_TEXTURE_2D, giOn ? mGi[0] : 0);
 
          glEnable(GL_CULL_FACE);
          glUseProgram(mSurf.id);
@@ -1960,6 +2230,7 @@ namespace
          mSurf.lit.SetFrame(f, ibl);
          mSurf.lit.SetShadow(shadow);
          mSurf.lit.SetAo(aoMode, f.width, f.height);
+         mSurf.lit.SetGi(giOn, f.giIntensity);
          // One forward-shaded mesh slot (S9: blended = Filament's transparent
          // mode, drawn after everything opaque).
          auto drawSurface = [&](size_t i, bool blended) {
@@ -2040,6 +2311,7 @@ namespace
                mSphDef.lit.SetFrame(f, ibl);
                mSphDef.lit.SetShadow(shadow);
                mSphDef.lit.SetAo(aoMode, f.width, f.height);
+               mSphDef.lit.SetGi(giOn, f.giIntensity);
                glActiveTexture(GL_TEXTURE0 + kUnitSphereAlbedo);
                glBindTexture(GL_TEXTURE_2D, mSphereAlbedo);
                glActiveTexture(GL_TEXTURE0 + kUnitSceneNormal);
@@ -2093,16 +2365,33 @@ namespace
             direct.mask = 0; // the mask holds what is behind them
             mSurf.lit.SetShadow(direct);
             mSurf.lit.SetAo(0, f.width, f.height);
+            mSurf.lit.SetGi(false, 0.0f); // its pixels are the opaque ones behind
             for (const auto& entry : blendOrder)
                drawSurface(entry.second, true);
             glDisable(GL_BLEND);
          }
       }
 
+      // 0.71.1: this frame's HDR colour is next frame's GI source.
+      if (f.gi)
+      {
+         if (mGiPrev == 0 || mGiPrevW != f.width || mGiPrevH != f.height)
+         {
+            if (mGiPrev != 0)
+               glDeleteTextures(1, &mGiPrev);
+            mGiPrev = MakeTexture(f.width, f.height, 1, GL_RGBA16F, false, "Render 3D HQ: SSGI source");
+            mGiPrevW = f.width;
+            mGiPrevH = f.height;
+         }
+         glCopyImageSubData(mColor, GL_TEXTURE_2D, 0, 0, 0, 0, mGiPrev, GL_TEXTURE_2D, 0, 0, 0, 0, f.width, f.height, 1);
+         mGiPrevValid = true;
+      }
+
       glDrawBuffers(1, both);
 
       // S6: this frame's cameras and model matrices are next frame's "last".
       mPrevViewProj = viewProjPlain;
+      mPrevView = f.view; // 0.71.1: the GI history's check
       mHavePrevViewProj = true;
       for (size_t i = 0; i < draw.size(); i++)
          if (mSlots[i].drawable)
@@ -2167,8 +2456,10 @@ namespace
       mSlots.clear();
       unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy,
                                    &mAoZ, &mAo[0], &mAo[1], &mVelocity, &mSphereAlbedo, &mTaaHist[0], &mTaaHist[1],
-                                   &mTaaCov[0], &mTaaCov[1], &mShadowMask[0], &mShadowMask[1], &mFxaaOut };
-      mMaskW = mMaskH = mFxaaW = mFxaaH = 0;
+                                   &mTaaCov[0], &mTaaCov[1], &mShadowMask[0], &mShadowMask[1], &mFxaaOut,
+                                   &mGi[0], &mGi[1], &mGiPrev, &mGiHist[0], &mGiHist[1] };
+      mMaskW = mMaskH = mFxaaW = mFxaaH = mGiW = mGiH = mGiPrevW = mGiPrevH = 0;
+      mGiPrevValid = false;
       if (mFxaaFbo != 0) glDeleteFramebuffers(1, &mFxaaFbo);
       mFxaaFbo = 0;
       for (unsigned int* t : textures)
@@ -2186,7 +2477,8 @@ namespace
       mShadowFbo = mDepthCopyFbo = mCmpSampler = mRawSampler = 0;
       if (mEmptyVao != 0) glDeleteVertexArrays(1, &mEmptyVao);
       unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mSphDef.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
-                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id, &mMaskProg.id, &mFxaaProg };
+                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id, &mMaskProg.id, &mFxaaProg,
+                                   &mGiProg.gi, &mGiProg.blur, &mGiProg.temporal };
       for (unsigned int* p : programs)
       {
          if (*p != 0)

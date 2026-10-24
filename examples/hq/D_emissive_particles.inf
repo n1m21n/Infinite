@@ -2,7 +2,7 @@ infinite-patch 1
 # turbo-mod-range
 node 1 3DScene Render 3D HQ
   uid 1
-  pos 2080 0
+  pos 2178 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
@@ -19,7 +19,7 @@ node 1 3DScene Render 3D HQ
 end
 node 2 3DScene Camera
   uid 2
-  pos 1560 0
+  pos 1333 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
@@ -33,15 +33,15 @@ node 2 3DScene Camera
 end
 node 3 3DScene HDRI
   uid 3
-  pos 1560 560
+  pos 1333 558
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
+  s path hq_media/studio.hdr
   f intensity 0.15
   f rotation 0
 end
 node 4 3DScene Material
   uid 4
-  pos 1560 1120
+  pos 1333 1040
   flags 1 0 0 0 1 0
   c color 1 0.45 0.1
   f metallic 0
@@ -63,7 +63,7 @@ node 5 PointZ Grid PointZ
 end
 node 6 PointZ Noise PointZ
   uid 6
-  pos 520 0
+  pos 407 0
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
@@ -75,7 +75,7 @@ node 6 PointZ Noise PointZ
 end
 node 7 PointZ Particle PointZ
   uid 7
-  pos 1040 0
+  pos 863 0
   flags 1 0 0 0 1 0
   i birth 0
   f rate 60000
@@ -98,7 +98,7 @@ node 7 PointZ Particle PointZ
 end
 node 8 Output Output
   uid 8
-  pos 3060 0
+  pos 2946 0
   flags 1 0 0 0 1 0
 end
 geo 6 0 5

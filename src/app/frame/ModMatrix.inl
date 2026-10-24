@@ -942,6 +942,20 @@
          gRequestFitView = true; // same, for the audio node UI fixture
       if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
          gRequestFitView = true;
+      // Turbo 0.71.1 (dev): the canvas size of every node of the loaded patch,
+      // "typeName <tab> width <tab> height" per line, so make_hq_scenes.py
+      // lays example patches out without nodes overlapping.
+      if (const char* sizesPath = getenv("INFINITE_NODESIZES"))
+         if (frameId == 20)
+            if (FILE* fp = fopen(sizesPath, "w"))
+            {
+               for (GraphNode& gn : gNodes)
+               {
+                  const ImVec2 s = ed::GetNodeSize(gn.NodeId());
+                  fprintf(fp, "%s\t%.0f\t%.0f\n", gn.typeName.c_str(), s.x, s.y);
+               }
+               fclose(fp);
+            }
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
          // Plugin instantiation is asynchronous, so the fixture's mapping list

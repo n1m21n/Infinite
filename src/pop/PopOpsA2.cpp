@@ -4,6 +4,7 @@
 #include "PopOpsInternal.h"
 
 #include <cstdlib>
+#include <cstring> // Turbo 0.71.1: Lookup Attribute's swizzles
 
 namespace pop
 {
@@ -244,13 +245,103 @@ namespace pop
          defs.push_back(d);
       }
 
+      // ---- Force Target (Turbo 0.71.1) -------------------------------------
+      // The "sand forms a shape" force: every particle is pulled towards its
+      // own point of the second input (a text, a grid with noise, a mesh) by a
+      // spring, damped by its velocity so it settles instead of orbiting.
+      {
+         PopDef d = Simple("Force Target PointZ", "Force Target PointZ",
+                           "Adds a spring force to PartForce pulling each particle towards its own point of the second "
+                           "input (a text, a grid with noise, a mesh): point PartId (or index, or a random one), wrapped "
+                           "around the target's count, so a million particles can share a smaller shape. 'damping' takes "
+                           "out velocity so they settle on it; 'max force' keeps far ones from shooting in. Put it inside "
+                           "a Particle PointZ loop, next to Force Radial (attract / repel) and Collide.", 2);
+         d.inputLabels = { "particles", "target" };
+         d.params = { F("strength", "strength", 4.0f, -100.0f, 100.0f), F("damping", "damping", 1.5f, 0.0f, 50.0f),
+                      M("match", "match by", { "PartId (else index)", "index", "random (by PartId)" }, 0),
+                      F("limit", "max force (0 = none)", 0.0f, 0.0f, 1000.0f), Mask() };
+         d.cook = [](CookCtx& c) {
+            if (!PassInput(c))
+               return true;
+            const PopData* target = c.Input(1);
+            if (target == nullptr || target->pointCount <= 0)
+            {
+               c.warning = "nothing on the target input";
+               return true;
+            }
+            const bool hasId = c.Input(0)->Find(attr::PartId) != nullptr;
+            KernelSpec k;
+            k.lookupInput = 1;
+            k.reads = { { attr::P, 3 }, { attr::PartVel, 3 } };
+            if (hasId)
+               k.reads.push_back({ attr::PartId, 1 });
+            k.writes = { { attr::PartForce, 3 } };
+            KernelIO tp;
+            tp.name = attr::P;
+            tp.comps = 3;
+            tp.as = "TargetP";
+            k.lookups = { tp };
+            const std::string key = hasId ? "int(PartId + 0.5)" : "id";
+            k.body = "   int n = max(1, n_TargetP);\n   int key = " + key + ";\n" + R"GLSL(
+   int j = key;
+   if (p_match == 1) j = id;
+   else if (p_match == 2) j = int(fract(sin(float(key) * 12.9898 + 78.233) * 43758.5453) * float(n));
+   j = ((j % n) + n) % n;
+   vec3 f = (fetch_TargetP(j) - P) * p_strength - PartVel * p_damping;
+   float fl = length(f);
+   if (p_limit > 0.0 && fl > p_limit) f *= p_limit / fl;
+   PartForce += f;
+)GLSL";
+            return Run(c, k);
+         };
+         defs.push_back(d);
+      }
+
+      // ---- Collide (Turbo 0.71.1) ------------------------------------------
+      // A floor (or any plane) for particles: below it they are put back on
+      // it, their velocity into it bounces by 'bounce' and the rest slows by
+      // 'friction' - sand settles and piles instead of falling through or
+      // sticking with the speed it had.
+      {
+         PopDef d = Simple("Collide PointZ", "Collide PointZ",
+                           "A plane particles cannot cross (a floor by default): a point behind it is put back on it, the "
+                           "part of PartVel going into the plane bounces back times 'bounce', and the sliding part slows "
+                           "by 'friction'. Put it inside a Particle PointZ loop, after the forces.", 1);
+         d.params = { V("point", "plane point", 0, 0, 0, -20.0f, 20.0f), V("normal", "plane normal", 0, 1, 0, -1.0f, 1.0f),
+                      F("bounce", "bounce", 0.2f, 0.0f, 1.0f), F("friction", "friction", 0.3f, 0.0f, 1.0f), Mask() };
+         d.cook = [](CookCtx& c) {
+            if (!PassInput(c))
+               return true;
+            KernelSpec k;
+            k.writes = { { attr::P, 3 }, { attr::PartVel, 3 } };
+            k.body = R"GLSL(
+   vec3 nrm = length(p_normal) > 1e-6 ? normalize(p_normal) : vec3(0, 1, 0);
+   float depth = dot(P - p_point, nrm);
+   if (depth < 0.0)
+   {
+      P -= nrm * depth;
+      float vn = dot(PartVel, nrm);
+      vec3 slide = PartVel - nrm * vn;
+      PartVel = slide * (1.0 - p_friction) + nrm * (vn < 0.0 ? -vn * p_bounce : vn);
+   }
+)GLSL";
+            return Run(c, k);
+         };
+         defs.push_back(d);
+      }
+
       // ---- Lookup Attribute --------------------------------------------------
       {
          PopDef d = Simple("Lookup Attribute PointZ", "Lookup Attribute PointZ",
                            "Copies attributes from the second input onto the first, point by point: point i reads the "
-                           "point given by its 'index attribute' (or the same number when empty), clamped to the range.", 2);
+                           "point given by its 'index attribute' (or the same number when empty), clamped to the range. "
+                           "Components and renames as in TouchDesigner's POPs: 'P.y' copies only P's y, 'P.y=Lum' writes "
+                           "the source's Lum into P's y, 'Height=P.y' the source's P.y into a new Height (x y z w or r g b "
+                           "a); 'combine' adds, subtracts, multiplies, or keeps the min / max instead of replacing.", 2);
          d.inputLabels = { "points", "source" };
-         d.params = { T("attribs", "attributes", "Color"), T("index", "index attribute", ""), I("offset", "index offset", 0, -100000, 100000) };
+         // Turbo 0.71.1: + combine (last: the params above keep their place).
+         d.params = { T("attribs", "attributes", "Color"), T("index", "index attribute", ""), I("offset", "index offset", 0, -100000, 100000),
+                      M("combine", "combine", { "replace", "add", "subtract", "multiply", "min", "max" }, 0) };
          d.cook = [](CookCtx& c) {
             if (!PassInput(c))
                return true;
@@ -273,19 +364,111 @@ namespace pop
                k.reads.push_back({ idx, 1 });
             }
             k.body = "   int j = " + (idx.empty() ? std::string("id") : "int(floor(" + idx + " + 0.5))") + " + p_offset;\n";
-            for (const std::string& a : SplitList(c.S("attribs")))
+            // Turbo 0.71.1: each entry is 'dest=source' or 'name' (the same on
+            // both sides), each side 'Name' or 'Name.swizzle' (x y z w / r g b a).
+            // A plain name with 'replace' is the 0.71.0 lookup, unchanged.
+            const int combine = c.I("combine");
+            const PopData& in = *c.Input(0);
+            auto splitSide = [](const std::string& s, std::string& name, std::string& swz) {
+               const size_t dot = s.find('.');
+               name = s.substr(0, dot);
+               swz = dot == std::string::npos ? std::string() : s.substr(dot + 1);
+               if (swz.empty())
+                  return dot == std::string::npos;
+               if (swz.size() > 4)
+                  return false;
+               for (char& ch : swz)
+               {
+                  const char* rgba = "rgba";
+                  const char* at = std::strchr(rgba, ch);
+                  if (at != nullptr && ch != '\0')
+                     ch = "xyzw"[at - rgba];
+                  if (std::strchr("xyzw", ch) == nullptr || ch == '\0')
+                     return false;
+               }
+               return true;
+            };
+            auto widest = [](const std::string& swz) {
+               static const char* const kXyzw = "xyzw"; // one literal: the offset is within it
+               int n = 0;
+               for (char ch : swz)
+                  if (const char* at = std::strchr(kXyzw, ch))
+                     n = std::max(n, (int)(at - kXyzw) + 1);
+               return n;
+            };
+            auto addIO = [](std::vector<KernelIO>& v, const std::string& n, int comps) {
+               for (KernelIO& io : v)
+                  if (io.name == n)
+                  {
+                     io.comps = std::max(io.comps, comps);
+                     return;
+                  }
+               v.push_back({ n, comps });
+            };
+            for (const std::string& entry : SplitList(c.S("attribs")))
             {
-               if (!ValidAttribName(a))
+               const size_t eq = entry.find('=');
+               const std::string destText = entry.substr(0, eq);
+               const std::string srcText = eq == std::string::npos ? entry : entry.substr(eq + 1);
+               std::string dName, dSwz, sName, sSwz;
+               if (!splitSide(destText, dName, dSwz) || !splitSide(srcText, sName, sSwz) || !ValidAttribName(dName) ||
+                   !ValidAttribName(sName))
+               {
+                  c.warning = "'" + entry + "' is not 'name', 'name.xyz' or 'dest=source'";
                   continue;
-               if (k.writes.size() >= 4)
+               }
+               const int srcComps = src->CompsOf(sName);
+               if (!sSwz.empty() && widest(sSwz) > srcComps)
+               {
+                  c.warning = "'" + srcText + "': the source's " + sName + " has " + std::to_string(srcComps) + " components";
+                  continue;
+               }
+               const int srcWidth = sSwz.empty() ? srcComps : (int)sSwz.size();
+               const bool whole = dSwz.empty() && sSwz.empty() && eq == std::string::npos;
+               // The destination: the source's shape for a whole replace (as
+               // before); else what the points have, widened to the swizzle.
+               int destComps = in.Find(dName) != nullptr ? in.CompsOf(dName) : (dSwz.empty() ? srcWidth : DefaultComps(dName));
+               if (whole && combine == 0)
+                  destComps = srcComps;
+               destComps = std::max(destComps, widest(dSwz));
+               const int destWidth = dSwz.empty() ? destComps : (int)dSwz.size();
+               std::string value = "fetch_" + sName + "(j)" + (sSwz.empty() ? std::string() : "." + sSwz);
+               if (srcWidth != destWidth)
+               {
+                  if (srcWidth != 1)
+                  {
+                     c.warning = "'" + entry + "': " + std::to_string(srcWidth) + " components into " + std::to_string(destWidth);
+                     continue;
+                  }
+                  value = std::string(GlslType(destWidth)) + "(" + value + ")";
+               }
+               bool fits = k.writes.size() < 4;
+               for (const KernelIO& w : k.writes)
+                  fits = fits || w.name == dName;
+               if (!fits)
                {
                   c.warning = "only four attributes per lookup";
                   break;
                }
-               const int comps = src->CompsOf(a);
-               k.writes.push_back({ a, comps });
-               k.lookups.push_back({ a, comps });
-               k.body += "   " + a + " = fetch_" + a + "(j);\n";
+               addIO(k.writes, dName, destComps);
+               addIO(k.lookups, sName, srcComps);
+               if (!(whole && combine == 0))
+                  addIO(k.reads, dName, destComps); // keeps the components not written
+               // A destination read and written: one width for both.
+               for (KernelIO& r : k.reads)
+                  for (KernelIO& w : k.writes)
+                     if (r.name == w.name)
+                        r.comps = w.comps = std::max(r.comps, w.comps);
+               const std::string target = dName + (dSwz.empty() ? std::string() : "." + dSwz);
+               switch (combine)
+               {
+                  case 1: k.body += "   " + target + " += " + value + ";\n"; break;
+                  case 2: k.body += "   " + target + " -= " + value + ";\n"; break;
+                  case 3: k.body += "   " + target + " *= " + value + ";\n"; break;
+                  case 4: k.body += "   " + target + " = min(" + target + ", " + value + ");\n"; break;
+                  case 5: k.body += "   " + target + " = max(" + target + ", " + value + ");\n"; break;
+                  default: k.body += "   " + target + " = " + value + ";\n"; break;
+               }
             }
             if (k.writes.empty())
             {

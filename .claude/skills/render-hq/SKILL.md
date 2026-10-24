@@ -35,14 +35,19 @@ there, not from memory).
 
 ## Reference scenes and captures
 
-Scenes A-H, one renderer per patch: `examples/hq/raster/*.inf` (Render 3D) and
-`examples/hq/filament/*.inf` (Render 3D HQ) (regenerate with `python scripts/make_hq_scenes.py`; HDRI with
-`scripts/make_hq_studio_hdr.py`). Both folders hold the same scenes with the same sources, camera,
-lights and HDRI (extend `make_hq_scenes.py`, do not edit the .inf by hand).
+Scenes A-L in `examples/hq/*.inf`, Render 3D HQ only (shipped: FILE > Examples). Regenerate with
+`python scripts/make_hq_scenes.py` (HDRI with `scripts/make_hq_studio_hdr.py`); extend the script, do
+not edit the .inf by hand. Since 0.71.1 the same A-I scenes through Render 3D, for BEFORE / AFTER, are
+generated on demand (`--raster`) into `build\hq\raster_scenes` (not shipped), and the layout uses the
+real node sizes (`scripts/hq_node_sizes.tsv`; after adding a node type or many params, run
+`--measure build\windows-vs2022\Release\Infinite-Turbo.exe`). Check the canvas for overlaps:
+`INFINITE_LOADPATCH=<patch>` + `IMAGERESYNTH_SCREENSHOT=<png>` + `INFINITE_SCREENSHOT_FRAME=40` frames
+every node and saves the window.
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq\raster
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq\filament -Type "Render 3D HQ" -OutDir build\hq\after
+python scripts\make_hq_scenes.py --raster
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles build\hq\raster_scenes -OutDir build\hq\before
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq -Type "Render 3D HQ" -OutDir build\hq\after
 ```
 
 Each node of `-Type` is saved as `<OutDir>\<scene>_<nodeIndex>.png` (upright, opaque) and its frame

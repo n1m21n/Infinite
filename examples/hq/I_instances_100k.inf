@@ -2,7 +2,7 @@ infinite-patch 1
 # turbo-mod-range
 node 1 3DScene Render 3D HQ
   uid 1
-  pos 1560 0
+  pos 2362 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
@@ -15,97 +15,82 @@ node 1 3DScene Render 3D HQ
 end
 node 2 3DScene Camera
   uid 2
-  pos 1040 0
+  pos 1517 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
   f distance 9
-  f azimuth -25
-  f elevation 15
+  f azimuth -30
+  f elevation 28
   f targetX 0
-  f targetY 1.2
+  f targetY 0.3
   f targetZ 0
   f orbitPerBeat 0.02
 end
 node 3 3DScene Light
   uid 3
-  pos 1040 560
+  pos 1517 558
   flags 1 0 0 0 1 0
   i type 0
-  f azimuth -40
-  f elevation 35
+  f azimuth 60
+  f elevation 30
   c color 1 0.97 0.92
   f intensity 2.5
 end
 node 4 3DScene HDRI
   uid 4
-  pos 1040 1120
+  pos 1517 960
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
-  f intensity 1
+  s path hq_media/studio.hdr
+  f intensity 0.8
   f rotation 0
 end
-node 5 3DScene Geometry
+node 5 PointZ Grid PointZ
   uid 5
   pos 0 0
   flags 1 0 0 0 1 0
-  i shape 7
-  f posY 1.4
-  f scale 1.1
-  c color 0.95 0.64 0.54
-  f metallic 1
-  f roughness 0.2
-end
-node 6 PointZ Grid PointZ
-  uid 6
-  pos 0 560
-  flags 1 0 0 0 1 0
-  f sizeX 3
-  f sizeY 3
+  f sizeX 6
+  f sizeY 6
   f sizeZ 0
-  i rows 100
-  i cols 100
+  i rows 316
+  i cols 316
   i orient 1
   i kind 2
 end
-node 7 PointZ Noise PointZ
-  uid 7
-  pos 520 0
+node 6 PointZ Noise PointZ
+  uid 6
+  pos 407 0
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
   i mode 0
-  f amp 0.3
+  f amp 0.5
   f freq 1.2
   b use4d 1
-  f speed 0
+  f speed 0.2
 end
-node 8 PointZ Particle PointZ
-  uid 8
-  pos 1040 1680
+node 7 PointZ Box PointZ
+  uid 7
+  pos 0 526
   flags 1 0 0 0 1 0
-  i birth 0
-  f rate 60000
-  f life 3
-  f lifeVar 0.1
-  f velX 0
-  f velY 0.3
-  f velZ 0
-  f velRand 0.2
-  f drag 2
-  f damp 0.6
-  i max 400000
-  b play 1
-  f sizeBirth 0.015
-  f sizeDeath 0.004
-  f turb 6
-  f turbScale 0.7
-  f turbSpeed 0.05
-  i engine 1
 end
-node 9 3DScene Geometry
+node 8 PointZ Instance PointZ
+  uid 8
+  pos 863 0
+  flags 1 0 0 0 1 0
+  f scale 0.016
+end
+node 9 3DScene Material
   uid 9
-  pos 0 1120
+  pos 1517 1442
+  flags 1 0 0 0 1 0
+  c color 0.9 0.62 0.45
+  f metallic 1
+  f roughness 0.3
+end
+node 10 3DScene Geometry
+  uid 10
+  pos 0 974
   flags 1 0 0 0 1 0
   i shape 1
   f scaleX 30
@@ -116,18 +101,19 @@ node 9 3DScene Geometry
   f metallic 0
   f roughness 0.8
 end
-node 10 Output Output
-  uid 10
-  pos 2540 0
+node 11 Output Output
+  uid 11
+  pos 3130 0
   flags 1 0 0 0 1 0
 end
-geo 1 0 5
-geo 7 0 6
-geo 8 0 7
-geo 1 1 8
-geo 1 2 9
+geo 6 0 5
+geo 8 0 6
+geo 8 1 7
+geo 9 0 8
+geo 1 0 9
+geo 1 1 10
 geo 1 4 2
 geo 1 5 3
 cable 1 8 4
-cable 10 0 1
+cable 11 0 1
 transport 120 4 4 0 0

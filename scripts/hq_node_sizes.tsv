@@ -1,0 +1,24 @@
+# Canvas size of each node type in the example patches (largest seen), measured by
+# python scripts/make_hq_scenes.py --measure <Infinite-Turbo.exe>. Used by layout().
+Attribute PointZ	265	345
+Box PointZ	247	358
+Camera	261	468
+Collide PointZ	282	455
+Force Radial PointZ	279	507
+Force Target PointZ	312	351
+Geometry	230	418
+Grid PointZ	267	436
+Group 3D	533	181
+HDRI	248	392
+Instance PointZ	514	861
+LFO	261	473
+Light	261	312
+Lookup Attribute PointZ	267	345
+Material	705	609
+Noise PointZ	316	859
+Null PointZ	254	247
+Output	213	719
+Particle PointZ	330	1027
+Random PointZ	271	605
+Render 3D HQ	628	1529
+Texture	265	632

@@ -1882,6 +1882,21 @@
          ModSlider("dome angle", &n->domeAngle, 90.0f, 360.0f, "%.0f\xC2\xB0", colW);
          ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
       }
+      // 0.71.1: PointZ points as spheres or as dots (sand: grains of a few
+      // pixels at any distance). Last, so the controls above keep their place.
+      NodeSeparator("points", colW);
+      DropdownButton("points as", RenderHqNode::PointStyleNames(), n->pointStyle,
+                     [n](int i) { PushUndoCheckpoint(); n->pointStyle = i; }, colW);
+      if (n->pointStyle == 1)
+         ModSlider("dot size (px)", &n->dotSize, 0.5f, 8.0f, "%.2f", colW);
+      // 0.71.1: screen-space GI - emissive objects light the scene. Last.
+      NodeSeparator("global illumination", colW);
+      ModCheckbox("screen-space GI", &n->gi);
+      if (n->gi)
+      {
+         ModSlider("GI intensity", &n->giIntensity, 0.0f, 4.0f, "%.2f", colW);
+         ModSlider("GI radius", &n->giRadius, 0.1f, 10.0f, "%.2f", colW);
+      }
       ImGui::EndGroup();
    }
 

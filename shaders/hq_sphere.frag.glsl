@@ -21,6 +21,10 @@ uniform int uOrtho;
 uniform vec3 uViewDir;
 uniform int uPrepass;
 uniform int uEarlyDepth; // shading pass: the prepass depth is in uSceneDepth
+// Turbo 0.71.1: dots (hq_sphere.vert) keep the corners their ray misses (the
+// silhouette's normal and depth there): a grain of a pixel or two always
+// covers its pixel instead of blinking in and out as the disc moves.
+uniform float uDotPixels;
 
 layout(depth_greater) out float gl_FragDepth;
 layout(location = 0) out vec4 outColor;
@@ -43,7 +47,7 @@ void main()
    vec3 oc = ro - vCentre;
    float b = dot(oc, rd);
    float disc = b * b - (dot(oc, oc) - vRadius * vRadius);
-   bool hit = disc >= 0.0;
+   bool hit = disc >= 0.0 || uDotPixels > 0.0;
    // Missing pixels still get a continuous normal (the silhouette's) so the
    // derivatives specular AA takes are sane; taken here, before any discard.
    float t = -b - sqrt(max(disc, 0.0));

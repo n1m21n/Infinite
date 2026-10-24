@@ -44,6 +44,12 @@ uniform float uExposure;
 uniform int uSsao;
 uniform sampler2D uSsaoMap;  // (visibility, view z) at the AO size
 uniform vec2 uFrameTexel;    // 1 / frame size: gl_FragCoord -> uv
+// 0.71.1: screen-space GI (hq_ssgi.comp) - diffuse light bounced off what is
+// on screen (emissive surfaces included), (irradiance / pi, view z) at the GI
+// size; 0 = off.
+uniform int uSsgi;
+uniform float uSsgiIntensity;
+uniform sampler2D uSsgiMap;
 
 struct HqSurface
 {
@@ -79,6 +85,19 @@ vec3 diffuseIrradiance(vec3 n)
    return gradientEnv(n, uEnvSky, uEnvHorizon, uEnvGround) * uEnvIntensity;
 }
 
+// 0.71.1: the window depth of the surface being shaded. A full-screen pass
+// (hq_sphere_deferred: spheres and instances) draws at the far plane, so
+// gl_FragCoord.z is not its surface's depth - it sets this from the depth
+// buffer; < 0 = gl_FragCoord.z. Until 0.71.1 the GTAO's depth-aware upsample
+// of deferred pixels saw the far plane (equal weights: occlusion could bleed
+// across sphere silhouettes).
+float gShadeDepth = -1.0;
+
+float shadeWindowZ()
+{
+   return gShadeDepth >= 0.0 ? gShadeDepth : gl_FragCoord.z;
+}
+
 // S5: the half-size GTAO at this pixel, depth-aware: the 4 bilinear taps
 // weighted by how close their view z is to this fragment's, so a silhouette
 // does not pick up the occlusion of what is behind it (Filament's upsampling
@@ -90,7 +109,7 @@ float ssaoVisibility()
    vec2 st = gl_FragCoord.xy * uFrameTexel * size - 0.5;
    vec2 base = floor(st);
    vec2 f = st - base;
-   float z = -linearDepth(gl_FragCoord.z);
+   float z = -linearDepth(shadeWindowZ());
    float sum = 0.0, weights = 0.0;
    for (int k = 0; k < 4; k++)
    {
@@ -109,6 +128,30 @@ float ssaoVisibility()
 // "transparent" mode: the diffuse is premultiplied by it, the specular is
 // not); 1 for everything opaque.
 float gDiffuseAlpha = 1.0;
+
+// 0.71.1: the half-size GI at this pixel, upsampled like the GTAO (the 4
+// bilinear taps weighted by how close their view z is to this fragment's).
+vec3 ssgiIrradiance()
+{
+   vec2 size = vec2(textureSize(uSsgiMap, 0));
+   vec2 st = gl_FragCoord.xy * uFrameTexel * size - 0.5;
+   vec2 base = floor(st);
+   vec2 f = st - base;
+   float z = -linearDepth(shadeWindowZ());
+   vec3 sum = vec3(0.0);
+   float weights = 0.0;
+   for (int k = 0; k < 4; k++)
+   {
+      ivec2 o = ivec2(k & 1, k >> 1);
+      vec4 s = texelFetch(uSsgiMap, clamp(ivec2(base) + o, ivec2(0), ivec2(size) - 1), 0);
+      float bilinear = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
+      float d = (s.w - z) * 20.0;
+      float w = bilinear * max(1e-4, 1.0 - d * d);
+      sum += s.rgb * w;
+      weights += w;
+   }
+   return sum / max(weights, 1e-6);
+}
 
 // Linear HDR radiance towards the camera (exposure not applied).
 vec3 hqShade(HqSurface s)
@@ -233,6 +276,11 @@ vec3 hqShade(HqSurface s)
    // Multi-bounce AO is on by default on the desktop (singleBounceAO = 1).
    Fd *= gtaoMultiBounce(indirectAO, diffuseColor);
    Fr *= gtaoMultiBounce(specularAO, f0);
+   // 0.71.1: + the light bounced off nearby surfaces on screen (SSGI) - what
+   // makes emissive objects light the scene (Filament has no GI). Already
+   // near-field and visible, so after the occlusion.
+   if (uSsgi == 1)
+      Fd += diffuseColor * ssgiIrradiance() * (uSsgiIntensity * (1.0 - E));
    if (hasSheen)
    {
       Fd *= sheenScaling;

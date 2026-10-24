@@ -85,6 +85,15 @@ struct HqFrame
    // S9: FXAA on the finished image when the frame has no TAA (TAA off, or a
    // 360 face) - without it nothing smooths the edges.
    bool fxaa = true;
+   // 0.71.1: PointZ points as grains this many pixels wide (x PScale) at any
+   // distance - sand, dust - instead of spheres of PScale world units; 0 =
+   // spheres.
+   float dotPixels = 0.0f;
+   // 0.71.1: screen-space GI - diffuse light bounced off what is on screen
+   // (emissive surfaces light their surroundings), strength and how far
+   // (world units) its rays look.
+   bool gi = false;
+   float giIntensity = 1.0f, giRadius = 1.5f;
 };
 
 class HqRenderer

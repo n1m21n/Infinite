@@ -1,13 +1,11 @@
 infinite-patch 1
 # turbo-mod-range
-node 1 3DScene Render 3D
+node 1 3DScene Render 3D HQ
   uid 1
-  pos 1560 0
+  pos 1333 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
-  i renderMode 0
-  i samples 2
   b shadows 1
   i shadowQuality 1
   i tonemap 1
@@ -17,39 +15,50 @@ node 1 3DScene Render 3D
 end
 node 2 3DScene Camera
   uid 2
-  pos 1040 0
+  pos 863 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
-  f distance 8
+  f distance 9
   f azimuth -25
   f elevation 15
   f targetX 0
-  f targetY 1
+  f targetY 1.2
   f targetZ 0
   f orbitPerBeat 0.02
 end
 node 3 3DScene Light
   uid 3
-  pos 1040 560
+  pos 863 558
   flags 1 0 0 0 1 0
   i type 0
   f azimuth -40
   f elevation 35
   c color 1 0.97 0.92
-  f intensity 2
+  f intensity 2.5
 end
 node 4 3DScene HDRI
   uid 4
-  pos 1040 1120
+  pos 863 960
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
+  s path hq_media/studio.hdr
   f intensity 1
   f rotation 0
 end
-node 5 PointZ Grid PointZ
+node 5 3DScene Geometry
   uid 5
   pos 0 0
+  flags 1 0 0 0 1 0
+  i shape 7
+  f posY 1.4
+  f scale 1.1
+  c color 0.95 0.64 0.54
+  f metallic 1
+  f roughness 0.2
+end
+node 6 PointZ Grid PointZ
+  uid 6
+  pos 0 508
   flags 1 0 0 0 1 0
   f sizeX 3
   f sizeY 3
@@ -59,9 +68,9 @@ node 5 PointZ Grid PointZ
   i orient 1
   i kind 2
 end
-node 6 PointZ Noise PointZ
-  uid 6
-  pos 520 0
+node 7 PointZ Noise PointZ
+  uid 7
+  pos 407 0
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
@@ -71,9 +80,9 @@ node 6 PointZ Noise PointZ
   b use4d 1
   f speed 0
 end
-node 7 PointZ Particle PointZ
-  uid 7
-  pos 1040 1680
+node 8 PointZ Particle PointZ
+  uid 8
+  pos 863 1442
   flags 1 0 0 0 1 0
   i birth 0
   f rate 60000
@@ -94,16 +103,31 @@ node 7 PointZ Particle PointZ
   f turbSpeed 0.05
   i engine 1
 end
-node 8 Output Output
-  uid 8
-  pos 2540 0
+node 9 3DScene Geometry
+  uid 9
+  pos 0 1034
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 10 Output Output
+  uid 10
+  pos 2101 0
   flags 1 0 0 0 1 0
 end
-geo 6 0 5
+geo 1 0 5
 geo 7 0 6
-geo 1 0 7
+geo 8 0 7
+geo 1 1 8
+geo 1 2 9
 geo 1 4 2
 geo 1 5 3
 cable 1 8 4
-cable 8 0 1
+cable 10 0 1
 transport 120 4 4 0 0

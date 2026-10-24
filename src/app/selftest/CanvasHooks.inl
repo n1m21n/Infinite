@@ -2420,6 +2420,72 @@
             printf("  particles alive after 30 frames: %d (warning '%s')\n", part->PointCount(), part->CookWarning().c_str());
             report("Particle PointZ loop runs through a tagged Null", part->PointCount() > 0 && part->CookError().empty() &&
                                                                      part->CookWarning().empty());
+
+            // Turbo 0.71.1: Lookup Attribute components / renames / combine,
+            // Force Target and Collide, on two 10 x 10 grids with known answers:
+            // A at the origin, B moved to (5, 2, 0).
+            auto setV = [](PopNode* n, const char* key, int comp, float v) {
+               const int i = n->Def().ParamIndex(key);
+               if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+            };
+            auto setS = [](PopNode* n, const char* key, const char* v) {
+               n->Values().s[(size_t)n->Def().ParamIndex(key)] = v;
+            };
+            std::unique_ptr<PopNode> gridA(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            std::unique_ptr<PopNode> gridB(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            for (PopNode* g : { gridA.get(), gridB.get() })
+            {
+               setV(g, "rows", 0, 10.0f);
+               setV(g, "cols", 0, 10.0f);
+            }
+            setV(gridB.get(), "center", 0, 5.0f);
+            setV(gridB.get(), "center", 1, 2.0f);
+            auto readP = [&](PopNode* n, const char* attrib, int comps) {
+               ++frame;
+               gridA->CookIfNeeded(frame);
+               gridB->CookIfNeeded(frame);
+               n->CookIfNeeded(frame);
+               return n->GetPop() ? n->GetPop()->Read(attrib, comps) : std::vector<float>();
+            };
+            const std::vector<float> pa = readP(gridA.get(), "P", 3);
+            std::unique_ptr<PopNode> look(static_cast<PopNode*>(PopNode::CreateFor("Lookup Attribute PointZ")));
+            look->inputs[0] = gridA.get();
+            look->inputs[1] = gridB.get();
+            setS(look.get(), "attribs", "P.y Height=P.y");
+            const std::vector<float> lp = readP(look.get(), "P", 3);
+            const std::vector<float> lh = readP(look.get(), "Height", 1);
+            setS(look.get(), "attribs", "P.y");
+            setV(look.get(), "combine", 0, 1.0f); // add
+            const std::vector<float> la = readP(look.get(), "P", 3);
+            bool lookOk = pa.size() == 300 && lp.size() == 300 && lh.size() == 100 && la.size() == 300 &&
+                          look->CookError().empty();
+            for (size_t i = 0; lookOk && i < 100; i++)
+               lookOk = std::fabs(lp[i * 3] - pa[i * 3]) < 1e-5f && std::fabs(lp[i * 3 + 1] - 2.0f) < 1e-5f &&
+                        std::fabs(lp[i * 3 + 2] - pa[i * 3 + 2]) < 1e-5f && std::fabs(lh[i] - 2.0f) < 1e-5f &&
+                        std::fabs(la[i * 3 + 1] - (pa[i * 3 + 1] + 2.0f)) < 1e-5f;
+            report("Lookup Attribute: P.y only, Height=P.y, combine add", lookOk);
+
+            std::unique_ptr<PopNode> pull(static_cast<PopNode*>(PopNode::CreateFor("Force Target PointZ")));
+            pull->inputs[0] = gridA.get();
+            pull->inputs[1] = gridB.get();
+            setV(pull.get(), "strength", 0, 1.0f);
+            setV(pull.get(), "damping", 0, 0.0f);
+            setV(pull.get(), "match", 0, 1.0f); // index
+            const std::vector<float> pf = readP(pull.get(), "PartForce", 3);
+            bool pullOk = pf.size() == 300 && pull->CookError().empty();
+            for (size_t i = 0; pullOk && i < 100; i++)
+               pullOk = std::fabs(pf[i * 3] - 5.0f) < 1e-4f && std::fabs(pf[i * 3 + 1] - 2.0f) < 1e-4f &&
+                        std::fabs(pf[i * 3 + 2]) < 1e-4f;
+            report("Force Target pulls each point to its target point", pullOk);
+
+            std::unique_ptr<PopNode> collide(static_cast<PopNode*>(PopNode::CreateFor("Collide PointZ")));
+            collide->inputs[0] = gridA.get();
+            setV(collide.get(), "point", 1, 1.0f); // the grid (y 0) is 1 below the plane
+            const std::vector<float> cp = readP(collide.get(), "P", 3);
+            bool collideOk = cp.size() == 300 && collide->CookError().empty();
+            for (size_t i = 0; collideOk && i < 100; i++)
+               collideOk = std::fabs(cp[i * 3 + 1] - 1.0f) < 1e-5f && std::fabs(cp[i * 3] - pa[i * 3]) < 1e-5f;
+            report("Collide puts points behind the plane back on it", collideOk);
          }
          report("every PointZ operator cooks on this GPU", failed == 0);
          printf("%s\n", all ? "POPTEST OK" : "POPTEST FAIL - BUG");
@@ -6624,6 +6690,82 @@
                       sum / (double)std::max<size_t>(1, px.size()), finite ? 1 : 0, err, ok ? "ok" : "FAIL");
                all = all && ok;
             }
+
+            // 0.71.1: screen-space GI - a glowing orange box on a grey floor in
+            // the dark: with GI the floor around it turns orange (red over
+            // blue grows), finite; off, the picture is the plain one.
+            {
+               std::unique_ptr<PopNode> lamp(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               std::unique_ptr<PopNode> ground(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               setSize(lamp.get(), 0.5f);
+               {
+                  const int i = ground->Def().ParamIndex("size");
+                  const float sz[3] = { 6.0f, 0.1f, 6.0f };
+                  for (int k = 0; i >= 0 && k < 3; k++)
+                     ground->Values().f[(size_t)(ground->Def().FloatOffset(i) + k)] = sz[k];
+                  const int ci = ground->Def().ParamIndex("center");
+                  if (ci >= 0)
+                     ground->Values().f[(size_t)(ground->Def().FloatOffset(ci) + 1)] = -0.3f;
+               }
+               std::unique_ptr<MaterialNode> lampMat(new MaterialNode()), groundMat(new MaterialNode());
+               lampMat->color[0] = lampMat->color[1] = lampMat->color[2] = 0.05f;
+               lampMat->emissionColor[0] = 1.0f;
+               lampMat->emissionColor[1] = 0.45f;
+               lampMat->emissionColor[2] = 0.1f;
+               lampMat->emission = 8.0f;
+               lampMat->input = lamp.get();
+               groundMat->color[0] = groundMat->color[1] = groundMat->color[2] = 0.7f;
+               groundMat->input = ground.get();
+               RenderHqNode room;
+               room.width = 320.0f;
+               room.height = 180.0f;
+               room.envIntensity = 0.05f;
+               room.lightIntensity = 0.0f;
+               room.shadowsEnabled = false;
+               room.reuseStill = false;
+               room.geometry[0] = lampMat.get();
+               room.geometry[1] = groundMat.get();
+               auto shootRoom = [&]() {
+                  ++frame;
+                  lamp->CookIfNeeded(frame);
+                  ground->CookIfNeeded(frame);
+                  lampMat->CookIfNeeded(frame);
+                  groundMat->CookIfNeeded(frame);
+                  room.CookIfNeeded(frame);
+                  return read(room.GetOutputTexture(), room.GetOutputWidth(), room.GetOutputHeight());
+               };
+               // Red minus blue over the lower third of the frame (the floor).
+               auto warmth = [](const std::vector<float>& px, int w, int h) {
+                  double s = 0.0;
+                  size_t n = 0;
+                  for (int y = 0; y < h / 3; y++)
+                     for (int x = 0; x < w; x++)
+                     {
+                        const size_t i = ((size_t)y * w + x) * 4;
+                        if (i + 2 < px.size())
+                        {
+                           s += px[i] - px[i + 2];
+                           n++;
+                        }
+                     }
+                  return n ? s / (double)n : 0.0;
+               };
+               room.gi = false;
+               const std::vector<float> plain = shootRoom();
+               room.gi = true;
+               std::vector<float> lit;
+               for (int k = 0; k < 24; k++) // the GI reads last frame; its history settles
+                  lit = shootRoom();
+               bool finite = !lit.empty();
+               for (size_t i = 0; finite && i < lit.size(); i++)
+                  finite = std::isfinite(lit[i]);
+               const double warmOff = warmth(plain, 320, 180), warmOn = warmth(lit, 320, 180);
+               const GLenum err = glGetError();
+               ok = finite && warmOn > warmOff + 0.01 && err == GL_NO_ERROR;
+               printf("  screen-space GI: floor red - blue %.4f off, %.4f on, finite %d, gl 0x%x  %s\n", warmOff, warmOn,
+                      finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
          }
 
          // S3: PointZ points as sphere impostors and PointZ triangles straight
@@ -6665,6 +6807,41 @@
             printf("  PointZ 100x100 points: %zu spheres, lit %.1f%%, finite %d, gl 0x%x  %s\n", ph.HqSpheres(),
                    cover * 100.0, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
             all = all && ok;
+
+            // Turbo 0.71.1: points as dots - every point drawn, a grain of
+            // dotSize pixels: 4 px covers more of the frame than 1 px, and the
+            // camera twice as far keeps 1 px grains on screen (spheres of a
+            // fixed world size shrink below a pixel there).
+            {
+               // Single frames: without TAA (its history would carry the last image).
+               const bool savedTaa = ph.taa;
+               ph.taa = false;
+               ph.pointStyle = 1;
+               auto coverAt = [&](float dot, float dist) {
+                  ph.dotSize = dot;
+                  ph.camDistance = dist;
+                  ph.CookIfNeeded(++frame);
+                  bool fin = false;
+                  return lit(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()), fin);
+               };
+               const float savedDist = ph.camDistance;
+               const double small = coverAt(1.0f, savedDist), big = coverAt(4.0f, savedDist);
+               const double farDots = coverAt(1.0f, savedDist * 2.0f);
+               ph.pointStyle = 0;
+               const double nearSpheres = coverAt(1.0f, savedDist), farSpheres = coverAt(1.0f, savedDist * 2.0f);
+               ph.camDistance = savedDist;
+               err = glGetError();
+               // Twice as far, a sphere covers a quarter of the pixels; a dot the same.
+               const double keptDots = small > 0.0 ? farDots / small : 0.0;
+               const double keptSpheres = nearSpheres > 0.0 ? farSpheres / nearSpheres : 1.0;
+               ok = ph.HqSpheres() == 10000 && big > small && small > 0.0 && keptDots > keptSpheres && err == GL_NO_ERROR;
+               printf("  points as dots: lit %.1f%% at 1 px, %.1f%% at 4 px; twice as far dots keep %.0f%% of their pixels, "
+                      "spheres %.0f%%, gl 0x%x  %s\n",
+                      small * 100.0, big * 100.0, keptDots * 100.0, keptSpheres * 100.0, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+               ph.taa = savedTaa;
+               ph.CookIfNeeded(++frame);
+            }
 
             setF(grid.get(), "kind", 0, 0.0f); // polygons
             ph.CookIfNeeded(++frame);
@@ -6794,6 +6971,42 @@
                printf("  instances hidden by a mesh drawn after them: max diff %.4f against the mesh alone, gl 0x%x  %s\n",
                       hidden, err, ok ? "ok" : "FAIL");
                all = all && ok;
+
+               // 0.71.1: copies that move on their own under TAA (the points
+               // move, the node does not) - each has its own velocity now, so
+               // the settled TAA image stays as close to the same frame without
+               // TAA as when nothing moves (until 0.71.0 they trailed ghosts).
+               {
+                  auto meanAbs = [](const std::vector<float>& a, const std::vector<float>& b) {
+                     if (a.empty() || a.size() != b.size())
+                        return 1.0;
+                     double d = 0.0;
+                     for (size_t i = 0; i < a.size(); i++)
+                        d += std::fabs(a[i] - b[i]);
+                     return d / (double)a.size();
+                  };
+                  pi.reuseStill = false;
+                  auto taaVsPlain = [&](float step) {
+                     pi.taa = true;
+                     for (int k = 0; k < 16; k++)
+                     {
+                        setF(grid.get(), "center", 0, step * (float)k);
+                        pi.CookIfNeeded(++frame);
+                     }
+                     const std::vector<float> withTaa = read(pi.GetOutputTexture(), pi.GetOutputWidth(), pi.GetOutputHeight());
+                     pi.taa = false;
+                     pi.CookIfNeeded(++frame);
+                     const std::vector<float> plain = read(pi.GetOutputTexture(), pi.GetOutputWidth(), pi.GetOutputHeight());
+                     setF(grid.get(), "center", 0, 0.0f);
+                     return meanAbs(withTaa, plain);
+                  };
+                  const double still = taaVsPlain(0.0f), moving = taaVsPlain(0.03f);
+                  err = glGetError();
+                  ok = moving < still * 2.0 + 0.002 && err == GL_NO_ERROR;
+                  printf("  instances moving under TAA: settled vs plain %.5f (still %.5f), gl 0x%x  %s\n", moving, still, err,
+                         ok ? "ok" : "FAIL");
+                  all = all && ok;
+               }
             }
             if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)
             {

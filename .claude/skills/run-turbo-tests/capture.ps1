@@ -5,10 +5,11 @@ Plays each patch to frame -Frame (playing, uncapped, as perf.ps1 does) and saves
 every node of type -Type as <OutDir>\<patch>_<nodeIndex>.png (upright), plus the
 Render 3D frame time FRAMEPROF reports, into <OutDir>\captures.txt.
 
-  capture.ps1 -PatchFiles examples\hq\raster\A_material_studio.inf,examples\hq\raster\F_points_1m.inf
-  capture.ps1 -PatchFiles examples\hq\filament -Type "Render 3D HQ" -OutDir build\hq\after
+  capture.ps1 -PatchFiles build\hq\raster_scenes\A_material_studio.inf,build\hq\raster_scenes\F_points_1m.inf
+  capture.ps1 -PatchFiles examples\hq -Type "Render 3D HQ" -OutDir build\hq\after
 
-Patches are read in place (they reference ..\hq_media\ next to their folder), never written.
+(build\hq\raster_scenes: python scripts\make_hq_scenes.py --raster.) Patches are read in place
+(their media paths are relative to them), never written.
 #>
 param(
    # Comma-separated (an array does not survive `powershell -File`); a folder takes its *.inf.

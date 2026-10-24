@@ -2,7 +2,7 @@ infinite-patch 1
 # turbo-mod-range
 node 1 3DScene Render 3D HQ
   uid 1
-  pos 1040 0
+  pos 863 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
@@ -15,7 +15,7 @@ node 1 3DScene Render 3D HQ
 end
 node 2 3DScene Camera
   uid 2
-  pos 520 0
+  pos 407 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
@@ -29,7 +29,7 @@ node 2 3DScene Camera
 end
 node 3 3DScene Light
   uid 3
-  pos 520 560
+  pos 407 558
   flags 1 0 0 0 1 0
   i type 0
   f azimuth 90
@@ -39,9 +39,9 @@ node 3 3DScene Light
 end
 node 4 3DScene HDRI
   uid 4
-  pos 520 1120
+  pos 407 960
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
+  s path hq_media/studio.hdr
   f intensity 0.6
   f rotation 0
 end
@@ -59,7 +59,7 @@ node 5 PointZ Grid PointZ
 end
 node 6 PointZ Noise PointZ
   uid 6
-  pos 520 1680
+  pos 407 1442
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
@@ -71,7 +71,7 @@ node 6 PointZ Noise PointZ
 end
 node 7 Output Output
   uid 7
-  pos 2020 0
+  pos 1631 0
   flags 1 0 0 0 1 0
 end
 geo 6 0 5
