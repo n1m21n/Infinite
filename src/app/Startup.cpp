@@ -1409,6 +1409,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
    AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
    AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+   Platform::AudioSetAsioDriver(gAudioAsioDriver);
    Platform::AudioSetOutputMode(gAudioOutputMode);
    AudioEngine::Instance().SetAudioThreads(gAudioThreads);
    // The window was just created with vsync hardcoded on (above); apply the

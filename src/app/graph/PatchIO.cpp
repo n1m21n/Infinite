@@ -440,7 +440,12 @@ namespace app
 
    void LoadAudioSettings()
    {
-      const std::string path = AudioSettingsPath();
+      LoadAudioSettingsFrom(AudioSettingsPath());
+   }
+
+
+   void LoadAudioSettingsFrom(const std::string& path)
+   {
       if (path.empty())
          return;
       std::ifstream file(AppPaths::FsPath(path));
@@ -466,7 +471,9 @@ namespace app
          else if (key == "oversample")
             gAudioOversample = std::strtof(val.c_str(), nullptr);
          else if (key == "outputMode")
-            gAudioOutputMode = std::clamp(atoi(val.c_str()), 0, 2);
+            gAudioOutputMode = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "asioDriver")
+            gAudioAsioDriver = val;
          else if (key == "audioThreads")
             gAudioThreads = std::clamp(atoi(val.c_str()), 0, 1);
          else if (key == "creditInExports")
@@ -477,7 +484,12 @@ namespace app
 
    void SaveAudioSettings()
    {
-      const std::string path = AudioSettingsPath();
+      SaveAudioSettingsTo(AudioSettingsPath());
+   }
+
+
+   void SaveAudioSettingsTo(const std::string& path)
+   {
       if (path.empty())
          return;
       std::ofstream file(AppPaths::FsPath(path));
@@ -487,6 +499,7 @@ namespace app
       file << "bufferFrames=" << gAudioBufferFrames << "\n";
       file << "oversample=" << gAudioOversample << "\n";
       file << "outputMode=" << gAudioOutputMode << "\n";
+      file << "asioDriver=" << gAudioAsioDriver << "\n";
       file << "audioThreads=" << gAudioThreads << "\n";
       file << "creditInExports=" << (Provenance::Enabled() ? 1 : 0) << "\n";
    }

@@ -437,6 +437,7 @@ extern double gAudioSampleRate;
 extern int gAudioBufferFrames;
 
 extern int gAudioOutputMode;
+extern std::string gAudioAsioDriver;
 extern int gAudioThreads;
 
 extern float gAudioOversample;
@@ -5532,6 +5533,8 @@ void SaveWorkspaceSettings();
 void PersistPanelLayoutIfChanged();
 
 void LoadAudioSettings();
+void LoadAudioSettingsFrom(const std::string& path); // self-test seam
+void SaveAudioSettingsTo(const std::string& path);
 
 void SaveAudioSettings();
 
