@@ -1,4 +1,35 @@
 # code_lint.py accepted hits: rule<TAB>file<TAB>detail. Each was reviewed and is guarded at the use site.
+clamp-bounds	src/app/bodies/GeometryParams.cpp	minPos .. maxPos
+clamp-bounds	src/app/bodies/OscBodies.cpp	n->start .. n->end
+clamp-bounds	src/app/bodies/OscBodies.cpp	s .. e
+clamp-bounds	src/app/bodies/SamplerBodies.cpp	n->start .. n->end
+clamp-bounds	src/audio/MusicTime.h	lo .. hi
+clamp-bounds	src/audio/NoteModel.cpp	lo .. hi
+clamp-bounds	src/audio/VoiceMod.h	rt.minValue .. rt.maxValue
+clamp-bounds	src/audio/dsp/EquationDsp.h	v1 .. v2
+clamp-bounds	src/audio/dsp/MolderDsp.cpp	minF .. maxF
+clamp-bounds	src/audio/dsp/PitchShiftKernel.cpp	minFade .. fade
+clamp-bounds	src/audio/dsp/SimdF4.h	lo .. hi
+clamp-bounds	src/nodes/AudioPluginNode.cpp	info.minValue .. info.maxValue
+clamp-bounds	src/nodes/FormulaNode.cpp	k.lo .. k.hi
+clamp-bounds	src/nodes/GrainMolderNode.cpp	curStartFrac .. curEndFrac
+clamp-bounds	src/nodes/GrainMolderNode.cpp	startFrac .. endFrac
+clamp-bounds	src/nodes/GrainMolderNode.cpp	startPos .. endPos
+clamp-bounds	src/nodes/GranularNode.cpp	(double)trimStart .. (double)trimEnd
+clamp-bounds	src/nodes/GranularNode.cpp	s .. e
+clamp-bounds	src/nodes/GranularNode.cpp	start .. end
+clamp-bounds	src/nodes/GranularNode.cpp	trimStart .. trimEnd
+clamp-bounds	src/nodes/MolderNode.cpp	startPos .. endPos
+clamp-bounds	src/nodes/MpcNode.cpp	cursor .. numFrames
+clamp-bounds	src/nodes/PaulStretchNode.cpp	curStartFrac .. curEndFrac
+clamp-bounds	src/nodes/PredictionNodes.cpp	lo .. hi
+clamp-bounds	src/nodes/SamplerNode.cpp	curStartFrac .. curEndFrac
+clamp-bounds	src/nodes/SamplerNode.cpp	startFrac .. endFrac
+clamp-bounds	src/nodes/SamplerNode.cpp	startPos .. endPos
+clamp-bounds	src/nodes/SlicerNode.cpp	lo .. hi
+clamp-bounds	src/nodes/VideoSourceNode.cpp	effStart .. effEnd
+clamp-bounds	src/nodes/VideoSourceNode.cpp	start .. (double)trimEnd
+clamp-bounds	src/nodes/VmpcNode.cpp	s .. e
 loaded-index	src/nodes/AnalogNode.cpp	filterType -> [filterType] in src/app/bodies
 loaded-index	src/nodes/EquationNode.cpp	filterType -> [filterType] in src/app/bodies
 loaded-index	src/nodes/GrainMolderNode.cpp	key -> [key] in src/app/bodies
