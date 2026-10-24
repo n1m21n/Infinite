@@ -241,7 +241,7 @@ jobs:
       - name: headless_smoke.sh through Infinite.com (informational)
         if: matrix.arch == 'x64'
         continue-on-error: true
-        timeout-minutes: 8
+        timeout-minutes: 2
         shell: bash
         run: scripts/headless_smoke.sh build/Release/Infinite.com
 
@@ -250,7 +250,7 @@ jobs:
       - name: Render goldens (informational)
         if: matrix.arch == 'x64'
         continue-on-error: true
-        timeout-minutes: 8
+        timeout-minutes: 2
         shell: bash
         run: python3 tools/render-check.py --binary build/Release/Infinite.exe
 
