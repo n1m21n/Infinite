@@ -4,7 +4,7 @@
 
 ## Final state
 
-- **59 findings** (B-A-001 … B-K-041). 55 are fixed. Four are not fixed (B-K-041 is wontfix):
+- **60 findings** (B-A-001 … B-K-042). 56 are fixed. Four are not fixed (B-K-041 is wontfix):
 
   | Finding | Decision |
   |---|---|
@@ -55,7 +55,11 @@
 
 B-K-040 was verified with a standalone build of `EquationDsp.h` (old header segfaults, new header refuses). The in-app DSPTEST case is committed but was not run: the fresh worktree had no build dir and a full first build did not fit the budget. Run `INFINITE_DSPTEST=1` on the next build.
 
-**Left over:** the 19 mod types past the budget, and the Array/Depth Projection/Audio Texture mod rows. Run `param_fuzz.py ... --kind mod` again to resume; a harness change that drops keys the schema rejects would cover the three.
+**Loose ends, closed the same day:**
+- DSPTEST is OK on a dev build of main with the B-K-040 case and the new B-K-042 case.
+- Text 3D timeouts were slow work, not a hang: B-K-042, fixed (50000 characters 56 s -> 2.8 s).
+- `param_fuzz.py` now drops mod lines the schema rejects (E_BAD_PARAM) and re-runs the row. Array, Depth Projection and Audio Texture then ran clean (9 rows, 0 BAD).
+- The last 24 mod types (alphabetical by category, type) ran: 72 rows, 3 BAD. Oscillator is B-K-041; Spectral Synth is the same class (addendum). The full 310-type mod sweep is now covered, in two runs.
 
 ---
 
