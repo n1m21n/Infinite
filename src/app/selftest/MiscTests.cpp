@@ -697,6 +697,12 @@ bool RunAppearanceSelfTest()
 
    // 1. Coverage - for all 10 presets x all 10 categories, ColorFor() returns a non-fallback color
    const auto& presetNames = CategoryColors::PresetNames();
+   const auto presetIndexOf = [&](const char* name) {
+      for (int i = 0; i < (int)presetNames.size(); i++)
+         if (presetNames[i] == name)
+            return i;
+      return 0;
+   };
    check(presetNames.size() == 15, "preset count is 15");
    const auto& catNames = CategoryColors::CategoryNames();
    check(catNames.size() == 11, "category count is 11");
@@ -722,7 +728,7 @@ bool RunAppearanceSelfTest()
    }
 
    // 3. Round trip persistence
-   CategoryColors::SetPreset(0); // Infinite (dark)
+   CategoryColors::SetPreset(0); // Infinite Ember (dark, the default)
    CategoryColors::ResetAllAppearanceBoth();
 
    CategoryColors::SetCategoryColor("Source", { 0.111f, 0.222f, 0.333f }, false);
@@ -745,9 +751,9 @@ bool RunAppearanceSelfTest()
    check(std::abs(CategoryColors::GetNodeRounding() - 18.0f) < 1e-3f, "reloaded rounding override");
 
    // 4. Polarity isolation
-   CategoryColors::SetPreset(6); // GitHub Light
+   CategoryColors::SetPreset(presetIndexOf("GitHub Light"));
    check(CategoryColors::IsThemeLight(), "GitHub Light is light theme");
-   CategoryColors::SetPreset(9); // Forest Green
+   CategoryColors::SetPreset(presetIndexOf("Forest Green"));
    check(CategoryColors::IsThemeLight(), "Forest Green is light theme");
    check(!CategoryColors::HasCategoryColorOverride("Source", true), "light Source has no override yet");
    check(!CategoryColors::HasCableColorOverride(CategoryColors::CableType::Modulation, true), "light cable has no override");
@@ -755,7 +761,7 @@ bool RunAppearanceSelfTest()
    check(std::abs(CategoryColors::GetNodeOpacity() - CategoryColors::DefaultNodeOpacity(true)) < 1e-3f, "light opacity defaults to 0.95");
 
    // 5. Reset
-   CategoryColors::SetPreset(0); // Dark Infinite
+   CategoryColors::SetPreset(0); // dark
    CategoryColors::ResetCategoryColor("Source", false);
    check(!CategoryColors::HasCategoryColorOverride("Source", false), "Source reset clears override");
    CategoryColors::ResetAllAppearanceBoth();

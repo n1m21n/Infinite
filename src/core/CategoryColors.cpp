@@ -401,7 +401,19 @@ const std::vector<Preset>& Presets()
          ui.textDim = WithContrast(ui.textDim, ui.windowBg, ui.panelBg, kMinTextContrast);
          ui.textDim = WithContrast(ui.textDim, FieldWellBg(ui), ui.panelBg, kMinTextContrast);
       }
-      return p;
+      // The brand themes lead the list, together, Ember first: preset 0 is the default for a
+      // fresh install (a saved choice is stored by name, so it is unaffected by the order).
+      static const char* const kLead[] = { "Infinite Ember", "Infinite Midnight", "Infinite Deep",
+                                           "Infinite Mist", "Infinite Paper", "Infinite" };
+      std::vector<Preset> ordered;
+      for (const char* name : kLead)
+         for (const Preset& preset : p)
+            if (preset.name == name)
+               ordered.push_back(preset);
+      for (const Preset& preset : p)
+         if (std::none_of(ordered.begin(), ordered.end(), [&](const Preset& o) { return o.name == preset.name; }))
+            ordered.push_back(preset);
+      return ordered;
    }();
    return presets;
 }

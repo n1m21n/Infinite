@@ -523,6 +523,9 @@ namespace app
       // The shown name too: on Windows "Syphon In" is labelled "Spout In"
       // (DisplayName), and a search for "spout" has to find it.
       std::string hay = typeName + " " + DisplayName(typeName) + " " + category;
+      // Features that live inside a node as a mode, found by what people call them.
+      if (typeName == "Displacement")
+         hay += " displacement noise noise displace";
       if (I18n::CurrentLanguage() != "en")
       {
          const char* key = NodeHelpTextFor(typeName, category);
