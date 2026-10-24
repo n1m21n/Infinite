@@ -1,6 +1,6 @@
 # Infinite-Turbo (for Windows) - changelog
 
-## 0.71.1 (in progress, branch feature/pointz-sand)
+## 0.71.1-turbo (2026-10-24)
 
 Sand, dust and particle sculptures with PointZ, rendered by Render 3D HQ. Example:
 `examples/hq/J_sand_1m.inf` - a million grains settling on drifting dunes, parted by a
