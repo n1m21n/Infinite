@@ -1824,7 +1824,7 @@ namespace app
          const int monH = std::max(16, (int)monAvail.y);
 
          // Same clock and same skip rules as the composite itself.
-         const int activeClipCount = CountActiveArrangeVideoClips(tr.Beats());
+         const int activeClipCount = CountActiveArrangeVideoClips(tr.Beats(), nullptr, /*timelineOwn=*/true);
 
          const ImVec2 monOrigin = ImGui::GetCursorScreenPos();
          const ImVec2 monBR(monOrigin.x + monAvail.x, monOrigin.y + monAvail.y);
@@ -1836,16 +1836,11 @@ namespace app
             // Only a request here: the composite runs after the cook loop
             // (CompositeArrangeMonitorIfRequested) into this same stable
             // texture, before ImGui renders the draw list recorded now.
-            gArrangeMonitorTarget.requestW = monW;
-            gArrangeMonitorTarget.requestH = monH;
-            const unsigned int tex = gArrangeMonitorTarget.result.tex;
+            gArrangeTimelineMonitorTarget.requestW = monW;
+            gArrangeTimelineMonitorTarget.requestH = monH;
+            const unsigned int tex = gArrangeTimelineMonitorTarget.result.tex;
             if (tex != 0)
                monDl->AddImage((ImTextureID)(intptr_t)tex, monOrigin, monBR, ImVec2(0, 1), ImVec2(1, 0));
-            // In Session audio mode the monitor plays launched Session clips,
-            // not the timeline's: say so, or an empty timeline looks wrong.
-            if (gAudioMode == AudioMode::Session)
-               monDl->AddText(ImVec2(monOrigin.x + 6.0f, monOrigin.y + 4.0f), IM_COL32(255, 255, 255, 170),
-                              L("Session clip"));
          }
 
          ImGui::Dummy(monAvail);

@@ -52,6 +52,11 @@ save/load, audio param/teardown sweeps, the all-node-types round trip, etc.).
 Don't skip this before committing. See that skill for what it actually
 checks and how to read a failure.
 
+Before any DMG, zip or installer leaves this machine, run
+`python3 scripts/check_release_binary.py <path to Infinite.app>`. It fails if
+the binary still has the debug-only UI (UI Debugger, UI Style Editor), which
+means it was built without NDEBUG. Never ship `build-dev`.
+
 ## Review
 
 Prints `git status --short` and the full `git diff HEAD` (staged + unstaged).

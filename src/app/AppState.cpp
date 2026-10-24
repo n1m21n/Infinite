@@ -1394,6 +1394,12 @@ bool gHeadlessNeedProbe = false;
    std::map<std::pair<int, int>, SparklineHistory> gModMatrixSparklines;
 
    ArrangeCompositeTarget gArrangeMonitorTarget{ 0 };
+   ArrangeCompositeTarget gArrangeTimelineMonitorTarget = []
+   {
+      ArrangeCompositeTarget t{ 2 };
+      t.timelineOwn = true;
+      return t;
+   }();
 
    ArrangeCompositeTarget gArrangeRenderTarget{ 1 };
 
