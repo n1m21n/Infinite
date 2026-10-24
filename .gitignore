@@ -44,3 +44,7 @@ tests/website/ui_type_shots/
 
 _site/
 node_modules/
+
+# API credentials
+tools/spread/*_config.json
+tools/spread/*client_secrets.json
