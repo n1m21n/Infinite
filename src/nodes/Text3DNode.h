@@ -34,6 +34,7 @@ public:
    const char* InputLabel(int) const override { return "texture"; }
 
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
+   static constexpr size_t kMaxTextLength = 2000;
    const std::string& Status() const { return mStatus; }
 
    std::string text = "Infinite";
