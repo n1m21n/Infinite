@@ -4,7 +4,7 @@
 
 ## Final state
 
-- **60 findings** (B-A-001 … B-K-042). 56 are fixed. Four are not fixed (B-K-041 is wontfix):
+- **60 findings** (B-A-001 … B-K-042). 56 are fixed. Four are not fixed (B-K-041 is wontfix; B-G-001 and B-H-001 moved to perf):
 
   | Finding | Decision |
   |---|---|
@@ -72,7 +72,7 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 ## Where things stand
 
 - **Findings:** 56 filed (B-A-001 … B-K-038). Every one is fixed except three:
-  - B-G-001 and B-H-001: P3, need a quiet-Mac re-run.
+  - B-G-001 and B-H-001: moved to the perf README (decided 2026-10-24; no longer open here).
   - B-J-001: the Windows headless hang, P5.
 - **New on 2026-10-23, evening** (merged to main):
   - **INFINITE_PARAMFUZZ** (`tools/bughunt/param_fuzz_inproc.py`): in-process fuzz of every audio node, one key at a time at ±1e9, -1 and 0, flagging NaN, HOT (peak > 100) and SLOW. The full run takes minutes; the app sweep took hours. The driver restarts past UBSan aborts.
@@ -143,7 +143,7 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 ## Decisions waiting on the owner
 
 1. **Push:** whether to push main.
-2. **Go or no-go on P3 and P5:** B-G-001 and B-H-001 (benches), and B-J-001 (Windows).
+2. ~~Go or no-go on P3 and P5~~ Decided 2026-10-24: B-G-001 and B-H-001 moved to perf; B-J-001 stays deferred until the next CI run shows Windows smoke and render pass.
 3. **The old plan file:** delete claude-context/v06-release/RELEASE_BUGHUNT_PLAN.md, or mark it superseded.
 4. **Linux-only sanitizers:**
    - LeakSanitizer, with a suppressions file instead of `detect_leaks=0`.

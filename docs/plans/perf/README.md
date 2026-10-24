@@ -16,6 +16,13 @@ blocks a target in this table.
 Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
 sweeps, merge `--no-ff`, update the State column here.
 
+## Carried from the bug spree
+
+Two P3 findings from the 2026-10-22 spree are timing re-runs. They belong here, not in the bug ledger: run them when the Mac is quiet (no other session building) as part of a normal bench pass, and refresh the numbers in this file.
+
+- B-G-001: the load-bench, project-bench and stress results are stale.
+- B-H-001: see `docs/release/findings/spree-2026-10-22/B-H-001.md`.
+
 ## Where we stand against the spec targets
 
 From the baseline `bench/baselines/m2-8gb.jsonl` (2026-09-25, `run_all.sh --quiet`:
