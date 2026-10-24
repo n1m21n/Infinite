@@ -107,11 +107,35 @@ def configure(mode):
     return path
 
 
+def newest_source_after_binary(path):
+    """A source or header newer than the built app. `make -n` misses header-only edits (CMake
+    reads its depfiles only while really building), so this backs up its zero."""
+    exe = None
+    for root, dirs, files in os.walk(path):
+        if root.endswith(".app/Contents/MacOS") and "Infinite" in files:
+            exe = os.path.join(root, "Infinite")
+            break
+        if root.count(os.sep) - path.count(os.sep) > 3:
+            dirs[:] = []
+    if exe is None:
+        return None
+    built = os.path.getmtime(exe)
+    for root, _, files in os.walk(os.path.join(ROOT, "src")):
+        for f in files:
+            fp = os.path.join(root, f)
+            if os.path.getmtime(fp) > built:
+                return os.path.relpath(fp, ROOT)
+    return None
+
+
 def stale_count(path, target):
     if not os.path.exists(path + "/Makefile"):
         return None
     out = sh(["make", "-C", path, "-n", "-s", target])
-    return len(re.findall(r"Building (?:C|CXX|OBJC|OBJCXX) object", out)), len(re.findall(r"Linking", out))
+    r = len(re.findall(r"Building (?:C|CXX|OBJC|OBJCXX) object", out)), len(re.findall(r"Linking", out))
+    if r == (0, 0) and newest_source_after_binary(path):
+        return (1, 1)  # at least that file; make finds the rest
+    return r
 
 
 def cmd_status(a):
