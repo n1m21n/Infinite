@@ -13,7 +13,7 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 
    The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
-3. **Nodes:** `INFINITE_PARAMFUZZ=1` first (minutes, one process), then `param_fuzz.py` with every kind against a sanitizer build of the app (hours, one launch per row).
+3. **Nodes:** `INFINITE_PARAMFUZZ=1` first (minutes, one process), then `param_fuzz.py` against a sanitizer build of the app (one launch per row, capped by `--budget`, default 20 min). Before a run, write down how many rows it will cost and what it could find that the last run did not. A kind the last run already covered is not worth another hour.
 4. **Before a clamp fix ships:** `clamp_check.py "Type.key=LO..HI" ...` (under a second). It lists every tracked patch the clamp would change. Any hit means look before clamping.
 5. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
 6. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
@@ -120,3 +120,7 @@ OUT/fuzz_hap OUT/crash-<hash>          # replay
 - **A GPU hang shows as a plain abort.** dither 1e9 exited -6 with no sanitizer log; stderr had Metal's "Caused GPU Hang Error". When a row aborts without a report, re-run it with stderr kept (the sweep sends stderr to /dev/null).
 - **Change one param per row, on a node that plays.** The app float sweep logged `Audio File 1e9 ok` while volume 1e9 played 5e8 loud (B-K-036). It sets every param of a type at once, so a param that silences the node (pitch → NaN position) hides one that makes it hot. Its file players also never started. INFINITE_PARAMFUZZ changes one key per row on the `SweepPrepare` fixtures, so it finds both kinds.
 - **A hardened-library abort is a Mac blind spot.** `std::clamp(pos, start, end)` with a loaded start > end aborted under Linux's `_GLIBCXX_ASSERTIONS`, while macOS libc++ fast mode let it pass, so only Linux ASan CI saw it. `code_lint.py` rule `clamp-bounds` lists every clamp whose bounds are both runtime values; the 58 existing ones are in the baseline (release returns a bound, nothing user-visible). Order the bounds in new code.
+
+## Lesson: a sweep without a budget eats the hour (2026-10-24)
+
+A float and signal run took about 56 min: 1074 of 1116 rows finished in under 5 s, and a third of the wall time went to timeouts. 28 shape nodes each burned a 22 s cap on one shared 1e9 cause. The sweep now has `--budget` (it stops starting types and is resumable). After 3 types time out on the same value, the rest of that value gets a 5 s probe. Estimate the cost first, check the yield after the first block, and stop once the new rows only repeat known classes.

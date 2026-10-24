@@ -33,6 +33,10 @@ error code the base run did not have.
                  for text, e.g. --values 1e9,-1). Since B-K-026 the reader
                  drops ±1e30, nan and inf, so those float rows only re-test
                  the base.
+  --budget MIN   stop starting new types after MIN minutes of wall time
+                 (default 20). Rows already written stay, so the next run
+                 resumes where this one stopped. Ask "is the next hour worth
+                 it?" between runs, not after one.
   --types-from   re-run only the types that have a BAD row in an earlier
                  results file (the verify step after a fix).
 
@@ -63,6 +67,23 @@ VALUES = {
     "signal": ["nan", "inf", "denorm", "huge", "dc", "square"],
 }
 PICK = set()  # --values: empty runs every value of the kind
+DEADLINE = [float("inf")]  # --budget
+# Once STREAK_AT types have timed out on one value, the rest of that value's
+# cases get PROBE_S: a timeout there is the same family (28 shape nodes all
+# hanging on 1e9 cost 10 minutes at 22 s each), a crash still shows in 5 s.
+STREAK_AT, PROBE_S = 3, 5.0
+STREAK = {}
+STREAK_LOCK = threading.Lock()
+
+
+def case_cap(label, budget):
+    with STREAK_LOCK:
+        return min(budget, PROBE_S) if STREAK.get(label, 0) >= STREAK_AT else budget
+
+
+def note_timeout(label):
+    with STREAK_LOCK:
+        STREAK[label] = STREAK.get(label, 0) + 1
 PREFIX = {"int": "i", "float": "f", "text": "s"}
 HOT_PEAK = 4.0  # +12 dBFS
 # --start seeks the transport and Audio File follows it, so the whole file
@@ -313,6 +334,8 @@ def bad_types(path):
 
 def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
     """All cases of one type, base first (its time sets the others' budget)."""
+    if time.time() > DEADLINE[0]:
+        return  # out of --budget: no row, so a re-run picks this type up
     safe = re.sub(r"[^A-Za-z0-9]+", "_", t["type"])
     base = prior.get("base")
     budget = max_timeout
@@ -331,7 +354,9 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
         tag = f"{kind}-{safe}-{label.lstrip('-').replace('.', '')}{'n' if label.startswith('-') else ''}"
         signal = kind == "signal" and audio
         rc, codes, reports, secs, tail, prev = run_case(binp, out, tag, text, audio,
-                                                  max_timeout if v == "base" else budget, signal)
+                                                  max_timeout if v == "base" else case_cap(label, budget), signal)
+        if v != "base" and rc == "TIMEOUT":
+            note_timeout(label)
         if signal and v == "base" and tail is None:
             codes += ",NOSIGNAL"  # the sine never reached the sink: this type's rows prove nothing
         if signal and v != "base" and base is not None:
@@ -394,7 +419,9 @@ def run_kind(binp, out, kind, only, jobs, max_timeout):
     res.close()
     rows = [l.rstrip("\n").split("\t") for l in open(res_path)]
     nbad = sum(1 for r in rows if r[-1] == "BAD")
-    print(f"{kind}: {len(rows)} rows, {nbad} BAD -> {res_path}")
+    left = sum(1 for t in todo if t["type"] not in {r[0] for r in rows})
+    print(f"{kind}: {len(rows)} rows, {nbad} BAD -> {res_path}"
+          + (f" ({left} types left: out of --budget, re-run to resume)" if left else ""))
     return nbad
 
 
@@ -428,6 +455,10 @@ def selftest():
     assert "  s filePath /x/clean.wav" in text and "fsig" not in text, text
     text, _ = patch_for(rec, "text", "path=../x", None, "/x/clean.wav")
     assert "/x/clean.wav" not in text, text
+    for _ in range(STREAK_AT):
+        assert case_cap("st", 20.0) == 20.0
+        note_timeout("st")
+    assert case_cap("st", 20.0) == PROBE_S and case_cap("other", 20.0) == 20.0
     print("param_fuzz selftest ok")
 
 
@@ -444,6 +475,7 @@ def main():
         only |= bad_types(a[a.index("--types-from") + 1])
     jobs = int(a[a.index("--jobs") + 1]) if "--jobs" in a else 1
     max_timeout = float(a[a.index("--max-timeout") + 1]) if "--max-timeout" in a else 90.0
+    DEADLINE[0] = time.time() + 60 * float(a[a.index("--budget") + 1] if "--budget" in a else 20)
     if "--values" in a:
         PICK.update(a[a.index("--values") + 1].split(","))
     os.makedirs(out, exist_ok=True)
