@@ -446,9 +446,37 @@ Tier A. Inputs: 1 geometry.
 | `axis` | swirl axis | vector | 0 1 0 |
 | `mask` | mask attribute | text |  |
 
+## Force Target PointZ
+
+(0.71.1) Adds a spring force to PartForce pulling each particle towards its own point of the second input (a text, a grid with noise, a mesh): point PartId (or index, or a random one), wrapped around the target's count, so a million particles can share a smaller shape. 'damping' takes out velocity so they settle on it; 'max force' keeps far ones from shooting in. Put it inside a Particle PointZ loop, next to Force Radial (attract / repel) and Collide.
+
+Tier A. Inputs: 2 geometry (particles, target).
+
+| key | label | type | default |
+|---|---|---|---|
+| `strength` | strength | number | 4 |
+| `damping` | damping | number | 1.5 |
+| `match` | match by | menu: 0 PartId (else index), 1 index, 2 random (by PartId) | 0 PartId (else index) |
+| `limit` | max force (0 = none) | number | 0 |
+| `mask` | mask attribute | text |  |
+
+## Collide PointZ
+
+(0.71.1) A plane particles cannot cross (a floor by default): a point behind it is put back on it, the part of PartVel going into the plane bounces back times 'bounce', and the sliding part slows by 'friction'. Put it inside a Particle PointZ loop, after the forces.
+
+Tier A. Inputs: 1 geometry.
+
+| key | label | type | default |
+|---|---|---|---|
+| `point` | plane point | vector | 0 0 0 |
+| `normal` | plane normal | vector | 0 1 0 |
+| `bounce` | bounce | number | 0.2 |
+| `friction` | friction | number | 0.3 |
+| `mask` | mask attribute | text |  |
+
 ## Lookup Attribute PointZ
 
-Copies attributes from the second input onto the first, point by point: point i reads the point given by its 'index attribute' (or the same number when empty), clamped to the range.
+Copies attributes from the second input onto the first, point by point: point i reads the point given by its 'index attribute' (or the same number when empty), clamped to the range. Components and renames as in TouchDesigner's POPs (0.71.1): 'P.y' copies only P's y, 'P.y=Lum' writes the source's Lum into P's y, 'Height=P.y' the source's P.y into a new Height (x y z w or r g b a); 'combine' adds, subtracts, multiplies, or keeps the min / max instead of replacing.
 
 Tier A. Inputs: 2 geometry.
 
@@ -457,6 +485,7 @@ Tier A. Inputs: 2 geometry.
 | `attribs` | attributes | text | Color |
 | `index` | index attribute | text |  |
 | `offset` | index offset | integer | 0 |
+| `combine` | combine | menu: 0 replace, 1 add, 2 subtract, 3 multiply, 4 min, 5 max | 0 replace |
 
 ## Lookup Channel PointZ
 

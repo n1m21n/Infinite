@@ -10,11 +10,18 @@ uniform mat4 uViewProj;
 uniform mat4 uModel;
 uniform float uRadiusScale;   // as hq_sphere.vert
 uniform float uTexelsPerUnit; // shadow map texels per world unit
+// Turbo 0.71.1: dots cast the grain they are on screen (hq_sphere.vert).
+uniform float uDotPixels;
+uniform float uPixelWorld;
+uniform vec3 uCamPos;
+uniform int uOrtho;
 
 void main()
 {
    vec3 c = (uModel * vec4(aP, 1.0)).xyz;
    float r = aPScale * uRadiusScale;
+   if (uDotPixels > 0.0)
+      r = 0.5 * uDotPixels * aPScale * uPixelWorld * ((uOrtho == 1) ? 1.0 : length(c - uCamPos));
    if (aActive < 0.5 || r <= 0.0)
    {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);

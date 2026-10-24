@@ -79,6 +79,8 @@ Resumo depois da leitura (2026-10-22): CPU 39, GPU 36, misto 7, pass-through 4 (
 | Dimension PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Field PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Force Radial PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
+| Force Target PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST); força conhecida em grid (POPTEST) | 1M partículas: 0,27 ms GPU | 0.71.1 | nasceu na GPU (kernel), sem caminho CPU |
+| Collide PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST); plano conhecido (POPTEST) | 1M partículas: 0,17 ms GPU | 0.71.1 | nasceu na GPU (kernel), sem caminho CPU |
 | GLSL Advanced PointZ | PopOpsB3.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | GLSL Copy PointZ | PopOpsB3.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | GLSL PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
@@ -86,7 +88,7 @@ Resumo depois da leitura (2026-10-22): CPU 39, GPU 36, misto 7, pass-through 4 (
 | Group PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Image to PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Limit PointZ | PopOpsA.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
-| Lookup Attribute PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
+| Lookup Attribute PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST); 0.71.1 componentes / renomes / combine em grid (POPTEST) | 1M pontos: 0,23 ms GPU | 0.71.1 | `P.y`, `dest=src.c`, combine |
 | Lookup Channel PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Lookup Texture PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Math Combine PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |

@@ -1,0 +1,230 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 PointZ Grid PointZ
+  uid 1
+  pos 0 0
+  flags 1 0 0 0 1 0
+  f sizeX 6
+  f sizeY 6
+  f sizeZ 0
+  i rows 1000
+  i cols 1000
+  i orient 1
+  i kind 2
+  f centerY 0.6
+end
+node 2 PointZ Grid PointZ
+  uid 2
+  pos 0 526
+  flags 1 0 0 0 1 0
+  f sizeX 6
+  f sizeY 6
+  f sizeZ 0
+  i rows 1000
+  i cols 1000
+  i orient 1
+  i kind 2
+  f centerY 0.6
+end
+node 3 PointZ Noise PointZ
+  uid 3
+  pos 407 0
+  flags 1 0 0 0 1 0
+  s attrib P
+  i type 2
+  i mode 0
+  f amp 0.45
+  f freq 0.55
+  b use4d 1
+  f speed 0.06
+end
+node 4 PointZ Random PointZ
+  uid 4
+  pos 407 949
+  flags 1 0 0 0 1 0
+  s attrib P
+  i mode 1
+  f loX -0.006
+  f loY 0
+  f loZ -0.006
+  f hiX 0.006
+  f hiY 0
+  f hiZ 0.006
+  f seed 7
+end
+node 5 PointZ Lookup Attribute PointZ
+  uid 5
+  pos 877 0
+  flags 1 0 0 0 1 0
+  s attribs P.y
+end
+node 6 PointZ Grid PointZ
+  uid 6
+  pos 0 1052
+  flags 1 0 0 0 1 0
+  f sizeX 6
+  f sizeY 6
+  f sizeZ 0
+  i rows 1000
+  i cols 1000
+  i orient 1
+  i kind 2
+  f centerY 4
+end
+node 7 PointZ Particle PointZ
+  uid 7
+  pos 407 1644
+  flags 1 0 0 0 1 0
+  i birth 1
+  i max 1000000
+  f life 600
+  f lifeVar 0
+  f velX 0
+  f velY 0
+  f velZ 0
+  f velRand 0.05
+  f gravityY -3
+  f drag 0.3
+  f damp 0
+  f sizeBirth 1
+  f sizeDeath 1
+  f turb 0.4
+  f turbScale 1.5
+  f turbSpeed 0.2
+  s target sand
+  i engine 1
+  b play 1
+end
+node 8 PointZ Force Target PointZ
+  uid 8
+  pos 1284 0
+  flags 1 0 0 0 1 0
+  f strength 8
+  f damping 3
+  i match 0
+  f limit 40
+end
+node 9 PointZ Force Radial PointZ
+  uid 9
+  pos 1736 0
+  flags 1 0 0 0 1 0
+  f centerX 0
+  f centerY 0.6
+  f centerZ 0
+  f strength -45
+  f radius 1.1
+  i falloff 1
+  f swirl 10
+end
+node 10 PointZ Collide PointZ
+  uid 10
+  pos 2155 0
+  flags 1 0 0 0 1 0
+  f bounce 0.1
+  f friction 0.6
+end
+node 11 PointZ Null PointZ
+  uid 11
+  pos 2577 0
+  flags 1 0 0 0 1 0
+  s tag sand
+end
+node 12 3DScene Material
+  uid 12
+  pos 2971 0
+  flags 1 0 0 0 1 0
+  c color 0.86 0.68 0.45
+  f metallic 0
+  f roughness 0.85
+end
+node 13 3DScene Render 3D HQ
+  uid 13
+  pos 3816 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  i tonemap 1
+  f exposure 1
+  f envIntensity 0.7
+  b envAsBackground 0
+  c bg 0.05 0.05 0.07
+  b shadows 1
+  i shadowQuality 2
+  f shadowSoftness 1
+  b ao 1
+  f aoRadius 0.4
+  f aoIntensity 1
+  b taa 1
+  i pointStyle 1
+  f dotSize 1.6
+end
+node 14 3DScene Camera
+  uid 14
+  pos 2971 699
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 7.5
+  f azimuth -35
+  f elevation 28
+  f targetX 0
+  f targetY 0.5
+  f targetZ 0
+  f orbitPerBeat 0.01
+end
+node 15 3DScene Light
+  uid 15
+  pos 2971 1257
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth -40
+  f elevation 22
+  c color 1 0.97 0.92
+  f intensity 3.2
+end
+node 16 3DScene HDRI
+  uid 16
+  pos 2971 1659
+  flags 1 0 0 0 1 0
+  s path hq_media/studio.hdr
+  f intensity 0.7
+  f rotation 0
+end
+node 17 3DScene Geometry
+  uid 17
+  pos 0 1578
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 18 Output Output
+  uid 18
+  pos 4584 0
+  flags 1 0 0 0 1 0
+end
+geo 3 0 2
+geo 4 0 1
+geo 5 0 4
+geo 5 1 3
+geo 7 0 6
+geo 8 0 7
+geo 8 1 5
+geo 9 0 8
+expr 9 centerX sin(t * 0.35) * 2.4
+expr 9 centerZ cos(t * 0.27) * 2.0
+geo 10 0 9
+geo 11 0 10
+geo 12 0 11
+geo 13 0 12
+geo 13 1 17
+geo 13 4 14
+geo 13 5 15
+cable 13 8 16
+cable 18 0 13
+transport 120 4 4 0 0

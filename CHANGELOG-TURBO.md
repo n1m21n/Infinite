@@ -1,5 +1,32 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.71.1 (in progress, branch feature/pointz-sand)
+
+Sand, dust and particle sculptures with PointZ, rendered by Render 3D HQ. Example:
+`examples/hq/J_sand_1m.inf` - a million grains settling on drifting dunes, parted by a
+wandering repulsor (~8.9 ms a frame at 1080p, RTX 4060 Laptop).
+
+- **Render 3D HQ: points as dots.** New "points as" menu at the end of the panel: Spheres (as
+  before) or Dots - every PointZ point a grain "dot size" pixels wide (times PScale) at any
+  distance, lit as a tiny sphere, with shadows, GTAO and TAA like the spheres.
+- **Lookup Attribute PointZ: components and renames**, as in TouchDesigner's POPs: `P.y` takes only
+  the source's y, `P.y=Lum` writes the source's Lum into y, `Height=P.y` makes a new attribute;
+  new "combine" (replace / add / subtract / multiply / min / max). Old patches look the same.
+- **New: Force Target PointZ** - pulls each particle to its own point of a second PointZ (a text, a
+  grid with noise, a mesh) with a damped spring: particles form and hold a shape.
+- **New: Collide PointZ** - a floor (any plane) for particles, with bounce and friction: sand piles
+  instead of falling through.
+- **Render 3D HQ: screen-space GI** ("screen-space GI" at the end of the panel, off by default):
+  light bounces off what is on screen, so emissive objects finally light the floor, walls and their
+  neighbours (Filament itself has no GI). One bounce per frame from last frame's image, more over
+  frames; its own temporal accumulation keeps it smooth. ~+0.5 ms a frame at 1080p. Example:
+  `examples/hq/K_emissive_gi.inf`.
+- **Fix, Render 3D HQ: ambient occlusion on spheres and plain instances** no longer bleeds across their
+  silhouettes (the full-screen pass they are shaded in read the far plane as their depth).
+- **Fix, Render 3D HQ: ghost trails behind Instance PointZ copies under TAA** when the points move
+  (noise on a grid of boxes). Each copy now has its own motion from last frame's transform; before,
+  only the camera's motion was known, so the TAA history lagged behind every moving copy.
+
 ## 0.71.0-turbo (2026-10-23)
 
 Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAMENT.md`.

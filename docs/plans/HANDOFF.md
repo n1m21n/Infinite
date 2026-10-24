@@ -61,6 +61,19 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
+### 0.71.1 em andamento: areia com PointZ (branch `feature/pointz-sand`)
+
+Pedido do dono (2026-10-23): efeito de areia com partículas, atratores e repulsores, foco no PointZ e
+render **só no Render 3D HQ**, patch de teste com 1M+ de partículas. Feito, testado pelo dono e
+commitado (090eb531, 2026-10-24; sem push, sem merge): pontos como grãos no HQ ("points as" Dots), Lookup Attribute com componentes (`P.y`,
+`dest=src.c`, combine), Force Target PointZ e Collide PointZ (novos), cena
+`examples/hq/J_sand_1m.inf` (8,85 ms por quadro). Depois, retornos do dono: correção do rastro
+fantasma do TAA em instâncias (velocidade própria por cópia) e GI em tela (SSGI) para emissivos
+iluminarem a cena (`K_emissive_gi.inf`, ~+0,5 ms), exemplos só do HQ em `examples/hq` (A-L, com o
+tutorial do Attribute PointZ em `L_tutorial_attribute_pointz.inf`) e layout pelos tamanhos reais dos
+nós. Falta, só com o aval do dono: merge em `turbo/next` → `turbo/windows-only`, versão 0.71.1, tag.
+Detalhes: CHANGELOG 0.71.1, `RENDER-3D-HQ-FILAMENT.md` "0.71.1", `POINTZ-REFERENCE.md`.
+
 ### 0.71.0 lançada (2026-10-23)
 
 `feature/render3d-hq` com merge em `turbo/next` e `turbo/windows-only`, versão 0.71.0 (CMakeLists,

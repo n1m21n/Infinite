@@ -117,7 +117,7 @@ comum em `app/frame/Startup.inl:1832`, lista do driver em `driver.ps1` (`'NOME:q
 
 ## 5. Cenas de referência e linha de base (S0)
 
-Cenas em `examples/hq/raster/` (Render 3D) e `examples/hq/filament/` (Render 3D HQ), um renderizador por patch, nós em colunas sem sobreposição (pedido do dono, 2026-10-23; antes os dois renderizadores dividiam o patch) (geradas por `scripts/make_hq_scenes.py`; HDRI procedural de estúdio
+(0.71.1: os exemplos são só do HQ, em `examples/hq/`, cenas A-L; as mesmas A-I pelo Render 3D, para o antes/depois, saem com `python scripts/make_hq_scenes.py --raster` em `build/hq/raster_scenes`.) Cenas em `examples/hq/raster/` (Render 3D) e `examples/hq/filament/` (Render 3D HQ), um renderizador por patch, nós em colunas sem sobreposição (pedido do dono, 2026-10-23; antes os dois renderizadores dividiam o patch) (geradas por `scripts/make_hq_scenes.py`; HDRI procedural de estúdio
 `examples/hq/hq_media/studio.hdr` por `scripts/make_hq_studio_hdr.py`, sem licença de terceiros):
 A estúdio de materiais (6 esferas PBR + chão), B estúdio de partículas (90k pontos, luz lateral,
 câmera em órbita), C nuvem generativa (partículas na GPU), D partículas emissivas (bloom), E
@@ -542,6 +542,68 @@ acompanha um UV animado (a textura borra), e é por isso que o FXAA existe. Chec
 reduz a energia de borda sem TAA; sombra suave + contato sem TAA sem mais detalhe fino que o PCF duro;
 o cutoff tira o mesh (diferença 0 contra a cena sem ele) e a opacidade 0,5 deixa ver o que está dentro;
 360 equirect 2:1 e dome no tamanho pedido. Exemplos A-I iguais a antes (só a animação muda).
+### 0.71.1: pontos como grãos (areia)
+
+Pedido do dono: partículas de areia com atratores e repulsores, renderizadas só pelo HQ, com 1M+ de
+pontos. O HQ desenhava todo ponto de PointZ como esfera de raio `PScale` no mundo; de longe, um milhão
+delas vira sub-pixel ou bolinhas. Novo menu **"points as"** (fim do painel; chaves `pointStyle`,
+`dotSize`): **Dots** dá a cada ponto um raio de `dotSize × PScale` **pixels** na sua distância
+(`hq_sphere.vert`, `uDotPixels × uPixelWorld × d`), sombreado como esfera pequena, com o mesmo
+pré-passe, sombreamento diferido, sombra (o mapa usa o mesmo raio, `hq_sphere_shadow.vert`), GTAO e
+velocidade do TAA das esferas. Os cantos do quad que o raio não acerta não são descartados no modo
+dots: um grão de 1-2 px sempre cobre o seu pixel em vez de piscar. Check no `HQTEST`: 4 px cobre mais
+que 1 px, e com a câmera duas vezes mais longe os grãos mantêm 71% dos pixels (as esferas, 21%).
+
+Cena `examples/hq/J_sand_1m.inf` (só HQ): 1000 × 1000 grãos (Particle PointZ na GPU, nascidos
+uma vez), puxados para dunas (Force Target, novo) que tiram só o P.y de um grid com noise (Lookup
+Attribute `P.y`, componente novo), afastados por um repulsor que passeia (Force Radial, centro por
+expressão), no chão (Collide, novo). Medido (`perf.ps1`, 1080p, RTX 4060 Laptop): **8,85 ms por
+quadro**; GPU: Noise 1,07, Particle 0,98, Force Target 0,27, Lookup 0,23, Collide 0,17, Force Radial
+0,13 ms. Um `Random PointZ` espalha o lugar de cada grão em até um passo da grade (sem ele, a grade
+regular aparece como listras de moiré).
+
+**Correção (retorno do dono): rastro fantasma do TAA em instâncias.** A velocidade do pré-passe das
+cópias de um Instance PointZ usava só o movimento da câmera ("instances have no last-frame
+transform"): com o noise movendo cada box, o histórico do TAA ficava atrás de cada um. Agora cada slot
+guarda as 4 colunas de matriz do quadro anterior (atributos 8-11 de `hq_surface.vert`; as atuais quando
+as cópias não mudaram, velocidade própria zero) e cada cópia tem a sua velocidade. Check no `HQTEST`:
+instâncias andando 0,03 por quadro, a imagem assentada do TAA contra o mesmo quadro sem TAA fica em
+0,00196 (parado: 0,00059); sem a correção, 0,02217 (o check falha).
+
+**GI em tela (SSGI), para o emissivo iluminar a cena** (pedido do dono). O Filament não tem iluminação
+global: o emissivo acendia só a própria superfície e o bloom. Novo "screen-space GI" (chaves `gi`,
+`giIntensity`, `giRadius`; desligado por padrão, os patches da 0.71.0 não mudam):
+- `hq_ssgi.comp`, em meia resolução, depois do GTAO: cada pixel lança 8 raios com distribuição de
+  cosseno no hemisfério da normal (girados por ruído branco novo a cada quadro) e anda 10 passos pela profundidade
+  do pré-passe, até `giRadius` unidades. Onde o raio passa atrás de uma superfície (até 25% do raio de
+  espessura), a luz que sai dela vem da **imagem HDR do quadro anterior**, reprojetada com a câmera
+  anterior: superfícies iluminadas e emissivas, já com o GI delas, então os rebotes se somam ao longo
+  dos quadros. Raio que não acerta nada não soma: o céu é do IBL.
+- `hq_ssgi_temporal.comp`: histórico próprio do GI (6% do quadro novo, ~16 quadros de memória; o ponto reprojetado no
+  histórico só vale se a profundidade de view bate, senão é desoclusão). Sem ele a luz saía manchada: o
+  clamp de vizinhança do TAA guarda manchas desse tamanho.
+- `hq_ssgi_blur.comp`: o blur bilateral do GTAO em RGB; no sombreamento, upsample bilateral
+  (`ssgiIrradiance`) e soma na luz difusa indireta, depois da oclusão (`diffuseColor × GI ×
+  intensidade`). Objetos translúcidos não recebem (não estão no pré-passe).
+- Cena `examples/hq/K_emissive_gi.inf`: três esferas e uma fileira de cubos instanciados
+  emissivos numa sala escura; com o GI, a parede e o chão pegam a cor de cada um.
+- Custo (`perf.ps1`, 3 rodadas intercaladas, câmera orbitando para não reaproveitar quadro parado,
+  1080p): **+0,45 ms por quadro** (3,03 × 2,59 ms, 8 raios; com 4 raios eram +0,52 ms, 0,72 ms de GPU no
+  passe). Check no `HQTEST`: uma
+  caixa laranja emissiva no escuro deixa o chão mais vermelho que azul (−0,045 → 0,112).
+- Retorno do dono: linhas diagonais leves onde a luz do emissivo bate. O ruído era o interleaved
+  gradient noise dos outros passes, avaliado só nos pixels pares (meia resolução): a estrutura diagonal
+  dele virava listras. Trocado por ruído branco de hash inteiro; com 4 raios ainda sobrava uma textura
+  manchada de emissor pequeno e brilhante, daí 8 raios e o histórico mais longo.
+- Revisão do fluxo, achados corrigidos: (1) o passe diferido (esferas e instâncias) é um triângulo de
+  tela cheia no plano distante, então `gl_FragCoord.z` não era a profundidade da superfície; o upsample
+  bilateral do GTAO (desde a S7) e o do GI viam o fundo e não paravam nas silhuetas - agora o passe
+  informa a profundidade do pixel (`gShadeDepth`); (2) 360: o GI fica desligado nas faces (cada uma leria
+  a face anterior, outra câmera, como "quadro anterior"); (3) `ResetSlot` passou a soltar as matrizes de
+  instância do quadro anterior; (4) Lookup Attribute: subtração entre ponteiros de dois literais iguais
+  (comportamento indefinido, funcionava no MSVC por coincidência) trocada por um literal só.
+- Limites: só o que está na tela ilumina (um emissivo fora do quadro ou escondido não ilumina);
+  emissivos muito pequenos na tela iluminam pouco e com ruído; a luz chega um quadro atrasada.
 ## 14. Licenças
 
 | Arquivo | Portado de (Filament @ 13be3649, Apache-2.0, © Google LLC) |

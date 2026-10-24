@@ -34,6 +34,9 @@ void main()
       discard;
    float depth = texelFetch(uSceneDepth, p, 0).r;
    vec4 world = uInvViewProj * vec4(vNdc, depth * 2.0 - 1.0, 1.0);
+   // 0.71.1: this pixel's surface depth for the GTAO / GI upsamples (the
+   // full-screen triangle itself is at the far plane).
+   gShadeDepth = depth;
 
    HqSurface s;
    s.pos = world.xyz / world.w;

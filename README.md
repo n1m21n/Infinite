@@ -76,7 +76,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Group 3D** | up to 8 objects through one pin, nestable, 64 per Render 3D |
 | **Render passes** | Render 3D outputs colour, linear depth, raw Z, normals or position |
 | **Render 3D FX** | after a Render 3D: ambient occlusion, screen-space reflections, depth of field, motion blur (shutter up to 8 frames), from the render's depth and motion |
-| **Render 3D HQ** | a second 3D renderer, wired like Render 3D, with techniques from Google Filament: physically based materials and HDRI lighting, PointZ points as lit spheres, shadows, GTAO, TAA or FXAA, Filament's bloom and ACES, quality presets, 360 output. Examples in `examples/hq/filament/`; notes in [docs/RENDER-3D-HQ-FILAMENT.md](docs/RENDER-3D-HQ-FILAMENT.md) |
+| **Render 3D HQ** | a second 3D renderer, wired like Render 3D, with techniques from Google Filament: physically based materials and HDRI lighting, PointZ points as lit spheres, shadows, GTAO, TAA or FXAA, Filament's bloom and ACES, quality presets, 360 output. Examples in `examples/hq/` (FILE > Examples), with a tutorial for Attribute PointZ; notes in [docs/RENDER-3D-HQ-FILAMENT.md](docs/RENDER-3D-HQ-FILAMENT.md) |
 | **From upstream** | Delaunay Mesh, Voronoi Cells, Curve Ops, Decimate, Material bump (height map) and texture alpha, red-border warning on a 3D pin fed the wrong kind |
 
 ### Video and output

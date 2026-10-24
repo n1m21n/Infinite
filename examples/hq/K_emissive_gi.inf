@@ -1,0 +1,183 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 3DScene Geometry
+  uid 1
+  pos 0 0
+  flags 1 0 0 0 1 0
+  i shape 1
+  f posY 1.5
+  f posZ -2.2
+  f scaleX 12
+  f scaleY 3
+  f scaleZ 0.2
+  c color 0.8 0.8 0.8
+  f roughness 0.8
+end
+node 2 3DScene Geometry
+  uid 2
+  pos 0 508
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posY 0.6
+  f posZ -0.6
+  f scale 1.2
+  c color 0.05 0.05 0.05
+  f roughness 0.5
+  f emission 6
+  f posX -2.2
+  c emissionColor 1 0.45 0.1
+end
+node 3 3DScene Geometry
+  uid 3
+  pos 0 1016
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posY 0.6
+  f posZ -0.6
+  f scale 1.2
+  c color 0.05 0.05 0.05
+  f roughness 0.5
+  f emission 6
+  f posX 0
+  c emissionColor 0.1 0.7 1
+end
+node 4 3DScene Geometry
+  uid 4
+  pos 0 1524
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posY 0.6
+  f posZ -0.6
+  f scale 1.2
+  c color 0.05 0.05 0.05
+  f roughness 0.5
+  f emission 6
+  f posX 2.2
+  c emissionColor 1 0.2 0.7
+end
+node 5 PointZ Grid PointZ
+  uid 5
+  pos 0 2032
+  flags 1 0 0 0 1 0
+  f sizeX 6
+  f sizeY 0
+  f sizeZ 0
+  i rows 1
+  i cols 12
+  i orient 1
+  i kind 2
+  f centerY 0.15
+  f centerZ 1.2
+end
+node 6 PointZ Box PointZ
+  uid 6
+  pos 0 2558
+  flags 1 0 0 0 1 0
+end
+node 7 PointZ Instance PointZ
+  uid 7
+  pos 407 0
+  flags 1 0 0 0 1 0
+  f scale 0.3
+end
+node 8 3DScene Material
+  uid 8
+  pos 1080 0
+  flags 1 0 0 0 1 0
+  c color 0.05 0.05 0.05
+  f roughness 0.5
+  c emissionColor 1 0.85 0.5
+  f emission 4
+end
+node 9 3DScene Render 3D HQ
+  uid 9
+  pos 1925 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  i tonemap 1
+  f exposure 1
+  f envIntensity 0.15
+  b envAsBackground 0
+  c bg 0.02 0.02 0.03
+  b shadows 1
+  i shadowQuality 1
+  b ao 1
+  f aoRadius 0.6
+  b taa 1
+  f bloom 0.3
+  f bloomThreshold 1
+  b gi 1
+  f giIntensity 1.5
+  f giRadius 2
+end
+node 10 3DScene Camera
+  uid 10
+  pos 1080 699
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 8
+  f azimuth 90
+  f elevation 18
+  f targetX 0
+  f targetY 0.6
+  f targetZ 0
+  f orbitPerBeat 0
+end
+node 11 3DScene HDRI
+  uid 11
+  pos 1080 1257
+  flags 1 0 0 0 1 0
+  s path hq_media/studio.hdr
+  f intensity 0.15
+  f rotation 0
+end
+node 12 3DScene Light
+  uid 12
+  pos 1080 1739
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth -40
+  f elevation 50
+  c color 1 0.97 0.92
+  f intensity 0.2
+end
+node 13 3DScene Geometry
+  uid 13
+  pos 0 3006
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 14 3DScene Group 3D
+  uid 14
+  pos 407 951
+  flags 1 0 0 0 1 0
+end
+node 15 Output Output
+  uid 15
+  pos 2693 0
+  flags 1 0 0 0 1 0
+end
+geo 7 0 5
+geo 7 1 6
+geo 8 0 7
+geo 14 0 2
+geo 14 1 3
+geo 14 2 4
+geo 14 3 1
+geo 14 4 13
+geo 9 0 14
+geo 9 1 8
+geo 9 4 10
+geo 9 5 12
+cable 9 8 11
+cable 15 0 9
+transport 120 4 4 0 0

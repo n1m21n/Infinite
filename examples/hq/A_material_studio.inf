@@ -1,13 +1,11 @@
 infinite-patch 1
 # turbo-mod-range
-node 1 3DScene Render 3D
+node 1 3DScene Render 3D HQ
   uid 1
-  pos 1560 0
+  pos 1923 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
-  i renderMode 0
-  i samples 2
   b shadows 1
   i shadowQuality 1
   i tonemap 1
@@ -17,7 +15,7 @@ node 1 3DScene Render 3D
 end
 node 2 3DScene Camera
   uid 2
-  pos 1040 0
+  pos 1250 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
@@ -31,15 +29,15 @@ node 2 3DScene Camera
 end
 node 3 3DScene HDRI
   uid 3
-  pos 1040 560
+  pos 1250 558
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
+  s path hq_media/studio.hdr
   f intensity 1
   f rotation 0
 end
 node 4 3DScene Light
   uid 4
-  pos 1040 1120
+  pos 1250 1040
   flags 1 0 0 0 1 0
   i type 0
   f azimuth -40
@@ -49,7 +47,7 @@ node 4 3DScene Light
 end
 node 5 3DScene Group 3D
   uid 5
-  pos 1040 1680
+  pos 1250 1442
   flags 1 0 0 0 1 0
 end
 node 6 3DScene Geometry
@@ -66,7 +64,7 @@ node 6 3DScene Geometry
 end
 node 7 3DScene Geometry
   uid 7
-  pos 0 560
+  pos 0 508
   flags 1 0 0 0 1 0
   i shape 2
   f posX -3
@@ -78,7 +76,7 @@ node 7 3DScene Geometry
 end
 node 8 3DScene Geometry
   uid 8
-  pos 0 1120
+  pos 0 1016
   flags 1 0 0 0 1 0
   i shape 2
   f posX -1
@@ -90,7 +88,7 @@ node 8 3DScene Geometry
 end
 node 9 3DScene Geometry
   uid 9
-  pos 0 1680
+  pos 0 1524
   flags 1 0 0 0 1 0
   i shape 2
   f posX 1
@@ -103,7 +101,7 @@ node 9 3DScene Geometry
 end
 node 10 3DScene Geometry
   uid 10
-  pos 0 2240
+  pos 0 2032
   flags 1 0 0 0 1 0
   i shape 2
   f posX 3
@@ -117,7 +115,7 @@ node 10 3DScene Geometry
 end
 node 11 3DScene Geometry
   uid 11
-  pos 0 2800
+  pos 0 2540
   flags 1 0 0 0 1 0
   i shape 2
   f posX 5
@@ -129,7 +127,7 @@ node 11 3DScene Geometry
 end
 node 12 Source Texture
   uid 12
-  pos 0 3360
+  pos 0 3048
   flags 1 0 0 0 1 0
   i textureType 0
   f width 1024
@@ -138,7 +136,7 @@ node 12 Source Texture
 end
 node 13 3DScene Material
   uid 13
-  pos 520 0
+  pos 405 0
   flags 1 0 0 0 1 0
   c color 0.8 0.8 0.8
   f metallic 0
@@ -148,7 +146,7 @@ node 13 3DScene Material
 end
 node 14 3DScene Geometry
   uid 14
-  pos 0 3920
+  pos 0 3770
   flags 1 0 0 0 1 0
   i shape 1
   f scaleX 30
@@ -161,12 +159,12 @@ node 14 3DScene Geometry
 end
 node 15 Output Output
   uid 15
-  pos 2540 0
+  pos 2691 0
   flags 1 0 0 0 1 0
 end
 node 16 Modulators LFO
   uid 16
-  pos 1040 2240
+  pos 1250 1713
   flags 1 0 0 0 1 0
   i shape 2
   i rateMode 0

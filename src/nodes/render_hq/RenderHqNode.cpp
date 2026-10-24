@@ -62,6 +62,12 @@ namespace
    };
 }
 
+const std::vector<std::string>& RenderHqNode::PointStyleNames()
+{
+   static const std::vector<std::string> names = { "Spheres", "Dots" };
+   return names;
+}
+
 const std::vector<std::string>& RenderHqNode::PresetNames()
 {
    static const std::vector<std::string> names = { "Performance", "Balanced", "High", "Custom" };
@@ -129,6 +135,9 @@ void RenderHqNode::Cook360(HqFrame& f)
    f.outWidth = f.outHeight = 0;
    f.taa = false;
    f.reuseStill = false;
+   // 0.71.1: nor screen-space GI - each face would read the face drawn before
+   // it (another camera) as its last frame.
+   f.gi = false;
    f.proj = Mat4::Perspective((float)M_PI * 0.5f, 1.0f, nearPlane, farPlane);
    const Mat4 cameraView = f.view;
    mOut = 0;
@@ -304,6 +313,10 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.sharpness = std::clamp(sharpness, 0.0f, 1.0f);
    f.aoFullRes = aoFullRes;
    f.fxaa = fxaa;
+   f.dotPixels = pointStyle == 1 ? std::max(0.5f, dotSize) : 0.0f; // 0.71.1
+   f.gi = gi; // 0.71.1: screen-space GI
+   f.giIntensity = std::max(0.0f, giIntensity);
+   f.giRadius = std::max(0.05f, giRadius);
 
    if (panorama > 0) // S9: 360
    {

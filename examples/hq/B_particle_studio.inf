@@ -1,14 +1,12 @@
 infinite-patch 1
 # turbo-mod-range
-node 1 3DScene Render 3D
+node 1 3DScene Render 3D HQ
   uid 1
-  pos 1040 0
+  pos 863 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
-  i renderMode 0
-  i samples 2
-  b shadows 0
+  b shadows 1
   i shadowQuality 1
   i tonemap 1
   f exposure 1
@@ -17,33 +15,33 @@ node 1 3DScene Render 3D
 end
 node 2 3DScene Camera
   uid 2
-  pos 520 0
+  pos 407 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
-  f distance 10
+  f distance 9
   f azimuth -30
-  f elevation 25
+  f elevation 18
   f targetX 0
   f targetY 0
   f targetZ 0
-  f orbitPerBeat 0
+  f orbitPerBeat 0.03
 end
 node 3 3DScene Light
   uid 3
-  pos 520 560
+  pos 407 558
   flags 1 0 0 0 1 0
   i type 0
   f azimuth 90
-  f elevation 20
+  f elevation 12
   c color 1 0.97 0.92
   f intensity 3
 end
 node 4 3DScene HDRI
   uid 4
-  pos 520 1120
+  pos 407 960
   flags 1 0 0 0 1 0
-  s path ../hq_media/studio.hdr
+  s path hq_media/studio.hdr
   f intensity 0.6
   f rotation 0
 end
@@ -51,35 +49,49 @@ node 5 PointZ Grid PointZ
   uid 5
   pos 0 0
   flags 1 0 0 0 1 0
-  f sizeX 8
-  f sizeY 8
+  f sizeX 6
+  f sizeY 6
   f sizeZ 0
-  i rows 1000
-  i cols 1000
+  i rows 300
+  i cols 300
   i orient 1
   i kind 2
 end
 node 6 PointZ Noise PointZ
   uid 6
-  pos 520 1680
+  pos 407 1442
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
   i mode 0
-  f amp 0.8
+  f amp 0.6
   f freq 1.2
   b use4d 1
-  f speed 0.3
+  f speed 0
 end
-node 7 Output Output
+node 7 3DScene Geometry
   uid 7
-  pos 2020 0
+  pos 0 526
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 8 Output Output
+  uid 8
+  pos 1631 0
   flags 1 0 0 0 1 0
 end
 geo 6 0 5
 geo 1 0 6
+geo 1 1 7
 geo 1 4 2
 geo 1 5 3
 cable 1 8 4
-cable 7 0 1
+cable 8 0 1
 transport 120 4 4 0 0

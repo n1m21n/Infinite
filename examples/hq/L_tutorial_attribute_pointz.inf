@@ -1,0 +1,252 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 Compositing Comment
+  uid 1
+  pos 0 0
+  flags 1 0 0 0 1 0
+  s text ATTRIBUTE POINTZ - tutorial\n\nWrites one attribute on every point: a number, a vector or a colour. Add it from the node menu: PointZ > Attribute PointZ. Plug any PointZ in, and what comes out is the same points with that attribute set.\n\nSettings\n- attribute: the name to write. P (position), N (normal), Color, PScale (size), Scale (size per axis), Rotate (degrees), Tex (uv), PartVel... or a new name of your own (Height, Mask).\n- components: 1 = one number, 2 / 3 / 4 = a vector (x y z w = r g b a).\n- value: where it comes from -\n   constant: 'value' (and 'value (4th)' for the 4th component)\n   copy attribute: another attribute, 'source attribute'\n   index: the point number 0, 1, 2...\n   index 0..1: the same, spread from 0 to 1\n   expression: one GLSL expression, 'expression' (below)\n\nIn an expression you can read\n- every attribute the points already have, by name: P, N, Color, Tex, PScale, PartAge... (P.x, P.y, P.z or Color.r for one component)\n- id (this point's number), uCount (how many points), uTime (seconds since play), uBeat, uFrame, uDelta (seconds per frame), uSeed\n- GLSL: sin cos abs fract floor mod mix clamp smoothstep length distance dot normalize pow min max, vec2 / vec3 / vec4(...)\n- noise and random: gnoise(vec3) (-1..1), fbm(vec3, octaves, roughness), curl(vec3), hashi(id, seed) and hash3i(id, seed) (0..1 per point), hash11(x), hash31(vec3); PI, TAU\nOne expression, no ';' or '{'. Its size must match 'components': vec3(...) for 3.\n\nThe chain below: a 40 x 40 grid, Noise moves it, four Attribute PointZ shape the boxes that Instance PointZ puts on every point. Change the expressions and watch the render.
+  f width 760
+  f height 900
+  i fontSize 1
+  c color 0.55 0.8 0.95
+end
+node 2 PointZ Grid PointZ
+  uid 2
+  pos 0 1536
+  flags 1 0 0 0 1 0
+  f sizeX 6
+  f sizeY 6
+  f sizeZ 0
+  i rows 40
+  i cols 40
+  i orient 1
+  i kind 2
+end
+node 3 Compositing Comment
+  uid 3
+  pos 0 1173
+  flags 1 0 0 0 1 0
+  s text A grid of 40 x 40 points (output: points), lying flat (orientation XZ).
+  f width 380
+  f height 90
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 4 PointZ Noise PointZ
+  uid 4
+  pos 916 383
+  flags 1 0 0 0 1 0
+  s attrib P
+  i type 2
+  i mode 0
+  f amp 0.5
+  f freq 0.6
+  b use4d 1
+  f speed 0.25
+end
+node 5 Compositing Comment
+  uid 5
+  pos 916 0
+  flags 1 0 0 0 1 0
+  s text Noise PointZ moves P up and down over time: now every point has its own P.y for the expressions after it to use.
+  f width 380
+  f height 110
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 6 PointZ Attribute PointZ
+  uid 6
+  pos 1452 473
+  flags 1 0 0 0 1 0
+  s name PScale
+  i comps 1
+  i from 4
+  s expr 0.4 + abs(P.y) * 3.0
+end
+node 7 Compositing Comment
+  uid 7
+  pos 1452 0
+  flags 1 0 0 0 1 0
+  s text 1  attribute PScale, 1 component, expression:\n0.4 + abs(P.y) * 3.0\n\nThe higher (or lower) the point, the bigger its box. Try length(P.xz) * 0.6: bigger towards the edges.
+  f width 420
+  f height 200
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 8 PointZ Attribute PointZ
+  uid 8
+  pos 2028 473
+  flags 1 0 0 0 1 0
+  s name Scale
+  i comps 3
+  i from 4
+  s expr vec3(1.0, 1.0 + abs(P.y) * 4.0, 1.0)
+end
+node 9 Compositing Comment
+  uid 9
+  pos 2028 0
+  flags 1 0 0 0 1 0
+  s text 2  attribute Scale, 3 components:\nvec3(1.0, 1.0 + abs(P.y) * 4.0, 1.0)\n\nSize per axis: only Y stretches - columns. It multiplies PScale.
+  f width 420
+  f height 200
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 10 PointZ Attribute PointZ
+  uid 10
+  pos 2604 473
+  flags 1 0 0 0 1 0
+  s name Rotate
+  i comps 3
+  i from 4
+  s expr vec3(0.0, hashi(id, 1.0) * 360.0, 0.0)
+end
+node 11 Compositing Comment
+  uid 11
+  pos 2604 0
+  flags 1 0 0 0 1 0
+  s text 3  attribute Rotate, 3 components (degrees X Y Z):\nvec3(0.0, hashi(id, 1.0) * 360.0, 0.0)\n\nA random turn around Y per box. hashi(id, seed) gives each point its own number, the same every frame; change the seed for another pattern.
+  f width 420
+  f height 200
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 12 PointZ Attribute PointZ
+  uid 12
+  pos 3180 473
+  flags 1 0 0 0 1 0
+  s name Color
+  i comps 4
+  i from 4
+  s expr vec4(0.5 + 0.5 * sin(P.x * 2.0 + uTime), 0.35, 0.5 + 0.5 * cos(P.z * 2.0), 1.0)
+end
+node 13 Compositing Comment
+  uid 13
+  pos 3180 0
+  flags 1 0 0 0 1 0
+  s text 4  attribute Color, 4 components (r g b a):\nvec4(0.5 + 0.5 * sin(P.x * 2.0 + uTime), 0.35,\n     0.5 + 0.5 * cos(P.z * 2.0), 1.0)\n\nColour by position, moving with uTime (seconds).
+  f width 420
+  f height 200
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 14 PointZ Box PointZ
+  uid 14
+  pos 0 2062
+  flags 1 0 0 0 1 0
+end
+node 15 PointZ Instance PointZ
+  uid 15
+  pos 3756 443
+  flags 1 0 0 0 1 0
+  f scale 0.07
+end
+node 16 Compositing Comment
+  uid 16
+  pos 3756 0
+  flags 1 0 0 0 1 0
+  s text Instance PointZ draws the shape on input 2 (a box) at every point of input 1, and per point reads P (where), PScale (size), Scale (size per axis), Rotate (degrees), Color, Active (0 hides it) and N (aim, with 'aim along N'). 'scale' here multiplies them all.
+  f width 380
+  f height 170
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 17 3DScene Material
+  uid 17
+  pos 4410 353
+  flags 1 0 0 0 1 0
+  c color 1 1 1
+  f metallic 0
+  f roughness 0.35
+end
+node 18 Compositing Comment
+  uid 18
+  pos 4410 0
+  flags 1 0 0 0 1 0
+  s text Material: white, so the boxes show their own Color.
+  f width 380
+  f height 80
+  i fontSize 1
+  c color 0.95 0.85 0.45
+end
+node 19 3DScene Render 3D HQ
+  uid 19
+  pos 5255 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  i tonemap 1
+  f exposure 1
+  f envIntensity 0.8
+  b envAsBackground 1
+  b shadows 1
+  i shadowQuality 1
+  b ao 1
+  f aoRadius 0.5
+  b taa 1
+end
+node 20 3DScene Camera
+  uid 20
+  pos 4410 1052
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 9
+  f azimuth -35
+  f elevation 30
+  f targetX 0
+  f targetY 0.3
+  f targetZ 0
+  f orbitPerBeat 0.02
+end
+node 21 3DScene Light
+  uid 21
+  pos 4410 1610
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth -40
+  f elevation 40
+  c color 1 0.97 0.92
+  f intensity 2.5
+end
+node 22 3DScene HDRI
+  uid 22
+  pos 4410 2012
+  flags 1 0 0 0 1 0
+  s path hq_media/studio.hdr
+  f intensity 0.8
+  f rotation 0
+end
+node 23 3DScene Geometry
+  uid 23
+  pos 0 2510
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 24 Output Output
+  uid 24
+  pos 6023 0
+  flags 1 0 0 0 1 0
+end
+geo 4 0 2
+geo 6 0 4
+geo 8 0 6
+geo 10 0 8
+geo 12 0 10
+geo 15 0 12
+geo 15 1 14
+geo 17 0 15
+geo 19 0 17
+geo 19 1 23
+geo 19 4 20
+geo 19 5 21
+cable 19 8 22
+cable 24 0 19
+transport 120 4 4 0 0
