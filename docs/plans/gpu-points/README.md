@@ -1,6 +1,6 @@
 # GPU points (P8 phases 1-2): design and steps
 
-Status: built on `feature/p8-gpu-points` (started 2026-10-23, every step done 2026-10-24; not merged). Owner said go on the Mac
+Status: built on `feature/p8-gpu-points` (started 2026-10-23, every step done 2026-10-24; merged to main 2026-10-24). Owner said go on the Mac
 benchmark alone ("keep going, I don't have Ricardo's laptop", 2026-10-23); the Windows/fork runs
 are not waited for. Phase 3 (new nodes and modes) was approved by the owner on 2026-10-24 ("Start
 Phase 3"): 5a Displacement noise, 5b Feedback carries geometry, 5c Point Trails.
@@ -204,6 +204,28 @@ Frame p50 / p99 ms, fps p50, cook ms p50. Off = `INFINITE_GPU_POINTS=0` (the CPU
 - **Step 7 pays:** 200k particles 37-41 → 90-96 fps, 100k 40-63 → 94-108 fps, and the p99 drops
   from 50-118 ms to 15-18 ms (the CPU sim's cook, 4.5-9.7 ms, is gone: ~1 ms on the GPU).
 - 10k is the same either way (~120-135 fps): the frame is the rest of the render, not the sim.
+
+### B11 after Phase 3 (Mac14,7 Release universal, 1080p, 2026-10-24, one round each)
+
+Same binary, `INFINITE_GPU_POINTS=0` (off) against the default (on). Frame p50 / p99 ms, fps p50,
+cook ms p50.
+
+| Row | off | on |
+|---|---|---|
+| A video→points 57.6k | 15.39 / 29.61, 65, cook 4.04 | 9.79 / 15.45, 102, cook 0.45 |
+| A video→points 230k | 37.15 / 67.28, 27, cook 11.39 | 15.41 / 22.30, 65, cook 0.55 |
+| A video→points 262k | 37.08 / 59.96, 27, cook 11.99 | 16.11 / 37.31, 62, cook 2.16 |
+| B particles 10k | 7.99 / 13.09, 125, cook 0.69 | 6.41 / 8.64, 156, cook 0.68 |
+| B particles 100k | 15.92 / 21.51, 63, cook 3.28 | 9.40 / 10.50, 106, cook 0.96 |
+| B particles 200k | 26.07 / 40.91, 38, cook 10.05 | 11.19 / 16.04, 89, cook 0.81 |
+| C instanced cubes 10k | 11.51 / 17.56, 87, cook 0.87 | 10.82 / 14.64, 93, cook 1.61 |
+| C instanced cubes 100k | 33.43 / 58.88, 30, cook 5.23 | 36.08 / 40.97, 28, cook 9.63 |
+| D 57.6k (6.2M tris) | 308.50 / 483.56, 3.2 | 303.41 / 450.04, 3.3 |
+| D 230k (24.9M tris) | 1225.32 / 2189.93, 0.8 | 1134.04 / 1604.86, 0.9 |
+
+Phase 3 kept the earlier gains: A 2.4x at 230k and B 2.3x at 200k, as in steps 1-4 and 7. C and D
+are unchanged within noise (C 100k p99 is lower on, p50 a little higher). D is bound by triangle
+count, not by the points path.
 
 ## Step 8: Mesh to Points outputs GPU points (2026-10-24, dev build)
 
@@ -576,7 +598,7 @@ its tail either way.
 
 ## Handoff (2026-10-24)
 
-Commits on `feature/p8-gpu-points` (not merged, not pushed): 093bb6b6, 283f9757, a03c9dd0,
+Commits on `feature/p8-gpu-points` (merged to main 2026-10-24): 093bb6b6, 283f9757, a03c9dd0,
 7e2267c4, 45094715, 7656ee6e, dcbfc000 (5a), 80fbd3af (5b, Feedback 3D) and the 5c commit (Point
 Trails). Every step in this file is done.
 
@@ -586,5 +608,3 @@ Trails). Every step in this file is done.
 - Feedback 3D: the life attribute reads back as a fraction of a one-second life (see `ReadBack`).
 - Sketch 3D hangs `--describe` (seen while updating facts; not investigated).
 - Colour from an image (for points) is not shipped.
-- B11 numbers for Phase 3 have not been taken (dev build only).
-- To merge: the Pro merges `main` after the owner says so (`docs/plans/two-laptops/README.md`).
