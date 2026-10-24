@@ -21,6 +21,15 @@ int main(int argc, char** argv)
    if (argc < 2)
       return 1;
 
+   // Parent's health check: proves this exe launches and can write to the
+   // pipe, without touching any plugin.
+   if (std::strcmp(argv[1], "--selftest") == 0)
+   {
+      std::printf("@ok\n");
+      std::fflush(stdout);
+      return 0;
+   }
+
    auto sanitize = [](std::string s)
    {
       for (char& c : s)
