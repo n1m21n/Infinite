@@ -1624,3 +1624,7 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	在下一个量化点停止所有正在播放的片段
 Session at Bottom	会话置于底部
 Session at Top	会话置于顶部
+Play Notes	弹奏音符
+Keyboard Octave	键盘八度
+With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing	鼠标悬停在 Keyboard 节点上(或它是唯一选中项)且勾选 numpad 时,字母行可弹奏音符:Z 行为低八度,Q 行为高八度。Shift、Ctrl、Cmd 或 Alt 加字母不会发声
+Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)	降低或升高鼠标所在 Keyboard 节点的八度(规则同弹奏音符)

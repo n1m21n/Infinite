@@ -1624,3 +1624,7 @@ Select a clip without launching it, for copy and paste. A click on an empty cell
 Stop every playing clip at the next quantize point	再生中のすべてのクリップを次のクオンタイズ位置で停止
 Session at Bottom	セッションを下に配置
 Session at Top	セッションを上に配置
+Play Notes	ノートを演奏
+Keyboard Octave	キーボードのオクターブ
+With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing	マウスが Keyboard ノードの上にある(または唯一の選択である)状態で numpad にチェックを入れると、文字キーの行で演奏できます。Z の行は低いオクターブ、Q の行は高いオクターブです。Shift、Ctrl、Cmd、Alt と文字キーの組み合わせでは鳴りません
+Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)	マウスが乗っている Keyboard ノードのオクターブを下げる/上げる(ノートを演奏と同じ条件)
