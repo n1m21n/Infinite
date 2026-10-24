@@ -1,0 +1,42 @@
+name: Attach release assets
+
+# Copies the Windows zips and the Linux AppImage from a finished Build run onto a release, on GitHub's
+# servers, so a slow connection on the releasing machine does not matter. Run it once the Build is green.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Build run to take the artifacts from
+        required: true
+      tag:
+        description: Release tag (the release may still be a draft)
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download artifacts
+        run: |
+          mkdir dl
+          for a in Infinite-windows-x64 Infinite-windows-ARM64 Infinite-x86_64.AppImage; do
+            gh run download "${{ inputs.run_id }}" -n "$a" -D "dl/$a"
+          done
+      - name: Zip the Windows builds
+        run: |
+          for arch in x64 ARM64; do
+            mkdir -p "stage-$arch/Infinite"
+            cp -R "dl/Infinite-windows-$arch"/. "stage-$arch/Infinite/"
+            (cd "stage-$arch" && zip -qr "../Infinite-windows-$arch.zip" Infinite)
+          done
+      - name: Upload to the release
+        run: |
+          gh release upload "${{ inputs.tag }}" Infinite-windows-x64.zip Infinite-windows-ARM64.zip \
+            dl/Infinite-x86_64.AppImage/Infinite-x86_64.AppImage --clobber
