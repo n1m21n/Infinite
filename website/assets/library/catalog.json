@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 215,
+ "count": 229,
  "items": [
   {
    "id": "first-sound",
@@ -494,6 +494,54 @@
    "file": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.webp",
    "page": "https://infinitedevices.org/library/dimension-spatial-chorus-fx.html"
+  },
+  {
+   "id": "spectral-drone-synth",
+   "name": "Spectral Drone Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-drone-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/spectral-drone-synth.webp",
+   "page": "https://infinitedevices.org/library/spectral-drone-synth.html"
+  },
+  {
+   "id": "resonant-brass-synth",
+   "name": "Resonant Brass Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/resonant-brass-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/resonant-brass-synth.webp",
+   "page": "https://infinitedevices.org/library/resonant-brass-synth.html"
+  },
+  {
+   "id": "biquad-morph-filter-fx",
+   "name": "Biquad Morph Filter FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.webp",
+   "page": "https://infinitedevices.org/library/biquad-morph-filter-fx.html"
+  },
+  {
+   "id": "harmonic-tremolo-panner-fx",
+   "name": "Harmonic Tremolo Panner FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.webp",
+   "page": "https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -2582,6 +2630,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/magnetar-quantum-flux.field",
    "preview": "https://infinitedevices.org/assets/library/previews/magnetar-quantum-flux.jpg",
    "page": "https://infinitedevices.org/library/magnetar-quantum-flux.html"
+  },
+  {
+   "id": "riemann-zeta-spiral",
+   "name": "Riemann Zeta Spiral",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Polar Dirichlet and Riemann zeta spiral harmonics with continuous critical-strip phase rotation and harmonic orbital nodes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/riemann-zeta-spiral.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/riemann-zeta-spiral.jpg",
+   "page": "https://infinitedevices.org/library/riemann-zeta-spiral.html"
+  },
+  {
+   "id": "cayley-hyperbolic-tree",
+   "name": "Cayley Hyperbolic Tree",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincaré plane with branching nodes and radial breathing.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/cayley-hyperbolic-tree.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/cayley-hyperbolic-tree.jpg",
+   "page": "https://infinitedevices.org/library/cayley-hyperbolic-tree.html"
+  },
+  {
+   "id": "pseudosphere-tractroid-3d",
+   "name": "Pseudosphere Tractroid 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Constant negative Gaussian curvature tractroid surface with parametric meridian ribs and orbiting equatorial satellites.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/pseudosphere-tractroid-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/pseudosphere-tractroid-3d.jpg",
+   "page": "https://infinitedevices.org/library/pseudosphere-tractroid-3d.html"
+  },
+  {
+   "id": "kummer-surface-3d",
+   "name": "Kummer Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Quartic Kummer nodal surface featuring 16 double points, tetrahedral geometric symmetry, and glowing nodal rings.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/kummer-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/kummer-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/kummer-surface-3d.html"
+  },
+  {
+   "id": "spectral-drone-synth",
+   "name": "Spectral Drone Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-drone-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/spectral-drone-synth.jpg",
+   "page": "https://infinitedevices.org/library/spectral-drone-synth.html"
+  },
+  {
+   "id": "resonant-brass-synth",
+   "name": "Resonant Brass Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/resonant-brass-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/resonant-brass-synth.jpg",
+   "page": "https://infinitedevices.org/library/resonant-brass-synth.html"
+  },
+  {
+   "id": "biquad-morph-filter-fx",
+   "name": "Biquad Morph Filter FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/biquad-morph-filter-fx.jpg",
+   "page": "https://infinitedevices.org/library/biquad-morph-filter-fx.html"
+  },
+  {
+   "id": "harmonic-tremolo-panner-fx",
+   "name": "Harmonic Tremolo Panner FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/harmonic-tremolo-panner-fx.jpg",
+   "page": "https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html"
+  },
+  {
+   "id": "stellar-nursery-nebula",
+   "name": "Stellar Nursery Nebula",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Volumetric turbulent cosmic gas cloud with newborn star clusters and ionization fronts. Bass compresses the dense core, mids wave the gas filaments, highs ignite coronal sparks.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/stellar-nursery-nebula.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/stellar-nursery-nebula.jpg",
+   "page": "https://infinitedevices.org/library/stellar-nursery-nebula.html"
+  },
+  {
+   "id": "quantum-chromodynamic-lattice",
+   "name": "Quantum Chromodynamic Lattice",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/quantum-chromodynamic-lattice.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/quantum-chromodynamic-lattice.jpg",
+   "page": "https://infinitedevices.org/library/quantum-chromodynamic-lattice.html"
   }
  ]
 }

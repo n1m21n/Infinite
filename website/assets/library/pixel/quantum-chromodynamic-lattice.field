@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Quantum Chromodynamic Lattice",
+    "author": "Infinite",
+    "description": "4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float latticeScale = 12.0 [4.0, 24.0];\nparam float fluxStrength = 1.6 [0.2, 3.5];\nparam float instantonWarp = 0.45 [0.0, 1.0];\nparam float gluonSpeed = 1.2 [0.1, 4.0];\nparam float confinement = 0.82 [0.1, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\n\ngrid = fract(p * latticeScale + t * gluonSpeed * 0.1) - 0.5;\ngridDist = min(abs(grid.x), abs(grid.y));\n\nang = atan2(p.y, p.x);\nvortex = sin(4.0 * ang - t * gluonSpeed * 2.0 + r * 14.0 * instantonWarp);\n\nflux = exp(-gridDist * 16.0 * confinement) * fluxStrength;\nnodeGlow = exp(-length(grid) * 12.0) * (1.2 + 0.5 * vortex);\n\ncGround = vec3(0.082, 0.098, 0.188);\ncSignal = vec3(0.655, 0.694, 1.0);\ncEmber = vec3(1.0, 0.42, 0.21);\ncEmerald = vec3(0.306, 0.949, 0.722);\n\ncolorField = mix(cSignal, cEmerald, 0.5 + 0.5 * sin(t * gluonSpeed + r * 6.0));\ncolorField = mix(colorField, cEmber, 0.5 + 0.5 * vortex);\n\ncol = cGround + colorField * flux + (cEmber * 0.7 + vec3(1.0) * 0.3) * nodeGlow;\nalpha = 1.0;\n",
+    "params": {
+      "latticeScale": 12.0,
+      "fluxStrength": 1.6,
+      "instantonWarp": 0.45,
+      "gluonSpeed": 1.2,
+      "confinement": 0.82
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

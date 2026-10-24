@@ -1,0 +1,47 @@
+infinite-patch 1
+# Harmonic Tremolo Panner FX: dual-band crossover harmonic tremolo
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id tape
+  pos 1020 1024
+  s code param float rate = 3.2 [0.2, 12.0]\nparam float depth = 0.78 [0.0, 1.0]\nparam float crossover = 650.0 [150.0, 2500.0]\nparam float drive = 1.5 [1.0, 4.0]\nparam float mix = 0.95 [0.0, 1.0]\nstate float lfoP = 0\nstate float lp = 0\n\nlfoP = (lfoP + rate / sr) % 1.0\nlfoLow = 0.5 + 0.5 * sin(6.2831853 * lfoP) * depth\nlfoHigh = 0.5 - 0.5 * sin(6.2831853 * lfoP) * depth\n\nu = in * drive\nsat = u / (1.0 + abs(u) * 0.25)\n\nfCross = clamp(crossover / sr * 2.2, 0.005, 0.44)\nlp = lp + fCross * (sat - lp)\nhp = sat - lp\n\nwet = lp * lfoLow * 1.35 + hp * lfoHigh * 1.35\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Harmonic Tremolo Panner FX. Dual-band crossover with anti-phase high/low modulation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud tape 0 synth
+aud speakers 0 tape
+aud ana 0 tape
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

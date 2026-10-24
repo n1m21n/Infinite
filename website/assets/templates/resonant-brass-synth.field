@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Resonant Brass Synth",
+    "author": "Infinite",
+    "description": "Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float brightness = 2800.0 [200.0, 9000.0];\nparam float lipTension = 0.75 [0.1, 1.0];\nparam float growl = 0.35 [0.0, 1.0];\nparam float decay = 0.45 [0.05, 1.5];\nparam float bellFlare = 1.6 [0.5, 4.0];\nstate float phase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float s1 = 0;\nstate float s2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.01);\nenv = if(target > env, env + (target - env) * 0.06, env - env * decayRate);\n\npStep = clamp(freq, 30.0, 3500.0) / sr;\nphase = (phase + pStep) % 1.0;\nsubPhase = (subPhase + pStep * 0.5) % 1.0;\n\nsaw = 2.0 * phase - 1.0;\nreed = saw - saw * saw * saw * 0.33 * lipTension;\ngr = sin(6.2831853 * subPhase) * growl * 0.4;\nu = (reed + gr) * bellFlare;\n\nsat = u / (1.0 + abs(u) * 0.35);\nfCut = clamp((brightness + env * 3500.0) / sr * 2.2, 0.005, 0.42);\ns1 = s1 + fCut * (sat - s1);\ns2 = s2 + fCut * (s1 - s2);\n\nout = s2 * env * 0.42;\n",
+    "params": {
+      "brightness": 2800.0,
+      "lipTension": 0.75,
+      "growl": 0.35,
+      "decay": 0.45,
+      "bellFlare": 1.6
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

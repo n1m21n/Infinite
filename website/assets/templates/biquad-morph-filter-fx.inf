@@ -1,0 +1,47 @@
+infinite-patch 1
+# Biquad Morph Filter FX: continuous state-variable filter morphing
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id tape
+  pos 1020 1024
+  s code param float cutoff = 1600.0 [60.0, 12000.0]\nparam float resonance = 0.82 [0.0, 0.98]\nparam float morph = 0.25 [0.0, 1.0]\nparam float drive = 2.2 [1.0, 6.0]\nparam float lfoRate = 0.65 [0.05, 8.0]\nparam float mix = 0.9 [0.0, 1.0]\nstate float lfoP = 0\nstate float s1 = 0\nstate float s2 = 0\n\nlfoP = (lfoP + lfoRate / sr) % 1.0\nlfoMod = sin(6.2831853 * lfoP) * 0.35\n\nf = clamp((cutoff * (1.0 + lfoMod)) / sr * 2.2, 0.005, 0.44)\nq = 1.0 - resonance * 0.95\n\nu = in * drive\nsat = u / (1.0 + abs(u) * 0.28)\n\nhp = sat - s1 * q - s2\nbp = s1 + f * hp\nlp = s2 + f * bp\ns1 = bp\ns2 = lp\nnotch = hp + lp\n\nm = morph * 3.0\nwLP = clamp(1.0 - m, 0.0, 1.0)\nwBP = clamp(1.0 - abs(m - 1.0), 0.0, 1.0)\nwNotch = clamp(1.0 - abs(m - 2.0), 0.0, 1.0)\nwHP = clamp(m - 2.0, 0.0, 1.0)\n\nwet = lp * wLP + bp * wBP + notch * wNotch + hp * wHP\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Biquad Morph Filter FX. Continuous state-variable filter morphing LP-BP-Notch-HP.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud tape 0 synth
+aud speakers 0 tape
+aud ana 0 tape
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

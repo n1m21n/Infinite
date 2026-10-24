@@ -469,7 +469,7 @@ namespace app
          if (hit >= 0) onSelect(hit);
       };
       auto paletteRGB = [](int i) {
-         return i == 0 ? ImVec4(0.0f, 0.0f, 0.0f, 0.0f) : ImGui::ColorConvertU32ToFloat4(kArrangePalette[i].col);
+         return i == 0 ? ImVec4{} : ImGui::ColorConvertU32ToFloat4(kArrangePalette[i].col);
       };
 
       if (clip != nullptr)

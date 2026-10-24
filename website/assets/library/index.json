@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "Rössler Attractor",
+      "name": "R\u00f6ssler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "Möbius Strip 3D",
+      "name": "M\u00f6bius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2100,7 +2100,7 @@
         "minimal-surface",
         "topology"
       ],
-      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting M\u00f6bius band topology and Neil's parabola boundary.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2235,7 +2235,7 @@
         "Audio-Reactive",
         "Tessellation"
       ],
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -2284,7 +2284,7 @@
     },
     {
       "id": "plucker-conoid-3d",
-      "name": "Plücker's Conoid 3D",
+      "name": "Pl\u00fccker's Conoid 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -2438,7 +2438,7 @@
     },
     {
       "id": "hyperbolic-poincare-disk",
-      "name": "Hyperbolic Poincaré Disk",
+      "name": "Hyperbolic Poincar\u00e9 Disk",
       "kind": "Generator",
       "tags": [
         "hyperbolic",
@@ -2446,7 +2446,7 @@
         "geometry",
         "poincare"
       ],
-      "description": "Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
+      "description": "Conformal Poincar\u00e9 disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
       "domain": "sketch",
       "category": "Sketch",
       "params": 7,
@@ -2598,7 +2598,7 @@
         "Audio-Reactive",
         "Colour"
       ],
-      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
+      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
       "domain": "pixel",
       "category": "Pixel",
       "params": 5,
@@ -2625,6 +2625,197 @@
       "price": 0,
       "preview": "assets/library/previews/magnetar-quantum-flux.jpg",
       "bytes": 2279
+    },
+    {
+      "id": "riemann-zeta-spiral",
+      "name": "Riemann Zeta Spiral",
+      "kind": "Generator",
+      "tags": [
+        "math",
+        "zeta",
+        "spiral",
+        "harmonics"
+      ],
+      "description": "Polar Dirichlet and Riemann zeta spiral harmonics with continuous critical-strip phase rotation and harmonic orbital nodes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/riemann-zeta-spiral.js",
+      "preview": "assets/library/previews/riemann-zeta-spiral.jpg",
+      "bytes": 2528
+    },
+    {
+      "id": "cayley-hyperbolic-tree",
+      "name": "Cayley Hyperbolic Tree",
+      "kind": "Generator",
+      "tags": [
+        "fractal",
+        "hyperbolic",
+        "tree",
+        "geometry"
+      ],
+      "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincar\u00e9 plane with branching nodes and radial breathing.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/cayley-hyperbolic-tree.js",
+      "preview": "assets/library/previews/cayley-hyperbolic-tree.jpg",
+      "bytes": 3999
+    },
+    {
+      "id": "pseudosphere-tractroid-3d",
+      "name": "Pseudosphere Tractroid 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "hyperbolic",
+        "surface"
+      ],
+      "description": "Constant negative Gaussian curvature tractroid surface with parametric meridian ribs and orbiting equatorial satellites.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/pseudosphere-tractroid-3d.js",
+      "preview": "assets/library/previews/pseudosphere-tractroid-3d.jpg",
+      "bytes": 2828
+    },
+    {
+      "id": "kummer-surface-3d",
+      "name": "Kummer Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "algebraic",
+        "nodal"
+      ],
+      "description": "Quartic Kummer nodal surface featuring 16 double points, tetrahedral geometric symmetry, and glowing nodal rings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/kummer-surface-3d.js",
+      "preview": "assets/library/previews/kummer-surface-3d.jpg",
+      "bytes": 2551
+    },
+    {
+      "id": "spectral-drone-synth",
+      "name": "Spectral Drone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "drone",
+        "additive",
+        "dsp"
+      ],
+      "description": "Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/spectral-drone-synth.inf",
+      "preview": "assets/library/previews/spectral-drone-synth.jpg",
+      "bytes": 1769
+    },
+    {
+      "id": "resonant-brass-synth",
+      "name": "Resonant Brass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "brass",
+        "physical-modeling",
+        "dsp"
+      ],
+      "description": "Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/resonant-brass-synth.inf",
+      "preview": "assets/library/previews/resonant-brass-synth.jpg",
+      "bytes": 1761
+    },
+    {
+      "id": "biquad-morph-filter-fx",
+      "name": "Biquad Morph Filter FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "filter",
+        "morph",
+        "dsp"
+      ],
+      "description": "Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/biquad-morph-filter-fx.inf",
+      "preview": "assets/library/previews/biquad-morph-filter-fx.jpg",
+      "bytes": 1747
+    },
+    {
+      "id": "harmonic-tremolo-panner-fx",
+      "name": "Harmonic Tremolo Panner FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "tremolo",
+        "modulation",
+        "panner",
+        "dsp"
+      ],
+      "description": "Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/harmonic-tremolo-panner-fx.inf",
+      "preview": "assets/library/previews/harmonic-tremolo-panner-fx.jpg",
+      "bytes": 1480
+    },
+    {
+      "id": "stellar-nursery-nebula",
+      "name": "Stellar Nursery Nebula",
+      "kind": "Generator",
+      "tags": [
+        "Space",
+        "Nebula",
+        "Volumetric",
+        "Noise"
+      ],
+      "description": "Volumetric turbulent cosmic gas cloud with newborn star clusters and ionization fronts. Bass compresses the dense core, mids wave the gas filaments, highs ignite coronal sparks.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/stellar-nursery-nebula.field",
+      "preview": "assets/library/previews/stellar-nursery-nebula.jpg",
+      "bytes": 1798
+    },
+    {
+      "id": "quantum-chromodynamic-lattice",
+      "name": "Quantum Chromodynamic Lattice",
+      "kind": "Generator",
+      "tags": [
+        "Quantum",
+        "Lattice",
+        "Vortex",
+        "Grid"
+      ],
+      "description": "4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/quantum-chromodynamic-lattice.field",
+      "preview": "assets/library/previews/quantum-chromodynamic-lattice.jpg",
+      "bytes": 1650
     }
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Biquad Morph Filter FX",
+    "author": "Infinite",
+    "description": "Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float cutoff = 1600.0 [60.0, 12000.0];\nparam float resonance = 0.82 [0.0, 0.98];\nparam float morph = 0.25 [0.0, 1.0];\nparam float drive = 2.2 [1.0, 6.0];\nparam float lfoRate = 0.65 [0.05, 8.0];\nparam float mix = 0.9 [0.0, 1.0];\nstate float lfoP = 0;\nstate float s1 = 0;\nstate float s2 = 0;\n\nlfoP = (lfoP + lfoRate / sr) % 1.0;\nlfoMod = sin(6.2831853 * lfoP) * 0.35;\n\nf = clamp((cutoff * (1.0 + lfoMod)) / sr * 2.2, 0.005, 0.44);\nq = 1.0 - resonance * 0.95;\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.28);\n\nhp = sat - s1 * q - s2;\nbp = s1 + f * hp;\nlp = s2 + f * bp;\ns1 = bp;\ns2 = lp;\nnotch = hp + lp;\n\nm = morph * 3.0;\nwLP = clamp(1.0 - m, 0.0, 1.0);\nwBP = clamp(1.0 - abs(m - 1.0), 0.0, 1.0);\nwNotch = clamp(1.0 - abs(m - 2.0), 0.0, 1.0);\nwHP = clamp(m - 2.0, 0.0, 1.0);\n\nwet = lp * wLP + bp * wBP + notch * wNotch + hp * wHP;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "cutoff": 1600.0,
+      "resonance": 0.82,
+      "morph": 0.25,
+      "drive": 2.2,
+      "lfoRate": 0.65,
+      "mix": 0.9
+    },
+    "nodeSettings": {}
+  }
+}

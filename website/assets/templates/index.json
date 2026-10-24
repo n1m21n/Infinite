@@ -657,6 +657,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "spectral-drone-synth",
+      "name": "Spectral Drone Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation.",
+      "price": 0,
+      "preview": "assets/templates/spectral-drone-synth.webp",
+      "file": "assets/templates/spectral-drone-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "resonant-brass-synth",
+      "name": "Resonant Brass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance.",
+      "price": 0,
+      "preview": "assets/templates/resonant-brass-synth.webp",
+      "file": "assets/templates/resonant-brass-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "biquad-morph-filter-fx",
+      "name": "Biquad Morph Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance.",
+      "price": 0,
+      "preview": "assets/templates/biquad-morph-filter-fx.webp",
+      "file": "assets/templates/biquad-morph-filter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "harmonic-tremolo-panner-fx",
+      "name": "Harmonic Tremolo Panner FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response.",
+      "price": 0,
+      "preview": "assets/templates/harmonic-tremolo-panner-fx.webp",
+      "file": "assets/templates/harmonic-tremolo-panner-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

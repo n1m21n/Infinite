@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Drone Synth",
+    "author": "Infinite",
+    "description": "Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 2400.0 [100.0, 8000.0];\nparam float detune = 0.035 [0.001, 0.15];\nparam float morph = 0.45 [0.0, 1.0];\nparam float drive = 1.8 [1.0, 5.0];\nparam float warmth = 0.72 [0.0, 1.0];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float p3 = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nenv = if(target > env, env + (target - env) * 0.02, env - env * 0.0003);\n\nbaseFreq = clamp(freq, 20.0, 3000.0) / sr;\np1 = (p1 + baseFreq) % 1.0;\np2 = (p2 + baseFreq * (1.0 + detune)) % 1.0;\np3 = (p3 + baseFreq * (1.0 - detune)) % 1.0;\n\ns1 = sin(6.2831853 * p1);\ns2 = sin(6.2831853 * p2);\ns3 = sin(6.2831853 * p3);\n\ncheb = 2.0 * s1 * s1 - 1.0;\nraw = (s1 * 0.5 + s2 * 0.3 + s3 * 0.2) * (1.0 - morph) + cheb * morph;\n\nfCut = clamp(cutoff / sr * 2.4, 0.005, 0.42);\nu = raw * drive;\nsat = u / (1.0 + abs(u) * 0.3);\nlp = lp + fCut * (sat - lp);\n\nout = lp * env * (0.35 + warmth * 0.25);\n",
+    "params": {
+      "cutoff": 2400.0,
+      "detune": 0.035,
+      "morph": 0.45,
+      "drive": 1.8,
+      "warmth": 0.72
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

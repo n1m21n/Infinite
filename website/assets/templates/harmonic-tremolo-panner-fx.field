@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Harmonic Tremolo Panner FX",
+    "author": "Infinite",
+    "description": "Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rate = 3.2 [0.2, 12.0];\nparam float depth = 0.78 [0.0, 1.0];\nparam float crossover = 650.0 [150.0, 2500.0];\nparam float drive = 1.5 [1.0, 4.0];\nparam float mix = 0.95 [0.0, 1.0];\nstate float lfoP = 0;\nstate float lp = 0;\n\nlfoP = (lfoP + rate / sr) % 1.0;\nlfoLow = 0.5 + 0.5 * sin(6.2831853 * lfoP) * depth;\nlfoHigh = 0.5 - 0.5 * sin(6.2831853 * lfoP) * depth;\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.25);\n\nfCross = clamp(crossover / sr * 2.2, 0.005, 0.44);\nlp = lp + fCross * (sat - lp);\nhp = sat - lp;\n\nwet = lp * lfoLow * 1.35 + hp * lfoHigh * 1.35;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "rate": 3.2,
+      "depth": 0.78,
+      "crossover": 650.0,
+      "drive": 1.5,
+      "mix": 0.95
+    },
+    "nodeSettings": {}
+  }
+}

@@ -82,6 +82,10 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Analog Supershape Pad Synth](https://infinitedevices.org/library/analog-supershape-pad-synth.html): Polyphonic pad synthesizer with 3 detuned cores, supershape wavefolding, and 4-pole diode filter. (file: https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf)
 - [Multiband Tape Saturator FX](https://infinitedevices.org/library/multiband-tape-saturator-fx.html): Three-band crossover tape saturator with low-end magnetic head hysteresis and dynamic tape bias. (file: https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf)
 - [Dimension Spatial Chorus FX](https://infinitedevices.org/library/dimension-spatial-chorus-fx.html): Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation and spatial diffusion. (file: https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf)
+- [Spectral Drone Synth](https://infinitedevices.org/library/spectral-drone-synth.html): Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation. (file: https://infinitedevices.org/assets/templates/spectral-drone-synth.inf)
+- [Resonant Brass Synth](https://infinitedevices.org/library/resonant-brass-synth.html): Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance. (file: https://infinitedevices.org/assets/templates/resonant-brass-synth.inf)
+- [Biquad Morph Filter FX](https://infinitedevices.org/library/biquad-morph-filter-fx.html): Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance. (file: https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf)
+- [Harmonic Tremolo Panner FX](https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html): Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response. (file: https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf)
 
 ## Library: Community
 
@@ -163,6 +167,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Chromatic Quasicrystal](https://infinitedevices.org/library/chromatic-quasicrystal.html): Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance. (file: https://infinitedevices.org/assets/library/pixel/chromatic-quasicrystal.field)
 - [Hyperbolic Disk Fractal](https://infinitedevices.org/library/hyperbolic-disk-fractal.html): Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices. (file: https://infinitedevices.org/assets/library/pixel/hyperbolic-disk-fractal.field)
 - [Magnetar Quantum Flux](https://infinitedevices.org/library/magnetar-quantum-flux.html): Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation. (file: https://infinitedevices.org/assets/library/pixel/magnetar-quantum-flux.field)
+- [Stellar Nursery Nebula](https://infinitedevices.org/library/stellar-nursery-nebula.html): Volumetric turbulent cosmic gas cloud with newborn star clusters and ionization fronts. Bass compresses the dense core, mids wave the gas filaments, highs ignite coronal sparks. (file: https://infinitedevices.org/assets/library/pixel/stellar-nursery-nebula.field)
+- [Quantum Chromodynamic Lattice](https://infinitedevices.org/library/quantum-chromodynamic-lattice.html): 4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations. (file: https://infinitedevices.org/assets/library/pixel/quantum-chromodynamic-lattice.field)
 
 ## Library: Sketch
 
@@ -196,6 +202,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Apollonian Gasket](https://infinitedevices.org/library/apollonian-gasket.html): Fractal circle packing governed by the Descartes Circle Theorem with conformal phase pulsation and iridescent brand strokes. (file: https://infinitedevices.org/assets/library/sketch/apollonian-gasket.js)
 - [Hyperbolic Poincaré Disk](https://infinitedevices.org/library/hyperbolic-poincare-disk.html): Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric. (file: https://infinitedevices.org/assets/library/sketch/hyperbolic-poincare-disk.js)
 - [Chladni Plate Harmonics](https://infinitedevices.org/library/chladni-plate-harmonics.html): Ernst Chladni acoustic nodal patterns on a vibrating square plate with dynamic modal indices and wandering sand quanta. (file: https://infinitedevices.org/assets/library/sketch/chladni-plate-harmonics.js)
+- [Riemann Zeta Spiral](https://infinitedevices.org/library/riemann-zeta-spiral.html): Polar Dirichlet and Riemann zeta spiral harmonics with continuous critical-strip phase rotation and harmonic orbital nodes. (file: https://infinitedevices.org/assets/library/sketch/riemann-zeta-spiral.js)
+- [Cayley Hyperbolic Tree](https://infinitedevices.org/library/cayley-hyperbolic-tree.html): Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincaré plane with branching nodes and radial breathing. (file: https://infinitedevices.org/assets/library/sketch/cayley-hyperbolic-tree.js)
 
 ## Library: Sketch 3D
 
@@ -224,6 +232,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Seifert Surface 3D](https://infinitedevices.org/library/seifert-surface-3d.html): Orientable topological Seifert surface spanning a knotted boundary with dynamic ribbon twists and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/seifert-surface-3d.js)
 - [Gyroid Minimal Surface 3D](https://infinitedevices.org/library/gyroid-minimal-surface-3d.html): Alan Schoen triply periodic minimal surface with interwoven enantiomorph labyrinth channels and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/gyroid-minimal-surface-3d.js)
 - [Villarceau Circles 3D](https://infinitedevices.org/library/villarceau-circles-3d.html): Yvon Villarceau bitangent diagonal circle families on a torus corresponding to the Hopf fibration fiber bundles. (file: https://infinitedevices.org/assets/library/sketch/villarceau-circles-3d.js)
+- [Pseudosphere Tractroid 3D](https://infinitedevices.org/library/pseudosphere-tractroid-3d.html): Constant negative Gaussian curvature tractroid surface with parametric meridian ribs and orbiting equatorial satellites. (file: https://infinitedevices.org/assets/library/sketch/pseudosphere-tractroid-3d.js)
+- [Kummer Surface 3D](https://infinitedevices.org/library/kummer-surface-3d.html): Quartic Kummer nodal surface featuring 16 double points, tetrahedral geometric symmetry, and glowing nodal rings. (file: https://infinitedevices.org/assets/library/sketch/kummer-surface-3d.js)
 
 ## Library: Synths
 
@@ -252,6 +262,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Spectral Additive Organ Synth](https://infinitedevices.org/library/spectral-additive-organ-synth.html): Additive tonewheel organ synthesizer with five harmonic drawbars, percussive key-click transient attack and warm saturation. (file: https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf)
 - [Inharmonic Chime Synth](https://infinitedevices.org/library/inharmonic-chime-synth.html): Metallic chime and acoustic bell physical synthesis using 6 Bessel-zero plate modes, strike transient, and high-frequency air absorption. (file: https://infinitedevices.org/assets/templates/inharmonic-chime-synth.inf)
 - [Analog Supershape Pad Synth](https://infinitedevices.org/library/analog-supershape-pad-synth.html): Polyphonic pad synthesizer with 3 detuned polyphonic oscillator cores, Gielis supershape wave-folding, and a 4-pole diode filter. (file: https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf)
+- [Spectral Drone Synth](https://infinitedevices.org/library/spectral-drone-synth.html): Multi-timbral additive drone synthesizer with 8 Chebyshev partials, microtonal detune drift, and non-linear tape saturation. (file: https://infinitedevices.org/assets/templates/spectral-drone-synth.inf)
+- [Resonant Brass Synth](https://infinitedevices.org/library/resonant-brass-synth.html): Physical modeling acoustic brass synthesizer with non-linear lip-reed valve oscillation and variable bell acoustic impedance. (file: https://infinitedevices.org/assets/templates/resonant-brass-synth.inf)
 
 ## Library: Audio Effects
 
@@ -280,6 +292,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Tube Preamp Overdrive FX](https://infinitedevices.org/library/tube-preamp-overdrive-fx.html): Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag, warm harmonic saturation and tone tilt. (file: https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf)
 - [Multiband Tape Saturator FX](https://infinitedevices.org/library/multiband-tape-saturator-fx.html): Three-band crossover tape saturator with low-end magnetic head hysteresis, even/odd harmonic drive, and dynamic tape bias. (file: https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf)
 - [Dimension Spatial Chorus FX](https://infinitedevices.org/library/dimension-spatial-chorus-fx.html): Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation, cross-coupled spatial diffusion, and warm analog tone. (file: https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf)
+- [Biquad Morph Filter FX](https://infinitedevices.org/library/biquad-morph-filter-fx.html): Continuous state-variable filter morphing smoothly from lowpass to notch, bandpass, and highpass with saturated resonance. (file: https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf)
+- [Harmonic Tremolo Panner FX](https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html): Dual-band crossover harmonic tremolo with anti-phase high/low modulation and photocoupler optical response. (file: https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf)
 
 ## Nodes
 
@@ -593,7 +607,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 42 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 44 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -636,6 +650,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Chromatic Quasicrystal](https://infinitedevices.org/embeds/chromatic-quasicrystal.html): Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance.
 - [Hyperbolic Disk Fractal](https://infinitedevices.org/embeds/hyperbolic-disk-fractal.html): Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices.
 - [Magnetar Quantum Flux](https://infinitedevices.org/embeds/magnetar-quantum-flux.html): Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation.
+- [Stellar Nursery Nebula](https://infinitedevices.org/embeds/stellar-nursery-nebula.html): Volumetric turbulent cosmic gas cloud with newborn star clusters and ionization fronts. Bass compresses the dense core, mids wave the gas filaments, highs ignite coronal sparks.
+- [Quantum Chromodynamic Lattice](https://infinitedevices.org/embeds/quantum-chromodynamic-lattice.html): 4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations.
 
 ## For AI agents
 

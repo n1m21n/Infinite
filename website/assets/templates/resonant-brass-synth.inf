@@ -1,0 +1,44 @@
+infinite-patch 1
+# Resonant Brass Synth: physical modeling acoustic brass synthesizer
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 40
+  i rangeHigh 68
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float brightness = 2800.0 [200.0, 9000.0]\nparam float lipTension = 0.75 [0.1, 1.0]\nparam float growl = 0.35 [0.0, 1.0]\nparam float decay = 0.45 [0.05, 1.5]\nparam float bellFlare = 1.6 [0.5, 4.0]\nstate float phase = 0\nstate float subPhase = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.01)\nenv = if(target > env, env + (target - env) * 0.06, env - env * decayRate)\n\npStep = clamp(freq, 30.0, 3500.0) / sr\nphase = (phase + pStep) % 1.0\nsubPhase = (subPhase + pStep * 0.5) % 1.0\n\nsaw = 2.0 * phase - 1.0\nreed = saw - saw * saw * saw * 0.33 * lipTension\ngr = sin(6.2831853 * subPhase) * growl * 0.4\nu = (reed + gr) * bellFlare\n\nsat = u / (1.0 + abs(u) * 0.35)\nfCut = clamp((brightness + env * 3500.0) / sr * 2.2, 0.005, 0.42)\ns1 = s1 + fCut * (sat - s1)\ns2 = s2 + fCut * (s1 - s2)\n\nout = s2 * env * 0.42\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1.0 0.42 0.21
+  f size 0.25
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Resonant Brass Synth. Physical modeling lip-reed valve with bell flare shaping.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45
