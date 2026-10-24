@@ -15,7 +15,3 @@ v0.6.6 fixes Infinite not opening for some Windows users, and the Windows VST3 s
 ### Updates
 
 - The Downloading dialog shows the Infinite mark drawing itself as the update arrives
-
-### Known issue
-
-- Some Windows machines use more CPU while idle than 0.4.7 did. It is being measured and is not fixed in this release
