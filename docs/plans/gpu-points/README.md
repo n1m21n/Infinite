@@ -637,6 +637,26 @@ Commits on `feature/p8-gpu-points` (merged to main 2026-10-24): 093bb6b6, 283f97
 7e2267c4, 45094715, 7656ee6e, dcbfc000 (5a), 80fbd3af (5b, Feedback 3D) and the 5c commit (Point
 Trails). Every step in this file is done.
 
+### B11 D cost split (2026-10-24, Release, D 57.6k, GPU points on, one round each)
+
+Knobs: `INFINITE_BENCH_B11_SAMPLES`, `_DETAIL` (stamp Cube detail), `_ISCALE` (stamp size), `_RES`
+(render size).
+
+| Run | Change | fps | GPU ms | Triangles |
+|---|---|---|---|---|
+| base | none | 3.4 | 294 | 6.2M |
+| no MSAA | samples 0 | 10.4 | 89 | 6.2M |
+| 12 triangles | detail 8 (9x fewer) | 4.0 | 246 | 0.69M |
+| small stamps | stamps 1/4 size | 10.7 | 88 | 6.2M |
+| small frame | 1/4 resolution | 9.7 | 98 | 6.2M |
+| floor | all four | 89.2 | 7.8 | 0.69M |
+
+**Verdict: not triangle-bound, so no cheap fix.** 9x fewer triangles saves 16%; MSAA, stamp size and
+frame size each save ~3x. The cost is pixels: 57.6k overlapping cubes, every sample shaded and
+resolved at 1080p. Fixing that in the renderer means occlusion culling or a depth pre-pass, 1-2 days,
+for a scene real patches do not build. Not done. The user-side levers already exist and work: Render
+3D samples, Instance on Points scale, render size.
+
 **Open limits and follow-ups.**
 - Feedback 3D: patch load does not refuse a geometry cycle written by hand into a `.inf`.
 - Feedback 3D runs every cook, including while the transport is paused, like the 2D Feedback.

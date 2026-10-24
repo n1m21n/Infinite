@@ -552,6 +552,23 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
          ps->endSize *= k;
       }
    }
+   // Instance cost split (c, d): INFINITE_BENCH_B11_DETAIL is the stamped
+   // Cube's detail (24 = 108 triangles, 8 = 12), INFINITE_BENCH_B11_ISCALE
+   // multiplies the stamp size, INFINITE_BENCH_B11_RES the render size.
+   if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(chainEnd))
+   {
+      if (const char* s = getenv("INFINITE_BENCH_B11_DETAIL"))
+         if (auto* cube = dynamic_cast<GeometryNode*>(inst->instanceShape))
+            cube->detail = std::max(1, atoi(s));
+      if (const char* s = getenv("INFINITE_BENCH_B11_ISCALE"))
+         inst->instanceScale *= std::max(0.01f, (float)atof(s));
+   }
+   if (const char* s = getenv("INFINITE_BENCH_B11_RES"))
+   {
+      const float k = std::max(0.05f, std::min(1.0f, (float)atof(s)));
+      render->width = std::round(1920.0f * k);
+      render->height = std::round(1080.0f * k);
+   }
 
    const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
    if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
