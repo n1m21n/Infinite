@@ -508,6 +508,45 @@ def sample_scene(r, P, facts, kind=None, play=None, size=None):
     return "AV %s ## %s%s" % (a, vcode, (" ;; " + " ".join(links)) if links else "")
 
 
+def names_of(code, facts, P):
+    """Node-type sequence of a scene genome, without compiling or probing it."""
+    kind, a, v, links = parse_scene(code)
+    names = u.node_names(a, P) if a else []
+    if v:
+        r = random.Random("V:%d" % int(v.split(".")[2])); g = Graph(facts, r)
+        _, ids = build_visual(g, r, P["_V"], *map(int, v.split(".")[:2])); names += [g.names[i] for i in ids]
+    return names
+
+
+def _grams(names, n=3):
+    return {tuple(names[i:i + n]) for i in range(max(0, len(names) - n + 1))}
+
+
+def novel_batch(r, P, facts, n, kind, play, archive, pool=8):
+    """Pattern breaking: draw pool*n genomes, then keep the n whose node bags and 3-gram chains are furthest from everything already kept or in the archive (archive = list of name lists)."""
+    cands = []
+    for _ in range(pool * n):
+        c = sample_scene(r, P, facts, kind, play)
+        try:
+            nm = names_of(c, facts, P)
+        except Exception:
+            continue
+        cands.append((c, frozenset(nm), _grams(nm)))
+    seen = [(frozenset(a), _grams(a)) for a in archive]
+    picked = []
+    while cands and len(picked) < n:
+        def dist(c):
+            d = 1.0
+            for bag, gr in seen:
+                jb = 1 - len(c[1] & bag) / (len(c[1] | bag) or 1)
+                jg = 1 - len(c[2] & gr) / (len(c[2] | gr) or 1)
+                d = min(d, 0.5 * jb + 0.5 * jg)
+            return d
+        best = max(cands, key=dist)
+        cands.remove(best); picked.append(best[0]); seen.append((best[1], best[2]))
+    return picked
+
+
 def probe(code, facts, P, binary, workdir, secs=4):
     import subprocess, time
     from visual import classify_frames
@@ -564,6 +603,8 @@ def main():
     from concurrent.futures import ThreadPoolExecutor
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["compile", "sample", "run"])
+    ap.add_argument("--novel", action="store_true", help="oversample 8x and keep the genomes furthest from the archive")
+    ap.add_argument("--archive", nargs="*", default=[], help="atlas files whose patches count as already seen")
     ap.add_argument("code", nargs="?")
     ap.add_argument("--bin", default=u.DEFAULT_BIN)
     ap.add_argument("-n", type=int, default=50)
@@ -578,7 +619,13 @@ def main():
     if a.cmd == "compile":
         sys.stdout.write(compile_scene(a.code, facts, P)); return
     r = random.Random(a.seed)
-    codes = [sample_scene(r, P, facts, a.kind, a.play) for _ in range(a.n)]
+    if a.novel:
+        arch = []
+        for p in a.archive + ([a.out] if a.out and os.path.exists(a.out) else []):
+            arch += [json.loads(l).get("names", []) for l in open(p) if l.strip()]
+        codes = novel_batch(r, P, facts, a.n, a.kind, a.play, [x for x in arch if x])
+    else:
+        codes = [sample_scene(r, P, facts, a.kind, a.play) for _ in range(a.n)]
     if a.cmd == "sample":
         print("\n".join(codes)); return
     t0, done = time.time(), 0

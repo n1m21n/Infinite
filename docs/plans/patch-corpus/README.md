@@ -272,3 +272,9 @@ Extending Tongue to modulation and other records. Training a generative model. H
 - Funnel F0-F5 plus `library.py` (wav/png/mp4/meta/index.jsonl per sample). Speed: ~1,200 probes/hour at 3 workers, ~77% ok.
 - Engine bugs found: Grain Molder `descending` (771) and Array (798) advertise modulatable indices the engine refuses (E_BAD_PARAM); filtered in `bad_params.json`.
 - Not done: F4 prefilter in the loop, visual-interest score, Sketch/Sketch 3D families. A ~2,000-patch run needs the owner's yes.
+
+### Pattern breaking (2026-10-26)
+- `presets.py` -> `presets.json`: 154 built-in language-node presets indexed as genome parts (`FieldPixel:p07`); `screen.py` screens each alone (~0.5 s) into `component_screen.json`; the sampler weights by pass rate. 30-patch run: 281 s -> 103 s, ok 53% -> 70%.
+- Probe time scales with node count, not startup (startup ~0.3 s), so an engine batch mode would save <10%; not built.
+- Visual topologies `fold/tree/fan/switch/split/solo` (Switcher Compositing is the time-based switch); audio shapes `voice/layers/fxrack/writers/language/classic` with a per-patch language lean.
+- `diversity.py` measures repetition; `scene.py run --novel` oversamples 8x and keeps the genomes furthest from the archive (mean pair distance 0.92 -> 0.957 on 40 genomes); `selftest.py` is the generator's own gate (determinism, lint, diversity floors, --validate sample).
