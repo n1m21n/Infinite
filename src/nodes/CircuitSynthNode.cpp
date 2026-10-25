@@ -25,6 +25,9 @@ namespace
       kParamWidth,
       kParamSpread,
       kParamLevel,
+      kParamCutoff,
+      kParamReso,
+      kParamFilterKey,
       kParamKnob0, // .. kParamKnob0 + 7
       kNumSmoothedParams = kParamKnob0 + CircuitSynthNode::kKnobs
    };
@@ -72,6 +75,10 @@ public:
       mMailbox.Push(kParamWidth, n.width);
       mMailbox.Push(kParamSpread, n.spread);
       mMailbox.Push(kParamLevel, n.level);
+      mMailbox.Push(kParamCutoff, n.cutoff);
+      mMailbox.Push(kParamReso, n.reso);
+      mMailbox.Push(kParamFilterKey, n.filterKey);
+      mFilterType.store(n.filterType, std::memory_order_relaxed);
       for (int k = 0; k < CircuitSynthNode::kKnobs; k++)
          mMailbox.Push(kParamKnob0 + k, n.knob[k]);
       mPreset.store(n.preset, std::memory_order_relaxed);
@@ -121,6 +128,7 @@ public:
       p.lfoTarget = mLfoTarget.load(std::memory_order_relaxed);
       p.probeA = mProbeA.load(std::memory_order_relaxed);
       p.probeB = mProbeB.load(std::memory_order_relaxed);
+      p.filterType = mFilterType.load(std::memory_order_relaxed);
 
       int ei = 0;
       int frame = 0;
@@ -146,6 +154,9 @@ public:
          p.width = mMailbox.BlockValue(kParamWidth, len);
          p.spread = mMailbox.BlockValue(kParamSpread, len);
          p.level = mMailbox.BlockValue(kParamLevel, len);
+         p.cutoff = mMailbox.BlockValue(kParamCutoff, len);
+         p.reso = mMailbox.BlockValue(kParamReso, len);
+         p.filterKey = mMailbox.BlockValue(kParamFilterKey, len);
          for (int k = 0; k < CircuitSynthNode::kKnobs; k++)
             p.knob[k] = mMailbox.BlockValue(kParamKnob0 + k, len);
          mEngine.Apply(p);
@@ -212,7 +223,7 @@ private:
 
    std::atomic<int> mPreset{ 0 }, mWave{ 0 }, mMode{ 0 }, mTrigger{ 1 }, mFollow{ 3 };
    std::atomic<int> mLfoShape{ 0 }, mLfoTarget{ 0 }, mProbeA{ 0 }, mProbeB{ 1 };
-   std::atomic<int> mTapRequest{ 0 }, mActive{ 0 }, mMaxVoices{ 1 };
+   std::atomic<int> mTapRequest{ 0 }, mActive{ 0 }, mMaxVoices{ 1 }, mFilterType{ 0 };
 };
 
 // ---------------------------------------------------------------------------
@@ -306,6 +317,10 @@ void CircuitSynthNode::VisitParams(ParamVisitor& v)
    v.Float("width", width);
    v.Float("spread", spread);
    v.Float("level", level);
+   v.Int("filter", filterType);
+   v.Float("cutoff", cutoff);
+   v.Float("reso", reso);
+   v.Float("filterKey", filterKey);
    static const char* kKnobNames[kKnobs] = { "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7" };
    for (int k = 0; k < kKnobs; k++)
       v.Float(kKnobNames[k], knob[k]);

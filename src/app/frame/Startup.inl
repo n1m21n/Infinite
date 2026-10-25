@@ -661,11 +661,14 @@
       }
       else if (getenv("INFINITE_CIRCUITSYNTHUITEST") != nullptr)
       {
-         // Turbo 0.73: one Circuit Synth (Fuzz: all eight part knobs) for a
-         // look at its panel - pair with IMAGERESYNTH_SCREENSHOT.
+         // Turbo 0.73: one Circuit Synth for a look at its panel and schematic
+         // - pair with IMAGERESYNTH_SCREENSHOT. The variable may name the
+         // circuit (default Fuzz: all eight part knobs).
          SpawnNode("Circuit Synth", "Synths", 20.0f, 20.0f); // 0
+         const int wanted = CircuitDsp::FindPreset(getenv("INFINITE_CIRCUITSYNTHUITEST"));
          if (auto* cs = dynamic_cast<CircuitSynthNode*>(gNodes[0].node.get()))
-            cs->ApplyPreset(CircuitDsp::FindPreset("Fuzz"));
+            cs->ApplyPreset(wanted >= 0 ? wanted : CircuitDsp::FindPreset("Fuzz"));
+         gRequestFitView = true; // the one node fills the window
       }
       else if (getenv("INFINITE_WTDRAGTEST") != nullptr)
       {

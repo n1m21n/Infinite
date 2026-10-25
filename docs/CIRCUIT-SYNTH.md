@@ -9,6 +9,10 @@ MIDI Notes (or any note source) -> **Circuit Synth** -> Audio Out. Unpatched, **
 
 - **Header**: the circuit (preset), the generator's wave (saw, pulse, sine, noise, step), mono / poly,
   tap / hold. Picking a circuit sets its play settings and puts every part knob back to 0.
+- **schematic**: the loaded circuit, drawn from its netlist (generator, R, C, L, diodes, lamp,
+  Chua / negative resistance boxes, op-amp, ground). Each part carries the name of the knob that
+  scales it; hovering a knob lights every part it moves. **A** and **B** mark where the left and right
+  sides listen (probe A / probe B).
 - **parts**: one knob per part (or group of parts, e.g. every coil of a line). The caption is the part,
   the readout its value; each knob scales its part from 1/8 to 8 times the drawn value (R, C, L,
   generator volts; a diode's knob scales its emission coefficient, i.e. its clipping level).
@@ -18,7 +22,9 @@ MIDI Notes (or any note source) -> **Circuit Synth** -> Audio Out. Unpatched, **
   circuit ring on its own; **hold** keeps it connected while the note is held. **contact** is how soft
   the connection is: the generator's resistance goes from open to its value over that time, and back.
 - **lfo**: rate, depth, shape; target tune (all tracking C and L, +/- 1 octave), power (generator
-  volts), damp (the circuit's loss part), level.
+  volts), damp (the circuit's loss part), level, cutoff (+/- 2 octaves).
+- **filter**: an output filter with the same types as the other synths (off, lp / hp 12-36, bp / notch
+  12-24, comb + / -): cutoff, reso, key (the cutoff follows the last note, 1 = fully, from 220 Hz).
 - **stereo**: probe A / probe B (where each side listens), width (mid/side: 0 mono, 1 as built, 1.5),
   spread (part tolerance between the twins, 0..5 %), level. The scope shows L (cyan) over R (amber)
   and their correlation.
@@ -36,7 +42,11 @@ its end.
 ## How it works
 
 `src/audio/dsp/CircuitSynthDsp.*` (engine), `CircuitSynthPresets.cpp` (netlists),
-`src/nodes/CircuitSynthNode.*` (node), `src/app/bodies/CircuitSynthBody.inl` (panel).
+`src/nodes/CircuitSynthNode.*` (node), `src/app/bodies/CircuitSynthBody.inl` (panel and schematic).
+Each preset places its nodes on a small grid (`Preset::nodeX / nodeY`, a left-to-right chain unless
+placed) and a part may ask for a route (`PartDef::route`: L-shaped, symbol on the vertical leg,
+detour over / under); the panel draws the rest. `INFINITE_CIRCUITSYNTHUITEST=<preset name>` opens one
+node on that circuit (with `IMAGERESYNTH_SCREENSHOT` for a picture; `..._HOVER=<knob>` lights a knob).
 
 - **Modified Nodal Analysis** with trapezoidal companion models for C and L and Norton generators; gmin
   on every node, as in SPICE. The linear part is one matrix, LU-factored only when a value changes

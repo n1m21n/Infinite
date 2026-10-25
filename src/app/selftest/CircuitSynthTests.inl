@@ -532,6 +532,52 @@ static int RunCircuitSynthTest()
       Check(worstPoly < 60.0, "poly voices capped by CPU", buf);
    }
 
+   // 8b. The output filter (the shared SynthModes types): lp 24 at 400 Hz
+   // takes most of the clipper's upper harmonics away (energy of the first
+   // difference, a high-frequency measure), hp 24 the fundamental's share.
+   {
+      auto hfRatio = [&](int type, float cutoff)
+      {
+         auto e = NewEngine();
+         Params p = Defaults(DefaultPreset());
+         p.filterType = type;
+         p.cutoff = cutoff;
+         std::vector<float> L, R;
+         RenderEngine(*e, p, { { 0.0, 45, true } }, 0.8, L, R);
+         double all = 0.0, hf = 0.0;
+         for (size_t i = 9600; i < L.size(); i++)
+         {
+            all += (double)L[i] * L[i];
+            hf += (double)(L[i] - L[i - 1]) * (L[i] - L[i - 1]);
+         }
+         return hf / (all + 1e-30);
+      };
+      const double off = hfRatio(SynthModes::kFilterOff, 8000.0f);
+      const double lp = hfRatio(SynthModes::kFilterLP24, 400.0f);
+      const double hp = hfRatio(SynthModes::kFilterHP24, 2000.0f);
+      snprintf(buf, sizeof(buf), "(hf share off %.4f, lp24 400 Hz %.4f, hp24 2 kHz %.4f)", off, lp, hp);
+      Check(lp < 0.3 * off && hp > 2.0 * off, "output filter lp / hp", buf);
+   }
+
+   // 8c. Every schematic places each node on its own grid point.
+   {
+      int clashes = 0;
+      std::string where;
+      for (int pi = 0; pi < NumPresets(); pi++)
+      {
+         const CircuitDsp::Preset& pr = GetPreset(pi);
+         for (int i = 1; i <= pr.numNodes; i++)
+            for (int j = i + 1; j <= pr.numNodes; j++)
+               if (std::fabs(pr.nodeX[i] - pr.nodeX[j]) < 0.05f && std::fabs(pr.nodeY[i] - pr.nodeY[j]) < 0.05f)
+               {
+                  clashes++;
+                  where += std::string(" ") + pr.name;
+               }
+      }
+      snprintf(buf, sizeof(buf), "(%d clashes%s)", clashes, where.c_str());
+      Check(clashes == 0, "schematic layouts", buf);
+   }
+
    // 9. The node path: params through the mailbox, a note at frame 300 of
    // the first block sounds from frame 300, not from the block start.
    {

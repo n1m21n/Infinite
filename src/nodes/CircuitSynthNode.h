@@ -60,6 +60,9 @@ public:
    int probeA = 0, probeB = 1;
    float width = 1.0f, spread = 1.5f, level = 0.8f;
    float knob[kKnobs] = {}; // -1..1: each part knob scales its parts (x1/8 .. x8 for R, C, L, volts)
+   int filterType = 0;      // SynthModes::FilterType, off by default
+   float cutoff = 8000.0f, reso = 0.2f, filterKey = 0.0f;
+   int hoverKnob = -1;      // UI only: the part knob under the mouse, lit in the schematic
 
    NoteCable noteInput;
 

@@ -2,6 +2,9 @@
 
 #include <cstdint>
 
+#include "audio/DspMath.h"
+#include "audio/SynthModes.h"
+
 // Circuit Synth (Turbo 0.73): a synth that makes its sound by simulating small
 // electrical circuits in real time. Clean room, MIT: written from textbook
 // circuit simulation only - Modified Nodal Analysis (Ho, Ruehli & Brennan
@@ -54,8 +57,12 @@ namespace CircuitDsp
 
    enum Wave { kSaw, kPulse, kSine, kNoise, kStep, kNumWaves };
    enum LfoShape { kLfoSine, kLfoTriangle, kLfoSquare, kLfoRandom, kNumLfoShapes };
-   enum LfoTarget { kToTune, kToPower, kToDamp, kToLevel, kNumLfoTargets };
+   enum LfoTarget { kToTune, kToPower, kToDamp, kToLevel, kToCutoff, kNumLfoTargets };
    enum Trigger { kTap, kHold };
+   // How the schematic draws a two-node part: an L-shaped wire whose
+   // horizontal leg runs at the upper node's height (auto) or the lower one's,
+   // the symbol forced onto the vertical leg, or a detour over / under.
+   enum Route : uint8_t { kRouteAuto, kRouteLow, kRouteVertical, kRouteOver, kRouteUnder };
    enum Mode { kMono, kPoly };
 
    struct PartDef
@@ -66,6 +73,7 @@ namespace CircuitDsp
       double p1 = 0.0, p2 = 0.0, p3 = 0.0;
       int8_t knob = -1;   // the knob that scales this part, -1 = none
       bool tracks = true; // a C or L that follows the key (false: fixed, e.g. a buzzer membrane)
+      uint8_t route = kRouteAuto; // schematic only
    };
 
    struct ProbeDef
@@ -104,6 +112,9 @@ namespace CircuitDsp
       int probeA = 0, probeB = 1;
       int dampKnob = -1;      // the knob DAMP moves
       float dampSign = 1.0f;  // +1: raising that knob adds loss
+      // Schematic: each node's place on a grid (x right, y down; ground is
+      // drawn one unit under the node a part goes to ground from).
+      float nodeX[kMaxNodes + 1] = {}, nodeY[kMaxNodes + 1] = {};
    };
 
    int NumPresets();
@@ -132,6 +143,12 @@ namespace CircuitDsp
       float spread = 1.5f; // percent part tolerance between the L and R circuits
       float level = 0.8f;
       float knob[kMaxKnobs] = {};
+      // Output filter, the same types as the other synths (SynthModes):
+      // off, lp / hp 12-36, bp / notch 12-24, comb + / -.
+      int filterType = SynthModes::kFilterOff;
+      float cutoff = 8000.0f; // Hz
+      float reso = 0.2f;      // 0..1
+      float filterKey = 0.0f; // 0..1: the cutoff follows the last note (1 = fully, from 220 Hz)
    };
 
    // One circuit instance: values, companion states, the factored matrix.
@@ -270,5 +287,7 @@ namespace CircuitDsp
       int mHistPos = 0;
       double mDcXL = 0.0, mDcYL = 0.0, mDcXR = 0.0, mDcYR = 0.0, mDcK = 0.999;
       float mBufL[kMaxChunk * kMaxOver] = {}, mBufR[kMaxChunk * kMaxOver] = {};
+      DspMath::TptSvf mFilter[2][SynthModes::kMaxFilterStages];
+      DspMath::CombFilter mComb[2];
    };
 }

@@ -1147,6 +1147,13 @@ namespace
             attack.prerequisites = { { "mode", 1.0f } }; // poly: every note-on is a fresh voice
             add("Circuit Synth", attack);
             skip("Circuit Synth", "glide", "glides between two pitches; the rig holds one note");
+            for (const char* k : { "cutoff", "reso", "filterKey" })
+            {
+               EffectParamDef d;
+               d.name = k;
+               d.prerequisites = { { "filter", 2.0f } }; // lp 24 (the filter is off by default)
+               add("Circuit Synth", d);
+            }
          }
          // Nodes that play recorded or learned content the rig cannot make.
          skip("Looper", "*", "plays back a recorded loop; nothing is recorded in the generic rig");

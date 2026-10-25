@@ -670,6 +670,9 @@ namespace CircuitDsp
       for (int k = 0; k < kTaps; k++)
          mFir[k] = (float)(h[k] / sum);
       mDcK = std::exp(-2.0 * kPi * 8.0 / mRate);
+      for (auto& ch : mFilter)
+         for (DspMath::TptSvf& f : ch)
+            f.SetSampleRate(mRate);
       std::fill(std::begin(mHistL), std::end(mHistL), 0.0f);
       std::fill(std::begin(mHistR), std::end(mHistR), 0.0f);
       mHistPos = 0;
@@ -689,6 +692,11 @@ namespace CircuitDsp
       std::fill(std::begin(mHistR), std::end(mHistR), 0.0f);
       mHistPos = 0;
       mDcXL = mDcYL = mDcXR = mDcYR = 0.0;
+      for (auto& ch : mFilter)
+         for (DspMath::TptSvf& f : ch)
+            f.Reset();
+      for (DspMath::CombFilter& c : mComb)
+         c.Reset();
    }
 
    void Engine::LoadPreset(int index)
@@ -971,6 +979,7 @@ namespace CircuitDsp
       const double power = p.lfoTarget == kToPower ? std::max(0.0, 1.0 + depth * lfo) : 1.0;
       const double dampAdd = p.lfoTarget == kToDamp ? 0.5 * depth * lfo * pr.dampSign : 0.0;
       const double levelMod = p.lfoTarget == kToLevel ? 1.0 - 0.5 * depth * (1.0 - lfo) : 1.0;
+      const double cutoffMod = p.lfoTarget == kToCutoff ? std::pow(2.0, 2.0 * depth * lfo) : 1.0; // +/- 2 octaves
 
       const double fs = mRate * mOver;
       const int N = frames * mOver;
@@ -1086,6 +1095,21 @@ namespace CircuitDsp
       // speakers do not want it), then width and level.
       const double width = std::clamp((double)p.width, 0.0, 1.5);
       const double level = std::clamp((double)p.level, 0.0, 4.0) * levelMod;
+      // The output filter, set once per chunk (the cutoff is smoothed upstream).
+      const int ftype = p.filterType;
+      const bool comb = SynthModes::IsCombFilter(ftype);
+      const int stages = comb ? 0 : SynthModes::FilterStages(ftype);
+      const int shape = SynthModes::FilterShapeOf(ftype);
+      const double keyMod = std::pow(std::max(1.0, mLastHz) / 220.0, std::clamp((double)p.filterKey, 0.0, 1.0));
+      const float cutoffHz = (float)std::clamp(p.cutoff * cutoffMod * keyMod, 20.0, 0.45 * mRate);
+      const float reso = std::clamp(p.reso, 0.0f, 1.0f);
+      if (stages > 0)
+         for (auto& ch : mFilter)
+            for (int s = 0; s < stages; s++)
+               ch[s].SetCutoff(cutoffHz, 0.5f + reso * 8.0f);
+      if (comb)
+         for (DspMath::CombFilter& c : mComb)
+            c.SetParams(cutoffHz, reso, SynthModes::CombIsNegative(ftype), mRate);
       for (int f = 0; f < frames; f++)
       {
          double l, r;
@@ -1120,7 +1144,30 @@ namespace CircuitDsp
          mDcXR = r;
          mDcYL = std::fabs(yl) < 1e-20 ? 0.0 : yl;
          mDcYR = std::fabs(yr) < 1e-20 ? 0.0 : yr;
-         const double mid = 0.5 * (mDcYL + mDcYR), side = 0.5 * (mDcYL - mDcYR) * width;
+         double fl = mDcYL, fr = mDcYR;
+         if (stages > 0)
+         {
+            double* io[2] = { &fl, &fr };
+            for (int ch = 0; ch < 2; ch++)
+            {
+               float x = (float)*io[ch];
+               for (int s = 0; s < stages; s++)
+               {
+                  const auto o = mFilter[ch][s].Process(x);
+                  x = shape == SynthModes::kShapeHigh ? o.high
+                    : shape == SynthModes::kShapeBand ? o.band
+                    : shape == SynthModes::kShapeNotch ? o.notch
+                                                       : o.low;
+               }
+               *io[ch] = x;
+            }
+         }
+         else if (comb)
+         {
+            fl = mComb[0].Process((float)fl);
+            fr = mComb[1].Process((float)fr);
+         }
+         const double mid = 0.5 * (fl + fr), side = 0.5 * (fl - fr) * width;
          double ol = (mid + side) * level, orr = (mid - side) * level;
          if (!std::isfinite(ol))
             ol = 0.0;

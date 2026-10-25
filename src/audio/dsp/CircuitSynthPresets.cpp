@@ -23,7 +23,18 @@ namespace CircuitDsp
             p.refHz = refHz;
             p.gain = gain;
          }
-         int Node() { return ++p.numNodes; }
+         int Node()
+         {
+            const int n = ++p.numNodes;
+            p.nodeX[n] = (float)(n - 1); // a chain left to right unless placed
+            return n;
+         }
+         void At(int node, float x, float y)
+         {
+            p.nodeX[node] = x;
+            p.nodeY[node] = y;
+         }
+         void Route(int part, uint8_t r) { p.parts[part].route = r; }
          int Knob(const char* label)
          {
             KnobDef& k = p.knobs[p.numKnobs];
@@ -167,6 +178,11 @@ namespace CircuitDsp
          const int n1 = b.Node(), n2 = b.Node(), n3 = b.Node(), n4 = b.Node(), n5 = b.Node(), n6 = b.Node(), n7 = b.Node();
          const int kG = b.Knob("drive"), kGain = b.Knob("gain R"), kD = b.Knob("soft D"), kR = b.Knob("R"), kH = b.Knob("hard D"),
                    kR2 = b.Knob("tone R"), kC2 = b.Knob("tone C"), kMid = b.Knob("mid C");
+         b.At(n3, 2.0f, -1.0f);
+         b.At(n4, 3.0f, 0.0f);
+         b.At(n5, 1.4f, -2.0f);
+         b.At(n6, 4.0f, 0.0f);
+         b.At(n7, 5.0f, 0.0f);
          b.Gen(n1, 0.5, kG);
          b.R(n1, n2, 1000.0);
          b.R(n2, 0, 510000.0);
@@ -254,6 +270,7 @@ namespace CircuitDsp
          b.C(n2, 0, 1e-6, kC);
          b.L(n2, n3, 0.233, kL);
          b.R(n3, 0, 2.0, kLoss);
+         b.At(n3, 1.6f, 1.0f);
          b.Probe("tank", n2);
          b.Probe("coil", n3, 0, 120.0f);
          b.ProbeI("R current", r, 10000.0f);
@@ -268,11 +285,14 @@ namespace CircuitDsp
          const int kG = b.Knob("G"), kRin = b.Knob("R in"), kR = b.Knob("R tee"), kC = b.Knob("C tee"), kLoad = b.Knob("R load");
          b.Gen(n1, 2.0, kG);
          b.R(n1, n2, 1000.0, kRin);
+         b.At(n3, 2.0f, -1.0f);
+         b.At(n4, 3.0f, 0.0f);
+         b.At(n5, 2.0f, 1.0f);
          b.R(n2, n3, 10000.0, kR); // R - R with 2C to ground
          b.R(n3, n4, 10000.0, kR);
          b.C(n3, 0, 32e-9, kC);
-         b.C(n2, n5, 16e-9, kC); // C - C with R/2 to ground
-         b.C(n5, n4, 16e-9, kC);
+         b.Route(b.C(n2, n5, 16e-9, kC), kRouteLow); // C - C with R/2 to ground
+         b.Route(b.C(n5, n4, 16e-9, kC), kRouteLow);
          b.R(n5, 0, 5000.0, kR);
          b.R(n4, 0, 100000.0, kLoad);
          b.Probe("out", n4);
@@ -318,6 +338,7 @@ namespace CircuitDsp
          b.C(n2, 0, 1e-6, kC);
          b.L(n2, n3, 0.25, kL);
          b.R(n3, 0, 4.0, kLoss);
+         b.At(n3, 1.6f, 1.0f);
          b.Probe("tank", n2);
          b.Probe("coil", n3, 0, 120.0f);
          b.ProbeI("R in current", r, 4700.0f);
@@ -337,6 +358,7 @@ namespace CircuitDsp
          b.C(n2, 0, 16.7e-6, kC);
          b.L(n2, n3, 0.5, kL);
          b.R(n3, 0, 60.0, kLoss);
+         b.At(n3, 1.6f, 1.0f);
          b.Probe("tank", n2);
          b.Probe("coil", n3, 0, 2.0f);
          b.Play(kStep, kTap, 0.0003f, 0.6f, 0.5f).Stereo(0, 0, 3.0f).Damp(kLoss, 1.0f);
@@ -351,6 +373,9 @@ namespace CircuitDsp
          const int n1 = b.Node(), n2 = b.Node(), n3 = b.Node(), n4 = b.Node(), n5 = b.Node();
          const int kG = b.Knob("G"), kK = b.Knob("couple"), kC = b.Knob("C"), kL1 = b.Knob("L1"), kL2 = b.Knob("L2"), kLoss = b.Knob("loss");
          b.Gen(n1, 5.0, kG);
+         b.At(n3, 1.6f, 1.0f);
+         b.At(n4, 2.8f, 0.0f);
+         b.At(n5, 3.4f, 1.0f);
          b.R(n1, n2, 2200.0);
          b.C(n2, 0, 1e-6, kC);
          b.L(n2, n3, 0.25, kL1);
@@ -376,6 +401,7 @@ namespace CircuitDsp
          Build b("Bell", 400.0, 0.5f);
          const int n1 = b.Node();
          const int kG = b.Knob("G"), kS = b.Knob("hammer C"), kC = b.Knob("C"), kL = b.Knob("L"), kLoss = b.Knob("loss");
+         b.At(n1, 0.0f, -1.0f);
          b.Gen(n1, 50.0, kG);
          b.R(n1, 0, 10000.0);
          static const double kRatio[5] = { 1.0, 1.183, 1.506, 2.0, 2.66 };
@@ -386,8 +412,10 @@ namespace CircuitDsp
          {
             const int t = b.Node(), m = b.Node();
             tank[k] = t;
+            b.At(t, 1.0f + 1.3f * k, 0.0f);
+            b.At(m, 1.6f + 1.3f * k, 1.0f);
             const double w = kTwoPi * 400.0 * kRatio[k];
-            b.C(n1, t, 10e-9, kS);
+            b.Route(b.C(n1, t, 10e-9, kS), kRouteVertical);
             b.C(t, 0, 1.0 / (w * w * lh), kC);
             b.L(t, m, lh, kL);
             b.R(m, 0, 2.0 * lh / kDecay[k], kLoss);
@@ -434,9 +462,12 @@ namespace CircuitDsp
          Build b("LC Mesh", 140.0, 0.3f);
          const int n1 = b.Node();
          int m[3][4];
-         for (auto& row : m)
-            for (int& n : row)
-               n = b.Node();
+         for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 4; j++)
+            {
+               m[i][j] = b.Node();
+               b.At(m[i][j], 1.0f + 1.5f * j, 1.6f * i);
+            }
          const int kG = b.Knob("G"), kR = b.Knob("R in"), kL = b.Knob("L mesh"), kC = b.Knob("C mesh"), kLoss = b.Knob("loss");
          b.Gen(n1, 5.0, kG);
          b.R(n1, m[0][0], 220.0, kR);
@@ -473,6 +504,9 @@ namespace CircuitDsp
          b.L(n1, n2, 0.25, kL);
          b.R(n2, 0, 2.0);
          b.R(n1, 0, 10000.0, kDamp);
+         b.At(n3, 0.0f, 0.0f);
+         b.At(n1, 1.0f, 0.0f);
+         b.At(n2, 1.7f, 1.0f);
          b.Neg(n1, 0, 3e-3, 1.0, kPush);
          // Tank voltage and coil current are 90 degrees apart; this pickup
          // hears both, half way between.
@@ -498,6 +532,9 @@ namespace CircuitDsp
          b.L(n1, n2, 0.25 * (290.0 / natural) * (290.0 / natural), kL);
          b.R(n2, 0, 2.0);
          b.R(n1, 0, 10000.0, kDamp);
+         b.At(n3, 0.0f, 0.0f);
+         b.At(n1, 1.0f, 0.0f);
+         b.At(n2, 1.7f, 1.0f);
          b.Neg(n1, 0, 3e-3, 1.0, kPush);
          // Tank voltage and coil current are 90 degrees apart; this pickup
          // hears both, half way between.
@@ -521,6 +558,9 @@ namespace CircuitDsp
          // the lamp never goes out (as with a real one).
          b.R(n1, n2, 1e6, kR);
          b.C(n2, 0, 8.2e-9, kC);
+         b.At(n3, 1.6f, 1.0f);
+         b.At(n4, 2.4f, 0.0f);
+         b.At(n5, 3.2f, -1.0f);
          b.Neon(n2, n3, 70.0, 55.0, 10000.0, kS);
          b.R(n3, 0, 100.0);
          b.C(n2, n4, 1e-9);
@@ -545,6 +585,10 @@ namespace CircuitDsp
          Build b("Chua", 2200.0, 0.3f);
          const int n1 = b.Node(), n2 = b.Node(), n3 = b.Node(), n4 = b.Node();
          const int kR = b.Knob("R"), kC1 = b.Knob("C1"), kC2 = b.Knob("C2"), kL = b.Knob("L"), kD = b.Knob("diode");
+         b.At(n4, 0.0f, 0.0f);
+         b.At(n1, 1.0f, 0.0f);
+         b.At(n2, 2.2f, 0.0f);
+         b.At(n3, 2.8f, 1.0f);
          b.Gen(n4, 0.5);
          b.R(n4, n1, 100000.0);
          b.C(n1, 0, 10e-9, kC1);
@@ -583,8 +627,8 @@ namespace CircuitDsp
          b.R(n1, n2, r1, kR1);
          b.R(n2, 0, r3, kR3);
          b.C(n2, n3, c, kC);
-         b.C(n2, n4, c, kC);
-         b.R(n3, n4, r2, kR2);
+         b.Route(b.C(n2, n4, c, kC), kRouteOver);
+         b.Route(b.R(n3, n4, r2, kR2), kRouteUnder);
          b.Op(0, n3, n4);
          b.Probe("out", n4);
          b.Probe("bridge", n2, 0, 6.0f);
@@ -609,6 +653,7 @@ namespace CircuitDsp
          b.Fixed(b.C(n3, 0, 22e-9, kM));
          b.Fixed(b.L(n3, n4, 0.2));
          b.R(n4, 0, 30.0);
+         b.At(n4, 2.6f, 1.0f);
          b.ProbeMix("coil side", n2, n3, 1.0f, 0.5f);
          b.ProbeMix("membrane side", n3, n2, 0.3f, 0.5f);
          b.Probe("coil", n2, 0, 0.5f);
@@ -624,6 +669,9 @@ namespace CircuitDsp
          Build b("Ringer", 25.0, 0.04f);
          const int n1 = b.Node(), n2 = b.Node(), n3 = b.Node(), n4 = b.Node(), n5 = b.Node(), n6 = b.Node();
          const int kG = b.Knob("G"), kR = b.Knob("R"), kL = b.Knob("coil"), kK = b.Knob("hammer"), kLoss = b.Knob("gong loss");
+         b.At(n5, 2.6f, 1.0f);
+         b.At(n4, 3.2f, -1.0f);
+         b.At(n6, 3.8f, 0.0f);
          b.Gen(n1, 40.0, kG);
          b.R(n1, n2, 1000.0, kR);
          b.L(n2, 0, 2.0, kL);

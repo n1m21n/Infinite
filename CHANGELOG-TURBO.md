@@ -12,6 +12,9 @@
   tracking, pitch, glide, contact, attack, release), an LFO on tune / power / damp / level. Stereo is
   designed in: twin circuits with part tolerance (spread), two probe points, mid/side width, poly
   voices panned; the default circuit measures L/R correlation 0.8 with the mono sum within 0.5 dB.
+  The panel draws the circuit's schematic: every part labelled with its knob, the parts a knob
+  moves light up while it is hovered, A / B show where each side listens. An output filter with the
+  synths' usual types (lp / hp / bp / notch / comb) with cutoff, reso and key tracking.
   Self-test `INFINITE_CIRCUITSYNTHTEST` (renders a WAV per circuit to `build\circuit-synth-wavs`).
   Docs: `docs/CIRCUIT-SYNTH.md`.
 
