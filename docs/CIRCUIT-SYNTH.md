@@ -39,6 +39,13 @@ Line (a lumped line: a pluck), LC Mesh (a 3 x 4 grid: a membrane), Van der Pol, 
 op-amp resonators, 808 style), Buzzer, Ringer. Presets are saved by index: the table only grows at
 its end.
 
+## From the MCP
+
+The MCP's `authoring_guide` (section "Circuit Synth", `src/platform/AISkillContent.h`) lists the
+preset indices and every setting key. Setting `preset` from a tool changes only the circuit, so a
+client sets the play settings (`trigger`, `wave`) with it and puts `k0`..`k7` back to 0; the knobs'
+drawn names follow the circuit (`explain` shows them).
+
 ## How it works
 
 `src/audio/dsp/CircuitSynthDsp.*` (engine), `CircuitSynthPresets.cpp` (netlists),
