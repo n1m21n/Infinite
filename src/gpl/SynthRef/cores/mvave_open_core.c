@@ -235,7 +235,9 @@ static int core_control(void* inst, uint32_t kind, uint32_t id, int32_t value)
    case SR_CTL_KEY: if (id >= 27) return -1; sim_control(1, id, value > 0); return 0;
    case SR_CTL_ENCODER:
       if (id >= 7 || value < -127 || value > 127) return -1;
-      sim_control(2, id, value);
+      /* The FM-1 application counts its encoders' detents the other way
+       * round (clockwise = negative): Synth REF's clockwise = positive. */
+      sim_control(2, id, -value);
       return 0;
    case SR_CTL_FADER:
       if (id != 0 || value < 0 || value > 127) return -1;
