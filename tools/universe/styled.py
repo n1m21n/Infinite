@@ -363,8 +363,6 @@ def batch(n, out, binary, workers, secs, seed, kinds="A,V,AV"):
                 text, meta = best_visual(A[aid], s, facts, binary, d)
         inf = os.path.join(d, "patch.inf")
         open(inf, "w").write(text)
-        if subprocess.run([binary, "--validate", inf], capture_output=True).returncode:
-            shutil.rmtree(d); return None
         made = catalog.render_media(binary, inf, kind, d, secs)
         if not all(made.get(k) for k, ks in {"wav": ("A", "AV"), "png": ("V", "AV"), "mp4": ("V", "AV")}.items() if kind in ks):
             shutil.rmtree(d); return None
