@@ -1227,10 +1227,29 @@ if(WIN32)
     # sit next to Infinite.exe to run, exactly like infinite-vst3-scanner.exe
     # below. package.ps1 and .github/workflows/build.yml duplicate this same
     # copy for the distributed zip.
+    #
+    # onnxruntime.dll is built against the shared MSVC runtime, so it needs
+    # MSVCP140/VCRUNTIME140(_1).dll even though our own exes link the CRT
+    # statically. A clean Windows has neither, so ship them app-local (the
+    # loader finds them next to the exe) instead of asking the user to
+    # install the Visual C++ redistributable.
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+    include(InstallRequiredSystemLibraries)
+    set(INFINITE_VC_RUNTIME_DLLS "")
+    foreach(_dll IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+        if(_dll MATCHES "/(msvcp140|vcruntime140|vcruntime140_1)\\.dll$")
+            list(APPEND INFINITE_VC_RUNTIME_DLLS "${_dll}")
+        endif()
+    endforeach()
+    if(NOT INFINITE_VC_RUNTIME_DLLS)
+        message(FATAL_ERROR "No Visual C++ runtime DLLs found to bundle; "
+                "install the VS C++ redistributable component (VC/Redist/MSVC).")
+    endif()
     add_custom_command(TARGET Infinite POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${ONNXRUNTIME_DLL}"
                 "${DIRECTML_DLL}"
+                ${INFINITE_VC_RUNTIME_DLLS}
                 "$<TARGET_FILE_DIR:Infinite>"
         COMMAND ${CMAKE_COMMAND} -E make_directory
                 "$<TARGET_FILE_DIR:Infinite>/assets/models"

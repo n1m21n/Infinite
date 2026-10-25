@@ -302,12 +302,35 @@ jobs:
           # already staged these next to the exe in the build tree.
           cp build/Release/onnxruntime.dll dist/Infinite/
           cp build/Release/DirectML.dll dist/Infinite/
+          # onnxruntime.dll imports the VC++ runtime; ship it app-local so a
+          # clean Windows needs no redistributable install.
+          cp build/Release/msvcp140.dll build/Release/vcruntime140.dll dist/Infinite/
+          if [ "${{ matrix.arch }}" = x64 ] || [ -f build/Release/vcruntime140_1.dll ]; then cp build/Release/vcruntime140_1.dll dist/Infinite/; fi
           cp build/Release/assets/models/u2netp.onnx dist/Infinite/assets/models/
           # Resources/ (fonts, icons, drumkits/infinite-basic) is what
           # BundledResourcePath() finds next to the exe; the POST_BUILD copy
           # fills it. Without it the Drum Sequencer's groove picker has no kit.
           cp -r build/Release/Resources dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+
+      # Every DLL in the zip (ours and bundled third-party ones such as
+      # onnxruntime.dll) may import the VC++ runtime. Assert each one it names
+      # is shipped beside the exe, so a clean Windows never shows a
+      # "VCRUNTIME140_1.dll was not found" dialog.
+      - name: Assert bundled DLLs find their VC++ runtime
+        shell: pwsh
+        run: |
+          $dir = "dist/Infinite"
+          $missing = @()
+          foreach ($f in Get-ChildItem $dir -Filter *.dll) {
+            $ascii = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($f.FullName))
+            [regex]::Matches($ascii, '(?i)(msvcp|vcruntime|concrt|vccorlib)\w*\.dll') |
+              ForEach-Object { $_.Value.ToLower() } | Sort-Object -Unique |
+              Where-Object { -not (Test-Path (Join-Path $dir $_)) } |
+              ForEach-Object { $missing += "$($f.Name) -> $_" }
+          }
+          if ($missing) { Write-Error ("Not shipped: " + ($missing -join "; ")); exit 1 }
+          Write-Host "OK: every VC++ runtime DLL imported by a shipped DLL is bundled."
 
       - name: Upload unsigned artifact
         id: upload-unsigned
