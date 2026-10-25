@@ -66,8 +66,10 @@ void DrawPresent(FrameCtx& fc)
       // second, unrelated budget just fights the vsync quantization instead of
       // capping anything more precisely (the Target FPS control is disabled in
       // the UI whenever Vsync is on, for the same reason). Skipped too while a
-      // projector window paces the loop to its display's refresh.
-      if (gTargetFps > 0 && !gVsync && !FrameClockActive())
+      // projector window paces the loop to its display's refresh. Skipped for
+      // a headless job (--validate, --audio-summary, --frame...): its phases
+      // count ticks, not seconds, so pacing only made every bot call wait.
+      if (gTargetFps > 0 && !gVsync && !FrameClockActive() && !HeadlessJobActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;
