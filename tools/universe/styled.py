@@ -136,8 +136,14 @@ def rgb(h):
     return [int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
 
 
+WORDS = ["signal", "after hours", "static", "drift", "night shift", "afterglow", "hum", "low tide", "feedback", "neon rain", "loop", "dusk", "phase", "slow burn", "echo", "transit",
+         "0x1F", "halflight", "pulse", "no sleep", "mono", "far field", "carrier", "late bus", "deep end", "glass", "orbit", "tape", "bloom", "ghost note"]
+
+
 def paint(g, nid, pal, rng):
-    """Replace every colour parameter of a node with palette colours (background = darkest first)."""
+    """Replace every colour parameter of a node with palette colours (background = darkest first). A Text node also gets words, never the default."""
+    if g.names[nid].split(":")[0] == "Text":
+        g.lines.insert(g.lines.index("end", g.lines.index("node %d %s Text" % (nid, g.facts[g.names[nid]]["category"]))), "  s text %s" % rng.choice(WORDS))
     lum = sorted(pal, key=lambda c: sum(rgb(c)))
     ks = [r["key"] for r in g.facts[g.names[nid]]["rows"] if r["tag"] == "c"]
     if not ks:
@@ -214,7 +220,7 @@ def best_visual(style, seed, facts, binary, d, tries=6):
         text, meta = build_visual(style, seed * 10 + k, facts)
         inf = os.path.join(d, "try.inf"); open(inf, "w").write(text)
         td = os.path.join(d, "try"); os.makedirs(td, exist_ok=True)
-        subprocess.run([binary, "--frame", inf, "0", td + "/", "--size", "320x180"], capture_output=True, timeout=120)
+        subprocess.run([binary, "--frame", inf, "0", td + "/", "--size", "180x320"], capture_output=True, timeout=120)
         pngs = [x for x in os.listdir(td) if x.endswith(".png")]
         sc = library.interest(os.path.join(td, pngs[0])) if pngs else -1
         for x in pngs:
@@ -280,6 +286,8 @@ def batch(n, out, binary, workers, secs, seed):
         if kind in ("V", "AV"):
             import library
             row["interest"] = library.interest(os.path.join(d, "poster.png"))
+            from PIL import Image, ImageStat
+            row["lum"] = round(ImageStat.Stat(Image.open(os.path.join(d, "poster.png")).convert("L")).mean[0], 1)
         if kind in ("A", "AV") and not bpm_ok(am.get("bpm_estimate"), M[mid]["bpm"]) and M[mid]["family"] not in ("ambient", "experimental"):
             shutil.rmtree(d); return ("tempo", mid)
         if not catalog.passes(row):

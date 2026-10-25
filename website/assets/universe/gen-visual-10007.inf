@@ -1,0 +1,118 @@
+infinite-patch 1
+node 1 Source Noise
+  f brightness 0.478229
+  b colorNoise 0
+  f contrast 1.05854
+  f gain 0.802849
+  f scale 1.50355
+  f seed 28.0711
+  f warp 1.39268
+  f width 3344.21
+  c lowColor 0.0392 0.0000 0.0784
+  c highColor 0.9882 0.9333 0.0392
+end
+node 2 Source Text
+  i align 0
+  f posY 0.565585
+  s text hum
+  c color 0.0392 0.0000 0.0784
+  c outlineColor 0.0000 0.9412 1.0000
+end
+node 3 Effects motionblur
+  f uAngle 5.02255
+end
+cable 3 0 2
+node 4 Source Noise
+  f lacunarity 3.18596
+  f scale 0.746234
+  f speed 1.40053
+  c lowColor 0.0392 0.0000 0.0784
+  c highColor 0.9882 0.9333 0.0392
+end
+node 5 Source Text
+  f outlineWidth 7.55755
+  f scaleX 1.26709
+  f scaleY 1.88317
+  s text 0x1F
+  c color 0.9882 0.9333 0.0392
+  c outlineColor 0.0000 0.9412 1.0000
+end
+node 6 Effects glitch
+  f uSeed 78.0392
+end
+cable 6 0 5
+node 7 Source Noise
+  b colorNoise 1
+  f contrast 2.19531
+  i noiseType 6
+  f octaves 2.99447
+  f scale 12.9413
+  f seed 80.9786
+  f warp 0.404534
+  c lowColor 0.0392 0.0000 0.0784
+  c highColor 0.9882 0.9333 0.0392
+end
+node 8 Effects bloom
+  f uIntensity 4.05178
+end
+cable 8 0 7
+node 9 Compositing Blend
+  b linear 0
+  i mode 10
+end
+cable 9 0 1
+cable 9 1 3
+node 10 Compositing Blend
+  f mix 0.183131
+  i mode 26
+end
+cable 10 0 9
+cable 10 1 4
+node 11 Compositing Blend
+  b linear 0
+  i mode 7
+end
+cable 11 0 10
+cable 11 1 6
+node 12 Compositing Blend
+  b linear 1
+  f mix 0.754
+end
+cable 12 0 11
+cable 12 1 8
+node 13 Effects motionblur
+end
+cable 13 0 12
+node 14 Effects glitch
+  f uAmount 1.74006
+  f uSeed 13.4872
+end
+cable 14 0 13
+node 15 Compositing gradientmap
+  f uMix 0.387362
+  c uShadowColor 0.0392 0.0000 0.0784
+  c uHighlightColor 0.9882 0.9333 0.0392
+end
+cable 15 0 14
+node 16 Effects bloom
+  f uRadius 4.15199
+end
+cable 16 0 15
+node 17 Utility Output
+end
+cable 17 0 16
+node 18 Modulators LFO
+  i phaseMode 0
+  f rateBeats 0.103931
+end
+mod 7 height 18 0 0 0.465 0.5
+node 19 Modulators LFO
+  f rateBeats 8.8799
+  i shape 4
+end
+mod 2 scaleY 19 0 0 0.478 0.5
+node 20 Modulators LFO
+  i phaseMode 1
+  i shape 1
+end
+mod 6 uDetail 20 0 0 0.417 0.5

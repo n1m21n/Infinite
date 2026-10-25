@@ -2,33 +2,89 @@
  "version": 1,
  "items": [
   {
-   "id": "gen-visual-8001",
-   "name": "Blend + Blob + Color Ramp",
+   "id": "gen-audio-10000",
+   "name": "Chorder + Chorus + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10000.jpg",
+   "file": "assets/universe/gen-audio-10000.inf",
+   "sample": "samples/audio/?s=audio-s10000",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Granular",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Partials",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-visual-10001",
+   "name": "Blend + Blob + Ellipse",
    "category": "Generated",
    "kind": "Patch",
    "tags": [
     "visual"
    ],
-   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
    "price": 0,
-   "preview": "assets/universe/gen-visual-8001.jpg",
-   "file": "assets/universe/gen-visual-8001.inf",
-   "sample": "samples/?s=visual-s8001",
+   "preview": "assets/universe/gen-visual-10001.jpg",
+   "file": "assets/universe/gen-visual-10001.inf",
+   "sample": "samples/?s=visual-s10001",
    "nodes": [
     "Blend",
     "Blob",
-    "Color Ramp",
+    "Ellipse",
+    "Fluid",
     "LFO",
     "Noise",
     "Output",
+    "Reaction Diffusion",
     "bloom",
     "liquify",
     "vignette"
    ]
   },
   {
-   "id": "gen-audiovisual-8002",
-   "name": "Arpeggiator + Blend + Chorder",
+   "id": "gen-audio-10003",
+   "name": "Bitcrush + Chorder + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10003.jpg",
+   "file": "assets/universe/gen-audio-10003.inf",
+   "sample": "samples/audio/?s=audio-s10003",
+   "nodes": [
+    "Audio Out",
+    "Bitcrush",
+    "Chorder",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audiovisual-10005",
+   "name": "Analog + Audio Filter + Blend",
    "category": "Generated",
    "kind": "Patch",
    "tags": [
@@ -36,22 +92,388 @@
    ],
    "description": "A sound and picture Infinite made by itself from 22 nodes. Open it, then change anything.",
    "price": 0,
-   "preview": "assets/universe/gen-audiovisual-8002.jpg",
-   "file": "assets/universe/gen-audiovisual-8002.inf",
-   "sample": "samples/?s=audiovisual-s8002",
+   "preview": "assets/universe/gen-audiovisual-10005.jpg",
+   "file": "assets/universe/gen-audiovisual-10005.inf",
+   "sample": "samples/?s=audiovisual-s10005",
    "nodes": [
-    "Arpeggiator",
+    "Analog",
+    "Audio Filter",
     "Audio Out",
     "Blend",
     "Chorder",
-    "Color Ramp",
+    "Chorus",
+    "Drum Sequencer",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Noise"
+   ]
+  },
+  {
+   "id": "gen-audio-10006",
+   "name": "Audio Filter + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10006.jpg",
+   "file": "assets/universe/gen-audio-10006.inf",
+   "sample": "samples/audio/?s=audio-s10006",
+   "nodes": [
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
     "Delay",
     "Drum Sequencer",
     "FM",
-    "Formula",
     "LFO",
     "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-visual-10007",
+   "name": "Blend + LFO + Noise",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10007.jpg",
+   "file": "assets/universe/gen-visual-10007.inf",
+   "sample": "samples/?s=visual-s10007",
+   "nodes": [
+    "Blend",
+    "LFO",
+    "Noise",
+    "Output",
+    "Text",
+    "bloom",
+    "glitch",
+    "gradientmap",
+    "motionblur"
+   ]
+  },
+  {
+   "id": "gen-audio-10009",
+   "name": "Analog + Drive + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10009.jpg",
+   "file": "assets/universe/gen-audio-10009.inf",
+   "sample": "samples/audio/?s=audio-s10009",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-visual-10010",
+   "name": "Blend + LFO + Noise",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10010.jpg",
+   "file": "assets/universe/gen-visual-10010.inf",
+   "sample": "samples/?s=visual-s10010",
+   "nodes": [
+    "Blend",
+    "LFO",
+    "Noise",
+    "Output",
+    "Ring",
+    "gaussianblur",
+    "gradientmap",
+    "ripple",
+    "vignette"
+   ]
+  },
+  {
+   "id": "gen-visual-10013",
+   "name": "Blend + LFO + Layer Stack",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10013.jpg",
+   "file": "assets/universe/gen-visual-10013.inf",
+   "sample": "samples/?s=visual-s10013",
+   "nodes": [
+    "Blend",
+    "LFO",
+    "Layer Stack",
+    "Noise",
+    "Output",
+    "Rectangle",
+    "Shape",
+    "addnoise",
+    "bloom",
+    "halftone"
+   ]
+  },
+  {
+   "id": "gen-audio-10018",
+   "name": "Analog + Drum Sequencer + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10018.jpg",
+   "file": "assets/universe/gen-audio-10018.inf",
+   "sample": "samples/audio/?s=audio-s10018",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Saturator"
+   ]
+  },
+  {
+   "id": "gen-visual-10019",
+   "name": "Blend + LFO + Noise",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 8 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10019.jpg",
+   "file": "assets/universe/gen-visual-10019.inf",
+   "sample": "samples/?s=visual-s10019",
+   "nodes": [
+    "Blend",
+    "LFO",
+    "Noise",
+    "Output",
+    "Ramp",
+    "dither",
+    "pixelate",
+    "vignette"
+   ]
+  },
+  {
+   "id": "gen-audio-10021",
+   "name": "Chorder + Chorus + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10021.jpg",
+   "file": "assets/universe/gen-audio-10021.inf",
+   "sample": "samples/audio/?s=audio-s10021",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Oscillator",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-visual-10022",
+   "name": "Blend + Circle + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10022.jpg",
+   "file": "assets/universe/gen-visual-10022.inf",
+   "sample": "samples/?s=visual-s10022",
+   "nodes": [
+    "Blend",
+    "Circle",
+    "LFO",
+    "Noise",
+    "Output",
+    "bloom",
+    "displace",
+    "gradientmap",
+    "ripple",
+    "vignette"
+   ]
+  },
+  {
+   "id": "gen-audio-10024",
+   "name": "Analog + Audio Filter + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10024.jpg",
+   "file": "assets/universe/gen-audio-10024.inf",
+   "sample": "samples/audio/?s=audio-s10024",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorus",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audiovisual-10026",
+   "name": "Analog + Blend + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audiovisual"
+   ],
+   "description": "A sound and picture Infinite made by itself from 18 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audiovisual-10026.jpg",
+   "file": "assets/universe/gen-audiovisual-10026.inf",
+   "sample": "samples/?s=audiovisual-s10026",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Blend",
+    "Drum Sequencer",
+    "LFO",
+    "Layer Stack",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Output",
+    "Ramp",
+    "Rectangle"
+   ]
+  },
+  {
+   "id": "gen-audiovisual-10029",
+   "name": "Blend + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audiovisual"
+   ],
+   "description": "A sound and picture Infinite made by itself from 22 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audiovisual-10029.jpg",
+   "file": "assets/universe/gen-audiovisual-10029.inf",
+   "sample": "samples/?s=audiovisual-s10029",
+   "nodes": [
+    "Audio Out",
+    "Blend",
+    "Chorder",
+    "Chorus",
+    "Color Ramp",
+    "Delay",
+    "Drum Sequencer",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Line",
     "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-10030",
+   "name": "Drive + Drum Sequencer + FM",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-10030.jpg",
+   "file": "assets/universe/gen-audio-10030.inf",
+   "sample": "samples/audio/?s=audio-s10030",
+   "nodes": [
+    "Audio Out",
+    "Drive",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-visual-10034",
+   "name": "Blend + Circle + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-10034.jpg",
+   "file": "assets/universe/gen-visual-10034.inf",
+   "sample": "samples/?s=visual-s10034",
+   "nodes": [
+    "Blend",
+    "Circle",
+    "LFO",
+    "Line",
+    "Noise",
+    "Output",
+    "Ring",
+    "bloom",
+    "kaleidoscope",
+    "symmetry",
+    "threshold",
+    "vignette"
    ]
   },
   {
@@ -66,7 +488,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8003.jpg",
    "file": "assets/universe/gen-audio-8003.inf",
-   "sample": "samples/?s=audio-s8003",
+   "sample": "samples/audio/?s=audio-s8003",
    "nodes": [
     "Audio Out",
     "Drum Sequencer",
@@ -76,34 +498,6 @@
     "Note Sequencer",
     "Reverb",
     "Sampler"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-8005",
-   "name": "Analog + Blend + Drive",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 17 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-8005.jpg",
-   "file": "assets/universe/gen-audiovisual-8005.inf",
-   "sample": "samples/?s=audiovisual-s8005",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Blend",
-    "Drive",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Noise",
-    "Note Sequencer",
-    "Output",
-    "Polygon"
    ]
   },
   {
@@ -118,7 +512,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8006.jpg",
    "file": "assets/universe/gen-audio-8006.inf",
-   "sample": "samples/?s=audio-s8006",
+   "sample": "samples/audio/?s=audio-s8006",
    "nodes": [
     "Analog",
     "Arpeggiator",
@@ -135,34 +529,6 @@
    ]
   },
   {
-   "id": "gen-audiovisual-8008",
-   "name": "Blend + Chorder + Chorus",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 19 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-8008.jpg",
-   "file": "assets/universe/gen-audiovisual-8008.inf",
-   "sample": "samples/?s=audiovisual-s8008",
-   "nodes": [
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Chorus",
-    "Circle",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Output",
-    "Ramp"
-   ]
-  },
-  {
    "id": "gen-audio-8009",
    "name": "Audio Filter + Chorder + Drum Sequencer",
    "category": "Generated",
@@ -174,7 +540,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8009.jpg",
    "file": "assets/universe/gen-audio-8009.inf",
-   "sample": "samples/?s=audio-s8009",
+   "sample": "samples/audio/?s=audio-s8009",
    "nodes": [
     "Audio Filter",
     "Audio Out",
@@ -190,59 +556,6 @@
    ]
   },
   {
-   "id": "gen-visual-8010",
-   "name": "Blend + Noise + Output",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-8010.jpg",
-   "file": "assets/universe/gen-visual-8010.inf",
-   "sample": "samples/?s=visual-s8010",
-   "nodes": [
-    "Blend",
-    "Noise",
-    "Output",
-    "Ramp",
-    "Rectangle",
-    "addnoise",
-    "bloom",
-    "exposure",
-    "vignette"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-8011",
-   "name": "Audio Filter + Blend + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 20 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-8011.jpg",
-   "file": "assets/universe/gen-audiovisual-8011.inf",
-   "sample": "samples/?s=audiovisual-s8011",
-   "nodes": [
-    "Audio Filter",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Noise",
-    "Note Sequencer"
-   ]
-  },
-  {
    "id": "gen-audio-8012",
    "name": "Audio Filter + Chorder + Delay",
    "category": "Generated",
@@ -254,7 +567,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8012.jpg",
    "file": "assets/universe/gen-audio-8012.inf",
-   "sample": "samples/?s=audio-s8012",
+   "sample": "samples/audio/?s=audio-s8012",
    "nodes": [
     "Audio Filter",
     "Audio Out",
@@ -270,83 +583,6 @@
    ]
   },
   {
-   "id": "gen-visual-8013",
-   "name": "Blend + Color Ramp + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 7 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-8013.jpg",
-   "file": "assets/universe/gen-visual-8013.inf",
-   "sample": "samples/?s=visual-s8013",
-   "nodes": [
-    "Blend",
-    "Color Ramp",
-    "LFO",
-    "Noise",
-    "Output",
-    "Ring",
-    "vignette"
-   ]
-  },
-  {
-   "id": "gen-visual-8016",
-   "name": "Blend + Blob + Ellipse",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-8016.jpg",
-   "file": "assets/universe/gen-visual-8016.inf",
-   "sample": "samples/?s=visual-s8016",
-   "nodes": [
-    "Blend",
-    "Blob",
-    "Ellipse",
-    "LFO",
-    "Noise",
-    "Output",
-    "Ramp",
-    "Reaction Diffusion",
-    "bloom",
-    "liquify"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-8017",
-   "name": "Analog + Blend + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 21 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-8017.jpg",
-   "file": "assets/universe/gen-audiovisual-8017.inf",
-   "sample": "samples/?s=audiovisual-s8017",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Chorus",
-    "Drum Sequencer",
-    "Icosphere",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Oscillator"
-   ]
-  },
-  {
    "id": "gen-audio-8018",
    "name": "Analog + Arpeggiator + Audio Filter",
    "category": "Generated",
@@ -358,7 +594,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8018.jpg",
    "file": "assets/universe/gen-audio-8018.inf",
-   "sample": "samples/?s=audio-s8018",
+   "sample": "samples/audio/?s=audio-s8018",
    "nodes": [
     "Analog",
     "Arpeggiator",
@@ -375,33 +611,6 @@
    ]
   },
   {
-   "id": "gen-visual-8019",
-   "name": "Blend + Circle + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-8019.jpg",
-   "file": "assets/universe/gen-visual-8019.inf",
-   "sample": "samples/?s=visual-s8019",
-   "nodes": [
-    "Blend",
-    "Circle",
-    "LFO",
-    "Noise",
-    "Output",
-    "Rectangle",
-    "bloom",
-    "halftone",
-    "pixelate",
-    "posterize",
-    "vignette"
-   ]
-  },
-  {
    "id": "gen-audio-8021",
    "name": "Analog + Chorder + Chorus",
    "category": "Generated",
@@ -413,7 +622,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-8021.jpg",
    "file": "assets/universe/gen-audio-8021.inf",
-   "sample": "samples/?s=audio-s8021",
+   "sample": "samples/audio/?s=audio-s8021",
    "nodes": [
     "Analog",
     "Audio Out",
@@ -426,33 +635,6 @@
     "Mixer",
     "Note Sequencer",
     "Reverb"
-   ]
-  },
-  {
-   "id": "gen-visual-8022",
-   "name": "Blend + LFO + Line",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-8022.jpg",
-   "file": "assets/universe/gen-visual-8022.inf",
-   "sample": "samples/?s=visual-s8022",
-   "nodes": [
-    "Blend",
-    "LFO",
-    "Line",
-    "Output",
-    "Ramp",
-    "Shape",
-    "bloom",
-    "gradientmap",
-    "halftone",
-    "posterize",
-    "vignette"
    ]
   },
   {
@@ -467,7 +649,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9000.jpg",
    "file": "assets/universe/gen-audio-9000.inf",
-   "sample": "samples/?s=audio-s9000",
+   "sample": "samples/audio/?s=audio-s9000",
    "nodes": [
     "Analog",
     "Audio Filter",
@@ -480,61 +662,6 @@
     "Limiter",
     "Mixer",
     "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
-   "id": "gen-visual-9001",
-   "name": "Blend + Feedback + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9001.jpg",
-   "file": "assets/universe/gen-visual-9001.inf",
-   "sample": "samples/?s=visual-s9001",
-   "nodes": [
-    "Blend",
-    "Feedback",
-    "LFO",
-    "Noise",
-    "Output",
-    "Rectangle",
-    "Trails",
-    "bloom",
-    "glitch",
-    "pixelate",
-    "vignette"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-9002",
-   "name": "Blend + Drum Sequencer + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 19 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-9002.jpg",
-   "file": "assets/universe/gen-audiovisual-9002.inf",
-   "sample": "samples/?s=audiovisual-s9002",
-   "nodes": [
-    "Audio Out",
-    "Blend",
-    "Drum Sequencer",
-    "LFO",
-    "Layer Stack",
-    "Limiter",
-    "Mixer",
-    "Noise",
-    "Note Sequencer",
-    "Output",
-    "Rectangle",
     "Reverb"
    ]
   },
@@ -550,7 +677,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9003.jpg",
    "file": "assets/universe/gen-audio-9003.inf",
-   "sample": "samples/?s=audio-s9003",
+   "sample": "samples/audio/?s=audio-s9003",
    "nodes": [
     "Analog",
     "Audio Filter",
@@ -561,62 +688,6 @@
     "Mixer",
     "Note Sequencer",
     "Reverb"
-   ]
-  },
-  {
-   "id": "gen-visual-9004",
-   "name": "Blend + LFO + Noise",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9004.jpg",
-   "file": "assets/universe/gen-visual-9004.inf",
-   "sample": "samples/?s=visual-s9004",
-   "nodes": [
-    "Blend",
-    "LFO",
-    "Noise",
-    "Output",
-    "Ramp",
-    "Text",
-    "bloom",
-    "kaleidoscope",
-    "pixelate",
-    "posterize",
-    "ripple",
-    "twirl"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-9005",
-   "name": "Analog + Audio Filter + Blend",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 17 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-9005.jpg",
-   "file": "assets/universe/gen-audiovisual-9005.inf",
-   "sample": "samples/?s=audiovisual-s9005",
-   "nodes": [
-    "Analog",
-    "Audio Filter",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Circle",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Output"
    ]
   },
   {
@@ -631,7 +702,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9006.jpg",
    "file": "assets/universe/gen-audio-9006.inf",
-   "sample": "samples/?s=audio-s9006",
+   "sample": "samples/audio/?s=audio-s9006",
    "nodes": [
     "Analog",
     "Audio Filter",
@@ -648,31 +719,6 @@
    ]
   },
   {
-   "id": "gen-visual-9007",
-   "name": "Blend + Circle + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9007.jpg",
-   "file": "assets/universe/gen-visual-9007.inf",
-   "sample": "samples/?s=visual-s9007",
-   "nodes": [
-    "Blend",
-    "Circle",
-    "LFO",
-    "Output",
-    "Ramp",
-    "Triangle",
-    "halftone",
-    "posterize",
-    "vignette"
-   ]
-  },
-  {
    "id": "gen-audio-9009",
    "name": "Chorder + Chorus + Delay",
    "category": "Generated",
@@ -684,7 +730,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9009.jpg",
    "file": "assets/universe/gen-audio-9009.inf",
-   "sample": "samples/?s=audio-s9009",
+   "sample": "samples/audio/?s=audio-s9009",
    "nodes": [
     "Audio Out",
     "Chorder",
@@ -701,59 +747,6 @@
    ]
   },
   {
-   "id": "gen-visual-9010",
-   "name": "Blend + Circle + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9010.jpg",
-   "file": "assets/universe/gen-visual-9010.inf",
-   "sample": "samples/?s=visual-s9010",
-   "nodes": [
-    "Blend",
-    "Circle",
-    "LFO",
-    "Output",
-    "Ramp",
-    "bloom",
-    "gradientmap",
-    "lensdistortion",
-    "radialblur"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-9011",
-   "name": "Audio Filter + Blend + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 20 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-9011.jpg",
-   "file": "assets/universe/gen-audiovisual-9011.inf",
-   "sample": "samples/?s=audiovisual-s9011",
-   "nodes": [
-    "Audio Filter",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Drive",
-    "Drum Sequencer",
-    "FM",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Noise",
-    "Note Sequencer"
-   ]
-  },
-  {
    "id": "gen-audio-9012",
    "name": "Analog + Chorder + Drive",
    "category": "Generated",
@@ -765,7 +758,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9012.jpg",
    "file": "assets/universe/gen-audio-9012.inf",
-   "sample": "samples/?s=audio-s9012",
+   "sample": "samples/audio/?s=audio-s9012",
    "nodes": [
     "Analog",
     "Audio Out",
@@ -781,61 +774,6 @@
    ]
   },
   {
-   "id": "gen-visual-9013",
-   "name": "Blend + Blob + Ellipse",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9013.jpg",
-   "file": "assets/universe/gen-visual-9013.inf",
-   "sample": "samples/?s=visual-s9013",
-   "nodes": [
-    "Blend",
-    "Blob",
-    "Ellipse",
-    "LFO",
-    "Noise",
-    "Output",
-    "bloom",
-    "gradientmap",
-    "liquify",
-    "twirl",
-    "vignette"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-9014",
-   "name": "Analog + Blend + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 19 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-9014.jpg",
-   "file": "assets/universe/gen-audiovisual-9014.inf",
-   "sample": "samples/?s=audiovisual-s9014",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Metallic",
-    "Mixer",
-    "Noise",
-    "Note Sequencer",
-    "Output"
-   ]
-  },
-  {
    "id": "gen-audio-9015",
    "name": "Arpeggiator + Chorder + Delay",
    "category": "Generated",
@@ -847,7 +785,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9015.jpg",
    "file": "assets/universe/gen-audio-9015.inf",
-   "sample": "samples/?s=audio-s9015",
+   "sample": "samples/audio/?s=audio-s9015",
    "nodes": [
     "Arpeggiator",
     "Audio Out",
@@ -864,32 +802,6 @@
    ]
   },
   {
-   "id": "gen-visual-9016",
-   "name": "Blend + LFO + Layer Stack",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9016.jpg",
-   "file": "assets/universe/gen-visual-9016.inf",
-   "sample": "samples/?s=visual-s9016",
-   "nodes": [
-    "Blend",
-    "LFO",
-    "Layer Stack",
-    "Output",
-    "Ramp",
-    "Rectangle",
-    "bloom",
-    "displace",
-    "halftone",
-    "vignette"
-   ]
-  },
-  {
    "id": "gen-audio-9018",
    "name": "Analog + Arpeggiator + Chorder",
    "category": "Generated",
@@ -901,7 +813,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9018.jpg",
    "file": "assets/universe/gen-audio-9018.inf",
-   "sample": "samples/?s=audio-s9018",
+   "sample": "samples/audio/?s=audio-s9018",
    "nodes": [
     "Analog",
     "Arpeggiator",
@@ -929,7 +841,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9021.jpg",
    "file": "assets/universe/gen-audio-9021.inf",
-   "sample": "samples/?s=audio-s9021",
+   "sample": "samples/audio/?s=audio-s9021",
    "nodes": [
     "Analog",
     "Audio Filter",
@@ -946,33 +858,6 @@
    ]
   },
   {
-   "id": "gen-visual-9022",
-   "name": "Blend + Formula + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9022.jpg",
-   "file": "assets/universe/gen-visual-9022.inf",
-   "sample": "samples/?s=visual-s9022",
-   "nodes": [
-    "Blend",
-    "Formula",
-    "LFO",
-    "Noise",
-    "Output",
-    "Ramp",
-    "Ring",
-    "bloom",
-    "symmetry",
-    "threshold",
-    "vignette"
-   ]
-  },
-  {
    "id": "gen-audio-9024",
    "name": "Drum Sequencer + FM + LFO",
    "category": "Generated",
@@ -984,7 +869,7 @@
    "price": 0,
    "preview": "assets/universe/gen-audio-9024.jpg",
    "file": "assets/universe/gen-audio-9024.inf",
-   "sample": "samples/?s=audio-s9024",
+   "sample": "samples/audio/?s=audio-s9024",
    "nodes": [
     "Audio Out",
     "Drum Sequencer",
@@ -994,32 +879,6 @@
     "Mixer",
     "Note Sequencer",
     "Saturator"
-   ]
-  },
-  {
-   "id": "gen-visual-9025",
-   "name": "Blend + LFO + Line",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-9025.jpg",
-   "file": "assets/universe/gen-visual-9025.inf",
-   "sample": "samples/?s=visual-s9025",
-   "nodes": [
-    "Blend",
-    "LFO",
-    "Line",
-    "Noise",
-    "Output",
-    "Polygon",
-    "Trails",
-    "bloom",
-    "gradientmap",
-    "kaleidoscope"
    ]
   }
  ]

@@ -1,0 +1,95 @@
+infinite-patch 1
+node 1 Source Noise
+  b colorNoise 0
+  f gain 0.347945
+  f height 618.237
+  f warp 1.77173
+  f width 458.628
+  c lowColor 0.0196 1.0000 0.6314
+  c highColor 1.0000 0.4431 0.8078
+end
+node 2 Source Noise
+  b colorNoise 0
+  f contrast 1.90031
+  f height 74.5084
+  f octaves 4.72559
+  f scale 0.583137
+  f speed 0.374572
+  f width 102.325
+  c lowColor 0.0196 1.0000 0.6314
+  c highColor 1.0000 0.4431 0.8078
+end
+node 3 Effects ripple
+  f uAmplitude 0.037324
+  f uCenterY 0.542464
+end
+cable 3 0 2
+node 4 Source Circle
+  f fillOpacity 0.690507
+  f height 101.265
+  i shapeType 4
+  f sizeX 0.983905
+  f strokeWidth 0.0208308
+  c fillColor 1.0000 0.4431 0.8078
+  c strokeColor 1.0000 0.4431 0.8078
+  c bgColor 0.0196 1.0000 0.6314
+end
+node 5 Effects ripple
+  f uCenterY 0.082474
+  f uPhase 3.09077
+end
+cable 5 0 4
+node 6 Source Noise
+  f brightness -0.426215
+  b colorNoise 0
+  f contrast 0.680954
+  c lowColor 0.0196 1.0000 0.6314
+  c highColor 1.0000 0.4431 0.8078
+end
+node 7 Effects ripple
+end
+cable 7 0 6
+node 8 Compositing Blend
+  f mix 0.321243
+end
+cable 8 0 1
+cable 8 1 3
+node 9 Compositing Blend
+end
+cable 9 0 8
+cable 9 1 5
+node 10 Compositing Blend
+  f mix 0.766084
+end
+cable 10 0 9
+cable 10 1 7
+node 11 Effects displace
+  f uAmount 1.72497
+end
+cable 11 0 10
+node 12 Effects bloom
+  f uThreshold 0.614525
+end
+cable 12 0 11
+node 13 Compositing gradientmap
+  f uMix 0.598439
+  c uShadowColor 0.0196 1.0000 0.6314
+  c uHighlightColor 1.0000 0.4431 0.8078
+end
+cable 13 0 12
+node 14 Effects vignette
+  f uSoftness 0.064389
+end
+cable 14 0 13
+node 15 Effects bloom
+end
+cable 15 0 14
+node 16 Utility Output
+end
+cable 16 0 15
+node 17 Modulators LFO
+  f low 0.208496
+  f phase 0.841626
+  i rateMode 2
+end
+mod 14 uRadius 17 0 0 0.202 0.5

@@ -20,8 +20,15 @@ body.reels-page {
   right: 0;
   z-index: 50;
   background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: none;
   pointer-events: none;
 }
+
+/* no separator line under the header, scrolled or not */
+.reels-page header.site-header.scrolled { border-bottom: 0; box-shadow: none; }
 
 .reels-page header.site-header * {
   pointer-events: auto;

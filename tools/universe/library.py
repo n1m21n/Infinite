@@ -65,7 +65,8 @@ def tags_of(r):
 def interest(png):
     """Cheap visual-interest score of a poster: luminance spread, edge density and colour variety, 0..1. Bland posters (flat fields, one blob) score low."""
     from PIL import Image, ImageFilter, ImageStat
-    im = Image.open(png).convert("RGB").resize((240, 135))
+    im = Image.open(png).convert("RGB")
+    im = im.resize((135, 240) if im.height > im.width else (240, 135))
     lum = im.convert("L")
     spread = min(1.0, ImageStat.Stat(lum).stddev[0] / 60.0)
     edges = min(1.0, ImageStat.Stat(lum.filter(ImageFilter.FIND_EDGES)).mean[0] / 18.0)
