@@ -348,14 +348,16 @@ def load_presets():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "presets.json")
     if PRESETS or not os.path.exists(path):
         return PRESETS
+    black = set(json.load(open(path.replace("presets", "preset_blacklist")))) if os.path.exists(path.replace("presets", "preset_blacklist")) else set()
     for base, items in json.load(open(path)).items():
         if base == "Field Graph":
             continue  # multi-node pipelines, not a standalone source
         keep = []
-        for it in items:
+        for pi, it in enumerate(items):
             if re.search(r"^\s*input\s", it["code"], re.M):
                 continue  # filters that read an image/audio input pin do not stand alone as sources
             it["params"] = [(m.group(1), float(m.group(2)), float(m.group(3)), float(m.group(4))) for m in PARAM_RE.finditer(it["code"])]
+            it["dead"] = "%s:p%02d" % (base, len(keep)) in black  # kept in place so the pNN indices never shift
             keep.append(it)
         PRESETS[base] = keep
     return PRESETS
@@ -380,6 +382,8 @@ def register_presets(facts):
         if base not in facts:
             continue
         for i, it in enumerate(items):
+            if it.get("dead"):
+                continue
             t = copy.deepcopy(facts[base]); t["type"] = "%s:p%02d" % (base, i); t["family"] = (base, "p%02d" % i); t["preset"] = it["name"]
             keep = [m for m in t["modulatable"] if not m.get("key", "").startswith("p.")]
             for j, (name, dv, lo, hi) in enumerate(it["params"]):

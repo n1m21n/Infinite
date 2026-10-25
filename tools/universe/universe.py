@@ -115,12 +115,26 @@ def seeded_params(t, seed):
 
 def tok(t):
     t = t.strip()
+    if t[0] in "$<":  # $name = a defined stream (chain head); <$name = wire that stream into the previous node's next free audio input
+        return (t[0], t.lstrip("<$"), 0)
     idx, _, seed = t[1:].partition(".")
     return (t[0], int(idx or 0), int(seed or 0))
 
 
+def split_defs(code):
+    """Genome with stream definitions: `$a=<body> && $b=<body> && <main body> ; mods` -> ([(name, body)], main code)."""
+    head, sep, mods = code.partition(";")
+    parts = [p.strip() for p in head.split("&&")]
+    defs = []
+    for p in parts[:-1]:
+        name, _, body = p.partition("=")
+        defs.append((name.strip().lstrip("$"), body.strip()))
+    return defs, parts[-1] + (" ;" + mods if sep else "")
+
+
 def parse(code):
     """-> (branches, join, tail, mods). A plain chain is one branch, no join."""
+    code = split_defs(code)[1]
     body, _, mods_s = code.partition(";")
     body = body.strip()
     join, tail = None, []
@@ -144,10 +158,20 @@ def parse(code):
 
 def node_names(code, P):
     """Type name of every chain node, in compile order (what `@k` indexes)."""
+    names = []
+    defs, main = split_defs(code)
+    for _, body in defs:
+        names += _chain_names(body, P)
+    return names + _chain_names(main, P)
+
+
+def _chain_names(code, P):
     branches, join, tail, _ = parse(code)
     names = []
     for b in branches:
         for j, (letter, idx, _) in enumerate(b):
+            if letter in "$<":
+                continue
             pool = P["G" if (letter == "N" and j == 0) else letter]
             names.append(pool[idx % len(pool)])
     for letter, idx, _ in ([join] if join else []) + tail:
@@ -156,7 +180,8 @@ def node_names(code, P):
 
 
 def compile_inf(code, facts, P, order_out=None):
-    branches, join, tail, mods = parse(code)
+    defs, main = split_defs(code)
+    branches, join, tail, mods = parse(main)
     lines, names, used, order = ["infinite-patch 1"], {}, {}, []
     n = 0
 
@@ -190,51 +215,67 @@ def compile_inf(code, facts, P, order_out=None):
     def kind_of(letter):
         return "note" if letter in "NGJ" else "aud"
 
+    streams = {}  # name -> (end node, "note" | "aud"): a defined chain other chains can start from or sidechain from
+
     # pad-type synths only answer notes 36..51: steer the branch's generator there
     pad_synths = {"MPC", "Slicer"}
-    tail_names = [P[l][i % len(P[l])] for l, i, _ in tail]
-    ends = []
-    for b in branches:
-        prev = None
-        wants_pads = any(P[l][i % len(P[l])] in pad_synths for l, i, _ in b[1:] if l == "S") or \
-            (join and join[0] == "J" and any(x in pad_synths for x in tail_names))
-        for j, (letter, idx, seed) in enumerate(b):
-            pool = P["G" if (letter == "N" and j == 0) else letter]
-            force = None
-            if wants_pads and j == 0:
-                gk = {r["key"] for r in facts[pool[idx % len(pool)]]["rows"]}
-                if "rangeLow" in gk:
-                    force = {"rangeLow": ("i", 36), "rangeHigh": ("i", 51)}
-                elif "root" in gk:
-                    force = {"root": ("i", 36)}
-                elif "transpose" in gk:
-                    force = {"path": ("s", os.path.join(HERE, "assets/pads.mid")), "transpose": ("i", 0)}
-                elif "note0" in gk:
-                    force = {"note%d" % q: ("i", 36 + q) for q in range(16)}
-            if pool[idx % len(pool)] == "Slicer":
-                force = {"sliceBy": ("i", 1), "volume": ("f", 0.8), "onsets": ("i", 8), "attack": ("f", 0)}  # grid slices answer every pad; onset slicing is sparse
-            nid = add(pool[idx % len(pool)], seed, force)
-            order.append(nid)
-            if prev is not None:
-                wire(prev, nid, kind_of(b[j - 1][0]))
-            feed_images(nid)
-            prev = nid
-        ends.append((prev, kind_of(b[-1][0])))
-    if join:
-        jl, ji, js = join
-        jn = add(P[jl][ji % len(P[jl])], js)
-        order.append(jn)
-        for e, k in ends:
-            wire(e, jn, k)
-        end, ek, prev_letter = jn, kind_of(jl), jl
-        for letter, idx, seed in tail:
-            nid = add(P[letter][idx % len(P[letter])], seed)
-            order.append(nid)
-            wire(end, nid, kind_of(prev_letter))
-            feed_images(nid)
-            end, prev_letter = nid, letter
-    else:
-        end = ends[0][0]
+
+    def build(branches, join, tail):
+        tail_names = [P[l][i % len(P[l])] for l, i, _ in tail]
+        ends = []
+        for b in branches:
+            prev, pk = None, None
+            wants_pads = any(P[l][i % len(P[l])] in pad_synths for l, i, _ in b[1:] if l == "S") or \
+                (join and join[0] == "J" and any(x in pad_synths for x in tail_names))
+            for j, (letter, idx, seed) in enumerate(b):
+                if letter == "$":
+                    prev, pk = streams[idx]
+                    continue
+                if letter == "<":
+                    src, sk = streams[idx]
+                    if prev is not None and sk == "aud" and any(i["kind"] == "audio" and (prev, i["slot"]) not in used for i in facts[names[prev]]["inputs"]):
+                        wire(src, prev, "aud")  # sidechain: only into a node that really has a spare audio input
+                    continue
+                pool = P["G" if (letter == "N" and j == 0) else letter]
+                force = None
+                if wants_pads and j == 0:
+                    gk = {r["key"] for r in facts[pool[idx % len(pool)]]["rows"]}
+                    if "rangeLow" in gk:
+                        force = {"rangeLow": ("i", 36), "rangeHigh": ("i", 51)}
+                    elif "root" in gk:
+                        force = {"root": ("i", 36)}
+                    elif "transpose" in gk:
+                        force = {"path": ("s", os.path.join(HERE, "assets/pads.mid")), "transpose": ("i", 0)}
+                    elif "note0" in gk:
+                        force = {"note%d" % q: ("i", 36 + q) for q in range(16)}
+                if pool[idx % len(pool)] == "Slicer":
+                    force = {"sliceBy": ("i", 1), "volume": ("f", 0.8), "onsets": ("i", 8), "attack": ("f", 0)}  # grid slices answer every pad; onset slicing is sparse
+                nid = add(pool[idx % len(pool)], seed, force)
+                order.append(nid)
+                if prev is not None:
+                    wire(prev, nid, pk)
+                feed_images(nid)
+                prev, pk = nid, kind_of(letter)
+            ends.append((prev, pk))
+        if join:
+            jl, ji, js = join
+            jn = add(P[jl][ji % len(P[jl])], js)
+            order.append(jn)
+            for e, k in ends:
+                wire(e, jn, k)
+            end, prev_letter = jn, jl
+            for letter, idx, seed in tail:
+                nid = add(P[letter][idx % len(P[letter])], seed)
+                order.append(nid)
+                wire(end, nid, kind_of(prev_letter))
+                feed_images(nid)
+                end, prev_letter = nid, letter
+            return end, kind_of(prev_letter)
+        return ends[0]
+
+    for name, body in defs:
+        streams[name] = build(*parse(body)[:3])
+    end, _ = build(branches, join, tail)
     out = add("Audio Out", 0)
     wire(end, out, "aud")
     shared = {}

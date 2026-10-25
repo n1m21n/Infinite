@@ -167,6 +167,58 @@ def audio_genome(r, P, facts, size, play):
         BIAS[0] = 1.0
 
 
+STRUCTS = ("plain", "plain", "fanout", "send", "nested", "sidechain", "rebus")
+PAD_SYNTHS = ("MPC", "Slicer")
+
+
+def _etok(r, P, name=None):
+    return "E%d.%d" % (P["E"].index(name) if name else P["E"].index(wchoice(r, P["E"], 1)[0]), u.sd(r))
+
+
+def _fx(r, P, k):
+    return [_etok(r, P) for _ in range(k)]
+
+
+def _synth_tok(r, P):
+    pool = [n for n in P["S"] if n not in PAD_SYNTHS]
+    return "S%d.%d" % (P["S"].index(wchoice(r, pool, 1)[0]), u.sd(r))
+
+
+def restructure(r, P, branches, slots):
+    """Rewires the plain branch list into a richer graph with stream definitions:
+    fanout    one note chain drives several synths             send      a voice also runs through a parallel effect chain (wet/dry)
+    nested    two voices are premixed, then treated as one     sidechain a voice's dynamics are keyed by another voice
+    rebus     everything is premixed, split into two treatments and joined again
+    Returns (defs, branches); defs are "$name=body" strings placed before the main body."""
+    kind = r.choice(STRUCTS)
+    mixer = "X%d.%d" % (P["X"].index("Mixer"), u.sd(r)) if "Mixer" in P["X"] else None
+    chain = lambda b: ">".join(b)
+    if kind == "fanout":
+        g = next((b for b in branches if b[0][0] == "N"), None)
+        if g:
+            cut = next((i for i, t in enumerate(g) if t[0] == "S"), len(g))
+            notes = g[:cut]
+            outs = [["$a", _synth_tok(r, P)] + _fx(r, P, r.choice([0, 1, 2])) for _ in range(min(slots, r.choice([2, 3])))]
+            return ["$a=" + chain(notes)], outs
+    elif kind == "send" and slots >= 2:
+        i = r.randrange(len(branches))
+        wet = ["$d"] + _fx(r, P, r.choice([1, 2, 3]))
+        rest = [b for j, b in enumerate(branches) if j != i][:slots - 2]
+        return ["$d=" + chain(branches[i])], [["$d"], wet] + rest
+    elif kind == "nested" and len(branches) >= 3 and mixer:
+        body = "[" + chain(branches[0]) + "]+[" + chain(branches[1]) + "]=>" + mixer
+        return ["$m=" + body], [["$m"] + _fx(r, P, r.choice([0, 1, 2]))] + branches[2:slots]
+    elif kind == "sidechain" and len(branches) >= 2 and mixer:
+        key = next((n for n in ("Dynamics", "Spectrum Slide") if n in P["E"]), None)
+        if key:
+            b1 = branches[1] + [_etok(r, P, key), "<$k"]
+            return ["$k=" + chain(branches[0])], [["$k"], b1] + branches[2:slots]
+    elif kind == "rebus" and len(branches) >= 2 and mixer and slots >= 2:
+        body = "[" + "]+[".join(chain(b) for b in branches[:slots]) + "]=>" + mixer
+        return ["$bus=" + body], [["$bus"] + _fx(r, P, r.choice([1, 2])), ["$bus"] + _fx(r, P, r.choice([1, 2, 3]))]
+    return [], branches
+
+
 def _audio_genome(r, P, facts, size, play, br, nchain, bfx, tfx):
     kmin, kmax = br
     jname = "Mixer" if r.random() < 0.65 and "Mixer" in P["X"] else wchoice(r, P["X"], 1)[0]
@@ -192,7 +244,8 @@ def _audio_genome(r, P, facts, size, play, br, nchain, bfx, tfx):
         tail.append("E%d.%d" % (P["E"].index(wchoice(r, P["E"], 1)[0]), u.sd(r)))
     if "Limiter" in P["E"] and r.random() < 0.5:
         tail.append("E%d.%d" % (P["E"].index("Limiter"), u.sd(r)))
-    code = " + ".join("[" + ">".join(b) + "]" for b in branches) + " => " + ">".join(tail) + ">O"
+    defs, branches = restructure(r, P, branches, slots)
+    code = "".join(d + " && " for d in defs) + " + ".join("[" + ">".join(b) + "]" for b in branches) + " => " + ">".join(tail) + ">O"
     if play > 0:
         names = u.node_names(code, P)
         toks = mod_tokens(r, P, facts, names, play)
