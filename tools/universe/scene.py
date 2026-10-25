@@ -238,6 +238,61 @@ def visual_pools(facts):
     return V
 
 
+TOPOS = ("fold", "tree", "fan", "switch", "split", "solo")
+
+
+def _blender(g, r, V, many=False):
+    pool = [n for n in V["blend"] if not many or sum(i["kind"] == "image" for i in g.facts[n]["inputs"]) >= 3] or V["blend"]
+    return g.add(wchoice(r, pool, 1)[0], u.sd(r))
+
+
+def _tint(g, r, V, cur, p=0.5):
+    if V["color"] and r.random() < p:
+        ca = g.add(wchoice(r, V["color"], 1)[0], u.sd(r)); g.connect(cur, ca); return ca
+    return cur
+
+
+def combine(g, r, V, layers):
+    """Joins the layers with one of several topologies so patches do not all share the same left-fold of blends."""
+    topo = r.choice(TOPOS)
+    if len(layers) == 1 or topo == "solo":
+        return layers[r.randrange(len(layers))]
+    if topo == "fold":
+        cur = layers[0]
+        for lay in layers[1:]:
+            bl = _blender(g, r, V); g.connect(cur, bl); g.connect(lay, bl); cur = _tint(g, r, V, bl, 0.4)
+        return cur
+    if topo == "tree":
+        level = list(layers)
+        while len(level) > 1:
+            nxt = []
+            for i in range(0, len(level) - 1, 2):
+                bl = _blender(g, r, V); g.connect(level[i], bl); g.connect(level[i + 1], bl); nxt.append(bl)
+            if len(level) % 2:
+                nxt.append(level[-1])
+            level = nxt
+        return _tint(g, r, V, level[0], 0.5)
+    if topo in ("fan", "switch"):
+        name = "Switcher Compositing" if topo == "switch" and "Switcher Compositing" in g.facts else None
+        bl = g.add(name, u.sd(r)) if name else _blender(g, r, V, many=True)
+        for lay in layers[:4]:
+            g.connect(lay, bl)
+        return _tint(g, r, V, bl, 0.5)
+    # split: one layer feeds two differently filtered branches that meet again
+    src = layers[0]
+    ends = []
+    for _ in range(2):
+        cur = src
+        for _ in range(r.choice([1, 2])):
+            fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r)); g.connect(cur, fl); cur = fl
+        ends.append(cur)
+    bl = _blender(g, r, V); g.connect(ends[0], bl); g.connect(ends[1], bl)
+    cur = bl
+    for lay in layers[1:]:
+        b2 = _blender(g, r, V); g.connect(cur, b2); g.connect(lay, b2); cur = b2
+    return _tint(g, r, V, cur, 0.5)
+
+
 def build_visual(g, r, V, size, play):
     """Adds the visual scene to graph g; returns (output id, modulatable node ids)."""
     f = g.facts
@@ -269,14 +324,7 @@ def build_visual(g, r, V, size, play):
             fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r))
             g.connect(cur, fl); cur = fl
         layers.append(cur)
-    cur = layers[0]
-    for lay in layers[1:]:
-        bl = g.add("Blend" if "Blend" in V["blend"] and r.random() < 0.7 else wchoice(r, V["blend"], 1)[0], u.sd(r))
-        g.connect(cur, bl); g.connect(lay, bl)
-        cur = bl
-        if V["color"] and r.random() < 0.55:
-            ca = g.add("color adjustments" if "color adjustments" in V["color"] and r.random() < 0.7 else wchoice(r, V["color"], 1)[0], u.sd(r))
-            g.connect(cur, ca); cur = ca
+    cur = combine(g, r, V, layers)
     for _ in range(r.choice([0, 1, 2])):
         fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r))
         g.connect(cur, fl); cur = fl
