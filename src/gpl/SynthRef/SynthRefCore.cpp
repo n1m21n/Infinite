@@ -16,17 +16,13 @@
 #pragma comment(lib, "comdlg32.lib")
 
 #include <atomic>
-#include <algorithm>
-#include <deque>
 #include <filesystem>
 
 namespace fs = std::filesystem;
 
-namespace
+const std::vector<SynthRefFirmware>& SynthRefFirmwares()
 {
-   std::vector<SynthRefFirmware>& RegistryList()
-   {
-      static std::vector<SynthRefFirmware> list = {
+   static const std::vector<SynthRefFirmware> list = {
       { "smk37_open", "M-VAVE SMK-37 Pro", "SMK37 OPEN V01", "synthref_smk37_open.dll", SynthRefStatus::Supported,
         "M-VAVE's open firmware (GPL-3.0), the whole application built natively; bit-exact with its official simulator" },
       { "smk37_stock", "M-VAVE SMK-37 Pro", "Stock V016", nullptr, SynthRefStatus::Unavailable,
@@ -38,56 +34,8 @@ namespace
         "community GPL-3.0 firmware; its host preview has no screen, panel or preset loading yet" },
       { "fm1_open", "M-VAVE FM-1", "FM1 OPEN V14", "synthref_fm1_open.dll", SynthRefStatus::Supported,
         "M-VAVE's open FM-1 firmware (GPL-3.0), the whole application built natively" },
-      };
-      return list;
-   }
-   constexpr size_t kBuiltIn = 5;
-   bool gRomsScanned = false;
-}
-
-// ROMs: firmware images exactly as their authors distribute them for their
-// simulators (WebAssembly), dropped in Documents\Infinite-Turbo\SynthRef\roms.
-// They run in synthref_rom.dll's sandboxed interpreter; no rebuild needed.
-void SynthRefRescanRoms()
-{
-   static std::deque<std::string> names; // stable storage for the entries' strings
-   std::vector<SynthRefFirmware>& list = RegistryList();
-   list.resize(kBuiltIn);
-   names.clear();
-   gRomsScanned = true;
-   const std::string user = SynthRefUserDir();
-   if (user.empty())
-      return;
-   std::error_code ec;
-   const fs::path dir = fs::u8path(user) / "roms";
-   fs::create_directories(dir, ec);
-   std::vector<std::string> files;
-   for (const auto& e : fs::directory_iterator(dir, ec))
-      if (e.is_regular_file() && e.path().extension() == ".wasm")
-         files.push_back(e.path().filename().u8string());
-   std::sort(files.begin(), files.end());
-   for (const std::string& f : files)
-   {
-      names.push_back("rom:" + f);
-      const char* id = names.back().c_str();
-      names.push_back(f);
-      list.push_back({ id, "ROM", names.back().c_str(), "synthref_rom.dll", SynthRefStatus::Experimental,
-                       "a firmware ROM as its authors distribute it (WebAssembly), run unmodified" });
-   }
-}
-
-const std::vector<SynthRefFirmware>& SynthRefFirmwares()
-{
-   if (!gRomsScanned)
-      SynthRefRescanRoms();
-   return RegistryList();
-}
-
-std::string SynthRefRomPath(const std::string& coreId)
-{
-   if (coreId.rfind("rom:", 0) != 0)
-      return {};
-   return (fs::u8path(SynthRefUserDir()) / "roms" / fs::u8path(coreId.substr(4))).u8string();
+   };
+   return list;
 }
 
 const SynthRefFirmware* SynthRefFindFirmware(const std::string& coreId)
@@ -253,29 +201,16 @@ std::unique_ptr<SynthRefCore> SynthRefCore::Open(const std::string& coreId, std:
       error = "core ABI mismatch (host ABI " + std::to_string(SYNTHREF_CORE_ABI_VERSION) + ")";
       return nullptr;
    }
-   core->mApi = api;
-   const std::string romPath = SynthRefRomPath(coreId);
-   if (!romPath.empty())
-   {
-      // A ROM core: the instance is the ROM, and so is its info.
-      char romError[512] = {};
-      core->mInst = api->create_rom ? api->create_rom(romPath.c_str(), romError, sizeof(romError)) : nullptr;
-      if (core->mInst == nullptr)
-      {
-         error = romError[0] ? romError : "the ROM core cannot load ROMs";
-         return nullptr;
-      }
-   }
-   const SynthRefCoreInfo* info = core->mInst && api->instance_info ? api->instance_info(core->mInst) : api->info();
+   const SynthRefCoreInfo* info = api->info();
    if (info == nullptr || info->structSize < sizeof(SynthRefCoreInfo) || info->blockFrames == 0 ||
        info->blockFrames > 4096 || info->channels < 1 || info->channels > 2 || info->sampleRate < 8000)
    {
       error = "core info invalid";
       return nullptr;
    }
+   core->mApi = api;
    core->mInfo = info;
-   if (core->mInst == nullptr)
-      core->mInst = api->create();
+   core->mInst = api->create();
    if (core->mInst == nullptr)
    {
       error = "core refused to start";
