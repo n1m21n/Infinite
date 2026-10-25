@@ -143,12 +143,14 @@ def compile_inf(code, facts, P):
     lines, names, used, order = ["infinite-patch 1"], {}, {}, []
     n = 0
 
-    def add(name, seed):
+    def add(name, seed, force=None):
         nonlocal n
         n += 1
         t = facts[name]
         lines.append("node %d %s %s" % (n, t["category"], name))
-        for k, (tag, v) in sorted(seeded_params(t, seed).items()):
+        ps = seeded_params(t, seed)
+        ps.update(force or {})
+        for k, (tag, v) in sorted(ps.items()):
             lines.append("  %s %s %s" % (tag, k, ("%.6g" % v) if tag == "f" else v if tag == "s" else int(v)))
         lines.append("end")
         names[n] = name
@@ -171,12 +173,26 @@ def compile_inf(code, facts, P):
     def kind_of(letter):
         return "note" if letter in "NGJ" else "aud"
 
+    # pad-type synths only answer notes 36..51: steer the branch's generator there
+    pad_synths = {"MPC", "Slicer"}
+    tail_names = [P[l][i % len(P[l])] for l, i, _ in tail]
     ends = []
     for b in branches:
         prev = None
+        wants_pads = any(P[l][i % len(P[l])] in pad_synths for l, i, _ in b[1:] if l == "S") or \
+            (join and join[0] == "J" and any(x in pad_synths for x in tail_names))
         for j, (letter, idx, seed) in enumerate(b):
             pool = P["G" if (letter == "N" and j == 0) else letter]
-            nid = add(pool[idx % len(pool)], seed)
+            force = None
+            if wants_pads and j == 0:
+                gk = {r["key"] for r in facts[pool[idx % len(pool)]]["rows"]}
+                if "rangeLow" in gk:
+                    force = {"rangeLow": ("i", 36), "rangeHigh": ("i", 51)}
+                elif "root" in gk:
+                    force = {"root": ("i", 36)}
+                elif "note0" in gk:
+                    force = {"note%d" % q: ("i", 36 + q) for q in range(16)}
+            nid = add(pool[idx % len(pool)], seed, force)
             order.append(nid)
             if prev is not None:
                 wire(prev, nid, kind_of(b[j - 1][0]))
