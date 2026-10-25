@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neo-Brutalist Concrete Monolith",
+    "author": "Infinite",
+    "description": "Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float slabScale = 18.0 [8.0, 40.0];\nparam float slotDensity = 12.0 [4.0, 30.0];\nparam float contrastRamp = 1.6 [0.5, 3.0];\nparam float shadowDepth = 1.4 [0.2, 3.0];\nparam float neonIntensity = 1.2 [0.0, 3.0];\n\np0 = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr2 = dot(p0, p0);\n\ngridX = floor(p0.x * slabScale);\ngridY = floor(p0.y * slabScale);\n\nelevation = sin(gridX * 2.3 + gridY * 4.7) * 0.5 + 0.5;\nfractPos = fract(p0 * slabScale) - 0.5;\n\ndistBorder = max(abs(fractPos.x), abs(fractPos.y));\ngroove = smoothstep(0.42, 0.48, distBorder);\n\nlightDir = vec2(0.7071, 0.7071);\nshadow = clamp(dot(fractPos, lightDir) * shadowDepth * contrastRamp + 0.5, 0.0, 1.0);\n\nslotActive = if(abs(gridX) < 3.0 && mod(gridY, 3.0) < 1.0, 1.0, 0.0);\nslotGlow = exp(-abs(fractPos.y) * slotDensity) * slotActive * neonIntensity;\n\ncShadow = vec3(0.082, 0.098, 0.188);\ncConcrete = vec3(0.24, 0.28, 0.42) * (0.8 + elevation * 0.4) * shadow;\ncSignalSlot = vec3(0.655, 0.694, 1.0) * (slotGlow * 1.5);\ncEmberAccent = vec3(1.0, 0.420, 0.208) * (slotGlow * 0.8 * if(gridX == 0.0, 1.0, 0.0));\n\nslabBase = mix(cConcrete, cShadow, groove);\nvignette = clamp(1.0 - r2 * 1.2, 0.0, 1.0);\ncol = (slabBase + cSignalSlot + cEmberAccent) * vignette;\nalpha = 1.0;\n",
+    "params": {
+      "slabScale": 18.0,
+      "slotDensity": 12.0,
+      "contrastRamp": 1.6,
+      "shadowDepth": 1.4,
+      "neonIntensity": 1.2
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

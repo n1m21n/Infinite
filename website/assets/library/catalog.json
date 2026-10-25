@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 271,
+ "count": 285,
  "items": [
   {
    "id": "first-sound",
@@ -686,6 +686,54 @@
    "file": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.webp",
    "page": "https://infinitedevices.org/library/op-art-phaser-matrix-fx.html"
+  },
+  {
+   "id": "acid-bass-303-lead-synth",
+   "name": "Acid Bass 303 Lead Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Classic diode-ladder resonant 303 bassline and lead synthesizer with snappy decaying filter envelope, variable accent bite, and asymmetric overdrive saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.webp",
+   "page": "https://infinitedevices.org/library/acid-bass-303-lead-synth.html"
+  },
+  {
+   "id": "brutalist-sub-bass-rumble-synth",
+   "name": "Brutalist Sub-Bass Rumble Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Heavy monolithic sub-bass generator with dual sub-octave dividers, warm even harmonic wave folding, and seismic low-frequency pressure envelope.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.webp",
+   "page": "https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html"
+  },
+  {
+   "id": "glitch-bitcrush-buffer-stutter-fx",
+   "name": "Glitch Bitcrush Buffer Stutter FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Post-digital audio mangler with variable bit-depth decimation, sample-rate reduction hold, and audio-triggered rhythmic buffer stutter repeats.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.webp",
+   "page": "https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html"
+  },
+  {
+   "id": "liquid-chorus-flanger-matrix-fx",
+   "name": "Liquid Chorus Flanger Matrix FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.webp",
+   "page": "https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -3254,6 +3302,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/liminal-void-haze.field",
    "preview": "https://infinitedevices.org/assets/library/previews/liminal-void-haze.jpg",
    "page": "https://infinitedevices.org/library/liminal-void-haze.html"
+  },
+  {
+   "id": "y2k-acid-starburst",
+   "name": "Y2K Acid Starburst",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Spiked acid starburst geometry with counter-rotating chrome star shells, radial holographic orbit tracks, and cybernetic rave HUD telemetry.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/y2k-acid-starburst.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/y2k-acid-starburst.jpg",
+   "page": "https://infinitedevices.org/library/y2k-acid-starburst.html"
+  },
+  {
+   "id": "neo-brutalist-grid-matrix",
+   "name": "Neo-Brutalist Grid Matrix",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "High-contrast Swiss neo-brutalist architectural poster layout with asymmetric modular concrete grids, diagonal hazard hatchings, and drafting crosshairs.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/neo-brutalist-grid-matrix.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/neo-brutalist-grid-matrix.jpg",
+   "page": "https://infinitedevices.org/library/neo-brutalist-grid-matrix.html"
+  },
+  {
+   "id": "y2k-chrome-torus-orbit-3d",
+   "name": "Y2K Chrome Torus Orbit 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Interlocking liquid chrome ribbed tori rotating with differential gyroscopic axes, surrounded by orbiting spiked star satellites and metallic highlights.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/y2k-chrome-torus-orbit-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/y2k-chrome-torus-orbit-3d.jpg",
+   "page": "https://infinitedevices.org/library/y2k-chrome-torus-orbit-3d.html"
+  },
+  {
+   "id": "ukiyoe-cloud-pagoda-3d",
+   "name": "Ukiyo-e Cloud Pagoda 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Multi-tiered Edo architectural pagoda structure with swooping parametric curved roof eaves, surrounded by floating woodblock cloud ribbons and indigo strata.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/ukiyoe-cloud-pagoda-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/ukiyoe-cloud-pagoda-3d.jpg",
+   "page": "https://infinitedevices.org/library/ukiyoe-cloud-pagoda-3d.html"
+  },
+  {
+   "id": "acid-bass-303-lead-synth",
+   "name": "Acid Bass 303 Lead Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Classic diode-ladder resonant 303 bassline and lead synthesizer with snappy decaying filter envelope, variable accent bite, and asymmetric overdrive saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/acid-bass-303-lead-synth.jpg",
+   "page": "https://infinitedevices.org/library/acid-bass-303-lead-synth.html"
+  },
+  {
+   "id": "brutalist-sub-bass-rumble-synth",
+   "name": "Brutalist Sub-Bass Rumble Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Heavy monolithic sub-bass generator with dual sub-octave dividers, warm even harmonic wave folding, and seismic low-frequency pressure envelope.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/brutalist-sub-bass-rumble-synth.jpg",
+   "page": "https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html"
+  },
+  {
+   "id": "glitch-bitcrush-buffer-stutter-fx",
+   "name": "Glitch Bitcrush Buffer Stutter FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Post-digital audio mangler with variable bit-depth decimation, sample-rate reduction hold, and audio-triggered rhythmic buffer stutter repeats.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/glitch-bitcrush-buffer-stutter-fx.jpg",
+   "page": "https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html"
+  },
+  {
+   "id": "liquid-chorus-flanger-matrix-fx",
+   "name": "Liquid Chorus Flanger Matrix FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/liquid-chorus-flanger-matrix-fx.jpg",
+   "page": "https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html"
+  },
+  {
+   "id": "y2k-liquid-chrome-rave",
+   "name": "Y2K Liquid Chrome Rave",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Iridescent liquid chrome metaball clusters with audio-reactive surface tension ripples, spiked holographic starburst flares, and cybernetic rave neon reflections. Bass expands the central chrome sphere, mids modulate liquid ripple viscosity, highs spark spiked starburst flares.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/y2k-liquid-chrome-rave.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/y2k-liquid-chrome-rave.jpg",
+   "page": "https://infinitedevices.org/library/y2k-liquid-chrome-rave.html"
+  },
+  {
+   "id": "neo-brutalist-concrete-monolith",
+   "name": "Neo-Brutalist Concrete Monolith",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/neo-brutalist-concrete-monolith.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/neo-brutalist-concrete-monolith.jpg",
+   "page": "https://infinitedevices.org/library/neo-brutalist-concrete-monolith.html"
   }
  ]
 }

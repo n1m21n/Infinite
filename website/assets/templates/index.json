@@ -913,6 +913,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "acid-bass-303-lead-synth",
+      "name": "Acid Bass 303 Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Classic diode-ladder resonant 303 bassline and lead synthesizer with snappy decaying filter envelope, variable accent bite, and asymmetric overdrive saturation.",
+      "price": 0,
+      "preview": "assets/templates/acid-bass-303-lead-synth.webp",
+      "file": "assets/templates/acid-bass-303-lead-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "brutalist-sub-bass-rumble-synth",
+      "name": "Brutalist Sub-Bass Rumble Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Heavy monolithic sub-bass generator with dual sub-octave dividers, warm even harmonic wave folding, and seismic low-frequency pressure envelope.",
+      "price": 0,
+      "preview": "assets/templates/brutalist-sub-bass-rumble-synth.webp",
+      "file": "assets/templates/brutalist-sub-bass-rumble-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "glitch-bitcrush-buffer-stutter-fx",
+      "name": "Glitch Bitcrush Buffer Stutter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Post-digital audio mangler with variable bit-depth decimation, sample-rate reduction hold, and audio-triggered rhythmic buffer stutter repeats.",
+      "price": 0,
+      "preview": "assets/templates/glitch-bitcrush-buffer-stutter-fx.webp",
+      "file": "assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "liquid-chorus-flanger-matrix-fx",
+      "name": "Liquid Chorus Flanger Matrix FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion.",
+      "price": 0,
+      "preview": "assets/templates/liquid-chorus-flanger-matrix-fx.webp",
+      "file": "assets/templates/liquid-chorus-flanger-matrix-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

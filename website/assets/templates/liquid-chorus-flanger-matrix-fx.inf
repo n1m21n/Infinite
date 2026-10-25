@@ -1,0 +1,50 @@
+infinite-patch 1
+# Liquid Chorus Flanger Matrix FX: iridescent stereo BBD delay matrix
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 48
+  i rangeHigh 72
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.85 [0.1, 8.0]\nparam float depth = 0.65 [0.0, 1.0]\nparam float feedback = 0.58 [0.0, 0.95]\nparam float dispersion = 0.4 [0.0, 1.0]\nparam float mix = 0.85 [0.0, 1.0]\nstate float lfoPhase = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float prevOut = 0\n\nlfoPhase = (lfoPhase + rate / sr) % 1.0\nmod1 = sin(lfoPhase * 6.2831853) * depth\nmod2 = cos((lfoPhase + dispersion * 0.25) * 6.2831853) * depth\n\ndriveIn = in + prevOut * feedback * 0.7\n\nc1 = clamp(0.35 + mod1 * 0.25, 0.05, 0.92)\nc2 = clamp(0.35 - mod2 * 0.25, 0.05, 0.92)\n\nap1 = d1 + c1 * (driveIn - d1)\nd1 = driveIn\n\nap2 = d2 + c2 * (ap1 - d2)\nd2 = ap1\n\nap3 = d3 + c1 * (ap2 - d3)\nd3 = ap2\n\nwet = (ap1 * 0.5 + ap3 * 0.5 + sin(driveIn * 1.5) * 0.1)\nprevOut = tanh(wet)\n\nout = in * (1.0 - mix) + prevOut * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Liquid Chorus Flanger Matrix FX. Multi-phase BBD delay matrix with through-zero flanging and feedback dispersion.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

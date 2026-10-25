@@ -3404,6 +3404,206 @@
       "file": "assets/library/pixel/liminal-void-haze.field",
       "preview": "assets/library/previews/liminal-void-haze.jpg",
       "bytes": 1894
+    },
+    {
+      "id": "y2k-acid-starburst",
+      "name": "Y2K Acid Starburst",
+      "kind": "Generator",
+      "tags": [
+        "y2k",
+        "acid",
+        "starburst",
+        "cyber",
+        "rave"
+      ],
+      "description": "Spiked acid starburst geometry with counter-rotating chrome star shells, radial holographic orbit tracks, and cybernetic rave HUD telemetry.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/y2k-acid-starburst.js",
+      "preview": "assets/library/previews/y2k-acid-starburst.jpg",
+      "bytes": 3503
+    },
+    {
+      "id": "neo-brutalist-grid-matrix",
+      "name": "Neo-Brutalist Grid Matrix",
+      "kind": "Generator",
+      "tags": [
+        "swiss",
+        "brutalist",
+        "grid",
+        "poster",
+        "minimal"
+      ],
+      "description": "High-contrast Swiss neo-brutalist architectural poster layout with asymmetric modular concrete grids, diagonal hazard hatchings, and drafting crosshairs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/neo-brutalist-grid-matrix.js",
+      "preview": "assets/library/previews/neo-brutalist-grid-matrix.jpg",
+      "bytes": 4035
+    },
+    {
+      "id": "y2k-chrome-torus-orbit-3d",
+      "name": "Y2K Chrome Torus Orbit 3D",
+      "kind": "Generator",
+      "tags": [
+        "y2k",
+        "chrome",
+        "torus",
+        "3d",
+        "orbit"
+      ],
+      "description": "Interlocking liquid chrome ribbed tori rotating with differential gyroscopic axes, surrounded by orbiting spiked star satellites and metallic highlights.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/y2k-chrome-torus-orbit-3d.js",
+      "preview": "assets/library/previews/y2k-chrome-torus-orbit-3d.jpg",
+      "bytes": 2986
+    },
+    {
+      "id": "ukiyoe-cloud-pagoda-3d",
+      "name": "Ukiyo-e Cloud Pagoda 3D",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "pagoda",
+        "3d",
+        "architecture",
+        "woodblock"
+      ],
+      "description": "Multi-tiered Edo architectural pagoda structure with swooping parametric curved roof eaves, surrounded by floating woodblock cloud ribbons and indigo strata.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/ukiyoe-cloud-pagoda-3d.js",
+      "preview": "assets/library/previews/ukiyoe-cloud-pagoda-3d.jpg",
+      "bytes": 3387
+    },
+    {
+      "id": "acid-bass-303-lead-synth",
+      "name": "Acid Bass 303 Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "303",
+        "bass",
+        "synth",
+        "dsp"
+      ],
+      "description": "Classic diode-ladder resonant 303 bassline and lead synthesizer with snappy decaying filter envelope, variable accent bite, and asymmetric overdrive saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/acid-bass-303-lead-synth.inf",
+      "preview": "assets/library/previews/acid-bass-303-lead-synth.jpg",
+      "bytes": 1996
+    },
+    {
+      "id": "brutalist-sub-bass-rumble-synth",
+      "name": "Brutalist Sub-Bass Rumble Synth",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "sub-bass",
+        "synth",
+        "monolith",
+        "dsp"
+      ],
+      "description": "Heavy monolithic sub-bass generator with dual sub-octave dividers, warm even harmonic wave folding, and seismic low-frequency pressure envelope.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/brutalist-sub-bass-rumble-synth.inf",
+      "preview": "assets/library/previews/brutalist-sub-bass-rumble-synth.jpg",
+      "bytes": 1912
+    },
+    {
+      "id": "glitch-bitcrush-buffer-stutter-fx",
+      "name": "Glitch Bitcrush Buffer Stutter FX",
+      "kind": "Filter",
+      "tags": [
+        "glitch",
+        "bitcrush",
+        "stutter",
+        "effects",
+        "dsp"
+      ],
+      "description": "Post-digital audio mangler with variable bit-depth decimation, sample-rate reduction hold, and audio-triggered rhythmic buffer stutter repeats.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
+      "preview": "assets/library/previews/glitch-bitcrush-buffer-stutter-fx.jpg",
+      "bytes": 1870
+    },
+    {
+      "id": "liquid-chorus-flanger-matrix-fx",
+      "name": "Liquid Chorus Flanger Matrix FX",
+      "kind": "Filter",
+      "tags": [
+        "chorus",
+        "flanger",
+        "liquid",
+        "effects",
+        "dsp"
+      ],
+      "description": "Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/liquid-chorus-flanger-matrix-fx.inf",
+      "preview": "assets/library/previews/liquid-chorus-flanger-matrix-fx.jpg",
+      "bytes": 1773
+    },
+    {
+      "id": "y2k-liquid-chrome-rave",
+      "name": "Y2K Liquid Chrome Rave",
+      "kind": "Generator",
+      "tags": [
+        "y2k",
+        "chrome",
+        "metaball",
+        "rave",
+        "pixel"
+      ],
+      "description": "Iridescent liquid chrome metaball clusters with audio-reactive surface tension ripples, spiked holographic starburst flares, and cybernetic rave neon reflections. Bass expands the central chrome sphere, mids modulate liquid ripple viscosity, highs spark spiked starburst flares.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/y2k-liquid-chrome-rave.field",
+      "preview": "assets/library/previews/y2k-liquid-chrome-rave.jpg",
+      "bytes": 2245
+    },
+    {
+      "id": "neo-brutalist-concrete-monolith",
+      "name": "Neo-Brutalist Concrete Monolith",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "concrete",
+        "monolith",
+        "swiss",
+        "pixel"
+      ],
+      "description": "Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/neo-brutalist-concrete-monolith.field",
+      "preview": "assets/library/previews/neo-brutalist-concrete-monolith.jpg",
+      "bytes": 2013
     }
   ]
 }

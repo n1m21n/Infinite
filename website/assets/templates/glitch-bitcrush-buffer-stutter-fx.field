@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Bitcrush Buffer Stutter FX",
+    "author": "Infinite",
+    "description": "Post-digital audio mangler with variable bit-depth decimation, sample-rate reduction hold, and audio-triggered rhythmic buffer stutter repeats.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float bits = 5.0 [2.0, 16.0];\nparam float downsample = 6.0 [1.0, 32.0];\nparam float stutterRate = 8.0 [1.0, 24.0];\nparam float jitter = 0.45 [0.0, 1.0];\nparam float mix = 0.9 [0.0, 1.0];\nstate float sampleCount = 0;\nstate float heldSample = 0;\nstate float stutterPhase = 0;\nstate float stutterBuffer = 0;\n\nsampleCount = sampleCount + 1.0;\nstepDs = floor(downsample + sin(stutterPhase * 12.56) * jitter * 3.0);\nheldSample = if(sampleCount >= stepDs, in, heldSample);\nsampleCount = if(sampleCount >= stepDs, 0.0, sampleCount);\n\nlevels = pow(2.0, clamp(bits, 2.0, 16.0));\ncrushed = floor(heldSample * levels + 0.5) / levels;\n\nstutterPhase = (stutterPhase + stutterRate / sr) % 1.0;\nstutterBuffer = if(stutterPhase < 0.08, crushed, stutterBuffer * 0.9996 + crushed * 0.0004);\nisRepeat = if(stutterPhase > 0.45, 1.0, 0.0);\nwet = isRepeat * stutterBuffer + (1.0 - isRepeat) * crushed;\n\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "bits": 5.0,
+      "downsample": 6.0,
+      "stutterRate": 8.0,
+      "jitter": 0.45,
+      "mix": 0.9
+    },
+    "nodeSettings": {}
+  }
+}

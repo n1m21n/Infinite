@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Y2K Liquid Chrome Rave",
+    "author": "Infinite",
+    "description": "Iridescent liquid chrome metaball clusters with audio-reactive surface tension ripples, spiked holographic starburst flares, and cybernetic rave neon reflections. Bass expands the central chrome sphere, mids modulate liquid ripple viscosity, highs spark spiked starburst flares.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float viscosity = 1.4 [0.5, 3.0];\nparam float chromeReflect = 1.8 [0.5, 3.5];\nparam float starSpikes = 6.0 [3.0, 12.0];\nparam float raveNeonGlow = 1.5 [0.2, 3.0];\nparam float pulseSpeed = 0.85 [0.1, 2.5];\n\np0 = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr2 = dot(p0, p0);\n\nwave = sin(r2 * 28.0 - t * pulseSpeed * 4.0) * (0.02 * viscosity);\np = p0 + p0 * wave;\n\nr = length(p);\nang = atan2(p.y, p.x);\n\nd1 = length(p - vec2(cos(t * pulseSpeed * 0.7) * 0.22, sin(t * pulseSpeed * 0.7) * 0.15)) - 0.28;\nd2 = length(p - vec2(cos(-t * pulseSpeed * 0.9 + 2.0) * 0.26, sin(t * pulseSpeed * 0.8) * 0.2)) - 0.22;\nd3 = length(p - vec2(sin(t * pulseSpeed * 1.1) * 0.18, cos(t * pulseSpeed * 1.1) * 0.24)) - 0.19;\n\nh1 = clamp(0.5 + 0.5 * (d2 - d1) / 0.18, 0.0, 1.0);\nmb1 = mix(d2, d1, h1) - 0.18 * h1 * (1.0 - h1);\nh2 = clamp(0.5 + 0.5 * (d3 - mb1) / 0.18, 0.0, 1.0);\nmb = mix(d3, mb1, h2) - 0.18 * h2 * (1.0 - h2);\n\nsurface = clamp(1.0 - mb * 8.0, 0.0, 1.0);\nedgeGlow = pow(clamp(1.0 - abs(mb) * 12.0, 0.0, 1.0), 3.0);\n\nstar = pow(abs(cos(ang * starSpikes + t * pulseSpeed)), 16.0) * exp(-r * 4.0);\n\nfresnel = pow(surface, 2.5) * chromeReflect;\ncChrome = vec3(0.655, 0.694, 1.0) * (fresnel + edgeGlow * 1.4);\ncNeon = vec3(1.0, 0.22, 0.65) * (edgeGlow * raveNeonGlow) + vec3(0.306, 0.949, 0.722) * (star * raveNeonGlow * 2.0);\n\ncGround = vec3(0.082, 0.098, 0.188);\nvignette = clamp(1.0 - r2 * 1.4, 0.0, 1.0);\ncol = mix(cGround, cChrome + cNeon, surface + star * 0.8) * vignette;\nalpha = 1.0;\n",
+    "params": {
+      "viscosity": 1.4,
+      "chromeReflect": 1.8,
+      "starSpikes": 6.0,
+      "raveNeonGlow": 1.5,
+      "pulseSpeed": 0.85
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

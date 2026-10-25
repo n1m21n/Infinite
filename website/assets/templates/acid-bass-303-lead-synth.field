@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid Bass 303 Lead Synth",
+    "author": "Infinite",
+    "description": "Classic diode-ladder resonant 303 bassline and lead synthesizer with snappy decaying filter envelope, variable accent bite, and asymmetric overdrive saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1400.0 [100.0, 8000.0];\nparam float resonance = 0.82 [0.1, 0.98];\nparam float envMod = 0.75 [0.0, 1.0];\nparam float decay = 0.42 [0.08, 1.5];\nparam float accent = 0.65 [0.0, 1.0];\nstate float phase = 0;\nstate float env = 0;\nstate float curFreq = 220;\nstate float f1 = 0;\nstate float f2 = 0;\nstate float f3 = 0;\nstate float f4 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nenv = if(target > env, env + (target - env) * 0.08, env - env * (0.0006 / decay));\n\ncurFreq = curFreq + (freq - curFreq) * 0.04;\nstepFreq = clamp(curFreq, 30.0, 6000.0) / sr;\nphase = (phase + stepFreq) % 1.0;\n\nsaw = phase * 2.0 - 1.0;\nsqr = if(phase > 0.5, 0.8, -0.8);\nosc = saw * 0.65 + sqr * 0.35;\n\nfCut = clamp(cutoff + env * envMod * 6000.0 * (1.0 + accent * 0.6), 60.0, 18000.0);\nfNorm = clamp(fCut * 3.14159265 / sr, 0.01, 0.95);\nfeedback = resonance * 3.8 * (1.0 - fNorm * 0.25);\n\ninSig = osc - tanh(f4 * feedback);\nf1 = f1 + fNorm * (tanh(inSig) - f1);\nf2 = f2 + fNorm * (f1 - f2);\nf3 = f3 + fNorm * (f2 - f3);\nf4 = f4 + fNorm * (f3 - f4);\n\nsat = tanh(f4 * (1.4 + accent * 1.8));\nout = sat * env * (0.8 + accent * 0.4);\n",
+    "params": {
+      "cutoff": 1400.0,
+      "resonance": 0.82,
+      "envMod": 0.75,
+      "decay": 0.42,
+      "accent": 0.65
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

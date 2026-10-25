@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid Chorus Flanger Matrix FX",
+    "author": "Infinite",
+    "description": "Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rate = 0.85 [0.1, 8.0];\nparam float depth = 0.65 [0.0, 1.0];\nparam float feedback = 0.58 [0.0, 0.95];\nparam float dispersion = 0.4 [0.0, 1.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float prevOut = 0;\n\nlfoPhase = (lfoPhase + rate / sr) % 1.0;\nmod1 = sin(lfoPhase * 6.2831853) * depth;\nmod2 = cos((lfoPhase + dispersion * 0.25) * 6.2831853) * depth;\n\ndriveIn = in + prevOut * feedback * 0.7;\n\nc1 = clamp(0.35 + mod1 * 0.25, 0.05, 0.92);\nc2 = clamp(0.35 - mod2 * 0.25, 0.05, 0.92);\n\nap1 = d1 + c1 * (driveIn - d1);\nd1 = driveIn;\n\nap2 = d2 + c2 * (ap1 - d2);\nd2 = ap1;\n\nap3 = d3 + c1 * (ap2 - d3);\nd3 = ap2;\n\nwet = (ap1 * 0.5 + ap3 * 0.5 + sin(driveIn * 1.5) * 0.1);\nprevOut = tanh(wet);\n\nout = in * (1.0 - mix) + prevOut * mix;\n",
+    "params": {
+      "rate": 0.85,
+      "depth": 0.65,
+      "feedback": 0.58,
+      "dispersion": 0.4,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

@@ -185,6 +185,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/neo-brutalist-concrete-monolith.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/neo_brutalist.html": {
    "font-size": 2,
    "hex": 5,
@@ -297,6 +301,10 @@
    "radius": 1
   },
   "embeds/voronoi-bioluminescence.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/y2k-liquid-chrome-rave.html": {
    "font-size": 2,
    "hex": 6
   },

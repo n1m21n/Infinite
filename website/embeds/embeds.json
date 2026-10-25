@@ -250,6 +250,16 @@
       "slug": "liminal-void-haze",
       "title": "Liminal Void Haze",
       "description": "Hypnagogic brutalist infinite corridor with volumetric atmospheric haze, stark rectangular portal lightframes, and dark spatial perspective. Bass contracts the corridor perspective depth, mids sweep portal illumination gradients, highs scatter atmospheric fog caustics."
+    },
+    {
+      "slug": "y2k-liquid-chrome-rave",
+      "title": "Y2K Liquid Chrome Rave",
+      "description": "Iridescent liquid chrome metaball clusters with audio-reactive surface tension ripples, spiked holographic starburst flares, and cybernetic rave neon reflections. Bass expands the central chrome sphere, mids modulate liquid ripple viscosity, highs spark spiked starburst flares."
+    },
+    {
+      "slug": "neo-brutalist-concrete-monolith",
+      "title": "Neo-Brutalist Concrete Monolith",
+      "description": "Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows."
     }
   ]
 }

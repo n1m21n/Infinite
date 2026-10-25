@@ -1,0 +1,44 @@
+infinite-patch 1
+# Brutalist Sub-Bass Rumble Synth: heavy monolithic sub-bass generator
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 28
+  i rangeHigh 48
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float subMix = 0.65 [0.0, 1.0]\nparam float foldDrive = 2.4 [1.0, 6.0]\nparam float glide = 0.35 [0.0, 1.0]\nparam float decay = 1.2 [0.2, 3.0]\nparam float bodyTone = 0.45 [0.0, 1.0]\nstate float phase = 0\nstate float subPhase1 = 0\nstate float subPhase2 = 0\nstate float env = 0\nstate float curFreq = 110\nstate float lp = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, env + (target - env) * 0.05, env - env * (0.0003 / decay))\n\ncurFreq = curFreq + (freq - curFreq) * (0.03 / (1.0 + glide * 3.0))\nstepFreq = clamp(curFreq, 20.0, 500.0) / sr\nphase = (phase + stepFreq) % 1.0\nsubPhase1 = (subPhase1 + stepFreq * 0.5) % 1.0\nsubPhase2 = (subPhase2 + stepFreq * 0.25) % 1.0\n\nsinCore = sin(phase * 6.2831853)\nsub1 = sin(subPhase1 * 6.2831853)\nsub2 = if(subPhase2 > 0.5, 0.7, -0.7)\n\nraw = sinCore * (1.0 - subMix * 0.5) + sub1 * (subMix * 0.7) + sub2 * (subMix * 0.4)\nfolded = sin(raw * foldDrive)\n\ncut = clamp(0.08 + bodyTone * 0.22, 0.02, 0.4)\nlp = lp + cut * (folded - lp)\n\nout = lp * env * 1.2\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.26
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Brutalist Sub-Bass Rumble Synth. Heavy monolithic sub-bass generator with dual sub-octave divider and wavefolding harmonics.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.16 0.42
+mod pic sizeY ana 0 0 1 0.5 0.16 0.42
