@@ -66,3 +66,8 @@
 }
 .reels-page .reel-card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .smp-none { color: #c9cfe6; text-align: center; padding: 40vh 24px 0; font: 500 0.9rem/1.4 var(--font-mono); }
+
+.smp-pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0 8px; }
+.smp-pager .lib-icon-pill { width: auto; padding: 0 16px; }
+.smp-pager .lib-icon-pill:disabled { opacity: .35; cursor: default; }
+.smp-pg-info { font-variant-numeric: tabular-nums; opacity: .7; }

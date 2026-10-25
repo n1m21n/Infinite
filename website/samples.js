@@ -33,10 +33,24 @@
     '</div>';
   }
 
+  var PAGE = 25, page = 0, pagerEl = document.getElementById('smp-pager');
+  pagerEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pg]');
+    if (!b || b.disabled) return;
+    page += +b.getAttribute('data-pg'); render(); window.scrollTo({ top: 0 });
+  });
+
   function render() {
     stop();
-    listEl.innerHTML = items.map(row).join('');
+    var pages = Math.max(1, Math.ceil(items.length / PAGE));
+    page = Math.min(page, pages - 1);
+    var shown = items.slice(page * PAGE, page * PAGE + PAGE);
+    listEl.innerHTML = shown.map(row).join('');
     emptyEl.hidden = items.length > 0;
+    pagerEl.hidden = pages < 2;
+    pagerEl.querySelector('.smp-pg-info').textContent = (page + 1) + ' / ' + pages;
+    pagerEl.querySelector('[data-pg="-1"]').disabled = page === 0;
+    pagerEl.querySelector('[data-pg="1"]').disabled = page >= pages - 1;
     Array.prototype.forEach.call(listEl.querySelectorAll('.smp-row'), function (r) {
       var it = items.filter(function (x) { return x.id === r.getAttribute('data-id'); })[0], cv = r.querySelector('canvas');
       if (cv) drawWave(cv, it.peaks, 0);
@@ -80,7 +94,7 @@
     }
     play(r);
   });
-  document.getElementById('smp-shuffle').addEventListener('click', function () { shuffle(items); render(); });
+  document.getElementById('smp-shuffle').addEventListener('click', function () { shuffle(items); page = 0; render(); });
   window.addEventListener('resize', function () {
     Array.prototype.forEach.call(listEl.querySelectorAll('canvas'), function (cv) {
       var r = cv.closest('.smp-row'), it = items.filter(function (x) { return x.id === r.getAttribute('data-id'); })[0];
@@ -89,6 +103,6 @@
   });
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
 
-  fetch('data.json').then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
+  fetch('data.json').then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); var q0 = new URLSearchParams(location.search).get('s'); if (q0) { var ix = items.findIndex(function (x) { return x.id === q0.replace(/[^\w-]/g, ''); }); if (ix > -1) page = Math.floor(ix / PAGE); } render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
     .catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the samples.'; });
 })();
