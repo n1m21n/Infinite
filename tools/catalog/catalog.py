@@ -33,12 +33,12 @@ def run(cmd, timeout):
         return False
 
 
-FRAME = (1080, 1920)   # every picture is a 9:16 reel at 1080x1920
+FRAME = (1080, 1080)   # 1:1 square at 1080x1080
 CLIP_SECS = 6
 
 
 def render_clip(binary, inf, d, kind):
-    """9:16 1080x1920 h264 clip: the Output node tapped at full size, re-encoded small, with the sample's sound muxed in for AV."""
+    """1:1 1080x1080 h264 clip: the Output node tapped at full size, re-encoded small, with the sample's sound muxed in for AV."""
     raw, mp4 = os.path.join(d, "raw.mp4"), os.path.join(d, "preview.mp4")
     if not run([binary, "--render", inf, raw, "--duration", str(CLIP_SECS), "--fps", "30"], 300):
         return False
@@ -136,13 +136,16 @@ def publish_samples(lib, site, max_mb=150):
         os.makedirs(d, exist_ok=True)
         s = {"id": m["sid"], "name": codename(m["sid"], used), "kind": m["kind"], "tags": m.get("tags", []), "nodes": len(m.get("nodes", [])),
              "family": (m.get("family") or "").replace("/", "-") or None, "peaks": [0.0] * 120, "audio": None, "video": None, "poster": None, "download": None}
-        wav, mp4, png = (os.path.join(src, f) for f in ("sample.wav", "preview.mp4", "poster.png"))
+        wav, mp4, png, inf = (os.path.join(src, f) for f in ("sample.wav", "preview.mp4", "poster.png", "patch.inf"))
         if m["kind"] == "A" and os.path.exists(wav):
             s["peaks"] = peaks(wav)
             shutil.copy(wav, os.path.join(d, "sample.wav"))
             subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "128000", wav, os.path.join(d, "sample.m4a")], check=True)
             s["audio"] = "media/%s/sample.m4a" % m["sid"]
             s["download"] = "media/%s/sample.wav" % m["sid"]
+            if os.path.exists(inf):
+                shutil.copy(inf, os.path.join(d, "patch.inf"))
+                s["patch"] = "media/%s/patch.inf" % m["sid"]
         elif m["kind"] in ("V", "AV") and os.path.exists(mp4):
             shutil.copy(mp4, os.path.join(d, "sample.mp4"))
             s["video"] = s["download"] = "media/%s/sample.mp4" % m["sid"]
@@ -156,11 +159,11 @@ def publish_samples(lib, site, max_mb=150):
         out.append(s)
     # a 'cap' that keeps the page's media under max_mb, dropping from the end of the (stable) order
     for s in list(out):
-        size = sum(os.path.getsize(os.path.join(site, p)) for p in (s["audio"], s["video"], s["poster"], s["download"]) if p and os.path.exists(os.path.join(site, p))) / 1e6
+        size = sum(os.path.getsize(os.path.join(site, p)) for p in (s["audio"], s["video"], s["poster"], s["download"], s.get("patch")) if p and os.path.exists(os.path.join(site, p))) / 1e6
         total += size
     while total > max_mb and out:
         s = out.pop()
-        total -= sum(os.path.getsize(os.path.join(site, p)) for p in (s["audio"], s["video"], s["poster"], s["download"]) if p and os.path.exists(os.path.join(site, p))) / 1e6
+        total -= sum(os.path.getsize(os.path.join(site, p)) for p in (s["audio"], s["video"], s["poster"], s["download"], s.get("patch")) if p and os.path.exists(os.path.join(site, p))) / 1e6
         shutil.rmtree(os.path.join(media, s["id"]), ignore_errors=True)
     json.dump({"samples": out}, open(os.path.join(site, "data.json"), "w"), separators=(",", ":"))
     print("samples: %d (%.0f MB) -> %s" % (len(out), total, site))
@@ -233,6 +236,12 @@ def main():
             by = {i["sample"].split("=")[1]: i["id"] for i in its if i["sample"]}
             for x in s:
                 x["library"] = by.get(x["id"])
+                if not x.get("patch") and x.get("library"):
+                    lib_inf = os.path.join(W, "assets", "universe", "%s.inf" % x["library"])
+                    if os.path.exists(lib_inf):
+                        dest_inf = os.path.join(W, "samples", "media", x["id"], "patch.inf")
+                        shutil.copy(lib_inf, dest_inf)
+                        x["patch"] = "media/%s/patch.inf" % x["id"]
             json.dump({"samples": s}, open(os.path.join(W, "samples", "data.json"), "w"), separators=(",", ":"))
 
 

@@ -1,0 +1,66 @@
+infinite-patch 1
+transport 82 4 4 8 4
+# style: solo_piano bpm 82 key 8 scale 4
+node 1 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 30
+  f humanizeVelocity 30
+  i progSteps 4
+  f rateBeats 2
+  i root 8
+  i scale 4
+  f strumMs 70
+end
+node 2 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 2 0 1
+node 3 Notes Velocity Curve
+  f curve 1.6
+end
+note 3 0 2
+node 4 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  i repeats 3
+  i transposePerRepeat 10
+end
+note 4 0 3
+node 5 Synths Partials
+  s path /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/04-open-hat.wav
+  s pathB /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/04-open-hat.wav
+  f speed 2.61477
+end
+note 5 0 4
+node 6 AudioEffects Convolution Reverb
+  s file /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/03-closed-hat.wav
+  f size 0.294753
+end
+aud 6 0 5
+node 7 AudioEffects Convolution Reverb
+  f decay 0.118715
+  f distance 0.46489
+  s file /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/08-bell.wav
+  f material 0.389244
+end
+aud 7 0 6
+node 8 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 8 0 7
+node 9 AudioEffects Reverb
+  f damping 0.999194
+  f decay 1.2
+  f mix 0.15
+  f predelay 48.2832
+  f width 0.456472
+end
+aud 9 0 8
+node 10 AudioEffects Limiter
+end
+aud 10 0 9
+node 11 Utility Audio Out
+end
+aud 11 0 10

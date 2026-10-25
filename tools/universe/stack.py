@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import universe as u
 import scene
 
-W, H = 1080, 1920
+W, H = 1080, 1080
 
 PRELUDE = r"""
 let _s = SEED;

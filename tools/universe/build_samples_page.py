@@ -67,9 +67,9 @@ def main():
     </section>
   </main>"""
     t = re.sub(r"<main>.*?</main>", lambda _: main, t, count=1, flags=re.S)
-    t = re.sub(r'<script src="\.\./library\.js[^"]*"></script>', '<script src="../samples.js?v=10"></script>', t)
+    t = re.sub(r'<script src="\.\./library\.js[^"]*"></script>', '<script src="../samples.js?v=11"></script>', t)
     t = re.sub(r'<script src="\.\./(?:\.\./)?deck\.js[^"]*"></script>', "", t)
-    t = t.replace('</head>', '  <link rel="stylesheet" href="../samples.css?v=8">\n</head>', 1)
+    t = t.replace('</head>', '  <link rel="stylesheet" href="../samples.css?v=9">\n</head>', 1)
     open(os.path.join(a.site, "index.html"), "w", encoding="utf-8").write(t)
     print("pages ->", a.site)
 

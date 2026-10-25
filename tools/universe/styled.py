@@ -211,8 +211,8 @@ def paint(g, nid, pal, rng):
                        "  c %s %.4f %.4f %.4f" % ((k,) + tuple(rgb(c))))
 
 
-def portrait(g, f, w=1080, h=1920):
-    """Make the picture natively 9:16: every source and 3D render gets the canvas size (a rescale at export would stretch it)."""
+def portrait(g, f, w=1080, h=1080):
+    """Make the picture natively 1:1: every source and 3D render gets the canvas size (a rescale at export would stretch it)."""
     for nid, name in list(g.names.items()):
         keys = {r["key"] for r in f[name]["rows"]}
         if not ({"width", "height"} <= keys) or not (f[name]["category"] == "Source" or name.split(":")[0] == "Render 3D"):

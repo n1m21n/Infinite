@@ -23,12 +23,15 @@
   }
 
   function row(it) {
+    var baseName = it.name.replace(/\W+/g, '_');
+    var patchBtn = it.patch ? '<a class="smp-dl smp-dl-patch" href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" aria-label="Download patch ' + esc(it.name) + '" title="Download .inf patch">' + IC_DL + '<span class="smp-fmt">.inf</span></a>' : '';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
       '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
-        '<a class="smp-dl" href="' + esc(it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.wav" aria-label="Download wav ' + esc(it.name) + '" title="Download .wav">' + IC_DL + '</a>' +
+        '<a class="smp-dl" href="' + esc(it.download) + '" download="' + esc(baseName) + '.wav" aria-label="Download wav ' + esc(it.name) + '" title="Download .wav">' + IC_DL + '<span class="smp-fmt">.wav</span></a>' +
+        patchBtn +
       '</div>' +
     '</div>';
   }

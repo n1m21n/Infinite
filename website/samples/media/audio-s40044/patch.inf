@@ -1,0 +1,142 @@
+infinite-patch 1
+transport 56 4 4 8 12
+# style: drone_kosmische bpm 56 key 8 scale 12
+node 1 Notes Note Sequencer
+  b en0 1
+  b en1 0
+  b en10 0
+  b en11 0
+  b en12 0
+  b en13 0
+  b en14 0
+  b en15 0
+  b en2 0
+  b en3 0
+  b en4 0
+  b en5 0
+  b en6 0
+  b en7 0
+  b en8 0
+  b en9 0
+  f gatePercent 55
+  i note0 32
+  i note1 32
+  i note10 32
+  i note11 32
+  i note12 32
+  i note13 32
+  i note14 32
+  i note15 32
+  i note2 32
+  i note3 32
+  i note4 32
+  i note5 32
+  i note6 32
+  i note7 32
+  i note8 32
+  i note9 32
+  f rateBeats 0.25
+  i rateMode 0
+  i steps 16
+  f vel0 0.9
+  f vel1 0.9
+  f vel10 0.9
+  f vel11 0.9
+  f vel12 0.9
+  f vel13 0.9
+  f vel14 0.9
+  f vel15 0.9
+  f vel2 0.9
+  f vel3 0.9
+  f vel4 0.9
+  f vel5 0.9
+  f vel6 0.9
+  f vel7 0.9
+  f vel8 0.9
+  f vel9 0.9
+end
+node 2 Synths Oscillator
+  f cutoff 1116.75
+  f fine -36.2129
+  f pan 0.860204
+  f phase 0.97136
+  f pitchBend -0.834474
+  f sync 13.3867
+end
+note 2 0 1
+node 3 AudioEffects Phaser
+  f cutoff 2006
+end
+aud 3 0 2
+node 4 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 0
+  f humanizeVelocity 0
+  i mode 11
+  i progSteps 4
+  f rateBeats 16
+  i root 8
+  i scale 12
+  f strumMs 0
+end
+node 5 Notes Note Echo
+  f decay 55
+  b muteDry 0
+  f rateBeats 0.75
+  f rateSeconds 1.99905
+  i repeats 3
+end
+note 5 0 4
+node 6 Synths Partials
+  f formant -1.34327
+  f morph 0.445808
+  s path /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/07-high-tom.wav
+  s pathB /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/01-kick.wav
+  f pitch 16.1513
+  f release 1073.57
+end
+note 6 0 5
+node 7 AudioEffects Audio Filter
+  f freq 20.7486
+  f gain 9.50286
+  f mix 0.327609
+  f q 0.520614
+  f rate 0.0823125
+end
+aud 7 0 6
+node 8 Utility Mixer
+  i channels 2
+  f gain0 -4
+  f gain1 14
+end
+aud 8 0 3
+aud 8 1 7
+node 9 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+end
+aud 9 0 8
+node 10 AudioEffects Limiter
+end
+aud 10 0 9
+node 11 Utility Audio Out
+end
+aud 11 0 10
+node 12 Modulators LFO
+  f high 0.0771606
+  i phaseMode 2
+  f rateBeats 5.09742
+  i rateMode 1
+  f seed 178.586
+  i shape 2
+  b voice 1
+end
+mod 2 cutoff 12 0 0 0.165 0.5
+node 13 Modulators LFO
+  f high 0.352408
+  i phaseMode 0
+  f rateBeats 0.101025
+  i rateMode 1
+  i shape 3
+end
+mod 2 fmDepth 13 0 0 0.119 0.5
