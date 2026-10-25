@@ -43,14 +43,9 @@ def main():
         t = t.replace('<a href="%ssamples/">' % ("../" * (depth)), '<a href="%ssamples/" aria-current="page">' % ("../" * depth))
         return t
 
-    # Visuals & audio: the embeds page's reel, one 9:16 clip per slide
+    # pictures are no longer on this page: the old address forwards to the list
     os.makedirs(os.path.join(a.site, "visuals"), exist_ok=True)
-    t = chrome("embeds/index.html", 2, "https://infinitedevices.org/samples/visuals/", "Infinite samples: pictures and sound from generated patches")
-    main = '<main>\n    <h1 class="sr-only">Samples</h1>\n    ' + TABS % ("../", "", "./", ' aria-current="page"') + '\n    <div class="reels" id="reels"></div>\n  </main>'
-    t = re.sub(r"<main>.*?</main>", lambda _: main, t, count=1, flags=re.S)
-    t = re.sub(r"<script>\s*\(function \(\) \{\s*var reels = .*?</script>", '<script src="../../samples-reels.js?v=4" defer></script>', t, count=1, flags=re.S)
-    t = t.replace('</head>', '  <link rel="stylesheet" href="../../samples.css?v=8">\n</head>', 1)
-    open(os.path.join(a.site, "visuals", "index.html"), "w", encoding="utf-8").write(t)
+    open(os.path.join(a.site, "visuals", "index.html"), "w", encoding="utf-8").write('<!doctype html><meta charset="utf-8"><title>Infinite samples</title><meta name="robots" content="noindex"><link rel="canonical" href="https://infinitedevices.org/samples/"><meta http-equiv="refresh" content="0;url=../"><a href="../">Samples</a>\n')
 
     # Only audio: the list
     t = chrome("library.html", 1, "https://infinitedevices.org/samples/", "Infinite samples: generated sounds you can hear")
@@ -58,7 +53,6 @@ def main():
     <section class="section lib-hero">
       <div class="container smp-wrap">
         <h1 class="slab deck-title" style="text-align:center">Samples</h1>
-        %s
         <div class="smp-bar">
           <span class="grow"></span>
           <button type="button" class="lib-icon-pill lib-shuffle-btn" id="smp-shuffle" aria-label="Shuffle" title="Shuffle"><svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg></button>
@@ -67,7 +61,7 @@ def main():
         <p class="lib-empty" id="smp-empty" hidden>Nothing here yet.</p>
       </div>
     </section>
-  </main>""" % (TABS % ("./", ' aria-current="page"', "visuals/", ""))
+  </main>"""
     t = re.sub(r"<main>.*?</main>", lambda _: main, t, count=1, flags=re.S)
     t = re.sub(r'<script src="\.\./library\.js[^"]*"></script>', '<script src="../samples.js?v=9"></script>', t)
     t = re.sub(r'<script src="\.\./(?:\.\./)?deck\.js[^"]*"></script>', "", t)

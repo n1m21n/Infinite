@@ -121,12 +121,15 @@ def curated(m):
     return True
 
 
+SAMPLE_KINDS = ("A",)   # the Samples page is sound only; pictures live in the Library
+
+
 def publish_samples(lib, site, max_mb=150):
     media = os.path.join(site, "media")
     shutil.rmtree(media, ignore_errors=True)
     out, total, used = [], 0.0, set()
     for m in read_lib(lib):
-        if not passes(m):
+        if not passes(m) or m["kind"] not in SAMPLE_KINDS:
             continue
         src = os.path.join(lib, m["id"])
         d = os.path.join(media, m["sid"])
@@ -191,7 +194,7 @@ def publish_library(lib, site_assets, n=60, samples=None):
     rows = [m for m in read_lib(lib) if curated(m) and not m.get("family")]  # one per family: the base patch
     live = {s["id"] for s in (samples or [])}
     if samples is not None:
-        rows = [m for m in rows if m["sid"] in live]  # a patch only links to a sample that is actually published
+        rows = [m for m in rows if m["kind"] not in SAMPLE_KINDS or m["sid"] in live]  # a sound patch only links to a sample that is actually published
     items = []
     for m in rows[:n]:
         src = os.path.join(lib, m["id"])
@@ -207,7 +210,7 @@ def publish_library(lib, site_assets, n=60, samples=None):
         items.append({"id": gid, "name": _title(m["nodes"]), "category": "Generated", "kind": "Patch", "tags": [t for t in m.get("tags", []) if t not in ("code", "small", "dense")][:4],
                       "description": "A %s Infinite made by itself from %d nodes. Open it, then change anything." % (kind_word, len(m["nodes"])),
                       "price": 0, "preview": "assets/universe/%s.jpg" % gid, "file": "assets/universe/%s.inf" % gid,
-                      "sample": ("samples/?s=%s" if m["kind"] == "A" else "samples/visuals/?s=%s") % m["sid"], "nodes": m["nodes"][:12]})
+                      "sample": ("samples/?s=%s" % m["sid"]) if m["kind"] == "A" else None, "nodes": m["nodes"][:12]})
     json.dump({"version": 1, "items": items}, open(os.path.join(site_assets, "index.json"), "w"), indent=1)
     print("library: %d patches -> %s" % (len(items), site_assets))
     return items
@@ -227,7 +230,7 @@ def main():
     if a.cmd in ("library", "all"):
         its = publish_library(a.lib, os.path.join(W, "assets", "universe"), a.n, s)
         if s is not None:  # the sample row links to its patch in the Library
-            by = {i["sample"].split("=")[1]: i["id"] for i in its}
+            by = {i["sample"].split("=")[1]: i["id"] for i in its if i["sample"]}
             for x in s:
                 x["library"] = by.get(x["id"])
             json.dump({"samples": s}, open(os.path.join(W, "samples", "data.json"), "w"), separators=(",", ":"))
