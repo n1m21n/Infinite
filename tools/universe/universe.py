@@ -190,8 +190,12 @@ def compile_inf(code, facts, P):
                     force = {"rangeLow": ("i", 36), "rangeHigh": ("i", 51)}
                 elif "root" in gk:
                     force = {"root": ("i", 36)}
+                elif "transpose" in gk:
+                    force = {"path": ("s", os.path.join(HERE, "assets/pads.mid")), "transpose": ("i", 0)}
                 elif "note0" in gk:
                     force = {"note%d" % q: ("i", 36 + q) for q in range(16)}
+            if pool[idx % len(pool)] == "Slicer":
+                force = {"sliceBy": ("i", 1), "volume": ("f", 0.8)}  # grid slices answer every pad; onset slicing is sparse
             nid = add(pool[idx % len(pool)], seed, force)
             order.append(nid)
             if prev is not None:

@@ -239,3 +239,18 @@ Prior art: [MatFormer](https://arxiv.org/pdf/2207.01044) (Adobe, SIGGRAPH 2022: 
 ## Parked
 
 Extending Tongue to modulation and other records. Training a generative model. Hosted or paid generation.
+
+## Probe findings (2026-10-25, universe v0)
+
+| Fact | Result |
+|---|---|
+| Pipeline | genome -> `.inf` -> `--audio-summary` probe, ~2 s per 4 s probe, 2 workers about 1 patch/s |
+| M2 audible | 70% first run, 76% after pad steering (about 340 patches) |
+| M3 audible | 77% (465 patches); joiners: Spectrum Slide ~94%, Note Merge ~80%, Note Switcher ~65% |
+| Failures | no NaN in about 1,765 patches; no modulator kills sound |
+| Pad synths | MPC and Slicer only answer notes 36..51; the compiler steers the branch generator there (Slicer also forced to grid slicing). MPC 12/20 audible now |
+| Slicer | still mostly silent: a note transformer between generator and synth (e.g. Field Notes) moves notes off the pads. This is atlas data, not a tool bug |
+| Chorder | `root` is a pitch class (0..11), so it cannot be steered into 36..51: Chorder into MPC is always silent |
+| Grain Molder | silent headless even with the official starter patch (loads and records via the UI); excluded like Keyboard |
+| Pool indices | a genome index is the position in the sorted pool, so changing the pool (e.g. excluding a type) changes what old genomes decode to. Decode atlas rows with the pool they were generated under, or store the compiled type names |
+| Engine bug | Grain Molder `descending` is advertised modulatable (index 771) but the engine rejects it (`E_BAD_PARAM`, only 0..680) |
