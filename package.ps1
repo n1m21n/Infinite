@@ -79,7 +79,7 @@ Copy-Item $OrtDll $Stage
 Copy-Item $DmlDll $Stage
 # onnxruntime.dll needs the VC++ runtime; ship it app-local.
 Get-ChildItem (Join-Path $Build "Release") -Filter "*.dll" |
-    Where-Object { $_.Name -match "^(msvcp140|vcruntime140(_1)?)\.dll$" } |
+    Where-Object { $_.Name -match "^(msvcp140|vcruntime140|concrt140)[a-z0-9_]*\.dll$" } |
     Copy-Item -Destination $Stage
 New-Item -ItemType Directory -Force (Join-Path $Stage "assets\models") | Out-Null
 Copy-Item (Join-Path $ModelDir "u2netp.onnx") (Join-Path $Stage "assets\models")
