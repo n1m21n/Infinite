@@ -1,0 +1,339 @@
+{
+ "version": 1,
+ "items": [
+  {
+   "id": "gen-audio-0001",
+   "name": "MIDI File + Field Synth + Reverb",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio",
+    "field-effect",
+    "field-synth",
+    "loud"
+   ],
+   "description": "A sound Infinite made by itself from 7 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-0001.jpg",
+   "file": "assets/universe/gen-audio-0001.inf",
+   "sample": "samples/?s=audio-s0001",
+   "nodes": [
+    "MIDI File",
+    "Field Synth:sync",
+    "Reverb",
+    "Chorder",
+    "Sampler",
+    "Dynamics",
+    "Field Effect:p12"
+   ]
+  },
+  {
+   "id": "gen-visual-0002",
+   "name": "Sketch + Predictive Coloring + bloom",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "p00",
+    "sketch",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 6 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0002.jpg",
+   "file": "assets/universe/gen-visual-0002.inf",
+   "sample": "samples/?s=visual-s0002",
+   "nodes": [
+    "Sketch:p00",
+    "Predictive Coloring",
+    "Sketch:p00",
+    "Switcher",
+    "bloom",
+    "edge outline"
+   ]
+  },
+  {
+   "id": "gen-visual-0003",
+   "name": "Sketch + luma key + lensdistortion",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "p11",
+    "sketch",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 3 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0003.jpg",
+   "file": "assets/universe/gen-visual-0003.inf",
+   "sample": "samples/?s=visual-s0003",
+   "nodes": [
+    "Sketch:p11",
+    "luma key",
+    "lensdistortion"
+   ]
+  },
+  {
+   "id": "gen-visual-0004",
+   "name": "FieldPixel + Resynthesize + invert",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "p00",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 3 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0004.jpg",
+   "file": "assets/universe/gen-visual-0004.inf",
+   "sample": "samples/?s=visual-s0004",
+   "nodes": [
+    "FieldPixel:p00",
+    "Resynthesize",
+    "invert"
+   ]
+  },
+  {
+   "id": "gen-visual-0006",
+   "name": "FieldPixel + alpha invert + Color Ramp",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "p08",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 4 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0006.jpg",
+   "file": "assets/universe/gen-visual-0006.inf",
+   "sample": "samples/?s=visual-s0006",
+   "nodes": [
+    "FieldPixel:p08",
+    "alpha invert",
+    "Color Ramp",
+    "addnoise"
+   ]
+  },
+  {
+   "id": "gen-visual-0007",
+   "name": "FieldPixel + threshold + Curves",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "p14",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 4 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0007.jpg",
+   "file": "assets/universe/gen-visual-0007.inf",
+   "sample": "samples/?s=visual-s0007",
+   "nodes": [
+    "FieldPixel:p14",
+    "threshold",
+    "Curves",
+    "liquify"
+   ]
+  },
+  {
+   "id": "gen-visual-0013",
+   "name": "Sketch + diffuseglow + outerglow",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "p10",
+    "p21",
+    "sketch"
+   ],
+   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0013.jpg",
+   "file": "assets/universe/gen-visual-0013.inf",
+   "sample": "samples/?s=visual-s0013",
+   "nodes": [
+    "Sketch:p10",
+    "diffuseglow",
+    "outerglow",
+    "FieldPixel:p21",
+    "Fit",
+    "Image Source",
+    "dither",
+    "set alpha",
+    "Switcher"
+   ]
+  },
+  {
+   "id": "gen-visual-0018",
+   "name": "FieldPixel + bloom + threshold",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "grid",
+    "p04",
+    "rings"
+   ],
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0018.jpg",
+   "file": "assets/universe/gen-visual-0018.inf",
+   "sample": "samples/?s=visual-s0018",
+   "nodes": [
+    "FieldPixel:rings",
+    "bloom",
+    "threshold",
+    "Sketch:tree",
+    "luma key",
+    "FieldPixel:grid",
+    "mirror tile",
+    "Sketch:p04",
+    "halftone",
+    "Fit"
+   ]
+  },
+  {
+   "id": "gen-audiovisual-0020",
+   "name": "Note Sequencer + Field Notes + Field Synth",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audiovisual",
+    "chorus",
+    "field-effect",
+    "field-notes"
+   ],
+   "description": "A sound and picture Infinite made by itself from 28 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audiovisual-0020.jpg",
+   "file": "assets/universe/gen-audiovisual-0020.inf",
+   "sample": "samples/?s=audiovisual-s0020",
+   "nodes": [
+    "Note Sequencer",
+    "Field Notes:p24",
+    "Field Synth:p19",
+    "Reverb",
+    "Field Effect:p01",
+    "Field Effect:p16",
+    "Field Effect:p14",
+    "Molder",
+    "Field Effect:p23",
+    "Field Effect:p17",
+    "Key-Snap",
+    "Field Effect:p08"
+   ]
+  },
+  {
+   "id": "gen-visual-0026",
+   "name": "FieldPixel + dither + glitch",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "p19",
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 6 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0026.jpg",
+   "file": "assets/universe/gen-visual-0026.inf",
+   "sample": "samples/?s=visual-s0026",
+   "nodes": [
+    "FieldPixel:p19",
+    "dither",
+    "glitch",
+    "gradientmap",
+    "edge sobel",
+    "Color Ramp"
+   ]
+  },
+  {
+   "id": "gen-visual-0028",
+   "name": "Sketch 3D + Extrude + Instance on Points",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "fieldpixel",
+    "sketch-3d",
+    "stack",
+    "tunnel"
+   ],
+   "description": "A picture Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0028.jpg",
+   "file": "assets/universe/gen-visual-0028.inf",
+   "sample": "samples/?s=visual-s0028",
+   "nodes": [
+    "Sketch 3D:stack",
+    "Extrude",
+    "Instance on Points",
+    "Model 3D",
+    "Render 3D",
+    "gradientmap",
+    "color adjustments",
+    "FieldPixel:tunnel",
+    "Blend",
+    "color adjustments",
+    "edge outline",
+    "radialblur"
+   ]
+  },
+  {
+   "id": "gen-visual-0030",
+   "name": "Text + opacity + Circle",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "visual"
+   ],
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0030.jpg",
+   "file": "assets/universe/gen-visual-0030.inf",
+   "sample": "samples/?s=visual-s0030",
+   "nodes": [
+    "Text",
+    "opacity",
+    "Circle",
+    "Fit",
+    "Video",
+    "crop",
+    "Blend",
+    "lensdistortion",
+    "Blend",
+    "lensdistortion"
+   ]
+  },
+  {
+   "id": "gen-visual-0036",
+   "name": "Sketch 3D + Material + Instance on Points",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "helix",
+    "sketch",
+    "sketch-3d",
+    "tree"
+   ],
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-visual-0036.jpg",
+   "file": "assets/universe/gen-visual-0036.inf",
+   "sample": "samples/?s=visual-s0036",
+   "nodes": [
+    "Sketch 3D:helix",
+    "Material",
+    "Instance on Points",
+    "Render 3D",
+    "Resynthesize",
+    "Fit",
+    "Sketch:tree",
+    "Blend",
+    "Color Ramp",
+    "Feedback"
+   ]
+  }
+ ]
+}

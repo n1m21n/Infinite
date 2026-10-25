@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import universe as u
 import scene
 import switches
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "catalog"))
+import catalog
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -154,17 +156,7 @@ def publish(args):
     open(inf, "w").write("%s\n# genome: %s\n%s" % (head, r["code"], rest))
     if subprocess.run([binary, "--validate", inf], capture_output=True, text=True).returncode:
         shutil.rmtree(d); return None, []
-    made = {}
-    if kind in ("A", "AV"):
-        made["wav"] = run([binary, "--audio-summary", inf, os.path.join(d, "audio.json"), "--duration", str(secs), "--wav", os.path.join(d, "sample.wav")], 120)
-    if kind in ("V", "AV"):
-        made["png"] = run([binary, "--frame", inf, "0", d + "/", "--size", "960x540"], 120)
-        for f in os.listdir(d):  # the engine names frames itself
-            if f.endswith(".png") and f != "poster.png":
-                os.replace(os.path.join(d, f), os.path.join(d, "poster.png"))
-        made["mp4"] = run([binary, "--render", inf, os.path.join(d, "preview.mp4"), "--duration", "3", "--fps", "24"], 240)
-    if os.path.exists(os.path.join(d, "audio.json")):
-        os.remove(os.path.join(d, "audio.json"))
+    made = catalog.render_media(binary, inf, kind, d, secs)
     want = {"wav": ("A", "AV"), "png": ("V", "AV"), "mp4": ("V", "AV")}
     if not all(made.get(k) for k, ks in want.items() if kind in ks):
         shutil.rmtree(d); return None, []

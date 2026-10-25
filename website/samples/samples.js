@@ -23,6 +23,8 @@
     }
   }
 
+  var IC_PATCH = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>';
+
   function row(it) {
     var thumb = it.poster ? '<img src="' + esc(it.poster) + '" alt="" loading="lazy" decoding="async">' : '<span class="smp-glyph">' + IC_PLAY.replace('<svg', '<svg class="smp-g"') + '</span>';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
@@ -30,7 +32,10 @@
       '<div class="smp-thumb">' + (it.poster ? thumb : '') + '</div>' +
       '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
       (it.audio ? '<canvas class="smp-wave"></canvas>' : '<div class="smp-track"><i></i></div>') +
-      '<a class="smp-dl" href="' + esc(it.patch) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.inf" aria-label="Download patch ' + esc(it.name) + '" title="Download patch (.inf)">' + IC_DL + '</a>' +
+      '<div class="smp-acts">' +
+        (it.library ? '<a class="smp-dl smp-lib" href="../library/' + esc(it.library) + '.html" aria-label="Open the patch in the Library" title="Patch in the Library">' + IC_PATCH + '</a>' : '') +
+        '<a class="smp-dl" href="' + esc(it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + (it.audio ? '.wav' : '.mp4') + '" aria-label="Download ' + (it.audio ? 'wav' : 'mp4') + ' ' + esc(it.name) + '" title="Download ' + (it.audio ? '.wav' : '.mp4') + '">' + IC_DL + '</a>' +
+      '</div>' +
     '</div>';
   }
 
@@ -105,6 +110,6 @@
   });
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
 
-  fetch('data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) { items = d.samples; shuffle(items); render(); })
+  fetch('data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) { items = d.samples; shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), tr = q && listEl.querySelector('.smp-row[data-id="' + q.replace(/[^\w-]/g, '') + '"]'); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
     .catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the samples.'; });
 })();

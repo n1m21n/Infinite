@@ -1,0 +1,87 @@
+infinite-patch 1
+# genome: V 3.50.16095914
+node 1 Source FieldPixel
+  pos 0 0
+  s code param float speed = 1.356 [0, 2];\nparam float freq = 10.79 [2, 40];\nparam float warp = 0.7101 [0, 2];\nparam float hue = 0.5882 [0, 1];\nparam float glow = 1.797 [0, 2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nrad = length(p) + 0.0008;\nang = atan2(p.y, p.x);\nw = sin(rad * freq - t * speed * 6.283185 + sin(ang * 3.0) * warp);\nv = 0.5 + 0.5 * w;\nv = v + glow * exp(0.0 - rad * 3.0);\nh = hue;\ncol = vec3(v) * (0.5 + 0.5 * cos(6.283185 * (vec3(0.0, 0.33, 0.67) + h + v * 0.3)));\n
+end
+node 2 Effects bloom
+  pos 500 0
+  f uIntensity 3.42681
+end
+node 3 Compositing threshold
+  pos 940 0
+end
+node 4 Source Sketch
+  pos 0 490
+  s code param("depth", 5.000, 2.000, 7.000);\nparam("angle", 0.646, 0.200, 1.200);\nparam("spin", 1.456, 0.000, 2.000);\nparam("hue", 0.719, 0.000, 1.000);\nparam("wob", 1.700, 0.000, 3.000);\n\nfunction draw(t) {\n  background(0.04);\n  translate(width / 2, height * 0.95);\n  stroke(1);\n  strokeWeight(2);\n  branch(height * 0.22, depth, t);\n}\n\nfunction branch(len, d, t) {\n  if (d < 1) return;\n  stroke(hsl((hue + d * 0.08) % 1, 0.7, 0.6));\n  line(0, 0, 0, -len);\n  translate(0, -len);\n  push();\n  rotate(angle + wob * 0.05 * sin(t * spin + d));\n  branch(len * 0.72, d - 1, t);\n  pop();\n  push();\n  rotate(0 - angle - wob * 0.05 * sin(t * spin + d));\n  branch(len * 0.72, d - 1, t);\n  pop();\n}\n
+end
+node 5 Compositing luma key
+  pos 500 350
+end
+node 6 Source FieldPixel
+  pos 0 900
+  s code param float speed = 1.747 [0, 2];\nparam float scale = 3.232 [1, 12];\nparam float warp = 0.9333 [0, 2];\nparam float hue = 0.9796 [0, 1];\nparam float glow = 1.028 [0, 2];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nrad = length(p) + 0.0008;\nang = atan2(p.y, p.x);\nq = p * scale + vec2(sin(t * speed), cos(t * speed)) * warp;\ng = abs(fract(q) - 0.5);\nv = 1.0 - smoothstep(0.0, 0.08, min(g.x, g.y)) ;\nv = v + glow * exp(0.0 - rad * 2.0) * 0.5;\nh = hue;\ncol = vec3(v) * (0.5 + 0.5 * cos(6.283185 * (vec3(0.0, 0.33, 0.67) + h + v * 0.3)));\n
+  f height 212.764
+end
+node 7 Effects mirror tile
+  pos 500 700
+end
+node 8 Source Sketch
+  pos 0 1390
+  s code // Swiss-style grid of rotating squares.\nparam("cols", 8, 2, 24);\nparam("gap", 0.15, 0, 0.5);\nparam("twist", 1, 0, 4);\n\nfunction draw(t) {\n  background(0.95, 0.94, 0.9);\n  const rows = Math.max(1, Math.round(cols * height / width));\n  const cw = width / cols, ch = height / rows;\n  noStroke();\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      const k = (r * cols + c) / (rows * cols);\n      push();\n      translate((c + 0.5) * cw, (r + 0.5) * ch);\n      rotate(twist * sin(t * 0.6 + k * TAU));\n      fill(hsl(0.02 + 0.1 * k, 0.8, 0.5 + 0.1 * sin(t + k * 9)));\n      const s = Math.min(cw, ch) * (1 - gap);\n      rect(-s / 2, -s / 2, s, s);\n      pop();\n    }\n  }\n}\n
+end
+node 9 Effects halftone
+  pos 500 1050
+  f uAngle 0.224043
+end
+node 10 Compositing Fit
+  pos 940 350
+  f bgOpacity 0.255756
+  b matchInput 1
+  f offsetX 70.7914
+end
+node 11 Utility Output
+  pos 1380 0
+end
+node 12 Macros Macro XY
+  pos 0 1950
+  s path /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/03-closed-hat.wav
+  f speed 0.0636764
+end
+node 13 Modulators Random
+  pos 420 1950
+  f high 0.29401
+  f rate 2.67053
+  f rateHz 0.160567
+  f seed 91.5579
+end
+node 14 Modulators Range to Range
+  pos 830 1950
+end
+node 15 Modulators Pattern
+  pos 1240 1950
+end
+cable 2 0 1
+cable 3 0 2
+cable 5 0 4
+cable 7 0 6
+cable 9 0 8
+cable 10 0 7
+cable 11 0 10
+mod 1 51 13 0 0 0.452 0.5
+mod 8 width 15 0 0 0.171 0.5
+mod 6 55 14 0 0 0.225 0.5
+mod 1 54 14 0 0 0.687 0.5
+mod 6 52 12 0 0 0.123 0.5
+mod 6 53 12 0 0 0.596 0.5
+mod 1 width 14 0 0 0.269 0.5
+mod 1 53 14 0 0 0.768 0.5
+mod 9 uAngle 12 0 0 0.971 0.5
+mod 10 offsetX 15 0 0 0.275 0.5
+mod 6 51 14 0 0 0.728 0.5
+mod 10 mode 15 0 0 0.487 0.5
+mod 9 uScale 15 0 0 0.257 0.5
+mod 5 uLow 14 0 0 0.576 0.5
+mod 3 uThreshold 14 0 0 0.548 0.5
+mod 10 offsetY 12 0 0 0.308 0.5
+mod 10 height 14 0 0 0.428 0.5

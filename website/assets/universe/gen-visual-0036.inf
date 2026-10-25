@@ -1,0 +1,151 @@
+infinite-patch 1
+# genome: V 2.70.9853745
+node 1 Source FieldPixel
+  pos 0 0
+  s code col = vec3(uv.x, uv.y, 0.5);
+  f width 212.219
+end
+node 2 Compositing Fit
+  pos 500 0
+  f height 2026.73
+  i mode 3
+end
+node 3 Compositing dither
+  pos 940 0
+  f uMix 0.977505
+end
+node 4 Source Superellipse
+  pos 0 490
+  f feather 0.0858888
+  f posX 0.763357
+  i shapeType 18
+  f sizeX 0.914737
+  f strokeWidth 0.0831215
+end
+node 5 Effects motionblur
+  pos 500 350
+end
+node 6 Source Sketch
+  pos 0 900
+  b animate 0
+  s code param("depth", 5.000, 2.000, 7.000);\nparam("angle", 0.807, 0.200, 1.200);\nparam("spin", 0.526, 0.000, 2.000);\nparam("hue", 0.585, 0.000, 1.000);\nparam("wob", 2.134, 0.000, 3.000);\n\nfunction draw(t) {\n  background(0.08);\n  translate(width / 2, height * 0.95);\n  stroke(1);\n  strokeWeight(2);\n  branch(height * 0.22, depth, t);\n}\n\nfunction branch(len, d, t) {\n  if (d < 1) return;\n  stroke(hsl((hue + d * 0.08) % 1, 0.7, 0.6));\n  line(0, 0, 0, -len);\n  translate(0, -len);\n  push();\n  rotate(angle + wob * 0.05 * sin(t * spin + d));\n  branch(len * 0.72, d - 1, t);\n  pop();\n  push();\n  rotate(0 - angle - wob * 0.05 * sin(t * spin + d));\n  branch(len * 0.72, d - 1, t);\n  pop();\n}\n
+end
+node 7 Compositing color adjustments
+  pos 940 350
+  f uBlackPoint 0.81412
+  f uGreenWeight 1.7869
+  f uMidtones 0.261585
+  f uOffsetB -0.406132
+  f uShadows 0.338964
+  f uSlopeB 1.80686
+  f uVibrance 1.40735
+end
+node 8 Compositing transform
+  pos 1380 0
+  f uRotation 106.99
+  f uScaleX 1.33123
+  f uScaleY 3.85509
+  f uTranslateX 0.558833
+  f uTranslateY -0.0812899
+end
+node 9 Utility Output
+  pos 1820 0
+end
+node 10 Modulators Random
+  pos 0 1460
+  f high 0.521202
+  f low 0.408335
+  f seed 127.385
+  b voice 1
+end
+node 11 Macros Macro Slider
+  pos 410 1460
+  f value 0.813667
+end
+node 12 Modulators Random
+  pos 830 1460
+  f high 0.0561748
+  i rateMode 1
+end
+node 13 Modulators Random
+  pos 1240 1460
+  f rateHz 3.45406
+  f smooth 0.204039
+end
+node 14 Modulators Random
+  pos 1650 1460
+  f high 0.372023
+  f low 0.698251
+  f rateHz 1.55062
+  f smooth 0.882748
+end
+node 15 Modulators LFO
+  pos 2060 1460
+  f rateBeats 0.0797726
+  f seed 42.861
+end
+node 16 Modulators LFO
+  pos 2470 1460
+  f low 0.59885
+  i phaseMode 1
+end
+node 17 Macros Macro Knob
+  pos 2880 1460
+  f value 0.0231235
+end
+node 18 Modulators Random
+  pos 3300 1460
+  f low 0.995939
+  f smooth 0.814787
+  b voice 1
+end
+cable 2 0 1
+cable 3 0 2
+cable 5 0 4
+cable 7 0 5
+cable 8 0 7
+cable 9 0 8
+mod 7 uPowerG 13 0 0 0.859 0.5
+mod 3 uLevels 14 0 0 0.408 0.5
+mod 8 uScaleX 11 0 0 0.831 0.5
+mod 1 width 11 0 0 0.567 0.5
+mod 7 uPowerR 11 0 0 0.878 0.5
+mod 2 bgOpacity 10 0 0 0.445 0.5
+mod 6 width 13 0 0 0.495 0.5
+mod 7 uCyanRed 11 0 0 0.898 0.5
+mod 7 uWhitePoint 13 0 0 0.949 0.5
+mod 7 uGamma 14 0 0 0.325 0.5
+mod 8 uScaleY 10 0 0 0.558 0.5
+mod 8 uTranslateY 13 0 0 0.476 0.5
+mod 3 uMix 11 0 0 0.590 0.5
+mod 7 uContrast 15 0 0 0.882 0.5
+mod 7 uHueShift 17 0 0 0.348 0.5
+mod 7 uSlopeG 11 0 0 0.334 0.5
+mod 5 uAngle 12 0 0 0.739 0.5
+mod 6 54 14 0 0 0.649 0.5
+mod 7 uYellowBlue 17 0 0 0.173 0.5
+mod 7 uMagentaGreen 18 0 0 0.527 0.5
+mod 2 height 16 0 0 0.523 0.5
+mod 7 uBrightness 12 0 0 0.344 0.5
+mod 7 uPowerB 14 0 0 0.574 0.5
+mod 2 offsetX 13 0 0 0.716 0.5
+mod 8 uScale 10 0 0 0.164 0.5
+mod 6 53 13 0 0 0.483 0.5
+mod 7 uSaturation 15 0 0 0.245 0.5
+mod 7 uMidtones 11 0 0 0.191 0.5
+mod 7 uBlackPoint 18 0 0 0.646 0.5
+mod 7 uCdlSat 18 0 0 0.093 0.5
+mod 7 uSlopeR 15 0 0 0.960 0.5
+mod 4 shapeType 16 0 0 0.352 0.5
+mod 7 uVibrance 18 0 0 0.374 0.5
+mod 1 height 15 0 0 0.228 0.5
+mod 7 uRedWeight 16 0 0 0.998 0.5
+mod 7 uContrastPivot 16 0 0 0.126 0.5
+mod 8 uRotation 17 0 0 0.756 0.5
+mod 4 height 11 0 0 0.372 0.5
+mod 7 uLightness 14 0 0 0.387 0.5
+mod 1 exposeAuxTexture 13 0 0 0.209 0.5
+mod 2 offsetY 10 0 0 0.314 0.5
+mod 7 uShadows 13 0 0 0.717 0.5
+mod 7 uOffsetB 15 0 0 0.689 0.5
+mod 6 52 14 0 0 0.410 0.5

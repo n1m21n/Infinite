@@ -1,0 +1,29 @@
+infinite-patch 1
+# genome: V 1.5.4888543
+node 1 Source FieldPixel
+  pos 0 0
+  s code param float cellSize = 48.8674 [6.0, 60.0];\nparam float contrast = 0.9374 [0.5, 3.0];\np = vec2(uv.x * aspect, uv.y) * cellSize;\ncell = floor(p);\nf = fract(p) - 0.5;\nlum = (col.r * 0.299 + col.g * 0.587 + col.b * 0.114) * contrast;\njitter = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453) * 0.15;\nradius = sqrt(clamp(lum + jitter, 0.0, 1.0)) * 0.5;\nedge = length(f) - radius;\ndotMask = 1.0 - smoothstep(0.0, 0.03, edge);\ncol = vec3(dotMask);
+  f width 112.061
+end
+node 2 Compositing threshold
+  pos 500 0
+end
+node 3 Compositing Curves
+  pos 940 0
+  i activeChannel 2
+end
+node 4 Effects liquify
+  pos 1380 0
+end
+node 5 Utility Output
+  pos 1820 0
+end
+node 6 Modulators Random
+  pos 0 640
+  f seed 0.120279
+end
+cable 2 0 1
+cable 3 0 2
+cable 4 0 3
+cable 5 0 4
+mod 1 width 6 0 0 0.813 0.5

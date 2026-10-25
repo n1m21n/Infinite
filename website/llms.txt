@@ -146,6 +146,22 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 - [Tracking pack](https://infinitedevices.org/library/ext-tracking.html): Turn a camera or a picture into controls: hands, face and body landmarks become modulators. (file: https://infinitedevices.org/extensions.html#tracking)
 
+## Library: Generated
+
+- [MIDI File + Field Synth + Reverb](https://infinitedevices.org/library/gen-audio-0001.html): A sound Infinite made by itself from 7 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-audio-0001.inf)
+- [Sketch + Predictive Coloring + bloom](https://infinitedevices.org/library/gen-visual-0002.html): A picture Infinite made by itself from 6 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0002.inf)
+- [Sketch + luma key + lensdistortion](https://infinitedevices.org/library/gen-visual-0003.html): A picture Infinite made by itself from 3 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0003.inf)
+- [FieldPixel + Resynthesize + invert](https://infinitedevices.org/library/gen-visual-0004.html): A picture Infinite made by itself from 3 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0004.inf)
+- [FieldPixel + alpha invert + Color Ramp](https://infinitedevices.org/library/gen-visual-0006.html): A picture Infinite made by itself from 4 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0006.inf)
+- [FieldPixel + threshold + Curves](https://infinitedevices.org/library/gen-visual-0007.html): A picture Infinite made by itself from 4 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0007.inf)
+- [Sketch + diffuseglow + outerglow](https://infinitedevices.org/library/gen-visual-0013.html): A picture Infinite made by itself from 9 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0013.inf)
+- [FieldPixel + bloom + threshold](https://infinitedevices.org/library/gen-visual-0018.html): A picture Infinite made by itself from 10 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0018.inf)
+- [Note Sequencer + Field Notes + Field Synth](https://infinitedevices.org/library/gen-audiovisual-0020.html): A sound and picture Infinite made by itself from 28 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-audiovisual-0020.inf)
+- [FieldPixel + dither + glitch](https://infinitedevices.org/library/gen-visual-0026.html): A picture Infinite made by itself from 6 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0026.inf)
+- [Sketch 3D + Extrude + Instance on Points](https://infinitedevices.org/library/gen-visual-0028.html): A picture Infinite made by itself from 12 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0028.inf)
+- [Text + opacity + Circle](https://infinitedevices.org/library/gen-visual-0030.html): A picture Infinite made by itself from 10 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0030.inf)
+- [Sketch 3D + Material + Instance on Points](https://infinitedevices.org/library/gen-visual-0036.html): A picture Infinite made by itself from 10 nodes. Open it, then change anything. (file: https://infinitedevices.org/assets/universe/gen-visual-0036.inf)
+
 ## Library: Pixel
 
 - [Ordered Dither](https://infinitedevices.org/library/ordered-dither.html): A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films. (file: https://infinitedevices.org/assets/library/pixel/ordered-dither.field)

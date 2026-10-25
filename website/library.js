@@ -32,10 +32,11 @@
     'Sketch': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg>',
     'Sketch 3D': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M3.8 6.7 10 10.05 16.2 6.7M10 10.05V16.9"/></svg>',
     'AI Skills': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 10h14M10 3v14"/><circle cx="6.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13.5" r="1.4" fill="currentColor" stroke="none"/></svg>',
+    'Generated': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M15 5l-2 2M7 13l-2 2"/></svg>',
     'Extensions': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 10c1.8-5.5 3.2-5.5 4.4 0s2.8 5.5 4.4 0 3.2-5.5 4.4 0"/></svg>'
   };
 
-  var CATS = ['Templates', 'Community', 'Pixel', 'Audio FX', 'Synths', 'Notes', 'Sketch', 'AI Skills', 'Extensions'];
+  var CATS = ['Templates', 'Community', 'Pixel', 'Audio FX', 'Synths', 'Notes', 'Sketch', 'AI Skills', 'Extensions', 'Generated'];
   var COLOUR = {
     'Templates': 'var(--accent)',
     'Pixel': 'var(--accent)',
@@ -47,7 +48,8 @@
     'Sketch 3D': 'var(--cat-3d)',
     'Community': 'var(--signal)',
     'AI Skills': 'var(--signal)',
-    'Extensions': 'var(--cat-prediction)'
+    'Extensions': 'var(--cat-prediction)',
+    'Generated': 'var(--cat-modulators)'
   };
 
 
@@ -274,9 +276,10 @@
     fetch('assets/templates/index.json?v=4').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/community/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/skills/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
-    fetch('assets/extensions/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; })
+    fetch('assets/extensions/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
+    fetch('assets/universe/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; })
   ]).then(function (all) {
-    items = all[1].items.concat(all[2].items, all[3].items, all[4].items, all[0].items);
+    items = all[1].items.concat(all[2].items, all[3].items, all[4].items, all[5].items, all[0].items);
     for (var i = items.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1)), t = items[i];
       items[i] = items[j]; items[j] = t;

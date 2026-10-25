@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 285,
+ "count": 298,
  "items": [
   {
    "id": "first-sound",
@@ -13,6 +13,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/first-sound.inf",
    "preview": "https://infinitedevices.org/assets/templates/first-sound.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/first-sound.html"
   },
   {
@@ -25,6 +26,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/first-image.inf",
    "preview": "https://infinitedevices.org/assets/templates/first-image.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/first-image.html"
   },
   {
@@ -37,6 +39,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/first-music-image.inf",
    "preview": "https://infinitedevices.org/assets/templates/first-music-image.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/first-music-image.html"
   },
   {
@@ -49,6 +52,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/source.inf",
    "preview": "https://infinitedevices.org/assets/templates/source.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/source.html"
   },
   {
@@ -61,6 +65,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/compositing.inf",
    "preview": "https://infinitedevices.org/assets/templates/compositing.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/compositing.html"
   },
   {
@@ -73,6 +78,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/effects.inf",
    "preview": "https://infinitedevices.org/assets/templates/effects.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/effects.html"
   },
   {
@@ -85,6 +91,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/3d.inf",
    "preview": "https://infinitedevices.org/assets/templates/3d.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/3d.html"
   },
   {
@@ -97,6 +104,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/modulators.inf",
    "preview": "https://infinitedevices.org/assets/templates/modulators.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/modulators.html"
   },
   {
@@ -109,6 +117,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/macros.inf",
    "preview": "https://infinitedevices.org/assets/templates/macros.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/macros.html"
   },
   {
@@ -121,6 +130,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/notes.inf",
    "preview": "https://infinitedevices.org/assets/templates/notes.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/notes.html"
   },
   {
@@ -133,6 +143,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/synths.inf",
    "preview": "https://infinitedevices.org/assets/templates/synths.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/synths.html"
   },
   {
@@ -145,6 +156,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/audio-effects.inf",
    "preview": "https://infinitedevices.org/assets/templates/audio-effects.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/audio-effects.html"
   },
   {
@@ -157,6 +169,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/prediction.inf",
    "preview": "https://infinitedevices.org/assets/templates/prediction.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/prediction.html"
   },
   {
@@ -169,6 +182,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/utility.inf",
    "preview": "https://infinitedevices.org/assets/templates/utility.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/utility.html"
   },
   {
@@ -181,6 +195,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/field.inf",
    "preview": "https://infinitedevices.org/assets/templates/field.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field.html"
   },
   {
@@ -193,6 +208,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/acid-bass-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/acid-bass-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/acid-bass-synth.html"
   },
   {
@@ -205,6 +221,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/space-tape-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/space-tape-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/space-tape-fx.html"
   },
   {
@@ -217,6 +234,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/supersaw-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/supersaw-lead-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/supersaw-lead-synth.html"
   },
   {
@@ -229,6 +247,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/tape-phaser-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/tape-phaser-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/tape-phaser-fx.html"
   },
   {
@@ -241,6 +260,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/fm-bell-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/fm-bell-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/fm-bell-synth.html"
   },
   {
@@ -253,6 +273,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/shimmer-delay-fx.html"
   },
   {
@@ -265,6 +286,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/phase-distortion-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/phase-distortion-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/phase-distortion-synth.html"
   },
   {
@@ -277,6 +299,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/formant-filter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/formant-filter-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/formant-filter-fx.html"
   },
   {
@@ -289,6 +312,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/wavetable-morph-synth.html"
   },
   {
@@ -301,6 +325,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/wavefolder-drive-fx.html"
   },
   {
@@ -313,6 +338,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/additive-harmonic-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/additive-harmonic-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/additive-harmonic-synth.html"
   },
   {
@@ -325,6 +351,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/comb-resonator-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/comb-resonator-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/comb-resonator-fx.html"
   },
   {
@@ -337,6 +364,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/hard-sync-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/hard-sync-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hard-sync-synth.html"
   },
   {
@@ -349,6 +377,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/ring-modulator-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/ring-modulator-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ring-modulator-fx.html"
   },
   {
@@ -361,6 +390,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/subharmonic-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/subharmonic-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/subharmonic-synth.html"
   },
   {
@@ -373,6 +403,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/bitcrush-degrader-fx.html"
   },
   {
@@ -385,6 +416,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/karplus-strong-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/karplus-strong-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/karplus-strong-synth.html"
   },
   {
@@ -397,6 +429,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/frequency-shifter-fx.html"
   },
   {
@@ -409,6 +442,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/feedback-fm-lead-synth.html"
   },
   {
@@ -421,6 +455,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-additive-organ-synth.html"
   },
   {
@@ -433,6 +468,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/stereo-pingpong-delay-fx.html"
   },
   {
@@ -445,6 +481,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/tube-preamp-overdrive-fx.html"
   },
   {
@@ -457,6 +494,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/inharmonic-chime-synth.html"
   },
   {
@@ -469,6 +507,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-supershape-pad-synth.html"
   },
   {
@@ -481,6 +520,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/multiband-tape-saturator-fx.html"
   },
   {
@@ -493,6 +533,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dimension-spatial-chorus-fx.html"
   },
   {
@@ -505,6 +546,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-drone-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/spectral-drone-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-drone-synth.html"
   },
   {
@@ -517,6 +559,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/resonant-brass-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/resonant-brass-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/resonant-brass-synth.html"
   },
   {
@@ -529,6 +572,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/biquad-morph-filter-fx.html"
   },
   {
@@ -541,6 +585,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html"
   },
   {
@@ -553,6 +598,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/buchla-complex-oscillator-synth.html"
   },
   {
@@ -565,6 +611,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/string-resonator-modal-synth.html"
   },
   {
@@ -577,6 +624,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html"
   },
   {
@@ -589,6 +637,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html"
   },
   {
@@ -601,6 +650,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cyber-acid-303-synth.html"
   },
   {
@@ -613,6 +663,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-resonator-bell-synth.html"
   },
   {
@@ -625,6 +676,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-tape-warble-fx.html"
   },
   {
@@ -637,6 +689,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-freeze-reverb-fx.html"
   },
   {
@@ -649,6 +702,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liminal-drone-pad-synth.html"
   },
   {
@@ -661,6 +715,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html"
   },
   {
@@ -673,6 +728,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chavetta-tape-saturator-fx.html"
   },
   {
@@ -685,6 +741,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/op-art-phaser-matrix-fx.html"
   },
   {
@@ -697,6 +754,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/acid-bass-303-lead-synth.html"
   },
   {
@@ -709,6 +767,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.inf",
    "preview": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html"
   },
   {
@@ -721,6 +780,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html"
   },
   {
@@ -733,6 +793,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html"
   },
   {
@@ -745,6 +806,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/terrain-mandala.inf",
    "preview": "https://infinitedevices.org/assets/community/terrain-mandala.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/terrain-mandala.html"
   },
   {
@@ -757,6 +819,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/glitch-feedback.inf",
    "preview": "https://infinitedevices.org/assets/community/glitch-feedback.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/glitch-feedback.html"
   },
   {
@@ -769,6 +832,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/shifted-blend.inf",
    "preview": "https://infinitedevices.org/assets/community/shifted-blend.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/shifted-blend.html"
   },
   {
@@ -781,6 +845,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/lens-spectral.inf",
    "preview": "https://infinitedevices.org/assets/community/lens-spectral.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/lens-spectral.html"
   },
   {
@@ -793,6 +858,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/checker-cube.inf",
    "preview": "https://infinitedevices.org/assets/community/checker-cube.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/checker-cube.html"
   },
   {
@@ -805,6 +871,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/occult-mandala.infinite",
    "preview": "https://infinitedevices.org/assets/community/occult-mandala.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/occult-mandala.html"
   },
   {
@@ -817,6 +884,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/pad-wash.inf",
    "preview": "https://infinitedevices.org/assets/community/pad-wash.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pad-wash.html"
   },
   {
@@ -829,6 +897,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/pads-75-bpm.infinite",
    "preview": "https://infinitedevices.org/assets/community/pads-75-bpm.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pads-75-bpm.html"
   },
   {
@@ -841,6 +910,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/trail-glitch.inf",
    "preview": "https://infinitedevices.org/assets/community/trail-glitch.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/trail-glitch.html"
   },
   {
@@ -853,6 +923,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/stretched-sampler.inf",
    "preview": "https://infinitedevices.org/assets/community/stretched-sampler.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/stretched-sampler.html"
   },
   {
@@ -865,6 +936,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/displaced-wavetable.inf",
    "preview": "https://infinitedevices.org/assets/community/displaced-wavetable.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/displaced-wavetable.html"
   },
   {
@@ -877,6 +949,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/welcome-home.infinite",
    "preview": "https://infinitedevices.org/assets/community/welcome-home.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/welcome-home.html"
   },
   {
@@ -889,6 +962,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/soft-render.inf",
    "preview": "https://infinitedevices.org/assets/community/soft-render.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/soft-render.html"
   },
   {
@@ -901,6 +975,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/stretched-blend.inf",
    "preview": "https://infinitedevices.org/assets/community/stretched-blend.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/stretched-blend.html"
   },
   {
@@ -913,6 +988,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/slice-room.inf",
    "preview": "https://infinitedevices.org/assets/community/slice-room.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/slice-room.html"
   },
   {
@@ -925,6 +1001,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/limited-stretch.inf",
    "preview": "https://infinitedevices.org/assets/community/limited-stretch.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/limited-stretch.html"
   },
   {
@@ -937,6 +1014,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/spectrum-slide.inf",
    "preview": "https://infinitedevices.org/assets/community/spectrum-slide.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectrum-slide.html"
   },
   {
@@ -949,6 +1027,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/plugin-stretch.inf",
    "preview": "https://infinitedevices.org/assets/community/plugin-stretch.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/plugin-stretch.html"
   },
   {
@@ -961,6 +1040,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/blue-cube.inf",
    "preview": "https://infinitedevices.org/assets/community/blue-cube.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/blue-cube.html"
   },
   {
@@ -973,6 +1053,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/fairy-type.inf",
    "preview": "https://infinitedevices.org/assets/community/fairy-type.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/fairy-type.html"
   },
   {
@@ -985,6 +1066,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/cube-colour.inf",
    "preview": "https://infinitedevices.org/assets/community/cube-colour.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cube-colour.html"
   },
   {
@@ -997,6 +1079,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/layered-blends.inf",
    "preview": "https://infinitedevices.org/assets/community/layered-blends.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/layered-blends.html"
   },
   {
@@ -1009,6 +1092,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/drum-reverb.inf",
    "preview": "https://infinitedevices.org/assets/community/drum-reverb.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/drum-reverb.html"
   },
   {
@@ -1021,6 +1105,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/delay-wash.inf",
    "preview": "https://infinitedevices.org/assets/community/delay-wash.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/delay-wash.html"
   },
   {
@@ -1033,6 +1118,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/filtered-mixer.inf",
    "preview": "https://infinitedevices.org/assets/community/filtered-mixer.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/filtered-mixer.html"
   },
   {
@@ -1045,6 +1131,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/merged-wavetable.inf",
    "preview": "https://infinitedevices.org/assets/community/merged-wavetable.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/merged-wavetable.html"
   },
   {
@@ -1057,6 +1144,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/community/oscillator-reverb.inf",
    "preview": "https://infinitedevices.org/assets/community/oscillator-reverb.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/oscillator-reverb.html"
   },
   {
@@ -1069,6 +1157,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/infinite-patch-authoring.md",
    "preview": "https://infinitedevices.org/assets/skills/infinite-patch-authoring.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/patch-authoring-skill.html"
   },
   {
@@ -1081,6 +1170,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/field-language.md",
    "preview": "https://infinitedevices.org/assets/skills/field-language.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field-language-skill.html"
   },
   {
@@ -1093,6 +1183,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/field-pixel-presets.md",
    "preview": "https://infinitedevices.org/assets/skills/field-pixel-presets.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field-pixel-presets-skill.html"
   },
   {
@@ -1105,6 +1196,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/field-modifier-presets.md",
    "preview": "https://infinitedevices.org/assets/skills/field-modifier-presets.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field-modifier-presets-skill.html"
   },
   {
@@ -1117,6 +1209,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/field-domains.md",
    "preview": "https://infinitedevices.org/assets/skills/field-domains.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field-domains-skill.html"
   },
   {
@@ -1129,6 +1222,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/skills/field-state.md",
    "preview": "https://infinitedevices.org/assets/skills/field-state.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/field-state-skill.html"
   },
   {
@@ -1141,7 +1235,177 @@
    "price": 0,
    "file": "https://infinitedevices.org/extensions.html#tracking",
    "preview": "https://infinitedevices.org/assets/extensions/tracking.webp",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ext-tracking.html"
+  },
+  {
+   "id": "gen-audio-0001",
+   "name": "MIDI File + Field Synth + Reverb",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A sound Infinite made by itself from 7 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-audio-0001.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-audio-0001.jpg",
+   "sample": "samples/?s=audio-s0001",
+   "page": "https://infinitedevices.org/library/gen-audio-0001.html"
+  },
+  {
+   "id": "gen-visual-0002",
+   "name": "Sketch + Predictive Coloring + bloom",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 6 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0002.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0002.jpg",
+   "sample": "samples/?s=visual-s0002",
+   "page": "https://infinitedevices.org/library/gen-visual-0002.html"
+  },
+  {
+   "id": "gen-visual-0003",
+   "name": "Sketch + luma key + lensdistortion",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 3 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0003.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0003.jpg",
+   "sample": "samples/?s=visual-s0003",
+   "page": "https://infinitedevices.org/library/gen-visual-0003.html"
+  },
+  {
+   "id": "gen-visual-0004",
+   "name": "FieldPixel + Resynthesize + invert",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 3 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0004.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0004.jpg",
+   "sample": "samples/?s=visual-s0004",
+   "page": "https://infinitedevices.org/library/gen-visual-0004.html"
+  },
+  {
+   "id": "gen-visual-0006",
+   "name": "FieldPixel + alpha invert + Color Ramp",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 4 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0006.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0006.jpg",
+   "sample": "samples/?s=visual-s0006",
+   "page": "https://infinitedevices.org/library/gen-visual-0006.html"
+  },
+  {
+   "id": "gen-visual-0007",
+   "name": "FieldPixel + threshold + Curves",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 4 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0007.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0007.jpg",
+   "sample": "samples/?s=visual-s0007",
+   "page": "https://infinitedevices.org/library/gen-visual-0007.html"
+  },
+  {
+   "id": "gen-visual-0013",
+   "name": "Sketch + diffuseglow + outerglow",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0013.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0013.jpg",
+   "sample": "samples/?s=visual-s0013",
+   "page": "https://infinitedevices.org/library/gen-visual-0013.html"
+  },
+  {
+   "id": "gen-visual-0018",
+   "name": "FieldPixel + bloom + threshold",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0018.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0018.jpg",
+   "sample": "samples/?s=visual-s0018",
+   "page": "https://infinitedevices.org/library/gen-visual-0018.html"
+  },
+  {
+   "id": "gen-audiovisual-0020",
+   "name": "Note Sequencer + Field Notes + Field Synth",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A sound and picture Infinite made by itself from 28 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-audiovisual-0020.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-audiovisual-0020.jpg",
+   "sample": "samples/?s=audiovisual-s0020",
+   "page": "https://infinitedevices.org/library/gen-audiovisual-0020.html"
+  },
+  {
+   "id": "gen-visual-0026",
+   "name": "FieldPixel + dither + glitch",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 6 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0026.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0026.jpg",
+   "sample": "samples/?s=visual-s0026",
+   "page": "https://infinitedevices.org/library/gen-visual-0026.html"
+  },
+  {
+   "id": "gen-visual-0028",
+   "name": "Sketch 3D + Extrude + Instance on Points",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0028.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0028.jpg",
+   "sample": "samples/?s=visual-s0028",
+   "page": "https://infinitedevices.org/library/gen-visual-0028.html"
+  },
+  {
+   "id": "gen-visual-0030",
+   "name": "Text + opacity + Circle",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0030.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0030.jpg",
+   "sample": "samples/?s=visual-s0030",
+   "page": "https://infinitedevices.org/library/gen-visual-0030.html"
+  },
+  {
+   "id": "gen-visual-0036",
+   "name": "Sketch 3D + Material + Instance on Points",
+   "category": "Generated",
+   "type": "Patch",
+   "description": "A picture Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/universe/gen-visual-0036.inf",
+   "preview": "https://infinitedevices.org/assets/universe/gen-visual-0036.jpg",
+   "sample": "samples/?s=visual-s0036",
+   "page": "https://infinitedevices.org/library/gen-visual-0036.html"
   },
   {
    "id": "ordered-dither",
@@ -1153,6 +1417,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/ordered-dither.field",
    "preview": "https://infinitedevices.org/assets/library/previews/ordered-dither.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ordered-dither.html"
   },
   {
@@ -1165,6 +1430,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/liquid-glass.field",
    "preview": "https://infinitedevices.org/assets/library/previews/liquid-glass.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liquid-glass.html"
   },
   {
@@ -1177,6 +1443,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/metaball-lens.field",
    "preview": "https://infinitedevices.org/assets/library/previews/metaball-lens.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/metaball-lens.html"
   },
   {
@@ -1189,6 +1456,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/pixel-plate.field",
    "preview": "https://infinitedevices.org/assets/library/previews/pixel-plate.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pixel-plate.html"
   },
   {
@@ -1201,6 +1469,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/iridescent-orb.field",
    "preview": "https://infinitedevices.org/assets/library/previews/iridescent-orb.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/iridescent-orb.html"
   },
   {
@@ -1213,6 +1482,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/phyllotaxis-bloom.field",
    "preview": "https://infinitedevices.org/assets/library/previews/phyllotaxis-bloom.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/phyllotaxis-bloom.html"
   },
   {
@@ -1225,6 +1495,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/lorenz-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/lorenz-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/lorenz-attractor.html"
   },
   {
@@ -1237,6 +1508,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/lotka-volterra.js",
    "preview": "https://infinitedevices.org/assets/library/previews/lotka-volterra.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/lotka-volterra.html"
   },
   {
@@ -1249,6 +1521,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/scale-free-network.js",
    "preview": "https://infinitedevices.org/assets/library/previews/scale-free-network.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/scale-free-network.html"
   },
   {
@@ -1261,6 +1534,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/rule-110.js",
    "preview": "https://infinitedevices.org/assets/library/previews/rule-110.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/rule-110.html"
   },
   {
@@ -1273,6 +1547,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/clifford-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/clifford-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/clifford-attractor.html"
   },
   {
@@ -1285,6 +1560,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/chladni-cymatics.field",
    "preview": "https://infinitedevices.org/assets/library/previews/chladni-cymatics.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chladni-cymatics.html"
   },
   {
@@ -1297,6 +1573,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/rossler-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/rossler-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/rossler-attractor.html"
   },
   {
@@ -1309,6 +1586,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/torus-knot-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/torus-knot-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/torus-knot-3d.html"
   },
   {
@@ -1321,6 +1599,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/acid-bass-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/acid-bass-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/acid-bass-synth.html"
   },
   {
@@ -1333,6 +1612,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/space-tape-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/space-tape-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/space-tape-fx.html"
   },
   {
@@ -1345,6 +1625,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/quantum-vortex.field",
    "preview": "https://infinitedevices.org/assets/library/previews/quantum-vortex.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/quantum-vortex.html"
   },
   {
@@ -1357,6 +1638,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/de-jong-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/de-jong-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/de-jong-attractor.html"
   },
   {
@@ -1369,6 +1651,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/mobius-strip-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/mobius-strip-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/mobius-strip-3d.html"
   },
   {
@@ -1381,6 +1664,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/supersaw-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/supersaw-lead-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/supersaw-lead-synth.html"
   },
   {
@@ -1393,6 +1677,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/tape-phaser-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/tape-phaser-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/tape-phaser-fx.html"
   },
   {
@@ -1405,6 +1690,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/pulsar-beam.field",
    "preview": "https://infinitedevices.org/assets/library/previews/pulsar-beam.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pulsar-beam.html"
   },
   {
@@ -1417,6 +1703,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/hopalong-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/hopalong-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hopalong-attractor.html"
   },
   {
@@ -1429,6 +1716,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/klein-bottle-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/klein-bottle-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/klein-bottle-3d.html"
   },
   {
@@ -1441,6 +1729,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/fm-bell-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/fm-bell-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/fm-bell-synth.html"
   },
   {
@@ -1453,6 +1742,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/shimmer-delay-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/shimmer-delay-fx.html"
   },
   {
@@ -1465,6 +1755,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/neural-synapse.field",
    "preview": "https://infinitedevices.org/assets/library/previews/neural-synapse.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/neural-synapse.html"
   },
   {
@@ -1477,6 +1768,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/gumowski-mira.js",
    "preview": "https://infinitedevices.org/assets/library/previews/gumowski-mira.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/gumowski-mira.html"
   },
   {
@@ -1489,6 +1781,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/enneper-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/enneper-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/enneper-surface-3d.html"
   },
   {
@@ -1501,6 +1794,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/phase-distortion-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/phase-distortion-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/phase-distortion-synth.html"
   },
   {
@@ -1513,6 +1807,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/formant-filter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/formant-filter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/formant-filter-fx.html"
   },
   {
@@ -1525,6 +1820,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/aurora-borealis.field",
    "preview": "https://infinitedevices.org/assets/library/previews/aurora-borealis.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/aurora-borealis.html"
   },
   {
@@ -1537,6 +1833,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/ikeda-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/ikeda-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ikeda-attractor.html"
   },
   {
@@ -1549,6 +1846,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/dini-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/dini-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dini-surface-3d.html"
   },
   {
@@ -1561,6 +1859,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/wavetable-morph-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/wavetable-morph-synth.html"
   },
   {
@@ -1573,6 +1872,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/wavefolder-drive-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/wavefolder-drive-fx.html"
   },
   {
@@ -1585,6 +1885,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/cosmic-nebula.field",
    "preview": "https://infinitedevices.org/assets/library/previews/cosmic-nebula.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cosmic-nebula.html"
   },
   {
@@ -1597,6 +1898,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/svensson-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/svensson-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/svensson-attractor.html"
   },
   {
@@ -1609,6 +1911,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/bour-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/bour-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/bour-surface-3d.html"
   },
   {
@@ -1621,6 +1924,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/additive-harmonic-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/additive-harmonic-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/additive-harmonic-synth.html"
   },
   {
@@ -1633,6 +1937,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/comb-resonator-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/comb-resonator-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/comb-resonator-fx.html"
   },
   {
@@ -1645,6 +1950,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/spectral-caustics.field",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-caustics.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-caustics.html"
   },
   {
@@ -1657,6 +1963,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/tinkerbell-map.js",
    "preview": "https://infinitedevices.org/assets/library/previews/tinkerbell-map.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/tinkerbell-map.html"
   },
   {
@@ -1669,6 +1976,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/kuen-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/kuen-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/kuen-surface-3d.html"
   },
   {
@@ -1681,6 +1989,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/hard-sync-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/hard-sync-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hard-sync-synth.html"
   },
   {
@@ -1693,6 +2002,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/ring-modulator-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/ring-modulator-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ring-modulator-fx.html"
   },
   {
@@ -1705,6 +2015,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/plasma-filament.field",
    "preview": "https://infinitedevices.org/assets/library/previews/plasma-filament.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/plasma-filament.html"
   },
   {
@@ -1717,6 +2028,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/halvorsen-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/halvorsen-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/halvorsen-attractor.html"
   },
   {
@@ -1729,6 +2041,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/boy-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/boy-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/boy-surface-3d.html"
   },
   {
@@ -1741,6 +2054,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/subharmonic-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/subharmonic-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/subharmonic-synth.html"
   },
   {
@@ -1753,6 +2067,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/bitcrush-degrader-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/bitcrush-degrader-fx.html"
   },
   {
@@ -1765,6 +2080,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/solar-flare.field",
    "preview": "https://infinitedevices.org/assets/library/previews/solar-flare.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/solar-flare.html"
   },
   {
@@ -1777,6 +2093,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/dejong-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/dejong-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dejong-attractor.html"
   },
   {
@@ -1789,6 +2106,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/breather-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/breather-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/breather-surface-3d.html"
   },
   {
@@ -1801,6 +2119,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/karplus-strong-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/karplus-strong-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/karplus-strong-synth.html"
   },
   {
@@ -1813,6 +2132,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/frequency-shifter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/frequency-shifter-fx.html"
   },
   {
@@ -1825,6 +2145,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/gravitational-lensing.field",
    "preview": "https://infinitedevices.org/assets/library/previews/gravitational-lensing.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/gravitational-lensing.html"
   },
   {
@@ -1837,6 +2158,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/harmonograph-resonance.js",
    "preview": "https://infinitedevices.org/assets/library/previews/harmonograph-resonance.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/harmonograph-resonance.html"
   },
   {
@@ -1849,6 +2171,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/chua-circuit.js",
    "preview": "https://infinitedevices.org/assets/library/previews/chua-circuit.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chua-circuit.html"
   },
   {
@@ -1861,6 +2184,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/hopf-fibration-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/hopf-fibration-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hopf-fibration-3d.html"
   },
   {
@@ -1873,6 +2197,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/hyperbolic-helicoid-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-helicoid-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hyperbolic-helicoid-3d.html"
   },
   {
@@ -1885,6 +2210,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/granular-cloud-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/granular-cloud-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/granular-cloud-synth.html"
   },
   {
@@ -1897,6 +2223,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/modal-bar-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/modal-bar-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/modal-bar-synth.html"
   },
   {
@@ -1909,6 +2236,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-diffuser-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-diffuser-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-diffuser-fx.html"
   },
   {
@@ -1921,6 +2249,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/vowel-resonator-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/vowel-resonator-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/vowel-resonator-fx.html"
   },
   {
@@ -1933,6 +2262,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/supernova-remnant.field",
    "preview": "https://infinitedevices.org/assets/library/previews/supernova-remnant.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/supernova-remnant.html"
   },
   {
@@ -1945,6 +2275,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-kaleidoscope.field",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-kaleidoscope.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hyperbolic-kaleidoscope.html"
   },
   {
@@ -1957,6 +2288,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/cyber-tunnel.field",
    "preview": "https://infinitedevices.org/assets/library/previews/cyber-tunnel.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cyber-tunnel.html"
   },
   {
@@ -1969,6 +2301,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/hex-lattice.field",
    "preview": "https://infinitedevices.org/assets/library/previews/hex-lattice.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hex-lattice.html"
   },
   {
@@ -1981,6 +2314,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/harmonic-warp.field",
    "preview": "https://infinitedevices.org/assets/library/previews/harmonic-warp.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/harmonic-warp.html"
   },
   {
@@ -1993,6 +2327,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/aizawa-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/aizawa-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/aizawa-attractor.html"
   },
   {
@@ -2005,6 +2340,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/thomas-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/thomas-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/thomas-attractor.html"
   },
   {
@@ -2017,6 +2353,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/roman-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/roman-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/roman-surface-3d.html"
   },
   {
@@ -2029,6 +2366,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/clifford-torus-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/clifford-torus-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/clifford-torus-3d.html"
   },
   {
@@ -2041,6 +2379,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/wave-terrain-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/wave-terrain-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/wave-terrain-synth.html"
   },
   {
@@ -2053,6 +2392,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/formant-vocal-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/formant-vocal-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/formant-vocal-synth.html"
   },
   {
@@ -2065,6 +2405,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/pitch-shifter-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/pitch-shifter-delay-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pitch-shifter-delay-fx.html"
   },
   {
@@ -2077,6 +2418,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/envelope-follower-wah-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/envelope-follower-wah-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/envelope-follower-wah-fx.html"
   },
   {
@@ -2089,6 +2431,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/bioluminescent-abyss.field",
    "preview": "https://infinitedevices.org/assets/library/previews/bioluminescent-abyss.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/bioluminescent-abyss.html"
   },
   {
@@ -2101,6 +2444,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/quantum-field-lattice.field",
    "preview": "https://infinitedevices.org/assets/library/previews/quantum-field-lattice.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/quantum-field-lattice.html"
   },
   {
@@ -2113,6 +2457,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/chen-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/chen-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chen-attractor.html"
   },
   {
@@ -2125,6 +2470,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/spirograph-epitrochoid.js",
    "preview": "https://infinitedevices.org/assets/library/previews/spirograph-epitrochoid.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spirograph-epitrochoid.html"
   },
   {
@@ -2137,6 +2483,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/costa-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/costa-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/costa-surface-3d.html"
   },
   {
@@ -2149,6 +2496,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/catenoid-helicoid-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/catenoid-helicoid-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/catenoid-helicoid-3d.html"
   },
   {
@@ -2161,6 +2509,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/vector-morph-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/vector-morph-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/vector-morph-synth.html"
   },
   {
@@ -2173,6 +2522,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/resonant-drone-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/resonant-drone-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/resonant-drone-synth.html"
   },
   {
@@ -2185,6 +2535,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/granular-freeze-reverb-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/granular-freeze-reverb-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/granular-freeze-reverb-fx.html"
   },
   {
@@ -2197,6 +2548,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/analog-chorus-flanger-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/analog-chorus-flanger-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-chorus-flanger-fx.html"
   },
   {
@@ -2209,6 +2561,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/reaction-diffusion-core.field",
    "preview": "https://infinitedevices.org/assets/library/previews/reaction-diffusion-core.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/reaction-diffusion-core.html"
   },
   {
@@ -2221,6 +2574,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/cymatic-liquid-matrix.field",
    "preview": "https://infinitedevices.org/assets/library/previews/cymatic-liquid-matrix.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cymatic-liquid-matrix.html"
   },
   {
@@ -2233,6 +2587,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/dadras-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/dadras-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dadras-attractor.html"
   },
   {
@@ -2245,6 +2600,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/fourier-epicycles.js",
    "preview": "https://infinitedevices.org/assets/library/previews/fourier-epicycles.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/fourier-epicycles.html"
   },
   {
@@ -2257,6 +2613,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/calabi-yau-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/calabi-yau-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/calabi-yau-3d.html"
   },
   {
@@ -2269,6 +2626,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/richmond-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/richmond-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/richmond-surface-3d.html"
   },
   {
@@ -2281,6 +2639,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/pulsar-train-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/pulsar-train-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pulsar-train-synth.html"
   },
   {
@@ -2293,6 +2652,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/chaos-duffing-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/chaos-duffing-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chaos-duffing-synth.html"
   },
   {
@@ -2305,6 +2665,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/rotary-speaker-doppler-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/rotary-speaker-doppler-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/rotary-speaker-doppler-fx.html"
   },
   {
@@ -2317,6 +2678,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-gate-stutter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-gate-stutter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-gate-stutter-fx.html"
   },
   {
@@ -2329,6 +2691,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/crystal-polytope.field",
    "preview": "https://infinitedevices.org/assets/library/previews/crystal-polytope.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/crystal-polytope.html"
   },
   {
@@ -2341,6 +2704,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/voronoi-bioluminescence.field",
    "preview": "https://infinitedevices.org/assets/library/previews/voronoi-bioluminescence.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/voronoi-bioluminescence.html"
   },
   {
@@ -2353,6 +2717,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/rabinovich-fabrikant.js",
    "preview": "https://infinitedevices.org/assets/library/previews/rabinovich-fabrikant.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/rabinovich-fabrikant.html"
   },
   {
@@ -2365,6 +2730,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/penrose-tiling.js",
    "preview": "https://infinitedevices.org/assets/library/previews/penrose-tiling.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/penrose-tiling.html"
   },
   {
@@ -2377,6 +2743,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/scherk-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/scherk-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/scherk-surface-3d.html"
   },
   {
@@ -2389,6 +2756,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/catalan-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/catalan-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/catalan-surface-3d.html"
   },
   {
@@ -2401,6 +2769,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/vosim-voice-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/vosim-voice-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/vosim-voice-synth.html"
   },
   {
@@ -2413,6 +2782,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/west-coast-fold-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/west-coast-fold-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/west-coast-fold-synth.html"
   },
   {
@@ -2425,6 +2795,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/bbd-bucket-brigade-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/bbd-bucket-brigade-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/bbd-bucket-brigade-fx.html"
   },
   {
@@ -2437,6 +2808,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/dynamic-transient-shaper-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/dynamic-transient-shaper-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dynamic-transient-shaper-fx.html"
   },
   {
@@ -2449,6 +2821,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/ferrofluid-spikes.field",
    "preview": "https://infinitedevices.org/assets/library/previews/ferrofluid-spikes.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ferrofluid-spikes.html"
   },
   {
@@ -2461,6 +2834,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/prismatic-hologram.field",
    "preview": "https://infinitedevices.org/assets/library/previews/prismatic-hologram.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/prismatic-hologram.html"
   },
   {
@@ -2473,6 +2847,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/barnsley-fern.js",
    "preview": "https://infinitedevices.org/assets/library/previews/barnsley-fern.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/barnsley-fern.html"
   },
   {
@@ -2485,6 +2860,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/gingerbreadman-map.js",
    "preview": "https://infinitedevices.org/assets/library/previews/gingerbreadman-map.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/gingerbreadman-map.html"
   },
   {
@@ -2497,6 +2873,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/henneberg-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/henneberg-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/henneberg-surface-3d.html"
   },
   {
@@ -2509,6 +2886,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/jeener-klein-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/jeener-klein-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/jeener-klein-3d.html"
   },
   {
@@ -2521,6 +2899,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/phase-resonance-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/phase-resonance-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/phase-resonance-synth.html"
   },
   {
@@ -2533,6 +2912,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/scanned-synthesis-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/scanned-synthesis-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/scanned-synthesis-synth.html"
   },
   {
@@ -2545,6 +2925,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/schroeder-fdn-reverb-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/schroeder-fdn-reverb-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/schroeder-fdn-reverb-fx.html"
   },
   {
@@ -2557,6 +2938,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/barberpole-flanger-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/barberpole-flanger-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/barberpole-flanger-fx.html"
   },
   {
@@ -2569,6 +2951,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/magnetic-plasma-torus.field",
    "preview": "https://infinitedevices.org/assets/library/previews/magnetic-plasma-torus.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/magnetic-plasma-torus.html"
   },
   {
@@ -2581,6 +2964,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-tessellation.field",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-tessellation.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hyperbolic-tessellation.html"
   },
   {
@@ -2593,6 +2977,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/sprott-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/sprott-attractor.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/sprott-attractor.html"
   },
   {
@@ -2605,6 +2990,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/apollonian-gasket.js",
    "preview": "https://infinitedevices.org/assets/library/previews/apollonian-gasket.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/apollonian-gasket.html"
   },
   {
@@ -2617,6 +3003,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/plucker-conoid-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/plucker-conoid-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/plucker-conoid-3d.html"
   },
   {
@@ -2629,6 +3016,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/seifert-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/seifert-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/seifert-surface-3d.html"
   },
   {
@@ -2641,6 +3029,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/feedback-fm-lead-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/feedback-fm-lead-synth.html"
   },
   {
@@ -2653,6 +3042,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-additive-organ-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-additive-organ-synth.html"
   },
   {
@@ -2665,6 +3055,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/stereo-pingpong-delay-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/stereo-pingpong-delay-fx.html"
   },
   {
@@ -2677,6 +3068,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/tube-preamp-overdrive-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/tube-preamp-overdrive-fx.html"
   },
   {
@@ -2689,6 +3081,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/accretion-disk.field",
    "preview": "https://infinitedevices.org/assets/library/previews/accretion-disk.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/accretion-disk.html"
   },
   {
@@ -2701,6 +3094,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/chromatic-quasicrystal.field",
    "preview": "https://infinitedevices.org/assets/library/previews/chromatic-quasicrystal.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chromatic-quasicrystal.html"
   },
   {
@@ -2713,6 +3107,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/hyperbolic-poincare-disk.js",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-poincare-disk.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hyperbolic-poincare-disk.html"
   },
   {
@@ -2725,6 +3120,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/chladni-plate-harmonics.js",
    "preview": "https://infinitedevices.org/assets/library/previews/chladni-plate-harmonics.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chladni-plate-harmonics.html"
   },
   {
@@ -2737,6 +3133,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/gyroid-minimal-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/gyroid-minimal-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/gyroid-minimal-surface-3d.html"
   },
   {
@@ -2749,6 +3146,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/villarceau-circles-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/villarceau-circles-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/villarceau-circles-3d.html"
   },
   {
@@ -2761,6 +3159,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/inharmonic-chime-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/inharmonic-chime-synth.html"
   },
   {
@@ -2773,6 +3172,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/analog-supershape-pad-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-supershape-pad-synth.html"
   },
   {
@@ -2785,6 +3185,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/multiband-tape-saturator-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/multiband-tape-saturator-fx.html"
   },
   {
@@ -2797,6 +3198,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/dimension-spatial-chorus-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/dimension-spatial-chorus-fx.html"
   },
   {
@@ -2809,6 +3211,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-disk-fractal.field",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-disk-fractal.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hyperbolic-disk-fractal.html"
   },
   {
@@ -2821,6 +3224,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/magnetar-quantum-flux.field",
    "preview": "https://infinitedevices.org/assets/library/previews/magnetar-quantum-flux.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/magnetar-quantum-flux.html"
   },
   {
@@ -2833,6 +3237,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/riemann-zeta-spiral.js",
    "preview": "https://infinitedevices.org/assets/library/previews/riemann-zeta-spiral.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/riemann-zeta-spiral.html"
   },
   {
@@ -2845,6 +3250,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/cayley-hyperbolic-tree.js",
    "preview": "https://infinitedevices.org/assets/library/previews/cayley-hyperbolic-tree.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cayley-hyperbolic-tree.html"
   },
   {
@@ -2857,6 +3263,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/pseudosphere-tractroid-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/pseudosphere-tractroid-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/pseudosphere-tractroid-3d.html"
   },
   {
@@ -2869,6 +3276,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/kummer-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/kummer-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/kummer-surface-3d.html"
   },
   {
@@ -2881,6 +3289,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-drone-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-drone-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-drone-synth.html"
   },
   {
@@ -2893,6 +3302,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/resonant-brass-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/resonant-brass-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/resonant-brass-synth.html"
   },
   {
@@ -2905,6 +3315,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/biquad-morph-filter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/biquad-morph-filter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/biquad-morph-filter-fx.html"
   },
   {
@@ -2917,6 +3328,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/harmonic-tremolo-panner-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html"
   },
   {
@@ -2929,6 +3341,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/stellar-nursery-nebula.field",
    "preview": "https://infinitedevices.org/assets/library/previews/stellar-nursery-nebula.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/stellar-nursery-nebula.html"
   },
   {
@@ -2941,6 +3354,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/quantum-chromodynamic-lattice.field",
    "preview": "https://infinitedevices.org/assets/library/previews/quantum-chromodynamic-lattice.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/quantum-chromodynamic-lattice.html"
   },
   {
@@ -2953,6 +3367,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/ulam-spiral-primes.js",
    "preview": "https://infinitedevices.org/assets/library/previews/ulam-spiral-primes.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ulam-spiral-primes.html"
   },
   {
@@ -2965,6 +3380,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/mandelbrot-buddhabrot-path.js",
    "preview": "https://infinitedevices.org/assets/library/previews/mandelbrot-buddhabrot-path.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/mandelbrot-buddhabrot-path.html"
   },
   {
@@ -2977,6 +3393,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/cross-cap-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/cross-cap-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cross-cap-surface-3d.html"
   },
   {
@@ -2989,6 +3406,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/barth-sextic-surface-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/barth-sextic-surface-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/barth-sextic-surface-3d.html"
   },
   {
@@ -3001,6 +3419,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/buchla-complex-oscillator-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/buchla-complex-oscillator-synth.html"
   },
   {
@@ -3013,6 +3432,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/string-resonator-modal-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/string-resonator-modal-synth.html"
   },
   {
@@ -3025,6 +3445,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/hilbert-frequency-shifter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html"
   },
   {
@@ -3037,6 +3458,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/granular-pitch-shifter-delay-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html"
   },
   {
@@ -3049,6 +3471,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/superconducting-magnetic-vortex.field",
    "preview": "https://infinitedevices.org/assets/library/previews/superconducting-magnetic-vortex.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/superconducting-magnetic-vortex.html"
   },
   {
@@ -3061,6 +3484,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/gravitational-caustic-microlens.field",
    "preview": "https://infinitedevices.org/assets/library/previews/gravitational-caustic-microlens.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/gravitational-caustic-microlens.html"
   },
   {
@@ -3073,6 +3497,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/riso-halftone-manga.js",
    "preview": "https://infinitedevices.org/assets/library/previews/riso-halftone-manga.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/riso-halftone-manga.html"
   },
   {
@@ -3085,6 +3510,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/ukiyoe-wave-strata.js",
    "preview": "https://infinitedevices.org/assets/library/previews/ukiyoe-wave-strata.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ukiyoe-wave-strata.html"
   },
   {
@@ -3097,6 +3523,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/swiss-brutalist-monolith-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/swiss-brutalist-monolith-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/swiss-brutalist-monolith-3d.html"
   },
   {
@@ -3109,6 +3536,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/kinetic-moire-sculpture-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/kinetic-moire-sculpture-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/kinetic-moire-sculpture-3d.html"
   },
   {
@@ -3121,6 +3549,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/cyber-acid-303-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/cyber-acid-303-synth.html"
   },
   {
@@ -3133,6 +3562,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-resonator-bell-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-resonator-bell-synth.html"
   },
   {
@@ -3145,6 +3575,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/analog-tape-warble-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-tape-warble-fx.html"
   },
   {
@@ -3157,6 +3588,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-freeze-reverb-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/spectral-freeze-reverb-fx.html"
   },
   {
@@ -3169,6 +3601,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/riso-pop-screen.field",
    "preview": "https://infinitedevices.org/assets/library/previews/riso-pop-screen.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/riso-pop-screen.html"
   },
   {
@@ -3181,6 +3614,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/analog-crt-vhs-glitch.field",
    "preview": "https://infinitedevices.org/assets/library/previews/analog-crt-vhs-glitch.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/analog-crt-vhs-glitch.html"
   },
   {
@@ -3193,6 +3627,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/ditherpunk-halftone-grid.js",
    "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-halftone-grid.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ditherpunk-halftone-grid.html"
   },
   {
@@ -3205,6 +3640,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/technical-blueprint-schematic.js",
    "preview": "https://infinitedevices.org/assets/library/previews/technical-blueprint-schematic.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/technical-blueprint-schematic.html"
   },
   {
@@ -3217,6 +3653,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/liminal-void-corridor-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/liminal-void-corridor-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liminal-void-corridor-3d.html"
   },
   {
@@ -3229,6 +3666,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/retro-surreal-monolith-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/retro-surreal-monolith-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/retro-surreal-monolith-3d.html"
   },
   {
@@ -3241,6 +3679,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/liminal-drone-pad-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liminal-drone-pad-synth.html"
   },
   {
@@ -3253,6 +3692,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-chiptune-lead-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html"
   },
   {
@@ -3265,6 +3705,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/chavetta-tape-saturator-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/chavetta-tape-saturator-fx.html"
   },
   {
@@ -3277,6 +3718,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/op-art-phaser-matrix-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/op-art-phaser-matrix-fx.html"
   },
   {
@@ -3289,6 +3731,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/ditherpunk-terminal-matrix.field",
    "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-terminal-matrix.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ditherpunk-terminal-matrix.html"
   },
   {
@@ -3301,6 +3744,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/liminal-void-haze.field",
    "preview": "https://infinitedevices.org/assets/library/previews/liminal-void-haze.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liminal-void-haze.html"
   },
   {
@@ -3313,6 +3757,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/y2k-acid-starburst.js",
    "preview": "https://infinitedevices.org/assets/library/previews/y2k-acid-starburst.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/y2k-acid-starburst.html"
   },
   {
@@ -3325,6 +3770,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/neo-brutalist-grid-matrix.js",
    "preview": "https://infinitedevices.org/assets/library/previews/neo-brutalist-grid-matrix.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/neo-brutalist-grid-matrix.html"
   },
   {
@@ -3337,6 +3783,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/y2k-chrome-torus-orbit-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/y2k-chrome-torus-orbit-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/y2k-chrome-torus-orbit-3d.html"
   },
   {
@@ -3349,6 +3796,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/sketch/ukiyoe-cloud-pagoda-3d.js",
    "preview": "https://infinitedevices.org/assets/library/previews/ukiyoe-cloud-pagoda-3d.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/ukiyoe-cloud-pagoda-3d.html"
   },
   {
@@ -3361,6 +3809,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/acid-bass-303-lead-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/acid-bass-303-lead-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/acid-bass-303-lead-synth.html"
   },
   {
@@ -3373,6 +3822,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/brutalist-sub-bass-rumble-synth.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html"
   },
   {
@@ -3385,6 +3835,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/glitch-bitcrush-buffer-stutter-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/glitch-bitcrush-buffer-stutter-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html"
   },
   {
@@ -3397,6 +3848,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.inf",
    "preview": "https://infinitedevices.org/assets/library/previews/liquid-chorus-flanger-matrix-fx.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html"
   },
   {
@@ -3409,6 +3861,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/y2k-liquid-chrome-rave.field",
    "preview": "https://infinitedevices.org/assets/library/previews/y2k-liquid-chrome-rave.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/y2k-liquid-chrome-rave.html"
   },
   {
@@ -3421,6 +3874,7 @@
    "price": 0,
    "file": "https://infinitedevices.org/assets/library/pixel/neo-brutalist-concrete-monolith.field",
    "preview": "https://infinitedevices.org/assets/library/previews/neo-brutalist-concrete-monolith.jpg",
+   "sample": "",
    "page": "https://infinitedevices.org/library/neo-brutalist-concrete-monolith.html"
   }
  ]

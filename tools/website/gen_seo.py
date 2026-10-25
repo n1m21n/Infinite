@@ -15,7 +15,7 @@ import gen_embeds, gen_nodes
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 BASE = "https://infinitedevices.org/"
-SRC = [("Templates", "assets/templates/index.json"), ("Community", "assets/community/index.json"), ("AI Skills", "assets/skills/index.json"), ("Extensions", "assets/extensions/index.json"), ("", "assets/library/index.json")]
+SRC = [("Templates", "assets/templates/index.json"), ("Community", "assets/community/index.json"), ("AI Skills", "assets/skills/index.json"), ("Extensions", "assets/extensions/index.json"), ("Generated", "assets/universe/index.json"), ("", "assets/library/index.json")]
 
 def items():
     out = []
@@ -23,7 +23,7 @@ def items():
         for i in json.load(open(os.path.join(W, p)))["items"]:
             out.append({"id": i["id"], "name": i["name"], "category": i.get("category", ""), "type": i.get("kind", ""),
                         "description": i.get("description", ""), "author": i.get("author", ""), "price": i.get("price", 0),
-                        "file": BASE + i["file"], "preview": BASE + i["preview"]})
+                        "file": BASE + i["file"], "preview": BASE + i["preview"], "sample": i.get("sample", "")})
     return out
 
 def library_block(its):
@@ -74,6 +74,7 @@ def page(i, embeds=frozenset()):
           "isPartOf": {"@type": "CollectionPage", "name": "Infinite Library", "url": BASE + "library.html"},
           "author": {"@type": "Person", "name": i["author"] or "n1m21n", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []}}
     by = f' by {e(i["author"])}' if i["author"] else ""
+    hear = f'  <a class="btn btn-ghost" href="../{e(i["sample"])}">Hear it first</a>\n' if i.get("sample") else ""
     live = f'  <a class="btn btn-ghost" href="../embeds/{e(i["id"])}.html">Play it live in your browser</a>\n' if i["id"] in embeds else ""
     return f"""<!DOCTYPE html>
 <html lang="en" data-mode="midnight">
@@ -117,7 +118,7 @@ def page(i, embeds=frozenset()):
   <p>{e(d)}</p>
   <p>Download the file, then open it in Infinite (File, Open for patches; import it into a Field or Sketch node for devices). Infinite is free, open source and runs on macOS, Windows and Linux.</p>
   <a class="btn btn-primary" href="{e(i["file"])}" download>Download .{e(ext)}</a>
-{live}  <a class="btn btn-ghost" href="../library.html">Back to the Library</a>
+{hear}{live}  <a class="btn btn-ghost" href="../library.html">Back to the Library</a>
   <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
 </main>
 <script src="../bird.js" defer></script>
