@@ -968,6 +968,44 @@
     "Refik Anadol data sculptures",
     "Generative terrain and contour art"
    ]
+  },
+  {
+   "id": "swiss_typographic",
+   "taxonomy": "new",
+   "name": "Minimal Signal",
+   "palette": [
+    "#F5F5F2",
+    "#111111",
+    "#E4261A"
+   ],
+   "sources": [
+    "Line",
+    "Rectangle",
+    "Circle"
+   ],
+   "fx": [
+    "ripple",
+    "gaussianblur"
+   ],
+   "comp": [
+    "threshold",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch",
+    "bloom"
+   ],
+   "motion": 0.2,
+   "pairs": [
+    "minimal_techno",
+    "dub_techno",
+    "ambient"
+   ],
+   "refs": [
+    "Ryoji Ikeda (test pattern, datamatics)",
+    "Carsten Nicolai / Alva Noto",
+    "Monochrome, grid, signal-as-image"
+   ]
   }
  ]
 }

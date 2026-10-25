@@ -198,6 +198,10 @@ def roundify(g, f):
 
 
 def build_visual(style, seed, facts, g=None, audio_out=None):
+    import cards, stack
+    if style["id"] in cards.RECIPES or style["id"] == "op_art":   # style cards: layered Sketch marks (stack.py)
+        r = stack.compile_card(cards.card_for(style["id"], style), seed, facts, g, audio_out)
+        return (r, {}) if g is not None else (r, {})
     rng = random.Random("%s:v:%d" % (style["id"], seed))
     own = g is None
     g = g or scene.Graph(facts, rng)
@@ -256,7 +260,7 @@ def build_visual(style, seed, facts, g=None, audio_out=None):
     return g, {}
 
 
-def best_visual(style, seed, facts, binary, d, tries=6):
+def best_visual(style, seed, facts, binary, d, tries=3):
     """Try several wirings of the style, keep the picture with the most going on (luminance spread, edges, colour variety)."""
     import library
     best, bt = -1, None

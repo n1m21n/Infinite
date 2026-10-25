@@ -59,6 +59,37 @@ def hexrgb(h):
     return [round(int(h[i:i + 2], 16) / 255, 4) for i in (0, 2, 4)]
 
 
+def special(L, pal):
+    """Whole-layer fields that are not a list of marks: coarse colour cells, horizon grid, rays, stacked waves."""
+    a, cols = L.get("arr"), L.get("col") or list(range(len(pal)))
+    n_lo, n_hi = L.get("n", (12, 20))
+    if a == "cells":   # a coarse grid whose cell colour follows a noise or sine field: plasma, dither, 8-bit, data terrain
+        f = L.get("freq", 2.0)
+        fld = "noise(x / %d * %.2f, y / %d * %.2f, t * %.2f)" % (1, f, 1, f, L.get("drift", 0.05)) if L.get("field", "noise") == "noise" else \
+              "0.5 + 0.25 * sin(x * %.2f * TAU + t * 0.5) + 0.25 * sin(y * %.2f * TAU - t * 0.4) * cos((x + y) * %.2f)" % (f, f, f * 0.5)
+        return ["  const c = floor(ri(%d, %d + 1)), r = floor(c * height / width);" % (n_lo, n_hi),
+                "  for (let j = 0; j < r; j++) for (let i = 0; i < c; i++) {",
+                "    const x = (i + 0.5) / c, y = (j + 0.5) / r;", "    const v = constrain(%s, 0, 0.999);" % fld,
+                "    fill(pal(COLS[floor(v * COLS.length)])); noStroke(); rect(i / c * width, j / r * height, width / c + 1, height / r + 1);", "  }"]
+    if a == "horizon":   # perspective floor: converging verticals, bunching horizontals
+        hz = L.get("y", 0.55)
+        return ["  const hy = height * %.2f; stroke(pal(COLS[0])); strokeWeight(%s); noFill();" % (hz, L.get("line", 3)),
+                "  for (let i = -%d; i <= %d; i++) line(width / 2 + i * width * 0.03, hy, width / 2 + i * width * 0.18, height);" % (n_hi, n_hi),
+                "  for (let k = 1; k < %d; k++) { const u = pow(k / %d, 2.2); line(0, hy + (height - hy) * u, width, hy + (height - hy) * u); }" % (n_hi, n_hi)]
+    if a == "rays":
+        return ["  stroke(pal(COLS[0])); strokeWeight(%s);" % L.get("line", 3), "  const k = floor(ri(%d, %d + 1));" % (n_lo, n_hi),
+                "  for (let i = 0; i < k; i++) { const q = i / k * TAU + t * 0.05; line(width / 2, height * %.2f, width / 2 + cos(q) * height, height * %.2f + sin(q) * height); }" % (L.get("y", 0.5), L.get("y", 0.5))]
+    if a == "waves":   # stacked sine ridges, back to front, each filled to the bottom: terrain, data, cymatic fringes
+        return ["  const k = floor(ri(%d, %d + 1));" % (n_lo, n_hi),
+                "  for (let i = 0; i < k; i++) { const y0 = height * (0.25 + 0.7 * i / k);",
+                "    fill(pal(COLS[i %% COLS.length])); stroke(pal(COLS[(i + 1) %% COLS.length])); strokeWeight(%s);" % L.get("line", 2),
+                "    beginShape(); vertex(0, height); for (let x = 0; x <= width; x += 12) vertex(x, y0 - S * %.3f * noise(x / width * 3 + i * 7, i, t * 0.1)); vertex(width, height); endShape(1); }" % L.get("amp", 0.12)]
+    if a == "sun":   # half-set disc with horizontal cuts
+        return ["  const R = S * %.2f, cy = height * %.2f; noStroke(); fill(pal(COLS[0])); circle(width / 2, cy, R);" % (L.get("r", 0.3), L.get("y", 0.45)),
+                "  fill(pal(%d)); for (let i = 1; i < 8; i++) rect(width / 2 - R, cy + R * (i / 8 - 0.1), R * 2, R * 0.03 * i);" % L.get("cut", 1)]
+    return None
+
+
 def layer_js(card, L, seed):
     pal = [hexrgb(c) for c in card["palette"]]
     cols = L.get("col") or list(range(len(pal)))
@@ -69,6 +100,10 @@ def layer_js(card, L, seed):
         out.append("const WORDS = %s;" % json.dumps(L["text"]))
     out += ["", "function draw(t) {", "  S = min(width, height);", "  _s = %d;" % seed,
             "  background(%s);" % ("PAL_BG" if False else ("%s, 1" % ",".join(map(str, pal[bg])) if bg is not None else "0, 0, 0, 0"))]
+    out.append("  translate(S * 0.012 * sin(t * 0.4 + %d), S * 0.012 * cos(t * 0.33 + %d));" % (seed % 7, seed % 5))
+    sp = special(L, pal)
+    if sp:
+        return "\n".join(out + sp + ["}"])
     n_lo, n_hi = L.get("n", (8, 20))
     s_lo, s_hi = L.get("size", (0.08, 0.3))
     arr, mk, rot, line = L.get("arr", "scatter"), L.get("mark", "circle"), L.get("rot", "none"), L.get("line", 0)
@@ -113,11 +148,65 @@ def sketch_node(g, facts, code):
     return nid
 
 
-def compile_card(card, seed, facts):
+def setc(g, nid, key, rgb):
+    """Write one colour parameter on a node already in the graph."""
+    name = g.names[nid]; base = name.split(":")[0]
+    e = g.lines.index("end", g.lines.index("node %d %s %s" % (nid, g.facts[name]["category"], base)))
+    g.lines.insert(e, "  c %s %.4f %.4f %.4f" % ((key,) + tuple(rgb)))
+
+
+OPIDX = {"Transform": 0, "Array": 1, "Subdivide": 2, "Solidify": 3, "Extrude": 4, "Wireframe": 5, "Explode": 8, "Twist": 9, "Smooth": 10, "Mirror": 11, "Screw": 12, "Bevel": 16, "Inset": 17}
+INT3D = {"projection", "op", "count", "tonemap", "shape", "mode", "knotP", "knotQ", "segments"}
+
+
+def _force(d):
+    return {k: (("i", v) if k in INT3D and not isinstance(v, bool) else ("b", int(v)) if isinstance(v, bool) else ("f", float(v))) for k, v in d.items()}
+
+
+def three_layer(g, card, T, rng):
+    """The 3D mirror of a layer: primitives (each carries its material) -> operators (Array = multiplicity, Mirror = symmetry, Twist) -> Render 3D, whose
+    camera, light, shadows and background are its own parameters. Marks become solids, arrangement becomes Array/Mirror/camera, layering becomes depth."""
+    pal = [hexrgb(c) for c in card["palette"]]
+    ids = []
+    for k, (name, kw) in enumerate(T["prims"]):
+        kw = dict(kw); ci = kw.pop("col", k)
+        n = g.add(name, 0, force=_force(dict({"metallic": 0.2, "roughness": 0.5}, **kw)))
+        setc(g, n, "color", pal[ci % len(pal)])
+        cur = n
+        for op, okw in T.get("ops", []):
+            o = g.add("Array", 0, force=_force(dict(okw, op=OPIDX[op]))); g.connect(cur, o, "geometry"); cur = o
+        ids.append(cur)
+    if len(ids) > 1:
+        gr = g.add("Group 3D", 0)
+        for i in ids:
+            g.connect(i, gr, "geometry")
+        ids = [gr]
+    ctr = [0.0, 0.0, 0.0]
+    for op, okw in T.get("ops", []):   # arrays grow from the origin: aim the camera at the middle of what they build
+        if op == "Array":
+            for ax, key in enumerate(("offsetX", "offsetY", "offsetZ")):
+                ctr[ax] += (okw.get("count", 1) - 1) * okw.get(key, 0.0) / 2
+    r = g.add("Render 3D", 0, force=_force(dict({"targetX": ctr[0], "targetY": ctr[1], "targetZ": ctr[2], "width": W, "height": H, "camAzimuth": 25, "camElevation": 18, "camDistance": 5.5, "fov": 40, "lightAzimuth": 40, "lightElevation": 45,
+                                                  "lightIntensity": 1.6, "shadows": True, "ao": 0.5, "bgOpacity": 1.0, "tonemap": 1, "bloom": 0.0}, **T.get("render", {}))))
+    setc(g, r, "bg", pal[T.get("bg", 0) % len(pal)])
+    g.connect(ids[0], r, "geometry")
+    return r
+
+
+def compile_card(card, seed, facts, g=None, audio_out=None):
     rng = random.Random("%s:%d" % (card["id"], seed))
-    g = scene.Graph(facts, rng)
+    own = g is None
+    g = g or scene.Graph(facts, rng)
     cur = None
     for i, L in enumerate(card["layers"]):
+        if "three" in L:
+            nid = three_layer(g, card, L["three"], rng)
+            if cur is None:
+                cur = nid
+            else:
+                b = g.add("Blend", 0, force={"mode": ("i", L.get("blend", 0)), "mix": ("f", L.get("mix", 1.0))})
+                g.connect(cur, b); g.connect(nid, b); cur = b
+            continue
         nid = g.add("Sketch", 0)
         s = g.lines.index("node %d %s Sketch" % (nid, facts["Sketch"]["category"]))
         e = g.lines.index("end", s)
@@ -135,11 +224,18 @@ def compile_card(card, seed, facts):
         n = g.add(name, 0, force=force); g.connect(cur, n); cur = n
     out = g.add("Output", 0)
     g.connect(cur, out)
-    return g.text()
+    if audio_out:
+        g.lines.append("aud %d 1 %d" % (out, audio_out))
+    return g.text() if own else g
 
 
 # ---------------------------------------------------------------- cards (first three; the rest follow visual-system.md)
 CARDS = {
+    "three_knots": dict(id="three_knots", meaning="Test: one solid, lit from the side, on the card's ground.", palette=["#101418", "#E4261A", "#F2B705", "#F4F4F0"], bg=0, layers=[
+        dict(three=dict(prims=[("Torus Knot", dict(metallic=0.6, roughness=0.25, col=1, tube=0.2, knotP=2, knotQ=3))], ops=[("Array", dict(count=5, rotStep=14.0, scaleStep=0.9))], render=dict(camDistance=7.0, camElevation=10)))]),
+    "three_grid": dict(id="three_grid", meaning="Test: repeated cubes, a grid in depth.", palette=["#F2EBDD", "#D8301F", "#1B3B8F", "#111111"], bg=0, layers=[
+        dict(three=dict(prims=[("Cube", dict(col=1, scale=0.5))], ops=[("Array", dict(count=5, offsetX=0.7)), ("Array", dict(count=5, offsetZ=0.7))], render=dict(camDistance=9.0, camElevation=35)))]),
+
     "bauhaus": dict(id="bauhaus", meaning="Primary colour, pure geometry and right angles: a school teaching that form follows function and every shape is a building block.", palette=["#F2EBDD", "#D8301F", "#F2B705", "#1B3B8F", "#111111"], bg=0, layers=[
         dict(mark="bar", arr="diagonal", n=(2, 4), size=(0.2, 0.5), col=[4], rot="snap"),
         dict(mark="circle", arr="thirds", n=(2, 4), size=(0.25, 0.55), col=[1, 2, 3]),

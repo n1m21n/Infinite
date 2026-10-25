@@ -276,7 +276,7 @@ def _pools_audio_names(code, P):
 
 # ---------------------------------------------------------------- visual
 class Graph:
-    WORD = {"audio": "aud", "note": "note", "image": "cable", "geometry": "geo"}
+    WORD = {"audio": "aud", "note": "note", "image": "cable", "geometry": "geo", "camera": "geo", "light": "geo", "environment": "geo"}
 
     def __init__(self, facts, rng):
         self.facts, self.r, self.lines, self.names, self.used, self.n = facts, rng, ["infinite-patch 1"], {}, {}, 0
