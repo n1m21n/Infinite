@@ -322,10 +322,10 @@ def best_visual(style, seed, facts, binary, d, tries=3):
 
 def bpm_ok(est, band):
     """Engine's own tempo estimate, allowed to be half / double (it often locks to the beat's subdivision)."""
-    return bool(est) and any(band[0] * 0.93 <= est * k <= band[1] * 1.07 for k in (0.5, 1, 2))
+    return bool(est) and any(band[0] * 0.93 <= est * k <= band[1] * 1.07 for k in (0.5, 2 / 3, 1, 1.5, 2))
 
 
-def batch(n, out, binary, workers, secs, seed):
+def batch(n, out, binary, workers, secs, seed, kinds="A,V,AV"):
     from concurrent.futures import ThreadPoolExecutor
     sys.path.insert(0, os.path.join(ROOT, "tools", "catalog"))
     import catalog
@@ -336,9 +336,10 @@ def batch(n, out, binary, workers, secs, seed):
     mids, aids = sorted(M), sorted(A)
     jobs = []
     for i in range(n):
-        kind = ["A", "V", "AV"][i % 3]
+        ks = kinds.split(",")
+        kind = ks[i % len(ks)]
         a = rr.choice(aids)
-        m = rr.choice([x for x in A[a]["pairs"] if x in M]) if kind == "AV" else rr.choice(mids)
+        m = rr.choice([x for x in A[a]["pairs"] if x in M]) if kind == "AV" else mids[(i // len(ks)) % len(mids)] if len(ks) == 1 else rr.choice(mids)   # a sound-only batch walks the styles in turn so every one is heard
         jobs.append((i, kind, m, a))
     os.makedirs(out, exist_ok=True)
 
@@ -377,7 +378,7 @@ def batch(n, out, binary, workers, secs, seed):
             row["interest"] = library.interest(os.path.join(d, "poster.png"))
             from PIL import Image, ImageStat
             row["lum"] = round(ImageStat.Stat(Image.open(os.path.join(d, "poster.png")).convert("L")).mean[0], 1)
-        if kind in ("A", "AV") and not bpm_ok(am.get("bpm_estimate"), M[mid]["bpm"]) and M[mid]["family"] not in ("ambient", "experimental"):
+        if kind in ("A", "AV") and not bpm_ok(am.get("bpm_estimate"), M[mid]["bpm"]) and M[mid]["family"] not in ("ambient", "experimental", "piano"):
             shutil.rmtree(d); return ("tempo", mid)
         if not catalog.passes(row):
             shutil.rmtree(d); return ("gate", row["style"])
@@ -404,10 +405,11 @@ def main():
     ap.add_argument("--out", default="/tmp/uni/styled")
     ap.add_argument("--bin", default=u.DEFAULT_BIN)
     ap.add_argument("--secs", type=int, default=8)
+    ap.add_argument("--kinds", default="A,V,AV")
     a = ap.parse_args()
     facts = u.load_facts(); scene.pools_v2(facts)
     if a.kind == "batch":
-        return batch(a.n, a.out, a.bin, a.workers, a.secs, a.seed)
+        return batch(a.n, a.out, a.bin, a.workers, a.secs, a.seed, a.kinds)
     S = styles()
     os.makedirs(a.out, exist_ok=True)
     for sid in (S if a.style == "all" else [a.style]):

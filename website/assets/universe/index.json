@@ -2,8 +2,286 @@
  "version": 1,
  "items": [
   {
-   "id": "gen-audio-31000",
+   "id": "gen-audio-40000",
+   "name": "Analog + Arpeggiator + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40000.jpg",
+   "file": "assets/universe/gen-audio-40000.inf",
+   "sample": "samples/?s=audio-s40000",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Oscillator"
+   ]
+  },
+  {
+   "id": "gen-audio-40001",
+   "name": "Analog + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40001.jpg",
+   "file": "assets/universe/gen-audio-40001.inf",
+   "sample": "samples/?s=audio-s40001",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "EQ",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40002",
+   "name": "Chorder + Chorus + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40002.jpg",
+   "file": "assets/universe/gen-audio-40002.inf",
+   "sample": "samples/?s=audio-s40002",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Field Synth",
+    "Granular",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40004",
+   "name": "Analog + Delay + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40004.jpg",
+   "file": "assets/universe/gen-audio-40004.inf",
+   "sample": "samples/?s=audio-s40004",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Delay",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Sampler"
+   ]
+  },
+  {
+   "id": "gen-audio-40005",
+   "name": "Arpeggiator + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40005.jpg",
+   "file": "assets/universe/gen-audio-40005.inf",
+   "sample": "samples/?s=audio-s40005",
+   "nodes": [
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo"
+   ]
+  },
+  {
+   "id": "gen-audio-40006",
+   "name": "Chorder + Convolution Reverb + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40006.jpg",
+   "file": "assets/universe/gen-audio-40006.inf",
+   "sample": "samples/?s=audio-s40006",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Convolution Reverb",
+    "Drum Sequencer",
+    "Granular",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40007",
+   "name": "Arpeggiator + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40007.jpg",
+   "file": "assets/universe/gen-audio-40007.inf",
+   "sample": "samples/?s=audio-s40007",
+   "nodes": [
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40008",
    "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40008.jpg",
+   "file": "assets/universe/gen-audio-40008.inf",
+   "sample": "samples/?s=audio-s40008",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo"
+   ]
+  },
+  {
+   "id": "gen-audio-40009",
+   "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40009.jpg",
+   "file": "assets/universe/gen-audio-40009.inf",
+   "sample": "samples/?s=audio-s40009",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40012",
+   "name": "Analog + Chorder + Drive",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40012.jpg",
+   "file": "assets/universe/gen-audio-40012.inf",
+   "sample": "samples/?s=audio-s40012",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Drive",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40013",
+   "name": "Analog + Audio Filter + Delay",
    "category": "Generated",
    "kind": "Patch",
    "tags": [
@@ -11,21 +289,1287 @@
    ],
    "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
    "price": 0,
-   "preview": "assets/universe/gen-audio-31000.jpg",
-   "file": "assets/universe/gen-audio-31000.inf",
-   "sample": "samples/?s=audio-s31000",
+   "preview": "assets/universe/gen-audio-40013.jpg",
+   "file": "assets/universe/gen-audio-40013.inf",
+   "sample": "samples/?s=audio-s40013",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40014",
+   "name": "Analog + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40014.jpg",
+   "file": "assets/universe/gen-audio-40014.inf",
+   "sample": "samples/?s=audio-s40014",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Sampler"
+   ]
+  },
+  {
+   "id": "gen-audio-40015",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40015.jpg",
+   "file": "assets/universe/gen-audio-40015.inf",
+   "sample": "samples/?s=audio-s40015",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Dynamics",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40016",
+   "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40016.jpg",
+   "file": "assets/universe/gen-audio-40016.inf",
+   "sample": "samples/?s=audio-s40016",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo"
+   ]
+  },
+  {
+   "id": "gen-audio-40018",
+   "name": "Analog + Bitcrush + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40018.jpg",
+   "file": "assets/universe/gen-audio-40018.inf",
+   "sample": "samples/?s=audio-s40018",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Bitcrush",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Note Strum"
+   ]
+  },
+  {
+   "id": "gen-audio-40019",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40019.jpg",
+   "file": "assets/universe/gen-audio-40019.inf",
+   "sample": "samples/?s=audio-s40019",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40020",
+   "name": "Analog + Chorder + Drive",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40020.jpg",
+   "file": "assets/universe/gen-audio-40020.inf",
+   "sample": "samples/?s=audio-s40020",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Drive",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Saturator"
+   ]
+  },
+  {
+   "id": "gen-audio-40021",
+   "name": "Analog + Drum Sequencer + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 8 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40021.jpg",
+   "file": "assets/universe/gen-audio-40021.inf",
+   "sample": "samples/?s=audio-s40021",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40022",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40022.jpg",
+   "file": "assets/universe/gen-audio-40022.inf",
+   "sample": "samples/?s=audio-s40022",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40023",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40023.jpg",
+   "file": "assets/universe/gen-audio-40023.inf",
+   "sample": "samples/?s=audio-s40023",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40024",
+   "name": "Analog + Chorder + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40024.jpg",
+   "file": "assets/universe/gen-audio-40024.inf",
+   "sample": "samples/?s=audio-s40024",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "EQ",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40025",
+   "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40025.jpg",
+   "file": "assets/universe/gen-audio-40025.inf",
+   "sample": "samples/?s=audio-s40025",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40026",
+   "name": "Analog + Audio Filter + Drive",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40026.jpg",
+   "file": "assets/universe/gen-audio-40026.inf",
+   "sample": "samples/?s=audio-s40026",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40027",
+   "name": "Chorder + Chorus + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40027.jpg",
+   "file": "assets/universe/gen-audio-40027.inf",
+   "sample": "samples/?s=audio-s40027",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo"
+   ]
+  },
+  {
+   "id": "gen-audio-40028",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40028.jpg",
+   "file": "assets/universe/gen-audio-40028.inf",
+   "sample": "samples/?s=audio-s40028",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40030",
+   "name": "Analog + Arpeggiator + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40030.jpg",
+   "file": "assets/universe/gen-audio-40030.inf",
+   "sample": "samples/?s=audio-s40030",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-40031",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40031.jpg",
+   "file": "assets/universe/gen-audio-40031.inf",
+   "sample": "samples/?s=audio-s40031",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Dynamics",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40032",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40032.jpg",
+   "file": "assets/universe/gen-audio-40032.inf",
+   "sample": "samples/?s=audio-s40032",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40034",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40034.jpg",
+   "file": "assets/universe/gen-audio-40034.inf",
+   "sample": "samples/?s=audio-s40034",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40035",
+   "name": "Analog + Arpeggiator + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40035.jpg",
+   "file": "assets/universe/gen-audio-40035.inf",
+   "sample": "samples/?s=audio-s40035",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "FM",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter"
+   ]
+  },
+  {
+   "id": "gen-audio-40036",
+   "name": "Chorder + Chorus + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40036.jpg",
+   "file": "assets/universe/gen-audio-40036.inf",
+   "sample": "samples/?s=audio-s40036",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Granular",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Partials"
+   ]
+  },
+  {
+   "id": "gen-audio-40037",
+   "name": "Chorder + FM + Humanizer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40037.jpg",
+   "file": "assets/universe/gen-audio-40037.inf",
+   "sample": "samples/?s=audio-s40037",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "FM",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40038",
+   "name": "Delay + Drum Sequencer + Field Synth",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40038.jpg",
+   "file": "assets/universe/gen-audio-40038.inf",
+   "sample": "samples/?s=audio-s40038",
+   "nodes": [
+    "Audio Out",
+    "Delay",
+    "Drum Sequencer",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Sampler"
+   ]
+  },
+  {
+   "id": "gen-audio-40039",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40039.jpg",
+   "file": "assets/universe/gen-audio-40039.inf",
+   "sample": "samples/?s=audio-s40039",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo"
+   ]
+  },
+  {
+   "id": "gen-audio-40040",
+   "name": "Audio Filter + Chorder + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40040.jpg",
+   "file": "assets/universe/gen-audio-40040.inf",
+   "sample": "samples/?s=audio-s40040",
+   "nodes": [
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Granular",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Partials"
+   ]
+  },
+  {
+   "id": "gen-audio-40041",
+   "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40041.jpg",
+   "file": "assets/universe/gen-audio-40041.inf",
+   "sample": "samples/?s=audio-s40041",
    "nodes": [
     "Analog",
     "Audio Out",
     "Chorder",
     "Chorus",
     "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40042",
+   "name": "Analog + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40042.jpg",
+   "file": "assets/universe/gen-audio-40042.inf",
+   "sample": "samples/?s=audio-s40042",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40043",
+   "name": "Analog + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40043.jpg",
+   "file": "assets/universe/gen-audio-40043.inf",
+   "sample": "samples/?s=audio-s40043",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40045",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40045.jpg",
+   "file": "assets/universe/gen-audio-40045.inf",
+   "sample": "samples/?s=audio-s40045",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40047",
+   "name": "Delay + Drum Sequencer + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40047.jpg",
+   "file": "assets/universe/gen-audio-40047.inf",
+   "sample": "samples/?s=audio-s40047",
+   "nodes": [
+    "Audio Out",
+    "Delay",
+    "Drum Sequencer",
     "LFO",
     "Limiter",
     "Mixer",
     "Note Sequencer",
     "Oscillator",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40048",
+   "name": "Analog + Chorder + Delay",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40048.jpg",
+   "file": "assets/universe/gen-audio-40048.inf",
+   "sample": "samples/?s=audio-s40048",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "Field Synth",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
     "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40049",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40049.jpg",
+   "file": "assets/universe/gen-audio-40049.inf",
+   "sample": "samples/?s=audio-s40049",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-40050",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40050.jpg",
+   "file": "assets/universe/gen-audio-40050.inf",
+   "sample": "samples/?s=audio-s40050",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-40052",
+   "name": "Analog + Bitcrush + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40052.jpg",
+   "file": "assets/universe/gen-audio-40052.inf",
+   "sample": "samples/?s=audio-s40052",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Bitcrush",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "FM",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Note Strum"
+   ]
+  },
+  {
+   "id": "gen-audio-40053",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40053.jpg",
+   "file": "assets/universe/gen-audio-40053.inf",
+   "sample": "samples/?s=audio-s40053",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "FM",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40054",
+   "name": "Analog + Chorder + Drive",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40054.jpg",
+   "file": "assets/universe/gen-audio-40054.inf",
+   "sample": "samples/?s=audio-s40054",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Metallic",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Saturator"
+   ]
+  },
+  {
+   "id": "gen-audio-40055",
+   "name": "Analog + Delay + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40055.jpg",
+   "file": "assets/universe/gen-audio-40055.inf",
+   "sample": "samples/?s=audio-s40055",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Delay",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40056",
+   "name": "Analog + Chorder + Drum Sequencer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40056.jpg",
+   "file": "assets/universe/gen-audio-40056.inf",
+   "sample": "samples/?s=audio-s40056",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Drum Sequencer",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40057",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 15 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40057.jpg",
+   "file": "assets/universe/gen-audio-40057.inf",
+   "sample": "samples/?s=audio-s40057",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
+   ]
+  },
+  {
+   "id": "gen-audio-40059",
+   "name": "Chorder + Delay + Humanizer",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40059.jpg",
+   "file": "assets/universe/gen-audio-40059.inf",
+   "sample": "samples/?s=audio-s40059",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Humanizer",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Note Sequencer",
+    "Partials",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "gen-audio-40060",
+   "name": "Drive + Drum Sequencer + LFO",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40060.jpg",
+   "file": "assets/universe/gen-audio-40060.inf",
+   "sample": "samples/?s=audio-s40060",
+   "nodes": [
+    "Audio Out",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Reverb",
+    "Saturator",
+    "Wavetable"
+   ]
+  },
+  {
+   "id": "gen-audio-40061",
+   "name": "Analog + Chorder + Chorus",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 16 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40061.jpg",
+   "file": "assets/universe/gen-audio-40061.inf",
+   "sample": "samples/?s=audio-s40061",
+   "nodes": [
+    "Analog",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-40062",
+   "name": "Analog + Arpeggiator + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40062.jpg",
+   "file": "assets/universe/gen-audio-40062.inf",
+   "sample": "samples/?s=audio-s40062",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drive",
+    "Drum Sequencer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer",
+    "Oscillator"
+   ]
+  },
+  {
+   "id": "gen-audio-40063",
+   "name": "Chorder + Convolution Reverb + EQ",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40063.jpg",
+   "file": "assets/universe/gen-audio-40063.inf",
+   "sample": "samples/?s=audio-s40063",
+   "nodes": [
+    "Audio Out",
+    "Chorder",
+    "Convolution Reverb",
+    "EQ",
+    "FM",
+    "Humanizer",
+    "Limiter",
+    "Mixer",
+    "Note Echo",
+    "Reverb",
+    "Velocity Curve"
+   ]
+  },
+  {
+   "id": "gen-audio-40064",
+   "name": "Analog + Arpeggiator + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 16 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40064.jpg",
+   "file": "assets/universe/gen-audio-40064.inf",
+   "sample": "samples/?s=audio-s40064",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer"
+   ]
+  },
+  {
+   "id": "gen-audio-40065",
+   "name": "Analog + Arpeggiator + Audio Filter",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 16 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40065.jpg",
+   "file": "assets/universe/gen-audio-40065.inf",
+   "sample": "samples/?s=audio-s40065",
+   "nodes": [
+    "Analog",
+    "Arpeggiator",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Delay",
+    "Drum Sequencer",
+    "Dynamics",
+    "FM",
+    "Humanizer",
+    "LFO",
+    "Limiter"
+   ]
+  },
+  {
+   "id": "gen-audio-40066",
+   "name": "Analog + Audio Filter + Chorder",
+   "category": "Generated",
+   "kind": "Patch",
+   "tags": [
+    "audio"
+   ],
+   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
+   "price": 0,
+   "preview": "assets/universe/gen-audio-40066.jpg",
+   "file": "assets/universe/gen-audio-40066.inf",
+   "sample": "samples/?s=audio-s40066",
+   "nodes": [
+    "Analog",
+    "Audio Filter",
+    "Audio Out",
+    "Chorder",
+    "Chorus",
+    "Drum Sequencer",
+    "Field Synth",
+    "Humanizer",
+    "LFO",
+    "Limiter",
+    "Mixer",
+    "Note Sequencer"
    ]
   },
   {
@@ -49,32 +1593,6 @@
    ]
   },
   {
-   "id": "gen-audio-31003",
-   "name": "Analog + Chorder + Chorus",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31003.jpg",
-   "file": "assets/universe/gen-audio-31003.inf",
-   "sample": "samples/?s=audio-s31003",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Chorus",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
    "id": "gen-visual-31004",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -93,59 +1611,6 @@
     "Sketch",
     "bloom",
     "twirl"
-   ]
-  },
-  {
-   "id": "gen-audio-31006",
-   "name": "Analog + Chorder + Chorus",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31006.jpg",
-   "file": "assets/universe/gen-audio-31006.inf",
-   "sample": "samples/?s=audio-s31006",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Chorus",
-    "Delay",
-    "Drum Sequencer",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
-   "id": "gen-audio-31012",
-   "name": "Analog + Chorder + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31012.jpg",
-   "file": "assets/universe/gen-audio-31012.inf",
-   "sample": "samples/?s=audio-s31012",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
    ]
   },
   {
@@ -197,32 +1662,6 @@
    ]
   },
   {
-   "id": "gen-audio-31015",
-   "name": "Analog + Chorder + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31015.jpg",
-   "file": "assets/universe/gen-audio-31015.inf",
-   "sample": "samples/?s=audio-s31015",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Wavetable"
-   ]
-  },
-  {
    "id": "gen-visual-31016",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -241,34 +1680,6 @@
     "Sketch",
     "bloom",
     "symmetry"
-   ]
-  },
-  {
-   "id": "gen-audio-31018",
-   "name": "Analog + Chorder + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31018.jpg",
-   "file": "assets/universe/gen-audio-31018.inf",
-   "sample": "samples/?s=audio-s31018",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "Dynamics",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Phaser",
-    "Reverb"
    ]
   },
   {
@@ -342,34 +1753,6 @@
    ]
   },
   {
-   "id": "gen-audio-31024",
-   "name": "Chorder + Chorus + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31024.jpg",
-   "file": "assets/universe/gen-audio-31024.inf",
-   "sample": "samples/?s=audio-s31024",
-   "nodes": [
-    "Audio Out",
-    "Chorder",
-    "Chorus",
-    "Delay",
-    "Drum Sequencer",
-    "FM",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
    "id": "gen-visual-31025",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -388,58 +1771,6 @@
     "Sketch",
     "bloom",
     "symmetry"
-   ]
-  },
-  {
-   "id": "gen-audio-31027",
-   "name": "Arpeggiator + Chorder + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31027.jpg",
-   "file": "assets/universe/gen-audio-31027.inf",
-   "sample": "samples/?s=audio-s31027",
-   "nodes": [
-    "Arpeggiator",
-    "Audio Out",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Wavetable"
-   ]
-  },
-  {
-   "id": "gen-audio-31030",
-   "name": "Analog + Delay + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31030.jpg",
-   "file": "assets/universe/gen-audio-31030.inf",
-   "sample": "samples/?s=audio-s31030",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Delay",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
    ]
   },
   {
@@ -464,56 +1795,6 @@
    ]
   },
   {
-   "id": "gen-audio-31033",
-   "name": "Drum Sequencer + LFO + Limiter",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 8 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31033.jpg",
-   "file": "assets/universe/gen-audio-31033.inf",
-   "sample": "samples/?s=audio-s31033",
-   "nodes": [
-    "Audio Out",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Sampler"
-   ]
-  },
-  {
-   "id": "gen-audio-31036",
-   "name": "Delay + Drum Sequencer + EQ",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 10 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31036.jpg",
-   "file": "assets/universe/gen-audio-31036.inf",
-   "sample": "samples/?s=audio-s31036",
-   "nodes": [
-    "Audio Out",
-    "Delay",
-    "Drum Sequencer",
-    "EQ",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Sampler"
-   ]
-  },
-  {
    "id": "gen-visual-31037",
    "name": "Output + Sketch + dither",
    "category": "Generated",
@@ -530,33 +1811,6 @@
     "Output",
     "Sketch",
     "dither"
-   ]
-  },
-  {
-   "id": "gen-audio-31039",
-   "name": "Chorder + Drum Sequencer + FM",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31039.jpg",
-   "file": "assets/universe/gen-audio-31039.inf",
-   "sample": "samples/?s=audio-s31039",
-   "nodes": [
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "FM",
-    "LFO",
-    "Limiter",
-    "Metallic",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Saturator"
    ]
   },
   {
@@ -581,34 +1835,6 @@
    ]
   },
   {
-   "id": "gen-audio-31042",
-   "name": "Analog + Chorder + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31042.jpg",
-   "file": "assets/universe/gen-audio-31042.inf",
-   "sample": "samples/?s=audio-s31042",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "FM",
-    "Humanizer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Echo",
-    "Note Sequencer"
-   ]
-  },
-  {
    "id": "gen-visual-31043",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -627,34 +1853,6 @@
     "Sketch",
     "bloom",
     "ripple"
-   ]
-  },
-  {
-   "id": "gen-audio-31045",
-   "name": "Bitcrush + Chorder + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31045.jpg",
-   "file": "assets/universe/gen-audio-31045.inf",
-   "sample": "samples/?s=audio-s31045",
-   "nodes": [
-    "Audio Out",
-    "Bitcrush",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Sampler",
-    "Stutter"
    ]
   },
   {
@@ -705,34 +1903,6 @@
    ]
   },
   {
-   "id": "gen-audio-31048",
-   "name": "Analog + Audio Filter + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 13 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31048.jpg",
-   "file": "assets/universe/gen-audio-31048.inf",
-   "sample": "samples/?s=audio-s31048",
-   "nodes": [
-    "Analog",
-    "Audio Filter",
-    "Audio Out",
-    "Chorder",
-    "Chorus",
-    "Drum Sequencer",
-    "Humanizer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
    "id": "gen-visual-31049",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -749,58 +1919,6 @@
     "Blend",
     "Output",
     "Sketch"
-   ]
-  },
-  {
-   "id": "gen-audio-31051",
-   "name": "Analog + Chorder + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31051.jpg",
-   "file": "assets/universe/gen-audio-31051.inf",
-   "sample": "samples/?s=audio-s31051",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "FM",
-    "Humanizer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Echo",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
-   "id": "gen-audio-31054",
-   "name": "Drum Sequencer + LFO + Limiter",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 8 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31054.jpg",
-   "file": "assets/universe/gen-audio-31054.inf",
-   "sample": "samples/?s=audio-s31054",
-   "nodes": [
-    "Audio Out",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Sampler"
    ]
   },
   {
@@ -853,34 +1971,6 @@
    ]
   },
   {
-   "id": "gen-audio-31057",
-   "name": "Analog + Arpeggiator + Audio Filter",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 14 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31057.jpg",
-   "file": "assets/universe/gen-audio-31057.inf",
-   "sample": "samples/?s=audio-s31057",
-   "nodes": [
-    "Analog",
-    "Arpeggiator",
-    "Audio Filter",
-    "Audio Out",
-    "Chorder",
-    "Drum Sequencer",
-    "Dynamics",
-    "Field Synth",
-    "Humanizer",
-    "LFO",
-    "Limiter",
-    "Mixer"
-   ]
-  },
-  {
    "id": "gen-visual-31058",
    "name": "Output + Sketch + bloom",
    "category": "Generated",
@@ -897,33 +1987,6 @@
     "Output",
     "Sketch",
     "bloom"
-   ]
-  },
-  {
-   "id": "gen-audio-31060",
-   "name": "Chorder + Drive + Drum Sequencer",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31060.jpg",
-   "file": "assets/universe/gen-audio-31060.inf",
-   "sample": "samples/?s=audio-s31060",
-   "nodes": [
-    "Audio Out",
-    "Chorder",
-    "Drive",
-    "Drum Sequencer",
-    "FM",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Wavetable"
    ]
   },
   {
@@ -976,33 +2039,6 @@
    ]
   },
   {
-   "id": "gen-audio-31063",
-   "name": "Chorder + Chorus + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 11 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-31063.jpg",
-   "file": "assets/universe/gen-audio-31063.inf",
-   "sample": "samples/?s=audio-s31063",
-   "nodes": [
-    "Audio Out",
-    "Chorder",
-    "Chorus",
-    "Delay",
-    "Drum Sequencer",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
    "id": "gen-audiovisual-31065",
    "name": "Analog + Audio Filter + Blend",
    "category": "Generated",
@@ -1028,30 +2064,6 @@
     "Mixer",
     "Note Sequencer",
     "Output"
-   ]
-  },
-  {
-   "id": "gen-audio-32000",
-   "name": "Analog + Drum Sequencer + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 8 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-32000.jpg",
-   "file": "assets/universe/gen-audio-32000.inf",
-   "sample": "samples/?s=audio-s32000",
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
    ]
   },
   {
@@ -1151,31 +2163,6 @@
    ]
   },
   {
-   "id": "gen-audio-32006",
-   "name": "Drum Sequencer + EQ + LFO",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 9 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-32006.jpg",
-   "file": "assets/universe/gen-audio-32006.inf",
-   "sample": "samples/?s=audio-s32006",
-   "nodes": [
-    "Audio Out",
-    "Drum Sequencer",
-    "EQ",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb",
-    "Sampler"
-   ]
-  },
-  {
    "id": "gen-visual-32007",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -1221,34 +2208,6 @@
     "Mixer",
     "Note Echo",
     "Note Sequencer"
-   ]
-  },
-  {
-   "id": "gen-audio-32009",
-   "name": "Arpeggiator + Chorder + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-32009.jpg",
-   "file": "assets/universe/gen-audio-32009.inf",
-   "sample": "samples/?s=audio-s32009",
-   "nodes": [
-    "Arpeggiator",
-    "Audio Out",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "Field Synth",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Oscillator",
-    "Reverb"
    ]
   },
   {
@@ -1323,34 +2282,6 @@
    ]
   },
   {
-   "id": "gen-audio-32015",
-   "name": "Analog + Audio Filter + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audio"
-   ],
-   "description": "A sound Infinite made by itself from 12 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audio-32015.jpg",
-   "file": "assets/universe/gen-audio-32015.inf",
-   "sample": "samples/?s=audio-s32015",
-   "nodes": [
-    "Analog",
-    "Audio Filter",
-    "Audio Out",
-    "Chorder",
-    "Drive",
-    "Drum Sequencer",
-    "FM",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Sequencer",
-    "Reverb"
-   ]
-  },
-  {
    "id": "gen-visual-32016",
    "name": "Blend + Output + Sketch",
    "category": "Generated",
@@ -1389,82 +2320,6 @@
     "Output",
     "Sketch",
     "vignette"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-32020",
-   "name": "Blend + Chorder + Delay",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 17 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-32020.jpg",
-   "file": "assets/universe/gen-audiovisual-32020.inf",
-   "sample": null,
-   "nodes": [
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Delay",
-    "Drum Sequencer",
-    "Field Synth",
-    "Granular",
-    "LFO",
-    "Limiter",
-    "Mixer",
-    "Note Echo",
-    "Note Sequencer"
-   ]
-  },
-  {
-   "id": "gen-visual-32022",
-   "name": "Blend + Output + Sketch",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "visual"
-   ],
-   "description": "A picture Infinite made by itself from 4 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-visual-32022.jpg",
-   "file": "assets/universe/gen-visual-32022.inf",
-   "sample": null,
-   "nodes": [
-    "Blend",
-    "Output",
-    "Sketch",
-    "bloom"
-   ]
-  },
-  {
-   "id": "gen-audiovisual-32023",
-   "name": "Analog + Blend + Chorder",
-   "category": "Generated",
-   "kind": "Patch",
-   "tags": [
-    "audiovisual"
-   ],
-   "description": "A sound and picture Infinite made by itself from 15 nodes. Open it, then change anything.",
-   "price": 0,
-   "preview": "assets/universe/gen-audiovisual-32023.jpg",
-   "file": "assets/universe/gen-audiovisual-32023.inf",
-   "sample": null,
-   "nodes": [
-    "Analog",
-    "Audio Out",
-    "Blend",
-    "Chorder",
-    "Drive",
-    "Drum Sequencer",
-    "LFO",
-    "Limiter",
-    "Metallic",
-    "Mixer",
-    "Note Sequencer",
-    "Output"
    ]
   }
  ]

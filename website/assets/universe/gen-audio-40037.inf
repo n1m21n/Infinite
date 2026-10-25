@@ -1,0 +1,70 @@
+infinite-patch 1
+transport 66 4 4 1 0
+# style: ambient_piano bpm 66 key 1 scale 0
+node 1 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 35
+  f humanizeVelocity 35
+  i progSteps 4
+  f rateBeats 8
+  i root 1
+  i scale 0
+  f strumMs 140
+end
+node 2 Notes Note Echo
+  f decay 55
+  b muteDry 0
+  f rateBeats 0.75
+  f rateSeconds 0.139297
+  i repeats 3
+  i transposePerRepeat 4
+end
+note 2 0 1
+node 3 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 3 0 2
+node 4 Synths FM
+  i algorithm 10
+  f decay3 1486.14
+  f decay4 1499.1
+  b fixed1 1
+  f level3 0.249372
+  f ratio4 4.87609
+  f release4 3981.65
+  f sustain3 0.0597253
+  f sustain4 0.583259
+end
+note 4 0 3
+node 5 AudioEffects Reverb
+  f damping 0.403232
+  f size 0.335478
+  f width 0.89977
+end
+aud 5 0 4
+node 6 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 6 0 5
+node 7 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+end
+aud 7 0 6
+node 8 AudioEffects Limiter
+end
+aud 8 0 7
+node 9 Utility Audio Out
+end
+aud 9 0 8
+node 10 Modulators LFO
+  f high 0.402362
+  f phase 0.446811
+  i phaseMode 2
+  f rateBeats 3.14566
+  i rateMode 0
+  b voice 0
+end
+mod 4 feedback 10 0 0 0.152 0.5
