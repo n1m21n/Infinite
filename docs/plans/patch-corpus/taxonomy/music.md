@@ -63,3 +63,49 @@ The first universe samples sounded like glitch because a random chain of nodes h
 ## Not covered on purpose
 
 Non-electronic genres, vocal genres, and regional styles that rely on live instruments. They stay out so every style can be made with the nodes Infinite has.
+
+## Gaps found on review (what the table cannot say yet)
+
+The 28 styles pin tempo, key, pulse, drums, a bass line, synth and fx pools, glitch and motion. Genres are also defined by things the table has no field for. Same principle as the visual system: a style is a distribution over axes, so add the missing axes.
+
+| Missing axis | Why it matters | Example | Lands in a patch as |
+|---|---|---|---|
+| Harmony | chords, not only a root line, make house, trance, lo-fi and synthwave | deep house m7 stabs; trance i-VI-III-VII; lo-fi ii-V | chord degrees per bar, Chorder / Note Stack, voicing and inversion |
+| Melodic motif | trance leads, acid lines, IDM hooks | 303 acid line with slides and accents | motif degrees + rhythm, Glide, Arpeggiator |
+| Timbre signature | each genre has one sound that names it | reese bass, supersaw, 303 squelch, 808 sub, Amen break, FM bell | synth choice + param ranges per role, not only a pool |
+| Sidechain / pump | the breathing of house, trance, big room | kick ducks bass and pads | Dynamics / gain modulated by the kick lane |
+| Groove detail | swing per lane, ghost notes, velocity accents, humanise | UK garage hat swing, boom-bap lag | per-lane swing, velocity pattern, Humanizer amount |
+| Fills and variation | an 8-second sample needs a change in it | snare roll at the end, hat open on bar 4 | pattern mutation rule per bar |
+| Space | reverb size and filter movement define ambient, dub | dub echo throws, long hall | send levels, delay time as a beat fraction |
+| Loudness target | genre norms differ (gabber hot, ambient quiet) | -8 LUFS vs -20 | limiter ceiling per style, used by the gate |
+
+## Styles to add (all makeable with the existing nodes)
+
+| Family | Style | BPM | Defining pattern |
+|---|---|---|---|
+| house | Afro house | 118-124 | polyrhythmic percussion, deep bass, call-response vocal chops |
+| house | Amapiano | 110-114 | log-drum bass (sub with pitch glide), shuffled hats, piano chords |
+| house | Tropical / melodic house | 118-124 | plucks, airy pads, arpeggio |
+| house | Italo disco / Eurodance | 120-135 | octave bass, bright arps, clap on 2 and 4 |
+| techno | Hard techno | 145-160 | distorted rolling kick, rumble bass |
+| techno | Ambient techno / microhouse | 118-126 | soft kick, tiny clicks, long filter moves |
+| techno | EBM / electro-industrial | 110-130 | sequenced bass, snare gate, shouty |
+| trance | Hard trance / hardstyle | 140-155 | reverse bass, distorted kick, screech lead |
+| breaks | Breakcore / speedcore | 180-240 | chopped Amen, pitched kicks |
+| breaks | Miami bass / electro | 120-130 | 808 pattern, long sub, claps |
+| breaks | Baltimore / Jersey club | 130-140 | kick triplets, bed-squeak sample, clap 2 and 4 |
+| bass music | Future garage | 130-135 | 2-step, washed pads, vocal-like chop |
+| bass music | Trap (electronic) | 130-150 | half-time snare, hat rolls, 808 slides |
+| bass music | Moombahton / dembow | 108-115 | dembow kick-snare, bright lead |
+| bass music | Wonky / glitch hop | 85-110 | swung off-grid, wobbly synths |
+| retro | Minimal wave / synth-pop | 100-125 | analog bass, gated snare |
+| retro | Chiptune | 120-160 | pulse waves, arpeggios, noise drums |
+| experimental | Drone / kosmische | no pulse | long sequences, slow filter, ring-mod |
+| downtempo | Chillout / Balearic | 90-115 | gentle shuffle, guitar-like plucks |
+
+## Build order for music
+
+1. Add the missing axes to `styles_music.json` as optional keys (chords, motif, timbre, sidechain, groove, fill, loudness); a style without a key keeps today's behaviour, so the existing 28 do not change.
+2. Teach the generator the two highest-yield ones first: **chords** and **sidechain**; they change the sound of most of the 28.
+3. Add the styles above in family batches; each gets a BPM-band and onset check like the rest.
+4. Gate with the loudness target per style instead of one global floor.
