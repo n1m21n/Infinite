@@ -9,6 +9,15 @@
   "url": "https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html"
  },
  {
+  "slug": "node-based-daw-modular-audio-routing",
+  "title": "Node-based DAW workflows: modular audio routing on an infinite canvas",
+  "description": "Explore node-based DAW workflows in Infinite: connect synthesiser modules, route MIDI through generative sequencers, and patch audio directly into live visual shaders.",
+  "date": "2026-10-25",
+  "updated": "2026-10-25",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/node-based-daw-modular-audio-routing.html"
+ },
+ {
   "slug": "every-note-node-in-infinite-generative-sequencing-guide",
   "title": "Every note node in Infinite: generative arpeggiators and algorithmic sequencing",
   "description": "Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.",
