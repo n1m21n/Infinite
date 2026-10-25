@@ -61,6 +61,11 @@ if (Test-Path -LiteralPath (Join-Path $root 'assets\drum-patterns')) {
 }
 if ($edition -ne 'MIT') {
     Copy-Item -LiteralPath (Join-Path $root 'assets\drumkits-gpl') -Destination (Join-Path $package 'assets') -Recurse -Force
+    # Turbo 0.72: Synth REF firmware cores, controller profiles and example (built next to the EXE).
+    $synthRef = Join-Path (Split-Path -Parent $exe) 'synthref'
+    if (Test-Path -LiteralPath $synthRef) {
+        Copy-Item -LiteralPath $synthRef -Destination $package -Recurse -Force
+    }
 }
 
 # Windows ML is self-contained: keep ONNX Runtime and DirectML next to the EXE.

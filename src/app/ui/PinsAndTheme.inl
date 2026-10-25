@@ -561,6 +561,7 @@
       REGISTER_NODE(GainNode, Gain, "AudioUtility");
 #if INFINITE_GPL
       REGISTER_NODE(PunchFxNode, Punch FX, "AudioEffects");
+      REGISTER_NODE(SynthRefNode, Synth REF, "Synths"); // Turbo 0.72
 #endif
       REGISTER_NODE(AudioMeterNode, Audio Meter, "AudioUtility");
       REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");

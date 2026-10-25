@@ -143,6 +143,8 @@
 #if INFINITE_GPL
 // Turbo full build: GPL-3.0 modules (src/gpl/README.md).
 #include "gpl/PunchFxNode.h"
+#include "gpl/SynthRef/SynthRefCore.h"
+#include "gpl/SynthRef/SynthRefNode.h"
 #endif
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
@@ -283,6 +285,9 @@ namespace
    #include "app/bodies/NoteSources.inl" // note sources: keyboard, chords, Pattern Player, Note Looper, MIDI Out
    #include "app/bodies/AudioEffects.inl" // audio effect node bodies
    #include "app/bodies/TurboInstruments.inl" // Looper, MPC, Super Mixer, Analog, Slicer, Molders, Transport Control
+#if INFINITE_GPL
+   #include "gpl/SynthRef/SynthRefBody.inl" // Turbo 0.72: Synth REF panel (full build)
+#endif
    #include "app/bodies/AudioBody.inl" // DrawAudioNodeBody: the audio body dispatcher
    #include "app/bodies/SceneParams.inl" // media, geometry, 3D, material, blend and filter params
    #include "app/bodies/PopParams.inl" // the PointZ family's generic parameter body
@@ -305,6 +310,9 @@ namespace
 #include "app/selftest/DspFixtures.inl" // audio node sweep discovery and the INFINITE_DSPTEST fixtures
 #include "app/selftest/EngineTests.inl" // PDC, param sweep and plugin scan tests
 #include "app/selftest/VoiceModFixture.inl" // Turbo 0.60: upstream per-voice modulation fixture
+#if INFINITE_GPL
+#include "gpl/SynthRef/SynthRefTests.inl" // Turbo 0.72: INFINITE_SYNTHREFTEST (full build)
+#endif
 
 namespace
 {

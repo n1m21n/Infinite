@@ -1,0 +1,22 @@
+infinite-patch 1
+node 1 Notes MIDI Notes
+  pos -1000 0
+  flags 0 0 1 0
+end
+node 2 Synths Synth REF
+  pos -200 0
+  flags 0 0 1 0
+  s core smk37_open
+  f volume 0
+  i view 1
+  s device
+  b lock 0
+  i mapmode 0
+  s profile
+end
+node 3 AudioUtility Audio Out
+  pos 1150 0
+  flags 0 0 1 0
+end
+note 2 0 1 0
+aud 3 0 2 0

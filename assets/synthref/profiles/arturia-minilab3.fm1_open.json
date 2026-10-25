@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "arturia-minilab3.fm1_open",
+  "name": "Arturia MiniLab 3 -> FM-1 (FM1 OPEN)",
+  "core": "fm1_open",
+  "mode": "ARTURIA or USER program, factory CCs (MIDI Control Center defaults); not the DAW program",
+  "device": {
+    "match": ["minilab3", "minilab 3"],
+    "exclude": ["mcu", "hui", "din thru", "alv"]
+  },
+  "keyboard": { "channel": "any" },
+  "controls": [
+    { "cc": 74, "target": "encoder", "id": 2, "input": "absolute", "label": "encoder 1 -> KNOB 1" },
+    { "cc": 71, "target": "encoder", "id": 3, "input": "absolute", "label": "encoder 2 -> KNOB 2" },
+    { "cc": 76, "target": "encoder", "id": 4, "input": "absolute", "label": "encoder 3 -> KNOB 3" },
+    { "cc": 77, "target": "encoder", "id": 5, "input": "absolute", "label": "encoder 4 -> KNOB 4" },
+    { "cc": 93, "target": "encoder", "id": 0, "input": "absolute", "label": "encoder 5 -> SELECT" },
+    { "cc": 18, "target": "encoder", "id": 1, "input": "absolute", "label": "encoder 6 -> ALGORITHM" },
+    { "cc": 19, "target": "encoder", "id": 6, "input": "absolute", "label": "encoder 7 -> PRESETS" },
+    { "cc": 82, "target": "fader", "id": 0, "input": "absolute", "label": "fader 1 -> VOLUME" },
+    { "cc": 114, "target": "encoder", "id": 6, "input": "relative64", "label": "main encoder -> PRESETS" },
+    { "cc": 112, "target": "encoder", "id": 0, "input": "relative64", "label": "shift + main encoder -> SELECT" },
+    { "note": 36, "channel": 10, "target": "button", "id": 12, "label": "pad 1 -> PLAY" },
+    { "note": 37, "channel": 10, "target": "button", "id": 13, "label": "pad 2 -> REC" },
+    { "note": 38, "channel": 10, "target": "button", "id": 11, "label": "pad 3 -> SEQ" },
+    { "note": 39, "channel": 10, "target": "button", "id": 10, "label": "pad 4 -> ARP" },
+    { "note": 40, "channel": 10, "target": "button", "id": 8, "label": "pad 5 -> HOME" },
+    { "note": 41, "channel": 10, "target": "button", "id": 9, "label": "pad 6 -> SAVE" },
+    { "note": 42, "channel": 10, "target": "button", "id": 0, "label": "pad 7 -> OCT -" },
+    { "note": 43, "channel": 10, "target": "button", "id": 1, "label": "pad 8 -> OCT +" },
+    { "note": 44, "channel": 10, "target": "button", "id": 2, "label": "pad 9 (bank B) -> FX" },
+    { "note": 45, "channel": 10, "target": "button", "id": 3, "label": "pad 10 -> SEL" },
+    { "note": 46, "channel": 10, "target": "button", "id": 4, "label": "pad 11 -> ENV" },
+    { "note": 47, "channel": 10, "target": "button", "id": 5, "label": "pad 12 -> LFO" },
+    { "note": 48, "channel": 10, "target": "button", "id": 6, "label": "pad 13 -> EDIT" },
+    { "note": 49, "channel": 10, "target": "button", "id": 7, "label": "pad 14 -> GLO" }
+  ],
+  "pass": { "pitchbend": true, "modwheel": true, "pressure": true, "sustain": "pass" }
+}

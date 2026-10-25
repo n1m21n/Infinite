@@ -1,5 +1,38 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.72.0-turbo (2026-10-24)
+
+Real instrument firmware inside the patch. Full build only (GPL). Example:
+`synthref/examples/SynthREF_SMK37_MIDI_Notes.inf` (MIDI Notes -> Synth REF -> Audio Out).
+
+- **New: Synth REF** (Synths). Runs an instrument's own open firmware natively, with its panel in the
+  node. First instrument: M-VAVE SMK-37 Pro with M-VAVE's SMK37 OPEN V01 firmware, the whole
+  application compiled unmodified (DX7 FM with 128 voices, 303, 808, PSG, pluck and sample engines,
+  8 tracks, sequencer, factory projects). Its audio is bit-exact with M-VAVE's own browser simulator.
+  FULL PANEL draws the firmware's screen and every control (buttons with LEDs, encoders, faders,
+  wheels, 16 pads, 37 keys); COMPACT is a normal card with a small live screen. With audio off the
+  firmware keeps running silently, so the panel still works.
+- **Synth REF: more instruments, and a panel per instrument.** A dropdown at the top of the node picks
+  the firmware. New: **M-VAVE FM-1 with FM1 OPEN V14** (M-VAVE's open firmware, Supported; same
+  family as SMK37 OPEN, with the same .syx / .fm1 / .fm1t imports) and **SMK-37 Pro with SLOOP SMK
+  2.6 (SLOOP 2.8)**, the community GPL-3.0 firmware with its own engines, screen and panel
+  (Experimental: built without the all-rights-reserved Felucca artwork, so its knob-card icons are
+  blank; no file import, its state is saved in the patch). The panel is now built from the controls
+  each firmware declares: SMK-37 (18 buttons, 8 encoders, faders, 16 pads, 37 keys), FM-1 (14
+  buttons, 7 encoders, a volume pot, 27 keys with LEDs) and SLOOP SMK (18 buttons, 8 encoders, faders,
+  16 pads with pad lights, 37 keys). MiniLab 3 profiles for each.
+- **Synth REF MIDI**: notes from the notes pin when it is cabled, otherwise from the MIDI device chosen
+  on the node (lock it, or let it follow the selected Synth REF); AUTO MAP from controller profiles
+  (Arturia MiniLab 3 included) or MIDI LEARN through Infinite's own MIDI learn; MIDI DEVICE RESCAN,
+  automatic reconnection when the controller comes back, MIDI DIAGNOSTICS.
+- **Synth REF timbres without recompiling**: LOAD FILE takes DX7 .syx (single voice or 32-voice bank)
+  and the firmware's .fm1 projects / .fm1t timbres; your files and profiles live in
+  Documents\Infinite-Turbo\SynthRef. The firmware's whole state is saved in the patch; several
+  Synth REF nodes run independent firmwares. Docs: `docs/SYNTH-REF.md`, `docs/SYNTH-REF-BANCOS.md`,
+  `docs/SYNTH-REF-MVP-TEST-GUIDE.md`.
+- Build: the full build fetches a pinned llvm-mingw Clang once (like the ASIO SDK) to compile firmware
+  cores; the MIT build is unchanged.
+
 ## 0.71.1-turbo (2026-10-24)
 
 Sand, dust and particle sculptures with PointZ, rendered by Render 3D HQ. Example:

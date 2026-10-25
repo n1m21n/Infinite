@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.71.1 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.72.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -515,7 +515,8 @@ target_compile_definitions(Infinite PRIVATE
     INFINITE_HAS_WINDOWS_ML=${INFINITE_HAS_WINDOWS_ML}
 )
 if(INFINITE_ENABLE_GPL)
-    file(GLOB INFINITE_GPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/*.cpp")
+    file(GLOB INFINITE_GPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/*.cpp"
+         "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/SynthRef/*.cpp")
     target_sources(Infinite PRIVATE ${INFINITE_GPL_SOURCES})
     message(STATUS "Infinite-Turbo edition: full (GPL-3.0 modules from src/gpl)")
 else()
@@ -713,6 +714,108 @@ if(INFINITE_ENABLE_GPL)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits-gpl"
             "$<TARGET_FILE_DIR:Infinite>/assets/drumkits-gpl"
+        VERBATIM)
+endif()
+
+# ---- Synth REF firmware cores (Turbo 0.72, full build only) ------------------
+# Each core is an instrument firmware compiled unmodified, as written by its
+# authors for GCC/Clang, into its own DLL (src/gpl/SynthRef/cores/, see
+# docs/SYNTH-REF.md). MSVC cannot build that C (weak symbols, GNU attributes),
+# so a pinned llvm-mingw Clang is fetched once into the build tree, like the
+# ASIO SDK above; INFINITE_LLVM_MINGW_DIR points at an existing one instead.
+# Without it the build goes on and Synth REF shows the core as missing.
+if(INFINITE_ENABLE_GPL)
+    set(INFINITE_LLVM_MINGW_DIR "" CACHE PATH "llvm-mingw toolchain for the Synth REF cores (empty = download the pinned one)")
+    set(_llvm_tag "20260922")
+    set(_llvm_name "llvm-mingw-${_llvm_tag}-ucrt-x86_64")
+    if(INFINITE_LLVM_MINGW_DIR)
+        set(_llvm_dir "${INFINITE_LLVM_MINGW_DIR}")
+    else()
+        set(_llvm_dir "${CMAKE_BINARY_DIR}/_deps/${_llvm_name}")
+        if(NOT EXISTS "${_llvm_dir}/bin/x86_64-w64-mingw32-clang.exe")
+            set(_llvm_zip "${CMAKE_BINARY_DIR}/_deps/${_llvm_name}.zip")
+            set(_llvm_sha512 "222957f21912b828cbd03cce9040650a840b3af529a5efc667623d0de43ce3195ece70e6bbce420a0151e2b1e05385f7f92c2a4d547506c17bc5ed4315553cd7")
+            if(NOT EXISTS "${_llvm_zip}")
+                message(STATUS "Downloading ${_llvm_name} (Synth REF cores)")
+                file(DOWNLOAD "https://github.com/mstorsjo/llvm-mingw/releases/download/${_llvm_tag}/${_llvm_name}.zip"
+                     "${_llvm_zip}" STATUS _llvm_status TLS_VERIFY ON)
+                list(GET _llvm_status 0 _llvm_code)
+                if(NOT _llvm_code EQUAL 0)
+                    file(REMOVE "${_llvm_zip}")
+                endif()
+            endif()
+            if(EXISTS "${_llvm_zip}")
+                file(SHA512 "${_llvm_zip}" _llvm_hash)
+                if(_llvm_hash STREQUAL _llvm_sha512)
+                    file(ARCHIVE_EXTRACT INPUT "${_llvm_zip}" DESTINATION "${CMAKE_BINARY_DIR}/_deps")
+                else()
+                    message(WARNING "llvm-mingw checksum mismatch, ignoring the download")
+                    file(REMOVE "${_llvm_zip}")
+                endif()
+            endif()
+        endif()
+    endif()
+    set(_sr_cc "${_llvm_dir}/bin/x86_64-w64-mingw32-clang.exe")
+    set(_sr_cores_out "${CMAKE_BINARY_DIR}/synthref-cores")
+    if(EXISTS "${_sr_cc}")
+        set(_sr_root "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/SynthRef/cores")
+        set(_sr_dlls "")
+        # M-VAVE open firmwares (SMK37 OPEN, FM1 OPEN): the flags of their own
+        # host build (tools/Build-Web.ps1), native target instead of WASI, the
+        # shared adapter mvave_open_core.c. Output is bit-exact with their
+        # browser simulators (docs/SYNTH-REF.md, Phase 0).
+        foreach(_core smk37_open fm1_open)
+            set(_up "${_sr_root}/${_core}/upstream")
+            file(GLOB_RECURSE _c CONFIGURE_DEPENDS "${_up}/app/*.c" "${_up}/web/*.c" "${_up}/third_party/synth/*.c")
+            list(FILTER _c EXCLUDE REGEX "/upstream/app/board/")
+            file(GLOB_RECURSE _h CONFIGURE_DEPENDS "${_up}/*.h" "${_up}/*.inc")
+            set(_def "")
+            if(_core STREQUAL "smk37_open")
+                set(_def "-DSR_MVAVE_SMK37")
+            endif()
+            set(_dll "${_sr_cores_out}/synthref_${_core}.dll")
+            add_custom_command(OUTPUT "${_dll}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${_sr_cores_out}"
+                COMMAND "${_sr_cc}" -std=c11 -O2 -fwrapv -fno-fast-math -ffp-contract=off
+                    -DFM1_HOST_TEST -DFM1_OPEN_WEB ${_def} -Wall -Wextra -Wno-unused-function -Wno-array-parameter
+                    "-I${_up}/web/engine" "-I${_up}/web/synth" "-I${_up}/third_party/synth"
+                    "-I${_up}/sdk/include" "-I${_up}/app/synth" "-I${_up}/app"
+                    -shared -s -o "${_dll}" "${_sr_root}/mvave_open_core.c" ${_c}
+                DEPENDS "${_sr_root}/mvave_open_core.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/SynthRef/SynthRefCoreApi.h" ${_c} ${_h}
+                COMMENT "Synth REF core: ${_core} (llvm-mingw clang)"
+                VERBATIM)
+            list(APPEND _sr_dlls "${_dll}")
+        endforeach()
+        # SLOOP SMK: its browser engine (one translation unit that #includes
+        # the SMK runtime and the SLOOP core), included by the adapter as is.
+        set(_up "${_sr_root}/sloop_smk/upstream")
+        file(GLOB_RECURSE _h CONFIGURE_DEPENDS "${_up}/*.c" "${_up}/*.h" "${_sr_root}/sloop_smk/generated/*.h")
+        set(_dll "${_sr_cores_out}/synthref_sloop_smk.dll")
+        add_custom_command(OUTPUT "${_dll}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${_sr_cores_out}"
+            COMMAND "${_sr_cc}" -std=c11 -O2 -fwrapv -fno-builtin -Wno-int-to-pointer-cast
+                "-I${_up}" "-I${_sr_root}/sloop_smk/generated" "-I${_up}/firmware/hal"
+                -shared -s -o "${_dll}" "${_sr_root}/sloop_smk/sloop_smk_core.c"
+            DEPENDS "${_sr_root}/sloop_smk/sloop_smk_core.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/SynthRef/SynthRefCoreApi.h" ${_h}
+            COMMENT "Synth REF core: sloop_smk (llvm-mingw clang)"
+            VERBATIM)
+        list(APPEND _sr_dlls "${_dll}")
+        # The copy is part of this target (not Infinite's POST_BUILD) so a
+        # core rebuilt without relinking the exe still reaches the exe folder.
+        add_custom_target(synthref_cores ALL
+            DEPENDS ${_sr_dlls}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Infinite>/synthref/cores"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_sr_dlls} "$<TARGET_FILE_DIR:Infinite>/synthref/cores/"
+            VERBATIM)
+        add_dependencies(Infinite synthref_cores)
+        message(STATUS "Synth REF cores: ON (${_sr_cc})")
+    else()
+        message(WARNING "Synth REF cores: no llvm-mingw clang (download failed?) - the node will report its core missing. "
+                        "Delete build/<preset>/_deps/llvm-mingw* and reconfigure to retry, or set INFINITE_LLVM_MINGW_DIR.")
+    endif()
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/synthref"
+            "$<TARGET_FILE_DIR:Infinite>/synthref"
         VERBATIM)
 endif()
 # The upstream codebase stores UTF-8 paths in std::string. Preserve that
