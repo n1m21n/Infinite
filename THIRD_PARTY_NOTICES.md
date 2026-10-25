@@ -35,6 +35,43 @@ under the same licence). Code inside `src/gpl/` is GPL-3.0 (`src/gpl/LICENSE`); 
 `ffmpeg.exe`, when present next to the exe, is a separate program with its own licence (most
 Windows builds of it are GPL); it is not linked into Infinite-Turbo.
 
+## Synth REF firmware cores (full build only)
+
+The MIT edition contains none of this. In the full edition, `src/gpl/SynthRef/` loads instrument
+firmware at run time from separate DLLs (`<exe>\synthref\cores`), built from the sources below
+by `CMakeLists.txt`. Details: `docs/SYNTH-REF.md`.
+
+| Component | Source | Licence | Notes |
+|---|---|---|---|
+| SMK37 OPEN V01, M-VAVE's open firmware for the SMK-37 Pro (`app/`, `web/`, `sdk/include/*.h`) | github.com/m-vave/smk37_open @ `b2d6bcbcd724adb13bcf85e44cfa16bb2c8153a8`, vendored unmodified in `src/gpl/SynthRef/cores/smk37_open/upstream/` (86 files; `UPSTREAM.md` lists the SHA-256 of each) | GPL-3.0-only WITH GPL-3.0-linking-exception, Copyright (c) 2026 珠海笙科智能科技有限公司 (M-VAVE) | the open web engine is built natively; the proprietary `sdk/lib` and `sdk/firmware` are not vendored and not used |
+| DX7 FM core (`web/synth/dx7*.c/.h`), C port of MSFA / Dexed msfa | github.com/google/music-synthesizer-for-android, github.com/asb2m10/dexed (revisions in the upstream `THIRD_PARTY.md`) | Apache-2.0 | Copyright 2012, 2013 Google Inc.; Copyright 2016-2025 Pascal Gauthier (Dexed msfa note-model changes). Modified by M-VAVE, 2026: C port, fixed-point arithmetic, block processing, voice management and MIDI controls |
+| 128 factory DX7 voices (`app/factory_dx7.inc`, `app/factory_dx7_packed.inc`) | extracted by M-VAVE from the FM1 OPEN resource `FM-1_015.fwsc` (upstream resource notice retained) | Apache-2.0 | modified by M-VAVE, 2026: names and positions kept, twelve out-of-range values in eleven voices clamped to standard DX7 limits |
+| Open303 (`third_party/synth/bass303*`) | github.com/RobinSchmidt/Open303 | MIT | Copyright (c) 2009 Robin Schmidt (Open303); C adaptation, 2026 M-VAVE |
+| DaisySP 808 and pluck, from Plaits (`third_party/synth/drum808*`, `pluck*`) | github.com/daisyaudio/DaisySP, Mutable Instruments Plaits | MIT | Copyright (c) 2020 Electrosmith, Corp.; Copyright (c) 2016 Emilie Gillet (Plaits); 2026 M-VAVE |
+| SVF filter (`third_party/synth/dsp_math.h`) | stmlib | MIT | Copyright (c) 2014 Emilie Gillet (stmlib); math helpers 2026 M-VAVE |
+| emu2149 PSG (`third_party/synth/emu2149.*`) | github.com/digital-sound-antiques/emu2149, v1.42 | MIT | Copyright (c) 2014 Mitsutaka Okazaki (emu2149; source copyright 2001-2022); the file header reads Copyright (C) 2001-2022 Mitsutaka Okazaki; adapted by M-VAVE, 2026-10-09 |
+| SEA codec (`web/synth/sea_decode.c`, `sea_encode.h`, `sample_metadata.inc`) | github.com/Daninet/sea-codec | MIT | Copyright (c) 2025 Dani Biró (SEA); modifications (c) 2026 M-VAVE |
+| FM1 OPEN V14, M-VAVE's open firmware for the FM-1 (`app/`, `web/`, `sdk/include/*.h`); the same family and layout as SMK37 OPEN, built by the same adapter | github.com/m-vave/fm1_open @ `4c7496daac04a95ff10d1afdcc8f9ead2dbabc41` (2026-10-21), vendored unmodified in `src/gpl/SynthRef/cores/fm1_open/upstream/` (81 files; `UPSTREAM.md` lists the SHA-256 of each) | GPL-3.0-only WITH GPL-3.0-linking-exception, Copyright (c) 2026 珠海笙科智能科技有限公司 (M-VAVE) | the open web engine is built natively; `sdk/lib`, `sdk/firmware`, `sdk/include/libc`, `app/board` and the tools are not vendored and not used |
+| FM1 OPEN: DX7 FM core (`web/synth/dx7*`), C port of MSFA / Dexed msfa | github.com/google/music-synthesizer-for-android, github.com/asb2m10/dexed (revisions in `fm1_open/upstream/THIRD_PARTY.md`) | Apache-2.0 | Copyright 2012, 2013 Google Inc. (file headers); Modified for FM1 by M-VAVE, 2026: C port, fixed-point and block processing |
+| FM1 OPEN: 128 factory DX7 voices (`app/fm_factory.inc`) | M-VAVE's original V15 factory DX7 bank, extracted from the bundled V15 recovery image (`THIRD_PARTY.md`) | Apache-2.0 | losslessly encoded by M-VAVE, 2026-10-19 |
+| FM1 OPEN: Open303 (`third_party/synth/bass303*`), DaisySP / Plaits 808 and pluck (`drum808*`, `pluck*`), SVF (`dsp_math.h`, stmlib), emu2149 PSG, SEA codec (`web/synth/sea_decode.c`, `sample_metadata.inc`) | github.com/RobinSchmidt/Open303, github.com/daisyaudio/DaisySP, stmlib, github.com/digital-sound-antiques/emu2149, github.com/Daninet/sea-codec | MIT | Copyright (c) 2009 Robin Schmidt (Open303), 2026 M-VAVE (C adaptation); Copyright (c) 2020 Electrosmith, Corp, Emilie Gillet, 2026 M-VAVE (808, pluck); Copyright (c) 2014 Emilie Gillet (SVF), 2026 M-VAVE (math helpers); emu2149 v1.42, FM1 adaptation 2026-10-09 (the notice is in `THIRD_PARTY.md`); Copyright (c) 2025 Dani Biro, modifications (c) 2026 M-VAVE (SEA) |
+| SLOOP SMK 2.6 (SLOOP 2.8), the community firmware for the SMK-37 Pro: SMK runtime, SLOOP 2.8 core, the firmware's browser engine (`firmware/`, `sloop/firmware/`, `web/audio/`) | github.com/ChanceTheMaker/sloop-smk @ `08c823081d9ab394077767a0604df7799ad449b0` (branch integrate/sloop-2.6-smk; its `sloop/` is SLOOP 2.8 from github.com/isod89/sloop-fm1 @ `b77bf55`), vendored unmodified in `src/gpl/SynthRef/cores/sloop_smk/upstream/` (83 files; `UPSTREAM.md` lists the SHA-256 of each) | GPL-3.0-only, Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments; Copyright (C) 2026 Andre Rezemini for `sloop/firmware/src/cpu1.h` and `scratch.h` (github.com/andrerezemini/sloop-lab) | its own engines, screen and panel; built as one translation unit from the firmware's own browser engine |
+| SLOOP SMK: FM6 engine (`sloop/firmware/src/fm6_core.c`), C port of msfa from Dexed | github.com/asb2m10/dexed (msfa) | Apache-2.0 | Copyright 2012 Google Inc.; Copyright 2016-2025 Pascal Gauthier; C port for Felucca (integer only), 2026: Leo Kuroshita, Hügelton Instruments (Dexed itself is GPL-3.0; only msfa is used) |
+| SLOOP SMK: physical models (`sloop/firmware/src/phys_dsp.c`, `phys_symp.c`) | DaisySP (Electrosmith), Rings (Emilie Gillet, github.com/pichenettes/eurorack) | MIT | Copyright (c) 2020 Electrosmith, Corp, Emilie Gillet (`phys_dsp.c`); Copyright (c) 2015 Emilie Gillet (`phys_symp.c`); ported to fixed-point C for Felucca, 2026: Leo Kuroshita, Hügelton Instruments |
+| SLOOP SMK: `generated/felucca_*.h` (font, samples, drum kits, FM6 patches, tables, icons) | produced by the firmware's own `sloop/tools/gen_*.py`; font: Terminus Bold 8x16 (`ter-u16b`); samples: Versilian Studios VSCO-2 CE, VCSL, Sonic Pi (SCRCH) as prepared by SLOOP (`upstream/sloop/LICENSING.md`) | font SIL OFL 1.1; samples CC0 1.0 | the icons table comes from a blank atlas: the all-rights-reserved Felucca assets (`icons.png`, panel art, Hügelton Sample Pack, Copyright (C) 2026 Hügelton Instruments) are not vendored and not used, so the knob-card icons are blank. `upstream/LICENSING.md` (the older root text of sloop-smk) disagrees with `upstream/sloop/LICENSING.md`; the stricter one is followed |
+| llvm-mingw 20260922 (clang, ucrt, x86_64) | github.com/mstorsjo/llvm-mingw; downloaded at configure time into the build tree, SHA-512 pinned in `CMakeLists.txt` | LLVM: Apache-2.0 with LLVM exceptions; mingw-w64 runtime: its own permissive licences | build-time tool only, not shipped. The core DLL can contain objects from the toolchain's C runtime |
+
+The full licence texts (GPL-3.0 with the linking exception, MIT, Apache-2.0) and the exact
+upstream notices are in `src/gpl/SynthRef/cores/smk37_open/upstream/LICENSE.md` and
+`upstream/THIRD_PARTY.md`, the same two files under `cores/fm1_open/upstream/`, and, for SLOOP SMK,
+`cores/sloop_smk/upstream/LICENSE`, `upstream/LICENSING.md` and `upstream/sloop/LICENSING.md`,
+which stay with the source. Product names identify compatible formats; "M-VAVE", "FM-1" and
+"SMK-37" belong to their owners, and no endorsement by M-VAVE, the SLOOP / Felucca authors or the
+authors above is implied.
+
+DX7 `.syx` banks that a user imports with LOAD FILE are not bundled and not covered by these
+licences; their provenance is the user's responsibility (`docs/SYNTH-REF-BANCOS.md`).
+
 ## Bundled media
 
 | Folder | Source | Licence |

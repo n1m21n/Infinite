@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "arturia-minilab3.smk37_open",
+  "name": "Arturia MiniLab 3 -> SMK-37 (SMK37 OPEN)",
+  "core": "smk37_open",
+  "mode": "ARTURIA or USER program, factory CCs (MIDI Control Center defaults); not the DAW program",
+  "device": {
+    "match": ["minilab3", "minilab 3"],
+    "exclude": ["mcu", "hui", "din thru", "alv"]
+  },
+  "keyboard": { "channel": "any" },
+  "pads": { "channel": 10, "first_note": 36, "count": 16, "first_id": 0 },
+  "controls": [
+    { "cc": 74, "target": "encoder", "id": 0, "input": "absolute", "label": "encoder 1 -> K1" },
+    { "cc": 71, "target": "encoder", "id": 1, "input": "absolute", "label": "encoder 2 -> K2" },
+    { "cc": 76, "target": "encoder", "id": 2, "input": "absolute", "label": "encoder 3 -> K3" },
+    { "cc": 77, "target": "encoder", "id": 3, "input": "absolute", "label": "encoder 4 -> K4" },
+    { "cc": 93, "target": "encoder", "id": 4, "input": "absolute", "label": "encoder 5 -> SELECT" },
+    { "cc": 18, "target": "encoder", "id": 5, "input": "absolute", "label": "encoder 6 -> PAGE" },
+    { "cc": 19, "target": "encoder", "id": 6, "input": "absolute", "label": "encoder 7 -> PRESETS" },
+    { "cc": 16, "target": "encoder", "id": 7, "input": "absolute", "label": "encoder 8 -> VOLUME" },
+    { "cc": 82, "target": "fader", "id": 0, "input": "absolute", "label": "fader 1 -> F1" },
+    { "cc": 83, "target": "fader", "id": 1, "input": "absolute", "label": "fader 2 -> F2" },
+    { "cc": 85, "target": "fader", "id": 2, "input": "absolute", "label": "fader 3 -> F3" },
+    { "cc": 17, "target": "fader", "id": 3, "input": "absolute", "label": "fader 4 -> F4" },
+    { "cc": 114, "target": "encoder", "id": 6, "input": "relative64", "label": "main encoder -> PRESETS" },
+    { "cc": 112, "target": "encoder", "id": 4, "input": "relative64", "label": "shift + main encoder -> SELECT" }
+  ],
+  "pass": { "pitchbend": true, "modwheel": true, "pressure": true, "sustain": "pedal" }
+}

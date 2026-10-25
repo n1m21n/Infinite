@@ -826,6 +826,27 @@ namespace Platform
    // wants *future* notes should seed its cursor with.
    unsigned long long MidiNoteStreamPosition();
 
+   // Turbo 0.72 (Synth REF): every short channel message (note, CC, pitch
+   // bend, pressure, program change) with its source device, in order, for
+   // instruments that need more than notes from a controller. Lock-free for
+   // readers, one cursor per consumer like MidiReadNotesSince, except that a
+   // consumer seeds its cursor with MidiRawStreamPosition() (0 is a real
+   // position here). System messages (clock, SysEx, active sensing) are not in it.
+   struct MidiRawMessage
+   {
+      MidiDeviceId device = 0;
+      unsigned char bytes[3] = { 0, 0, 0 };
+      int size = 0;
+   };
+   int MidiReadRawSince(unsigned long long& cursor, MidiRawMessage* out, int maxCount);
+   unsigned long long MidiRawStreamPosition();
+   // The id MidiDevices() gives a device key (the same hash), so a saved key
+   // can be matched without the device being connected.
+   MidiDeviceId MidiDeviceIdForKey(const std::string& key);
+   // Names of the MIDI inputs the OS lists right now, without opening them
+   // (to notice a controller plugged back in and rescan).
+   std::vector<std::string> MidiAvailableInputNames();
+
    // ---- MIDI clock ---------------------------------------------------------
    // MIDI Clock (status byte 0xF8) is a realtime system message sent 24 times
    // per quarter note by a clock source (DJ mixer, drum machine, DAW) whenever

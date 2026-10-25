@@ -61,6 +61,10 @@
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
+#if INFINITE_GPL
+   if (getenv("INFINITE_SYNTHREFTEST") != nullptr) // Turbo 0.72
+      return HeadlessExit(RunSynthRefTest());
+#endif
 
    // Turbo 0.61: Collect Media, headless, in a temp folder of its own.
    if (getenv("INFINITE_COLLECTMEDIATEST") != nullptr)

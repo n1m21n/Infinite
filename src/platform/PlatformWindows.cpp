@@ -1626,6 +1626,7 @@ namespace Platform
          MidiCCValue lastTouched; bool touched = false;
          static constexpr size_t cap = 4096;
          MidiNoteMessage noteRing[cap]; std::atomic<unsigned long long> noteWrite {0};
+         MidiRawMessage rawRing[cap]; std::atomic<unsigned long long> rawWrite {0}; // Turbo 0.72 (Synth REF)
          std::atomic<long long> lastClockUs {0}; std::atomic<float> clockBpm {0.0f};
 
          void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& msg) override
@@ -1641,6 +1642,20 @@ namespace Platform
                dev = found != ids.end() ? found->second : HashId(source ? source->getName().toStdString() : "MIDI");
             }
             const int ch = std::max(0, msg.getChannel() - 1);
+            // Turbo 0.72 (Synth REF): the raw channel-message stream. JUCE
+            // calls back on one thread per input, so writers take the mutex;
+            // readers stay lock-free behind the release store.
+            if (msg.getRawDataSize() >= 1 && msg.getRawDataSize() <= 3 && (msg.getRawData()[0] & 0xF0) != 0xF0)
+            {
+               std::lock_guard<std::mutex> lock(mutex);
+               const auto pos = rawWrite.load(std::memory_order_relaxed);
+               MidiRawMessage& r = rawRing[pos % cap];
+               r.device = dev;
+               r.size = msg.getRawDataSize();
+               for (int i = 0; i < 3; ++i)
+                  r.bytes[i] = i < r.size ? msg.getRawData()[i] : 0;
+               rawWrite.store(pos + 1, std::memory_order_release);
+            }
             if (msg.isController() || msg.isNoteOnOrOff())
             {
                const bool note = msg.isNoteOnOrOff();
@@ -1736,6 +1751,29 @@ namespace Platform
       int n=0; while(cursor<w&&n<maxCount){out[n++]=MidiStateInstance().noteRing[cursor%MidiState::cap];++cursor;} return n;
    }
    unsigned long long MidiNoteStreamPosition(){return MidiStateInstance().noteWrite.load(std::memory_order_acquire);}
+   // Turbo 0.72 (Synth REF): raw channel messages, same cursor rules as the note ring.
+   int MidiReadRawSince(unsigned long long& cursor, MidiRawMessage* out, int maxCount)
+   {
+      // No "0 = from now" shortcut here: seed the cursor with
+      // MidiRawStreamPosition(). A reader that fell behind skips to the
+      // oldest entry with a margin, so it never reads a slot being written.
+      const auto w = MidiStateInstance().rawWrite.load(std::memory_order_acquire);
+      if (cursor > w) cursor = w;
+      if (w - cursor > MidiState::cap - 64) cursor = w - (MidiState::cap - 64);
+      int n = 0;
+      while (cursor < w && n < maxCount) { out[n++] = MidiStateInstance().rawRing[cursor % MidiState::cap]; ++cursor; }
+      return n;
+   }
+   unsigned long long MidiRawStreamPosition() { return MidiStateInstance().rawWrite.load(std::memory_order_acquire); }
+   MidiDeviceId MidiDeviceIdForKey(const std::string& key) { return key.empty() ? 0 : HashId(key); }
+   std::vector<std::string> MidiAvailableInputNames()
+   {
+      EnsureJuceInitialised();
+      std::vector<std::string> out;
+      for (const auto& d : juce::MidiInput::getAvailableDevices())
+         out.push_back(d.name.toStdString());
+      return out;
+   }
    bool MidiClockIsPresent(){const auto now=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); return now-MidiStateInstance().lastClockUs.load()<2000000;}
    float MidiClockBpm(){return MidiClockIsPresent()?MidiStateInstance().clockBpm.load():0.0f;}
 

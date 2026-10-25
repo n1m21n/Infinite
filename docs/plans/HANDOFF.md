@@ -1,5 +1,20 @@
 # Passagem de trabalho: turbo/next (0.70)
 
+## 0.72.0 em andamento: Synth REF (branch `feature/synth-ref`, saída de `turbo/windows-only`)
+
+- Novo nó GPL (só build full) que roda firmware aberta de instrumento: SMK-37 Pro + SMK37 OPEN V01
+  (vendorizada sem alteração em `src/gpl/SynthRef/cores/smk37_open/upstream`, commit b2d6bcbc),
+  compilada por llvm-mingw fixado (CMake baixa uma vez) em `synthref_smk37_open.dll`, uma cópia por
+  instância. Bit-exato com o simulador WASM oficial. Painel FULL/COMPACT com o LCD real,
+  MIDI (pino / dispositivo com lock ou foco), AUTO MAP (perfil MiniLab 3) / MIDI LEARN, diagnóstico,
+  LOAD FILE (.syx DX7, .fm1, .fm1t), estado completo salvo no patch.
+- Ler `docs/SYNTH-REF.md` (arquitetura, ABI, testes), `docs/SYNTH-REF-MVP-TEST-GUIDE.md` (teste com o
+  MiniLab 3, pt-BR), `docs/SYNTH-REF-BANCOS.md` (timbres sem recompilar).
+- Testes: `INFINITE_SYNTHREFTEST` (no gate full), sweeps de áudio passam; MIT compila sem Synth REF.
+- Falta: teste do dono com o MiniLab 3 físico; commit/merge em `turbo/windows-only` e tag só com o aval.
+- Próximo (Fase 5, só depois do aval do MVP): core SLOOP SMK, FM-1 OPEN, import de samples WAV,
+  sync do sequenciador da firmware com o transporte do Infinite.
+
 Para a próxima sessão ou IA. Leia nesta ordem: este arquivo, `NEXT-STRATEGY.md` (seção 8,
 checklist), `NEXT-BACKLOG.md` (o que cada ID significa), `CHANGELOG-TURBO.md` (seção 0.70).
 

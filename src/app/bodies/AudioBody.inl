@@ -58,6 +58,8 @@
 #if INFINITE_GPL
       else if (auto* n = dynamic_cast<PunchFxNode*>(gn.node.get()))
          DrawPunchFxBody(gn, n);
+      else if (auto* n = dynamic_cast<SynthRefNode*>(gn.node.get()))
+         DrawSynthRefBody(gn, n);
 #endif
       else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
          DrawAudioMeterBody(gn, n);
