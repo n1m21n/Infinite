@@ -164,6 +164,13 @@ All calls into a core are made under one mutex (`AudioSynthRefNode::mCoreMutex`)
   DIAGNOSTICS keep working with the audio off, like the hardware with the volume down. This is
   the firmware's clock, not DSP for the graph; it stops as soon as an audio callback renders the
   node, and the resampler then restarts from silence.
+- MIDI is **timed**: every message (a pin note at its `frameOffset`, device messages at the start
+  of the host block) is handed to the firmware right before the core block (128 frames) that
+  contains its time, at most 32 per block (the M-VAVE firmware's MIDI input holds 64 per block and
+  resets all MIDI when it overflows), and a note-off never in the block of its own note-on. Without
+  that, fast notes vanished: a 2 ms note had its on and off in one host block and lasted zero
+  samples (SYNTHREFTEST "fast notes from the pin": 0/40 before, 40/40 after, on SMK37 OPEN and
+  FM1 OPEN).
 - Inputs are never dropped while the main thread holds the lock: pin notes and device MIDI stay
   queued for the next block. Removing the notes cable, changing device or mapping mode, losing
   focus or reloading a profile releases every note, pad and button the source still holds.

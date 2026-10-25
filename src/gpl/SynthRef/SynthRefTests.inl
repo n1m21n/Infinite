@@ -228,6 +228,42 @@ namespace SynthRefTest
       snprintf(buf, sizeof(buf), "(%zu lit pixels, revision %u)", lit, rev);
       Check(info->lcdFormat == SR_LCD_NONE || (px != nullptr && lit > 500), what, buf);
 
+      // Fast notes from the notes pin: 40 notes of 2 ms (note-on and note-off
+      // inside one 512-frame host block), 60 ms apart. Each must sound.
+      {
+         auto n = make();
+         std::vector<float> nl, nr;
+         Render(*n, nl, nr, 2048, 48000.0, 512);
+         NoteEventQueue queue;
+         const int cursor = queue.RegisterConsumer();
+         n->GetAudioNode()->SetNoteInbox(&queue, cursor);
+         int heard = 0;
+         for (int k = 0; k < 40; ++k)
+         {
+            NoteEvent on;
+            on.note = 60 + (k % 12);
+            on.velocity = 0.9f;
+            on.isNoteOn = true;
+            on.frameOffset = 10;
+            NoteEvent off = on;
+            off.isNoteOn = false;
+            off.velocity = 0.0f;
+            off.frameOffset = 106;
+            queue.Push(on);
+            queue.Push(off);
+            nl.clear();
+            nr.clear();
+            Render(*n, nl, nr, 512, 48000.0, 512);
+            Render(*n, nl, nr, 2880 - 512, 48000.0, 512);
+            if (Measure(nl, nr, 0, nl.size()).rms > 0.001)
+               ++heard;
+         }
+         n->GetAudioNode()->SetNoteInbox(nullptr, -1);
+         snprintf(what, sizeof(what), "[%s] fast notes from the pin", fw.coreId);
+         snprintf(buf, sizeof(buf), "(%d/40 sounded, 2 ms notes)", heard);
+         Check(heard == 40, what, buf);
+      }
+
       // CPU: 5 s of a held chord at 48 kHz.
       {
          auto n = make();

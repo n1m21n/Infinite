@@ -177,6 +177,11 @@ namespace
       }
 
       bool Bypass() const { return mBypass; }
+      // Input (core) frames pushed so far, the input position of the next
+      // output frame, and input frames per output frame.
+      uint64_t Written() const { return mWritten; }
+      double InputPos() const { return (double)mPos + mFrac; }
+      double Step() const { return mBypass ? 1.0 : mStep; }
 
    private:
       float mL[kCap], mR[kCap];
@@ -274,7 +279,7 @@ class AudioSynthRefNode : public AudioNode
 public:
    using JobFn = int (*)(AudioSynthRefNode& self, const SynthRefCoreApi& api, void* inst, void* ctx);
 
-   AudioSynthRefNode() : mRawCursor(Platform::MidiRawStreamPosition()) { mRs.Configure(44100.0, 44100.0); }
+   AudioSynthRefNode() : mRawCursor(Platform::MidiRawStreamPosition()) { mRs.Configure(44100.0, 44100.0); ClearMidi(); }
    ~AudioSynthRefNode() override
    {
       std::lock_guard<std::mutex> lock(mCoreMutex);
@@ -298,6 +303,7 @@ public:
          }
          mLcdRevision = 0xFFFFFFFFu;
          mRs.Configure(mInfo ? (double)mInfo->sampleRate : 44100.0, mOutRate);
+         ClearMidi();
          std::memset(mLastCc, 0xFF, sizeof(mLastCc));
          std::memset(mHeldPin, 0xFF, sizeof(mHeldPin));
          std::memset(mHeldDevice, 0xFF, sizeof(mHeldDevice));
@@ -426,17 +432,22 @@ public:
       Cmd c;
       while (mCommands.Pop(c))
          Execute(api, inst, c);
+      mEventTime = 0.0;
       DeviceMidi(api, inst);
       int blocks = 0;
       while (mIdleFrames >= mInfo->blockFrames && blocks < 64)
       {
+         DeliverMidi(api, inst, 1e300); // silent: no timing to keep, only the order and the gate
          api.render(inst);
+         ++mBlockSerial;
          mIdleFrames -= mInfo->blockFrames;
          ++blocks;
       }
       if (blocks == 64)
          mIdleFrames = 0.0;
       mRs.Reset(); // audio resumes from silence, not from stale input
+      for (int i = 0; i < mPendingCount; ++i)
+         mPending[i].time = 0.0; // times restart with the resampler
       if (blocks > 0)
          Publish(api, inst, (int)(blocks * mInfo->blockFrames * mOutRate / mInfo->sampleRate));
    }
@@ -461,6 +472,7 @@ public:
       std::lock_guard<std::mutex> lock(mCoreMutex);
       mOutRate = sampleRate > 0.0 ? sampleRate : 48000.0;
       mRs.Configure(mInfo ? (double)mInfo->sampleRate : 44100.0, mOutRate);
+      ClearMidi();
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
@@ -498,18 +510,28 @@ public:
       const SynthRefCoreApi& api = mCore->Api();
       void* inst = mCore->Inst();
 
+      // MIDI is timed: every message carries the core-frame time it belongs
+      // to (this block's start, or a pin note's frameOffset) and is handed
+      // to the firmware right before the core block that contains it.
+      const double base = mRs.InputPos();
+      mEventTime = base;
       Cmd c;
       while (mCommands.Pop(c))
          Execute(api, inst, c);
       RunPosted(mJob, api, inst);
       RunPosted(mExport, api, inst);
-      PinNotes(api, inst);
+      PinNotes(api, inst, base);
+      mEventTime = base;
       DeviceMidi(api, inst);
 
       // Render whole core blocks until the resampler can fill this block.
       const int channels = (int)mInfo->channels;
       for (int guard = 0; !mRs.CanProduce(n) && guard < 256; ++guard)
+      {
+         DeliverMidi(api, inst, (double)mRs.Written() + mInfo->blockFrames);
          mRs.Push(api.render(inst), (int)mInfo->blockFrames, channels);
+         ++mBlockSerial;
+      }
       if (!mRs.CanProduce(n))
       {
          // A block larger than the resampler ring can hold: never read stale input.
@@ -640,7 +662,7 @@ private:
       switch (c.type)
       {
       case kCmdControl: api.control(inst, c.kind, c.id, c.value); break;
-      case kCmdMidi: api.midi(inst, c.bytes, c.count); break;
+      case kCmdMidi: Send3(api, inst, c.bytes[0], c.bytes[1], c.bytes[2], c.count); break;
       case kCmdRelease: api.release(inst); break;
       case kCmdPanic:
          api.panic(inst);
@@ -651,10 +673,61 @@ private:
       }
    }
 
+   // Queues one message at mEventTime; DeliverMidi hands it over in time.
    void Send3(const SynthRefCoreApi& api, void* inst, uint8_t a, uint8_t b, uint8_t c, int count = 3)
    {
-      const uint8_t m[3] = { a, b, c };
-      api.midi(inst, m, (uint32_t)count);
+      if (mPendingCount == kPending)
+      {
+         const uint8_t m[3] = { a, b, c };
+         api.midi(inst, m, (uint32_t)count); // never lost, at worst early
+         return;
+      }
+      TimedMidi& t = mPending[mPendingCount++];
+      t.time = mEventTime;
+      t.bytes[0] = a;
+      t.bytes[1] = b;
+      t.bytes[2] = c;
+      t.count = (uint8_t)count;
+   }
+
+   // Hands the firmware every queued message due before `limit` (core frames),
+   // in order, for the core block about to render. Two firmware rules, the
+   // ones a fast player hits: its MIDI input holds 64 messages per block (an
+   // overflow resets all MIDI and cuts every note), so at most 32 go per
+   // block; and a note-off never arrives in the block of its own note-on, or
+   // the note would last zero samples. What waits keeps its order (a later
+   // message of the same note waits behind it).
+   void DeliverMidi(const SynthRefCoreApi& api, void* inst, double limit)
+   {
+      std::memset(mWaiting, 0, sizeof(mWaiting));
+      int kept = 0, sent = 0;
+      for (int i = 0; i < mPendingCount; ++i)
+      {
+         const TimedMidi t = mPending[i];
+         const int st = t.bytes[0] & 0xF0, ch = t.bytes[0] & 15, note = t.bytes[1] & 127;
+         const bool isNote = st == 0x80 || st == 0x90;
+         const bool isOff = st == 0x80 || (st == 0x90 && t.bytes[2] == 0);
+         bool wait = t.time >= limit || sent >= 32 || (isNote && mWaiting[ch][note]) ||
+                     (isOff && mOnBlock[ch][note] == mBlockSerial);
+         if (wait)
+         {
+            mPending[kept++] = t;
+            if (isNote)
+               mWaiting[ch][note] = true;
+            continue;
+         }
+         api.midi(inst, t.bytes, t.count);
+         ++sent;
+         if (st == 0x90 && t.bytes[2] > 0)
+            mOnBlock[ch][note] = mBlockSerial;
+      }
+      mPendingCount = kept;
+   }
+
+   void ClearMidi()
+   {
+      mPendingCount = 0;
+      std::memset(mOnBlock, 0xFF, sizeof(mOnBlock));
    }
 
    // A note for the instrument's keyboard: sent on the channel of the track
@@ -687,7 +760,7 @@ private:
          }
    }
 
-   void PinNotes(const SynthRefCoreApi& api, void* inst)
+   void PinNotes(const SynthRefCoreApi& api, void* inst, double base)
    {
       if (mReleasePin.exchange(false, std::memory_order_relaxed))
          ReleaseHeld(api, inst, mHeldPin);
@@ -699,6 +772,7 @@ private:
          for (int i = 0; i < got; ++i)
          {
             const NoteEvent& e = ev[i];
+            mEventTime = base + std::max(0, e.frameOffset) * mRs.Step();
             if (e.bendUpdate)
             {
                // Infinite's bends are semitones; the firmware's range is +-2.
@@ -960,6 +1034,19 @@ private:
    bool mHasTable = false;
    int16_t mLastCc[16][128];
    uint8_t mHeldPin[128], mHeldDevice[128];
+   struct TimedMidi
+   {
+      double time;
+      uint8_t bytes[3];
+      uint8_t count;
+   };
+   static constexpr int kPending = 1024;
+   TimedMidi mPending[kPending];
+   int mPendingCount = 0;
+   double mEventTime = 0.0;
+   uint64_t mBlockSerial = 0;
+   uint64_t mOnBlock[16][128];
+   bool mWaiting[16][128];
    int mKeyChannel = 0;
    unsigned long long mRawCursor = 0;
    NoteEventQueue* mInbox = nullptr;
