@@ -55,7 +55,7 @@ def compile_combined(code, facts, P, VP):
         mname = P["L"][int(idx) % len(P["L"])]
         t = facts[mname]
         nid += 1
-        lines.append("node %d %s %s" % (nid, t["category"], mname))
+        lines.append("node %d %s %s" % (nid, t["category"], mname.split(":")[0]))
         for kk, (tag, val) in sorted(u.seeded_params(t, int(seed or 0)).items()):
             lines.append("  %s %s %s" % (tag, kk, ("%.6g" % val) if tag == "f" else val if tag == "s" else int(val)))
         lines.append("end")
@@ -64,7 +64,7 @@ def compile_combined(code, facts, P, VP):
         slot = next(i["slot"] for i in t["inputs"] if i["kind"] == skind)
         lines.append("%s %d %d %d" % ({"audio": "aud", "note": "note", "image": "cable"}[skind], nid, slot, src_node))
         lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[int(k) % len(order)], key, nid, random.Random(int(seed or 0)).uniform(0.1, 1)))
-    return "\n".join(lines) + "\n"
+    return u.index_code_mods("\n".join(lines) + "\n")
 
 
 def sample(r, P, VP, facts, pick, vpick):
@@ -98,7 +98,7 @@ def probe(code, facts, P, VP, binary, workdir):
     try:
         open(path, "w").write(compile_combined(code, facts, P, VP))
         cp = subprocess.run([binary, "--audio-summary", path, path + ".json", "--duration", "4"], capture_output=True, text=True, timeout=60)
-        j = json.loads(cp.stdout.strip().splitlines()[-1])
+        j = json.loads(u.last_json(cp.stdout))
         if cp.returncode or not j.get("ok"):
             res["class"] = "error:" + ((j.get("errors") or [{}])[0].get("code") or "?")
             res["msg"] = (j.get("errors") or [{}])[0].get("message")
@@ -106,7 +106,7 @@ def probe(code, facts, P, VP, binary, workdir):
             res["a"] = j.get("audio_summary", {})
             ac = u.classify({"ok": True, "a": res["a"]})
             cp2 = subprocess.run([binary, "--frame", path, "0,1,2", os.path.join(workdir, h + "/")], capture_output=True, text=True, timeout=90)
-            j2 = json.loads(cp2.stdout.strip().splitlines()[-1])
+            j2 = json.loads(u.last_json(cp2.stdout))
             vc = v.classify_frames(j2["frame_stats"]) if j2.get("ok") else "error:" + ((j2.get("errors") or [{}])[0].get("code") or "?")
             res["audio_class"], res["visual_class"] = ac, vc
             res["moves"] = len({round(s["mean_luma"], 3) for s in j2.get("frame_stats", [])}) > 1

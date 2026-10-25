@@ -102,7 +102,8 @@ def publish(r, i, outdir, facts, P, VP, binary):
     open(path, "w").write(text)
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "patch-layout.py"), path], capture_output=True)
     body = open(path).read()
-    open(path, "w").write("# genome: %s\n%s" % (r["code"], body))
+    head, _, rest = body.partition("\n")  # the header line must stay first
+    open(path, "w").write("%s\n# genome: %s\n%s" % (head, r["code"], rest))
     val = subprocess.run([binary, "--validate", path], capture_output=True, text=True)
     if val.returncode:
         os.remove(path)
@@ -145,7 +146,10 @@ def main():
             if m and m["stable"]:
                 mf.write(json.dumps(m) + "\n"); kept += 1
             elif m:
+                print("unstable:", m["kind"], m["class"], "->", m["recheck"], m["genome"][:70])
                 os.remove(os.path.join(a.out, m["file"]))
+            else:
+                print("invalid:", r["code"][:70])
     print("published %d of %d (validated, laid out, stable on re-probe) -> %s" % (kept, len(picked), a.out))
 
 

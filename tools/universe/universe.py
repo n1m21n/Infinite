@@ -31,7 +31,8 @@ AUDIO_PATH_KEYS = ("path", "pathB", "filePath", "loopFile", "file")
 
 def load_facts(path=None):
     d = json.load(open(path or os.path.join(HERE, "describe_all.json")))
-    return {t["type"]: t for t in d["types"]}
+    import codegen
+    return codegen.register({t["type"]: t for t in d["types"]})
 
 
 def kinds(t, which):
@@ -67,6 +68,12 @@ def pools(facts):
 IMAGES = sorted(glob.glob(os.path.join(HERE, "assets/img/*.png")))
 
 
+def last_json(out):
+    """Status JSON is the last line starting with `{`; the engine may print log lines after it."""
+    ls = [l for l in out.strip().splitlines() if l.startswith("{")]
+    return ls[-1] if ls else "{}"
+
+
 def pick_file(r, node_type):
     if node_type == "Image Source":
         return r.choice(IMAGES)
@@ -77,6 +84,9 @@ def seeded_params(t, seed):
     """key -> (tag, value) for a node type, deterministic in (type, seed)."""
     r = random.Random("%s:%d" % (t["type"], seed))
     out = {}
+    if t.get("family"):
+        import codegen
+        out["code"] = ("s", codegen.source(t["type"], seed))
     for row in t["rows"]:
         k = row["key"]
         if row["tag"] == "s" and (k in AUDIO_PATH_KEYS or k.endswith("_path")) and t["type"] != "Palette":
@@ -126,8 +136,9 @@ def parse(code):
         src, _, dst = m.partition("@")
         src, _, frm = src.partition("<")  # `<j`: the modulator reads compiled node j (M4)
         idx, _, seed = src[1:].partition(".")
-        k, _, key = dst.partition(".")
-        mods.append((int(idx), int(seed or 0), int(k), key, int(frm) if frm else None))
+        for one in dst.split(","):  # one modulator may drive many targets: L5.7@3.cutoff,9.mix
+            k, _, key = one.partition(".")
+            mods.append((int(idx), int(seed or 0), int(k), key, int(frm) if frm else None))
     return branches, join, tail, mods
 
 
@@ -153,7 +164,7 @@ def compile_inf(code, facts, P, order_out=None):
         nonlocal n
         n += 1
         t = facts[name]
-        lines.append("node %d %s %s" % (n, t["category"], name))
+        lines.append("node %d %s %s" % (n, t["category"], name.split(":")[0]))
         ps = seeded_params(t, seed)
         ps.update(force or {})
         for k, (tag, v) in sorted(ps.items()):
@@ -226,16 +237,22 @@ def compile_inf(code, facts, P, order_out=None):
         end = ends[0][0]
     out = add("Audio Out", 0)
     wire(end, out, "aud")
+    shared = {}
     for idx, seed, k, key, frm in mods:
+        if (idx, seed, frm) in shared:
+            m = shared[(idx, seed, frm)]
+            lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random("%d:%s" % (seed, key)).uniform(0.1, 1)))
+            continue
         m = add(P["L"][idx % len(P["L"])], seed)
+        shared[(idx, seed, frm)] = m
         if frm is not None:
             src = order[frm % len(order)]
             skind = facts[names[src]]["outputs"][0]["kind"]
             wire(src, m, "note" if skind == "note" else "aud")
-        lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random(seed).uniform(0.1, 1)))
+        lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random("%d:%s" % (seed, key)).uniform(0.1, 1)))
     if order_out is not None:
         order_out.extend(order)
-    return "\n".join(lines) + "\n"
+    return index_code_mods("\n".join(lines) + "\n")
 
 
 class Pick:
@@ -306,6 +323,24 @@ def sample_code(r, P, facts, order=1, pick=None):
     return code
 
 
+def index_code_mods(text):
+    """Mod lines naming a code param (p.<name>) need its numeric index: keys only resolve for default-code params."""
+    import re as _re
+    node, params, out = None, {}, []
+    for line in text.split("\n"):
+        m = _re.match(r"node (\d+) ", line)
+        if m:
+            node = int(m.group(1)); params[node] = []
+        elif line.startswith("  s code ") and node is not None:
+            params[node] = _re.findall(r"param \w+ (\w+)", line.replace("\\n", "\n"))
+        elif line.startswith("mod "):
+            f = line.split(" ")
+            if len(f) > 2 and f[2].startswith("p.") and f[1].isdigit() and f[2][2:] in params.get(int(f[1]), []):
+                f[2] = str(51 + params[int(f[1])].index(f[2][2:])); line = " ".join(f)
+        out.append(line)
+    return "\n".join(out)
+
+
 def spine_ids(code):
     """Spine index of each compiled node, in compile order; -1 for join and tail."""
     branches, join, tail, _ = parse(code)
@@ -354,8 +389,7 @@ def probe(code, facts, P, binary, secs, workdir):
     try:
         cp = subprocess.run([binary, "--audio-summary", path, path + ".json", "--duration", str(secs)],
                             capture_output=True, text=True, timeout=60)
-        line = cp.stdout.strip().splitlines()[-1] if cp.stdout.strip() else "{}"
-        j = json.loads(line)
+        j = json.loads(last_json(cp.stdout))
         res = {"ok": cp.returncode == 0 and j.get("ok", False), "exit": cp.returncode,
                "err": (j.get("errors") or [{}])[0].get("code"), "a": j.get("audio_summary", {})}
         if res["err"]:

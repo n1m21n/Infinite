@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import universe as u
 
-SKIP_F = {"Comment", "Group", "Null"}
+SKIP_F = {"Comment", "Group", "Null", "Audio Texture", "Optical Flow", "VMPC"}  # need live audio/camera/UI input
 
 
 def vpools(facts):
@@ -42,7 +42,7 @@ def compile_visual(code, facts, P, order_out=None):
         nonlocal n
         n += 1
         t = facts[name]
-        lines.append("node %d %s %s" % (n, t["category"], name))
+        lines.append("node %d %s %s" % (n, t["category"], name.split(":")[0]))
         for k, (tag, v) in sorted(u.seeded_params(t, seed).items()):
             lines.append("  %s %s %s" % (tag, k, ("%.6g" % v) if tag == "f" else v if tag == "s" else int(v)))
         lines.append("end")
@@ -85,7 +85,7 @@ def compile_visual(code, facts, P, order_out=None):
         lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random(seed).uniform(0.1, 1)))
     if order_out is not None:
         order_out.extend(order)
-    return "\n".join(lines) + "\n"
+    return u.index_code_mods("\n".join(lines) + "\n")
 
 
 def sample(r, P, facts, order, pick):
@@ -132,7 +132,7 @@ def probe(code, facts, P, binary, workdir):
     res = {"code": code}
     try:
         cp = subprocess.run([binary, "--frame", path, "0,1,2", os.path.join(workdir, h + "/")], capture_output=True, text=True, timeout=90)
-        j = json.loads(cp.stdout.strip().splitlines()[-1])
+        j = json.loads(u.last_json(cp.stdout))
         if cp.returncode or not j.get("ok"):
             res["class"] = "error:" + ((j.get("errors") or [{}])[0].get("code") or "?")
             res["msg"] = (j.get("errors") or [{}])[0].get("message")
