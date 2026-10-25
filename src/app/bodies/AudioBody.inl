@@ -37,6 +37,8 @@
          DrawImageSpectralSynthBody(gn, n);
       else if (auto* n = dynamic_cast<MetallicNode*>(gn.node.get()))
          DrawMetallicBody(gn, n);
+      else if (auto* n = dynamic_cast<CircuitSynthNode*>(gn.node.get()))
+         DrawCircuitSynthBody(gn, n); // Turbo 0.73
       else if (auto* n = dynamic_cast<FMNode*>(gn.node.get()))
          DrawFMBody(gn, n);
       else if (auto* n = dynamic_cast<PartialsNode*>(gn.node.get()))

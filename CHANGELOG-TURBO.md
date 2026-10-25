@@ -1,5 +1,20 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## Unreleased (feature/circuit-synth)
+
+- **New: Circuit Synth** (Synths, both editions, MIT clean room). Makes its sound by simulating a
+  small electrical circuit in real time: Modified Nodal Analysis with trapezoidal companions, Newton
+  on the nonlinear parts (diode, neon lamp with hysteresis, Chua's diode, cubic negative resistance,
+  saturating op-amp), oversampled 2x / 4x. 23 circuits: Diode Clipper, Fuzz, RC / RLC Lowpass,
+  Series LC, Tank Filter, Twin-T Notch, LC Ladder, LC Tank, Thump, Coupled Tanks, Bell, LC Line, LC
+  Mesh, Van der Pol, Pushed VdP, Neon Relax, Chua, BT Kick / BT Tom / Rim (808-style bridged-T),
+  Buzzer, Ringer. One knob per part, notes from the notes pin (mono / poly, tap / hold, C and L key
+  tracking, pitch, glide, contact, attack, release), an LFO on tune / power / damp / level. Stereo is
+  designed in: twin circuits with part tolerance (spread), two probe points, mid/side width, poly
+  voices panned; the default circuit measures L/R correlation 0.8 with the mono sum within 0.5 dB.
+  Self-test `INFINITE_CIRCUITSYNTHTEST` (renders a WAV per circuit to `build\circuit-synth-wavs`).
+  Docs: `docs/CIRCUIT-SYNTH.md`.
+
 ## 0.72.0-turbo (2026-10-24)
 
 Real instrument firmware inside the patch. Full build only (GPL). Example:

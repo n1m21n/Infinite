@@ -273,6 +273,8 @@ add_executable(Infinite WIN32
     src/audio/dsp/ShapeResonatorKernel.cpp
     src/audio/dsp/ConvolutionKernel.cpp
     src/audio/dsp/MeshModalSolver.cpp
+    src/audio/dsp/CircuitSynthDsp.cpp
+    src/audio/dsp/CircuitSynthPresets.cpp
     src/audio/dsp/SlicerDsp.cpp
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
@@ -377,6 +379,7 @@ add_executable(Infinite WIN32
     src/audio/dsp/SpectralAdditiveSynth.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
+    src/nodes/CircuitSynthNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
     src/nodes/PaulStretchNode.cpp

@@ -61,6 +61,8 @@
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
+   if (getenv("INFINITE_CIRCUITSYNTHTEST") != nullptr) // Turbo 0.73
+      return HeadlessExit(RunCircuitSynthTest());
 #if INFINITE_GPL
    if (getenv("INFINITE_SYNTHREFTEST") != nullptr) // Turbo 0.72
       return HeadlessExit(RunSynthRefTest());
@@ -656,6 +658,14 @@
          mixer->inputs[0].Connect(gain);
          out->input.Connect(mixer);
          RebuildAudioTopology();
+      }
+      else if (getenv("INFINITE_CIRCUITSYNTHUITEST") != nullptr)
+      {
+         // Turbo 0.73: one Circuit Synth (Fuzz: all eight part knobs) for a
+         // look at its panel - pair with IMAGERESYNTH_SCREENSHOT.
+         SpawnNode("Circuit Synth", "Synths", 20.0f, 20.0f); // 0
+         if (auto* cs = dynamic_cast<CircuitSynthNode*>(gNodes[0].node.get()))
+            cs->ApplyPreset(CircuitDsp::FindPreset("Fuzz"));
       }
       else if (getenv("INFINITE_WTDRAGTEST") != nullptr)
       {

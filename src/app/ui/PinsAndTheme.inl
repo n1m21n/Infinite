@@ -538,6 +538,7 @@
       REGISTER_NODE(EquationNode, Equation Synth, "Synths");
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
+      REGISTER_NODE(CircuitSynthNode, Circuit Synth, "Synths"); // Turbo 0.73
       REGISTER_NODE(FMNode, FM, "Synths");           // Turbo 0.60, from upstream
       REGISTER_NODE(PartialsNode, Partials, "Synths");
       REGISTER_NODE(StringNode, String, "Synths");
