@@ -11,15 +11,19 @@ import argparse, hashlib, json, os, re, shutil, subprocess, wave
 import numpy as np
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-ALPHA = "abcdefghjkmnpqrstuvwxyz23456789"
-SYM = "!#$%&*+-=?@^_~<>/|:;"
 KINDS = ("A", "V", "AV")
 
 
-def codename(sid):
-    """Eight characters of letters, digits and symbols, fixed by the id (no words)."""
-    h = hashlib.sha1(sid.encode()).digest()
-    return "".join(SYM[b % len(SYM)] if b % 4 == 0 else ALPHA[b % len(ALPHA)] for b in h[:8])
+def codename(sid, taken=()):
+    """Sixteen binary digits in four groups of four, fixed by the id; a clash re-hashes."""
+    n = 0
+    while True:
+        h = hashlib.sha1((sid if not n else "%s#%d" % (sid, n)).encode()).digest()
+        bits = "".join("01"[(h[i // 8] >> (i % 8)) & 1] for i in range(16))
+        name = " ".join(bits[i:i + 4] for i in range(0, 16, 4))
+        if name not in taken:
+            return name
+        n += 1
 
 
 def run(cmd, timeout):
@@ -94,14 +98,14 @@ def curated(m):
 def publish_samples(lib, site, max_mb=150):
     media = os.path.join(site, "media")
     shutil.rmtree(media, ignore_errors=True)
-    out, total = [], 0.0
+    out, total, used = [], 0.0, set()
     for m in read_lib(lib):
         if not passes(m):
             continue
         src = os.path.join(lib, m["id"])
         d = os.path.join(media, m["sid"])
         os.makedirs(d, exist_ok=True)
-        s = {"id": m["sid"], "name": codename(m["sid"]), "kind": m["kind"], "tags": m.get("tags", []), "nodes": len(m.get("nodes", [])),
+        s = {"id": m["sid"], "name": codename(m["sid"], used), "kind": m["kind"], "tags": m.get("tags", []), "nodes": len(m.get("nodes", [])),
              "family": (m.get("family") or "").replace("/", "-") or None, "peaks": [0.0] * 120, "audio": None, "video": None, "poster": None, "download": None}
         wav, mp4, png = (os.path.join(src, f) for f in ("sample.wav", "preview.mp4", "poster.png"))
         if m["kind"] == "A" and os.path.exists(wav):
@@ -118,6 +122,7 @@ def publish_samples(lib, site, max_mb=150):
                 s["poster"] = "media/%s/poster.jpg" % m["sid"]
         else:
             shutil.rmtree(d); continue
+        used.add(s["name"])
         s["curated"] = curated(m)
         out.append(s)
     # a 'cap' that keeps the page's media under max_mb, dropping from the end of the (stable) order
