@@ -1,4 +1,30 @@
-/* Samples reuses the library's deck (library.css, library-deck.css); only the playing states are new. */
-.lib-card .smp-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; pointer-events: none; background: #000; }
-.lib-card .smp-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent, #f5b3a0); z-index: 2; }
-.lib-card.is-playing .lib-chip-open { background: var(--accent); color: var(--on-accent, #fff); }
+/* Samples: a plain list in the library's glass look. */
+.smp-wrap { max-width: 980px; margin: 0 auto; }
+.smp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 18px; }
+.smp-bar .grow { flex: 1; }
+.smp-count { color: var(--muted); font: 500 0.8rem/1 var(--font-mono); }
+.smp-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-seg button { border: 0; background: transparent; color: var(--muted); font: 600 0.85rem/1 var(--font-sans); padding: 9px 14px; border-radius: 999px; cursor: pointer; }
+.smp-seg button.is-on { background: var(--ink); color: var(--paper); }
+.smp-list { display: grid; gap: 6px; }
+.smp-row { display: grid; grid-template-columns: 44px 84px minmax(120px, 230px) 1fr 44px; align-items: center; gap: 14px; padding: 8px 12px 8px 8px; border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); transition: background var(--dur-small) var(--ease-out); }
+.smp-row:hover, .smp-row.on { background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
+.smp-play, .smp-dl { width: 44px; height: 44px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; cursor: pointer; text-decoration: none;
+  background: color-mix(in srgb, var(--surface-2) 82%, var(--deep)); color: var(--ink); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-play svg, .smp-dl svg { width: 18px; height: 18px; }
+.smp-row.on .smp-play { background: var(--ink); color: var(--paper); }
+.smp-dl { background: transparent; box-shadow: none; color: var(--muted); }
+.smp-dl:hover { background: var(--ink); color: var(--paper); }
+.smp-thumb { position: relative; width: 84px; height: 52px; border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--deep) 70%, var(--surface-2)); }
+.smp-thumb img, .smp-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.smp-id { min-width: 0; display: grid; gap: 3px; }
+.smp-id b { font: 700 0.98rem/1.2 var(--font-mono); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-id span { color: var(--muted); font: 500 0.72rem/1.3 var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-wave { width: 100%; height: 44px; display: block; color: var(--muted); --smp-on: var(--accent); cursor: pointer; }
+.smp-track { height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.smp-track i { display: block; height: 100%; width: 0; background: var(--accent); }
+@media (max-width: 680px) {
+  .smp-row { grid-template-columns: 44px 1fr 44px; }
+  .smp-thumb, .smp-wave, .smp-track { display: none; }
+}
