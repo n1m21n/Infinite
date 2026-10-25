@@ -11,7 +11,7 @@
   function slide(it) {
     return '<section class="reel-slide" aria-label="' + esc(it.name) + '" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<div class="reel-wrap"><div class="reel-card">' +
-      '<video muted loop playsinline preload="none" poster="' + esc(it.poster ? '../' + it.poster : '') + '" data-src="' + esc('../' + it.video) + '" title="' + esc(it.name) + '"></video>' +
+      '<video muted loop playsinline preload="none" data-poster="' + esc(it.poster ? '../' + it.poster : '') + '" data-src="' + esc('../' + it.video) + '" title="' + esc(it.name) + '"></video>' +
       '<div class="reel-swipe" aria-hidden="true"></div>' +
       '<div class="reel-meta"><h2>' + esc(it.name) + '</h2></div></div>' +
       '<div class="reel-rail">' +
@@ -53,6 +53,16 @@
       });
     }, { root: reels, threshold: [0, 0.6] });
     Array.prototype.forEach.call(reels.querySelectorAll('.reel-slide'), function (s) { io.observe(s); });
+    // posters load only for the slide on screen and its neighbours, not all at once
+    var pio = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var v = e.target.querySelector('video'), p = v.getAttribute('data-poster');
+        if (p) { v.poster = p; v.removeAttribute('data-poster'); }
+        pio.unobserve(e.target);
+      });
+    }, { root: reels, rootMargin: '100% 0px' });
+    Array.prototype.forEach.call(reels.querySelectorAll('.reel-slide'), function (s) { pio.observe(s); });
     var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), hit = qs && reels.querySelector('.reel-slide[data-id="' + qs + '"]');
     if (hit) { reels.style.scrollBehavior = 'auto'; hit.scrollIntoView({ block: 'start' }); reels.style.scrollBehavior = ''; }
   }
@@ -82,7 +92,7 @@
     if (Math.abs(dy) > 38 && Math.abs(dy) > Math.abs(dx)) goTo(activeIndex() + (dy > 0 ? 1 : -1));
   }, { passive: true });
 
-  fetch('../data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
+  fetch('../data.json').then(function (r) { return r.json(); }).then(function (d) {
     var items = d.samples.filter(function (x) { return x.kind !== 'A' && x.video; });
     shuffle(items); mount(items);
   }).catch(function () { reels.innerHTML = '<p class="smp-none">Could not load the samples.</p>'; });

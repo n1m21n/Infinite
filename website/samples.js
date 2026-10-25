@@ -89,6 +89,6 @@
   });
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
 
-  fetch('data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
+  fetch('data.json').then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
     .catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the samples.'; });
 })();
