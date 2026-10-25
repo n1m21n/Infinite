@@ -721,7 +721,10 @@ int DrawTestsB(FrameCtx& fc)
       }
       {
          ConditionalStageTimer timerSwap(benchStagesCpuSample ? &sStageSwap : nullptr, Bench::FrameTail::kSwap);
-         glfwSwapBuffers(window);
+         // A headless job's window is never shown and its pictures are read
+         // from node textures, so presenting the canvas is wasted time.
+         if (!HeadlessJobActive())
+            glfwSwapBuffers(window);
       }
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkSwapped, Bench::ScopedStageTimer::NowMs());
