@@ -64,7 +64,12 @@ def pools(facts):
     return P
 
 
+IMAGES = sorted(glob.glob(os.path.join(HERE, "assets/img/*.png")))
+
+
 def pick_file(r, node_type):
+    if node_type == "Image Source":
+        return r.choice(IMAGES)
     return r.choice(MIDIS if node_type == "MIDI File" else WAVS)
 
 
@@ -139,7 +144,7 @@ def node_names(code, P):
     return names
 
 
-def compile_inf(code, facts, P):
+def compile_inf(code, facts, P, order_out=None):
     branches, join, tail, mods = parse(code)
     lines, names, used, order = ["infinite-patch 1"], {}, {}, []
     n = 0
@@ -228,6 +233,8 @@ def compile_inf(code, facts, P):
             skind = facts[names[src]]["outputs"][0]["kind"]
             wire(src, m, "note" if skind == "note" else "aud")
         lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random(seed).uniform(0.1, 1)))
+    if order_out is not None:
+        order_out.extend(order)
     return "\n".join(lines) + "\n"
 
 
