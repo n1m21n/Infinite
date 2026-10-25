@@ -163,6 +163,8 @@
 #include "nodes/AudioColorRampNode.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/MetallicNode.h"
+#include "nodes/CircuitSynthNode.h" // Turbo 0.73
+#include "audio/dsp/CircuitSynthDsp.h"
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/MidiOutNode.h" // Turbo 0.57 (upstream)
@@ -285,6 +287,7 @@ namespace
    #include "app/bodies/NoteSources.inl" // note sources: keyboard, chords, Pattern Player, Note Looper, MIDI Out
    #include "app/bodies/AudioEffects.inl" // audio effect node bodies
    #include "app/bodies/TurboInstruments.inl" // Looper, MPC, Super Mixer, Analog, Slicer, Molders, Transport Control
+   #include "app/bodies/CircuitSynthBody.inl" // Turbo 0.73: Circuit Synth panel
 #if INFINITE_GPL
    #include "gpl/SynthRef/SynthRefBody.inl" // Turbo 0.72: Synth REF panel (full build)
 #endif
@@ -310,6 +313,7 @@ namespace
 #include "app/selftest/DspFixtures.inl" // audio node sweep discovery and the INFINITE_DSPTEST fixtures
 #include "app/selftest/EngineTests.inl" // PDC, param sweep and plugin scan tests
 #include "app/selftest/VoiceModFixture.inl" // Turbo 0.60: upstream per-voice modulation fixture
+#include "app/selftest/CircuitSynthTests.inl" // Turbo 0.73: INFINITE_CIRCUITSYNTHTEST
 #if INFINITE_GPL
 #include "gpl/SynthRef/SynthRefTests.inl" // Turbo 0.72: INFINITE_SYNTHREFTEST (full build)
 #endif

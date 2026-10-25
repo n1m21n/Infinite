@@ -1,5 +1,13 @@
 # Passagem de trabalho: turbo/next (0.70)
 
+## Em andamento: Circuit Synth (branch `feature/circuit-synth`, saída de `turbo/windows-only`)
+
+- Nó novo (Synths, MIT, sala limpa, nas duas edições) que simula circuitos em tempo real: MNA +
+  trapezoidal + Newton em portas não lineares (diodo, neon, Chua, resistência negativa, op-amp).
+  23 presets, estéreo de projeto (gêmeos com tolerância, duas sondas, width M/S, vozes poly no campo).
+- Ler `docs/CIRCUIT-SYNTH.md`. Teste: `INFINITE_CIRCUITSYNTHTEST` (driver: CIRCUITSYNTHTEST), WAVs em
+  `build\circuit-synth-wavs` para o A/B do dono. Nada mergeado; merge/push só com o aval dele.
+
 ## 0.72.0 em andamento: Synth REF (branch `feature/synth-ref`, saída de `turbo/windows-only`)
 
 - Novo nó GPL (só build full) que roda firmware aberta de instrumento: SMK-37 Pro + SMK37 OPEN V01

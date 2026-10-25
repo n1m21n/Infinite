@@ -1116,6 +1116,45 @@ namespace
             skip("Spatial Mixer", "formatIndex", "export file setting, no effect on live audio");
             skip("Spatial Mixer", "live", "graph latency alignment done by the engine, not this node's output");
          }
+         // Circuit Synth (Turbo 0.73). The default circuit (Diode Clipper) has
+         // six part knobs and no coil; the 7th / 8th knob and L key act on
+         // circuits that have them. Onset-only settings need a fresh note.
+         {
+            for (const char* k : { "k6", "k7" })
+            {
+               EffectParamDef d;
+               d.name = k;
+               d.prerequisites = { { "preset", 1.0f } }; // Fuzz: 8 part knobs
+               add("Circuit Synth", d);
+            }
+            EffectParamDef l;
+            l.name = "lFollow";
+            l.prerequisites = { { "preset", 5.0f } }; // Tank Filter
+            add("Circuit Synth", l);
+            for (const char* k : { "lfoRate", "lfoShape", "lfoTarget" })
+            {
+               EffectParamDef d;
+               d.name = k;
+               d.prerequisites = { { "lfoDepth", 0.6f } };
+               add("Circuit Synth", d);
+            }
+            EffectParamDef contact;
+            contact.name = "contact";
+            contact.prerequisites = { { "trigger", 0.0f } }; // a tap's length follows the contact
+            add("Circuit Synth", contact);
+            EffectParamDef attack;
+            attack.name = "attack";
+            attack.prerequisites = { { "mode", 1.0f } }; // poly: every note-on is a fresh voice
+            add("Circuit Synth", attack);
+            skip("Circuit Synth", "glide", "glides between two pitches; the rig holds one note");
+            for (const char* k : { "cutoff", "reso", "filterKey" })
+            {
+               EffectParamDef d;
+               d.name = k;
+               d.prerequisites = { { "filter", 2.0f } }; // lp 24 (the filter is off by default)
+               add("Circuit Synth", d);
+            }
+         }
          // Nodes that play recorded or learned content the rig cannot make.
          skip("Looper", "*", "plays back a recorded loop; nothing is recorded in the generic rig");
          skip("Note Looper", "*", "plays back recorded notes; nothing is recorded in the generic rig");
