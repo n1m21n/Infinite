@@ -139,7 +139,7 @@
     {
       "slug": "hyperbolic-kaleidoscope",
       "title": "Hyperbolic Kaleidoscope",
-      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
+      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
     },
     {
       "slug": "bioluminescent-abyss",
@@ -189,7 +189,7 @@
     {
       "slug": "hyperbolic-tessellation",
       "title": "Hyperbolic Tessellation",
-      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
+      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
     },
     {
       "slug": "accretion-disk",
@@ -204,7 +204,7 @@
     {
       "slug": "hyperbolic-disk-fractal",
       "title": "Hyperbolic Disk Fractal",
-      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
+      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
     },
     {
       "slug": "magnetar-quantum-flux",
@@ -240,6 +240,16 @@
       "slug": "analog-crt-vhs-glitch",
       "title": "Analog CRT VHS Glitch",
       "description": "Cathode-ray tube phosphor raster with curved barrel glass distortion, RGB triad subpixel grid, VHS tracking tear bar, and magnetic beam deflection. Bass sags the power supply beam width, mids warp VHS sync tracking displacement, highs inject phosphor noise burst."
+    },
+    {
+      "slug": "ditherpunk-terminal-matrix",
+      "title": "Ditherpunk Terminal Matrix",
+      "description": "1-bit cybernetic ditherpunk terminal raster with 4x4 Bayer ordered dithering matrix, vintage amber/emerald phosphor bloom, and audio-reactive scanline glitch. Bass expands the central telemetry orb, mids shift the threshold dither lattice, highs inject phosphor burst noise."
+    },
+    {
+      "slug": "liminal-void-haze",
+      "title": "Liminal Void Haze",
+      "description": "Hypnagogic brutalist infinite corridor with volumetric atmospheric haze, stark rectangular portal lightframes, and dark spatial perspective. Bass contracts the corridor perspective depth, mids sweep portal illumination gradients, highs scatter atmospheric fog caustics."
     }
   ]
 }

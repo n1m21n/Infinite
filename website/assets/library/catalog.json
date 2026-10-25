@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 257,
+ "count": 271,
  "items": [
   {
    "id": "first-sound",
@@ -638,6 +638,54 @@
    "file": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.webp",
    "page": "https://infinitedevices.org/library/spectral-freeze-reverb-fx.html"
+  },
+  {
+   "id": "liminal-drone-pad-synth",
+   "name": "Liminal Drone Pad Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Hypnagogic dark ambient drone synthesizer with detuned multi-oscillator harmonic cluster, sub-octave fundamental saturation, slow-drift chorus modulation, and four-pole ladder lowpass filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.webp",
+   "page": "https://infinitedevices.org/library/liminal-drone-pad-synth.html"
+  },
+  {
+   "id": "ditherpunk-chiptune-lead-synth",
+   "name": "Ditherpunk Chiptune Lead Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Lo-fi 8-bit chiptune synthesizer with variable pulse-width duty cycle modulation, bit-crush quantization decimation, and snappily accented pitch decay.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.webp",
+   "page": "https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html"
+  },
+  {
+   "id": "chavetta-tape-saturator-fx",
+   "name": "Chavetta Tape Saturator FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Vintage analog magnetic tape deck saturator with soft-knee asymmetric hysteresis clipping, dual-stage motor flutter warble, and tape head damping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.webp",
+   "page": "https://infinitedevices.org/library/chavetta-tape-saturator-fx.html"
+  },
+  {
+   "id": "op-art-phaser-matrix-fx",
+   "name": "Op Art Phaser Matrix FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multistage optical phaser processor with four-pole allpass phase-shift ladder, quadrature sinusoidal sweep modulation, and resonant feedback matrix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.webp",
+   "page": "https://infinitedevices.org/library/op-art-phaser-matrix-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -3086,6 +3134,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/analog-crt-vhs-glitch.field",
    "preview": "https://infinitedevices.org/assets/library/previews/analog-crt-vhs-glitch.jpg",
    "page": "https://infinitedevices.org/library/analog-crt-vhs-glitch.html"
+  },
+  {
+   "id": "ditherpunk-halftone-grid",
+   "name": "Ditherpunk Halftone Grid",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "1-bit cybernetic ditherpunk lattice with ordered 8x8 Bayer matrix threshold clusters, bitmap scanline glitch, and retro terminal telemetry.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/ditherpunk-halftone-grid.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-halftone-grid.jpg",
+   "page": "https://infinitedevices.org/library/ditherpunk-halftone-grid.html"
+  },
+  {
+   "id": "technical-blueprint-schematic",
+   "name": "Technical Blueprint Schematic",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Cyanotype drafting schematic with precision architectural millimeter grids, concentric compass coordinate arcs, and isometric mechanical annotation nodes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/technical-blueprint-schematic.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/technical-blueprint-schematic.jpg",
+   "page": "https://infinitedevices.org/library/technical-blueprint-schematic.html"
+  },
+  {
+   "id": "liminal-void-corridor-3d",
+   "name": "Liminal Void Corridor 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Infinite hypnagogic brutalist corridor with receding architectural concrete portals, recessed floor lighting troughs, and floating monolithic plinths.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/liminal-void-corridor-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/liminal-void-corridor-3d.jpg",
+   "page": "https://infinitedevices.org/library/liminal-void-corridor-3d.html"
+  },
+  {
+   "id": "retro-surreal-monolith-3d",
+   "name": "Retro Surreal Monolith 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Metaphysical surrealist architectural plinth with checkered perspective plane, hovering metallic polyhedral relic, and dramatic cast shadow arches.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/retro-surreal-monolith-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/retro-surreal-monolith-3d.jpg",
+   "page": "https://infinitedevices.org/library/retro-surreal-monolith-3d.html"
+  },
+  {
+   "id": "liminal-drone-pad-synth",
+   "name": "Liminal Drone Pad Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Hypnagogic dark ambient drone synthesizer with detuned multi-oscillator harmonic cluster, sub-octave fundamental saturation, slow-drift chorus modulation, and four-pole ladder lowpass filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/liminal-drone-pad-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/liminal-drone-pad-synth.jpg",
+   "page": "https://infinitedevices.org/library/liminal-drone-pad-synth.html"
+  },
+  {
+   "id": "ditherpunk-chiptune-lead-synth",
+   "name": "Ditherpunk Chiptune Lead Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Lo-fi 8-bit chiptune synthesizer with variable pulse-width duty cycle modulation, bit-crush quantization decimation, and snappily accented pitch decay.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/ditherpunk-chiptune-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-chiptune-lead-synth.jpg",
+   "page": "https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html"
+  },
+  {
+   "id": "chavetta-tape-saturator-fx",
+   "name": "Chavetta Tape Saturator FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Vintage analog magnetic tape deck saturator with soft-knee asymmetric hysteresis clipping, dual-stage motor flutter warble, and tape head damping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/chavetta-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/chavetta-tape-saturator-fx.jpg",
+   "page": "https://infinitedevices.org/library/chavetta-tape-saturator-fx.html"
+  },
+  {
+   "id": "op-art-phaser-matrix-fx",
+   "name": "Op Art Phaser Matrix FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Multistage optical phaser processor with four-pole allpass phase-shift ladder, quadrature sinusoidal sweep modulation, and resonant feedback matrix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/op-art-phaser-matrix-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/op-art-phaser-matrix-fx.jpg",
+   "page": "https://infinitedevices.org/library/op-art-phaser-matrix-fx.html"
+  },
+  {
+   "id": "ditherpunk-terminal-matrix",
+   "name": "Ditherpunk Terminal Matrix",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "1-bit cybernetic ditherpunk terminal raster with 4x4 Bayer ordered dithering matrix, vintage amber/emerald phosphor bloom, and audio-reactive scanline glitch. Bass expands the central telemetry orb, mids shift the threshold dither lattice, highs inject phosphor burst noise.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/ditherpunk-terminal-matrix.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/ditherpunk-terminal-matrix.jpg",
+   "page": "https://infinitedevices.org/library/ditherpunk-terminal-matrix.html"
+  },
+  {
+   "id": "liminal-void-haze",
+   "name": "Liminal Void Haze",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Hypnagogic brutalist infinite corridor with volumetric atmospheric haze, stark rectangular portal lightframes, and dark spatial perspective. Bass contracts the corridor perspective depth, mids sweep portal illumination gradients, highs scatter atmospheric fog caustics.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/liminal-void-haze.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/liminal-void-haze.jpg",
+   "page": "https://infinitedevices.org/library/liminal-void-haze.html"
   }
  ]
 }

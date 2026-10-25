@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Chavetta Tape Saturator FX",
+    "author": "Infinite",
+    "description": "Vintage analog magnetic tape deck saturator with soft-knee asymmetric hysteresis clipping, dual-stage motor flutter warble, and tape head damping.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float drive = 2.6 [1.0, 6.0];\nparam float hysteresis = 0.45 [0.0, 1.0];\nparam float flutterRate = 4.2 [0.5, 12.0];\nparam float toneDamp = 0.55 [0.0, 1.0];\nparam float mix = 0.95 [0.0, 1.0];\nstate float pFlut = 0;\nstate float d1 = 0;\nstate float prevSat = 0;\nstate float lp = 0;\n\npFlut = (pFlut + flutterRate / sr) % 1.0;\nflutMod = sin(6.2831853 * pFlut) * 0.08;\n\nu = (in + flutMod * 0.05) * drive;\n// Asymmetric magnetic tape hysteresis\nsat = (u + hysteresis * prevSat * 0.35) / (1.0 + abs(u) * 0.38);\nprevSat = sat;\n\nd1 = sat;\n\ncut = clamp(0.5 - toneDamp * 0.38, 0.04, 0.48);\nlp = lp + cut * (d1 - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "drive": 2.6,
+      "hysteresis": 0.45,
+      "flutterRate": 4.2,
+      "toneDamp": 0.55,
+      "mix": 0.95
+    },
+    "nodeSettings": {}
+  }
+}

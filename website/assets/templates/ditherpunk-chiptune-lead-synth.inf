@@ -1,0 +1,44 @@
+infinite-patch 1
+# Ditherpunk Chiptune Lead Synth: lo-fi 8-bit chiptune synthesizer
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 48
+  i rangeHigh 72
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pulseWidth = 0.35 [0.05, 0.95]\nparam float crushBits = 4.0 [2.0, 16.0]\nparam float glide = 0.25 [0.0, 1.0]\nparam float decay = 0.65 [0.1, 2.0]\nparam float accent = 0.55 [0.0, 1.0]\nstate float phase = 0\nstate float env = 0\nstate float curFreq = 220\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, env + (target - env) * 0.06, env - env * (0.0005 / decay))\n\ncurFreq = curFreq + (freq - curFreq) * (0.05 / (1.0 + glide * 4.0))\nstepFreq = clamp(curFreq, 40.0, 5000.0) / sr\nphase = (phase + stepFreq) % 1.0\n\npwMod = pulseWidth + sin(phase * 6.2831853) * 0.1 * accent\npulse = if(phase > pwMod, 0.8, -0.8)\nsub = if(phase > 0.5, 0.4, -0.4)\n\nrawSig = pulse * 0.75 + sub * 0.25\nlevels = pow(2.0, clamp(crushBits, 2.0, 16.0))\ncrushed = floor(rawSig * levels + 0.5) / levels\n\nout = crushed * env * (0.85 + accent * 0.35)\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.22
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Ditherpunk Chiptune Lead Synth. Lo-fi 8-bit chiptune synthesizer with variable pulse width and bit crush quantization.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.38
+mod pic sizeY ana 0 0 1 0.5 0.12 0.38

@@ -83,6 +83,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/ditherpunk-terminal-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/ditherpunk.html": {
    "font-size": 2,
    "hex": 5,
@@ -151,9 +155,14 @@
    "hex": 6
   },
   "embeds/lilliputian_surreal.html": {
+   "duration": 1,
    "font-size": 2,
    "hex": 5,
    "radius": 1
+  },
+  "embeds/liminal-void-haze.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/liminal_void.html": {
    "font-size": 2,

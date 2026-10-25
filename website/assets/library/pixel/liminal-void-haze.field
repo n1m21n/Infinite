@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liminal Void Haze",
+    "author": "Infinite",
+    "description": "Hypnagogic brutalist infinite corridor with volumetric atmospheric haze, stark rectangular portal lightframes, and dark spatial perspective. Bass contracts the corridor perspective depth, mids sweep portal illumination gradients, highs scatter atmospheric fog caustics.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float corridorDepth = 1.4 [0.5, 3.0];\nparam float portalCount = 6.0 [2.0, 12.0];\nparam float fogDensity = 1.25 [0.2, 3.0];\nparam float plinthHeight = 0.45 [0.0, 1.0];\nparam float glowIntensity = 1.8 [0.5, 4.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n\nzDepth = 1.0 / max(0.02, length(p));\nang = atan2(p.y, p.x);\n\nportalZ = fract(zDepth * 0.15 - t * 0.25 * corridorDepth);\nboxDist = max(abs(p.x * zDepth) - 1.2, abs(p.y * zDepth) - 0.9);\nedgeGlow = exp(-abs(boxDist) * 12.0);\n\nfloorY = -0.32;\nfloorStrip = exp(-pow(p.y - floorY, 2.0) * 80.0) * exp(-abs(p.x) * 4.0);\nceilY = 0.35;\nceilStrip = exp(-pow(p.y - ceilY, 2.0) * 80.0) * exp(-abs(p.x) * 4.0);\n\nfog = clamp((zDepth - 1.0) * 0.12 * fogDensity, 0.0, 1.0);\ncaustic = sin(p.x * 14.0 + t * 2.0) * sin(p.y * 14.0 - t * 1.5) * 0.5 + 0.5;\n\ncGround = vec3(0.082, 0.098, 0.188);\ncPortal = vec3(0.655, 0.694, 1.0);\ncEmber = vec3(1.0, 0.42, 0.21);\ncEmerald = vec3(0.306, 0.949, 0.722);\n\nhazeCol = mix(cGround, cEmerald * (0.8 + caustic * 0.4), fog);\nillum = edgeGlow * cPortal * glowIntensity + floorStrip * cEmber * 2.2 + ceilStrip * cPortal * 1.6;\n\ncol = hazeCol + illum;\nalpha = 1.0;\n",
+    "params": {
+      "corridorDepth": 1.4,
+      "portalCount": 6.0,
+      "fogDensity": 1.25,
+      "plinthHeight": 0.45,
+      "glowIntensity": 1.8
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

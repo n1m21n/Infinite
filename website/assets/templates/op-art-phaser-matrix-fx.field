@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Op Art Phaser Matrix FX",
+    "author": "Infinite",
+    "description": "Multistage optical phaser processor with four-pole allpass phase-shift ladder, quadrature sinusoidal sweep modulation, and resonant feedback matrix.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rate = 0.45 [0.05, 5.0];\nparam float depth = 0.82 [0.0, 1.0];\nparam float feedback = 0.65 [0.0, 0.95];\nparam float centerFreq = 1400.0 [200.0, 4000.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float phaseLfo = 0;\nstate float ap1_in = 0;\nstate float ap1_out = 0;\nstate float ap2_in = 0;\nstate float ap2_out = 0;\nstate float ap3_in = 0;\nstate float ap3_out = 0;\nstate float ap4_in = 0;\nstate float ap4_out = 0;\n\nphaseLfo = (phaseLfo + rate / sr) % 1.0;\nlfo = sin(6.2831853 * phaseLfo) * 0.5 + 0.5;\n\nfSweep = centerFreq * (0.4 + lfo * depth * 2.2);\ng = clamp(tan(3.14159265 * fSweep / sr), 0.05, 0.92);\na1 = (g - 1.0) / (g + 1.0);\n\nxIn = in + ap4_out * feedback;\n\n// 4-stage all-pass ladder network\ny1 = a1 * xIn + ap1_in - a1 * ap1_out;\nap1_in = xIn;\nap1_out = y1;\n\ny2 = a1 * y1 + ap2_in - a1 * ap2_out;\nap2_in = y1;\nap2_out = y2;\n\ny3 = a1 * y2 + ap3_in - a1 * ap3_out;\nap3_in = y2;\nap3_out = y3;\n\ny4 = a1 * y3 + ap4_in - a1 * ap4_out;\nap4_in = y3;\nap4_out = y4;\n\nout = in * (1.0 - mix) + (in + y4) * 0.5 * mix;\n",
+    "params": {
+      "rate": 0.45,
+      "depth": 0.82,
+      "feedback": 0.65,
+      "centerFreq": 1400.0,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

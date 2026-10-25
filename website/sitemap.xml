@@ -80,6 +80,8 @@
   <url><loc>https://infinitedevices.org/embeds/gravitational-caustic-microlens.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/riso-pop-screen.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/analog-crt-vhs-glitch.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ditherpunk-terminal-matrix.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/liminal-void-haze.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
@@ -145,6 +147,10 @@
   <url><loc>https://infinitedevices.org/library/spectral-resonator-bell-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-tape-warble-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/spectral-freeze-reverb-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liminal-drone-pad-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/chavetta-tape-saturator-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-phaser-matrix-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
@@ -349,6 +355,16 @@
   <url><loc>https://infinitedevices.org/library/spectral-freeze-reverb-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/riso-pop-screen.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-vhs-glitch.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-halftone-grid.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/technical-blueprint-schematic.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liminal-void-corridor-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/retro-surreal-monolith-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liminal-drone-pad-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-chiptune-lead-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/chavetta-tape-saturator-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-phaser-matrix-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-terminal-matrix.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/liminal-void-haze.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-25</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>

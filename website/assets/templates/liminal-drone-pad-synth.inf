@@ -1,0 +1,44 @@
+infinite-patch 1
+# Liminal Drone Pad Synth: hypnagogic dark ambient drone synthesizer
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i rangeLow 28
+  i rangeHigh 48
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 950.0 [80.0, 8000.0]\nparam float detune = 0.35 [0.0, 1.0]\nparam float subLevel = 0.65 [0.0, 1.0]\nparam float chorusRate = 0.45 [0.1, 5.0]\nparam float drive = 2.2 [1.0, 5.0]\nstate float phase1 = 0\nstate float phase2 = 0\nstate float phase3 = 0\nstate float phaseSub = 0\nstate float env = 0\nstate float lfo = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, env + (target - env) * 0.008, env - env * 0.0008)\n\nlfo = (lfo + chorusRate / sr) % 1.0\nlfoMod = sin(6.2831853 * lfo) * detune * 0.015\n\nf0 = clamp(freq, 20.0, 2000.0) / sr\nf1 = f0 * (1.0 + lfoMod)\nf2 = f0 * (1.0 - lfoMod * 0.85)\nfSub = f0 * 0.5\n\nphase1 = (phase1 + f1) % 1.0\nphase2 = (phase2 + f2) % 1.0\nphase3 = (phase3 + f0 * 1.5) % 1.0\nphaseSub = (phaseSub + fSub) % 1.0\n\nsaw1 = phase1 * 2.0 - 1.0\nsaw2 = phase2 * 2.0 - 1.0\nsin3 = sin(6.2831853 * phase3)\nsub = if(phaseSub > 0.5, 0.7, -0.7)\n\nrawMix = (saw1 * 0.4 + saw2 * 0.4 + sin3 * 0.2) + sub * subLevel\nu = rawMix * drive\nsatIn = u / (1.0 + abs(u) * 0.28)\n\nfFilt = clamp(cutoff / sr * 2.2, 0.005, 0.45)\ns1 = s1 + fFilt * (satIn - s1)\ns2 = s2 + fFilt * (s1 - s2)\ns3 = s3 + fFilt * (s2 - s3)\ns4 = s4 + fFilt * (s3 - s4)\n\nout = s4 * env\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Liminal Drone Pad Synth. Hypnagogic dark ambient drone synthesizer with detuned harmonic cluster and 4-pole lowpass filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.42
+mod pic sizeY ana 0 0 1 0.5 0.18 0.42

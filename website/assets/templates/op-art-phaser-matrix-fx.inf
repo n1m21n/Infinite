@@ -1,0 +1,50 @@
+infinite-patch 1
+# Op Art Phaser Matrix FX: multistage optical phaser processor
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 40
+  i rangeHigh 64
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2800.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.45 [0.05, 5.0]\nparam float depth = 0.82 [0.0, 1.0]\nparam float feedback = 0.65 [0.0, 0.95]\nparam float centerFreq = 1400.0 [200.0, 4000.0]\nparam float mix = 0.85 [0.0, 1.0]\nstate float phaseLfo = 0\nstate float ap1_in = 0\nstate float ap1_out = 0\nstate float ap2_in = 0\nstate float ap2_out = 0\nstate float ap3_in = 0\nstate float ap3_out = 0\nstate float ap4_in = 0\nstate float ap4_out = 0\n\nphaseLfo = (phaseLfo + rate / sr) % 1.0\nlfo = sin(6.2831853 * phaseLfo) * 0.5 + 0.5\n\nfSweep = centerFreq * (0.4 + lfo * depth * 2.2)\ng = clamp(tan(3.14159265 * fSweep / sr), 0.05, 0.92)\na1 = (g - 1.0) / (g + 1.0)\n\nxIn = in + ap4_out * feedback\n\ny1 = a1 * xIn + ap1_in - a1 * ap1_out\nap1_in = xIn\nap1_out = y1\n\ny2 = a1 * y1 + ap2_in - a1 * ap2_out\nap2_in = y1\nap2_out = y2\n\ny3 = a1 * y2 + ap3_in - a1 * ap3_out\nap3_in = y2\nap3_out = y3\n\ny4 = a1 * y3 + ap4_in - a1 * ap4_out\nap4_in = y3\nap4_out = y4\n\nout = in * (1.0 - mix) + (in + y4) * 0.5 * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Op Art Phaser Matrix FX. Multistage optical phaser processor with 4-pole all-pass network and resonant feedback.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.36
+mod pic sizeY ana 0 0 1 0.5 0.14 0.36

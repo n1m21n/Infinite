@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ditherpunk Terminal Matrix",
+    "author": "Infinite",
+    "description": "1-bit cybernetic ditherpunk terminal raster with 4x4 Bayer ordered dithering matrix, vintage amber/emerald phosphor bloom, and audio-reactive scanline glitch. Bass expands the central telemetry orb, mids shift the threshold dither lattice, highs inject phosphor burst noise.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float bayerScale = 48.0 [16.0, 120.0];\nparam float threshold = 0.52 [0.1, 0.9];\nparam float scanDensity = 280.0 [60.0, 600.0];\nparam float terminalGlow = 1.35 [0.2, 3.0];\nparam float glitchRate = 0.65 [0.0, 2.0];\n\np0 = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr2 = dot(p0, p0);\np = p0 * (1.0 + 0.18 * r2);\n\nglitchY = fract(t * 0.22);\ndGlitch = abs(p.y - (glitchY - 0.5));\nshiftX = if(dGlitch < 0.05, sin(p.y * 140.0 + t * 50.0) * glitchRate * 0.03, 0.0);\np.x = p.x + shiftX;\n\nr = length(p);\nang = atan2(p.y, p.x);\n\nsig1 = sin(r * 24.0 - t * 3.5 + ang * 6.0) * 0.5 + 0.5;\nsig2 = exp(-pow(r - 0.35, 2.0) * 40.0) * (sin(ang * 8.0 + t * 2.0) * 0.5 + 0.5);\nlum = sig1 * 0.6 + sig2 * 0.5 + max(0.0, 0.3 - r) * 1.5;\n\ncoord = floor((uv * vec2(aspect, 1.0) + vec2(shiftX, 0.0)) * bayerScale);\nbx = mod(coord.x, 4.0);\nby = mod(coord.y, 4.0);\nbMat = mod(bx * 4.0 + by * 9.0 + mod(bx, 2.0) * 6.0, 16.0) / 16.0;\n\ndith = if(lum > bMat * threshold, 1.0, 0.0);\n\nscan = sin(p.y * scanDensity * 6.2831853) * 0.2 + 0.8;\n\ncGround = vec3(0.082, 0.098, 0.188);\ncGreen = vec3(0.306, 0.949, 0.722) * dith * terminalGlow * scan;\ncAmber = vec3(1.0, 0.42, 0.21) * dith * terminalGlow * scan;\ncTerminal = mix(cGreen, cAmber, clamp(sig2 * 1.5, 0.0, 1.0));\n\nvignette = clamp(1.0 - r2 * 1.6, 0.0, 1.0);\ncol = mix(cGround, cTerminal, vignette);\nalpha = 1.0;\n",
+    "params": {
+      "bayerScale": 48.0,
+      "threshold": 0.52,
+      "scanDensity": 280.0,
+      "terminalGlow": 1.35,
+      "glitchRate": 0.65
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

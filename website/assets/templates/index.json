@@ -849,6 +849,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "liminal-drone-pad-synth",
+      "name": "Liminal Drone Pad Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Hypnagogic dark ambient drone synthesizer with detuned multi-oscillator harmonic cluster, sub-octave fundamental saturation, slow-drift chorus modulation, and four-pole ladder lowpass filter.",
+      "price": 0,
+      "preview": "assets/templates/liminal-drone-pad-synth.webp",
+      "file": "assets/templates/liminal-drone-pad-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "ditherpunk-chiptune-lead-synth",
+      "name": "Ditherpunk Chiptune Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Lo-fi 8-bit chiptune synthesizer with variable pulse-width duty cycle modulation, bit-crush quantization decimation, and snappily accented pitch decay.",
+      "price": 0,
+      "preview": "assets/templates/ditherpunk-chiptune-lead-synth.webp",
+      "file": "assets/templates/ditherpunk-chiptune-lead-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "chavetta-tape-saturator-fx",
+      "name": "Chavetta Tape Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage analog magnetic tape deck saturator with soft-knee asymmetric hysteresis clipping, dual-stage motor flutter warble, and tape head damping.",
+      "price": 0,
+      "preview": "assets/templates/chavetta-tape-saturator-fx.webp",
+      "file": "assets/templates/chavetta-tape-saturator-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "op-art-phaser-matrix-fx",
+      "name": "Op Art Phaser Matrix FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multistage optical phaser processor with four-pole allpass phase-shift ladder, quadrature sinusoidal sweep modulation, and resonant feedback matrix.",
+      "price": 0,
+      "preview": "assets/templates/op-art-phaser-matrix-fx.webp",
+      "file": "assets/templates/op-art-phaser-matrix-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

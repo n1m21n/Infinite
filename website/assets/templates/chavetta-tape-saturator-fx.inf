@@ -1,0 +1,50 @@
+infinite-patch 1
+# Chavetta Tape Saturator FX: vintage analog magnetic tape deck saturator
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 36
+  i rangeHigh 60
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2200.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float drive = 2.6 [1.0, 6.0]\nparam float hysteresis = 0.45 [0.0, 1.0]\nparam float flutterRate = 4.2 [0.5, 12.0]\nparam float toneDamp = 0.55 [0.0, 1.0]\nparam float mix = 0.95 [0.0, 1.0]\nstate float pFlut = 0\nstate float d1 = 0\nstate float prevSat = 0\nstate float lp = 0\n\npFlut = (pFlut + flutterRate / sr) % 1.0\nflutMod = sin(6.2831853 * pFlut) * 0.08\n\nu = (in + flutMod * 0.05) * drive\nsat = (u + hysteresis * prevSat * 0.35) / (1.0 + abs(u) * 0.38)\nprevSat = sat\n\nd1 = sat\n\ncut = clamp(0.5 - toneDamp * 0.38, 0.04, 0.48)\nlp = lp + cut * (d1 - lp)\n\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1.0 0.42 0.21
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Chavetta Tape Saturator FX. Vintage analog magnetic tape deck saturator with hysteresis clipping and flutter warble.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.36
+mod pic sizeY ana 0 0 1 0.5 0.14 0.36
