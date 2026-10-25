@@ -139,6 +139,9 @@ For full tool schemas, architecture details, and custom prompts, see [`tools/npm
 Download the latest build for your platform from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows, or `Infinite-x86_64.AppImage` for Linux.
 
 **macOS** (Infinite is not notarized by Apple, so the first launch needs one extra step)
+
+With Homebrew: `brew install --cask n1m21n/tap/infinite` (the first-launch step below still applies).
+
 1. Open the DMG and drag `Infinite.app` to Applications.
 2. Double-click `Fix & Open Infinite.command` in the DMG and press `y`. It clears the download flag on Infinite only, then opens it.
    - Or do it by hand: try to open Infinite once, then **System Settings → Privacy & Security → Open Anyway** (macOS 15 and later), or right-click `Infinite.app` → **Open** (older macOS).

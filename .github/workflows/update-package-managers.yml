@@ -1,0 +1,60 @@
+# After each release is published: bump the Homebrew tap cask and open a winget-pkgs PR.
+# One-time setup by the owner (never put tokens in chat or in the repo):
+#   TAP_TOKEN     fine-grained PAT, contents:write on n1m21n/homebrew-tap
+#   WINGET_TOKEN  classic PAT with public_repo (needs a fork of microsoft/winget-pkgs under n1m21n)
+# A step is skipped when its secret is missing. The AUR PKGBUILD is bumped by hand.
+name: update-package-managers
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v0.6.7"
+        required: true
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+    steps:
+      - id: t
+        run: echo "tag=${{ inputs.tag || github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+
+  homebrew:
+    needs: tag
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+    steps:
+      - if: env.TAP_TOKEN == ''
+        run: echo "TAP_TOKEN not set, skipping" && exit 0
+      - if: env.TAP_TOKEN != ''
+        run: |
+          set -e
+          VER="${TAG#v}"
+          curl -fsSL -o Infinite.dmg "https://github.com/${{ github.repository }}/releases/download/${TAG}/Infinite.dmg"
+          SHA=$(sha256sum Infinite.dmg | cut -d' ' -f1)
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/n1m21n/homebrew-tap.git" tap
+          cd tap
+          sed -i "s/^  version \".*\"/  version \"${VER}\"/; s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" Casks/infinite.rb
+          git config user.name "infinite-release-bot"
+          git config user.email "noreply@infinitedevices.org"
+          git commit -am "Infinite ${VER}" || exit 0
+          git push
+
+  winget:
+    needs: tag
+    runs-on: windows-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: n1m21n.Infinite
+          version: ${{ needs.tag.outputs.tag }}
+          installers-regex: 'Infinite-windows-(x64|ARM64)\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}
