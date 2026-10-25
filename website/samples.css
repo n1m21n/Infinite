@@ -7,7 +7,7 @@
 .smp-seg button { border: 0; background: transparent; color: var(--muted); font: 600 0.85rem/1 var(--font-sans); padding: 9px 14px; border-radius: 999px; cursor: pointer; }
 .smp-seg button.is-on { background: var(--ink); color: var(--paper); }
 .smp-list { display: grid; gap: 6px; }
-.smp-row { display: grid; grid-template-columns: 44px minmax(120px, 230px) 1fr auto; align-items: center; gap: 14px; padding: 8px 12px 8px 8px; border-radius: 18px;
+.smp-row { position: relative; display: grid; grid-template-columns: 44px minmax(120px, 230px) 1fr auto; align-items: center; gap: 14px; padding: 8px 12px 8px 8px; border-radius: 18px;
   background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); transition: background var(--dur-small) var(--ease-out); }
 .smp-row:hover, .smp-row.on { background: color-mix(in srgb, var(--surface-2) 92%, transparent); }
 .smp-play { width: 44px; height: 44px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; cursor: pointer; text-decoration: none;
@@ -30,7 +30,12 @@
 .smp-track { height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 .smp-track i { display: block; height: 100%; width: 0; background: var(--accent); }
 @media (max-width: 680px) {
-  .smp-row { grid-template-columns: 44px minmax(64px, 104px) 1fr auto; gap: 10px; }
+  .smp-row { grid-template-columns: 40px 1fr 36px; grid-template-areas: "play id dl" "play wave dl"; gap: 2px 10px; padding: 8px; }
+  .smp-play { grid-area: play; width: 40px; height: 40px; }
+  .smp-id { grid-area: id; }
+  .smp-id b { font-size: 0.74rem; letter-spacing: 0.04em; }
+  .smp-wave { grid-area: wave; height: 34px; }
+  .smp-acts { grid-area: dl; }
   .smp-thumb { display: none; }
 }
 
@@ -76,3 +81,18 @@
 .smp-pager .lib-icon-pill { width: auto; padding: 0 16px; }
 .smp-pager .lib-icon-pill:disabled { opacity: .35; cursor: default; }
 .smp-pg-info { font-variant-numeric: tabular-nums; opacity: .7; }
+
+/* One download button; a small menu offers the sound or the patch. */
+.smp-acts { position: relative; }
+.smp-dlb { width: 36px; height: 36px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; cursor: pointer; color: var(--muted); background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); transition: background var(--dur-small) var(--ease-out), color var(--dur-small) var(--ease-out); }
+.smp-dlb svg { width: 16px; height: 16px; }
+.smp-dlb:hover, .smp-dlb[aria-expanded="true"] { background: var(--ink); color: var(--paper); }
+.smp-row.menu-open { z-index: 5; }
+.smp-menu { position: absolute; right: 0; top: calc(100% + 6px); min-width: 150px; display: grid; padding: 6px; border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 96%, var(--deep)); box-shadow: var(--glass-hi), var(--shadow-2, var(--shadow-1)); }
+.smp-menu[hidden] { display: none; }
+.smp-menu a { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 12px; border-radius: 9px; color: var(--ink); text-decoration: none; }
+.smp-menu a:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.smp-menu b { font: 700 0.82rem/1 var(--font-mono); }
+.smp-menu span { color: var(--muted); font: 500 0.72rem/1 var(--font-mono); }

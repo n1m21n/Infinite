@@ -24,17 +24,32 @@
 
   function row(it) {
     var baseName = it.name.replace(/\W+/g, '_');
-    var patchBtn = it.patch ? '<a class="smp-dl smp-dl-patch" href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" aria-label="Download patch ' + esc(it.name) + '" title="Download .inf patch">' + IC_DL + '<span class="smp-fmt">.inf</span></a>' : '';
+    var patchLink = it.patch ? '<a href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' : '';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
       '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
-        '<a class="smp-dl" href="' + esc(it.download) + '" download="' + esc(baseName) + '.wav" aria-label="Download wav ' + esc(it.name) + '" title="Download .wav">' + IC_DL + '<span class="smp-fmt">.wav</span></a>' +
-        patchBtn +
+        '<button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</button>' +
+        '<div class="smp-menu" role="menu" hidden>' +
+          '<a href="' + esc(it.download) + '" download="' + esc(baseName) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' + patchLink +
+        '</div>' +
       '</div>' +
     '</div>';
   }
+
+  function closeMenus() {
+    Array.prototype.forEach.call(document.querySelectorAll('.smp-menu:not([hidden])'), function (m) {
+      m.hidden = true; m.parentNode.querySelector('.smp-dlb').setAttribute('aria-expanded', 'false'); m.closest('.smp-row').classList.remove('menu-open');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.smp-dlb');
+    var open = b && b.nextElementSibling.hidden;
+    if (!e.target.closest('.smp-menu')) closeMenus();
+    if (open) { b.nextElementSibling.hidden = false; b.setAttribute('aria-expanded', 'true'); b.closest('.smp-row').classList.add('menu-open'); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(); });
 
   var PAGE = 25, page = 0, pagerEl = document.getElementById('smp-pager');
   pagerEl.addEventListener('click', function (e) {
@@ -90,7 +105,7 @@
 
   listEl.addEventListener('click', function (e) {
     var r = e.target.closest('.smp-row');
-    if (!r || e.target.closest('.smp-dl')) return;
+    if (!r || e.target.closest('.smp-acts')) return;
     var cv = e.target.closest('canvas');
     if (cv && playing && playing.row === r) {   // click on the waveform seeks
       var b = cv.getBoundingClientRect(); playing.media.currentTime = (e.clientX - b.left) / b.width * (playing.media.duration || 0); return;
