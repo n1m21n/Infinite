@@ -4,7 +4,7 @@ Each family is its own pool entry, e.g. "Field Synth:fm", so the atlas learns pe
 targets (p.<param>) are exact. `register(facts)` adds the entries; `source(family, seed)` writes the program.
 Seed picks constants and structural variants; every declared param is used by the program.
 """
-import copy, random
+import copy, json, os, random, re
 
 TAU = "6.283185"
 
@@ -340,7 +340,57 @@ BASES = {
 }
 
 
+PRESETS = {}  # base type -> [{"name", "code", "params"}]; the index is the preset's pseudo-type family "pNN"
+PARAM_RE = re.compile(r"param\s+float\s+(\w+)\s*=\s*(-?[\d.]+)\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\]")
+
+
+def load_presets():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "presets.json")
+    if PRESETS or not os.path.exists(path):
+        return PRESETS
+    for base, items in json.load(open(path)).items():
+        if base == "Field Graph":
+            continue  # multi-node pipelines, not a standalone source
+        keep = []
+        for it in items:
+            if re.search(r"^\s*input\s", it["code"], re.M):
+                continue  # filters that read an image/audio input pin do not stand alone as sources
+            it["params"] = [(m.group(1), float(m.group(2)), float(m.group(3)), float(m.group(4))) for m in PARAM_RE.finditer(it["code"])]
+            keep.append(it)
+        PRESETS[base] = keep
+    return PRESETS
+
+
+def preset_source(base, idx, seed):
+    """The built-in preset's code with every float param's default re-drawn inside its own range (seed 0 keeps the shipped values)."""
+    it = PRESETS[base][idx]
+    if not seed:
+        return it["code"]
+    r = _rng("%s#%d" % (base, idx), seed)
+    code = it["code"]
+    for name, dv, lo, hi in it["params"]:
+        v = lo + (hi - lo) * r.random()
+        code = re.sub(r"(param\s+float\s+%s\s*=\s*)-?[\d.]+" % name, lambda m, v=v: "%s%.4f" % (m.group(1), v), code, count=1)
+    return code
+
+
+def register_presets(facts):
+    """One pseudo type per built-in preset ("FieldPixel:p07"); params come from the code's own `param float` declarations."""
+    for base, items in load_presets().items():
+        if base not in facts:
+            continue
+        for i, it in enumerate(items):
+            t = copy.deepcopy(facts[base]); t["type"] = "%s:p%02d" % (base, i); t["family"] = (base, "p%02d" % i); t["preset"] = it["name"]
+            keep = [m for m in t["modulatable"] if not m.get("key", "").startswith("p.")]
+            for j, (name, dv, lo, hi) in enumerate(it["params"]):
+                keep.append({"index": 51 + j, "label": name, "key": "p." + name, "min": lo, "max": hi, "step": 0})
+            t["modulatable"] = keep
+            facts[t["type"]] = t
+    return facts
+
+
 def register(facts):
+    register_presets(facts)
     """Add one pseudo type per family ("Field Synth:fm") and drop the default-code base types from the pools."""
     for base, (fams, prm, _) in BASES.items():
         if base not in facts:
@@ -356,11 +406,16 @@ def register(facts):
             t["modulatable"] = keep
             facts[t["type"]] = t
         facts[base]["hardware_driven"] = True  # keep the default-code node out of every pool
+    for base in load_presets():
+        if base in facts:
+            facts[base]["hardware_driven"] = True
     return facts
 
 
 def source(typ, seed):
     base, fam = typ.split(":")
+    if re.fullmatch(r"p\d\d", fam):
+        return preset_source(base, int(fam[1:]), int(seed or 0)).replace("%%", "%").replace("\n", "\\n")
     return BASES[base][2](fam, int(seed or 0)).replace("%%", "%").replace("\n", "\\n")
 
 

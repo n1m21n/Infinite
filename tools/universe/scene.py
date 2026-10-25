@@ -31,16 +31,20 @@ try:
 except OSError:
     MOVE = {}
 LABEL = {}  # (type, key) -> display label, filled by pools_v2
-CODE_BOOST = 10.0  # the language-taking nodes: Claude writes these well, so favour them
+CODE_BOOST = 6.0  # the language-taking nodes: Claude writes these well, so favour them
 
 
 def _norm(x):
     return "".join(c for c in x.lower() if c.isalnum())
 
 
+SCREEN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "component_screen.json"))) if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "component_screen.json")) else {}
+
+
 def node_w(name):
     if ":" in name:
-        return CODE_BOOST
+        r = SCREEN.get(name)  # screen.py: how often this component works alone; never-ok ones are not composed
+        return CODE_BOOST * ((r["ok"] + 0.5) / (r["n"] + 1) if r else 1.0) if not r or r["ok"] else 0.0
     return 0.35 + NCOUNT.get(name, 0) ** 0.8
 
 

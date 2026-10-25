@@ -1,0 +1,827 @@
+{
+ "Field Synth:additive": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Synth:fm": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.59
+ },
+ "Field Synth:p00": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Field Synth:p01": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Field Synth:p02": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p03": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.51
+ },
+ "Field Synth:p04": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p05": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Field Synth:p06": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Field Synth:p07": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p08": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Field Synth:p09": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p10": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Field Synth:p11": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.51
+ },
+ "Field Synth:p12": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.51
+ },
+ "Field Synth:p13": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Field Synth:p14": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.59
+ },
+ "Field Synth:p15": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.51
+ },
+ "Field Synth:p16": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.51
+ },
+ "Field Synth:p17": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Field Synth:p18": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Field Synth:p19": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Field Synth:p20": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p21": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p22": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Synth:p23": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:p24": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Field Synth:p25": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Field Synth:p26": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Field Synth:pulse": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Field Synth:saw": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Synth:super": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Synth:sync": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Field Synth:tri": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:chorus": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:comb": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:crush": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:echo": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:fold": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p00": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p01": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p02": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p03": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p04": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p05": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p06": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p07": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p08": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p09": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:p10": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p11": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p12": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p13": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p14": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p15": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p16": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p17": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p18": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p19": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p20": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p21": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Field Effect:p22": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:p23": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Effect:ring": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:stutter": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Effect:trem": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Notes:chance": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:euclid": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.61
+ },
+ "Field Notes:p00": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.75
+ },
+ "Field Notes:p01": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.77
+ },
+ "Field Notes:p02": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:p03": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p04": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.61
+ },
+ "Field Notes:p05": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p06": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.77
+ },
+ "Field Notes:p07": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.57
+ },
+ "Field Notes:p08": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.74
+ },
+ "Field Notes:p09": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.62
+ },
+ "Field Notes:p10": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.75
+ },
+ "Field Notes:p11": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.78
+ },
+ "Field Notes:p12": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:p13": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.74
+ },
+ "Field Notes:p14": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.62
+ },
+ "Field Notes:p15": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p16": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.78
+ },
+ "Field Notes:p17": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:p18": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p19": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.63
+ },
+ "Field Notes:p20": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p21": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.78
+ },
+ "Field Notes:p22": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:p23": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.75
+ },
+ "Field Notes:p24": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.61
+ },
+ "Field Notes:p25": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "Field Notes:p26": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.78
+ },
+ "Field Notes:p27": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:p28": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.75
+ },
+ "Field Notes:p29": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.62
+ },
+ "Field Notes:p30": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.75
+ },
+ "Field Notes:p31": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.78
+ },
+ "Field Notes:p32": {
+  "ok": 1,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Field Notes:walk": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.74
+ },
+ "Field Notes:wander": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.62
+ },
+ "FieldPixel:feedback": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.5
+ },
+ "FieldPixel:grid": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.5
+ },
+ "FieldPixel:p00": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "FieldPixel:p01": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.56
+ },
+ "FieldPixel:p02": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.52
+ },
+ "FieldPixel:p03": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.51
+ },
+ "FieldPixel:p04": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p05": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.51
+ },
+ "FieldPixel:p06": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.51
+ },
+ "FieldPixel:p07": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.51
+ },
+ "FieldPixel:p08": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p09": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.51
+ },
+ "FieldPixel:p10": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p11": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p12": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p13": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.76
+ },
+ "FieldPixel:p14": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p15": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p16": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p17": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p18": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.58
+ },
+ "FieldPixel:p19": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.56
+ },
+ "FieldPixel:p20": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p21": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "FieldPixel:p22": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:p23": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p24": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p25": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p26": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p27": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p28": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p29": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.54
+ },
+ "FieldPixel:p30": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p31": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.52
+ },
+ "FieldPixel:p32": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "FieldPixel:p33": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:plasma": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "FieldPixel:rings": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "FieldPixel:spiral": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.57
+ },
+ "FieldPixel:tunnel": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.62
+ },
+ "Sketch:grid": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.58
+ },
+ "Sketch:lissa": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Sketch:orbit": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Sketch:p00": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Sketch:p01": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:p02": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:p03": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.56
+ },
+ "Sketch:p04": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Sketch:p05": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Sketch:p06": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Sketch:p07": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:p08": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Sketch:p09": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:p10": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Sketch:p11": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.55
+ },
+ "Sketch:p12": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Sketch:p13": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Sketch:p14": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.52
+ },
+ "Sketch:p15": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:p16": {
+  "ok": 0,
+  "n": 2,
+  "sec": 0.54
+ },
+ "Sketch:rose": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ },
+ "Sketch:tree": {
+  "ok": 2,
+  "n": 2,
+  "sec": 0.53
+ }
+}
