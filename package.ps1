@@ -1,6 +1,6 @@
 # Builds a Release Infinite.exe and stages a distributable folder with the
-# runtime DLLs it needs (none beyond the OS inbox ones, in practice - the
-# build links everything statically except system libraries).
+# runtime DLLs it needs (the exes link the CRT statically; onnxruntime.dll
+# needs the VC++ runtime DLLs, which are staged app-local).
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File package.ps1            # build + stage
@@ -77,6 +77,10 @@ if (Test-Path $CliCom) { Copy-Item $CliCom $Stage }
 # POST_BUILD copy comment for why these three are needed next to the exe.
 Copy-Item $OrtDll $Stage
 Copy-Item $DmlDll $Stage
+# onnxruntime.dll needs the VC++ runtime; ship it app-local.
+Get-ChildItem (Join-Path $Build "Release") -Filter "*.dll" |
+    Where-Object { $_.Name -match "^(msvcp140|vcruntime140(_1)?)\.dll$" } |
+    Copy-Item -Destination $Stage
 New-Item -ItemType Directory -Force (Join-Path $Stage "assets\models") | Out-Null
 Copy-Item (Join-Path $ModelDir "u2netp.onnx") (Join-Path $Stage "assets\models")
 # Resources\ (fonts, icons, drumkits) sits next to the exe: BundledResourcePath()
