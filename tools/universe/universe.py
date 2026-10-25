@@ -385,6 +385,8 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--cover", action="store_true", help="cycle every type in each pool before repeating")
     ap.add_argument("--out", default="atlas.jsonl")
+    ap.add_argument("--filter", help="F4 model json: skip genomes scored below --min-p (10%% still probed to keep the model honest)")
+    ap.add_argument("--min-p", type=float, default=0.5)
     a = ap.parse_args()
     facts = load_facts()
     P = pools(facts)
@@ -397,6 +399,12 @@ def main():
         r = random.Random(a.seed)
         pick = Pick(r, P, a.cover)
         codes = [sample_code(r, P, facts, a.order, pick) for _ in range(a.n)]
+        if a.filter:
+            import learned_filter as lf
+            model = json.load(open(a.filter))
+            keep = [c for c in codes if lf.score_code(model, c, P) >= a.min_p or r.random() < 0.1]
+            print("F4 kept", len(keep), "of", len(codes))
+            codes = keep
         t0, done = time.time(), 0
         with tempfile.TemporaryDirectory() as wd, open(a.out, "a") as f, ThreadPoolExecutor(a.workers) as ex:
             futs = [ex.submit(lambda c=c: probe(c, facts, P, a.bin, a.secs, wd) if time.time() - t0 < a.budget else None)
