@@ -60,14 +60,27 @@ def build(style, seed, facts, g=None):
     drums = {k: v for k, v in style["drums"].items() if v}
     synth_ids = []
     if drums:
-        force = {"steps": ("i", 16), "rate": ("i", 12), "swing": ("f", style["swing"]), "volume": ("f", 0.9), "run": ("b", 1)}
+        force = {"steps": ("i", 32), "rate": ("i", 12), "swing": ("f", style["swing"]), "volume": ("f", 0.9), "run": ("b", 1)}
+        groove, fill = style.get("groove", 0.5), style.get("fill", 0.5)
+        fill_lane = next((l for l in ("snare", "clap", "tom", "chat") if drums.get(l)), None)
+        fn = rng.choice([2, 3, 4]) if fill_lane and rng.random() < fill else 0   # a fill on the last steps of the second bar
         for i, (lane, f) in enumerate(zip(LANES, KIT_FILES)):
             force["lane%d_path" % i] = ("s", os.path.join(KIT, f + ".wav"))
             force["lane%d_volume" % i] = ("f", 0.85 if lane != "chat" else 0.55)
             pat = drums.get(lane, "")
             for k in range(32):
                 c = pat[k % 16] if pat else "."
-                force["lane%d_step%d" % (i, k)] = ("f", 1.0 if c == "x" else 0.45 if c == "o" else 0.0)
+                v = 1.0 if c == "x" else 0.45 if c == "o" else 0.0
+                if v:
+                    v = min(1.0, max(0.2, v + rng.uniform(-0.12, 0.12) * groove))   # each lane breathes: no two hits at the same weight
+                elif pat and lane in ("snare", "chat", "clap", "ohat") and k % 2 == 1 and rng.random() < 0.22 * groove:
+                    v = 0.18 + 0.1 * rng.random()   # ghost note between the beats
+                if fn and k >= 32 - fn:
+                    if lane == fill_lane:
+                        v = 0.55 + 0.45 * (k - (32 - fn) + 1) / fn
+                    elif lane == "kick" and k == 31:
+                        v = 0.0
+                force["lane%d_step%d" % (i, k)] = ("f", round(v, 3))
         d = g.add("Drum Sequencer", rng.randrange(1 << 30), force)
         chans.append((chain(d, "audio", 0), 0.0))
     bass_pat = (style["bass"] + "." * 16)[:16]
@@ -101,10 +114,38 @@ def build(style, seed, facts, g=None):
             dy = g.add("Dynamics", rng.randrange(1 << 30), {"sidechainExternal": ("f", 1.0), "ratio": ("f", 6.0), "threshold": ("f", -28.0), "attack": ("f", 5.0), "release": ("f", 160.0)})
             g.connect(pad, dy, "audio"); g.connect(d, dy, "audio"); pad = dy
         chans.append((pad, style.get("gain", -9.0)))
+    mo = style.get("motif")
+    if mo:   # a short melody: eight steps asked, then answered with its last notes changed; it returns every bar, so the ear can hold it
+        deg, notes_ = rng.randrange(0, 4), []
+        for k in range(8):
+            deg = max(-2, min(mo.get("range", 6), deg + rng.choice([-2, -1, -1, 0, 1, 1, 2])))
+            notes_.append((deg, k % 4 == 0 or rng.random() < mo.get("density", 0.5)))
+        ans = notes_[:5]
+        for k in range(3):
+            deg = max(-2, min(mo.get("range", 6), deg + rng.choice([-2, -1, 1, 2, 3])))
+            ans.append((deg, rng.random() < 0.85))
+        seq16 = notes_ + ans
+        ms = g.add("Note Sequencer", rng.randrange(1 << 30), dict(
+            {"steps": ("i", 16), "rateMode": ("i", 0), "rateBeats": ("f", mo.get("rate", 0.25)), "gatePercent": ("f", mo.get("gate", 60))},
+            **{("note%d" % k): ("i", degree_note(dg, root, scale, mo.get("octave", 2))) for k, (dg, _) in enumerate(seq16)},
+            **{("en%d" % k): ("b", int(on)) for k, (_, on) in enumerate(seq16)},
+            **{("vel%d" % k): ("f", 1.0 if k % 4 == 0 else round(0.65 + 0.2 * rng.random(), 2)) for k in range(16)}))
+        mn = ms
+        for nf in mo.get("notefx", []):
+            nn = g.add(nf, rng.randrange(1 << 30), NOTEFX.get(nf, {}))
+            g.connect(mn, nn, "note"); mn = nn
+        msy = g.add(pick(rng, mo["synth"], ban, facts) or mo["synth"][0], rng.randrange(1 << 30))
+        g.connect(mn, msy, "note")
+        synth_ids.append(msy)
+        lead = chain(msy, "audio", 1)
+        if style.get("sidechain") and drums and "Dynamics" in facts:
+            dy = g.add("Dynamics", rng.randrange(1 << 30), {"sidechainExternal": ("f", 1.0), "ratio": ("f", 4.0), "threshold": ("f", -26.0), "attack": ("f", 5.0), "release": ("f", 140.0)})
+            g.connect(lead, dy, "audio"); g.connect(d, dy, "audio"); lead = dy
+        chans.append((lead, mo.get("gain", -11.0)))
     mx = g.add("Mixer", 0, {"channels": ("i", len(chans))})
     for i, (n, db) in enumerate(chans):
         g.connect(n, mx, "audio")
-        g.lines.insert(g.lines.index("end", g.lines.index("node %d Utility Mixer" % mx)), "  f gain%d %g" % (i, db))
+        g.lines.insert(g.lines.index("end", g.lines.index("node %d Utility Mixer" % mx)), "  f gain%d %g" % (i, db + style.get("trim", 0.0)))
     end = mx
     if "Reverb" not in ban:
         rv = g.add("Reverb", rng.randrange(1 << 30), {"mix": ("f", 0.45 if style["family"] == "ambient" else 0.15), "decay": ("f", 3.0 if style["family"] == "ambient" else 1.2)})

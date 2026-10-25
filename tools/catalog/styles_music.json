@@ -57,7 +57,18 @@
    },
    "notefx": [
     "Humanizer"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.3,
+    "octave": 2,
+    "gate": 50,
+    "gain": -13
+   },
+   "groove": 0.6
   },
   {
    "id": "acid_house",
@@ -101,7 +112,20 @@
     "Phuture, Acid Tracks (1987)",
     "Roland TB-303",
     "Hardfloor, Josh Wink"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.8,
+    "rate": 0.25,
+    "octave": 1,
+    "gate": 45,
+    "gain": -9
+   },
+   "groove": 0.4,
+   "fill": 0.5
   },
   {
    "id": "tech_house",
@@ -145,7 +169,31 @@
     "Ricardo Villalobos",
     "Richie Hawtin (minimal crossover)",
     "Fabric/Berlin club scene"
-   ]
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     3
+    ],
+    "beats": 2.0,
+    "strum": 10,
+    "human": 6
+   },
+   "notefx": [
+    "Humanizer"
+   ],
+   "gain": -12,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.35,
+    "octave": 2,
+    "gate": 40,
+    "gain": -12
+   },
+   "groove": 0.7
   },
   {
    "id": "progressive_house",
@@ -195,7 +243,21 @@
    "sidechain": true,
    "notefx": [
     "Humanizer"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.45,
+    "rate": 0.5,
+    "octave": 2,
+    "notefx": [
+     "Note Echo"
+    ],
+    "gain": -12
+   },
+   "fill": 0.7
   },
   {
    "id": "french_filter_house",
@@ -239,7 +301,29 @@
     "Daft Punk, Homework / Discovery",
     "Stardust, Music Sounds Better With You",
     "Cassius, Alan Braxe"
-   ]
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 25,
+    "human": 8
+   },
+   "notefx": [
+    "Humanizer"
+   ],
+   "gain": -8,
+   "motif": {
+    "synth": [
+     "Analog"
+    ],
+    "density": 0.5,
+    "octave": 2,
+    "gain": -12
+   },
+   "groove": 0.6
   },
   {
    "id": "detroit_techno",
@@ -284,7 +368,30 @@
     "Belleville Three: Juan Atkins, Derrick May, Kevin Saunderson",
     "Underground Resistance",
     "Reynolds, Energy Flash"
-   ]
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 8.0,
+    "strum": 30,
+    "human": 6
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "gain": -10,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.3,
+    "octave": 2,
+    "gain": -12
+   },
+   "groove": 0.5
   },
   {
    "id": "minimal_techno",
@@ -328,7 +435,19 @@
     "Basic Channel, Chain Reaction",
     "Plastikman, Richie Hawtin",
     "Ricardo Villalobos, Perlon"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.25,
+    "octave": 2,
+    "gate": 30,
+    "gain": -11
+   },
+   "groove": 0.8,
+   "fill": 0.3
   },
   {
    "id": "dub_techno",
@@ -373,7 +492,21 @@
     "Basic Channel / Rhythm & Sound",
     "Deepchord, Echospace",
     "Gas (Wolfgang Voigt)"
-   ]
+   ],
+   "chords": {
+    "size": [
+     3
+    ],
+    "beats": 4.0,
+    "strum": 30,
+    "human": 5
+   },
+   "notefx": [
+    "Note Echo"
+   ],
+   "gain": -9,
+   "groove": 0.3,
+   "fill": 0.2
   },
   {
    "id": "industrial_techno",
@@ -417,7 +550,20 @@
     "Surgeon, Regis, Blawan",
     "Perc, Ancient Methods",
     "Throbbing Gristle, Cabaret Voltaire (ancestors)"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.4,
+    "octave": 1,
+    "gate": 70,
+    "gain": -12
+   },
+   "groove": 0.3,
+   "fill": 0.6,
+   "trim": -7.0
   },
   {
    "id": "classic_trance",
@@ -462,7 +608,32 @@
     "Paul van Dyk, Tiesto, Armin van Buuren",
     "Oakenfold, Goa lineage",
     "Reynolds, Energy Flash (trance chapter)"
-   ]
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 10,
+    "human": 0
+   },
+   "gain": -10,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.65,
+    "rate": 0.25,
+    "octave": 3,
+    "notefx": [
+     "Note Echo"
+    ],
+    "gain": -11
+   },
+   "fill": 0.9
   },
   {
    "id": "psytrance",
@@ -506,7 +677,18 @@
     "Goa trance (Juno Reactor, Hallucinogen)",
     "Infected Mushroom, Astrix",
     "Full-on / dark psy (Zenon, Parasense)"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.55,
+    "octave": 3,
+    "gate": 50,
+    "gain": -12
+   },
+   "fill": 0.6
   },
   {
    "id": "liquid_dnb",
@@ -552,7 +734,21 @@
     "LTJ Bukem, Good Looking Records",
     "Hospital Records, Calibre",
     "High Contrast, Netsky"
-   ]
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 8.0,
+    "strum": 35,
+    "human": 10
+   },
+   "notefx": [
+    "Humanizer"
+   ],
+   "gain": -9,
+   "groove": 0.7,
+   "fill": 0.7
   },
   {
    "id": "neurofunk",
@@ -596,7 +792,19 @@
     "Ed Rush & Optical, Konflict",
     "Noisia, Phace, Mefjus",
     "Photek (precursor)"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.5,
+    "octave": 1,
+    "gate": 65,
+    "gain": -11
+   },
+   "groove": 0.4,
+   "fill": 0.6
   },
   {
    "id": "jungle",
@@ -639,7 +847,9 @@
     "Amen break lineage (The Winstons)",
     "Goldie, Timeless",
     "Shy FX, Congo Natty, Rebel MC"
-   ]
+   ],
+   "groove": 0.9,
+   "fill": 0.8
   },
   {
    "id": "uk_garage",
@@ -683,7 +893,30 @@
     "2-step: Artful Dodger, MJ Cole",
     "Burial, Untrue",
     "Todd Edwards"
-   ]
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 15,
+    "human": 10
+   },
+   "notefx": [
+    "Humanizer"
+   ],
+   "gain": -10,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.4,
+    "octave": 2,
+    "gain": -12
+   },
+   "groove": 0.8
   },
   {
    "id": "dubstep",
@@ -727,7 +960,19 @@
     "Digital Mystikz, Loefah, Skream, Benga",
     "Mala, Coki",
     "Skream Midnight Request Line"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.3,
+    "rate": 0.5,
+    "octave": 1,
+    "gate": 80,
+    "gain": -10
+   },
+   "fill": 0.4
   },
   {
    "id": "breakbeat",
@@ -770,7 +1015,18 @@
     "Prodigy, Chemical Brothers, Fatboy Slim (big beat)",
     "Nu skool breaks (Plump DJs)",
     "Detroit breakdown tradition"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.4,
+    "octave": 2,
+    "gain": -12
+   },
+   "groove": 0.8,
+   "fill": 0.7
   },
   {
    "id": "electro",
@@ -815,7 +1071,18 @@
     "Kraftwerk, Planet Rock (Afrika Bambaataa, Arthur Baker)",
     "Drexciya, Dopplereffekt",
     "Roland TR-808 era"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.5,
+    "octave": 2,
+    "gate": 40,
+    "gain": -11
+   },
+   "groove": 0.3
   },
   {
    "id": "ambient",
@@ -923,7 +1190,21 @@
     "Lustmord",
     "Raison d'etre, Atrium Carceri",
     "Tim Hecker, Ben Frost"
-   ]
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 8.0,
+    "strum": 60,
+    "human": 12
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "gain": 3
   },
   {
    "id": "idm",
@@ -970,7 +1251,22 @@
    "notefx": [
     "Note Echo",
     "Humanizer"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth",
+     "Wavetable"
+    ],
+    "density": 0.55,
+    "octave": 2,
+    "notefx": [
+     "Humanizer"
+    ],
+    "gain": -12
+   },
+   "groove": 1.0,
+   "fill": 0.8
   },
   {
    "id": "glitch",
@@ -1012,7 +1308,22 @@
     "Oval, Ryoji Ikeda, Alva Noto",
     "Mille Plateaux / Clicks and Cuts",
     "Kim Cascone, The Aesthetics of Failure (2000)"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.6,
+    "octave": 3,
+    "gate": 25,
+    "notefx": [
+     "Note Strum"
+    ],
+    "gain": -12
+   },
+   "groove": 1.0,
+   "fill": 0.8
   },
   {
    "id": "downtempo",
@@ -1059,7 +1370,34 @@
     "Massive Attack, Portishead (trip-hop)",
     "Bonobo, Thievery Corporation",
     "Ninja Tune, Mo' Wax"
-   ]
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 30,
+    "human": 12
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ],
+   "gain": -9,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.35,
+    "rate": 0.5,
+    "octave": 2,
+    "notefx": [
+     "Note Echo"
+    ],
+    "gain": -12
+   },
+   "groove": 0.8
   },
   {
    "id": "lofi_beats",
@@ -1117,7 +1455,19 @@
    "notefx": [
     "Humanizer",
     "Velocity Curve"
-   ]
+   ],
+   "groove": 0.9,
+   "fill": 0.4,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.3,
+    "rate": 0.5,
+    "octave": 2,
+    "gain": -13
+   }
   },
   {
    "id": "synthwave",
@@ -1162,7 +1512,34 @@
     "Kavinsky, Perturbator, Carpenter Brut",
     "Drive (2011), Stranger Things (2016) soundtracks",
     "Giorgio Moroder, Vangelis (ancestors)"
-   ]
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 4.0,
+    "strum": 5,
+    "human": 4
+   },
+   "notefx": [
+    "Humanizer"
+   ],
+   "gain": -10,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.6,
+    "octave": 3,
+    "gate": 70,
+    "notefx": [
+     "Note Echo"
+    ],
+    "gain": -11
+   }
   },
   {
    "id": "vaporwave",
@@ -1208,7 +1585,22 @@
     "Macintosh Plus, Floral Shoppe (2011)",
     "Vektroid, 2814",
     "Fuji TV, mall-music and elevator-music reappropriation"
-   ]
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 40,
+    "human": 10
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "gain": -9,
+   "groove": 0.2,
+   "fill": 0.1
   },
   {
    "id": "footwork",
@@ -1252,7 +1644,19 @@
     "Chicago juke / footwork: DJ Rashad, RP Boo, DJ Spinn",
     "Teklife crew",
     "Planet Mu, Dancemania"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.5,
+    "octave": 2,
+    "gate": 35,
+    "gain": -12
+   },
+   "groove": 1.0,
+   "fill": 0.6
   },
   {
    "id": "gabber",
@@ -1296,7 +1700,19 @@
     "Rotterdam hardcore: Rotterdam Terror Corps, Neophyte",
     "Thunderdome (1992-2012)",
     "Mokum, Euromasters"
-   ]
+   ],
+   "motif": {
+    "synth": [
+     "Analog",
+     "Wavetable"
+    ],
+    "density": 0.45,
+    "octave": 2,
+    "gate": 70,
+    "gain": -11
+   },
+   "fill": 0.8,
+   "trim": -13.0
   },
   {
    "id": "solo_piano",
@@ -1540,7 +1956,18 @@
    },
    "notefx": [
     "Humanizer"
-   ]
+   ],
+   "groove": 0.9,
+   "fill": 0.5,
+   "motif": {
+    "synth": [
+     "Analog",
+     "Field Synth"
+    ],
+    "density": 0.35,
+    "octave": 2,
+    "gain": -12
+   }
   },
   {
    "id": "future_garage",
@@ -1598,7 +2025,9 @@
    "notefx": [
     "Note Echo",
     "Humanizer"
-   ]
+   ],
+   "groove": 0.6,
+   "fill": 0.3
   },
   {
    "id": "drone_kosmische",
