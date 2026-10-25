@@ -28,7 +28,7 @@
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
       '<div class="smp-thumb">' + (it.poster ? thumb : '') + '</div>' +
-      '<div class="smp-id"><b>' + esc(it.name) + '</b><span>' + esc(LABEL[it.kind] || '') + ' · ' + esc(it.tags.slice(0, 4).join(' · ')) + '</span></div>' +
+      '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
       (it.audio ? '<canvas class="smp-wave"></canvas>' : '<div class="smp-track"><i></i></div>') +
       '<a class="smp-dl" href="' + esc(it.patch) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.inf" aria-label="Download patch ' + esc(it.name) + '" title="Download patch (.inf)">' + IC_DL + '</a>' +
     '</div>';
