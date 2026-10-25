@@ -41,10 +41,13 @@ def _norm(x):
 SCREEN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "component_screen.json"))) if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "component_screen.json")) else {}
 
 
+BIAS = [1.0]  # per-patch language-vs-classic lean, set by the shape draw in audio_genome / build_visual
+
+
 def node_w(name):
     if ":" in name:
         r = SCREEN.get(name)  # screen.py: how often this component works alone; never-ok ones are not composed
-        return CODE_BOOST * ((r["ok"] + 0.5) / (r["n"] + 1) if r else 1.0) if not r or r["ok"] else 0.0
+        return BIAS[0] * CODE_BOOST * ((r["ok"] + 0.5) / (r["n"] + 1) if r else 1.0) if not r or r["ok"] else 0.0
     return 0.35 + NCOUNT.get(name, 0) ** 0.8
 
 
@@ -144,11 +147,33 @@ def mod_tokens(r, P, facts, names, play, order_ids=None, id_off=0, cap=90):
     return ["L%d.%d@%s" % (idx, seed, ",".join(t)) for (idx, seed), t in groups.items()]
 
 
+# audio shapes: (branch override, note-chain lengths, per-branch fx lengths, tail fx lengths, language lean)
+SHAPES = {
+    "voice": ((1, 1), [0, 1], [0, 1, 2], [0, 1], 1.0),         # one voice, little around it
+    "layers": ((3, 5), [0, 0, 1], [0, 0, 1], [0, 1, 2], 1.0),  # many dry voices, glue at the end
+    "fxrack": ((1, 2), [0, 1], [3, 4, 5, 6], [1, 2, 3], 1.0),  # long effect chains
+    "writers": ((1, 3), [2, 3, 4, 5], [0, 1], [0, 1], 1.0),    # note generators and transformers lead
+    "language": ((1, 3), [0, 1, 2], [1, 2, 3], [0, 1, 2], 4.0),   # code nodes first
+    "classic": ((1, 3), [0, 1, 2], [1, 2, 3], [0, 1, 2], 0.1),    # the built-in nodes only, mostly
+}
+
+
 def audio_genome(r, P, facts, size, play):
-    kmin, kmax = {1: (1, 2), 2: (2, 3), 3: (2, 4), 4: (3, 5), 5: (4, 6)}[size]
+    shape = r.choice(list(SHAPES))
+    br, nchain, bfx, tfx, BIAS[0] = SHAPES[shape]
+    try:
+        return _audio_genome(r, P, facts, size, play, br, nchain, bfx, tfx)
+    finally:
+        BIAS[0] = 1.0
+
+
+def _audio_genome(r, P, facts, size, play, br, nchain, bfx, tfx):
+    kmin, kmax = br
     jname = "Mixer" if r.random() < 0.65 and "Mixer" in P["X"] else wchoice(r, P["X"], 1)[0]
     slots = sum(1 for i in facts[jname]["inputs"] if i["kind"] == "audio")
     nb = max(1, min(r.randint(kmin, kmax), slots))
+    if nb < 2 and "Mixer" in P["X"] and jname != "Mixer":
+        jname = "Mixer"  # a two-sided joiner with one wire is an open input (W_OPEN_INPUT)
     branches = []
     for _ in range(nb):
         toks = []
@@ -156,14 +181,14 @@ def audio_genome(r, P, facts, size, play):
             toks.append("Z%d.%d" % (P["Z"].index(wchoice(r, P["Z"], 1)[0]), u.sd(r)))
         else:
             toks.append("N%d.%d" % (P["G"].index(wchoice(r, P["G"], 1)[0]), u.sd(r)))
-            for _ in range(r.choice([0, 0, 1, 1, 2, 3])):
+            for _ in range(r.choice(nchain)):
                 toks.append("N%d.%d" % (P["N"].index(wchoice(r, P["N"], 1)[0]), u.sd(r)))
             toks.append("S%d.%d" % (P["S"].index(wchoice(r, P["S"], 1)[0]), u.sd(r)))
-        for _ in range(r.choice([0, 1, 1, 2, 2, 3, 4])):
+        for _ in range(r.choice(bfx)):
             toks.append("E%d.%d" % (P["E"].index(wchoice(r, P["E"], 1)[0]), u.sd(r)))
         branches.append(toks)
     tail = ["X%d.%d" % (P["X"].index(jname), u.sd(r))]
-    for _ in range(r.choice([0, 1, 1, 2, 3])):
+    for _ in range(r.choice(tfx)):
         tail.append("E%d.%d" % (P["E"].index(wchoice(r, P["E"], 1)[0]), u.sd(r)))
     if "Limiter" in P["E"] and r.random() < 0.5:
         tail.append("E%d.%d" % (P["E"].index("Limiter"), u.sd(r)))
@@ -294,6 +319,14 @@ def combine(g, r, V, layers):
 
 
 def build_visual(g, r, V, size, play):
+    BIAS[0] = r.choice([0.1, 1.0, 1.0, 4.0])  # classic / mixed / language-led picture
+    try:
+        return _build_visual(g, r, V, size, play)
+    finally:
+        BIAS[0] = 1.0
+
+
+def _build_visual(g, r, V, size, play):
     """Adds the visual scene to graph g; returns (output id, modulatable node ids)."""
     f = g.facts
     nl = {1: (1, 2), 2: (2, 3), 3: (3, 4), 4: (4, 6), 5: (5, 8)}[size]
