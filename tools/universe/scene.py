@@ -117,7 +117,10 @@ def src_w(name):
 
 
 # ---------------------------------------------------------------- audio
-def mod_tokens(r, P, facts, names, play, order_ids=None, id_off=0, cap=90):
+MM_P = 0.35  # chance per extra modulator source to also drive an earlier modulator
+
+
+def mod_tokens(r, P, facts, names, play, order_ids=None, id_off=0, cap=90, id_mod=0):
     """Shared-source modulation tokens for chain nodes `names` (index k = position in compile order)."""
     cand = []
     for k, n in enumerate(names):
@@ -144,7 +147,19 @@ def mod_tokens(r, P, facts, names, play, order_ids=None, id_off=0, cap=90):
             if g is None:
                 continue
         groups.setdefault(g, []).append("%d.%s" % (k + id_off, key))
-    return ["L%d.%d@%s" % (idx, seed, ",".join(t)) for (idx, seed), t in groups.items()]
+    toks = [[idx, seed, t] for (idx, seed), t in groups.items()]
+    for s_ in range(1, len(toks) if r.random() < 0.4 else 0):  # modulator-of-modulator (in ~40% of patches): a later source drives a continuous control of an earlier one (acyclic by order)
+        if r.random() >= MM_P:
+            continue
+        t_ = r.randrange(s_)
+        tn, sn = P["L"][toks[t_][0]], P["L"][toks[s_][0]]
+        if tn in PRED:
+            continue
+        keys = [m["key"] for m in facts[tn]["modulatable"] if m.get("key") and not m.get("enum") and m.get("max", 0) > m.get("min", 0)
+                and (sn not in PRED or CONT.get((tn, m["key"])))]
+        if keys:
+            toks[s_][2].append("m%d.%s" % (t_ + id_mod, r.choice(keys)))
+    return ["L%d.%d@%s" % (idx, seed, ",".join(t)) for idx, seed, t in toks]
 
 
 # audio shapes: (branch override, note-chain lengths, per-branch fx lengths, tail fx lengths, language lean)

@@ -164,7 +164,8 @@ def parse(code):
         idx, _, seed = src[1:].partition(".")
         for one in dst.split(","):  # one modulator may drive many targets: L5.7@3.cutoff,9.mix
             k, _, key = one.partition(".")
-            mods.append((int(idx), int(seed or 0), int(k), key, int(frm) if frm else None))
+            k = -(int(k[1:]) + 1) if k.startswith("m") else int(k)  # `m2.rateBeats`: a modulator (j-th distinct source, 0-based) is the target
+            mods.append((int(idx), int(seed or 0), k, key, int(frm) if frm else None))
     return branches, join, tail, mods
 
 
@@ -293,19 +294,21 @@ def compile_inf(code, facts, P, order_out=None):
     end, _ = build(branches, join, tail)
     out = add("Audio Out", 0)
     wire(end, out, "aud")
-    shared = {}
-    for idx, seed, k, key, frm in mods:
-        if (idx, seed, frm) in shared:
-            m = shared[(idx, seed, frm)]
-            lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random("%d:%s" % (seed, key)).uniform(0.1, 1)))
+    shared, mlist = {}, []
+    for idx, seed, k, key, frm in mods:  # pass 1: one node per distinct source, in first-appearance order (what `m<j>` indexes)
+        if (idx, seed, frm) not in shared:
+            m = add(P["L"][idx % len(P["L"])], seed)
+            shared[(idx, seed, frm)] = m; mlist.append(m)
+            if frm is not None:
+                src = order[frm % len(order)]
+                skind = facts[names[src]]["outputs"][0]["kind"]
+                wire(src, m, "note" if skind == "note" else "aud")
+    for idx, seed, k, key, frm in mods:  # pass 2: the mod lines
+        m = shared[(idx, seed, frm)]
+        tgt = mlist[(-k - 1) % len(mlist)] if k < 0 else order[k % len(order)]
+        if tgt == m:
             continue
-        m = add(P["L"][idx % len(P["L"])], seed)
-        shared[(idx, seed, frm)] = m
-        if frm is not None:
-            src = order[frm % len(order)]
-            skind = facts[names[src]]["outputs"][0]["kind"]
-            wire(src, m, "note" if skind == "note" else "aud")
-        lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random("%d:%s" % (seed, key)).uniform(0.1, 1)))
+        lines.append("mod %d %s %d 0 0 %.3f 0.5" % (tgt, key, m, random.Random("%d:%s" % (seed, key)).uniform(0.1, 1)))
     if order_out is not None:
         order_out.extend(order)
     return index_code_mods("\n".join(lines) + "\n")
