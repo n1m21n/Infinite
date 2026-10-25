@@ -86,6 +86,7 @@ def pools_v2(facts):
         for m in t["modulatable"]:
             if m.get("key"):
                 LABEL[(n, m["key"])] = m.get("label", m["key"])
+                CONT[(n, m["key"])] = not m.get("bool") and not m.get("step")
     P = u.pools(facts)
     P.pop('_V', None)
     P["Z"] = [n for n in sorted(facts) if facts[n]["category"] == "Synths" and not facts[n]["hardware_driven"] and n not in u.NEEDS_LIVE
@@ -93,15 +94,19 @@ def pools_v2(facts):
     P["L"] = sorted(n for n in facts if facts[n]["category"] in ("Modulators", "Macros", "Prediction") and not facts[n]["hardware_driven"]
                     and all(i["kind"] == "modulator" for i in facts[n]["inputs"])
                     and any(o["kind"] in ("modulator", "predictor") for o in facts[n]["outputs"]) and n not in ("Face Track", "Hand Track", "Pose Track"))
-    P["L"] = [n for n in P["L"] if facts[n]["category"] != "Prediction" or n == "Drift"]
+    P["L"] = [n for n in P["L"] if facts[n]["category"] != "Prediction" or n in PRED]
     readers = [n for n in ("Note to CV", "Velocity to CV", "Audio to CV", "Audio Analyze", "Image Analyze") if n in facts]
     P["L_ALL"] = P["L"] + [n for n in readers if n not in P["L"]]  # link modulators; L indexes stay a prefix
     P["_V"] = visual_pools(facts)
     return P
 
 
+PRED = ("Drift", "Predictive Modulator")  # learned modulators (green cable): continuous params only
+CONT = {}  # (type, key) -> param is continuous (not bool/enum/stepped)
+
+
 def src_w(name):
-    return 0.2 + SRC_COUNT.get(name, 0)
+    return 0.25 * max(SRC_COUNT.values(), default=40) if name in PRED else 0.2 + SRC_COUNT.get(name, 0)
 
 
 # ---------------------------------------------------------------- audio
@@ -127,6 +132,10 @@ def mod_tokens(r, P, facts, names, play, order_ids=None, id_off=0, cap=90):
     groups = {}
     for k, n, key in chosen:
         g = r.choice(srcs)
+        if P["L"][g[0]] in PRED and not CONT.get((n, key)):
+            g = next((x for x in srcs if P["L"][x[0]] not in PRED), None)
+            if g is None:
+                continue
         groups.setdefault(g, []).append("%d.%s" % (k + id_off, key))
     return ["L%d.%d@%s" % (idx, seed, ",".join(t)) for (idx, seed), t in groups.items()]
 

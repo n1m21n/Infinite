@@ -264,3 +264,11 @@ Extending Tongue to modulation and other records. Training a generative model. H
 | F3 determinism | 40 audible patches re-probed: 29 bit-identical, 39 within 1 LU, 1 unstable (clipped frames 3 vs 20). Cause not isolated; suspect free-running random generators or modulators |
 | Tools | `tools/universe/universe.py` (genome, compile, probe), `atlas.py` (summary), `determinism.py` (F3) |
 | Not yet | F4 learned filter, F5 judge, visual orders, combined order, publishing (P6) |
+
+## Scene universe (tools/universe) — state 2026-10-25
+- Genomes: `A` audio, `V size.play.seed` visual, `AV` both. `play` 0..100 = param-play dial, weighted by the owner's movement logs (`mine_movement.py` -> `profile_movement.json`).
+- Code nodes first: Field Synth/Effect/Notes/Pixel families (`codegen.py`, pseudo types `Field Synth:fm`) get 10x pool weight; code params are modulated by numeric index.
+- Learned modulators: Drift and Predictive Modulator join the source pool (boosted); predictive sources only get continuous targets.
+- Funnel F0-F5 plus `library.py` (wav/png/mp4/meta/index.jsonl per sample). Speed: ~1,200 probes/hour at 3 workers, ~77% ok.
+- Engine bugs found: Grain Molder `descending` (771) and Array (798) advertise modulatable indices the engine refuses (E_BAD_PARAM); filtered in `bad_params.json`.
+- Not done: F4 prefilter in the loop, visual-interest score, Sketch/Sketch 3D families. A ~2,000-patch run needs the owner's yes.
