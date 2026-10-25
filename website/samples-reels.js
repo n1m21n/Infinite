@@ -2,7 +2,6 @@
 (function () {
   var reels = document.getElementById('reels'), soundOn = false, isLock = false, lockTimer = null, io = null;
   var IC_DL = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9.5m0 0-3.5-3.5M10 13l3.5-3.5M4 16.5h12"/></svg>';
-  var IC_PATCH = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>';
   var IC_MUTE = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8v4h3l4 3.5v-11L6.5 8h-3Z"/><path d="m13.5 8 3.5 4M17 8l-3.5 4"/></svg>';
   var IC_SOUND = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8v4h3l4 3.5v-11L6.5 8h-3Z"/><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5M15.6 5.4a6.5 6.5 0 0 1 0 9.2"/></svg>';
 
@@ -12,13 +11,12 @@
   function slide(it) {
     return '<section class="reel-slide" aria-label="' + esc(it.name) + '" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<div class="reel-wrap"><div class="reel-card">' +
-      '<video muted loop playsinline preload="none" poster="' + esc(it.poster || '') + '" data-src="' + esc(it.video) + '" title="' + esc(it.name) + '"></video>' +
+      '<video muted loop playsinline preload="none" poster="' + esc(it.poster ? '../' + it.poster : '') + '" data-src="' + esc('../' + it.video) + '" title="' + esc(it.name) + '"></video>' +
       '<div class="reel-swipe" aria-hidden="true"></div>' +
       '<div class="reel-meta"><h2>' + esc(it.name) + '</h2></div></div>' +
       '<div class="reel-rail">' +
         (it.kind === 'AV' ? '<button type="button" class="rail-btn" data-snd aria-label="Sound">' + IC_MUTE + '<span>Sound</span></button>' : '') +
-        (it.library ? '<a class="rail-btn" href="../library/' + esc(it.library) + '.html" aria-label="Open the patch in the Library">' + IC_PATCH + '<span>Patch</span></a>' : '') +
-        '<a class="rail-btn" href="' + esc(it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.mp4" aria-label="Download ' + esc(it.name) + '">' + IC_DL + '<span>Save</span></a>' +
+        '<a class="rail-btn" href="' + esc('../' + it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.mp4" aria-label="Download ' + esc(it.name) + '">' + IC_DL + '<span>Save</span></a>' +
       '</div></div></section>';
   }
 
@@ -84,7 +82,7 @@
     if (Math.abs(dy) > 38 && Math.abs(dy) > Math.abs(dx)) goTo(activeIndex() + (dy > 0 ? 1 : -1));
   }, { passive: true });
 
-  fetch('data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
+  fetch('../data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) {
     var items = d.samples.filter(function (x) { return x.kind !== 'A' && x.video; });
     shuffle(items); mount(items);
   }).catch(function () { reels.innerHTML = '<p class="smp-none">Could not load the samples.</p>'; });

@@ -157,6 +157,33 @@ def paint(g, nid, pal, rng):
                        "  c %s %.4f %.4f %.4f" % ((k,) + tuple(rgb(c))))
 
 
+def portrait(g, f, w=1080, h=1920):
+    """Make the picture natively 9:16: every source and 3D render gets the canvas size (a rescale at export would stretch it)."""
+    for nid, name in list(g.names.items()):
+        keys = {r["key"] for r in f[name]["rows"]}
+        if not ({"width", "height"} <= keys) or not (f[name]["category"] == "Source" or name.split(":")[0] == "Render 3D"):
+            continue
+        s = g.lines.index("node %d %s %s" % (nid, f[name]["category"], name.split(":")[0]))
+        e = g.lines.index("end", s)
+        g.lines[s + 1:e] = [l for l in g.lines[s + 1:e] if not l.startswith(("  f width ", "  f height "))] + ["  f width %d" % w, "  f height %d" % h]
+
+
+ROUND = {"Circle", "Ring", "Pie", "Star", "Polygon", "Hexagon", "Heart", "Gear", "Crescent", "Blob", "Cross", "Teardrop", "Superellipse"}
+
+
+def roundify(g, f):
+    """Shapes meant to be round get one size on both axes: the generator drew sizeX and sizeY independently, which makes circles into ellipses (the stretched look)."""
+    for nid, name in list(g.names.items()):
+        base = name.split(":")[0]
+        if base not in ROUND or not ({"sizeX", "sizeY"} <= {r["key"] for r in f[name]["rows"]}):
+            continue
+        s = g.lines.index("node %d %s %s" % (nid, f[name]["category"], base))
+        e = g.lines.index("end", s)
+        body = g.lines[s + 1:e]
+        sx = next((l.split()[2] for l in body if l.startswith("  f sizeX ")), "0.35")
+        g.lines[s + 1:e] = [l for l in body if not l.startswith("  f sizeY ")] + ["  f sizeY " + sx]
+
+
 def build_visual(style, seed, facts, g=None, audio_out=None):
     rng = random.Random("%s:v:%d" % (style["id"], seed))
     own = g is None
@@ -200,13 +227,17 @@ def build_visual(style, seed, facts, g=None, audio_out=None):
     g.connect(cur, out)
     if audio_out:
         g.lines.append("aud %d 1 %d" % (out, audio_out))
+    portrait(g, f)
+    roundify(g, f)
     k = round(style["motion"] * 4)
     targets = [(n, m["key"]) for n in list(g.names) for m in f[g.names[n]]["modulatable"]
                if m.get("key") and f[g.names[n]]["category"] in ("Source", "Effects", "Compositing") and not m.get("bool") and not m.get("step")]
     rng.shuffle(targets)
     for t, key in targets[:k]:
         lf = g.add("LFO", rng.randrange(1 << 30))
-        g.lines.append("mod %d %s %d 0 0 %.3f 0.5" % (t, key, lf, 0.15 + 0.5 * style["motion"] * rng.random()))
+        amt = 0.15 + 0.5 * style["motion"] * rng.random()
+        for kk in (("sizeX", "sizeY") if key in ("sizeX", "sizeY") and g.names[t].split(":")[0] in ROUND else (key,)):   # round shapes breathe on both axes together
+            g.lines.append("mod %d %s %d 0 0 %.3f 0.5" % (t, kk, lf, amt))
     if own:
         return g.text(), {}
     return g, {}

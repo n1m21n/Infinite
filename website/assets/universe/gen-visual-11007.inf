@@ -1,0 +1,95 @@
+infinite-patch 1
+node 1 Source Ramp
+  f angle 27.4145
+  i repeat 0
+  f scale 1.5698
+  f stop0 0.144927
+  f stop1 0.67226
+  c stopColor0 0.9686 0.4980 0.0000
+  c stopColor1 0.8392 0.1569 0.1569
+  c stopColor2 0.0000 0.1882 0.2863
+  c stopColor3 0.9176 0.8863 0.7176
+  c stopColor4 0.9686 0.4980 0.0000
+  f width 1080
+  f height 1920
+end
+node 2 Source Rectangle
+  f bgOpacity 0.203646
+  i shapeType 3
+  c fillColor 0.9176 0.8863 0.7176
+  c strokeColor 0.0000 0.1882 0.2863
+  c bgColor 0.0000 0.1882 0.2863
+  f width 1080
+  f height 1920
+end
+node 3 Effects gaussianblur
+end
+cable 3 0 2
+node 4 Source Noise
+  f contrast 2.56761
+  f lacunarity 1.99277
+  f scale 42.4161
+  f seed 21.4686
+  c lowColor 0.0000 0.1882 0.2863
+  c highColor 0.9176 0.8863 0.7176
+  f width 1080
+  f height 1920
+end
+node 5 Effects vignette
+  f uAmount 0.368529
+  f uCenterX 0.262877
+end
+cable 5 0 4
+node 6 Source Rectangle
+  f posX 0.796362
+  f posY 0.928226
+  i shapeType 5
+  f sizeX 0.0183583
+  f sizeY 0.0738443
+  c fillColor 0.9176 0.8863 0.7176
+  c strokeColor 0.0000 0.1882 0.2863
+  c bgColor 0.0000 0.1882 0.2863
+  f width 1080
+  f height 1920
+end
+node 7 Effects vignette
+end
+cable 7 0 6
+node 8 Compositing Blend
+  f mix 0.254862
+end
+cable 8 0 1
+cable 8 1 3
+node 9 Compositing Blend
+  f mix 0.683946
+end
+cable 9 0 8
+cable 9 1 5
+node 10 Compositing Blend
+  i mode 0
+end
+cable 10 0 9
+cable 10 1 7
+node 11 Effects gaussianblur
+end
+cable 11 0 10
+node 12 Effects vignette
+  f uCenterX 0.961295
+end
+cable 12 0 11
+node 13 Compositing gradientmap
+  c uShadowColor 0.0000 0.1882 0.2863
+  c uHighlightColor 0.9176 0.8863 0.7176
+end
+cable 13 0 12
+node 14 Effects vignette
+  f uSoftness 0.011643
+end
+cable 14 0 13
+node 15 Effects bloom
+  f uRadius 11.7
+end
+cable 15 0 14
+node 16 Utility Output
+end
+cable 16 0 15

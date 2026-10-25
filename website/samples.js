@@ -1,5 +1,5 @@
 (function () {
-  var listEl = document.getElementById('smp-list'), countEl = document.getElementById('smp-count'), emptyEl = document.getElementById('smp-empty');
+  var listEl = document.getElementById('smp-list'), emptyEl = document.getElementById('smp-empty');
   var items = [], playing = null;
   var IC_PLAY = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.6v10.8a.6.6 0 0 0 .9.5l8.6-5.4a.6.6 0 0 0 0-1L7.9 4.1a.6.6 0 0 0-.9.5Z"/></svg>';
   var IC_PAUSE = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.6" height="12" rx="1"/><rect x="11.4" y="4" width="3.6" height="12" rx="1"/></svg>';
@@ -22,18 +22,13 @@
     }
   }
 
-  var IC_PATCH = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>';
-
   function row(it) {
-    var thumb = it.poster ? '<img src="../' + esc(it.poster) + '" alt="" loading="lazy" decoding="async">' : '<span class="smp-glyph">' + IC_PLAY.replace('<svg', '<svg class="smp-g"') + '</span>';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
-      '<div class="smp-thumb">' + (it.poster ? thumb : '') + '</div>' +
       '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
-      (it.audio ? '<canvas class="smp-wave"></canvas>' : '<div class="smp-track"><i></i></div>') +
+      '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
-        (it.library ? '<a class="smp-dl smp-lib" href="../library/' + esc(it.library) + '.html" aria-label="Open the patch in the Library" title="Patch in the Library">' + IC_PATCH + '</a>' : '') +
-        '<a class="smp-dl" href="../' + esc(it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + (it.audio ? '.wav' : '.mp4') + '" aria-label="Download ' + (it.audio ? 'wav' : 'mp4') + ' ' + esc(it.name) + '" title="Download ' + (it.audio ? '.wav' : '.mp4') + '">' + IC_DL + '</a>' +
+        '<a class="smp-dl" href="' + esc(it.download) + '" download="' + esc(it.name.replace(/\W+/g, '_')) + '.wav" aria-label="Download wav ' + esc(it.name) + '" title="Download .wav">' + IC_DL + '</a>' +
       '</div>' +
     '</div>';
   }
@@ -41,7 +36,6 @@
   function render() {
     stop();
     listEl.innerHTML = items.map(row).join('');
-    countEl.textContent = items.length + ' samples';
     emptyEl.hidden = items.length > 0;
     Array.prototype.forEach.call(listEl.querySelectorAll('.smp-row'), function (r) {
       var it = items.filter(function (x) { return x.id === r.getAttribute('data-id'); })[0], cv = r.querySelector('canvas');
@@ -64,15 +58,8 @@
   function play(r) {
     if (playing && playing.row === r) { stop(); return; }
     stop();
-    var it = items.filter(function (x) { return x.id === r.getAttribute('data-id'); })[0], media, el = null;
-    if (it.video) {
-      el = media = document.createElement('video');
-      media.src = '../' + it.video; media.loop = true; media.playsInline = true; media.className = 'smp-vid';
-      if (it.kind === 'V') media.muted = true;
-      r.querySelector('.smp-thumb').appendChild(el);
-    } else {
-      media = new Audio('../' + it.audio); media.loop = true;
-    }
+    var it = items.filter(function (x) { return x.id === r.getAttribute('data-id'); })[0], media = new Audio(it.audio), el = null;
+    media.loop = true;
     playing = { row: r, it: it, media: media, el: el };
     r.classList.add('on');
     r.querySelector('.smp-play').innerHTML = IC_PAUSE;
@@ -102,6 +89,6 @@
   });
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
 
-  fetch('../data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
+  fetch('data.json?v=' + Date.now()).then(function (r) { return r.json(); }).then(function (d) { items = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(items); render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
     .catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the samples.'; });
 })();

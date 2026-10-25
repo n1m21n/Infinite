@@ -39,15 +39,14 @@ CLIP_SECS = 6
 
 def render_clip(binary, inf, d, kind):
     """9:16 1080x1920 h264 clip: the Output node tapped at full size, re-encoded small, with the sample's sound muxed in for AV."""
-    m = re.search(r"^node (\d+) Utility Output", open(inf).read(), re.M)
     raw, mp4 = os.path.join(d, "raw.mp4"), os.path.join(d, "preview.mp4")
-    if not m or not run([binary, "--render", inf, raw, "--node", m.group(1), "--duration", str(CLIP_SECS), "--fps", "30", "--size", "%dx%d" % FRAME], 300):
+    if not run([binary, "--render", inf, raw, "--duration", str(CLIP_SECS), "--fps", "30"], 300):
         return False
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", raw]
     wav = os.path.join(d, "sample.wav")
     if kind == "AV" and os.path.exists(wav):
         cmd += ["-i", wav, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "160k", "-t", str(CLIP_SECS)]
-    cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4]
+    cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "24", "-maxrate", "4M", "-bufsize", "8M", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4]
     ok = run(cmd, 300)
     os.remove(raw)
     return ok and os.path.exists(mp4)
@@ -59,7 +58,7 @@ def render_media(binary, inf, kind, d, secs=8):
     if kind in ("A", "AV"):
         made["wav"] = run([binary, "--audio-summary", inf, os.path.join(d, "audio.json"), "--duration", str(secs), "--wav", os.path.join(d, "sample.wav")], 120)
     if kind in ("V", "AV"):
-        made["png"] = run([binary, "--frame", inf, "0", d + "/", "--size", "%dx%d" % FRAME], 180)
+        made["png"] = run([binary, "--frame", inf, "0", d + "/"], 180)
         for f in os.listdir(d):  # the engine names frames itself
             if f.endswith(".png") and f != "poster.png":
                 os.replace(os.path.join(d, f), os.path.join(d, "poster.png"))
@@ -208,7 +207,7 @@ def publish_library(lib, site_assets, n=60, samples=None):
         items.append({"id": gid, "name": _title(m["nodes"]), "category": "Generated", "kind": "Patch", "tags": [t for t in m.get("tags", []) if t not in ("code", "small", "dense")][:4],
                       "description": "A %s Infinite made by itself from %d nodes. Open it, then change anything." % (kind_word, len(m["nodes"])),
                       "price": 0, "preview": "assets/universe/%s.jpg" % gid, "file": "assets/universe/%s.inf" % gid,
-                      "sample": ("samples/audio/?s=%s" if m["kind"] == "A" else "samples/?s=%s") % m["sid"], "nodes": m["nodes"][:12]})
+                      "sample": ("samples/?s=%s" if m["kind"] == "A" else "samples/visuals/?s=%s") % m["sid"], "nodes": m["nodes"][:12]})
     json.dump({"version": 1, "items": items}, open(os.path.join(site_assets, "index.json"), "w"), indent=1)
     print("library: %d patches -> %s" % (len(items), site_assets))
     return items
