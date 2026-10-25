@@ -292,7 +292,7 @@ class Graph:
 
 
 def visual_pools(facts):
-    V = {"src": [], "flt": [], "geo": [], "gop": [], "blend": [], "color": []}
+    V = {"src": [], "flt": [], "geo": [], "gop": [], "gjoin": [], "blend": [], "color": []}
     for n in sorted(facts):
         t = facts[n]
         if t["hardware_driven"] or n in ("Comment", "Group", "Null", "Plugin", "Output", "Syphon Out", "NDI Out", "Projection",
@@ -313,6 +313,8 @@ def visual_pools(facts):
                 V["geo"].append(n)
             elif ins.count("geometry") == 1:
                 V["gop"].append(n)
+            elif ins.count("geometry") >= 2 and outs == ["geometry"] and n != "Feedback 3D":  # Join Geometry / Union / Intersect / Difference (Feedback 3D needs a cycle)
+                V["gjoin"].append(n)
     return V
 
 
@@ -390,6 +392,14 @@ def _build_visual(g, r, V, size, play):
             if f[g.names[prim]]["inputs"] and r.random() < 0.6 and V["src"]:
                 g.connect(g.add(wchoice(r, V["src"], 1)[0], u.sd(r)), prim)
             cur = prim
+            if V["gjoin"] and r.random() < 0.3:  # CSG / merge of two solids
+                jn = g.add(r.choice(V["gjoin"]), u.sd(r)); g.connect(cur, jn)
+                for _ in range(r.choice([1, 1, 2])):
+                    other = g.add(wchoice(r, V["geo"], 1)[0], u.sd(r))
+                    if r.random() < 0.5:
+                        o2 = g.add(wchoice(r, V["gop"], 1)[0], u.sd(r)); g.connect(other, o2); other = o2
+                    g.connect(other, jn)
+                cur = jn
             for _ in range(r.choice([0, 1, 1, 2, 3])):
                 op = g.add(wchoice(r, V["gop"], 1)[0], u.sd(r))
                 g.connect(cur, op); cur = op
@@ -571,6 +581,17 @@ def names_of(code, facts, P):
     return names
 
 
+def mods_of(code, facts, P):
+    """Modulator source types of a scene genome (kept apart from names_of so chain n-gram metrics stay about chains)."""
+    kind, a, v, links = parse_scene(code)
+    out = [P["L"][idx % len(P["L"])] for idx, _ in sorted({(m[0], m[1]) for m in u.parse(a)[3]})] if a else []
+    if v:
+        r = random.Random("V:%d" % int(v.split(".")[2])); g = Graph(facts, r)
+        _, ids = build_visual(g, r, P["_V"], *map(int, v.split(".")[:2]))
+        out += [n for i, n in g.names.items() if i not in ids and n != "Output"]
+    return out
+
+
 def _grams(names, n=3):
     return {tuple(names[i:i + n]) for i in range(max(0, len(names) - n + 1))}
 
@@ -638,11 +659,7 @@ def probe(code, facts, P, binary, workdir, secs=4):
         res["class"] = "classify-error:%s:%s" % (type(e).__name__, str(e)[:80])
     res["sec"] = round(time.time() - t0, 2)
     try:
-        kind, a, v, links = parse_scene(code)
-        names = u.node_names(a, P) if a else []
-        if v:
-            r = random.Random("V:%d" % int(v.split(".")[2])); g = Graph(facts, r)
-            _, ids = build_visual(g, r, P["_V"], *map(int, v.split(".")[:2])); names += [g.names[i] for i in ids]
+        names = names_of(code, facts, P); res["mods"] = mods_of(code, facts, P)
         res["names"], res["order"] = names, 6
     except Exception:
         pass

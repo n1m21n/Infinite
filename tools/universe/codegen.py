@@ -340,6 +340,7 @@ BASES = {
 }
 
 
+CODE_MOD_CAP = {"Field Notes": 1}  # the engine gives Field Notes one modulatable code slot (index 51); a mod on the next one is E_BAD_PARAM
 PRESETS = {}  # base type -> [{"name", "code", "params"}]; the index is the preset's pseudo-type family "pNN"
 PARAM_RE = re.compile(r"param\s+float\s+(\w+)\s*=\s*(-?[\d.]+)\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\]")
 
@@ -384,9 +385,9 @@ def register_presets(facts):
         for i, it in enumerate(items):
             if it.get("dead"):
                 continue
-            t = copy.deepcopy(facts[base]); t["type"] = "%s:p%02d" % (base, i); t["family"] = (base, "p%02d" % i); t["preset"] = it["name"]
+            t = copy.deepcopy(facts[base]); t["type"] = "%s:p%02d" % (base, i); t["family"] = (base, "p%02d" % i); t["preset"] = it["name"]; t["topology"] = it.get("topology")
             keep = [m for m in t["modulatable"] if not m.get("key", "").startswith("p.")]
-            for j, (name, dv, lo, hi) in enumerate(it["params"]):
+            for j, (name, dv, lo, hi) in enumerate(it["params"][:CODE_MOD_CAP.get(base, 99)]):
                 keep.append({"index": 51 + j, "label": name, "key": "p." + name, "min": lo, "max": hi, "step": 0})
             t["modulatable"] = keep
             facts[t["type"]] = t
@@ -404,7 +405,7 @@ def register(facts):
             t["type"] = "%s:%s" % (base, fam)
             t["family"] = (base, fam)
             keep = [m for m in t["modulatable"] if not m.get("key", "").startswith("p.")]
-            for i, k in enumerate(keys):
+            for i, k in enumerate(keys[:CODE_MOD_CAP.get(base, 99)]):
                 lo, hi, _ = prm[k]
                 keep.append({"index": 51 + i, "label": k, "key": "p." + k, "min": lo, "max": hi, "step": 0})
             t["modulatable"] = keep

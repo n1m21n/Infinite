@@ -10,7 +10,8 @@ NODES = {  # node type -> source file (relative to src/)
     "Sketch": "core/sketch/SketchPresets.h", "Sketch 3D": "core/sketch/Sketch3DPresets.h",
 }
 ESC = {"n": "\n", "t": "\t", '"': '"', "\\": "\\", "'": "'", "r": "\r"}
-ENTRY = re.compile(r'\{\s*"((?:[^"\\]|\\.)*)"\s*,\s*')
+ENTRY = re.compile(r'\{\s*"((?:[^"\\]|\\.)*)"\s*,\s*(?:PrimitiveTopology::(\w+)\s*,\s*\d+\s*,\s*)?')
+TOPO = ["Points", "Plane", "Sphere", "Cylinder", "Torus", "Disc"]  # row order of Field Primitive's `topology` enum
 
 
 def unescape(s):
@@ -42,7 +43,10 @@ def parse(path):
             break
         got = code_at(text, m.end())
         if got and got[0].strip():
-            out.append({"name": unescape(m.group(1)), "code": got[0]}); i = got[1]
+            e = {"name": unescape(m.group(1)), "code": got[0]}
+            if m.group(2):
+                e["topology"] = TOPO.index(m.group(2))
+            out.append(e); i = got[1]
         else:
             i = m.end()
     return out

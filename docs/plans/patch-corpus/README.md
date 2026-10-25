@@ -281,3 +281,12 @@ Extending Tongue to modulation and other records. Training a generative model. H
 
 ### Graph grammar (2026-10-26)
 Genomes may start with stream definitions: `$a=<chain or [..]+[..]=>X> && ... && <main> ; mods`. `$name` at the head of a chain starts from the stream's end (fan-out: one note chain drives several synths, or a voice also feeds a parallel wet chain); `<$name` after an effect wires the stream into that node's next free audio input (sidechain; only Dynamics and Spectrum Slide have one). Nested joins and re-bussing (premix, split, rejoin) are defs used as branches. Old genomes compile byte-identical (300-genome diff). `scene.py` draws one of plain/fanout/send/nested/sidechain/rebus per audio patch. `check_presets.py` validates every preset's params against the engine and writes `preset_blacklist.json` (Field Notes "Scale Walk" and "Random Melody" expose only one param to the engine, possibly an engine or preset bug).
+
+
+## Switch slots, 3D joins, coverage (2026-10-25)
+
+- **Switch slots** (`tools/universe/switches.py`): `{E49.7|E5.7}` swaps a node type at one slot (same pins, keeps every mod key); `S3.2~fmMode=1` sets an enum mode. `expand()` gives one sibling genome per alternative; `propose()` picks a slot. `switch_test.py` validates every alternative (38 sets, 0 invalid) and 17 of 19 rendered alternatives differ from the base audio. Audio chains only; visual scenes come from a builder and need their own hook.
+- **3D joins**: Join Geometry / Union / Intersect / Difference (one node, `mode` enum) are in the 3D scene builder (`gjoin`). Feedback 3D stays out (needs a cycle).
+- **Field Primitive presets**: 23 parsed (their topology is set per preset). Field Graph presets are not usable headless (they emit nodes into the live graph).
+- **Field Notes** exposes one modulatable code slot (index 51); `CODE_MOD_CAP` limits the generator to it (this was making ~5% of genomes invalid).
+- `coverage.py`: engine node types vs pools vs atlas use. Atlas rows carry `mods` (modulator sources) apart from `names`.

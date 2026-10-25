@@ -92,6 +92,8 @@ def seeded_params(t, seed):
         if row["tag"] == "s" and (k in AUDIO_PATH_KEYS or k.endswith("_path")) and t["type"] != "Palette":
             out[k] = ("s", pick_file(r, t["type"]))
     if not seed:
+        if t.get("topology") is not None:
+            out["topology"] = ("i", t["topology"])
         return out
     for row in t["rows"]:
         if not row.get("ui", True) or row["tag"] not in ("f", "i", "b"):
@@ -110,15 +112,25 @@ def seeded_params(t, seed):
                 out[row["key"]] = ("f", math.exp(r.uniform(math.log(lo), math.log(hi))))
             else:
                 out[row["key"]] = ("f", r.uniform(lo, hi))
+    if t.get("topology") is not None:
+        out["topology"] = ("i", t["topology"])  # a Field Primitive preset is written for one topology
     return out
+
+
+class Seed(int):
+    """A node seed that may carry parameter overrides: `E7.3~warpMode=4~fmMode=1` (the switch-slot grammar)."""
+    over = None
 
 
 def tok(t):
     t = t.strip()
     if t[0] in "$<":  # $name = a defined stream (chain head); <$name = wire that stream into the previous node's next free audio input
         return (t[0], t.lstrip("<$"), 0)
+    t, *over = t.split("~")
     idx, _, seed = t[1:].partition(".")
-    return (t[0], int(idx or 0), int(seed or 0))
+    seed = Seed(int(seed or 0))
+    seed.over = dict(o.partition("=")[::2] for o in over) or None
+    return (t[0], int(idx or 0), seed)
 
 
 def split_defs(code):
@@ -191,6 +203,9 @@ def compile_inf(code, facts, P, order_out=None):
         t = facts[name]
         lines.append("node %d %s %s" % (n, t["category"], name.split(":")[0]))
         ps = seeded_params(t, seed)
+        tags = {r["key"]: r["tag"] for r in t["rows"]}
+        for k, v in (getattr(seed, "over", None) or {}).items():
+            ps[k] = (tags[k], float(v) if tags[k] == "f" else int(float(v)))
         ps.update(force or {})
         for k, (tag, v) in sorted(ps.items()):
             lines.append("  %s %s %s" % (tag, k, ("%.6g" % v) if tag == "f" else v if tag == "s" else int(v)))
