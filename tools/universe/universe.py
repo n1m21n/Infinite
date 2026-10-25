@@ -195,7 +195,7 @@ def compile_inf(code, facts, P):
                 elif "note0" in gk:
                     force = {"note%d" % q: ("i", 36 + q) for q in range(16)}
             if pool[idx % len(pool)] == "Slicer":
-                force = {"sliceBy": ("i", 1), "volume": ("f", 0.8)}  # grid slices answer every pad; onset slicing is sparse
+                force = {"sliceBy": ("i", 1), "volume": ("f", 0.8), "onsets": ("i", 8), "attack": ("f", 0)}  # grid slices answer every pad; onset slicing is sparse
             nid = add(pool[idx % len(pool)], seed, force)
             order.append(nid)
             if prev is not None:
@@ -322,6 +322,11 @@ def probe(code, facts, P, binary, secs, workdir):
     except Exception as e:
         res = {"ok": False, "exit": -1, "err": type(e).__name__, "a": {}}
     res.update(code=code, sec=round(time.time() - t0, 2))
+    try:
+        res["names"] = node_names(code, P)  # decode-proof: indices shift if a pool changes
+        res["order"] = 1 if "=>" not in code and ";" not in code else (2 if "=>" not in code else (3 if ";" not in code else 4))
+    except Exception:
+        pass
     try:
         res["class"] = classify(res)
     except Exception as e:
