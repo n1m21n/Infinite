@@ -1,0 +1,963 @@
+{
+ "_doc": "Visual style table: internal taxonomy for sample generation. The first 15 ids come from tools/spread/art_taxonomy.py (palette and name are read from there); the rest extend it with digital-culture and electronic-music-adjacent movements. 'sources' / 'fx' / 'comp' are node pools; 'ban' keeps nodes out; motion 0..1 is how much the picture moves; 'pairs' lists music style ids that fit when the sample has sound. Research in docs/plans/patch-corpus/taxonomy/art.md.",
+ "styles": [
+  {
+   "id": "y2k_acid",
+   "taxonomy": "spread",
+   "sources": [
+    "Blob",
+    "Superellipse",
+    "Ramp"
+   ],
+   "fx": [
+    "bloom",
+    "liquify",
+    "twirl"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [],
+   "motion": 0.6,
+   "pairs": [
+    "detroit_techno",
+    "classic_trance",
+    "electro",
+    "synthwave"
+   ]
+  },
+  {
+   "id": "glitch_datamosh",
+   "taxonomy": "spread",
+   "sources": [
+    "Noise",
+    "Rectangle",
+    "Image Source"
+   ],
+   "fx": [
+    "glitch",
+    "displace",
+    "pixelate"
+   ],
+   "comp": [
+    "Feedback",
+    "Trails"
+   ],
+   "ban": [],
+   "motion": 0.9,
+   "pairs": [
+    "glitch",
+    "idm",
+    "industrial_techno",
+    "footwork"
+   ]
+  },
+  {
+   "id": "ditherpunk",
+   "taxonomy": "spread",
+   "sources": [
+    "Noise",
+    "Ramp",
+    "Circle"
+   ],
+   "fx": [
+    "pixelate"
+   ],
+   "comp": [
+    "dither",
+    "threshold",
+    "posterize"
+   ],
+   "ban": [
+    "bloom"
+   ],
+   "motion": 0.5,
+   "pairs": [
+    "idm",
+    "minimal_techno",
+    "lofi_beats",
+    "electro"
+   ]
+  },
+  {
+   "id": "neo_brutalist",
+   "taxonomy": "spread",
+   "sources": [
+    "Rectangle",
+    "Text",
+    "Line"
+   ],
+   "fx": [
+    "halftone",
+    "edge outline"
+   ],
+   "comp": [
+    "posterize",
+    "threshold"
+   ],
+   "ban": [
+    "bloom",
+    "glitch"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "minimal_techno",
+    "industrial_techno",
+    "dubstep"
+   ]
+  },
+  {
+   "id": "technical_blueprint",
+   "taxonomy": "spread",
+   "sources": [
+    "Line",
+    "Polygon",
+    "Ring"
+   ],
+   "fx": [
+    "edge outline",
+    "edge sobel"
+   ],
+   "comp": [
+    "Color Ramp",
+    "invert"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "ambient",
+    "dub_techno",
+    "idm"
+   ]
+  },
+  {
+   "id": "retro_surreal",
+   "taxonomy": "spread",
+   "sources": [
+    "Image Source",
+    "Shape",
+    "Crescent"
+   ],
+   "fx": [
+    "halftone",
+    "addnoise"
+   ],
+   "comp": [
+    "gradientmap",
+    "posterize"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "downtempo",
+    "lofi_beats",
+    "vaporwave"
+   ]
+  },
+  {
+   "id": "op_art",
+   "taxonomy": "spread",
+   "sources": [
+    "Ring",
+    "Line",
+    "Circle"
+   ],
+   "fx": [
+    "ripple",
+    "symmetry",
+    "kaleidoscope"
+   ],
+   "comp": [
+    "threshold",
+    "invert"
+   ],
+   "ban": [
+    "addnoise"
+   ],
+   "motion": 0.7,
+   "pairs": [
+    "psytrance",
+    "classic_trance",
+    "minimal_techno"
+   ]
+  },
+  {
+   "id": "analog_crt",
+   "taxonomy": "spread",
+   "sources": [
+    "Noise",
+    "Rectangle",
+    "Video"
+   ],
+   "fx": [
+    "lensdistortion",
+    "vignette",
+    "radialblur"
+   ],
+   "comp": [
+    "Feedback",
+    "Trails",
+    "gradientmap"
+   ],
+   "ban": [],
+   "motion": 0.5,
+   "pairs": [
+    "vaporwave",
+    "synthwave",
+    "dub_techno"
+   ]
+  },
+  {
+   "id": "thundr_brutalist",
+   "taxonomy": "spread",
+   "sources": [
+    "Rectangle",
+    "Text",
+    "Polygon"
+   ],
+   "fx": [
+    "halftone",
+    "edge sobel"
+   ],
+   "comp": [
+    "posterize",
+    "threshold"
+   ],
+   "ban": [
+    "bloom"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "industrial_techno",
+    "gabber",
+    "neurofunk"
+   ]
+  },
+  {
+   "id": "chavetta_montage",
+   "taxonomy": "spread",
+   "sources": [
+    "Image Source",
+    "Rectangle",
+    "Shape"
+   ],
+   "fx": [
+    "halftone",
+    "addnoise",
+    "displace"
+   ],
+   "comp": [
+    "Layer Stack",
+    "gradientmap"
+   ],
+   "ban": [],
+   "motion": 0.3,
+   "pairs": [
+    "breakbeat",
+    "jungle",
+    "downtempo"
+   ]
+  },
+  {
+   "id": "lilliputian_surreal",
+   "taxonomy": "spread",
+   "sources": [
+    "Image Source",
+    "Circle",
+    "Shape"
+   ],
+   "fx": [
+    "gaussianblur",
+    "vignette"
+   ],
+   "comp": [
+    "gradientmap",
+    "Blend"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.2,
+   "pairs": [
+    "ambient",
+    "downtempo"
+   ]
+  },
+  {
+   "id": "ukiyoe_cartography",
+   "taxonomy": "spread",
+   "sources": [
+    "Line",
+    "Polygon",
+    "Shape"
+   ],
+   "fx": [
+    "halftone",
+    "emboss"
+   ],
+   "comp": [
+    "posterize",
+    "gradientmap"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.2,
+   "pairs": [
+    "ambient",
+    "lofi_beats",
+    "downtempo"
+   ]
+  },
+  {
+   "id": "indie_psychedelic",
+   "taxonomy": "spread",
+   "sources": [
+    "Blob",
+    "Noise",
+    "Ellipse"
+   ],
+   "fx": [
+    "liquify",
+    "twirl",
+    "bloom"
+   ],
+   "comp": [
+    "Fluid",
+    "Reaction Diffusion",
+    "gradientmap"
+   ],
+   "ban": [],
+   "motion": 0.7,
+   "pairs": [
+    "psytrance",
+    "downtempo",
+    "progressive_house"
+   ]
+  },
+  {
+   "id": "riso_manga_zine",
+   "taxonomy": "spread",
+   "sources": [
+    "Circle",
+    "Rectangle",
+    "Image Source"
+   ],
+   "fx": [
+    "halftone",
+    "pixelate"
+   ],
+   "comp": [
+    "posterize",
+    "Blend",
+    "gradientmap"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "footwork",
+    "breakbeat",
+    "uk_garage"
+   ]
+  },
+  {
+   "id": "liminal_void",
+   "taxonomy": "spread",
+   "sources": [
+    "Rectangle",
+    "Noise",
+    "Ramp"
+   ],
+   "fx": [
+    "gaussianblur",
+    "vignette",
+    "addnoise"
+   ],
+   "comp": [
+    "gradientmap",
+    "exposure"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.1,
+   "pairs": [
+    "dark_ambient",
+    "ambient",
+    "dub_techno"
+   ]
+  },
+  {
+   "id": "vaporwave_collage",
+   "taxonomy": "new",
+   "name": "Vaporwave Collage",
+   "palette": [
+    "#ff71ce",
+    "#01cdfe",
+    "#05ffa1",
+    "#b967ff"
+   ],
+   "sources": [
+    "Image Source",
+    "Ramp",
+    "Superellipse"
+   ],
+   "fx": [
+    "bloom",
+    "gaussianblur",
+    "displace"
+   ],
+   "comp": [
+    "gradientmap",
+    "Blend"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "vaporwave",
+    "lofi_beats"
+   ],
+   "refs": [
+    "Macintosh Plus, Floral Shoppe cover (2011)",
+    "Vektroid / James Ferraro lineage",
+    "Early 90s CGI and Windows 95 clip art"
+   ]
+  },
+  {
+   "id": "synthwave_grid",
+   "taxonomy": "new",
+   "name": "Synthwave Grid & Sunset",
+   "palette": [
+    "#2b0a5e",
+    "#ff2a6d",
+    "#05d9e8",
+    "#ffd319"
+   ],
+   "sources": [
+    "Ramp",
+    "Line",
+    "Circle"
+   ],
+   "fx": [
+    "bloom",
+    "radialblur",
+    "lensdistortion"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "synthwave",
+    "electro"
+   ],
+   "refs": [
+    "Tron (1982), Miami Vice, Outrun",
+    "Kavinsky, Perturbator cover art",
+    "Retro-futurism of 80s airbrush"
+   ]
+  },
+  {
+   "id": "cyberpunk_neon",
+   "taxonomy": "new",
+   "name": "Cyberpunk Neon Rain",
+   "palette": [
+    "#0a0014",
+    "#ff0090",
+    "#00f0ff",
+    "#fcee0a"
+   ],
+   "sources": [
+    "Noise",
+    "Rectangle",
+    "Text"
+   ],
+   "fx": [
+    "bloom",
+    "motionblur",
+    "glitch"
+   ],
+   "comp": [
+    "Trails",
+    "gradientmap"
+   ],
+   "ban": [],
+   "motion": 0.7,
+   "pairs": [
+    "industrial_techno",
+    "neurofunk",
+    "dubstep"
+   ],
+   "refs": [
+    "Blade Runner (1982), Neuromancer (Gibson, 1984)",
+    "Akira (1988)",
+    "Cyberpunk 2077 UI language"
+   ]
+  },
+  {
+   "id": "generative_plotter",
+   "taxonomy": "new",
+   "name": "Generative Plotter Line Art",
+   "palette": [
+    "#f5f1e6",
+    "#111111",
+    "#d1301f"
+   ],
+   "sources": [
+    "Line",
+    "Polygon",
+    "Ring"
+   ],
+   "fx": [
+    "edge outline"
+   ],
+   "comp": [
+    "posterize"
+   ],
+   "ban": [
+    "bloom",
+    "glitch",
+    "gaussianblur"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "minimal_techno",
+    "ambient",
+    "idm"
+   ],
+   "refs": [
+    "Vera Molnar, Manfred Mohr, Frieder Nake (1960s algorithmic art)",
+    "Tyler Hobbs fidenza",
+    "Plotter art community"
+   ]
+  },
+  {
+   "id": "demoscene_plasma",
+   "taxonomy": "new",
+   "name": "Demoscene Plasma & Rotozoom",
+   "palette": [
+    "#000000",
+    "#ff3b00",
+    "#00e0ff",
+    "#ffffff"
+   ],
+   "sources": [
+    "Noise",
+    "Ramp",
+    "Formula"
+   ],
+   "fx": [
+    "ripple",
+    "twirl",
+    "kaleidoscope"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.9,
+   "pairs": [
+    "acid_house",
+    "classic_trance",
+    "electro",
+    "breakbeat"
+   ],
+   "refs": [
+    "Amiga and C64 demoscene (Future Crew, Farbrausch)",
+    "Second Reality (1993), .kkrieger (2004)",
+    "Pouet, Revision party"
+   ]
+  },
+  {
+   "id": "vector_wireframe",
+   "taxonomy": "new",
+   "name": "Vector Wireframe",
+   "palette": [
+    "#000000",
+    "#00ff6a",
+    "#ffffff"
+   ],
+   "sources": [
+    "Wireframe",
+    "Torus Knot",
+    "Icosphere",
+    "Supershape"
+   ],
+   "fx": [
+    "bloom"
+   ],
+   "comp": [
+    "Trails",
+    "gradientmap"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.5,
+   "pairs": [
+    "electro",
+    "synthwave",
+    "detroit_techno"
+   ],
+   "refs": [
+    "Elite (1984), Battlezone, Tempest",
+    "Vectrex, vector CRT arcades",
+    "Vasulka Brothers video art"
+   ]
+  },
+  {
+   "id": "pixel_art_8bit",
+   "taxonomy": "new",
+   "name": "Pixel Art 8-bit",
+   "palette": [
+    "#0f380f",
+    "#306230",
+    "#8bac0f",
+    "#9bbc0f"
+   ],
+   "sources": [
+    "Rectangle",
+    "Noise",
+    "Circle"
+   ],
+   "fx": [
+    "pixelate"
+   ],
+   "comp": [
+    "posterize",
+    "dither",
+    "gradientmap"
+   ],
+   "ban": [
+    "glitch",
+    "gaussianblur"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "electro",
+    "gabber",
+    "synthwave"
+   ],
+   "refs": [
+    "NES/Game Boy palettes",
+    "Chiptune and tracker culture",
+    "Space Invaders, Pac-Man sprites"
+   ]
+  },
+  {
+   "id": "bauhaus_geometry",
+   "taxonomy": "new",
+   "name": "Bauhaus Geometry",
+   "palette": [
+    "#f2e8cf",
+    "#d62828",
+    "#1d3557",
+    "#fcbf49"
+   ],
+   "sources": [
+    "Circle",
+    "Rectangle",
+    "Triangle"
+   ],
+   "fx": [
+    "halftone"
+   ],
+   "comp": [
+    "posterize",
+    "Blend"
+   ],
+   "ban": [
+    "glitch",
+    "bloom"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "minimal_techno",
+    "deep_house",
+    "detroit_techno"
+   ],
+   "refs": [
+    "Bauhaus (Gropius, 1919), Kandinsky, Moholy-Nagy",
+    "Josef Albers, Interaction of Color",
+    "Ulm School and Swiss style followers"
+   ]
+  },
+  {
+   "id": "suprematist_blocks",
+   "taxonomy": "new",
+   "name": "Suprematist Forms",
+   "palette": [
+    "#f4efe6",
+    "#111111",
+    "#d9231f"
+   ],
+   "sources": [
+    "Rectangle",
+    "Polygon",
+    "Circle"
+   ],
+   "fx": [
+    "halftone"
+   ],
+   "comp": [
+    "posterize"
+   ],
+   "ban": [
+    "glitch",
+    "bloom"
+   ],
+   "motion": 0.3,
+   "pairs": [
+    "industrial_techno",
+    "gabber",
+    "dark_ambient"
+   ],
+   "refs": [
+    "Malevich, Black Square (1915)",
+    "El Lissitzky, Beat the Whites with the Red Wedge",
+    "Constructivist posters"
+   ]
+  },
+  {
+   "id": "cymatics_sine",
+   "taxonomy": "new",
+   "name": "Cymatics & Chladni",
+   "palette": [
+    "#000000",
+    "#ffffff",
+    "#7df9ff"
+   ],
+   "sources": [
+    "Ring",
+    "Formula",
+    "Noise"
+   ],
+   "fx": [
+    "ripple",
+    "symmetry"
+   ],
+   "comp": [
+    "threshold",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.8,
+   "pairs": [
+    "ambient",
+    "dub_techno",
+    "psytrance"
+   ],
+   "refs": [
+    "Ernst Chladni, Entdeckungen (1787)",
+    "Hans Jenny, Cymatics (1967)",
+    "Oscilloscope music: Jerobeam Fenderson"
+   ]
+  },
+  {
+   "id": "brutalist_architecture",
+   "taxonomy": "new",
+   "name": "Brutalist Concrete",
+   "palette": [
+    "#7a7a78",
+    "#d9d6cf",
+    "#222222"
+   ],
+   "sources": [
+    "Rectangle",
+    "Cube",
+    "Polygon"
+   ],
+   "fx": [
+    "emboss",
+    "vignette"
+   ],
+   "comp": [
+    "exposure",
+    "gradientmap"
+   ],
+   "ban": [
+    "glitch",
+    "bloom"
+   ],
+   "motion": 0.2,
+   "pairs": [
+    "dark_ambient",
+    "industrial_techno",
+    "dub_techno"
+   ],
+   "refs": [
+    "Le Corbusier, Brutalist architecture",
+    "Soviet modernism, Spomenik monuments",
+    "Brutalist websites movement"
+   ]
+  },
+  {
+   "id": "holographic_iridescent",
+   "taxonomy": "new",
+   "name": "Holographic Iridescence",
+   "palette": [
+    "#a9f0ff",
+    "#ffb3f5",
+    "#d6ff9e",
+    "#ffffff"
+   ],
+   "sources": [
+    "Blob",
+    "Ramp",
+    "Superellipse"
+   ],
+   "fx": [
+    "bloom",
+    "liquify",
+    "kaleidoscope"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.6,
+   "pairs": [
+    "progressive_house",
+    "classic_trance",
+    "uk_garage"
+   ],
+   "refs": [
+    "Y2K iridescent chrome and foil",
+    "Holographic print and risograph foil",
+    "Aphex Twin and Chris Cunningham era"
+   ]
+  },
+  {
+   "id": "acid_graphics",
+   "taxonomy": "new",
+   "name": "Acid Graphics Typography",
+   "palette": [
+    "#ccff00",
+    "#000000",
+    "#ff00ff"
+   ],
+   "sources": [
+    "Text",
+    "Ramp",
+    "Noise"
+   ],
+   "fx": [
+    "pixelate",
+    "twirl",
+    "bloom"
+   ],
+   "comp": [
+    "gradientmap",
+    "posterize"
+   ],
+   "ban": [],
+   "motion": 0.7,
+   "pairs": [
+    "acid_house",
+    "psytrance",
+    "tech_house"
+   ],
+   "refs": [
+    "Acid graphics (2010s revival)",
+    "Rave flyer 1991-1993",
+    "Designers Republic for Warp"
+   ]
+  },
+  {
+   "id": "minimal_signal",
+   "taxonomy": "new",
+   "name": "Minimal Signal",
+   "palette": [
+    "#101010",
+    "#f0f0f0",
+    "#ff3300"
+   ],
+   "sources": [
+    "Line",
+    "Rectangle",
+    "Circle"
+   ],
+   "fx": [
+    "gaussianblur"
+   ],
+   "comp": [
+    "threshold",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch",
+    "bloom"
+   ],
+   "motion": 0.2,
+   "pairs": [
+    "minimal_techno",
+    "dub_techno",
+    "ambient"
+   ],
+   "refs": [
+    "Ryoji Ikeda (test pattern, datamatics)",
+    "Carsten Nicolai / Alva Noto",
+    "Monochrome, grid, signal-as-image"
+   ]
+  },
+  {
+   "id": "data_landscape",
+   "taxonomy": "new",
+   "name": "Data Landscape",
+   "palette": [
+    "#0b132b",
+    "#1c2541",
+    "#5bc0be",
+    "#ffffff"
+   ],
+   "sources": [
+    "Noise",
+    "Ramp",
+    "Ring"
+   ],
+   "fx": [
+    "gaussianblur",
+    "vignette"
+   ],
+   "comp": [
+    "gradientmap",
+    "Color Ramp"
+   ],
+   "ban": [
+    "glitch"
+   ],
+   "motion": 0.4,
+   "pairs": [
+    "ambient",
+    "idm",
+    "downtempo"
+   ],
+   "refs": [
+    "Joy Division Unknown Pleasures cover (1979, Peter Saville)",
+    "Refik Anadol data sculptures",
+    "Generative terrain and contour art"
+   ]
+  }
+ ]
+}
