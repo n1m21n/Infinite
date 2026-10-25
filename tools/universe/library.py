@@ -59,6 +59,20 @@ def tags_of(r):
     return sorted(t)
 
 
+def interest(png):
+    """Cheap visual-interest score of a poster: luminance spread, edge density and colour variety, 0..1. Bland posters (flat fields, one blob) score low."""
+    from PIL import Image, ImageFilter, ImageStat
+    im = Image.open(png).convert("RGB").resize((240, 135))
+    lum = im.convert("L")
+    spread = min(1.0, ImageStat.Stat(lum).stddev[0] / 60.0)
+    edges = min(1.0, ImageStat.Stat(lum.filter(ImageFilter.FIND_EDGES)).mean[0] / 18.0)
+    colours = min(1.0, len(set(im.quantize(16).getdata())) / 12.0)
+    return round(0.4 * spread + 0.4 * edges + 0.2 * colours, 3)
+
+
+MIN_INTEREST = 0.2
+
+
 def run(cmd, timeout):
     try:
         cp = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -96,8 +110,13 @@ def publish(args):
     want = {"wav": ("A", "AV"), "png": ("V", "AV"), "mp4": ("V", "AV")}
     if not all(made.get(k) for k, ks in want.items() if kind in ks):
         shutil.rmtree(d); return None
+    score = None
+    if kind in ("V", "AV"):
+        score = interest(os.path.join(d, "poster.png"))
+        if score < MIN_INTEREST:
+            shutil.rmtree(d); return None
     meta = {"id": "%s/%s" % (folder, eid), "kind": kind, "genome": r["code"], "nodes": r["names"], "tags": tags_of(r),
-            "class": r["class"], "audio": {k: v for k, v in (r.get("a") or {}).items() if k in ("integrated_lufs", "sample_peak_dbfs", "onset_count_estimate", "silence_ratio")},
+            "class": r["class"], "interest": score, "audio": {k: v for k, v in (r.get("a") or {}).items() if k in ("integrated_lufs", "sample_peak_dbfs", "onset_count_estimate", "silence_ratio")},
             "files": sorted(f for f in os.listdir(d))}
     json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
     return meta
@@ -119,7 +138,7 @@ def main():
             r = json.loads(l)
             if r.get("class") == "ok" and r.get("names") and r["code"] not in seen:
                 seen.add(r["code"]); rows.append(r)
-    picked = select(rows, a.n)
+    picked = select(rows, int(a.n * 1.4))  # over-pick: the interest gate drops bland posters
     print("candidates %d  picked %d" % (len(rows), len(picked)))
     os.makedirs(a.out, exist_ok=True)
     start = sum(len(os.listdir(os.path.join(a.out, f))) for f in ("audio", "visual", "audiovisual") if os.path.isdir(os.path.join(a.out, f)))

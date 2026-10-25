@@ -332,7 +332,8 @@ def index_code_mods(text):
         if m:
             node = int(m.group(1)); params[node] = []
         elif line.startswith("  s code ") and node is not None:
-            params[node] = _re.findall(r"param \w+ (\w+)", line.replace("\\n", "\n"))
+            src = line.replace("\\n", "\n")
+            params[node] = _re.findall(r"param \w+ (\w+)", src) or _re.findall(r'param\("(\w+)"', src)
         elif line.startswith("mod "):
             f = line.split(" ")
             if len(f) > 2 and f[2].startswith("p.") and f[1].isdigit() and f[2][2:] in params.get(int(f[1]), []):

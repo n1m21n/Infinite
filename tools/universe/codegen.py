@@ -249,12 +249,94 @@ def pixel_source(fam, seed):
     return "\n".join(L) + "\n"
 
 
+
+# ------------------------------------------------------------------ Sketch (JS drawing) and Sketch 3D
+SK_PARAMS = {
+    "count": (3.0, 48.0, False), "spin": (0.0, 2.0, False), "size": (4.0, 90.0, False), "hue": (0.0, 1.0, False),
+    "reach": (0.1, 0.9, False), "wob": (0.0, 3.0, False), "arms": (2.0, 12.0, False), "depth": (2.0, 7.0, False),
+    "angle": (0.2, 1.2, False), "twist": (0.0, 2.0, False), "radius": (0.5, 3.0, False), "bulge": (0.0, 1.5, False),
+}
+SK_FAMS = {
+    "orbit": ["count", "spin", "size", "hue", "reach"],
+    "lissa": ["count", "spin", "size", "hue", "wob"],
+    "rose": ["arms", "spin", "size", "hue", "reach"],
+    "tree": ["depth", "angle", "spin", "hue", "wob"],
+    "grid": ["count", "spin", "size", "hue", "wob"],
+}
+SK3_FAMS = {
+    "helix": ["count", "twist", "size", "radius", "spin"],
+    "ring": ["count", "radius", "size", "bulge", "spin"],
+    "stack": ["count", "twist", "size", "bulge", "spin"],
+}
+
+
+def _sk_params(r, keys, tight=()):
+    L = []
+    for k in keys:
+        lo, hi, _ = SK_PARAMS[k]
+        d = lo + (hi - lo) * r.uniform(0.2, 0.8)
+        if k in ("count", "arms", "depth"):
+            d = float(int(d))
+        L.append('param("%s", %.3f, %.3f, %.3f);' % (k, d, lo, hi))
+    return L
+
+
+def sketch_source(fam, seed):
+    r = _rng("Sketch:" + fam, seed)
+    keys = SK_FAMS[fam]
+    L = _sk_params(r, keys) + ["", "function draw(t) {", "  background(%.2f);" % r.uniform(0.02, 0.1)]
+    if fam == "orbit":
+        L += ["  translate(width / 2, height / 2);", "  noStroke();", "  const R = min(width, height) * reach;",
+              "  for (let i = 0; i < count; i++) {", "    rotate(TAU / count + spin * t * 0.1);", "    fill(hsl((hue + i / count) %% 1, 0.7, 0.6));",
+              "    circle(R + R * 0.3 * sin(t + i), 0, size);", "  }"]
+    elif fam == "lissa":
+        L += ["  translate(width / 2, height / 2);", "  noStroke();", "  const R = min(width, height) * 0.4;",
+              "  for (let i = 0; i < count * 4; i++) {", "    const a = i / (count * 4) * TAU;",
+              "    fill(hsl((hue + i / (count * 4)) %% 1, 0.8, 0.6));",
+              "    circle(R * sin(%d * a + t * spin), R * sin(%d * a + wob), size * 0.4);" % (r.choice([2, 3, 4]), r.choice([3, 4, 5])), "  }"]
+    elif fam == "rose":
+        L += ["  translate(width / 2, height / 2);", "  noStroke();", "  const R = min(width, height) * reach;",
+              "  for (let i = 0; i < 160; i++) {", "    const a = i / 160 * TAU;", "    const k = R * cos(arms * 0.5 * a + t * spin * 0.3);",
+              "    fill(hsl((hue + i / 160) %% 1, 0.75, 0.6));", "    circle(k * cos(a), k * sin(a), size * 0.3);", "  }"]
+    elif fam == "tree":
+        L += ["  translate(width / 2, height * 0.95);", "  stroke(1);", "  strokeWeight(2);", "  branch(height * 0.22, depth, t);", "}", "",
+              "function branch(len, d, t) {", "  if (d < 1) return;", "  stroke(hsl((hue + d * 0.08) %% 1, 0.7, 0.6));", "  line(0, 0, 0, -len);", "  translate(0, -len);",
+              "  push();", "  rotate(angle + wob * 0.05 * sin(t * spin + d));", "  branch(len * 0.72, d - 1, t);", "  pop();",
+              "  push();", "  rotate(0 - angle - wob * 0.05 * sin(t * spin + d));", "  branch(len * 0.72, d - 1, t);", "  pop();"]
+    elif fam == "grid":
+        L += ["  noStroke();", "  const n = floor(count);", "  for (let i = 0; i < n; i++) {", "    for (let j = 0; j < n; j++) {",
+              "      const x = (i + 0.5) / n * width;", "      const y = (j + 0.5) / n * height;",
+              "      fill(hsl((hue + (i + j) / (2 * n) + 0.1 * sin(t * spin)) %% 1, 0.7, 0.55));",
+              "      circle(x + wob * 8 * sin(t * spin + j), y + wob * 8 * cos(t * spin + i), size * 0.5);", "    }", "  }"]
+    L += ["}"]
+    return "\n".join(L) + "\n"
+
+
+def sketch3d_source(fam, seed):
+    r = _rng("Sketch 3D:" + fam, seed)
+    keys = SK3_FAMS[fam]
+    L = _sk_params(r, keys) + ["", "function draw(t) {"]
+    if fam == "helix":
+        L += ["  for (let i = 0; i < count; i++) {", "    push();", "    rotateY(i * twist * 0.3 + t * spin);", "    translate(radius, i * 0.25 - count * 0.125, 0);",
+              "    fill(hsl((i / count) %% 1, 0.7, 0.6));", "    sphere(size * 0.01);", "    pop();", "  }"]
+    elif fam == "ring":
+        L += ["  for (let i = 0; i < count; i++) {", "    push();", "    rotateY(i / count * TAU + t * spin);", "    translate(radius, 0, 0);",
+              "    fill(hsl((i / count) %% 1, 0.7, 0.6));", "    box(size * 0.01 * (1 + bulge * sin(i + t)));", "    pop();", "  }"]
+    else:
+        L += ["  for (let i = 0; i < count; i++) {", "    push();", "    translate(0, i * 0.2 - count * 0.1, 0);", "    rotateY(i * twist * 0.4 + t * spin);",
+              "    fill(hsl((i / count) %% 1, 0.7, 0.6));", "    box(size * 0.02 * (1 + bulge * 0.3 * sin(i)), 0.08, size * 0.02);", "    pop();", "  }"]
+    L += ["}"]
+    return "\n".join(L) + "\n"
+
+
 # ------------------------------------------------------------------ registry
 BASES = {
     "Field Synth": (SYNTH_FAMS, SYNTH_PARAMS, synth_source),
     "Field Effect": (FX_FAMS, FX_PARAMS, fx_source),
     "Field Notes": (NOTE_FAMS, NOTE_PARAMS, notes_source),
     "FieldPixel": (PIX_FAMS, PIX_PARAMS, pixel_source),
+    "Sketch": (SK_FAMS, SK_PARAMS, sketch_source),
+    "Sketch 3D": (SK3_FAMS, SK_PARAMS, sketch3d_source),
 }
 
 
