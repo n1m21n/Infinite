@@ -102,7 +102,7 @@ current patch as text.
 | PointZ (GPU points) | Grid / Sphere / Box / Point Generator / Line / Text PointZ, Noise / Transform / Twist / Math / Field / Random / GLSL PointZ, Instance PointZ, Particle PointZ + Null PointZ, Copy / Merge / Delete / Extrude / Sprinkle PointZ, Image to PointZ (`describe` lists all 85) |
 | 3D | Geometry, Model 3D, Text 3D, Material, Mapping, Displacement, the Geometry Op family (Transform, Array, Subdivide, Extrude, Twist, Decimate ...), Join Geometry, Group 3D, Instance on Points, Distribute Points on Faces / in Grid, Delaunay Mesh, Voronoi Cells, Curve, Curve Ops, Particle System, Cloth, Metaballs, Camera, Light, HDRI, Render 3D |
 | Modulators | LFO, Envelope, Random, Drift, Pattern, Math, Smoothing, Range to Range, Audio Analyze (audio to CV), Image Analyze, MIDI CC, Macro Knob / Slider / XY |
-| Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Looper, Audio Out |
+| Sound | Oscillator, Analog, Wavetable, Circuit Synth (a simulated circuit), Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Looper, Audio Out |
 | Mixing | **Super Mixer** (16 channels, the default whenever 2+ sources play), Mixer (8-input sum inside a chain), Spatial Mixer (binaural) |
 | Notes | Keyboard (virtual keyboard: mouse or computer keys, typingAlways plays without hover), Note Sequencer, Drum Sequencer, Arpeggiator, Pattern Player, Note Looper, Chord Progression, MIDI File, Quantizer, MIDI Notes, MIDI Out |
 | Performance | Clip Matrix (+ Clip Matrix Out), Transport Control, Timeline |
@@ -461,6 +461,37 @@ frac -> fract, mul(a,b) -> a*b with care for order, saturate(x) -> clamp(x,0.,1.
 **Licences**: Shadertoy code is CC BY-NC-SA 3.0 unless the author says otherwise, and some
 authors forbid any reuse. Check the header. Never put third-party shaders into the Infinite-Turbo
 repository or a release; keep them in the user's own patches, and keep the author's credit line.
+)SKILL"
+R"SKILL(
+## Circuit Synth: a circuit simulated as an instrument (Turbo 0.73)
+
+`Circuit Synth` (Synths) makes its sound by simulating a small electrical circuit. Notes in (slot 0),
+stereo audio out: MIDI Notes / Keyboard / Note Sequencer -> Circuit Synth -> a Super Mixer channel ->
+Audio Out. Its panel draws the circuit's schematic.
+
+- `preset` picks the circuit by index: 0 Diode Clipper, 1 Fuzz, 2 RC Lowpass, 3 RLC Lowpass, 4 Series LC,
+  5 Tank Filter, 6 Twin-T Notch, 7 LC Ladder, 8 LC Tank, 9 Thump, 10 Coupled Tanks, 11 Bell, 12 LC Line,
+  13 LC Mesh, 14 Van der Pol, 15 Pushed VdP, 16 Neon Relax, 17 Chua, 18 BT Kick, 19 BT Tom, 20 Rim,
+  21 Buzzer, 22 Ringer.
+- Setting `preset` from a tool changes only the circuit, not its play settings (the panel's menu sets
+  those). Set them with it: the struck circuits 8-13 and 18-20 want `trigger` 0 (tap) and `wave` 4
+  (step); 14, 16 and 17 `wave` 4 with `trigger` 1 (hold); 21 and 22 `wave` 1 (pulse); the rest `wave` 0
+  (saw) and `trigger` 1. Put `k0`..`k7` back to 0 when you switch circuit.
+- `k0`..`k7`: one knob per part (or group of parts) of the current circuit, -1..1 = 1/8 .. 8 times the
+  drawn value (R, C, L, volts; a diode's knob moves its clipping level 0.5..2x). Their drawn names (for
+  modulate, set_expression, perf_add) are the part names (`R`, `C`, `D`, `L line`, `R decay`...) and
+  change with the circuit: `explain` the node after setting `preset`.
+- Play: `mode` 0 mono / 1 poly, `trigger` 0 tap (touch the source and let the circuit ring) / 1 hold,
+  `wave` 0 saw 1 pulse 2 sine 3 noise 4 step, `cFollow` / `lFollow` (C and L follow the key), `pitch`
+  (semitones), `glide` (s), `contact` (ms, how soft the source connects), `attack` / `release` (s).
+- LFO: `lfoRate` (Hz), `lfoDepth` (0..1, 0 = off), `lfoShape` 0 sine 1 triangle 2 square 3 random,
+  `lfoTarget` 0 tune 1 power 2 damp 3 level 4 cutoff.
+- Output filter, the synths' usual list: `filter` 0 off, 1-3 lp 12/24/36, 4-6 hp 12/24/36, 7-8 bp
+  12/24, 9-10 notch 12/24, 11-12 comb +/-; `cutoff` (Hz), `reso` (0..1), `filterKey` (0..1, the cutoff
+  follows the last note).
+- Stereo: `probeA` / `probeB` (where the left and right sides listen; each circuit has 2-4 probe points,
+  `explain` names them), `width` (0 mono .. 1.5), `spread` (0..5 %, part tolerance between the two
+  circuits each voice runs), `level`.
 )SKILL"
 R"SKILL(
 ## PointZ nodes: GPU point operators (Turbo 0.58)

@@ -166,6 +166,10 @@ getting a file each:
   EQ), not a new node class. EQ is a deliberate second, separate node from Audio
   Filter rather than a re-expansion of it — Audio Filter stays one band/one type
   on purpose.
+- **`src/audio/dsp/CircuitSynthDsp.h`/`.cpp`** (Turbo 0.73) - the **Circuit Synth** engine: Modified
+  Nodal Analysis with trapezoidal companions, Newton on nonlinear ports, twin circuits per voice for
+  stereo; the netlists (and their schematic layouts) live in `CircuitSynthPresets.cpp`. See
+  `docs/CIRCUIT-SYNTH.md`.
 - **`src/audio/Wavetable.h`/`.cpp`** — the 12-table/8-frame/10-mip-level bank
   shared by the **Wavetable** synth and the **Wavetable Shaper** effect
   (the latter reads a frame as a transfer curve rather than an oscillator).
