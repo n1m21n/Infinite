@@ -254,3 +254,13 @@ Extending Tongue to modulation and other records. Training a generative model. H
 | Grain Molder | silent headless even with the official starter patch (loads and records via the UI); excluded like Keyboard |
 | Pool indices | a genome index is the position in the sorted pool, so changing the pool (e.g. excluding a type) changes what old genomes decode to. Decode atlas rows with the pool they were generated under, or store the compiled type names |
 | Engine bug | Grain Molder `descending` is advertised modulatable (index 771) but the engine rejects it (`E_BAD_PARAM`, only 0..680) |
+
+### M4 and F3 (2026-10-25)
+
+| Fact | Result |
+|---|---|
+| M4 notation | `L18.25018<1@2.rateSeconds`: modulator reads compiled node 1 (audio or note reader) and drives node 2 on another spine |
+| M4 audible | 93.3% of 254 join patches (24 clipped, 17 silent, 0 errors); join patches skew audible, not comparable to M2 |
+| F3 determinism | 40 audible patches re-probed: 29 bit-identical, 39 within 1 LU, 1 unstable (clipped frames 3 vs 20). Cause not isolated; suspect free-running random generators or modulators |
+| Tools | `tools/universe/universe.py` (genome, compile, probe), `atlas.py` (summary), `determinism.py` (F3) |
+| Not yet | F4 learned filter, F5 judge, visual orders, combined order, publishing (P6) |
