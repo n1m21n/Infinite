@@ -56,5 +56,6 @@ jobs:
         with:
           identifier: n1m21n.Infinite
           version: ${{ needs.tag.outputs.tag }}
+          release-tag: ${{ needs.tag.outputs.tag }}
           installers-regex: 'Infinite-windows-(x64|ARM64)\.zip$'
           token: ${{ secrets.WINGET_TOKEN }}
