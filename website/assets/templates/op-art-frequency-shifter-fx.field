@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Op Art Frequency Shifter FX",
+    "author": "Infinite",
+    "description": "Bode-style single-sideband frequency shifter with quadrature phase splitting, endless barber-pole Shepard tone phase sweeps, and cross-channel dispersion.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float shiftHz = 14.0 [-100.0, 100.0];\nparam float barberRate = 0.45 [0.05, 2.0];\nparam float feedback = 0.35 [0.0, 0.85];\nparam float dispersion = 0.6 [0.0, 1.0];\nparam float mix = 0.5 [0.0, 1.0];\nstate float carrierPhase = 0;\nstate float barberPhase = 0;\nstate float q1 = 0;\nstate float q2 = 0;\nstate float prevOut = 0;\n\ncarrierPhase = (carrierPhase + shiftHz / sr) % 1.0;\nbarberPhase = (barberPhase + barberRate / sr) % 1.0;\n\ndrive = in + prevOut * feedback * 0.6;\n\nq1 = q1 + 0.5 * (drive - q1);\nq2 = q2 + 0.25 * (q1 - q2);\n\ncI = cos(carrierPhase * 6.2831853);\nsQ = sin(carrierPhase * 6.2831853);\n\nbarberTrem = sin(barberPhase * 6.2831853) * dispersion * 0.4 + 1.0;\nshifted = (drive * cI - (drive - q2 * 1.5) * sQ) * barberTrem;\n\nprevOut = tanh(shifted);\nout = in * (1.0 - mix) + prevOut * mix;\n",
+    "params": {
+      "shiftHz": 14.0,
+      "barberRate": 0.45,
+      "feedback": 0.35,
+      "dispersion": 0.6,
+      "mix": 0.5
+    },
+    "nodeSettings": {}
+  }
+}

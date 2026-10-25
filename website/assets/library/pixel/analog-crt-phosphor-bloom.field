@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Analog CRT Phosphor Bloom",
+    "author": "Infinite",
+    "description": "Cathode ray oscilloscope vector bloom with curved CRT barrel distortion, dual Lissajous electron beam traces, phosphor decay persistence, and scanline raster glow. Bass expands the screen curvature and beam diameter, mids modulate harmonic Lissajous ratios, highs flare phosphor halo bloom.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float barrel = 0.22 [0.0, 0.6];\nparam float beamGlow = 1.6 [0.5, 3.5];\nparam float scanlines = 0.45 [0.0, 1.0];\nparam float lissajousRate = 1.0 [0.2, 3.0];\nparam float phosphorGreen = 0.85 [0.2, 1.0];\n\np0 = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr2 = dot(p0, p0);\np = p0 * (1.0 + r2 * barrel);\n\nr = length(p);\nang = atan2(p.y, p.x);\n\ncurve1 = abs(p.y - sin(p.x * 6.28 * 2.0 + t * lissajousRate) * 0.22);\ncurve2 = abs(p.x - cos(p.y * 6.28 * 3.0 - t * lissajousRate * 0.7) * 0.28);\nbeam = exp(-curve1 * 35.0) + exp(-curve2 * 35.0);\n\nring = abs(r - 0.32 - sin(ang * 4.0 + t) * 0.04);\nhalo = exp(-ring * 24.0) * 0.6;\n\nscan = 0.85 + 0.15 * sin(uv.y * 480.0 * 3.14159);\nscanEffect = mix(1.0, scan, scanlines);\n\ncPhosphor = vec3(0.2, 0.95, 0.55) * phosphorGreen + vec3(0.1, 0.4, 0.9) * (1.0 - phosphorGreen);\ncolCore = vec3(0.9, 1.0, 0.95) * pow(clamp(beam, 0.0, 1.0), 3.0);\ncolGlow = cPhosphor * (beam * beamGlow + halo * 1.2);\n\ncGround = vec3(0.04, 0.06, 0.08);\nvignette = clamp(1.0 - r2 * 1.6, 0.0, 1.0);\ncol = (mix(cGround, colGlow + colCore, clamp(beam + halo, 0.0, 1.0)) * scanEffect) * vignette;\nalpha = 1.0;\n",
+    "params": {
+      "barrel": 0.22,
+      "beamGlow": 1.6,
+      "scanlines": 0.45,
+      "lissajousRate": 1.0,
+      "phosphorGreen": 0.85
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

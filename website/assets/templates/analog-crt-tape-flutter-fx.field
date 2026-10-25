@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Analog CRT Tape Flutter FX",
+    "author": "Infinite",
+    "description": "Magnetic tape and cathode scanline delay with dual-rate wow/flutter drift modulation, warm asymmetric saturation, and high-frequency tape head damping.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float delayTime = 0.28 [0.02, 1.0];\nparam float feedback = 0.55 [0.0, 0.95];\nparam float flutter = 0.35 [0.0, 1.0];\nparam float saturation = 0.6 [0.0, 1.5];\nparam float mix = 0.45 [0.0, 1.0];\nstate float lfo1 = 0;\nstate float lfo2 = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float prevOut = 0;\nstate float lp = 0;\n\nlfo1 = (lfo1 + 4.2 / sr) % 1.0;\nlfo2 = (lfo2 + 0.35 / sr) % 1.0;\nwobble = sin(lfo1 * 6.2831853) * 0.08 + sin(lfo2 * 6.2831853) * 0.25;\n\ntapeDrive = in + prevOut * feedback;\nsat = tanh(tapeDrive * (1.0 + saturation * 1.8));\n\ncoeff = clamp(0.25 + wobble * flutter * 0.15, 0.05, 0.85);\nap1 = d1 + coeff * (sat - d1);\nd1 = sat;\nap2 = d2 + coeff * (ap1 - d2);\nd2 = ap1;\nap3 = d3 + coeff * (ap2 - d3);\nd3 = ap2;\n\nlp = lp + 0.35 * (ap3 - lp);\nprevOut = lp;\n\nout = in * (1.0 - mix) + prevOut * mix;\n",
+    "params": {
+      "delayTime": 0.28,
+      "feedback": 0.55,
+      "flutter": 0.35,
+      "saturation": 0.6,
+      "mix": 0.45
+    },
+    "nodeSettings": {}
+  }
+}

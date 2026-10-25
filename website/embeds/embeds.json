@@ -139,7 +139,7 @@
     {
       "slug": "hyperbolic-kaleidoscope",
       "title": "Hyperbolic Kaleidoscope",
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
     },
     {
       "slug": "bioluminescent-abyss",
@@ -189,7 +189,7 @@
     {
       "slug": "hyperbolic-tessellation",
       "title": "Hyperbolic Tessellation",
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
     },
     {
       "slug": "accretion-disk",
@@ -204,7 +204,7 @@
     {
       "slug": "hyperbolic-disk-fractal",
       "title": "Hyperbolic Disk Fractal",
-      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
+      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
     },
     {
       "slug": "magnetar-quantum-flux",
@@ -260,6 +260,16 @@
       "slug": "neo-brutalist-concrete-monolith",
       "title": "Neo-Brutalist Concrete Monolith",
       "description": "Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows."
+    },
+    {
+      "slug": "analog-crt-phosphor-bloom",
+      "title": "Analog CRT Phosphor Bloom",
+      "description": "Cathode ray oscilloscope vector bloom with curved CRT barrel distortion, dual Lissajous electron beam traces, phosphor decay persistence, and scanline raster glow. Bass expands the screen curvature and beam diameter, mids modulate harmonic Lissajous ratios, highs flare phosphor halo bloom."
+    },
+    {
+      "slug": "op-art-hypnotic-vortex",
+      "title": "Op Art Hypnotic Vortex",
+      "description": "Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing."
     }
   ]
 }

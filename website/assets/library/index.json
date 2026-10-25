@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "Rössler Attractor",
+      "name": "R\u00f6ssler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "Möbius Strip 3D",
+      "name": "M\u00f6bius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2100,7 +2100,7 @@
         "minimal-surface",
         "topology"
       ],
-      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting M\u00f6bius band topology and Neil's parabola boundary.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2235,7 +2235,7 @@
         "Audio-Reactive",
         "Tessellation"
       ],
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -2284,7 +2284,7 @@
     },
     {
       "id": "plucker-conoid-3d",
-      "name": "Plücker's Conoid 3D",
+      "name": "Pl\u00fccker's Conoid 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -2438,7 +2438,7 @@
     },
     {
       "id": "hyperbolic-poincare-disk",
-      "name": "Hyperbolic Poincaré Disk",
+      "name": "Hyperbolic Poincar\u00e9 Disk",
       "kind": "Generator",
       "tags": [
         "hyperbolic",
@@ -2446,7 +2446,7 @@
         "geometry",
         "poincare"
       ],
-      "description": "Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
+      "description": "Conformal Poincar\u00e9 disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
       "domain": "sketch",
       "category": "Sketch",
       "params": 7,
@@ -2598,7 +2598,7 @@
         "Audio-Reactive",
         "Colour"
       ],
-      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
+      "description": "Conformal hyperbolic Poincar\u00e9 disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
       "domain": "pixel",
       "category": "Pixel",
       "params": 5,
@@ -2655,7 +2655,7 @@
         "tree",
         "geometry"
       ],
-      "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincaré plane with branching nodes and radial breathing.",
+      "description": "Recursive Bethe lattice and Cayley tree projected onto the hyperbolic Poincar\u00e9 plane with branching nodes and radial breathing.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch",
@@ -3076,7 +3076,7 @@
         "3d",
         "sculpture"
       ],
-      "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moiré interference lattices and topological phase shifts.",
+      "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moir\u00e9 interference lattices and topological phase shifts.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -3604,6 +3604,207 @@
       "file": "assets/library/pixel/neo-brutalist-concrete-monolith.field",
       "preview": "assets/library/previews/neo-brutalist-concrete-monolith.jpg",
       "bytes": 2013
+    },
+    {
+      "id": "analog-crt-vector-oscilloscope",
+      "name": "Analog CRT Vector Oscilloscope",
+      "kind": "Generator",
+      "tags": [
+        "analog",
+        "crt",
+        "vector",
+        "oscilloscope",
+        "lissajous"
+      ],
+      "description": "Dual-beam cathode ray vector oscilloscope with Lissajous harmonic curves, phosphor decay persistence, and drafting calibration graticule.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/analog-crt-vector-oscilloscope.js",
+      "preview": "assets/library/previews/analog-crt-vector-oscilloscope.jpg",
+      "bytes": 3236
+    },
+    {
+      "id": "op-art-kinetic-wave-moire",
+      "name": "Op Art Kinetic Wave Moire",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "kinetic",
+        "wave",
+        "moire",
+        "riley"
+      ],
+      "description": "Bridget Riley inspired optical illusion with interfering harmonic wave lines, dynamic moire nodes, and perceived kinetic vibration.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/op-art-kinetic-wave-moire.js",
+      "preview": "assets/library/previews/op-art-kinetic-wave-moire.jpg",
+      "bytes": 2453
+    },
+    {
+      "id": "analog-crt-wireframe-terrain-3d",
+      "name": "Analog CRT Wireframe Terrain 3D",
+      "kind": "Generator",
+      "tags": [
+        "analog",
+        "crt",
+        "wireframe",
+        "terrain",
+        "3d",
+        "arcade"
+      ],
+      "description": "Retro vector arcade perspective terrain grid scrolling towards the horizon with glowing phosphor vectors and radar beacon monoliths.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/analog-crt-wireframe-terrain-3d.js",
+      "preview": "assets/library/previews/analog-crt-wireframe-terrain-3d.jpg",
+      "bytes": 2474
+    },
+    {
+      "id": "op-art-hyperbolic-cage-3d",
+      "name": "Op Art Hyperbolic Cage 3D",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "hyperbolic",
+        "cage",
+        "3d",
+        "moire"
+      ],
+      "description": "Kinetic optical illusion ruled hyperboloid cage whose rotating straight struts generate curved saddle moire interference patterns.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/op-art-hyperbolic-cage-3d.js",
+      "preview": "assets/library/previews/op-art-hyperbolic-cage-3d.jpg",
+      "bytes": 2488
+    },
+    {
+      "id": "analog-crt-phosphor-beam-synth",
+      "name": "Analog CRT Phosphor Beam Synth",
+      "kind": "Generator",
+      "tags": [
+        "crt",
+        "phosphor",
+        "beam",
+        "synth",
+        "dsp"
+      ],
+      "description": "Cathode ray vector beam oscillator with morphing sawtooth-pulse waveform, sub-octave divider, 4-pole resonant beam focusing filter, and warm analog cathode saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/analog-crt-phosphor-beam-synth.inf",
+      "preview": "assets/library/previews/analog-crt-phosphor-beam-synth.jpg",
+      "bytes": 2159
+    },
+    {
+      "id": "op-art-spectral-chime-synth",
+      "name": "Op Art Spectral Chime Synth",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "chime",
+        "bell",
+        "spectral",
+        "dsp"
+      ],
+      "description": "Multi-partial inharmonic additive chime and bell synthesizer with kinetic beating moire modulations, metallic partial ratios, and shimmering exponential modal decays.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/op-art-spectral-chime-synth.inf",
+      "preview": "assets/library/previews/op-art-spectral-chime-synth.jpg",
+      "bytes": 2515
+    },
+    {
+      "id": "analog-crt-tape-flutter-fx",
+      "name": "Analog CRT Tape Flutter FX",
+      "kind": "Filter",
+      "tags": [
+        "crt",
+        "tape",
+        "flutter",
+        "delay",
+        "dsp"
+      ],
+      "description": "Magnetic tape and cathode scanline delay with dual-rate wow/flutter drift modulation, warm asymmetric saturation, and high-frequency tape head damping.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/analog-crt-tape-flutter-fx.inf",
+      "preview": "assets/library/previews/analog-crt-tape-flutter-fx.jpg",
+      "bytes": 1817
+    },
+    {
+      "id": "op-art-frequency-shifter-fx",
+      "name": "Op Art Frequency Shifter FX",
+      "kind": "Filter",
+      "tags": [
+        "op-art",
+        "frequency-shifter",
+        "shepard",
+        "effects",
+        "dsp"
+      ],
+      "description": "Bode-style single-sideband frequency shifter with quadrature phase splitting, endless barber-pole Shepard tone phase sweeps, and cross-channel dispersion.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/op-art-frequency-shifter-fx.inf",
+      "preview": "assets/library/previews/op-art-frequency-shifter-fx.jpg",
+      "bytes": 1794
+    },
+    {
+      "id": "analog-crt-phosphor-bloom",
+      "name": "Analog CRT Phosphor Bloom",
+      "kind": "Generator",
+      "tags": [
+        "crt",
+        "phosphor",
+        "bloom",
+        "vector",
+        "pixel"
+      ],
+      "description": "Cathode ray oscilloscope vector bloom with curved CRT barrel distortion, dual Lissajous electron beam traces, phosphor decay persistence, and scanline raster glow. Bass expands the screen curvature and beam diameter, mids modulate harmonic Lissajous ratios, highs flare phosphor halo bloom.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/analog-crt-phosphor-bloom.field",
+      "preview": "assets/library/previews/analog-crt-phosphor-bloom.jpg",
+      "bytes": 1886
+    },
+    {
+      "id": "op-art-hypnotic-vortex",
+      "name": "Op Art Hypnotic Vortex",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "vortex",
+        "moire",
+        "hypnotic",
+        "pixel"
+      ],
+      "description": "Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/op-art-hypnotic-vortex.field",
+      "preview": "assets/library/previews/op-art-hypnotic-vortex.jpg",
+      "bytes": 1676
     }
   ]
 }
