@@ -1,6 +1,6 @@
 /* Samples as a reel: the same 9:16 stage as the embeds page, one clip per slide, the slide on screen plays. */
 (function () {
-  var reels = document.getElementById('reels'), soundOn = false, isLock = false, lockTimer = null, io = null;
+  var reels = document.getElementById('reels'), pendingSound = false, soundOn = true, isLock = false, lockTimer = null, io = null;
   var IC_DL = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9.5m0 0-3.5-3.5M10 13l3.5-3.5M4 16.5h12"/></svg>';
   var IC_MUTE = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8v4h3l4 3.5v-11L6.5 8h-3Z"/><path d="m13.5 8 3.5 4M17 8l-3.5 4"/></svg>';
   var IC_SOUND = '<svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8v4h3l4 3.5v-11L6.5 8h-3Z"/><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5M15.6 5.4a6.5 6.5 0 0 1 0 9.2"/></svg>';
@@ -45,13 +45,20 @@
         if (e.isIntersecting && e.intersectionRatio >= 0.6) {
           if (!v.getAttribute('src')) v.src = v.getAttribute('data-src');
           v.muted = !(soundOn && av);
-          v.play().catch(function () { v.muted = true; v.play().catch(function () {}); });
-        } else {
-          v.pause();
-          if (!e.isIntersecting && v.getAttribute('src')) { v.removeAttribute('src'); v.load(); }   // only the slide on screen holds a decoder
-        }
+          v.play().catch(function () { v.muted = true; pendingSound = av; v.play().catch(function () {}); });   // autoplay with sound is refused until the first touch or key
+        } else v.pause();
       });
     }, { root: reels, threshold: [0, 0.6] });
+    // the slides next door are fetched ahead so a scroll lands on a ready frame; only far ones give their decoder back
+    var near = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        var v = e.target.querySelector('video');
+        if (e.isIntersecting) {
+          if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = v.getAttribute('data-src'); }
+        } else if (v.getAttribute('src')) { v.pause(); v.removeAttribute('src'); v.load(); }
+      });
+    }, { root: reels, rootMargin: '150% 0px' });
+    Array.prototype.forEach.call(reels.querySelectorAll('.reel-slide'), function (s) { near.observe(s); });
     Array.prototype.forEach.call(reels.querySelectorAll('.reel-slide'), function (s) { io.observe(s); });
     // posters load only for the slide on screen and its neighbours, not all at once
     var pio = new IntersectionObserver(function (es) {
@@ -66,6 +73,14 @@
     var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), hit = qs && reels.querySelector('.reel-slide[data-id="' + qs + '"]');
     if (hit) { reels.style.scrollBehavior = 'auto'; hit.scrollIntoView({ block: 'start' }); reels.style.scrollBehavior = ''; }
   }
+
+  function unlock() {
+    if (!pendingSound) return;
+    pendingSound = false; setSound();
+    var s = reels.children[activeIndex()], v = s && s.querySelector('video');
+    if (v && v.paused) v.play().catch(function () {});
+  }
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (t) { window.addEventListener(t, unlock, { once: false, passive: true }); });
 
   reels.addEventListener('click', function (e) {
     var b = e.target.closest('[data-snd]');

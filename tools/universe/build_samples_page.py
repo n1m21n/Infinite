@@ -48,7 +48,7 @@ def main():
     t = chrome("embeds/index.html", 2, "https://infinitedevices.org/samples/visuals/", "Infinite samples: pictures and sound from generated patches")
     main = '<main>\n    <h1 class="sr-only">Samples</h1>\n    ' + TABS % ("../", "", "./", ' aria-current="page"') + '\n    <div class="reels" id="reels"></div>\n  </main>'
     t = re.sub(r"<main>.*?</main>", lambda _: main, t, count=1, flags=re.S)
-    t = re.sub(r"<script>\s*\(function \(\) \{\s*var reels = .*?</script>", '<script src="../../samples-reels.js?v=3" defer></script>', t, count=1, flags=re.S)
+    t = re.sub(r"<script>\s*\(function \(\) \{\s*var reels = .*?</script>", '<script src="../../samples-reels.js?v=4" defer></script>', t, count=1, flags=re.S)
     t = t.replace('</head>', '  <link rel="stylesheet" href="../../samples.css?v=8">\n</head>', 1)
     open(os.path.join(a.site, "visuals", "index.html"), "w", encoding="utf-8").write(t)
 
