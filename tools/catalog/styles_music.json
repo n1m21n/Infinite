@@ -1,33 +1,1663 @@
 {
  "_doc": "Electronic-music style table: the internal taxonomy that drives sample generation. Not shown on the site. Drum lanes follow assets/drumkits/infinite-basic (kick,snare,closed hat,open hat,clap,low tom,high tom,bell); 16 steps, x=hit o=soft .=rest. scale = MusicTime ScaleType index (0 maj,1 min,2 harm min,3 mel min,4 dorian,5 phrygian,6 lydian,7 mixolydian,8 locrian,9 maj pent,10 min pent,11 blues,12 whole tone,13 chromatic). rate = RateDivision index (6 1/4, 9 1/8, 12 1/16). bass = scale degrees per 16th (0=root, .=rest). glitch 0..1 = how much stutter/bitcrush/stop-start the style tolerates. mod 0..1 = how much the modulators move. Research notes in docs/plans/patch-corpus/taxonomy/music.md.",
  "styles": [
-  {"id":"deep_house","family":"house","bpm":[118,124],"swing":0.12,"scale":[4,1],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..o...o...o...o.","ohat":"..x...x...x...x.","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0..0..2.0..0..3.","fx":["Chorus","Reverb","Audio Filter"],"synth":["Analog","Field Synth","Wavetable"],"ban":["Bitcrush","Stutter","Ring Mod"],"glitch":0.0,"mod":0.3,"refs":["Chicago house (Frankie Knuckles, Warehouse)","Larry Heard, Mr. Fingers","Moodymann, Theo Parrish (Detroit deep house)"]},
-  {"id":"acid_house","family":"house","bpm":[120,130],"swing":0.05,"scale":[10,5],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..x...x...x...x.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0.0.12.0.0.1.5.0","fx":["Audio Filter","Delay","Drive"],"synth":["Analog","Oscillator"],"ban":["Bitcrush","Stutter"],"glitch":0.05,"mod":0.8,"refs":["Phuture, Acid Tracks (1987)","Roland TB-303","Hardfloor, Josh Wink"]},
-  {"id":"tech_house","family":"house","bpm":[124,128],"swing":0.08,"scale":[1,5],"drums":{"kick":"x...x...x...x...","snare":"","chat":".o.o.o.o.o.o.o.o","ohat":"..x...x...x...x.","clap":"....x.......x..o","tom":"..........o....o","htom":"","bell":""},"bass":"0..0.0..0..0.0.3","fx":["Delay","Reverb","Audio Filter"],"synth":["Analog","FM","Wavetable"],"ban":["Bitcrush"],"glitch":0.1,"mod":0.4,"refs":["Ricardo Villalobos","Richie Hawtin (minimal crossover)","Fabric/Berlin club scene"]},
-  {"id":"progressive_house","family":"house","bpm":[124,130],"swing":0.0,"scale":[1,4],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..o...o...o...o.","ohat":"..x...x...x...x.","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0..0..0..0..0..0","fx":["Reverb","Delay","Chorus"],"synth":["Field Synth","Analog","Wavetable"],"ban":["Bitcrush","Stutter","Ring Mod"],"glitch":0.0,"mod":0.5,"refs":["Sasha and John Digweed","Deep Dish","Hybrid, Lange"]},
-  {"id":"french_filter_house","family":"house","bpm":[120,126],"swing":0.1,"scale":[1,4],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..o...o...o...o.","ohat":"..x...x...x...x.","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0..0..0..0..3..5","fx":["Audio Filter","Phaser","Dynamics"],"synth":["Analog","Field Synth"],"ban":["Bitcrush","Stutter"],"glitch":0.0,"mod":0.7,"refs":["Daft Punk, Homework / Discovery","Stardust, Music Sounds Better With You","Cassius, Alan Braxe"]},
-  {"id":"detroit_techno","family":"techno","bpm":[128,138],"swing":0.0,"scale":[1,4],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..x...x...x...x.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":"x.......x......."},"bass":"0.....0.......3.","fx":["Reverb","Delay","Chorus"],"synth":["Analog","Field Synth","FM"],"ban":["Bitcrush","Stutter"],"glitch":0.0,"mod":0.4,"refs":["Belleville Three: Juan Atkins, Derrick May, Kevin Saunderson","Underground Resistance","Reynolds, Energy Flash"]},
-  {"id":"minimal_techno","family":"techno","bpm":[122,128],"swing":0.06,"scale":[1,5],"drums":{"kick":"x...x...x...x...","snare":"","chat":".o..o..o..o..o..","ohat":"","clap":"..........o.....","tom":"o.......o...o...","htom":"","bell":""},"bass":"0.......0...3...","fx":["Delay","Reverb","EQ"],"synth":["FM","Wavetable","Analog"],"ban":["Bitcrush"],"glitch":0.2,"mod":0.5,"refs":["Basic Channel, Chain Reaction","Plastikman, Richie Hawtin","Ricardo Villalobos, Perlon"]},
-  {"id":"dub_techno","family":"techno","bpm":[116,124],"swing":0.0,"scale":[1,4],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..o...o...o...o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0...............","fx":["Delay","Reverb","Audio Filter"],"synth":["Analog","Field Synth"],"ban":["Bitcrush","Stutter","Drive"],"glitch":0.0,"mod":0.3,"refs":["Basic Channel / Rhythm & Sound","Deepchord, Echospace","Gas (Wolfgang Voigt)"]},
-  {"id":"industrial_techno","family":"techno","bpm":[135,150],"swing":0.0,"scale":[5,1],"drums":{"kick":"x..xx..xx..xx...","snare":"","chat":".o.o.o.o.o.o.o.o","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0.0.0.0.0.0.0.0.","fx":["Drive","Saturator","Reverb"],"synth":["Analog","FM","Metallic"],"ban":["Chorus"],"glitch":0.15,"mod":0.5,"refs":["Surgeon, Regis, Blawan","Perc, Ancient Methods","Throbbing Gristle, Cabaret Voltaire (ancestors)"]},
-  {"id":"classic_trance","family":"trance","bpm":[132,140],"swing":0.0,"scale":[1,4],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..x...x...x...x.","ohat":"..x...x...x...x.","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":".0.0.0.0.0.0.0.0","fx":["Delay","Reverb","Audio Filter"],"synth":["Analog","Field Synth","Wavetable"],"ban":["Bitcrush","Stutter"],"glitch":0.0,"mod":0.6,"refs":["Paul van Dyk, Tiesto, Armin van Buuren","Oakenfold, Goa lineage","Reynolds, Energy Flash (trance chapter)"]},
-  {"id":"psytrance","family":"trance","bpm":[140,148],"swing":0.0,"scale":[5,1],"drums":{"kick":"x...x...x...x...","snare":"","chat":".o.o.o.o.o.o.o.o","ohat":"..x...x...x...x.","clap":"","tom":"","htom":"","bell":""},"bass":".0.0.0.0.0.0.0.0","fx":["Delay","Audio Filter","Drive"],"synth":["Analog","FM","Oscillator"],"ban":["Bitcrush"],"glitch":0.1,"mod":0.8,"refs":["Goa trance (Juno Reactor, Hallucinogen)","Infected Mushroom, Astrix","Full-on / dark psy (Zenon, Parasense)"]},
-  {"id":"liquid_dnb","family":"drum_and_bass","bpm":[170,176],"swing":0.0,"scale":[1,4],"drums":{"kick":"x.........x.....","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.........0.3...","fx":["Reverb","Chorus","Audio Filter"],"synth":["Field Synth","Analog","Wavetable"],"ban":["Bitcrush","Stutter","Drive"],"glitch":0.0,"mod":0.4,"refs":["LTJ Bukem, Good Looking Records","Hospital Records, Calibre","High Contrast, Netsky"]},
-  {"id":"neurofunk","family":"drum_and_bass","bpm":[172,178],"swing":0.0,"scale":[5,1],"drums":{"kick":"x.........x.....","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.0.0...0.0.3...","fx":["Drive","Audio Filter","Saturator"],"synth":["Analog","FM","Wavetable"],"ban":["Chorus"],"glitch":0.2,"mod":0.9,"refs":["Ed Rush & Optical, Konflict","Noisia, Phace, Mefjus","Photek (precursor)"]},
-  {"id":"jungle","family":"drum_and_bass","bpm":[160,170],"swing":0.05,"scale":[1,10],"drums":{"kick":"x.........x.....","snare":"....x..o.o..x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.........0.....","fx":["Reverb","Delay","EQ"],"synth":["Sampler","Analog"],"ban":["Bitcrush"],"glitch":0.2,"mod":0.4,"refs":["Amen break lineage (The Winstons)","Goldie, Timeless","Shy FX, Congo Natty, Rebel MC"]},
-  {"id":"uk_garage","family":"bass_music","bpm":[130,138],"swing":0.28,"scale":[1,4],"drums":{"kick":"x.........x.....","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.....0.....3...","fx":["Chorus","Reverb","Audio Filter"],"synth":["Analog","Field Synth"],"ban":["Bitcrush","Stutter"],"glitch":0.05,"mod":0.4,"refs":["2-step: Artful Dodger, MJ Cole","Burial, Untrue","Todd Edwards"]},
-  {"id":"dubstep","family":"bass_music","bpm":[138,142],"swing":0.0,"scale":[1,5],"drums":{"kick":"x...............","snare":"........x.......","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.......0.......","fx":["Drive","Audio Filter","Reverb"],"synth":["Analog","Wavetable","FM"],"ban":["Chorus"],"glitch":0.1,"mod":0.9,"refs":["Digital Mystikz, Loefah, Skream, Benga","Mala, Coki","Skream Midnight Request Line"]},
-  {"id":"breakbeat","family":"breaks","bpm":[125,140],"swing":0.05,"scale":[1,10],"drums":{"kick":"x.....x...x.....","snare":"....x..o.o..x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.....0...0.....","fx":["Delay","Drive","Reverb"],"synth":["Analog","Sampler"],"ban":["Bitcrush"],"glitch":0.1,"mod":0.5,"refs":["Prodigy, Chemical Brothers, Fatboy Slim (big beat)","Nu skool breaks (Plump DJs)","Detroit breakdown tradition"]},
-  {"id":"electro","family":"breaks","bpm":[118,132],"swing":0.0,"scale":[1,5],"drums":{"kick":"x.....x...x.....","snare":"....x.......x...","chat":"..o...o...o...o.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0.....0...0.....","fx":["Chorus","Delay","Audio Filter"],"synth":["Analog","FM","Oscillator"],"ban":["Bitcrush","Stutter"],"glitch":0.05,"mod":0.5,"refs":["Kraftwerk, Planet Rock (Afrika Bambaataa, Arthur Baker)","Drexciya, Dopplereffekt","Roland TR-808 era"]},
-  {"id":"ambient","family":"ambient","bpm":[60,90],"swing":0.0,"scale":[6,9,4],"drums":{"kick":"","snare":"","chat":"","ohat":"","clap":"","tom":"","htom":"","bell":"x.......o......."},"bass":"0...............","fx":["Reverb","Delay","Chorus"],"synth":["Field Synth","Partials","Granular","Spectral Synth"],"ban":["Bitcrush","Stutter","Drive","Ring Mod"],"glitch":0.0,"mod":0.2,"refs":["Brian Eno, Music for Airports","Aphex Twin, Selected Ambient Works 85-92","Stars of the Lid, Hiroshi Yoshimura"]},
-  {"id":"dark_ambient","family":"ambient","bpm":[50,80],"swing":0.0,"scale":[5,8],"drums":{"kick":"","snare":"","chat":"","ohat":"","clap":"","tom":"x...............","htom":"","bell":""},"bass":"0...............","fx":["Reverb","Convolution Reverb","Audio Filter"],"synth":["Granular","Partials","Spectral Synth","Metallic"],"ban":["Chorus","Bitcrush"],"glitch":0.0,"mod":0.3,"refs":["Lustmord","Raison d'etre, Atrium Carceri","Tim Hecker, Ben Frost"]},
-  {"id":"idm","family":"experimental","bpm":[100,170],"swing":0.0,"scale":[4,5,13],"drums":{"kick":"x....x....x..x..","snare":"....x..o....x.o.","chat":"o.oo.o.oo.o.oo.o","ohat":"","clap":"","tom":"..o.....o...o...","htom":"","bell":""},"bass":"0..2..0...5..3..","fx":["Delay","Reverb","Audio Filter"],"synth":["FM","Wavetable","Analog"],"ban":[],"glitch":0.45,"mod":0.8,"refs":["Warp Records: Autechre, Aphex Twin, Boards of Canada","Squarepusher, Venetian Snares","Artificial Intelligence compilation (1992)"]},
-  {"id":"glitch","family":"experimental","bpm":[90,140],"swing":0.0,"scale":[13,5],"drums":{"kick":"x..x..x...x.x...","snare":"....x.......x.x.","chat":"o.o.oo.o.oo.o.oo","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0..0.......0.3..","fx":["Stutter","Bitcrush","Delay"],"synth":["Wavetable","FM","Sampler"],"ban":[],"glitch":1.0,"mod":0.9,"refs":["Oval, Ryoji Ikeda, Alva Noto","Mille Plateaux / Clicks and Cuts","Kim Cascone, The Aesthetics of Failure (2000)"]},
-  {"id":"downtempo","family":"downtempo","bpm":[80,100],"swing":0.15,"scale":[4,1,10],"drums":{"kick":"x.....x...x.....","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.....0...3.....","fx":["Reverb","Chorus","Delay"],"synth":["Analog","Field Synth","Sampler"],"ban":["Bitcrush","Stutter","Drive"],"glitch":0.0,"mod":0.3,"refs":["Massive Attack, Portishead (trip-hop)","Bonobo, Thievery Corporation","Ninja Tune, Mo' Wax"]},
-  {"id":"lofi_beats","family":"downtempo","bpm":[70,90],"swing":0.22,"scale":[4,1,10],"drums":{"kick":"x.....x...x.....","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0.....0...3.....","fx":["Chorus","Reverb","Audio Filter"],"synth":["Analog","Sampler","Field Synth"],"ban":["Stutter","Drive"],"glitch":0.02,"mod":0.2,"refs":["J Dilla, Donuts (2006)","Nujabes","Lofi hip hop radio culture (2010s)"]},
-  {"id":"synthwave","family":"retro","bpm":[96,118],"swing":0.0,"scale":[1,0],"drums":{"kick":"x...x...x...x...","snare":"....x.......x...","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0.0.0.0.0.0.0.0.","fx":["Chorus","Reverb","Delay"],"synth":["Analog","Field Synth","Oscillator"],"ban":["Bitcrush","Stutter"],"glitch":0.0,"mod":0.3,"refs":["Kavinsky, Perturbator, Carpenter Brut","Drive (2011), Stranger Things (2016) soundtracks","Giorgio Moroder, Vangelis (ancestors)"]},
-  {"id":"vaporwave","family":"retro","bpm":[60,85],"swing":0.0,"scale":[6,0],"drums":{"kick":"x.......x.......","snare":"........x.......","chat":"","ohat":"","clap":"","tom":"","htom":"","bell":""},"bass":"0...............","fx":["Chorus","Reverb","Audio Filter"],"synth":["Field Synth","Sampler","Analog"],"ban":["Stutter","Drive","Bitcrush"],"glitch":0.0,"mod":0.2,"refs":["Macintosh Plus, Floral Shoppe (2011)","Vektroid, 2814","Fuji TV, mall-music and elevator-music reappropriation"]},
-  {"id":"footwork","family":"bass_music","bpm":[155,165],"swing":0.0,"scale":[1,5],"drums":{"kick":"x..x..x...x..x..","snare":"..o.....o.o.....","chat":"o.o.o.o.o.o.o.o.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0..0..0...0..0..","fx":["Delay","Reverb","Audio Filter"],"synth":["Sampler","Analog","FM"],"ban":["Chorus"],"glitch":0.2,"mod":0.5,"refs":["Chicago juke / footwork: DJ Rashad, RP Boo, DJ Spinn","Teklife crew","Planet Mu, Dancemania"]},
-  {"id":"gabber","family":"hard","bpm":[165,190],"swing":0.0,"scale":[5,1],"drums":{"kick":"x...x...x...x...","snare":"","chat":"..x...x...x...x.","ohat":"","clap":"....x.......x...","tom":"","htom":"","bell":""},"bass":"0...0...0...0...","fx":["Drive","Saturator","Dynamics"],"synth":["Analog","FM"],"ban":["Chorus","Reverb"],"glitch":0.1,"mod":0.4,"refs":["Rotterdam hardcore: Rotterdam Terror Corps, Neophyte","Thunderdome (1992-2012)","Mokum, Euromasters"]}
+  {
+   "id": "deep_house",
+   "family": "house",
+   "bpm": [
+    118,
+    124
+   ],
+   "swing": 0.12,
+   "scale": [
+    4,
+    1
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "..x...x...x...x.",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..2.0..0..3.",
+   "fx": [
+    "Chorus",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Chicago house (Frankie Knuckles, Warehouse)",
+    "Larry Heard, Mr. Fingers",
+    "Moodymann, Theo Parrish (Detroit deep house)"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 20,
+    "human": 8
+   },
+   "notefx": [
+    "Humanizer"
+   ]
+  },
+  {
+   "id": "acid_house",
+   "family": "house",
+   "bpm": [
+    120,
+    130
+   ],
+   "swing": 0.05,
+   "scale": [
+    10,
+    5
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..x...x...x...x.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.12.0.0.1.5.0",
+   "fx": [
+    "Audio Filter",
+    "Delay",
+    "Drive"
+   ],
+   "synth": [
+    "Analog",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.8,
+   "refs": [
+    "Phuture, Acid Tracks (1987)",
+    "Roland TB-303",
+    "Hardfloor, Josh Wink"
+   ]
+  },
+  {
+   "id": "tech_house",
+   "family": "house",
+   "bpm": [
+    124,
+    128
+   ],
+   "swing": 0.08,
+   "scale": [
+    1,
+    5
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": ".o.o.o.o.o.o.o.o",
+    "ohat": "..x...x...x...x.",
+    "clap": "....x.......x..o",
+    "tom": "..........o....o",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0.0..0..0.0.3",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.1,
+   "mod": 0.4,
+   "refs": [
+    "Ricardo Villalobos",
+    "Richie Hawtin (minimal crossover)",
+    "Fabric/Berlin club scene"
+   ]
+  },
+  {
+   "id": "progressive_house",
+   "family": "house",
+   "bpm": [
+    124,
+    130
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "..x...x...x...x.",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..0..0..0..0",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Chorus"
+   ],
+   "synth": [
+    "Field Synth",
+    "Analog",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.5,
+   "refs": [
+    "Sasha and John Digweed",
+    "Deep Dish",
+    "Hybrid, Lange"
+   ],
+   "sidechain": true,
+   "notefx": [
+    "Humanizer"
+   ]
+  },
+  {
+   "id": "french_filter_house",
+   "family": "house",
+   "bpm": [
+    120,
+    126
+   ],
+   "swing": 0.1,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "..x...x...x...x.",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..0..0..3..5",
+   "fx": [
+    "Audio Filter",
+    "Phaser",
+    "Dynamics"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.7,
+   "refs": [
+    "Daft Punk, Homework / Discovery",
+    "Stardust, Music Sounds Better With You",
+    "Cassius, Alan Braxe"
+   ]
+  },
+  {
+   "id": "detroit_techno",
+   "family": "techno",
+   "bpm": [
+    128,
+    138
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..x...x...x...x.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": "x.......x......."
+   },
+   "bass": "0.....0.......3.",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Chorus"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "FM"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.4,
+   "refs": [
+    "Belleville Three: Juan Atkins, Derrick May, Kevin Saunderson",
+    "Underground Resistance",
+    "Reynolds, Energy Flash"
+   ]
+  },
+  {
+   "id": "minimal_techno",
+   "family": "techno",
+   "bpm": [
+    122,
+    128
+   ],
+   "swing": 0.06,
+   "scale": [
+    1,
+    5
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": ".o..o..o..o..o..",
+    "ohat": "",
+    "clap": "..........o.....",
+    "tom": "o.......o...o...",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......0...3...",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "EQ"
+   ],
+   "synth": [
+    "FM",
+    "Wavetable",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.2,
+   "mod": 0.5,
+   "refs": [
+    "Basic Channel, Chain Reaction",
+    "Plastikman, Richie Hawtin",
+    "Ricardo Villalobos, Perlon"
+   ]
+  },
+  {
+   "id": "dub_techno",
+   "family": "techno",
+   "bpm": [
+    116,
+    124
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..o...o...o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...............",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Basic Channel / Rhythm & Sound",
+    "Deepchord, Echospace",
+    "Gas (Wolfgang Voigt)"
+   ]
+  },
+  {
+   "id": "industrial_techno",
+   "family": "techno",
+   "bpm": [
+    135,
+    150
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    1
+   ],
+   "drums": {
+    "kick": "x..xx..xx..xx...",
+    "snare": "",
+    "chat": ".o.o.o.o.o.o.o.o",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.0.0.0.0.0.0.",
+   "fx": [
+    "Drive",
+    "Saturator",
+    "Reverb"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Metallic"
+   ],
+   "ban": [
+    "Chorus"
+   ],
+   "glitch": 0.15,
+   "mod": 0.5,
+   "refs": [
+    "Surgeon, Regis, Blawan",
+    "Perc, Ancient Methods",
+    "Throbbing Gristle, Cabaret Voltaire (ancestors)"
+   ]
+  },
+  {
+   "id": "classic_trance",
+   "family": "trance",
+   "bpm": [
+    132,
+    140
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..x...x...x...x.",
+    "ohat": "..x...x...x...x.",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": ".0.0.0.0.0.0.0.0",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.6,
+   "refs": [
+    "Paul van Dyk, Tiesto, Armin van Buuren",
+    "Oakenfold, Goa lineage",
+    "Reynolds, Energy Flash (trance chapter)"
+   ]
+  },
+  {
+   "id": "psytrance",
+   "family": "trance",
+   "bpm": [
+    140,
+    148
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    1
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": ".o.o.o.o.o.o.o.o",
+    "ohat": "..x...x...x...x.",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": ".0.0.0.0.0.0.0.0",
+   "fx": [
+    "Delay",
+    "Audio Filter",
+    "Drive"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.1,
+   "mod": 0.8,
+   "refs": [
+    "Goa trance (Juno Reactor, Hallucinogen)",
+    "Infected Mushroom, Astrix",
+    "Full-on / dark psy (Zenon, Parasense)"
+   ]
+  },
+  {
+   "id": "liquid_dnb",
+   "family": "drum_and_bass",
+   "bpm": [
+    170,
+    176
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x.........x.....",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.........0.3...",
+   "fx": [
+    "Reverb",
+    "Chorus",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Field Synth",
+    "Analog",
+    "Wavetable"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.4,
+   "refs": [
+    "LTJ Bukem, Good Looking Records",
+    "Hospital Records, Calibre",
+    "High Contrast, Netsky"
+   ]
+  },
+  {
+   "id": "neurofunk",
+   "family": "drum_and_bass",
+   "bpm": [
+    172,
+    178
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    1
+   ],
+   "drums": {
+    "kick": "x.........x.....",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.0...0.0.3...",
+   "fx": [
+    "Drive",
+    "Audio Filter",
+    "Saturator"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Wavetable"
+   ],
+   "ban": [
+    "Chorus"
+   ],
+   "glitch": 0.2,
+   "mod": 0.9,
+   "refs": [
+    "Ed Rush & Optical, Konflict",
+    "Noisia, Phace, Mefjus",
+    "Photek (precursor)"
+   ]
+  },
+  {
+   "id": "jungle",
+   "family": "drum_and_bass",
+   "bpm": [
+    160,
+    170
+   ],
+   "swing": 0.05,
+   "scale": [
+    1,
+    10
+   ],
+   "drums": {
+    "kick": "x.........x.....",
+    "snare": "....x..o.o..x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.........0.....",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "EQ"
+   ],
+   "synth": [
+    "Sampler",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.2,
+   "mod": 0.4,
+   "refs": [
+    "Amen break lineage (The Winstons)",
+    "Goldie, Timeless",
+    "Shy FX, Congo Natty, Rebel MC"
+   ]
+  },
+  {
+   "id": "uk_garage",
+   "family": "bass_music",
+   "bpm": [
+    130,
+    138
+   ],
+   "swing": 0.28,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x.........x.....",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....0.....3...",
+   "fx": [
+    "Chorus",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.4,
+   "refs": [
+    "2-step: Artful Dodger, MJ Cole",
+    "Burial, Untrue",
+    "Todd Edwards"
+   ]
+  },
+  {
+   "id": "dubstep",
+   "family": "bass_music",
+   "bpm": [
+    138,
+    142
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    5
+   ],
+   "drums": {
+    "kick": "x...............",
+    "snare": "........x.......",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.......0.......",
+   "fx": [
+    "Drive",
+    "Audio Filter",
+    "Reverb"
+   ],
+   "synth": [
+    "Analog",
+    "Wavetable",
+    "FM"
+   ],
+   "ban": [
+    "Chorus"
+   ],
+   "glitch": 0.1,
+   "mod": 0.9,
+   "refs": [
+    "Digital Mystikz, Loefah, Skream, Benga",
+    "Mala, Coki",
+    "Skream Midnight Request Line"
+   ]
+  },
+  {
+   "id": "breakbeat",
+   "family": "breaks",
+   "bpm": [
+    125,
+    140
+   ],
+   "swing": 0.05,
+   "scale": [
+    1,
+    10
+   ],
+   "drums": {
+    "kick": "x.....x...x.....",
+    "snare": "....x..o.o..x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....0...0.....",
+   "fx": [
+    "Delay",
+    "Drive",
+    "Reverb"
+   ],
+   "synth": [
+    "Analog",
+    "Sampler"
+   ],
+   "ban": [
+    "Bitcrush"
+   ],
+   "glitch": 0.1,
+   "mod": 0.5,
+   "refs": [
+    "Prodigy, Chemical Brothers, Fatboy Slim (big beat)",
+    "Nu skool breaks (Plump DJs)",
+    "Detroit breakdown tradition"
+   ]
+  },
+  {
+   "id": "electro",
+   "family": "breaks",
+   "bpm": [
+    118,
+    132
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    5
+   ],
+   "drums": {
+    "kick": "x.....x...x.....",
+    "snare": "....x.......x...",
+    "chat": "..o...o...o...o.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....0...0.....",
+   "fx": [
+    "Chorus",
+    "Delay",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "FM",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.5,
+   "refs": [
+    "Kraftwerk, Planet Rock (Afrika Bambaataa, Arthur Baker)",
+    "Drexciya, Dopplereffekt",
+    "Roland TR-808 era"
+   ]
+  },
+  {
+   "id": "ambient",
+   "family": "ambient",
+   "bpm": [
+    60,
+    90
+   ],
+   "swing": 0.0,
+   "scale": [
+    6,
+    9,
+    4
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": "x.......o......."
+   },
+   "bass": "0...............",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Chorus"
+   ],
+   "synth": [
+    "Field Synth",
+    "Partials",
+    "Granular",
+    "Spectral Synth"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive",
+    "Ring Mod"
+   ],
+   "glitch": 0.0,
+   "mod": 0.2,
+   "refs": [
+    "Brian Eno, Music for Airports",
+    "Aphex Twin, Selected Ambient Works 85-92",
+    "Stars of the Lid, Hiroshi Yoshimura"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 8.0,
+    "strum": 120,
+    "human": 12
+   },
+   "notefx": [
+    "Note Echo"
+   ],
+   "gain": 3.0
+  },
+  {
+   "id": "dark_ambient",
+   "family": "ambient",
+   "bpm": [
+    50,
+    80
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    8
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "x...............",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...............",
+   "fx": [
+    "Reverb",
+    "Convolution Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Granular",
+    "Partials",
+    "Spectral Synth",
+    "Metallic"
+   ],
+   "ban": [
+    "Chorus",
+    "Bitcrush"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Lustmord",
+    "Raison d'etre, Atrium Carceri",
+    "Tim Hecker, Ben Frost"
+   ]
+  },
+  {
+   "id": "idm",
+   "family": "experimental",
+   "bpm": [
+    100,
+    170
+   ],
+   "swing": 0.0,
+   "scale": [
+    4,
+    5,
+    13
+   ],
+   "drums": {
+    "kick": "x....x....x..x..",
+    "snare": "....x..o....x.o.",
+    "chat": "o.oo.o.oo.o.oo.o",
+    "ohat": "",
+    "clap": "",
+    "tom": "..o.....o...o...",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..2..0...5..3..",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "FM",
+    "Wavetable",
+    "Analog"
+   ],
+   "ban": [],
+   "glitch": 0.45,
+   "mod": 0.8,
+   "refs": [
+    "Warp Records: Autechre, Aphex Twin, Boards of Canada",
+    "Squarepusher, Venetian Snares",
+    "Artificial Intelligence compilation (1992)"
+   ],
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ]
+  },
+  {
+   "id": "glitch",
+   "family": "experimental",
+   "bpm": [
+    90,
+    140
+   ],
+   "swing": 0.0,
+   "scale": [
+    13,
+    5
+   ],
+   "drums": {
+    "kick": "x..x..x...x.x...",
+    "snare": "....x.......x.x.",
+    "chat": "o.o.oo.o.oo.o.oo",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0.......0.3..",
+   "fx": [
+    "Stutter",
+    "Bitcrush",
+    "Delay"
+   ],
+   "synth": [
+    "Wavetable",
+    "FM",
+    "Sampler"
+   ],
+   "ban": [],
+   "glitch": 1.0,
+   "mod": 0.9,
+   "refs": [
+    "Oval, Ryoji Ikeda, Alva Noto",
+    "Mille Plateaux / Clicks and Cuts",
+    "Kim Cascone, The Aesthetics of Failure (2000)"
+   ]
+  },
+  {
+   "id": "downtempo",
+   "family": "downtempo",
+   "bpm": [
+    80,
+    100
+   ],
+   "swing": 0.15,
+   "scale": [
+    4,
+    1,
+    10
+   ],
+   "drums": {
+    "kick": "x.....x...x.....",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....0...3.....",
+   "fx": [
+    "Reverb",
+    "Chorus",
+    "Delay"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Sampler"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Massive Attack, Portishead (trip-hop)",
+    "Bonobo, Thievery Corporation",
+    "Ninja Tune, Mo' Wax"
+   ]
+  },
+  {
+   "id": "lofi_beats",
+   "family": "downtempo",
+   "bpm": [
+    70,
+    90
+   ],
+   "swing": 0.22,
+   "scale": [
+    4,
+    1,
+    10
+   ],
+   "drums": {
+    "kick": "x.....x...x.....",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....0...3.....",
+   "fx": [
+    "Chorus",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Sampler",
+    "Field Synth"
+   ],
+   "ban": [
+    "Stutter",
+    "Drive"
+   ],
+   "glitch": 0.02,
+   "mod": 0.2,
+   "refs": [
+    "J Dilla, Donuts (2006)",
+    "Nujabes",
+    "Lofi hip hop radio culture (2010s)"
+   ],
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 35,
+    "human": 22
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve"
+   ]
+  },
+  {
+   "id": "synthwave",
+   "family": "retro",
+   "bpm": [
+    96,
+    118
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    0
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "....x.......x...",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.0.0.0.0.0.0.0.",
+   "fx": [
+    "Chorus",
+    "Reverb",
+    "Delay"
+   ],
+   "synth": [
+    "Analog",
+    "Field Synth",
+    "Oscillator"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Kavinsky, Perturbator, Carpenter Brut",
+    "Drive (2011), Stranger Things (2016) soundtracks",
+    "Giorgio Moroder, Vangelis (ancestors)"
+   ]
+  },
+  {
+   "id": "vaporwave",
+   "family": "retro",
+   "bpm": [
+    60,
+    85
+   ],
+   "swing": 0.0,
+   "scale": [
+    6,
+    0
+   ],
+   "drums": {
+    "kick": "x.......x.......",
+    "snare": "........x.......",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...............",
+   "fx": [
+    "Chorus",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Field Synth",
+    "Sampler",
+    "Analog"
+   ],
+   "ban": [
+    "Stutter",
+    "Drive",
+    "Bitcrush"
+   ],
+   "glitch": 0.0,
+   "mod": 0.2,
+   "refs": [
+    "Macintosh Plus, Floral Shoppe (2011)",
+    "Vektroid, 2814",
+    "Fuji TV, mall-music and elevator-music reappropriation"
+   ]
+  },
+  {
+   "id": "footwork",
+   "family": "bass_music",
+   "bpm": [
+    155,
+    165
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    5
+   ],
+   "drums": {
+    "kick": "x..x..x...x..x..",
+    "snare": "..o.....o.o.....",
+    "chat": "o.o.o.o.o.o.o.o.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0..0..0...0..0..",
+   "fx": [
+    "Delay",
+    "Reverb",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Sampler",
+    "Analog",
+    "FM"
+   ],
+   "ban": [
+    "Chorus"
+   ],
+   "glitch": 0.2,
+   "mod": 0.5,
+   "refs": [
+    "Chicago juke / footwork: DJ Rashad, RP Boo, DJ Spinn",
+    "Teklife crew",
+    "Planet Mu, Dancemania"
+   ]
+  },
+  {
+   "id": "gabber",
+   "family": "hard",
+   "bpm": [
+    165,
+    190
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    1
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "..x...x...x...x.",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...0...0...0...",
+   "fx": [
+    "Drive",
+    "Saturator",
+    "Dynamics"
+   ],
+   "synth": [
+    "Analog",
+    "FM"
+   ],
+   "ban": [
+    "Chorus",
+    "Reverb"
+   ],
+   "glitch": 0.1,
+   "mod": 0.4,
+   "refs": [
+    "Rotterdam hardcore: Rotterdam Terror Corps, Neophyte",
+    "Thunderdome (1992-2012)",
+    "Mokum, Euromasters"
+   ]
+  },
+  {
+   "id": "solo_piano",
+   "family": "piano",
+   "bpm": [
+    60,
+    84
+   ],
+   "swing": 0.0,
+   "scale": [
+    0,
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "",
+   "fx": [
+    "Reverb",
+    "EQ",
+    "Convolution Reverb"
+   ],
+   "synth": [
+    "FM",
+    "Partials"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.15,
+   "refs": [
+    "Satie, Gymnopedies",
+    "Ludovico Einaudi",
+    "Nils Frahm, Felt"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 70,
+    "human": 30
+   },
+   "notefx": [
+    "Humanizer",
+    "Velocity Curve",
+    "Note Echo"
+   ],
+   "gain": 6.0
+  },
+  {
+   "id": "neo_classical",
+   "family": "piano",
+   "bpm": [
+    66,
+    96
+   ],
+   "swing": 0.0,
+   "scale": [
+    1,
+    0,
+    2
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....4.....2...",
+   "fx": [
+    "Reverb",
+    "Chorus",
+    "Delay"
+   ],
+   "synth": [
+    "FM",
+    "Partials",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.2,
+   "refs": [
+    "Max Richter",
+    "Olafur Arnalds",
+    "Joep Beving"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 2.0,
+    "strum": 55,
+    "human": 25
+   },
+   "notefx": [
+    "Humanizer",
+    "Note Echo"
+   ],
+   "gain": 6.0
+  },
+  {
+   "id": "ambient_piano",
+   "family": "piano",
+   "bpm": [
+    50,
+    72
+   ],
+   "swing": 0.0,
+   "scale": [
+    0,
+    4,
+    6
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "Convolution Reverb",
+    "Chorus"
+   ],
+   "synth": [
+    "FM",
+    "Partials",
+    "Granular"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter",
+    "Ring Mod",
+    "Drive"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Brian Eno, Music for Airports",
+    "Harold Budd",
+    "Hania Rani"
+   ],
+   "chords": {
+    "size": [
+     3,
+     4
+    ],
+    "beats": 8.0,
+    "strum": 140,
+    "human": 35
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ],
+   "gain": 6.0
+  },
+  {
+   "id": "amapiano",
+   "family": "house",
+   "bpm": [
+    110,
+    114
+   ],
+   "swing": 0.22,
+   "scale": [
+    4,
+    1
+   ],
+   "drums": {
+    "kick": "x...x...x...x...",
+    "snare": "",
+    "chat": "x.xxx.xxx.xxx.xx",
+    "ohat": "",
+    "clap": "....x.......x...",
+    "tom": "",
+    "htom": "",
+    "bell": "..x....x..x....."
+   },
+   "bass": "0..0.0..3..0..5.",
+   "fx": [
+    "Reverb",
+    "Delay",
+    "EQ"
+   ],
+   "synth": [
+    "Wavetable",
+    "FM",
+    "Analog"
+   ],
+   "ban": [
+    "Bitcrush",
+    "Stutter"
+   ],
+   "glitch": 0.0,
+   "mod": 0.3,
+   "refs": [
+    "Kabza De Small",
+    "DJ Maphorisa",
+    "Log drum bass lineage"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 2.0,
+    "strum": 30,
+    "human": 14
+   },
+   "notefx": [
+    "Humanizer"
+   ]
+  },
+  {
+   "id": "future_garage",
+   "family": "bass_music",
+   "bpm": [
+    130,
+    135
+   ],
+   "swing": 0.3,
+   "scale": [
+    1,
+    4
+   ],
+   "drums": {
+    "kick": "x.....x.....x...",
+    "snare": "....x.......x...",
+    "chat": "..o...o...o...o.",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0.....3...2.....",
+   "fx": [
+    "Reverb",
+    "Chorus",
+    "Audio Filter",
+    "Delay"
+   ],
+   "synth": [
+    "Wavetable",
+    "Analog",
+    "Field Synth"
+   ],
+   "ban": [
+    "Stutter"
+   ],
+   "glitch": 0.05,
+   "mod": 0.5,
+   "refs": [
+    "Burial, Untrue",
+    "Mount Kimbie",
+    "Four Tet"
+   ],
+   "sidechain": true,
+   "chords": {
+    "size": [
+     4
+    ],
+    "beats": 4.0,
+    "strum": 40,
+    "human": 20
+   },
+   "notefx": [
+    "Note Echo",
+    "Humanizer"
+   ]
+  },
+  {
+   "id": "drone_kosmische",
+   "family": "experimental",
+   "bpm": [
+    40,
+    70
+   ],
+   "swing": 0.0,
+   "scale": [
+    5,
+    12
+   ],
+   "drums": {
+    "kick": "",
+    "snare": "",
+    "chat": "",
+    "ohat": "",
+    "clap": "",
+    "tom": "",
+    "htom": "",
+    "bell": ""
+   },
+   "bass": "0...............",
+   "fx": [
+    "Reverb",
+    "Phaser",
+    "Delay",
+    "Audio Filter"
+   ],
+   "synth": [
+    "Analog",
+    "Oscillator",
+    "Partials"
+   ],
+   "ban": [
+    "Stutter",
+    "Bitcrush"
+   ],
+   "glitch": 0.0,
+   "mod": 0.8,
+   "refs": [
+    "Tangerine Dream, Phaedra",
+    "Klaus Schulze",
+    "Eliane Radigue"
+   ],
+   "chords": {
+    "size": [
+     2,
+     3
+    ],
+    "beats": 16.0,
+    "strum": 0,
+    "human": 0
+   },
+   "notefx": [
+    "Note Echo"
+   ],
+   "gain": 14.0
+  }
  ]
 }

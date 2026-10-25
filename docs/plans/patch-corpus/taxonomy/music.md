@@ -109,3 +109,10 @@ The 28 styles pin tempo, key, pulse, drums, a bass line, synth and fx pools, gli
 2. Teach the generator the two highest-yield ones first: **chords** and **sidechain**; they change the sound of most of the 28.
 3. Add the styles above in family batches; each gets a BPM-band and onset check like the rest.
 4. Gate with the loudness target per style instead of one global floor.
+
+## Built 2026-10-25: note chains, sidechain, piano family
+
+- New optional style keys, read by `styled.build`: `chords` (size, beats, strum, human), `notefx` (note nodes between Chorder and synth: Humanizer, Note Echo, Velocity Curve, Note Strum, Note Transpose), `sidechain` (kick drum feeds a Dynamics with external sidechain on the chord channel), `gain` (per-style chord channel dB, so drumless styles reach a usable loudness).
+- New styles: solo_piano, neo_classical, ambient_piano (family `piano`, FM/Partials voices; there is no acoustic piano sample in the repo, so these are piano-like, not a recording), amapiano, future_garage, drone_kosmische.
+- Retrofitted: deep_house and progressive_house (sidechain + Humanizer), idm and ambient (Note Echo), lofi_beats (Humanizer + Velocity Curve).
+- Still to add: motif (a repeating melody cell through Note Sequencer + Quantizer), per-lane groove, fills, timbre signature; the remaining styles in the table above.

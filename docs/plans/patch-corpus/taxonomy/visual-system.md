@@ -198,3 +198,11 @@ Decided without asking: model = distributions on the ten axes; style cards are d
 - Bridget Riley and Victor Vasarely catalogues (op art structure).
 - Rosa Menkman, *The Glitch Moment(um)*; Lev Manovich, *The Language of New Media*.
 - Local skills used as method: `design-style` (families, line, texture, style bible, A/B), `colour-and-light` (palettes, value, grading), `compositing` (blending, layers and passes, finishing), `environment-design` and `camera-language` (3D framing).
+
+## Built 2026-10-25: stack compiler (`tools/universe/stack.py`)
+
+- A card is layers; each layer is one Sketch node (JS: arrangement sampler + mark), layers composite through Blend nodes, then a finish chain and Output. Native 1080x1920, circles stay round (sizes come from one value).
+- Samplers in the script: grid, radial, concentric, spiral, thirds, axis (mirror), diagonal, bands, stripes, scatter. Marks: circle, ring, square, bar, rule, tri, half, quarter, cross, line, dot, text.
+- Cards built: bauhaus, op_art, swiss, each with a `meaning` line (why it looks that way). Contact sheet: `stack.py sheet bauhaus,op_art,swiss --seeds 8 --bin <binary>`.
+- Sketch globals trap: `dist`, `min`, `floor`... are prelude constants; redeclaring them silently yields no image.
+- Next: cards for the existing 30 styles with meanings, Sketch 3D mirror, Field kernels for texture, per-axis gates.

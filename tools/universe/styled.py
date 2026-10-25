@@ -33,6 +33,10 @@ def pick(rng, names, ban, facts, want_kind=None):
     return rng.choice(ok) if ok else None
 
 
+NOTEFX = {"Humanizer": {"timingMs": ("f", 14.0), "velocityPct": ("f", 18.0)}, "Note Echo": {"repeats": ("i", 3), "decay": ("f", 55.0), "rateBeats": ("f", 0.75)},
+          "Velocity Curve": {"curve": ("f", 1.6)}, "Note Strum": {"strumMs": ("f", 45.0)}, "Note Transpose": {"semitones": ("i", 12)}}
+
+
 def build(style, seed, facts, g=None):
     rng = random.Random("%s:%d" % (style["id"], seed))
     bpm = rng.randint(*style["bpm"])
@@ -77,17 +81,26 @@ def build(style, seed, facts, g=None):
         g.connect(sq, sy, "note")
         synth_ids.append(sy)
         chans.append((chain(sy, "audio", rng.choice([0, 1, 1, 2])), -4.0))
-    if style["family"] in ("ambient", "house", "trance", "downtempo", "retro", "techno", "experimental", "bass_music") or not chans:
-        ch = g.add("Chorder", rng.randrange(1 << 30), {"root": ("i", root), "scale": ("i", scale), "chordSize": ("i", rng.choice([3, 4])),
-                                                         "rateBeats": ("f", 4.0), "progSteps": ("i", 4), "strumMs": ("f", 15.0)})
+    if style.get("chords") or style["family"] in ("ambient", "house", "trance", "downtempo", "retro", "techno", "experimental", "bass_music", "piano") or not chans:
+        cc = style.get("chords", {})
+        ch = g.add("Chorder", rng.randrange(1 << 30), {"root": ("i", root), "scale": ("i", scale), "chordSize": ("i", rng.choice(cc.get("size", [3, 4]))),
+                                                         "rateBeats": ("f", cc.get("beats", 4.0)), "progSteps": ("i", cc.get("steps", 4)), "strumMs": ("f", cc.get("strum", 15.0)),
+                                                         "humanizeTimingMs": ("f", cc.get("human", 0.0)), "humanizeVelocity": ("f", cc.get("human", 0.0))})
         notes = ch
+        for nf in style.get("notefx", []):   # note effects between the chord source and the synth: they shape what the synth is asked to play
+            nn = g.add(nf, rng.randrange(1 << 30), NOTEFX.get(nf, {}))
+            g.connect(notes, nn, "note"); notes = nn
         if style["family"] in ("trance", "retro", "house") and rng.random() < 0.6:
             ar = g.add("Arpeggiator", rng.randrange(1 << 30), {"rateMode": ("i", 0), "rateBeats": ("f", 0.25), "octaves": ("i", 2), "mode": ("i", 0)})
             g.connect(ch, ar, "note"); notes = ar
         sy = g.add(pick(rng, style["synth"], ban, facts), rng.randrange(1 << 30))
         g.connect(notes, sy, "note")
         synth_ids.append(sy)
-        chans.append((chain(sy, "audio", rng.choice([1, 2])), -9.0))
+        pad = chain(sy, "audio", rng.choice([1, 2]))
+        if style.get("sidechain") and drums and "Dynamics" in facts:   # the kick ducks the chords: the pump that makes house breathe
+            dy = g.add("Dynamics", rng.randrange(1 << 30), {"sidechainExternal": ("f", 1.0), "ratio": ("f", 6.0), "threshold": ("f", -28.0), "attack": ("f", 5.0), "release": ("f", 160.0)})
+            g.connect(pad, dy, "audio"); g.connect(d, dy, "audio"); pad = dy
+        chans.append((pad, style.get("gain", -9.0)))
     mx = g.add("Mixer", 0, {"channels": ("i", len(chans))})
     for i, (n, db) in enumerate(chans):
         g.connect(n, mx, "audio")
