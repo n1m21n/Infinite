@@ -1,0 +1,148 @@
+infinite-patch 1
+node 1 Source Noise
+  f brightness 0.143695
+  f height 1442.39
+  f speed 0.541407
+  f warp 0.491708
+  f width 392.532
+  c lowColor 0.8392 1.0000 0.6196
+  c highColor 1.0000 1.0000 1.0000
+end
+node 2 Source Blob
+  f rotation -68.8406
+  i shapeType 11
+  i sides 13
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 0.8392 1.0000 0.6196
+  c bgColor 0.8392 1.0000 0.6196
+end
+node 3 Effects liquify
+  f uScale 18.8691
+end
+cable 3 0 2
+node 4 Source Blob
+  f feather 0.0619346
+  f fillOpacity 0.104662
+  f posY 0.825317
+  i sides 16
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 1.0000 1.0000 1.0000
+  c bgColor 0.8392 1.0000 0.6196
+end
+node 5 Effects liquify
+  f uScale 4.52568
+end
+cable 5 0 4
+node 6 Source Blob
+  f bgOpacity 0.0802474
+  f posY 0.973673
+  f sizeY 0.475639
+  f strokeWidth 0.0491635
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 0.6627 0.9412 1.0000
+  c bgColor 0.8392 1.0000 0.6196
+end
+node 7 Source Blob
+  f bgOpacity 0.857584
+  f feather 0.0151438
+  f fillOpacity 0.791366
+  f height 1021.76
+  f strokeWidth 0.0199684
+  f width 141.17
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 1.0000 1.0000 1.0000
+  c bgColor 0.8392 1.0000 0.6196
+end
+node 8 Effects liquify
+  f uAmount 1.08384
+  f uSpeed 1.28289
+end
+cable 8 0 7
+node 9 Compositing Blend
+  b linear 0
+  i mode 20
+end
+cable 9 0 1
+cable 9 1 3
+node 10 Compositing Blend
+end
+cable 10 0 9
+cable 10 1 5
+node 11 Compositing Blend
+  b linear 1
+end
+cable 11 0 10
+cable 11 1 6
+node 12 Compositing Blend
+  b linear 1
+  f mix 0.972287
+  i mode 20
+end
+cable 12 0 11
+cable 12 1 8
+node 13 Effects liquify
+  f uAmount 1.96131
+  f uScale 13.1175
+  f uSpeed 2.28657
+end
+cable 13 0 12
+node 14 Effects liquify
+end
+cable 14 0 13
+node 15 Compositing Color Ramp
+  c stopColor0 0.6627 0.9412 1.0000
+  c stopColor1 1.0000 0.7020 0.9608
+  c stopColor2 0.8392 1.0000 0.6196
+  c stopColor3 1.0000 1.0000 1.0000
+  c stopColor4 0.6627 0.9412 1.0000
+  c stopColor5 1.0000 0.7020 0.9608
+  c stopColor6 0.8392 1.0000 0.6196
+  c stopColor7 1.0000 1.0000 1.0000
+  c stopColor8 0.6627 0.9412 1.0000
+  c stopColor9 1.0000 0.7020 0.9608
+  c stopColor10 0.8392 1.0000 0.6196
+  c stopColor11 1.0000 1.0000 1.0000
+  c stopColor12 0.6627 0.9412 1.0000
+  c stopColor13 1.0000 0.7020 0.9608
+  c stopColor14 0.8392 1.0000 0.6196
+  c stopColor15 1.0000 1.0000 1.0000
+  c stopColor16 0.6627 0.9412 1.0000
+  c stopColor17 1.0000 0.7020 0.9608
+  c stopColor18 0.8392 1.0000 0.6196
+  c stopColor19 1.0000 1.0000 1.0000
+  c stopColor20 0.6627 0.9412 1.0000
+  c stopColor21 1.0000 0.7020 0.9608
+  c stopColor22 0.8392 1.0000 0.6196
+  c stopColor23 1.0000 1.0000 1.0000
+  c stopColor24 0.6627 0.9412 1.0000
+  c stopColor25 1.0000 0.7020 0.9608
+  c stopColor26 0.8392 1.0000 0.6196
+  c stopColor27 1.0000 1.0000 1.0000
+  c stopColor28 0.6627 0.9412 1.0000
+  c stopColor29 1.0000 0.7020 0.9608
+  c stopColor30 0.8392 1.0000 0.6196
+  c stopColor31 1.0000 1.0000 1.0000
+end
+cable 15 0 14
+node 16 Effects vignette
+  f uCenterX 0.447595
+  f uRadius 0.557262
+end
+cable 16 0 15
+node 17 Effects bloom
+  f uRadius 1.36948
+end
+cable 17 0 16
+node 18 Utility Output
+end
+cable 18 0 17
+node 19 Modulators LFO
+  i shape 3
+end
+mod 16 uCenterY 19 0 0 0.236 0.5
+node 20 Modulators LFO
+  f phase 0.0724515
+  f rateHz 33.6498
+  i rateMode 0
+end
+mod 7 sizeX 20 0 0 0.416 0.5

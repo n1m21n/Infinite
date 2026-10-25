@@ -1,0 +1,100 @@
+infinite-patch 1
+node 1 Source Ramp
+  f centerX -0.160946
+  f gamma 0.666586
+  f height 474.312
+  f stop0 0.807103
+  i type 2
+  f width 73.3655
+  c stopColor0 0.1686 0.1686 0.1686
+  c stopColor1 0.8471 0.7686 0.7137
+  c stopColor2 0.6392 0.2824 0.2235
+  c stopColor3 0.3098 0.3647 0.4588
+  c stopColor4 0.1686 0.1686 0.1686
+end
+node 2 Source Rectangle
+  f posY 0.963698
+  f sizeX 0.054091
+  f sizeY 0.0193328
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.1686 0.1686 0.1686
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 3 Effects addnoise
+  f uAmount 0.0888806
+end
+cable 3 0 2
+node 4 Source Rectangle
+  f fillOpacity 0.278967
+  f height 303.727
+  f sizeY 0.496031
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.1686 0.1686 0.1686
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 5 Effects halftone
+end
+cable 5 0 4
+node 6 Source Shape
+  f bgOpacity 0.173506
+  f height 4078.91
+  f posY 0.905631
+  f sizeX 0.235354
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.8471 0.7686 0.7137
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 7 Effects addnoise
+end
+cable 7 0 6
+node 8 Compositing Blend
+  f mix 0.98364
+end
+cable 8 0 1
+cable 8 1 3
+node 9 Compositing Blend
+  b linear 1
+  f mix 0.212512
+end
+cable 9 0 8
+cable 9 1 5
+node 10 Compositing Blend
+  f mix 0.604195
+end
+cable 10 0 9
+cable 10 1 7
+node 11 Effects addnoise
+  f uAmount 0.495251
+end
+cable 11 0 10
+node 12 Effects halftone
+  f uAngle 1.47581
+end
+cable 12 0 11
+node 13 Compositing Layer Stack
+  i mode0 14
+  i mode1 9
+  f opacity0 0.746621
+  f opacity2 0.375857
+end
+cable 13 0 12
+node 14 Effects vignette
+  f uCenterX 0.401572
+  f uRadius 0.952184
+end
+cable 14 0 13
+node 15 Effects bloom
+  f uRadius 6.79541
+  f uThreshold 0.993693
+end
+cable 15 0 14
+node 16 Utility Output
+end
+cable 16 0 15
+node 17 Modulators LFO
+  f phase 0.8286
+  f rateHz 0.358192
+  i rateMode 2
+  b voice 0
+end
+mod 4 height 17 0 0 0.263 0.5

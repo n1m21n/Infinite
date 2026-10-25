@@ -1,0 +1,76 @@
+infinite-patch 1
+node 1 Source Noise
+  f brightness -0.05452
+  f height 88.625
+  f lacunarity 2.90433
+  f seed 14.7998
+  f speed 0.513555
+  c lowColor 0.0000 0.1882 0.2863
+  c highColor 0.9176 0.8863 0.7176
+end
+node 2 Source Ramp
+  f dither 0.575894
+  f offset -0.665295
+  f scale 1.73311
+  f stop0 0.441821
+  f stop1 0.942467
+  i stopCount 5
+  f width 262.847
+  c stopColor0 0.9686 0.4980 0.0000
+  c stopColor1 0.8392 0.1569 0.1569
+  c stopColor2 0.0000 0.1882 0.2863
+  c stopColor3 0.9176 0.8863 0.7176
+  c stopColor4 0.9686 0.4980 0.0000
+end
+node 3 Source Rectangle
+  f feather 0.0945298
+  f width 29.2663
+  c fillColor 0.9176 0.8863 0.7176
+  c strokeColor 0.9176 0.8863 0.7176
+  c bgColor 0.0000 0.1882 0.2863
+end
+node 4 Effects vignette
+end
+cable 4 0 3
+node 5 Source Noise
+  f brightness 0.276502
+  f gain 0.524347
+  i noiseType 5
+  f speed -0.26581
+  f warp 0.0483536
+  f width 106.396
+  c lowColor 0.0000 0.1882 0.2863
+  c highColor 0.9176 0.8863 0.7176
+end
+node 6 Compositing Blend
+  i mode 22
+end
+cable 6 0 1
+cable 6 1 2
+node 7 Compositing Blend
+  b linear 1
+end
+cable 7 0 6
+cable 7 1 4
+node 8 Compositing Blend
+  i mode 5
+end
+cable 8 0 7
+cable 8 1 5
+node 9 Effects addnoise
+end
+cable 9 0 8
+node 10 Compositing exposure
+end
+cable 10 0 9
+node 11 Effects vignette
+  f uAmount 0.226795
+  f uCenterY 0.681797
+end
+cable 11 0 10
+node 12 Effects bloom
+end
+cable 12 0 11
+node 13 Utility Output
+end
+cable 13 0 12

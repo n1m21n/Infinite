@@ -44,8 +44,13 @@ def render_media(binary, inf, kind, d, secs=8):
             if f.endswith(".png") and f != "poster.png":
                 os.replace(os.path.join(d, f), os.path.join(d, "poster.png"))
         made["mp4"] = run([binary, "--render", inf, os.path.join(d, "preview.mp4"), "--duration", "3", "--fps", "24"], 240)
-    if os.path.exists(os.path.join(d, "audio.json")):
-        os.remove(os.path.join(d, "audio.json"))
+    aj = os.path.join(d, "audio.json")
+    if os.path.exists(aj):
+        try:
+            made["metrics"] = json.load(open(aj))
+        except ValueError:
+            pass
+        os.remove(aj)
     return made
 
 
@@ -170,7 +175,8 @@ def publish_library(lib, site_assets, n=60, samples=None):
     for m in rows[:n]:
         src = os.path.join(lib, m["id"])
         gid = "gen-" + m["sid"].replace("-s", "-")
-        shutil.copy(os.path.join(src, "patch.inf"), os.path.join(site_assets, gid + ".inf"))
+        body = open(os.path.join(src, "patch.inf")).read().replace(os.path.join(ROOT, "assets", "drumkits"), "/Applications/Infinite.app/Contents/Resources/drumkits")  # the engine re-resolves stale kit paths against the installed kit
+        open(os.path.join(site_assets, gid + ".inf"), "w").write(body)
         prev = os.path.join(site_assets, gid + ".jpg")
         if os.path.exists(os.path.join(src, "poster.png")):
             subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", os.path.join(src, "poster.png"), "-vf", "scale=640:-2", "-q:v", "5", prev], check=True)

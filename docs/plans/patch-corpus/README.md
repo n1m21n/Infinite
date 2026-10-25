@@ -300,3 +300,18 @@ Genomes may start with stream definitions: `$a=<chain or [..]+[..]=>X> && ... &&
 - **Samples** (`website/samples/`, page chrome from `build_samples_page.py`): listening and downloading only. Audio downloads as `.wav`, visual and audio+visual as `.mp4`; the patch is never offered. Publishes every sample that passes the free-zone gate (`passes`: audible, not blank). Plain list in the library chrome (play, waveform with seek, video thumbnail, kind filter, shuffle); codenames are 8 random characters; no ratings. A row whose patch is in the Library shows a link to it; `?s=<id>` jumps to a row. Media is committed, capped at 150 MB (`--max-mb`).
 - **Library** (`website/assets/universe/`, category *Generated*): the stricter slice (`curated`: loudness window, no clipping, picture variety) of up to 60 per run, base patches only (one per switch family), each linking back to its sample ("Hear it first" on the item page). Read by `library.js` and `tools/website/gen_seo.py` like any other source.
 - Pool changes shift pool indices: atlases made before them no longer decode; rebuild the atlas.
+
+## Styles (taxonomy-driven samples)
+
+Samples are no longer random node chains. Each one picks a style first:
+- music: `tools/catalog/styles_music.json` (28 electronic styles: BPM band, key and scale, swing, drum pattern, bass figure, allowed and banned nodes, modulation level);
+- art: `tools/catalog/styles_art.json` (30 styles: palette, node pools, motion, music pairings for audio+visual).
+Research and references live in `taxonomy/music.md` and `taxonomy/art.md`. The taxonomy is internal: the site shows codenames only.
+
+Generate and publish:
+```
+python3 tools/universe/styled.py batch x --n 24 --seed 8 --out /tmp/uni/lib_styled --bin <Infinite binary>
+python3 tools/catalog/catalog.py all --lib /tmp/uni/lib_styled --n 60
+```
+Gates: engine tempo estimate inside the style's band (half/double allowed; ambient and experimental exempt), not silent, picture interest >= 0.2 (Samples) / 0.45 (Library). Pictures are best-of-4 wirings by interest. Known gaps: the wireframe style renders black, some styles (brutalist, acid graphics) stay plain, per-style recipes and parameter ranges are the next step.
+The Samples page shows pictures in a swipe deck and audio-only in the list.

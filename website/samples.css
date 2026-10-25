@@ -32,3 +32,21 @@
 .smp-acts { display: flex; gap: 2px; }
 .smp-lib { color: var(--accent); }
 .smp-row.is-hit { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Swipe deck for pictures: scroll-snap rail, the centred card plays. */
+.smp-deck { position: relative; margin: 0 0 22px; }
+.smp-rail { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.smp-rail::-webkit-scrollbar { display: none; }
+.smp-card { position: relative; flex: 0 0 min(86%, 640px); aspect-ratio: 16 / 9; scroll-snap-align: center; border-radius: 22px; overflow: hidden; cursor: pointer;
+  background: color-mix(in srgb, var(--deep) 70%, var(--surface-2)); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.smp-cap { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 26px 14px 10px 18px;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.55), transparent); color: #fff; }
+.smp-cap b { font: 700 0.98rem/1.2 var(--font-mono); letter-spacing: 0.02em; text-transform: lowercase; }
+.smp-cap .smp-dl { color: #fff; }
+.smp-cap .smp-dl:hover { background: #fff; color: #111; }
+.smp-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; font-size: 1.5rem; line-height: 1;
+  background: color-mix(in srgb, var(--surface-2) 85%, transparent); color: var(--ink); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-prev { left: 6px; } .smp-next { right: 6px; }
+.smp-card.is-hit { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 680px) { .smp-nav { display: none; } .smp-card { flex-basis: 88%; } }
