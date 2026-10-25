@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Op Art Hypnotic Vortex",
+    "author": "Infinite",
+    "description": "Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float vortexTwist = 3.5 [0.5, 8.0];\nparam float spokeRays = 16.0 [4.0, 32.0];\nparam float ringFreq = 24.0 [6.0, 48.0];\nparam float moirePulse = 1.2 [0.2, 3.0];\nparam float contrastStrobe = 0.7 [0.0, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\nang = atan2(p.y, p.x);\n\nlogR = log(r + 0.001);\nspiral = ang * spokeRays + logR * vortexTwist * 12.0 - t * moirePulse * 4.0;\nconcentric = sin(r * ringFreq * 6.28 - t * moirePulse * 2.0);\n\npattern1 = sin(spiral);\npattern2 = concentric;\nmoire = pattern1 * pattern2;\n\nedge = smoothstep(-0.2, 0.2, moire);\n\ncLight = vec3(0.933, 0.945, 0.980);\ncSignal = vec3(0.655, 0.694, 1.0);\ncDark = vec3(0.082, 0.098, 0.188);\n\ncForeground = mix(cLight, cSignal, sin(ang * 4.0 + t) * 0.5 + 0.5);\nvignette = clamp(1.0 - r * 1.5, 0.0, 1.0);\n\ncol = mix(cDark, cForeground, edge * contrastStrobe + (1.0 - contrastStrobe) * (moire * 0.5 + 0.5)) * vignette;\nalpha = 1.0;\n",
+    "params": {
+      "vortexTwist": 3.5,
+      "spokeRays": 16.0,
+      "ringFreq": 24.0,
+      "moirePulse": 1.2,
+      "contrastStrobe": 0.7
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

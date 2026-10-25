@@ -979,6 +979,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "analog-crt-phosphor-beam-synth",
+      "name": "Analog CRT Phosphor Beam Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Cathode ray vector beam oscillator with morphing sawtooth-pulse waveform, sub-octave divider, 4-pole resonant beam focusing filter, and warm analog cathode saturation.",
+      "price": 0,
+      "preview": "assets/templates/analog-crt-phosphor-beam-synth.webp",
+      "file": "assets/templates/analog-crt-phosphor-beam-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "op-art-spectral-chime-synth",
+      "name": "Op Art Spectral Chime Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Multi-partial inharmonic additive chime and bell synthesizer with kinetic beating moire modulations, metallic partial ratios, and shimmering exponential modal decays.",
+      "price": 0,
+      "preview": "assets/templates/op-art-spectral-chime-synth.webp",
+      "file": "assets/templates/op-art-spectral-chime-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "analog-crt-tape-flutter-fx",
+      "name": "Analog CRT Tape Flutter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Magnetic tape and cathode scanline delay with dual-rate wow/flutter drift modulation, warm asymmetric saturation, and high-frequency tape head damping.",
+      "price": 0,
+      "preview": "assets/templates/analog-crt-tape-flutter-fx.webp",
+      "file": "assets/templates/analog-crt-tape-flutter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "op-art-frequency-shifter-fx",
+      "name": "Op Art Frequency Shifter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Bode-style single-sideband frequency shifter with quadrature phase splitting, endless barber-pole Shepard tone phase sweeps, and cross-channel dispersion.",
+      "price": 0,
+      "preview": "assets/templates/op-art-frequency-shifter-fx.webp",
+      "file": "assets/templates/op-art-frequency-shifter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

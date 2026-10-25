@@ -1,0 +1,50 @@
+infinite-patch 1
+# Analog CRT Tape Flutter FX: magnetic tape delay with wow and flutter modulation
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 36
+  i rangeHigh 60
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float delayTime = 0.28 [0.02, 1.0]\nparam float feedback = 0.55 [0.0, 0.95]\nparam float flutter = 0.35 [0.0, 1.0]\nparam float saturation = 0.6 [0.0, 1.5]\nparam float mix = 0.45 [0.0, 1.0]\nstate float lfo1 = 0\nstate float lfo2 = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float prevOut = 0\nstate float lp = 0\n\nlfo1 = (lfo1 + 4.2 / sr) % 1.0\nlfo2 = (lfo2 + 0.35 / sr) % 1.0\nwobble = sin(lfo1 * 6.2831853) * 0.08 + sin(lfo2 * 6.2831853) * 0.25\n\ntapeDrive = in + prevOut * feedback\nsat = tanh(tapeDrive * (1.0 + saturation * 1.8))\n\ncoeff = clamp(0.25 + wobble * flutter * 0.15, 0.05, 0.85)\nap1 = d1 + coeff * (sat - d1)\nd1 = sat\nap2 = d2 + coeff * (ap1 - d2)\nd2 = ap1\nap3 = d3 + coeff * (ap2 - d3)\nd3 = ap2\n\nlp = lp + 0.35 * (ap3 - lp)\nprevOut = lp\n\nout = in * (1.0 - mix) + prevOut * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.2 0.92 0.58
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Analog CRT Tape Flutter FX. Magnetic tape and cathode delay with dual-rate wow/flutter drift, warm saturation and high-frequency damping.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

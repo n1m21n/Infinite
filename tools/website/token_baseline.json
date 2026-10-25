@@ -33,6 +33,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/analog-crt-phosphor-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/analog-crt-vhs-glitch.html": {
    "font-size": 2,
    "hex": 6
@@ -199,6 +203,10 @@
    "hex": 6
   },
   "embeds/neural-synapse.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/op-art-hypnotic-vortex.html": {
    "font-size": 2,
    "hex": 6
   },

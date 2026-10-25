@@ -1,0 +1,44 @@
+infinite-patch 1
+# Analog CRT Phosphor Beam Synth: cathode ray vector oscillator with resonant beam focusing
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 36
+  i rangeHigh 64
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 1800.0 [80.0, 12000.0]\nparam float resonance = 0.72 [0.05, 0.98]\nparam float subLevel = 0.45 [0.0, 1.0]\nparam float beamWarmth = 0.55 [0.0, 1.0]\nparam float decay = 0.55 [0.05, 2.0]\nstate float phase = 0\nstate float subPhase = 0\nstate float env = 0\nstate float curFreq = 220\nstate float lp1 = 0\nstate float lp2 = 0\nstate float lp3 = 0\nstate float lp4 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, env + (target - env) * 0.08, env - env * (0.0005 / decay))\n\ncurFreq = curFreq + (freq - curFreq) * 0.04\nstepFreq = clamp(curFreq, 20.0, 8000.0) / sr\nphase = (phase + stepFreq) % 1.0\nsubPhase = (subPhase + stepFreq * 0.5) % 1.0\n\nsaw = phase * 2.0 - 1.0\npulse = if(phase > 0.45, 0.8, -0.8)\nsub = sin(subPhase * 6.2831853)\n\nraw = (saw * 0.6 + pulse * 0.4) * (1.0 - subLevel * 0.4) + sub * subLevel\n\nfCut = clamp(cutoff + env * 4500.0, 60.0, 16000.0)\nfNorm = clamp(fCut * 3.14159265 / sr, 0.01, 0.95)\nfb = resonance * 3.6 * (1.0 - fNorm * 0.2)\n\ndrive = raw - tanh(lp4 * fb)\nlp1 = lp1 + fNorm * (tanh(drive) - lp1)\nlp2 = lp2 + fNorm * (lp1 - lp2)\nlp3 = lp3 + fNorm * (lp2 - lp3)\nlp4 = lp4 + fNorm * (lp3 - lp4)\n\nwarm = tanh(lp4 * (1.2 + beamWarmth * 1.5))\nout = warm * env * 1.1\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.2 0.92 0.58
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Analog CRT Phosphor Beam Synth. Cathode ray vector oscillator with morphing saw-pulse waveform, sub-octave divider and resonant beam filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

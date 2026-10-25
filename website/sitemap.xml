@@ -85,6 +85,8 @@
   <url><loc>https://infinitedevices.org/embeds/liminal-void-haze.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/y2k-liquid-chrome-rave.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/neo-brutalist-concrete-monolith.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/analog-crt-phosphor-bloom.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/op-art-hypnotic-vortex.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
@@ -158,6 +160,10 @@
   <url><loc>https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-bitcrush-buffer-stutter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-beam-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-spectral-chime-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-frequency-shifter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
@@ -395,6 +401,16 @@
   <url><loc>https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-liquid-chrome-rave.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/neo-brutalist-concrete-monolith.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-vector-oscilloscope.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-kinetic-wave-moire.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-wireframe-terrain-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-hyperbolic-cage-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-beam-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-spectral-chime-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-frequency-shifter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-bloom.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-hypnotic-vortex.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-25</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
