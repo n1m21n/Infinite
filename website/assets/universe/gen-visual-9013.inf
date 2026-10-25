@@ -1,0 +1,119 @@
+infinite-patch 1
+node 1 Source Noise
+  f brightness -0.230809
+  f contrast 2.72297
+  f octaves 3.90538
+  f speed -0.233981
+  f warp 1.32321
+  c lowColor 0.2275 0.0471 0.6392
+  c highColor 0.2980 0.7882 0.9412
+end
+node 2 Source Noise
+  f contrast 0.780877
+  f height 103.388
+  f lacunarity 3.12886
+  f width 98.6255
+  c lowColor 0.2275 0.0471 0.6392
+  c highColor 0.2980 0.7882 0.9412
+end
+node 3 Effects bloom
+end
+cable 3 0 2
+node 4 Source Blob
+  f posY 0.17061
+  i sides 17
+  f sizeY 0.0473954
+  f strokeWidth 0.0640094
+  c fillColor 0.2980 0.7882 0.9412
+  c strokeColor 0.4471 0.0353 0.7176
+  c bgColor 0.2275 0.0471 0.6392
+end
+node 5 Effects liquify
+  f uAmount 1.45351
+  f uScale 16.9888
+end
+cable 5 0 4
+node 6 Source Ellipse
+  f height 522.71
+  f posY 0.18584
+  f sizeX 0.349646
+  f sizeY 0.683924
+  c fillColor 0.2980 0.7882 0.9412
+  c strokeColor 0.9686 0.1451 0.5216
+  c bgColor 0.2275 0.0471 0.6392
+end
+node 7 Effects twirl
+  f uAngle 3.21374
+end
+cable 7 0 6
+node 8 Source Noise
+  f contrast 3.88196
+  f height 44.6989
+  f octaves 1.54196
+  f scale 3.18867
+  f speed -0.984905
+  f warp 1.6507
+  f width 1477.92
+  c lowColor 0.2275 0.0471 0.6392
+  c highColor 0.2980 0.7882 0.9412
+end
+node 9 Effects liquify
+end
+cable 9 0 8
+node 10 Compositing Blend
+  f mix 0.193731
+end
+cable 10 0 1
+cable 10 1 3
+node 11 Compositing Blend
+end
+cable 11 0 10
+cable 11 1 5
+node 12 Compositing Blend
+  i mode 1
+end
+cable 12 0 11
+cable 12 1 7
+node 13 Compositing Blend
+  f mix 0.261775
+end
+cable 13 0 12
+cable 13 1 9
+node 14 Effects liquify
+end
+cable 14 0 13
+node 15 Compositing gradientmap
+  f uMix 0.696139
+  c uShadowColor 0.2275 0.0471 0.6392
+  c uHighlightColor 0.2980 0.7882 0.9412
+end
+cable 15 0 14
+node 16 Effects vignette
+  f uSoftness 0.0238901
+end
+cable 16 0 15
+node 17 Utility Output
+end
+cable 17 0 16
+node 18 Modulators LFO
+  f low 0.272582
+  f phase 0.0313785
+  i phaseMode 0
+  f rateBeats 8.90623
+  f rateHz 4.92251
+  f seed 15.8813
+  i shape 4
+  b voice 1
+end
+mod 8 octaves 18 0 0 0.301 0.5
+node 19 Modulators LFO
+  f low 0.409632
+  b voice 1
+end
+mod 8 contrast 19 0 0 0.160 0.5
+node 20 Modulators LFO
+  i phaseMode 0
+  f rateBeats 0.24261
+  i rateMode 0
+end
+mod 6 fillOpacity 20 0 0 0.260 0.5

@@ -12,7 +12,8 @@
    "fx": [
     "bloom",
     "liquify",
-    "twirl"
+    "twirl",
+    "kaleidoscope"
    ],
    "comp": [
     "gradientmap",
@@ -405,14 +406,15 @@
     "#b967ff"
    ],
    "sources": [
-    "Image Source",
     "Ramp",
-    "Superellipse"
+    "Superellipse",
+    "Circle",
+    "Noise"
    ],
    "fx": [
     "bloom",
-    "gaussianblur",
-    "displace"
+    "displace",
+    "ripple"
    ],
    "comp": [
     "gradientmap",
@@ -594,12 +596,13 @@
     "#ffffff"
    ],
    "sources": [
-    "Wireframe",
-    "Torus Knot",
-    "Icosphere",
-    "Supershape"
+    "Ring",
+    "Line",
+    "Polygon"
    ],
    "fx": [
+    "kaleidoscope",
+    "symmetry",
     "bloom"
    ],
    "comp": [
@@ -787,7 +790,9 @@
    ],
    "fx": [
     "emboss",
-    "vignette"
+    "vignette",
+    "halftone",
+    "edge sobel"
    ],
    "comp": [
     "exposure",
@@ -865,7 +870,9 @@
    "fx": [
     "pixelate",
     "twirl",
-    "bloom"
+    "bloom",
+    "kaleidoscope",
+    "ripple"
    ],
    "comp": [
     "gradientmap",
@@ -899,6 +906,7 @@
     "Circle"
    ],
    "fx": [
+    "ripple",
     "gaussianblur"
    ],
    "comp": [
@@ -937,6 +945,8 @@
     "Ring"
    ],
    "fx": [
+    "ripple",
+    "displace",
     "gaussianblur",
     "vignette"
    ],

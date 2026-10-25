@@ -206,7 +206,7 @@ def build_visual(style, seed, facts, g=None, audio_out=None):
     return g, {}
 
 
-def best_visual(style, seed, facts, binary, d, tries=4):
+def best_visual(style, seed, facts, binary, d, tries=6):
     """Try several wirings of the style, keep the picture with the most going on (luminance spread, edges, colour variety)."""
     import library
     best, bt = -1, None

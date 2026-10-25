@@ -1,0 +1,107 @@
+infinite-patch 1
+node 1 Source Noise
+  f contrast 3.93666
+  f gain 0.783983
+  f lacunarity 1.88608
+  i noiseType 4
+  f seed 49.5223
+  f width 61.8276
+  c lowColor 0.0000 0.0000 0.0000
+  c highColor 1.0000 1.0000 1.0000
+end
+node 2 Source Line
+  f feather 0.0156561
+  f posY 0.599142
+  i shapeType 3
+  f sizeX 0.252931
+  f sizeY 0.0339079
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 1.0000 1.0000 1.0000
+  c bgColor 0.0000 0.0000 0.0000
+end
+node 3 Source Polygon
+  f fillOpacity 0.730361
+  f height 28.1252
+  f rotation -37.5221
+  i shapeType 10
+  i sides 11
+  f sizeX 0.0876465
+  f width 93.9425
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 0.0000 1.0000 0.4157
+  c bgColor 0.0000 0.0000 0.0000
+end
+node 4 Effects kaleidoscope
+  f uCenterX 0.0997734
+  f uCenterY 0.833869
+  f uZoom 2.32022
+end
+cable 4 0 3
+node 5 Source Line
+  f cornerRadius 0.221063
+  f rotation 26.3619
+  i shapeType 19
+  f sizeY 0.0499184
+  f width 20.5026
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 0.0000 1.0000 0.4157
+  c bgColor 0.0000 0.0000 0.0000
+end
+node 6 Effects bloom
+  f uIntensity 1.5816
+end
+cable 6 0 5
+node 7 Compositing Blend
+end
+cable 7 0 1
+cable 7 1 2
+node 8 Compositing Blend
+  b linear 1
+  f mix 0.463353
+end
+cable 8 0 7
+cable 8 1 4
+node 9 Compositing Blend
+end
+cable 9 0 8
+cable 9 1 6
+node 10 Effects kaleidoscope
+  f uCenterX 0.71639
+  f uCenterY 0.448754
+  f uRotation 2.3948
+  f uSegments 4.44862
+end
+cable 10 0 9
+node 11 Effects bloom
+  f uThreshold 0.503315
+end
+cable 11 0 10
+node 12 Compositing Trails
+  f rotate 3.57742
+end
+cable 12 0 11
+node 13 Compositing gradientmap
+  f uMix 0.818127
+  c uShadowColor 0.0000 0.0000 0.0000
+  c uHighlightColor 1.0000 1.0000 1.0000
+end
+cable 13 0 12
+node 14 Utility Output
+end
+cable 14 0 13
+node 15 Modulators LFO
+  f high 0.436909
+  i rateMode 1
+  f seed 26.4336
+  i shape 2
+end
+mod 2 bgOpacity 15 0 0 0.179 0.5
+node 16 Modulators LFO
+  f high 0.355663
+  f phase 0.242489
+  f rateBeats 20.3493
+  f rateHz 9.41455
+  i rateMode 0
+  b voice 0
+end
+mod 5 width 16 0 0 0.204 0.5

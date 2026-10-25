@@ -84,6 +84,8 @@ def passes(m):
             return False
     if m["kind"] in ("V", "AV") and (m.get("interest") or 0) < 0.2:
         return False
+    if m["kind"] in ("V", "AV") and not 14 <= (m.get("lum") or 90) <= 185:
+        return False  # blown-out white or near-black picture
     return True
 
 

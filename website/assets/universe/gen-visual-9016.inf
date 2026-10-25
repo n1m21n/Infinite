@@ -1,0 +1,86 @@
+infinite-patch 1
+node 1 Source Ramp
+  f centerY 1.32151
+  f dither 0.0743871
+  f gamma 2.29709
+  f height 274.309
+  f stop0 0.378051
+  i type 0
+  f width 106.075
+  c stopColor0 0.1686 0.1686 0.1686
+  c stopColor1 0.8471 0.7686 0.7137
+  c stopColor2 0.6392 0.2824 0.2235
+  c stopColor3 0.3098 0.3647 0.4588
+  c stopColor4 0.1686 0.1686 0.1686
+end
+node 2 Source Rectangle
+  f fillOpacity 0.806372
+  f rotation 126.997
+  i shapeType 2
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.3098 0.3647 0.4588
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 3 Source Rectangle
+  f bgOpacity 0.153827
+  f feather 0.0725833
+  f sizeX 0.885727
+  f width 165.663
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.6392 0.2824 0.2235
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 4 Source Rectangle
+  f fillOpacity 0.239103
+  i shapeType 0
+  c fillColor 0.8471 0.7686 0.7137
+  c strokeColor 0.8471 0.7686 0.7137
+  c bgColor 0.1686 0.1686 0.1686
+end
+node 5 Compositing Blend
+  b linear 0
+end
+cable 5 0 1
+cable 5 1 2
+node 6 Compositing Blend
+  i mode 31
+end
+cable 6 0 5
+cable 6 1 3
+node 7 Compositing Blend
+  f mix 0.4162
+end
+cable 7 0 6
+cable 7 1 4
+node 8 Effects displace
+  f uAmount 0.320968
+  f uScale 0.23229
+end
+cable 8 0 7
+node 9 Effects halftone
+  f uScale 198.019
+end
+cable 9 0 8
+node 10 Compositing Layer Stack
+  i fit 0
+  i mode1 21
+  i mode2 18
+  f opacity3 0.92654
+end
+cable 10 0 9
+node 11 Effects vignette
+  f uCenterX 0.795376
+end
+cable 11 0 10
+node 12 Effects bloom
+  f uIntensity 1.27824
+  f uRadius 3.572
+end
+cable 12 0 11
+node 13 Utility Output
+end
+cable 13 0 12
+node 14 Modulators LFO
+  f high 0.392545
+end
+mod 8 uAmount 14 0 0 0.238 0.5

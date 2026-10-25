@@ -1,0 +1,115 @@
+infinite-patch 1
+node 1 Source Ramp
+  f centerX 1.35678
+  f centerY 0.392045
+  f gamma 0.617615
+  f height 1711.58
+  i repeat 1
+  i stopCount 3
+  f width 63.515
+  c stopColor0 0.0000 0.0000 0.0000
+  c stopColor1 1.0000 1.0000 1.0000
+  c stopColor2 0.4902 0.9765 1.0000
+  c stopColor3 0.0000 0.0000 0.0000
+  c stopColor4 1.0000 1.0000 1.0000
+end
+node 2 Source Noise
+  f brightness -0.169769
+  f contrast 3.46481
+  f gain 0.17382
+  f lacunarity 3.45202
+  f octaves 4.11299
+  f speed -1.95966
+  c lowColor 0.0000 0.0000 0.0000
+  c highColor 1.0000 1.0000 1.0000
+end
+node 3 Source Ring
+  f bgOpacity 0.0999976
+  f height 326.475
+  f posX 0.320589
+  f posY 0.212603
+  f sizeY 0.712538
+  c fillColor 1.0000 1.0000 1.0000
+  c strokeColor 0.4902 0.9765 1.0000
+  c bgColor 0.0000 0.0000 0.0000
+end
+node 4 Source Noise
+  i noiseType 6
+  f octaves 4.23385
+  f warp 1.7028
+  c lowColor 0.0000 0.0000 0.0000
+  c highColor 1.0000 1.0000 1.0000
+end
+node 5 Source Formula
+  b animate 0
+  f knobB 0.0865239
+  f knobD 0.909995
+end
+node 6 Effects symmetry
+  f uCenterY 0.0224849
+end
+cable 6 0 5
+node 7 Compositing Blend
+  i mode 5
+end
+cable 7 0 1
+cable 7 1 2
+node 8 Compositing Blend
+  i mode 17
+end
+cable 8 0 7
+cable 8 1 3
+node 9 Compositing Blend
+end
+cable 9 0 8
+cable 9 1 4
+node 10 Compositing Blend
+  b linear 0
+  f mix 0.0723335
+  i mode 18
+end
+cable 10 0 9
+cable 10 1 6
+node 11 Effects symmetry
+  f uCenterX 0.144008
+end
+cable 11 0 10
+node 12 Compositing threshold
+end
+cable 12 0 11
+node 13 Compositing threshold
+end
+cable 13 0 12
+node 14 Effects vignette
+  f uCenterX 0.98176
+  f uCenterY 0.322312
+end
+cable 14 0 13
+node 15 Effects bloom
+  f uThreshold 0.0564137
+end
+cable 15 0 14
+node 16 Utility Output
+end
+cable 16 0 15
+node 17 Modulators LFO
+  f high 0.351069
+  f rateHz 11.7659
+  b voice 0
+end
+mod 1 dither 17 0 0 0.219 0.5
+node 18 Modulators LFO
+  f high 0.0700304
+  f phase 0.486491
+  i rateMode 2
+  b voice 0
+end
+mod 4 warp 18 0 0 0.306 0.5
+node 19 Modulators LFO
+  f phase 0.764704
+  f rateBeats 3.20799
+  i rateMode 1
+  f seed 166.231
+  b voice 0
+end
+mod 14 uRadius 19 0 0 0.511 0.5

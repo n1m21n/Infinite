@@ -315,3 +315,16 @@ python3 tools/catalog/catalog.py all --lib /tmp/uni/lib_styled --n 60
 ```
 Gates: engine tempo estimate inside the style's band (half/double allowed; ambient and experimental exempt), not silent, picture interest >= 0.2 (Samples) / 0.45 (Library). Pictures are best-of-4 wirings by interest. Known gaps: the wireframe style renders black, some styles (brutalist, acid graphics) stay plain, per-style recipes and parameter ranges are the next step.
 The Samples page shows pictures in a swipe deck and audio-only in the list.
+
+## Engine findings from the corpus (for the owner)
+
+Found while rendering generated patches; none fixed here (engine code is out of scope for the corpus work).
+
+| Finding | Where it showed | Note |
+|---|---|---|
+| Grain Molder crashes or misbehaves on some generated params | seed case 771 | repro: regenerate genome 771 of the scene atlas |
+| Array node misbehaves on some generated params | case 798 | same |
+| Field Notes: out-of-range index 51 | one generated patch | index not clamped |
+| Selftest does not lint `m<j>` modulation lines or switch slots | generator emits them, `--validate` accepts bad ones | add a lint pass over `mod` targets and switch indices |
+
+Visual gate: `catalog.passes` now also rejects pictures with mean luminance outside 14..185 (blown-out white or near-black). Styles that still render weakly: vector_wireframe (washes out white), technical_blueprint, holographic_iridescent.

@@ -1,0 +1,112 @@
+infinite-patch 1
+node 1 Source Ramp
+  f angle -164.115
+  f dither 0.0634688
+  f height 273.712
+  f scale 4.93154
+  f stop0 0.329767
+  i stopCount 5
+  c stopColor0 0.1686 0.0392 0.3686
+  c stopColor1 1.0000 0.1647 0.4275
+  c stopColor2 0.0196 0.8510 0.9098
+  c stopColor3 1.0000 0.8275 0.0980
+  c stopColor4 0.1686 0.0392 0.3686
+end
+node 2 Source Ramp
+  f centerX 1.06051
+  f gamma 2.40635
+  f height 458.642
+  f offset -0.338795
+  f scale 0.0528605
+  f stop0 0.472192
+  f stop1 0.00371181
+  i type 2
+  f width 2141.2
+  c stopColor0 0.1686 0.0392 0.3686
+  c stopColor1 1.0000 0.1647 0.4275
+  c stopColor2 0.0196 0.8510 0.9098
+  c stopColor3 1.0000 0.8275 0.0980
+  c stopColor4 0.1686 0.0392 0.3686
+end
+node 3 Source Circle
+  f feather 0.0424222
+  f posX 0.285843
+  f posY 0.873189
+  f sizeY 0.153737
+  f width 32.4879
+  c fillColor 1.0000 0.8275 0.0980
+  c strokeColor 0.0196 0.8510 0.9098
+  c bgColor 0.1686 0.0392 0.3686
+end
+node 4 Effects lensdistortion
+end
+cable 4 0 3
+node 5 Source Ramp
+  f angle 156.453
+  f centerX 0.855807
+  f centerY 1.25879
+  f dither 0.744003
+  f height 143.198
+  i repeat 2
+  f scale 0.249126
+  f stop1 0.416309
+  i stopCount 3
+  c stopColor0 0.1686 0.0392 0.3686
+  c stopColor1 1.0000 0.1647 0.4275
+  c stopColor2 0.0196 0.8510 0.9098
+  c stopColor3 1.0000 0.8275 0.0980
+  c stopColor4 0.1686 0.0392 0.3686
+end
+node 6 Effects radialblur
+  f uCenterX 0.32191
+  f uCenterY 0.020755
+end
+cable 6 0 5
+node 7 Compositing Blend
+  i mode 22
+end
+cable 7 0 1
+cable 7 1 2
+node 8 Compositing Blend
+  f mix 0.765943
+end
+cable 8 0 7
+cable 8 1 4
+node 9 Compositing Blend
+  b linear 0
+end
+cable 9 0 8
+cable 9 1 6
+node 10 Effects lensdistortion
+  f uZoom 1.55136
+end
+cable 10 0 9
+node 11 Effects radialblur
+  f uCenterY 0.347279
+end
+cable 11 0 10
+node 12 Compositing gradientmap
+  f uMix 0.454899
+  c uShadowColor 0.1686 0.0392 0.3686
+  c uHighlightColor 1.0000 0.8275 0.0980
+end
+cable 12 0 11
+node 13 Effects bloom
+  f uThreshold 0.999904
+end
+cable 13 0 12
+node 14 Utility Output
+end
+cable 14 0 13
+node 15 Modulators LFO
+  f low 0.52378
+  f rateHz 0.127766
+  f seed 70.7427
+  b voice 0
+end
+mod 11 uAmount 15 0 0 0.198 0.5
+node 16 Modulators LFO
+  f high 0.147766
+  f phase 0.741171
+end
+mod 10 uZoom 16 0 0 0.190 0.5
