@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import universe as u
 import scene
+import switches
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -81,11 +82,68 @@ def run(cmd, timeout):
         return False
 
 
+FAMILY_P = 0.4          # share of samples that also get switch siblings
+MIN_AUDIO_DIFF = 0.01   # rms of (alt - base) must clear this, or the switch did nothing audible
+MIN_FRAME_DIFF = 1.5    # mean abs pixel difference of the posters
+
+
+def _wav(path):
+    import wave
+    import numpy as np
+    w = wave.open(path)
+    return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(float) / 32768
+
+
+def _differs(kind, base_dir, alt_dir):
+    import numpy as np
+    if kind in ("A", "AV"):
+        a, b = _wav(os.path.join(base_dir, "sample.wav")), _wav(os.path.join(alt_dir, "sample.wav"))
+        m = min(len(a), len(b))
+        if m and float(np.sqrt(np.mean((a[:m] - b[:m]) ** 2))) >= MIN_AUDIO_DIFF:
+            return True
+    if kind in ("V", "AV"):
+        from PIL import Image
+        a = np.asarray(Image.open(os.path.join(base_dir, "poster.png")).convert("RGB"), float)
+        b = np.asarray(Image.open(os.path.join(alt_dir, "poster.png")).convert("RGB"), float)
+        if a.shape == b.shape and float(np.abs(a - b).mean()) >= MIN_FRAME_DIFF:
+            return True
+    return False
+
+
+def siblings(base_meta, d, out, facts, P, binary, secs, seed):
+    """Switch family: re-render the sample with one slot turned over to each alternative; keep the ones that really differ."""
+    rr = random.Random(seed)
+    code = base_meta["genome"]
+    kind = base_meta["kind"]
+    if kind == "A":
+        sw = switches.propose(code.partition(" ")[2], facts, P, rr)
+        sw = "A " + sw if sw else None
+    elif kind == "V":
+        sw = switches.propose_inf(code, facts, P, rr)
+    else:
+        sw = None  # AV: the audio and picture halves are switched in their own samples
+    if not sw:
+        return []
+    kept = []
+    for j, alt in enumerate(switches.expand(sw)[1:], 1):
+        sub = "%s%s" % (os.path.basename(d), "bcdef"[j - 1])
+        row, _ = publish((dict(code=alt, names=base_meta["nodes"], a=None, **{"class": base_meta["class"]}), sub, out, facts, P, binary, secs))
+        if not row:
+            continue
+        sd = os.path.join(out, row["id"].split("/")[0], sub)
+        if not _differs(kind, d, sd):
+            shutil.rmtree(sd); continue
+        row["family"] = base_meta["id"]; row["switch"] = sw
+        json.dump(row, open(os.path.join(sd, "meta.json"), "w"), indent=1)
+        kept.append(row)
+    return kept
+
+
 def publish(args):
     r, i, out, facts, P, binary, secs = args
     kind = r["code"].split(" ")[0]
     folder = {"A": "audio", "V": "visual", "AV": "audiovisual"}[kind]
-    eid = "s%04d" % i
+    eid = i if isinstance(i, str) else "s%04d" % i
     d = os.path.join(out, folder, eid)
     os.makedirs(d, exist_ok=True)
     inf = os.path.join(d, "patch.inf")
@@ -95,7 +153,7 @@ def publish(args):
     head, _, rest = body.partition("\n")
     open(inf, "w").write("%s\n# genome: %s\n%s" % (head, r["code"], rest))
     if subprocess.run([binary, "--validate", inf], capture_output=True, text=True).returncode:
-        shutil.rmtree(d); return None
+        shutil.rmtree(d); return None, []
     made = {}
     if kind in ("A", "AV"):
         made["wav"] = run([binary, "--audio-summary", inf, os.path.join(d, "audio.json"), "--duration", str(secs), "--wav", os.path.join(d, "sample.wav")], 120)
@@ -109,17 +167,22 @@ def publish(args):
         os.remove(os.path.join(d, "audio.json"))
     want = {"wav": ("A", "AV"), "png": ("V", "AV"), "mp4": ("V", "AV")}
     if not all(made.get(k) for k, ks in want.items() if kind in ks):
-        shutil.rmtree(d); return None
+        shutil.rmtree(d); return None, []
     score = None
     if kind in ("V", "AV"):
         score = interest(os.path.join(d, "poster.png"))
         if score < MIN_INTEREST:
-            shutil.rmtree(d); return None
+            shutil.rmtree(d); return None, []
     meta = {"id": "%s/%s" % (folder, eid), "kind": kind, "genome": r["code"], "nodes": r["names"], "tags": tags_of(r),
             "class": r["class"], "interest": score, "audio": {k: v for k, v in (r.get("a") or {}).items() if k in ("integrated_lufs", "sample_peak_dbfs", "onset_count_estimate", "silence_ratio")},
             "files": sorted(f for f in os.listdir(d))}
     json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
-    return meta
+    sibs = []
+    if not isinstance(i, str) and random.Random(eid).random() < FAMILY_P:
+        sibs = siblings(meta, d, out, facts, P, binary, secs, i)
+        meta["siblings"] = [m["id"] for m in sibs]
+        json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
+    return meta, sibs
 
 
 def main():
@@ -144,8 +207,9 @@ def main():
     start = sum(len(os.listdir(os.path.join(a.out, f))) for f in ("audio", "visual", "audiovisual") if os.path.isdir(os.path.join(a.out, f)))
     with ThreadPoolExecutor(a.workers) as ex, open(os.path.join(a.out, "index.jsonl"), "a") as idx:
         for m in ex.map(publish, [(r, start + i, a.out, facts, P, a.bin, a.secs) for i, r in enumerate(picked)]):
-            if m:
-                idx.write(json.dumps(m) + "\n"); idx.flush()
+            meta, sibs = m
+            for row in ([meta] if meta else []) + sibs:
+                idx.write(json.dumps(row) + "\n"); idx.flush()
     print("published into", a.out)
 
 

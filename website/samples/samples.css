@@ -1,0 +1,55 @@
+/* Samples: swipeable cards + a Splice-style list, on the site's own tokens (see ../blog.css for the toolbar look). */
+.smp-lede { max-width: 1120px; margin: 0 auto 20px; color: var(--ink2); font: 400 0.95rem/1.5 var(--font-sans); }
+.smp-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 1120px; margin: 0 auto 16px; }
+.smp-pill { min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); background: var(--glass); color: var(--ink);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-hi), var(--shadow-1);
+  font: 500 0.8438rem/1 var(--font-sans); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: 0;
+  transition: transform var(--spring-slab-ms) var(--spring-slab), box-shadow var(--dur-small) var(--ease-out); }
+.smp-pill:hover { box-shadow: var(--glass-hi), var(--shadow-2); }
+.smp-pill:active { transform: scale(0.96); }
+.smp-pill[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.smp-bar .grow { flex: 1; }
+.smp-count { color: var(--muted); font: 500 0.8125rem/1 var(--font-mono); }
+
+/* swipe view */
+.smp-stage { max-width: 760px; margin: 0 auto; touch-action: pan-y; user-select: none; }
+.smp-card { border-radius: var(--r-md); background: var(--glass); box-shadow: var(--glass-hi), var(--shadow-2); overflow: hidden;
+  transition: transform 240ms var(--ease-out), opacity 240ms var(--ease-out); }
+.smp-card.out-l { transform: translateX(-60px) rotate(-2deg); opacity: 0; }
+.smp-card.out-r { transform: translateX(60px) rotate(2deg); opacity: 0; }
+.smp-media { position: relative; aspect-ratio: 16 / 9; background: color-mix(in srgb, var(--ink) 92%, var(--paper)); display: grid; place-items: center; }
+.smp-media img, .smp-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.smp-media canvas.wave-big { width: 100%; height: 100%; display: block; }
+.smp-play { position: absolute; inset: 0; margin: auto; width: 72px; height: 72px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--glass); color: var(--ink); box-shadow: var(--glass-hi), var(--shadow-2); font-size: 1.4rem;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); display: grid; place-items: center; }
+.smp-body { padding: 16px 20px 20px; display: grid; gap: 12px; }
+.smp-title { font: 800 1.5rem/1.1 var(--font-sans); letter-spacing: -0.03em; margin: 0; }
+.smp-meta { color: var(--muted); font: 500 0.75rem/1.4 var(--font-mono); }
+.smp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.smp-tag { padding: 4px 10px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink2); font: 500 0.75rem/1 var(--font-sans); }
+.smp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.smp-stars { display: inline-flex; gap: 2px; }
+.smp-star { width: 36px; height: 36px; border: 0; background: transparent; cursor: pointer; font-size: 1.35rem; color: var(--muted); border-radius: 50%; }
+.smp-star[aria-pressed="true"] { color: var(--ink); }
+.smp-star:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.smp-nav { display: flex; justify-content: space-between; margin-top: 12px; }
+.smp-hint { text-align: center; color: var(--muted); font: 500 0.75rem/1 var(--font-mono); margin-top: 10px; }
+
+/* list view */
+.smp-list { max-width: 1120px; margin: 0 auto; display: grid; gap: 4px; }
+.smp-li { display: grid; grid-template-columns: 44px minmax(120px, 220px) 1fr auto auto; gap: 14px; align-items: center; padding: 8px 12px;
+  border-radius: var(--r-md); background: transparent; transition: background-color var(--dur-small) var(--ease-out); }
+.smp-li:hover, .smp-li.on { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.smp-li .smp-play { position: static; width: 40px; height: 40px; font-size: 0.95rem; margin: 0; }
+.smp-li canvas { width: 100%; height: 44px; display: block; }
+.smp-li .name { font: 700 0.95rem/1.2 var(--font-sans); letter-spacing: -0.01em; }
+.smp-li .sub { color: var(--muted); font: 500 0.7rem/1.3 var(--font-mono); }
+.smp-dl { color: var(--ink2); font: 500 0.8125rem/1 var(--font-sans); text-decoration: none; padding: 8px 12px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink) 8%, transparent); white-space: nowrap; }
+.smp-dl:hover { background: var(--ink); color: var(--paper); }
+@media (max-width: 720px) {
+  .smp-li { grid-template-columns: 40px 1fr auto; }
+  .smp-li canvas, .smp-li .smp-stars { display: none; }
+}
+[hidden] { display: none !important; }

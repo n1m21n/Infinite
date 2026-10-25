@@ -290,3 +290,11 @@ Genomes may start with stream definitions: `$a=<chain or [..]+[..]=>X> && ... &&
 - **Field Primitive presets**: 23 parsed (their topology is set per preset). Field Graph presets are not usable headless (they emit nodes into the live graph).
 - **Field Notes** exposes one modulatable code slot (index 51); `CODE_MOD_CAP` limits the generator to it (this was making ~5% of genomes invalid).
 - `coverage.py`: engine node types vs pools vs atlas use. Atlas rows carry `mods` (modulator sources) apart from `names`.
+
+### Modulator chains, topologies, visual switches, samples page (2026-10-25)
+- **Modulator of modulator**: `m<j>.key` targets the j-th distinct modulator source (0-based, first appearance); ~40% of scene patches use it. Mods compile in two passes.
+- **Topologies**: scene 3D/visual graphs add echo, grid, ladder and parallel shapes; Field Primitive presets carry a topology (Points, Plane, Sphere, Cylinder, Torus, Disc); Prediction nodes are in the note and filter pools (Field Notes exposes mod index 51 only, `CODE_MOD_CAP`).
+- **Visual switches**: scene genomes take a suffix ` %% 14={Blur|Bloom}` (type swap, seeded params) or ` %% 9.mode={0|2}` (enum set), applied after compile by `switches.apply_inf`.
+- **Library families**: `library.py` renders one sibling per switch alternative; siblings that do not differ in audio or frame 0 are dropped (`_differs`).
+- **Samples page**: `build_samples_page.py --lib <library>` writes `website/samples/{index.html,data.json,media/}` (AAC audio, mp4, poster, patch.inf, waveform peaks, deterministic codename). Page: swipe and list views, shuffle on every load, 1-5 ratings in localStorage with JSON export. `media/` is gitignored.
+- Pool changes shift pool indices: atlases made before them no longer decode; rebuild the atlas.

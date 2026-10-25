@@ -48,3 +48,4 @@ node_modules/
 # API credentials
 tools/spread/*_config.json
 tools/spread/*client_secrets.json
+website/samples/media/
