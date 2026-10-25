@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="robots" content="noindex">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lilliputian Scale-Displacement Surrealism — Infinite 2D Sketch</title>
+  <title>Lilliputian Scale-Displacement Surrealism — Interactive Infinite Visualizer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body, html { width: 100%; height: 100%; overflow: hidden; background: #0b0d17; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -13,8 +12,9 @@
       position: absolute;
       bottom: 14px;
       right: 14px;
-      background: rgba(15, 18, 35, 0.85);
+      background: rgba(15, 18, 35, 0.82);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.15);
       padding: 6px 12px;
       border-radius: 999px;
@@ -25,12 +25,32 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.2s, background 0.2s;
       z-index: 10;
     }
-    .badge-icon { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #F57F66, #A9CDF1); }
-    .controls { position: absolute; bottom: 14px; left: 14px; display: flex; gap: 8px; z-index: 10; }
+    .badge:hover {
+      transform: translateY(-2px);
+      background: rgba(30, 35, 65, 0.95);
+      border-color: rgba(245, 127, 102, 0.5);
+    }
+    .badge-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #F57F66, #A9CDF1);
+      display: inline-block;
+    }
+    .controls {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
     .btn {
-      background: rgba(15, 18, 35, 0.85);
+      background: rgba(15, 18, 35, 0.82);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.15);
       color: #eaeaea;
@@ -39,129 +59,108 @@
       font-size: 11px;
       cursor: pointer;
     }
-    .btn:hover { background: rgba(255, 255, 255, 0.2); }
+    .btn:hover { background: rgba(255, 255, 255, 0.15); }
   </style>
 </head>
 <body>
-  <canvas id="cv"></canvas>
+  <canvas id="gl"></canvas>
+
   <div class="controls">
     <button class="btn" id="btn-audio">enable mic input</button>
   </div>
-  <a href="https://infinitedevices.org" target="_blank" rel="noopener" class="badge">
+
+  <a href="https://infinitedevices.org" target="_blank" rel="noopener" class="badge" title="infinite: the open-source audiovisual daw">
     <span class="badge-icon"></span>
-    <span>Lilliputian Scale-Displacement Surrealism • made in <strong>infinite</strong></span>
+    <span>made in <strong>infinite</strong></span>
   </a>
 
   <script>
-    const canvas = document.getElementById("cv");
-    const ctx = canvas.getContext("2d");
-    let width = 800, height = 600;
-    const PI = Math.PI, TAU = Math.PI * 2;
-    const sin = Math.sin, cos = Math.cos, min = Math.min, max = Math.max, floor = Math.floor, sqrt = Math.sqrt, abs = Math.abs, dist = Math.hypot;
+    const canvas = document.getElementById("gl");
+    const gl = canvas.getContext("webgl");
+    if (!gl) { document.body.innerHTML = "webgl not supported"; }
 
-    function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = canvas.width = window.innerWidth * dpr;
-      height = canvas.height = window.innerHeight * dpr;
-    }
-    window.addEventListener("resize", resize);
-    resize();
+    const vsSource = `
+      attribute vec2 position;
+      void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
 
-    // Infinite Sketch compatibility runtime
-    let _fill = "white", _stroke = null, _lineWidth = 1;
-    let _shapeActive = false, _shapePts = [];
-    function background(...args) {
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      if (args.length === 1 && typeof args[0] === 'number') {
-        const v = floor(args[0] * 255); ctx.fillStyle = `rgb(${v},${v},${v})`;
-      } else if (args.length === 3) {
-        ctx.fillStyle = `rgb(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)})`;
-      } else if (typeof args[0] === 'string') { ctx.fillStyle = args[0]; }
-      ctx.fillRect(0, 0, width, height);
-      ctx.restore();
-    }
-    function fill(...args) {
-      if (typeof args[0] === 'string') { _fill = args[0]; }
-      else if (args.length === 1) { const v = floor(args[0]*255); _fill = `rgb(${v},${v},${v})`; }
-      else if (args.length >= 3) { const a = args[3] !== undefined ? args[3] : 1; _fill = `rgba(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)},${a})`; }
-    }
-    function noFill() { _fill = null; }
-    function stroke(...args) {
-      if (typeof args[0] === 'string') { _stroke = args[0]; }
-      else if (args.length === 1) { const v = floor(args[0]*255); _stroke = `rgb(${v},${v},${v})`; }
-      else if (args.length >= 3) { const a = args[3] !== undefined ? args[3] : 1; _stroke = `rgba(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)},${a})`; }
-    }
-    function noStroke() { _stroke = null; }
-    function strokeWeight(w) { _lineWidth = w; }
-    function translate(x, y) { ctx.translate(x, y); }
-    function rotate(a) { ctx.rotate(a); }
-    function push() { ctx.save(); }
-    function pop() { ctx.restore(); }
-    function circle(x, y, r) {
-      ctx.beginPath(); ctx.arc(x, y, r / 2, 0, TAU);
-      if (_fill) { ctx.fillStyle = _fill; ctx.fill(); }
-      if (_stroke) { ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke(); }
-    }
-    function rect(x, y, w, h) {
-      if (_fill) { ctx.fillStyle = _fill; ctx.fillRect(x, y, w, h); }
-      if (_stroke) { ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.strokeRect(x, y, w, h); }
-    }
-    function line(x1, y1, x2, y2) {
-      if (!_stroke) return;
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-      ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke();
-    }
-    function beginShape() { _shapePts = []; _shapeActive = true; }
-    function vertex(x, y) { if (_shapeActive) _shapePts.push([x, y]); }
-    function endShape() {
-      if (!_shapeActive || _shapePts.length < 2) return;
-      ctx.beginPath();
-      ctx.moveTo(_shapePts[0][0], _shapePts[0][1]);
-      for (let i = 1; i < _shapePts.length; i++) ctx.lineTo(_shapePts[i][0], _shapePts[i][1]);
-      if (_fill) { ctx.fillStyle = _fill; ctx.fill(); }
-      if (_stroke) { ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke(); }
-      _shapeActive = false;
-    }
-    function hsl(h, s, l, a = 1.0) {
-      const H = ((h % 1) + 1) % 1 * 360, S = s * 100, L = l * 100;
-      return `hsla(${H}, ${S}%, ${L}%, ${a})`;
-    }
-    function param(name, def) { window[name] = def; }
+    // Standard fragment shader wrapper converting Field logic to WebGL
+    const fsSource = `
+      precision highp float;
+      uniform vec2 res;
+      uniform float t;
+      uniform float aspect;
+      uniform float audio_bass;
+      uniform float audio_mid;
+      uniform float audio_high;
 
-    // User script body
-    param("tinyCount", 12, 4, 30);
+      float atan2(float y, float x) {
+        return atan(y, x);
+      }
 
-function draw(t) {
-  background(0.12, 0.15, 0.22); // Deep Shadow Interior
-  
-  // Gigantic focal sphere (giant eyeball / relic)
-  translate(width / 2, height * 0.45);
-  noStroke();
-  fill(0.92, 0.88, 0.82);
-  circle(0, 0, min(width, height) * 0.65);
-  
-  // Miniature human figures traversing below
-  fill(0.85, 0.25, 0.15);
-  for (let i = 0; i < tinyCount; i++) {
-    const x = ((i / tinyCount + t * 0.03) % 1) * width - width / 2;
-    const y = height * 0.38 + sin(i * 3.1) * 15;
-    rect(x, y, 4, 12); // tiny figure body
-    circle(x + 2, y - 4, 5); // tiny head
-  }
-}
+      void main() {
+        vec2 uv = gl_FragCoord.xy / res.xy;
+        vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+        vec3 col = vec3(0.0);
+        float alpha = 1.0;
 
-    // Audio reactivity
-    let audioCtx = null, analyser = null, freqData = null, bass = 0.5;
+        p = (uv - 0.5) * aspect; r = length(p); titan = step(r, 0.35); col = mix(vec3(0.08, 0.11, 0.18), vec3(0.92, 0.88, 0.8), titan);
+
+        gl_FragColor = vec4(col, alpha);
+      }
+    `;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1, -1,  1,
+      -1,  1,  1, -1,  1,  1
+    ]), gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(program, "res");
+    const uTime = gl.getUniformLocation(program, "t");
+    const uAspect = gl.getUniformLocation(program, "aspect");
+    const uBass = gl.getUniformLocation(program, "audio_bass");
+    const uMid = gl.getUniformLocation(program, "audio_mid");
+    const uHigh = gl.getUniformLocation(program, "audio_high");
+
+    let audioContext = null;
+    let analyser = null;
+    let freqData = null;
+    let bass = 0.5, mid = 0.5, high = 0.5;
+
     document.getElementById("btn-audio").addEventListener("click", async () => {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const src = audioCtx.createMediaStreamSource(stream);
-          analyser = audioCtx.createAnalyser();
+          const source = audioContext.createMediaStreamSource(stream);
+          analyser = audioContext.createAnalyser();
           analyser.fftSize = 64;
-          src.connect(analyser);
+          source.connect(analyser);
           freqData = new Uint8Array(analyser.frequencyBinCount);
           document.getElementById("btn-audio").innerText = "mic active";
         } catch(e) {
@@ -170,19 +169,44 @@ function draw(t) {
       }
     });
 
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== window.innerWidth * dpr || canvas.height !== window.innerHeight * dpr) {
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+    }
+
     const start = performance.now();
-    function loop() {
-      const t = (performance.now() - start) * 0.001;
+    function render() {
+      resize();
+      gl.useProgram(program);
+
+      const elapsed = (performance.now() - start) * 0.001;
+
       if (analyser && freqData) {
         analyser.getByteFrequencyData(freqData);
         bass = (freqData[1] + freqData[2]) / 255.0;
+        mid = (freqData[8] + freqData[9]) / 255.0;
+        high = (freqData[20] + freqData[21]) / 255.0;
+      } else {
+        bass = 0.5 + 0.3 * Math.sin(elapsed * 2.0);
+        mid = 0.5 + 0.3 * Math.cos(elapsed * 3.1);
+        high = 0.5 + 0.3 * Math.sin(elapsed * 5.0);
       }
-      ctx.save();
-      if (typeof draw === 'function') draw(t);
-      ctx.restore();
-      requestAnimationFrame(loop);
+
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, elapsed);
+      gl.uniform1f(uAspect, canvas.width / canvas.height);
+      gl.uniform1f(uBass, bass);
+      gl.uniform1f(uMid, mid);
+      gl.uniform1f(uHigh, high);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
     }
-    loop();
+    render();
   </script>
 </body>
 </html>
