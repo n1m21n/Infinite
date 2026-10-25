@@ -25,7 +25,7 @@ DEFAULT_BIN = "build/Infinite.app/Contents/MacOS/Infinite"
 P_SET = 0.35  # chance that a seeded param leaves its default
 WAVS = sorted(glob.glob(os.path.join(ROOT, "assets/drumkits/infinite-basic/*.wav")))
 MIDIS = sorted(glob.glob(os.path.join(HERE, "assets/*.mid")))
-NEEDS_LIVE = {"Keyboard"}  # silent headless: waits for key presses
+NEEDS_LIVE = {"Keyboard", "Grain Molder"}  # silent headless: key presses, or UI-side record/load
 AUDIO_PATH_KEYS = ("path", "pathB", "filePath", "loopFile", "file")
 
 
