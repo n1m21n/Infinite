@@ -800,6 +800,19 @@ if(INFINITE_ENABLE_GPL)
             COMMENT "Synth REF core: sloop_smk (llvm-mingw clang)"
             VERBATIM)
         list(APPEND _sr_dlls "${_dll}")
+        # ROM core: firmware ROMs as their authors distribute them (WebAssembly),
+        # run by wasm3 (MIT), loaded at run time from the user's roms folder.
+        file(GLOB _w3 CONFIGURE_DEPENDS "${_sr_root}/../rom/wasm3/*.c")
+        file(GLOB _w3h CONFIGURE_DEPENDS "${_sr_root}/../rom/wasm3/*.h")
+        set(_dll "${_sr_cores_out}/synthref_rom.dll")
+        add_custom_command(OUTPUT "${_dll}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${_sr_cores_out}"
+            COMMAND "${_sr_cc}" -std=gnu11 -O3 "-Dd_m3MaxNativeStack=(512*1024)" "-I${_sr_root}/../rom/wasm3"
+                -shared -s -o "${_dll}" "${_sr_root}/../rom/rom_core.c" ${_w3}
+            DEPENDS "${_sr_root}/../rom/rom_core.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/SynthRef/SynthRefCoreApi.h" ${_w3} ${_w3h}
+            COMMENT "Synth REF core: ROM host (wasm3, llvm-mingw clang)"
+            VERBATIM)
+        list(APPEND _sr_dlls "${_dll}")
         # The copy is part of this target (not Infinite's POST_BUILD) so a
         # core rebuilt without relinking the exe still reaches the exe folder.
         add_custom_target(synthref_cores ALL

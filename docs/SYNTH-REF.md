@@ -529,6 +529,34 @@ stricter `sloop/LICENSING.md`.
 
 How a user imports banks without recompiling: `docs/SYNTH-REF-BANCOS.md`.
 
+## 12b. ROMs: firmwares as their authors distribute them
+
+Synth REF also runs a firmware **exactly as its authors distribute it** for their browser
+simulators: a WebAssembly module. Nothing is rebuilt or recreated; the screens, fonts, icons,
+samples and presets are the ones in the file, so the LCD is identical to the authors' simulator.
+
+- Drop the `.wasm` in `Documents\Infinite-Turbo\SynthRef\roms` (the **ROMS** button on the node
+  opens the folder and rereads it). Each ROM appears in the firmware menu as `ROM | <file>`.
+  No rebuild of Infinite.
+- `synthref_rom.dll` (`src/gpl/SynthRef/rom/rom_core.c`) runs it in **wasm3** v0.9.0 (MIT,
+  vendored unmodified in `rom/wasm3`), compiled at load time (`m3_CompileModule`) so the audio
+  thread only executes. A ROM imports nothing: it is sandboxed by construction (no file, network or
+  OS access) and a trap only silences that node. Native stack guard: 512 KB
+  (`d_m3MaxNativeStack`), a trap past it, never a crash. Each instance has its own runtime and
+  linear memory (no DLL copies).
+- ABI: `create_rom(path)` and `instance_info(inst)` were appended to `SynthRefCoreApi`; ids are
+  `rom:<file>`; state is the ROM's own snapshot ("SRR1" + size + bytes).
+- **Families** (the API a group of firmwares exports; a ROM of a known family loads without a
+  rebuild, a new family needs its mapping once in `rom_core.c`):
+  - SLOOP SMK web engine (`synth_*`, `fw_*`, zero imports): `web/audio/smk-engine.wasm` of
+    github.com/ChanceTheMaker/sloop-smk. Tested: the generic battery passes; its audio, state
+    size and screen match the natively built `sloop_smk` core exactly; ~9 % of one core.
+  - Not yet: M-VAVE workbench (`sim_*`; the WASM is embedded in the workbench HTML).
+- Not available as a ROM today: SLOOP for the FM-1 (its authors ship the hardware `.fwsc` and a
+  sound-only preview without screen), FM1VST cores (macOS bundles), stock firmwares (JieLi CPU
+  images; running them would need an emulator of a proprietary, undocumented CPU).
+- Synth REF does not ship third-party ROMs; users load the files they obtain from the authors.
+
 ## 13. Known limitations
 
 - **Sample import** (WAV into the firmware's sample bank) is not implemented.

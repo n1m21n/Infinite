@@ -33,6 +33,11 @@ Real instrument firmware inside the patch. Full build only (GPL). Example:
 - Build: the full build fetches a pinned llvm-mingw Clang once (like the ASIO SDK) to compile firmware
   cores; the MIT build is unchanged.
 
+- **Synth REF ROMs**: a firmware exactly as its authors distribute it for their simulators (a
+  WebAssembly file) runs in a sandboxed interpreter (wasm3): drop it in
+  Documents\Infinite-Turbo\SynthRef\roms and pick it in the firmware menu, no rebuild. First family:
+  SLOOP SMK's own smk-engine.wasm, with its real screen, icons and presets.
+
 ## 0.71.1-turbo (2026-10-24)
 
 Sand, dust and particle sculptures with PointZ, rendered by Render 3D HQ. Example:

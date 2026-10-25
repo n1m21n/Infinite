@@ -192,6 +192,13 @@ typedef struct SynthRefCoreApi
    /* Preset navigation as the instrument's panel does it. <0 = unsupported. */
    int (*load_factory)(void* inst, uint32_t index);
    int (*load_program)(void* inst, uint32_t program);
+
+   /* Appended in ABI 1 (used only when structSize covers them, NULL when a
+    * core has none): a ROM core runs a firmware image exactly as its authors
+    * distribute it (synthref_rom.dll: their WebAssembly simulator builds).
+    * create_rom replaces create(); each instance then has its own info. */
+   void* (*create_rom)(const char* utf8Path, char* error, uint32_t errorCapacity);
+   const SynthRefCoreInfo* (*instance_info)(void* inst);
 } SynthRefCoreApi;
 
 typedef const SynthRefCoreApi* (*SynthRefCoreEntryFn)(uint32_t hostAbiVersion);

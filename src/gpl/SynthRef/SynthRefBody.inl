@@ -482,6 +482,16 @@
       if (ImGui::SmallButton("BANKS FOLDER"))
          SynthRefRevealFolder(SynthRefUserDir());
       ImGui::SameLine();
+      if (ImGui::SmallButton("ROMS"))
+      {
+         // Firmware ROMs (.wasm, as their authors distribute them): open the
+         // folder and list what is in it now in the firmware menu.
+         SynthRefRescanRoms();
+         SynthRefRevealFolder(SynthRefUserDir() + "\\roms");
+      }
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("ROMS", "drop firmware ROMs (.wasm simulator builds) here; they appear in the firmware menu");
+      ImGui::SameLine();
       if (ImGui::SmallButton("PANIC"))
          n->Panic();
       if (ImGui::IsItemHovered())

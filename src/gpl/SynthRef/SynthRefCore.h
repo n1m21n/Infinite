@@ -34,6 +34,10 @@ struct SynthRefFirmware
 
 const std::vector<SynthRefFirmware>& SynthRefFirmwares();
 const SynthRefFirmware* SynthRefFindFirmware(const std::string& coreId);
+// ROMs (firmware images as their authors distribute them, see rom/rom_core.c)
+// are listed from Documents\Infinite-Turbo\SynthRef\roms with ids "rom:<file>".
+void SynthRefRescanRoms();
+std::string SynthRefRomPath(const std::string& coreId); // "" if not a ROM id
 
 // One live core instance. Main thread creates and destroys it; every call
 // into `api` must be serialised by the owner (SynthRefNode does it with its
