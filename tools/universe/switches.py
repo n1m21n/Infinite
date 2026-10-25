@@ -81,6 +81,83 @@ def propose(code, facts, P, r, kinds=("type", "mode")):
     return code[:a] + "{" + "|".join(alts) + "}" + code[b:]
 
 
+def apply_inf(text, spec, facts):
+    """Post-compile overrides of a scene genome: `14=Blur` swaps node 14's type (defaults for the new one), `9.mode=2` sets an enum/number."""
+    swaps, sets = {}, {}
+    for tk in spec.split():
+        lhs, _, val = tk.partition("=")
+        if "." in lhs:
+            k, _, key = lhs.partition("."); sets.setdefault(int(k), {})[key] = val
+        else:
+            swaps[int(lhs)] = val.replace("_", " ")
+    out, cur, typ, dropping = [], None, None, False
+    for line in text.splitlines():
+        p = line.split()
+        if line.startswith("node "):
+            cur, typ, dropping = int(p[1]), " ".join(p[3:]), False
+            if swaps.get(cur) in facts:
+                typ = swaps[cur]; dropping = True
+                out.append("node %d %s %s" % (cur, facts[typ]["category"], typ.split(":")[0]))
+                for key, (tag, val) in sorted(u.seeded_params(facts[typ], 7919 * cur + 17).items()):  # seeded, not default: most filters do nothing at their defaults
+                    out.append("  %s %s %s" % (tag, key, ("%.6g" % val) if tag == "f" else val if tag == "s" else int(val)))
+                continue
+        elif line == "end" and cur in sets:
+            tags = {r["key"]: r["tag"] for r in facts[typ]["rows"]}
+            for key, val in sets[cur].items():
+                j = len(out)
+                while j > 0 and not out[j - 1].startswith("node "):  # drop the node's earlier line for this key: the first one wins in the engine
+                    j -= 1
+                    if out[j].split()[1:2] == [key]:
+                        del out[j]
+                out.append("  %s %s %s" % (tags.get(key, "i"), key, val))
+        elif dropping and line.startswith("  "):
+            continue
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
+def name_of(text, k):
+    for l in text.splitlines():
+        p = l.split()
+        if l.startswith("node ") and int(p[1]) == k:
+            return " ".join(p[3:])
+
+
+def propose_inf(code, facts, P, r, text=None):
+    """Pick one node of the compiled scene and turn it into a switch group: `... %% 14={Blur|Bloom}` or `... %% 9.mode={0|2}`."""
+    import scene
+    text = text or scene.compile_scene(code, facts, P)
+    nodes = [(int(l.split()[1]), " ".join(l.split()[3:])) for l in text.splitlines() if l.startswith("node ")]
+    modded = {}
+    for l in text.splitlines():
+        if l.startswith("mod "):
+            q = l.split(); modded.setdefault(int(q[1]), set()).add(q[2])
+    cands = []
+    for k, n in nodes:
+        if n not in facts or n in ("Audio Out", "Output", "Render 3D") or facts[n]["category"] in ("Modulators", "Macros", "Prediction") and not facts[n]["inputs"]:
+            continue
+        t = facts[n]; need = modded.get(k, set())
+        sib = [m for m in facts if m != n and ":" not in m and signature(facts[m]) == signature(t) and not facts[m]["hardware_driven"]
+               and need <= {x.get("key") or str(x.get("index")) for x in facts[m]["modulatable"]}]
+        if sib:
+            cands.append(("type", k, sib))
+        if t["category"] in ("Modulators", "Macros"):
+            continue  # a modulator's mode barely shows in one frame; the type swaps above already cover them
+        for row in t["rows"]:
+            if row.get("options") and len(row["options"]) >= 2 and row.get("ui", True) and row["key"] not in need:
+                cands.append(("mode", k, row))
+    if not cands:
+        return None
+    kind, k, x = r.choice(cands)
+    if kind == "type":
+        alts = [name_of(text, k)] + r.sample(x, min(len(x), r.randint(1, 3)))
+        spec = "%d={%s}" % (k, "|".join(a.replace(" ", "_") for a in alts))
+    else:
+        vals = r.sample(range(len(x["options"])), min(len(x["options"]), r.randint(2, 4)))
+        spec = "%d.%s={%s}" % (k, x["key"], "|".join(map(str, vals)))
+    return code.partition(" %% ")[0] + " %% " + spec
+
+
 if __name__ == "__main__":
     import scene
     facts = u.load_facts(); P = scene.pools_v2(facts)

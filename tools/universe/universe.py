@@ -45,7 +45,7 @@ def pools(facts):
         if t["hardware_driven"] or name == "Plugin" or name in NEEDS_LIVE:
             continue
         ins, outs, cat = kinds(t, "inputs"), kinds(t, "outputs"), t["category"]
-        if cat == "Notes" and "note" in outs:
+        if cat in ("Notes", "Prediction") and "note" in outs:
             if ins.count("note") >= 2:
                 P["J"].append(name)
             else:

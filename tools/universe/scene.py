@@ -317,7 +317,7 @@ def visual_pools(facts):
         ni = ins.count("image")
         if t["category"] == "Source" and ni == 0 and "image" in outs:
             V["src"].append(n)
-        elif t["category"] in ("Effects", "Compositing") and ni == 1 and len(ins) == 1 and "image" in outs:
+        elif t["category"] in ("Effects", "Compositing", "Prediction") and ni == 1 and len(ins) == 1 and "image" in outs:
             V["flt"].append(n)
             if t["category"] == "Compositing" and ("color" in n.lower() or n in ("Curves", "Color Ramp")):
                 V["color"].append(n)
@@ -333,7 +333,7 @@ def visual_pools(facts):
     return V
 
 
-TOPOS = ("fold", "tree", "fan", "switch", "split", "solo")
+TOPOS = ("fold", "tree", "fan", "switch", "split", "solo", "echo", "grid", "ladder", "parallel")
 
 
 def _blender(g, r, V, many=False):
@@ -373,6 +373,43 @@ def combine(g, r, V, layers):
         for lay in layers[:4]:
             g.connect(lay, bl)
         return _tint(g, r, V, bl, 0.5)
+    if topo == "echo":  # the picture blended with a filtered copy of itself, again and again (a feed-forward trail)
+        cur = layers[0]
+        for lay in layers[1:] + [None] * r.choice([1, 2]):
+            fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r)); g.connect(cur, fl)
+            bl = _blender(g, r, V); g.connect(cur, bl); g.connect(fl, bl)
+            if lay is not None:
+                b2 = _blender(g, r, V); g.connect(bl, b2); g.connect(lay, b2); bl = b2
+            cur = bl
+        return _tint(g, r, V, cur, 0.4)
+    if topo == "ladder":  # a left fold with a filter between every rung
+        cur = layers[0]
+        for lay in layers[1:]:
+            bl = _blender(g, r, V); g.connect(cur, bl); g.connect(lay, bl)
+            fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r)); g.connect(bl, fl); cur = fl
+        return cur
+    if topo == "parallel":  # every layer gets its own filter chain, then one wide blender
+        ends = []
+        for lay in layers[:4]:
+            cur = lay
+            for _ in range(r.choice([1, 2])):
+                fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r)); g.connect(cur, fl); cur = fl
+            ends.append(cur)
+        bl = _blender(g, r, V, many=len(ends) >= 3)
+        for e in ends:
+            g.connect(e, bl)
+        return _tint(g, r, V, bl, 0.4)
+    if topo == "grid":  # 2x2 style: pairs blended, each pair filtered, then the pairs blended
+        level = list(layers)
+        while len(level) > 1:
+            nxt = []
+            for i in range(0, len(level) - 1, 2):
+                bl = _blender(g, r, V); g.connect(level[i], bl); g.connect(level[i + 1], bl)
+                fl = g.add(wchoice(r, V["flt"], 1)[0], u.sd(r)); g.connect(bl, fl); nxt.append(fl)
+            if len(level) % 2:
+                nxt.append(level[-1])
+            level = nxt
+        return level[0]
     # split: one layer feeds two differently filtered branches that meet again
     src = layers[0]
     ends = []
@@ -475,6 +512,7 @@ def shift(text, off):
 
 
 def parse_scene(code):
+    code = code.partition(" %% ")[0]  # post-compile switch overrides (see switches.apply_inf)
     kind, _, rest = code.partition(" ")
     if kind == "A":
         return kind, rest, None, ""
@@ -495,6 +533,14 @@ def compile_visual_part(vcode, facts, V, P):
 
 
 def compile_scene(code, facts, P, V=None):
+    text = _compile_scene(code, facts, P, V)
+    if " %% " in code:
+        import switches
+        text = switches.apply_inf(text, code.partition(" %% ")[2], facts)
+    return text
+
+
+def _compile_scene(code, facts, P, V=None):
     V = V or P["_V"]
     kind, a, v, links = parse_scene(code)
     if kind == "A":
