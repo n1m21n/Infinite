@@ -119,9 +119,10 @@ def parse(code):
     mods = []
     for m in mods_s.split():
         src, _, dst = m.partition("@")
+        src, _, frm = src.partition("<")  # `<j`: the modulator reads compiled node j (M4)
         idx, _, seed = src[1:].partition(".")
         k, _, key = dst.partition(".")
-        mods.append((int(idx), int(seed or 0), int(k), key))
+        mods.append((int(idx), int(seed or 0), int(k), key, int(frm) if frm else None))
     return branches, join, tail, mods
 
 
@@ -220,8 +221,12 @@ def compile_inf(code, facts, P):
         end = ends[0][0]
     out = add("Audio Out", 0)
     wire(end, out, "aud")
-    for idx, seed, k, key in mods:
+    for idx, seed, k, key, frm in mods:
         m = add(P["L"][idx % len(P["L"])], seed)
+        if frm is not None:
+            src = order[frm % len(order)]
+            skind = facts[names[src]]["outputs"][0]["kind"]
+            wire(src, m, "note" if skind == "note" else "aud")
         lines.append("mod %d %s %d 0 0 %.3f 0.5" % (order[k % len(order)], key, m, random.Random(seed).uniform(0.1, 1)))
     return "\n".join(lines) + "\n"
 
@@ -277,7 +282,11 @@ def sample_code(r, P, facts, order=1, pick=None):
         code = " + ".join("[" + ">".join(b) + "]" for b in bs) + " => " + ">".join(tail) + ">O"
     else:
         code = ">".join(audio_branch(r, pick)) + ">O"
-    if order >= 2:
+    if order >= 4 and "=>" in code:
+        picks = cross_mods(r, P, facts, code, pick)
+        if picks:
+            code += " ; " + " ".join(picks)
+    elif order >= 2:
         names = node_names(code, P)
         picks = []
         for _ in range(r.choice([1, 2, 3])):
@@ -288,6 +297,33 @@ def sample_code(r, P, facts, order=1, pick=None):
         if picks:
             code += " ; " + " ".join(picks)
     return code
+
+
+def spine_ids(code):
+    """Spine index of each compiled node, in compile order; -1 for join and tail."""
+    branches, join, tail, _ = parse(code)
+    ids = [i for i, b in enumerate(branches) for _ in b]
+    return ids + [-1] * ((1 if join else 0) + len(tail))
+
+
+def cross_mods(r, P, facts, code, pick):
+    """M4: audio/note readers fed from one spine that drive a param of another spine."""
+    names, ids = node_names(code, P), spine_ids(code)
+    readers = [i for i, n in enumerate(P["L"]) if any(x["kind"] in ("audio", "note") for x in facts[n]["inputs"])]
+    out = []
+    for _ in range(r.choice([1, 2, 3])):
+        j = r.randrange(len(names))
+        if ids[j] < 0:
+            continue
+        kind = facts[names[j]]["outputs"][0]["kind"]
+        ok = [i for i in readers if any(x["kind"] == kind for x in facts[P["L"][i]]["inputs"])]
+        tgts = [k for k in range(len(names)) if ids[k] != ids[j] and any(m.get("key") for m in facts[names[k]]["modulatable"])]
+        if not ok or not tgts:
+            continue
+        k = r.choice(tgts)
+        key = r.choice([m["key"] for m in facts[names[k]]["modulatable"] if m.get("key")])
+        out.append("L%d.%d<%d@%d.%s" % (r.choice(ok), sd(r), j, k, key))
+    return out
 
 
 def classify(res):
