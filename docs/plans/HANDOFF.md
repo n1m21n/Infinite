@@ -11,7 +11,12 @@
 - Ler `docs/SYNTH-REF.md` (arquitetura, ABI, testes), `docs/SYNTH-REF-MVP-TEST-GUIDE.md` (teste com o
   MiniLab 3, pt-BR), `docs/SYNTH-REF-BANCOS.md` (timbres sem recompilar).
 - Testes: `INFINITE_SYNTHREFTEST` (no gate full), sweeps de áudio passam; MIT compila sem Synth REF.
-- Falta: teste do dono com o MiniLab 3 físico; commit/merge em `turbo/windows-only` e tag só com o aval.
+- 2026-10-24: testado pelo dono com o MiniLab 3 (teclas no canal 15, knobs, pads, faders); FM-1 (FM1 OPEN)
+  e SLOOP SMK adicionados; encoders do FM-1 com o sentido corrigido; mergeado em `turbo/windows-only`
+  (sem tag, sem push).
+- O carregador de ROMs WebAssembly (wasm3; ROM do SLOOP SMK como o autor distribui) foi feito e revertido
+  (commit 5e78601d, revert ada60159): no uso real trouxe latência alta e perda de mensagens MIDI. Investigar
+  antes de trazer de volta (custo do interpretador na thread de áudio? tamanho do bloco de 32 frames?).
 - Próximo (Fase 5, só depois do aval do MVP): core SLOOP SMK, FM-1 OPEN, import de samples WAV,
   sync do sequenciador da firmware com o transporte do Infinite.
 
