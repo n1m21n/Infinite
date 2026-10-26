@@ -154,7 +154,7 @@ bool GenerateSamplesNode::StartAttempt(int attempt)
    // first and is dropped: the loop then starts with the reverb and release
    // tails a loop playing round would have, so the seam does not click in.
    job.barFrames = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
-   job.prerollBars = r.bars == 1 ? 1 : 2;
+   job.prerollBars = PrerollBars(r.bars);
    const int frames = job.barFrames * (r.bars + job.prerollBars);
    job.done.store(false);
    job.progress.store(0.0f);
@@ -179,14 +179,7 @@ void GenerateSamplesNode::Finish()
    }
    const int from = job.barFrames * job.prerollBars;
    const int frames = job.barFrames * job.recipe.bars;
-   AudioSummary::Analyzer an(kRate);
-   an.Push(job.left.data() + from, job.right.data() + from, frames);
-   const AudioSummary::Result s = an.Finish();
-   const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
-   const bool finite = s.nonFiniteFrames == 0;
-   const bool silent = !(s.integratedLufs > kSilentLufs); // NaN for silence
-   const bool flat = rms > 0.0 && s.samplePeak / rms < 1.2; // DC or a stuck square, not music
-   if (!finite || silent || flat)
+   if (!Master(job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR))
    {
       if (job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
          return;
@@ -194,23 +187,13 @@ void GenerateSamplesNode::Finish()
       mFailed = true;
       return;
    }
-
-   // -14 LUFS, then held under a -1 dBTP ceiling.
-   double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
-   const double ceiling = std::pow(10.0, kCeilingDb / 20.0);
-   if (s.truePeak * gain > ceiling)
-      gain = ceiling / s.truePeak;
    auto* buf = new Platform::SampleBuffer();
    buf->channels = 2;
    buf->numFrames = frames;
    buf->sampleRate = kRate;
    buf->channelData.resize((size_t)frames * 2);
-   mLoopL.assign(job.left.begin() + from, job.left.begin() + from + frames);
-   mLoopR.assign(job.right.begin() + from, job.right.begin() + from + frames);
    for (int i = 0; i < frames; i++)
    {
-      mLoopL[i] *= (float)gain;
-      mLoopR[i] *= (float)gain;
       buf->channelData[i] = mLoopL[i];
       buf->channelData[(size_t)frames + i] = mLoopR[i];
    }
@@ -231,18 +214,49 @@ void GenerateSamplesNode::Finish()
    mGenVersion = kGeneratorVersion;
 }
 
-std::string GenerateSamplesNode::MadeLabel() const
+bool GenerateSamplesNode::Master(const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+{
+   AudioSummary::Analyzer an(kRate);
+   an.Push(l, r, frames);
+   const AudioSummary::Result s = an.Finish();
+   const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
+   const bool finite = s.nonFiniteFrames == 0;
+   const bool silent = !(s.integratedLufs > kSilentLufs); // NaN for silence
+   const bool flat = rms > 0.0 && s.samplePeak / rms < 1.2; // DC or a stuck square, not music
+   if (!finite || silent || flat)
+      return false;
+   // -14 LUFS, then held under a -1 dBTP ceiling.
+   double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
+   const double ceiling = std::pow(10.0, kCeilingDb / 20.0);
+   if (s.truePeak * gain > ceiling)
+      gain = ceiling / s.truePeak;
+   outL.assign(l, l + frames);
+   outR.assign(r, r + frames);
+   for (int i = 0; i < frames; i++)
+   {
+      outL[i] *= (float)gain;
+      outR[i] *= (float)gain;
+   }
+   return true;
+}
+
+std::string GenerateSamplesNode::Label(const SampleStyles::Recipe& r, int root, int scale)
 {
    static const char* kRoots[12] = { "c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b" };
-   const SampleStyles::Style st = SampleStyles::At(std::max(0, SampleStyles::Find(mMade.style)));
+   const SampleStyles::Style st = SampleStyles::At(std::max(0, SampleStyles::Find(r.style)));
    std::string s = st.name;
-   if (mMade.part != SampleStyles::Part::Full)
-      s += std::string(" ") + SampleStyles::PartName(mMade.part);
-   s += " " + std::to_string(mMade.seed);
+   if (r.part != SampleStyles::Part::Full)
+      s += std::string(" ") + SampleStyles::PartName(r.part);
+   s += " " + std::to_string(r.seed);
    // Drums and percussion have no key.
-   if (mMade.part != SampleStyles::Part::Drums && mMade.part != SampleStyles::Part::Percussion)
-      s += std::string(", ") + kRoots[((madeRoot % 12) + 12) % 12] + " " + MusicTime::ScaleTable(madeScale).name;
+   if (r.part != SampleStyles::Part::Drums && r.part != SampleStyles::Part::Percussion)
+      s += std::string(", ") + kRoots[((root % 12) + 12) % 12] + " " + MusicTime::ScaleTable(scale).name;
    return s;
+}
+
+std::string GenerateSamplesNode::MadeLabel() const
+{
+   return Label(mMade, madeRoot, madeScale);
 }
 
 bool GenerateSamplesNode::KeepAsFile()

@@ -1,6 +1,7 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -499,9 +500,9 @@ namespace app
       AudioBareDropdown("genStyle", styleNames, std::max(0, SampleStyles::Find(n->style)),
                         [n](int i) { PushUndoCheckpoint(); n->style = SampleStyles::At(i).id; }, AudioHalfWidth(),
                         styleFamilies, /*focusSearch=*/true);
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSliderInt("seed", &n->seed, 0, 99999, AudioHalfWidth() - diceW - gap);
-      ImGui::SameLine();
+      FormParts::Inline();
       if (AudioSmallButton("\xe2\x9a\x84##genDice", diceW))
       {
          PushUndoCheckpoint();
@@ -518,7 +519,7 @@ namespace app
       AudioBareDropdown("genPart", partNames, n->part, [n](int i) { PushUndoCheckpoint(); n->part = i; }, AudioHalfWidth());
       if (ImGui::IsItemHovered())
          SetAudioReadout("part", "the whole mix, or one layer of it from the same seed");
-      ImGui::SameLine();
+      FormParts::Inline();
       {
          // Length as four pills: a loop is 1, 2, 4 or 8 bars, nothing between.
          const int choices[] = { 1, 2, 4, 8 };
@@ -526,7 +527,7 @@ namespace app
          for (int i = 0; i < 4; i++)
          {
             if (i > 0)
-               ImGui::SameLine();
+               FormParts::Inline();
             char label[24];
             snprintf(label, sizeof(label), "%d##genBars%d", choices[i], i);
             bool on = n->bars == choices[i];
@@ -539,7 +540,7 @@ namespace app
       }
 
       AudioSlider("variation", &n->variation, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       // Tempo, key and scale: the transport's, or the style card's own.
       {
          const float halfPill = (AudioHalfWidth() - gap) / 2.0f;
@@ -549,7 +550,7 @@ namespace app
             PushUndoCheckpoint();
             n->followTransport = true;
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          if (AudioToggleButton("card's own##genOwn", &own, halfPill) && n->followTransport)
          {
             PushUndoCheckpoint();
@@ -568,7 +569,7 @@ namespace app
             PushUndoCheckpoint();
             n->Generate();
          }
-         ImGui::SameLine();
+         FormParts::Inline();
          const bool canKeep = state == State::Ready || state == State::Stale;
          ImGui::BeginDisabled(!canKeep || !n->FilePath().empty());
          if (ActionButton::Draw("keep as file##gen", ImVec2(btnW, 0)))
@@ -595,9 +596,9 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
       AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
-      ImGui::SameLine();
+      FormParts::Inline();
       AudioSlider("gain", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth() - 44.0f - gap);
-      ImGui::SameLine();
+      FormParts::Inline();
       bool loopBool = n->loop;
       if (AudioToggleButton("loop##genLoop", &loopBool))
       {

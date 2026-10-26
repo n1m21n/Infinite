@@ -26,18 +26,19 @@ namespace SampleStyles
    // Which part of the style a sample is: the whole mix, or one layer of it.
    // A part is drawn from the same seed as the full mix, so "drums" of a seed
    // is the drum layer of that seed's full loop (percussion and fx, which the
-   // full mix may not have, are made from the card's own figures).
+   // full mix may not have, are made from the card's own figures; pads and
+   // plucks are the card's chords with the voice's envelope set for them).
    enum class Part
    {
-      Full,
-      Drums,      // kick, snare, hats
+      Full,       // "all": the whole mix
+      Synths,     // bass and the motif line on the card's voices
+      Pads,       // the chords held long on a slow-swelling voice
+      Plucks,     // the chords arpeggiated on a short, plucked voice
       Percussion, // clap, toms, bell
-      Synths,     // bass, chords, motif on the card's voices
-      Piano,      // chords, bass and motif on a piano voice
-      Fx,         // one held chord through a long effect chain: a texture
+      Drums,      // kick, snare, hats
       Count
    };
-   const char* PartName(Part p); // lowercase: "full", "drums", ...
+   const char* PartName(Part p); // lowercase: "all", "synths", ...
 
    struct Recipe
    {

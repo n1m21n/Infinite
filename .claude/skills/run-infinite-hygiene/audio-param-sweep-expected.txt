@@ -454,3 +454,16 @@ VMPC|transitionMs|the sweep's bare rig loads no clip into any pad, so AudioVmpcN
 VMPC|holdLast|the sweep's bare rig loads no clip into any pad, so AudioVmpcNode::ProcessBlock has no soundtrack buffer (mActive[p] == nullptr) and writes silence before any param is read (VmpcNode.cpp); every pad and transition param only shapes the picture and the soundtrack weights of a loaded clip. Covered by VMPCTEST with real clips.
 VMPC|soundtrack|the sweep's bare rig loads no clip into any pad, so AudioVmpcNode::ProcessBlock has no soundtrack buffer (mActive[p] == nullptr) and writes silence before any param is read (VmpcNode.cpp); every pad and transition param only shapes the picture and the soundtrack weights of a loaded clip. Covered by VMPCTEST with real clips.
 VMPC|selectedPad|the sweep's bare rig loads no clip into any pad, so AudioVmpcNode::ProcessBlock has no soundtrack buffer (mActive[p] == nullptr) and writes silence before any param is read (VmpcNode.cpp); every pad and transition param only shapes the picture and the soundtrack weights of a loaded clip. Covered by VMPCTEST with real clips.
+Generate Samples|position|a Sample Player underneath: the bare rig has generated nothing, so nothing plays and no player param is observable (same blind spot as the Sampler rows above)
+Generate Samples|fadeOut|a Sample Player underneath: the bare rig has generated nothing, so nothing plays (see Sampler|fadeOut)
+Generate Samples|loop|a Sample Player underneath: the bare rig has generated nothing, so nothing plays (see Sampler|loop)
+Generate Samples|rateFix|not a control (legacy flag inherited from Sample Player; see Sampler|rateFix)
+Generate Samples|reverse|a Sample Player underneath: the bare rig has generated nothing, so nothing plays (see Sampler|reverse)
+Generate Samples|pingpong|a Sample Player underneath: the bare rig has generated nothing, so nothing plays (see Sampler|pingpong)
+Generate Samples|seed|a recipe param, not an audio one: it changes the loop only when generate renders it offline (GENSAMPLETEST covers the render)
+Generate Samples|variation|a recipe param, read only by generate's offline render (GENSAMPLETEST)
+Generate Samples|bars|a recipe param, read only by generate's offline render (GENSAMPLETEST)
+Generate Samples|followTransport|a recipe param, read only by generate's offline render (GENSAMPLETEST)
+Generate Samples|part|a recipe param, read only by generate's offline render (GENSAMPLETEST parts)
+Generate Samples|generated|not a control: saved state that the patch held a generated loop
+Generate Samples|genVersion|not a control: the generator version that made the saved loop

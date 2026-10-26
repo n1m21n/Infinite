@@ -256,7 +256,7 @@ namespace SampleStyles
 {
 const char* PartName(Part p)
 {
-   static const char* const kNames[] = { "full", "drums", "percussion", "synths", "piano", "fx" };
+   static const char* const kNames[] = { "all", "synths", "pads", "plucks", "percussion", "drums" };
    const int i = (int)p;
    return i >= 0 && i < (int)Part::Count ? kNames[i] : kNames[0];
 }
@@ -302,18 +302,29 @@ Compiled Compile(const Recipe& recipe)
    // same and a part is that layer of the seed's full mix; a layer the part
    // leaves out goes no further than the mixer (the offline graph renders
    // only what reaches the tap). The drums still feed the sidechains.
-   const bool wantBass = full || part == Part::Synths || part == Part::Piano;
-   const bool wantChords = full || part == Part::Synths || part == Part::Piano || part == Part::Fx;
+   const bool pads = part == Part::Pads, plucks = part == Part::Plucks;
+   const bool wantBass = full || part == Part::Synths;
+   const bool wantChords = full || pads || plucks;
    const bool wantMotif = wantBass;
-   // The piano voice comes from its own stream, so swapping it in moves nothing else.
-   Rng pianoRng(std::string("piano:") + std::to_string(recipe.seed));
-   auto voice = [&](const std::string& picked) -> std::string
+   // Pads and plucks play the chords on a voice whose envelope is set for
+   // them (the seeded spread runs attacks up to 4 s, which is neither). The
+   // voice and envelope come from their own stream, so nothing else moves.
+   Rng shapeRng(std::string("shape:") + std::to_string(recipe.seed));
+   std::string shapedVoice;
+   Params shapedEnv;
+   if (pads || plucks)
    {
-      if (part != Part::Piano)
-         return picked;
-      const char* const kPianos[] = { "FM", "Partials" };
-      return kPianos[pianoRng.Range(2)];
-   };
+      const bool analog = shapeRng.Range(2) == 0;
+      shapedVoice = analog ? "Analog" : "Wavetable";
+      const char* const keys[4] = { analog ? "attack" : "a.ampAttack", analog ? "decay" : "a.ampDecay", analog ? "sustain" : "a.ampSustain",
+                                    analog ? "release" : "a.ampRelease" };
+      const double env[4] = { pads ? shapeRng.Uniform(300.0, 900.0) : shapeRng.Uniform(1.0, 5.0),
+                              pads ? shapeRng.Uniform(800.0, 1600.0) : shapeRng.Uniform(120.0, 350.0),
+                              pads ? shapeRng.Uniform(0.7, 0.9) : 0.0,
+                              pads ? shapeRng.Uniform(1500.0, 2500.0) : shapeRng.Uniform(80.0, 200.0) };
+      for (int i = 0; i < 4; i++)
+         shapedEnv[keys[i]] = { 'f', Num(std::round(env[i] * 1000.0) / 1000.0) };
+   }
 
    std::set<std::string> ban;
    for (const std::string& b : Split(st.ban))
@@ -460,7 +471,7 @@ Compiled Compile(const Recipe& recipe)
       const std::string picked = pick(st.synth);
       if (!picked.empty())
       {
-         const int sy = g.Add(voice(picked), seed());
+         const int sy = g.Add(picked, seed());
          g.Connect(sq, sy, true);
          const int fxChoices[] = { 0, 1, 1, 2 };
          const int end = chain(sy, fxChoices[rng.Range(4)]);
@@ -478,11 +489,11 @@ Compiled Compile(const Recipe& recipe)
    for (const char* f : kChordFamilies)
       chordFamily = chordFamily || std::string(st.family) == f;
    const bool chordsInFull = st.hasChords || chordFamily || layers == 0;
-   if (chordsInFull || part == Part::Piano || part == Part::Fx)
+   if (chordsInFull || pads || plucks)
    {
       const std::vector<std::string> sizes = Split(st.chordSizes);
-      // fx holds one chord for two bars: a bed for the effects to move.
-      Params p = F({ { "rateBeats", part == Part::Fx ? 8.0 : st.chordBeats }, { "strumMs", st.chordStrum },
+      // Pads change chord at most once a bar.
+      Params p = F({ { "rateBeats", pads ? std::max(4.0, (double)st.chordBeats) : st.chordBeats }, { "strumMs", st.chordStrum },
                      { "humanizeTimingMs", st.chordHuman }, { "humanizeVelocity", st.chordHuman } });
       p["root"] = { 'i', std::to_string(root) };
       p["scale"] = { 'i', std::to_string(out.scale) };
@@ -491,7 +502,8 @@ Compiled Compile(const Recipe& recipe)
       const int ch = g.Add("Chorder", seed(), p);
       int notes = noteChain(ch, st.notefx);
       const std::string fam = st.family;
-      if ((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6 && part != Part::Piano && part != Part::Fx)
+      // Plucks always run the chords through the arpeggiator; pads never do.
+      if (((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6 && !pads) || plucks)
       {
          Params a = F({ { "rateBeats", 0.25 } });
          a["rateMode"] = { 'i', "0" };
@@ -504,13 +516,11 @@ Compiled Compile(const Recipe& recipe)
       const std::string picked = pick(st.synth);
       if (!picked.empty())
       {
-         const int sy = g.Add(voice(picked), seed());
+         const int sy = (pads || plucks) ? g.Add(shapedVoice, seed(), shapedEnv) : g.Add(picked, seed());
          g.Connect(notes, sy, true);
          if (wantChords)
             synths.push_back(sy);
          int pad = chain(sy, 1 + rng.Range(2));
-         if (part == Part::Fx)
-            pad = chain(pad, 3);
          if (st.sidechain && drums != 0)
          {
             // The kick ducks the chords: the pump that makes house breathe.
@@ -560,7 +570,7 @@ Compiled Compile(const Recipe& recipe)
          synth = Split(st.motifSynth).empty() ? "" : Split(st.motifSynth)[0];
       if (!synth.empty() && TypeOf(synth) != nullptr)
       {
-         const int sy = g.Add(voice(synth), seed());
+         const int sy = g.Add(synth, seed());
          g.Connect(mn, sy, true);
          synths.push_back(sy);
          int lead = chain(sy, 1);
@@ -584,9 +594,9 @@ Compiled Compile(const Recipe& recipe)
    for (const auto& ch : chans)
       g.Connect(ch.first, mx, false);
    int end = mx;
-   if (!ban.count("Reverb") || part == Part::Fx)
+   if (!ban.count("Reverb") || pads)
    {
-      const bool wide = std::string(st.family) == "ambient" || part == Part::Fx;
+      const bool wide = std::string(st.family) == "ambient" || pads;
       const int rv = g.Add("Reverb", seed(), F({ { "mix", wide ? 0.45 : 0.15 }, { "decay", wide ? 3.0 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
@@ -603,11 +613,11 @@ Compiled Compile(const Recipe& recipe)
             targets.push_back({ sy, &row });
    for (size_t i = targets.size(); i > 1; i--)
       std::swap(targets[i - 1], targets[(size_t)rng.Range((int)i)]);
-   const int k = part == Part::Fx ? 3 : (int)std::lround(st.mod * 3.0f); // fx is the movement
+   const int k = (int)std::lround(st.mod * 3.0f);
    for (int i = 0; i < k && i < (int)targets.size(); i++)
    {
       const GenRow& row = *targets[i].second;
-      const float depth = part == Part::Fx ? 0.5f + 0.4f * (float)rng.Uniform() : 0.1f + 0.5f * st.mod * (float)rng.Uniform();
+      const float depth = 0.1f + 0.5f * st.mod * (float)rng.Uniform();
       app::OfflineGraph::Motion m;
       m.node = targets[i].first;
       m.key = row.key;

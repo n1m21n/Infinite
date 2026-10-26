@@ -152,7 +152,7 @@ getting a file each:
   compiles one of the 34 music style cards (`tools/catalog/styles_music.json`, a port of
   `tools/universe/styled.py` build()) into patch text, from tables `tools/universe/gen_sample_tables.py` writes to
   `GenerateSamplesTables.inc` (cards, every placeable type's pins and seedable param ranges; `--check` fails when
-  stale). A recipe's part (full, drums, percussion, synths, piano, fx) builds every layer anyway, so
+  stale). A recipe's part (all, synths, pads, plucks, percussion, drums) builds every layer anyway, so
   the random stream and a part match that seed's full mix, and wires only the part's layers to the mixer. `OfflineGraph` is a private mini-engine: it makes the nodes, wires audio and note cables and prepares
   them on the main thread, then renders 512-frame blocks on one worker on its own `Transport` (installed for that
   thread by `ScopedTransport`, so the user's playhead never moves), sweeping style motions by re-cooking every
