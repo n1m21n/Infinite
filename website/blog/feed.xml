@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Mon, 26 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Tue, 27 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Generative visuals in live performance: audio, nodes and GPU</title><link>https://infinitedevices.org/blog/generative-visuals-live-performance.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/generative-visuals-live-performance.html</guid>
+    <pubDate>Tue, 27 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.</description></item>
   <item><title>Open source VJ software: real-time visual performance in Infinite</title><link>https://infinitedevices.org/blog/open-source-vj-software.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/open-source-vj-software.html</guid>
     <pubDate>Mon, 26 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Build real-time generative visuals, map live audio frequencies, and drive stage projection with Infinite, an open source VJ software workstation for performers.</description></item>
   <item><title>Automatic visuals for DJ sets: hands-free live visuals in Infinite</title><link>https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/automatic-visuals-for-dj-sets.html</guid>
