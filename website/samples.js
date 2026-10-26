@@ -41,7 +41,7 @@
     var patchLink = it.patch ? '<a href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' : '';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
-      '<div class="smp-id"><b>' + esc(it.name) + '</b></div>' +
+      '<div class="smp-id"><b>' + esc(it.name) + '</b>' + (it.bpm ? '<span>' + it.bpm + ' bpm' + (it.style ? ' · ' + esc(it.style) : '') + '</span>' : '') + '</div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
         '<button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</button>' +
@@ -172,7 +172,7 @@
     var shown = items.slice(page * PAGE, page * PAGE + PAGE);
     listEl.innerHTML = shown.map(row).join('');
     emptyEl.hidden = items.length > 0;
-    if (!items.length && all.length) emptyEl.textContent = 'No saved samples match these filters. Press generate for a new one.';
+    if (!items.length && all.length) emptyEl.textContent = 'Nothing in the library matches these filters. Press generate for a new one.';
     pagerEl.hidden = pages < 2;
     pagerEl.querySelector('.smp-pg-info').textContent = (page + 1) + ' / ' + pages;
     pagerEl.querySelector('[data-pg="-1"]').disabled = page === 0;
@@ -231,7 +231,7 @@
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
 
   // The blob: a soft shape that breathes while idle, churns while the engine works and follows the loop's spectrum while it plays.
-  var bcv = document.getElementById('smp-blob'), bctx = bcv.getContext('2d');
+  var bcv = document.getElementById('smp-blob'), bctx = null;
   var ac = null, an = null, bin = null, src = null, lvl = [], N = 96, bt = 0, accent = '#e8745a', frame = 0, energy = 0;
   for (var li = 0; li < N; li++) lvl.push(0);
   function wakeAudio() {
@@ -257,8 +257,8 @@
   }
   bcv.addEventListener('click', blobToggle);
   bcv.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); blobToggle(); } });
-  function blobDraw() {
-    requestAnimationFrame(blobDraw);
+  function blobDraw2d() {
+    requestAnimationFrame(blobDraw2d);
     if (document.hidden) return;
     var dpr = window.devicePixelRatio || 1, w = bcv.clientWidth, h = bcv.clientHeight;
     if (!w) return;
@@ -299,10 +299,84 @@
     bctx.save(); bctx.globalAlpha = 0.92; bctx.fillStyle = g; shape(1, 1, 1); bctx.fill(); bctx.restore();
     bctx.save(); bctx.globalAlpha = 0.35; bctx.strokeStyle = '#fff'; bctx.lineWidth = 1.5; shape(0.78, 0.7, 1.4); bctx.stroke(); bctx.restore();
   }
-  requestAnimationFrame(blobDraw);
+  // A fragment shader draws the blob: a warped, blurred field in the brand's ember and signal, its edge pushed out by sixteen bands of the loop.
+  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG;\n' +
+    'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
+    'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n' +
+    '  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }\n' +
+    'float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + 7.1; a *= 0.5; } return v; }\n' +
+    'float band(float m){ float s = 0.0, w = 0.0; for (int i = 0; i < 16; i++) { float d = m * 15.0 - float(i); float k = exp(-d * d * 0.35); s += uB[i] * k; w += k; } return s / w; }\n' +
+    'void main(){\n' +
+    '  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / min(uRes.x, uRes.y) * 2.0;\n' +
+    '  float t = uT, a = atan(p.y, p.x), r = length(p);\n' +
+    '  vec2 q = vec2(fbm(p * 1.3 + t * 0.12), fbm(p * 1.3 - t * 0.1 + 4.0));\n' +
+    '  float wob = (fbm(vec2(cos(a), sin(a)) * 1.4 + t * 0.18) - 0.5) * (0.26 + 0.16 * uBusy);\n' +
+    '  float R = 0.5 + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
+    '  float d = r - R;\n' +
+    '  float body = smoothstep(0.2, -0.22, d);\n' +
+    '  float glow = exp(-max(d, 0.0) * 3.4) * 0.5 * smoothstep(1.0, 0.55, r) * smoothstep(1.0, 0.6, abs(p.y));\n' +
+    '  float f = fbm(p * 1.1 + q * 1.6 + t * 0.07);\n' +
+    '  float g = clamp(f * 1.5 + p.y * 0.35 - p.x * 0.2 + 0.25 * uE, 0.0, 1.0);\n' +
+    '  vec3 hot = mix(uA, vec3(1.0, 0.82, 0.62), 0.55);\n' +
+    '  vec3 c = mix(uS, uA, smoothstep(0.1, 0.55, g)); c = mix(c, hot, smoothstep(0.55, 1.0, g));\n' +
+    '  c = mix(c, vec3(1.0), 0.28 * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
+    '  float edge = smoothstep(-0.5, 0.2, d) * body; c = mix(c, uS, edge * 0.45);\n' +
+    '  float al = clamp(body * 0.94 + glow * (1.0 - body), 0.0, 1.0);\n' +
+    '  vec3 col = mix(mix(uS, uA, 0.5), c, body);\n' +
+    '  col += (hash(gl_FragCoord.xy + t) - 0.5) / 120.0;\n' +
+    '  gl_FragColor = vec4(col * al, al);\n' +
+    '}';
+  var gl = null, gp = null, gU = {};
+  function glInit() {
+    gl = bcv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false });
+    if (!gl) return false;
+    function sh(type, src) { var o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; }
+    var v = sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }'), f = sh(gl.FRAGMENT_SHADER, FS);
+    if (!v || !f) { gl = null; return false; }
+    gp = gl.createProgram(); gl.attachShader(gp, v); gl.attachShader(gp, f); gl.linkProgram(gp);
+    if (!gl.getProgramParameter(gp, gl.LINK_STATUS)) { gl = null; return false; }
+    gl.useProgram(gp);
+    var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(gp, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    return true;
+  }
+  function rgb(css, d) { var m = /^#([0-9a-f]{6})$/i.exec((css || '').trim()); if (!m) return d; var n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
+  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0;
+  for (var bi = 0; bi < 16; bi++) bands.push(0);
+  function blobDraw() {
+    requestAnimationFrame(blobDraw);
+    if (document.hidden) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2), w = bcv.clientWidth, h = bcv.clientHeight;
+    if (!w) return;
+    if (bcv.width !== Math.round(w * dpr) || bcv.height !== Math.round(h * dpr)) { bcv.width = Math.round(w * dpr); bcv.height = Math.round(h * dpr); }
+    if (frame++ % 60 === 0) {
+      var cs = getComputedStyle(bcv);
+      cA = rgb(cs.getPropertyValue('--accent'), cA); cS = rgb(cs.getPropertyValue('--signal'), cS);
+    }
+    bt += 0.016 + 0.03 * busyK;
+    busyK += ((busy ? 1 : 0) - busyK) * 0.08;
+    var i, j, sum = 0;
+    if (src) an.getByteFrequencyData(bin);
+    for (i = 0; i < 16; i++) {
+      var v = 0;
+      if (src) { var lo = Math.floor(Math.pow(i / 16, 1.6) * 70), hi = Math.max(lo + 1, Math.floor(Math.pow((i + 1) / 16, 1.6) * 70)); for (j = lo; j < hi; j++) v += bin[j]; v = v / (hi - lo) / 255; }
+      bands[i] += (v - bands[i]) * 0.3; sum += bands[i];
+    }
+    energy += (sum / 16 - energy) * 0.2;
+    gl.viewport(0, 0, bcv.width, bcv.height);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform2f(gU.uRes, bcv.width, bcv.height); gl.uniform1f(gU.uT, bt); gl.uniform1f(gU.uE, energy); gl.uniform1f(gU.uBusy, busyK);
+    gl.uniform1fv(gU.uB, new Float32Array(bands)); gl.uniform3fv(gU.uA, cA); gl.uniform3fv(gU.uS, cS); gl.uniform3fv(gU.uG, [0.08, 0.1, 0.19]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  if (glInit()) requestAnimationFrame(blobDraw);
+  else { bctx = bcv.getContext('2d'); requestAnimationFrame(blobDraw2d); }
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
-  fetch('data.json').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('data.json?v=20').then(function (r) { return r.json(); }).then(function (d) {
     all = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(all);
     var qp = new URLSearchParams(location.search);
     ['part', 'scale'].forEach(function (k) { if (qp.get(k)) filt[k] = qp.get(k); });
