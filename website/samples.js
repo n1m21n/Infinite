@@ -41,7 +41,7 @@
     var patchLink = it.patch ? '<a href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' : '';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
-      '<div class="smp-id"><b>' + esc(it.name) + '</b>' + (it.bpm ? '<span>' + it.bpm + ' bpm' + (it.style ? ' · ' + esc(it.style) : '') + '</span>' : '') + '</div>' +
+      '<div class="smp-id"><b>' + esc(it.name) + '</b>' + (it.bpm ? '<span>' + it.bpm + ' bpm</span>' : '') + '</div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
         '<button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</button>' +
@@ -108,10 +108,10 @@
       stop();
       var url = URL.createObjectURL(wavOf(r.pcm, r.rate));
       if (gens[0] && gens[0].audio) URL.revokeObjectURL(gens[0].audio);
-      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label, bpm: Math.round(r.bpm), audio: url, pcm: r.pcm, rate: r.rate }];
+      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label.replace(/ \d+(?=,|$)/, ''), bpm: Math.round(r.bpm), audio: url, pcm: r.pcm, rate: r.rate }];
       genEl.hidden = false;
-      genEl.innerHTML = '<div class="smp-id"><b>' + esc(r.label) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
-        '<button class="smp-dlb" type="button" data-gen="' + gens[0].id + '" aria-label="Download ' + esc(r.label) + ' as wav" title="Download .wav">' + IC_DL + '</button>';
+      genEl.innerHTML = '<div class="smp-id"><b>' + esc(gens[0].name) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
+        '<button class="smp-dlb" type="button" data-gen="' + gens[0].id + '" aria-label="Download ' + esc(gens[0].name) + ' as wav" title="Download .wav">' + IC_DL + '</button>';
       blobPlay(gens[0]);
     }).catch(function () {
       genEl.hidden = false; genEl.innerHTML = '<p class="lib-empty">Could not generate a loop here. Try again.</p>';
@@ -376,7 +376,7 @@
   else { bctx = bcv.getContext('2d'); requestAnimationFrame(blobDraw2d); }
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
-  fetch('data.json?v=20').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('data.json?v=21').then(function (r) { return r.json(); }).then(function (d) {
     all = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(all);
     var qp = new URLSearchParams(location.search);
     ['part', 'scale'].forEach(function (k) { if (qp.get(k)) filt[k] = qp.get(k); });

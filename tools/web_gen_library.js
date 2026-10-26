@@ -30,7 +30,7 @@ factory().then(M => {
       const peaks = []; let mx = 0;
       for (let b = 0; b < 120; b++) { let pk = 0; for (let j = Math.floor(b * frames / 120); j < Math.floor((b + 1) * frames / 120); j++) pk = Math.max(pk, Math.abs(pcm[j * 2]), Math.abs(pcm[j * 2 + 1])); peaks.push(pk); mx = Math.max(mx, pk); }
       const label = M.UTF8ToString(M._gen_label()), comma = label.indexOf(', ');
-      data.samples.push({ id, name: label, kind: 'A', tags: ['audio'], nodes: null, family: null, peaks: peaks.map(p => Math.round(p / (mx || 1) * 1000) / 1000),
+      data.samples.push({ id, name: name + (comma < 0 ? '' : label.slice(comma)), kind: 'A', tags: ['audio'], nodes: null, family: null, peaks: peaks.map(p => Math.round(p / (mx || 1) * 1000) / 1000),
         audio: `media/${id}/sample.wav`, video: null, poster: null, download: `media/${id}/sample.wav`, patch: null, curated: false, library: null,
         part: name, style: M.UTF8ToString(M._gen_style_id(style)), key: comma < 0 ? '' : label.slice(comma + 2), bpm: Math.round(M._gen_bpm()) });
       made++;

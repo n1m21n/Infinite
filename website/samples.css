@@ -24,8 +24,8 @@
 .smp-thumb { position: relative; width: 84px; height: 52px; border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--deep) 70%, var(--surface-2)); }
 .smp-thumb img, .smp-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .smp-id { min-width: 0; display: grid; gap: 3px; }
-.smp-id b { font: 700 0.98rem/1.2 var(--font-mono); letter-spacing: 0.02em; text-transform: lowercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.smp-id span { color: var(--muted); font: 500 0.72rem/1.3 var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-id b { font: 600 1rem/1.2 var(--font-sans); letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-id span { color: var(--muted); font: 500 0.78rem/1.3 var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .smp-wave { width: 100%; height: 44px; display: block; color: var(--muted); --smp-on: var(--accent); cursor: pointer; }
 .smp-track { height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 .smp-track i { display: block; height: 100%; width: 0; background: var(--accent); }
@@ -33,7 +33,7 @@
   .smp-row { grid-template-columns: 40px 1fr 36px; grid-template-areas: "play id dl" "play wave dl"; gap: 2px 10px; padding: 8px; }
   .smp-play { grid-area: play; width: 40px; height: 40px; }
   .smp-id { grid-area: id; }
-  .smp-id b { font-size: 0.74rem; letter-spacing: 0.04em; }
+  .smp-id b { font-size: 0.92rem; }
   .smp-wave { grid-area: wave; height: 34px; }
   .smp-acts { grid-area: dl; }
   .smp-thumb { display: none; }
@@ -112,9 +112,9 @@
 .smp-genb:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .smp-genp { display: grid; justify-items: center; gap: 8px; margin: 22px 0 36px; padding: 26px 18px 22px; border-radius: 28px; text-align: center;
   background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
-.smp-h { margin: 0; font: 700 1.25rem/1.2 var(--font-sans); }
+.smp-h { margin: 0; font: 700 clamp(1.5rem, 1.15rem + 1.1vw, 2.1rem)/1.1 var(--font-sans); letter-spacing: -0.025em; }
 .smp-h2 { margin-top: 8px; }
-.smp-sub { margin: 0; color: var(--muted); font: 500 0.9rem/1.4 var(--font-sans); max-width: 46ch; }
+.smp-sub { margin: 0; color: var(--muted); font: 400 1rem/1.5 var(--font-sans); max-width: 46ch; }
 .smp-blob { width: 100%; max-width: 520px; height: 300px; display: block; cursor: pointer; border-radius: 24px; }
 .smp-blob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .smp-genbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
