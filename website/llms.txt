@@ -17,7 +17,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 - [Home](https://infinitedevices.org/): what Infinite is, the node canvas, how to set it up
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
-- [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav
+- [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit
 - [Extensions](https://infinitedevices.org/extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated

@@ -174,7 +174,7 @@ def main():
          "## Start here", "",
          f"- [Home]({BASE}): what Infinite is, the node canvas, how to set it up",
          f"- [Library]({BASE}library.html): free templates, community patches and Field devices to download",
-        f"- [Free unlimited samples]({BASE}samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav",
+        f"- [Free unlimited samples]({BASE}samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit",
          f"- [Extensions]({BASE}extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions",
          f"- [Library catalog (JSON)]({BASE}assets/library/catalog.json): every library item with description, category and file URL",
          f"- [Benchmarks]({BASE}benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated",
