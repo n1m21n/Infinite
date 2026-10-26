@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Generative visuals in live performance | Infinite</title>
+  <meta name="description" content="Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/generative-visuals-live-performance.html">
+  <meta property="og:title" content="Generative visuals in live performance | Infinite">
+  <meta property="og:description" content="Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_generative-visuals-live-performance.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/generative-visuals-live-performance.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Generative visuals in live performance | Infinite">
+  <meta name="twitter:description" content="Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_generative-visuals-live-performance.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=d046c735">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Generative visuals in live performance: audio, nodes and GPU", "description": "Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.", "datePublished": "2026-10-27", "dateModified": "2026-10-27", "mainEntityOfPage": "https://infinitedevices.org/blog/generative-visuals-live-performance.html", "url": "https://infinitedevices.org/blog/generative-visuals-live-performance.html", "image": ["https://infinitedevices.org/assets/blog_generative-visuals-live-performance.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "generative visuals, live performance, creative coding, shaders, modular", "wordCount": 1542, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Generative visuals in live performance: audio, nodes and GPU", "item": "https://infinitedevices.org/blog/generative-visuals-live-performance.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Generative visuals in live performance: audio, nodes and GPU</h1>
+          <p class="post-lede">Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">27 October 2026 · 7 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/blog_generative-visuals-live-performance.png" alt="Technical architecture diagram of a live generative visual performance system showing audio analysis, GPU shaders, feedback loops, and multi-display projection" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#latency-budgets-and-audio-reactive-signal-chains">Latency budgets and audio-reactive signal chains</a></li><li><a href="#real-time-fragment-shaders-with-field-pixel">Real-time fragment shaders with Field Pixel</a></li><li><a href="#procedural-geometry-and-3d-instancing">Procedural geometry and 3D instancing</a></li><li><a href="#stable-feedback-loops-for-live-performance">Stable feedback loops for live performance</a></li><li><a href="#stage-control-midi-mapping-and-multi-screen-projection">Stage control, MIDI mapping and multi-screen projection</a></li><li><a href="#production-checklist-for-stage-reliability">Production checklist for stage reliability</a></li><li><a href="#where-to-go-next">Where to go next</a></li></ol></details>
+        <div class="prose">
+<figure><img src="https://infinitedevices.org/assets/blog_generative-visuals-live-performance.png" alt="Technical architecture diagram of a live generative visual performance system showing audio analysis, GPU shaders, feedback loops, and multi-display projection" width="1200" height="675" loading="lazy" decoding="async"><figcaption>Technical architecture diagram of a live generative visual performance system showing audio analysis, GPU shaders, feedback loops, and multi-display projection</figcaption></figure>
+<p>Designing generative visuals live performance systems requires balancing organic computational complexity against absolute stage reliability. Video loops pre-rendered to disk are predictable, but they cannot respond to improvisational tempo changes, unexpected beat drops, or the dynamic energy of a live crowd. Writing raw graphics code in standalone frameworks provides procedural freedom, but building custom audio routing, MIDI mapping, and projection calibration from scratch during show preparation introduces significant friction.</p>
+<p><a href="https://infinitedevices.org" rel="noopener">Infinite</a> bridges this divide by providing a unified, node-based workstation where audio synthesis, digital signal processing, real-time GPU fragment shaders, and 3D procedural geometry execute within a single graph. Because audio and graphics share memory space, modulation runs without operating system inter-process latency.</p>
+<p>This guide details the technical architecture needed to build robust generative stage visual rigs that respond accurately to incoming music while maintaining locked 60 fps rendering.</p>
+<h2 id="latency-budgets-and-audio-reactive-signal-chains">Latency budgets and audio-reactive signal chains</h2>
+<p>The primary failure mode of reactive stage visuals is phase latency: visual pulses hitting the projection screen after the audience has already heard and felt the acoustic transient through the sound system. In club environments and festival stages, human perception detects audiovisual offsets greater than 20 milliseconds as disconnected.</p>
+<p>To maintain tight synchronisation, the signal pipeline must minimise buffer delays at every stage:</p>
+<ol><li><strong>Audio ingestion</strong>: Live sound enters through an <code>Audio In</code> node connected to the venue mixer booth monitor feed, or is generated internally using synthesiser nodes such as <code>Analog</code> or <code>Sampler</code>.</li><li><strong>Frequency decomposition</strong>: The signal connects to an <code>Audio Analyze</code> node. Rather than relying on simple root-mean-square amplitude, this node computes an 8-band fast Fourier transform filterbank alongside dedicated transient onset detection.</li><li><strong>Lock-free modulation transfer</strong>: Audio runs on real-time worker threads at 48 kHz in blocks of 128 or 256 samples (2.67 to 5.33 ms of latency). Visual render passes query analysis results through lock-free ring buffers immediately before cooking a frame, ensuring that graphics update within the same display refresh cycle.</li></ol>
+<p>The <code>Audio Analyze</code> node exposes specific pins designed for musical modulation:</p>
+<ul><li><code>low</code>: Energy below 250 Hz, isolating sub-bass and kick drum attacks.</li><li><code>mid</code>: Frequencies between 250 Hz and 4 kHz, tracking synth stabs, snares, and vocal phrases.</li><li><code>high</code>: Frequencies above 4 kHz, capturing percussion sizzle and open hi-hats.</li><li><code>onset</code>: Single-frame impulse triggers generated by high-frequency spectral flux, suitable for resetting phase counters or switching visual states.</li></ul>
+<p>Raw FFT signals often produce harsh, jittery modulation. Routing <code>low</code> or <code>mid</code> through a <code>Smooth</code> node or a <code>Range To Range</code> node dampens jitter, converting spiky numbers into smooth, continuous envelope sweeps.</p>
+<h2 id="real-time-fragment-shaders-with-field-pixel">Real-time fragment shaders with Field Pixel</h2>
+<p>While pre-built filter nodes handle standard video adjustments, unique visual aesthetics often demand custom GPU algorithms: reaction-diffusion patterns, raymarched distance fields, gyroids, and recursive domain warping. In Infinite, performers write these routines directly on the canvas using the <code>Field Pixel</code> node.</p>
+<p>Field compiles high-level mathematical expressions into native GLSL fragment shaders executing on the graphics processor. Controls declared with the <code>param</code> keyword expose animatable input pins on the node body, allowing live audio signals to modulate shader constants.</p>
+<p>Here is a complete, stage-ready domain-warping shader kernel designed for the <code>Field Pixel</code> node:</p>
+<pre><code class="language-c">// Declared modulation inputs exposed as node pins
+param bass_drive  = 0.45;
+param warp_speed  = 1.20;
+param complexity  = 3.50;
+param colour_drift = 0.80;
+
+// Normalised canvas coordinates
+vec2 uv = (fragCoord - 0.5 * resolution.xy) / resolution.y;
+
+// Audio-reactive domain warping
+vec2 q = uv;
+q.x += sin(uv.y * complexity + time * warp_speed) * 0.25;
+q.y += cos(uv.x * complexity + time * warp_speed) * 0.25;
+
+// Distance estimation
+float dist = length(q) - (bass_drive * 0.6);
+float rings = sin(dist * 18.0 - time * 2.0);
+float edge = smoothstep(0.02, 0.0, abs(rings));
+
+// Procedural cosine colour palette
+vec3 tint_a = vec3(0.08, 0.10, 0.20);
+vec3 tint_b = vec3(0.65, 0.70, 0.95);
+vec3 tint_c = vec3(1.00, 0.42, 0.21);
+vec3 col = tint_a + tint_b * cos(6.28318 * (colour_drift * q.xyx + vec3(0.0, 0.33, 0.67)));
+col += edge * tint_c;
+
+fragColor = vec4(col, 1.0);</code></pre>
+<p>When patched, connecting <code>Audio Analyze (low)</code> to <code>bass_drive</code> expands the central geometric core on every kick drum strike, while <code>Audio Analyze (high)</code> wired to <code>colour_drift</code> cycles the colour palette on open hats. For an in-depth review of fragment shader techniques, explore the <a href="https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html">audio-reactive GLSL shaders guide</a>.</p>
+<h2 id="procedural-geometry-and-3d-instancing">Procedural geometry and 3D instancing</h2>
+<p>Two-dimensional pixel shaders gain substantial depth when combined with procedural 3D structures. Rather than importing rigid polygonal assets from external modelling software, generative stage visual sets often use mathematical primitives deformed in real time.</p>
+<p>In Infinite, 3D pipelines assemble using modular geometry nodes:</p>
+<ol><li><strong>Primitive sources</strong>: Nodes such as <code>Cube</code>, <code>Sphere</code>, <code>Torus</code>, or <code>Cylinder</code> generate parametric vertex meshes with configurable subdivisions.</li><li><strong>Procedural replication</strong>: The <code>Array</code> node duplicates geometry across three-dimensional Cartesian grids, concentric rings, or Fibonacci spirals without issuing multiple draw calls.</li><li><strong>Real-time vertex deformation</strong>: The <code>Audio Displacement</code> and <code>Field Modifier</code> nodes manipulate vertex positions <code>P</code> and surface normals <code>N</code> along mathematical functions or audio waveforms before rasterisation.</li><li><strong>Rendering</strong>: The <code>Render 3D</code> node collects instances, evaluates a virtual <code>Camera</code>, applies lighting models, and outputs a 2D texture buffer into the compositing tree.</li></ol>
+<p>By driving the rotation angles of <code>Render 3D</code> with an <code>LFO</code> node and modulating mesh displacement with live audio frequencies, performers create evolving architectural forms that breathe in tempo with the performance.</p>
+<h2 id="stable-feedback-loops-for-live-performance">Stable feedback loops for live performance</h2>
+<p>Optical feedback is a foundational technique of live visual art. By feeding a rendered frame back into the input of a compositing chain with subtle scale, rotation, and colour offsets, static shapes evolve into fluid, self-organising cellular structures.</p>
+<p>However, unconstrained digital feedback loops quickly suffer from instability: values either blow out to peak white within seconds or fade out into complete blackness.</p>
+<p>A dependable stage feedback network requires three explicit stages:</p>
+<ul><li><strong>Attenuation</strong>: Every iteration must decay slightly. A <code>Blend</code> node operating in Multiply or Screen mode, or an <code>Opacity</code> node set to 0.92 to 0.96, prevents energy from accumulating beyond display limits.</li><li><strong>Spatial transformation</strong>: A <code>Transform</code> node placed inside the loop introduces slight zoom (for example, 1.015x) or rotation (0.3 degrees). This pushes old frame content outward toward the display borders, creating tunnel or vortex motion.</li><li><strong>Temporal persistence</strong>: A <code>Trails</code> node preserves trailing light paths while dampening abrupt visual discontinuities.</li></ul>
+<p>Because Infinite manages texture buffers natively on the GPU, feedback loops execute without memory copy overhead between the graphics card and host CPU.</p>
+<h2 id="stage-control-midi-mapping-and-multi-screen-projection">Stage control, MIDI mapping and multi-screen projection</h2>
+<p>A generative patch must remain steerable during a live show. Relying solely on automated sound analysis risks visual monotony across a ninety-minute set. Physical hardware control allows performers to introduce sudden breakdowns, adjust overall complexity, or transition between aesthetic themes.</p>
+<p>Infinite supports direct hardware integration:</p>
+<ul><li><strong><code>MIDI In</code></strong>: Binds physical knobs, faders, and rotary encoders to any parameter on the canvas. Assigning faders to feedback decay, shader warp frequency, and master brightness gives physical tactility to digital generative structures.</li><li><strong><code>OSC Receive</code></strong>: Accepts Open Sound Control network packets over UDP from external sequencing apps, mobile control interfaces, or digital audio workstations.</li><li><strong><code>Projection</code></strong>: The final output node provides four-corner perspective homography warping, keystoning, and grid-based mesh calibration for mapping angled projector outputs onto geometric stage surfaces.</li><li><strong>Zero-copy interconnects</strong>: For multi-application stage configurations, <code>Syphon Out</code> (on macOS) and <code>Spout Out</code> (on Windows) stream GPU textures directly to lighting servers, media software, or broadcasting rigs without dropping frames.</li></ul>
+<h2 id="production-checklist-for-stage-reliability">Production checklist for stage reliability</h2>
+<p>When performing in front of an audience, technical failures cannot be negotiated away. Preparing a generative patch for live performance requires strict verification:</p>
+<ol><li><strong>Headless validation</strong>: Test patch syntax and node integrity from the command line using <code>infinite --validate patch.inf</code>. This verifies that all connections, modulation bindings, and shader kernels parse cleanly without syntax errors.</li><li><strong>Fixed resolution budgets</strong>: Target 1920x1080 at 60 fps for standard projection systems. Avoid arbitrarily oversized framebuffers that consume excessive fill-rate bandwidth without visible audience benefit.</li><li><strong>Thermal headroom</strong>: Confirm that your graphics processor maintains sustained frame rates under warm stage conditions. Monitor cook times in the performance matrix; an efficient generative graph should complete its graphics pass in under 4 milliseconds per frame.</li><li><strong>Safety fallbacks</strong>: Always patch a master fader mapped to an auxiliary hardware slider that can fade the entire visual output to black or crossfade into an ambient background if an incoming booth audio cable is disconnected.</li></ol>
+<h2 id="where-to-go-next">Where to go next</h2>
+<p>Generative visual systems reward ongoing experimentation and iteration. To explore practical working patches, download free example setups from the <a href="https://infinitedevices.org/library.html">Infinite Library</a>, or consult the <a href="https://infinitedevices.org/blog/field-language-write-what-a-node-does.html">Field language manual</a> to begin authoring bespoke mathematical shaders. By combining real-time DSP analysis with GPU-accelerated node pipelines, you can build responsive, instrument-grade visual instruments tailored specifically for live performance.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="open-source-vj-software.html"><span class="mono">Creative</span><b>Open source VJ software: real-time visual performance in Infinite</b></a><a class="rel-card" href="audio-reactive-glsl-shaders.html"><span class="mono">Creative</span><b>Audio-reactive GLSL shaders: writing real-time visuals in Infinite</b></a><a class="rel-card" href="procedural-3d-geometry-nodes-and-audio-deformation.html"><span class="mono">Creative</span><b>Procedural 3D geometry and audio mesh deformation</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../samples/">Samples</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+          <a href="../extensions.html">Extensions</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>

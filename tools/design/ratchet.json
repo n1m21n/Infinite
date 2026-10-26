@@ -10,7 +10,7 @@
   "src/app/bodies/ParamBodies1.cpp": 6,
   "src/app/bodies/ParamBodies2.cpp": 4,
   "src/app/bodies/PreviewBodies.cpp": 5,
-  "src/app/bodies/SamplerBodies.cpp": 84,
+  "src/app/bodies/SamplerBodies.cpp": 90,
   "src/app/bodies/SpatialMixerBody.cpp": 2,
   "src/app/frame/StageFloating.cpp": 3,
   "src/app/frame/StageLayout.cpp": 4,
