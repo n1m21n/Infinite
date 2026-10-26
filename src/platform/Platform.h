@@ -200,6 +200,9 @@ namespace Platform
    std::string OpenShowSetDialog();
    std::string SaveShowSetDialog(const std::string& suggestedName = "Untitled.infshow");
 
+   // Export a .wav. Returns the chosen path (with .wav), or "" if cancelled.
+   std::string SaveWavDialog(const std::string& suggestedName = "sample.wav");
+
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
    // normalised so cap height is roughly 1. Curves are subdivided here because

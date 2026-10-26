@@ -525,6 +525,16 @@ namespace Platform
                            suggestedName.empty() ? "Untitled.infshow" : suggestedName, err);
    }
 
+   std::string SaveWavDialog(const std::string& suggestedName)
+   {
+      std::string err;
+      return RunSaveDialog(L"Export wav",
+                           {
+                              { L"Wave file (*.wav)", L"*.wav" },
+                           },
+                           suggestedName.empty() ? "sample.wav" : suggestedName, err);
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       std::string err;

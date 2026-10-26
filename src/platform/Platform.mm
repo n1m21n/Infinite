@@ -1451,6 +1451,23 @@ namespace Platform
       }
    }
 
+   std::string SaveWavDialog(const std::string& suggestedName)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:@"Export wav"];
+         [panel setNameFieldStringValue:
+            [NSString stringWithUTF8String:suggestedName.empty() ? "sample.wav" : suggestedName.c_str()]];
+         if (@available(macOS 11.0, *))
+            [panel setAllowedContentTypes:@[ UTTypeWAV ]];
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [panel URL];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenModelDialog()
    {
       @autoreleasepool

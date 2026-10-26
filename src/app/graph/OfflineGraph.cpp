@@ -1,7 +1,13 @@
 // A private patch rendered to a buffer, away from the live engine. See OfflineGraph.h.
 #include "app/graph/OfflineGraph.h"
 
-#include "app/AppShared.h"
+#include "audio/AudioEngine.h"
+#include "nodes/AudioEffectNode.h"
+#include "nodes/DrumSequencerNode.h"
+#include "nodes/FieldSynthNode.h"
+#include "nodes/GranularNode.h"
+#include "nodes/PartialsNode.h"
+#include "nodes/SamplerNode.h"
 #include "core/NodeFactory.h"
 
 #include <algorithm>
@@ -24,6 +30,35 @@ namespace
    // Longest wait for nodes that build in the background (a convolution
    // impulse, a Partials analysis) before rendering anyway.
    constexpr int kPrepareWaitMs = 3000;
+
+   constexpr int kMaxNoteSlots = AudioNode::kMaxNoteSlots;
+
+   // The audio node behind a node that makes or carries audio or notes (the visual-audio nodes never appear in a style's patch).
+   AudioNode* AudioNodeOfAny(INode* node)
+   {
+      if (node == nullptr)
+         return nullptr;
+      if (auto* src = dynamic_cast<IAudioSource*>(node))
+         return src->GetAudioNode();
+      if (auto* noteSrc = dynamic_cast<INoteSource*>(node))
+         return noteSrc->GetAudioNode();
+      return node->AudioNodeForNotePorts();
+   }
+
+   // File-backed and compiled params load here, as on patch load, for the node types a style card places.
+   void ReloadDerivedState(INode* node)
+   {
+      if (auto* sampler = dynamic_cast<SamplerNode*>(node))
+         sampler->ReloadFromPath();
+      if (auto* partials = dynamic_cast<PartialsNode*>(node))
+         partials->ReloadFromPath();
+      if (auto* gran = dynamic_cast<GranularNode*>(node))
+         gran->ReloadFromPath();
+      if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
+         drum->ReloadFromPaths();
+      if (auto* fsn = dynamic_cast<FieldSynthNode*>(node))
+         fsn->Apply();
+   }
 
    // True while a node is still making what it plays from, on its own job:
    // the headless render waits on the same thing (Headless.cpp).
@@ -131,7 +166,7 @@ void OfflineGraph::Collect(INode* node, std::vector<INode*>& visiting)
 
    Entry e;
    e.owner = node;
-   for (int slot = 0; slot < kMaxAudioSlots && slot < kAudioMaxNodeInputs; slot++)
+   for (int slot = 0; slot < kAudioMaxNodeInputs; slot++)
    {
       AudioCable* cable = node->AudioInputSlot(slot);
       if (cable == nullptr)

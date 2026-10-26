@@ -36,6 +36,16 @@ namespace SampleStyles
       Plucks,     // the chords arpeggiated on a short, plucked voice
       Percussion, // clap, toms, bell
       Drums,      // kick, snare, hats
+      Bass,       // one bass line on a built bass voice
+      Fx,         // risers, sweeps, impacts, textures
+      Foley,      // taps, steps, knocks, drips, rustles
+      Keys,       // chords struck on a piano, tine, organ or clav voice
+      Leads,      // a single line on a lead voice
+      Textures,   // drones, beds, grains: sound with no pulse
+      Kicks,      // the kick lane alone, in a genre's pattern
+      Snares,     // snare and clap
+      Hats,       // closed and open hats
+      Toms,       // toms and bell
       Count
    };
    const char* PartName(Part p); // lowercase: "all", "synths", ...
@@ -51,6 +61,10 @@ namespace SampleStyles
       int key = -1;
       int scale = -1; // MusicTime scale; < 0: the card picks
       Part part = Part::Full;
+      // Lean the choices toward this machine's learned profiles (UserStyle):
+      // key and scale, motif steps and rhythm, velocities, ghost notes. Off
+      // for the website pool and the tests, which must not depend on a player.
+      bool personal = false;
    };
 
    struct Compiled

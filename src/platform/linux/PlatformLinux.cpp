@@ -456,6 +456,18 @@ namespace Platform
       return AppendExtensionIfMissing(std::string(res), ".infshow");
    }
 
+   std::string SaveWavDialog(const std::string& suggestedName)
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const char* const filterPatterns[] = { "*.wav" };
+      std::string defaultPath = AppendExtensionIfMissing(suggestedName.empty() ? "sample.wav" : suggestedName, ".wav");
+      const char* res = tinyfd_saveFileDialog("Export wav", defaultPath.c_str(), 1, filterPatterns, "Wave file (*.wav)");
+      if (!res) return "";
+      return AppendExtensionIfMissing(std::string(res), ".wav");
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       if (IsHeadlessOrExitAfter()) return "";

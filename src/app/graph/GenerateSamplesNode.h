@@ -8,15 +8,15 @@
 #include "nodes/SamplerNode.h"
 
 // Generate Samples: a sample player whose sample is made, not loaded. Pick a
-// music style card and a seed, press generate, and a private patch built
-// from that card (SampleStyles::Compile) renders a loop of 1-8 bars on a
+// part (synths, pads, plucks, percussion, drums), press generate, and a
+// private patch built from a style card drawn by the seed (SampleStyles::Compile) renders a loop of 1-8 bars on a
 // worker thread. The result plays back through the sample player it extends:
 // waveform, start/end, pitch, volume, loop, and notes in to play it.
 //
 // Lives in app/graph, not nodes/: the render needs the patch loader and the
 // node factory, which no plain node reaches.
 //
-// Saved as its recipe, not its audio: style, seed, variation, length and
+// Saved as its recipe, not its audio: part, seed, variation, length and
 // tempo source, plus the generator version that made it. Reopening a patch
 // renders it again (deterministic in the recipe; a newer generator may make
 // a slightly different loop, which is fine - patches evolve with the app).
@@ -51,24 +51,31 @@ public:
    void Cancel();
    // Writes the loop to a wav in the recordings folder and switches this node
    // to it. False with nothing generated or when the write fails.
-   bool KeepAsFile();
-   // A new random seed.
+   // Writes the made loop to a wav at `path`, as heard (the -14 LUFS master). The node is not changed.
+   bool ExportWav(const std::string& path) const;
+   bool HasLoopToExport() const { return !mLoopL.empty(); }
+   std::string ExportName() const; // a file name for the made loop
+   // A new random seed (the generate button does this before every render).
    void RollSeed();
 
-   // Recipe. `style` is a SampleStyles id.
-   std::string style = "deep_house";
+   // Recipe. There is no style to pick: the seed draws the style card (its
+   // voices, chords and rhythm), so each generate is a new take on the part.
+   // The seed is saved so a reopened patch renders the same loop; the node's
+   // generate button rolls a new one, the file-load path does not.
    int seed = 1;
+   int card = -1; // the style card the seed drew (by what has landed for this part); -1: from the seed
    float variation = 0.5f;
    int bars = 2;                 // 1, 2, 4 or 8
-   bool followTransport = false; // tempo, key and scale from the transport, else the card's own
-   int part = 0;                 // SampleStyles::Part: the whole mix or one layer
+   bool followTransport = false; // "follow tempo": the transport's tempo, else the card's own (name kept for saved patches)
+   bool followScale = false;     // "follow scale": the transport's key and scale, else the card's own
+   int part = (int)SampleStyles::Part::Synths; // SampleStyles::Part: synths, pads, plucks, percussion or drums
 
    static constexpr int kGeneratorVersion = 1;
    // Last generate's resolved tempo and key, for the status line.
    float madeBpm = 0.0f;
    int madeRoot = 0;
    int madeScale = 0;
-   // "deep house drums 1204, a natural minor": what the sample is, for its
+   // "synths 1204, a natural minor": what the sample is, for its
    // name and a kept file's.
    std::string MadeLabel() const;
    static std::string Label(const SampleStyles::Recipe& r, int root, int scale);

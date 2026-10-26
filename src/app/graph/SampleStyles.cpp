@@ -2,6 +2,7 @@
 // is documented in tools/catalog/styles_music.json's _doc.
 #include "app/graph/SampleStyles.h"
 
+#include "app/graph/UserStyle.h"
 #include "audio/MusicTime.h"
 #include "nodes/DrumSequencerNode.h"
 
@@ -252,11 +253,92 @@ namespace
    }
 }
 
+namespace
+{
+   // The seeded draw leaves engine A off half the time and scatters the pitch
+   // envelope and fine tune; a built voice sets all of them.
+   void CleanWavetable(std::map<std::string, std::pair<char, std::string>>& k)
+   {
+      k["a.on"] = { 'b', "1" };
+      k["a.volume"] = { 'f', "1" };
+      k["a.fine"] = { 'f', "0" };
+      k["pitchBend"] = { 'f', "0" };
+      k["glide"] = { 'f', "0" };
+      k["a.pitchAmount"] = { 'f', "0" };
+      k["a.pitchAttack"] = { 'f', "0" };
+      k["a.pitchSustain"] = { 'f', "0" };
+      k["a.filterAttack"] = { 'f', "0" };
+      k["a.warpAmount"] = { 'f', "0" };
+      k["fmDepth"] = { 'f', "0" };
+      k["b.on"] = { 'b', "0" };
+   }
+   // A pluck is a note that is struck and then dies: a bright start that
+   // closes fast. Each kit is a Wavetable voice whose own filter envelope
+   // (octaves of sweep from a dark cutoff) gives the snap, whose amp envelope
+   // has no sustain, and whose table is an instrument that is plucked or
+   // struck. Ranges are drawn per take, so no two takes of a kit match.
+   struct PluckKit
+   {
+      const char* name;
+      int tableA, tableB;      // two tables to draw between (same when one)
+      double posLo, posHi;     // wavetable position
+      int filter;              // 1 = lp 12, 2 = lp 24
+      double cutLo, cutHi;     // resting cutoff, Hz
+      double amtLo, amtHi;     // filter envelope, octaves above the cutoff on the strike
+      double ampLo, ampHi;     // amp decay, ms
+      double resLo, resHi;
+      int unisonLo, unisonHi;
+      double detuneLo, detuneHi;
+      double pitchLo, pitchHi; // strike pitch chirp, semitones
+      int octaveLo, octaveHi;
+   };
+   const PluckKit kPluckKits[] = {
+      { "string", 50, 50, 0.15, 0.85, 2, 450, 1400, 2.5, 4.5, 260, 720, 0.0, 0.25, 1, 2, 4, 14, 0, 0, 0, 1 },
+      { "harp", 50, 53, 0.1, 0.6, 1, 900, 2400, 1.5, 3.0, 500, 1100, 0.0, 0.15, 1, 1, 0, 0, 0, 0, 0, 1 },
+      { "mallet", 16, 49, 0.0, 0.6, 1, 2500, 6000, 0.5, 1.5, 150, 480, 0.0, 0.1, 1, 1, 0, 0, 0, 2, 0, 1 },
+      { "kalimba", 55, 55, 0.05, 0.7, 1, 3000, 7000, 0.0, 1.0, 300, 800, 0.0, 0.1, 1, 1, 0, 0, 0, 0, 0, 1 },
+      { "tine", 17, 17, 0.0, 0.7, 1, 2000, 5000, 1.0, 2.0, 300, 800, 0.0, 0.1, 1, 2, 3, 9, 0, 0, 0, 0 },
+      { "saw stab", 24, 0, 0.45, 0.8, 2, 380, 1000, 3.5, 5.5, 160, 420, 0.0, 0.2, 3, 5, 10, 26, 0, 0, -1, 0 },
+      { "squelch", 4, 35, 0.2, 0.7, 2, 300, 800, 4.0, 6.0, 140, 360, 0.3, 0.6, 1, 2, 3, 12, 0, 0, -1, 0 },
+      { "fm pluck", 12, 32, 0.1, 0.7, 1, 4000, 9000, 0.0, 1.0, 180, 520, 0.0, 0.1, 1, 2, 2, 8, 3, 7, 0, 1 },
+      { "glass", 11, 60, 0.1, 0.8, 1, 3500, 8000, 0.5, 1.5, 250, 700, 0.0, 0.2, 1, 3, 4, 14, 0, 1, 0, 1 },
+   };
+   // A pad is a note that swells in, holds and leaves slowly: the attack is
+   // hundreds of ms to seconds, the filter opens with it, and the release hangs
+   // into the reverb. Unison and width make it a field of sound rather than a line.
+   struct PadKit
+   {
+      const char* name;
+      int tableA, tableB;
+      double posLo, posHi;
+      int filter;
+      double cutLo, cutHi;
+      double amtLo, amtHi;     // filter swell, octaves
+      double atkLo, atkHi;     // amp attack, ms
+      double relLo, relHi;     // amp release, ms
+      int unisonLo, unisonHi;
+      double detuneLo, detuneHi;
+      int octaveLo, octaveHi;
+   };
+   const PadKit kPadKits[] = {
+      { "warm saw", 24, 0, 0.4, 0.8, 1, 500, 1600, 1.0, 2.5, 500, 2200, 2000, 4500, 5, 7, 12, 30, -1, 0 },
+      { "strings", 0, 24, 0.55, 0.85, 1, 900, 2600, 0.5, 1.5, 700, 2800, 1800, 4000, 6, 8, 8, 20, 0, 0 },
+      { "choir", 43, 5, 0.1, 0.7, 1, 1500, 4000, 0.3, 1.0, 500, 1800, 1800, 4200, 2, 4, 4, 12, 0, 0 },
+      { "glass", 11, 60, 0.1, 0.9, 1, 3000, 9000, 0.0, 0.8, 600, 2600, 2200, 4500, 2, 5, 6, 18, 0, 1 },
+      { "shimmer", 62, 63, 0.0, 1.0, 1, 2500, 8000, 0.0, 1.0, 900, 3000, 2500, 4500, 2, 4, 6, 20, 0, 1 },
+      { "dark drone", 56, 59, 0.0, 1.0, 2, 250, 900, 1.0, 3.0, 1200, 3500, 2500, 4500, 2, 4, 2, 10, -2, -1 },
+      { "organ", 14, 2, 0.0, 0.6, 1, 2000, 6000, 0.0, 0.5, 300, 900, 900, 2200, 1, 2, 2, 8, -1, 0 },
+      { "soft keys", 17, 6, 0.0, 0.6, 1, 1500, 4500, 0.2, 1.0, 300, 1200, 1800, 4000, 1, 3, 3, 10, 0, 0 },
+   };
+   constexpr int kPadKitCount = (int)(sizeof(kPadKits) / sizeof(kPadKits[0]));
+   constexpr int kPluckKitCount = (int)(sizeof(kPluckKits) / sizeof(kPluckKits[0]));
+}
+
 namespace SampleStyles
 {
 const char* PartName(Part p)
 {
-   static const char* const kNames[] = { "all", "synths", "pads", "plucks", "percussion", "drums" };
+   static const char* const kNames[] = { "all", "synths", "pads", "plucks", "percussion", "drums", "bass", "fx", "foley", "keys", "leads", "textures", "kicks", "snares", "hats", "toms" };
    const int i = (int)p;
    return i >= 0 && i < (int)Part::Count ? kNames[i] : kNames[0];
 }
@@ -292,9 +374,80 @@ Compiled Compile(const Recipe& recipe)
    const int cardRoot = rng.Range(12);
    const std::vector<std::string> scales = Split(st.scales);
    const int scale = scales.empty() ? 0 : std::stoi(rng.Choice(scales));
-   out.bpm = recipe.bpm > 0.0f ? recipe.bpm : (float)cardBpm;
-   out.root = recipe.key >= 0 ? recipe.key % 12 : cardRoot;
-   out.scale = recipe.scale >= 0 ? recipe.scale : scale;
+   // The player's own habits (empty when off or not yet learned): how hard
+   // the generator leans on them. A card stays a direction, not a rule.
+   const UserStyle::Profile& user = UserStyle::Get();
+   const bool mine = recipe.personal && user.valid;
+   int root0 = recipe.key >= 0 ? recipe.key % 12 : cardRoot;
+   int scale0 = recipe.scale >= 0 ? recipe.scale : scale;
+   if (mine && user.hasPitch)
+   {
+      // The root the player lands on most, drawn by how often they play it, and
+      // the card's scale that holds the most of what they play from that root.
+      if (recipe.key < 0 && rng.Uniform() < std::min(0.95, (double)user.pitchW + 0.15))
+      {
+         double r = rng.Uniform();
+         for (int i = 0; i < 12; i++)
+         {
+            r -= user.pitchClass[i];
+            if (r <= 0.0)
+            {
+               root0 = i;
+               break;
+            }
+         }
+      }
+      if (recipe.scale < 0 && !scales.empty())
+      {
+         double best = -1.0;
+         for (const std::string& sc : scales)
+         {
+            const int id = std::stoi(sc);
+            const MusicTime::ScaleDef& def = MusicTime::ScaleTable(id);
+            double fit = 0.0;
+            for (int k = 0; k < def.count; k++)
+               fit += user.pitchClass[(root0 + def.intervals[k]) % 12];
+            if (fit > best)
+            {
+               best = fit;
+               scale0 = id;
+            }
+         }
+      }
+   }
+   // No history yet: lean the root toward where catalogue music sits. Spotify's whole-catalogue count
+   // (Ning, 2015) puts G major at 10.7% and C major at 10.2%, with the guitar and piano keys next; the
+   // other weights are an estimate in that spirit. Its own stream, so nothing else moves.
+   if (recipe.personal && recipe.key < 0 && !(mine && user.hasPitch))
+   {
+      static const double kPrior[12] = { 10.2, 3.0, 9.0, 4.0, 6.5, 6.0, 3.5, 10.7, 4.0, 8.0, 5.0, 4.0 }; // C .. B
+      Rng pr(std::string("prior:") + std::to_string(recipe.seed));
+      if (pr.Uniform() < 0.6)
+      {
+         double total = 0.0, r;
+         for (double w : kPrior)
+            total += w;
+         r = pr.Uniform() * total;
+         for (int i = 0; i < 12; i++)
+         {
+            r -= kPrior[i];
+            if (r <= 0.0)
+            {
+               root0 = i;
+               break;
+            }
+         }
+      }
+   }
+   // Tempo: where the player usually runs the transport, when they have a history of it.
+   float myBpm = 0.0f, bpmW = 0.0f;
+   bool tempoFromUser = false;
+   if (recipe.personal && recipe.bpm <= 0.0f && UserStyle::DrawTempo(rng.Uniform(), myBpm, bpmW) && rng.Uniform() < bpmW)
+      tempoFromUser = true, out.bpm = std::clamp(myBpm + (float)rng.Uniform(-1.5, 1.5), (float)st.bpmLo * 0.6f, (float)st.bpmHi * 1.6f);
+   else
+      out.bpm = recipe.bpm > 0.0f ? recipe.bpm : (float)cardBpm;
+   out.root = root0;
+   out.scale = scale0;
    const int root = out.root;
    const Part part = recipe.part;
    const bool full = part == Part::Full;
@@ -312,18 +465,117 @@ Compiled Compile(const Recipe& recipe)
    Rng shapeRng(std::string("shape:") + std::to_string(recipe.seed));
    std::string shapedVoice;
    Params shapedEnv;
+   double padWet = 0.45, padDecay = 3.0, padDelayMix = 0.25, padDelayFb = 40.0, padDelayBeats = 0.75;
+   bool padDelay = false;
+   bool pluckArp = true;
+   double pluckRate = 0.25, pluckGate = 50.0, pluckStab = 1.0;
+   int pluckMode = 0, pluckOctaves = 2;
    if (pads || plucks)
    {
-      const bool analog = shapeRng.Range(2) == 0;
+      const bool analog = shapeRng.Range(2) == 0 && !plucks && !pads;
       shapedVoice = analog ? "Analog" : "Wavetable";
+      const PluckKit* kit = plucks ? &kPluckKits[shapeRng.Range(kPluckKitCount)] : nullptr;
+      const PadKit* pk = pads ? &kPadKits[shapeRng.Range(kPadKitCount)] : nullptr;
+      if (pads)
+         shapedVoice = "Wavetable";
       const char* const keys[4] = { analog ? "attack" : "a.ampAttack", analog ? "decay" : "a.ampDecay", analog ? "sustain" : "a.ampSustain",
                                     analog ? "release" : "a.ampRelease" };
-      const double env[4] = { pads ? shapeRng.Uniform(300.0, 900.0) : shapeRng.Uniform(1.0, 5.0),
-                              pads ? shapeRng.Uniform(800.0, 1600.0) : shapeRng.Uniform(120.0, 350.0),
+      // A pluck rings about as long as this player holds a note.
+      const double theirDecay = mine && user.durW > 0.0f ? std::clamp((double)user.durBeats * 60.0 / out.bpm * 1000.0 * 0.8, 60.0, 600.0) : 0.0;
+      double decay = pads ? shapeRng.Uniform(800.0, 1600.0) : shapeRng.Uniform(kit->ampLo, kit->ampHi);
+      if (plucks && theirDecay > 0.0)
+         decay += (theirDecay - decay) * user.durW;
+      const double env[4] = { pads ? shapeRng.Uniform(pk->atkLo, pk->atkHi) : shapeRng.Uniform(1.0, 5.0),
+                              decay,
                               pads ? shapeRng.Uniform(0.7, 0.9) : 0.0,
-                              pads ? shapeRng.Uniform(1500.0, 2500.0) : shapeRng.Uniform(80.0, 200.0) };
+                              pads ? shapeRng.Uniform(pk->relLo, pk->relHi) : shapeRng.Uniform(80.0, 200.0) };
+      double fin[4] = { env[0], env[1], env[2], env[3] };
+      // Where this player leaves the envelope knobs (milliseconds here; the habit is log2 seconds).
+      // Their own stream, so the sound's other draws do not move when the habit does.
+      if (mine)
+      {
+         Rng habit(std::string("habit:") + std::to_string(recipe.seed));
+         const char* const roles[4] = { "env.attack", "env.decay", "env.sustain", "env.release" };
+         for (int i = 0; i < 4; i++)
+         {
+            float v = 0.0f, w = 0.0f;
+            const double u = habit.Uniform(), pick = habit.Uniform();
+            if (!UserStyle::DrawKnob(roles[i], u, v, w) || pick >= w)
+               continue;
+            const double theirs = i == 2 ? std::clamp((double)v, 0.0, 1.0) : std::clamp(std::exp2((double)v) * 1000.0, 1.0, 4000.0);
+            // Pluck decay is already pulled toward the note length; the habit only nudges that.
+            const double share = (i == 1 && plucks) ? 0.5 : 1.0;
+            fin[i] += (theirs - fin[i]) * share * w;
+         }
+         fin[2] = plucks ? 0.0 : fin[2]; // a pluck has no sustain
+      }
       for (int i = 0; i < 4; i++)
-         shapedEnv[keys[i]] = { 'f', Num(std::round(env[i] * 1000.0) / 1000.0) };
+         shapedEnv[keys[i]] = { 'f', Num(std::round(fin[i] * 1000.0) / 1000.0) };
+      if (pads)
+      {
+         CleanWavetable(shapedEnv);
+         auto put = [&](const char* k, double v) { shapedEnv[k] = { 'f', Num(std::round(v * 1000.0) / 1000.0) }; };
+         auto putI = [&](const char* k, int v) { shapedEnv[k] = { 'i', std::to_string(v) }; };
+         putI("a.table", shapeRng.Range(2) == 0 ? pk->tableA : pk->tableB);
+         put("a.position", shapeRng.Uniform(pk->posLo, pk->posHi));
+         putI("a.filterType", pk->filter);
+         put("a.cutoff", shapeRng.Uniform(pk->cutLo, pk->cutHi));
+         put("a.resonance", shapeRng.Uniform(0.0, 0.25));
+         // The swell: the filter opens over about the same time the amp does.
+         put("a.filterAmount", shapeRng.Uniform(pk->amtLo, pk->amtHi));
+         put("a.filterAttack", fin[0] * shapeRng.Uniform(0.8, 1.6));
+         put("a.filterDecay", shapeRng.Uniform(1200.0, 3500.0));
+         put("a.filterSustain", shapeRng.Uniform(0.3, 0.8));
+         put("a.filterRelease", fin[3]);
+         putI("a.unison", pk->unisonLo + shapeRng.Range(pk->unisonHi - pk->unisonLo + 1));
+         put("a.detune", shapeRng.Uniform(pk->detuneLo, pk->detuneHi));
+         put("a.stereoWidth", shapeRng.Uniform(0.6, 1.0));
+         putI("a.octave", pk->octaveLo + shapeRng.Range(pk->octaveHi - pk->octaveLo + 1));
+         padWet = shapeRng.Uniform(0.35, 0.7);
+         padDecay = shapeRng.Uniform(2.5, 7.0);
+         padDelay = shapeRng.Uniform() < 0.6;
+         padDelayMix = shapeRng.Uniform(0.15, 0.4);
+         padDelayFb = shapeRng.Uniform(30.0, 60.0);
+         padDelayBeats = shapeRng.Range(2) == 0 ? 0.75 : 1.5;
+      }
+      if (plucks)
+      {
+         CleanWavetable(shapedEnv);
+         auto put = [&](const char* k, double v) { shapedEnv[k] = { 'f', Num(std::round(v * 1000.0) / 1000.0) }; };
+         auto putI = [&](const char* k, int v) { shapedEnv[k] = { 'i', std::to_string(v) }; };
+         putI("a.table", shapeRng.Range(2) == 0 ? kit->tableA : kit->tableB);
+         put("a.position", shapeRng.Uniform(kit->posLo, kit->posHi));
+         putI("a.filterType", kit->filter);
+         put("a.cutoff", shapeRng.Uniform(kit->cutLo, kit->cutHi));
+         put("a.resonance", shapeRng.Uniform(kit->resLo, kit->resHi));
+         // The snap: the filter opens on the strike and closes in a share of the note's life.
+         put("a.filterAmount", shapeRng.Uniform(kit->amtLo, kit->amtHi));
+         put("a.filterAttack", 0.0);
+         put("a.filterDecay", std::max(40.0, fin[1] * shapeRng.Uniform(0.3, 0.8)));
+         put("a.filterSustain", 0.0);
+         put("a.filterRelease", 60.0);
+         putI("a.unison", kit->unisonLo + shapeRng.Range(kit->unisonHi - kit->unisonLo + 1));
+         put("a.detune", shapeRng.Uniform(kit->detuneLo, kit->detuneHi));
+         put("a.stereoWidth", shapeRng.Uniform(0.2, 0.9));
+         if (kit->pitchHi > 0.0)
+         {
+            put("a.pitchAmount", shapeRng.Uniform(kit->pitchLo, kit->pitchHi));
+            put("a.pitchAttack", 0.0);
+            put("a.pitchDecay", shapeRng.Uniform(18.0, 55.0));
+            put("a.pitchSustain", 0.0);
+            put("a.pitchRelease", 20.0);
+         }
+         putI("a.octave", kit->octaveLo + shapeRng.Range(kit->octaveHi - kit->octaveLo + 1));
+      }
+      // How the plucks are played: an arpeggio at some rate, or chord stabs.
+      pluckArp = shapeRng.Uniform() < 0.78;
+      static const double kRates[] = { 0.125, 0.25, 0.25, 0.5, 0.1667 };
+      pluckRate = kRates[shapeRng.Range(5)];
+      pluckMode = shapeRng.Range(6);
+      pluckOctaves = 1 + shapeRng.Range(3);
+      pluckGate = shapeRng.Uniform(25.0, 70.0);
+      static const double kStab[] = { 0.5, 1.0, 1.0, 2.0 };
+      pluckStab = kStab[shapeRng.Range(4)];
    }
 
    std::set<std::string> ban;
@@ -337,7 +589,31 @@ Compiled Compile(const Recipe& recipe)
             ok.push_back(n);
       return ok.empty() ? std::string() : rng.Choice(ok);
    };
+   // A card is a direction, not a rule: two in five times a voice comes from
+   // any card's pool, so one card + part does not always sound the same.
+   auto pickVoice = [&](const char* list) -> std::string
+   {
+      if (rng.Uniform() < 0.4)
+      {
+         std::vector<std::string> any;
+         for (int i = 0; i < Count(); i++)
+            for (const std::string& n : Split(kGenStyles[i].synth))
+               if (!ban.count(n) && TypeOf(n) != nullptr && std::find(any.begin(), any.end(), n) == any.end())
+                  any.push_back(n);
+         if (!any.empty())
+            return rng.Choice(any);
+      }
+      return pick(list);
+   };
    auto seed = [&]() { return rng.Range(1 << 30); };
+   // A step's gate, drawn toward how long this player holds a note.
+   auto myGate = [&](double card, double stepBeats) -> double
+   {
+      if (!mine || user.durW <= 0.0f || stepBeats <= 0.0)
+         return card;
+      const double theirs = std::clamp((double)user.durBeats / stepBeats * 100.0, 15.0, 100.0);
+      return card + (theirs - card) * user.durW;
+   };
 
    Graph g;
    g.variation = recipe.variation;
@@ -386,27 +662,71 @@ Compiled Compile(const Recipe& recipe)
       lanes[i] = st.drums[i] != nullptr ? st.drums[i] : "";
       hasDrums = hasDrums || *lanes[i] != 0;
    }
-   const bool drumPart = part == Part::Drums || part == Part::Percussion;
+   const bool subPart = part == Part::Kicks || part == Part::Snares || part == Part::Hats || part == Part::Toms;
+   const bool drumPart = part == Part::Drums || part == Part::Percussion || subPart;
    auto none = [&](int from) { return !*lanes[from] && !*lanes[from + 1] && !*lanes[from + 2] && !*lanes[from + 3]; };
-   if (drumPart && none(0) && (part == Part::Drums || none(4)))
+   if (drumPart && none(0) && ((part != Part::Percussion && part != Part::Toms) || none(4)))
    {
       lanes[0] = "x...x...x...x...";
       lanes[1] = "....x.......x...";
       lanes[2] = "..x...x...x...x.";
       hasDrums = true;
    }
-   if (part == Part::Percussion && none(4))
+   if ((part == Part::Percussion || part == Part::Toms) && none(4))
    {
       lanes[4] = lanes[1];
       lanes[5] = lanes[0];
       lanes[6] = lanes[3];
       lanes[7] = lanes[2];
+      hasDrums = true;
+   }
+   // A genre feel for the drum family: its own stream, so nothing else moves.
+   // Direction, not rules: one skeleton per feel, the hits then breathe as usual.
+   if (drumPart)
+   {
+      Rng feel(std::string("feel:") + std::to_string(recipe.seed));
+      struct Feel { const char* k; const char* s; const char* h; const char* o; const char* c; double lo, hi; };
+      static const Feel kFeels[] = {
+         { "x...x...x...x...", "....x.......x...", "..x...x...x...x.", "..o...o...o...o.", "....x.......x...", 118, 128 },   // house
+         { "x...x...x...x...", "................", "xxxxxxxxxxxxxxxx", "..o...o...o...o.", "....x.......x...", 126, 136 },   // techno
+         { "x.....x...x.....", "....x.......x...", "x.x.x.x.x.x.x.x.", "......o.......o.", "....x.......x...", 86, 98 },     // boom bap
+         { "x.......x.x.....", "........x.......", "xxxxxxxxxxxxxxxx", "......o.......o.", "........x.......", 134, 148 },  // trap
+         { "x.........x.....", "....x.......x...", "x.x.x.x.x.x.x.x.", "......o.........", "....x.......x...", 170, 176 },  // dnb
+         { "x.....x.....x...", "....x..x..x.x...", "x.x.x.x.x.x.x.x.", "........o.......", "....x.......x...", 112, 140 },  // breakbeat
+      };
+      const int nf = (int)(sizeof(kFeels) / sizeof(kFeels[0]));
+      const Feel& f = kFeels[feel.Range(nf)];
+      const bool own = recipe.bpm > 0.0f || tempoFromUser;
+      if (subPart && !own)
+         out.bpm = (float)feel.Uniform(f.lo, f.hi);
+      if (subPart)
+      {
+         lanes[0] = f.k;
+         lanes[1] = f.s;
+         lanes[2] = f.h;
+         lanes[3] = f.o;
+         lanes[4] = f.c;
+         if (!*lanes[1])
+            lanes[1] = "....x.......x...";
+         lanes[5] = "x...............";
+         lanes[6] = "........x.......";
+         lanes[7] = "..x.....x.....x.";
+         hasDrums = true;
+      }
    }
    if (part == Part::Drums)
       lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
    if (part == Part::Percussion)
       lanes[0] = lanes[1] = lanes[2] = lanes[3] = "";
-   int drums = 0;
+   if (part == Part::Kicks)
+      lanes[1] = lanes[2] = lanes[3] = lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
+   if (part == Part::Snares)
+      lanes[0] = lanes[2] = lanes[3] = lanes[5] = lanes[6] = lanes[7] = "";
+   if (part == Part::Hats)
+      lanes[0] = lanes[1] = lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
+   if (part == Part::Toms)
+      lanes[0] = lanes[1] = lanes[2] = lanes[3] = lanes[4] = "";
+   int drums = 0, duckKey = 0;
    if (hasDrums)
    {
       Params force = F({ { "swing", st.swing }, { "volume", 0.9 } });
@@ -435,7 +755,9 @@ Compiled Compile(const Recipe& recipe)
             double v = c == 'x' ? 1.0 : c == 'o' ? 0.45 : 0.0;
             if (v > 0.0)
                v = std::clamp(v + rng.Uniform(-0.12, 0.12) * st.groove, 0.2, 1.0);
-            else if (!pat.empty() && ghostLane && k % 2 == 1 && rng.Uniform() < 0.22 * st.groove)
+            if (v > 0.0 && mine && user.hasVelocity)
+               v = std::clamp(v * (1.0 + (std::clamp(user.velMean / 0.75, 0.6, 1.15) - 1.0) * user.velW), 0.2, 1.0); // as hard as they play
+            else if (!pat.empty() && ghostLane && k % 2 == 1 && rng.Uniform() < 0.22 * st.groove * (1.0 + 2.0 * (mine && user.hasTiming ? user.offGrid * user.timingW : 0.0)))
                v = 0.18 + 0.1 * rng.Uniform();
             if (fn > 0 && k >= 32 - fn)
             {
@@ -447,9 +769,174 @@ Compiled Compile(const Recipe& recipe)
             force[lane + "_step" + std::to_string(k)] = { 'f', Num(std::round(v * 1000.0) / 1000.0) };
          }
       }
+      // Each take voices its own kit: a character that shapes every lane, then
+      // each lane's pitch, decay, snap and place in the stereo field. Its own
+      // stream, so the grooves above do not move when the voicing does.
+      Rng dr(std::string("drum:") + std::to_string(recipe.seed));
+      struct Character { double pitch, decay, snap, spread; };
+      static const Character kChars[] = { { 0.0, 0.35, 0.5, 0.3 },   // tight
+                                          { -3.0, 0.0, 0.0, 0.2 },   // boomy
+                                          { 2.0, 0.2, 0.9, 0.5 },    // crunchy
+                                          { -1.0, 0.1, -0.5, 0.4 },  // soft
+                                          { 4.0, 0.5, 0.7, 0.6 } };  // snappy
+      const Character& cr = kChars[dr.Range(5)];
+      const bool lowLane[8] = { true, false, false, false, false, true, false, false };
+      for (int i = 0; i < 8; i++)
+      {
+         const std::string lane = "lane" + std::to_string(i);
+         const double pitch = cr.pitch * (lowLane[i] ? 0.5 : 1.0) + dr.Uniform(-4.0, 4.0) * (lowLane[i] ? 0.6 : 1.0);
+         force[lane + "_pitch"] = { 'f', Num(std::round(pitch * 100.0) / 100.0) };
+         force[lane + "_finetune"] = { 'f', Num(std::round(dr.Uniform(-30.0, 30.0))) };
+         force[lane + "_decay"] = { 'f', Num(std::round(std::clamp(cr.decay + dr.Uniform(-0.2, 0.3), 0.0, 0.85) * 100.0) / 100.0) };
+         force[lane + "_transient"] = { 'f', Num(std::round(std::clamp(cr.snap + dr.Uniform(-0.4, 0.4), -1.0, 1.0) * 100.0) / 100.0) };
+         const double pan = (i == 0 || i == 1) ? 0.0 : dr.Uniform(-cr.spread, cr.spread);
+         force[lane + "_pan"] = { 'f', Num(std::round(pan * 100.0) / 100.0) };
+      }
+      // A kick or hat built from a synth, in place of the sample, two takes in five:
+      // pitch-dropped sub kicks from tight to 808, and metallic hats.
+      struct Replace { int lane; int node; float gain; };
+      std::vector<Replace> synthDrums;
+      auto lanePattern = [&](int li, double base, std::vector<double>& v)
+      {
+         v.assign(16, 0.0);
+         const std::string pat = lanes[li];
+         for (int k = 0; k < 16; k++)
+         {
+            const char c = pat.empty() ? '.' : pat[(size_t)k];
+            v[(size_t)k] = c == 'x' ? 1.0 : c == 'o' ? base : 0.0;
+         }
+      };
+      auto drumSeq = [&](int li, int note, double gate, int& outNode)
+      {
+         std::vector<double> v;
+         lanePattern(li, 0.5, v);
+         Params p = F({ { "rateBeats", 0.25 }, { "gatePercent", gate } });
+         p["steps"] = { 'i', "16" };
+         p["rateMode"] = { 'i', "0" };
+         for (int k = 0; k < 16; k++)
+         {
+            p["note" + std::to_string(k)] = { 'i', std::to_string(note) };
+            p["en" + std::to_string(k)] = { 'b', v[(size_t)k] > 0.0 ? "1" : "0" };
+            p["vel" + std::to_string(k)] = { 'f', Num(v[(size_t)k] > 0.0 ? v[(size_t)k] : 0.0) };
+         }
+         outNode = g.Add("Note Sequencer", dr.Range(1 << 30), p);
+      };
+      auto noiseVoice = [&](int filter, double cut, double res, double dec, double vol)
+      {
+         Params nn = F({ { "volume", vol }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 0.0 },
+                         { "decay", dec }, { "sustain", 0.0 }, { "release", dec * 0.5 }, { "cutoff", cut }, { "resonance", res },
+                         { "voices", 1.0 }, { "keyTrack", 0.0 } });
+         nn["filterType"] = { 'i', std::to_string(filter) };
+         return g.Add("Analog", dr.Range(1 << 30), nn);
+      };
+      auto toneVoice = [&](double drop, double dropMs, double decMs, int table)
+      {
+         Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 }, { "a.filterAmount", 0.0 },
+                        { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchSustain", 0.0 }, { "a.pitchRelease", 20.0 },
+                        { "a.ampRelease", 30.0 }, { "a.detune", 0.0 }, { "a.warpAmount", 0.0 }, { "fmDepth", 0.0 } });
+         CleanWavetable(k);
+         k["a.table"] = { 'i', std::to_string(table) };
+         k["a.unison"] = { 'i', "1" };
+         k["a.filterType"] = { 'i', "1" };
+         k["a.octave"] = { 'i', "0" };
+         k["a.pitchAmount"] = { 'f', Num(drop) };
+         k["a.pitchDecay"] = { 'f', Num(dropMs) };
+         k["a.ampDecay"] = { 'f', Num(decMs) };
+         return g.Add("Wavetable", dr.Range(1 << 30), k);
+      };
+      if (*lanes[0] && dr.Uniform() < (subPart ? 0.75 : 0.4))
+      {
+         int sq = 0;
+         const int kind = dr.Range(3); // 0 punch, 1 808, 2 thump
+         drumSeq(0, 24 + dr.Range(8), 90.0, sq);
+         Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.position", dr.Uniform(0.0, 0.3) }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 },
+                        { "a.filterAmount", 0.0 }, { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchAttack", 0.0 },
+                        { "a.pitchSustain", 0.0 }, { "a.pitchRelease", 20.0 }, { "a.ampRelease", 30.0 }, { "a.detune", 0.0 },
+                        { "a.warpAmount", 0.0 }, { "fmDepth", 0.0 } });
+         CleanWavetable(k);
+         k["a.table"] = { 'i', kind == 2 ? "10" : "0" };
+         k["a.unison"] = { 'i', "1" };
+         k["a.filterType"] = { 'i', "1" };
+         k["b.on"] = { 'b', "0" };
+         k["a.octave"] = { 'i', "0" };
+         k["a.pitchAmount"] = { 'f', Num(kind == 0 ? dr.Uniform(14.0, 26.0) : kind == 1 ? dr.Uniform(8.0, 16.0) : dr.Uniform(20.0, 36.0)) };
+         k["a.pitchDecay"] = { 'f', Num(kind == 0 ? dr.Uniform(18.0, 40.0) : kind == 1 ? dr.Uniform(50.0, 110.0) : dr.Uniform(25.0, 60.0)) };
+         k["a.ampDecay"] = { 'f', Num(kind == 0 ? dr.Uniform(130.0, 260.0) : kind == 1 ? dr.Uniform(450.0, 900.0) : dr.Uniform(200.0, 420.0)) };
+         const int sy = g.Add("Wavetable", dr.Range(1 << 30), k);
+         g.Connect(sq, sy, true);
+         force["lane0_volume"] = { 'f', "0" };
+         synthDrums.push_back({ 0, sy, -3.0f });
+         if (dr.Uniform() < 0.7) // a 5-15 ms noise click on the front
+         {
+            const int ck = noiseVoice(2, dr.Uniform(3000.0, 8000.0), 0.1, dr.Uniform(5.0, 15.0), 0.8);
+            g.Connect(sq, ck, true);
+            synthDrums.push_back({ 0, ck, -13.0f });
+         }
+      }
+      if (*lanes[2] && dr.Uniform() < (subPart ? 0.75 : 0.35))
+      {
+         int sq = 0;
+         drumSeq(2, 84, 20.0, sq);
+         Params h = F({ { "transient", dr.Uniform(0.5, 1.6) }, { "decay", dr.Uniform(0.02, 0.09) }, { "stiffness", dr.Uniform(0.8, 2.0) },
+                        { "filterCutoff", dr.Uniform(6000.0, 16000.0) }, { "filterResonance", dr.Uniform(0.0, 0.3) },
+                        { "volume", 0.7 }, { "width", dr.Uniform(0.2, 0.8) } });
+         h["material"] = { 'i', std::to_string(dr.Range(8)) };
+         const int sy = g.Add("Metallic", dr.Range(1 << 30), h);
+         g.Connect(sq, sy, true);
+         force["lane2_volume"] = { 'f', "0" };
+         synthDrums.push_back({ 2, sy, -9.0f });
+      }
+      // A snare, clap or toms from a synth, each about one take in three: noise
+      // through a band for the crack, a dropped sine for the body.
+      if (*lanes[1] && dr.Uniform() < (subPart ? 0.75 : 0.33))
+      {
+         int sq = 0;
+         drumSeq(1, 52 + dr.Range(7), 25.0, sq); // 175-260 Hz body, as the 909's 180 Hz partial
+         const int nz = noiseVoice(dr.Range(2) ? 6 : 2, dr.Uniform(1800.0, 6000.0), dr.Uniform(0.05, 0.4), dr.Uniform(70.0, 220.0), 0.9);
+         g.Connect(sq, nz, true);
+         const int bd = toneVoice(dr.Uniform(6.0, 14.0), dr.Uniform(15.0, 45.0), dr.Uniform(60.0, 140.0), dr.Range(2) ? 0 : 10);
+         g.Connect(sq, bd, true);
+         force["lane1_volume"] = { 'f', "0" };
+         synthDrums.push_back({ 1, nz, -4.0f });
+         synthDrums.push_back({ 1, bd, -8.0f });
+      }
+      if (*lanes[4] && dr.Uniform() < (subPart ? 0.75 : 0.33))
+      {
+         int sq = 0;
+         drumSeq(4, 60, 20.0, sq);
+         const int nz = noiseVoice(6, dr.Uniform(900.0, 2800.0), dr.Uniform(0.1, 0.6), dr.Uniform(90.0, 280.0), 0.9);
+         g.Connect(sq, nz, true);
+         // The 909 clap is one noise burst retriggered about four times, ~11 ms apart.
+         const int bursts = g.Add("Delay", dr.Range(1 << 30), F({ { "mix", 0.7 }, { "timeMs", dr.Uniform(9.0, 16.0) }, { "feedback", dr.Uniform(0.5, 0.7) } }));
+         g.Connect(nz, bursts, false);
+         force["lane4_volume"] = { 'f', "0" };
+         synthDrums.push_back({ 4, bursts, -4.0f });
+      }
+      if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (subPart ? 0.75 : 0.33))
+      {
+         const int notes[2] = { 40 + dr.Range(8), 52 + dr.Range(8) };
+         for (int ti = 0; ti < 2; ti++)
+         {
+            if (!*lanes[5 + ti])
+               continue;
+            int sq = 0;
+            drumSeq(5 + ti, notes[ti], 70.0, sq);
+            const int tm = toneVoice(dr.Uniform(8.0, 22.0), dr.Uniform(40.0, 110.0), dr.Uniform(180.0, 460.0), dr.Range(3) == 0 ? 10 : 0);
+            g.Connect(sq, tm, true);
+            force["lane" + std::to_string(5 + ti) + "_volume"] = { 'f', "0" };
+            synthDrums.push_back({ 5 + ti, tm, -5.0f });
+         }
+      }
       drums = g.Add("Drum Sequencer", seed(), force);
+      for (const Replace& r : synthDrums)
+         if (r.lane == 0)
+            duckKey = r.node; // the synth kick keys the pump when it replaces the sample
       if (full || drumPart)
+      {
          chans.push_back({ chain(drums, 0), 0.0f });
+         for (const Replace& r : synthDrums)
+            chans.push_back({ r.node, r.gain });
+      }
       layers++;
    }
 
@@ -458,7 +945,7 @@ Compiled Compile(const Recipe& recipe)
    bass.resize(16);
    if (bass.find_first_not_of('.') != std::string::npos)
    {
-      Params p = F({ { "rateBeats", 0.25 }, { "gatePercent", 55.0 } });
+      Params p = F({ { "rateBeats", 0.25 }, { "gatePercent", myGate(55.0, 0.25) } });
       p["steps"] = { 'i', "16" };
       p["rateMode"] = { 'i', "0" };
       for (int k = 0; k < 16; k++)
@@ -468,7 +955,7 @@ Compiled Compile(const Recipe& recipe)
          p["vel" + std::to_string(k)] = { 'f', "0.9" };
       }
       const int sq = g.Add("Note Sequencer", seed(), p);
-      const std::string picked = pick(st.synth);
+      const std::string picked = pickVoice(st.synth);
       if (!picked.empty())
       {
          const int sy = g.Add(picked, seed());
@@ -497,33 +984,62 @@ Compiled Compile(const Recipe& recipe)
    {
       const std::vector<std::string> sizes = Split(st.chordSizes);
       // Pads change chord at most once a bar.
-      Params p = F({ { "rateBeats", pads ? std::max(4.0, (double)st.chordBeats) : st.chordBeats }, { "strumMs", st.chordStrum },
+      Params p = F({ { "rateBeats", pads ? std::max(4.0, (double)st.chordBeats) : (plucks && !pluckArp) ? pluckStab : st.chordBeats },
+                     { "strumMs", st.chordStrum },
                      { "humanizeTimingMs", st.chordHuman }, { "humanizeVelocity", st.chordHuman } });
       p["root"] = { 'i', std::to_string(root) };
       p["scale"] = { 'i', std::to_string(out.scale) };
       p["chordSize"] = { 'i', sizes.empty() ? "3" : rng.Choice(sizes) };
+      if (mine && user.hasChords && rng.Uniform() < user.chordW)
+      {
+         // The chord sizes this player actually plays, by how often they play them.
+         double r = rng.Uniform();
+         for (int i = 0; i < 4; i++)
+         {
+            r -= user.chordSize[i];
+            if (r <= 0.0)
+            {
+               p["chordSize"] = { 'i', std::to_string(i + 2) };
+               break;
+            }
+         }
+      }
       p["progSteps"] = { 'i', std::to_string(st.chordSteps) };
       const int ch = g.Add("Chorder", seed(), p);
       int notes = noteChain(ch, st.notefx);
       const std::string fam = st.family;
       // Plucks always run the chords through the arpeggiator; pads never do.
-      if (((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6 && !pads) || plucks)
+      if (((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6 && !pads) || (plucks && pluckArp))
       {
-         Params a = F({ { "rateBeats", 0.25 } });
+         Params a = F({ { "rateBeats", plucks ? pluckRate : 0.25 }, { "gatePercent", plucks ? pluckGate : 50.0 } });
          a["rateMode"] = { 'i', "0" };
-         a["octaves"] = { 'i', "2" };
-         a["mode"] = { 'i', "0" };
+         a["octaves"] = { 'i', plucks ? std::to_string(pluckOctaves) : "2" };
+         a["mode"] = { 'i', plucks ? std::to_string(pluckMode) : "0" };
          const int ar = g.Add("Arpeggiator", seed(), a);
          g.Connect(notes, ar, true);
          notes = ar;
       }
-      const std::string picked = pick(st.synth);
+      const std::string picked = pickVoice(st.synth);
       if (!picked.empty())
       {
          const int sy = (pads || plucks) ? g.Add(shapedVoice, seed(), shapedEnv) : g.Add(picked, seed());
          g.Connect(notes, sy, true);
          if (wantChords)
             synths.push_back(sy);
+         if (pads && std::string(shapedVoice) == "Wavetable")
+         {
+            Rng drift(std::string("drift:") + std::to_string(recipe.seed));
+            app::OfflineGraph::Motion m;
+            m.node = sy;
+            m.key = "a.position";
+            const double mid = drift.Uniform(0.25, 0.75), span = drift.Uniform(0.1, 0.35);
+            m.lo = (float)(mid - span * 0.5);
+            m.hi = (float)(mid + span * 0.5);
+            const double periods[] = { 16.0, 24.0, 32.0 };
+            m.periodBeats = periods[drift.Range(3)];
+            m.phase = drift.Uniform();
+            out.motions.push_back(m);
+         }
          int pad = chain(sy, 1 + rng.Range(2));
          if (st.sidechain && drums != 0)
          {
@@ -531,7 +1047,7 @@ Compiled Compile(const Recipe& recipe)
             const int dy = g.Add("Dynamics", seed(), F({ { "sidechainExternal", 1.0 }, { "ratio", 6.0 }, { "threshold", -28.0 },
                                                           { "attack", 5.0 }, { "release", 160.0 } }));
             g.Connect(pad, dy, false);
-            g.Connect(drums, dy, false);
+            g.Connect(duckKey != 0 ? duckKey : drums, dy, false);
             pad = dy;
          }
          if (wantChords)
@@ -547,8 +1063,26 @@ Compiled Compile(const Recipe& recipe)
       for (int k = 0; k < 8; k++)
       {
          const int steps[] = { -2, -1, -1, 0, 1, 1, 2 };
-         deg = std::clamp(deg + steps[rng.Range(7)], -2, st.motifRange);
-         seq.push_back({ deg, k % 4 == 0 || rng.Uniform() < st.motifDensity });
+         int move = steps[rng.Range(7)];
+         double density = st.motifDensity;
+         if (mine && user.hasPitch && rng.Uniform() < user.pitchW)
+         {
+            // The player's own melodic moves, drawn by how often they make them.
+            double r = rng.Uniform();
+            for (int i = 0; i < 6; i++)
+            {
+               r -= user.step[i];
+               if (r <= 0.0)
+               {
+                  move = i - 2;
+                  break;
+               }
+            }
+         }
+         if (mine && user.hasTiming)
+            density += (0.25 + 0.75 * user.onset[(k * 2) % 16] - density) * user.timingW;
+         deg = std::clamp(deg + move, -2, st.motifRange);
+         seq.push_back({ deg, k % 4 == 0 || rng.Uniform() < density });
       }
       std::vector<std::pair<int, bool>> answer(seq.begin(), seq.begin() + 5);
       for (int k = 0; k < 3; k++)
@@ -558,14 +1092,17 @@ Compiled Compile(const Recipe& recipe)
          answer.push_back({ deg, rng.Uniform() < 0.85 });
       }
       seq.insert(seq.end(), answer.begin(), answer.end());
-      Params p = F({ { "rateBeats", st.motifRate }, { "gatePercent", st.motifGate } });
+      Params p = F({ { "rateBeats", st.motifRate }, { "gatePercent", myGate(st.motifGate, st.motifRate) } });
       p["steps"] = { 'i', "16" };
       p["rateMode"] = { 'i', "0" };
       for (int k = 0; k < 16; k++)
       {
          p["note" + std::to_string(k)] = { 'i', std::to_string(degreeNote(seq[k].first, st.motifOctave)) };
          p["en" + std::to_string(k)] = { 'b', seq[k].second ? "1" : "0" };
-         p["vel" + std::to_string(k)] = { 'f', k % 4 == 0 ? "1" : Num(std::round((0.65 + 0.2 * rng.Uniform()) * 100.0) / 100.0) };
+         double v = 0.65 + 0.2 * rng.Uniform();
+         if (mine && user.hasVelocity)
+            v += (user.vel[(size_t)rng.Range((int)user.vel.size())] - v) * user.velW; // a velocity they have played
+         p["vel" + std::to_string(k)] = { 'f', k % 4 == 0 ? "1" : Num(std::round(std::clamp(v, 0.2, 1.0) * 100.0) / 100.0) };
       }
       const int ms = g.Add("Note Sequencer", seed(), p);
       const int mn = noteChain(ms, st.motifNotefx);
@@ -583,10 +1120,741 @@ Compiled Compile(const Recipe& recipe)
             const int dy = g.Add("Dynamics", seed(), F({ { "sidechainExternal", 1.0 }, { "ratio", 4.0 }, { "threshold", -26.0 },
                                                           { "attack", 5.0 }, { "release", 140.0 } }));
             g.Connect(lead, dy, false);
-            g.Connect(drums, dy, false);
+            g.Connect(duckKey != 0 ? duckKey : drums, dy, false);
             lead = dy;
          }
          chans.push_back({ lead, st.motifGain });
+      }
+   }
+
+   // Bass, fx and foley are built from their own stream and their own kits:
+   // each take picks a kit (an instrument or a kind of sound), then draws the
+   // kit's ranges and a rhythm. Nothing here moves the other parts' draws.
+   const bool bassPart = part == Part::Bass, fxPart = part == Part::Fx, foleyPart = part == Part::Foley;
+   const bool keysPart = part == Part::Keys, leadPart = part == Part::Leads, texPart = part == Part::Textures;
+   const bool ownSpace = fxPart || foleyPart || keysPart || leadPart || texPart; // sets its own reverb
+   double specialWet = 0.2, specialDecay = 1.6;
+   if (bassPart || fxPart || foleyPart || keysPart || leadPart || texPart)
+   {
+      Rng sp(std::string("special:") + std::to_string(recipe.seed));
+      const double beatMs = 60000.0 / out.bpm;
+      const int loopBeats = recipe.bars * 4;
+      const int preBeats = (recipe.bars == 1 ? 1 : 2) * 4;
+      auto num = [](double v) { return Num(std::round(v * 1000.0) / 1000.0); };
+      auto wt = [&](Params& k, int table, double pos, int filter, double cut, double res)
+      {
+         CleanWavetable(k);
+         k["mix"] = { 'f', "0.45" }; // mix 1 is silent
+         k["volume"] = { 'f', "0.9" };
+         k["a.table"] = { 'i', std::to_string(table) };
+         k["a.position"] = { 'f', num(pos) };
+         k["a.filterType"] = { 'i', std::to_string(filter) };
+         k["a.cutoff"] = { 'f', num(cut) };
+         k["a.resonance"] = { 'f', num(res) };
+         k["a.unison"] = { 'i', "1" };
+         k["a.detune"] = { 'f', "0" };
+         k["a.warpAmount"] = { 'f', "0" };
+         k["fmDepth"] = { 'f', "0" };
+         k["b.on"] = { 'b', "0" };
+         k["a.octave"] = { 'i', "0" };
+         k["a.ampAttack"] = { 'f', "1" };
+         k["a.filterAmount"] = { 'f', "0" };
+         k["a.pitchAmount"] = { 'f', "0" };
+      };
+      // Sixteen steps of notes: `vel[k] > 0` plays `note[k]` at that velocity.
+      auto sequence = [&](const std::vector<double>& vel, const std::vector<int>& note, double rate, double gate, int steps)
+      {
+         Params q = F({ { "rateBeats", rate }, { "gatePercent", gate } });
+         q["steps"] = { 'i', std::to_string(steps) };
+         q["rateMode"] = { 'i', "0" };
+         for (int k = 0; k < steps; k++)
+         {
+            q["note" + std::to_string(k)] = { 'i', std::to_string(note[(size_t)k]) };
+            q["en" + std::to_string(k)] = { 'b', vel[(size_t)k] > 0.0 ? "1" : "0" };
+            q["vel" + std::to_string(k)] = { 'f', num(std::max(0.0, vel[(size_t)k])) };
+         }
+         return g.Add("Note Sequencer", sp.Range(1 << 30), q);
+      };
+      auto sweep = [&](int node, const char* key, double lo, double hi, double periodBeats, double phase)
+      {
+         app::OfflineGraph::Motion m;
+         m.node = node;
+         m.key = key;
+         m.lo = (float)lo;
+         m.hi = (float)hi;
+         m.periodBeats = periodBeats;
+         m.phase = phase - std::floor(phase);
+         out.motions.push_back(m);
+      };
+
+      if (bassPart)
+      {
+         // A figure of one to eight hits in sixteen steps, on the root, its fifth and its neighbours.
+         const double density = sp.Uniform(0.15, 0.65);
+         std::vector<double> vel(16, 0.0);
+         std::vector<int> note(16, 0), deg16(16, 0);
+         static const int kDeg[] = { 0, 0, 0, 0, 2, 3, 4, 4, 5, 6, 7 };
+         static const int kOct[] = { 0, 0, 0, 1 };
+         int prev = 0;
+         for (int k = 0; k < 16; k++)
+         {
+            const bool strong = k % 4 == 0;
+            if (sp.Uniform() < density * (strong ? 1.8 : 0.8) || k == 0)
+            {
+               vel[(size_t)k] = std::clamp((strong ? 0.95 : 0.7) + sp.Uniform(-0.15, 0.1), 0.3, 1.0);
+               prev = sp.Uniform() < 0.55 ? prev : kDeg[sp.Range(11)];
+               deg16[(size_t)k] = prev;
+               note[(size_t)k] = degreeNote(prev, 1 + kOct[sp.Range(4)]);
+            }
+         }
+         const double rate = sp.Range(5) == 0 ? 0.5 : 0.25;
+         const int kind = sp.Range(6);
+         Params k;
+         double gate = 70.0;
+         if (kind == 1) // an 808 is tuned to the key: the root sits at 30-60 Hz, never above about 100
+            for (int i = 0; i < 16; i++)
+               note[(size_t)i] = degreeNote(deg16[(size_t)i], 0);
+         if (kind == 5) // acid: a few accented steps, the rest softer; the 303's accent lifts level and sweep together
+            for (int i = 0; i < 16; i++)
+               if (vel[(size_t)i] > 0.0)
+                  vel[(size_t)i] = sp.Uniform() < 0.3 || i == 0 ? 1.0 : sp.Uniform(0.45, 0.65);
+         switch (kind)
+         {
+         case 0: // sub: a clean low sine, long notes
+            wt(k, 10, sp.Uniform(0.0, 0.3), 1, 700, 0.0);
+            k["a.ampDecay"] = { 'f', "400" };
+            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.7, 1.0)) };
+            k["a.ampRelease"] = { 'f', num(sp.Uniform(60.0, 220.0)) };
+            gate = sp.Uniform(60.0, 95.0);
+            break;
+         case 1: // 808: a pitch-dropped boom that rings
+            wt(k, sp.Range(2) ? 10 : 0, 0.1, 1, 1200, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(6.0, 18.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(40.0, 120.0)) };
+            k["a.pitchSustain"] = { 'f', "0" };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(500.0, 1400.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "80" };
+            k["glide"] = { 'f', num(sp.Uniform(0.0, 0.12)) };
+            gate = 50.0;
+            break;
+         case 2: // reese: detuned saws through a slow low-pass
+            wt(k, sp.Range(2) ? 24 : 0, sp.Uniform(0.4, 0.8), 2, sp.Uniform(250.0, 700.0), sp.Uniform(0.05, 0.3));
+            k["a.unison"] = { 'i', std::to_string(2 + sp.Range(2)) };
+            k["a.detune"] = { 'f', num(sp.Uniform(20.0, 60.0)) };
+            k["a.stereoWidth"] = { 'f', "0.3" };
+            k["a.ampSustain"] = { 'f', "0.9" };
+            k["a.ampRelease"] = { 'f', "120" };
+            break;
+         case 3: // plucked: the string or slap, a filter snap
+            wt(k, sp.Range(2) ? 54 : 50, sp.Uniform(0.1, 0.7), 2, sp.Uniform(250.0, 600.0), sp.Uniform(0.0, 0.2));
+            k["a.filterAmount"] = { 'f', num(sp.Uniform(2.5, 4.0)) };
+            k["a.filterDecay"] = { 'f', num(sp.Uniform(120.0, 300.0)) };
+            k["a.filterSustain"] = { 'f', "0" };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(250.0, 600.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "90" };
+            break;
+         case 4: // fm: a bright, hollow growl that closes
+            wt(k, sp.Range(2) ? 12 : 32, sp.Uniform(0.1, 0.7), 1, sp.Uniform(600.0, 1600.0), 0.1);
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(250.0, 500.0)) };
+            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.2, 0.5)) };
+            k["a.ampRelease"] = { 'f', "100" };
+            break;
+         default: // acid: a squelching, resonant saw with a fast sweep
+            wt(k, sp.Range(2) ? 35 : 4, sp.Uniform(0.2, 0.7), 2, sp.Uniform(250.0, 600.0), sp.Uniform(0.45, 0.75));
+            k["a.filterAmount"] = { 'f', num(sp.Uniform(3.0, 5.0)) };
+            k["a.filterDecay"] = { 'f', num(sp.Uniform(110.0, 260.0)) };
+            k["a.filterSustain"] = { 'f', "0.05" };
+            k["a.ampDecay"] = { 'f', "300" };
+            k["a.ampSustain"] = { 'f', "0.6" };
+            k["a.ampRelease"] = { 'f', "70" };
+            k["glide"] = { 'f', num(sp.Uniform(0.05, 0.07)) }; // the 303's slide is about 60 ms
+            gate = sp.Uniform(85.0, 110.0);                    // long gates are what lets a step slide into the next
+            break;
+         }
+         const int sq = sequence(vel, note, rate, gate, 16);
+         const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+         g.Connect(sq, sy, true);
+         int end = sy;
+         if (sp.Uniform() < 0.5)
+         {
+            const int dr2 = g.Add("Drive", sp.Range(1 << 30), F({ { "mix", sp.Uniform(0.3, 0.8) }, { "drive", sp.Uniform(4.0, 16.0) }, { "output", -4.0 } }));
+            g.Connect(end, dr2, false);
+            end = dr2;
+         }
+         synths.push_back(sy);
+         chans.push_back({ end, 0.0f });
+         if (kind == 2)
+         {
+            // A clean sine an octave under the beating saws, as the reese recipes layer it.
+            Params sb;
+            wt(sb, 10, 0.0, 1, 600, 0.0);
+            sb["a.ampSustain"] = { 'f', "0.9" };
+            sb["a.ampRelease"] = { 'f', "120" };
+            sb["a.octave"] = { 'i', "-1" };
+            const int sub = g.Add("Wavetable", sp.Range(1 << 30), sb);
+            g.Connect(sq, sub, true);
+            chans.push_back({ sub, -6.0f });
+         }
+      }
+      else if (fxPart)
+      {
+         const int kind = sp.Range(7);
+         const double period = 2.0 * loopBeats;
+         // Phase that puts the preroll's end at the trough (rising) or the crest (falling) of the sweep.
+         const double rise = 0.75 - preBeats / period, fall = 0.25 - preBeats / period;
+         auto noiseVoice = [&](double attackMs, double releaseMs)
+         {
+            Params n = F({ { "volume", 0.8 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 },
+                           { "attack", std::min(4000.0, attackMs) }, { "decay", 200.0 }, { "sustain", 1.0 }, { "release", releaseMs },
+                           { "cutoff", 18000.0 }, { "resonance", 0.1 }, { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            n["filterType"] = { 'i', "0" };
+            return g.Add("Analog", sp.Range(1 << 30), n);
+         };
+         auto hold = [&](double beats)
+         {
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 60);
+            vel[0] = 1.0;
+            return sequence(vel, note, beats, 100.0, 1);
+         };
+         specialWet = sp.Uniform(0.25, 0.55);
+         specialDecay = sp.Uniform(2.0, 6.0);
+         if (kind <= 1) // riser / downlifter: noise through a band-pass that sweeps, over the whole loop
+         {
+            const bool up = kind == 0;
+            const int nv = noiseVoice(up ? loopBeats * beatMs * 0.9 : 30.0, up ? 200.0 : loopBeats * beatMs * 0.5);
+            g.Connect(hold(loopBeats), nv, true);
+            Params f = F({ { "freq", 1000.0 }, { "q", sp.Uniform(1.5, 6.0 ) }, { "mix", 1.0 } });
+            f["type"] = { 'i', "6" };
+            const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
+            g.Connect(nv, af, false);
+            sweep(af, "freq", sp.Uniform(200.0, 500.0), sp.Uniform(5000.0, 12000.0), period, up ? rise : fall);
+            // A tonal line under the noise: a saw whose pitch the loop climbs.
+            Params k;
+            wt(k, 24, 0.6, 1, 2500, 0.0);
+            k["a.unison"] = { 'i', "4" };
+            k["a.detune"] = { 'f', "25" };
+            k["a.ampAttack"] = { 'f', num(up ? loopBeats * beatMs * 0.8 : 20.0) };
+            k["a.ampSustain"] = { 'f', "1" };
+            k["a.ampRelease"] = { 'f', "300" };
+            k["volume"] = { 'f', "0.3" };
+            const int tone = g.Add("Wavetable", sp.Range(1 << 30), k);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, degreeNote(sp.Range(3) * 2, 1));
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, loopBeats, 100.0, 1), tone, true);
+            sweep(tone, "a.cutoff", 300.0, 9000.0, period, up ? rise : fall);
+            synths.push_back(tone);
+            chans.push_back({ af, 0.0f });
+            chans.push_back({ tone, -9.0f });
+         }
+         else if (kind == 2) // impact: a pitch-dropped boom with a noise burst, once at the start
+         {
+            Params k;
+            wt(k, 10, 0.1, 1, 900, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(18.0, 40.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(60.0, 250.0)) };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(1200.0, 3500.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "400" };
+            const int boom = g.Add("Wavetable", sp.Range(1 << 30), k);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 24 + sp.Range(8));
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, loopBeats, 30.0, 1), boom, true);
+            Params nn = F({ { "volume", 0.7 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1.0 },
+                            { "decay", sp.Uniform(250.0, 1200.0) }, { "sustain", 0.0 }, { "release", 300.0 }, { "cutoff", sp.Uniform(1500.0, 9000.0) },
+                            { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            nn["filterType"] = { 'i', "1" };
+            const int burst = g.Add("Analog", sp.Range(1 << 30), nn);
+            g.Connect(sequence(vel, std::vector<int>(16, 60), loopBeats, 30.0, 1), burst, true);
+            chans.push_back({ boom, 0.0f });
+            chans.push_back({ burst, -6.0f });
+         }
+         else if (kind == 3) // whoosh: a pass-by, noise swept up and down over about a second, panned across
+         {
+            const double secs = sp.Uniform(0.5, 1.2);
+            const double beats = secs * 1000.0 / beatMs;
+            const int nv = noiseVoice(secs * 450.0, secs * 500.0);
+            // The pass-by lands at the start of the loop so the tail rings into the next.
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 60);
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, loopBeats, std::clamp(secs * 1000.0 / (loopBeats * beatMs) * 100.0, 5.0, 100.0), 1), nv, true);
+            Params f = F({ { "freq", 800.0 }, { "q", sp.Uniform(0.8, 2.5) }, { "mix", 1.0 } });
+            f["type"] = { 'i', "6" };
+            const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
+            g.Connect(nv, af, false);
+            const double lo = sp.Uniform(250.0, 600.0), hi = sp.Uniform(4000.0, 9000.0);
+            sweep(af, "freq", lo, hi, std::max(0.25, beats * 2.0), 0.75 - preBeats / std::max(0.25, beats * 2.0));
+            const int pn = g.Add("Stereo", sp.Range(1 << 30), F({ { "width", 1.0 } }));
+            g.Connect(af, pn, false);
+            sweep(pn, "pan", -0.9, 0.9, std::max(0.25, beats * 2.0), 0.75 - preBeats / std::max(0.25, beats * 2.0));
+            chans.push_back({ pn, 0.0f });
+         }
+         else if (kind == 4) // zaps: falling or rising lasers, a few to a bar
+         {
+            Params k;
+            wt(k, sp.Range(2) ? 12 : 37, sp.Uniform(0.1, 0.8), 1, 8000, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(0.0, 1.0) < 0.5 ? sp.Uniform(-36.0, -14.0) : sp.Uniform(14.0, 30.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(80.0, 300.0)) };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(150.0, 500.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "80" };
+            const int zp = g.Add("Wavetable", sp.Range(1 << 30), k);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 72);
+            for (int i = 0; i < 16; i++)
+               if (sp.Uniform() < 0.2)
+               {
+                  vel[(size_t)i] = sp.Uniform(0.5, 1.0);
+                  note[(size_t)i] = 60 + sp.Range(24);
+               }
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, 0.5, 25.0, 16), zp, true);
+            chans.push_back({ zp, 0.0f });
+         }
+         else if (kind == 6) // endless riser: three octave-spaced voices climbing, fading in low and out high
+         {
+            for (int v = 0; v < 3; v++)
+            {
+               Params k;
+               wt(k, v == 0 ? 24 : 0, 0.5, 1, 3500, 0.0);
+               k["a.unison"] = { 'i', "2" };
+               k["a.detune"] = { 'f', "10" };
+               k["a.ampAttack"] = { 'f', "40" };
+               k["a.ampSustain"] = { 'f', "1" };
+               k["a.ampRelease"] = { 'f', "120" };
+               k["glide"] = { 'f', "0.25" };
+               k["volume"] = { 'f', "0.4" };
+               const int sv = g.Add("Wavetable", sp.Range(1 << 30), k);
+               std::vector<double> vel(16, 0.0), note0(0);
+               std::vector<int> note(16, 48);
+               const int steps = 8;
+               for (int i = 0; i < steps; i++)
+               {
+                  vel[(size_t)i] = 1.0;
+                  // Each voice climbs one octave over the loop, starting a third of the way further on.
+                  note[(size_t)i] = 40 + ((i * 12 / steps + v * 12 / 3 * 3) % 36);
+               }
+               g.Connect(sequence(vel, note, loopBeats / (double)steps, 100.0, steps), sv, true);
+               // Loudest mid-climb, silent at the edges: the ear loses the seam.
+               sweep(sv, "volume", 0.02, 0.45, loopBeats * 1.0, 0.25 + v / 3.0 - preBeats / (double)loopBeats);
+               synths.push_back(sv);
+               chans.push_back({ sv, -4.0f });
+            }
+         }
+         else // sparkle: high metallic ticks scattered, bell-like, over a long tail
+         {
+            Params m = F({ { "transient", sp.Uniform(0.3, 1.2) }, { "decay", sp.Uniform(0.6, 2.5) }, { "stiffness", sp.Uniform(0.4, 1.6) },
+                           { "filterCutoff", sp.Uniform(5000.0, 15000.0) }, { "volume", 0.8 }, { "width", 0.8 } });
+            m["material"] = { 'i', std::to_string(sp.Range(8)) };
+            const int mt = g.Add("Metallic", sp.Range(1 << 30), m);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 84);
+            for (int i = 0; i < 16; i++)
+               if (sp.Uniform() < 0.3)
+               {
+                  vel[(size_t)i] = sp.Uniform(0.4, 1.0);
+                  note[(size_t)i] = 72 + sp.Range(24);
+               }
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, 0.5, 30.0, 16), mt, true);
+            chans.push_back({ mt, 0.0f });
+         }
+      }
+      else if (keysPart || leadPart)
+      {
+         Params k;
+         if (keysPart)
+         {
+            // Chords struck on an instrument: a tine piano, organ, mallet keys, a clav or a plucked-string piano.
+            const int kind = sp.Range(6);
+            double rate = sp.Uniform() < 0.5 ? 2.0 : 4.0, strum = sp.Uniform(4.0, 28.0);
+            switch (kind)
+            {
+            case 0: // electric piano: tine table, bell-like top, long decay
+               wt(k, 17, sp.Uniform(0.0, 0.5), 1, sp.Uniform(3000.0, 6500.0), 0.0);
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(900.0, 1800.0)) };
+               k["a.ampSustain"] = { 'f', num(sp.Uniform(0.0, 0.2)) };
+               k["a.ampRelease"] = { 'f', "350" };
+               break;
+            case 1: // organ: drawbars, no decay, sits on the key
+               wt(k, 14, sp.Uniform(0.0, 0.6), 1, sp.Uniform(3500.0, 7000.0), 0.0);
+               k["a.ampAttack"] = { 'f', "6" };
+               k["a.ampSustain"] = { 'f', "1" };
+               k["a.ampRelease"] = { 'f', "90" };
+               break;
+            case 2: // felt piano: a plucked string with a soft filter on the strike
+               wt(k, 50, sp.Uniform(0.05, 0.4), 2, sp.Uniform(1200.0, 2600.0), 0.0);
+               k["a.filterAmount"] = { 'f', num(sp.Uniform(1.5, 2.8)) };
+               k["a.filterDecay"] = { 'f', num(sp.Uniform(250.0, 600.0)) };
+               k["a.filterSustain"] = { 'f', "0" };
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(1100.0, 2400.0)) };
+               k["a.ampSustain"] = { 'f', "0" };
+               k["a.ampRelease"] = { 'f', "300" };
+               break;
+            case 3: // vibes: struck bars that ring
+               wt(k, 49, sp.Uniform(0.0, 0.5), 1, sp.Uniform(4000.0, 8000.0), 0.0);
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(1500.0, 2800.0)) };
+               k["a.ampSustain"] = { 'f', "0" };
+               k["a.ampRelease"] = { 'f', "400" };
+               break;
+            case 4: // clav: a short, hard, nasal chord stab
+               wt(k, 50, sp.Uniform(0.5, 0.85), 1, sp.Uniform(1500.0, 3200.0), 0.15);
+               k["a.filterAmount"] = { 'f', num(sp.Uniform(1.5, 2.5)) };
+               k["a.filterDecay"] = { 'f', num(sp.Uniform(60.0, 140.0)) };
+               k["a.filterSustain"] = { 'f', "0" };
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(140.0, 320.0)) };
+               k["a.ampSustain"] = { 'f', "0" };
+               k["a.ampRelease"] = { 'f', "60" };
+               rate = sp.Uniform() < 0.5 ? 1.0 : 0.5;
+               strum = sp.Uniform(0.0, 8.0);
+               break;
+            default: // pipes: a church organ, slow to speak
+               wt(k, 29, sp.Uniform(0.0, 0.6), 1, sp.Uniform(2500.0, 5500.0), 0.0);
+               k["a.ampAttack"] = { 'f', num(sp.Uniform(40.0, 160.0)) };
+               k["a.ampSustain"] = { 'f', "1" };
+               k["a.ampRelease"] = { 'f', num(sp.Uniform(300.0, 900.0)) };
+               rate = 4.0;
+               break;
+            }
+            k["a.octave"] = { 'i', "0" };
+            k["a.unison"] = { 'i', std::to_string(1 + sp.Range(2)) };
+            k["a.detune"] = { 'f', num(sp.Uniform(2.0, 9.0)) };
+            Params p = F({ { "rateBeats", rate }, { "strumMs", strum }, { "humanizeTimingMs", sp.Uniform(3.0, 14.0) }, { "humanizeVelocity", sp.Uniform(5.0, 20.0) } });
+            p["root"] = { 'i', std::to_string(root) };
+            p["scale"] = { 'i', std::to_string(out.scale) };
+            p["chordSize"] = { 'i', std::to_string(3 + sp.Range(2)) };
+            p["progSteps"] = { 'i', std::to_string(2 + sp.Range(3)) };
+            const int ch = g.Add("Chorder", sp.Range(1 << 30), p);
+            const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(ch, sy, true);
+            synths.push_back(sy);
+            chans.push_back({ sy, 0.0f });
+            specialWet = sp.Uniform(0.1, 0.3);
+            specialDecay = sp.Uniform(1.0, 2.4);
+         }
+         else
+         {
+            // One voice playing a line: stepwise, with rests and a few leaps.
+            const int kind = sp.Range(6);
+            switch (kind)
+            {
+            case 0: // brass
+               wt(k, 53, sp.Uniform(0.2, 0.8), 1, sp.Uniform(2200.0, 5000.0), 0.0);
+               k["a.filterAmount"] = { 'f', num(sp.Uniform(1.0, 2.0)) };
+               k["a.filterDecay"] = { 'f', "250" };
+               k["a.filterSustain"] = { 'f', "0.5" };
+               k["a.ampAttack"] = { 'f', num(sp.Uniform(15.0, 60.0)) };
+               break;
+            case 1: // reed
+               wt(k, 52, sp.Uniform(0.1, 0.7), 1, sp.Uniform(2500.0, 6000.0), 0.0);
+               k["a.ampAttack"] = { 'f', num(sp.Uniform(10.0, 40.0)) };
+               break;
+            case 2: // detuned saw lead
+               wt(k, 24, sp.Uniform(0.4, 0.85), 2, sp.Uniform(2000.0, 5500.0), sp.Uniform(0.0, 0.25));
+               k["a.unison"] = { 'i', std::to_string(2 + sp.Range(3)) };
+               k["a.detune"] = { 'f', num(sp.Uniform(8.0, 22.0)) };
+               k["a.stereoWidth"] = { 'f', "0.7" };
+               break;
+            case 3: // pulse
+               wt(k, 4, sp.Uniform(0.15, 0.7), 1, sp.Uniform(2500.0, 6000.0), 0.1);
+               break;
+            case 4: // vowel: a sung line
+               wt(k, 47, sp.Uniform(0.0, 0.9), 1, sp.Uniform(3500.0, 8000.0), 0.0);
+               k["a.ampAttack"] = { 'f', num(sp.Uniform(30.0, 90.0)) };
+               break;
+            default: // fm lead: bright and glassy
+               wt(k, sp.Range(2) ? 12 : 32, sp.Uniform(0.1, 0.6), 1, sp.Uniform(4500.0, 9000.0), 0.0);
+               break;
+            }
+            k["a.ampDecay"] = { 'f', "300" };
+            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.6, 0.95)) };
+            k["a.ampRelease"] = { 'f', num(sp.Uniform(80.0, 260.0)) };
+            k["glide"] = { 'f', num(sp.Uniform(0.0, 0.14)) };
+            k["a.octave"] = { 'i', std::to_string(sp.Range(2)) };
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 0);
+            const double density = sp.Uniform(0.35, 0.7);
+            static const int kMove[] = { -2, -1, -1, 0, 1, 1, 2, 3 };
+            int d = sp.Range(4);
+            for (int i = 0; i < 16; i++)
+               if (i == 0 || sp.Uniform() < density * (i % 4 == 0 ? 1.4 : 0.8))
+               {
+                  d = std::clamp(d + kMove[sp.Range(8)], -2, 7);
+                  vel[(size_t)i] = std::clamp((i % 4 == 0 ? 0.95 : 0.75) + sp.Uniform(-0.15, 0.1), 0.3, 1.0);
+                  note[(size_t)i] = degreeNote(d, 2);
+               }
+            const int sq = sequence(vel, note, sp.Uniform() < 0.3 ? 0.5 : 0.25, sp.Uniform(60.0, 100.0), 16);
+            const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(sq, sy, true);
+            int end = sy;
+            if (sp.Uniform() < 0.7) // a dotted echo is how a lead gets its space
+            {
+               const int dl = g.Add("Delay", sp.Range(1 << 30), F({ { "mix", sp.Uniform(0.15, 0.35) }, { "timeMs", 0.75 * beatMs }, { "feedback", sp.Uniform(25.0, 50.0) }, { "tone", -0.3 } }));
+               g.Connect(end, dl, false);
+               end = dl;
+            }
+            synths.push_back(sy);
+            chans.push_back({ end, 0.0f });
+            specialWet = sp.Uniform(0.1, 0.3);
+            specialDecay = sp.Uniform(1.0, 2.2);
+         }
+      }
+      else if (texPart)
+      {
+         // Sound with no pulse: it holds, drifts and breathes across the loop.
+         const int kind = sp.Range(6);
+         const double cyc = sp.Uniform() < 0.5 ? (double)loopBeats : loopBeats / 2.0; // a whole number of cycles per loop, so it loops
+         specialWet = sp.Uniform(0.3, 0.6);
+         specialDecay = sp.Uniform(3.0, 6.0);
+         auto bed = [&](int table, int filter, double cutLo, double cutHi, double res, int octave)
+         {
+            Params k;
+            wt(k, table, sp.Uniform(0.0, 1.0), filter, sp.Uniform(cutLo, cutHi), res);
+            k["a.unison"] = { 'i', std::to_string(2 + sp.Range(3)) };
+            k["a.detune"] = { 'f', num(sp.Uniform(8.0, 40.0)) };
+            k["a.stereoWidth"] = { 'f', "1" };
+            k["a.ampAttack"] = { 'f', num(std::min(3500.0, loopBeats * beatMs * 0.5)) };
+            k["a.ampSustain"] = { 'f', "1" };
+            k["a.ampRelease"] = { 'f', "2500" };
+            k["a.octave"] = { 'i', std::to_string(octave) };
+            const int tx = g.Add("Wavetable", sp.Range(1 << 30), k);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, degreeNote(sp.Range(5), 1));
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, note, loopBeats, 100.0, 1), tx, true);
+            sweep(tx, "a.cutoff", cutLo * 0.6, cutHi * 1.5, cyc, sp.Uniform(0.0, 1.0));
+            sweep(tx, "a.position", 0.1, 0.9, cyc, sp.Uniform(0.0, 1.0));
+            synths.push_back(tx);
+            return tx;
+         };
+         if (kind == 0) // drone: dark, wide, slow
+            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 300.0, 1200.0, sp.Uniform(0.1, 0.35), 0), 0.0f });
+         else if (kind == 1) // vowel bed: a held, breathy formant
+            chans.push_back({ bed(sp.Range(2) ? 46 : 43, 1, 1500.0, 4500.0, 0.0, 0), 0.0f });
+         else if (kind == 2) // shimmer: high, bright, glassy
+            chans.push_back({ bed(sp.Range(2) ? 62 : 63, 1, 3000.0, 8000.0, 0.0, 1), 0.0f });
+         else if (kind == 3) // rumble: a low sine under dark noise
+         {
+            chans.push_back({ bed(10, 1, 200.0, 500.0, 0.0, -1), 0.0f });
+            Params n = F({ { "volume", 0.6 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1500.0 },
+                           { "decay", 200.0 }, { "sustain", 1.0 }, { "release", 2000.0 }, { "cutoff", sp.Uniform(120.0, 320.0) }, { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            n["filterType"] = { 'i', "1" };
+            const int nv = g.Add("Analog", sp.Range(1 << 30), n);
+            std::vector<double> vel(16, 0.0);
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, std::vector<int>(16, 36), loopBeats, 100.0, 1), nv, true);
+            chans.push_back({ nv, -3.0f });
+         }
+         else if (kind == 4) // wind: noise through a band-pass that wanders
+         {
+            Params n = F({ { "volume", 0.8 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1200.0 },
+                           { "decay", 200.0 }, { "sustain", 1.0 }, { "release", 1800.0 }, { "cutoff", 18000.0 }, { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            n["filterType"] = { 'i', "0" };
+            const int nv = g.Add("Analog", sp.Range(1 << 30), n);
+            std::vector<double> vel(16, 0.0);
+            vel[0] = 1.0;
+            g.Connect(sequence(vel, std::vector<int>(16, 60), loopBeats, 100.0, 1), nv, true);
+            Params f = F({ { "freq", 700.0 }, { "q", sp.Uniform(0.8, 3.0) }, { "mix", 1.0 } });
+            f["type"] = { 'i', "6" };
+            const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
+            g.Connect(nv, af, false);
+            sweep(af, "freq", sp.Uniform(250.0, 500.0), sp.Uniform(1800.0, 4000.0), cyc, sp.Uniform(0.0, 1.0));
+            chans.push_back({ af, 0.0f });
+         }
+         else // grain: scattered glassy specks over a quiet bed
+         {
+            Params k;
+            wt(k, 58, sp.Uniform(0.0, 1.0), 1, sp.Uniform(5000.0, 12000.0), 0.0);
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(60.0, 240.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "60" };
+            const int gr = g.Add("Wavetable", sp.Range(1 << 30), k);
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 72);
+            for (int i = 0; i < 16; i++)
+               if (sp.Uniform() < 0.35)
+               {
+                  vel[(size_t)i] = sp.Uniform(0.25, 0.9);
+                  note[(size_t)i] = 66 + sp.Range(24);
+               }
+            vel[(size_t)sp.Range(4)] = 0.8;
+            g.Connect(sequence(vel, note, 0.5, 25.0, 16), gr, true);
+            sweep(gr, "a.position", 0.0, 1.0, cyc, sp.Uniform(0.0, 1.0));
+            chans.push_back({ gr, 0.0f });
+            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 250.0, 900.0, 0.1, 0), -9.0f });
+            specialWet = sp.Uniform(0.45, 0.7);
+         }
+      }
+      else // foley: taps, steps, knocks, drips and rustles, placed by hand-like irregular timing
+      {
+         const int kind = sp.Range(10);
+         specialWet = sp.Uniform(0.08, 0.3);
+         specialDecay = sp.Uniform(0.6, 1.8);
+         std::vector<double> vel(16, 0.0);
+         std::vector<int> note(16, 60);
+         const double density = kind == 5 ? sp.Uniform(0.5, 0.9) : kind == 2 ? sp.Uniform(0.2, 0.4) : sp.Uniform(0.15, 0.5);
+         for (int i = 0; i < 16; i++)
+            if (sp.Uniform() < density)
+            {
+               vel[(size_t)i] = sp.Uniform(0.35, 1.0);
+               note[(size_t)i] = 52 + sp.Range(14);
+            }
+         // Three ways to place the hits: scattered, in bursts with gaps, or walking evenly.
+         const int layout = sp.Range(3);
+         if (layout == 1)
+         {
+            std::fill(vel.begin(), vel.end(), 0.0);
+            for (int b = sp.Range(4); b < 16; b += 5 + sp.Range(4))
+               for (int j = 0; j < 2 + sp.Range(3) && b + j < 16; j++)
+               {
+                  vel[(size_t)(b + j)] = sp.Uniform(0.4, 1.0);
+                  note[(size_t)(b + j)] = 52 + sp.Range(14);
+               }
+         }
+         else if (layout == 2)
+         {
+            std::fill(vel.begin(), vel.end(), 0.0);
+            const int gap = 2 + sp.Range(3);
+            for (int i = sp.Range(gap); i < 16; i += gap)
+               vel[(size_t)i] = sp.Uniform(0.55, 1.0);
+         }
+         vel[(size_t)sp.Range(4)] = 1.0;
+         const double rate = kind == 5 || kind == 7 || kind == 9 ? 0.25 : 0.5;
+         int src = sequence(vel, note, rate, 20.0, 16);
+         src = [&]()
+         {
+            const int hu = g.Add("Humanizer", sp.Range(1 << 30), F({ { "timingMs", sp.Uniform(15.0, 45.0) }, { "velocityPct", 25.0 } }));
+            g.Connect(src, hu, true);
+            return hu;
+         }();
+         auto noiseHit = [&](int filter, double cut, double res, double dec, double vol)
+         {
+            Params nn = F({ { "volume", vol }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 0.0 },
+                            { "decay", dec }, { "sustain", 0.0 }, { "release", dec * 0.5 }, { "cutoff", cut }, { "resonance", res },
+                            { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            nn["filterType"] = { 'i', std::to_string(filter) };
+            return g.Add("Analog", sp.Range(1 << 30), nn);
+         };
+         int voice = 0;
+         switch (kind)
+         {
+         case 0: // footsteps: a low thud under a soft filtered scuff
+         {
+            // Surface drives the scuff: dirt is dull, wood hollow, concrete short and bright, gravel long and crunchy.
+            const int surface = sp.Range(4);
+            const double cuts[4][2] = { { 250.0, 600.0 }, { 900.0, 2200.0 }, { 2500.0, 5000.0 }, { 4000.0, 9000.0 } };
+            const double decs[4][2] = { { 90.0, 170.0 }, { 60.0, 130.0 }, { 30.0, 70.0 }, { 140.0, 280.0 } };
+            voice = noiseHit(surface == 3 ? 2 : 1, sp.Uniform(cuts[surface][0], cuts[surface][1]), surface == 1 ? 0.35 : 0.1,
+                             sp.Uniform(decs[surface][0], decs[surface][1]), 0.9);
+            g.Connect(src, voice, true);
+            Params k;
+            wt(k, 10, 0.1, 1, 500, 0.0);
+            k["a.pitchAmount"] = { 'f', "8" };
+            k["a.pitchDecay"] = { 'f', "30" };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(80.0, 160.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "30" };
+            k["a.octave"] = { 'i', "-1" };
+            const int th = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(src, th, true);
+            chans.push_back({ th, -3.0f });
+            break;
+         }
+         case 1: // knocks: a struck wooden body
+         {
+            Params k;
+            wt(k, sp.Range(2) ? 16 : 49, sp.Uniform(0.0, 0.5), 1, sp.Uniform(1500.0, 4000.0), 0.0);
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(40.0, 160.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "30" };
+            k["a.octave"] = { 'i', std::to_string(-1 + sp.Range(2)) };
+            voice = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(src, voice, true);
+            break;
+         }
+         case 2: // drips: a sine that bends up fast, high, with a tail
+         {
+            Params k;
+            wt(k, 0, 0.0, 0, 18000, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(-12.0, -4.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(25.0, 70.0)) };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(70.0, 200.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "50" };
+            k["a.octave"] = { 'i', "2" };
+            voice = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(src, voice, true);
+            specialWet = sp.Uniform(0.3, 0.55);
+            break;
+         }
+         case 3: // clock ticks: two short metallic clicks
+         {
+            Params m = F({ { "transient", 1.6 }, { "decay", sp.Uniform(0.05, 0.14) }, { "stiffness", sp.Uniform(1.0, 2.0) },
+                           { "filterCutoff", sp.Uniform(4000.0, 12000.0) }, { "volume", 0.8 }, { "width", 0.2 } });
+            m["material"] = { 'i', std::to_string(sp.Range(8)) };
+            voice = g.Add("Metallic", sp.Range(1 << 30), m);
+            g.Connect(src, voice, true);
+            break;
+         }
+         case 4: // paper and cloth: a high, breathy rustle
+            voice = noiseHit(2, sp.Uniform(3000.0, 9000.0), 0.15, sp.Uniform(80.0, 260.0), 0.8);
+            g.Connect(src, voice, true);
+            break;
+         case 5: // crackle: many tiny ticks, fire or vinyl
+            voice = noiseHit(1, sp.Uniform(5000.0, 14000.0), 0.0, sp.Uniform(8.0, 25.0), 0.9);
+            g.Connect(src, voice, true);
+            break;
+         case 6: // glass: bright clinks that ring
+         {
+            Params m = F({ { "transient", 1.2 }, { "decay", sp.Uniform(0.25, 0.7) }, { "stiffness", sp.Uniform(1.5, 2.0) },
+                           { "filterCutoff", sp.Uniform(9000.0, 16000.0) }, { "volume", 0.7 }, { "width", 0.5 } });
+            m["material"] = { 'i', std::to_string(sp.Range(8)) };
+            voice = g.Add("Metallic", sp.Range(1 << 30), m);
+            g.Connect(src, voice, true);
+            specialWet = sp.Uniform(0.2, 0.45);
+            break;
+         }
+         case 7: // typing: tiny dry clicks, a hard and a soft one
+            voice = noiseHit(2, sp.Uniform(2500.0, 7000.0), 0.3, sp.Uniform(6.0, 18.0), 0.9);
+            g.Connect(src, voice, true);
+            specialWet = sp.Uniform(0.03, 0.12);
+            break;
+         case 8: // bubbles: little sines that bend up
+         {
+            Params k;
+            wt(k, 0, 0.0, 0, 18000, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(5.0, 14.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(15.0, 45.0)) };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(40.0, 110.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "30" };
+            k["a.octave"] = { 'i', std::to_string(1 + sp.Range(2)) };
+            voice = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(src, voice, true);
+            specialWet = sp.Uniform(0.15, 0.4);
+            break;
+         }
+         default: // heartbeat or hand-on-table: soft double thumps
+         {
+            Params k;
+            wt(k, 10, 0.0, 1, 400, 0.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(10.0, 20.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(40.0, 90.0)) };
+            k["a.ampDecay"] = { 'f', num(sp.Uniform(110.0, 240.0)) };
+            k["a.ampSustain"] = { 'f', "0" };
+            k["a.ampRelease"] = { 'f', "60" };
+            k["a.octave"] = { 'i', "-1" };
+            voice = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.Connect(src, voice, true);
+            break;
+         }
+         }
+         chans.push_back({ voice, 0.0f });
       }
    }
 
@@ -598,10 +1866,25 @@ Compiled Compile(const Recipe& recipe)
    for (const auto& ch : chans)
       g.Connect(ch.first, mx, false);
    int end = mx;
-   if (!ban.count("Reverb") || pads)
+   if ((!ban.count("Reverb") || pads || ownSpace) && !bassPart)
    {
-      const bool wide = std::string(st.family) == "ambient" || pads;
-      const int rv = g.Add("Reverb", seed(), F({ { "mix", wide ? 0.45 : 0.15 }, { "decay", wide ? 3.0 : 1.2 } }));
+      const bool wide = std::string(st.family) == "ambient" || pads || fxPart || texPart;
+      if (pads)
+      {
+         Rng cr(std::string("padchorus:") + std::to_string(recipe.seed));
+         const int ch = g.Add("Chorus", seed(), F({ { "mix", cr.Uniform(0.25, 0.5) }, { "delay", cr.Uniform(8.0, 18.0) }, { "depth", cr.Uniform(3.0, 8.0) },
+                                                    { "rate", cr.Uniform(0.15, 0.6) }, { "spread", cr.Uniform(0.5, 1.0) } }));
+         g.Connect(end, ch, false);
+         end = ch;
+      }
+      if (pads && padDelay)
+      {
+         const int dl = g.Add("Delay", seed(), F({ { "mix", padDelayMix }, { "timeMs", padDelayBeats * 60000.0 / out.bpm }, { "feedback", padDelayFb },
+                                                   { "tone", -0.4 } }));
+         g.Connect(end, dl, false);
+         end = dl;
+      }
+      const int rv = g.Add("Reverb", seed(), F({ { "mix", pads ? padWet : ownSpace ? specialWet : wide ? 0.45 : 0.15 }, { "decay", pads ? padDecay : ownSpace ? specialDecay : wide ? 3.0 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
    }

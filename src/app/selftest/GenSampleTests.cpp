@@ -21,9 +21,15 @@
 #include "app/graph/OfflineGraph.h"
 #include "audio/AudioFileWriter.h"
 #include "app/graph/SampleStyles.h"
+#include "app/graph/UserStyle.h"
+#include "audio/NoteModel.h"
+#include "platform/AppPaths.h"
 #include "audio/MusicTime.h"
 
+#include <algorithm>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <cmath>
 #include <cstdlib>
 #include <set>
@@ -91,10 +97,16 @@ bool RunGenSampleBatch(const std::string& dir)
    }
    fprintf(index, "[\n");
    int made = 0, failed = 0;
+   // INFINITE_GENSAMPLEPARITY=1: only what the wasm parity test compares (tools/web_gen_parity.py).
+   const bool parity = getenv("INFINITE_GENSAMPLEPARITY") != nullptr;
+   static const int kParityStyles[5] = { 0, 7, 14, 21, 28 }, kParityParts[6] = { 0, 1, 2, 3, 5, 6 };
    for (int i = 0; i < SampleStyles::Count(); i++)
       for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
-         for (uint32_t seed = 1; seed <= 3; seed++)
+         for (uint32_t seed = 1; seed <= (parity ? 1u : 3u); seed++)
          {
+            if (parity && (std::find(kParityStyles, kParityStyles + 5, i) == kParityStyles + 5 ||
+                           std::find(kParityParts, kParityParts + 6, pi) == kParityParts + 6))
+               continue;
             SampleStyles::Recipe rec;
             rec.style = SampleStyles::At(i).id;
             rec.part = (SampleStyles::Part)pi;
@@ -144,6 +156,84 @@ bool RunGenSampleBatch(const std::string& dir)
    return failed == 0;
 }
 
+// INFINITE_GENSAMPLEDIVERSITY=<dir> [INFINITE_GENSAMPLETAKES=<n per part>]: the diversity baseline's
+// renders. Takes as the node makes them (a random seed draws the card, 2 bars, the generic card only:
+// no personal profile, so the numbers do not depend on whose machine it runs), as <dir>/<part>-<i>.wav
+// plus <dir>/takes.json with each take's recipe, the node types in its patch and a hash of its patch.
+// tools/gensample_diversity.py reads it.
+bool RunGenSampleDiversity(const std::string& dir, int takes)
+{
+   FILE* index = fopen((dir + "/takes.json").c_str(), "w");
+   if (index == nullptr)
+   {
+      printf("GENSAMPLEDIVERSITY cannot write %s\n", dir.c_str());
+      return false;
+   }
+   fprintf(index, "[\n");
+   int made = 0, failed = 0;
+   for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
+      for (int i = 0; i < takes; i++)
+      {
+         SampleStyles::Recipe rec;
+         const uint32_t seed = 1000u + (uint32_t)i * 37u + (uint32_t)pi * 100003u;
+         rec.style = SampleStyles::At((int)((seed * 2654435761u >> 8) % (uint32_t)SampleStyles::Count())).id;
+         rec.part = (SampleStyles::Part)pi;
+         rec.bars = 2;
+         bool ok = false;
+         for (int attempt = 0; attempt <= 3 && !ok; attempt++)
+         {
+            rec.seed = seed + (uint32_t)attempt * 7919u;
+            const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+            const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
+            const int pre = bar * GenerateSamplesNode::PrerollBars(rec.bars);
+            const int frames = bar * rec.bars;
+            Patch::Data data;
+            std::string err;
+            OfflineGraph g;
+            if (!c.error.empty() || !Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+               continue;
+            for (const OfflineGraph::Motion& m : c.motions)
+               g.AddMotion(m);
+            std::vector<float> left, right, l, r;
+            if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
+               continue;
+            if (!GenerateSamplesNode::Master(left.data() + pre, right.data() + pre, frames, l, r))
+               continue;
+            std::vector<float> inter((size_t)frames * 2);
+            for (int f = 0; f < frames; f++)
+            {
+               inter[(size_t)f * 2] = l[f];
+               inter[(size_t)f * 2 + 1] = r[f];
+            }
+            const std::string name = std::string(SampleStyles::PartName(rec.part)) + "-" + std::to_string(i);
+            if (!AudioRecordings::WriteWav(dir + "/" + name + ".wav", inter.data(), frames, kRate, 2))
+               continue;
+            // The node types the patch uses, in order, and a hash of the whole patch text.
+            std::string types;
+            size_t pos = 0;
+            while ((pos = c.patch.find("\nnode ", pos)) != std::string::npos)
+            {
+               const size_t eol = c.patch.find('\n', pos + 1);
+               const std::string line = c.patch.substr(pos + 1, eol - pos - 1);
+               const size_t t = line.find(' ', line.find(' ', 5) + 1); // after "node N Category"
+               types += (types.empty() ? "" : "|") + (t == std::string::npos ? line : line.substr(t + 1));
+               pos = eol == std::string::npos ? c.patch.size() : eol;
+            }
+            const uint64_t hash = std::hash<std::string>()(c.patch);
+            fprintf(index, "%s{\"file\":\"%s\",\"style\":\"%s\",\"part\":\"%s\",\"seed\":%u,\"root\":%d,\"scale\":\"%s\",\"bpm\":%.2f,\"types\":\"%s\",\"hash\":\"%llx\"}\n",
+                    made > 0 ? "," : "", name.c_str(), rec.style.c_str(), SampleStyles::PartName(rec.part), rec.seed, c.root,
+                    MusicTime::ScaleTable(c.scale).name, c.bpm, types.c_str(), (unsigned long long)hash);
+            ok = true;
+         }
+         made += ok ? 1 : 0;
+         failed += ok ? 0 : 1;
+      }
+   fprintf(index, "]\n");
+   fclose(index);
+   printf("GENSAMPLEDIVERSITY %d made, %d failed\n", made, failed);
+   return failed == 0;
+}
+
 bool RunGenSampleTest()
 {
    // INFINITE_GENSAMPLETEST=1 runs every section, the styles at seed 1 (a
@@ -154,6 +244,46 @@ bool RunGenSampleTest()
    const std::string only = arg == "1" || arg == "full" ? "" : arg;
    const uint32_t seeds = arg == "1" ? 1u : 3u;
    auto runs = [&](const char* section) { return only.empty() || only == section; };
+   if (const char* dump = getenv("INFINITE_GENSAMPLEPATCH")) // "<style>:<part>:<seed>": print the compiled patch and stop
+   {
+      SampleStyles::Recipe rec;
+      char style[64] = {};
+      int pi = 0;
+      unsigned sd = 1;
+      if (sscanf(dump, "%63[^:]:%d:%u", style, &pi, &sd) == 3)
+      {
+         rec.style = style;
+         rec.part = (SampleStyles::Part)pi;
+         rec.seed = sd;
+         SampleStyles::Compiled c = SampleStyles::Compile(rec);
+         if (const char* file = getenv("INFINITE_GENSAMPLEFILE")) // render an edited copy of the patch instead
+         {
+            FILE* f = fopen(file, "rb");
+            std::string text;
+            char buf[4096];
+            size_t got;
+            while (f != nullptr && (got = fread(buf, 1, sizeof(buf), f)) > 0)
+               text.append(buf, got);
+            if (f != nullptr)
+               fclose(f);
+            c.patch = text;
+         }
+         printf("%s\n", c.patch.c_str());
+         const int frames = (int)(4 * 60.0 / c.bpm * kRate);
+         Result r = RenderOnWorker(c, frames);
+         printf("GENSAMPLEPATCH rms %.1f dB (%zu motions)\n", r.rmsDb, c.motions.size());
+         c.motions.clear();
+         r = RenderOnWorker(c, frames);
+         printf("GENSAMPLEPATCH without motions rms %.1f dB\n", r.rmsDb);
+         for (int t = getenv("INFINITE_GENSAMPLEFILE") ? 14 : 1; t <= (getenv("INFINITE_GENSAMPLEFILE") ? 14 : 24); t++)
+         {
+            c.tap = t;
+            r = RenderOnWorker(c, frames);
+            printf("GENSAMPLEPATCH tap %d rms %.1f dB %s\n", t, r.rmsDb, r.error.c_str());
+         }
+      }
+      return true;
+   }
    int fails = 0;
    if (runs("types"))
       printf("GENSAMPLETEST types\n");
@@ -208,6 +338,145 @@ bool RunGenSampleTest()
                    r.rmsDb, attempt - 1, r.error.c_str());
          fails += r.ok ? 0 : 1;
       }
+   }
+   // Profile: a player whose notes are mostly A (pitch class 9), played loud and off the grid. A personal
+   // recipe should land on that root most of the time, a plain one not, and still render.
+   if (runs("profile"))
+   {
+      printf("GENSAMPLETEST profile\n");
+      const std::string dir = AppPaths::TempDir() + "/infinite-userstyle-test";
+      std::filesystem::create_directories(AppPaths::FsPath(dir));
+      std::vector<NoteModel::Event> ev;
+      for (int i = 0; i < 512; i++)
+      {
+         NoteModel::Event e;
+         e.note = (uint8_t)(i % 5 == 0 ? 60 : 57);
+         e.metric = (uint8_t)((i * 3) & 15);
+         e.ioiTicks = 5;
+         e.durTicks = 12;
+         ev.push_back(e);
+      }
+      auto writeInts = [&](const char* name, int v)
+      {
+         std::ofstream f(AppPaths::FsPath(dir + "/" + name), std::ios::binary | std::ios::trunc);
+         const uint32_t n = 32;
+         f.write(reinterpret_cast<const char*>(&n), sizeof(n));
+         for (uint32_t i = 0; i < n; i++)
+         {
+            const int32_t x = v;
+            f.write(reinterpret_cast<const char*>(&x), sizeof(x));
+         }
+      };
+      {
+         std::ofstream f(AppPaths::FsPath(dir + "/notes_style.bin"), std::ios::binary | std::ios::trunc);
+         const std::string text = NoteModel::EncodeEvents(ev);
+         f.write(text.data(), (std::streamsize)text.size());
+      }
+      writeInts("velocity_profile.bin", 120);
+      writeInts("quantize_profile.bin", 5);
+      UserStyle::UseDirectory(dir);
+      const UserStyle::Profile& pr = UserStyle::Get();
+      const bool read = pr.valid && pr.hasPitch && pr.hasVelocity && pr.hasTiming && pr.pitchClass[9] > 0.4f &&
+                        pr.velMean > 0.9f && pr.offGrid > 0.9f;
+      int onA = 0, onAPlain = 0;
+      for (uint32_t seed = 1; seed <= 20; seed++)
+      {
+         SampleStyles::Recipe rec;
+         rec.style = "deep_house";
+         rec.seed = seed;
+         rec.personal = true;
+         onA += SampleStyles::Compile(rec).root == 9 ? 1 : 0;
+         rec.personal = false;
+         onAPlain += SampleStyles::Compile(rec).root == 9 ? 1 : 0;
+      }
+      SampleStyles::Recipe rec;
+      rec.style = "deep_house";
+      rec.part = SampleStyles::Part::Plucks;
+      rec.personal = true;
+      const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+      const Result r = RenderOnWorker(c, (int)(4 * 60.0 / c.bpm * kRate));
+      printf("  read %s, root A %d/20 personal vs %d/20 plain, render %s\n", read ? "ok" : "FAIL", onA, onAPlain, r.ok ? "ok" : "FAIL");
+      fails += (read && onA >= 9 && onA > onAPlain + 5 && r.ok) ? 0 : 1;
+      // The player's chords and note length come out of the same notes, and the weight grows with them.
+      const bool shaped = pr.durW > 0.0f && pr.pitchW > 0.0f && pr.pitchW < UserStyle::kMaxWeight + 1e-6f;
+      // Taste: a card that lands is drawn more often than one that is skipped, and none is ruled out.
+      for (int i = 0; i < 6; i++)
+      {
+         UserStyle::NoteGenerate(1, 5);
+         UserStyle::NoteKept();
+      }
+      for (int i = 0; i < 6; i++)
+      {
+         UserStyle::NoteGenerate(1, 7);
+         UserStyle::NoteGenerate(1, 8); // straight after: card 7 was skipped
+         UserStyle::NoteKept();
+      }
+      int drewLanded = 0, drewSkipped = 0;
+      for (int i = 0; i < 1000; i++)
+      {
+         const int c = UserStyle::DrawCard(1, (i + 0.5) / 1000.0, SampleStyles::Count());
+         drewLanded += c == 5;
+         drewSkipped += c == 7;
+      }
+      const bool tasteOk = drewLanded > 35 && drewSkipped * 10 < drewLanded * 6 && drewSkipped > 0;
+      printf("  weights pitch %.2f dur %.2f, taste landed %d / skipped %d of 1000 draws: %s\n", pr.pitchW, pr.durW, drewLanded, drewSkipped,
+             shaped && tasteOk ? "ok" : "FAIL");
+      fails += (shaped && tasteOk) ? 0 : 1;
+      {
+         // Knob habits: a real habit (bins 20-22) plus a lone stray wobble (bin 55) and noise.
+         float h[64] = {};
+         for (int i = 0; i < 64; i++)
+            h[i] = 0.2f;
+         h[20] = 100.0f;
+         h[21] = 140.0f;
+         h[22] = 90.0f;
+         h[55] = 6.0f;
+         int inHabit = 0, stray = 0, drawn = 0;
+         for (int i = 0; i < 1000; i++)
+         {
+            float v = 0.0f;
+            if (!UserStyle::DrawFromHistogram(h, 0.0f, 64.0f, (i + 0.5) / 1000.0, v))
+               continue;
+            drawn++;
+            inHabit += v >= 17.0f && v <= 26.0f;
+            stray += v >= 53.0f;
+         }
+         const bool knobsOk = drawn == 1000 && inHabit > 950 && stray == 0;
+         float none = 0.0f, zero[64] = {};
+         const bool emptyOk = !UserStyle::DrawFromHistogram(zero, 0.0f, 1.0f, 0.5, none);
+         printf("  knob habit: %d of 1000 in the habit, %d stray, empty histogram refused: %s\n", inHabit, stray,
+                knobsOk && emptyOk ? "ok" : "FAIL");
+         fails += (knobsOk && emptyOk) ? 0 : 1;
+      }
+      UserStyle::UseDirectory("");
+      std::filesystem::remove_all(AppPaths::FsPath(dir));
+   }
+   // Tempo: reads this machine's own movement log (so reported, not failed, when there is no history).
+   if (only == "tempo")
+   {
+      printf("GENSAMPLETEST tempo (this machine's movement log)\n");
+      float bpm = 0.0f, w = 0.0f;
+      const auto t0 = std::chrono::steady_clock::now();
+      bool got = false;
+      while (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 240.0)
+      {
+         got = UserStyle::DrawTempo(0.5, bpm, w);
+         if (got)
+            break;
+         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      }
+      printf("  %s: median %.0f bpm, weight %.2f, %.1f s\n", got ? "history" : "no history yet", bpm, w,
+             std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
+      int hist[8] = {};
+      for (int i = 0; i < 400 && got; i++)
+      {
+         UserStyle::DrawTempo((i + 0.5) / 400.0, bpm, w);
+         hist[std::clamp((int)bpm / 30, 0, 7)]++;
+      }
+      printf("  draws per 30 bpm band from 0:");
+      for (int h : hist)
+         printf(" %d", h);
+      printf("\n");
    }
    if (runs("styles"))
       printf("GENSAMPLETEST slowest 2-bar generate %.1f ms (budget 500)\n", worst);

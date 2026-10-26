@@ -495,6 +495,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchIO.cpp
     src/app/graph/OfflineGraph.cpp
     src/app/graph/SampleStyles.cpp
+    src/app/graph/UserStyle.cpp
     src/app/graph/GenerateSamplesNode.cpp
     src/app/graph/PatchLoad.cpp
     src/app/graph/NodeClipboard.cpp

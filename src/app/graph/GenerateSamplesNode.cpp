@@ -1,5 +1,6 @@
 // Generate Samples. See GenerateSamplesNode.h.
 #include "app/graph/GenerateSamplesNode.h"
+#include "app/graph/UserStyle.h"
 
 #include "app/graph/OfflineGraph.h"
 #include "audio/AudioFileWriter.h"
@@ -67,17 +68,19 @@ GenerateSamplesNode::~GenerateSamplesNode() = default;
 SampleStyles::Recipe GenerateSamplesNode::CurrentRecipe() const
 {
    SampleStyles::Recipe r;
-   r.style = style;
+   r.style = SampleStyles::At(card >= 0 ? card % SampleStyles::Count() : (int)(seed % SampleStyles::Count())).id;
    r.seed = (uint32_t)std::max(0, seed);
    r.variation = variation;
    r.bars = SnapBars(bars);
    if (followTransport)
-   {
       r.bpm = Transport::Instance().Tempo();
+   if (followScale)
+   {
       r.key = Transport::Instance().Key();
       r.scale = Transport::Instance().Scale();
    }
    r.part = (SampleStyles::Part)std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
+   r.personal = true;
    return r;
 }
 
@@ -104,7 +107,10 @@ float GenerateSamplesNode::Progress() const
 void GenerateSamplesNode::RollSeed()
 {
    std::random_device rd;
-   seed = (int)(rd() % 100000u);
+   seed = (int)(rd() % 100000u); // hidden: only so a reopened patch renders the same loop
+   // The card is drawn once, here, so a reopened patch keeps its style however taste has moved since.
+   card = UserStyle::DrawCard(std::clamp(part, 0, (int)SampleStyles::Part::Count - 1), (double)(rd() % 1000000u) / 1000000.0, SampleStyles::Count());
+   UserStyle::NoteGenerate(std::clamp(part, 0, (int)SampleStyles::Part::Count - 1), card);
 }
 
 void GenerateSamplesNode::Cancel()
@@ -243,13 +249,12 @@ bool GenerateSamplesNode::Master(const float* l, const float* r, int frames, std
 std::string GenerateSamplesNode::Label(const SampleStyles::Recipe& r, int root, int scale)
 {
    static const char* kRoots[12] = { "c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b" };
-   const SampleStyles::Style st = SampleStyles::At(std::max(0, SampleStyles::Find(r.style)));
-   std::string s = st.name;
-   if (r.part != SampleStyles::Part::Full)
-      s += std::string(" ") + SampleStyles::PartName(r.part);
+   std::string s = SampleStyles::PartName(r.part);
    s += " " + std::to_string(r.seed);
    // Drums and percussion have no key.
-   if (r.part != SampleStyles::Part::Drums && r.part != SampleStyles::Part::Percussion)
+   using P = SampleStyles::Part;
+   if (r.part != P::Drums && r.part != P::Percussion && r.part != P::Fx && r.part != P::Foley && r.part != P::Kicks &&
+       r.part != P::Snares && r.part != P::Hats && r.part != P::Toms)
       s += std::string(", ") + kRoots[((root % 12) + 12) % 12] + " " + MusicTime::ScaleTable(scale).name;
    return s;
 }
@@ -259,36 +264,33 @@ std::string GenerateSamplesNode::MadeLabel() const
    return Label(mMade, madeRoot, madeScale);
 }
 
-bool GenerateSamplesNode::KeepAsFile()
+std::string GenerateSamplesNode::ExportName() const
 {
-   if (mLoopL.empty())
+   std::string name = "generated " + MadeLabel();
+   for (char& ch : name)
+      ch = std::isalnum((unsigned char)ch) ? ch : ch == '#' ? 's' : '-';
+   name.erase(std::unique(name.begin(), name.end(), [](char a, char b) { return a == '-' && b == '-'; }), name.end());
+   return name + ".wav";
+}
+
+bool GenerateSamplesNode::ExportWav(const std::string& path) const
+{
+   if (mLoopL.empty() || path.empty())
       return false;
+   UserStyle::NoteKept(); // a loop worth taking away landed
    std::vector<float> inter(mLoopL.size() * 2);
    for (size_t i = 0; i < mLoopL.size(); i++)
    {
       inter[i * 2] = mLoopL[i];
       inter[i * 2 + 1] = mLoopR[i];
    }
-   // The file says what it is: generated-deep-house-drums-1204-...
-   std::string prefix = "generated " + MadeLabel();
-   for (char& ch : prefix)
-      ch = std::isalnum((unsigned char)ch) ? ch : ch == '#' ? 's' : '-';
-   prefix.erase(std::unique(prefix.begin(), prefix.end(), [](char a, char b) { return a == '-' && b == '-'; }), prefix.end());
-   const std::string path = AudioRecordings::GenerateFilePath(prefix);
-   if (!AudioRecordings::WriteWav(path, inter.data(), (int)mLoopL.size(), kRate, 2))
-      return false;
-   const float s0 = start, e0 = end, p0 = position;
-   if (!LoadFile(path))
-      return false;
-   start = s0;
-   end = e0;
-   position = p0;
-   return true;
+   return AudioRecordings::WriteWav(path, inter.data(), (int)mLoopL.size(), kRate, 2);
 }
 
 void GenerateSamplesNode::CookIfNeeded(int frameId)
 {
    SamplerNode::CookIfNeeded(frameId);
+   UserStyle::SettleTaste();
    if (mJob && mJob->done.load(std::memory_order_acquire))
       Finish();
    // A kept file reloaded from a patch: it is the sample, made from the saved recipe.
@@ -300,6 +302,7 @@ void GenerateSamplesNode::CookIfNeeded(int frameId)
    // Reopened from a patch: render the saved recipe again.
    if (mGenerated && !mHasSample && !mJob && !mFailed)
    {
+      UserStyle::NoteSaved(part, card, seed);
       mRestoreRange = true;
       mSavedStart = start;
       mSavedEnd = end;
@@ -311,11 +314,12 @@ void GenerateSamplesNode::CookIfNeeded(int frameId)
 void GenerateSamplesNode::VisitParams(ParamVisitor& v)
 {
    SamplerNode::VisitParams(v);
-   v.Text("style", style);
    v.Int("seed", seed);
+   v.Int("card", card);
    v.Float("variation", variation);
    v.Int("bars", bars);
    v.Bool("followTransport", followTransport);
+   v.Bool("followScale", followScale);
    v.Int("part", part);
    v.Bool("generated", mGenerated);
    v.Int("genVersion", mGenVersion); // not a control: the generator that made the saved sample
@@ -323,6 +327,4 @@ void GenerateSamplesNode::VisitParams(ParamVisitor& v)
    variation = std::clamp(variation, 0.0f, 1.0f);
    bars = SnapBars(bars);
    part = std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
-   if (SampleStyles::Find(style) < 0)
-      style = "deep_house";
 }
