@@ -77,7 +77,7 @@
   // 16-bit wav of an interleaved stereo float buffer.
   function wavOf(pcm, rate, name, comment) {
     // LIST/INFO carries name, artist, copyright and comment, so the credit travels with the file into any DAW.
-    var tags = [['INAM', name], ['IART', 'Infinite (Naman Soni, n1m21n)'], ['ICOP', 'Made with Infinite, https://infinitedevices.org'], ['ICMT', comment], ['ISFT', 'Infinite']]
+    var tags = [['INAM', name], ['IART', 'Infinite (Naman Soni, n1m21n)'], ['ICOP', 'Free for commercial use with credit: Made with Infinite, https://infinitedevices.org'], ['ICMT', comment], ['ISFT', 'Infinite']]
       .map(function (t) { var b = new TextEncoder().encode(t[1] + '\0'); return [t[0], b, b.length + (b.length & 1)]; });
     var infoLen = 4 + tags.reduce(function (a, t) { return a + 8 + t[2]; }, 0);
     var n = pcm.length / 2, v = new DataView(new ArrayBuffer(44 + n * 4 + 8 + infoLen)), o = 44;
@@ -426,7 +426,7 @@
   else { bctx = bcv.getContext('2d'); requestAnimationFrame(blobDraw2d); }
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
-  fetch('data.json?v=23').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('data.json?v=24').then(function (r) { return r.json(); }).then(function (d) {
     all = d.samples.filter(function (x) { return x.kind === 'A'; });
     all.forEach(function (x) { if (x.part === 'foley') { x.part = 'textures'; x.name = String(x.name).replace(/^foley/, 'textures'); } });
     shuffle(all);

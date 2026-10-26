@@ -82,7 +82,7 @@ namespace
       std::string out = c.patch;
       const size_t nl = out.find("\n", out.find("\ntransport") == std::string::npos ? 0 : out.find("\ntransport") + 1);
       out.insert(nl == std::string::npos ? out.size() : nl + 1,
-                 "# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/\n");
+                 "# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/\n# Free for commercial use if credited (Infinite, infinitedevices.org).\n");
       out += "node " + std::to_string(last + 1) + " Utility Audio Out\nend\naud " + std::to_string(last + 1) + " 0 " + std::to_string(c.tap) + "\n";
       return out;
    }

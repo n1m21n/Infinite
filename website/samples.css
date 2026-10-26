@@ -126,3 +126,5 @@
 @media (max-width: 680px) { .smp-blob { height: 260px; } .smp-picks .smp-pick { flex: 1 1 120px; } }
 .smp-dlb:disabled { opacity: 0.4; cursor: progress; }
 .smp-play.is-busy { opacity: 0.5; cursor: progress; }
+.smp-license { margin: 2rem 0 0; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans); max-width: 70ch; }
+.smp-license b { color: var(--text, inherit); }
