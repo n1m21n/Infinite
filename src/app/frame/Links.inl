@@ -634,7 +634,7 @@
       // for the mouse.
       if (!io.WantTextInput && !cmdOrCtrl && !io.KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
-         Transport::Instance().TogglePlay();
+         Transport::Instance().RequestTogglePlay(); // Turbo 0.72: waits for the launch grid when one is set
 
       if (!typing && !gShowLock && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))

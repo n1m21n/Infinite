@@ -346,6 +346,18 @@ std::vector<uint64_t> gArrangeSel;      // selected clip ids
 uint64_t gArrangeSelLane = 0;           // last clicked lane (paste target)
 uint64_t gArrangeSettingsClip = 0;      // clip shown in the Clip settings window
 bool gArrangeSettingsOpen = false;
+// Turbo 0.72 (upstream's Session view, ArrangeSession.inl): Session audio
+// plays only launched slots (Timeline mode stays on underneath); the audio and
+// video paths read ArrangePlaybackModel(), which is gArrange unless slots are
+// launched.
+bool gArrangeSessionMode = false;
+bool gArrangeSessionView = false; // the panel shows the Session grid instead of the timeline
+void DrawArrangeSessionGrid(ImVec2 areaMin, ImVec2 areaMax);
+void ArrangeSessionStopAll();
+const Arrange::Model& ArrangePlaybackModel();
+uint64_t ArrangeSessionGeneration();
+void ArrangeSessionTick();
+
 bool gArrangeBlade = false; // mirrors gArrangeTool == Blade (older call sites read it)
 bool gArrangeFollow = true;
 
@@ -415,6 +427,7 @@ void ArrangeResetSession()
    gArrangeSettingsClip = 0;
    gArrangeSettingsOpen = false;
    gArrangeTimelineMode = false;
+   gArrangeSessionMode = false;
    gArrangeGestureOpen = false;
    PublishArrangeLoop();
 }
@@ -456,6 +469,7 @@ void ArrangeLoadFromPatchData(const Patch::Data& data, bool fileLoad)
    {
       gArrangeSel.clear();
       gArrangeTimelineMode = false;
+      gArrangeSessionMode = false;
       if (!gArrange.lanes.empty())
          gArrangePanelOpen = true;
    }
@@ -829,6 +843,24 @@ int gArrangeRecTakeCount = 0;
 double gArrangeRecSampleRate = 48000.0; // the rate the takes are written at
 std::string gArrangeRecStatus;
 
+// Turbo 0.72 (upstream's Render Track / Render Group): a render can be
+// scoped to some tracks (a stem). The draft is what the next "Add to queue"
+// takes; the active scope silences every other track while that job renders.
+std::vector<uint64_t> gArrangeRenderScopeDraft;
+std::string gArrangeRenderScopeLabel;
+std::vector<uint64_t> gArrangeRenderActiveScope;
+bool ArrangeLaneInRenderScope(uint64_t laneId)
+{
+   return gArrangeRenderActiveScope.empty() ||
+          std::find(gArrangeRenderActiveScope.begin(), gArrangeRenderActiveScope.end(), laneId) != gArrangeRenderActiveScope.end();
+}
+void ArrangeOpenRenderFor(const std::vector<uint64_t>& lanes, const std::string& label)
+{
+   gArrangeRenderScopeDraft = lanes;
+   gArrangeRenderScopeLabel = label;
+   gArrangeRenderWindowOpen = true;
+}
+
 ArrangeRecArm* ArrangeRecArmFor(uint64_t laneId)
 {
    auto it = gArrangeRecArms.find(laneId);
@@ -1010,7 +1042,7 @@ void ArrangeSeedAudio(std::set<INode*>& visited, std::vector<AudioTopologyEntry>
 {
    if (!gArrangeTimelineMode)
       return;
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
       if (!ArrangeLaneAudible(lane))
          continue;
@@ -1059,10 +1091,10 @@ void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& buffe
       r.monitor = true;
       topology.arrangeRecorders.push_back(r);
    }
-   const int laneCount = std::min((int)gArrange.lanes.size(), AudioEngine::kMaxArrangeLanes);
+   const int laneCount = std::min((int)ArrangePlaybackModel().lanes.size(), AudioEngine::kMaxArrangeLanes);
    for (int li = 0; li < laneCount; li++)
    {
-      const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
+      const Arrange::Lane& lane = ArrangePlaybackModel().lanes[(size_t)li];
       if (!ArrangeLaneAudible(lane))
          continue;
       // One terminal per distinct source node on this lane.
@@ -1140,6 +1172,8 @@ uint64_t ArrangeAudioSignature()
    mix(gArrangeTimelineMode ? 1 : 0);
    if (!gArrangeTimelineMode)
       return h;
+   mix(gArrangeSessionMode ? 1 : 0);    // Turbo 0.72: a launch or stop changes
+   mix(ArrangeSessionGeneration());      // the playback model's clips
    for (const auto& kv : gArrangeRecArms) // Turbo 0.72: armed lanes are in the topology
    {
       mix(kv.first);
@@ -1147,7 +1181,7 @@ uint64_t ArrangeAudioSignature()
       GraphNode* gn = FindNodeByUid(kv.second.srcUid);
       mix((uint64_t)(uintptr_t)(gn != nullptr ? gn->node.get() : nullptr));
    }
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
       mix(lane.id);
       mix(ArrangeLaneAudible(lane) ? 1 : 0);
@@ -1197,6 +1231,7 @@ void ArrangeFrameUpdate()
 {
    ArrangeCollectModBypass();
    ArrangeDrainPeaks();
+   ArrangeSessionTick(); // Turbo 0.72: Session launches, follow actions, the playback copy
    // Turbo 0.72: takes in progress. Stopping the transport or jumping the
    // playhead ends the take (it is linear); two frames later it is committed.
    if (gArrangeRecording)
@@ -1222,7 +1257,8 @@ void ArrangeFrameUpdate()
       const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
       if (lane.type != Arrange::kLaneAudio)
          continue;
-      const bool silent = lane.mute || (anySolo && !lane.solo);
+      // Turbo 0.72: a stem render silences the tracks outside its scope.
+      const bool silent = lane.mute || (anySolo && !lane.solo) || !ArrangeLaneInRenderScope(lane.id);
       float l = 1.0f, r = 1.0f;
       if (lane.pan != 0.0f)
       {
@@ -1244,9 +1280,9 @@ void ArrangeFrameUpdate()
    const bool jumped = serial != gArrangeVideoSeekSerial;
    gArrangeVideoSeekSerial = serial;
    std::map<uint64_t, uint64_t> active;
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
-      if (!Arrange::LaneEffectivelyEnabled(gArrange, lane))
+      if (!Arrange::LaneEffectivelyEnabled(ArrangePlaybackModel(), lane))
          continue;
       for (const Arrange::Clip& c : lane.clips)
       {
@@ -1263,7 +1299,8 @@ void ArrangeFrameUpdate()
          if (video == nullptr || video->Duration() <= 0.0 || active.count(c.srcUid))
             continue;
          active[c.srcUid] = c.id;
-         double want = c.sourceOffsetSeconds + (beat - s) * 60.0 / bpm;
+         // Turbo 0.72 (upstream): the clip's signed speed (reverse runs back from the offset).
+         double want = std::max(0.0, c.sourceOffsetSeconds + (beat - s) * 60.0 / bpm * Arrange::ClipSpeedFactor(c));
          // A clip longer than the movie: loop inside the trimmed range if
          // the node loops, else hold the last frame.
          const double t0 = (double)video->trimStart * video->Duration();
@@ -1516,10 +1553,11 @@ struct ArrangeVideoLayer
 void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out)
 {
    out.clear();
-   for (size_t li = gArrange.lanes.size(); li-- > 0;)
+   for (size_t li = ArrangePlaybackModel().lanes.size(); li-- > 0;)
    {
-      const Arrange::Lane& lane = gArrange.lanes[li];
-      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(gArrange, lane))
+      const Arrange::Lane& lane = ArrangePlaybackModel().lanes[li];
+      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(ArrangePlaybackModel(), lane) ||
+          !ArrangeLaneInRenderScope(lane.id)) // Turbo 0.72: stem render
          continue;
       for (const Arrange::Clip& c : lane.clips)
       {
@@ -2707,6 +2745,41 @@ void ArrangeSetSampleSync(uint64_t clipId, bool sync)
    ArrangeRescaleSampleBox(clipId, oldEff, newEff);
 }
 
+// Turbo 0.72 (upstream's ArrangeSetClipSpeed, verbatim): changing a clip's
+// speed keeps the same source covered: the box scales by oldSpeed /
+// newSpeed, so 2x halves it and the same take now plays twice as fast. Goes
+// through TrimEdge so growing into a neighbour clamps there.
+void ArrangeSetClipSpeed(uint64_t clipId, float speed)
+{
+   Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+   if (c == nullptr || !std::isfinite(speed))
+      return;
+   speed = std::clamp(speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax);
+   const double oldSpeed = std::fabs(Arrange::ClipSpeedFactor(*c));
+   if (speed == c->speed)
+      return;
+   c->speed = speed;
+   gArrange.revision++;
+   const double newSpeed = std::fabs(Arrange::ClipSpeedFactor(*c));
+   const Arrange::Tick newLength =
+      std::max<Arrange::Tick>(1, (Arrange::Tick)std::llround((double)c->length * oldSpeed / newSpeed));
+   Arrange::TrimEdge(gArrange, clipId, Arrange::kEdgeEnd, c->start + newLength);
+}
+
+// Turbo 0.72 (upstream's ArrangeSetClipReverse, verbatim): turning reverse on
+// or off keeps the same stretch of source under the box: forward starts at
+// the offset, reversed starts at the far end of the region and runs back to it.
+void ArrangeSetClipReverse(uint64_t clipId, bool reverse)
+{
+   Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+   if (c == nullptr || c->reverse == reverse)
+      return;
+   const double covered = std::fabs(Arrange::ClipSourceAdvance(*c, c->length));
+   c->reverse = reverse;
+   c->sourceOffsetSeconds = (float)std::max(0.0, (double)c->sourceOffsetSeconds + (reverse ? covered : -covered));
+   gArrange.revision++;
+}
+
 void ArrangeSetSampleBpm(uint64_t clipId, float bpm)
 {
    Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
@@ -2820,6 +2893,24 @@ void DrawArrangeClipSettings(bool docked)
          }
          c = &gArrange.lanes[(size_t)again.lane].clips[(size_t)again.index];
       }
+   }
+
+   // Turbo 0.72 (upstream's conflict warning): one node on several tracks has
+   // one playback position, so those tracks cannot play it independently.
+   if (c->srcUid != 0)
+   {
+      int lanesUsing = 0;
+      for (const Arrange::Lane& ln : gArrange.lanes)
+         for (const Arrange::Clip& oc : ln.clips)
+            if (oc.srcUid == c->srcUid)
+            {
+               lanesUsing++;
+               break;
+            }
+      if (lanesUsing > 1)
+         ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f),
+                            "this node plays on %d tracks: they share one playback position\n"
+                            "(duplicate the node to play it independently)", lanesUsing);
    }
 
    // Position / length in beats (bars shown alongside).
@@ -3087,6 +3178,32 @@ void DrawArrangeClipSettings(bool docked)
       }
    }
 
+   // Turbo 0.72 (upstream): Speed and Reverse move a file's playhead (an
+   // audio or a video file); a synth or a shader has no position to move.
+   {
+      const GraphNode* speedSrc = FindNodeByUid(c->srcUid);
+      const bool hasFilePosition = speedSrc != nullptr && (dynamic_cast<const AudioFileNode*>(speedSrc->node.get()) != nullptr ||
+                                                           dynamic_cast<const VideoSourceNode*>(speedSrc->node.get()) != nullptr);
+      if (hasFilePosition)
+      {
+         const uint64_t clipId = c->id;
+         float speed = c->speed;
+         if (ImGui::SliderFloat("speed", &speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax, "%.2fx",
+                                ImGuiSliderFlags_Logarithmic))
+            ArrangeEdit([&]() { ArrangeSetClipSpeed(clipId, speed); });
+         bool reverse = c->reverse;
+         if (ImGui::Checkbox("reverse", &reverse))
+            ArrangeEdit([&]() { ArrangeSetClipReverse(clipId, reverse); });
+         const Arrange::Loc l3 = Arrange::Find(gArrange, clipId);
+         if (!l3.Valid())
+         {
+            ArrangeSettingsEnd(docked);
+            return;
+         }
+         c = &gArrange.lanes[(size_t)l3.lane].clips[(size_t)l3.index];
+      }
+   }
+
    bool enabled = c->enabled;
    if (ImGui::Checkbox("enabled", &enabled))
    {
@@ -3225,6 +3342,18 @@ void DrawArrangeToolbar(float width)
    gArrangeLastPanelW = width;
    ImGui::Dummy(ImVec2(0.0f, 2.0f)); // air above the row
 
+   // Turbo 0.72: Timeline | Session (upstream's two views of one arrangement).
+   ArrUi::GroupBegin();
+   if (ArrUi::Chip("##viewtl", "Timeline", "the arrangement: clips in time", !gArrangeSessionView))
+      gArrangeSessionView = false;
+   ArrUi::Next();
+   if (ArrUi::Chip("##viewsess", "Session",
+                   "the clip launcher: tracks in columns, scenes in rows, clips loop on the launch grid",
+                   gArrangeSessionView))
+      gArrangeSessionView = true;
+   ArrUi::GroupEnd();
+   ArrUi::Gap();
+
    // Transport: start, play / pause, record.
    ArrUi::GroupBegin();
    if (ArrUi::IconTile("##arrhome", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawPlayerRewind(dl, c, s, col); },
@@ -3241,8 +3370,28 @@ void DrawArrangeToolbar(float width)
                           else
                              Tabler::DrawPlayerPlay(dl, c, s, col);
                        },
-                       playing ? "pause  -  Space" : "play  -  Space", playing, ArrUi::Semantic(tok::action_go)))
-      tr.TogglePlay();
+                       tr.PendingLaunch() == Transport::kLaunchPause ? "pausing on the launch grid - click to cancel"
+                                                                     : (playing ? "pause  -  Space" : "play  -  Space"),
+                       playing, ArrUi::Semantic(tok::action_go)))
+      tr.RequestTogglePlay(); // Turbo 0.72: on the launch grid when one is set
+   ArrUi::Next();
+   {
+      // Turbo 0.72 (upstream v0.6 2.38): where a pause or restart lands.
+      const std::vector<std::string>& qs = MusicTime::LaunchQuantizeList();
+      const int q = std::clamp(tr.LaunchQuantize(), 0, (int)qs.size() - 1);
+      ImGui::SetNextItemWidth(64.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (ArrUi::Tile() - ImGui::GetTextLineHeight()) * 0.5f));
+      if (ImGui::BeginCombo("##arrlaunchq", q == 0 ? "now" : qs[(size_t)q].c_str()))
+      {
+         for (int i = 0; i < (int)qs.size(); i++)
+            if (ImGui::Selectable(i == 0 ? "now" : qs[(size_t)i].c_str(), i == q))
+               tr.SetLaunchQuantize(i);
+         ImGui::EndCombo();
+      }
+      ImGui::PopStyleVar();
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("launch grid: pause (Space) and restart wait for the next beat / bar while playing");
+   }
    ArrUi::Next();
    const bool recording = gArrangeRecording;
    if (ArrUi::IconTile("##arrrec",
@@ -3421,18 +3570,39 @@ void DrawArrangeToolbar(float width)
    ArrUi::GroupEnd();
 
    // Right side: who owns the audio, the monitor, render.
-   const float rightW = ArrUi::ChipW("Timeline audio") + ArrUi::Tile() * 2.0f + ArrUi::ChipW("Render...") + 4.0f * 3.0f + tok::space_3;
+   const float rightW = ArrUi::ChipW("Timeline audio") + (gArrangeSessionView ? ArrUi::ChipW("Stop all") + 2.0f : 0.0f) + ArrUi::Tile() * 2.0f + ArrUi::ChipW("Render...") + 4.0f * 3.0f + tok::space_3;
    const float rightX = rowX0 + width - rightW;
    if (ImGui::GetItemRectMax().x + tok::space_3 < rightX)
       ImGui::SameLine(rightX - ImGui::GetWindowPos().x + ImGui::GetScrollX());
    else
       ArrUi::Gap();
-   if (ArrUi::Chip("##arrtlmode", "Timeline audio",
-                   "on: the timeline owns the audio output - canvas Audio Outs go quiet (live ones stay)\n"
-                   "and only what the audio clips play is heard. Off: the canvas plays as usual and the\n"
-                   "timeline only drives video.",
-                   gArrangeTimelineMode, ArrUi::Semantic(tok::action_learn)))
-      gArrangeTimelineMode = !gArrangeTimelineMode;
+   // Turbo 0.72: who owns the audio - Timeline clips, or (Session) only the
+   // launched slots. Launching a slot switches to Session by itself.
+   const bool tlOwns = gArrangeTimelineMode && !gArrangeSessionMode;
+   if (ArrUi::Chip("##arrtlmode", gArrangeSessionMode ? "Session audio" : "Timeline audio",
+                   gArrangeSessionMode
+                      ? "Session audio: only the launched clips play (launching one switched to it).\n"
+                        "Click to give the output back to the timeline."
+                      : "on: the timeline owns the audio output - canvas Audio Outs go quiet (live ones stay)\n"
+                        "and only what the audio clips play is heard. Off: the canvas plays as usual and the\n"
+                        "timeline only drives video.",
+                   gArrangeTimelineMode, ArrUi::Semantic(gArrangeSessionMode ? tok::action_go : tok::action_learn)))
+   {
+      if (gArrangeSessionMode)
+      {
+         ArrangeSessionStopAll();
+         gArrangeSessionMode = false;
+         gArrangeTimelineMode = true;
+      }
+      else
+         gArrangeTimelineMode = !tlOwns;
+   }
+   if (gArrangeSessionView)
+   {
+      ArrUi::Next();
+      if (ArrUi::Chip("##arrstopall", "Stop all", "stop every launched clip (on the launch grid)  -  ."))
+         ArrangeSessionStopAll();
+   }
    ArrUi::Next();
    if (ArrUi::IconTile("##arrinspector", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawEdit(dl, c, s, col); },
                        "inspector: the selected clip or track, in a column on the right", gArrangeInspector))
@@ -3768,6 +3938,9 @@ void DrawArrangeInspector(ImVec2 mn, ImVec2 mx)
       ArrUi::Next();
       if (ArrUi::Chip("##insdel", "Delete", "delete the track and its clips  -  Delete"))
          ArrangeDeleteRowSelection();
+      ArrUi::Next();
+      if (ArrUi::Chip("##insrender", "Render...", "render this track alone (a stem)"))
+         ArrangeOpenRenderFor({ id }, ArrangeLaneLabel(gArrange, Arrange::LaneIndex(gArrange, id)));
    }
    else if (rows.size() > 1)
    {
@@ -3784,6 +3957,8 @@ void DrawArrangeInspector(ImVec2 mn, ImVec2 mx)
       ArrUi::Next();
       if (ArrUi::Chip("##insdeln", "Delete", "delete the tracks  -  Delete"))
          ArrangeDeleteRowSelection();
+      if (ArrUi::Chip("##insrendern", "Render...", "render these tracks together (a stem)"))
+         ArrangeOpenRenderFor(rows, std::to_string(rows.size()) + " tracks");
    }
    else if (gArrangeSel.size() > 1)
    {
@@ -4135,6 +4310,8 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          const uint64_t id = g->id;
          ImGui::TextDisabled("%s", g->name.empty() ? "Group" : g->name.c_str());
          ImGui::Separator();
+         if (ImGui::MenuItem("Render group...")) // Turbo 0.72 (upstream): a stem of the group's tracks
+            ArrangeOpenRenderFor(Arrange::LanesInTrackGroupRecursive(gArrange, id), g->name.empty() ? "Group" : g->name);
          if (ImGui::MenuItem("Rename"))
          {
             gArrangeRenameGroup = id;
@@ -5130,6 +5307,14 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          const int type = gArrange.lanes[(size_t)li].type;
          ImGui::TextDisabled("%s", ArrangeLaneLabel(gArrange, li).c_str());
          ImGui::Separator();
+         // Turbo 0.72 (upstream): a stem of this track (or of the selected tracks).
+         {
+            const std::vector<uint64_t> rows = ArrangeLiveRowSel();
+            const bool many = rows.size() > 1 && ArrangeRowSelected(id);
+            if (ImGui::MenuItem(many ? "Render selected tracks..." : "Render track..."))
+               ArrangeOpenRenderFor(many ? rows : std::vector<uint64_t>{ id },
+                                    many ? std::to_string(rows.size()) + " tracks" : ArrangeLaneLabel(gArrange, li));
+         }
          if (ImGui::MenuItem("Rename"))
          {
             gArrangeRenameLane = id;
@@ -5298,6 +5483,8 @@ void ArrangeHandleKeys()
       toggleTool(ArrangeTool::Hand);
    if (noMods && pressed(ImGuiKey_P))
       toggleTool(ArrangeTool::Pencil);
+   if (noMods && gArrangeSessionView && pressed(ImGuiKey_Period))
+      ArrangeSessionStopAll(); // upstream's Stop All key
    if (noMods && pressed(ImGuiKey_F))
       ArrangeZoomToFit(gArrangeLastPanelW);
    if (noMods && ImGui::IsKeyPressed(ImGuiKey_Equal, true))
@@ -5386,7 +5573,10 @@ void DrawArrangePanelDocked(const ImVec2& size)
    const float rightX = bodyMin.x + avail.x - (monW > 0.0f ? monW + 8.0f : 0.0f);
    const ImVec2 tlMin = bodyMin;
    const ImVec2 tlMax(rightX - (insW > 0.0f ? insW + 8.0f : 0.0f), bodyMin.y + bodyH);
-   DrawArrangeTimeline(tlMin, tlMax);
+   if (gArrangeSessionView)
+      DrawArrangeSessionGrid(tlMin, tlMax); // Turbo 0.72: the Session view
+   else
+      DrawArrangeTimeline(tlMin, tlMax);
    if (insW > 0.0f)
       DrawArrangeInspector(ImVec2(tlMax.x + 8.0f, bodyMin.y), ImVec2(rightX, bodyMin.y + bodyH));
 
@@ -5446,6 +5636,8 @@ struct ArrangeRenderJob
    int status = 0; // 0 queued, 1 running, 2 done, 3 failed, 4 cancelled
    std::string message;
    int frame = 0, totalFrames = 0;
+   std::vector<uint64_t> laneScope; // Turbo 0.72: empty = the whole mix, else a stem of these tracks
+   std::string scopeLabel;
 };
 std::vector<ArrangeRenderJob> gArrangeRenderJobs;
 
@@ -5524,6 +5716,7 @@ void ArrangeRenderFinish(int status, const std::string& message)
    Transport::Instance().SetPlaying(false);
    Transport::Instance().SeekBeats(r.wasBeat);
    gArrangeTimelineMode = r.wasTimelineMode;
+   gArrangeRenderActiveScope.clear(); // Turbo 0.72
    PublishArrangeLoop();
    gVsync = r.wasVsync;
    RuntimeLog::Write("timeline render %s: %s (%s)", status == 2 ? "done" : "stopped", job.path.c_str(), job.message.c_str());
@@ -5586,6 +5779,7 @@ bool ArrangeRenderBegin(int jobIndex)
    // Timeline owns the output, no loop, playhead at the start, graph driven
    // from here.
    gArrangeTimelineMode = true;
+   gArrangeRenderActiveScope = job.laneScope; // Turbo 0.72: stem
    Transport::Instance().SetLoop(false, 0.0, 0.0);
    AudioEngine::Instance().SetOfflineRender(true);
    Transport::Instance().SetPlaying(true);
@@ -5758,6 +5952,20 @@ void DrawArrangeRenderWindow()
    }
    ImGui::TextDisabled("%s  to  %s   (%s)", ArrangeFormatPos(a).c_str(), ArrangeFormatPos(b).c_str(),
                        ArrangeFormatLen(std::max<Arrange::Tick>(0, b - a)).c_str());
+   // Turbo 0.72: what is rendered - the whole mix, or a stem of some tracks
+   // (track / group menu: Render track..., Render group...).
+   if (gArrangeRenderScopeDraft.empty())
+      ImGui::TextDisabled("tracks: the whole mix  (right-click a track or group: Render track / group)");
+   else
+   {
+      ImGui::Text("tracks: %s", gArrangeRenderScopeLabel.c_str());
+      ImGui::SameLine();
+      if (ImGui::SmallButton("whole mix"))
+      {
+         gArrangeRenderScopeDraft.clear();
+         gArrangeRenderScopeLabel.clear();
+      }
+   }
 
    static const char* kFormats[] = { "MP4 (video + audio)", "MOV (video + audio)", "WAV (audio only)" };
    ImGui::SetNextItemWidth(200.0f);
@@ -5786,8 +5994,12 @@ void DrawArrangeRenderWindow()
       job.width = st.renderWidth;
       job.height = st.renderHeight;
       job.fps = std::clamp(st.renderFps, 1, 120);
+      job.laneScope = gArrangeRenderScopeDraft;
+      job.scopeLabel = gArrangeRenderScopeLabel;
       const std::string base = gPatchPath.empty() ? "timeline" : gPatchPath.substr(gPatchPath.find_last_of("/\\") + 1);
-      const std::string stem = base.substr(0, base.find_last_of('.'));
+      std::string stem = base.substr(0, base.find_last_of('.'));
+      if (!job.scopeLabel.empty())
+         stem += " - " + job.scopeLabel; // a stem's file is named after its tracks
       if (job.format == 2)
          StartFileDialog([stem]() { return Platform::SaveAudioDialog(stem + ".wav"); },
                          [job](const std::string& path) mutable { job.path = path; gArrangeRenderJobs.push_back(job); });
@@ -5842,3 +6054,6 @@ void DrawArrangeRenderWindow()
    }
    ImGui::End();
 }
+
+#include "arrange/ArrangeSession.inl" // Turbo 0.72: upstream Session view engine
+#include "arrange/ArrangeSessionUi.inl" // Turbo 0.72: the Session view grid

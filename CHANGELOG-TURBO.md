@@ -32,6 +32,18 @@ Timeline aligned with upstream before new timeline features (plan: `docs/plans/T
 - **Track headers redesigned** (power, mute / solo / record arm chips, gain and pan wells, meter) and
   a **docked inspector** column on the right for the selected clip, track or tracks (pencil button
   in the toolbar; the floating clip window only when it is hidden).
+- **New: Session view (upstream's clip launcher).** Timeline | Session in the panel toolbar. Tracks
+  are columns, scenes are rows; a clip loops on the launch grid. Click launches / stops, a scene's
+  play button launches its row, the square under a track stops it, Stop all (`.`). Double-click an
+  empty cell to give it a source; right-click a clip for loop and loop length, trigger / gate,
+  quantize and follow action. Session audio plays only the launched clips. Upstream's engine,
+  ported; the grid is drawn on the timeline's design system.
+- **Launch grid (upstream v0.6 2.38):** pause (Space) and restart can wait for the next beat, bar or
+  2 bars while playing (dropdown next to play).
+- **Stems:** Render track / Render group / Render selected tracks render only those tracks.
+- **Clip speed and reverse** in the inspector; reversed audio clips play backwards; video follows.
+- **Transient-aware stretch (upstream v0.6 1.6):** stretched drum hits stay tight (no flams or
+  pre-echo).
 - **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
   a dashed snap guide while dragging.
 - **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),

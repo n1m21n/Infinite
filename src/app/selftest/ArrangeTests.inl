@@ -1225,6 +1225,15 @@
                printf("arrange multitrack live: %s (track peaks %.4f %.4f %.4f, all three %.4f)\n",
                       liveOk ? "OK" : "FAIL", single[0], single[1], single[2], all);
                sOk = sOk && liveOk;
+               // Turbo 0.72: a stem render's scope silences the other tracks
+               // (the same flag the render queue sets, without a device).
+               gArrangeRenderActiveScope = { lanes[0] };
+               const float stem = render(0.0, blocks);
+               gArrangeRenderActiveScope.clear();
+               const bool stemOk = std::fabs(stem - sSinglePeak) < 0.15f * sSinglePeak;
+               printf("arrange multitrack stem scope: %s (stem %.4f, one track %.4f)\n", stemOk ? "OK" : "FAIL", stem,
+                      sSinglePeak);
+               sOk = sOk && stemOk;
                tr.NotifyAudioEngineStopped();
             }
 
@@ -1247,6 +1256,12 @@
                job.fps = 30;
                job.path = sWavPath;
                gArrangeRenderJobs.push_back(job);
+               // Turbo 0.72: a stem of the first track only (Render track...).
+               ArrangeRenderJob stemJob = job;
+               stemJob.path = sWavPath.substr(0, sWavPath.size() - 4) + "_stem.wav";
+               std::remove(stemJob.path.c_str());
+               stemJob.laneScope = { gArrange.lanes[0].id };
+               gArrangeRenderJobs.push_back(stemJob);
                sWavQueued = true;
             }
             else
@@ -1257,23 +1272,37 @@
             if (sWavQueued)
             {
                // Float WAV written by ArrangeWavHeader: data starts at byte 58.
-               std::ifstream f(sWavPath, std::ios::binary);
-               std::vector<char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-               float peak = 0.0f;
-               size_t frames = 0;
-               if (bytes.size() > 58)
+               auto readPeak = [](const std::string& path, size_t& frames)
                {
-                  frames = (bytes.size() - 58) / 8;
-                  const float* s = reinterpret_cast<const float*>(bytes.data() + 58);
-                  for (size_t i = frames / 8; i < frames; i++) // past the onset
-                     peak = std::max(peak, std::fabs(s[i * 2]));
-               }
-               const bool done = !gArrangeRenderJobs.empty() && gArrangeRenderJobs.back().status == 2;
+                  std::ifstream f(path, std::ios::binary);
+                  std::vector<char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+                  float peak = 0.0f;
+                  frames = 0;
+                  if (bytes.size() > 58)
+                  {
+                     frames = (bytes.size() - 58) / 8;
+                     const float* s = reinterpret_cast<const float*>(bytes.data() + 58);
+                     for (size_t i = frames / 8; i < frames; i++) // past the onset
+                        peak = std::max(peak, std::fabs(s[i * 2]));
+                  }
+                  return peak;
+               };
+               const std::string stemPath = sWavPath.substr(0, sWavPath.size() - 4) + "_stem.wav";
+               size_t frames = 0, stemFrames = 0;
+               const float peak = readPeak(sWavPath, frames);
+               const float stemPeak = readPeak(stemPath, stemFrames);
+               const size_t n = gArrangeRenderJobs.size();
+               const bool done = n >= 2 && gArrangeRenderJobs[n - 2].status == 2 && gArrangeRenderJobs[n - 1].status == 2;
                const bool wavOk = done && frames > 0 && sSinglePeak > 0.0f && peak > 2.5f * sSinglePeak;
-               printf("arrange multitrack wav render: %s (job done %d, %zu frames, peak %.4f, one track %.4f)\n",
+               printf("arrange multitrack wav render: %s (jobs done %d, %zu frames, peak %.4f, one track %.4f)\n",
                       wavOk ? "OK" : "FAIL", (int)done, frames, peak, sSinglePeak);
-               sOk = sOk && wavOk;
+               // The stem holds one track: about one track's level, not three.
+               const bool stemOk = done && stemFrames > 0 && std::fabs(stemPeak - sSinglePeak) < 0.15f * sSinglePeak;
+               printf("arrange multitrack stem render: %s (stem peak %.4f, one track %.4f)\n", stemOk ? "OK" : "FAIL",
+                      stemPeak, sSinglePeak);
+               sOk = sOk && wavOk && stemOk;
                std::remove(sWavPath.c_str());
+               std::remove(stemPath.c_str());
             }
             printf("arrange multitrack test: all  %s\n", sOk ? "OK" : "FAIL");
          }
@@ -1405,6 +1434,118 @@
          printf("arrange record test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
+      // Turbo 0.72: INFINITE_ARRANGESESSIONTEST - the Session view engine
+      // (upstream's, ported). A timeline clip on track 1 and a session slot
+      // on track 2, two Oscillators: launching the slot plays it and, in
+      // Session audio, strips the timeline clip; stopping the track silences
+      // it. Offline, no device; launch grid off so moves land at once.
+      if (getenv("INFINITE_ARRANGESESSIONTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         bool allOk = true;
+         Transport& tr = Transport::Instance();
+         const double kSr = 48000.0;
+         const int kBlock = 256;
+         const double kSamplesPerBeat = kSr * 60.0 / 120.0;
+         const bool hadEngine = AudioEngine::Instance().SampleRate() > 0.0;
+         AudioEngine::Instance().Stop();
+         tr.NotifyAudioEngineStopped();
+         GraphNode* a = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f);
+         const uint64_t uidA = a != nullptr ? a->uid : 0;
+         GraphNode* b = SpawnNode("Oscillator", "Synths", 220.0f, 0.0f);
+         const uint64_t uidB = b != nullptr ? b->uid : 0;
+         gArrange = Arrange::Model();
+         gArrange.revision = 5000;
+         const uint64_t laneA = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         const uint64_t laneB = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         Arrange::Clip c;
+         c.length = Arrange::kTicksPerBar * 8;
+         c.srcUid = uidA;
+         Arrange::PlaceOverwrite(gArrange, laneA, c);
+         ArrSess::SetSlotSource(laneB, 0, uidB);
+         gArrange.sessionQuantize = 0; // launch at once
+         tr.SetTempo(120.0f);
+         tr.SetLoop(false, 0.0, 0.0);
+         tr.SetLaunchQuantize(0);
+         tr.NotifyAudioEngineStarted(kSr);
+         tr.SetPlaying(false);
+         gArrangeTimelineMode = true;
+         gArrangeSessionMode = true; // Session audio already on: no device start from the launch
+
+         int cookFrame = 5000000;
+         auto render = [&](int numBlocks)
+         {
+            ArrangeFrameUpdate();
+            RebuildAudioTopology();
+            gArrangeAudioSig = ArrangeAudioSignature();
+            cookFrame++;
+            for (GraphNode& gn : gNodes)
+               gn.node->CookIfNeeded(cookFrame);
+            for (GraphNode& gn : gNodes)
+               if (AudioNode* an = AudioNodeOfAny(gn.node.get()))
+                  if (an->preparedForSampleRate != kSr)
+                  {
+                     an->PrepareToPlay(kSr, kAudioMaxBlockFrames);
+                     an->preparedForSampleRate = kSr;
+                  }
+            std::vector<float> ch0((size_t)kBlock), ch1((size_t)kBlock);
+            float* chans[2] = { ch0.data(), ch1.data() };
+            AudioBuffer buffer;
+            buffer.channels = chans;
+            buffer.numChannels = 2;
+            buffer.numFrames = kBlock;
+            float peak = 0.0f;
+            for (int blk = 0; blk < numBlocks; blk++)
+            {
+               ArrangeSessionTick();
+               ArrangeAudioRebuildIfStale();
+               AudioEngine::Instance().RenderOfflineBlock(buffer);
+               for (int i = 0; i < kBlock; i++)
+                  if ((double)(blk * kBlock + i) > 0.25 * kSamplesPerBeat)
+                     peak = std::max(peak, std::fabs(ch0[(size_t)i]));
+            }
+            return peak;
+         };
+         const int blocks = (int)(2.0 * kSamplesPerBeat / kBlock);
+
+         const bool ok0 = uidA != 0 && uidB != 0 && !gArrange.lanes[1].slots.empty() && gArrange.lanes[1].slots[0].Has();
+         ArrangeSessionLaunch(laneB, 0);
+         const bool started = tr.IsPlaying();
+         const float launched = render(blocks);
+         const ArrangeSessionSlotState st = ArrangeSessionQuery(laneB, 0);
+         // One oscillator, not two: the timeline clip on track 1 is out of Session audio.
+         const bool playOk = ok0 && started && st.playing && launched > 0.3f && launched < 0.8f;
+         printf("arrange session launch: %s (playing %d, peak %.4f - one oscillator, timeline clip stripped)\n",
+                playOk ? "OK" : "FAIL", (int)st.playing, launched);
+         allOk = allOk && playOk;
+
+         ArrangeSessionStopLane(laneB);
+         const float stopped = render(blocks);
+         const bool stopOk = stopped < 1e-4f && !ArrangeSessionQuery(laneB, 0).playing;
+         printf("arrange session stop: %s (peak %.6f)\n", stopOk ? "OK" : "FAIL", stopped);
+         allOk = allOk && stopOk;
+
+         // Back to the timeline: its clip plays again.
+         gArrangeSessionMode = false;
+         tr.SeekBeats(0.0);
+         const float timeline = render(blocks);
+         const bool backOk = timeline > 0.3f;
+         printf("arrange session back to timeline: %s (peak %.4f)\n", backOk ? "OK" : "FAIL", timeline);
+         allOk = allOk && backOk;
+
+         tr.NotifyAudioEngineStopped();
+         tr.SetPlaying(true);
+         gArrangeTimelineMode = false;
+         if (hadEngine)
+         {
+            std::string startErr;
+            if (AudioEngine::Instance().Start(startErr))
+               tr.NotifyAudioEngineStarted(AudioEngine::Instance().SampleRate());
+         }
+         RebuildAudioTopology();
+         printf("arrange session test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
       // Turbo 0.72: INFINITE_ARRANGEDEMO - a small arrangement with the panel
       // open, a Range selection and the Range tool on, for screenshots of the
       // timeline UI (IMAGERESYNTH_SCREENSHOT + INFINITE_SCREENSHOT_FRAME).
@@ -1441,6 +1582,17 @@
          gArrangeRange.laneHi = 2;
          ArrangeSetTool(ArrangeTool::Range);
          gArrangeRowSel = { gArrange.lanes[1].id }; // the inspector shows a track
+         if (std::string(getenv("INFINITE_ARRANGEDEMO")) == "session")
+         {
+            // The Session view: a clip per track in the first rows, scene 1 launched.
+            for (size_t i = 0; i < uids.size(); i++)
+               for (int row = 0; row <= (int)i; row++)
+                  ArrSess::SetSlotSource(gArrange.lanes[i + 1].id, row, uids[i]);
+            gArrange.scenes.resize(3);
+            gArrange.scenes[0].name = "intro";
+            gArrangeSessionView = true;
+            ArrangeSessionLaunchScene(0);
+         }
          gArrangePanelOpen = true;
          gArrangePanelHeight = 340.0f;
          PublishArrangeLoop();

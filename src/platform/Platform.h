@@ -396,6 +396,13 @@ namespace Platform
       int channels = 0;
       int numFrames = 0;
       double sampleRate = 0.0;
+      // Hit starts in file frames, ascending, for ClipTimeStretch's transient
+      // pass. Filled where the file is decoded (DetectTransients).
+      std::vector<double> transients;
+      // Peak |x| (channel mean) per envelopeHop file frames, same pass: the
+      // ceiling ClipTimeStretch holds its output to, which removes pre-echo.
+      std::vector<float> envelope;
+      int envelopeHop = 0;
    };
 
    // Decodes whatever AVFoundation reads natively (wav/aiff/caf/m4a/mp3/alac).
