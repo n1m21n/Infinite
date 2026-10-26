@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Stage 5: The 6-Gate Quantitative Benchmark Suite for Generate Samples.
-    benchmark.py [--scope shippable|local] [--store DIR] [--models DIR]
+"""Stage 5: The 10-Gate Quantitative Benchmark Suite for Generate Samples.
+    benchmark.py [--scope shippable|local] [--store DIR] [--models DIR] [--spectrum FILE]
+Real data: B1-B5 (held-out corpus), B8 (real renders, spectral_gates.py). Simulated listeners: B6, B9 and
+B10's keep-rate (personas whose taste is a linear function of the features the learner sees, so they show the
+learner converges, not that people like the output). B7 is a regression check of the graph, not an accuracy.
 Verifies:
   B1: Held-out compression (bits saved per cell/step/value on unseen source files)
   B2: Real-music False-Reject Rate (FRR <= 3.0%)
   B3: Mishap Catch Rate on 9 corruption types (MCR >= 96%, 100% on critical mishaps)
-  B4: Structural Realism Two-Sample Classifier AUC (Struct-AUC in [0.40, 0.65] on universal musical invariants)
+  B4: Structural Realism Two-Sample Classifier AUC (cross-validated, unfolded, <= 0.65 for melodies and drums)
   B5: Out-of-Distribution Novelty & Diversity (Card-escape >= 85%, Pairwise diversity >= real, Cluster entropy >= 0.75)
-  B6: Personal Taste Adaptation Speed (5 user personas reach >= 75% keep-rate by click 20 vs card-only bandit)"""
+  B6: Personal Taste Adaptation Speed (5 simulated personas reach >= 75% keep-rate by click 20 vs card-only bandit)
+  B7: Genre graph regression check (archetypes reach the graph, neighbours well-formed) + leave-one-out neighbour signal
+  B8: Spectral gate on real renders (held-out FRR <= 2%, catch >= 96% on damaged copies)
+  B9: 5-pillar + graph learner on simulated personas (Keep@20 >= 82%)
+  B10: Emotion layer: mood from chord features alone beats the majority baseline, MIDI cue monotonicity, simulated keep"""
 import argparse, collections, json, math, os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import critic as CR
@@ -15,11 +22,23 @@ import genre_graph as GG
 import learn as L
 import pieces as P
 import proposer as PR
+import spectral_gates as SG
+
+
+def struct_features_drum(p):
+    """Style-agnostic drum-bar features: [kick count, snare count, hat count, kicks on beats, longest non-hat run, syncopation]."""
+    lanes = p["lanes"]
+    cnt = lambda l: sum(c != "." for c in l) if l else 0
+    k = lanes[0] if lanes else ""
+    on_beat = sum(k[i] != "." for i in range(0, 16, 4)) if k else 0
+    run = max((CR.max_run(l) for i, l in enumerate(lanes) if i not in (2, 3) and l), default=0)
+    return [cnt(k) / 16.0, cnt(lanes[1]) / 16.0 if len(lanes) > 1 else 0.0, (cnt(lanes[2]) + cnt(lanes[3])) / 32.0 if len(lanes) > 3 else 0.0,
+            on_beat / 4.0, run / 16.0, CR.syncopation_score(lanes)]
 
 
 def struct_features_melody(p):
     """Style-agnostic universal musical validity features:
-       [key_clarity, strong_beat_scale_rate, step_resolution_after_leap, distinct_pitch_ratio]."""
+       [key_clarity, strong_beat_scale_rate, step_resolution_after_leap]."""
     P_ = p["pitches"]
     tonic, mode = L.key_of(P_)
     in_key = sum((x - tonic) % 12 in mode for x in P_) / len(P_)
@@ -59,8 +78,8 @@ def cross_val_auc(pos_feats, neg_feats):
     if n0 == 0 or n1 == 0:
         return 0.5
     rank_sum = sum(i + 1 for i, (_, y) in enumerate(scores) if y == 1)
-    auc = (rank_sum - n1 * (n1 + 1) / 2.0) / (n0 * n1)
-    return max(auc, 1.0 - auc)
+    # Unfolded: the direction is learned on the other fold, so an AUC under 0.5 means it did not generalise.
+    return (rank_sum - n1 * (n1 + 1) / 2.0) / (n0 * n1)
 
 
 def pairwise_hamming(drums):
@@ -150,6 +169,7 @@ def main():
     ap.add_argument("--scope", default="shippable", choices=["shippable", "local"])
     ap.add_argument("--store", default="~/Infinite/training-data/store")
     ap.add_argument("--models", default="~/Infinite/training-data/models")
+    ap.add_argument("--spectrum", default="~/Infinite/training-data/renders/spectrum.jsonl")
     a = ap.parse_args()
     mdir = os.path.join(os.path.expanduser(a.models), a.scope)
     rec = json.load(open(os.path.join(mdir, "current.json")))
@@ -160,7 +180,7 @@ def main():
     rng = random.Random(101)
 
     print("=" * 78)
-    print("GENERATE SAMPLES: 6-GATE BENCHMARK SUITE (scope=%s)" % a.scope)
+    print("GENERATE SAMPLES: 10-GATE BENCHMARK SUITE (scope=%s)" % a.scope)
     print("=" * 78)
 
     # ---- B1: Held-Out Compression (bits saved) ---------------------------------------------------
@@ -213,10 +233,12 @@ def main():
     real_m_feats = [struct_features_melody(p) for p in m_sample[:250]]
     gen_m_feats = [struct_features_melody(p) for p in gen_mels]
     struct_auc = cross_val_auc(real_m_feats, gen_m_feats)
-    b4_ok = 0.45 <= struct_auc <= 0.65
-    print("\n[B4] Structural Validity Realism (2-Sample AUC on universal musical invariants, target 0.45..0.65)")
-    print("     Struct-AUC=%.3f (1.00 = obvious fake, 0.50 = structurally indistinguishable in key/resolution validity)  -> %s" % (
-        struct_auc, "PASS" if b4_ok else "FAIL"))
+    drum_auc = cross_val_auc([struct_features_drum(p) for p in d_sample[:250]], [struct_features_drum(p) for p in gen_drums])
+    b4_ok = struct_auc <= 0.65 and drum_auc <= 0.65
+    print("\n[B4] Structural Realism (cross-validated linear 2-sample AUC, unfolded, target <= 0.65)")
+    print("     Melody-AUC=%.3f (3 features: key, strong-beat key, leap resolution) | Drum-AUC=%.3f (6 features)  -> %s" % (
+        struct_auc, drum_auc, "PASS" if b4_ok else "FAIL"))
+    print("     (a linear test on a few features: 0.50 = these features cannot tell them apart, not that the music is indistinguishable)")
 
     # ---- B5: Out-of-Distribution Novelty & Diversity (QD-Score) ----------------------------------
     escape = 100.0 * sum(CR.min_card_dist_drum(L.cells(p)) >= 0.25 for p in gen_drums) / len(gen_drums)
@@ -233,11 +255,13 @@ def main():
     # ---- B6: Simulated User Adaptation Speed (Taste-Regret@20) -----------------------------------
     k0, k20, card20 = simulate_taste_benchmark(rec)
     b6_ok = k20 >= 0.75 and k20 > card20 + 0.15
-    print("\n[B6] Personal Taste Adaptation Speed (5 simulated user personas, 20 clicks)")
-    print("     Keep-Rate@0=%.1f%% -> Contextual-Keep@20=%.1f%% (vs Card-Bandit@20=%.1f%%)  -> %s" % (
-        100 * k0, 100 * k20, 100 * card20, "PASS" if b6_ok else "FAIL"))
+    print("\n[B6] Personal Taste Adaptation Speed (5 SIMULATED personas, 20 clicks; Keep@0 is 28% in expectation by construction, sampled on 20 loops)")
+    print("     Keep-Rate@0=%.1f%% -> Contextual-Keep@20=%.1f%% (vs Card-Bandit@20=%.1f%%, +%.1f pp)  -> %s" % (
+        100 * k0, 100 * k20, 100 * card20, 100 * (k20 - card20), "PASS" if b6_ok else "FAIL"))
 
-    # ---- B7: Connected Genre-Subgenre Graph & Multi-Modal Directive Coherence --------------------
+    # ---- B7: Genre graph regression check + leave-one-out neighbour signal -------------------------
+    # The archetype expectations mirror genre_graph's hand-written overrides, so this guards against a
+    # regression (an override lost in smoothing or export); it is not evidence the archetypes are right.
     net = GG.build_genre_network()
     dir_hits = dir_tot = 0
     expected_top_bass = {
@@ -253,49 +277,44 @@ def main():
             dir_tot += 1
             if top2 & expected_top_bass[sid]:
                 dir_hits += 1
-        # Verify neighbor graph connectivity is non-degenerate and within-family or acoustically close
         nbs = st_node["neighbors"]
         dir_tot += 1
         if len(nbs) == 4 and 0.35 <= nbs[0]["weight"] <= 0.999:
             dir_hits += 1
     dir_acc = 100.0 * dir_hits / max(1, dir_tot)
+    # Leave-one-out (reported, not gated): does the weighted mean of a style's neighbours predict its own
+    # top lead/keys/bass voice better than its family's default does?
+    loo_nb = loo_fam = loo_tot = 0
+    for st_node in net["styles"]:
+        fam_arch = GG.FAMILY_ARCHETYPES.get(st_node["family"], GG.FAMILY_ARCHETYPES["house"])
+        for role in ("bass", "keys", "lead"):
+            own = max(range(6), key=lambda k: st_node["archetypes"][role][k])
+            nb = [sum(n["weight"] * net["styles"][n["index"]]["archetypes"][role][k] for n in st_node["neighbors"]) for k in range(6)]
+            loo_nb += int(max(range(6), key=lambda k: nb[k]) == own)
+            loo_fam += int(max(range(6), key=lambda k: fam_arch[role][k]) == own)
+            loo_tot += 1
     b7_ok = dir_acc >= 92.0 and net["n_styles"] >= 34
-    print("\n[B7] Connected Genre-Subgenre Graph & Multi-Modal Directive Coherence (target >= 92.0%)")
-    print("     Styles=%d | Directive-Archetype & Graph-Neighbor Accuracy=%.1f%%  -> %s" % (
+    print("\n[B7] Genre Graph Regression Check (by construction; target >= 92.0%)")
+    print("     Styles=%d | Overrides-survive & Neighbours-well-formed=%.1f%%  -> %s" % (
         net["n_styles"], dir_acc, "PASS" if b7_ok else "FAIL"))
+    print("     Leave-one-out top voice: neighbours %.1f%% vs family default %.1f%% (%d role-styles, reported only)" % (
+        100.0 * loo_nb / loo_tot, 100.0 * loo_fam / loo_tot, loo_tot))
 
-    # ---- B8: Category & Genre 32-Band Spectral + Dynamic Fingerprint Gate ------------------------
-    valid_pass = valid_tot = 0
-    for pname, gates in GG.PART_SPECTRAL_GATES.items():
-        min_l, max_l, min_m, min_h, max_h, min_c, max_s, _ = gates
-        for _ in range(15):
-            l_sh = rng.uniform(min_l + 0.04, min(max_l - 0.04, min_l + 0.30))
-            h_sh = rng.uniform(min_h + 0.03, min(max_h - 0.03, min_h + 0.25))
-            m_sh = max(min_m + 0.02, 1.0 - l_sh - h_sh)
-            bands = [l_sh / 11.0] * 11 + [m_sh / 11.0] * 11 + [h_sh / 10.0] * 10
-            ok_sp, _ = GG.verify_spectral_critic(bands, min_c + 0.5, max_s * 0.4, 0.45, pname)
-            valid_tot += 1
-            valid_pass += int(ok_sp)
-    spec_frr = 100.0 * (valid_tot - valid_pass) / max(1, valid_tot)
+    # ---- B8: Spectral gate on real renders (spectral_gates.py) ------------------------------------
+    sp_path = os.path.expanduser(a.spectrum)
+    if os.path.exists(sp_path):
+        _, sp = SG.evaluate(SG.load(sp_path))
+        spec_frr, spec_catch_rate = sp["frr"], sp["catch"]
+        kinds = " ".join("%s=%d/%d" % (k, sp["kinds"][k], sp["kinds_tot"][k]) for k in sorted(sp["kinds_tot"]))
+        b8_ok = spec_frr <= 2.0 and spec_catch_rate >= 96.0
+    else:
+        spec_frr, spec_catch_rate, kinds, b8_ok = float("nan"), float("nan"), "no renders at %s" % sp_path, False
+    print("\n[B8] Spectral Gate on Real Renders (fit on 4/5 of the takes, measured on the held-out fifth)")
+    print("     Held-out FRR=%.2f%% (<=2.0%%) | Damaged-copy catch=%.1f%% (>=96%%)  -> %s" % (
+        spec_frr, spec_catch_rate, "PASS" if b8_ok else "FAIL"))
+    print("     %s" % kinds)
 
-    # 7 synthetic acoustic/spectral mishaps
-    spec_mishaps = [
-        ("thin_kick",        [0.005] * 11 + [0.05] * 11 + [0.04] * 10, 2.2, 0.2, 0.5, "kicks"),
-        ("muddy_mix",        [0.085] * 11 + [0.004] * 11 + [0.002] * 10, 2.0, 0.1, 0.4, "full"),
-        ("dull_hats",        [0.04] * 11 + [0.04] * 11 + [0.01] * 10, 2.2, 0.2, 0.3, "hats"),
-        ("resonant_whistle", [0.01] * 11 + [0.01] * 11 + [0.65] + [0.005] * 9, 2.5, 0.1, 0.4, "full"),
-        ("phase_cancelled",  [0.03] * 11 + [0.04] * 11 + [0.02] * 10, 2.2, 0.1, -0.75, "full"),
-        ("brickwall_flat",   [0.03] * 11 + [0.04] * 11 + [0.02] * 10, 1.08, 0.1, 0.5, "drums"),
-        ("dropout_pad",      [0.03] * 11 + [0.05] * 11 + [0.01] * 10, 1.8, 0.72, 0.6, "pads"),
-    ]
-    spec_caught = sum(not GG.verify_spectral_critic(b, cr_v, sil, corr, pn)[0] for _, b, cr_v, sil, corr, pn in spec_mishaps)
-    spec_catch_rate = 100.0 * spec_caught / len(spec_mishaps)
-    b8_ok = spec_frr <= 2.0 and spec_catch_rate >= 96.0
-    print("\n[B8] Category & Genre 32-Band Spectral + Dynamic Fingerprint Gate")
-    print("     Valid-Spectrum FRR=%.2f%% (<=2.0%%) | Acoustic-Mishap Catch=%.1f%% (%d/%d)  -> %s" % (
-        spec_frr, spec_catch_rate, spec_caught, len(spec_mishaps), "PASS" if b8_ok else "FAIL"))
-
-    # ---- B9: Spotify 5-Pillar + Graph-Propagated User Likeability (Keep@20 >= 82%) ---------------
+    # ---- B9: 5 heuristic pillars + Graph-Propagated User Likeability (Keep@20 >= 82%) ---------------
     pillar_personas = [
         ("High-Energy Dance Club",     {"danceability": +1.8, "energy": +2.0, "valence": +0.6, "brightness": +0.8, "contrast": +1.2}),
         ("Dark Dub / Hypnotic Sub",    {"danceability": +0.8, "energy": -0.4, "valence": -1.8, "brightness": -1.6, "contrast": +0.6}),
@@ -332,18 +351,20 @@ def main():
         p_keep20.append(hits20 / 40.0)
     b9_keep = sum(p_keep20) / len(p_keep20)
     b9_ok = b9_keep >= 0.82
-    print("\n[B9] Spotify 5-Pillar (Danceability/Energy/Valence/Brightness/Contrast) + Graph Likeability")
+    print("\n[B9] 5 Heuristic Pillars (Danceability/Energy/Valence/Brightness/Contrast) + Graph, SIMULATED personas")
     print("     Multi-Modal Graph Keep-Rate@20=%.1f%% (target >= 82.0%%)  -> %s" % (
         100.0 * b9_keep, "PASS" if b9_ok else "FAIL"))
 
     # ---- B10: Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment ----------------
-    # (1) Ground-truth human mood labels in chord_prog -> 8-Emotion inference accuracy
+    # (1) Chord-pack mood tags (from file names) -> 8-Emotion inference from the chords ALONE: the tags are
+    # stripped before inference, which otherwise blends 65% toward the tag's own emotion and scores itself.
     mood_hits = mood_tot = 0
+    expected_counts = collections.Counter()
     for cp in c_test:
         moods = [m for m in cp.get("mood", []) if m in GG.CORPUS_MOOD_TO_EMOTIONS]
         if not moods:
             continue
-        em_vec = GG.infer_piece_emotions(cp)
+        em_vec = GG.infer_piece_emotions(dict(cp, mood=[]))
         top2_em = set(sorted(GG.EMOTION_NAMES, key=lambda k: -em_vec[k])[:2])
         expected_em = set()
         for m in moods:
@@ -352,7 +373,17 @@ def main():
         mood_tot += 1
         if top2_em & expected_em:
             mood_hits += 1
+        expected_counts.update(expected_em)
     mood_acc = 100.0 * mood_hits / max(1, mood_tot)
+    # Baseline: always answer the two most common expected emotions
+    base2 = {e for e, _ in expected_counts.most_common(2)}
+    base_hits = 0
+    for cp in c_test:
+        moods = [m for m in cp.get("mood", []) if m in GG.CORPUS_MOOD_TO_EMOTIONS]
+        if moods:
+            exp = {max(GG.CORPUS_MOOD_TO_EMOTIONS[m].items(), key=lambda kv: kv[1])[0] for m in moods}
+            base_hits += int(bool(base2 & exp))
+    base_acc = 100.0 * base_hits / max(1, mood_tot)
 
     # (2) Emotion-Conditioned MIDI Proposer Technical Monotonicity (Happy vs Sad, Complex vs Simple, Tense vs Serene)
     r_emo = random.Random(303)
@@ -414,10 +445,10 @@ def main():
                 hits_e += 1
         emo_keep20.append(hits_e / 40.0)
     b10_keep = sum(emo_keep20) / len(emo_keep20)
-    b10_ok = mood_acc >= 92.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
+    b10_ok = mood_acc >= base_acc + 10.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
     print("\n[B10] Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment")
-    print("      Corpus-Mood-Acc=%.1f%% (>=92%%) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, IntIv=%.1f) | Affective-Keep@20=%.1f%%  -> %s" % (
-        mood_acc, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_distinct_iv(m_int), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
+    print("      Mood-from-chords=%.1f%% vs majority baseline %.1f%% (n=%d, need +10 pp) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, IntIv=%.1f) | Simulated-Keep@20=%.1f%%  -> %s" % (
+        mood_acc, base_acc, mood_tot, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_distinct_iv(m_int), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
 
     gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok, b10_ok]
     all_ok = all(gates_list)
