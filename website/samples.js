@@ -37,12 +37,6 @@
   }
 
   function row(it) {
-    if (it.gen) return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="A">' +
-      '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
-      '<div class="smp-id"><b>' + esc(it.name) + '</b><span>' + it.bpm + ' bpm</span></div>' +
-      '<canvas class="smp-wave"></canvas>' +
-      '<div class="smp-acts"><button class="smp-dlb" type="button" data-gen="' + esc(it.id) + '" aria-label="Download ' + esc(it.name) + ' as wav" title="Download .wav">' + IC_DL + '</button></div>' +
-    '</div>';
     var baseName = it.name.replace(/\W+/g, '_');
     var patchLink = it.patch ? '<a href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' : '';
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
@@ -101,25 +95,24 @@
   }
   function generate() {
     if (busy) return;
-    busy = true; genBtn.disabled = true; genBtn.classList.add('is-busy');
+    busy = true; wakeAudio(); genBtn.disabled = true; genBtn.classList.add('is-busy');
     var label = genBtn.textContent;
     if (!info) genBtn.setAttribute('data-label', label);
     genBtn.textContent = info ? 'Generating…' : 'Loading engine…';
     (info ? Promise.resolve(info) : ask({ cmd: 'info' }).then(function (d) { info = d; return d; })).then(function (d) {
       genBtn.textContent = 'Generating…';
-      var scale = filt.scale ? d.scales.indexOf(filt.scale) : -1, part = filt.part;
+      var scale = gf.scale ? d.scales.indexOf(gf.scale) : -1, part = gf.part;
       return ask({ cmd: 'run', style: Math.floor(Math.random() * d.styles.length), part: PART_INDEX[part] || 0, seed: Math.floor(Math.random() * 99999),
         bars: 2, key: -1, scale: KEYLESS[part] ? -1 : scale });
     }).then(function (r) {
       stop();
       var url = URL.createObjectURL(wavOf(r.pcm, r.rate));
       if (gens[0] && gens[0].audio) URL.revokeObjectURL(gens[0].audio);
-      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label, bpm: Math.round(r.bpm), peaks: peaksOf(r.pcm, 64), audio: url }];
+      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label, bpm: Math.round(r.bpm), audio: url, pcm: r.pcm, rate: r.rate }];
       genEl.hidden = false;
-      genEl.innerHTML = row(gens[0]);
-      var rw = genEl.querySelector('.smp-row');
-      drawWave(rw.querySelector('canvas'), gens[0].peaks, 0);
-      play(rw);
+      genEl.innerHTML = '<div class="smp-id"><b>' + esc(r.label) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
+        '<button class="smp-dlb" type="button" data-gen="' + gens[0].id + '" aria-label="Download ' + esc(r.label) + ' as wav" title="Download .wav">' + IC_DL + '</button>';
+      blobPlay(gens[0]);
     }).catch(function () {
       genEl.hidden = false; genEl.innerHTML = '<p class="lib-empty">Could not generate a loop here. Try again.</p>';
     }).then(function () {
@@ -150,31 +143,26 @@
     page = 0;
   }
 
-  function buildFilters() {
-    var bar = document.querySelector('.smp-bar'), grow = bar.querySelector('.grow');
-    var seg = document.createElement('div');
-    seg.className = 'smp-seg'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Part');
-        seg.innerHTML = [''].concat(PARTS).map(function (p) {
-      return '<button type="button" data-part="' + p + '" aria-pressed="' + (filt.part === p) + '"' + (filt.part === p ? ' class="is-on"' : '') + '>' + (p || 'all') + '</button>';
+  // Instrument and scale are always dropdowns: one pair for the generator, one for the saved list.
+  var gf = { part: '', scale: '' };
+  function pick(state, key, label, vals, onchange) {
+    var sel = document.createElement('select');
+    sel.className = 'smp-pick'; sel.setAttribute('aria-label', label);
+    sel.innerHTML = '<option value="">' + label + '</option>' + vals.map(function (v) {
+      return '<option value="' + esc(v) + '"' + (state[key] === v ? ' selected' : '') + '>' + esc(v) + '</option>';
     }).join('');
-    seg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-part]'); if (!b) return;
-      filt.part = b.getAttribute('data-part');
-      Array.prototype.forEach.call(seg.children, function (c) { var on = c === b; c.classList.toggle('is-on', on); c.setAttribute('aria-pressed', on); });
-      applyFilters(); render();
-    });
-    bar.insertBefore(seg, grow);
-    [['scale', 'any scale', scaleOf]].forEach(function (f) {
-      var vals = SCALES;
-      if (!vals.length) return;
-      var sel = document.createElement('select');
-      sel.className = 'smp-pick'; sel.setAttribute('aria-label', f[0]);
-      sel.innerHTML = '<option value="">' + f[1] + '</option>' + vals.map(function (v) {
-        return '<option value="' + esc(v) + '"' + (filt[f[0]] === v ? ' selected' : '') + '>' + esc(v) + '</option>';
-      }).join('');
-      sel.addEventListener('change', function () { filt[f[0]] = sel.value; applyFilters(); render(); });
-      bar.insertBefore(sel, grow);
-    });
+    sel.addEventListener('change', function () { state[key] = sel.value; onchange(); });
+    return sel;
+  }
+  function buildFilters() {
+    var bar = document.getElementById('smp-bar'), grow = bar.querySelector('.grow');
+    var gbar = document.getElementById('smp-genbar');
+    var noop = function () {};
+    gbar.insertBefore(pick(gf, 'part', 'full mix', PARTS, noop), genBtn);
+    gbar.insertBefore(pick(gf, 'scale', 'any scale', SCALES, noop), genBtn);
+    var onList = function () { applyFilters(); render(); };
+    bar.insertBefore(pick(filt, 'part', 'all instruments', PARTS, onList), grow);
+    bar.insertBefore(pick(filt, 'scale', 'any scale', SCALES, onList), grow);
   }
 
   function render() {
@@ -209,7 +197,7 @@
 
   function play(r) {
     if (playing && playing.row === r) { stop(); return; }
-    stop();
+    stop(); blobStop();
     var it = byId(r.getAttribute('data-id')), media = new Audio(it.audio), el = null;
     media.loop = true;
     playing = { row: r, it: it, media: media, el: el };
@@ -233,7 +221,6 @@
     play(r);
   }
   listEl.addEventListener('click', rowClick);
-  genEl.addEventListener('click', rowClick);
   document.getElementById('smp-shuffle').addEventListener('click', function () { shuffle(all); applyFilters(); render(); });
   window.addEventListener('resize', function () {
     Array.prototype.forEach.call(document.querySelectorAll('.smp-wave'), function (cv) {
@@ -242,6 +229,77 @@
     });
   });
   window.addEventListener('keydown', function (e) { if (e.key === ' ' && playing && e.target === document.body) { e.preventDefault(); play(playing.row); } });
+
+  // The blob: a soft shape that breathes while idle, churns while the engine works and follows the loop's spectrum while it plays.
+  var bcv = document.getElementById('smp-blob'), bctx = bcv.getContext('2d');
+  var ac = null, an = null, bin = null, src = null, lvl = [], N = 96, bt = 0, accent = '#e8745a', frame = 0, energy = 0;
+  for (var li = 0; li < N; li++) lvl.push(0);
+  function wakeAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!ac) { ac = new AC(); an = ac.createAnalyser(); an.fftSize = 256; an.smoothingTimeConstant = 0.78; an.connect(ac.destination); bin = new Uint8Array(an.frequencyBinCount); }
+    if (ac.state === 'suspended') ac.resume();
+  }
+  function blobStop() { if (src) { try { src.stop(); } catch (e) {} src.disconnect(); src = null; } }
+  function blobPlay(g) {
+    if (!ac) wakeAudio();
+    if (!ac) return;
+    stop(); blobStop();
+    var n = g.pcm.length / 2, buf = ac.createBuffer(2, n, g.rate), l = buf.getChannelData(0), r = buf.getChannelData(1);
+    for (var i = 0; i < n; i++) { l[i] = g.pcm[i * 2]; r[i] = g.pcm[i * 2 + 1]; }
+    src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(an); src.start();
+    bcv.setAttribute('aria-pressed', 'true');
+  }
+  function blobToggle() {
+    if (busy) return;
+    if (!gens[0]) { generate(); return; }
+    if (src) { blobStop(); bcv.setAttribute('aria-pressed', 'false'); } else blobPlay(gens[0]);
+  }
+  bcv.addEventListener('click', blobToggle);
+  bcv.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); blobToggle(); } });
+  function blobDraw() {
+    requestAnimationFrame(blobDraw);
+    if (document.hidden) return;
+    var dpr = window.devicePixelRatio || 1, w = bcv.clientWidth, h = bcv.clientHeight;
+    if (!w) return;
+    if (bcv.width !== Math.round(w * dpr) || bcv.height !== Math.round(h * dpr)) { bcv.width = Math.round(w * dpr); bcv.height = Math.round(h * dpr); }
+    if (frame++ % 60 === 0) accent = getComputedStyle(bcv).getPropertyValue('--accent').trim() || accent;
+    bt += busy ? 0.045 : 0.014;
+    var playingNow = !!src, i, k;
+    if (playingNow) an.getByteFrequencyData(bin);
+    var sum = 0;
+    for (i = 0; i < N; i++) {
+      var m = Math.abs(i / N * 2 - 1), v = playingNow ? bin[Math.floor(Math.pow(m, 1.5) * 70)] / 255 : 0;
+      lvl[i] += (v - lvl[i]) * 0.35; sum += lvl[i];
+    }
+    energy += (sum / N - energy) * 0.2;
+    var cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.27, pulse = busy ? 0.08 * Math.sin(bt * 5) : 0;
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bctx.clearRect(0, 0, w, h);
+    function shape(scale, amp, phase) {
+      var pts = [];
+      for (k = 0; k < N; k++) {
+        var a = k / N * Math.PI * 2 + bt * 0.3 * phase;
+        var wob = 0.05 * Math.sin(a * 3 + bt * 1.7 * phase) + 0.035 * Math.sin(a * 5 - bt * 1.1 * phase) + (busy ? 0.05 * Math.sin(a * 7 + bt * 4) : 0);
+        var r = R * scale * (1 + wob + pulse + amp * (lvl[k] * 0.9 + energy * 0.6));
+        pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+      bctx.beginPath();
+      for (k = 0; k < N; k++) {
+        var p0 = pts[k], p1 = pts[(k + 1) % N], mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2;
+        if (!k) bctx.moveTo(mx, my); else bctx.quadraticCurveTo(p0[0], p0[1], mx, my);
+      }
+      bctx.quadraticCurveTo(pts[0][0], pts[0][1], (pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
+      bctx.closePath();
+    }
+    bctx.save(); bctx.globalAlpha = 0.28; bctx.fillStyle = accent; bctx.shadowColor = accent; bctx.shadowBlur = 40;
+    shape(1.18, 1.25, -0.7); bctx.fill(); bctx.restore();
+    var g = bctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R * 1.5);
+    g.addColorStop(0, '#fff'); g.addColorStop(0.35, accent); g.addColorStop(1, accent);
+    bctx.save(); bctx.globalAlpha = 0.92; bctx.fillStyle = g; shape(1, 1, 1); bctx.fill(); bctx.restore();
+    bctx.save(); bctx.globalAlpha = 0.35; bctx.strokeStyle = '#fff'; bctx.lineWidth = 1.5; shape(0.78, 0.7, 1.4); bctx.stroke(); bctx.restore();
+  }
+  requestAnimationFrame(blobDraw);
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
   fetch('data.json').then(function (r) { return r.json(); }).then(function (d) {
