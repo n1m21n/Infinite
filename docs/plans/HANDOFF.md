@@ -12,10 +12,36 @@ no app. UX: ler `docs/plans/TIMELINE-UX-PLAN.md`.
   - inspector fixo.
 - Paridade com o Naman (`feature/timeline-parity`): reverse, speed, stems, stretch por transientes,
   grade de lançamento, aviso de conflito e Session view (motor dele e grade nossa).
-- Próximo: o resto da Session (arrastar células, Record/Send to Timeline, inspector de slot), os
-  testes do upstream que dependem da UI dele, e a U2 de `TIMELINE-UX-PLAN.md` (edição nível Reaper).
-- `AUDIORECOVERYTEST` falha às vezes na suíte cheia (intervalo mínimo, depende de tempo) e passa
-  sozinho.
+- U2 e U3 (`feature/timeline-u2u3`, ainda não testadas pelo dono no app). Detalhes em
+  `TIMELINE-UX-PLAN.md` 4b.
+  - U2:
+    - botões de undo/redo;
+    - Ctrl+arrastar copia e Ctrl+Alt faz slip;
+    - linha de ganho;
+    - curvas de fade (tag `clipfadeshape`);
+    - snap magnético e ripple;
+    - copiar/duplicar range;
+    - S divide;
+    - Alt+roda muda a altura.
+  - U3:
+    - loop do conteúdo do clip (tag `cliploop`);
+    - count-in e punch;
+    - gravação em loop em takes;
+    - lanes de automação com keyframes (tags `autolane`/`autokey`, modo W de escrita).
+  - Teste: `ARRANGEEDITPLUSTEST`.
+- Próximo:
+  - tempo map;
+  - compensação de latência do Audio In;
+  - comping;
+  - metrônomo na gravação;
+  - arrastar range;
+  - Alt+clique para criar key num parâmetro;
+  - automação precisa por bloco (hoje é por frame);
+  - o resto da Session (arrastar células, Record/Send to Timeline, inspector de slot);
+  - os testes do upstream que dependem da UI dele.
+- Compat: 0 regressões. `001_3d_noise_teste_56fps` difere da referência 0.70 só em nós que dependem
+  do tempo (Render 3D, Slideshow). O exe atual é determinístico e a referência foi regravada com ele.
+- `DRAGTEST` e `AUDIORECOVERYTEST` falham às vezes na suíte cheia e passam sozinhos.
 
 ### Primeira etapa: alinhamento ao upstream (`feature/timeline-align`)
 
