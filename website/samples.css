@@ -126,8 +126,10 @@
 @media (max-width: 680px) { .smp-blob { height: 260px; } .smp-picks .smp-pick { flex: 1 1 120px; } }
 .smp-dlb:disabled { opacity: 0.4; cursor: progress; }
 .smp-play.is-busy { opacity: 0.5; cursor: progress; }
-.smp-license { margin: 2rem 0 0; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans); max-width: 70ch; }
-.smp-license b { color: var(--text, inherit); }
+.smp-license { display: flex; gap: 14px; align-items: center; margin: 2rem 0 0; padding: 16px 18px; border-radius: 22px; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans);
+  background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-license img { width: 44px; height: 44px; flex: none; }
+.smp-license b { color: var(--ink); }
 
 /* Filters read as icons; the native list stays as is. The chosen value shows beside the icon. */
 .smp-pickw { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 36px; min-width: 36px; padding: 0 10px; justify-content: center; border-radius: 999px; cursor: pointer;
@@ -139,3 +141,20 @@
 .smp-pickw .smp-pick { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; opacity: 0; padding: 0; flex: none; }
 .smp-pickw:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 680px) { .smp-picks .smp-pickw { flex: 0 0 auto; } }
+
+/* Header and steps, in the same voice as the other pages: hand word, slab headline, one plain line, 3D icons. */
+.smp-head { display: grid; gap: 6px; justify-items: start; margin: 6px 0 22px; }
+.smp-head .deck-title { margin: 0; text-align: left; }
+.smp-lede { margin: 0; color: var(--muted); font: 400 1.05rem/1.5 var(--font-sans); max-width: 52ch; }
+.smp-steps { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.smp-steps li { display: grid; grid-template-columns: 72px 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center; padding: 14px 16px; border-radius: 22px;
+  background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-steps img { grid-row: 1 / 3; width: 72px; height: 72px; object-fit: contain; }
+.smp-steps b { align-self: end; font: 700 1.05rem/1.2 var(--font-sans); letter-spacing: -0.01em; }
+.smp-steps span { align-self: start; color: var(--muted); font: 400 .85rem/1.4 var(--font-sans); }
+.smp-sub-l { margin: 4px 0 0; }
+.smp-wrap .blog-hand { justify-self: start; }
+@media (max-width: 760px) { .smp-steps { grid-template-columns: 1fr; } .smp-steps li { grid-template-columns: 56px 1fr; } .smp-steps img { width: 56px; height: 56px; } }
+.smp-head .blog-hand { display: block; font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1; }
+.lib-hero .smp-head h1.slab.deck-title { justify-self: start; text-align: left; width: auto; margin: 0; }
+.smp-steps li { grid-template-columns: 84px 1fr; } .smp-steps img { width: 84px; height: 84px; }
