@@ -308,3 +308,19 @@ private:
    std::atomic<bool> mOfflineInAudioBlock { false };
    std::atomic<double> mOfflineVideoSeconds { 0.0 };
 };
+
+// Points Transport::Instance() at another clock, for the calling thread only,
+// for as long as it lives. An offline render of a private graph (Generate
+// Samples) runs its sequencers on their own playhead, at their own tempo,
+// without moving or reading the live one. Nests; the audio thread never has one.
+class ScopedTransport
+{
+public:
+   explicit ScopedTransport(Transport& clock);
+   ~ScopedTransport();
+   ScopedTransport(const ScopedTransport&) = delete;
+   ScopedTransport& operator=(const ScopedTransport&) = delete;
+
+private:
+   Transport* mPrev;
+};

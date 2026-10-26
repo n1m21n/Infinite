@@ -11,6 +11,8 @@ namespace
    // Set by BeginFrameClock on the thread that latched (the main thread);
    // never true on the audio thread, so its reads are untouched.
    thread_local bool tFrameLatched = false;
+   // Set by ScopedTransport: this thread's Instance() is that clock instead.
+   thread_local Transport* tOverride = nullptr;
 
    double SteadyNow()
    {
@@ -136,8 +138,20 @@ void Transport::BeginFrameClock()
 
 Transport& Transport::Instance()
 {
+   if (tOverride != nullptr)
+      return *tOverride;
    static Transport instance;
    return instance;
+}
+
+ScopedTransport::ScopedTransport(Transport& clock) : mPrev(tOverride)
+{
+   tOverride = &clock;
+}
+
+ScopedTransport::~ScopedTransport()
+{
+   tOverride = mPrev;
 }
 
 double Transport::Seconds() const
