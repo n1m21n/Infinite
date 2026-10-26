@@ -159,3 +159,13 @@
 .lib-hero .smp-head h1.slab.deck-title { justify-self: start; text-align: left; width: auto; margin: 0; }
 .smp-steps li { grid-template-columns: 84px 1fr; } .smp-steps img { width: 84px; height: 84px; }
 .smp-genp { margin-bottom: 18px; } .smp-steps { margin-top: 0; }
+
+/* Controls share the raised 3D look of the other pages (neumo.css variables): raised, pearl when primary, pocket when pressed. */
+.smp-pickw, .smp-play, .smp-dlb, .smp-dl, .smp-seg { background: var(--nm-up); color: var(--nm-ink); box-shadow: var(--nm-raise); transition: box-shadow 160ms ease, transform 160ms ease; }
+.smp-pickw.is-set, .smp-row.on .smp-play { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); box-shadow: var(--nm-pearl-raise); }
+.smp-genb { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); box-shadow: var(--nm-pearl-raise); padding: 13px 26px; font-size: 0.95rem; }
+.smp-genb:hover { opacity: 1; transform: translateY(-1px); }
+.smp-genb:active, .smp-pickw:active, .smp-play:active, .smp-dlb:active { transform: translateY(1px); background: var(--nm-down); color: var(--nm-ink); box-shadow: var(--nm-pocket); }
+.smp-pickw { height: 40px; min-width: 40px; }
+.smp-pickw svg { width: 20px; height: 20px; }
+.smp-dl:hover { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); }
