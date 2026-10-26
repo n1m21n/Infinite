@@ -1,9 +1,10 @@
 // Runs Infinite's Generate Samples engine (wasm) off the page's thread. Loaded lazily on the first generate press.
-importScripts('infinite_gen_wasm.js');
+var V = '?v=4'; // bump with every rebuild: the worker, glue, wasm and data are all cached by the browser
+importScripts('infinite_gen_wasm.js' + V);
 
 var mod = null;
 function ready() {
-  if (!mod) mod = InfiniteGen();
+  if (!mod) mod = InfiniteGen({ locateFile: function (f, dir) { return dir + f + V; } });
   return mod;
 }
 

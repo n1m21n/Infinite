@@ -80,6 +80,10 @@ namespace
       for (size_t at = c.patch.find("\nnode "); at != std::string::npos; at = c.patch.find("\nnode ", at + 1))
          last = std::max(last, atoi(c.patch.c_str() + at + 6));
       std::string out = c.patch;
+      // The browser keeps the kit at /kit; on a desktop the same files live in the app's drumkits/infinite-basic folder,
+      // which the drum sequencer finds again from any such path when the patch opens.
+      for (size_t at = out.find("/kit/"); at != std::string::npos; at = out.find("/kit/", at + 1))
+         out.replace(at, 5, "/Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/");
       const size_t nl = out.find("\n", out.find("\ntransport") == std::string::npos ? 0 : out.find("\ntransport") + 1);
       out.insert(nl == std::string::npos ? out.size() : nl + 1,
                  "# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/\n# Free for commercial use if credited (Infinite, infinitedevices.org).\n");

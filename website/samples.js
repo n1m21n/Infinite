@@ -68,8 +68,8 @@
   var PART_INDEX = { '': 0, synths: 1, pads: 2, plucks: 3, percussion: 4, drums: 5, bass: 6, fx: 7, foley: 8, keys: 9, leads: 10, textures: 11, kicks: 12, snares: 13, hats: 14, toms: 15 };
   function ask(msg) {
     if (!worker) {
-      worker = new Worker('../gen/gen-worker.js');
-      worker.onmessage = function (e) { var j = jobs[e.data.id]; delete jobs[e.data.id]; if (j) (e.data.error ? j[1](new Error(e.data.error)) : j[0](e.data)); };
+      worker = new Worker('../gen/gen-worker.js?v=4');
+      worker.onmessage = function (e) { var j = jobs[e.data.id]; delete jobs[e.data.id]; var d = e.data; if (j) (d.error || (d.frames && String(d.patch).indexOf('infinite-patch') !== 0) ? j[1](new Error(d.error || 'stale generator')) : j[0](d)); };
       worker.onerror = function () { Object.keys(jobs).forEach(function (k) { jobs[k][1](new Error('worker')); delete jobs[k]; }); worker = null; info = null; };
     }
     return new Promise(function (ok, no) { msg.id = ++jobId; jobs[msg.id] = [ok, no]; worker.postMessage(msg); });
