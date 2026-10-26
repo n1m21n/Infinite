@@ -176,7 +176,7 @@ bool RunGenSampleTest()
          const int frames = (int)(2 * 4 * 60.0 / c.bpm * kRate);
          const Result r = RenderOnWorker(c, frames);
          worst = std::max(worst, r.ms);
-         if (!r.ok || seed == 1)
+         if (!r.ok || seed == 1 || r.ms > 1000.0)
             printf("  %-24s seed %u %s rms %7.1f dB %6.1f ms %s\n", rec.style.c_str(), seed, r.ok ? "ok  " : "FAIL", r.rmsDb, r.ms, r.error.c_str());
          fails += r.ok ? 0 : 1;
       }
