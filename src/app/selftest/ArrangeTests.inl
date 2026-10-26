@@ -1420,6 +1420,43 @@
             printf("arrange record playback without the source: %s (take peak %.4f, recorded live %.4f)\n",
                    playOk ? "OK" : "FAIL", played, monitored);
             allOk = allOk && playOk;
+
+            // Turbo 0.72 (U3): loop recording - a one-bar loop recorded for
+            // two and a half passes gives three takes: the last on the armed
+            // track, the two before on muted take tracks under it.
+            GraphNode* osc2 = SpawnNode("Oscillator", "Synths", 400.0f, 0.0f);
+            const uint64_t osc2Uid = osc2 != nullptr ? osc2->uid : 0;
+            const size_t lanesBefore = gArrange.lanes.size();
+            const bool armed2 = osc2Uid != 0 && ArrangeSetRecordArm(laneId, osc2Uid);
+            gArrange.settings.loop = { true, 0, Arrange::kTicksPerBar };
+            PublishArrangeLoop();
+            tr.SetPlaying(false);
+            tr.SeekBeats(0.0);
+            prepare();
+            const bool started2 = armed2 && ArrangeRecordStart(kSr);
+            run((int)(10.0 * kSamplesPerBeat / kBlock), nullptr); // 2.5 bars
+            ArrangeRecordStop();
+            ArrangeRecordCommit();
+            int takeLanes = 0;
+            for (const Arrange::Lane& l : gArrange.lanes)
+               if (l.name.find(" take ") != std::string::npos && l.mute && l.clips.size() == 1)
+                  takeLanes++;
+            const Arrange::Lane* armedLane = Arrange::FindLane(gArrange, laneId);
+            const Arrange::Clip* lastPass = nullptr;
+            if (armedLane != nullptr)
+               for (const Arrange::Clip& c : armedLane->clips)
+                  if (c.name.find(".3") != std::string::npos)
+                     lastPass = &c;
+            const bool loopRecOk = started2 && takeLanes == 2 && gArrange.lanes.size() == lanesBefore + 2 &&
+                                   lastPass != nullptr && lastPass->start == 0 &&
+                                   std::fabs(Arrange::TicksToBeats(lastPass->length) - 2.0) < 0.1 && lastPass->sourceOffsetSeconds > 3.9f;
+            printf("arrange record loop takes: %s (take tracks %d, last pass start %lld, %.3f beats, file offset %.3f s)\n",
+                   loopRecOk ? "OK" : "FAIL", takeLanes, lastPass != nullptr ? (long long)lastPass->start : -1LL,
+                   lastPass != nullptr ? Arrange::TicksToBeats(lastPass->length) : 0.0,
+                   lastPass != nullptr ? lastPass->sourceOffsetSeconds : 0.0f);
+            allOk = allOk && loopRecOk;
+            gArrange.settings.loop.enabled = false;
+            PublishArrangeLoop();
             tr.NotifyAudioEngineStopped();
          }
 

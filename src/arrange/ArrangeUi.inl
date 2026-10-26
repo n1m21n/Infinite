@@ -848,6 +848,14 @@ bool gArrangeRecLoopWas = false;  // the loop is off while recording (takes are 
 uint32_t gArrangeRecSeekSerial = 0;
 int gArrangeRecTakeCount = 0;
 double gArrangeRecSampleRate = 48000.0; // the rate the takes are written at
+// Turbo 0.72 (U3): recording options (REC's right-click menu) and the mode
+// the running take was started in.
+bool gArrangeRecCountIn = false;   // one bar before the take starts
+bool gArrangeRecPunch = false;     // with a loop range: record only inside it, once
+bool gArrangeRecLoopMode = false;  // loop on and no punch: one take per pass
+bool gArrangeRecPunchActive = false;
+Arrange::Tick gArrangeRecPunchEnd = 0;
+Arrange::LoopRange gArrangeRecLoop;
 std::string gArrangeRecStatus;
 
 // Turbo 0.72 (upstream's Render Track / Render Group): a render can be
@@ -956,19 +964,56 @@ bool ArrangeRecordStart(double sampleRate = 0.0) // 0 = the engine's rate (the o
          arm.writer.reset();
          continue;
       }
+   }
+   // Turbo 0.72 (U3): where the take may start and end. Punch: only the
+   // loop range, once. Loop recording: the loop keeps going and every pass
+   // becomes a take. Count-in: the transport starts a bar early.
+   Transport& tr = Transport::Instance();
+   const bool wasPlaying = tr.IsPlaying();
+   gArrangeRecLoop = gArrange.settings.loop;
+   const bool loopOn = gArrangeRecLoop.enabled && gArrangeRecLoop.end > gArrangeRecLoop.start;
+   gArrangeRecPunchActive = gArrangeRecPunch && loopOn;
+   gArrangeRecLoopMode = loopOn && !gArrangeRecPunchActive;
+   Arrange::Tick from = ArrangePlayTick();
+   // Without count-in or punch the take starts with the first block played
+   // (-1); a count-in arms it at the position REC was pressed at.
+   double armBeat = (gArrangeRecCountIn && !wasPlaying) ? Arrange::TicksToBeats(from) : -1.0, endBeat = -1.0;
+   if (gArrangeRecPunchActive)
+   {
+      armBeat = Arrange::TicksToBeats(gArrangeRecLoop.start);
+      endBeat = Arrange::TicksToBeats(gArrangeRecLoop.end);
+      gArrangeRecPunchEnd = gArrangeRecLoop.end;
+      from = std::min(from, gArrangeRecLoop.start);
+   }
+   for (auto& kv : gArrangeRecArms)
+   {
+      ArrangeRecArm& arm = kv.second;
+      if (arm.tap < 0 || !arm.writer)
+         continue;
       ArrangeRecordTap& tap = *gArrangeRecTaps[arm.tap];
       tap.started.store(false, std::memory_order_relaxed);
+      tap.armBeat.store(armBeat, std::memory_order_relaxed);
+      tap.endBeat.store(endBeat, std::memory_order_relaxed);
+      tap.framesWritten.store(0, std::memory_order_relaxed);
+      tap.wrapCount.store(0, std::memory_order_relaxed);
+      tap.lastBlockBeat = -1.0;
       tap.enabled.store(true, std::memory_order_release);
    }
    gArrangeTimelineMode = true; // the timeline owns the output while it records
-   Transport& tr = Transport::Instance();
    gArrangeRecLoopWas = gArrange.settings.loop.enabled;
-   tr.SetLoop(false, 0.0, 0.0);
+   if (!gArrangeRecLoopMode)
+      tr.SetLoop(false, 0.0, 0.0); // a linear take (punch runs past its range too)
+   if (!wasPlaying)
+   {
+      const double preroll = gArrangeRecCountIn ? std::max(0.25, tr.BeatsPerBar()) : 0.0;
+      if (gArrangeRecCountIn || gArrangeRecPunchActive)
+         tr.SeekBeats(std::max(0.0, Arrange::TicksToBeats(from) - preroll));
+   }
    gArrangeRecSeekSerial = tr.SeekSerial();
    gArrangeRecording = true;
    gArrangeRecStopFrames = -1;
    gArrangeRecStatus.clear();
-   if (!tr.IsPlaying())
+   if (!wasPlaying)
       tr.SetPlaying(true);
    return true;
 }
@@ -991,7 +1036,9 @@ void ArrangeRecordCommit()
    ArrangeRecordDrain();
    const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
    const double sr = std::max(1.0, gArrangeRecSampleRate);
-   struct Take { uint64_t laneId; std::string path; double startBeat; double seconds; };
+   // One pass of a take: where it lands and which stretch of the file it is.
+   struct Pass { double startBeat; double fileSeconds; double seconds; };
+   struct Take { uint64_t laneId; std::string path; double totalSeconds; std::vector<Pass> passes; };
    std::vector<Take> takes;
    for (auto& kv : gArrangeRecArms)
    {
@@ -1003,42 +1050,97 @@ void ArrangeRecordCommit()
       const std::string path = arm.writer->Path();
       arm.writer->Close();
       arm.writer.reset();
-      if (frames > 0 && tap.started.load(std::memory_order_acquire))
-         takes.push_back({ kv.first, path, std::max(0.0, tap.startBeat.load(std::memory_order_relaxed)),
-                           (double)frames / sr });
-      else
+      if (frames <= 0 || !tap.started.load(std::memory_order_acquire))
+      {
          std::remove(path.c_str());
+         continue;
+      }
+      Take t;
+      t.laneId = kv.first;
+      t.path = path;
+      t.totalSeconds = (double)frames / sr;
+      // Turbo 0.72 (U3): loop recording splits the file at every wrap - the
+      // first pass starts where REC began, the others at the loop start.
+      std::vector<int64_t> cuts = { 0 };
+      if (gArrangeRecLoopMode)
+         for (int w = 0; w < tap.wrapCount.load(std::memory_order_acquire); w++)
+            if (tap.wrapFrames[w] > cuts.back() && tap.wrapFrames[w] < frames)
+               cuts.push_back(tap.wrapFrames[w]);
+      cuts.push_back(frames);
+      for (size_t k = 0; k + 1 < cuts.size(); k++)
+      {
+         Pass p;
+         p.startBeat = k == 0 ? std::max(0.0, tap.startBeat.load(std::memory_order_relaxed))
+                              : Arrange::TicksToBeats(gArrangeRecLoop.start);
+         p.fileSeconds = (double)cuts[k] / sr;
+         p.seconds = (double)(cuts[k + 1] - cuts[k]) / sr;
+         if (p.seconds > 0.01)
+            t.passes.push_back(p);
+      }
+      if (!t.passes.empty())
+         takes.push_back(t);
    }
    gArrangeRecording = false;
    gArrangeRecStopFrames = -1;
    gArrange.settings.loop.enabled = gArrangeRecLoopWas;
    PublishArrangeLoop();
-   for (const Take& t : takes)
+   auto spawnPlayer = [&](const std::string& path) -> uint64_t
    {
       const std::string category = NodeFactory::Instance().CategoryOf("Audio File");
       GraphNode* gn = SpawnNode("Audio File", category.empty() ? "Source" : category, gViewCenterCanvas.x,
                                 gViewCenterCanvas.y + 120.0f);
       auto* af = gn != nullptr ? dynamic_cast<AudioFileNode*>(gn->node.get()) : nullptr;
       if (af == nullptr)
-         continue;
+         return 0;
       af->loop = false;
       af->volume = 1.0f; // the node's 0.8 default would play the take 2 dB under what was recorded
-      af->Open(t.path);
-      const uint64_t uid = gn->uid;
+      af->Open(path);
+      return gn->uid;
+   };
+   for (const Take& t : takes)
+   {
       gArrangeRecTakeCount++;
+      const int takeNo = gArrangeRecTakeCount;
+      // The last pass goes on the armed track; earlier passes go on muted
+      // take tracks right under it (one player each, so they never share a
+      // playback position), to compare and pick from.
+      std::vector<uint64_t> players;
+      for (size_t k = 0; k < t.passes.size(); k++)
+         players.push_back(spawnPlayer(t.path));
       ArrangeEdit([&]()
       {
-         Arrange::Clip c;
-         c.start = Arrange::BeatsToTicks(t.startBeat);
-         c.length = std::max<Arrange::Tick>(1, Arrange::SampleClipLengthTicks(t.seconds, bpm));
-         c.srcUid = uid;
-         c.sampleDropped = true; // an Audio Sample: position-locked, splits and trims read the file
-         c.syncToTempo = false;  // a take plays at the speed it was played
-         c.sampleBpm = (float)bpm;
-         c.origBpm = 0.0f;
-         c.sourceDurationSeconds = (float)t.seconds;
-         c.name = "Take " + std::to_string(gArrangeRecTakeCount);
-         Arrange::PlaceOverwrite(gArrange, t.laneId, c);
+         const int armedIdx = Arrange::LaneIndex(gArrange, t.laneId);
+         const std::string base = armedIdx >= 0 ? ArrangeLaneLabel(gArrange, armedIdx) : std::string("Track");
+         for (size_t k = 0; k < t.passes.size(); k++)
+         {
+            if (players[k] == 0)
+               continue;
+            const Pass& p = t.passes[k];
+            Arrange::Clip c;
+            c.start = Arrange::BeatsToTicks(p.startBeat);
+            c.length = std::max<Arrange::Tick>(1, Arrange::SampleClipLengthTicks(p.seconds, bpm));
+            c.srcUid = players[k];
+            c.sampleDropped = true; // an Audio Sample: position-locked, splits and trims read the file
+            c.syncToTempo = false;  // a take plays at the speed it was played
+            c.sampleBpm = (float)bpm;
+            c.origBpm = 0.0f;
+            c.sourceDurationSeconds = (float)t.totalSeconds;
+            c.sourceOffsetSeconds = (float)p.fileSeconds;
+            c.name = t.passes.size() > 1 ? "Take " + std::to_string(takeNo) + "." + std::to_string(k + 1)
+                                         : "Take " + std::to_string(takeNo);
+            uint64_t laneId = t.laneId;
+            if (k + 1 < t.passes.size())
+            {
+               const int at = Arrange::LaneIndex(gArrange, t.laneId) + 1 + (int)k;
+               laneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio, at);
+               if (Arrange::Lane* nl = Arrange::FindLane(gArrange, laneId))
+               {
+                  nl->name = base + " take " + std::to_string(takeNo) + "." + std::to_string(k + 1);
+                  nl->mute = true;
+               }
+            }
+            Arrange::PlaceOverwrite(gArrange, laneId, c);
+         }
       });
    }
    RuntimeLog::Write("timeline record: %d take(s)", (int)takes.size());
@@ -1250,7 +1352,10 @@ void ArrangeFrameUpdate()
    {
       ArrangeRecordDrain();
       const Transport& rt = Transport::Instance();
-      if (gArrangeRecStopFrames < 0 && (!rt.IsPlaying() || rt.SeekSerial() != gArrangeRecSeekSerial))
+      // Stopping the transport ends a take; so does passing a punch range's
+      // end (Turbo 0.72, U3). Loop wraps and the count-in's seek do not.
+      const bool punchDone = gArrangeRecPunchActive && ArrangePlayTick() > gArrangeRecPunchEnd + Arrange::kPPQ / 4;
+      if (gArrangeRecStopFrames < 0 && (!rt.IsPlaying() || punchDone))
          ArrangeRecordStop();
       if (gArrangeRecStopFrames > 0 && --gArrangeRecStopFrames == 0)
          ArrangeRecordCommit();
@@ -3683,6 +3788,20 @@ void DrawArrangeToolbar(float width)
          ArrangeRecordStop();
       else
          ArrangeRecordStart();
+   }
+   // Turbo 0.72 (U3): recording options on REC's right-click.
+   if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+      ImGui::OpenPopup("##arrrecopts");
+   if (ImGui::BeginPopup("##arrrecopts"))
+   {
+      ImGui::TextDisabled("recording");
+      ImGui::Separator();
+      ImGui::MenuItem("Count-in (one bar)", nullptr, &gArrangeRecCountIn);
+      ImGui::MenuItem("Punch in / out on the loop range", nullptr, &gArrangeRecPunch);
+      ImGui::Separator();
+      ImGui::TextDisabled("loop on (no punch): every pass is a take -\n"
+                          "the last on the track, the others on muted take tracks");
+      ImGui::EndPopup();
    }
    ArrUi::GroupEnd();
 

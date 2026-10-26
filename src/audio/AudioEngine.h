@@ -179,6 +179,16 @@ struct ArrangeRecordTap
    std::atomic<bool> enabled { false };
    std::atomic<bool> started { false };     // audio thread: first block written
    std::atomic<double> startBeat { 0.0 };   // beat of the first recorded frame
+   // Turbo 0.72 (U3): count-in / punch. Frames before armBeat and from
+   // endBeat on are not written (-1 = no limit). Loop recording: the frame
+   // count at each loop wrap, so the take splits into one clip per pass.
+   std::atomic<double> armBeat { -1.0 };
+   std::atomic<double> endBeat { -1.0 };
+   static constexpr int kMaxWraps = 512;
+   std::atomic<int64_t> framesWritten { 0 };
+   std::atomic<int> wrapCount { 0 };
+   int64_t wrapFrames[kMaxWraps] = {};
+   double lastBlockBeat = -1.0;             // audio thread: to see the transport jump back
 };
 
 // One armed lane in the topology: the source's buffer, its tap, and whether
