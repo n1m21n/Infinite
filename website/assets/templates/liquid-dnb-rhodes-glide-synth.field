@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid DnB Rhodes Glide Synth",
+    "author": "Infinite",
+    "description": "Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float tineMod = 0.72 [0.1, 2.0]\nparam float warmth = 0.65 [0.1, 1.0]\nparam float cutoff = 2600.0 [200.0, 8000.0]\nparam float decay = 0.75 [0.1, 3.0]\nparam float tremolo = 0.25 [0.0, 0.8]\nstate float phaseC = 0\nstate float phaseM = 0\nstate float env = 0\nstate float tineEnv = 0\nstate float lfo = 0\nstate float lp1 = 0\nstate float curFreq = 220\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00003, 0.01)\nenv = if(target > env, env + (target - env) * 0.25, env - env * decayRate)\ntineEnv = if(target > tineEnv, 1.0, tineEnv * 0.9982)\n\ncurFreq = curFreq + (freq - curFreq) * 0.15\nfBase = clamp(curFreq, 30.0, 3000.0)\n\nstepC = fBase / sr\nstepM = (fBase * 3.0) / sr\n\nphaseC = (phaseC + stepC) % 1.0\nphaseM = (phaseM + stepM) % 1.0\nlfo = (lfo + 5.5 / sr) % 1.0\n\nmodSig = sin(phaseM * 6.2831853) * tineMod * tineEnv\ncar = sin((phaseC + modSig * 0.25) * 6.2831853)\n\ntrem = 1.0 - tremolo * 0.5 * (1.0 + sin(lfo * 6.2831853))\nraw = car * env * trem\n\nsat = clamp(raw * (1.0 + warmth * 0.5), -1.0, 1.0)\nfCut = clamp(cutoff / sr * 2.8, 0.008, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\n\nout = lp1 * 0.35\n",
+    "params": {
+      "tineMod": 0.72,
+      "warmth": 0.65,
+      "cutoff": 2600.0,
+      "decay": 0.75,
+      "tremolo": 0.25
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

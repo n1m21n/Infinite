@@ -95,6 +95,14 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/demoscene-plasma-rotozoom-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/demoscene-plasma-sine-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/ditherpunk-terminal-matrix.html": {
    "font-size": 2,
    "hex": 6
@@ -378,9 +386,10 @@
    "radius": 1
   },
   "samples.css": {
-   "font-size": 17,
+   "duration": 1,
+   "font-size": 25,
    "hex": 8,
-   "radius": 9
+   "radius": 11
   },
   "search.css": {
    "duration": 3,

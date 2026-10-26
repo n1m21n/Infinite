@@ -115,6 +115,10 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Acid House Resonant Sub Synth](https://infinitedevices.org/library/acid-house-resonant-sub-synth.html): Deep resonant acid sub bass synthesizer with transistor glide, soft saturation drive, and sub-octave punch. (file: https://infinitedevices.org/assets/templates/acid-house-resonant-sub-synth.inf)
 - [Psytrance Resonant Comb FX](https://infinitedevices.org/library/psytrance-resonant-comb-fx.html): Multi-tap resonant comb filter with kinetic sweep LFO modulation and harmonic feedback saturation. (file: https://infinitedevices.org/assets/templates/psytrance-resonant-comb-fx.inf)
 - [Psytrance Spectral Filter FX](https://infinitedevices.org/library/psytrance-spectral-filter-fx.html): Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive. (file: https://infinitedevices.org/assets/templates/psytrance-spectral-filter-fx.inf)
+- [Liquid DnB Roller Bass Synth](https://infinitedevices.org/library/liquid-dnb-roller-bass-synth.html): Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-roller-bass-synth.inf)
+- [Liquid DnB Rhodes Glide Synth](https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html): Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-glide-synth.inf)
+- [French Touch Disco Filter FX](https://infinitedevices.org/library/french-touch-disco-filter-fx.html): Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character. (file: https://infinitedevices.org/assets/templates/french-touch-disco-filter-fx.inf)
+- [French Touch Phaser Sweep FX](https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html): Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth. (file: https://infinitedevices.org/assets/templates/french-touch-phaser-sweep-fx.inf)
 
 ## Library: Community
 
@@ -295,6 +299,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Cymatics Sine Harmonic Ripples](https://infinitedevices.org/library/cymatics-sine-harmonic-ripples.html): Intersecting Bessel standing wave rings with audio-reactive frequency nodal clusters, kinetic wavefront displacement, and metallic plate highlights. (file: https://infinitedevices.org/assets/library/pixel/cymatics-sine-harmonic-ripples.field)
 - [Indie Psychedelic Kaleido Melt](https://infinitedevices.org/library/indie-psychedelic-kaleido-melt.html): Kaleidoscopic radial symmetry melt shader with liquid color warping, gold iridescence, and turquoise glow. (file: https://infinitedevices.org/assets/library/pixel/indie-psychedelic-kaleido-melt.field)
 - [Indie Psychedelic Liquid Dream](https://infinitedevices.org/library/indie-psychedelic-liquid-dream.html): Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms. (file: https://infinitedevices.org/assets/library/pixel/indie-psychedelic-liquid-dream.field)
+- [Demoscene Plasma Sine Matrix](https://infinitedevices.org/library/demoscene-plasma-sine-matrix.html): Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows. (file: https://infinitedevices.org/assets/library/pixel/demoscene-plasma-sine-matrix.field)
+- [Demoscene Plasma Rotozoom Bloom](https://infinitedevices.org/library/demoscene-plasma-rotozoom-bloom.html): Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. (file: https://infinitedevices.org/assets/library/pixel/demoscene-plasma-rotozoom-bloom.field)
 
 ## Library: Sketch
 
@@ -344,6 +350,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Generative Plotter Spiral Lattice](https://infinitedevices.org/library/generative-plotter-spiral-lattice.html): Concentric logarithmic Archimedean spiral lattice with geometric pen hatching and harmonic angle offsets. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-spiral-lattice.js)
 - [Bauhaus Constructivist Grid](https://infinitedevices.org/library/bauhaus-constructivist-grid.html): Modular constructivist grid of primary circular discs, quarter-circle wedges, and solid rectangular balance bars. (file: https://infinitedevices.org/assets/library/sketch/bauhaus-constructivist-grid.js)
 - [Bauhaus Geometric Rotary](https://infinitedevices.org/library/bauhaus-geometric-rotary.html): Concentric circular arcs, rotating triangular wedges, and cantilever balance bars in dynamic equilibrium. (file: https://infinitedevices.org/assets/library/sketch/bauhaus-geometric-rotary.js)
+- [Minimal Signal Raster Scanner](https://infinitedevices.org/library/minimal-signal-raster-scanner.html): Ryoji Ikeda inspired high-frequency raster scanner with horizontal scanlines, binary barcode pulses, and electric red strobe markers. (file: https://infinitedevices.org/assets/library/sketch/minimal-signal-raster-scanner.js)
+- [Minimal Signal Binary Matrix](https://infinitedevices.org/library/minimal-signal-binary-matrix.html): Precision digital test pattern matrix with algorithmic binary telemetry, segmented waveform ribbons, and focal signal reticles. (file: https://infinitedevices.org/assets/library/sketch/minimal-signal-binary-matrix.js)
 
 ## Library: Sketch 3D
 
@@ -388,6 +396,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Vector Wireframe Torus Knot 3D](https://infinitedevices.org/library/vector-wireframe-torus-knot-3d.html): Orthographic vector wireframe trefoil torus knot with segmented glowing green rib cages and parametric twists. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-torus-knot-3d.js)
 - [Suprematist Floating Monolith 3D](https://infinitedevices.org/library/suprematist-floating-monolith-3d.html): Suspended carbon black rectangular monolith flanked by dynamic red diagonal wedges and interlocking cantilever planes. (file: https://infinitedevices.org/assets/library/sketch/suprematist-floating-monolith-3d.js)
 - [Suprematist Geometric Cantilever 3D](https://infinitedevices.org/library/suprematist-geometric-cantilever-3d.html): Interlocking constructivist cantilever beams, offset rectangular planes, and hovering geometric volumes. (file: https://infinitedevices.org/assets/library/sketch/suprematist-geometric-cantilever-3d.js)
+- [Data Landscape Contour Mesh 3D](https://infinitedevices.org/library/data-landscape-contour-mesh-3d.html): Peter Saville inspired procedural 3D topological contour mesh with stepped elevation strata and oceanic cyan depth shading. (file: https://infinitedevices.org/assets/library/sketch/data-landscape-contour-mesh-3d.js)
+- [Data Landscape Topological Ridge 3D](https://infinitedevices.org/library/data-landscape-topological-ridge-3d.html): Generative data sculpture with undulating stacked frequency waveform ridges and floating structural datum planes. (file: https://infinitedevices.org/assets/library/sketch/data-landscape-topological-ridge-3d.js)
 
 ## Library: Synths
 
@@ -432,6 +442,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Dub Techno Sub Rumble Synth](https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html): Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch. (file: https://infinitedevices.org/assets/templates/dub-techno-sub-rumble-synth.inf)
 - [Acid House Transistor Lead Synth](https://infinitedevices.org/library/acid-house-transistor-lead-synth.html): Resonant 3-pole transistor diode ladder lead synthesizer with accent modulation and vintage acid squelch. (file: https://infinitedevices.org/assets/templates/acid-house-transistor-lead-synth.inf)
 - [Acid House Resonant Sub Synth](https://infinitedevices.org/library/acid-house-resonant-sub-synth.html): Deep resonant acid sub bass synthesizer with transistor glide, soft saturation drive, and sub-octave punch. (file: https://infinitedevices.org/assets/templates/acid-house-resonant-sub-synth.inf)
+- [Liquid DnB Roller Bass Synth](https://infinitedevices.org/library/liquid-dnb-roller-bass-synth.html): Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-roller-bass-synth.inf)
+- [Liquid DnB Rhodes Glide Synth](https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html): Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-glide-synth.inf)
 
 ## Library: Audio Effects
 
@@ -476,6 +488,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Drone Kosmische Resonator Filter FX](https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html): Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive. (file: https://infinitedevices.org/assets/templates/drone-kosmische-resonator-filter-fx.inf)
 - [Psytrance Resonant Comb FX](https://infinitedevices.org/library/psytrance-resonant-comb-fx.html): Multi-tap resonant comb filter with kinetic sweep LFO modulation and harmonic feedback saturation. (file: https://infinitedevices.org/assets/templates/psytrance-resonant-comb-fx.inf)
 - [Psytrance Spectral Filter FX](https://infinitedevices.org/library/psytrance-spectral-filter-fx.html): Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive. (file: https://infinitedevices.org/assets/templates/psytrance-spectral-filter-fx.inf)
+- [French Touch Disco Filter FX](https://infinitedevices.org/library/french-touch-disco-filter-fx.html): Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character. (file: https://infinitedevices.org/assets/templates/french-touch-disco-filter-fx.inf)
+- [French Touch Phaser Sweep FX](https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html): Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth. (file: https://infinitedevices.org/assets/templates/french-touch-phaser-sweep-fx.inf)
 
 ## Nodes
 
@@ -789,7 +803,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 58 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 60 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -848,6 +862,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Cymatics Sine Harmonic Ripples](https://infinitedevices.org/embeds/cymatics-sine-harmonic-ripples.html): Intersecting circular acoustic Bessel standing wave rings with audio-reactive nodal interference clusters and metallic plate highlights. Bass deepens the central wavefront displacement, mids modulate multi-focus ripple frequencies, highs ignite luminous amber nodal boundaries.
 - [Indie Psychedelic Kaleido Melt](https://infinitedevices.org/embeds/indie-psychedelic-kaleido-melt.html): Kaleidoscopic radial symmetry melt shader with liquid color warping, gold iridescence, and turquoise glow. Bass drives melt distortion and pulsation, mids cycle kaleidoscopic folds, highs ignite turquoise surface shimmer.
 - [Indie Psychedelic Liquid Dream](https://infinitedevices.org/embeds/indie-psychedelic-liquid-dream.html): Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms. Bass accelerates fluid warps and center blob eruption, mids blend electric orange and lime contours, highs release pink pulse bloom.
+- [Demoscene Plasma Sine Matrix](https://infinitedevices.org/embeds/demoscene-plasma-sine-matrix.html): Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows. Bass accelerates plasma turbulence and central pulsation, mids cycle interference harmonics, highs illuminate electric cyan coronal flares.
+- [Demoscene Plasma Rotozoom Bloom](https://infinitedevices.org/embeds/demoscene-plasma-rotozoom-bloom.html): Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. Bass drives dynamic coordinate rotation and zoom breathing, mids expand radial spiral interference bands, highs spark blazing white-hot thermal blooms.
 
 ## For AI agents
 

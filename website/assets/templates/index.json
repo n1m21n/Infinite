@@ -1179,6 +1179,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "liquid-dnb-roller-bass-synth",
+      "name": "Liquid DnB Roller Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth.",
+      "price": 0,
+      "preview": "assets/templates/liquid-dnb-roller-bass-synth.webp",
+      "file": "assets/templates/liquid-dnb-roller-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "liquid-dnb-rhodes-glide-synth",
+      "name": "Liquid DnB Rhodes Glide Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth.",
+      "price": 0,
+      "preview": "assets/templates/liquid-dnb-rhodes-glide-synth.webp",
+      "file": "assets/templates/liquid-dnb-rhodes-glide-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-touch-disco-filter-fx",
+      "name": "French Touch Disco Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character.",
+      "price": 0,
+      "preview": "assets/templates/french-touch-disco-filter-fx.webp",
+      "file": "assets/templates/french-touch-disco-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-touch-phaser-sweep-fx",
+      "name": "French Touch Phaser Sweep FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth.",
+      "price": 0,
+      "preview": "assets/templates/french-touch-phaser-sweep-fx.webp",
+      "file": "assets/templates/french-touch-phaser-sweep-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

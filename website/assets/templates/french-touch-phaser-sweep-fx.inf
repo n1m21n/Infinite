@@ -1,0 +1,84 @@
+infinite-patch 1
+# French Touch Phaser Sweep FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3000.0
+  f resonance 0.35
+  f decay 0.22
+  f volume 0.55
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float rate = 0.65 [0.05, 5.0]\nparam float depth = 0.8 [0.1, 1.0]\nparam float feedback = 0.62 [0.0, 0.92]\nparam float baseFreq = 800.0 [100.0, 3000.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfo = 0\nstate float ap1_x = 0\nstate float ap1_y = 0\nstate float ap2_x = 0\nstate float ap2_y = 0\nstate float ap3_x = 0\nstate float ap3_y = 0\nstate float ap4_x = 0\nstate float ap4_y = 0\n\nlfo = (lfo + rate / sr) % 1.0\nmod = sin(lfo * 6.2831853) * 0.5 + 0.5\nfSweep = clamp(baseFreq * (1.0 + mod * depth * 3.0), 50.0, 12000.0)\n\nw = clamp(fSweep * 3.14159265 / sr, 0.01, 0.85)\nalpha = (1.0 - w) / (1.0 + w)\n\ninp = in + ap4_y * feedback\n\ny1 = alpha * inp + ap1_x - alpha * ap1_y\nap1_x = inp\nap1_y = y1\n\ny2 = alpha * y1 + ap2_x - alpha * ap2_y\nap2_x = y1\nap2_y = y2\n\ny3 = alpha * y2 + ap3_x - alpha * ap3_y\nap3_x = y2\nap3_y = y3\n\ny4 = alpha * y3 + ap4_x - alpha * ap4_y\nap4_x = y3\nap4_y = y4\n\nwet = y4\nout = (in * (1.0 - mix) + wet * mix) * 0.92\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.45 0.15 0.22
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text French Touch Phaser Sweep FX. Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

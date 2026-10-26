@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid DnB Roller Bass Synth",
+    "author": "Infinite",
+    "description": "Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.45 [0.05, 1.2]\nparam float cutoff = 950.0 [80.0, 4500.0]\nparam float drive = 1.6 [0.5, 3.5]\nparam float subLevel = 0.65 [0.0, 1.0]\nparam float decay = 0.55 [0.1, 2.5]\nstate float phase1 = 0\nstate float phase2 = 0\nstate float subPhase = 0\nstate float curFreq = 55\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00004, 0.01)\nenv = if(target > env, env + (target - env) * 0.15, env - env * decayRate)\n\ncurFreq = curFreq + (freq - curFreq) * 0.12\nfBase = clamp(curFreq, 20.0, 2000.0)\n\nstep1 = fBase / sr\nstep2 = (fBase * (1.0 + detune * 0.018)) / sr\nstepSub = (fBase * 0.5) / sr\n\nphase1 = (phase1 + step1) % 1.0\nphase2 = (phase2 + step2) % 1.0\nsubPhase = (subPhase + stepSub) % 1.0\n\nsaw1 = phase1 * 2.0 - 1.0\nsaw2 = phase2 * 2.0 - 1.0\nsub = sin(subPhase * 6.2831853) * subLevel\n\nraw = (saw1 * 0.45 + saw2 * 0.45 + sub) * env\n\nu = raw * drive\nsat = clamp(u - 0.25 * u * u * u, -1.0, 1.0)\n\nfCut = clamp(cutoff / sr * 2.8, 0.005, 0.42)\nlp1 = lp1 + fCut * (sat - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.28\n",
+    "params": {
+      "detune": 0.45,
+      "cutoff": 950.0,
+      "drive": 1.6,
+      "subLevel": 0.65,
+      "decay": 0.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

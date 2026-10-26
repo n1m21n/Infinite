@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "French Touch Phaser Sweep FX",
+    "author": "Infinite",
+    "description": "Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.65 [0.05, 5.0]\nparam float depth = 0.8 [0.1, 1.0]\nparam float feedback = 0.62 [0.0, 0.92]\nparam float baseFreq = 800.0 [100.0, 3000.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfo = 0\nstate float ap1_x = 0\nstate float ap1_y = 0\nstate float ap2_x = 0\nstate float ap2_y = 0\nstate float ap3_x = 0\nstate float ap3_y = 0\nstate float ap4_x = 0\nstate float ap4_y = 0\n\nlfo = (lfo + rate / sr) % 1.0\nmod = sin(lfo * 6.2831853) * 0.5 + 0.5\nfSweep = clamp(baseFreq * (1.0 + mod * depth * 3.0), 50.0, 12000.0)\n\nw = clamp(fSweep * 3.14159265 / sr, 0.01, 0.85)\nalpha = (1.0 - w) / (1.0 + w)\n\ninp = in + ap4_y * feedback\n\ny1 = alpha * inp + ap1_x - alpha * ap1_y\nap1_x = inp\nap1_y = y1\n\ny2 = alpha * y1 + ap2_x - alpha * ap2_y\nap2_x = y1\nap2_y = y2\n\ny3 = alpha * y2 + ap3_x - alpha * ap3_y\nap3_x = y2\nap3_y = y3\n\ny4 = alpha * y3 + ap4_x - alpha * ap4_y\nap4_x = y3\nap4_y = y4\n\nwet = y4\nout = (in * (1.0 - mix) + wet * mix) * 0.92\n",
+    "params": {
+      "rate": 0.65,
+      "depth": 0.8,
+      "feedback": 0.62,
+      "baseFreq": 800.0,
+      "mix": 0.5
+    }
+  }
+}

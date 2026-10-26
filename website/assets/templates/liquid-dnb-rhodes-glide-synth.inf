@@ -1,0 +1,75 @@
+infinite-patch 1
+# Liquid DnB Rhodes Glide Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i steps 16
+  i note0 62
+  i note1 62
+  i note2 65
+  i note3 65
+  i note4 69
+  i note5 69
+  i note6 67
+  i note7 67
+  i note8 62
+  i note9 62
+  i note10 65
+  i note11 65
+  i note12 70
+  i note13 70
+  i note14 69
+  i note15 67
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float tineMod = 0.72 [0.1, 2.0]\nparam float warmth = 0.65 [0.1, 1.0]\nparam float cutoff = 2600.0 [200.0, 8000.0]\nparam float decay = 0.75 [0.1, 3.0]\nparam float tremolo = 0.25 [0.0, 0.8]\nstate float phaseC = 0\nstate float phaseM = 0\nstate float env = 0\nstate float tineEnv = 0\nstate float lfo = 0\nstate float lp1 = 0\nstate float curFreq = 220\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00003, 0.01)\nenv = if(target > env, env + (target - env) * 0.25, env - env * decayRate)\ntineEnv = if(target > tineEnv, 1.0, tineEnv * 0.9982)\n\ncurFreq = curFreq + (freq - curFreq) * 0.15\nfBase = clamp(curFreq, 30.0, 3000.0)\n\nstepC = fBase / sr\nstepM = (fBase * 3.0) / sr\n\nphaseC = (phaseC + stepC) % 1.0\nphaseM = (phaseM + stepM) % 1.0\nlfo = (lfo + 5.5 / sr) % 1.0\n\nmodSig = sin(phaseM * 6.2831853) * tineMod * tineEnv\ncar = sin((phaseC + modSig * 0.25) * 6.2831853)\n\ntrem = 1.0 - tremolo * 0.5 * (1.0 + sin(lfo * 6.2831853))\nraw = car * env * trem\n\nsat = clamp(raw * (1.0 + warmth * 0.5), -1.0, 1.0)\nfCut = clamp(cutoff / sr * 2.8, 0.008, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\n\nout = lp1 * 0.35\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.12 0.35 0.58
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Liquid DnB Rhodes Glide Synth. Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "French Touch Disco Filter FX",
+    "author": "Infinite",
+    "description": "Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float sweepRate = 1.25 [0.1, 10.0]\nparam float resonance = 0.72 [0.1, 0.96]\nparam float cutoff = 1500.0 [80.0, 9000.0]\nparam float drive = 1.35 [0.5, 3.5]\nparam float mix = 0.75 [0.0, 1.0]\nstate float lfo = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\n\nlfo = (lfo + sweepRate / sr) % 1.0\nsweep = sin(lfo * 6.2831853) * 0.42 + 0.58\n\nu = in * drive\nsat = clamp(u - 0.2 * u * u * u, -1.0, 1.0)\n\nfCut = clamp((cutoff * sweep) / sr * 3.14159265, 0.005, 0.48)\nfb = resonance * 3.6\ninputSignal = sat - s4 * fb\n\ns1 = s1 + fCut * (inputSignal - s1)\ns2 = s2 + fCut * (s1 - s2)\ns3 = s3 + fCut * (s2 - s3)\ns4 = s4 + fCut * (s3 - s4)\n\nout = (in * (1.0 - mix) + s4 * mix) * 1.15\n",
+    "params": {
+      "sweepRate": 1.25,
+      "resonance": 0.72,
+      "cutoff": 1500.0,
+      "drive": 1.35,
+      "mix": 0.75
+    }
+  }
+}

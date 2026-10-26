@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Demoscene Plasma Sine Matrix",
+    "author": "Infinite",
+    "description": "Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float waveSpeed = 0.85 [0.1, 3.0]\nparam float freqX = 4.5 [1.0, 12.0]\nparam float freqY = 4.0 [1.0, 12.0]\nparam float swirl = 1.35 [0.2, 4.0]\nparam float glow = 0.8 [0.1, 1.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\nr = length(p)\nang = atan2(p.y, p.x)\ntime = t * waveSpeed\n\nw1 = sin(p.x * freqX + time * 1.5)\nw2 = sin(p.y * freqY - time * 1.2)\nw3 = sin((p.x + p.y) * (freqX * 0.7) + time * 0.9)\nw4 = sin(r * (freqY * 1.2) - time * 2.2 + ang * swirl)\n\nplasma = (w1 + w2 + w3 + w4) * 0.25\n\ncBlack = vec3(0.02, 0.02, 0.04)\ncFire = vec3(1.0, 0.23, 0.0)\ncCyan = vec3(0.0, 0.88, 1.0)\ncWhite = vec3(1.0, 1.0, 1.0)\n\nramp1 = mix(cBlack, cFire, clamp(plasma * 1.2 + 0.5, 0.0, 1.0))\nramp2 = mix(ramp1, cCyan, clamp(sin(plasma * 6.2831853 + time) * 0.5 + 0.5, 0.0, 1.0) * glow)\ncol = mix(ramp2, cWhite, clamp(plasma * 2.0 - 0.8, 0.0, 1.0))\nalpha = 1.0\n",
+    "params": {
+      "waveSpeed": 0.85,
+      "freqX": 4.5,
+      "freqY": 4.0,
+      "swirl": 1.35,
+      "glow": 0.8
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

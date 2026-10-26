@@ -4205,6 +4205,218 @@
       "file": "assets/library/pixel/indie-psychedelic-liquid-dream.field",
       "preview": "assets/library/previews/indie-psychedelic-liquid-dream.jpg",
       "bytes": 1716
+    },
+    {
+      "id": "minimal-signal-raster-scanner",
+      "name": "Minimal Signal Raster Scanner",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "raster",
+        "scanner",
+        "monochrome",
+        "drawing"
+      ],
+      "description": "Ryoji Ikeda inspired high-frequency raster scanner with horizontal scanlines, binary barcode pulses, and electric red strobe markers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/minimal-signal-raster-scanner.js",
+      "preview": "assets/library/previews/minimal-signal-raster-scanner.jpg",
+      "bytes": 2465
+    },
+    {
+      "id": "minimal-signal-binary-matrix",
+      "name": "Minimal Signal Binary Matrix",
+      "kind": "Generator",
+      "tags": [
+        "minimal",
+        "signal",
+        "binary",
+        "matrix",
+        "datamatics",
+        "drawing"
+      ],
+      "description": "Precision digital test pattern matrix with algorithmic binary telemetry, segmented waveform ribbons, and focal signal reticles.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/minimal-signal-binary-matrix.js",
+      "preview": "assets/library/previews/minimal-signal-binary-matrix.jpg",
+      "bytes": 2909
+    },
+    {
+      "id": "data-landscape-contour-mesh-3d",
+      "name": "Data Landscape Contour Mesh 3D",
+      "kind": "Generator",
+      "tags": [
+        "data",
+        "landscape",
+        "contour",
+        "mesh",
+        "3d",
+        "topography",
+        "geometry"
+      ],
+      "description": "Peter Saville inspired procedural 3D topological contour mesh with stepped elevation strata and oceanic cyan depth shading.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/data-landscape-contour-mesh-3d.js",
+      "preview": "assets/library/previews/data-landscape-contour-mesh-3d.jpg",
+      "bytes": 1764
+    },
+    {
+      "id": "data-landscape-topological-ridge-3d",
+      "name": "Data Landscape Topological Ridge 3D",
+      "kind": "Generator",
+      "tags": [
+        "data",
+        "landscape",
+        "topological",
+        "ridge",
+        "3d",
+        "sculpture",
+        "geometry"
+      ],
+      "description": "Generative data sculpture with undulating stacked frequency waveform ridges and floating structural datum planes.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/data-landscape-topological-ridge-3d.js",
+      "preview": "assets/library/previews/data-landscape-topological-ridge-3d.jpg",
+      "bytes": 1734
+    },
+    {
+      "id": "liquid-dnb-roller-bass-synth",
+      "name": "Liquid DnB Roller Bass Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "liquid",
+        "dnb",
+        "bass",
+        "reese",
+        "drum-and-bass"
+      ],
+      "description": "Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/liquid-dnb-roller-bass-synth.inf",
+      "preview": "assets/library/previews/liquid-dnb-roller-bass-synth.jpg",
+      "bytes": 2379
+    },
+    {
+      "id": "liquid-dnb-rhodes-glide-synth",
+      "name": "Liquid DnB Rhodes Glide Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "liquid",
+        "dnb",
+        "rhodes",
+        "electric-piano",
+        "chime"
+      ],
+      "description": "Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/liquid-dnb-rhodes-glide-synth.inf",
+      "preview": "assets/library/previews/liquid-dnb-rhodes-glide-synth.jpg",
+      "bytes": 2366
+    },
+    {
+      "id": "french-touch-disco-filter-fx",
+      "name": "French Touch Disco Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "filter",
+        "french-touch",
+        "disco",
+        "house",
+        "audio-effects"
+      ],
+      "description": "Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/french-touch-disco-filter-fx.inf",
+      "preview": "assets/library/previews/french-touch-disco-filter-fx.jpg",
+      "bytes": 2072
+    },
+    {
+      "id": "french-touch-phaser-sweep-fx",
+      "name": "French Touch Phaser Sweep FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "phaser",
+        "french-touch",
+        "sweep",
+        "house",
+        "audio-effects"
+      ],
+      "description": "Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/french-touch-phaser-sweep-fx.inf",
+      "preview": "assets/library/previews/french-touch-phaser-sweep-fx.jpg",
+      "bytes": 2312
+    },
+    {
+      "id": "demoscene-plasma-sine-matrix",
+      "name": "Demoscene Plasma Sine Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "demoscene",
+        "plasma",
+        "shader",
+        "sine",
+        "retro"
+      ],
+      "description": "Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/demoscene-plasma-sine-matrix.field",
+      "preview": "assets/library/previews/demoscene-plasma-sine-matrix.jpg",
+      "bytes": 1457
+    },
+    {
+      "id": "demoscene-plasma-rotozoom-bloom",
+      "name": "Demoscene Plasma Rotozoom Bloom",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "demoscene",
+        "rotozoom",
+        "plasma",
+        "shader",
+        "bloom"
+      ],
+      "description": "Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/demoscene-plasma-rotozoom-bloom.field",
+      "preview": "assets/library/previews/demoscene-plasma-rotozoom-bloom.jpg",
+      "bytes": 1638
     }
   ]
 }

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Demoscene Plasma Rotozoom Bloom",
+    "author": "Infinite",
+    "description": "Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rotSpeed = 0.65 [0.1, 2.5]\nparam float zoom = 2.8 [0.5, 6.0]\nparam float harmonics = 5.0 [2.0, 10.0]\nparam float thermalBloom = 0.75 [0.1, 1.5]\nparam float phaseShift = 0.5 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5)\nr = length(p)\nang = atan2(p.y, p.x)\ntime = t * rotSpeed\n\nrotAng = ang + time * 0.8\npRot = vec2(cos(rotAng), sin(rotAng)) * r * zoom\n\nv1 = sin(pRot.x * harmonics + time * 2.0)\nv2 = cos(pRot.y * harmonics - time * 1.6)\nv3 = sin((pRot.x * cos(time * 0.5) + pRot.y * sin(time * 0.5)) * 4.0)\nv4 = cos(r * 12.0 - time * 3.0)\n\nwave = (v1 + v2 + v3 + v4) * 0.25\n\ncDark = vec3(0.01, 0.01, 0.03)\ncOrange = vec3(1.0, 0.35, 0.02)\ncElectricCyan = vec3(0.0, 0.9, 1.0)\ncWhiteHot = vec3(1.0, 1.0, 1.0)\n\nm1 = mix(cDark, cOrange, clamp(wave * 0.8 + 0.5, 0.0, 1.0))\nm2 = mix(m1, cElectricCyan, clamp(sin(wave * 4.0 + r * 6.0 + phaseShift * 3.14) * 0.5 + 0.5, 0.0, 1.0) * 0.85)\ncol = mix(m2, cWhiteHot, clamp(cos(r * 8.0 - time * 2.0) * 0.5 + 0.5, 0.0, 1.0) * thermalBloom * clamp(wave + 0.5, 0.0, 1.0))\nalpha = 1.0\n",
+    "params": {
+      "rotSpeed": 0.65,
+      "zoom": 2.8,
+      "harmonics": 5.0,
+      "thermalBloom": 0.75,
+      "phaseShift": 0.5
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -290,6 +290,16 @@
       "slug": "indie-psychedelic-liquid-dream",
       "title": "Indie Psychedelic Liquid Dream",
       "description": "Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms. Bass accelerates fluid warps and center blob eruption, mids blend electric orange and lime contours, highs release pink pulse bloom."
+    },
+    {
+      "slug": "demoscene-plasma-sine-matrix",
+      "title": "Demoscene Plasma Sine Matrix",
+      "description": "Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows. Bass accelerates plasma turbulence and central pulsation, mids cycle interference harmonics, highs illuminate electric cyan coronal flares."
+    },
+    {
+      "slug": "demoscene-plasma-rotozoom-bloom",
+      "title": "Demoscene Plasma Rotozoom Bloom",
+      "description": "Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. Bass drives dynamic coordinate rotation and zoom breathing, mids expand radial spiral interference bands, highs spark blazing white-hot thermal blooms."
     }
   ]
 }
