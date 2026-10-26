@@ -622,6 +622,13 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
             file << "clipsrcoffset " << i << " " << c.id << " " << FloatToString(c.sourceOffsetSeconds) << "\n";
       // Per-clip speed and direction: own tag, only written when not the
       // default, so an ordinary clip's patch is unchanged.
+      // Turbo 0.72 (not upstream): fade curves and content loop, own tags.
+      for (const ClipRecord& c : s.clips)
+         if (c.fadeInShape != 0 || c.fadeOutShape != 0)
+            file << "clipfadeshape " << i << " " << c.id << " " << c.fadeInShape << " " << c.fadeOutShape << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.loopTicks > 0)
+            file << "cliploop " << i << " " << c.id << " " << c.loopTicks << "\n";
       for (const ClipRecord& c : s.clips)
          if (c.speed != 1.0f || c.reverse)
             file << "clipspeed " << i << " " << c.id << " " << FloatToString(c.speed) << " " << (c.reverse ? 1 : 0) << "\n";
@@ -1323,6 +1330,28 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                {
                   c.speed = speed;
                   c.reverse = reverse != 0;
+               }
+         }
+      }
+      else if (tag == "clipfadeshape" || tag == "cliploop") // Turbo 0.72
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int64_t a = 0, b = 0;
+         if (in >> streamIdx >> clipId >> a && streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (tag == "clipfadeshape" && !(in >> b))
+               b = 0;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  if (tag == "clipfadeshape")
+                  {
+                     c.fadeInShape = (int)std::clamp<int64_t>(a, 0, 3);
+                     c.fadeOutShape = (int)std::clamp<int64_t>(b, 0, 3);
+                  }
+                  else
+                     c.loopTicks = std::max<int64_t>(0, a);
                }
          }
       }

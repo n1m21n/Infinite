@@ -116,6 +116,9 @@ struct ArrangeClipWindow
    double endBeat = 0.0;     // exclusive
    double fadeInBeats = 0.0;
    double fadeOutBeats = 0.0;
+   int fadeInShape = 0;      // Turbo 0.72: Arrange::FadeShape
+   int fadeOutShape = 0;
+   double loopBeats = 0.0;   // Turbo 0.72: > 0 = the content repeats every loopBeats
    float gain = 1.0f;        // clip gain, linear
    float panL = 1.0f;        // clip pan as per-channel gains
    float panR = 1.0f;

@@ -374,6 +374,11 @@ namespace Patch
       // on every clip saved before this field existed, which is the same as
       // "nothing bypassed" - so an old patch loads identically.
       std::vector<int> bypassedModParams;
+      // Turbo 0.72 (not upstream, own tags `clipfadeshape` / `cliploop`, so
+      // upstream's reader skips them): fade curves and content loop.
+      int    fadeInShape = 0;
+      int    fadeOutShape = 0;
+      int64_t loopTicks = 0;
       // Session view (Arrange::SessionSlot): >= 0 = this record is the
       // stream's session slot in that scene row, not a timeline clip. Written
       // as `slotclip` (same grammar as `cliptick`, so an older reader skips

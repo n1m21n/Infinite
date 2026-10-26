@@ -93,6 +93,9 @@ Patch::ClipRecord ArrangeClipToRecord(const Arrange::Clip& c)
    r.sourceOffsetSeconds = c.sourceOffsetSeconds;
    r.speed = c.speed;
    r.reverse = c.reverse;
+   r.fadeInShape = c.fadeInShape; // Turbo 0.72
+   r.fadeOutShape = c.fadeOutShape;
+   r.loopTicks = c.loopTicks;
    r.bypassedModParams = c.bypassedModParams;
    return r;
 }
@@ -136,6 +139,9 @@ Arrange::Clip ArrangeClipFromRecord(const Patch::ClipRecord& c, int streamBlendM
    clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
    clip.speed = c.speed;
    clip.reverse = c.reverse;
+   clip.fadeInShape = c.fadeInShape; // Turbo 0.72
+   clip.fadeOutShape = c.fadeOutShape;
+   clip.loopTicks = c.loopTicks;
    clip.bypassedModParams = c.bypassedModParams;
    return clip;
 }
@@ -547,7 +553,8 @@ bool ArrangeContentEqual(const Arrange::Model& a, const Arrange::Model& b)
              ca.syncToTempo != cb.syncToTempo || ca.sampleBpm != cb.sampleBpm ||
              ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
              ca.sourceOffsetSeconds != cb.sourceOffsetSeconds || ca.speed != cb.speed ||
-             ca.reverse != cb.reverse || ca.bypassedModParams != cb.bypassedModParams)
+             ca.reverse != cb.reverse || ca.bypassedModParams != cb.bypassedModParams ||
+             ca.fadeInShape != cb.fadeInShape || ca.fadeOutShape != cb.fadeOutShape || ca.loopTicks != cb.loopTicks)
             return false;
       }
       // Turbo 0.72 (timeline align): session slots are document data too.
@@ -1124,6 +1131,9 @@ void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& buffe
             w.endBeat = Arrange::TicksToBeats(c.End());
             w.fadeInBeats = Arrange::TicksToBeats(c.fadeIn);
             w.fadeOutBeats = Arrange::TicksToBeats(c.fadeOut);
+            w.fadeInShape = c.fadeInShape; // Turbo 0.72 (U2)
+            w.fadeOutShape = c.fadeOutShape;
+            w.loopBeats = Arrange::TicksToBeats(c.loopTicks); // Turbo 0.72 (U3)
             w.gain = DspMath::DbToLinear(c.gainDb);
             float l = 1.0f, r = 1.0f;
             if (c.pan != 0.0f)
@@ -1196,6 +1206,8 @@ uint64_t ArrangeAudioSignature()
          mix((uint64_t)(uintptr_t)ArrangeClipAudioNode(c));
          mix((uint64_t)c.fadeIn);
          mix((uint64_t)c.fadeOut);
+         mix((uint64_t)(c.fadeInShape * 16 + c.fadeOutShape)); // Turbo 0.72
+         mix((uint64_t)c.loopTicks);
          mixd(c.gainDb);
          mixd(c.pan);
          mix(c.enabled ? 1 : 0);
@@ -2052,6 +2064,66 @@ bool ArrangeGroupRowSelection()
    return true;
 }
 
+// Turbo 0.72 (U2): ripple editing. 0 off, 1 the track an edit is on, 2 every
+// track: deleting closes the gap - what comes after moves left by the length.
+int gArrangeRipple = 0;
+
+// Moves everything at or after `from` left by `len` on lane `laneIdx` (or on
+// every lane when gArrangeRipple is 2). Called inside an ArrangeEdit.
+void ArrangeRippleClose(int laneIdx, Arrange::Tick from, Arrange::Tick len)
+{
+   if (gArrangeRipple == 0 || len <= 0)
+      return;
+   std::vector<uint64_t> later;
+   for (int li = 0; li < (int)gArrange.lanes.size(); li++)
+      if (gArrangeRipple == 2 || li == laneIdx)
+         for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+            if (c.start >= from)
+               later.push_back(c.id);
+   if (!later.empty())
+      Arrange::MoveClips(gArrange, later, -len, 0);
+   if (gArrangeRipple == 2)
+      for (Arrange::Marker& mk : gArrange.markers)
+         if (mk.pos >= from)
+            mk.pos = std::max<Arrange::Tick>(0, mk.pos - len);
+}
+
+// Turbo 0.72 (U2): where a clip's gain line sits in its box: -36 dB at the
+// bottom, +12 dB at the top, so 0 dB rides at three quarters.
+float ArrangeGainLineY(float gainDb, float y0, float y1)
+{
+   const float n = std::clamp((gainDb + 36.0f) / 48.0f, 0.0f, 1.0f);
+   return y1 - 3.0f - (y1 - y0 - 12.0f) * n;
+}
+
+// Turbo 0.72 (U2, Ctrl+drag): copies of `ids` moved by dt ticks and dLane
+// lanes (same lane type, else the copy stays on its lane), placed over
+// whatever is there. Grouped copies form a new group together.
+void ArrangePlaceCopies(const std::vector<uint64_t>& ids, Arrange::Tick dt, int dLane)
+{
+   std::vector<uint64_t> made;
+   for (uint64_t id : ids)
+   {
+      const Arrange::Loc loc = Arrange::Find(gArrange, id);
+      if (!loc.Valid())
+         continue;
+      Arrange::Clip copy = gArrange.lanes[(size_t)loc.lane].clips[(size_t)loc.index];
+      int target = loc.lane + dLane;
+      if (target < 0 || target >= (int)gArrange.lanes.size() ||
+          gArrange.lanes[(size_t)target].type != gArrange.lanes[(size_t)loc.lane].type)
+         target = loc.lane;
+      copy.id = 0;
+      copy.groupId = 0;
+      copy.start = std::max<Arrange::Tick>(0, copy.start + dt);
+      uint64_t out = 0;
+      Arrange::PlaceOverwrite(gArrange, gArrange.lanes[(size_t)target].id, copy, &out);
+      if (out != 0)
+         made.push_back(out);
+   }
+   if (made.size() >= 2)
+      Arrange::Group(gArrange, made);
+}
+
 // Turbo 0.72 (Range tool): erases the span on its lanes - a clip crossing an
 // edge is cut there and everything inside goes, in one undo step.
 void ArrangeEraseRange()
@@ -2079,9 +2151,81 @@ void ArrangeEraseRange()
                inside.push_back(c.id);
          if (!inside.empty())
             Arrange::Delete(gArrange, inside);
+         if (gArrangeRipple == 1)
+            ArrangeRippleClose(li, r.end, r.end - r.start); // Turbo 0.72 (U2)
       }
+      if (gArrangeRipple == 2)
+         ArrangeRippleClose(-1, r.end, r.end - r.start);
    });
    ArrangePruneSelection();
+}
+
+// Turbo 0.72 (U2, Range tool): copy what the span holds (clips cut to it),
+// paste it at a tick, duplicate it right after itself.
+struct ArrangeRangeClipboard
+{
+   bool valid = false;
+   Arrange::Tick length = 0;
+   int laneLo = 0;
+   std::vector<std::pair<int, Arrange::Clip>> clips; // lane offset from laneLo, clip relative to the span start
+};
+ArrangeRangeClipboard gArrangeRangeClip;
+
+void ArrangeCopyRange()
+{
+   const ArrangeRangeSel r = gArrangeRange;
+   if (!r.active || r.end <= r.start)
+      return;
+   gArrangeRangeClip = ArrangeRangeClipboard();
+   gArrangeRangeClip.valid = true;
+   gArrangeRangeClip.length = r.end - r.start;
+   gArrangeRangeClip.laneLo = r.laneLo;
+   for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
+      for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+      {
+         const Arrange::Tick s = std::max(c.start, r.start), e = std::min(c.End(), r.end);
+         if (e <= s)
+            continue;
+         Arrange::Clip piece = c;
+         piece.id = 0;
+         piece.groupId = 0;
+         piece.sourceOffsetSeconds = (float)std::max(0.0, (double)c.sourceOffsetSeconds + Arrange::ClipSourceAdvance(c, s - c.start));
+         piece.start = s - r.start;
+         piece.length = e - s;
+         piece.fadeIn = s == c.start ? std::min(c.fadeIn, piece.length) : 0;
+         piece.fadeOut = e == c.End() ? std::min(c.fadeOut, piece.length) : 0;
+         gArrangeRangeClip.clips.push_back({ li - r.laneLo, piece });
+      }
+}
+
+void ArrangePasteRangeAt(Arrange::Tick at, int laneLo)
+{
+   if (!gArrangeRangeClip.valid)
+      return;
+   ArrangeEdit([&]()
+   {
+      for (const auto& pc : gArrangeRangeClip.clips)
+      {
+         const int li = laneLo + pc.first;
+         if (li < 0 || li >= (int)gArrange.lanes.size())
+            continue;
+         Arrange::Clip c = pc.second;
+         c.start = at + c.start;
+         Arrange::PlaceOverwrite(gArrange, gArrange.lanes[(size_t)li].id, c);
+      }
+   });
+}
+
+void ArrangeDuplicateRange()
+{
+   if (!gArrangeRange.active)
+      return;
+   ArrangeCopyRange();
+   ArrangePasteRangeAt(gArrangeRange.end, gArrangeRange.laneLo);
+   // The selection moves onto the copy, so D again keeps going.
+   const Arrange::Tick len = gArrangeRange.end - gArrangeRange.start;
+   gArrangeRange.start += len;
+   gArrangeRange.end += len;
 }
 
 void ArrangeDeleteSelection()
@@ -2089,7 +2233,25 @@ void ArrangeDeleteSelection()
    const std::vector<uint64_t> ids = ArrangeSelectionIds();
    if (ids.empty())
       return;
-   ArrangeEdit([&]() { Arrange::Delete(gArrange, ids); });
+   // The spans to close, last first so each move leaves the earlier ones put.
+   struct Span { int lane; Arrange::Tick start, len; };
+   std::vector<Span> spans;
+   for (uint64_t id : ids)
+   {
+      const Arrange::Loc loc = Arrange::Find(gArrange, id);
+      if (loc.Valid())
+      {
+         const Arrange::Clip& c = gArrange.lanes[(size_t)loc.lane].clips[(size_t)loc.index];
+         spans.push_back({ loc.lane, c.start, c.length });
+      }
+   }
+   std::sort(spans.begin(), spans.end(), [](const Span& a, const Span& b) { return a.start > b.start; });
+   ArrangeEdit([&]()
+   {
+      Arrange::Delete(gArrange, ids);
+      for (const Span& s : spans)
+         ArrangeRippleClose(s.lane, s.start + s.len, s.len);
+   });
    gArrangeSel.clear();
 }
 
@@ -2619,7 +2781,9 @@ enum ArrangeDragMode
    kArrDragNone = 0, kArrDragMove, kArrDragTrimL, kArrDragTrimR, kArrDragFadeIn, kArrDragFadeOut,
    kArrDragMarquee, kArrDragScrub, kArrDragLoop, kArrDragMarker, kArrDragHScroll, kArrDragRowResize,
    // Turbo 0.72: the tools.
-   kArrDragZoom, kArrDragHand, kArrDragRange, kArrDragPencil
+   kArrDragZoom, kArrDragHand, kArrDragRange, kArrDragPencil,
+   // Turbo 0.72 (U2): clip gain line, slip.
+   kArrDragGain, kArrDragSlip
 };
 
 struct ArrangeDragState
@@ -2646,14 +2810,57 @@ struct ArrangeDragState
    Arrange::Tick anchorTick = 0;   // Range / Pencil: where the drag began (snapped)
    Arrange::Tick currentTick = 0;  // Range / Pencil: where it is now (snapped)
    int anchorLane = -1;            // Range / Pencil: lane under the press (-1 = ruler: all lanes)
+   // Turbo 0.72 (U2)
+   bool copy = false;              // Ctrl+drag: the move leaves the originals and places copies
+   bool ctrlAdded = false;         // Ctrl+press added the clip to the selection
+   float gainAtStart = 0.0f;       // gain line drag
+   float slipAtStart = 0.0f;       // slip drag: sourceOffsetSeconds at the press
 };
 ArrangeDragState gArrDrag;
+
+float ArrangePxPerBeat();
 
 Arrange::Tick ArrangeSnapMaybe(Arrange::Tick t)
 {
    if (ImGui::GetIO().KeyAlt)
       return std::max<Arrange::Tick>(0, t); // Alt: free, off the grid
    const Arrange::Tick g = ArrangeSnapGridTicks();
+   // Turbo 0.72 (U2): magnetic snap. With snap on, an edge within 8 px of
+   // another clip's edge, a marker, the playhead or a loop end lands on it
+   // before the grid (the clips being dragged do not attract themselves).
+   if (g > 0)
+   {
+      const double ppb = std::max(1e-3f, ArrangePxPerBeat());
+      const Arrange::Tick reach = std::max<Arrange::Tick>(1, Arrange::BeatsToTicks(8.0 / ppb));
+      Arrange::Tick best = -1, bestD = reach + 1;
+      auto consider = [&](Arrange::Tick cand)
+      {
+         const Arrange::Tick d = cand > t ? cand - t : t - cand;
+         if (d < bestD)
+         {
+            bestD = d;
+            best = cand;
+         }
+      };
+      for (const Arrange::Lane& lane : gArrange.lanes)
+         for (const Arrange::Clip& c : lane.clips)
+         {
+            if (std::find(gArrDrag.ids.begin(), gArrDrag.ids.end(), c.id) != gArrDrag.ids.end() || c.id == gArrDrag.clipId)
+               continue;
+            consider(c.start);
+            consider(c.End());
+         }
+      for (const Arrange::Marker& mk : gArrange.markers)
+         consider(mk.pos);
+      consider(ArrangePlayTick());
+      if (gArrange.settings.loop.end > gArrange.settings.loop.start)
+      {
+         consider(gArrange.settings.loop.start);
+         consider(gArrange.settings.loop.end);
+      }
+      if (best >= 0 && bestD <= reach)
+         return std::max<Arrange::Tick>(0, best);
+   }
    return std::max<Arrange::Tick>(0, g > 0 ? Arrange::SnapToGrid(t, g) : t);
 }
 
@@ -3204,6 +3411,46 @@ void DrawArrangeClipSettings(bool docked)
       }
    }
 
+   // Turbo 0.72 (U3): loop the content - stretching the box repeats it.
+   {
+      const uint64_t clipId = c->id;
+      bool loopOn = c->loopTicks > 0;
+      if (ImGui::Checkbox("loop content", &loopOn))
+         ArrangeEdit([&]()
+         {
+            if (Arrange::Clip* x = Arrange::FindClip(gArrange, clipId))
+            {
+               x->loopTicks = loopOn ? x->length : 0; // the loop is what the box holds now
+               gArrange.revision++;
+            }
+         });
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("on: the clip's content repeats every loop length,\nso dragging its right edge loops it");
+      const Arrange::Clip* lc = Arrange::FindClip(gArrange, clipId);
+      if (lc != nullptr && lc->loopTicks > 0)
+      {
+         const double bpb = std::max(0.25, Transport::Instance().BeatsPerBar());
+         float bars = (float)(Arrange::TicksToBeats(lc->loopTicks) / bpb);
+         if (ImGui::DragFloat("loop length (bars)", &bars, 0.02f, 0.0625f, 256.0f, "%.3f"))
+         {
+            const Arrange::Tick want = std::max<Arrange::Tick>(1, Arrange::BeatsToTicks(std::max(0.0625f, bars) * bpb));
+            if (Arrange::Clip* x = Arrange::FindClip(gArrange, clipId))
+            {
+               x->loopTicks = want;
+               gArrange.revision++;
+            }
+         }
+         ArrangeTrackGesture();
+      }
+      const Arrange::Loc l4 = Arrange::Find(gArrange, clipId);
+      if (!l4.Valid())
+      {
+         ArrangeSettingsEnd(docked);
+         return;
+      }
+      c = &gArrange.lanes[(size_t)l4.lane].clips[(size_t)l4.index];
+   }
+
    bool enabled = c->enabled;
    if (ImGui::Checkbox("enabled", &enabled))
    {
@@ -3353,6 +3600,32 @@ void DrawArrangeToolbar(float width)
       gArrangeSessionView = true;
    ArrUi::GroupEnd();
    ArrUi::Gap();
+
+   // Turbo 0.72: undo / redo (every timeline edit is a step of the patch's
+   // undo; Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y work with the timeline focused too).
+   {
+      auto arrow = [](ImDrawList* d, ImVec2 c, float s, ImU32 col, bool redo)
+      {
+         const float r = s * 0.3f, th = std::max(1.4f, s * 0.09f);
+         const float a0 = redo ? -2.6f : -0.55f, a1 = redo ? 0.55f : 2.6f;
+         d->PathArcTo(ImVec2(c.x, c.y + r * 0.25f), r, redo ? a1 : a0, redo ? a0 : a1, 16);
+         d->PathStroke(col, 0, th);
+         const ImVec2 tip(c.x + (redo ? r * 0.85f : -r * 0.85f), c.y - r * 0.55f);
+         const float dir = redo ? 1.0f : -1.0f;
+         d->AddTriangleFilled(ImVec2(tip.x + dir * s * 0.16f, tip.y), ImVec2(tip.x - dir * s * 0.02f, tip.y - s * 0.17f),
+                              ImVec2(tip.x - dir * s * 0.02f, tip.y + s * 0.17f), col);
+      };
+      ArrUi::GroupBegin();
+      if (ArrUi::IconTile("##arrundo", [arrow](ImDrawList* d, ImVec2 c, float s, ImU32 col) { arrow(d, c, s, col, false); },
+                          gUndoStack.empty() ? "nothing to undo" : "undo  -  Ctrl+Z"))
+         Undo();
+      ArrUi::Next();
+      if (ArrUi::IconTile("##arrredo", [arrow](ImDrawList* d, ImVec2 c, float s, ImU32 col) { arrow(d, c, s, col, true); },
+                          gRedoStack.empty() ? "nothing to redo" : "redo  -  Ctrl+Shift+Z / Ctrl+Y"))
+         Redo();
+      ArrUi::GroupEnd();
+      ArrUi::Gap();
+   }
 
    // Transport: start, play / pause, record.
    ArrUi::GroupBegin();
@@ -3533,6 +3806,14 @@ void DrawArrangeToolbar(float width)
       if (ArrUi::IconTile("##arrfollow", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawTimeline(dl, c, s, col); },
                           "follow the playhead while playing", gArrangeFollow))
          gArrangeFollow = !gArrangeFollow;
+      // Turbo 0.72 (U2): ripple editing.
+      ArrUi::Next();
+      static const char* kRipple[] = { "Ripple off", "Ripple track", "Ripple all" };
+      if (ArrUi::Chip("##arrripple", kRipple[std::clamp(gArrangeRipple, 0, 2)],
+                      "ripple: deleting closes the gap - what comes after moves left.\n"
+                      "off / on the edited track / on every track (markers too). Click to cycle.",
+                      gArrangeRipple != 0))
+         gArrangeRipple = (gArrangeRipple + 1) % 3;
    }
    ArrUi::GroupEnd();
 
@@ -4456,19 +4737,35 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          else if (lane.type == Arrange::kLaneAudio && y1 - y0 > 22.0f)
             DrawArrangeClipWave(dl, c, x0, x1, y0 + 15.0f, y1 - 2.0f, x0, laneX0, laneX1,
                                 ArrangeScaleCol(base, live ? 1.35f : 0.7f, live ? 220 : 120));
-         // Fades.
+         // Fades (Turbo 0.72, U2: drawn with their shape).
+         auto drawFade = [&](float fromX, float toX, int shape, bool in)
+         {
+            const int steps = 16;
+            for (int k = 0; k < steps; k++)
+            {
+               const float u0 = (float)k / steps, u1 = (float)(k + 1) / steps;
+               const float g0 = Arrange::FadeShapeGain(in ? u0 : 1.0f - u0, shape);
+               const float g1 = Arrange::FadeShapeGain(in ? u1 : 1.0f - u1, shape);
+               const float xa = fromX + (toX - fromX) * u0, xb = fromX + (toX - fromX) * u1;
+               dl->AddQuadFilled(ImVec2(xa, y0), ImVec2(xb, y0), ImVec2(xb, y1 - (y1 - y0) * g1), ImVec2(xa, y1 - (y1 - y0) * g0),
+                                 IM_COL32(0, 0, 0, 70));
+               dl->AddLine(ImVec2(xa, y1 - (y1 - y0) * g0), ImVec2(xb, y1 - (y1 - y0) * g1), IM_COL32(255, 255, 255, 160), 1.5f);
+            }
+         };
          if (c.fadeIn > 0)
-         {
-            const float fx = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.start + c.fadeIn));
-            dl->AddTriangleFilled(ImVec2(x0, y0), ImVec2(fx, y0), ImVec2(x0, y1), IM_COL32(0, 0, 0, 70));
-            dl->AddLine(ImVec2(x0, y1), ImVec2(fx, y0), IM_COL32(255, 255, 255, 160), 1.5f);
-         }
+            drawFade(x0, ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.start + c.fadeIn)), c.fadeInShape, true);
          if (c.fadeOut > 0)
-         {
-            const float fx = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.End() - c.fadeOut));
-            dl->AddTriangleFilled(ImVec2(x1, y0), ImVec2(fx, y0), ImVec2(x1, y1), IM_COL32(0, 0, 0, 70));
-            dl->AddLine(ImVec2(fx, y0), ImVec2(x1, y1), IM_COL32(255, 255, 255, 160), 1.5f);
-         }
+            drawFade(ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.End() - c.fadeOut)), x1, c.fadeOutShape, false);
+         // Turbo 0.72 (U3): where a looping clip's content starts over.
+         if (c.loopTicks > 0)
+            for (Arrange::Tick lt = c.start + c.loopTicks; lt < c.End(); lt += c.loopTicks)
+            {
+               const float lx = ArrangeScreenXOfBeat(Arrange::TicksToBeats(lt));
+               if (lx < laneX0 || lx > laneX1)
+                  continue;
+               dl->AddLine(ImVec2(lx, y0 + 2.0f), ImVec2(lx, y1 - 2.0f), IM_COL32(255, 255, 255, 120), 1.0f);
+               dl->AddCircleFilled(ImVec2(lx, y0 + 5.0f), 2.5f, IM_COL32(255, 255, 255, 170));
+            }
          if (c.groupId != 0)
             dl->AddRectFilled(ImVec2(x0 + 2.0f, y1 - 3.0f), ImVec2(x1 - 2.0f, y1), ArrangeGroupColor(c.groupId));
          dl->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), sel ? IM_COL32(255, 255, 255, 255) : ArrangeScaleCol(base, 0.35f),
@@ -4501,8 +4798,20 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
                hit.zone = 1;
             else if (mouse.x > x1 - edgePx)
                hit.zone = 2;
+            else if (lane.type == Arrange::kLaneAudio && y1 - y0 >= 24.0f &&
+                     std::fabs(mouse.y - ArrangeGainLineY(c.gainDb, y0, y1)) < 4.0f)
+               hit.zone = 5; // Turbo 0.72 (U2): the clip's gain line
             else
                hit.zone = 0;
+            // Turbo 0.72 (U2): the gain line, on the clip under the mouse.
+            if (lane.type == Arrange::kLaneAudio && y1 - y0 >= 24.0f)
+            {
+               const float gy = ArrangeGainLineY(c.gainDb, y0, y1);
+               dl->AddLine(ImVec2(std::max(x0, laneX0) + 2.0f, gy), ImVec2(std::min(x1, laneX1) - 2.0f, gy),
+                           hit.zone == 5 ? IM_COL32(255, 255, 255, 230) : IM_COL32(255, 255, 255, 90), hit.zone == 5 ? 2.0f : 1.0f);
+               if (hit.zone == 5 && gArrDrag.mode == kArrDragNone)
+                  ImGui::SetTooltip("clip gain %.1f dB - drag up / down (Shift: fine)", c.gainDb);
+            }
             if (sel && (hit.zone == 3 || hit.zone == 4 || mouse.y < y0 + 9.0f))
             {
                // fade handles drawn on the selected clip
@@ -4593,12 +4902,29 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    // Wheel: Ctrl zoom (around the mouse), Shift horizontal, else vertical.
    if (hovered && io.MouseWheel != 0.0f)
    {
-      if (io.KeyCtrl)
+      if (io.KeyCtrl && !io.KeyAlt)
          ArrangeSetZoomAround(gArrange.settings.zoom * std::pow(1.15f, io.MouseWheel), mouse.x);
-      else if (io.KeyShift)
+      else if (io.KeyShift && !io.KeyAlt)
          gArrange.settings.scroll = (float)std::max(0.0, scroll - io.MouseWheel * visBeats * 0.1);
       else
-         gArrangeVScroll -= io.MouseWheel * 40.0f;
+      {
+         // Turbo 0.72 (U2): Alt+wheel sets the height of the track under the
+         // mouse (Ctrl+Alt: every track); the wheel alone scrolls.
+         const int wl = laneAtY(mouse.y);
+         if (io.KeyAlt && wl >= 0)
+         {
+            const float step = io.MouseWheel * 8.0f;
+            for (int i = 0; i < (int)gArrange.lanes.size(); i++)
+               if (io.KeyCtrl || i == wl)
+               {
+                  Arrange::Lane& ln = gArrange.lanes[(size_t)i];
+                  ln.rowHeight = std::clamp(ArrangeRowHeight(ln) + step, kArrangeRowMinH, 400.0f);
+               }
+            gPatchDirty = true;
+         }
+         else
+            gArrangeVScroll -= io.MouseWheel * 40.0f;
+      }
    }
    if (hovered && io.MouseWheelH != 0.0f)
       gArrange.settings.scroll = (float)std::max(0.0, scroll - io.MouseWheelH * visBeats * 0.1);
@@ -4623,6 +4949,8 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
          else if (hit.zone == 3 || hit.zone == 4)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         else if (hit.zone == 5)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS); // the gain line
          else if (ArrangeIsSelected(hit.id))
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
       }
@@ -4739,7 +5067,19 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          }
          else
          {
-            if (io.KeyCtrl)
+            // Turbo 0.72 (U2): Ctrl+click toggles the selection on release
+            // (when the mouse did not move); Ctrl+drag copies the selection.
+            const bool ctrlCopy = io.KeyCtrl && !io.KeyAlt && hit.zone == 0;
+            const bool slip = io.KeyCtrl && io.KeyAlt && hit.zone == 0; // Ctrl+Alt+drag: slip the content
+            if (ctrlCopy || slip)
+            {
+               if (!ArrangeIsSelected(hit.id))
+               {
+                  gArrangeSel.push_back(hit.id);
+                  gArrDrag.ctrlAdded = true; // a plain Ctrl+click adds it; nothing to undo on release
+               }
+            }
+            else if (io.KeyCtrl)
             {
                if (ArrangeIsSelected(hit.id))
                   gArrangeSel.erase(std::remove(gArrangeSel.begin(), gArrangeSel.end(), hit.id), gArrangeSel.end());
@@ -4774,7 +5114,19 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
                case 2: gArrDrag.mode = kArrDragTrimR; break;
                case 3: gArrDrag.mode = kArrDragFadeIn; break;
                case 4: gArrDrag.mode = kArrDragFadeOut; break;
+               case 5: gArrDrag.mode = kArrDragGain; gArrDrag.gainAtStart = c ? c->gainDb : 0.0f; break; // Turbo 0.72
                default: gArrDrag.mode = ArrangeIsSelected(hit.id) ? kArrDragMove : kArrDragNone; break;
+            }
+            // Turbo 0.72 (U2): Ctrl+drag copies, Ctrl+Alt+drag slips.
+            if (gArrDrag.mode == kArrDragMove && io.KeyCtrl)
+            {
+               if (io.KeyAlt)
+               {
+                  gArrDrag.mode = kArrDragSlip;
+                  gArrDrag.slipAtStart = c ? c->sourceOffsetSeconds : 0.0f;
+               }
+               else
+                  gArrDrag.copy = true;
             }
             if (gArrDrag.mode != kArrDragNone)
                ArrangeGestureBegin();
@@ -4885,7 +5237,9 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
                   gArrDrag.lastLane = laneNow;
                const int dLane = gArrDrag.lastLane - gArrDrag.startLane;
                gArrange = gArrDrag.base;
-               if (!Arrange::MoveClips(gArrange, gArrDrag.ids, dt, dLane))
+               if (gArrDrag.copy)
+                  ArrangePlaceCopies(gArrDrag.ids, dt, dLane); // Turbo 0.72 (U2): Ctrl+drag
+               else if (!Arrange::MoveClips(gArrange, gArrDrag.ids, dt, dLane))
                {
                   gArrange = gArrDrag.base;
                   Arrange::MoveClips(gArrange, gArrDrag.ids, dt, 0);
@@ -4985,6 +5339,34 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
             gArrangeSnapGuide = gArrDrag.currentTick;
             break;
+         // Turbo 0.72 (U2): the clip's gain line, 0.1 dB a pixel (Shift: fine).
+         case kArrDragGain:
+         {
+            gArrange = gArrDrag.base;
+            if (Arrange::Clip* c = Arrange::FindClip(gArrange, gArrDrag.clipId))
+            {
+               c->gainDb = std::clamp(gArrDrag.gainAtStart - dy * (io.KeyShift ? 0.02f : 0.1f), -60.0f, 12.0f);
+               gArrange.revision++;
+               ImGui::SetTooltip("clip gain %.1f dB", c->gainDb);
+            }
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+            break;
+         }
+         // Turbo 0.72 (U2): slip - the source slides under a fixed box.
+         case kArrDragSlip:
+         {
+            gArrange = gArrDrag.base;
+            if (Arrange::Clip* c = Arrange::FindClip(gArrange, gArrDrag.clipId))
+            {
+               const Arrange::Tick dtk = tickAtX(mouse.x) - gArrDrag.grabTick;
+               const double secs = Arrange::ClipSourceAdvance(*c, dtk);
+               c->sourceOffsetSeconds = (float)std::max(0.0, (double)gArrDrag.slipAtStart - secs);
+               gArrange.revision++;
+               ImGui::SetTooltip("slip: source starts at %.3f s", c->sourceOffsetSeconds);
+            }
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            break;
+         }
          default:
             break;
       }
@@ -5003,6 +5385,13 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    {
       if (gArrDrag.mode == kArrDragRowResize)
          gPatchDirty = true;
+      // Turbo 0.72 (U2): a Ctrl+click that did not drag toggles the clip off
+      // (when it was already selected before the press).
+      if (gArrDrag.mode == kArrDragMove && gArrDrag.copy && !gArrDrag.moved && !gArrDrag.ctrlAdded)
+      {
+         gArrange = gArrDrag.base;
+         gArrangeSel.erase(std::remove(gArrangeSel.begin(), gArrangeSel.end(), gArrDrag.clipId), gArrangeSel.end());
+      }
       // Turbo 0.72: tool releases.
       if (gArrDrag.mode == kArrDragZoom && !gArrDrag.moved)
          ArrangeSetZoomAround(gArrange.settings.zoom * (io.KeyAlt ? 0.75f : 1.35f), mouse.x);
@@ -5037,6 +5426,34 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
       gArrDrag = ArrangeDragState();
    }
 
+   // Turbo 0.72 (U2): fade curve menu.
+   static uint64_t sFadeMenuClip = 0;
+   static bool sFadeMenuIn = true;
+   if (ImGui::BeginPopup("##arrfademenu"))
+   {
+      const Arrange::Clip* fc = Arrange::FindClip(gArrange, sFadeMenuClip);
+      if (fc == nullptr)
+         ImGui::CloseCurrentPopup();
+      else
+      {
+         ImGui::TextDisabled(sFadeMenuIn ? "fade in curve" : "fade out curve");
+         ImGui::Separator();
+         static const char* kShapes[] = { "Linear", "Fast (log)", "Slow (exp)", "S-curve" };
+         const int cur = sFadeMenuIn ? fc->fadeInShape : fc->fadeOutShape;
+         for (int s = 0; s < (int)Arrange::kFadeShapeCount; s++)
+            if (ImGui::MenuItem(kShapes[s], nullptr, cur == s))
+               ArrangeEdit([&]()
+               {
+                  if (Arrange::Clip* x = Arrange::FindClip(gArrange, sFadeMenuClip))
+                  {
+                     (sFadeMenuIn ? x->fadeInShape : x->fadeOutShape) = s;
+                     gArrange.revision++;
+                  }
+               });
+      }
+      ImGui::EndPopup();
+   }
+
    // ---- right click ----
    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
    {
@@ -5052,6 +5469,13 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             sRulerMenuTick = ArrangeSnapMaybe(tickAtX(mouse.x));
             openRulerMenu = true;
          }
+      }
+      else if (hit.id != 0 && (hit.zone == 3 || hit.zone == 4))
+      {
+         // Turbo 0.72 (U2): right-click a fade handle picks its curve.
+         sFadeMenuClip = hit.id;
+         sFadeMenuIn = hit.zone == 3;
+         ImGui::OpenPopup("##arrfademenu");
       }
       else if (hit.id != 0)
       {
@@ -5416,6 +5840,7 @@ void ArrangeHandleKeys()
       return;
    const bool ctrl = io.KeyCtrl || io.KeySuper;
    auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+   const bool noModsEarly = !ctrl && !io.KeyShift && !io.KeyAlt;
    if (pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace))
    {
       if (gArrangeRange.active)
@@ -5423,17 +5848,84 @@ void ArrangeHandleKeys()
       else if (!ArrangeDeleteRowSelection())
          ArrangeDeleteSelection();
    }
+   // Turbo 0.72 (U2): with a Range selection, copy / paste / duplicate act
+   // on the span (clips cut to it, across its tracks).
+   static bool sLastCopyWasRange = false;
    if ((ctrl && !io.KeyShift && pressed(ImGuiKey_D)) || (!ctrl && io.KeyShift && pressed(ImGuiKey_D)))
-      if (!ArrangeDuplicateRowSelection())
+   {
+      if (gArrangeRange.active)
+         ArrangeDuplicateRange();
+      else if (!ArrangeDuplicateRowSelection())
          ArrangeDuplicateSelection();
+   }
    if (ctrl && pressed(ImGuiKey_C))
-      ArrangeCopySelection();
+   {
+      sLastCopyWasRange = gArrangeRange.active;
+      if (gArrangeRange.active)
+         ArrangeCopyRange();
+      else
+         ArrangeCopySelection();
+   }
    if (ctrl && pressed(ImGuiKey_V))
    {
       int lane = Arrange::LaneIndex(gArrange, gArrangeSelLane);
       if (lane < 0 && !gArrange.lanes.empty())
          lane = 0;
-      ArrangePasteAt(lane, ArrangeSnapMaybe(ArrangePlayTick()));
+      if (sLastCopyWasRange && gArrangeRangeClip.valid)
+         ArrangePasteRangeAt(ArrangeSnapMaybe(ArrangePlayTick()), gArrangeRange.active ? gArrangeRange.laneLo : gArrangeRangeClip.laneLo);
+      else
+         ArrangePasteAt(lane, ArrangeSnapMaybe(ArrangePlayTick()));
+   }
+   // Turbo 0.72 (U2): S splits - a Range at both of its edges, else the
+   // selected clips at the playhead, else every clip under the playhead on
+   // the selected tracks (or on every track).
+   if (noModsEarly && pressed(ImGuiKey_S))
+   {
+      if (gArrangeRange.active)
+      {
+         const ArrangeRangeSel r = gArrangeRange;
+         ArrangeEdit([&]()
+         {
+            for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
+               for (const Arrange::Tick edge : { r.start, r.end })
+               {
+                  std::vector<uint64_t> cut;
+                  for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+                     if (c.start < edge && edge < c.End())
+                        cut.push_back(c.id);
+                  for (uint64_t id : cut)
+                     Arrange::Split(gArrange, id, edge);
+               }
+         });
+      }
+      else
+      {
+         const Arrange::Tick t = ArrangePlayTick();
+         bool any = false;
+         for (uint64_t id : ArrangeSelectionIds())
+            if (const Arrange::Clip* c = Arrange::FindClip(gArrange, id))
+               any = any || (c->start < t && t < c->End());
+         if (any)
+            ArrangeSplitSelectionAt(t);
+         else
+         {
+            const std::vector<uint64_t> rows = ArrangeLiveRowSel();
+            ArrangeEdit([&]()
+            {
+               for (const Arrange::Lane& lane : gArrange.lanes)
+               {
+                  if (!rows.empty() && std::find(rows.begin(), rows.end(), lane.id) == rows.end())
+                     continue;
+                  std::vector<uint64_t> cut;
+                  for (const Arrange::Clip& c : lane.clips)
+                     if (c.start < t && t < c.End())
+                        cut.push_back(c.id);
+                  for (uint64_t id : cut)
+                     Arrange::Split(gArrange, id, t);
+               }
+            });
+         }
+      }
    }
    if (ctrl && pressed(ImGuiKey_E))
       ArrangeSplitSelectionAt(ArrangePlayTick());

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <thread>
 
+#include "arrange/ArrangeModel.h" // Turbo 0.72: FadeShapeGain
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
@@ -425,7 +426,12 @@ void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
       const double effBpm = (w[k].syncToTempo && w[k].sampleBpm > 0.0f) ? (double)w[k].sampleBpm : bpm;
       // Turbo 0.72 (timeline align): upstream's per-clip speed, signed.
       const double clipSpeed = (double)w[k].speed;
-      const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm * clipSpeed;
+      // Turbo 0.72 (U3): a looping clip's content repeats every loopBeats
+      // (the file player re-anchors on the jump at each lap).
+      double into = blockStart - w[k].startBeat;
+      if (w[k].loopBeats > 0.0)
+         into = std::fmod(std::max(0.0, into), w[k].loopBeats);
+      const double secs = w[k].sourceOffsetSeconds + into * 60.0 / effBpm * clipSpeed;
       const double perSecond = bpm / effBpm * clipSpeed;
       t.source->SetClipSamplePosition(secs, perSecond, w[k].pitch, jumped || entered);
    }
@@ -545,11 +551,11 @@ void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuff
          const double in = beat - cw.startBeat;
          const double out = cw.endBeat - beat;
          if (cw.fadeInBeats > 0.0 && in < cw.fadeInBeats)
-            g *= in / cw.fadeInBeats;
+            g *= Arrange::FadeShapeGain((float)(in / cw.fadeInBeats), cw.fadeInShape); // Turbo 0.72: shaped
          else if (!cw.abutsPrev && in < ramp)
             g *= in / ramp;
          if (cw.fadeOutBeats > 0.0 && out < cw.fadeOutBeats)
-            g *= out / cw.fadeOutBeats;
+            g *= Arrange::FadeShapeGain((float)(out / cw.fadeOutBeats), cw.fadeOutShape);
          else if (!cw.abutsNext && out < ramp)
             g *= out / ramp;
          const float gl = (float)g * laneGain * cw.panL * lanePanL;
