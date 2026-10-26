@@ -713,6 +713,60 @@ Compiled Compile(const Recipe& recipe)
          lanes[7] = "..x.....x.....x.";
          hasDrums = true;
       }
+      // Hats, toms and percussion play a groove of their own, not just the
+      // feel's skeleton: closed hat, open hat | low tom, high tom | clap, bell.
+      if (part == Part::Hats)
+      {
+         static const char* kHats[][2] = {
+            { "x.x.x.x.x.x.x.x.", "......o.......o." },   // eighths
+            { "xoxoxoxoxoxoxoxo", "" },                    // sixteenths, accented
+            { "x.o.x.o.x.o.x.o.", "..x...x...x...x." },    // offbeat open
+            { "x.x.xxx.x.x.xxxx", "" },                    // trap rolls
+            { "x..x..x..x..x..x", "" },                    // dotted
+            { "x.......x.......", "....o.......o..." },    // sparse
+            { "xoxxxoxoxoxxxoxo", "..............o." },    // ghosted sixteenths
+            { "x.xxx.x.x.xxx.x.", "......x.......x." },    // broken
+            { "o.x.o.x.o.x.o.xx", "" },                    // swung eighths with a push
+            { "xxx.xxx.xxx.xxx.", "...x.......x...." },    // triplet feel
+         };
+         const int pick = feel.Range((int)(sizeof(kHats) / sizeof(kHats[0])));
+         lanes[2] = kHats[pick][0];
+         lanes[3] = kHats[pick][1];
+      }
+      if (part == Part::Snares && feel.Uniform() < 0.6)
+         lanes[4] = ""; // a snare on its own, no clap on top
+      if (part == Part::Toms)
+      {
+         static const char* kToms[][2] = {
+            { "x...............", "........x......." },
+            { "x..x..x.........", "..........x.x..." },
+            { "x.......x.x.....", "....x.......x..x" },
+            { "x.x.............", "......x.x.x....." },
+            { "x..x....x..x....", "..x...x...x..x.." },
+            { "x...x...x...x...", "..x...x...x...xx" },
+         };
+         const int pick = feel.Range((int)(sizeof(kToms) / sizeof(kToms[0])));
+         lanes[5] = kToms[pick][0];
+         lanes[6] = kToms[pick][1];
+      }
+   }
+   if (part == Part::Percussion)
+   {
+      Rng feel(std::string("perc:") + std::to_string(recipe.seed));
+      static const char* kPerc[][4] = {
+         { "....x.......x...", "x..x..x.........", "........x.x.....", "..x...x...x...x." },
+         { "....x..x....x...", "x.....x...x.....", "..x.x.....x.x...", "x.x.x.x.x.x.x.x." },
+         { "................", "x..x....x..x....", "....x..x....x..x", "o.o.o.o.o.o.o.o." },
+         { "....x.......x.x.", "x.......x.......", "..x.....x.x.....", "..o..o..o..o..o." },
+         { "..x...x...x...x.", "x...x.......x...", "......x.x.......", "x.....x.....x..." },
+         { "....x.......x...", "x..x..x..x..x...", "..x..x..x..x..x.", "o...o...o...o..." },
+      };
+      const int pick = feel.Range((int)(sizeof(kPerc) / sizeof(kPerc[0])));
+      lanes[4] = kPerc[pick][0];
+      lanes[5] = kPerc[pick][1];
+      lanes[6] = kPerc[pick][2];
+      lanes[7] = kPerc[pick][3];
+      hasDrums = true;
    }
    if (part == Part::Drums)
       lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
@@ -746,7 +800,7 @@ Compiled Compile(const Recipe& recipe)
       {
          const std::string lane = "lane" + std::to_string(i);
          force[lane + "_path"] = { 's', DrumSequencerNode::KitDir() + "/" + kKitFiles[i] + ".wav" };
-         force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : 0.85) };
+         force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : part == Part::Percussion && i == 5 ? 0.6 : 0.85) };
          const std::string pat = lanes[i];
          const bool ghostLane = i == 1 || i == 2 || i == 3 || i == 4;
          for (int k = 0; k < 32; k++)
@@ -784,7 +838,9 @@ Compiled Compile(const Recipe& recipe)
       for (int i = 0; i < 8; i++)
       {
          const std::string lane = "lane" + std::to_string(i);
-         const double pitch = cr.pitch * (lowLane[i] ? 0.5 : 1.0) + dr.Uniform(-4.0, 4.0) * (lowLane[i] ? 0.6 : 1.0);
+         // Sample kicks, snares and toms sit lower: a kick under its pitch, a snare with body, toms at tom pitch.
+         static const double kLower[8] = { -3.0, -3.0, 0.0, 0.0, 0.0, -3.0, -4.0, 0.0 };
+         const double pitch = cr.pitch * (lowLane[i] ? 0.5 : 1.0) + dr.Uniform(-4.0, 4.0) * (lowLane[i] ? 0.6 : 1.0) + (subPart || part == Part::Drums ? kLower[i] : 0.0);
          force[lane + "_pitch"] = { 'f', Num(std::round(pitch * 100.0) / 100.0) };
          force[lane + "_finetune"] = { 'f', Num(std::round(dr.Uniform(-30.0, 30.0))) };
          force[lane + "_decay"] = { 'f', Num(std::round(std::clamp(cr.decay + dr.Uniform(-0.2, 0.3), 0.0, 0.85) * 100.0) / 100.0) };
@@ -829,9 +885,9 @@ Compiled Compile(const Recipe& recipe)
          nn["filterType"] = { 'i', std::to_string(filter) };
          return g.Add("Analog", dr.Range(1 << 30), nn);
       };
-      auto toneVoice = [&](double drop, double dropMs, double decMs, int table)
+      auto toneVoice = [&](double drop, double dropMs, double decMs, int table, double cutoff)
       {
-         Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 }, { "a.filterAmount", 0.0 },
+         Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.cutoff", cutoff }, { "a.resonance", 0.0 }, { "a.filterAmount", 0.0 },
                         { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchSustain", 0.0 }, { "a.pitchRelease", 20.0 },
                         { "a.ampRelease", 30.0 }, { "a.detune", 0.0 }, { "a.warpAmount", 0.0 }, { "fmDepth", 0.0 } });
          CleanWavetable(k);
@@ -844,11 +900,12 @@ Compiled Compile(const Recipe& recipe)
          k["a.ampDecay"] = { 'f', Num(decMs) };
          return g.Add("Wavetable", dr.Range(1 << 30), k);
       };
-      if (*lanes[0] && dr.Uniform() < (subPart ? 0.75 : 0.4))
+      if (*lanes[0] && dr.Uniform() < (part == Part::Kicks ? 0.95 : subPart ? 0.75 : 0.4))
       {
          int sq = 0;
-         const int kind = dr.Range(3); // 0 punch, 1 808, 2 thump
-         drumSeq(0, 24 + dr.Range(8), 90.0, sq);
+         static const int kKinds[4] = { 1, 0, 1, 2 };
+         const int kind = kKinds[dr.Range(4)]; // 0 punch, 1 808 (twice as likely), 2 thump
+         drumSeq(0, 21 + dr.Range(7), 90.0, sq); // 28-41 Hz: the sub under the thump
          Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.position", dr.Uniform(0.0, 0.3) }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 },
                         { "a.filterAmount", 0.0 }, { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchAttack", 0.0 },
                         { "a.pitchSustain", 0.0 }, { "a.pitchRelease", 20.0 }, { "a.ampRelease", 30.0 }, { "a.detune", 0.0 },
@@ -861,12 +918,12 @@ Compiled Compile(const Recipe& recipe)
          k["a.octave"] = { 'i', "0" };
          k["a.pitchAmount"] = { 'f', Num(kind == 0 ? dr.Uniform(14.0, 26.0) : kind == 1 ? dr.Uniform(8.0, 16.0) : dr.Uniform(20.0, 36.0)) };
          k["a.pitchDecay"] = { 'f', Num(kind == 0 ? dr.Uniform(18.0, 40.0) : kind == 1 ? dr.Uniform(50.0, 110.0) : dr.Uniform(25.0, 60.0)) };
-         k["a.ampDecay"] = { 'f', Num(kind == 0 ? dr.Uniform(130.0, 260.0) : kind == 1 ? dr.Uniform(450.0, 900.0) : dr.Uniform(200.0, 420.0)) };
+         k["a.ampDecay"] = { 'f', Num(kind == 0 ? dr.Uniform(200.0, 340.0) : kind == 1 ? dr.Uniform(600.0, 1100.0) : dr.Uniform(300.0, 520.0)) };
          const int sy = g.Add("Wavetable", dr.Range(1 << 30), k);
          g.Connect(sq, sy, true);
          force["lane0_volume"] = { 'f', "0" };
          synthDrums.push_back({ 0, sy, -3.0f });
-         if (dr.Uniform() < 0.7) // a 5-15 ms noise click on the front
+         if (dr.Uniform() < 0.45) // a 5-15 ms noise click on the front
          {
             const int ck = noiseVoice(2, dr.Uniform(3000.0, 8000.0), 0.1, dr.Uniform(5.0, 15.0), 0.8);
             g.Connect(sq, ck, true);
@@ -888,17 +945,17 @@ Compiled Compile(const Recipe& recipe)
       }
       // A snare, clap or toms from a synth, each about one take in three: noise
       // through a band for the crack, a dropped sine for the body.
-      if (*lanes[1] && dr.Uniform() < (subPart ? 0.75 : 0.33))
+      if (*lanes[1] && dr.Uniform() < (part == Part::Snares ? 0.9 : subPart ? 0.75 : 0.33))
       {
          int sq = 0;
-         drumSeq(1, 52 + dr.Range(7), 25.0, sq); // 175-260 Hz body, as the 909's 180 Hz partial
-         const int nz = noiseVoice(dr.Range(2) ? 6 : 2, dr.Uniform(1800.0, 6000.0), dr.Uniform(0.05, 0.4), dr.Uniform(70.0, 220.0), 0.9);
+         drumSeq(1, 46 + dr.Range(6), 25.0, sq); // 115-165 Hz body, under the 909's 180 Hz partial
+         const int nz = noiseVoice(dr.Range(2) ? 6 : 2, dr.Uniform(1500.0, 4500.0), dr.Uniform(0.05, 0.3), dr.Uniform(60.0, 160.0), 0.8);
          g.Connect(sq, nz, true);
-         const int bd = toneVoice(dr.Uniform(6.0, 14.0), dr.Uniform(15.0, 45.0), dr.Uniform(60.0, 140.0), dr.Range(2) ? 0 : 10);
+         const int bd = toneVoice(dr.Uniform(6.0, 12.0), dr.Uniform(15.0, 45.0), dr.Uniform(110.0, 220.0), dr.Range(2) ? 0 : 10, 4500.0);
          g.Connect(sq, bd, true);
          force["lane1_volume"] = { 'f', "0" };
-         synthDrums.push_back({ 1, nz, -4.0f });
-         synthDrums.push_back({ 1, bd, -8.0f });
+         synthDrums.push_back({ 1, nz, -6.0f });
+         synthDrums.push_back({ 1, bd, -3.0f });
       }
       if (*lanes[4] && dr.Uniform() < (subPart ? 0.75 : 0.33))
       {
@@ -907,21 +964,23 @@ Compiled Compile(const Recipe& recipe)
          const int nz = noiseVoice(6, dr.Uniform(900.0, 2800.0), dr.Uniform(0.1, 0.6), dr.Uniform(90.0, 280.0), 0.9);
          g.Connect(sq, nz, true);
          // The 909 clap is one noise burst retriggered about four times, ~11 ms apart.
-         const int bursts = g.Add("Delay", dr.Range(1 << 30), F({ { "mix", 0.7 }, { "timeMs", dr.Uniform(9.0, 16.0) }, { "feedback", dr.Uniform(0.5, 0.7) } }));
+         const int bursts = g.Add("Delay", dr.Range(1 << 30), F({ { "mix", 0.5 }, { "timeMs", dr.Uniform(9.0, 16.0) }, { "feedback", dr.Uniform(0.3, 0.5) } }));
          g.Connect(nz, bursts, false);
          force["lane4_volume"] = { 'f', "0" };
          synthDrums.push_back({ 4, bursts, -4.0f });
       }
       if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (subPart ? 0.75 : 0.33))
       {
-         const int notes[2] = { 40 + dr.Range(8), 52 + dr.Range(8) };
+         const bool perc = part == Part::Percussion; // percussion keeps its brighter toms
+         const int notes[2] = { perc ? 40 + dr.Range(8) : 36 + dr.Range(6), perc ? 52 + dr.Range(8) : 45 + dr.Range(6) }; // toms: floor 70-100 Hz, rack 110-160 Hz
          for (int ti = 0; ti < 2; ti++)
          {
             if (!*lanes[5 + ti])
                continue;
             int sq = 0;
             drumSeq(5 + ti, notes[ti], 70.0, sq);
-            const int tm = toneVoice(dr.Uniform(8.0, 22.0), dr.Uniform(40.0, 110.0), dr.Uniform(180.0, 460.0), dr.Range(3) == 0 ? 10 : 0);
+            const int tm = toneVoice(perc ? dr.Uniform(8.0, 22.0) : dr.Uniform(4.0, 9.0), perc ? dr.Uniform(40.0, 110.0) : dr.Uniform(35.0, 80.0),
+                                   perc ? dr.Uniform(180.0, 460.0) : dr.Uniform(260.0, 520.0), dr.Range(3) == 0 ? 10 : 0, perc ? 9000.0 : 2800.0);
             g.Connect(sq, tm, true);
             force["lane" + std::to_string(5 + ti) + "_volume"] = { 'f', "0" };
             synthDrums.push_back({ 5 + ti, tm, -5.0f });
@@ -1866,7 +1925,8 @@ Compiled Compile(const Recipe& recipe)
    for (const auto& ch : chans)
       g.Connect(ch.first, mx, false);
    int end = mx;
-   if ((!ban.count("Reverb") || pads || ownSpace) && !bassPart)
+   const bool dryDrums = part == Part::Kicks || part == Part::Snares || part == Part::Toms;
+   if ((!ban.count("Reverb") || pads || ownSpace) && !bassPart && !dryDrums)
    {
       const bool wide = std::string(st.family) == "ambient" || pads || fxPart || texPart;
       if (pads)
@@ -1884,7 +1944,7 @@ Compiled Compile(const Recipe& recipe)
          g.Connect(end, dl, false);
          end = dl;
       }
-      const int rv = g.Add("Reverb", seed(), F({ { "mix", pads ? padWet : ownSpace ? specialWet : wide ? 0.45 : 0.15 }, { "decay", pads ? padDecay : ownSpace ? specialDecay : wide ? 3.0 : 1.2 } }));
+      const int rv = g.Add("Reverb", seed(), F({ { "mix", pads ? padWet : ownSpace ? specialWet : wide ? 0.45 : drumPart ? 0.05 : 0.15 }, { "decay", pads ? padDecay : ownSpace ? specialDecay : wide ? 3.0 : drumPart ? 0.5 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
    }
