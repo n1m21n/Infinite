@@ -1,0 +1,79 @@
+infinite-patch 1
+transport 71 4 4 7 0
+# style: ambient_piano bpm 71 key 7 scale 0
+node 1 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 35
+  f humanizeVelocity 35
+  i progSteps 4
+  f rateBeats 8
+  i root 7
+  i scale 0
+  f strumMs 140
+  f upperHarmonics 30.9672
+end
+node 2 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  f rateSeconds 0.301142
+  i repeats 3
+end
+note 2 0 1
+node 3 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 3 0 2
+node 4 Synths FM
+  f decay1 1628.28
+  f decay2 1339.28
+  f feedback 0.600667
+  b fixed1 1
+  b fixed2 0
+  b fixed4 1
+  f ratio4 6.28467
+  f release3 2243.41
+  f sustain1 0.741864
+  f sustain3 0.509973
+  f sustain4 0.51873
+end
+note 4 0 3
+node 5 AudioEffects Convolution Reverb
+  f decay 0.603001
+  s file /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/07-high-tom.wav
+end
+aud 5 0 4
+node 6 AudioEffects Delay
+  f diffusion 0.225586
+  f feedback 70.975
+  f mix 0.990892
+  f timeMs 28.7431
+end
+aud 6 0 5
+node 7 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 7 0 6
+node 8 AudioEffects Reverb
+  f damping 0.924284
+  f decay 1.2
+  f mix 0.15
+  f predelay 174.129
+  f width 0.908596
+end
+aud 8 0 7
+node 9 AudioEffects Limiter
+end
+aud 9 0 8
+node 10 Utility Audio Out
+end
+aud 10 0 9
+node 11 Modulators LFO
+  f low 0.231767
+  f rateBeats 0.31362
+  f rateHz 3.37759
+  f seed 140.967
+  b voice 0
+end
+mod 4 feedback 11 0 0 0.209 0.5

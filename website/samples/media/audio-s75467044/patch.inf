@@ -1,0 +1,150 @@
+infinite-patch 1
+transport 54 4 4 0 5
+# style: drone_kosmische bpm 54 key 0 scale 5
+node 1 Notes Note Sequencer
+  b en0 1
+  b en1 0
+  b en10 0
+  b en11 0
+  b en12 0
+  b en13 0
+  b en14 0
+  b en15 0
+  b en2 0
+  b en3 0
+  b en4 0
+  b en5 0
+  b en6 0
+  b en7 0
+  b en8 0
+  b en9 0
+  f gatePercent 55
+  i note0 24
+  i note1 24
+  i note10 24
+  i note11 24
+  i note12 24
+  i note13 24
+  i note14 24
+  i note15 24
+  i note2 24
+  i note3 24
+  i note4 24
+  i note5 24
+  i note6 24
+  i note7 24
+  i note8 24
+  i note9 24
+  f rateBeats 0.25
+  i rateMode 0
+  i steps 16
+  f vel0 0.9
+  f vel1 0.9
+  f vel10 0.9
+  f vel11 0.9
+  f vel12 0.9
+  f vel13 0.9
+  f vel14 0.9
+  f vel15 0.9
+  f vel2 0.9
+  f vel3 0.9
+  f vel4 0.9
+  f vel5 0.9
+  f vel6 0.9
+  f vel7 0.9
+  f vel8 0.9
+  f vel9 0.9
+end
+node 2 Synths Partials
+  f formant -8.02583
+  b loop 0
+  f noise 1.04722
+  s path /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/06-low-tom.wav
+  s pathB /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/03-closed-hat.wav
+  f pitch -4.87183
+  f release 108.158
+  f volume 0.769951
+end
+note 2 0 1
+node 3 AudioEffects Audio Filter
+  f q 0.1166
+end
+aud 3 0 2
+node 4 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 0
+  f humanizeVelocity 0
+  i mode 1
+  i progSteps 4
+  f rateBeats 16
+  i root 0
+  i scale 5
+  f strumMs 0
+end
+node 5 Notes Note Echo
+  f decay 55
+  b muteDry 0
+  f rateBeats 0.75
+  i repeats 3
+  i transposePerRepeat -1
+end
+note 5 0 4
+node 6 Synths Analog
+  f cutoff 118.808
+  f decay 2733.03
+  f noise 0.346946
+  f oscMix 0.440732
+  f release 2406.59
+  f sub 0.526319
+  f sustain 0.973646
+  i wave1 0
+end
+note 6 0 5
+node 7 AudioEffects Delay
+  f ducking 0.889182
+  f feedback 62.1537
+  f mix 0.28933
+  f timeMs 997.357
+  f tone -0.466635
+end
+aud 7 0 6
+node 8 AudioEffects Audio Filter
+  f envAmount 0.543042
+  f q 15.435
+  f rate 3.62907
+end
+aud 8 0 7
+node 9 Utility Mixer
+  i channels 2
+  f gain0 -4
+  f gain1 14
+end
+aud 9 0 3
+aud 9 1 8
+node 10 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+  f width 0.700996
+end
+aud 10 0 9
+node 11 AudioEffects Limiter
+end
+aud 11 0 10
+node 12 Utility Audio Out
+end
+aud 12 0 11
+node 13 Modulators LFO
+  f low 0.611366
+  f phase 0.045971
+  b voice 1
+end
+mod 6 cutoff 13 0 0 0.318 0.5
+node 14 Modulators LFO
+  f low 0.491847
+  f phase 0.450396
+  i phaseMode 2
+  f rateHz 0.369456
+  i rateMode 2
+  i shape 5
+end
+mod 6 resonance 14 0 0 0.274 0.5

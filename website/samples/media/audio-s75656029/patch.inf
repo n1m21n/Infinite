@@ -1,0 +1,73 @@
+infinite-patch 1
+transport 65 4 4 1 4
+# style: solo_piano bpm 65 key 1 scale 4
+node 1 Notes Chorder
+  i chordSize 4
+  f humanizeTimingMs 30
+  f humanizeVelocity 30
+  i mode 3
+  i progSteps 4
+  f rateBeats 2
+  i root 1
+  i scale 4
+  f strumMs 70
+end
+node 2 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 2 0 1
+node 3 Notes Velocity Curve
+  f curve 1.6
+end
+note 3 0 2
+node 4 Notes Note Echo
+  f decay 55
+  b muteDry 1
+  f rateBeats 0.75
+  i rateMode 0
+  i repeats 3
+end
+note 4 0 3
+node 5 Synths FM
+  i algorithm 8
+  f attack1 203.458
+  f attack4 1377.2
+  f feedback 0.870718
+  b fixed4 0
+  f level3 0.508106
+  f ratio3 12.855
+  f release2 659.769
+  f sustain1 0.513767
+  f sustain2 0.823546
+  f sustain3 0.612539
+  f volume 0.802798
+end
+note 5 0 4
+node 6 AudioEffects Reverb
+  f damping 0.935503
+  f decay 0.114143
+end
+aud 6 0 5
+node 7 AudioEffects Reverb
+  f mix 0.645578
+end
+aud 7 0 6
+node 8 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 8 0 7
+node 9 AudioEffects Reverb
+  f damping 0.360051
+  f decay 1.2
+  f mix 0.15
+  f predelay 38.9761
+end
+aud 9 0 8
+node 10 AudioEffects Limiter
+end
+aud 10 0 9
+node 11 Utility Audio Out
+end
+aud 11 0 10

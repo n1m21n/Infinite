@@ -1,0 +1,151 @@
+infinite-patch 1
+transport 71 4 4 7 1
+# style: neo_classical bpm 71 key 7 scale 1
+node 1 Notes Note Sequencer
+  b en0 1
+  b en1 0
+  b en10 0
+  b en11 0
+  b en12 1
+  b en13 0
+  b en14 0
+  b en15 0
+  b en2 0
+  b en3 0
+  b en4 0
+  b en5 0
+  b en6 1
+  b en7 0
+  b en8 0
+  b en9 0
+  f gatePercent 55
+  i note0 31
+  i note1 31
+  i note10 31
+  i note11 31
+  i note12 34
+  i note13 31
+  i note14 31
+  i note15 31
+  i note2 31
+  i note3 31
+  i note4 31
+  i note5 31
+  i note6 38
+  i note7 31
+  i note8 31
+  i note9 31
+  f rateBeats 0.25
+  i rateMode 0
+  f rateSeconds 1.91303
+  i steps 16
+  f vel0 0.9
+  f vel1 0.9
+  f vel10 0.9
+  f vel11 0.9
+  f vel12 0.9
+  f vel13 0.9
+  f vel14 0.9
+  f vel15 0.9
+  f vel2 0.9
+  f vel3 0.9
+  f vel4 0.9
+  f vel5 0.9
+  f vel6 0.9
+  f vel7 0.9
+  f vel8 0.9
+  f vel9 0.9
+end
+node 2 Synths FM
+  i algorithm 7
+  f attack4 2077.78
+  f decay3 3864.4
+  f feedback 0.565717
+  b fixed2 0
+  f level4 0.719918
+  f ratio1 1.32372
+  f ratio2 5.74801
+  f ratio4 6.40437
+  f release4 3526.78
+  f sustain2 0.30666
+  f sustain3 0.423189
+end
+note 2 0 1
+node 3 AudioEffects Delay
+  f flutter 6.41093e-05
+  f saturation 0.244597
+  f timeMs 27.6541
+end
+aud 3 0 2
+node 4 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 25
+  f humanizeVelocity 25
+  i progSteps 4
+  f rateBeats 2
+  i root 7
+  i scale 1
+  f strumMs 55
+end
+node 5 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 5 0 4
+node 6 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  i rateMode 1
+  i repeats 3
+end
+note 6 0 5
+node 7 Synths Analog
+  b analog 1
+  f decay 1071.06
+  f fm 0.517499
+  f keyTrack 0.740187
+  f osc1Vol 0.151306
+  f resonance 0.704396
+  f spread 0.691369
+  b sync 1
+  f voices 5.41287
+  f volume 0.0254755
+end
+note 7 0 6
+node 8 AudioEffects Chorus
+  f delay 19.5362
+  f mix 0.454875
+  f rate 0.380035
+  f spread 0.407329
+end
+aud 8 0 7
+node 9 AudioEffects Reverb
+  f predelay 268.933
+  f size 0.481768
+end
+aud 9 0 8
+node 10 Utility Mixer
+  i channels 2
+  f gain0 -4
+  f gain1 6
+end
+aud 10 0 3
+aud 10 1 9
+node 11 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+end
+aud 11 0 10
+node 12 AudioEffects Limiter
+end
+aud 12 0 11
+node 13 Utility Audio Out
+end
+aud 13 0 12
+node 14 Modulators LFO
+  f rateBeats 12.4509
+  f rateHz 0.0372069
+  i rateMode 0
+  i shape 4
+end
+mod 7 detune 14 0 0 0.167 0.5

@@ -1,0 +1,64 @@
+infinite-patch 1
+transport 74 4 4 6 0
+# style: solo_piano bpm 74 key 6 scale 0
+node 1 Notes Chorder
+  i chordSize 4
+  f humanizeTimingMs 30
+  f humanizeVelocity 30
+  i mode 13
+  i progSteps 4
+  f rateBeats 2
+  i root 6
+  i scale 0
+  f strumMs 70
+end
+node 2 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 2 0 1
+node 3 Notes Velocity Curve
+  f curve 1.6
+end
+note 3 0 2
+node 4 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  f rateSeconds 0.195367
+  i repeats 3
+end
+note 4 0 3
+node 5 Synths Partials
+  s path /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/08-bell.wav
+  s pathB /Applications/Infinite.app/Contents/Resources/drumkits/infinite-basic/04-open-hat.wav
+  f release 7.00621
+end
+note 5 0 4
+node 6 AudioEffects EQ
+  f band1Gain -12.2993
+  f band1Q 0.930789
+  f band2Freq 5596.92
+  f band2Q 11.9474
+  f band3Gain -14.3632
+  f band3Q 1.06825
+  f band4Gain -18.3665
+  f band5Q 3.74889
+end
+aud 6 0 5
+node 7 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 7 0 6
+node 8 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+  f size 0.332199
+end
+aud 8 0 7
+node 9 AudioEffects Limiter
+end
+aud 9 0 8
+node 10 Utility Audio Out
+end
+aud 10 0 9

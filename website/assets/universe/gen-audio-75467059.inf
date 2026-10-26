@@ -1,0 +1,144 @@
+infinite-patch 1
+transport 70 4 4 9 0
+# style: neo_classical bpm 70 key 9 scale 0
+node 1 Notes Note Sequencer
+  b en0 1
+  b en1 0
+  b en10 0
+  b en11 0
+  b en12 1
+  b en13 0
+  b en14 0
+  b en15 0
+  b en2 0
+  b en3 0
+  b en4 0
+  b en5 0
+  b en6 1
+  b en7 0
+  b en8 0
+  b en9 0
+  f gatePercent 55
+  i note0 33
+  i note1 33
+  i note10 33
+  i note11 33
+  i note12 37
+  i note13 33
+  i note14 33
+  i note15 33
+  i note2 33
+  i note3 33
+  i note4 33
+  i note5 33
+  i note6 40
+  i note7 33
+  i note8 33
+  i note9 33
+  f rateBeats 0.25
+  i rateMode 0
+  i steps 16
+  f vel0 0.9
+  f vel1 0.9
+  f vel10 0.9
+  f vel11 0.9
+  f vel12 0.9
+  f vel13 0.9
+  f vel14 0.9
+  f vel15 0.9
+  f vel2 0.9
+  f vel3 0.9
+  f vel4 0.9
+  f vel5 0.9
+  f vel6 0.9
+  f vel7 0.9
+  f vel8 0.9
+  f vel9 0.9
+end
+node 2 Synths Analog
+  f attack 2093.87
+  f osc1Vol 0.46743
+  f osc2Vol 0.73726
+  f pitchBend 0.727291
+  b sync 0
+  f voices 2.2568
+  i wave2 2
+end
+note 2 0 1
+node 3 AudioEffects Chorus
+  f delay 14.0853
+  f depth 13.2432
+  f mix 0.479505
+  f spread 0.52169
+end
+aud 3 0 2
+node 4 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 25
+  f humanizeVelocity 25
+  i progSteps 4
+  f rateBeats 2
+  i root 9
+  i scale 0
+  f strumMs 55
+  f upperHarmonics 41.0919
+end
+node 5 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 5 0 4
+node 6 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  i repeats 3
+  i transposePerRepeat 11
+end
+note 6 0 5
+node 7 Synths FM
+  f attack2 2905.76
+  f decay1 1796.31
+  f decay3 100.618
+  f feedback 0.195267
+  b fixed3 1
+  b fixed4 1
+  f level1 0.168009
+  f level3 0.994743
+  f release1 3177.02
+  f release2 2618.59
+  f sustain1 0.312065
+  f volume 0.337724
+end
+note 7 0 6
+node 8 AudioEffects Chorus
+  f mix 0.493956
+  f rate 0.035617
+  f spread 0.969011
+end
+aud 8 0 7
+node 9 Utility Mixer
+  i channels 2
+  f gain0 -4
+  f gain1 6
+end
+aud 9 0 3
+aud 9 1 8
+node 10 AudioEffects Reverb
+  f decay 1.2
+  f mix 0.15
+  f predelay 217.189
+  f width 0.765173
+end
+aud 10 0 9
+node 11 AudioEffects Limiter
+end
+aud 11 0 10
+node 12 Utility Audio Out
+end
+aud 12 0 11
+node 13 Modulators LFO
+  f phase 0.73565
+  f rateHz 28.8032
+  i rateMode 2
+end
+mod 2 cutoff 13 0 0 0.106 0.5

@@ -1,0 +1,58 @@
+infinite-patch 1
+transport 64 4 4 2 0
+# style: ambient_piano bpm 64 key 2 scale 0
+node 1 Notes Chorder
+  i chordSize 3
+  f humanizeTimingMs 35
+  f humanizeVelocity 35
+  i progSteps 4
+  f rateBeats 8
+  i root 2
+  i scale 0
+  f strumMs 140
+end
+node 2 Notes Note Echo
+  f decay 55
+  f rateBeats 0.75
+  i rateMode 1
+  i repeats 3
+  i transposePerRepeat 1
+end
+note 2 0 1
+node 3 Notes Humanizer
+  f timingMs 14
+  f velocityPct 18
+end
+note 3 0 2
+node 4 Synths Partials
+  f formant 5.10503
+  f partials 8.28601
+  s path /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/01-kick.wav
+  s pathB /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/08-bell.wav
+  f pitch -1.78742
+  f speed 1.23526
+end
+note 4 0 3
+node 5 AudioEffects Reverb
+  f predelay 286.768
+  f width 0.596374
+end
+aud 5 0 4
+node 6 Utility Mixer
+  i channels 1
+  f gain0 6
+end
+aud 6 0 5
+node 7 AudioEffects Reverb
+  f damping 0.241578
+  f decay 1.2
+  f mix 0.15
+  f size 0.167776
+end
+aud 7 0 6
+node 8 AudioEffects Limiter
+end
+aud 8 0 7
+node 9 Utility Audio Out
+end
+aud 9 0 8
