@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Chladni Resonance",
+    "author": "Infinite",
+    "description": "2D Chladni acoustic plate resonance showing nodal vibration lines where sand grains collect into geometric harmonic patterns.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float modalM = 3.0 [1.0, 8.0]\nparam float modalN = 5.0 [1.0, 8.0]\nparam float nodalWidth = 0.08 [0.01, 0.3]\nparam float vibrationRate = 0.8 [0.1, 3.0]\nparam float amberGlow = 0.65 [0.0, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0\nr = length(p)\n\npi = 3.14159265\nkx = p.x * pi\nky = p.y * pi\ntime = t * vibrationRate\n\nm1 = sin(modalN * kx + time * 0.2) * sin(modalM * ky)\nm2 = sin(modalM * kx) * sin(modalN * ky - time * 0.2)\nchladni = m1 - m2\n\ndistNode = abs(chladni)\nsand = smoothstep(nodalWidth, 0.0, distNode)\n\nripple = sin(r * 18.0 - time * 3.0) * 0.5 + 0.5\n\ncGround = vec3(0.043, 0.055, 0.078)\ncSand = vec3(0.878, 0.902, 0.929)\ncNode = vec3(0.220, 0.741, 0.973)\ncAmber = vec3(0.961, 0.620, 0.043)\n\nplateRim = smoothstep(0.98, 0.92, r)\nboundaryRing = smoothstep(0.04, 0.0, abs(r - 0.92))\n\nvibrationField = mix(cGround, cNode * 0.7, ripple * (1.0 - distNode * 0.5))\ncolPlate = mix(vibrationField, cSand, sand) + boundaryRing * cAmber * amberGlow\n\ncol = colPlate * plateRim\nalpha = 1.0\n",
+    "params": {
+      "modalM": 3.0,
+      "modalN": 5.0,
+      "nodalWidth": 0.08,
+      "vibrationRate": 0.8,
+      "amberGlow": 0.65
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -270,6 +270,16 @@
       "slug": "op-art-hypnotic-vortex",
       "title": "Op Art Hypnotic Vortex",
       "description": "Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing."
+    },
+    {
+      "slug": "cymatics-sine-chladni-resonance",
+      "title": "Cymatics Sine Chladni Resonance",
+      "description": "2D acoustic Chladni plate resonance showing nodal vibration geometry where sand grains collect into harmonic standing wave figures. Bass drives vibrational energy and plate rim pulsation, mids shift modal integer ratios, highs scatter micro-grain sand particles."
+    },
+    {
+      "slug": "cymatics-sine-harmonic-ripples",
+      "title": "Cymatics Sine Harmonic Ripples",
+      "description": "Intersecting circular acoustic Bessel standing wave rings with audio-reactive nodal interference clusters and metallic plate highlights. Bass deepens the central wavefront displacement, mids modulate multi-focus ripple frequencies, highs ignite luminous amber nodal boundaries."
     }
   ]
 }

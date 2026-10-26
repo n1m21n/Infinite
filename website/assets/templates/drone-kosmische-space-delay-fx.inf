@@ -1,0 +1,55 @@
+infinite-patch 1
+# Drone Kosmische Space Delay FX
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 36
+  i rangeHigh 60
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float delayTime = 0.28 [0.02, 1.0]\nparam float feedback = 0.55 [0.0, 0.9]\nparam float wowRate = 0.45 [0.05, 2.0]\nparam float damping = 0.45 [0.0, 1.0]\nparam float mix = 0.42 [0.0, 1.0]\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float lp = 0\nstate float prev = 0\n\npStep = clamp(wowRate, 0.05, 5.0) / sr\nlfo = (lfo + pStep) % 1.0\nwobble = sin(lfo * 6.2831853) * 0.08\n\ndrive = in + prev * feedback\nsat = drive / (1.0 + abs(drive) * 0.5)\n\ndCoeff = clamp(0.35 + wobble * 0.15, 0.05, 0.85)\nap1 = d1 + dCoeff * (sat - d1)\nd1 = sat\nap2 = d2 + dCoeff * (ap1 - d2)\nd2 = ap1\n\nfDamp = clamp((1.0 - damping * 0.65) * 4000.0 / sr * 2.4, 0.01, 0.45)\nlp = lp + fDamp * (ap2 - lp)\nprev = lp\n\nout = in * (1.0 - mix) + prev * mix * 0.85\n
+end
+node 4 Effects Limiter
+  id lim
+  pos 1100 1024
+end
+node 5 Utility Audio Out
+  id speakers
+  pos 1400 1024
+end
+node 6 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 7 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.28 0.18 0.45
+  f size 0.24
+end
+node 8 Utility Output
+  id out
+  pos 460 0
+end
+node 9 Compositing Comment
+  pos 0 722
+  s text Drone Kosmische Space Delay FX. Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud lim 0 fx
+aud speakers 0 lim
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

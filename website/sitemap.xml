@@ -87,6 +87,8 @@
   <url><loc>https://infinitedevices.org/embeds/neo-brutalist-concrete-monolith.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/analog-crt-phosphor-bloom.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/op-art-hypnotic-vortex.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-chladni-resonance.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-harmonic-ripples.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
@@ -164,6 +166,10 @@
   <url><loc>https://infinitedevices.org/library/op-art-spectral-chime-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-frequency-shifter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-chord-stab-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
@@ -478,6 +484,16 @@
   <url><loc>https://infinitedevices.org/library/op-art-frequency-shifter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/analog-crt-phosphor-bloom.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/op-art-hypnotic-vortex.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/generative-plotter-contour-flow.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/generative-plotter-spiral-lattice.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vector-wireframe-geodesic-sphere-3d.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vector-wireframe-torus-knot-3d.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-chord-stab-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-resonance.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-ripples.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-26</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>

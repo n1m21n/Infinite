@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dub Techno Chord Stab Synth",
+    "author": "Infinite",
+    "description": "Minor triad chord stab synthesizer with resonant lowpass filter sweep, noise breath, and exponential envelope decay.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1500.0 [80.0, 8000.0]\nparam float res = 0.65 [0.0, 0.95]\nparam float chordSpread = 0.5 [0.0, 1.0]\nparam float decay = 0.45 [0.05, 1.5]\nparam float noiseLevel = 0.15 [0.0, 0.5]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float noiseState = 0.5\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.01)\nenv = if(target > env, env + (target - env) * 0.1, env - env * decayRate)\n\npStep = clamp(freq, 20.0, 4000.0) / sr\np1 = (p1 + pStep) % 1.0\np2 = (p2 + pStep * (1.0 + 0.1892 * chordSpread)) % 1.0\n\nsaw1 = 2.0 * p1 - 1.0\nsaw2 = 2.0 * p2 - 1.0\n\nnoiseState = (noiseState * 105.13 + 0.137) % 1.0\nnoise = (noiseState * 2.0 - 1.0) * noiseLevel\n\nraw = (saw1 * 0.55 + saw2 * 0.45 + noise) * env\n\nfCut = clamp((cutoff + env * 4500.0) / sr * 2.4, 0.004, 0.45)\nfeedback = (s2 * res * 2.8) / (1.0 + abs(s2))\nu = raw - feedback\nsat = u / (1.0 + abs(u) * 0.4)\ns1 = s1 + fCut * (sat - s1)\ns2 = s2 + fCut * (s1 - s2)\n\nout = s2 * 0.22\n",
+    "params": {
+      "cutoff": 1500.0,
+      "res": 0.65,
+      "chordSpread": 0.5,
+      "decay": 0.45,
+      "noiseLevel": 0.15
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

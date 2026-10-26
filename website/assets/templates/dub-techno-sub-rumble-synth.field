@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dub Techno Sub Rumble Synth",
+    "author": "Infinite",
+    "description": "Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float subDrive = 1.6 [1.0, 4.0]\nparam float subTone = 0.45 [0.0, 1.0]\nparam float punch = 0.55 [0.0, 1.0]\nparam float glideRate = 0.12 [0.02, 0.5]\nparam float decay = 0.55 [0.1, 2.0]\nstate float phase = 0\nstate float curFreq = 55\nstate float env = 0\nstate float pEnv = 0\nstate float s1 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.01)\nenv = if(target > env, env + (target - env) * 0.15, env - env * decayRate)\n\npEnv = if(target > pEnv, 1.0, pEnv * 0.998)\ncurFreq = curFreq + (freq * 0.5 - curFreq) * glideRate\nf0 = clamp(curFreq + pEnv * punch * 40.0, 20.0, 600.0)\n\npStep = f0 / sr\nphase = (phase + pStep) % 1.0\n\nsin1 = sin(phase * 6.2831853)\nsin2 = sin((phase * 2.0) % 1.0 * 6.2831853) * subTone * 0.5\nraw = (sin1 + sin2) * env\n\nu = raw * subDrive\nsat = u / (1.0 + abs(u) * 0.5)\n\nfCut = clamp(240.0 / sr * 2.4, 0.005, 0.35)\ns1 = s1 + fCut * (sat - s1)\n\nout = s1 * 0.28\n",
+    "params": {
+      "subDrive": 1.6,
+      "subTone": 0.45,
+      "punch": 0.55,
+      "glideRate": 0.12,
+      "decay": 0.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

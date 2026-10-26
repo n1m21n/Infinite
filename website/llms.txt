@@ -106,6 +106,10 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Op Art Spectral Chime Synth](https://infinitedevices.org/library/op-art-spectral-chime-synth.html): Multi-partial inharmonic additive chime and bell synthesizer with kinetic beating moire modulations, metallic partial ratios, and shimmering exponential modal decays. (file: https://infinitedevices.org/assets/templates/op-art-spectral-chime-synth.inf)
 - [Analog CRT Tape Flutter FX](https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html): Magnetic tape and cathode scanline delay with dual-rate wow/flutter drift modulation, warm asymmetric saturation, and high-frequency tape head damping. (file: https://infinitedevices.org/assets/templates/analog-crt-tape-flutter-fx.inf)
 - [Op Art Frequency Shifter FX](https://infinitedevices.org/library/op-art-frequency-shifter-fx.html): Bode-style single-sideband frequency shifter with quadrature phase splitting, endless barber-pole Shepard tone phase sweeps, and cross-channel dispersion. (file: https://infinitedevices.org/assets/templates/op-art-frequency-shifter-fx.inf)
+- [Dub Techno Chord Stab Synth](https://infinitedevices.org/library/dub-techno-chord-stab-synth.html): Minor triad chord stab synthesizer with resonant lowpass filter sweep, noise breath, and exponential envelope decay. (file: https://infinitedevices.org/assets/templates/dub-techno-chord-stab-synth.inf)
+- [Dub Techno Sub Rumble Synth](https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html): Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch. (file: https://infinitedevices.org/assets/templates/dub-techno-sub-rumble-synth.inf)
+- [Drone Kosmische Space Delay FX](https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html): Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections. (file: https://infinitedevices.org/assets/templates/drone-kosmische-space-delay-fx.inf)
+- [Drone Kosmische Resonator Filter FX](https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html): Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive. (file: https://infinitedevices.org/assets/templates/drone-kosmische-resonator-filter-fx.inf)
 
 ## Library: Community
 
@@ -282,6 +286,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Neo-Brutalist Concrete Monolith](https://infinitedevices.org/library/neo-brutalist-concrete-monolith.html): Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows. (file: https://infinitedevices.org/assets/library/pixel/neo-brutalist-concrete-monolith.field)
 - [Analog CRT Phosphor Bloom](https://infinitedevices.org/library/analog-crt-phosphor-bloom.html): Cathode ray oscilloscope vector bloom with curved CRT barrel distortion, dual Lissajous electron beam traces, phosphor decay persistence, and scanline raster glow. Bass expands the screen curvature and beam diameter, mids modulate harmonic Lissajous ratios, highs flare phosphor halo bloom. (file: https://infinitedevices.org/assets/library/pixel/analog-crt-phosphor-bloom.field)
 - [Op Art Hypnotic Vortex](https://infinitedevices.org/library/op-art-hypnotic-vortex.html): Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing. (file: https://infinitedevices.org/assets/library/pixel/op-art-hypnotic-vortex.field)
+- [Cymatics Sine Chladni Resonance](https://infinitedevices.org/library/cymatics-sine-chladni-resonance.html): 2D Chladni acoustic plate resonance showing nodal vibration lines where sand grains collect into geometric harmonic patterns. (file: https://infinitedevices.org/assets/library/pixel/cymatics-sine-chladni-resonance.field)
+- [Cymatics Sine Harmonic Ripples](https://infinitedevices.org/library/cymatics-sine-harmonic-ripples.html): Intersecting Bessel standing wave rings with audio-reactive frequency nodal clusters, kinetic wavefront displacement, and metallic plate highlights. (file: https://infinitedevices.org/assets/library/pixel/cymatics-sine-harmonic-ripples.field)
 
 ## Library: Sketch
 
@@ -327,6 +333,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Neo-Brutalist Grid Matrix](https://infinitedevices.org/library/neo-brutalist-grid-matrix.html): High-contrast Swiss neo-brutalist architectural poster layout with asymmetric modular concrete grids, diagonal hazard hatchings, and drafting crosshairs. (file: https://infinitedevices.org/assets/library/sketch/neo-brutalist-grid-matrix.js)
 - [Analog CRT Vector Oscilloscope](https://infinitedevices.org/library/analog-crt-vector-oscilloscope.html): Dual-beam cathode ray vector oscilloscope with Lissajous harmonic curves, phosphor decay persistence, and drafting calibration graticule. (file: https://infinitedevices.org/assets/library/sketch/analog-crt-vector-oscilloscope.js)
 - [Op Art Kinetic Wave Moire](https://infinitedevices.org/library/op-art-kinetic-wave-moire.html): Bridget Riley inspired optical illusion with interfering harmonic wave lines, dynamic moire nodes, and perceived kinetic vibration. (file: https://infinitedevices.org/assets/library/sketch/op-art-kinetic-wave-moire.js)
+- [Generative Plotter Contour Flow](https://infinitedevices.org/library/generative-plotter-contour-flow.html): Pen plotter topographic contour isolines with undulating vector flow fields drawn on archival cream stock. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-contour-flow.js)
+- [Generative Plotter Spiral Lattice](https://infinitedevices.org/library/generative-plotter-spiral-lattice.html): Concentric logarithmic Archimedean spiral lattice with geometric pen hatching and harmonic angle offsets. (file: https://infinitedevices.org/assets/library/sketch/generative-plotter-spiral-lattice.js)
 
 ## Library: Sketch 3D
 
@@ -367,6 +375,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Ukiyo-e Cloud Pagoda 3D](https://infinitedevices.org/library/ukiyoe-cloud-pagoda-3d.html): Multi-tiered Edo architectural pagoda structure with swooping parametric curved roof eaves, surrounded by floating woodblock cloud ribbons and indigo strata. (file: https://infinitedevices.org/assets/library/sketch/ukiyoe-cloud-pagoda-3d.js)
 - [Analog CRT Wireframe Terrain 3D](https://infinitedevices.org/library/analog-crt-wireframe-terrain-3d.html): Retro vector arcade perspective terrain grid scrolling towards the horizon with glowing phosphor vectors and radar beacon monoliths. (file: https://infinitedevices.org/assets/library/sketch/analog-crt-wireframe-terrain-3d.js)
 - [Op Art Hyperbolic Cage 3D](https://infinitedevices.org/library/op-art-hyperbolic-cage-3d.html): Kinetic optical illusion ruled hyperboloid cage whose rotating straight struts generate curved saddle moire interference patterns. (file: https://infinitedevices.org/assets/library/sketch/op-art-hyperbolic-cage-3d.js)
+- [Vector Wireframe Geodesic Sphere 3D](https://infinitedevices.org/library/vector-wireframe-geodesic-sphere-3d.html): Rotating vector display geodesic icosahedral sphere with luminescent green strut edges and pulsing nodal vertices. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-geodesic-sphere-3d.js)
+- [Vector Wireframe Torus Knot 3D](https://infinitedevices.org/library/vector-wireframe-torus-knot-3d.html): Orthographic vector wireframe trefoil torus knot with segmented glowing green rib cages and parametric twists. (file: https://infinitedevices.org/assets/library/sketch/vector-wireframe-torus-knot-3d.js)
 
 ## Library: Synths
 
@@ -407,6 +417,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Brutalist Sub-Bass Rumble Synth](https://infinitedevices.org/library/brutalist-sub-bass-rumble-synth.html): Heavy monolithic sub-bass generator with dual sub-octave dividers, warm even harmonic wave folding, and seismic low-frequency pressure envelope. (file: https://infinitedevices.org/assets/templates/brutalist-sub-bass-rumble-synth.inf)
 - [Analog CRT Phosphor Beam Synth](https://infinitedevices.org/library/analog-crt-phosphor-beam-synth.html): Cathode ray vector beam oscillator with morphing sawtooth-pulse waveform, sub-octave divider, 4-pole resonant beam focusing filter, and warm analog cathode saturation. (file: https://infinitedevices.org/assets/templates/analog-crt-phosphor-beam-synth.inf)
 - [Op Art Spectral Chime Synth](https://infinitedevices.org/library/op-art-spectral-chime-synth.html): Multi-partial inharmonic additive chime and bell synthesizer with kinetic beating moire modulations, metallic partial ratios, and shimmering exponential modal decays. (file: https://infinitedevices.org/assets/templates/op-art-spectral-chime-synth.inf)
+- [Dub Techno Chord Stab Synth](https://infinitedevices.org/library/dub-techno-chord-stab-synth.html): Minor triad chord stab synthesizer with resonant lowpass filter sweep, noise breath, and exponential envelope decay. (file: https://infinitedevices.org/assets/templates/dub-techno-chord-stab-synth.inf)
+- [Dub Techno Sub Rumble Synth](https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html): Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch. (file: https://infinitedevices.org/assets/templates/dub-techno-sub-rumble-synth.inf)
 
 ## Library: Audio Effects
 
@@ -447,6 +459,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Liquid Chorus Flanger Matrix FX](https://infinitedevices.org/library/liquid-chorus-flanger-matrix-fx.html): Iridescent stereo BBD delay matrix with multi-phase sinusoidal LFO modulation, through-zero flanging sweep, and cross-channel feedback dispersion. (file: https://infinitedevices.org/assets/templates/liquid-chorus-flanger-matrix-fx.inf)
 - [Analog CRT Tape Flutter FX](https://infinitedevices.org/library/analog-crt-tape-flutter-fx.html): Magnetic tape and cathode scanline delay with dual-rate wow/flutter drift modulation, warm asymmetric saturation, and high-frequency tape head damping. (file: https://infinitedevices.org/assets/templates/analog-crt-tape-flutter-fx.inf)
 - [Op Art Frequency Shifter FX](https://infinitedevices.org/library/op-art-frequency-shifter-fx.html): Bode-style single-sideband frequency shifter with quadrature phase splitting, endless barber-pole Shepard tone phase sweeps, and cross-channel dispersion. (file: https://infinitedevices.org/assets/templates/op-art-frequency-shifter-fx.inf)
+- [Drone Kosmische Space Delay FX](https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html): Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections. (file: https://infinitedevices.org/assets/templates/drone-kosmische-space-delay-fx.inf)
+- [Drone Kosmische Resonator Filter FX](https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html): Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive. (file: https://infinitedevices.org/assets/templates/drone-kosmische-resonator-filter-fx.inf)
 
 ## Nodes
 
@@ -760,7 +774,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 54 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 56 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -815,6 +829,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Neo-Brutalist Concrete Monolith](https://infinitedevices.org/embeds/neo-brutalist-concrete-monolith.html): Stark Swiss architectural concrete facade with rhythmic modular window slots, dramatic directional shadow casting, and audio-reactive structural illumination. Bass displaces the monolithic architectural slabs, mids illuminate recessed neon light slots, highs project directional casting shadows.
 - [Analog CRT Phosphor Bloom](https://infinitedevices.org/embeds/analog-crt-phosphor-bloom.html): Cathode ray oscilloscope vector bloom with curved CRT barrel distortion, dual Lissajous electron beam traces, phosphor decay persistence, and scanline raster glow. Bass expands the screen curvature and beam diameter, mids modulate harmonic Lissajous ratios, highs flare phosphor halo bloom.
 - [Op Art Hypnotic Vortex](https://infinitedevices.org/embeds/op-art-hypnotic-vortex.html): Hypnotic high-contrast optical art spiral vortex with logarithmic radiating rays, pulsating concentric moire bands, and kinetic edge vibration. Bass expands and twists the logarithmic spiral, mids modulate moire interference frequencies, highs induce high-contrast optical strobing.
+- [Cymatics Sine Chladni Resonance](https://infinitedevices.org/embeds/cymatics-sine-chladni-resonance.html): 2D acoustic Chladni plate resonance showing nodal vibration geometry where sand grains collect into harmonic standing wave figures. Bass drives vibrational energy and plate rim pulsation, mids shift modal integer ratios, highs scatter micro-grain sand particles.
+- [Cymatics Sine Harmonic Ripples](https://infinitedevices.org/embeds/cymatics-sine-harmonic-ripples.html): Intersecting circular acoustic Bessel standing wave rings with audio-reactive nodal interference clusters and metallic plate highlights. Bass deepens the central wavefront displacement, mids modulate multi-focus ripple frequencies, highs ignite luminous amber nodal boundaries.
 
 ## For AI agents
 

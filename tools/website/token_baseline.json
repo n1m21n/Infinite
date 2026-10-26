@@ -376,6 +376,14 @@
    "font-size": 47,
    "hex": 18,
    "radius": 12
+  },
+  "embeds/cymatics-sine-chladni-resonance.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-harmonic-ripples.html": {
+   "font-size": 2,
+   "hex": 6
   }
  }
 }
