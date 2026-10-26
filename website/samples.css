@@ -126,7 +126,7 @@
 @media (max-width: 680px) { .smp-blob { height: 260px; } .smp-picks .smp-pick { flex: 1 1 120px; } }
 .smp-dlb:disabled { opacity: 0.4; cursor: progress; }
 .smp-play.is-busy { opacity: 0.5; cursor: progress; }
-.smp-license { display: flex; gap: 14px; align-items: center; margin: 2rem 0 0; padding: 16px 18px; border-radius: 22px; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans);
+.smp-license { display: flex; gap: 14px; align-items: center; margin: 12px 0 0; padding: 16px 18px; border-radius: 22px; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans);
   background: color-mix(in srgb, var(--surface-2) 62%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
 .smp-license img { width: 44px; height: 44px; flex: none; }
 .smp-license b { color: var(--ink); }
@@ -169,3 +169,4 @@
 .smp-pickw { height: 40px; min-width: 40px; }
 .smp-pickw svg { width: 20px; height: 20px; }
 .smp-dl:hover { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); }
+.smp-steps { margin: 28px 0 0; }
