@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 64 4 4 2 0
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: ambient_piano bpm 64 key 2 scale 0
 node 1 Notes Chorder
   i chordSize 3

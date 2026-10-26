@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 85 4 4 2 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: lofi_beats bpm 85 key 2 scale 4
 node 1 Synths Drum Sequencer
   s lane0_path /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/01-kick.wav

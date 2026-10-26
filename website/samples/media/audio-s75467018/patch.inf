@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 123 4 4 6 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: glitch bpm 123 key 6 scale 5
 node 1 Synths Drum Sequencer
   f globalPitch 13.9146

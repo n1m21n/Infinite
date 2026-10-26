@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 137 4 4 7 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: classic_trance bpm 137 key 7 scale 1
 node 1 Synths Drum Sequencer
   f globalPitch 6.21834

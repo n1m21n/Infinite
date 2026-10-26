@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 116 4 4 10 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: dub_techno bpm 116 key 10 scale 1
 node 1 Synths Drum Sequencer
   s lane0_path /Users/namansoni/Infinite/worktrees/patch-universe/assets/drumkits/infinite-basic/01-kick.wav

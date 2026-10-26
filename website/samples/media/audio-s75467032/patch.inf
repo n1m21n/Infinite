@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 130 4 4 6 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: uk_garage bpm 130 key 6 scale 4
 node 1 Synths Drum Sequencer
   f globalPan 0.0447859

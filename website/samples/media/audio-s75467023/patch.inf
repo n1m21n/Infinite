@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 70 4 4 6 10
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: lofi_beats bpm 70 key 6 scale 10
 node 1 Synths Drum Sequencer
   f lane0_accentLevel 5.24335

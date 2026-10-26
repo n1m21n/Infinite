@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 140 4 4 9 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: dubstep bpm 140 key 9 scale 5
 node 1 Synths Drum Sequencer
   f globalDecay -0.787079

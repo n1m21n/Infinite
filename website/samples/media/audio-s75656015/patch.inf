@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 125 4 4 2 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: french_filter_house bpm 125 key 2 scale 4
 node 1 Synths Drum Sequencer
   f globalPitch -18.6535

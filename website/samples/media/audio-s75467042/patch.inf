@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 133 4 4 4 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: detroit_techno bpm 133 key 4 scale 1
 node 1 Synths Drum Sequencer
   f globalDecay 0.234439

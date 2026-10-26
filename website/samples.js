@@ -41,23 +41,25 @@
 
   function row(it) {
     var baseName = it.name.replace(/\W+/g, '_');
+    if (it.recipe) return rowHtml(it, '<a href="#" data-lazy="wav" role="menuitem"><b>.wav</b><span>sound</span></a><a href="#" data-lazy="inf" role="menuitem"><b>.inf</b><span>patch</span></a>');
     var patchLink = it.patch ? '<a href="' + esc(it.patch) + '" download="' + esc(baseName) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' : '';
+    return rowHtml(it, '<a href="' + esc(it.download) + '" download="' + esc(baseName) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' + patchLink);
+  }
+  function rowHtml(it, links) {
     return '<div class="smp-row" data-id="' + esc(it.id) + '" data-kind="' + it.kind + '">' +
       '<button class="smp-play" type="button" aria-label="Play ' + esc(it.name) + '">' + IC_PLAY + '</button>' +
       '<div class="smp-id"><b>' + esc(it.name) + '</b>' + (it.bpm ? '<span>' + it.bpm + ' bpm</span>' : '') + '</div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
         '<button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</button>' +
-        '<div class="smp-menu" role="menu" hidden>' +
-          '<a href="' + esc(it.download) + '" download="' + esc(baseName) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' + patchLink +
-        '</div>' +
+        '<div class="smp-menu" role="menu" hidden>' + links + '</div>' +
       '</div>' +
     '</div>';
   }
 
   function closeMenus() {
     Array.prototype.forEach.call(document.querySelectorAll('.smp-menu:not([hidden])'), function (m) {
-      m.hidden = true; m.parentNode.querySelector('.smp-dlb').setAttribute('aria-expanded', 'false'); m.closest('.smp-row').classList.remove('menu-open');
+      m.hidden = true; m.parentNode.querySelector('.smp-dlb').setAttribute('aria-expanded', 'false'); var rw = m.closest('.smp-row'); if (rw) rw.classList.remove('menu-open');
     });
   }
   // The generator is the desktop engine compiled to wasm, run in a worker; it loads on the first press.
@@ -73,13 +75,19 @@
     return new Promise(function (ok, no) { msg.id = ++jobId; jobs[msg.id] = [ok, no]; worker.postMessage(msg); });
   }
   // 16-bit wav of an interleaved stereo float buffer.
-  function wavOf(pcm, rate) {
-    var n = pcm.length / 2, v = new DataView(new ArrayBuffer(44 + n * 4)), o = 44;
+  function wavOf(pcm, rate, name, comment) {
+    // LIST/INFO carries name, artist, copyright and comment, so the credit travels with the file into any DAW.
+    var tags = [['INAM', name], ['IART', 'Infinite (Naman Soni, n1m21n)'], ['ICOP', 'Made with Infinite, https://infinitedevices.org'], ['ICMT', comment], ['ISFT', 'Infinite']]
+      .map(function (t) { var b = new TextEncoder().encode(t[1] + '\0'); return [t[0], b, b.length + (b.length & 1)]; });
+    var infoLen = 4 + tags.reduce(function (a, t) { return a + 8 + t[2]; }, 0);
+    var n = pcm.length / 2, v = new DataView(new ArrayBuffer(44 + n * 4 + 8 + infoLen)), o = 44;
     function str(at, t) { for (var i = 0; i < t.length; i++) v.setUint8(at + i, t.charCodeAt(i)); }
-    str(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 4 + 8 + infoLen, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
     v.setUint16(22, 2, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
     str(36, 'data'); v.setUint32(40, n * 4, true);
     for (var i = 0; i < pcm.length; i++) { var x = Math.max(-1, Math.min(1, pcm[i])); v.setInt16(o, x < 0 ? x * 32768 : x * 32767, true); o += 2; }
+    str(o, 'LIST'); v.setUint32(o + 4, infoLen, true); str(o + 8, 'INFO'); o += 12;
+    tags.forEach(function (t) { str(o, t[0]); v.setUint32(o + 4, t[1].length, true); new Uint8Array(v.buffer).set(t[1], o + 8); o += 8 + t[2]; });
     return new Blob([v], { type: 'audio/wav' });
   }
   function peaksOf(pcm, bins) {
@@ -91,11 +99,23 @@
     }
     return out.map(function (x) { return m ? x / m : 0; });
   }
-  function downloadGen(it) {
-    var a = document.createElement('a');
-    a.href = it.audio; a.download = 'infinite-' + it.name.replace(/#/g, 's').replace(/\W+/g, '-') + '-' + it.bpm + 'bpm.wav';
-    document.body.appendChild(a); a.click(); a.remove();
+  // A library take with a recipe has no file: the engine renders the same loop here on first play or download.
+  function realize(it) {
+    if (it.audio) return Promise.resolve(it);
+    if (it.pending) return it.pending;
+    it.pending = (info ? Promise.resolve(info) : ask({ cmd: 'info' }).then(function (d) { info = d; return d; })).then(function () {
+      var r0 = it.recipe;
+      return ask({ cmd: 'run', style: r0.s, part: r0.p, seed: r0.seed, bars: r0.b, key: -1, scale: r0.sc });
+    }).then(function (r) {
+      it.audio = URL.createObjectURL(wavOf(r.pcm, r.rate, r.label, r.label + ', ' + Math.round(r.bpm) + ' bpm. Generated by Infinite, https://infinitedevices.org/samples/'));
+      it.patch = URL.createObjectURL(new Blob([r.patch], { type: 'text/plain' }));
+      it.download = it.audio;
+      return it;
+    }).catch(function (e) { it.pending = null; throw e; });
+    return it.pending;
   }
+  function saveAs(url, name) { var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  function genFile(it) { return 'infinite-' + it.name.replace(/#/g, 's').replace(/\W+/g, '-') + '-' + it.bpm + 'bpm'; }
   function generate() {
     if (busy) return;
     busy = true; wakeAudio(); genBtn.disabled = true; genBtn.classList.add('is-busy');
@@ -112,12 +132,19 @@
         bars: 2, key: KEYLESS[part] || part === 'foley' ? -1 : key, scale: KEYLESS[part] || part === 'foley' ? -1 : scale });
     }).then(function (r) {
       stop();
-      var url = URL.createObjectURL(wavOf(r.pcm, r.rate));
+      var url = URL.createObjectURL(wavOf(r.pcm, r.rate, r.label, r.label + ', ' + Math.round(r.bpm) + ' bpm. Generated by Infinite, https://infinitedevices.org/samples/'));
+      var infUrl = URL.createObjectURL(new Blob([r.patch], { type: 'text/plain' }));
+      if (gens[0] && gens[0].patch) URL.revokeObjectURL(gens[0].patch);
       if (gens[0] && gens[0].audio) URL.revokeObjectURL(gens[0].audio);
-      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label.replace(/ \d+(?=,|$)/, ''), bpm: Math.round(r.bpm), audio: url, pcm: r.pcm, rate: r.rate }];
+      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label.replace(/ \d+(?=,|$)/, ''), bpm: Math.round(r.bpm), audio: url, patch: infUrl, pcm: r.pcm, rate: r.rate }];
       genEl.hidden = false;
+      var gf0 = genFile(gens[0]);
       genEl.innerHTML = '<div class="smp-id"><b>' + esc(gens[0].name) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
-        '<button class="smp-dlb" type="button" data-gen="' + gens[0].id + '" aria-label="Download ' + esc(gens[0].name) + ' as wav" title="Download .wav">' + IC_DL + '</button>';
+        '<div class="smp-acts"><button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(gens[0].name) + '" title="Download">' + IC_DL + '</button>' +
+        '<div class="smp-menu" role="menu" hidden>' +
+          '<a href="' + url + '" download="' + esc(gf0) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' +
+          '<a href="' + infUrl + '" download="' + esc(gf0) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' +
+        '</div></div>';
       blobPlay(gens[0]);
     }).catch(function () {
       genEl.hidden = false; genEl.innerHTML = '<p class="lib-empty">Could not generate a loop here. Try again.</p>';
@@ -128,12 +155,17 @@
   genBtn.addEventListener('click', generate);
 
   document.addEventListener('click', function (e) {
-    var g = e.target.closest('[data-gen]');
-    if (g) { downloadGen(byId(g.getAttribute('data-gen'))); return; }
+    var lz = e.target.closest('[data-lazy]');
+    if (lz) {
+      e.preventDefault();
+      var lit = byId(lz.closest('.smp-row').getAttribute('data-id')), kind = lz.getAttribute('data-lazy');
+      realize(lit).then(function () { saveAs(kind === 'inf' ? lit.patch : lit.audio, 'infinite-' + lit.name.replace(/#/g, 's').replace(/\W+/g, '-') + (lit.bpm ? '-' + lit.bpm + 'bpm' : '') + '.' + kind); closeMenus(); });
+      return;
+    }
     var b = e.target.closest('.smp-dlb');
     var open = b && b.nextElementSibling.hidden;
     if (!e.target.closest('.smp-menu')) closeMenus();
-    if (open) { b.nextElementSibling.hidden = false; b.setAttribute('aria-expanded', 'true'); b.closest('.smp-row').classList.add('menu-open'); }
+    if (open) { b.nextElementSibling.hidden = false; b.setAttribute('aria-expanded', 'true'); var rw = b.closest('.smp-row'); if (rw) rw.classList.add('menu-open'); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(); });
 
@@ -206,7 +238,14 @@
   function play(r) {
     if (playing && playing.row === r) { stop(); return; }
     stop(); blobStop();
-    var it = byId(r.getAttribute('data-id')), media = new Audio(it.audio), el = null;
+    var it = byId(r.getAttribute('data-id')), media, el = null;
+    if (it.recipe && !it.audio) {
+      var btn = r.querySelector('.smp-play'); btn.disabled = true; btn.classList.add('is-busy');
+      realize(it).then(function () { btn.disabled = false; btn.classList.remove('is-busy'); if (document.body.contains(r)) play(r); })
+        .catch(function () { btn.disabled = false; btn.classList.remove('is-busy'); });
+      return;
+    }
+    media = new Audio(it.audio);
     media.loop = true;
     playing = { row: r, it: it, media: media, el: el };
     r.classList.add('on');
@@ -387,7 +426,7 @@
   else { bctx = bcv.getContext('2d'); requestAnimationFrame(blobDraw2d); }
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
-  fetch('data.json?v=22').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('data.json?v=23').then(function (r) { return r.json(); }).then(function (d) {
     all = d.samples.filter(function (x) { return x.kind === 'A'; });
     all.forEach(function (x) { if (x.part === 'foley') { x.part = 'textures'; x.name = String(x.name).replace(/^foley/, 'textures'); } });
     shuffle(all);

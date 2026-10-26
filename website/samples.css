@@ -125,3 +125,4 @@
 .smp-gen .smp-id span { display: block; color: var(--muted); font-size: 0.8rem; }
 @media (max-width: 680px) { .smp-blob { height: 260px; } .smp-picks .smp-pick { flex: 1 1 120px; } }
 .smp-dlb:disabled { opacity: 0.4; cursor: progress; }
+.smp-play.is-busy { opacity: 0.5; cursor: progress; }

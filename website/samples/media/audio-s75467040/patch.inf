@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 54 4 4 2 8
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: dark_ambient bpm 54 key 2 scale 8
 node 1 Synths Drum Sequencer
   f globalPitch 22.4959

@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 130 4 4 7 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: electro bpm 130 key 7 scale 5
 node 1 Synths Drum Sequencer
   f globalPitch -22.4899

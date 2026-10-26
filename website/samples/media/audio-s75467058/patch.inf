@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 124 4 4 7 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: minimal_techno bpm 124 key 7 scale 1
 node 1 Synths Drum Sequencer
   f globalPan 0.922892

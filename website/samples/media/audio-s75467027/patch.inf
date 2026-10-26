@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 127 4 4 4 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: progressive_house bpm 127 key 4 scale 4
 node 1 Synths Drum Sequencer
   f globalDecay -0.289227

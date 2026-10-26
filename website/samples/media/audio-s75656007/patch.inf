@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 120 4 4 0 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: deep_house bpm 120 key 0 scale 1
 node 1 Synths Drum Sequencer
   f globalTransient 0.861097

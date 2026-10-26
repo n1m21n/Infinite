@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 115 4 4 10 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: synthwave bpm 115 key 10 scale 1
 node 1 Synths Drum Sequencer
   f globalTransient 0.990903

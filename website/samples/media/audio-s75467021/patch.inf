@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 167 4 4 4 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: jungle bpm 167 key 4 scale 1
 node 1 Synths Drum Sequencer
   f globalPan 0.60038

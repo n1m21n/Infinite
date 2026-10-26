@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 133 4 4 6 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: classic_trance bpm 133 key 6 scale 4
 node 1 Synths Drum Sequencer
   f lane0_decay 0.412526

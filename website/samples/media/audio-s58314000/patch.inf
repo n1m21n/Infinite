@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 129 4 4 11 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: acid_house bpm 129 key 11 scale 5
 node 1 Synths Drum Sequencer
   f globalDecay -0.415784

@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 176 4 4 3 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: neurofunk bpm 176 key 3 scale 1
 node 1 Synths Drum Sequencer
   f globalPitch 16.9946

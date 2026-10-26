@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 131 4 4 3 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: electro bpm 131 key 3 scale 1
 node 1 Synths Drum Sequencer
   f lane0_decay 0.366803

@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 157 4 4 6 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: footwork bpm 157 key 6 scale 1
 node 1 Synths Drum Sequencer
   f lane0_accentPitch -6.48235

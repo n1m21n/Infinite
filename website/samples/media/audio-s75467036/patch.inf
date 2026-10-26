@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 88 4 4 8 9
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: ambient bpm 88 key 8 scale 9
 node 1 Synths Drum Sequencer
   f globalDecay 0.77496

@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 71 4 4 7 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: neo_classical bpm 71 key 7 scale 1
 node 1 Notes Note Sequencer
   b en0 1

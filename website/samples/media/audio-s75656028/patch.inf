@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 145 4 4 1 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: psytrance bpm 145 key 1 scale 5
 node 1 Synths Drum Sequencer
   f globalPitch -16.4133

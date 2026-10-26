@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 119 4 4 1 4
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: dub_techno bpm 119 key 1 scale 4
 node 1 Synths Drum Sequencer
   f globalTransient 0.663081

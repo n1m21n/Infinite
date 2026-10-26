@@ -40,6 +40,7 @@ factory().then(M => {
     }
     let pk = 0, pv = 0, sub = 0, tot = 0;
     for (let k = 1; k < W / 2; k++) { const hz = k * 48000 / W; if (hz < 20) continue; tot += avg[k]; if (hz < 40) sub += avg[k]; if (hz > 25 && avg[k] > pv) { pv = avg[k]; pk = hz; } }
+    if (process.env.VERBOSE) console.log('  ', name, cs.map(Math.round).join(' '));
     cs.sort((a, b) => a - b); const med = cs[cs.length >> 1], tg = TARGET[name];
     console.log(name.padEnd(11), String(Math.round(med)).padStart(7), String(Math.round(pk)).padStart(7), (100 * sub / tot).toFixed(1).padStart(6) + '%', tg ? `  ${tg[0]}-${tg[1]} ${med >= tg[0] && med <= tg[1] ? 'ok' : 'OUT'}` : '');
   }

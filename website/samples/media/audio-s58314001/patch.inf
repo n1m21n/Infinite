@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 112 4 4 5 1
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: amapiano bpm 112 key 5 scale 1
 node 1 Synths Drum Sequencer
   f globalPan -0.588254

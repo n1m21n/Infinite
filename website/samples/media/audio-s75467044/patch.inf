@@ -1,5 +1,6 @@
 infinite-patch 1
 transport 54 4 4 0 5
+# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/
 # style: drone_kosmische bpm 54 key 0 scale 5
 node 1 Notes Note Sequencer
   b en0 1
