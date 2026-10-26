@@ -1,6 +1,7 @@
 #include "AudioDecodeCache.h"
 
 #include "AssetCache.h"
+#include "audio/dsp/TransientDetect.h"
 
 namespace AudioDecodeCache
 {
@@ -33,6 +34,7 @@ namespace AudioDecodeCache
       if (!Platform::DecodeAudioFileToBuffer(path, outBuffer, outError))
          return false;
 
+      DetectTransients(outBuffer);
       cache.Put(path, outBuffer, BufferBytes(outBuffer));
       return true;
    }

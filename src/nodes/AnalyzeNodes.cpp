@@ -17,6 +17,7 @@
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
 #include "audio/dsp/ClipTimeStretch.h"
+#include "audio/dsp/TransientDetect.h" // Turbo 0.72 (upstream): transient-aware stretch
 
 // =========================================================== Image Analyze
 
@@ -1098,6 +1099,9 @@ bool AudioFileNode::Open(const std::string& path)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioFilePlayerAudioNode>();
 
+   // Turbo 0.72 (upstream v0.6 1.6): hits and the peak envelope, found once
+   // here, keep a timeline stretch from smearing drums (ClipTimeStretch).
+   DetectTransients(*decoded);
    mDuration = decoded->sampleRate > 0.0 ? (double)decoded->numFrames / decoded->sampleRate : 0.0;
    mAudioNode->PushBuffer(decoded);
    mAudioNode->PushParams(volume, gain, attack, release, loop, monitor);

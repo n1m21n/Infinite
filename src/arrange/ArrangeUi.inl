@@ -2878,6 +2878,24 @@ void DrawArrangeClipSettings(bool docked)
       }
    }
 
+   // Turbo 0.72 (upstream's conflict warning): one node on several tracks has
+   // one playback position, so those tracks cannot play it independently.
+   if (c->srcUid != 0)
+   {
+      int lanesUsing = 0;
+      for (const Arrange::Lane& ln : gArrange.lanes)
+         for (const Arrange::Clip& oc : ln.clips)
+            if (oc.srcUid == c->srcUid)
+            {
+               lanesUsing++;
+               break;
+            }
+      if (lanesUsing > 1)
+         ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f),
+                            "this node plays on %d tracks: they share one playback position\n"
+                            "(duplicate the node to play it independently)", lanesUsing);
+   }
+
    // Position / length in beats (bars shown alongside).
    {
       float startBeats = (float)Arrange::TicksToBeats(c->start);
@@ -3323,8 +3341,28 @@ void DrawArrangeToolbar(float width)
                           else
                              Tabler::DrawPlayerPlay(dl, c, s, col);
                        },
-                       playing ? "pause  -  Space" : "play  -  Space", playing, ArrUi::Semantic(tok::action_go)))
-      tr.TogglePlay();
+                       tr.PendingLaunch() == Transport::kLaunchPause ? "pausing on the launch grid - click to cancel"
+                                                                     : (playing ? "pause  -  Space" : "play  -  Space"),
+                       playing, ArrUi::Semantic(tok::action_go)))
+      tr.RequestTogglePlay(); // Turbo 0.72: on the launch grid when one is set
+   ArrUi::Next();
+   {
+      // Turbo 0.72 (upstream v0.6 2.38): where a pause or restart lands.
+      const std::vector<std::string>& qs = MusicTime::LaunchQuantizeList();
+      const int q = std::clamp(tr.LaunchQuantize(), 0, (int)qs.size() - 1);
+      ImGui::SetNextItemWidth(64.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (ArrUi::Tile() - ImGui::GetTextLineHeight()) * 0.5f));
+      if (ImGui::BeginCombo("##arrlaunchq", q == 0 ? "now" : qs[(size_t)q].c_str()))
+      {
+         for (int i = 0; i < (int)qs.size(); i++)
+            if (ImGui::Selectable(i == 0 ? "now" : qs[(size_t)i].c_str(), i == q))
+               tr.SetLaunchQuantize(i);
+         ImGui::EndCombo();
+      }
+      ImGui::PopStyleVar();
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("launch grid: pause (Space) and restart wait for the next beat / bar while playing");
+   }
    ArrUi::Next();
    const bool recording = gArrangeRecording;
    if (ArrUi::IconTile("##arrrec",

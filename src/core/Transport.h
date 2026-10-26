@@ -23,11 +23,40 @@ public:
    // clock (see mAudioSampleRate). Main thread only.
    void Tick(float deltaSeconds);
 
-   void SetPlaying(bool playing) { mPlaying = playing; }
+   void SetPlaying(bool playing)
+   {
+      if (!playing)
+         CancelLaunch(); // nothing is left to launch on a stopped clock
+      mPlaying = playing;
+   }
    bool IsPlaying() const { return mPlaying; }
    // Upstream offline render; Turbo has none, so ported nodes always see live time.
    bool IsOfflineMode() const { return false; }
-   void TogglePlay() { mPlaying = !mPlaying; }
+   void TogglePlay()
+   {
+      if (mPlaying)
+         CancelLaunch();
+      mPlaying = !mPlaying;
+   }
+
+   // ---- launch quantize (Turbo 0.72, upstream v0.6 2.38) -----------------
+   // Where a pause or a restart lands while the transport is playing: none
+   // (at once, the default), beat, bar or 2 bars (a MusicTime::LaunchQuantize
+   // value). The Request* calls are what a button or a key presses; the plain
+   // TogglePlay / Rewind / Seek stay immediate for everything else (loading a
+   // patch, tests, renders).
+   //   - Pause and Rewind while playing wait for the next grid line; the clock
+   //     owner applies them at the first audio block that contains the line.
+   //   - Play from a stopped transport starts at once.
+   //   - Pressing again while one is waiting cancels it.
+   enum LaunchAction { kLaunchNothing = 0, kLaunchPause, kLaunchRestart };
+   void SetLaunchQuantize(int q) { mLaunchQuantize.store(q, std::memory_order_relaxed); if (q <= 0) CancelLaunch(); }
+   int LaunchQuantize() const { return mLaunchQuantize.load(std::memory_order_relaxed); }
+   LaunchAction RequestTogglePlay();
+   LaunchAction RequestRewind();
+   LaunchAction PendingLaunch() const { return (LaunchAction)mPendingLaunch.load(std::memory_order_acquire); }
+   double PendingLaunchBeat() const { return mPendingLaunchBeat.load(std::memory_order_relaxed); }
+   void CancelLaunch() { mPendingLaunch.store(kLaunchNothing, std::memory_order_release); }
 
    void Rewind()
    {
@@ -198,6 +227,15 @@ private:
 
    std::atomic<double> mPendingSeekBeats { -1.0 };
    std::atomic<double> mBlockStartBeats { 0.0 }; // Turbo 0.72: see BlockStartBeats()
+   // Turbo 0.72: launch quantize state. The pending action is written by the
+   // UI thread (beat first, then the action) and consumed by the clock owner,
+   // which clears it with a compare-exchange so a request landing at the same
+   // moment is not lost.
+   std::atomic<int> mLaunchQuantize { 0 };
+   std::atomic<int> mPendingLaunch { 0 };
+   std::atomic<double> mPendingLaunchBeat { 0.0 };
+   // Applies a waiting launch whose grid line falls in [b0, b1) (or has passed).
+   void ResolveLaunch(double b0, double b1);
    std::atomic<bool> mLoopEnabled { false };
    std::atomic<double> mLoopStartBeats { 0.0 };
    std::atomic<double> mLoopEndBeats { 0.0 };

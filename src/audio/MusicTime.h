@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -130,6 +131,49 @@ namespace MusicTime
          for (int i = 0; i < kNumRateDivisions; i++)
             list.push_back(RateDivisionNames()[i]);
       return list;
+   }
+
+   // Turbo 0.72 (upstream verbatim): launch quantize (v0.6 2.35 show set,
+   // 2.38 sequencer starts): where a start, restart or switch lands. Index
+   // order is the dropdown order.
+   enum LaunchQuantize
+   {
+      kLaunchNone = 0,
+      kLaunchBeat,
+      kLaunchBar,
+      kLaunch2Bars,
+      kNumLaunchQuantize
+   };
+
+   inline const std::vector<std::string>& LaunchQuantizeList()
+   {
+      static const std::vector<std::string> list = { "none", "beat", "bar", "2 bars" };
+      return list;
+   }
+
+   inline double LaunchQuantizeBeats(int q)
+   {
+      switch (q)
+      {
+         case kLaunchBeat: return 1.0;
+         case kLaunchBar: return BarsToBeats(1.0);
+         case kLaunch2Bars: return BarsToBeats(2.0);
+         default: return 0.0;
+      }
+   }
+
+   // The first grid line of `q` at or after `beats + minLeadBeats`; `beats`
+   // itself with no grid. Bars count from beat 0, as the bar ruler does.
+   inline double NextLaunchBeat(double beats, int q, double minLeadBeats = 0.0)
+   {
+      const double grid = LaunchQuantizeBeats(q);
+      if (grid <= 0.0)
+         return beats;
+      const double from = beats + minLeadBeats;
+      double next = std::ceil(from / grid - 1e-9) * grid;
+      if (next < from - 1e-9)
+         next += grid;
+      return next;
    }
 
    // ------------------------------------------------------------------ scale
