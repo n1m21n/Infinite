@@ -1,6 +1,19 @@
 # Passagem de trabalho: turbo/next (0.70)
 
-## Em andamento: Timeline alinhada ao upstream (branch `feature/timeline-align`, saída de `turbo/windows-only`)
+## Timeline (mergeada em `turbo/windows-only` em 2026-10-26, sem tag, sem push)
+
+Branches `feature/timeline-align` → `feature/timeline-ux` → `feature/timeline-u1`, testadas pelo dono
+no app. UX: ler `docs/plans/TIMELINE-UX-PLAN.md`.
+- Feito:
+  - toolbar sobre os tokens, com ícones;
+  - as 7 ferramentas do Naman;
+  - seleção de pistas;
+  - cabeçalhos novos;
+  - inspector fixo.
+- Próximo (resto da U1): no motor, stems (Render Track/Group), reverse no player, stretch por
+  transientes e fades de vídeo, com os testes do upstream de cada um. Depois, a Session view.
+
+### Primeira etapa: alinhamento ao upstream (`feature/timeline-align`)
 
 - Ler `docs/plans/TIMELINE-ANALYSIS.md`: análise, regra "o Naman tem que conseguir levar de volta"
   (4b), progresso (4c), plano F0–F5.
