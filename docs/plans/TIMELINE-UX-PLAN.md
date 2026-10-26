@@ -145,6 +145,37 @@ hit zones e snap guide.
 Cada branch: operações no modelo com teste, UI fina, gate completo, nota em
 `TIMELINE-ANALYSIS.md` do que o Naman pode levar.
 
+## 4b. U2 e U3 feitas (2026-10-26, `feature/timeline-u2u3`)
+
+- **Undo/redo:** botões no toolbar, no mesmo histórico do Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (toda edição
+  da timeline já entrava no undo do patch).
+- **U2:**
+  - Ctrl+arrastar copia; Ctrl+clique sem mover alterna a seleção.
+  - Ctrl+Alt+arrastar faz o slip. (O Alt sozinho continua soltando o snap, como antes.)
+  - Linha de ganho no clip (Shift para ajuste fino).
+  - Curvas de fade (clique direito na alça), desenhadas, ouvidas e salvas (`clipfadeshape`).
+  - Snap magnético em borda de clip, marker, agulha e loop.
+  - Ripple off/pista/todas.
+  - Range com Ctrl+C / Ctrl+V / Ctrl+D.
+  - `S` corta.
+  - Alt+roda muda a altura da pista (Ctrl+Alt: todas).
+- **U3:**
+  - Loop do conteúdo do clip (`cliploop`).
+  - Count-in e punch in/out (clique direito no REC).
+  - Gravação com loop: um take por volta, o último na pista e os outros em pistas de take mutadas.
+  - Automação com keyframes: `ArrangeAutomation.h` sem UI; linhas `autolane`/`autokey`; aplicada a
+    cada frame; modo W grava o knob; linhas abaixo das pistas; botão "+ Automation".
+- **Testes:** `ARRANGERECORDTEST` (takes em loop) e `ARRANGEEDITPLUSTEST` (automação, round trip,
+  ripple, duplicar trecho).
+- **Ficou de fora:**
+  - mapa de tempo;
+  - compensação da latência de entrada do Audio In;
+  - comping (escolher trechos entre takes);
+  - metrônomo próprio na gravação;
+  - mover um trecho arrastando a Range;
+  - Alt+clique num parâmetro para criar key;
+  - automação com precisão de bloco (hoje é por frame).
+
 ## 5. Decisões do dono (2026-10-25)
 
 1. **Roda igual ao Naman:**

@@ -1420,6 +1420,43 @@
             printf("arrange record playback without the source: %s (take peak %.4f, recorded live %.4f)\n",
                    playOk ? "OK" : "FAIL", played, monitored);
             allOk = allOk && playOk;
+
+            // Turbo 0.72 (U3): loop recording - a one-bar loop recorded for
+            // two and a half passes gives three takes: the last on the armed
+            // track, the two before on muted take tracks under it.
+            GraphNode* osc2 = SpawnNode("Oscillator", "Synths", 400.0f, 0.0f);
+            const uint64_t osc2Uid = osc2 != nullptr ? osc2->uid : 0;
+            const size_t lanesBefore = gArrange.lanes.size();
+            const bool armed2 = osc2Uid != 0 && ArrangeSetRecordArm(laneId, osc2Uid);
+            gArrange.settings.loop = { true, 0, Arrange::kTicksPerBar };
+            PublishArrangeLoop();
+            tr.SetPlaying(false);
+            tr.SeekBeats(0.0);
+            prepare();
+            const bool started2 = armed2 && ArrangeRecordStart(kSr);
+            run((int)(10.0 * kSamplesPerBeat / kBlock), nullptr); // 2.5 bars
+            ArrangeRecordStop();
+            ArrangeRecordCommit();
+            int takeLanes = 0;
+            for (const Arrange::Lane& l : gArrange.lanes)
+               if (l.name.find(" take ") != std::string::npos && l.mute && l.clips.size() == 1)
+                  takeLanes++;
+            const Arrange::Lane* armedLane = Arrange::FindLane(gArrange, laneId);
+            const Arrange::Clip* lastPass = nullptr;
+            if (armedLane != nullptr)
+               for (const Arrange::Clip& c : armedLane->clips)
+                  if (c.name.find(".3") != std::string::npos)
+                     lastPass = &c;
+            const bool loopRecOk = started2 && takeLanes == 2 && gArrange.lanes.size() == lanesBefore + 2 &&
+                                   lastPass != nullptr && lastPass->start == 0 &&
+                                   std::fabs(Arrange::TicksToBeats(lastPass->length) - 2.0) < 0.1 && lastPass->sourceOffsetSeconds > 3.9f;
+            printf("arrange record loop takes: %s (take tracks %d, last pass start %lld, %.3f beats, file offset %.3f s)\n",
+                   loopRecOk ? "OK" : "FAIL", takeLanes, lastPass != nullptr ? (long long)lastPass->start : -1LL,
+                   lastPass != nullptr ? Arrange::TicksToBeats(lastPass->length) : 0.0,
+                   lastPass != nullptr ? lastPass->sourceOffsetSeconds : 0.0f);
+            allOk = allOk && loopRecOk;
+            gArrange.settings.loop.enabled = false;
+            PublishArrangeLoop();
             tr.NotifyAudioEngineStopped();
          }
 
@@ -1544,6 +1581,162 @@
          }
          RebuildAudioTopology();
          printf("arrange session test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
+      // Turbo 0.72 (U2/U3): INFINITE_ARRANGEEDITPLUSTEST - the editing and
+      // automation layer: an automation lane driving a real parameter
+      // (linear and step curves, write mode recording), the patch round trip
+      // of automation / fade curves / content loop, ripple delete and range
+      // duplicate. Headless.
+      if (getenv("INFINITE_ARRANGEEDITPLUSTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         bool allOk = true;
+         Transport& tr = Transport::Instance();
+         const bool hadEngine = AudioEngine::Instance().SampleRate() > 0.0;
+         AudioEngine::Instance().Stop();
+         tr.NotifyAudioEngineStopped();
+         tr.SetPlaying(false);
+         tr.SetTempo(120.0f);
+
+         // --- automation drives a parameter -------------------------------
+         GraphNode* gn = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f);
+         std::string param;
+         if (gn != nullptr)
+         {
+            ArrangeAutoParamLister pl;
+            gn->node->VisitParams(pl);
+            for (const auto& p : pl.params)
+            {
+               ArrangeAutoParamFinder pf(p.first);
+               gn->node->VisitParams(pf);
+               if (pf.f != nullptr)
+               {
+                  param = p.first;
+                  break;
+               }
+            }
+         }
+         bool autoOk = gn != nullptr && !param.empty();
+         if (autoOk)
+         {
+            tr.SeekBeats(0.0);
+            ArrangeAutoAdd(gn->uid, param, 0.0f);
+            ArrangeAuto::Lane& al = gArrangeAuto.back();
+            al.lo = 0.0f;
+            al.hi = 1.0f;
+            al.keys = { { 0, 0.2f, ArrangeAuto::kLinear }, { Arrange::kPPQ * 4, 0.6f, ArrangeAuto::kStep }, { Arrange::kPPQ * 8, 0.9f, ArrangeAuto::kLinear } };
+            float got = -1.0f;
+            tr.SeekBeats(2.0);
+            ArrangeAutoApply();
+            const bool mid = ArrangeAutoRead(al, got) && std::fabs(got - 0.4f) < 1e-3f;
+            tr.SeekBeats(6.0);
+            ArrangeAutoApply();
+            float held = -1.0f;
+            const bool step = ArrangeAutoRead(al, held) && std::fabs(held - 0.6f) < 1e-3f;
+            // Write mode: while playing, a moved knob becomes keys.
+            const size_t keysBefore = al.keys.size();
+            gArrangeAutoWrite = { al.id };
+            tr.SetPlaying(true);
+            tr.SeekBeats(10.0);
+            ArrangeAutoWriteValue(al, 0.33f);
+            ArrangeAutoApply();
+            tr.SeekBeats(11.0);
+            ArrangeAutoWriteValue(al, 0.77f);
+            ArrangeAutoApply();
+            tr.SetPlaying(false);
+            gArrangeAutoWrite.clear();
+            float w10 = 0.0f, w11 = 0.0f;
+            const bool wrote = al.keys.size() == keysBefore + 2 && ArrangeAuto::Eval(al, Arrange::kPPQ * 10, w10) &&
+                               ArrangeAuto::Eval(al, Arrange::kPPQ * 11, w11) && std::fabs(w10 - 0.33f) < 1e-3f &&
+                               std::fabs(w11 - 0.77f) < 1e-3f;
+            autoOk = mid && step && wrote;
+            printf("arrange automation drive: %s (linear mid %.3f, step hold %.3f, write keys +%d)\n", autoOk ? "OK" : "FAIL",
+                   got, held, (int)(al.keys.size() - keysBefore));
+         }
+         else
+            printf("arrange automation drive: FAIL (no float parameter on the Oscillator)\n");
+         allOk = allOk && autoOk;
+
+         // --- patch round trip: automation, fade curves, content loop ------
+         {
+            gArrange = Arrange::Model();
+            gArrange.revision = 9000;
+            const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            Arrange::Clip c;
+            c.length = Arrange::kTicksPerBar;
+            c.fadeIn = Arrange::kPPQ;
+            c.fadeInShape = Arrange::kFadeS;
+            c.fadeOutShape = Arrange::kFadeFast;
+            c.loopTicks = Arrange::kPPQ * 2;
+            uint64_t cid = 0;
+            Arrange::PlaceOverwrite(gArrange, lane, c, &cid);
+            std::string text, err;
+            Patch::Data back;
+            const bool io = Patch::WriteText(BuildPatchData(), text, err) && Patch::ReadText(text, back, err);
+            bool rtOk = io && back.automation.size() == gArrangeAuto.size() && !back.automation.empty() &&
+                        back.automation[0].keys.size() == gArrangeAuto[0].keys.size() && back.automation[0].param == param;
+            Arrange::Model r;
+            if (io)
+               PatchDataToArrangeModel(back, r);
+            const Arrange::Clip* rc = io ? Arrange::FindClip(r, cid) : nullptr;
+            rtOk = rtOk && rc != nullptr && rc->fadeInShape == Arrange::kFadeS && rc->fadeOutShape == Arrange::kFadeFast &&
+                   rc->loopTicks == Arrange::kPPQ * 2;
+            printf("arrange automation / fade curve / loop round trip: %s\n", rtOk ? "OK" : "FAIL");
+            allOk = allOk && rtOk;
+         }
+
+         // --- ripple delete -----------------------------------------------
+         {
+            gArrange = Arrange::Model();
+            gArrange.revision = 9100;
+            const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            uint64_t ids[3] = {};
+            for (int k = 0; k < 3; k++)
+            {
+               Arrange::Clip c;
+               c.start = Arrange::kTicksPerBar * k;
+               c.length = Arrange::kTicksPerBar;
+               Arrange::PlaceOverwrite(gArrange, lane, c, &ids[k]);
+            }
+            gArrangeRipple = 1;
+            gArrangeSel = { ids[1] };
+            ArrangeDeleteSelection();
+            gArrangeRipple = 0;
+            const Arrange::Clip* third = Arrange::FindClip(gArrange, ids[2]);
+            const bool ripOk = Arrange::FindClip(gArrange, ids[1]) == nullptr && third != nullptr &&
+                               third->start == Arrange::kTicksPerBar;
+            printf("arrange ripple delete: %s (third clip now at %lld)\n", ripOk ? "OK" : "FAIL",
+                   third != nullptr ? (long long)third->start : -1LL);
+            allOk = allOk && ripOk;
+
+            // --- range duplicate: the span lands right after itself -----
+            gArrangeRange.active = true;
+            gArrangeRange.start = 0;
+            gArrangeRange.end = Arrange::kTicksPerBar / 2;
+            gArrangeRange.laneLo = 0;
+            gArrangeRange.laneHi = 0;
+            const size_t before = gArrange.lanes[0].clips.size();
+            ArrangeDuplicateRange();
+            gArrangeRange = ArrangeRangeSel();
+            bool dupOk = gArrange.lanes[0].clips.size() == before + 1; // the copy replaces the first clip's second half
+            bool found = false;
+            for (const Arrange::Clip& c : gArrange.lanes[0].clips)
+               found = found || (c.start == Arrange::kTicksPerBar / 2 && c.length == Arrange::kTicksPerBar / 2);
+            dupOk = dupOk && found;
+            printf("arrange range duplicate: %s (%zu clips)\n", dupOk ? "OK" : "FAIL", gArrange.lanes[0].clips.size());
+            allOk = allOk && dupOk;
+         }
+
+         gArrangeAuto.clear();
+         tr.SetPlaying(true);
+         if (hadEngine)
+         {
+            std::string startErr;
+            if (AudioEngine::Instance().Start(startErr))
+               tr.NotifyAudioEngineStarted(AudioEngine::Instance().SampleRate());
+         }
+         printf("arrange edit plus test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
       // Turbo 0.72: INFINITE_ARRANGEDEMO - a small arrangement with the panel

@@ -374,6 +374,11 @@ namespace Patch
       // on every clip saved before this field existed, which is the same as
       // "nothing bypassed" - so an old patch loads identically.
       std::vector<int> bypassedModParams;
+      // Turbo 0.72 (not upstream, own tags `clipfadeshape` / `cliploop`, so
+      // upstream's reader skips them): fade curves and content loop.
+      int    fadeInShape = 0;
+      int    fadeOutShape = 0;
+      int64_t loopTicks = 0;
       // Session view (Arrange::SessionSlot): >= 0 = this record is the
       // stream's session slot in that scene row, not a timeline clip. Written
       // as `slotclip` (same grammar as `cliptick`, so an older reader skips
@@ -487,6 +492,19 @@ namespace Patch
       // Turbo 0.72 (timeline align): upstream's Session view rows, carried so
       // a patch saved by either build keeps them.
       std::vector<SceneRecord> scenes;   // session view rows
+      // Turbo 0.72 (U3, not upstream): timeline automation lanes, own tags
+      // `autolane` / `autokey` (an upstream reader skips them).
+      struct AutoKeyRecord { int64_t tick = 0; float value = 0.0f; int interp = 1; };
+      struct AutoLaneRecord
+      {
+         uint64_t id = 0;
+         uint64_t nodeUid = 0;
+         float lo = 0.0f, hi = 1.0f;
+         bool enabled = true;
+         std::string param;
+         std::vector<AutoKeyRecord> keys;
+      };
+      std::vector<AutoLaneRecord> automation;
       int sessionQuantize = 2;           // `sessionmeta` line; absent = 1 bar
       ArrangeSettingsRecord arrangeSettings;
       bool hasArrange = false; // an `arrange` line was read

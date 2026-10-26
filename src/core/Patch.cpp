@@ -622,6 +622,13 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
             file << "clipsrcoffset " << i << " " << c.id << " " << FloatToString(c.sourceOffsetSeconds) << "\n";
       // Per-clip speed and direction: own tag, only written when not the
       // default, so an ordinary clip's patch is unchanged.
+      // Turbo 0.72 (not upstream): fade curves and content loop, own tags.
+      for (const ClipRecord& c : s.clips)
+         if (c.fadeInShape != 0 || c.fadeOutShape != 0)
+            file << "clipfadeshape " << i << " " << c.id << " " << c.fadeInShape << " " << c.fadeOutShape << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.loopTicks > 0)
+            file << "cliploop " << i << " " << c.id << " " << c.loopTicks << "\n";
       for (const ClipRecord& c : s.clips)
          if (c.speed != 1.0f || c.reverse)
             file << "clipspeed " << i << " " << c.id << " " << FloatToString(c.speed) << " " << (c.reverse ? 1 : 0) << "\n";
@@ -651,6 +658,14 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
               << (data.scenes[k].followNext ? 1 : 0) << " " << data.scenes[k].followBars << "\n";
    if (data.sessionQuantize != 2)
       file << "sessionmeta " << data.sessionQuantize << "\n";
+   // Turbo 0.72 (U3, not upstream): automation lanes and their keys.
+   for (const Data::AutoLaneRecord& al : data.automation)
+   {
+      file << "autolane " << al.id << " " << al.nodeUid << " " << FloatToString(al.lo) << " " << FloatToString(al.hi) << " "
+           << (al.enabled ? 1 : 0) << " " << EscapeLine(al.param) << "\n";
+      for (const Data::AutoKeyRecord& k : al.keys)
+         file << "autokey " << al.id << " " << k.tick << " " << FloatToString(k.value) << " " << k.interp << "\n";
+   }
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -1323,6 +1338,57 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                {
                   c.speed = speed;
                   c.reverse = reverse != 0;
+               }
+         }
+      }
+      else if (tag == "autolane") // Turbo 0.72 (U3)
+      {
+         Data::AutoLaneRecord al;
+         int en = 1;
+         if (in >> al.id >> al.nodeUid >> al.lo >> al.hi >> en && al.id != 0)
+         {
+            al.enabled = en != 0;
+            if (!std::isfinite(al.lo)) al.lo = 0.0f;
+            if (!std::isfinite(al.hi)) al.hi = 1.0f;
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            al.param = UnescapeLine(raw);
+            outData.automation.push_back(al);
+         }
+      }
+      else if (tag == "autokey") // Turbo 0.72 (U3)
+      {
+         uint64_t laneId = 0;
+         Data::AutoKeyRecord k;
+         if (in >> laneId >> k.tick >> k.value >> k.interp && k.tick >= 0 && std::isfinite(k.value))
+         {
+            k.interp = std::clamp(k.interp, 0, 2);
+            for (Data::AutoLaneRecord& al : outData.automation)
+               if (al.id == laneId)
+                  al.keys.push_back(k);
+         }
+      }
+      else if (tag == "clipfadeshape" || tag == "cliploop") // Turbo 0.72
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int64_t a = 0, b = 0;
+         if (in >> streamIdx >> clipId >> a && streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (tag == "clipfadeshape" && !(in >> b))
+               b = 0;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  if (tag == "clipfadeshape")
+                  {
+                     c.fadeInShape = (int)std::clamp<int64_t>(a, 0, 3);
+                     c.fadeOutShape = (int)std::clamp<int64_t>(b, 0, 3);
+                  }
+                  else
+                     c.loopTicks = std::max<int64_t>(0, a);
                }
          }
       }

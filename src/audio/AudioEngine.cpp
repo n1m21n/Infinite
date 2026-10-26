@@ -5,6 +5,7 @@
 #include <cmath>
 #include <thread>
 
+#include "arrange/ArrangeModel.h" // Turbo 0.72: FadeShapeGain
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
@@ -425,7 +426,12 @@ void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
       const double effBpm = (w[k].syncToTempo && w[k].sampleBpm > 0.0f) ? (double)w[k].sampleBpm : bpm;
       // Turbo 0.72 (timeline align): upstream's per-clip speed, signed.
       const double clipSpeed = (double)w[k].speed;
-      const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm * clipSpeed;
+      // Turbo 0.72 (U3): a looping clip's content repeats every loopBeats
+      // (the file player re-anchors on the jump at each lap).
+      double into = blockStart - w[k].startBeat;
+      if (w[k].loopBeats > 0.0)
+         into = std::fmod(std::max(0.0, into), w[k].loopBeats);
+      const double secs = w[k].sourceOffsetSeconds + into * 60.0 / effBpm * clipSpeed;
       const double perSecond = bpm / effBpm * clipSpeed;
       t.source->SetClipSamplePosition(secs, perSecond, w[k].pitch, jumped || entered);
    }
@@ -545,11 +551,11 @@ void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuff
          const double in = beat - cw.startBeat;
          const double out = cw.endBeat - beat;
          if (cw.fadeInBeats > 0.0 && in < cw.fadeInBeats)
-            g *= in / cw.fadeInBeats;
+            g *= Arrange::FadeShapeGain((float)(in / cw.fadeInBeats), cw.fadeInShape); // Turbo 0.72: shaped
          else if (!cw.abutsPrev && in < ramp)
             g *= in / ramp;
          if (cw.fadeOutBeats > 0.0 && out < cw.fadeOutBeats)
-            g *= out / cw.fadeOutBeats;
+            g *= Arrange::FadeShapeGain((float)(out / cw.fadeOutBeats), cw.fadeOutShape);
          else if (!cw.abutsNext && out < ramp)
             g *= out / ramp;
          const float gl = (float)g * laneGain * cw.panL * lanePanL;
@@ -587,19 +593,46 @@ void AudioEngine::RunArrangeRecorders(ProcessList* list, AudioBuffer& deviceBuff
       AudioBuffer src = list->buffers[r.bufferIndex].View(numFrames, numChannels);
       if (playing && r.tap->enabled.load(std::memory_order_acquire))
       {
-         if (!r.tap->started.load(std::memory_order_relaxed))
+         // Turbo 0.72 (U3): only [armBeat, endBeat) is written (count-in,
+         // punch), frame-accurately inside the block; a jump back of the
+         // transport (a loop wrap) is logged so the take splits per pass.
+         const double b0 = ArrangeBlockStartBeat();
+         const double sr = mSampleRate.load(std::memory_order_relaxed);
+         const double bps = ArrangeBeatsPerSample(sr > 0.0 ? sr : 48000.0);
+         const double arm = r.tap->armBeat.load(std::memory_order_relaxed);
+         const double end = r.tap->endBeat.load(std::memory_order_relaxed);
+         int first = 0, last = numFrames;
+         if (arm >= 0.0 && b0 < arm)
+            first = std::min(numFrames, (int)std::ceil((arm - b0) / std::max(1e-12, bps)));
+         if (end >= 0.0)
+            last = std::max(0, std::min(numFrames, (int)std::ceil((end - b0) / std::max(1e-12, bps))));
+         if (r.tap->started.load(std::memory_order_relaxed) && r.tap->lastBlockBeat >= 0.0 && b0 < r.tap->lastBlockBeat)
          {
-            r.tap->startBeat.store(ArrangeBlockStartBeat(), std::memory_order_relaxed);
-            r.tap->started.store(true, std::memory_order_release);
+            const int w = r.tap->wrapCount.load(std::memory_order_relaxed);
+            if (w < ArrangeRecordTap::kMaxWraps)
+            {
+               r.tap->wrapFrames[w] = r.tap->framesWritten.load(std::memory_order_relaxed);
+               r.tap->wrapCount.store(w + 1, std::memory_order_release);
+            }
          }
-         for (int i = 0; i < numFrames; i++)
+         r.tap->lastBlockBeat = b0;
+         if (last > first)
          {
-            const float l = src.channels[0][i];
-            const float rr = numChannels > 1 ? src.channels[1][i] : l;
-            mInterleaveScratch[(size_t)i * 2 + 0] = l;
-            mInterleaveScratch[(size_t)i * 2 + 1] = rr;
+            if (!r.tap->started.load(std::memory_order_relaxed))
+            {
+               r.tap->startBeat.store(b0 + first * bps, std::memory_order_relaxed);
+               r.tap->started.store(true, std::memory_order_release);
+            }
+            for (int i = first; i < last; i++)
+            {
+               const float l = src.channels[0][i];
+               const float rr = numChannels > 1 ? src.channels[1][i] : l;
+               mInterleaveScratch[(size_t)(i - first) * 2 + 0] = l;
+               mInterleaveScratch[(size_t)(i - first) * 2 + 1] = rr;
+            }
+            r.tap->ring.Write(mInterleaveScratch, (last - first) * 2);
+            r.tap->framesWritten.fetch_add(last - first, std::memory_order_relaxed);
          }
-         r.tap->ring.Write(mInterleaveScratch, numFrames * 2);
       }
       // Auto monitoring, like a DAW: heard while recording or while stopped,
       // not while the transport plays the lane's takes back.

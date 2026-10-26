@@ -44,6 +44,17 @@ Timeline aligned with upstream before new timeline features (plan: `docs/plans/T
 - **Clip speed and reverse** in the inspector; reversed audio clips play backwards; video follows.
 - **Transient-aware stretch (upstream v0.6 1.6):** stretched drum hits stay tight (no flams or
   pre-echo).
+- **New: automation lanes with keyframes (U3).** "+ Automation" picks any node parameter; its lane
+  sits under the tracks with the curve and keys (click adds and drags, right-click: step / linear /
+  smooth or delete). On / W (write: record the knob while playing) / range / remove on its header.
+  Saved with the patch, part of undo.
+- **Recording (U3):** count-in and punch in / out (REC right-click); with the loop on, every pass is a
+  take (the last on the track, the others on muted take tracks).
+- **Clip content loop (U3):** "loop content" in the inspector - stretching the clip repeats it.
+- **Editing like a DAW (U2):** undo / redo buttons; Ctrl+drag copies, Ctrl+Alt+drag slips the source
+  under the box; a gain line in every audio clip; fade curves (right-click a fade handle: linear,
+  fast, slow, S); magnetic snap to clip edges, markers, playhead and loop; ripple off / track / all;
+  Range copy / paste / duplicate (Ctrl+C / V / D); S splits; Alt+wheel sets track height.
 - **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
   a dashed snap guide while dragging.
 - **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),

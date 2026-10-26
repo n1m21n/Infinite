@@ -75,6 +75,21 @@ namespace Arrange
       return liveBpm > 0.0 ? liveBpm : 120.0;
    }
 
+   // Turbo 0.72 (not upstream): fade curves. `x` is how far into the fade
+   // (0 = silent end, 1 = full level); the result is the gain.
+   enum FadeShape { kFadeLinear = 0, kFadeFast, kFadeSlow, kFadeS, kFadeShapeCount };
+   inline float FadeShapeGain(float x, int shape)
+   {
+      x = x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
+      switch (shape)
+      {
+         case kFadeFast: return 1.0f - (1.0f - x) * (1.0f - x); // rises fast, eases into full
+         case kFadeSlow: return x * x;                         // stays low, rises late
+         case kFadeS: return x * x * (3.0f - 2.0f * x);        // smoothstep
+         default: return x;
+      }
+   }
+
    // Ticks that `seconds` of source audio occupy at effBpm.
    inline Tick SampleClipLengthTicks(double seconds, double effBpm)
    {
@@ -97,6 +112,13 @@ namespace Arrange
       int      srcOutput = 0;  // which output of srcUid, as CableRecord::srcOutput
       Tick     fadeIn   = 0;   // 0..length
       Tick     fadeOut  = 0;   // 0..length
+      // Turbo 0.72 (not upstream): fade curve, a FadeShape. 0 = linear, so
+      // every clip from before (or from upstream) fades as it always did.
+      int      fadeInShape  = 0;
+      int      fadeOutShape = 0;
+      // Turbo 0.72 (not upstream): > 0 = the clip's content repeats every
+      // loopTicks (stretching the box loops it); 0 = plays through once.
+      Tick     loopTicks = 0;
       float    gainDb   = 0.0f;
       bool     enabled  = true; // the `0` key (WP5)
       uint64_t groupId  = 0;   // 0 = not grouped; a live group has >= 2 members
