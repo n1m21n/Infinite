@@ -21,6 +21,6 @@ onmessage = function (e) {
     var frames = M._gen_run(m.style, m.part, m.seed, m.bars, m.key, m.scale);
     if (!frames) { postMessage({ id: m.id, error: 'no loop' }); return; }
     var pcm = new Float32Array(M.HEAPF32.buffer, M._gen_pcm(), frames * 2).slice();
-    postMessage({ id: m.id, frames: frames, rate: 48000, pcm: pcm, label: M.UTF8ToString(M._gen_label()), bpm: M._gen_bpm(), attempt: M._gen_attempt(), ms: Date.now() - t0 }, [pcm.buffer]);
+    postMessage({ id: m.id, frames: frames, rate: 48000, pcm: pcm, label: M.UTF8ToString(M._gen_label()), patch: M.UTF8ToString(M._gen_patch()), bpm: M._gen_bpm(), attempt: M._gen_attempt(), ms: Date.now() - t0 }, [pcm.buffer]);
   }).catch(function (err) { postMessage({ id: m.id, error: String(err) }); });
 };

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <string>
@@ -29,6 +30,7 @@ namespace
 
    std::vector<float> gPcm; // interleaved
    std::string gLabel;
+   std::string gPatch; // the graph that made the loop, as an openable .inf
    std::string gStyleId;
    float gBpm = 0.0f;
    int gAttempt = 0;
@@ -66,6 +68,23 @@ namespace
           r.part != P::Snares && r.part != P::Hats && r.part != P::Toms)
          s += std::string(", ") + kRoots[((root % 12) + 12) % 12] + " " + MusicTime::ScaleTable(scale).name;
       return s;
+   }
+}
+
+namespace
+{
+   // The compiled graph ends at a tap; a download needs credit and an Audio Out so it opens playing.
+   std::string OpenablePatch(const SampleStyles::Compiled& c)
+   {
+      int last = 0;
+      for (size_t at = c.patch.find("\nnode "); at != std::string::npos; at = c.patch.find("\nnode ", at + 1))
+         last = std::max(last, atoi(c.patch.c_str() + at + 6));
+      std::string out = c.patch;
+      const size_t nl = out.find("\n", out.find("\ntransport") == std::string::npos ? 0 : out.find("\ntransport") + 1);
+      out.insert(nl == std::string::npos ? out.size() : nl + 1,
+                 "# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/\n");
+      out += "node " + std::to_string(last + 1) + " Utility Audio Out\nend\naud " + std::to_string(last + 1) + " 0 " + std::to_string(c.tap) + "\n";
+      return out;
    }
 }
 
@@ -145,6 +164,7 @@ extern "C"
             gPcm[(size_t)f * 2 + 1] = rr[f];
          }
          gLabel = Label(rec, c.root, c.scale);
+         gPatch = OpenablePatch(c);
          gBpm = c.bpm;
          gAttempt = attempt;
          return frames;
@@ -154,6 +174,7 @@ extern "C"
 
    EMSCRIPTEN_KEEPALIVE const float* gen_pcm() { return gPcm.data(); }
    EMSCRIPTEN_KEEPALIVE const char* gen_label() { return gLabel.c_str(); }
+   EMSCRIPTEN_KEEPALIVE const char* gen_patch() { return gPatch.c_str(); }
    EMSCRIPTEN_KEEPALIVE float gen_bpm() { return gBpm; }
    EMSCRIPTEN_KEEPALIVE int gen_attempt() { return gAttempt; }
 }

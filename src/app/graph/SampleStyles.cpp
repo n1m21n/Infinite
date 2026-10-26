@@ -785,7 +785,7 @@ Compiled Compile(const Recipe& recipe)
    if (part == Part::Hats)
       lanes[0] = lanes[1] = lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
    if (part == Part::Toms)
-      lanes[0] = lanes[1] = lanes[2] = lanes[3] = lanes[4] = "";
+      lanes[0] = lanes[1] = lanes[2] = lanes[3] = lanes[4] = lanes[7] = ""; // no bell: it is the high metallic ring
    int drums = 0, duckKey = 0;
    if (hasDrums)
    {
@@ -936,18 +936,25 @@ Compiled Compile(const Recipe& recipe)
             synthDrums.push_back({ 0, ck, -13.0f });
          }
       }
-      if (*lanes[2] && dr.Uniform() < (subPart ? 0.75 : 0.35))
+      if (*lanes[2] && dr.Uniform() < (part == Part::Hats ? 0.9 : subPart ? 0.75 : 0.35))
       {
+         // A hat is mostly noise: band-passed hiss around 7-9 kHz with a short decay, and only a little ring of metal under it.
          int sq = 0;
          drumSeq(2, 84, 20.0, sq);
-         Params h = F({ { "transient", dr.Uniform(0.5, 1.6) }, { "decay", dr.Uniform(0.02, 0.09) }, { "stiffness", dr.Uniform(0.8, 2.0) },
-                        { "filterCutoff", dr.Uniform(6000.0, 16000.0) }, { "filterResonance", dr.Uniform(0.0, 0.3) },
-                        { "volume", 0.7 }, { "width", dr.Uniform(0.2, 0.8) } });
-         h["material"] = { 'i', std::to_string(dr.Range(8)) };
-         const int sy = g.Add("Metallic", dr.Range(1 << 30), h);
-         g.Connect(sq, sy, true);
+         const int hz = noiseVoice(8, dr.Uniform(6500.0, 9500.0), dr.Uniform(0.15, 0.4), dr.Uniform(22.0, 80.0), 0.8);
+         g.Connect(sq, hz, true);
          force["lane2_volume"] = { 'f', "0" };
-         synthDrums.push_back({ 2, sy, -9.0f });
+         synthDrums.push_back({ 2, hz, -7.0f });
+         if (dr.Uniform() < 0.6)
+         {
+            Params h = F({ { "transient", dr.Uniform(0.5, 1.6) }, { "decay", dr.Uniform(0.02, 0.07) }, { "stiffness", dr.Uniform(0.8, 2.0) },
+                           { "filterCutoff", dr.Uniform(7000.0, 16000.0) }, { "filterResonance", dr.Uniform(0.0, 0.3) },
+                           { "volume", 0.7 }, { "width", dr.Uniform(0.2, 0.8) } });
+            h["material"] = { 'i', std::to_string(dr.Range(8)) };
+            const int sy = g.Add("Metallic", dr.Range(1 << 30), h);
+            g.Connect(sq, sy, true);
+            synthDrums.push_back({ 2, sy, -18.0f });
+         }
       }
       // A snare, clap or toms from a synth, each about one take in three: noise
       // through a band for the crack, a dropped sine for the body.
@@ -975,7 +982,7 @@ Compiled Compile(const Recipe& recipe)
          force["lane4_volume"] = { 'f', "0" };
          synthDrums.push_back({ 4, bursts, -4.0f });
       }
-      if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (subPart ? 0.75 : 0.33))
+      if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (part == Part::Toms ? 1.0 : subPart ? 0.75 : 0.33))
       {
          const bool perc = part == Part::Percussion; // percussion keeps its brighter toms
          const int notes[2] = { perc ? 40 + dr.Range(8) : 37 + dr.Range(8), perc ? 52 + dr.Range(8) : 47 + dr.Range(8) }; // toms: floor 75-140 Hz, rack 125-230 Hz
@@ -986,7 +993,7 @@ Compiled Compile(const Recipe& recipe)
             int sq = 0;
             drumSeq(5 + ti, notes[ti], 70.0, sq);
             const int tm = toneVoice(perc ? dr.Uniform(8.0, 22.0) : dr.Uniform(4.0, 9.0), perc ? dr.Uniform(40.0, 110.0) : dr.Uniform(35.0, 80.0),
-                                   perc ? dr.Uniform(180.0, 460.0) : dr.Uniform(260.0, 520.0), dr.Range(3) == 0 ? 10 : 0, perc ? 9000.0 : 2800.0);
+                                   perc ? dr.Uniform(180.0, 460.0) : dr.Uniform(300.0, 600.0), perc && dr.Range(3) == 0 ? 10 : 0, perc ? 9000.0 : 1500.0);
             g.Connect(sq, tm, true);
             force["lane" + std::to_string(5 + ti) + "_volume"] = { 'f', "0" };
             synthDrums.push_back({ 5 + ti, tm, -5.0f });
