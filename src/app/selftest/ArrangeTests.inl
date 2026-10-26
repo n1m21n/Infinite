@@ -1225,6 +1225,15 @@
                printf("arrange multitrack live: %s (track peaks %.4f %.4f %.4f, all three %.4f)\n",
                       liveOk ? "OK" : "FAIL", single[0], single[1], single[2], all);
                sOk = sOk && liveOk;
+               // Turbo 0.72: a stem render's scope silences the other tracks
+               // (the same flag the render queue sets, without a device).
+               gArrangeRenderActiveScope = { lanes[0] };
+               const float stem = render(0.0, blocks);
+               gArrangeRenderActiveScope.clear();
+               const bool stemOk = std::fabs(stem - sSinglePeak) < 0.15f * sSinglePeak;
+               printf("arrange multitrack stem scope: %s (stem %.4f, one track %.4f)\n", stemOk ? "OK" : "FAIL", stem,
+                      sSinglePeak);
+               sOk = sOk && stemOk;
                tr.NotifyAudioEngineStopped();
             }
 
@@ -1247,6 +1256,12 @@
                job.fps = 30;
                job.path = sWavPath;
                gArrangeRenderJobs.push_back(job);
+               // Turbo 0.72: a stem of the first track only (Render track...).
+               ArrangeRenderJob stemJob = job;
+               stemJob.path = sWavPath.substr(0, sWavPath.size() - 4) + "_stem.wav";
+               std::remove(stemJob.path.c_str());
+               stemJob.laneScope = { gArrange.lanes[0].id };
+               gArrangeRenderJobs.push_back(stemJob);
                sWavQueued = true;
             }
             else
@@ -1257,23 +1272,37 @@
             if (sWavQueued)
             {
                // Float WAV written by ArrangeWavHeader: data starts at byte 58.
-               std::ifstream f(sWavPath, std::ios::binary);
-               std::vector<char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-               float peak = 0.0f;
-               size_t frames = 0;
-               if (bytes.size() > 58)
+               auto readPeak = [](const std::string& path, size_t& frames)
                {
-                  frames = (bytes.size() - 58) / 8;
-                  const float* s = reinterpret_cast<const float*>(bytes.data() + 58);
-                  for (size_t i = frames / 8; i < frames; i++) // past the onset
-                     peak = std::max(peak, std::fabs(s[i * 2]));
-               }
-               const bool done = !gArrangeRenderJobs.empty() && gArrangeRenderJobs.back().status == 2;
+                  std::ifstream f(path, std::ios::binary);
+                  std::vector<char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+                  float peak = 0.0f;
+                  frames = 0;
+                  if (bytes.size() > 58)
+                  {
+                     frames = (bytes.size() - 58) / 8;
+                     const float* s = reinterpret_cast<const float*>(bytes.data() + 58);
+                     for (size_t i = frames / 8; i < frames; i++) // past the onset
+                        peak = std::max(peak, std::fabs(s[i * 2]));
+                  }
+                  return peak;
+               };
+               const std::string stemPath = sWavPath.substr(0, sWavPath.size() - 4) + "_stem.wav";
+               size_t frames = 0, stemFrames = 0;
+               const float peak = readPeak(sWavPath, frames);
+               const float stemPeak = readPeak(stemPath, stemFrames);
+               const size_t n = gArrangeRenderJobs.size();
+               const bool done = n >= 2 && gArrangeRenderJobs[n - 2].status == 2 && gArrangeRenderJobs[n - 1].status == 2;
                const bool wavOk = done && frames > 0 && sSinglePeak > 0.0f && peak > 2.5f * sSinglePeak;
-               printf("arrange multitrack wav render: %s (job done %d, %zu frames, peak %.4f, one track %.4f)\n",
+               printf("arrange multitrack wav render: %s (jobs done %d, %zu frames, peak %.4f, one track %.4f)\n",
                       wavOk ? "OK" : "FAIL", (int)done, frames, peak, sSinglePeak);
-               sOk = sOk && wavOk;
+               // The stem holds one track: about one track's level, not three.
+               const bool stemOk = done && stemFrames > 0 && std::fabs(stemPeak - sSinglePeak) < 0.15f * sSinglePeak;
+               printf("arrange multitrack stem render: %s (stem peak %.4f, one track %.4f)\n", stemOk ? "OK" : "FAIL",
+                      stemPeak, sSinglePeak);
+               sOk = sOk && wavOk && stemOk;
                std::remove(sWavPath.c_str());
+               std::remove(stemPath.c_str());
             }
             printf("arrange multitrack test: all  %s\n", sOk ? "OK" : "FAIL");
          }

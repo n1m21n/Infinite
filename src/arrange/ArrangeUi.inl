@@ -829,6 +829,24 @@ int gArrangeRecTakeCount = 0;
 double gArrangeRecSampleRate = 48000.0; // the rate the takes are written at
 std::string gArrangeRecStatus;
 
+// Turbo 0.72 (upstream's Render Track / Render Group): a render can be
+// scoped to some tracks (a stem). The draft is what the next "Add to queue"
+// takes; the active scope silences every other track while that job renders.
+std::vector<uint64_t> gArrangeRenderScopeDraft;
+std::string gArrangeRenderScopeLabel;
+std::vector<uint64_t> gArrangeRenderActiveScope;
+bool ArrangeLaneInRenderScope(uint64_t laneId)
+{
+   return gArrangeRenderActiveScope.empty() ||
+          std::find(gArrangeRenderActiveScope.begin(), gArrangeRenderActiveScope.end(), laneId) != gArrangeRenderActiveScope.end();
+}
+void ArrangeOpenRenderFor(const std::vector<uint64_t>& lanes, const std::string& label)
+{
+   gArrangeRenderScopeDraft = lanes;
+   gArrangeRenderScopeLabel = label;
+   gArrangeRenderWindowOpen = true;
+}
+
 ArrangeRecArm* ArrangeRecArmFor(uint64_t laneId)
 {
    auto it = gArrangeRecArms.find(laneId);
@@ -1222,7 +1240,8 @@ void ArrangeFrameUpdate()
       const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
       if (lane.type != Arrange::kLaneAudio)
          continue;
-      const bool silent = lane.mute || (anySolo && !lane.solo);
+      // Turbo 0.72: a stem render silences the tracks outside its scope.
+      const bool silent = lane.mute || (anySolo && !lane.solo) || !ArrangeLaneInRenderScope(lane.id);
       float l = 1.0f, r = 1.0f;
       if (lane.pan != 0.0f)
       {
@@ -1263,7 +1282,8 @@ void ArrangeFrameUpdate()
          if (video == nullptr || video->Duration() <= 0.0 || active.count(c.srcUid))
             continue;
          active[c.srcUid] = c.id;
-         double want = c.sourceOffsetSeconds + (beat - s) * 60.0 / bpm;
+         // Turbo 0.72 (upstream): the clip's signed speed (reverse runs back from the offset).
+         double want = std::max(0.0, c.sourceOffsetSeconds + (beat - s) * 60.0 / bpm * Arrange::ClipSpeedFactor(c));
          // A clip longer than the movie: loop inside the trimmed range if
          // the node loops, else hold the last frame.
          const double t0 = (double)video->trimStart * video->Duration();
@@ -1519,7 +1539,8 @@ void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out)
    for (size_t li = gArrange.lanes.size(); li-- > 0;)
    {
       const Arrange::Lane& lane = gArrange.lanes[li];
-      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(gArrange, lane))
+      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(gArrange, lane) ||
+          !ArrangeLaneInRenderScope(lane.id)) // Turbo 0.72: stem render
          continue;
       for (const Arrange::Clip& c : lane.clips)
       {
@@ -2707,6 +2728,41 @@ void ArrangeSetSampleSync(uint64_t clipId, bool sync)
    ArrangeRescaleSampleBox(clipId, oldEff, newEff);
 }
 
+// Turbo 0.72 (upstream's ArrangeSetClipSpeed, verbatim): changing a clip's
+// speed keeps the same source covered: the box scales by oldSpeed /
+// newSpeed, so 2x halves it and the same take now plays twice as fast. Goes
+// through TrimEdge so growing into a neighbour clamps there.
+void ArrangeSetClipSpeed(uint64_t clipId, float speed)
+{
+   Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+   if (c == nullptr || !std::isfinite(speed))
+      return;
+   speed = std::clamp(speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax);
+   const double oldSpeed = std::fabs(Arrange::ClipSpeedFactor(*c));
+   if (speed == c->speed)
+      return;
+   c->speed = speed;
+   gArrange.revision++;
+   const double newSpeed = std::fabs(Arrange::ClipSpeedFactor(*c));
+   const Arrange::Tick newLength =
+      std::max<Arrange::Tick>(1, (Arrange::Tick)std::llround((double)c->length * oldSpeed / newSpeed));
+   Arrange::TrimEdge(gArrange, clipId, Arrange::kEdgeEnd, c->start + newLength);
+}
+
+// Turbo 0.72 (upstream's ArrangeSetClipReverse, verbatim): turning reverse on
+// or off keeps the same stretch of source under the box: forward starts at
+// the offset, reversed starts at the far end of the region and runs back to it.
+void ArrangeSetClipReverse(uint64_t clipId, bool reverse)
+{
+   Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+   if (c == nullptr || c->reverse == reverse)
+      return;
+   const double covered = std::fabs(Arrange::ClipSourceAdvance(*c, c->length));
+   c->reverse = reverse;
+   c->sourceOffsetSeconds = (float)std::max(0.0, (double)c->sourceOffsetSeconds + (reverse ? covered : -covered));
+   gArrange.revision++;
+}
+
 void ArrangeSetSampleBpm(uint64_t clipId, float bpm)
 {
    Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
@@ -3084,6 +3140,32 @@ void DrawArrangeClipSettings(bool docked)
             ImGui::TextDisabled("(the bypassed params are not modulated now)");
          else
             ImGui::TextDisabled("unchecked = the knob holds still while this clip is under the playhead");
+      }
+   }
+
+   // Turbo 0.72 (upstream): Speed and Reverse move a file's playhead (an
+   // audio or a video file); a synth or a shader has no position to move.
+   {
+      const GraphNode* speedSrc = FindNodeByUid(c->srcUid);
+      const bool hasFilePosition = speedSrc != nullptr && (dynamic_cast<const AudioFileNode*>(speedSrc->node.get()) != nullptr ||
+                                                           dynamic_cast<const VideoSourceNode*>(speedSrc->node.get()) != nullptr);
+      if (hasFilePosition)
+      {
+         const uint64_t clipId = c->id;
+         float speed = c->speed;
+         if (ImGui::SliderFloat("speed", &speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax, "%.2fx",
+                                ImGuiSliderFlags_Logarithmic))
+            ArrangeEdit([&]() { ArrangeSetClipSpeed(clipId, speed); });
+         bool reverse = c->reverse;
+         if (ImGui::Checkbox("reverse", &reverse))
+            ArrangeEdit([&]() { ArrangeSetClipReverse(clipId, reverse); });
+         const Arrange::Loc l3 = Arrange::Find(gArrange, clipId);
+         if (!l3.Valid())
+         {
+            ArrangeSettingsEnd(docked);
+            return;
+         }
+         c = &gArrange.lanes[(size_t)l3.lane].clips[(size_t)l3.index];
       }
    }
 
@@ -3768,6 +3850,9 @@ void DrawArrangeInspector(ImVec2 mn, ImVec2 mx)
       ArrUi::Next();
       if (ArrUi::Chip("##insdel", "Delete", "delete the track and its clips  -  Delete"))
          ArrangeDeleteRowSelection();
+      ArrUi::Next();
+      if (ArrUi::Chip("##insrender", "Render...", "render this track alone (a stem)"))
+         ArrangeOpenRenderFor({ id }, ArrangeLaneLabel(gArrange, Arrange::LaneIndex(gArrange, id)));
    }
    else if (rows.size() > 1)
    {
@@ -3784,6 +3869,8 @@ void DrawArrangeInspector(ImVec2 mn, ImVec2 mx)
       ArrUi::Next();
       if (ArrUi::Chip("##insdeln", "Delete", "delete the tracks  -  Delete"))
          ArrangeDeleteRowSelection();
+      if (ArrUi::Chip("##insrendern", "Render...", "render these tracks together (a stem)"))
+         ArrangeOpenRenderFor(rows, std::to_string(rows.size()) + " tracks");
    }
    else if (gArrangeSel.size() > 1)
    {
@@ -4135,6 +4222,8 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          const uint64_t id = g->id;
          ImGui::TextDisabled("%s", g->name.empty() ? "Group" : g->name.c_str());
          ImGui::Separator();
+         if (ImGui::MenuItem("Render group...")) // Turbo 0.72 (upstream): a stem of the group's tracks
+            ArrangeOpenRenderFor(Arrange::LanesInTrackGroupRecursive(gArrange, id), g->name.empty() ? "Group" : g->name);
          if (ImGui::MenuItem("Rename"))
          {
             gArrangeRenameGroup = id;
@@ -5130,6 +5219,14 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          const int type = gArrange.lanes[(size_t)li].type;
          ImGui::TextDisabled("%s", ArrangeLaneLabel(gArrange, li).c_str());
          ImGui::Separator();
+         // Turbo 0.72 (upstream): a stem of this track (or of the selected tracks).
+         {
+            const std::vector<uint64_t> rows = ArrangeLiveRowSel();
+            const bool many = rows.size() > 1 && ArrangeRowSelected(id);
+            if (ImGui::MenuItem(many ? "Render selected tracks..." : "Render track..."))
+               ArrangeOpenRenderFor(many ? rows : std::vector<uint64_t>{ id },
+                                    many ? std::to_string(rows.size()) + " tracks" : ArrangeLaneLabel(gArrange, li));
+         }
          if (ImGui::MenuItem("Rename"))
          {
             gArrangeRenameLane = id;
@@ -5446,6 +5543,8 @@ struct ArrangeRenderJob
    int status = 0; // 0 queued, 1 running, 2 done, 3 failed, 4 cancelled
    std::string message;
    int frame = 0, totalFrames = 0;
+   std::vector<uint64_t> laneScope; // Turbo 0.72: empty = the whole mix, else a stem of these tracks
+   std::string scopeLabel;
 };
 std::vector<ArrangeRenderJob> gArrangeRenderJobs;
 
@@ -5524,6 +5623,7 @@ void ArrangeRenderFinish(int status, const std::string& message)
    Transport::Instance().SetPlaying(false);
    Transport::Instance().SeekBeats(r.wasBeat);
    gArrangeTimelineMode = r.wasTimelineMode;
+   gArrangeRenderActiveScope.clear(); // Turbo 0.72
    PublishArrangeLoop();
    gVsync = r.wasVsync;
    RuntimeLog::Write("timeline render %s: %s (%s)", status == 2 ? "done" : "stopped", job.path.c_str(), job.message.c_str());
@@ -5586,6 +5686,7 @@ bool ArrangeRenderBegin(int jobIndex)
    // Timeline owns the output, no loop, playhead at the start, graph driven
    // from here.
    gArrangeTimelineMode = true;
+   gArrangeRenderActiveScope = job.laneScope; // Turbo 0.72: stem
    Transport::Instance().SetLoop(false, 0.0, 0.0);
    AudioEngine::Instance().SetOfflineRender(true);
    Transport::Instance().SetPlaying(true);
@@ -5758,6 +5859,20 @@ void DrawArrangeRenderWindow()
    }
    ImGui::TextDisabled("%s  to  %s   (%s)", ArrangeFormatPos(a).c_str(), ArrangeFormatPos(b).c_str(),
                        ArrangeFormatLen(std::max<Arrange::Tick>(0, b - a)).c_str());
+   // Turbo 0.72: what is rendered - the whole mix, or a stem of some tracks
+   // (track / group menu: Render track..., Render group...).
+   if (gArrangeRenderScopeDraft.empty())
+      ImGui::TextDisabled("tracks: the whole mix  (right-click a track or group: Render track / group)");
+   else
+   {
+      ImGui::Text("tracks: %s", gArrangeRenderScopeLabel.c_str());
+      ImGui::SameLine();
+      if (ImGui::SmallButton("whole mix"))
+      {
+         gArrangeRenderScopeDraft.clear();
+         gArrangeRenderScopeLabel.clear();
+      }
+   }
 
    static const char* kFormats[] = { "MP4 (video + audio)", "MOV (video + audio)", "WAV (audio only)" };
    ImGui::SetNextItemWidth(200.0f);
@@ -5786,8 +5901,12 @@ void DrawArrangeRenderWindow()
       job.width = st.renderWidth;
       job.height = st.renderHeight;
       job.fps = std::clamp(st.renderFps, 1, 120);
+      job.laneScope = gArrangeRenderScopeDraft;
+      job.scopeLabel = gArrangeRenderScopeLabel;
       const std::string base = gPatchPath.empty() ? "timeline" : gPatchPath.substr(gPatchPath.find_last_of("/\\") + 1);
-      const std::string stem = base.substr(0, base.find_last_of('.'));
+      std::string stem = base.substr(0, base.find_last_of('.'));
+      if (!job.scopeLabel.empty())
+         stem += " - " + job.scopeLabel; // a stem's file is named after its tracks
       if (job.format == 2)
          StartFileDialog([stem]() { return Platform::SaveAudioDialog(stem + ".wav"); },
                          [job](const std::string& path) mutable { job.path = path; gArrangeRenderJobs.push_back(job); });

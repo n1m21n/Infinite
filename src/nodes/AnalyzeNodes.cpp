@@ -861,7 +861,9 @@ private:
       }
       const double fileRate = mActiveBuffer->sampleRate > 0.0 ? mActiveBuffer->sampleRate : mSampleRate;
       const double playbackRate = (fileRate > 0.0 && mSampleRate > 0.0) ? fileRate / mSampleRate : 1.0;
-      const double sourcePerOutput = playbackRate * std::max(0.0, mClipSourcePerSecond);
+      // Turbo 0.72 (upstream): signed - a reversed clip reads the file backwards.
+      const bool reversed = mClipSourcePerSecond < 0.0;
+      const double sourcePerOutput = playbackRate * mClipSourcePerSecond;
       const double target = mClipSourceSeconds * fileRate;
       const double driftLimit = 0.005 * fileRate;
 
@@ -872,14 +874,18 @@ private:
       if (reseek)
          mClipSource = target;
 
-      const double rate = std::clamp(mClipSourcePerSecond, 0.05, 20.0);
-      const bool plain = std::fabs(rate - 1.0) < 1e-4 && mClipPitch == 0.0f;
-      const bool canStretch = mStretcher.Prepared() && buffer.numFrames <= mStretchCapacity;
+      const double rate = std::clamp(std::fabs(mClipSourcePerSecond), 0.05, 20.0);
+      // Reversed reads straight off the buffer (the stretcher only runs
+      // forward), so a reversed clip's pitch follows its speed (upstream).
+      const bool plain = reversed || (std::fabs(rate - 1.0) < 1e-4 && mClipPitch == 0.0f);
+      const bool canStretch = mStretcher.Prepared() && buffer.numFrames <= mStretchCapacity && !reversed;
       bool direct = mClipDirect;
       if (reseek || !mClipActive)
          direct = plain || !canStretch;
       else if (!plain && canStretch)
          direct = false;
+      if (reversed)
+         direct = true;
 
       const double fileFramesPerInput = playbackRate;
       const double inputFrame = mClipSource / std::max(1e-9, fileFramesPerInput);
