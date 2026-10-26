@@ -15,7 +15,7 @@
   </p>
 
   <p>
-    <a href="https://discord.gg/7cpQfCxnx"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://discord.gg/GMeQTyJqkH"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
     <a href="https://x.com/n1m21n"><img src="https://img.shields.io/badge/X-@n1m21n-000000?style=for-the-badge&logo=x&logoColor=white" alt="X / Twitter" /></a>
     <a href="https://instagram.com/n1m21n"><img src="https://img.shields.io/badge/Instagram-@n1m21n-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
   </p>
@@ -104,7 +104,7 @@ flowchart LR
 
 ### Connect
 
-- Discord Community: [Join the Infinite Server](https://discord.gg/7cpQfCxnx)
+- Discord Community: [Join the Infinite Server](https://discord.gg/GMeQTyJqkH)
 - Twitter / X: [@n1m21n](https://x.com/n1m21n)
 - Instagram: [@n1m21n](https://instagram.com/n1m21n)
 - Email: namansoniiii21@gmail.com

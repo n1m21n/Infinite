@@ -188,7 +188,7 @@ def main():
          f"- [Embeds]({BASE}embeds/): audio-reactive WebGL visuals to put on any page with one iframe",
          "- [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux",
          "- [Source code](https://github.com/n1m21n/Infinite): MIT licensed",
-         "- [Discord](https://discord.gg/7cpQfCxnx): community and support",
+         "- [Discord](https://discord.gg/GMeQTyJqkH): community and support",
          "- [YouTube](https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug): tutorials and films", "",
          "## File formats", "",
          "- `.inf` and `.infinite`: a patch. A line-based text file listing nodes and cables. Open it with File, Open in Infinite.",

@@ -10,6 +10,6 @@ Check each against the repo before use; update when the app changes.
 - Headless flags: `--validate`, `--frame`, `--frames-dir`, `--render`, `--audio-summary`, `--describe`, `--explain`, `--set`. Camera, microphone and MIDI patches are refused headless (exit code 4). Linux needs `xvfb-run -a`.
 - Video output: Syphon (macOS), Spout (Windows), NDI.
 - Patch format: plain text `.inf` (`infinite-patch 1`, `node`, `cable`, `mod`, `expr`).
-- Links: site https://infinitedevices.org, source https://github.com/n1m21n/Infinite, Discord https://discord.gg/7cpQfCxnx.
+- Links: site https://infinitedevices.org, source https://github.com/n1m21n/Infinite, Discord https://discord.gg/GMeQTyJqkH.
 
 Do not claim: AAX support, mobile apps, anything about performance numbers we have not measured, user counts.

@@ -5,7 +5,7 @@ Thanks for helping. Bug reports, feature ideas, patches and nodes are all welcom
 ## Ways to help
 
 - **Report a bug or ask for a feature** in [GitHub Issues](https://github.com/n1m21n/Infinite/issues). For a bug, include your OS and version, your GPU and audio device, and the steps that trigger it.
-- **Share patches and ask questions** in the [Discord community](https://discord.gg/7cpQfCxnx).
+- **Share patches and ask questions** in the [Discord community](https://discord.gg/GMeQTyJqkH).
 - **Send a pull request.** Small, focused PRs are easiest to review. If a PR bundles several unrelated areas, we may take the ideas and build them natively instead of merging it as one piece. In that case we say so in the PR and credit you (see below).
 
 ## Code rules

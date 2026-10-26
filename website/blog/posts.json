@@ -1,5 +1,14 @@
 [
  {
+  "slug": "open-source-vj-software",
+  "title": "Open source VJ software: real-time visual performance in Infinite",
+  "description": "Build real-time generative visuals, map live audio frequencies, and drive stage projection with Infinite, an open source VJ software workstation for performers.",
+  "date": "2026-10-26",
+  "updated": "2026-10-26",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/open-source-vj-software.html"
+ },
+ {
   "slug": "automatic-visuals-for-dj-sets",
   "title": "Automatic visuals for DJ sets: hands-free live visuals in Infinite",
   "description": "Generate hands-free, audio-reactive visuals for DJ sets in Infinite using live audio analysis, frequency-split modulation, and hardware projection.",
