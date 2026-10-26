@@ -128,3 +128,14 @@
 .smp-play.is-busy { opacity: 0.5; cursor: progress; }
 .smp-license { margin: 2rem 0 0; color: var(--muted); font: 400 .9rem/1.55 var(--font-sans); max-width: 70ch; }
 .smp-license b { color: var(--text, inherit); }
+
+/* Filters read as icons; the native list stays as is. The chosen value shows beside the icon. */
+.smp-pickw { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 36px; min-width: 36px; padding: 0 10px; justify-content: center; border-radius: 999px; cursor: pointer;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent); color: var(--ink); font: 600 0.85rem/1 var(--font-sans); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-pickw svg { width: 18px; height: 18px; flex: none; }
+.smp-pickw .smp-pickv { display: none; }
+.smp-pickw.is-set { padding: 0 14px 0 12px; }
+.smp-pickw.is-set .smp-pickv { display: inline; }
+.smp-pickw .smp-pick { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; opacity: 0; padding: 0; flex: none; }
+.smp-pickw:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 680px) { .smp-picks .smp-pickw { flex: 0 0 auto; } }

@@ -183,14 +183,25 @@
 
   // Instrument and scale are always dropdowns: one pair for the generator, one for the saved list.
   var gf = { part: '', scale: '', key: '' };
+  var PICK_IC = {
+    part: '<path d="M3 10h1.5M7 6v8M10.5 3.5v13M14 7v6M17 10h-1.5"/>',
+    key: '<path d="M8 15V4.5l7-1.5v10.5"/><circle cx="6" cy="15" r="2"/><circle cx="13" cy="13.5" r="2"/>',
+    scale: '<path d="M3 16h3.5v-3.5H10V9h3.5V5.5H17"/>'
+  };
   function pick(state, key, label, vals, onchange) {
+    var w = document.createElement('label');
+    w.className = 'smp-pickw'; w.title = label;
     var sel = document.createElement('select');
     sel.className = 'smp-pick'; sel.setAttribute('aria-label', label);
     sel.innerHTML = '<option value="">' + label + '</option>' + vals.map(function (v) {
       return '<option value="' + esc(v) + '"' + (state[key] === v ? ' selected' : '') + '>' + esc(v) + '</option>';
     }).join('');
-    sel.addEventListener('change', function () { state[key] = sel.value; onchange(); });
-    return sel;
+    w.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + PICK_IC[key] + '</svg><span class="smp-pickv"></span>';
+    w.appendChild(sel);
+    var show = function () { var v = w.querySelector('.smp-pickv'); v.textContent = sel.value; w.classList.toggle('is-set', !!sel.value); };
+    sel.addEventListener('change', function () { state[key] = sel.value; show(); onchange(); });
+    show();
+    return w;
   }
   function buildFilters() {
     var bar = document.getElementById('smp-bar'), grow = bar.querySelector('.grow');
