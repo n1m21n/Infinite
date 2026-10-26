@@ -8,6 +8,7 @@ Generates novel music without imitating the corpus by combining:
 import argparse, json, math, os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import critic as CR
+import genre_graph as GG
 import learn as L
 import pieces as P
 import synth_music as S
@@ -81,45 +82,104 @@ def propose_drum_raw(rng, fam=None, mix=None):
     return {"type": "drum_groove", "src": "proposer:" + mode, "family": f1, "lanes": str_lanes, "swing": round(rng.uniform(0.0, 0.25), 2), "groove": mode}
 
 
-def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None):
-    """Compositional call-and-response melody proposer with chromatic passing tension and cadence."""
-    scale_name = mode_name if mode_name in S.SCALES else rng.choice(S.FAM_SCALE.get(fam, ["minor", "dorian"]))
-    scale = S.SCALES[scale_name]
+EMOTION_SCALES = dict(S.SCALES, lydian=[0, 2, 4, 6, 7, 9, 11], harm_minor=[0, 2, 3, 5, 7, 8, 11])
+
+
+def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, emotion=None):
+    """Compositional call-and-response melody proposer with emotion-conditioned contour, mode, and intervals."""
+    if emotion is None:
+        scale_name = mode_name if mode_name in S.SCALES else rng.choice(S.FAM_SCALE.get(fam, ["minor", "dorian"]))
+        scale = S.SCALES[scale_name]
+        tonic = rng.randrange(12) if tonic is None else tonic
+        base_oct = rng.choice([48, 60, 60, 72])
+        pos = rng.choice([0, 2, 4])
+        arc_type = rng.choice(["arch", "wave", "climb", "cascade"])
+        pitches = []
+        for i in range(16):
+            if i == 0:
+                deg = pos
+            elif i == 7:
+                deg = pos + rng.choice([1, 3, 4, -1])
+            elif i == 15:
+                deg = round(pos / 7.0) * 7 + rng.choice([0, 0, 4, 2])
+            else:
+                bias = 0.25 if (arc_type == "arch" and i < 8) or (arc_type == "climb") else (-0.25 if arc_type == "cascade" else 0.0)
+                step = rng.choices([-3, -2, -1, 0, 1, 2, 3, 4], weights=[2, 5, 11, 5, 11, 5, 2, 1])[0]
+                if rng.random() < abs(bias):
+                    step = abs(step) if bias > 0 else -abs(step)
+                if len(pitches) >= 2 and abs(pitches[-1] - pitches[-2]) >= 7 and rng.random() < 0.20:
+                    step = -1 if pitches[-1] > pitches[-2] else 1
+                deg = max(-4, min(14, pos + step))
+            pos = deg
+            note = base_oct + tonic + 12 * (deg // 7) + scale[deg % 7]
+            if i not in (0, 15) and rng.random() < (0.04 if i % 4 == 0 else 0.05):
+                note += rng.choice([-1, 1])
+            pitches.append(max(36, min(96, note)))
+        steps = [b - a for a, b in zip(pitches, pitches[1:])]
+        return {"type": "melody_contour", "src": "proposer:" + arc_type, "family": fam, "role": "lead",
+                "pitches": pitches, "steps": steps}
+
+    edir = GG.EMOTION_MIDI_DIRECTIVES.get(emotion, {})
+    if mode_name in EMOTION_SCALES:
+        scale_name = mode_name
+    elif emotion == "valence_happiness":
+        scale_name = rng.choice(["major", "lydian", "mixolydian"])
+    elif emotion == "sadness_melancholy":
+        scale_name = rng.choice(["minor", "dorian"])
+    elif emotion == "tension_aggression":
+        scale_name = rng.choice(["phrygian", "harm_minor", "minor"])
+    elif emotion == "serenity_transcendence":
+        scale_name = rng.choice(["lydian", "major", "dorian"])
+    elif emotion == "intelligence_complexity":
+        scale_name = rng.choice(["dorian", "lydian", "harm_minor", "mixolydian"])
+    else:
+        scale_name = rng.choice(S.FAM_SCALE.get(fam, ["minor", "dorian"]))
+    scale = EMOTION_SCALES[scale_name]
     tonic = rng.randrange(12) if tonic is None else tonic
-    base_oct = rng.choice([48, 60, 60, 72])
+    base_oct = 72 if emotion == "valence_happiness" else (48 if emotion in ("sadness_melancholy", "tension_aggression") else rng.choice([48, 60, 60, 72]))
     pos = rng.choice([0, 2, 4])
-    arc_type = rng.choice(["arch", "wave", "climb", "cascade"])
+    arc_type = "climb" if emotion == "valence_happiness" else ("cascade" if emotion in ("sadness_melancholy", "nostalgia_warmth") else rng.choice(["arch", "wave", "climb", "cascade"]))
+    step_bias = edir.get("step_bias", 0.0)
+    leap_prob = edir.get("leap_prob", 0.20)
+    tens_prob = edir.get("tension_iv_prob", 0.04)
     pitches = []
     for i in range(16):
         if i == 0:
             deg = pos
         elif i == 7:
-            # Half-cadence tension at end of Call (scale degree 1, 3, 4, or 6)
             deg = pos + rng.choice([1, 3, 4, -1])
         elif i == 15:
-            # Full cadence resolution to tonic or fifth at end of Response
             deg = round(pos / 7.0) * 7 + rng.choice([0, 0, 4, 2])
         else:
-            bias = 0.25 if (arc_type == "arch" and i < 8) or (arc_type == "climb") else (-0.25 if arc_type == "cascade" else 0.0)
-            step = rng.choices([-3, -2, -1, 0, 1, 2, 3, 4], weights=[2, 5, 11, 5, 11, 5, 2, 1])[0]
-            if rng.random() < abs(bias):
-                step = abs(step) if bias > 0 else -abs(step)
+            if rng.random() < leap_prob:
+                step = rng.choice([-4, -3, 3, 4, 5])
+            else:
+                step = rng.choices([-3, -2, -1, 0, 1, 2, 3, 4], weights=[2, 5, 11, 5, 11, 5, 2, 1])[0]
+            if rng.random() < abs(step_bias):
+                step = abs(step) if step_bias > 0 else -abs(step)
             if len(pitches) >= 2 and abs(pitches[-1] - pitches[-2]) >= 7 and rng.random() < 0.20:
                 step = -1 if pitches[-1] > pitches[-2] else 1
             deg = max(-4, min(14, pos + step))
         pos = deg
         note = base_oct + tonic + 12 * (deg // 7) + scale[deg % 7]
-        if i not in (0, 15) and rng.random() < (0.04 if i % 4 == 0 else 0.05):
+        if i not in (0, 15) and rng.random() < tens_prob:
             note += rng.choice([-1, 1])
         pitches.append(max(36, min(96, note)))
     steps = [b - a for a, b in zip(pitches, pitches[1:])]
     return {"type": "melody_contour", "src": "proposer:" + arc_type, "family": fam, "role": "lead",
-            "pitches": pitches, "steps": steps}
+            "mode_name": scale_name, "pitches": pitches, "steps": steps}
 
 
-def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house"):
+def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house", emotion=None):
     """Coupled bass proposer that locks to or syncopates around the kick lane."""
-    style = rng.choice(["lock", "offbeat_pocket", "syncopated_answer", "walking"])
+    if emotion == "groove_hypnosis":
+        style = "offbeat_pocket"
+    elif emotion == "intelligence_complexity":
+        style = "walking"
+    elif emotion in ("energy_drive", "tension_aggression"):
+        style = "lock"
+    else:
+        style = rng.choice(["lock", "offbeat_pocket", "syncopated_answer", "walking"])
     chars = []
     prev = 0
     for s in range(16):
@@ -149,13 +209,14 @@ def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house"):
 def propose_filtered(kind, rec, rng, k=12, **kw):
     """Best-of-K proposal: generate K candidates, keep those passing Critic, pick highest novelty/score."""
     cands = []
+    emotion = kw.get("emotion")
     for _ in range(k * 2):
         if kind == "drum_groove":
             p = propose_drum_raw(rng, fam=kw.get("fam"))
         elif kind == "melody_contour":
-            p = propose_melody_raw(rng, fam=kw.get("fam", "house"), tonic=kw.get("tonic"), mode_name=kw.get("mode_name"))
+            p = propose_melody_raw(rng, fam=kw.get("fam", "house"), tonic=kw.get("tonic"), mode_name=kw.get("mode_name"), emotion=emotion)
         elif kind == "bass_seq":
-            p = propose_bass_raw(rng, kick_lane=kw.get("kick_lane", "x...x...x...x..."), fam=kw.get("fam", "house"))
+            p = propose_bass_raw(rng, kick_lane=kw.get("kick_lane", "x...x...x...x..."), fam=kw.get("fam", "house"), emotion=emotion)
         else:
             raise ValueError("unknown kind " + kind)
         res = CR.judge(p, rec)
@@ -166,7 +227,10 @@ def propose_filtered(kind, rec, rng, k=12, **kw):
                 break
     if not cands:
         return p
-    cands.sort(key=lambda x: x["_critic"]["novelty"], reverse=True)
+    if emotion:
+        cands.sort(key=lambda x: 0.65 * GG.infer_piece_emotions(x).get(emotion, 0.5) + 0.35 * x["_critic"]["novelty"], reverse=True)
+    else:
+        cands.sort(key=lambda x: x["_critic"]["novelty"], reverse=True)
     return cands[0]
 
 

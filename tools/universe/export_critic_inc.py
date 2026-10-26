@@ -170,16 +170,46 @@ def main():
     lines.append("   };")
     lines.append("")
 
-    # 6. Connected Genre-Subgenre Graph Directives & Spotify 5-Pillar Perceptual Vectors
+    # 6. Connected Genre-Subgenre Graph Directives, Spotify 5-Pillar & 8-Emotion Vectors
     net = GG.build_genre_network()
     lines += [
+        "   // 8-Node Connected Emotion Indices:",
+        "   // 0=ValenceHappiness, 1=SadnessMelancholy, 2=EnergyDrive, 3=IntelligenceComplexity,",
+        "   // 4=TensionAggression, 5=NostalgiaWarmth, 6=SerenityTranscendence, 7=GrooveHypnosis",
+        "   constexpr int kEmotionCount = 8;",
+        "   struct EmotionMidiDirective",
+        "   {",
+        "      const char* name;",
+        "      float stepBias;      // + ascending (happy/drive), - descending sigh (sad/nostalgic)",
+        "      float leapProb;      // probability of >=3rd melodic leap",
+        "      float tensionIvProb; // probability of chromatic/tension interval",
+        "      float chordExtBonus; // preference for 7th/9th extended chord voicings (size 4..5)",
+        "      float velBias;       // MIDI velocity shift",
+        "      float gateScale;     // note duration/legato multiplier",
+        "      float humanizeScale; // micro-timing & strum humanization multiplier",
+        "      float syncTarget;    // target Witek syncopation index",
+        "      float euclidProb;    // probability of Euclidean polyrhythmic hat/percussion layer",
+        "   };",
+        "   constexpr EmotionMidiDirective kEmotionMidiDirectives[kEmotionCount] = {",
+    ]
+    for ename in GG.EMOTION_NAMES:
+        ed = GG.EMOTION_MIDI_DIRECTIVES[ename]
+        lines.append(
+            f'      {{ "{ename}", {ed["step_bias"]:+.3f}f, {ed["leap_prob"]:.3f}f, {ed["tension_iv_prob"]:.3f}f, '
+            f'{ed["chord_ext_bonus"]:.3f}f, {ed["vel_bias"]:+.3f}f, {ed["gate_scale"]:.3f}f, '
+            f'{ed["humanize_scale"]:.3f}f, {ed["sync_target"]:.3f}f, {ed["euclid_prob"]:.3f}f }},'
+        )
+    lines += [
+        "   };",
+        "",
         "   struct StyleDirective",
         "   {",
         "      const char* id;",
         "      float bassW[6];     // 0=sub, 1=808, 2=reese, 3=plucked, 4=fm, 5=acid",
         "      float keysW[6];     // 0=epiano, 1=organ, 2=felt, 3=vibes, 4=clav, 5=pipes",
-        "      float leadW[6];     // 0=brass, 1=reed, 2=supersaw, 3=pulse, 4=vowel, 5=fm",
+        "      float leadW[6];     // 0=brass, 1=reed, 2=supersaw, 4=vowel, 5=fm",
         "      float pillars[5];   // Danceability, Energy, Valence, Brightness, SpectralContrast",
+        "      float emotions[8];  // Happiness, Sadness, Energy, Intelligence, Tension, Nostalgia, Serenity, Groove",
         "      int   neighbors[4]; // Top-4 connected sub-genre indices in the Genre Network",
         "      float neighborW[4]; // Graph edge weights for cross-genre taste propagation",
         "      float velMean;",
@@ -195,11 +225,13 @@ def main():
         lw = ", ".join(f"{v:.3f}f" for v in st["archetypes"]["lead"])
         pil = st["pillars"]
         pw = f"{pil['danceability']:.3f}f, {pil['energy']:.3f}f, {pil['valence']:.3f}f, {pil['brightness']:.3f}f, {pil['contrast']:.3f}f"
+        em = st["emotions"]
+        ew = ", ".join(f"{em[k]:.3f}f" for k in GG.EMOTION_NAMES)
         nb_i = ", ".join(str(x["index"]) for x in st["neighbors"][:4])
         nb_w = ", ".join(f"{x['weight']:.3f}f" for x in st["neighbors"][:4])
         ex = st["expression"]
         lines.append(
-            f'      {{ "{st["id"]}", {{ {bw} }}, {{ {kw} }}, {{ {lw} }}, {{ {pw} }}, '
+            f'      {{ "{st["id"]}", {{ {bw} }}, {{ {kw} }}, {{ {lw} }}, {{ {pw} }}, {{ {ew} }}, '
             f'{{ {nb_i} }}, {{ {nb_w} }}, {ex["vel_mean"]:.3f}f, {ex["vel_spread"]:.3f}f, {ex["glide_prob"]:.3f}f }},'
         )
     lines.append("   };")

@@ -411,8 +411,37 @@ namespace
       return true;
    }
 
+   const SampleCriticData::StyleDirective& StyleDirectiveFor(const char* styleId)
+   {
+      if (styleId != nullptr)
+         for (int i = 0; i < SampleCriticData::kStyleDirectiveCount; i++)
+            if (std::strcmp(SampleCriticData::kStyleDirectives[i].id, styleId) == 0)
+               return SampleCriticData::kStyleDirectives[i];
+      return SampleCriticData::kStyleDirectives[0];
+   }
+
+   int PickDirectiveKind(Rng& r, const float w[6])
+   {
+      double sum = 0.0;
+      for (int i = 0; i < 6; i++)
+         sum += std::max(0.0f, w[i]);
+      if (sum <= 1e-6)
+         return r.Range(6);
+      double u = r.Uniform() * sum;
+      for (int i = 0; i < 6; i++)
+      {
+         u -= std::max(0.0f, w[i]);
+         if (u <= 0.0)
+            return i;
+      }
+      return 5;
+   }
+
    void ProposeGroove(Rng& cr, const GenStyle& st, bool mine, const char* inLanes[8], std::string outLanes[8], float& outNov, float& outSync)
    {
+      const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
+      const float emoIntel  = dir.emotions[3]; // Intelligence / Complexity
+      const float emoGroove = dir.emotions[7]; // Groove / Hypnosis
       uint16_t baseM[8] = {}, baseG[8] = {};
       for (int l = 0; l < 8; l++)
       {
@@ -434,7 +463,7 @@ namespace
       {
          uint16_t m[8];
          for (int l = 0; l < 8; l++) m[l] = baseM[l];
-         const int mode = cr.Range(3);
+         const int mode = (emoIntel > 0.65f && cr.Uniform() < 0.45) ? 1 : cr.Range(3);
          const int cl = cr.Range(32);
          if (mode == 0)
          {
@@ -455,8 +484,8 @@ namespace
                m[3] = 0x4444u;
             if (m[1] != 0)
                m[1] |= (uint16_t)(1u << (cr.Range(2) ? 7 : 15));
-            if (cr.Uniform() < 0.45)
-               m[5] = EuclideanMask(cr.Int(2, 4), cr.Range(8));
+            if (cr.Uniform() < 0.45 + 0.25 * emoIntel)
+               m[5] = EuclideanMask(cr.Int(2, 5), cr.Range(8));
          }
          else
          {
@@ -475,6 +504,7 @@ namespace
          float sc = 0.0f, sy = 0.0f;
          if (CriticJudgeDrum(m, baseM, ambient, sc, sy))
          {
+            sc += 0.10f * sy * emoGroove;
             if (mine)
             {
                float phi[UserStyle::kFeatureDim] = {};
@@ -670,6 +700,10 @@ namespace
 
    void ProposeMotif(Rng& cr, const GenStyle& st, bool mine, int root, int scaleId, std::vector<std::pair<int, bool>>& seq, float& outNov)
    {
+      const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
+      const float emoHappy = dir.emotions[0]; // Valence / Happiness
+      const float emoSad   = dir.emotions[1]; // Sadness / Melancholy
+      const float emoIntel = dir.emotions[3]; // Intelligence / Complexity
       std::vector<std::pair<int, bool>> best = seq;
       float bestScore = -1.0f;
       CriticJudgeMelody(seq, root, scaleId, st.motifOctave, bestScore);
@@ -680,7 +714,11 @@ namespace
          std::vector<std::pair<int, bool>> cur;
          cur.reserve(16);
          int deg = cr.Range(4), active = 0;
-         const int arcType = cr.Range(4); // 0 arch, 1 wave, 2 climb, 3 cascade
+         int arcType = cr.Range(4); // 0 arch, 1 wave, 2 climb, 3 cascade
+         if (emoHappy > emoSad + 0.20f && cr.Uniform() < 0.45)
+            arcType = 2; // rising uplift contour
+         else if (emoSad > emoHappy + 0.20f && cr.Uniform() < 0.45)
+            arcType = 3; // descending sighing cascade
          int prevDeg = deg;
          for (int k = 0; k < 16; k++)
          {
@@ -694,9 +732,9 @@ namespace
             {
                int move = kMoves[cr.Range(8)];
                if ((arcType == 0 && k < 8) || arcType == 2)
-                  move = cr.Uniform() < 0.35 ? std::abs(move) : move;
+                  move = cr.Uniform() < (0.35 + 0.20 * emoHappy) ? std::abs(move) : move;
                else if ((arcType == 0 && k >= 8) || arcType == 3)
-                  move = cr.Uniform() < 0.35 ? -std::abs(move) : move;
+                  move = cr.Uniform() < (0.35 + 0.20 * emoSad) ? -std::abs(move) : move;
                if (std::abs(deg - prevDeg) >= 3 && cr.Uniform() < 0.58)
                   move = (deg > prevDeg) ? -1 : 1;
                prevDeg = deg;
@@ -709,6 +747,7 @@ namespace
          float sc = 0.0f;
          if (CriticJudgeMelody(cur, root, scaleId, st.motifOctave, sc))
          {
+            sc += 0.08f * emoIntel * sc;
             if (mine)
             {
                float phi[UserStyle::kFeatureDim] = {};
@@ -729,32 +768,6 @@ namespace
       }
       seq = best;
       outNov = std::max(0.2f, bestScore);
-   }
-
-   const SampleCriticData::StyleDirective& StyleDirectiveFor(const char* styleId)
-   {
-      if (styleId != nullptr)
-         for (int i = 0; i < SampleCriticData::kStyleDirectiveCount; i++)
-            if (std::strcmp(SampleCriticData::kStyleDirectives[i].id, styleId) == 0)
-               return SampleCriticData::kStyleDirectives[i];
-      return SampleCriticData::kStyleDirectives[0];
-   }
-
-   int PickDirectiveKind(Rng& r, const float w[6])
-   {
-      double sum = 0.0;
-      for (int i = 0; i < 6; i++)
-         sum += std::max(0.0f, w[i]);
-      if (sum <= 1e-6)
-         return r.Range(6);
-      double u = r.Uniform() * sum;
-      for (int i = 0; i < 6; i++)
-      {
-         u -= std::max(0.0f, w[i]);
-         if (u <= 0.0)
-            return i;
-      }
-      return 5;
    }
 }
 
@@ -1593,6 +1606,10 @@ Compiled Compile(const Recipe& recipe)
       p["root"] = { 'i', std::to_string(root) };
       p["scale"] = { 'i', std::to_string(out.scale) };
       p["chordSize"] = { 'i', sizes.empty() ? "3" : rng.Choice(sizes) };
+      const SampleCriticData::StyleDirective& cDir = StyleDirectiveFor(st.id);
+      if (p["chordSize"].second == "3" && (cDir.emotions[3] > 0.62f || cDir.emotions[5] > 0.72f) &&
+          criticRng.Uniform() < 0.35 * (cDir.emotions[3] + cDir.emotions[5]))
+         p["chordSize"] = { 'i', "4" }; // Emotion network: 7th chord extension for intelligence/nostalgia
       if (mine && user.hasChords && rng.Uniform() < user.chordW)
       {
          // The chord sizes this player actually plays, by how often they play them.
@@ -2569,12 +2586,12 @@ Compiled Compile(const Recipe& recipe)
       phi[7] = (float)st.motifRange / 8.0f;
       phi[8] = melNov;
       phi[9] = (float)bassHits / 16.0f;
-      // Spotify 5 Perceptual Pillars: Danceability, Energy, Valence, Brightness, Contrast
-      phi[10] = dir.pillars[0];
-      phi[11] = dir.pillars[1];
-      phi[12] = dir.pillars[2];
-      phi[13] = dir.pillars[3];
-      phi[14] = dir.pillars[4];
+      // Perceptual Pillars + 8-Node Connected Emotion Network activations
+      phi[10] = 0.5f * (dir.pillars[0] + dir.emotions[7]); // Danceability & Groove Hypnosis
+      phi[11] = 0.5f * (dir.pillars[1] + dir.emotions[2]); // Energy & Drive
+      phi[12] = 0.5f * (dir.pillars[2] + dir.emotions[0] - 0.5f * dir.emotions[1] + 0.25f); // Valence / Happiness vs Melancholy
+      phi[13] = 0.5f * (dir.pillars[3] + dir.emotions[3]); // Brightness & Intelligence/Complexity
+      phi[14] = 0.5f * (dir.pillars[4] + dir.emotions[4] - 0.3f * dir.emotions[6] + 0.15f); // Contrast & Tension vs Serenity
       phi[15] = 1.0f;
       UserStyle::NoteFeatures(phi);
    }

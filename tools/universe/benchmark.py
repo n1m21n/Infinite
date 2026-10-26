@@ -336,7 +336,90 @@ def main():
     print("     Multi-Modal Graph Keep-Rate@20=%.1f%% (target >= 82.0%%)  -> %s" % (
         100.0 * b9_keep, "PASS" if b9_ok else "FAIL"))
 
-    gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok]
+    # ---- B10: Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment ----------------
+    # (1) Ground-truth human mood labels in chord_prog -> 8-Emotion inference accuracy
+    mood_hits = mood_tot = 0
+    for cp in c_test:
+        moods = [m for m in cp.get("mood", []) if m in GG.CORPUS_MOOD_TO_EMOTIONS]
+        if not moods:
+            continue
+        em_vec = GG.infer_piece_emotions(cp)
+        top2_em = set(sorted(GG.EMOTION_NAMES, key=lambda k: -em_vec[k])[:2])
+        expected_em = set()
+        for m in moods:
+            top_m = max(GG.CORPUS_MOOD_TO_EMOTIONS[m].items(), key=lambda kv: kv[1])[0]
+            expected_em.add(top_m)
+        mood_tot += 1
+        if top2_em & expected_em:
+            mood_hits += 1
+    mood_acc = 100.0 * mood_hits / max(1, mood_tot)
+
+    # (2) Emotion-Conditioned MIDI Proposer Technical Monotonicity (Happy vs Sad, Complex vs Simple, Tense vs Serene)
+    r_emo = random.Random(303)
+    m_hap = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="valence_happiness") for _ in range(30)]
+    m_sad = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="sadness_melancholy") for _ in range(30)]
+    m_int = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="intelligence_complexity") for _ in range(30)]
+    m_ten = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="tension_aggression") for _ in range(30)]
+    m_ser = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="serenity_transcendence") for _ in range(30)]
+
+    mean_step = lambda ms: sum(sum(x["steps"]) / len(x["steps"]) for x in ms) / len(ms)
+    mean_reg = lambda ms: sum(sum(x["pitches"]) / len(x["pitches"]) for x in ms) / len(ms)
+    mean_distinct_iv = lambda ms: sum(len(set(x["steps"])) for x in ms) / len(ms)
+    mean_tens_iv = lambda ms: sum(sum(1 for s in x["steps"] if abs(s) in (1, 6, 10, 11)) / len(x["steps"]) for x in ms) / len(ms)
+
+    midi_checks = [
+        mean_step(m_hap) > mean_step(m_sad) + 0.35,
+        mean_reg(m_hap) > mean_reg(m_sad) + 4.0,
+        mean_distinct_iv(m_int) >= 5.2,
+        mean_tens_iv(m_ten) > mean_tens_iv(m_ser),
+    ]
+    midi_align_rate = 100.0 * sum(midi_checks) / len(midi_checks)
+
+    # (3) 6 Affective User Personas with Emotion-Graph + Subgenre-Graph Propagation
+    emo_personas = [
+        ("Euphoric Uplift",        {"valence_happiness": +2.0, "energy_drive": +1.4, "sadness_melancholy": -1.6}),
+        ("Melancholic Nocturne",   {"sadness_melancholy": +2.0, "nostalgia_warmth": +1.5, "energy_drive": -1.4}),
+        ("Cerebral IDM / Jazz",    {"intelligence_complexity": +2.2, "groove_hypnosis": +1.0, "serenity_transcendence": +0.4}),
+        ("Dark Industrial Tension",{"tension_aggression": +2.2, "energy_drive": +1.6, "serenity_transcendence": -1.8}),
+        ("Bittersweet Nostalgia",  {"nostalgia_warmth": +2.0, "sadness_melancholy": +1.0, "serenity_transcendence": +1.0}),
+        ("Hypnotic Pocket Groove", {"groove_hypnosis": +2.2, "energy_drive": +1.0, "valence_happiness": +0.8}),
+    ]
+    emo_keep20 = []
+    for _, ep in emo_personas:
+        w_emo = {k: 0.0 for k in GG.EMOTION_NAMES}
+        node_b = [0.0] * len(net["styles"])
+        r_es = random.Random(88)
+        u_fn = lambda s: sum(ep.get(k, 0.0) * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES)
+        all_u = sorted(u_fn(s) for s in net["styles"])
+        e_thresh = all_u[int(0.62 * len(all_u))]
+        for step in range(20):
+            cands = r_es.sample(net["styles"], 6)
+            best_s = max(cands, key=lambda s: sum(w_emo[k] * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES) + node_b[s["index"]])
+            kept = u_fn(best_s) >= e_thresh
+            sgn = 1.0 if kept else -1.0
+            for k in GG.EMOTION_NAMES:
+                dv = sgn * (best_s["emotions"][k] - 0.5)
+                w_emo[k] += 0.45 * dv
+                # Propagate across Emotion Network adjacency!
+                for nb_e, ew in GG.EMOTION_ADJACENCY[k].items():
+                    w_emo[nb_e] += 0.08 * ew * dv
+            node_b[best_s["index"]] += 0.35 * sgn
+            for nb in best_s["neighbors"]:
+                node_b[nb["index"]] += 0.20 * nb["weight"] * sgn
+        hits_e = 0
+        for _ in range(40):
+            cands = r_es.sample(net["styles"], 6)
+            best_s = max(cands, key=lambda s: sum(w_emo[k] * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES) + node_b[s["index"]])
+            if u_fn(best_s) >= e_thresh:
+                hits_e += 1
+        emo_keep20.append(hits_e / 40.0)
+    b10_keep = sum(emo_keep20) / len(emo_keep20)
+    b10_ok = mood_acc >= 92.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
+    print("\n[B10] Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment")
+    print("      Corpus-Mood-Acc=%.1f%% (>=92%%) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, IntIv=%.1f) | Affective-Keep@20=%.1f%%  -> %s" % (
+        mood_acc, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_distinct_iv(m_int), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
+
+    gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok, b10_ok]
     all_ok = all(gates_list)
     print("\n" + "=" * 78)
     print("OVERALL BENCHMARK RESULT: %s (%d / %d gates passed)" % (
