@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Drone Kosmische Space Delay FX",
+    "author": "Infinite",
+    "description": "Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float delayTime = 0.28 [0.02, 1.0]\nparam float feedback = 0.55 [0.0, 0.9]\nparam float wowRate = 0.45 [0.05, 2.0]\nparam float damping = 0.45 [0.0, 1.0]\nparam float mix = 0.42 [0.0, 1.0]\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float lp = 0\nstate float prev = 0\n\npStep = clamp(wowRate, 0.05, 5.0) / sr\nlfo = (lfo + pStep) % 1.0\nwobble = sin(lfo * 6.2831853) * 0.08\n\ndrive = in + prev * feedback\nsat = drive / (1.0 + abs(drive) * 0.5)\n\ndCoeff = clamp(0.35 + wobble * 0.15, 0.05, 0.85)\nap1 = d1 + dCoeff * (sat - d1)\nd1 = sat\nap2 = d2 + dCoeff * (ap1 - d2)\nd2 = ap1\n\nfDamp = clamp((1.0 - damping * 0.65) * 4000.0 / sr * 2.4, 0.01, 0.45)\nlp = lp + fDamp * (ap2 - lp)\nprev = lp\n\nout = in * (1.0 - mix) + prev * mix * 0.85\n",
+    "params": {
+      "delayTime": 0.28,
+      "feedback": 0.55,
+      "wowRate": 0.45,
+      "damping": 0.45,
+      "mix": 0.42
+    }
+  }
+}

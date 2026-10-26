@@ -1,0 +1,55 @@
+infinite-patch 1
+# Drone Kosmische Resonator Filter FX
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 36
+  i rangeHigh 60
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float cutoff = 1200.0 [80.0, 6000.0]\nparam float resonance = 0.72 [0.1, 0.95]\nparam float sweepRate = 0.25 [0.02, 1.5]\nparam float drive = 1.5 [1.0, 4.0]\nparam float mix = 0.45 [0.0, 1.0]\nstate float lfo = 0\nstate float s1 = 0\nstate float s2 = 0\n\npStep = clamp(sweepRate, 0.02, 3.0) / sr\nlfo = (lfo + pStep) % 1.0\nsweep = sin(lfo * 6.2831853) * 0.45 + 0.55\n\nu = in * drive\nsatIn = u / (1.0 + abs(u) * 0.4)\n\nfCut = clamp((cutoff * sweep) / sr * 2.4, 0.005, 0.45)\nfeedback = (s2 * resonance * 2.8) / (1.0 + abs(s2))\ndiff = satIn - feedback - s1\ns1 = s1 + fCut * diff\ns2 = s2 + fCut * s1\n\nout = in * (1.0 - mix) + s2 * mix * 0.55\n
+end
+node 4 Effects Limiter
+  id lim
+  pos 1100 1024
+end
+node 5 Utility Audio Out
+  id speakers
+  pos 1400 1024
+end
+node 6 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 7 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.28 0.18 0.45
+  f size 0.24
+end
+node 8 Utility Output
+  id out
+  pos 460 0
+end
+node 9 Compositing Comment
+  pos 0 722
+  s text Drone Kosmische Resonator Filter FX. Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud lim 0 fx
+aud speakers 0 lim
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

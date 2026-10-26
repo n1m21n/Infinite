@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Harmonic Ripples",
+    "author": "Infinite",
+    "description": "Intersecting Bessel standing wave rings with audio-reactive frequency nodal clusters, kinetic wavefront displacement, and metallic plate highlights.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rippleFrequency = 32.0 [8.0, 64.0]\nparam float waveVelocity = 1.2 [0.2, 4.0]\nparam float interferenceNodes = 4.0 [2.0, 8.0]\nparam float amberAccent = 0.7 [0.0, 1.0]\nparam float sandGathering = 0.65 [0.1, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0\nr = length(p)\nang = atan2(p.y, p.x)\ntime = t * waveVelocity\n\nd1 = length(p - vec2(cos(time * 0.4) * 0.35, sin(time * 0.4) * 0.35))\nd2 = length(p + vec2(cos(time * 0.4) * 0.35, sin(time * 0.4) * 0.35))\nd3 = length(p - vec2(-sin(time * 0.3) * 0.25, cos(time * 0.3) * 0.25))\n\nw1 = sin(d1 * rippleFrequency - time * 2.5)\nw2 = sin(d2 * rippleFrequency - time * 2.5)\nw3 = sin(d3 * rippleFrequency * 0.75 + time * 1.8)\n\nwaveSum = (w1 + w2 + w3) * 0.3333\n\nnodeSand = smoothstep(0.12 * sandGathering, 0.0, abs(waveSum))\ncrestGlow = smoothstep(0.4, 0.9, waveSum)\n\nangularBeats = sin(ang * interferenceNodes + time) * 0.5 + 0.5\n\ncGround = vec3(0.043, 0.055, 0.078)\ncSand = vec3(0.878, 0.902, 0.929)\ncNode = vec3(0.220, 0.741, 0.973)\ncAmber = vec3(0.961, 0.620, 0.043)\n\nplateRim = smoothstep(0.98, 0.92, r)\nboundaryGlow = smoothstep(0.06, 0.0, abs(r - 0.92)) * amberAccent\n\nbasePlate = mix(cGround, cNode * 0.65, crestGlow * angularBeats)\nwithSand = mix(basePlate, cSand, nodeSand) + boundaryGlow * cAmber\n\ncol = withSand * plateRim\nalpha = 1.0\n",
+    "params": {
+      "rippleFrequency": 32.0,
+      "waveVelocity": 1.2,
+      "interferenceNodes": 4.0,
+      "amberAccent": 0.7,
+      "sandGathering": 0.65
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1045,6 +1045,74 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "dub-techno-chord-stab-synth",
+      "name": "Dub Techno Chord Stab Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Minor triad chord stab synthesizer with resonant lowpass filter sweep, noise breath, and exponential envelope decay.",
+      "price": 0,
+      "preview": "assets/templates/dub-techno-chord-stab-synth.webp",
+      "file": "assets/templates/dub-techno-chord-stab-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dub-techno-sub-rumble-synth",
+      "name": "Dub Techno Sub Rumble Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch.",
+      "price": 0,
+      "preview": "assets/templates/dub-techno-sub-rumble-synth.webp",
+      "file": "assets/templates/dub-techno-sub-rumble-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "drone-kosmische-space-delay-fx",
+      "name": "Drone Kosmische Space Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-space-delay-fx.webp",
+      "file": "assets/templates/drone-kosmische-space-delay-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Limiter",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "drone-kosmische-resonator-filter-fx",
+      "name": "Drone Kosmische Resonator Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive.",
+      "price": 0,
+      "preview": "assets/templates/drone-kosmische-resonator-filter-fx.webp",
+      "file": "assets/templates/drone-kosmische-resonator-filter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Field Effect",
+        "Limiter",
+        "Audio Out"
+      ]
     }
   ]
 }

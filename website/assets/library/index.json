@@ -3805,6 +3805,206 @@
       "file": "assets/library/pixel/op-art-hypnotic-vortex.field",
       "preview": "assets/library/previews/op-art-hypnotic-vortex.jpg",
       "bytes": 1676
+    },
+    {
+      "id": "generative-plotter-contour-flow",
+      "name": "Generative Plotter Contour Flow",
+      "kind": "Generator",
+      "tags": [
+        "plotter",
+        "generative",
+        "procedural",
+        "drawing",
+        "contours"
+      ],
+      "description": "Pen plotter topographic contour isolines with undulating vector flow fields drawn on archival cream stock.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/generative-plotter-contour-flow.js",
+      "preview": "assets/library/previews/generative-plotter-contour-flow.jpg",
+      "bytes": 3011
+    },
+    {
+      "id": "generative-plotter-spiral-lattice",
+      "name": "Generative Plotter Spiral Lattice",
+      "kind": "Generator",
+      "tags": [
+        "plotter",
+        "generative",
+        "spiral",
+        "lattice",
+        "hatching"
+      ],
+      "description": "Concentric logarithmic Archimedean spiral lattice with geometric pen hatching and harmonic angle offsets.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/generative-plotter-spiral-lattice.js",
+      "preview": "assets/library/previews/generative-plotter-spiral-lattice.jpg",
+      "bytes": 2831
+    },
+    {
+      "id": "vector-wireframe-geodesic-sphere-3d",
+      "name": "Vector Wireframe Geodesic Sphere 3D",
+      "kind": "Generator",
+      "tags": [
+        "vector",
+        "wireframe",
+        "3d",
+        "geodesic",
+        "geometry"
+      ],
+      "description": "Rotating vector display geodesic icosahedral sphere with luminescent green strut edges and pulsing nodal vertices.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/vector-wireframe-geodesic-sphere-3d.js",
+      "preview": "assets/library/previews/vector-wireframe-geodesic-sphere-3d.jpg",
+      "bytes": 2246
+    },
+    {
+      "id": "vector-wireframe-torus-knot-3d",
+      "name": "Vector Wireframe Torus Knot 3D",
+      "kind": "Generator",
+      "tags": [
+        "vector",
+        "wireframe",
+        "3d",
+        "torus",
+        "knot"
+      ],
+      "description": "Orthographic vector wireframe trefoil torus knot with segmented glowing green rib cages and parametric twists.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/vector-wireframe-torus-knot-3d.js",
+      "preview": "assets/library/previews/vector-wireframe-torus-knot-3d.jpg",
+      "bytes": 2762
+    },
+    {
+      "id": "dub-techno-chord-stab-synth",
+      "name": "Dub Techno Chord Stab Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "dub",
+        "techno",
+        "chord",
+        "filter"
+      ],
+      "description": "Minor triad chord stab synthesizer with resonant lowpass filter sweep, noise breath, and exponential envelope decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/dub-techno-chord-stab-synth.inf",
+      "preview": "assets/library/previews/dub-techno-chord-stab-synth.jpg",
+      "bytes": 1914
+    },
+    {
+      "id": "dub-techno-sub-rumble-synth",
+      "name": "Dub Techno Sub Rumble Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "dub",
+        "techno",
+        "sub",
+        "bass"
+      ],
+      "description": "Sub-octave sinusoidal bass synthesizer with warm soft saturation, pitch glide envelope, and deep low-end punch.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/dub-techno-sub-rumble-synth.inf",
+      "preview": "assets/library/previews/dub-techno-sub-rumble-synth.jpg",
+      "bytes": 1801
+    },
+    {
+      "id": "drone-kosmische-space-delay-fx",
+      "name": "Drone Kosmische Space Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "delay",
+        "kosmische",
+        "drone",
+        "space"
+      ],
+      "description": "Dual tape space echo with drifting motor wow, damping lowpass filter in feedback loop, and stereo cross-reflections.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/drone-kosmische-space-delay-fx.inf",
+      "preview": "assets/library/previews/drone-kosmische-space-delay-fx.jpg",
+      "bytes": 1776
+    },
+    {
+      "id": "drone-kosmische-resonator-filter-fx",
+      "name": "Drone Kosmische Resonator Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "filter",
+        "resonator",
+        "kosmische",
+        "drone"
+      ],
+      "description": "Four-pole resonant state-variable filter with slow LFO phase modulation, harmonic comb resonance, and soft drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/drone-kosmische-resonator-filter-fx.inf",
+      "preview": "assets/library/previews/drone-kosmische-resonator-filter-fx.jpg",
+      "bytes": 1665
+    },
+    {
+      "id": "cymatics-sine-chladni-resonance",
+      "name": "Cymatics Sine Chladni Resonance",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cymatics",
+        "resonance",
+        "chladni",
+        "acoustics"
+      ],
+      "description": "2D Chladni acoustic plate resonance showing nodal vibration lines where sand grains collect into geometric harmonic patterns.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-chladni-resonance.field",
+      "preview": "assets/library/previews/cymatics-sine-chladni-resonance.jpg",
+      "bytes": 1613
+    },
+    {
+      "id": "cymatics-sine-harmonic-ripples",
+      "name": "Cymatics Sine Harmonic Ripples",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cymatics",
+        "harmonic",
+        "ripples",
+        "waves"
+      ],
+      "description": "Intersecting Bessel standing wave rings with audio-reactive frequency nodal clusters, kinetic wavefront displacement, and metallic plate highlights.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-harmonic-ripples.field",
+      "preview": "assets/library/previews/cymatics-sine-harmonic-ripples.jpg",
+      "bytes": 1963
     }
   ]
 }
