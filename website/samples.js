@@ -68,7 +68,7 @@
   var PART_INDEX = { '': 0, synths: 1, pads: 2, plucks: 3, percussion: 4, drums: 5, bass: 6, fx: 7, foley: 8, keys: 9, leads: 10, textures: 11, kicks: 12, snares: 13, hats: 14, toms: 15 };
   function ask(msg) {
     if (!worker) {
-      worker = new Worker('../gen/gen-worker.js?v=4');
+      worker = new Worker('../gen/gen-worker.js?v=6');
       worker.onmessage = function (e) { var j = jobs[e.data.id]; delete jobs[e.data.id]; var d = e.data; if (j) (d.error || (d.frames && String(d.patch).indexOf('infinite-patch') !== 0) ? j[1](new Error(d.error || 'stale generator')) : j[0](d)); };
       worker.onerror = function () { Object.keys(jobs).forEach(function (k) { jobs[k][1](new Error('worker')); delete jobs[k]; }); worker = null; info = null; };
     }
@@ -116,8 +116,44 @@
   }
   function saveAs(url, name) { var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
   function genFile(it) { return 'infinite-' + it.name.replace(/#/g, 's').replace(/\W+/g, '-') + '-' + it.bpm + 'bpm'; }
+  // Personal taste layer in the browser: Keep (download or >=12s listen) vs Skip (<8s redraw) updates Beta-Bernoulli style weights.
+  var taste = (function () {
+    try { return JSON.parse(localStorage.getItem('infinite_taste_v1') || '{}'); } catch (e) { return {}; }
+  })();
+  var pendGen = null;
+  function saveTaste() { try { localStorage.setItem('infinite_taste_v1', JSON.stringify(taste)); } catch (e) {} }
+  function settleWebTaste(nextNow) {
+    if (!pendGen || pendGen.settled) return;
+    var age = (Date.now() - pendGen.t) / 1000;
+    if (!nextNow && age < 12) return;
+    var k = pendGen.part + ':' + pendGen.style;
+    var row = taste[k] || [0, 0];
+    if (pendGen.kept || age >= 12) row[0] += 1;
+    else if (nextNow && age < 8) row[1] += 1;
+    else return;
+    taste[k] = row; pendGen.settled = true; saveTaste();
+  }
+  function drawStyle(n, part) {
+    var w = [], sum = 0, total = 0, i, k, r;
+    for (i = 0; i < n; i++) {
+      r = taste[part + ':' + i] || [0, 0];
+      total += r[0] + r[1];
+    }
+    var trust = Math.min(0.9, total / (total + 6));
+    for (i = 0; i < n; i++) {
+      r = taste[part + ':' + i] || [0, 0];
+      var post = (r[0] + 1) / (r[0] + r[1] + 2);
+      var wi = (1 - trust) * (1 / n) + trust * post;
+      w.push(wi); sum += wi;
+    }
+    var u = Math.random() * sum;
+    for (i = 0; i < n; i++) { u -= w[i]; if (u <= 0) return i; }
+    return Math.floor(Math.random() * n);
+  }
+  setInterval(function () { settleWebTaste(false); }, 2000);
   function generate() {
     if (busy) return;
+    settleWebTaste(true);
     busy = true; wakeAudio(); genBtn.disabled = true; genBtn.classList.add('is-busy');
     var label = genBtn.textContent;
     if (!info) genBtn.setAttribute('data-label', label);
@@ -128,7 +164,9 @@
       // Textures and foley are one choice here: a keyed texture or a keyless found sound, drawn at random.
       var pi = part === 'textures' && Math.random() < 0.4 ? PART_INDEX.foley : PART_INDEX[part] || 0;
       if (pi === PART_INDEX.foley) part = 'foley';
-      return ask({ cmd: 'run', style: Math.floor(Math.random() * d.styles.length), part: pi, seed: Math.floor(Math.random() * 99999),
+      var stIdx = drawStyle(d.styles.length, pi);
+      pendGen = { style: stIdx, part: pi, t: Date.now(), kept: false, settled: false };
+      return ask({ cmd: 'run', style: stIdx, part: pi, seed: Math.floor(Math.random() * 99999),
         bars: 2, key: KEYLESS[part] || part === 'foley' ? -1 : key, scale: KEYLESS[part] || part === 'foley' ? -1 : scale });
     }).then(function (r) {
       stop();
@@ -155,6 +193,7 @@
   genBtn.addEventListener('click', generate);
 
   document.addEventListener('click', function (e) {
+    if (e.target.closest('#smp-gen .smp-menu a') && pendGen) { pendGen.kept = true; settleWebTaste(true); }
     var lz = e.target.closest('[data-lazy]');
     if (lz) {
       e.preventDefault();

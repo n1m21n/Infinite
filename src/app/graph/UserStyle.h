@@ -65,6 +65,12 @@ namespace UserStyle
    void SettleTaste();                    // main thread, each frame: a loop left alone lands
    int DrawCard(int part, double u, int cardCount); // by what has landed for this part
 
+   // 16-dimensional contextual preference model over musical features phi(x) in [-1, 1].
+   // Every landed/skipped sample updates the user's feature weights across all styles.
+   constexpr int kFeatureDim = 16;
+   void NoteFeatures(const float phi[kFeatureDim]);
+   float ScoreFeatures(const float phi[kFeatureDim], double exploreU, float& weight);
+
    // Reads a directory of profiles. Public so a test can point it at a fixture.
    Profile Read(const char* directory);
 }

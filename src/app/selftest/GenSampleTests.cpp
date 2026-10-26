@@ -448,6 +448,32 @@ bool RunGenSampleTest()
                 knobsOk && emptyOk ? "ok" : "FAIL");
          fails += (knobsOk && emptyOk) ? 0 : 1;
       }
+      {
+         // 16-feature contextual preference critic: keeping high-syncopation / high-novelty takes and skipping flat ones.
+         float hi[UserStyle::kFeatureDim] = {}, lo[UserStyle::kFeatureDim] = {};
+         hi[0] = 0.6f; hi[2] = 0.7f; hi[5] = 0.8f; hi[8] = 0.75f; hi[15] = 1.0f;
+         lo[0] = 0.2f; lo[2] = 0.05f; lo[5] = 0.1f; lo[8] = 0.1f; lo[15] = 1.0f;
+         for (int i = 0; i < 8; i++)
+         {
+            UserStyle::NoteGenerate(0, 2);
+            UserStyle::NoteFeatures(hi);
+            UserStyle::NoteKept();
+         }
+         for (int i = 0; i < 8; i++)
+         {
+            UserStyle::NoteGenerate(0, 3);
+            UserStyle::NoteFeatures(lo);
+            UserStyle::NoteGenerate(0, 4); // immediate redraw = skipped lo
+            UserStyle::NoteFeatures(hi);
+            UserStyle::NoteKept();
+         }
+         float wHi = 0.0f, wLo = 0.0f;
+         const float sHi = UserStyle::ScoreFeatures(hi, 0.5, wHi);
+         const float sLo = UserStyle::ScoreFeatures(lo, 0.5, wLo);
+         const bool featOk = wHi > 0.35f && sHi > 0.60f && sLo < 0.40f && (sHi - sLo) > 0.25f;
+         printf("  feature critic: weight %.2f, kept score %.2f vs skipped %.2f: %s\n", wHi, sHi, sLo, featOk ? "ok" : "FAIL");
+         fails += featOk ? 0 : 1;
+      }
       UserStyle::UseDirectory("");
       std::filesystem::remove_all(AppPaths::FsPath(dir));
    }

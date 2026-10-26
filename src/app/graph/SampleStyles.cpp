@@ -65,6 +65,7 @@ namespace
    };
 
 #include "app/graph/GenerateSamplesTables.inc"
+#include "app/graph/GenerateSamplesCritic.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -174,6 +175,40 @@ namespace
                   out[row.key] = { 'f', Num(r.Uniform(row.lo, row.hi)) };
             }
          }
+         // Parameter Critic: clamp against learned safe bounds [p05, p95] & enforce 2D audibility invariants.
+         for (const SampleCriticData::SafeParam& sp : SampleCriticData::kSafeParams)
+            if (type == sp.type)
+            {
+               auto it = out.find(sp.key);
+               if (it != out.end() && it->second.first == 'f')
+               {
+                  const double v = std::stod(it->second.second);
+                  const double span = std::max(0.0, (double)sp.p95 - (double)sp.p05);
+                  const double lo = (double)sp.p05 - 0.15 * span;
+                  const double hi = (double)sp.p95 + 0.15 * span;
+                  if (v < lo || v > hi)
+                     it->second.second = Num(std::clamp(v, lo, hi));
+               }
+            }
+         for (const char* vk : { "volume", "a.volume" })
+         {
+            auto it = out.find(vk);
+            if (it != out.end() && it->second.first == 'f' && std::stod(it->second.second) < 0.25)
+               it->second.second = "0.65";
+         }
+         for (const char* ck : { "cutoff", "a.cutoff", "filterCutoff" })
+         {
+            auto it = out.find(ck);
+            if (it != out.end() && it->second.first == 'f' && std::stod(it->second.second) < 220.0)
+               it->second.second = "420";
+         }
+         if (type == "Wavetable")
+         {
+            out["a.on"] = { 'b', "1" };
+            auto mx = out.find("mix"), bOn = out.find("b.on");
+            if (mx != out.end() && (bOn == out.end() || bOn->second.second == "0") && std::stod(mx->second.second) > 0.65)
+               mx->second.second = "0.45";
+         }
          return out;
       }
 
@@ -250,6 +285,450 @@ namespace
       if (c >= 'a' && c <= 'z') return c - 'a' + 10;
       if (c >= 'A' && c <= 'Z') return c - 'A' + 10;
       return 0;
+   }
+
+   // ---- Compositional Proposer & 3-Stage Trained Critic ----------------------------------------
+
+   uint16_t MaskOfLane(const std::string& s)
+   {
+      uint16_t m = 0;
+      for (int i = 0; i < 16 && i < (int)s.size(); i++)
+         if (s[(size_t)i] != '.')
+            m |= (uint16_t)(1u << i);
+      return m;
+   }
+
+   std::string LaneOfMask(uint16_t m, uint16_t ghostMask = 0)
+   {
+      if (m == 0)
+         return "";
+      std::string out(16, '.');
+      for (int i = 0; i < 16; i++)
+         if (m & (1u << i))
+            out[(size_t)i] = (ghostMask & (1u << i)) ? 'o' : 'x';
+      return out;
+   }
+
+   uint16_t EuclideanMask(int k, int rot)
+   {
+      if (k <= 0) return 0;
+      if (k >= 16) return 0xffffu;
+      uint16_t m = 0;
+      for (int i = 0; i < 16; i++)
+         if (((i * k) % 16) < k)
+            m |= (uint16_t)(1u << ((i + rot) & 15));
+      return m;
+   }
+
+   int PopCount16(uint16_t m)
+   {
+      int c = 0;
+      for (; m; m &= (uint16_t)(m - 1))
+         c++;
+      return c;
+   }
+
+   int MaxRun16(uint16_t m)
+   {
+      int best = 0, cur = 0;
+      for (int i = 0; i < 16; i++)
+      {
+         cur = (m & (1u << i)) ? (cur + 1) : 0;
+         best = std::max(best, cur);
+      }
+      return best;
+   }
+
+   float BerlyneSweetSpot(float ll, float lo, float mid, float hi)
+   {
+      if (ll <= mid)
+         return std::clamp(0.5f + 0.5f * (ll - lo) / std::max(1e-4f, mid - lo), 0.2f, 1.0f);
+      return std::clamp(1.0f - 0.7f * (ll - mid) / std::max(1e-4f, hi - mid), 0.15f, 1.0f);
+   }
+
+   bool CriticJudgeDrum(const uint16_t m[8], const uint16_t cardM[8], bool ambient, float& outScore, float& outSync)
+   {
+      int activeLanes = 0, totalHits = 0;
+      for (int l = 0; l < 8; l++)
+      {
+         const int h = PopCount16(m[l]);
+         if (h > 0)
+         {
+            activeLanes++;
+            totalHits += h;
+         }
+         if (l != 2 && l != 3)
+         {
+            if (h > 12 || MaxRun16(m[l]) > 8)
+               return false; // stuck / machine-gun lane
+         }
+      }
+      if (totalHits == 0)
+         return false;
+      const float dens = (float)totalHits / (float)std::max(48, activeLanes * 16);
+      if (dens > 0.60f || (float)totalHits / (float)(activeLanes * 16) < 0.05f)
+         return false;
+      const int kh = PopCount16(m[0]), sh = PopCount16(m[1]);
+      if (!ambient && kh == 0)
+         return false;
+      if (!ambient && kh >= 4 && (m[0] & 0x5555u) == 0)
+         return false; // wrong meter: no kick on any 8th-note pulse
+      if (kh >= 5 && sh >= 5 && m[0] == m[1])
+         return false; // 100% kick-snare clash
+
+      // Plausibility log-likelihood under corpus step model
+      float ll = 0.0f;
+      for (int l = 0; l < 8; l++)
+         for (int s = 0; s < 16; s++)
+         {
+            const float p = std::clamp(SampleCriticData::kDrumStepP[l][s], 1e-4f, 1.0f - 1e-4f);
+            const bool hit = (m[l] & (1u << s)) != 0;
+            ll += std::log2(hit ? p : (1.0f - p));
+         }
+      ll /= 128.0f;
+      if (ll < SampleCriticData::kDrumFloor)
+         return false;
+
+      // Syncopation & card-escape novelty
+      static const int kMetW[16] = { 4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1 };
+      float sync = 0.0f, syncTot = 0.0f;
+      for (int l : { 0, 1, 4, 5, 6 })
+         for (int s = 0; s < 16; s++)
+            if (m[l] & (1u << s))
+            {
+               syncTot += 1.0f;
+               if (kMetW[s] <= 2 && (m[l] & (1u << ((s + 1) & 15))) == 0)
+                  sync += (float)(3 - kMetW[s]) * 0.5f;
+            }
+      const float anchor = ((m[0] & 1u) || (m[0] & (1u << 8))) ? 1.0f : 0.4f;
+      outSync = std::min(1.0f, (sync / std::max(1.0f, syncTot)) * anchor);
+      int diff = 0;
+      for (int l = 0; l < 8; l++)
+         diff += PopCount16(m[l] ^ cardM[l]);
+      const float cdist = std::min(1.0f, (float)diff / 18.0f);
+      const float surp = BerlyneSweetSpot(ll, SampleCriticData::kDrumFloor, SampleCriticData::kDrumMidLl, SampleCriticData::kDrumHiLl);
+      outScore = 0.38f * cdist + 0.35f * outSync + 0.27f * surp;
+      return true;
+   }
+
+   void ProposeGroove(Rng& cr, const GenStyle& st, bool mine, const char* inLanes[8], std::string outLanes[8], float& outNov, float& outSync)
+   {
+      uint16_t baseM[8] = {}, baseG[8] = {};
+      for (int l = 0; l < 8; l++)
+      {
+         const std::string s = inLanes[l] ? inLanes[l] : "";
+         baseM[l] = MaskOfLane(s);
+         for (int i = 0; i < 16 && i < (int)s.size(); i++)
+            if (s[(size_t)i] == 'o')
+               baseG[l] |= (uint16_t)(1u << i);
+      }
+      const bool ambient = std::string(st.family) == "ambient";
+      const bool fourFloor = std::string(st.family) == "house" || std::string(st.family) == "techno" ||
+                             std::string(st.family) == "trance" || std::string(st.family) == "hard";
+      uint16_t bestM[8];
+      for (int l = 0; l < 8; l++) bestM[l] = baseM[l];
+      float bestScore = -1.0f, bestSync = 0.2f;
+      CriticJudgeDrum(baseM, baseM, ambient, bestScore, bestSync);
+
+      for (int cand = 0; cand < 8; cand++)
+      {
+         uint16_t m[8];
+         for (int l = 0; l < 8; l++) m[l] = baseM[l];
+         const int mode = cr.Range(3);
+         const int cl = cr.Range(32);
+         if (mode == 0)
+         {
+            // Cross-cluster hybrid: keep genre kick anchor, blend hats/percussion from learned cluster + syncopated kick pickup
+            if (!fourFloor && (SampleCriticData::kDrumClusters[cl][0] & 1u))
+               m[0] = SampleCriticData::kDrumClusters[cl][0];
+            else if (fourFloor && cr.Uniform() < 0.65)
+               m[0] = (uint16_t)(0x1111u | (1u << (cr.Range(2) ? 14 : 15)) | (cr.Uniform() < 0.4 ? (1u << 6) : 0u));
+            m[2] = SampleCriticData::kDrumClusters[cl][2] ? SampleCriticData::kDrumClusters[cl][2] : EuclideanMask(cr.Int(5, 11), cr.Range(4));
+            if (cr.Uniform() < 0.5)
+               m[5] = (uint16_t)(SampleCriticData::kDrumClusters[cl][5] & 0x6c6cu);
+         }
+         else if (mode == 1)
+         {
+            // Euclidean polyrhythmic hats + syncopated ghost snare/percussion
+            m[2] = EuclideanMask(cr.Int(5, 13), cr.Range(4));
+            if (m[3] == 0 && cr.Uniform() < 0.6)
+               m[3] = 0x4444u;
+            if (m[1] != 0)
+               m[1] |= (uint16_t)(1u << (cr.Range(2) ? 7 : 15));
+            if (cr.Uniform() < 0.45)
+               m[5] = EuclideanMask(cr.Int(2, 4), cr.Range(8));
+         }
+         else
+         {
+            // Pocket mutation: displace 1-3 offbeat hits while preserving Beat 1 and backbeats
+            for (int flips = 0; flips < 3; flips++)
+            {
+               const int l = cr.Range(6);
+               const int s = 1 + cr.Range(15);
+               if ((l == 0 || l == 1) && (s == 0 || s == 4 || s == 8 || s == 12) && fourFloor)
+                  continue;
+               m[l] ^= (uint16_t)(1u << s);
+            }
+         }
+         if (!ambient && m[0] == 0)
+            m[0] = 0x0101u;
+         float sc = 0.0f, sy = 0.0f;
+         if (CriticJudgeDrum(m, baseM, ambient, sc, sy))
+         {
+            if (mine)
+            {
+               float phi[UserStyle::kFeatureDim] = {};
+               phi[0] = (float)PopCount16(m[0]) / 8.0f;
+               phi[1] = (float)PopCount16(m[2]) / 16.0f;
+               phi[2] = sy;
+               phi[3] = st.swing * 3.0f;
+               phi[4] = st.groove;
+               phi[5] = sc;
+               phi[15] = 1.0f;
+               float tw = 0.0f;
+               const float ts = UserStyle::ScoreFeatures(phi, cr.Uniform(), tw);
+               sc += tw * (ts - 0.5f) * 1.6f;
+            }
+            if (sc > bestScore)
+            {
+               bestScore = sc;
+               bestSync = sy;
+               for (int l = 0; l < 8; l++) bestM[l] = m[l];
+            }
+         }
+      }
+      outNov = std::max(0.1f, bestScore);
+      outSync = bestSync;
+      for (int l = 0; l < 8; l++)
+         outLanes[l] = LaneOfMask(bestM[l], baseG[l]);
+   }
+
+   bool CriticJudgeBass(const std::string& st, const std::string& cardBass, uint16_t kickMask, float& outScore)
+   {
+      if (st.size() != 16)
+         return false;
+      int notes = 0, rootFifth = 0, prevDeg = -1, maxJump = 0, offbeats = 0, kickLock = 0;
+      float ll = 0.0f;
+      for (int s = 0; s < 16; s++)
+      {
+         const char c = st[(size_t)s];
+         int sym = 0;
+         if (c != '.')
+         {
+            const int d = Degree(c);
+            if (d < 0 || d > 9)
+               return false;
+            sym = d + 1;
+            notes++;
+            if (d == 0 || d == 4 || d == 7)
+               rootFifth++;
+            if (prevDeg >= 0)
+               maxJump = std::max(maxJump, std::abs(d - prevDeg));
+            prevDeg = d;
+            if (s & 1)
+               offbeats++;
+            if (kickMask & (1u << s))
+               kickLock++;
+         }
+         ll += SampleCriticData::kBassLogP[s & 3][sym];
+      }
+      if (notes < 2 || notes > 12 || maxJump > 7)
+         return false;
+      if ((float)rootFifth / (float)notes < 0.35f)
+         return false;
+      ll /= 16.0f;
+      if (ll < SampleCriticData::kBassFloor)
+         return false;
+      int diff = 0;
+      for (int s = 0; s < 16 && s < (int)cardBass.size(); s++)
+         if (st[(size_t)s] != cardBass[(size_t)s])
+            diff++;
+      const float cdist = std::min(1.0f, (float)diff / 8.0f);
+      const float pocket = std::min(1.0f, ((float)offbeats + 0.5f * (float)kickLock) / (float)std::max(1, notes));
+      outScore = 0.45f * cdist + 0.55f * pocket;
+      return true;
+   }
+
+   std::string ProposeBass(Rng& cr, bool mine, const std::string& cardBass, const std::string& kickLane)
+   {
+      if (cardBass.find_first_not_of('.') == std::string::npos)
+         return cardBass;
+      const uint16_t km = MaskOfLane(kickLane);
+      std::string best = cardBass;
+      float bestScore = -1.0f;
+      CriticJudgeBass(cardBass, cardBass, km, bestScore);
+      static const int kDegPool[8] = { 0, 0, 0, 2, 3, 4, 4, 6 };
+      for (int cand = 0; cand < 8; cand++)
+      {
+         std::string s(16, '.');
+         const int mode = cr.Range(3);
+         int prev = 0, hits = 0;
+         for (int i = 0; i < 16; i++)
+         {
+            const bool kOn = (km & (1u << i)) != 0;
+            bool on = false;
+            if (i == 0)
+               on = true;
+            else if (mode == 0) // kick-locked pocket + offbeat answer
+               on = kOn || ((i == 6 || i == 10 || i == 14) && cr.Uniform() < 0.45);
+            else if (mode == 1) // offbeat pump
+               on = (i % 4 == 2) || (kOn && (i == 0 || i == 8)) || ((i == 7 || i == 15) && cr.Uniform() < 0.35);
+            else // mutated card rhythm with new scale degree motion
+               on = (cardBass[(size_t)i] != '.' && cr.Uniform() < 0.8) || (i % 2 == 1 && cr.Uniform() < 0.22);
+            if (on)
+            {
+               int d = (i == 0 || (kOn && cr.Uniform() < 0.65)) ? 0 : kDegPool[cr.Range(8)];
+               if (std::abs(d - prev) > 5)
+                  d = 4;
+               prev = d;
+               s[(size_t)i] = (char)('0' + d);
+               hits++;
+            }
+         }
+         float sc = 0.0f;
+         if (CriticJudgeBass(s, cardBass, km, sc))
+         {
+            if (mine)
+            {
+               float phi[UserStyle::kFeatureDim] = {};
+               phi[9] = (float)hits / 16.0f;
+               phi[15] = 1.0f;
+               float tw = 0.0f;
+               const float ts = UserStyle::ScoreFeatures(phi, cr.Uniform(), tw);
+               sc += tw * (ts - 0.5f) * 1.4f;
+            }
+            if (sc > bestScore)
+            {
+               bestScore = sc;
+               best = s;
+            }
+         }
+      }
+      return best;
+   }
+
+   int PrevIntervalBin(int iv, bool first)
+   {
+      if (first) return 6;
+      if (iv <= -5) return 0;
+      if (iv <= -3) return 1;
+      if (iv <= -1) return 2;
+      if (iv == 0)  return 3;
+      if (iv <= 2)  return 4;
+      if (iv <= 4)  return 5;
+      return 6;
+   }
+
+   bool CriticJudgeMelody(const std::vector<std::pair<int, bool>>& seq, int root, int scaleId, int octave, float& outScore)
+   {
+      std::vector<int> pitches;
+      for (int k = 0; k < (int)seq.size(); k++)
+         if (seq[(size_t)k].second)
+         {
+            int n = MusicTime::DegreeToNote(seq[(size_t)k].first, octave + 1, root, scaleId);
+            while (n < 28) n += 12;
+            pitches.push_back(n);
+         }
+      if (pitches.size() < 6)
+         return false;
+      int lo = pitches[0], hi = pitches[0], maxLeap = 0, extremeLeaps = 0;
+      std::set<int> distinct, distinctIv;
+      float ll = 0.0f;
+      int prevIv = 0;
+      for (size_t i = 0; i < pitches.size(); i++)
+      {
+         lo = std::min(lo, pitches[i]);
+         hi = std::max(hi, pitches[i]);
+         distinct.insert(pitches[i]);
+         if (i + 1 < pitches.size())
+         {
+            const int iv = pitches[i + 1] - pitches[i];
+            maxLeap = std::max(maxLeap, std::abs(iv));
+            if (std::abs(iv) > 12 || std::abs(iv) == 6)
+               extremeLeaps++;
+            distinctIv.insert(std::clamp(iv, -12, 12));
+            const int pb = PrevIntervalBin(prevIv, i == 0);
+            const int rel = ((pitches[i] - root) % 12 + 12) % 12;
+            const int idx = std::clamp(iv, -12, 12) + 12;
+            ll += SampleCriticData::kMelodyLogP[pb][rel][idx];
+            prevIv = iv;
+         }
+      }
+      if (hi - lo > 36 || maxLeap > 24 || distinct.size() < 3)
+         return false;
+      const int nSteps = (int)pitches.size() - 1;
+      if ((float)extremeLeaps / (float)std::max(1, nSteps) > 0.65f)
+         return false;
+      ll /= (float)std::max(1, nSteps);
+      if (ll < SampleCriticData::kMelodyFloor)
+         return false;
+      const float surp = BerlyneSweetSpot(ll, SampleCriticData::kMelodyFloor, SampleCriticData::kMelodyMidLl, SampleCriticData::kMelodyHiLl);
+      const float ivVar = std::min(1.0f, (float)distinctIv.size() / 6.0f);
+      outScore = 0.55f * surp + 0.45f * ivVar;
+      return true;
+   }
+
+   void ProposeMotif(Rng& cr, const GenStyle& st, bool mine, int root, int scaleId, std::vector<std::pair<int, bool>>& seq, float& outNov)
+   {
+      std::vector<std::pair<int, bool>> best = seq;
+      float bestScore = -1.0f;
+      CriticJudgeMelody(seq, root, scaleId, st.motifOctave, bestScore);
+
+      static const int kMoves[8] = { -3, -2, -1, -1, 0, 1, 1, 2 };
+      for (int cand = 0; cand < 8; cand++)
+      {
+         std::vector<std::pair<int, bool>> cur;
+         cur.reserve(16);
+         int deg = cr.Range(4), active = 0;
+         const int arcType = cr.Range(4); // 0 arch, 1 wave, 2 climb, 3 cascade
+         int prevDeg = deg;
+         for (int k = 0; k < 16; k++)
+         {
+            if (k == 0)
+               deg = cr.Range(3) * 2; // 0, 2, or 4
+            else if (k == 7)
+               deg = std::clamp(deg + (cr.Range(2) ? 1 : -1), -2, st.motifRange); // half-cadence tension
+            else if (k == 15)
+               deg = cr.Range(3) == 0 ? 4 : 0; // full-cadence resolution to root or fifth
+            else
+            {
+               int move = kMoves[cr.Range(8)];
+               if ((arcType == 0 && k < 8) || arcType == 2)
+                  move = cr.Uniform() < 0.35 ? std::abs(move) : move;
+               else if ((arcType == 0 && k >= 8) || arcType == 3)
+                  move = cr.Uniform() < 0.35 ? -std::abs(move) : move;
+               if (std::abs(deg - prevDeg) >= 3 && cr.Uniform() < 0.58)
+                  move = (deg > prevDeg) ? -1 : 1;
+               prevDeg = deg;
+               deg = std::clamp(deg + move, -2, st.motifRange);
+            }
+            const bool on = (k % 4 == 0) || (k == 7) || (k == 15) || (cr.Uniform() < st.motifDensity);
+            if (on) active++;
+            cur.push_back({ deg, on });
+         }
+         float sc = 0.0f;
+         if (CriticJudgeMelody(cur, root, scaleId, st.motifOctave, sc))
+         {
+            if (mine)
+            {
+               float phi[UserStyle::kFeatureDim] = {};
+               phi[6] = (float)active / 16.0f;
+               phi[7] = (float)st.motifRange / 8.0f;
+               phi[8] = sc;
+               phi[15] = 1.0f;
+               float tw = 0.0f;
+               const float ts = UserStyle::ScoreFeatures(phi, cr.Uniform(), tw);
+               sc += tw * (ts - 0.5f) * 1.5f;
+            }
+            if (sc > bestScore)
+            {
+               bestScore = sc;
+               best = cur;
+            }
+         }
+      }
+      seq = best;
+      outNov = std::max(0.2f, bestScore);
    }
 }
 
@@ -786,6 +1265,19 @@ Compiled Compile(const Recipe& recipe)
       lanes[0] = lanes[1] = lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
    if (part == Part::Toms)
       lanes[0] = lanes[1] = lanes[2] = lanes[3] = lanes[4] = lanes[7] = ""; // no bell: it is the high metallic ring
+
+   Rng criticRng(std::string("critic:") + st.id + ":" + std::to_string(recipe.seed));
+   std::string propLanes[8];
+   float drumNov = 0.0f, drumSync = 0.0f, melNov = 0.0f;
+   if (hasDrums && !subPart && part != Part::Percussion && std::string(st.family) != "ambient")
+   {
+      ProposeGroove(criticRng, st, mine, lanes, propLanes, drumNov, drumSync);
+      for (int i = 0; i < 8; i++)
+         lanes[i] = propLanes[i].c_str();
+      if (part == Part::Drums)
+         lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
+   }
+
    int drums = 0, duckKey = 0;
    if (hasDrums)
    {
@@ -1016,6 +1508,8 @@ Compiled Compile(const Recipe& recipe)
    std::string bass = std::string(st.bass) + std::string(16, '.');
    bass.resize(16);
    if (bass.find_first_not_of('.') != std::string::npos)
+      bass = ProposeBass(criticRng, mine, bass, lanes[0]);
+   if (bass.find_first_not_of('.') != std::string::npos)
    {
       Params p = F({ { "rateBeats", 0.25 }, { "gatePercent", myGate(55.0, 0.25) } });
       p["steps"] = { 'i', "16" };
@@ -1164,6 +1658,7 @@ Compiled Compile(const Recipe& recipe)
          answer.push_back({ deg, rng.Uniform() < 0.85 });
       }
       seq.insert(seq.end(), answer.begin(), answer.end());
+      ProposeMotif(criticRng, st, mine, root, out.scale, seq, melNov);
       Params p = F({ { "rateBeats", st.motifRate }, { "gatePercent", myGate(st.motifGate, st.motifRate) } });
       p["steps"] = { 'i', "16" };
       p["rateMode"] = { 'i', "0" };
@@ -1995,6 +2490,34 @@ Compiled Compile(const Recipe& recipe)
    g.lines.insert(g.lines.begin() + 3, std::string("# style: ") + st.id + " seed " + std::to_string(recipe.seed) + " part " + PartName(part));
    out.patch = g.Text();
    out.tap = lm;
+   if (mine)
+   {
+      float phi[UserStyle::kFeatureDim] = {};
+      int kicks = 0, hats = 0, bassHits = 0;
+      for (int s = 0; s < 16; s++)
+      {
+         if (*lanes[0] && lanes[0][s] != '.') kicks++;
+         if (*lanes[2] && lanes[2][s] != '.') hats++;
+         if (s < (int)bass.size() && bass[(size_t)s] != '.') bassHits++;
+      }
+      phi[0] = (float)kicks / 8.0f;
+      phi[1] = (float)hats / 16.0f;
+      phi[2] = drumSync;
+      phi[3] = st.swing * 3.0f;
+      phi[4] = st.groove;
+      phi[5] = drumNov;
+      phi[6] = st.motifDensity;
+      phi[7] = (float)st.motifRange / 8.0f;
+      phi[8] = melNov;
+      phi[9] = (float)bassHits / 16.0f;
+      phi[10] = (out.bpm - 70.0f) / 110.0f;
+      phi[11] = out.scale == 0 ? 1.0f : 0.0f;
+      phi[12] = std::min(1.0f, (float)Split(st.fx).size() / 4.0f);
+      phi[13] = st.mod;
+      phi[14] = st.sidechain ? 1.0f : 0.0f;
+      phi[15] = 1.0f;
+      UserStyle::NoteFeatures(phi);
+   }
    return out;
 }
 

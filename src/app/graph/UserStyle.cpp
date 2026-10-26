@@ -481,10 +481,20 @@ namespace UserStyle
       {
          float landed[kParts][kCards] = {};
          float skipped[kParts][kCards] = {};
+         float featW[kFeatureDim] = {};
+         float featPrec[kFeatureDim] = {};
+         float featN = 0.0f;
+         float pendingPhi[kFeatureDim] = {};
+         bool hasPendingPhi = false;
          bool loaded = false;
          bool pending = false;
          int part = 0, card = 0;
          std::chrono::steady_clock::time_point at;
+         Taste()
+         {
+            for (int i = 0; i < kFeatureDim; i++)
+               featPrec[i] = 2.0f;
+         }
       };
       Taste& T()
       {
@@ -493,6 +503,7 @@ namespace UserStyle
       }
       std::string TasteDir() { return gOverride.empty() ? AppPaths::AppSupportDir() + "/prediction" : gOverride; }
       std::string TastePath() { return TasteDir() + "/generate_taste.txt"; }
+      std::string TasteVecPath() { return TasteDir() + "/generate_taste_vec.txt"; }
 
       void LoadTaste(Taste& t)
       {
@@ -508,6 +519,10 @@ namespace UserStyle
                t.landed[pa][c] = l;
                t.skipped[pa][c] = s;
             }
+         std::ifstream fv(AppPaths::FsPath(TasteVecPath()));
+         if (fv >> t.featN)
+            for (int i = 0; i < kFeatureDim; i++)
+               fv >> t.featW[i] >> t.featPrec[i];
       }
 
       void SaveTaste(const Taste& t)
@@ -519,6 +534,13 @@ namespace UserStyle
             for (int c = 0; c < kCards; c++)
                if (t.landed[pa][c] > 0.0f || t.skipped[pa][c] > 0.0f)
                   f << pa << " " << c << " " << t.landed[pa][c] << " " << t.skipped[pa][c] << "\n";
+         if (t.featN > 0.0f)
+         {
+            std::ofstream fv(AppPaths::FsPath(TasteVecPath()), std::ios::trunc);
+            fv << t.featN << "\n";
+            for (int i = 0; i < kFeatureDim; i++)
+               fv << t.featW[i] << " " << t.featPrec[i] << "\n";
+         }
       }
 
       void Resolve(Taste& t, bool landed, float amount)
@@ -526,6 +548,27 @@ namespace UserStyle
          if (!t.pending)
             return;
          (landed ? t.landed : t.skipped)[t.part][t.card] += amount;
+         if (t.hasPendingPhi)
+         {
+            const float y = landed ? 1.0f : -1.0f;
+            double dot = 0.0;
+            for (int i = 0; i < kFeatureDim; i++)
+            {
+               const double x = (i == kFeatureDim - 1) ? 0.1 : ((double)t.pendingPhi[i] - 0.35) * 2.0;
+               dot += (double)t.featW[i] * x;
+            }
+            dot = std::clamp(dot, -8.0, 8.0);
+            const double pred = 1.0 / (1.0 + std::exp(-y * dot));
+            const double err = (1.0 - pred) * y * std::min(2.0f, amount);
+            for (int i = 0; i < kFeatureDim; i++)
+            {
+               const float x = (i == kFeatureDim - 1) ? 0.1f : (t.pendingPhi[i] - 0.35f) * 2.0f;
+               t.featPrec[i] += 0.15f * x * x;
+               t.featW[i] += (float)((0.65 / std::sqrt(std::max(0.5f, t.featPrec[i]))) * err * x);
+            }
+            t.featN += amount;
+            t.hasPendingPhi = false;
+         }
          t.pending = false;
          SaveTaste(t);
       }
@@ -628,5 +671,33 @@ namespace UserStyle
             return c;
       }
       return cardCount - 1;
+   }
+
+   void NoteFeatures(const float phi[kFeatureDim])
+   {
+      Taste& t = T();
+      LoadTaste(t);
+      for (int i = 0; i < kFeatureDim; i++)
+         t.pendingPhi[i] = std::clamp(phi[i], -1.0f, 1.0f);
+      t.hasPendingPhi = true;
+   }
+
+   float ScoreFeatures(const float phi[kFeatureDim], double exploreU, float& weight)
+   {
+      Taste& t = T();
+      LoadTaste(t);
+      weight = (float)std::min((double)kMaxWeight, (double)t.featN / ((double)t.featN + 6.0));
+      if (weight <= 1e-5f)
+         return 0.5f;
+      double dot = 0.0;
+      const double jitter = (exploreU - 0.5) * 0.35;
+      for (int i = 0; i < kFeatureDim; i++)
+      {
+         const double wi = t.featW[i] + jitter / std::sqrt(std::max(0.5f, t.featPrec[i]));
+         const double x = (i == kFeatureDim - 1) ? 0.1 : (std::clamp((double)phi[i], -1.0, 1.0) - 0.35) * 2.0;
+         dot += wi * x;
+      }
+      dot = std::clamp(dot, -8.0, 8.0);
+      return (float)(1.0 / (1.0 + std::exp(-dot)));
    }
 }
