@@ -27,6 +27,11 @@ Timeline aligned with upstream before new timeline features (plan: `docs/plans/T
   clip), Range (R, a span over tracks or over all tracks from the ruler; Delete erases it), Blade (B),
   Zoom (Z: click, Alt+click, drag), Hand (H), Pencil (P: drag on an empty track draws a clip). Keys
   F (fit), = / - (zoom), Ctrl+L (loop), I / O (loop in / out at the playhead).
+- **Track selection (upstream's):** click a track header, Shift extends, Ctrl toggles; Delete,
+  Duplicate and Group act on the selected tracks.
+- **Track headers redesigned** (power, mute / solo / record arm chips, gain and pan wells, meter) and
+  a **docked inspector** column on the right for the selected clip, track or tracks (pencil button
+  in the toolbar; the floating clip window only when it is hidden).
 - **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
   a dashed snap guide while dragging.
 - **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),

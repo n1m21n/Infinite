@@ -1440,6 +1440,7 @@
          gArrangeRange.laneLo = 1;
          gArrangeRange.laneHi = 2;
          ArrangeSetTool(ArrangeTool::Range);
+         gArrangeRowSel = { gArrange.lanes[1].id }; // the inspector shows a track
          gArrangePanelOpen = true;
          gArrangePanelHeight = 340.0f;
          PublishArrangeLoop();

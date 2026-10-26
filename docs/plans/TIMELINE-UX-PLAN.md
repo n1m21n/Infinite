@@ -184,3 +184,22 @@ Cada branch: operações no modelo com teste, UI fina, gate completo, nota em
   - Borda de trim de 4 a 12 px conforme o tamanho na tela, e 4 px para fora.
   - Um cursor por zona e por ferramenta.
   - Linha-guia de snap tracejada durante o drag.
+- `feature/timeline-u1` (saída de `feature/timeline-ux`):
+  - **Seleção de pistas** (`gArrangeRowSel`, como a do Naman):
+    - clique seleciona, Shift estende, Ctrl alterna, Esc limpa;
+    - clicar num clip limpa a seleção de pistas, e clicar numa pista limpa a de clips;
+    - Delete, Shift/Ctrl+D e Ctrl+G agem nas pistas quando há pistas selecionadas, nos clips quando
+      não há; uma Range selecionada tem prioridade sobre as duas.
+  - **Cabeçalhos das pistas** sobre os componentes `ArrUi`:
+    - nome e tipo em cima;
+    - power, M, S e R como chips nas cores semânticas;
+    - ganho e pan em campos rebaixados;
+    - medidor na borda;
+    - destaque de seleção e de hover.
+  - **Inspector fixo** numa coluna à direita (botão de lápis no toolbar). Mostra:
+    - o clip (os mesmos campos da janela antiga);
+    - uma pista: nome, on/mute/solo, ganho, pan, gravação, cor, duplicar/excluir;
+    - várias pistas: duplicar/agrupar/excluir;
+    - vários clips: duplicar/excluir.
+
+    A janela flutuante só aparece se o inspector estiver escondido.
