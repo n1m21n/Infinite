@@ -198,6 +198,7 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/LooperNode.h"
 #include "nodes/TimelineNode.h"
 #include "arrange/ArrangeModel.h"
+#include "arrange/ArrangeAutomation.h" // Turbo 0.72 (U3): timeline automation lanes
 #include "audio/dsp/SlicerDsp.h"
 #include "nodes/MpcNode.h"
 #include "nodes/SuperMixerNode.h"
