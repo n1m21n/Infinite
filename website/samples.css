@@ -158,3 +158,4 @@
 .smp-head .blog-hand { display: block; font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1; }
 .lib-hero .smp-head h1.slab.deck-title { justify-self: start; text-align: left; width: auto; margin: 0; }
 .smp-steps li { grid-template-columns: 84px 1fr; } .smp-steps img { width: 84px; height: 84px; }
+.smp-genp { margin-bottom: 18px; } .smp-steps { margin-top: 0; }
