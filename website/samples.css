@@ -170,3 +170,5 @@
 .smp-pickw svg { width: 20px; height: 20px; }
 .smp-dl:hover { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); }
 .smp-steps { margin: 28px 0 0; }
+.smp-license { display: block; margin: 18px 0 0; padding: 0; background: none; box-shadow: none; border-radius: 0; color: var(--muted); font: 400 .78rem/1.5 var(--font-sans); max-width: 70ch; }
+.smp-license b { color: var(--muted); font-weight: 600; }
