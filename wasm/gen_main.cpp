@@ -1,6 +1,7 @@
 // infinite_gen_wasm entry: one call renders a Generate Samples loop the way GenerateSamplesNode does.
 // The redraw rule (seed + attempt * 7919, up to 3) and Master() mirror src/app/graph/GenerateSamplesNode.cpp; the parity test keeps them honest.
 #include "app/graph/GenerateSamplesNode.h"  // PrerollBars
+#include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/OfflineGraph.h"
 #include "app/graph/SampleStyles.h"
 #include "audio/MusicTime.h"
@@ -42,7 +43,8 @@ namespace
       an.Push(l, r, frames);
       const AudioSummary::Result s = an.Finish();
       const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
-      if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (rms > 0.0 && s.samplePeak / rms < 1.2))
+      const bool specOk = SampleCriticData::VerifyAudioSpectrum(0, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
+      if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (rms > 0.0 && s.samplePeak / rms < 1.2) || !specOk)
          return false;
       double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
       const double ceiling = std::pow(10.0, kCeilingDb / 20.0);

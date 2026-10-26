@@ -1,5 +1,6 @@
 // Generate Samples. See GenerateSamplesNode.h.
 #include "app/graph/GenerateSamplesNode.h"
+#include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/UserStyle.h"
 
 #include "app/graph/OfflineGraph.h"
@@ -229,7 +230,8 @@ bool GenerateSamplesNode::Master(const float* l, const float* r, int frames, std
    const bool finite = s.nonFiniteFrames == 0;
    const bool silent = !(s.integratedLufs > kSilentLufs); // NaN for silence
    const bool flat = rms > 0.0 && s.samplePeak / rms < 1.2; // DC or a stuck square, not music
-   if (!finite || silent || flat)
+   const bool specOk = SampleCriticData::VerifyAudioSpectrum(0, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
+   if (!finite || silent || flat || !specOk)
       return false;
    // -14 LUFS, then held under a -1 dBTP ceiling.
    double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);

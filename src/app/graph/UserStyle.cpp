@@ -1,4 +1,5 @@
 #include "app/graph/UserStyle.h"
+#include "app/graph/GenerateSamplesCritic.inc"
 
 #include "audio/NoteModel.h"
 #include "core/MovementLog.h"
@@ -548,6 +549,17 @@ namespace UserStyle
          if (!t.pending)
             return;
          (landed ? t.landed : t.skipped)[t.part][t.card] += amount;
+         if (t.card >= 0 && t.card < SampleCriticData::kStyleDirectiveCount)
+         {
+            // Connected Genre-Subgenre Network: propagate preference to neighboring sub-genres
+            const SampleCriticData::StyleDirective& dir = SampleCriticData::kStyleDirectives[t.card];
+            for (int k = 0; k < 4; k++)
+            {
+               const int nb = dir.neighbors[k];
+               if (nb >= 0 && nb < kCards && nb != t.card)
+                  (landed ? t.landed : t.skipped)[t.part][nb] += 0.20f * amount * dir.neighborW[k];
+            }
+         }
          if (t.hasPendingPhi)
          {
             const float y = landed ? 1.0f : -1.0f;

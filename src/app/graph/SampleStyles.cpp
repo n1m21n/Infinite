@@ -730,6 +730,32 @@ namespace
       seq = best;
       outNov = std::max(0.2f, bestScore);
    }
+
+   const SampleCriticData::StyleDirective& StyleDirectiveFor(const char* styleId)
+   {
+      if (styleId != nullptr)
+         for (int i = 0; i < SampleCriticData::kStyleDirectiveCount; i++)
+            if (std::strcmp(SampleCriticData::kStyleDirectives[i].id, styleId) == 0)
+               return SampleCriticData::kStyleDirectives[i];
+      return SampleCriticData::kStyleDirectives[0];
+   }
+
+   int PickDirectiveKind(Rng& r, const float w[6])
+   {
+      double sum = 0.0;
+      for (int i = 0; i < 6; i++)
+         sum += std::max(0.0f, w[i]);
+      if (sum <= 1e-6)
+         return r.Range(6);
+      double u = r.Uniform() * sum;
+      for (int i = 0; i < 6; i++)
+      {
+         u -= std::max(0.0f, w[i]);
+         if (u <= 0.0)
+            return i;
+      }
+      return 5;
+   }
 }
 
 namespace
@@ -1279,6 +1305,7 @@ Compiled Compile(const Recipe& recipe)
    }
 
    int drums = 0, duckKey = 0;
+   bool is808Kick = false;
    if (hasDrums)
    {
       Params force = F({ { "swing", st.swing }, { "volume", 0.9 } });
@@ -1403,6 +1430,7 @@ Compiled Compile(const Recipe& recipe)
          int sq = 0;
          static const int kKinds[4] = { 1, 0, 1, 2 };
          const int kind = kKinds[dr.Range(4)]; // 0 punch, 1 808 (twice as likely), 2 thump
+         is808Kick = (kind == 1);
          drumSeq(0, 29 + dr.Range(7), 90.0, sq); // 46-73 Hz: the kick's fundamental, audible on a small speaker too
          Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.position", dr.Uniform(0.0, 0.3) }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 },
                         { "a.filterAmount", 0.0 }, { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchAttack", 0.0 },
@@ -1527,7 +1555,16 @@ Compiled Compile(const Recipe& recipe)
          const int sy = g.Add(picked, seed());
          g.Connect(sq, sy, true);
          const int fxChoices[] = { 0, 1, 1, 2 };
-         const int end = chain(sy, fxChoices[rng.Range(4)]);
+         int end = chain(sy, fxChoices[rng.Range(4)]);
+         if (wantBass && (is808Kick || st.sidechain) && drums != 0)
+         {
+            // Kick-Bass frequency slotting: duck the bass under an 808 sub or sidechain kick so 30-90 Hz stays clean.
+            const int dy = g.Add("Dynamics", seed(), F({ { "sidechainExternal", 1.0 }, { "ratio", 4.5 }, { "threshold", -26.0 },
+                                                          { "attack", 3.0 }, { "release", 110.0 } }));
+            g.Connect(end, dy, false);
+            g.Connect(duckKey != 0 ? duckKey : drums, dy, false);
+            end = dy;
+         }
          layers++;
          if (wantBass)
          {
@@ -1754,6 +1791,8 @@ Compiled Compile(const Recipe& recipe)
          out.motions.push_back(m);
       };
 
+      const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
+
       if (bassPart)
       {
          // A figure of one to eight hits in sixteen steps, on the root, its fifth and its neighbours.
@@ -1762,20 +1801,30 @@ Compiled Compile(const Recipe& recipe)
          std::vector<int> note(16, 0), deg16(16, 0);
          static const int kDeg[] = { 0, 0, 0, 0, 2, 3, 4, 4, 5, 6, 7 };
          static const int kOct[] = { 0, 0, 0, 1 };
+         std::string rawBass(16, '.');
          int prev = 0;
          for (int k = 0; k < 16; k++)
          {
             const bool strong = k % 4 == 0;
             if (sp.Uniform() < density * (strong ? 1.8 : 0.8) || k == 0)
             {
-               vel[(size_t)k] = std::clamp((strong ? 0.95 : 0.7) + sp.Uniform(-0.15, 0.1), 0.3, 1.0);
                prev = sp.Uniform() < 0.55 ? prev : kDeg[sp.Range(11)];
-               deg16[(size_t)k] = prev;
-               note[(size_t)k] = degreeNote(prev, 1 + kOct[sp.Range(4)]);
+               rawBass[(size_t)k] = (char)('0' + std::clamp(prev, 0, 7));
+            }
+         }
+         rawBass = ProposeBass(criticRng, mine, rawBass, lanes[0]);
+         for (int k = 0; k < 16; k++)
+         {
+            if (rawBass[(size_t)k] != '.')
+            {
+               const bool strong = k % 4 == 0;
+               vel[(size_t)k] = std::clamp((strong ? dir.velMean + 0.15 : dir.velMean) + sp.Uniform(-dir.velSpread, dir.velSpread), 0.3, 1.0);
+               deg16[(size_t)k] = Degree(rawBass[(size_t)k]);
+               note[(size_t)k] = degreeNote(deg16[(size_t)k], 1 + kOct[sp.Range(4)]);
             }
          }
          const double rate = sp.Range(5) == 0 ? 0.5 : 0.25;
-         const int kind = sp.Range(6);
+         const int kind = PickDirectiveKind(sp, dir.bassW);
          Params k;
          double gate = 70.0;
          if (kind == 1) // an 808 is tuned to the key: the root sits at 30-60 Hz, never above about 100
@@ -2038,7 +2087,7 @@ Compiled Compile(const Recipe& recipe)
          if (keysPart)
          {
             // Chords struck on an instrument: a tine piano, organ, mallet keys, a clav or a plucked-string piano.
-            const int kind = sp.Range(6);
+            const int kind = PickDirectiveKind(sp, dir.keysW);
             double rate = sp.Uniform() < 0.5 ? 2.0 : 4.0, strum = sp.Uniform(4.0, 28.0);
             switch (kind)
             {
@@ -2107,7 +2156,7 @@ Compiled Compile(const Recipe& recipe)
          else
          {
             // One voice playing a line: stepwise, with rests and a few leaps.
-            const int kind = sp.Range(6);
+            const int kind = PickDirectiveKind(sp, dir.leadW);
             switch (kind)
             {
             case 0: // brass
@@ -2148,12 +2197,21 @@ Compiled Compile(const Recipe& recipe)
             const double density = sp.Uniform(0.35, 0.7);
             static const int kMove[] = { -2, -1, -1, 0, 1, 1, 2, 3 };
             int d = sp.Range(4);
+            std::vector<std::pair<int, bool>> leadSeq;
+            leadSeq.reserve(16);
             for (int i = 0; i < 16; i++)
-               if (i == 0 || sp.Uniform() < density * (i % 4 == 0 ? 1.4 : 0.8))
-               {
+            {
+               const bool on = (i == 0 || sp.Uniform() < density * (i % 4 == 0 ? 1.4 : 0.8));
+               if (on)
                   d = std::clamp(d + kMove[sp.Range(8)], -2, 7);
-                  vel[(size_t)i] = std::clamp((i % 4 == 0 ? 0.95 : 0.75) + sp.Uniform(-0.15, 0.1), 0.3, 1.0);
-                  note[(size_t)i] = degreeNote(d, 2);
+               leadSeq.push_back({ d, on });
+            }
+            ProposeMotif(criticRng, st, mine, root, out.scale, leadSeq, melNov);
+            for (int i = 0; i < 16; i++)
+               if (leadSeq[(size_t)i].second)
+               {
+                  vel[(size_t)i] = std::clamp((i % 4 == 0 ? dir.velMean + 0.15 : dir.velMean) + sp.Uniform(-dir.velSpread, dir.velSpread), 0.3, 1.0);
+                  note[(size_t)i] = degreeNote(leadSeq[(size_t)i].first, 2);
                }
             const int sq = sequence(vel, note, sp.Uniform() < 0.3 ? 0.5 : 0.25, sp.Uniform(60.0, 100.0), 16);
             const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
@@ -2492,6 +2550,7 @@ Compiled Compile(const Recipe& recipe)
    out.tap = lm;
    if (mine)
    {
+      const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
       float phi[UserStyle::kFeatureDim] = {};
       int kicks = 0, hats = 0, bassHits = 0;
       for (int s = 0; s < 16; s++)
@@ -2510,11 +2569,12 @@ Compiled Compile(const Recipe& recipe)
       phi[7] = (float)st.motifRange / 8.0f;
       phi[8] = melNov;
       phi[9] = (float)bassHits / 16.0f;
-      phi[10] = (out.bpm - 70.0f) / 110.0f;
-      phi[11] = out.scale == 0 ? 1.0f : 0.0f;
-      phi[12] = std::min(1.0f, (float)Split(st.fx).size() / 4.0f);
-      phi[13] = st.mod;
-      phi[14] = st.sidechain ? 1.0f : 0.0f;
+      // Spotify 5 Perceptual Pillars: Danceability, Energy, Valence, Brightness, Contrast
+      phi[10] = dir.pillars[0];
+      phi[11] = dir.pillars[1];
+      phi[12] = dir.pillars[2];
+      phi[13] = dir.pillars[3];
+      phi[14] = dir.pillars[4];
       phi[15] = 1.0f;
       UserStyle::NoteFeatures(phi);
    }

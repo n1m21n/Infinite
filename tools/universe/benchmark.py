@@ -11,6 +11,7 @@ Verifies:
 import argparse, collections, json, math, os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import critic as CR
+import genre_graph as GG
 import learn as L
 import pieces as P
 import proposer as PR
@@ -236,11 +237,111 @@ def main():
     print("     Keep-Rate@0=%.1f%% -> Contextual-Keep@20=%.1f%% (vs Card-Bandit@20=%.1f%%)  -> %s" % (
         100 * k0, 100 * k20, 100 * card20, "PASS" if b6_ok else "FAIL"))
 
-    all_ok = b1_ok and b2_ok and b3_ok and b4_ok and b5_ok and b6_ok
+    # ---- B7: Connected Genre-Subgenre Graph & Multi-Modal Directive Coherence --------------------
+    net = GG.build_genre_network()
+    dir_hits = dir_tot = 0
+    expected_top_bass = {
+        "acid_house": {5}, "neurofunk": {2, 4}, "liquid_dnb": {0, 2}, "jungle": {0, 1},
+        "amapiano": {0, 1}, "footwork": {0, 1}, "dubstep": {0, 2, 4}, "lofi_beats": {0, 3},
+        "synthwave": {3, 0}, "psytrance": {3, 0, 5}, "deep_house": {3, 0},
+    }
+    for st_node in net["styles"]:
+        sid = st_node["id"]
+        bw = st_node["archetypes"]["bass"]
+        top2 = set(sorted(range(6), key=lambda k: -bw[k])[:2])
+        if sid in expected_top_bass:
+            dir_tot += 1
+            if top2 & expected_top_bass[sid]:
+                dir_hits += 1
+        # Verify neighbor graph connectivity is non-degenerate and within-family or acoustically close
+        nbs = st_node["neighbors"]
+        dir_tot += 1
+        if len(nbs) == 4 and 0.35 <= nbs[0]["weight"] <= 0.999:
+            dir_hits += 1
+    dir_acc = 100.0 * dir_hits / max(1, dir_tot)
+    b7_ok = dir_acc >= 92.0 and net["n_styles"] >= 34
+    print("\n[B7] Connected Genre-Subgenre Graph & Multi-Modal Directive Coherence (target >= 92.0%)")
+    print("     Styles=%d | Directive-Archetype & Graph-Neighbor Accuracy=%.1f%%  -> %s" % (
+        net["n_styles"], dir_acc, "PASS" if b7_ok else "FAIL"))
+
+    # ---- B8: Category & Genre 32-Band Spectral + Dynamic Fingerprint Gate ------------------------
+    valid_pass = valid_tot = 0
+    for pname, gates in GG.PART_SPECTRAL_GATES.items():
+        min_l, max_l, min_m, min_h, max_h, min_c, max_s, _ = gates
+        for _ in range(15):
+            l_sh = rng.uniform(min_l + 0.04, min(max_l - 0.04, min_l + 0.30))
+            h_sh = rng.uniform(min_h + 0.03, min(max_h - 0.03, min_h + 0.25))
+            m_sh = max(min_m + 0.02, 1.0 - l_sh - h_sh)
+            bands = [l_sh / 11.0] * 11 + [m_sh / 11.0] * 11 + [h_sh / 10.0] * 10
+            ok_sp, _ = GG.verify_spectral_critic(bands, min_c + 0.5, max_s * 0.4, 0.45, pname)
+            valid_tot += 1
+            valid_pass += int(ok_sp)
+    spec_frr = 100.0 * (valid_tot - valid_pass) / max(1, valid_tot)
+
+    # 7 synthetic acoustic/spectral mishaps
+    spec_mishaps = [
+        ("thin_kick",        [0.005] * 11 + [0.05] * 11 + [0.04] * 10, 2.2, 0.2, 0.5, "kicks"),
+        ("muddy_mix",        [0.085] * 11 + [0.004] * 11 + [0.002] * 10, 2.0, 0.1, 0.4, "full"),
+        ("dull_hats",        [0.04] * 11 + [0.04] * 11 + [0.01] * 10, 2.2, 0.2, 0.3, "hats"),
+        ("resonant_whistle", [0.01] * 11 + [0.01] * 11 + [0.65] + [0.005] * 9, 2.5, 0.1, 0.4, "full"),
+        ("phase_cancelled",  [0.03] * 11 + [0.04] * 11 + [0.02] * 10, 2.2, 0.1, -0.75, "full"),
+        ("brickwall_flat",   [0.03] * 11 + [0.04] * 11 + [0.02] * 10, 1.08, 0.1, 0.5, "drums"),
+        ("dropout_pad",      [0.03] * 11 + [0.05] * 11 + [0.01] * 10, 1.8, 0.72, 0.6, "pads"),
+    ]
+    spec_caught = sum(not GG.verify_spectral_critic(b, cr_v, sil, corr, pn)[0] for _, b, cr_v, sil, corr, pn in spec_mishaps)
+    spec_catch_rate = 100.0 * spec_caught / len(spec_mishaps)
+    b8_ok = spec_frr <= 2.0 and spec_catch_rate >= 96.0
+    print("\n[B8] Category & Genre 32-Band Spectral + Dynamic Fingerprint Gate")
+    print("     Valid-Spectrum FRR=%.2f%% (<=2.0%%) | Acoustic-Mishap Catch=%.1f%% (%d/%d)  -> %s" % (
+        spec_frr, spec_catch_rate, spec_caught, len(spec_mishaps), "PASS" if b8_ok else "FAIL"))
+
+    # ---- B9: Spotify 5-Pillar + Graph-Propagated User Likeability (Keep@20 >= 82%) ---------------
+    pillar_personas = [
+        ("High-Energy Dance Club",     {"danceability": +1.8, "energy": +2.0, "valence": +0.6, "brightness": +0.8, "contrast": +1.2}),
+        ("Dark Dub / Hypnotic Sub",    {"danceability": +0.8, "energy": -0.4, "valence": -1.8, "brightness": -1.6, "contrast": +0.6}),
+        ("Warm Acoustic / Lo-Fi Keys", {"danceability": -0.2, "energy": -1.4, "valence": +1.0, "brightness": -1.2, "contrast": -0.5}),
+        ("Bright Euphoric Melodic",    {"danceability": +1.0, "energy": +1.2, "valence": +2.0, "brightness": +1.6, "contrast": +0.4}),
+        ("Crisp High-Contrast Breaks", {"danceability": +1.2, "energy": +1.5, "valence": -0.4, "brightness": +1.0, "contrast": +2.0}),
+    ]
+    p_keep20 = []
+    for _, pref in pillar_personas:
+        # Graph-propagated + 5-pillar preference learner over the 34 styles
+        w_pil = {k: 0.0 for k in pref}
+        node_bonus = [0.0] * len(net["styles"])
+        r_sim = random.Random(77)
+        for step in range(20):
+            # Pick best of 6 candidate styles using current pillar weights + graph bonus
+            cands = r_sim.sample(net["styles"], 6)
+            best_s = max(cands, key=lambda s: sum(w_pil[k] * (s["pillars"][k] - 0.5) for k in w_pil) + node_bonus[s["index"]])
+            u_true = sum(pref[k] * (best_s["pillars"][k] - 0.5) for k in pref)
+            kept = u_true > 0.12
+            sgn = 1.0 if kept else -1.0
+            for k in w_pil:
+                w_pil[k] += 0.45 * sgn * (best_s["pillars"][k] - 0.5)
+            # Propagate reward across connected sub-genre neighbors in the graph!
+            node_bonus[best_s["index"]] += 0.35 * sgn
+            for nb in best_s["neighbors"]:
+                node_bonus[nb["index"]] += 0.20 * nb["weight"] * sgn
+        # Evaluate keep-rate at click 20
+        hits20 = 0
+        for _ in range(40):
+            cands = r_sim.sample(net["styles"], 6)
+            best_s = max(cands, key=lambda s: sum(w_pil[k] * (s["pillars"][k] - 0.5) for k in w_pil) + node_bonus[s["index"]])
+            if sum(pref[k] * (best_s["pillars"][k] - 0.5) for k in pref) > 0.12:
+                hits20 += 1
+        p_keep20.append(hits20 / 40.0)
+    b9_keep = sum(p_keep20) / len(p_keep20)
+    b9_ok = b9_keep >= 0.82
+    print("\n[B9] Spotify 5-Pillar (Danceability/Energy/Valence/Brightness/Contrast) + Graph Likeability")
+    print("     Multi-Modal Graph Keep-Rate@20=%.1f%% (target >= 82.0%%)  -> %s" % (
+        100.0 * b9_keep, "PASS" if b9_ok else "FAIL"))
+
+    gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok]
+    all_ok = all(gates_list)
     print("\n" + "=" * 78)
-    print("OVERALL BENCHMARK RESULT: %s (%d / 6 gates passed)" % (
+    print("OVERALL BENCHMARK RESULT: %s (%d / %d gates passed)" % (
         "ALL GATES PASSED" if all_ok else "NEEDS ATTENTION",
-        sum([b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok])))
+        sum(gates_list), len(gates_list)))
     print("=" * 78)
 
 

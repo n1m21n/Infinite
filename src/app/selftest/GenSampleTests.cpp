@@ -17,6 +17,7 @@
 // style x part at seeds 1-3, 2 bars, as <dir>/<style>-<part>-<seed>.wav plus
 // <dir>/pool.json. tools/catalog/catalog.py pool publishes it.
 #include "app/AppShared.h"
+#include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/GenerateSamplesNode.h"
 #include "app/graph/OfflineGraph.h"
 #include "audio/AudioFileWriter.h"
@@ -473,6 +474,22 @@ bool RunGenSampleTest()
          const bool featOk = wHi > 0.35f && sHi > 0.60f && sLo < 0.40f && (sHi - sLo) > 0.25f;
          printf("  feature critic: weight %.2f, kept score %.2f vs skipped %.2f: %s\n", wHi, sHi, sLo, featOk ? "ok" : "FAIL");
          fails += featOk ? 0 : 1;
+
+         // 32-band spectral & dynamic gate: balanced spectrum accepted, narrow whistle & phase cancellation rejected.
+         double goodBands[32] = {}, whistleBands[32] = {};
+         for (int i = 0; i < 32; i++)
+         {
+            goodBands[i] = 0.03;
+            whistleBands[i] = 0.002;
+         }
+         whistleBands[24] = 0.90;
+         const bool spGood = SampleCriticData::VerifyAudioSpectrum(0, goodBands, 0.85, 0.25, 0.05, 0.45);
+         const bool spWhistle = !SampleCriticData::VerifyAudioSpectrum(0, whistleBands, 0.85, 0.25, 0.05, 0.45);
+         const bool spPhase = !SampleCriticData::VerifyAudioSpectrum(0, goodBands, 0.85, 0.25, 0.05, -0.75);
+         const bool specGateOk = spGood && spWhistle && spPhase && SampleCriticData::kStyleDirectiveCount >= 34;
+         printf("  spectral & genre graph critic: %d styles, balanced ok, whistle & phase rejected: %s\n",
+                SampleCriticData::kStyleDirectiveCount, specGateOk ? "ok" : "FAIL");
+         fails += specGateOk ? 0 : 1;
       }
       UserStyle::UseDirectory("");
       std::filesystem::remove_all(AppPaths::FsPath(dir));
