@@ -55,6 +55,16 @@ Timeline aligned with upstream before new timeline features (plan: `docs/plans/T
   under the box; a gain line in every audio clip; fade curves (right-click a fade handle: linear,
   fast, slow, S); magnetic snap to clip edges, markers, playhead and loop; ripple off / track / all;
   Range copy / paste / duplicate (Ctrl+C / V / D); S splits; Alt+wheel sets track height.
+- **Recording click and input latency:** REC's right-click picks the click (off, during the count-in,
+  or the count-in and the take) and compensates input latency: a take recorded from an Audio In (or
+  through one) moves earlier by the driver's round trip, plus a manual offset in ms.
+- **Drag a Range selection** to move what it holds in time and onto other tracks of the same kind
+  (Ctrl: a copy); one undo step.
+- **Session view:** drag a clip to another cell (swaps; Ctrl: a copy); the selected clip shows in the
+  inspector (name, source, length, loop, launch, quantize, follow action); Send to Timeline puts a
+  clip, or a whole scene (scene right-click), on the timeline at the playhead's bar - sending scene
+  after scene with the transport stopped writes the song out in order. A clip's body now launches on
+  release (so it can be dragged); its play glyph and gate clips still launch on press.
 - **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
   a dashed snap guide while dragging.
 - **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),

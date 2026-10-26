@@ -399,6 +399,11 @@ ArrangeTool gArrangeTool = ArrangeTool::Select;
 // selection - Shift extends, Ctrl toggles; while it is not empty, Delete,
 // Duplicate and Group act on these tracks instead of on clips.
 bool gArrangeInspector = true;
+// Turbo 0.72: the Session clip the inspector shows (0 / -1 = none).
+uint64_t gArrangeSessSelLane = 0;
+int gArrangeSessSelRow = -1;
+bool ArrangeSessionSlotSelected();        // ArrangeSessionUi.inl
+void DrawArrangeSessionSlotInspector();   // ArrangeSessionUi.inl
 std::vector<uint64_t> gArrangeRowSel;
 uint64_t gArrangeRowAnchor = 0;
 bool ArrangeRowSelected(uint64_t laneId)
@@ -901,6 +906,12 @@ bool gArrangeRecPunchActive = false;
 Arrange::Tick gArrangeRecPunchEnd = 0;
 Arrange::LoopRange gArrangeRecLoop;
 std::string gArrangeRecStatus;
+// Turbo 0.72: the click while recording (0 off, 1 count-in only, 2 count-in
+// and the take) and input latency compensation: a take recorded from an
+// Audio In is moved earlier by the driver's round trip plus a manual offset.
+int gArrangeRecClick = 1;
+bool gArrangeRecLatencyComp = true;
+float gArrangeRecLatencyExtraMs = 0.0f;
 
 // Turbo 0.72 (upstream's Render Track / Render Group): a render can be
 // scoped to some tracks (a stem). The draft is what the next "Add to queue"
@@ -918,6 +929,42 @@ void ArrangeOpenRenderFor(const std::vector<uint64_t>& lanes, const std::string&
    gArrangeRenderScopeDraft = lanes;
    gArrangeRenderScopeLabel = label;
    gArrangeRenderWindowOpen = true;
+}
+
+// True when the node is an Audio In or is fed by one (its sound arrives a
+// round trip late compared to what the player heard).
+bool ArrangeChainHasAudioIn(INode* node, std::set<INode*>& visited)
+{
+   if (node == nullptr || !visited.insert(node).second)
+      return false;
+   if (dynamic_cast<AudioInputNode*>(node) != nullptr)
+      return true;
+   for (int slot = 0; slot < kMaxAudioSlots; slot++)
+      if (AudioCable* cable = node->AudioInputSlot(slot))
+         if (cable->IsConnected() && ArrangeChainHasAudioIn(cable->GetSource(), visited))
+            return true;
+   for (int w = 0; w < kAudioMaxNodeInputs; w++)
+   {
+      AudioCable* cable = node->WirelessAudioInput(w);
+      if (cable == nullptr)
+         break;
+      if (cable->IsConnected() && ArrangeChainHasAudioIn(cable->GetSource(), visited))
+         return true;
+   }
+   return false;
+}
+
+// Seconds a take from this source is moved earlier (0 when nothing to do).
+double ArrangeRecLatencySeconds(uint64_t srcUid, double sampleRate)
+{
+   if (!gArrangeRecLatencyComp)
+      return 0.0;
+   GraphNode* gn = FindNodeByUid(srcUid);
+   std::set<INode*> visited;
+   if (gn == nullptr || !ArrangeChainHasAudioIn(gn->node.get(), visited))
+      return 0.0;
+   const double driver = sampleRate > 0.0 ? (double)Platform::AudioRoundTripLatencyFrames() / sampleRate : 0.0;
+   return std::max(0.0, driver + gArrangeRecLatencyExtraMs / 1000.0);
 }
 
 ArrangeRecArm* ArrangeRecArmFor(uint64_t laneId)
@@ -1053,6 +1100,11 @@ bool ArrangeRecordStart(double sampleRate = 0.0) // 0 = the engine's rate (the o
       if (gArrangeRecCountIn || gArrangeRecPunchActive)
          tr.SeekBeats(std::max(0.0, Arrange::TicksToBeats(from) - preroll));
    }
+   // The click: through the count-in (up to the arm beat) or the whole take.
+   const bool countingIn = gArrangeRecCountIn && !wasPlaying;
+   AudioEngine::Instance().SetRecordClickUntil(gArrangeRecClick == 2                 ? 1e12
+                                               : gArrangeRecClick == 1 && countingIn ? Arrange::TicksToBeats(from)
+                                                                                     : -1.0);
    gArrangeRecSeekSerial = tr.SeekSerial();
    gArrangeRecording = true;
    gArrangeRecStopFrames = -1;
@@ -1066,6 +1118,7 @@ void ArrangeRecordStop()
 {
    if (!gArrangeRecording || gArrangeRecStopFrames > 0)
       return;
+   AudioEngine::Instance().SetRecordClickUntil(-1.0);
    for (auto& kv : gArrangeRecArms)
       if (kv.second.tap >= 0 && gArrangeRecTaps[kv.second.tap])
          gArrangeRecTaps[kv.second.tap]->enabled.store(false, std::memory_order_release);
@@ -1083,6 +1136,7 @@ void ArrangeRecordCommit()
    // One pass of a take: where it lands and which stretch of the file it is.
    struct Pass { double startBeat; double fileSeconds; double seconds; };
    struct Take { uint64_t laneId; std::string path; double totalSeconds; std::vector<Pass> passes; };
+   AudioEngine::Instance().SetRecordClickUntil(-1.0);
    std::vector<Take> takes;
    for (auto& kv : gArrangeRecArms)
    {
@@ -1111,13 +1165,16 @@ void ArrangeRecordCommit()
             if (tap.wrapFrames[w] > cuts.back() && tap.wrapFrames[w] < frames)
                cuts.push_back(tap.wrapFrames[w]);
       cuts.push_back(frames);
+      // Turbo 0.72: input latency - every pass reads its stretch of the file
+      // that much later, so what was played lands where it was heard.
+      const double latency = ArrangeRecLatencySeconds(arm.srcUid, sr);
       for (size_t k = 0; k + 1 < cuts.size(); k++)
       {
          Pass p;
          p.startBeat = k == 0 ? std::max(0.0, tap.startBeat.load(std::memory_order_relaxed))
                               : Arrange::TicksToBeats(gArrangeRecLoop.start);
-         p.fileSeconds = (double)cuts[k] / sr;
-         p.seconds = (double)(cuts[k + 1] - cuts[k]) / sr;
+         p.fileSeconds = (double)cuts[k] / sr + latency;
+         p.seconds = std::min((double)(cuts[k + 1] - cuts[k]) / sr, t.totalSeconds - p.fileSeconds);
          if (p.seconds > 0.01)
             t.passes.push_back(p);
       }
@@ -2399,6 +2456,33 @@ void ArrangePlaceCopies(const std::vector<uint64_t>& ids, Arrange::Tick dt, int 
 
 // Turbo 0.72 (Range tool): erases the span on its lanes - a clip crossing an
 // edge is cut there and everything inside goes, in one undo step.
+// Cuts the clips crossing the span's edges and deletes what is inside, on
+// one lane.
+void ArrangeEraseSpanOnLane(int li, Arrange::Tick start, Arrange::Tick end)
+{
+   for (const Arrange::Tick edge : { start, end })
+   {
+      std::vector<uint64_t> ids;
+      for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+         if (c.start < edge && edge < c.End())
+            ids.push_back(c.id);
+      for (uint64_t id : ids)
+         Arrange::Split(gArrange, id, edge);
+   }
+   std::vector<uint64_t> inside;
+   for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+      if (c.start >= start && c.End() <= end)
+         inside.push_back(c.id);
+   if (!inside.empty())
+      Arrange::Delete(gArrange, inside);
+}
+
+void ArrangeEraseSpan(const ArrangeRangeSel& r)
+{
+   for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
+      ArrangeEraseSpanOnLane(li, r.start, r.end);
+}
+
 void ArrangeEraseRange()
 {
    const ArrangeRangeSel r = gArrangeRange;
@@ -2409,21 +2493,7 @@ void ArrangeEraseRange()
    {
       for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
       {
-         for (const Arrange::Tick edge : { r.start, r.end })
-         {
-            std::vector<uint64_t> ids;
-            for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
-               if (c.start < edge && edge < c.End())
-                  ids.push_back(c.id);
-            for (uint64_t id : ids)
-               Arrange::Split(gArrange, id, edge);
-         }
-         std::vector<uint64_t> inside;
-         for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
-            if (c.start >= r.start && c.End() <= r.end)
-               inside.push_back(c.id);
-         if (!inside.empty())
-            Arrange::Delete(gArrange, inside);
+         ArrangeEraseSpanOnLane(li, r.start, r.end);
          if (gArrangeRipple == 1)
             ArrangeRippleClose(li, r.end, r.end - r.start); // Turbo 0.72 (U2)
       }
@@ -2444,15 +2514,11 @@ struct ArrangeRangeClipboard
 };
 ArrangeRangeClipboard gArrangeRangeClip;
 
-void ArrangeCopyRange()
+// What the span holds on its lanes, each clip cut to it (lane offset from
+// laneLo, clip start relative to the span start).
+std::vector<std::pair<int, Arrange::Clip>> ArrangeRangePieces(const ArrangeRangeSel& r)
 {
-   const ArrangeRangeSel r = gArrangeRange;
-   if (!r.active || r.end <= r.start)
-      return;
-   gArrangeRangeClip = ArrangeRangeClipboard();
-   gArrangeRangeClip.valid = true;
-   gArrangeRangeClip.length = r.end - r.start;
-   gArrangeRangeClip.laneLo = r.laneLo;
+   std::vector<std::pair<int, Arrange::Clip>> out;
    for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
       for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
       {
@@ -2467,8 +2533,47 @@ void ArrangeCopyRange()
          piece.length = e - s;
          piece.fadeIn = s == c.start ? std::min(c.fadeIn, piece.length) : 0;
          piece.fadeOut = e == c.End() ? std::min(c.fadeOut, piece.length) : 0;
-         gArrangeRangeClip.clips.push_back({ li - r.laneLo, piece });
+         out.push_back({ li - r.laneLo, piece });
       }
+   return out;
+}
+
+void ArrangeCopyRange()
+{
+   const ArrangeRangeSel r = gArrangeRange;
+   if (!r.active || r.end <= r.start)
+      return;
+   gArrangeRangeClip = ArrangeRangeClipboard();
+   gArrangeRangeClip.valid = true;
+   gArrangeRangeClip.length = r.end - r.start;
+   gArrangeRangeClip.laneLo = r.laneLo;
+   gArrangeRangeClip.clips = ArrangeRangePieces(r);
+}
+
+// Turbo 0.72: drags a Range selection - what it holds moves by dt ticks and
+// dLane lanes (copy: the original stays). Works on gArrange directly; the
+// drag wraps it in one gesture (one undo step). Refused (false, nothing
+// changed) when a lane would land on a track of another kind or off the end.
+bool ArrangeMoveRangeBy(const ArrangeRangeSel& r, Arrange::Tick dt, int dLane, bool copy)
+{
+   if (!r.active || r.end <= r.start || (dt == 0 && dLane == 0) || r.laneLo < 0)
+      return false;
+   for (int li = r.laneLo; li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
+   {
+      const int to = li + dLane;
+      if (to < 0 || to >= (int)gArrange.lanes.size() || gArrange.lanes[(size_t)to].type != gArrange.lanes[(size_t)li].type)
+         return false;
+   }
+   const std::vector<std::pair<int, Arrange::Clip>> pieces = ArrangeRangePieces(r);
+   if (!copy)
+      ArrangeEraseSpan(r);
+   for (const auto& pc : pieces)
+   {
+      Arrange::Clip c = pc.second;
+      c.start = std::max<Arrange::Tick>(0, r.start + dt + c.start);
+      Arrange::PlaceOverwrite(gArrange, gArrange.lanes[(size_t)(r.laneLo + pc.first + dLane)].id, c);
+   }
+   return true;
 }
 
 void ArrangePasteRangeAt(Arrange::Tick at, int laneLo)
@@ -3056,7 +3161,9 @@ enum ArrangeDragMode
    // Turbo 0.72: the tools.
    kArrDragZoom, kArrDragHand, kArrDragRange, kArrDragPencil,
    // Turbo 0.72 (U2): clip gain line, slip.
-   kArrDragGain, kArrDragSlip
+   kArrDragGain, kArrDragSlip,
+   // Turbo 0.72: dragging a Range selection moves (Ctrl: copies) what it holds.
+   kArrDragRangeMove
 };
 
 struct ArrangeDragState
@@ -3088,6 +3195,7 @@ struct ArrangeDragState
    bool ctrlAdded = false;         // Ctrl+press added the clip to the selection
    float gainAtStart = 0.0f;       // gain line drag
    float slipAtStart = 0.0f;       // slip drag: sourceOffsetSeconds at the press
+   ArrangeRangeSel rangeAtStart;   // Range move: the selection at the press
 };
 ArrangeDragState gArrDrag;
 
@@ -3967,6 +4075,27 @@ void DrawArrangeToolbar(float width)
       ImGui::MenuItem("Count-in (one bar)", nullptr, &gArrangeRecCountIn);
       ImGui::MenuItem("Punch in / out on the loop range", nullptr, &gArrangeRecPunch);
       ImGui::Separator();
+      ImGui::TextDisabled("click");
+      if (ImGui::MenuItem("Off", nullptr, gArrangeRecClick == 0))
+         gArrangeRecClick = 0;
+      if (ImGui::MenuItem("During the count-in", nullptr, gArrangeRecClick == 1))
+         gArrangeRecClick = 1;
+      if (ImGui::MenuItem("During the count-in and the take", nullptr, gArrangeRecClick == 2))
+         gArrangeRecClick = 2;
+      ImGui::Separator();
+      ImGui::MenuItem("Compensate input latency (Audio In)", nullptr, &gArrangeRecLatencyComp);
+      if (gArrangeRecLatencyComp)
+      {
+         const double sr = AudioEngine::Instance().SampleRate();
+         const int rt = Platform::AudioRoundTripLatencyFrames();
+         if (sr > 0.0)
+            ImGui::TextDisabled("driver round trip %.1f ms", 1000.0 * rt / sr);
+         ImGui::SetNextItemWidth(160.0f);
+         ImGui::SliderFloat("##arrreclat", &gArrangeRecLatencyExtraMs, -50.0f, 50.0f, "extra %+.1f ms");
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("added to the driver's figure: raise it if takes still land late, lower it if early");
+      }
+      ImGui::Separator();
       ImGui::TextDisabled("loop on (no punch): every pass is a take -\n"
                           "the last on the track, the others on muted take tracks");
       ImGui::EndPopup();
@@ -4692,7 +4821,12 @@ void DrawArrangeInspector(ImVec2 mn, ImVec2 mx)
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
    };
    const std::vector<uint64_t> rows = ArrangeLiveRowSel();
-   if (gArrangeSettingsOpen && gArrangeSettingsClip != 0 && Arrange::FindClip(gArrange, gArrangeSettingsClip) != nullptr)
+   if (ArrangeSessionSlotSelected())
+   {
+      title("Session clip");
+      DrawArrangeSessionSlotInspector();
+   }
+   else if (gArrangeSettingsOpen && gArrangeSettingsClip != 0 && Arrange::FindClip(gArrange, gArrangeSettingsClip) != nullptr)
    {
       title("Clip");
       DrawArrangeClipSettings(true);
@@ -5588,6 +5722,18 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
          gArrDrag.scrollAtStart = gArrange.settings.scroll;
          gArrDrag.vscrollAtStart = gArrangeVScroll;
       }
+      else if (gArrangeTool == ArrangeTool::Range && gArrangeRange.active && laneAtY(mouse.y) >= gArrangeRange.laneLo &&
+               laneAtY(mouse.y) <= gArrangeRange.laneHi && tickAtX(mouse.x) >= gArrangeRange.start &&
+               tickAtX(mouse.x) < gArrangeRange.end)
+      {
+         // Turbo 0.72: a press inside the selection drags it (Ctrl: a copy).
+         gArrDrag.mode = kArrDragRangeMove;
+         gArrDrag.rangeAtStart = gArrangeRange;
+         gArrDrag.grabTick = tickAtX(mouse.x);
+         gArrDrag.startLane = laneAtY(mouse.y);
+         gArrDrag.copy = io.KeyCtrl;
+         ArrangeGestureBegin();
+      }
       else if (gArrangeTool == ArrangeTool::Range)
       {
          gArrDrag.mode = kArrDragRange;
@@ -5902,6 +6048,28 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
             gArrangeSnapGuide = gArrDrag.currentTick;
             break;
+         case kArrDragRangeMove:
+         {
+            if (!gArrDrag.moved)
+               break;
+            const ArrangeRangeSel& r0 = gArrDrag.rangeAtStart;
+            const Arrange::Tick newStart =
+               std::max<Arrange::Tick>(0, ArrangeSnapMaybe(r0.start + tickAtX(mouse.x) - gArrDrag.grabTick));
+            const int laneNow = laneAtY(mouse.y);
+            int dLane = laneNow >= 0 ? laneNow - gArrDrag.startLane : 0;
+            dLane = std::clamp(dLane, -r0.laneLo, (int)gArrange.lanes.size() - 1 - r0.laneHi);
+            gArrange = gArrDrag.base;
+            gArrangeRange = r0;
+            if (!ArrangeMoveRangeBy(r0, newStart - r0.start, dLane, gArrDrag.copy))
+               break; // not onto tracks of another kind: the selection stays put
+            gArrange.revision = gArrDrag.base.revision + 1;
+            gArrangeRange.start = newStart;
+            gArrangeRange.end = newStart + (r0.end - r0.start);
+            gArrangeRange.laneLo += dLane;
+            gArrangeRange.laneHi += dLane;
+            gArrangeSnapGuide = newStart;
+            break;
+         }
          // Turbo 0.72 (U2): the clip's gain line, 0.1 dB a pixel (Shift: fine).
          case kArrDragGain:
          {
@@ -5958,7 +6126,7 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
       // Turbo 0.72: tool releases.
       if (gArrDrag.mode == kArrDragZoom && !gArrDrag.moved)
          ArrangeSetZoomAround(gArrange.settings.zoom * (io.KeyAlt ? 0.75f : 1.35f), mouse.x);
-      if (gArrDrag.mode == kArrDragRange && !gArrDrag.moved)
+      if ((gArrDrag.mode == kArrDragRange || gArrDrag.mode == kArrDragRangeMove) && !gArrDrag.moved)
          gArrangeRange = ArrangeRangeSel(); // a click drops the range
       if (gArrDrag.mode == kArrDragPencil && gArrDrag.anchorLane >= 0 && gArrDrag.anchorLane < (int)gArrange.lanes.size())
       {

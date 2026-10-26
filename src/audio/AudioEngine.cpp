@@ -746,7 +746,9 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    {
       Transport& transport = Transport::Instance();
       const bool nodeClick = mDirectClick.load(std::memory_order_relaxed);
-      if ((nodeClick || mTopBarClick.load(std::memory_order_relaxed)) && transport.IsPlaying() && sampleRate > 0.0)
+      const bool recordClick = transport.Beats() < mRecordClickUntil.load(std::memory_order_relaxed);
+      if ((nodeClick || recordClick || mTopBarClick.load(std::memory_order_relaxed)) && transport.IsPlaying() &&
+          sampleRate > 0.0)
       {
          const double spb = sampleRate * 60.0 / std::max(1.0, (double)transport.Tempo());
          mDirectClickGen.RenderAdd(buffers, std::min(numChannels, 2), numFrames, transport.Beats(), spb,

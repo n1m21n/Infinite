@@ -322,6 +322,10 @@ public:
    // not need a Transport Control node; mixed like the direct click.
    void SetTopBarClick(bool enabled) { mTopBarClick.store(enabled, std::memory_order_relaxed); }
    bool TopBarClick() const { return mTopBarClick.load(std::memory_order_relaxed); }
+   // Turbo 0.72: the timeline's recording click - sounds while the transport
+   // is before this beat (the count-in's end, or "always" while a take runs).
+   // -1 = off.
+   void SetRecordClickUntil(double beat) { mRecordClickUntil.store(beat, std::memory_order_relaxed); }
    void SetDirectClick(bool enabled, float volume, bool accent)
    {
       mDirectClickVolume.store(volume, std::memory_order_relaxed);
@@ -463,5 +467,6 @@ private:
    std::atomic<bool> mTopBarClick { false };
    std::atomic<float> mDirectClickVolume { 0.5f };
    std::atomic<bool> mDirectClickAccent { true };
+   std::atomic<double> mRecordClickUntil { -1.0 };
    MetronomeClick mDirectClickGen; // audio thread only
 };

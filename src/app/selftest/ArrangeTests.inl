@@ -1586,8 +1586,9 @@
       // Turbo 0.72 (U2/U3): INFINITE_ARRANGEEDITPLUSTEST - the editing and
       // automation layer: an automation lane driving a real parameter
       // (linear and step curves, write mode recording), the patch round trip
-      // of automation / fade curves / content loop, ripple delete and range
-      // duplicate. Headless.
+      // of automation / fade curves / content loop, ripple delete, range
+      // duplicate and drag, Session clip drag and send to timeline, input
+      // latency. Headless.
       if (getenv("INFINITE_ARRANGEEDITPLUSTEST") != nullptr && frameId == 4)
       {
          NewPatch();
@@ -1728,6 +1729,78 @@
             allOk = allOk && dupOk;
          }
 
+         // --- range drag: move to another track and time, then copy back ---
+         {
+            gArrange = Arrange::Model();
+            gArrange.revision = 9200;
+            const uint64_t a = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            const uint64_t b = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            Arrange::AddLane(gArrange, Arrange::kLaneVideo);
+            Arrange::Clip c;
+            c.length = Arrange::kTicksPerBar;
+            Arrange::PlaceOverwrite(gArrange, a, c);
+            ArrangeRangeSel r;
+            r.active = true;
+            r.start = 0;
+            r.end = Arrange::kTicksPerBar;
+            r.laneLo = r.laneHi = 0;
+            ArrangeMoveRangeBy(r, Arrange::kTicksPerBar * 2, 1, false);
+            const Arrange::Lane* la = Arrange::FindLane(gArrange, a);
+            const Arrange::Lane* lb = Arrange::FindLane(gArrange, b);
+            bool moveOk = la->clips.empty() && lb->clips.size() == 1 && lb->clips[0].start == Arrange::kTicksPerBar * 2;
+            r.start = Arrange::kTicksPerBar * 2;
+            r.end = Arrange::kTicksPerBar * 3;
+            r.laneLo = r.laneHi = 1;
+            ArrangeMoveRangeBy(r, -Arrange::kTicksPerBar * 2, -1, true);     // copy: the original stays
+            const bool refused = !ArrangeMoveRangeBy(r, 0, 1, false); // onto a video track: refused
+            la = Arrange::FindLane(gArrange, a);
+            lb = Arrange::FindLane(gArrange, b);
+            moveOk = moveOk && refused && la->clips.size() == 1 && la->clips[0].start == 0 && lb->clips.size() == 1 &&
+                     gArrange.lanes[2].clips.empty();
+            printf("arrange range drag move / copy: %s\n", moveOk ? "OK" : "FAIL");
+            allOk = allOk && moveOk;
+         }
+
+         // --- Session: drag a clip (swap / copy), send a scene to the timeline
+         {
+            gArrange = Arrange::Model();
+            gArrange.revision = 9300;
+            const uint64_t a = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            const uint64_t b = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            const uint64_t v = Arrange::AddLane(gArrange, Arrange::kLaneVideo);
+            Arrange::Lane* la = Arrange::FindLane(gArrange, a);
+            la->slots.resize(1);
+            la->slots[0].clip.id = gArrange.NewId();
+            la->slots[0].clip.length = Arrange::kTicksPerBar * 4;
+            la->slots[0].loopTicks = Arrange::kTicksPerBar * 2;
+            gArrange.scenes.resize(1);
+            ArrSess::MoveSlot(a, 0, a, 2, false);
+            bool sessOk = ArrSess::FindSlot(a, 0) == nullptr && ArrSess::FindSlot(a, 2) != nullptr;
+            ArrSess::MoveSlot(a, 2, b, 0, true);
+            ArrSess::MoveSlot(a, 2, v, 0, false); // an audio clip on a video track: refused
+            sessOk = sessOk && ArrSess::FindSlot(a, 2) != nullptr && ArrSess::FindSlot(b, 0) != nullptr &&
+                     ArrSess::FindSlot(v, 0) == nullptr &&
+                     ArrSess::FindSlot(b, 0)->clip.id != ArrSess::FindSlot(a, 2)->clip.id;
+            tr.SeekBeats(0.0);
+            ArrSess::SendSceneToTimeline(0);
+            const Arrange::Lane* lb = Arrange::FindLane(gArrange, b);
+            sessOk = sessOk && lb->clips.size() == 1 && lb->clips[0].start == 0 &&
+                     lb->clips[0].length == Arrange::kTicksPerBar * 2 && Arrange::FindLane(gArrange, a)->clips.empty();
+            printf("arrange session drag / send to timeline: %s (playhead now beat %.2f)\n", sessOk ? "OK" : "FAIL",
+                   tr.Beats());
+            allOk = allOk && sessOk;
+            gArrangeSessSelLane = 0;
+            gArrangeSessSelRow = -1;
+         }
+
+         // --- input latency: only a source fed by an Audio In is moved ------
+         {
+            GraphNode* osc = SpawnNode("Oscillator", "Synths", 0.0f, 200.0f);
+            const bool latOk = osc != nullptr && ArrangeRecLatencySeconds(osc->uid, 48000.0) == 0.0;
+            printf("arrange input latency (synth source untouched): %s\n", latOk ? "OK" : "FAIL");
+            allOk = allOk && latOk;
+         }
+
          gArrangeAuto.clear();
          tr.SetPlaying(true);
          if (hadEngine)
@@ -1784,6 +1857,8 @@
             gArrange.scenes.resize(3);
             gArrange.scenes[0].name = "intro";
             gArrangeSessionView = true;
+            gArrangeSessSelLane = gArrange.lanes[2].id; // the inspector shows a Session clip
+            gArrangeSessSelRow = 1;
             ArrangeSessionLaunchScene(0);
          }
          gArrangePanelOpen = true;
