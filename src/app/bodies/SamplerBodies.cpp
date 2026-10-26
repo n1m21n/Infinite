@@ -545,12 +545,12 @@ namespace app
       {
          // Length: a loop is 1, 2, 4 or 8 bars, nothing between.
          static const std::vector<std::string> barNames = { "1 bar", "2 bars", "4 bars", "8 bars" };
-         const int choices[] = { 1, 2, 4, 8 };
+         static const int choices[] = { 1, 2, 4, 8 }; // static: the popup runs after this frame body, so the pick cannot capture a local
          int barIdx = 2;
          for (int i = 0; i < 4; i++)
             if (n->bars == choices[i])
                barIdx = i;
-         AudioBareDropdown("genBars", barNames, barIdx, [n, &choices](int i) { PushUndoCheckpoint(); n->bars = choices[i]; }, AudioHalfWidth());
+         AudioBareDropdown("genBars", barNames, barIdx, [n](int i) { PushUndoCheckpoint(); n->bars = choices[i]; }, AudioHalfWidth());
          if (ImGui::IsItemHovered())
             SetAudioReadout("length", "loop length in bars");
       }

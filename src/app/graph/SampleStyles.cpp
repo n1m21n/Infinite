@@ -646,7 +646,13 @@ Compiled Compile(const Recipe& recipe)
       }
       return cur;
    };
-   auto degreeNote = [&](int deg, int octave) { return MusicTime::DegreeToNote(deg, octave + 1, root, out.scale); };
+   // Nothing sits below E1 (41 Hz): lower than that is felt, not heard, and vanishes on most speakers.
+   auto degreeNote = [&](int deg, int octave) {
+      int n = MusicTime::DegreeToNote(deg, octave + 1, root, out.scale);
+      while (n < 28)
+         n += 12;
+      return n;
+   };
 
    // Drums: the card's 16-step lanes over two bars, each hit breathing a
    // little, ghost notes between the beats and maybe a fill into bar 3.
@@ -839,7 +845,7 @@ Compiled Compile(const Recipe& recipe)
       {
          const std::string lane = "lane" + std::to_string(i);
          // Sample kicks, snares and toms sit lower: a kick under its pitch, a snare with body, toms at tom pitch.
-         static const double kLower[8] = { -3.0, -3.0, 0.0, 0.0, 0.0, -3.0, -4.0, 0.0 };
+         static const double kLower[8] = { -1.0, -3.0, 0.0, 0.0, 0.0, -3.0, -4.0, 0.0 };
          const double pitch = cr.pitch * (lowLane[i] ? 0.5 : 1.0) + dr.Uniform(-4.0, 4.0) * (lowLane[i] ? 0.6 : 1.0) + (subPart || part == Part::Drums ? kLower[i] : 0.0);
          force[lane + "_pitch"] = { 'f', Num(std::round(pitch * 100.0) / 100.0) };
          force[lane + "_finetune"] = { 'f', Num(std::round(dr.Uniform(-30.0, 30.0))) };
@@ -905,7 +911,7 @@ Compiled Compile(const Recipe& recipe)
          int sq = 0;
          static const int kKinds[4] = { 1, 0, 1, 2 };
          const int kind = kKinds[dr.Range(4)]; // 0 punch, 1 808 (twice as likely), 2 thump
-         drumSeq(0, 21 + dr.Range(7), 90.0, sq); // 28-41 Hz: the sub under the thump
+         drumSeq(0, 29 + dr.Range(7), 90.0, sq); // 46-73 Hz: the kick's fundamental, audible on a small speaker too
          Params k = F({ { "mix", 0.45 }, { "volume", 0.9 }, { "a.position", dr.Uniform(0.0, 0.3) }, { "a.cutoff", 9000.0 }, { "a.resonance", 0.0 },
                         { "a.filterAmount", 0.0 }, { "a.ampAttack", 0.0 }, { "a.ampSustain", 0.0 }, { "a.pitchAttack", 0.0 },
                         { "a.pitchSustain", 0.0 }, { "a.pitchRelease", 20.0 }, { "a.ampRelease", 30.0 }, { "a.detune", 0.0 },
@@ -948,7 +954,7 @@ Compiled Compile(const Recipe& recipe)
       if (*lanes[1] && dr.Uniform() < (part == Part::Snares ? 0.9 : subPart ? 0.75 : 0.33))
       {
          int sq = 0;
-         drumSeq(1, 46 + dr.Range(6), 25.0, sq); // 115-165 Hz body, under the 909's 180 Hz partial
+         drumSeq(1, 49 + dr.Range(7), 25.0, sq); // 140-210 Hz body, the snare's fundamental
          const int nz = noiseVoice(dr.Range(2) ? 6 : 2, dr.Uniform(1500.0, 4500.0), dr.Uniform(0.05, 0.3), dr.Uniform(60.0, 160.0), 0.8);
          g.Connect(sq, nz, true);
          const int bd = toneVoice(dr.Uniform(6.0, 12.0), dr.Uniform(15.0, 45.0), dr.Uniform(110.0, 220.0), dr.Range(2) ? 0 : 10, 4500.0);
@@ -972,7 +978,7 @@ Compiled Compile(const Recipe& recipe)
       if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (subPart ? 0.75 : 0.33))
       {
          const bool perc = part == Part::Percussion; // percussion keeps its brighter toms
-         const int notes[2] = { perc ? 40 + dr.Range(8) : 36 + dr.Range(6), perc ? 52 + dr.Range(8) : 45 + dr.Range(6) }; // toms: floor 70-100 Hz, rack 110-160 Hz
+         const int notes[2] = { perc ? 40 + dr.Range(8) : 37 + dr.Range(8), perc ? 52 + dr.Range(8) : 47 + dr.Range(8) }; // toms: floor 75-140 Hz, rack 125-230 Hz
          for (int ti = 0; ti < 2; ti++)
          {
             if (!*lanes[5 + ti])
