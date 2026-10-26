@@ -11,6 +11,7 @@ namespace app
 bool RunAliasTest(); // selftest/AliasTests.cpp
 bool RunOversampleTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
+bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
 bool RunFxAudit(); // selftest/FxAudit.cpp
 bool RunModAudit(); // selftest/ModAudit.cpp
 bool RunSynthAudit(); // selftest/SynthAudit.cpp
@@ -625,6 +626,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    {
       RegisterNodes(); // its PDC check spawns real nodes; no GL involved
       return RunPitchTest() ? 0 : 1;
+   }
+
+   // Generate Samples: every pool type and style rendered on a worker (selftest/GenSampleTests.cpp).
+   if (getenv("INFINITE_GENSAMPLETEST") != nullptr)
+   {
+      RegisterNodes();
+      return RunGenSampleTest() ? 0 : 1;
    }
 
    // Measurement audit of every audio effect: gain, stereo, tail, stress,
