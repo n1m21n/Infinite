@@ -3,6 +3,7 @@
 
     catalog.py samples --lib <samples dir> [--max-mb 150]    -> website/samples/ data.json + media (wav / mp4 / poster / m4a for playback)
     catalog.py library --lib <samples dir> [--n 60]          -> website/assets/universe/ index.json + .inf + preview (the Library's curated slice)
+    catalog.py tag                                           -> part / style / key on website/samples/data.json from each patch (the page's filters)
 
 Samples are listening and downloading only: audio downloads as .wav, visual and audio+visual as .mp4. The patch is never offered there.
 Patches live in the Library; only a stricter slice of the samples goes in, and each carries a link back to its sample.
@@ -167,7 +168,53 @@ def publish_samples(lib, site, max_mb=150):
         shutil.rmtree(os.path.join(media, s["id"]), ignore_errors=True)
     json.dump({"samples": out}, open(os.path.join(site, "data.json"), "w"), separators=(",", ":"))
     print("samples: %d (%.0f MB) -> %s" % (len(out), total, site))
+    tag_samples(site)
     return out
+
+
+ROOTS = ("c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b")
+# MusicTime::ScaleTable order (src/audio/MusicTime.h)
+SCALES = ("major", "natural minor", "harmonic minor", "melodic minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian",
+          "major pentatonic", "minor pentatonic", "blues", "whole tone", "chromatic")
+PIANO_VOICES = {"FM", "Partials"}
+SYNTH_TYPES = {"Oscillator", "Wavetable", "Analog", "FM", "Partials", "String", "Wave Terrain", "Equation Synth", "Spectral Synth", "Metallic",
+               "Sampler", "Slicer", "PaulStretch", "Molder", "Grain Molder", "Granular", "Field Synth"}
+
+
+def describe(inf):
+    """What a sample is, read from its patch: part (the Generate Samples node's parts: full, drums, percussion, synths, piano, fx),
+    style (display name) and key ("a natural minor"; None for drums). The header's '# style:' line names the card."""
+    text = open(inf, encoding="utf-8", errors="replace").read()
+    types = set(re.findall(r"^node \d+ \S+ (.+)$", text, re.M))
+    m = re.search(r"^# style: (\w+)(?:.*\bpart (\w+))?", text, re.M)
+    style, part = (m.group(1), m.group(2)) if m else (None, None)
+    fam = None
+    if style:
+        for st in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles_music.json")))["styles"]:
+            if st["id"] == style:
+                fam = st["family"]
+    voices = types & SYNTH_TYPES
+    if not part:
+        drums = "Drum Sequencer" in types
+        part = ("drums" if drums and not voices else "piano" if (fam == "piano" or (voices and voices <= PIANO_VOICES)) and not drums
+                else "synths" if not drums else "full")
+    t = re.search(r"^transport \S+ \d+ \d+ (\d+) (\d+)", text, re.M)
+    key = None
+    if t and part not in ("drums", "percussion"):
+        key = "%s %s" % (ROOTS[int(t.group(1)) % 12], SCALES[int(t.group(2))] if int(t.group(2)) < len(SCALES) else "major")
+    return {"part": part, "style": style.replace("_", " ") if style else None, "key": key}
+
+
+def tag_samples(site):
+    """Adds part / style / key to every audio item of <site>/data.json that has its patch (no media rewritten)."""
+    path = os.path.join(site, "data.json")
+    d = json.load(open(path))
+    for s in d["samples"]:
+        if s.get("patch") and os.path.exists(os.path.join(site, s["patch"])):
+            s.update(describe(os.path.join(site, s["patch"])))
+    json.dump(d, open(path, "w"), separators=(",", ":"))
+    from collections import Counter
+    print("tagged %d: %s" % (len(d["samples"]), dict(Counter(s.get("part") for s in d["samples"]))))
 
 
 def _title(nodes):
@@ -221,7 +268,7 @@ def publish_library(lib, site_assets, n=60, samples=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["samples", "library", "all"])
+    ap.add_argument("cmd", choices=["samples", "library", "all", "tag"])
     ap.add_argument("--lib", default=os.path.expanduser("~/Infinite/patch-universe-library/samples"))
     ap.add_argument("--n", type=int, default=60)
     ap.add_argument("--max-mb", type=float, default=150)
@@ -243,6 +290,8 @@ def main():
                         shutil.copy(lib_inf, dest_inf)
                         x["patch"] = "media/%s/patch.inf" % x["id"]
             json.dump({"samples": s}, open(os.path.join(W, "samples", "data.json"), "w"), separators=(",", ":"))
+    if a.cmd in ("all", "tag"):
+        tag_samples(os.path.join(W, "samples"))
 
 
 if __name__ == "__main__":

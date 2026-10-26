@@ -96,3 +96,12 @@
 .smp-menu a:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
 .smp-menu b { font: 700 0.82rem/1 var(--font-mono); }
 .smp-menu span { color: var(--muted); font: 500 0.72rem/1 var(--font-mono); }
+
+/* Filters: part segments, style and key picks. A plain well, no chevron. */
+.smp-pick { appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; padding: 10px 14px; border-radius: 999px; max-width: 200px;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent); color: var(--ink); font: 600 0.85rem/1 var(--font-sans); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-pick:focus-visible, .smp-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 680px) {
+  .smp-seg { flex-wrap: wrap; border-radius: 18px; }
+  .smp-pick { flex: 1; max-width: none; }
+}
