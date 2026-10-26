@@ -39,6 +39,7 @@
 #include <unordered_set>
 #include <set>
 #include <memory>
+#include <random> // Turbo 0.72: ARRANGETEST fuzz (std::mt19937)
 #include <string>
 #include <thread>
 #include <mutex>
@@ -73,6 +74,7 @@
 #include "platform/McpBridge.h"
 #include "platform/AISkillContent.h"
 #include "app/ui/design/TokenColors.h" // Turbo 0.57: upstream design tokens (Infinite Dark theme)
+#include "core/TablerIcons.h" // Turbo 0.72: upstream's vector icons (timeline tools and transport)
 #include "platform/ClaudeChat.h"
 #include "platform/McpShare.h"
 #include "core/RuntimeLog.h"
@@ -166,6 +168,7 @@
 #include "nodes/CircuitSynthNode.h" // Turbo 0.73
 #include "audio/dsp/CircuitSynthDsp.h"
 #include "audio/Wavetable.h"
+#include "audio/AudioFileWriter.h" // Turbo 0.72: timeline takes (ArrangeUi.inl)
 #include "nodes/NoteNodes.h"
 #include "nodes/MidiOutNode.h" // Turbo 0.57 (upstream)
 #include "nodes/SpatialMixerNode.h" // Turbo 0.57 (upstream)

@@ -207,6 +207,7 @@ void Transport::AdvanceAudioClock(int numFrames)
          ApplySeek(start);
    }
    mClockThread.store(ThisThreadTag(), std::memory_order_relaxed);
+   mBlockStartBeats.store(Beats(), std::memory_order_relaxed); // Turbo 0.72: after the seek / wrap, before the advance
    if (mPlaying.load(std::memory_order_relaxed))
    {
       mBlockSeq.fetch_add(1, std::memory_order_acq_rel); // odd: changing

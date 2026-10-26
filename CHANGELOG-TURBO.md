@@ -1,5 +1,44 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## Unreleased (feature/timeline-align)
+
+Timeline aligned with upstream before new timeline features (plan: `docs/plans/TIMELINE-ANALYSIS.md`).
+
+- **Model and patch format = upstream's.** `ArrangeModel` taken verbatim from upstream main
+  (per-clip speed / reverse, Session view slots and scenes). Patches read and write `clipspeed`,
+  `slotclip`, `sessionslot`, `scene`, `scenemeta`, `sessionmeta` and legacy seconds `clip` lines
+  like upstream, so a patch saved by either build keeps all of it.
+- **Fix: timeline audio played one audio block early.** The mix read the block's end beat;
+  it now reads the block's start (`Transport::BlockStartBeats`, upstream's).
+- **Fix: undo could hand out a clip id again.** Undo no longer rewinds the id counter.
+- **Every audio clip is position-locked** (upstream rule), not only dropped samples; a clip's
+  speed reaches the file player. Reverse is saved and loaded but not yet played backwards.
+- **New: record to timeline.** R on an audio track arms it and picks what it records (Audio In, a
+  synth played by hand, a Mixer, any audio node). REC in the timeline toolbar starts the transport
+  and records every armed track; stop or pause ends the take, which lands on its track as an audio
+  clip (its own Audio File node, WAV in the recordings folder) at the beat it was played, replacing
+  what was under it. An armed track is heard while recording or stopped (auto monitoring). Takes
+  are linear: the loop is off while recording. Before this, the timeline only gated live nodes, so
+  parts played by hand were gone after a rewind.
+- **Timeline toolbar redesigned** on the shared design tokens and theme: icon tiles (upstream's
+  Tabler vector icons), grouped transport / position / tools / snap-loop-follow / tracks / zoom,
+  audio owner, monitor and render on the right.
+- **Editing tools (upstream's set and keys):** Select (A), Trim (T, nearer edge from anywhere in a
+  clip), Range (R, a span over tracks or over all tracks from the ruler; Delete erases it), Blade (B),
+  Zoom (Z: click, Alt+click, drag), Hand (H), Pencil (P: drag on an empty track draws a clip). Keys
+  F (fit), = / - (zoom), Ctrl+L (loop), I / O (loop in / out at the playhead).
+- **Track selection (upstream's):** click a track header, Shift extends, Ctrl toggles; Delete,
+  Duplicate and Group act on the selected tracks.
+- **Track headers redesigned** (power, mute / solo / record arm chips, gain and pan wells, meter) and
+  a **docked inspector** column on the right for the selected clip, track or tracks (pencil button
+  in the toolbar; the floating clip window only when it is hidden).
+- **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
+  a dashed snap guide while dragging.
+- **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),
+  `INFINITE_ARRANGEMULTITRACKTEST` (three tracks side by side, live and in a WAV render) and
+  `INFINITE_ARRANGERECORDTEST` (record an Oscillator, delete it, the take still plays at the same
+  level), in the gate.
+
 ## Unreleased (feature/circuit-synth)
 
 - **New: Circuit Synth** (Synths, both editions, MIT clean room). Makes its sound by simulating a

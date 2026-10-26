@@ -323,6 +323,8 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
 
    if (timeline && !list->topology.arrangeTerminals.empty())
       MixArrangeTerminals(list, deviceBuffer, numFrames, numChannels);
+   if (timeline && !list->topology.arrangeRecorders.empty())
+      RunArrangeRecorders(list, deviceBuffer, numFrames, numChannels); // Turbo 0.72
 
    // Last line of defence for the hardware stream. A faulty plugin or DSP
    // node must never poison every downstream terminal with NaN/Inf, nor send
@@ -366,7 +368,9 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
 
 namespace
 {
-   double ArrangeBlockStartBeat() { return Transport::Instance().Beats(); }
+   // Turbo 0.72: the block's first frame, not Beats() (the block's end after
+   // AdvanceAudioClock) - the timeline mix used to run one block early.
+   double ArrangeBlockStartBeat() { return Transport::Instance().BlockStartBeats(); }
    double ArrangeBeatsPerSample(double sampleRate)
    {
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
@@ -419,8 +423,10 @@ void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
       if (!w[k].seekSource)
          continue;
       const double effBpm = (w[k].syncToTempo && w[k].sampleBpm > 0.0f) ? (double)w[k].sampleBpm : bpm;
-      const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm;
-      const double perSecond = bpm / effBpm;
+      // Turbo 0.72 (timeline align): upstream's per-clip speed, signed.
+      const double clipSpeed = (double)w[k].speed;
+      const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm * clipSpeed;
+      const double perSecond = bpm / effBpm * clipSpeed;
       t.source->SetClipSamplePosition(secs, perSecond, w[k].pitch, jumped || entered);
    }
 
@@ -564,6 +570,50 @@ void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuff
          const float prev = mLanePeak[i].load(std::memory_order_relaxed);
          mLanePeak[i].store(std::max(peaks[i], prev * 0.85f), std::memory_order_relaxed);
       }
+}
+
+// Turbo 0.72 (record to timeline): every armed lane's source. While its tap
+// is enabled and the transport plays, the block goes into the tap's ring
+// (stereo, interleaved, before the lane's mix) and the first block stamps
+// its start beat, so the take lands exactly where it was played. A monitored
+// lane is also heard, through the lane's gain and pan.
+void AudioEngine::RunArrangeRecorders(ProcessList* list, AudioBuffer& deviceBuffer, int numFrames, int numChannels)
+{
+   const bool playing = Transport::Instance().IsPlaying();
+   for (const ArrangeRecorder& r : list->topology.arrangeRecorders)
+   {
+      if (r.bufferIndex < 0 || r.tap == nullptr)
+         continue;
+      AudioBuffer src = list->buffers[r.bufferIndex].View(numFrames, numChannels);
+      if (playing && r.tap->enabled.load(std::memory_order_acquire))
+      {
+         if (!r.tap->started.load(std::memory_order_relaxed))
+         {
+            r.tap->startBeat.store(ArrangeBlockStartBeat(), std::memory_order_relaxed);
+            r.tap->started.store(true, std::memory_order_release);
+         }
+         for (int i = 0; i < numFrames; i++)
+         {
+            const float l = src.channels[0][i];
+            const float rr = numChannels > 1 ? src.channels[1][i] : l;
+            mInterleaveScratch[(size_t)i * 2 + 0] = l;
+            mInterleaveScratch[(size_t)i * 2 + 1] = rr;
+         }
+         r.tap->ring.Write(mInterleaveScratch, numFrames * 2);
+      }
+      // Auto monitoring, like a DAW: heard while recording or while stopped,
+      // not while the transport plays the lane's takes back.
+      if (r.monitor && (r.tap->enabled.load(std::memory_order_relaxed) || !playing))
+      {
+         const int slot = std::clamp(r.laneSlot, 0, kMaxArrangeLanes - 1);
+         const float g = mLaneGain[slot].load(std::memory_order_relaxed);
+         const float gl = g * mLanePanL[slot].load(std::memory_order_relaxed);
+         const float gr = g * mLanePanR[slot].load(std::memory_order_relaxed);
+         for (int ch = 0; ch < numChannels; ch++)
+            for (int i = 0; i < numFrames; i++)
+               deviceBuffer.channels[ch][i] += src.channels[ch][i] * (ch == 0 ? gl : (ch == 1 ? gr : g));
+      }
+   }
 }
 
 void AudioEngine::SetOfflineRender(bool on)

@@ -1,5 +1,33 @@
 # Passagem de trabalho: turbo/next (0.70)
 
+## Timeline (mergeada em `turbo/windows-only` em 2026-10-26, sem tag, sem push)
+
+Branches `feature/timeline-align` → `feature/timeline-ux` → `feature/timeline-u1`, testadas pelo dono
+no app. UX: ler `docs/plans/TIMELINE-UX-PLAN.md`.
+- Feito:
+  - toolbar sobre os tokens, com ícones;
+  - as 7 ferramentas do Naman;
+  - seleção de pistas;
+  - cabeçalhos novos;
+  - inspector fixo.
+- Próximo (resto da U1): no motor, stems (Render Track/Group), reverse no player, stretch por
+  transientes e fades de vídeo, com os testes do upstream de cada um. Depois, a Session view.
+
+### Primeira etapa: alinhamento ao upstream (`feature/timeline-align`)
+
+- Ler `docs/plans/TIMELINE-ANALYSIS.md`: análise, regra "o Naman tem que conseguir levar de volta"
+  (4b), progresso (4c), plano F0–F5.
+- Feito: `ArrangeModel` verbatim do upstream; Patch com speed/reverse, Session e `clip` legado; todo
+  clip de áudio com lock de posição; correção do áudio um bloco adiantado (`BlockStartBeats`) e do
+  undo que reaproveitava id.
+- Gravação numa pista armada feita (R na pista + REC no toolbar), desenho em
+  `TIMELINE-ANALYSIS.md` 4d.
+- Testes: `ARRANGETEST`, `ARRANGEAUDIOTEST`, `ARRANGEMULTITRACKTEST`, `ARRANGERECORDTEST`
+  (`src/app/selftest/ArrangeTests.inl`), no `driver.ps1`. Nada commitado; commit só com o aval do dono.
+- Próximo: o dono testar no app (gravar 3 pistas, rewind, render WAV). Depois: takes em loop, loop do
+  conteúdo do clip, stems (Render Track do upstream), reverse no player, e os testes de
+  sample/render/edit do upstream.
+
 ## Em andamento: Circuit Synth (branch `feature/circuit-synth`, saída de `turbo/windows-only`)
 
 - Nó novo (Synths, MIT, sala limpa, nas duas edições) que simula circuitos em tempo real: MNA +
