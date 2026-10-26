@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Psytrance Resonant Comb FX",
+    "author": "Infinite",
+    "description": "Multi-tap resonant comb filter with kinetic sweep LFO modulation and harmonic feedback saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float combRate = 4.5 [0.1, 16.0]\nparam float resonance = 0.72 [0.1, 0.95]\nparam float feedbackMod = 0.55 [0.0, 1.0]\nparam float drive = 0.5 [0.0, 1.5]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float prevOut = 0\n\nlfo = (lfo + combRate / sr) % 1.0\nmodSweep = (sin(lfo * 6.2831853) * 0.5 + 0.5) * feedbackMod\n\nsig = in + prevOut * (resonance * (0.6 + modSweep * 0.35))\nsat = clamp(sig * (1.0 + drive * 0.8), -1.0, 1.0)\n\ncoeff = clamp(0.25 + modSweep * 0.45, 0.05, 0.85)\nd1 = d1 + coeff * (sat - d1)\nd2 = d2 + coeff * (d1 - d2)\nd3 = d3 + coeff * (d2 - d3)\nprevOut = d3\n\nout = (in * (1.0 - mix) + prevOut * mix) * 0.82\n",
+    "params": {
+      "combRate": 4.5,
+      "resonance": 0.72,
+      "feedbackMod": 0.55,
+      "drive": 0.5,
+      "mix": 0.5
+    }
+  }
+}

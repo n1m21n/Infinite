@@ -87,11 +87,20 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/cymatics-sine-chladni-resonance.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-harmonic-ripples.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/ditherpunk-terminal-matrix.html": {
    "font-size": 2,
    "hex": 6
   },
   "embeds/ditherpunk.html": {
+   "duration": 1,
    "font-size": 2,
    "hex": 5,
    "radius": 1
@@ -142,6 +151,14 @@
    "hex": 6
   },
   "embeds/hyperspace-tunnel.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/indie-psychedelic-kaleido-melt.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/indie-psychedelic-liquid-dream.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -360,6 +377,11 @@
    "hex": 3,
    "radius": 1
   },
+  "samples.css": {
+   "font-size": 17,
+   "hex": 8,
+   "radius": 9
+  },
   "search.css": {
    "duration": 3,
    "font-size": 9,
@@ -376,14 +398,6 @@
    "font-size": 47,
    "hex": 18,
    "radius": 12
-  },
-  "embeds/cymatics-sine-chladni-resonance.html": {
-   "font-size": 2,
-   "hex": 6
-  },
-  "embeds/cymatics-sine-harmonic-ripples.html": {
-   "font-size": 2,
-   "hex": 6
   }
  }
 }

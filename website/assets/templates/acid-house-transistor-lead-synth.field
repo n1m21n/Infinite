@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid House Transistor Lead Synth",
+    "author": "Infinite",
+    "description": "Resonant 3-pole transistor diode ladder lead synthesizer with accent modulation and vintage acid squelch.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1400.0 [80.0, 9000.0]\nparam float resonance = 0.78 [0.1, 0.98]\nparam float envMod = 0.75 [0.0, 1.0]\nparam float accent = 0.5 [0.0, 1.0]\nparam float decay = 0.35 [0.05, 2.0]\nstate float phase = 0\nstate float env = 0\nstate float curFreq = 110\nstate float lp1 = 0\nstate float lp2 = 0\nstate float lp3 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, env + (target - env) * 0.1, env - env * (0.0006 / decay))\n\ncurFreq = curFreq + (freq - curFreq) * 0.08\nstepFreq = clamp(curFreq, 20.0, 4000.0) / sr\nphase = (phase + stepFreq) % 1.0\n\nsaw = phase * 2.0 - 1.0\nsquare = if(phase > 0.5, 0.9, -0.9)\nraw = saw * 0.7 + square * 0.3\n\nfMod = clamp(cutoff + env * (4500.0 * (1.0 + accent * 0.5)), 60.0, 14000.0)\nfNorm = clamp(fMod * 3.14159265 / sr, 0.01, 0.85)\nfb = resonance * 3.2\n\ndrive = raw - lp3 * fb\nlp1 = lp1 + fNorm * (drive - lp1)\nlp2 = lp2 + fNorm * (lp1 - lp2)\nlp3 = lp3 + fNorm * (lp2 - lp3)\n\nsat = clamp(lp3 * 1.5, -1.0, 1.0)\nout = sat * env * 0.38\n",
+    "params": {
+      "cutoff": 1400.0,
+      "resonance": 0.78,
+      "envMod": 0.75,
+      "accent": 0.5,
+      "decay": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

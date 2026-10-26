@@ -1,0 +1,84 @@
+infinite-patch 1
+# Psytrance Spectral Filter FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 2400.0
+  f resonance 0.3
+  f decay 0.2
+  f volume 0.5
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float filterRate = 6.0 [0.2, 20.0]\nparam float resonance = 0.75 [0.1, 0.96]\nparam float cutoff = 1600.0 [100.0, 8000.0]\nparam float drive = 1.2 [0.5, 3.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfo = 0\nstate float s1 = 0\nstate float s2 = 0\n\nlfo = (lfo + filterRate / sr) % 1.0\nsweep = sin(lfo * 6.2831853) * 0.45 + 0.55\n\nu = in * drive\nsat = clamp(u, -1.0, 1.0)\n\nfCut = clamp((cutoff * sweep) / sr * 2.4, 0.005, 0.45)\nfeedback = (s2 * resonance * 2.5) / (1.0 + abs(s2))\ndiff = sat - feedback - s1\ns1 = s1 + fCut * diff\ns2 = s2 + fCut * s1\n\nout = (in * (1.0 - mix) + s2 * mix) * 0.85\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.28 0.18 0.45
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Psytrance Spectral Filter FX. Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

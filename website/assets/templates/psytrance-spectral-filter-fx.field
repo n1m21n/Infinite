@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Psytrance Spectral Filter FX",
+    "author": "Infinite",
+    "description": "Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float filterRate = 6.0 [0.2, 20.0]\nparam float resonance = 0.75 [0.1, 0.96]\nparam float cutoff = 1600.0 [100.0, 8000.0]\nparam float drive = 1.2 [0.5, 3.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfo = 0\nstate float s1 = 0\nstate float s2 = 0\n\nlfo = (lfo + filterRate / sr) % 1.0\nsweep = sin(lfo * 6.2831853) * 0.45 + 0.55\n\nu = in * drive\nsat = clamp(u, -1.0, 1.0)\n\nfCut = clamp((cutoff * sweep) / sr * 2.4, 0.005, 0.45)\nfeedback = (s2 * resonance * 2.5) / (1.0 + abs(s2))\ndiff = sat - feedback - s1\ns1 = s1 + fCut * diff\ns2 = s2 + fCut * s1\n\nout = (in * (1.0 - mix) + s2 * mix) * 0.85\n",
+    "params": {
+      "filterRate": 6.0,
+      "resonance": 0.75,
+      "cutoff": 1600.0,
+      "drive": 1.2,
+      "mix": 0.5
+    }
+  }
+}

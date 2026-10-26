@@ -1113,6 +1113,72 @@
         "Limiter",
         "Audio Out"
       ]
+    },
+    {
+      "id": "acid-house-transistor-lead-synth",
+      "name": "Acid House Transistor Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Resonant 3-pole transistor diode ladder lead synthesizer with accent modulation and vintage acid squelch.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-transistor-lead-synth.webp",
+      "file": "assets/templates/acid-house-transistor-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "acid-house-resonant-sub-synth",
+      "name": "Acid House Resonant Sub Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep resonant acid sub bass synthesizer with transistor glide, soft saturation drive, and sub-octave punch.",
+      "price": 0,
+      "preview": "assets/templates/acid-house-resonant-sub-synth.webp",
+      "file": "assets/templates/acid-house-resonant-sub-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "psytrance-resonant-comb-fx",
+      "name": "Psytrance Resonant Comb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-tap resonant comb filter with kinetic sweep LFO modulation and harmonic feedback saturation.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-resonant-comb-fx.webp",
+      "file": "assets/templates/psytrance-resonant-comb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "psytrance-spectral-filter-fx",
+      "name": "Psytrance Spectral Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive.",
+      "price": 0,
+      "preview": "assets/templates/psytrance-spectral-filter-fx.webp",
+      "file": "assets/templates/psytrance-spectral-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

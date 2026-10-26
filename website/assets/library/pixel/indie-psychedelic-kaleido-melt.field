@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Indie Psychedelic Kaleido Melt",
+    "author": "Infinite",
+    "description": "Kaleidoscopic radial symmetry melt shader with liquid color warping, gold iridescence, and turquoise glow.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float swirlRate = 0.85 [0.1, 3.0]\nparam float symmetry = 6.0 [3.0, 12.0]\nparam float meltDistort = 1.4 [0.2, 4.0]\nparam float colorPhase = 0.6 [0.0, 1.0]\nparam float glow = 0.7 [0.1, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\nr = length(p)\nang = atan2(p.y, p.x)\ntime = t * swirlRate\n\nsector = 6.2831853 / symmetry\naFold = abs(mod(ang + time * 0.2, sector) - sector * 0.5)\n\npFold = vec2(cos(aFold), sin(aFold)) * r\nswirl = sin(r * 5.0 - time * 2.0 + sin(aFold * 4.0) * meltDistort)\nripple = cos(pFold.x * 6.0 + pFold.y * 6.0 - time * 1.5)\n\nval = swirl * 0.6 + ripple * 0.4\n\ncDeep = vec3(0.08, 0.04, 0.16)\ncMagenta = vec3(0.92, 0.12, 0.58)\ncGold = vec3(0.98, 0.76, 0.15)\ncTurquoise = vec3(0.12, 0.85, 0.82)\n\nmix1 = mix(cDeep, cMagenta, clamp(val * 0.6 + 0.4, 0.0, 1.0))\nmix2 = mix(mix1, cGold, clamp(sin(r * 4.0 - time + colorPhase * 3.14) * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(mix2, cTurquoise, clamp(cos(aFold * 3.0 + r * 2.0) * 0.5 + 0.5, 0.0, 1.0) * glow)\nalpha = 1.0\n",
+    "params": {
+      "swirlRate": 0.85,
+      "symmetry": 6.0,
+      "meltDistort": 1.4,
+      "colorPhase": 0.6,
+      "glow": 0.7
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Indie Psychedelic Liquid Dream",
+    "author": "Infinite",
+    "description": "Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float flowSpeed = 0.75 [0.1, 2.5]\nparam float fluidWarp = 2.2 [0.5, 5.0]\nparam float colorSpread = 1.1 [0.2, 2.0]\nparam float pulseBloom = 0.65 [0.1, 1.0]\nparam float density = 4.0 [1.0, 8.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0\nr = length(p)\ntime = t * flowSpeed\n\nw1 = sin(p.x * density + time * 1.2) + cos(p.y * density - time * 0.9)\nw2 = sin(p.y * (density * 1.3) + time * 0.8 + w1 * 0.5)\npWarp = p + vec2(w1, w2) * (0.18 * fluidWarp)\n\nblob1 = sin(length(pWarp - vec2(cos(time * 0.4) * 0.4, sin(time * 0.4) * 0.4)) * 6.0 - time * 1.8)\nblob2 = cos(length(pWarp + vec2(sin(time * 0.5) * 0.35, cos(time * 0.5) * 0.35)) * 5.0 + time * 1.4)\nfluidPattern = blob1 * 0.5 + blob2 * 0.5\n\ncViolet = vec3(0.18, 0.04, 0.32)\ncElectricOrange = vec3(0.98, 0.42, 0.08)\ncLime = vec3(0.45, 0.92, 0.18)\ncPink = vec3(0.95, 0.18, 0.68)\n\nbase = mix(cViolet, cElectricOrange, clamp(fluidPattern * 0.7 + 0.5, 0.0, 1.0))\nlayered = mix(base, cLime, clamp(sin(fluidPattern * 4.0 + time * colorSpread) * 0.5 + 0.5, 0.0, 1.0) * 0.75)\ncol = mix(layered, cPink, clamp(cos(r * 5.0 - time * 1.5) * 0.5 + 0.5, 0.0, 1.0) * pulseBloom)\nalpha = 1.0\n",
+    "params": {
+      "flowSpeed": 0.75,
+      "fluidWarp": 2.2,
+      "colorSpread": 1.1,
+      "pulseBloom": 0.65,
+      "density": 4.0
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

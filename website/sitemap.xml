@@ -91,6 +91,8 @@
   <url><loc>https://infinitedevices.org/embeds/op-art-hypnotic-vortex.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/cymatics-sine-chladni-resonance.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/cymatics-sine-harmonic-ripples.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/indie-psychedelic-kaleido-melt.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/indie-psychedelic-liquid-dream.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-26</lastmod><priority>0.7</priority></url>
@@ -172,6 +174,10 @@
   <url><loc>https://infinitedevices.org/library/dub-techno-sub-rumble-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/drone-kosmische-space-delay-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-house-transistor-lead-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-house-resonant-sub-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-resonant-comb-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-spectral-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
@@ -496,6 +502,16 @@
   <url><loc>https://infinitedevices.org/library/drone-kosmische-resonator-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-chladni-resonance.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-ripples.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-constructivist-grid.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bauhaus-geometric-rotary.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/suprematist-floating-monolith-3d.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/suprematist-geometric-cantilever-3d.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-house-transistor-lead-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/acid-house-resonant-sub-synth.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-resonant-comb-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/psytrance-spectral-filter-fx.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/indie-psychedelic-kaleido-melt.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/indie-psychedelic-liquid-dream.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-26</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-26</lastmod><priority>0.5</priority></url>

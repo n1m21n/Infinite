@@ -4005,6 +4005,206 @@
       "file": "assets/library/pixel/cymatics-sine-harmonic-ripples.field",
       "preview": "assets/library/previews/cymatics-sine-harmonic-ripples.jpg",
       "bytes": 1963
+    },
+    {
+      "id": "bauhaus-constructivist-grid",
+      "name": "Bauhaus Constructivist Grid",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "constructivist",
+        "grid",
+        "geometric",
+        "drawing"
+      ],
+      "description": "Modular constructivist grid of primary circular discs, quarter-circle wedges, and solid rectangular balance bars.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-constructivist-grid.js",
+      "preview": "assets/library/previews/bauhaus-constructivist-grid.jpg",
+      "bytes": 2843
+    },
+    {
+      "id": "bauhaus-geometric-rotary",
+      "name": "Bauhaus Geometric Rotary",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "rotary",
+        "geometry",
+        "constructivist",
+        "procedural"
+      ],
+      "description": "Concentric circular arcs, rotating triangular wedges, and cantilever balance bars in dynamic equilibrium.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-geometric-rotary.js",
+      "preview": "assets/library/previews/bauhaus-geometric-rotary.jpg",
+      "bytes": 2332
+    },
+    {
+      "id": "suprematist-floating-monolith-3d",
+      "name": "Suprematist Floating Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "monolith",
+        "3d",
+        "constructivist",
+        "geometry"
+      ],
+      "description": "Suspended carbon black rectangular monolith flanked by dynamic red diagonal wedges and interlocking cantilever planes.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/suprematist-floating-monolith-3d.js",
+      "preview": "assets/library/previews/suprematist-floating-monolith-3d.jpg",
+      "bytes": 2095
+    },
+    {
+      "id": "suprematist-geometric-cantilever-3d",
+      "name": "Suprematist Geometric Cantilever 3D",
+      "kind": "Generator",
+      "tags": [
+        "suprematist",
+        "cantilever",
+        "3d",
+        "architecture",
+        "geometry"
+      ],
+      "description": "Interlocking constructivist cantilever beams, offset rectangular planes, and hovering geometric volumes.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/suprematist-geometric-cantilever-3d.js",
+      "preview": "assets/library/previews/suprematist-geometric-cantilever-3d.jpg",
+      "bytes": 2020
+    },
+    {
+      "id": "acid-house-transistor-lead-synth",
+      "name": "Acid House Transistor Lead Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "acid",
+        "house",
+        "lead",
+        "transistor"
+      ],
+      "description": "Resonant 3-pole transistor diode ladder lead synthesizer with accent modulation and vintage acid squelch.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/acid-house-transistor-lead-synth.inf",
+      "preview": "assets/library/previews/acid-house-transistor-lead-synth.jpg",
+      "bytes": 2222
+    },
+    {
+      "id": "acid-house-resonant-sub-synth",
+      "name": "Acid House Resonant Sub Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "acid",
+        "house",
+        "sub",
+        "bass"
+      ],
+      "description": "Deep resonant acid sub bass synthesizer with transistor glide, soft saturation drive, and sub-octave punch.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/acid-house-resonant-sub-synth.inf",
+      "preview": "assets/library/previews/acid-house-resonant-sub-synth.jpg",
+      "bytes": 2215
+    },
+    {
+      "id": "psytrance-resonant-comb-fx",
+      "name": "Psytrance Resonant Comb FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "psytrance",
+        "comb",
+        "filter",
+        "resonance"
+      ],
+      "description": "Multi-tap resonant comb filter with kinetic sweep LFO modulation and harmonic feedback saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/psytrance-resonant-comb-fx.inf",
+      "preview": "assets/library/previews/psytrance-resonant-comb-fx.jpg",
+      "bytes": 2029
+    },
+    {
+      "id": "psytrance-spectral-filter-fx",
+      "name": "Psytrance Spectral Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "psytrance",
+        "filter",
+        "spectral",
+        "sweep"
+      ],
+      "description": "Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/psytrance-spectral-filter-fx.inf",
+      "preview": "assets/library/previews/psytrance-spectral-filter-fx.jpg",
+      "bytes": 1934
+    },
+    {
+      "id": "indie-psychedelic-kaleido-melt",
+      "name": "Indie Psychedelic Kaleido Melt",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "psychedelic",
+        "kaleidoscope",
+        "melt",
+        "shader"
+      ],
+      "description": "Kaleidoscopic radial symmetry melt shader with liquid color warping, gold iridescence, and turquoise glow.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/indie-psychedelic-kaleido-melt.field",
+      "preview": "assets/library/previews/indie-psychedelic-kaleido-melt.jpg",
+      "bytes": 1564
+    },
+    {
+      "id": "indie-psychedelic-liquid-dream",
+      "name": "Indie Psychedelic Liquid Dream",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "psychedelic",
+        "fluid",
+        "liquid",
+        "shader"
+      ],
+      "description": "Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/indie-psychedelic-liquid-dream.field",
+      "preview": "assets/library/previews/indie-psychedelic-liquid-dream.jpg",
+      "bytes": 1716
     }
   ]
 }
