@@ -641,6 +641,8 @@ namespace app
          DrawStringBody(gn, n);
       else if (auto* n = dynamic_cast<AudioPluginNode*>(gn.node.get()))
          DrawPluginBody(gn, n);
+      else if (auto* n = dynamic_cast<GenerateSamplesNode*>(gn.node.get()))
+         DrawGenerateSamplesBody(gn, n); // before Sampler: it is one
       else if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
          DrawSamplerBody(gn, n);
       else if (auto* n = dynamic_cast<SlicerNode*>(gn.node.get()))

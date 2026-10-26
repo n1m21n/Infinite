@@ -254,6 +254,13 @@ namespace
 
 namespace SampleStyles
 {
+const char* PartName(Part p)
+{
+   static const char* const kNames[] = { "full", "drums", "percussion", "synths", "piano", "fx" };
+   const int i = (int)p;
+   return i >= 0 && i < (int)Part::Count ? kNames[i] : kNames[0];
+}
+
 int Count() { return (int)(sizeof(kGenStyles) / sizeof(kGenStyles[0])); }
 
 Style At(int i)
@@ -287,8 +294,26 @@ Compiled Compile(const Recipe& recipe)
    const int scale = scales.empty() ? 0 : std::stoi(rng.Choice(scales));
    out.bpm = recipe.bpm > 0.0f ? recipe.bpm : (float)cardBpm;
    out.root = recipe.key >= 0 ? recipe.key % 12 : cardRoot;
-   out.scale = scale;
+   out.scale = recipe.scale >= 0 ? recipe.scale : scale;
    const int root = out.root;
+   const Part part = recipe.part;
+   const bool full = part == Part::Full;
+   // Every layer is built whatever the part, so the random stream stays the
+   // same and a part is that layer of the seed's full mix; a layer the part
+   // leaves out goes no further than the mixer (the offline graph renders
+   // only what reaches the tap). The drums still feed the sidechains.
+   const bool wantBass = full || part == Part::Synths || part == Part::Piano;
+   const bool wantChords = full || part == Part::Synths || part == Part::Piano || part == Part::Fx;
+   const bool wantMotif = wantBass;
+   // The piano voice comes from its own stream, so swapping it in moves nothing else.
+   Rng pianoRng(std::string("piano:") + std::to_string(recipe.seed));
+   auto voice = [&](const std::string& picked) -> std::string
+   {
+      if (part != Part::Piano)
+         return picked;
+      const char* const kPianos[] = { "FM", "Partials" };
+      return kPianos[pianoRng.Range(2)];
+   };
 
    std::set<std::string> ban;
    for (const std::string& b : Split(st.ban))
@@ -307,6 +332,7 @@ Compiled Compile(const Recipe& recipe)
    g.variation = recipe.variation;
    std::vector<std::pair<int, float>> chans; // (node, gain dB)
    std::vector<int> synths;
+   int layers = 0; // layers the full mix has, whatever the part keeps
 
    auto chain = [&](int src, int fxN)
    {
@@ -333,13 +359,42 @@ Compiled Compile(const Recipe& recipe)
       }
       return cur;
    };
-   auto degreeNote = [&](int deg, int octave) { return MusicTime::DegreeToNote(deg, octave + 1, root, scale); };
+   auto degreeNote = [&](int deg, int octave) { return MusicTime::DegreeToNote(deg, octave + 1, root, out.scale); };
 
    // Drums: the card's 16-step lanes over two bars, each hit breathing a
    // little, ghost notes between the beats and maybe a fill into bar 3.
+   // Drums and percussion are the card's lanes split in two (kick, snare,
+   // hats | clap, toms, bell). A card with no drums asked for drums gets a
+   // plain kit; one with no percussion plays its kit's figures on the
+   // percussion sounds (snare on clap, kick on low tom, open hat on high
+   // tom, closed hat on bell).
+   const char* lanes[8];
    bool hasDrums = false;
-   for (const char* p : st.drums)
-      hasDrums = hasDrums || (p != nullptr && *p != 0);
+   for (int i = 0; i < 8; i++)
+   {
+      lanes[i] = st.drums[i] != nullptr ? st.drums[i] : "";
+      hasDrums = hasDrums || *lanes[i] != 0;
+   }
+   const bool drumPart = part == Part::Drums || part == Part::Percussion;
+   auto none = [&](int from) { return !*lanes[from] && !*lanes[from + 1] && !*lanes[from + 2] && !*lanes[from + 3]; };
+   if (drumPart && none(0) && (part == Part::Drums || none(4)))
+   {
+      lanes[0] = "x...x...x...x...";
+      lanes[1] = "....x.......x...";
+      lanes[2] = "..x...x...x...x.";
+      hasDrums = true;
+   }
+   if (part == Part::Percussion && none(4))
+   {
+      lanes[4] = lanes[1];
+      lanes[5] = lanes[0];
+      lanes[6] = lanes[3];
+      lanes[7] = lanes[2];
+   }
+   if (part == Part::Drums)
+      lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
+   if (part == Part::Percussion)
+      lanes[0] = lanes[1] = lanes[2] = lanes[3] = "";
    int drums = 0;
    if (hasDrums)
    {
@@ -350,9 +405,9 @@ Compiled Compile(const Recipe& recipe)
       const char* fillLane = nullptr;
       const int fillIdx[] = { 1, 4, 5, 2 }; // snare, clap, tom, closed hat
       for (int li : fillIdx)
-         if (*st.drums[li])
+         if (*lanes[li])
          {
-            fillLane = st.drums[li];
+            fillLane = lanes[li];
             break;
          }
       const int fn = (fillLane != nullptr && rng.Uniform() < st.fill) ? 2 + rng.Range(3) : 0;
@@ -361,7 +416,7 @@ Compiled Compile(const Recipe& recipe)
          const std::string lane = "lane" + std::to_string(i);
          force[lane + "_path"] = { 's', DrumSequencerNode::KitDir() + "/" + kKitFiles[i] + ".wav" };
          force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : 0.85) };
-         const std::string pat = st.drums[i];
+         const std::string pat = lanes[i];
          const bool ghostLane = i == 1 || i == 2 || i == 3 || i == 4;
          for (int k = 0; k < 32; k++)
          {
@@ -373,7 +428,7 @@ Compiled Compile(const Recipe& recipe)
                v = 0.18 + 0.1 * rng.Uniform();
             if (fn > 0 && k >= 32 - fn)
             {
-               if (st.drums[i] == fillLane)
+               if (lanes[i] == fillLane)
                   v = 0.55 + 0.45 * (k - (32 - fn) + 1) / fn;
                else if (i == 0 && k == 31)
                   v = 0.0;
@@ -382,7 +437,9 @@ Compiled Compile(const Recipe& recipe)
          }
       }
       drums = g.Add("Drum Sequencer", seed(), force);
-      chans.push_back({ chain(drums, 0), 0.0f });
+      if (full || drumPart)
+         chans.push_back({ chain(drums, 0), 0.0f });
+      layers++;
    }
 
    // Bass: the card's 16-step figure as scale degrees, one octave up from the bottom.
@@ -400,14 +457,19 @@ Compiled Compile(const Recipe& recipe)
          p["vel" + std::to_string(k)] = { 'f', "0.9" };
       }
       const int sq = g.Add("Note Sequencer", seed(), p);
-      const std::string synth = pick(st.synth);
-      if (!synth.empty())
+      const std::string picked = pick(st.synth);
+      if (!picked.empty())
       {
-         const int sy = g.Add(synth, seed());
+         const int sy = g.Add(voice(picked), seed());
          g.Connect(sq, sy, true);
-         synths.push_back(sy);
          const int fxChoices[] = { 0, 1, 1, 2 };
-         chans.push_back({ chain(sy, fxChoices[rng.Range(4)]), -4.0f });
+         const int end = chain(sy, fxChoices[rng.Range(4)]);
+         layers++;
+         if (wantBass)
+         {
+            synths.push_back(sy);
+            chans.push_back({ end, -4.0f });
+         }
       }
    }
 
@@ -415,19 +477,21 @@ Compiled Compile(const Recipe& recipe)
    bool chordFamily = false;
    for (const char* f : kChordFamilies)
       chordFamily = chordFamily || std::string(st.family) == f;
-   if (st.hasChords || chordFamily || chans.empty())
+   const bool chordsInFull = st.hasChords || chordFamily || layers == 0;
+   if (chordsInFull || part == Part::Piano || part == Part::Fx)
    {
       const std::vector<std::string> sizes = Split(st.chordSizes);
-      Params p = F({ { "rateBeats", st.chordBeats }, { "strumMs", st.chordStrum },
+      // fx holds one chord for two bars: a bed for the effects to move.
+      Params p = F({ { "rateBeats", part == Part::Fx ? 8.0 : st.chordBeats }, { "strumMs", st.chordStrum },
                      { "humanizeTimingMs", st.chordHuman }, { "humanizeVelocity", st.chordHuman } });
       p["root"] = { 'i', std::to_string(root) };
-      p["scale"] = { 'i', std::to_string(scale) };
+      p["scale"] = { 'i', std::to_string(out.scale) };
       p["chordSize"] = { 'i', sizes.empty() ? "3" : rng.Choice(sizes) };
       p["progSteps"] = { 'i', std::to_string(st.chordSteps) };
       const int ch = g.Add("Chorder", seed(), p);
       int notes = noteChain(ch, st.notefx);
       const std::string fam = st.family;
-      if ((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6)
+      if ((fam == "trance" || fam == "retro" || fam == "house") && rng.Uniform() < 0.6 && part != Part::Piano && part != Part::Fx)
       {
          Params a = F({ { "rateBeats", 0.25 } });
          a["rateMode"] = { 'i', "0" };
@@ -437,13 +501,16 @@ Compiled Compile(const Recipe& recipe)
          g.Connect(notes, ar, true);
          notes = ar;
       }
-      const std::string synth = pick(st.synth);
-      if (!synth.empty())
+      const std::string picked = pick(st.synth);
+      if (!picked.empty())
       {
-         const int sy = g.Add(synth, seed());
+         const int sy = g.Add(voice(picked), seed());
          g.Connect(notes, sy, true);
-         synths.push_back(sy);
+         if (wantChords)
+            synths.push_back(sy);
          int pad = chain(sy, 1 + rng.Range(2));
+         if (part == Part::Fx)
+            pad = chain(pad, 3);
          if (st.sidechain && drums != 0)
          {
             // The kick ducks the chords: the pump that makes house breathe.
@@ -453,12 +520,13 @@ Compiled Compile(const Recipe& recipe)
             g.Connect(drums, dy, false);
             pad = dy;
          }
-         chans.push_back({ pad, st.gain });
+         if (wantChords)
+            chans.push_back({ pad, st.gain });
       }
    }
 
    // Motif: eight steps asked, then answered with the last three changed.
-   if (st.hasMotif)
+   if (st.hasMotif && (full || wantMotif))
    {
       int deg = rng.Range(4);
       std::vector<std::pair<int, bool>> seq;
@@ -492,7 +560,7 @@ Compiled Compile(const Recipe& recipe)
          synth = Split(st.motifSynth).empty() ? "" : Split(st.motifSynth)[0];
       if (!synth.empty() && TypeOf(synth) != nullptr)
       {
-         const int sy = g.Add(synth, seed());
+         const int sy = g.Add(voice(synth), seed());
          g.Connect(mn, sy, true);
          synths.push_back(sy);
          int lead = chain(sy, 1);
@@ -516,10 +584,10 @@ Compiled Compile(const Recipe& recipe)
    for (const auto& ch : chans)
       g.Connect(ch.first, mx, false);
    int end = mx;
-   if (!ban.count("Reverb"))
+   if (!ban.count("Reverb") || part == Part::Fx)
    {
-      const bool ambient = std::string(st.family) == "ambient";
-      const int rv = g.Add("Reverb", seed(), F({ { "mix", ambient ? 0.45 : 0.15 }, { "decay", ambient ? 3.0 : 1.2 } }));
+      const bool wide = std::string(st.family) == "ambient" || part == Part::Fx;
+      const int rv = g.Add("Reverb", seed(), F({ { "mix", wide ? 0.45 : 0.15 }, { "decay", wide ? 3.0 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
    }
@@ -535,11 +603,11 @@ Compiled Compile(const Recipe& recipe)
             targets.push_back({ sy, &row });
    for (size_t i = targets.size(); i > 1; i--)
       std::swap(targets[i - 1], targets[(size_t)rng.Range((int)i)]);
-   const int k = (int)std::lround(st.mod * 3.0f);
+   const int k = part == Part::Fx ? 3 : (int)std::lround(st.mod * 3.0f); // fx is the movement
    for (int i = 0; i < k && i < (int)targets.size(); i++)
    {
       const GenRow& row = *targets[i].second;
-      const float depth = 0.1f + 0.5f * st.mod * (float)rng.Uniform();
+      const float depth = part == Part::Fx ? 0.5f + 0.4f * (float)rng.Uniform() : 0.1f + 0.5f * st.mod * (float)rng.Uniform();
       app::OfflineGraph::Motion m;
       m.node = targets[i].first;
       m.key = row.key;
@@ -552,9 +620,9 @@ Compiled Compile(const Recipe& recipe)
    }
 
    char head[96];
-   snprintf(head, sizeof(head), "transport %g 4 4 %d %d", out.bpm, root, scale);
+   snprintf(head, sizeof(head), "transport %g 4 4 %d %d", out.bpm, root, out.scale);
    g.lines.insert(g.lines.begin() + 2, head);
-   g.lines.insert(g.lines.begin() + 3, std::string("# style: ") + st.id + " seed " + std::to_string(recipe.seed));
+   g.lines.insert(g.lines.begin() + 3, std::string("# style: ") + st.id + " seed " + std::to_string(recipe.seed) + " part " + PartName(part));
    out.patch = g.Text();
    out.tap = lm;
    return out;

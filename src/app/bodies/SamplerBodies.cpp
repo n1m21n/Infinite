@@ -463,6 +463,152 @@ namespace app
    }
 
 
+   // Generate Samples: the recipe on top (style, seed, variation, length,
+   // tempo source), generate / keep as file, then the sample player's
+   // waveform and its few controls that matter for a loop. The status line
+   // says which of the five states the node is in.
+   void DrawGenerateSamplesBody(GraphNode& gn, GenerateSamplesNode* n)
+   {
+      using State = GenerateSamplesNode::State;
+      const State state = n->GetState();
+      char stat[160];
+      switch (state)
+      {
+         case State::Empty: snprintf(stat, sizeof(stat), "pick a style and generate"); break;
+         case State::Generating: snprintf(stat, sizeof(stat), "generating %d%%", (int)(n->Progress() * 100.0f)); break;
+         case State::Ready:
+            snprintf(stat, sizeof(stat), "%s, %.0f bpm", n->MadeLabel().c_str(), n->madeBpm);
+            break;
+         case State::Stale: snprintf(stat, sizeof(stat), "settings changed"); break;
+         case State::Failed: snprintf(stat, sizeof(stat), "could not make one, try another seed"); break;
+      }
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      static std::vector<std::string> styleNames, styleFamilies;
+      if (styleNames.empty())
+         for (int i = 0; i < SampleStyles::Count(); i++)
+         {
+            const SampleStyles::Style st = SampleStyles::At(i);
+            styleNames.push_back(st.name);
+            std::string fam = st.family;
+            std::replace(fam.begin(), fam.end(), '_', ' ');
+            styleFamilies.push_back(fam);
+         }
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+      const float diceW = 26.0f;
+      AudioBareDropdown("genStyle", styleNames, std::max(0, SampleStyles::Find(n->style)),
+                        [n](int i) { PushUndoCheckpoint(); n->style = SampleStyles::At(i).id; }, AudioHalfWidth(),
+                        styleFamilies, /*focusSearch=*/true);
+      ImGui::SameLine();
+      AudioSliderInt("seed", &n->seed, 0, 99999, AudioHalfWidth() - diceW - gap);
+      ImGui::SameLine();
+      if (AudioSmallButton("\xe2\x9a\x84##genDice", diceW))
+      {
+         PushUndoCheckpoint();
+         n->RollSeed();
+      }
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("#", "a new seed");
+
+      // Part: the whole mix or one layer of it, from the same seed.
+      static std::vector<std::string> partNames;
+      if (partNames.empty())
+         for (int i = 0; i < (int)SampleStyles::Part::Count; i++)
+            partNames.push_back(SampleStyles::PartName((SampleStyles::Part)i));
+      AudioBareDropdown("genPart", partNames, n->part, [n](int i) { PushUndoCheckpoint(); n->part = i; }, AudioHalfWidth());
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("part", "the whole mix, or one layer of it from the same seed");
+      ImGui::SameLine();
+      {
+         // Length as four pills: a loop is 1, 2, 4 or 8 bars, nothing between.
+         const int choices[] = { 1, 2, 4, 8 };
+         const float pillW = (AudioHalfWidth() - gap * 3.0f) / 4.0f;
+         for (int i = 0; i < 4; i++)
+         {
+            if (i > 0)
+               ImGui::SameLine();
+            char label[24];
+            snprintf(label, sizeof(label), "%d##genBars%d", choices[i], i);
+            bool on = n->bars == choices[i];
+            if (AudioToggleButton(label, &on, pillW) && n->bars != choices[i])
+            {
+               PushUndoCheckpoint();
+               n->bars = choices[i];
+            }
+         }
+      }
+
+      AudioSlider("variation", &n->variation, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      // Tempo, key and scale: the transport's, or the style card's own.
+      {
+         const float halfPill = (AudioHalfWidth() - gap) / 2.0f;
+         bool follow = n->followTransport, own = !n->followTransport;
+         if (AudioToggleButton("follow transport##genFollow", &follow, halfPill) && !n->followTransport)
+         {
+            PushUndoCheckpoint();
+            n->followTransport = true;
+         }
+         ImGui::SameLine();
+         if (AudioToggleButton("card's own##genOwn", &own, halfPill) && n->followTransport)
+         {
+            PushUndoCheckpoint();
+            n->followTransport = false;
+         }
+      }
+      {
+         const float btnW = AudioHalfWidth();
+         if (state == State::Generating)
+         {
+            if (ActionButton::Draw("cancel##gen", ImVec2(btnW, 0), ActionButton::Kind::Record))
+               n->Cancel();
+         }
+         else if (ActionButton::Draw("generate##gen", ImVec2(btnW, 0), ActionButton::Kind::Primary))
+         {
+            PushUndoCheckpoint();
+            n->Generate();
+         }
+         ImGui::SameLine();
+         const bool canKeep = state == State::Ready || state == State::Stale;
+         ImGui::BeginDisabled(!canKeep || !n->FilePath().empty());
+         if (ActionButton::Draw("keep as file##gen", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->KeepAsFile();
+         }
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            SetAudioReadout("#", n->FilePath().empty() ? "writes the loop to a wav, saved with the patch as a file" : "kept as a file");
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      if (state == State::Empty || state == State::Failed || (state == State::Generating && n->waveformCacheCount == 0))
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::Dummy(ImVec2(AudioFullWidth(), 140.0f));
+         EmptyState::Draw(p, ImVec2(p.x + AudioFullWidth(), p.y + 140.0f),
+                          state == State::Generating ? "generating" : state == State::Failed ? "could not make one" : "no sample yet",
+                          state == State::Failed ? "try another seed" : state == State::Generating ? nullptr : "pick a style and generate");
+      }
+      else
+         DrawSamplerWaveform(n, 140.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("gain", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth() - 44.0f - gap);
+      ImGui::SameLine();
+      bool loopBool = n->loop;
+      if (AudioToggleButton("loop##genLoop", &loopBool))
+      {
+         PushUndoCheckpoint();
+         n->loop = loopBool;
+      }
+
+      EndAudioBody();
+   }
+
+
 
    // Custom node body for the Slicer.
    //

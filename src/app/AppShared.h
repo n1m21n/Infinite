@@ -3668,6 +3668,8 @@ void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n);
 
 void DrawSamplerBody(GraphNode& gn, SamplerNode* n);
 
+void DrawGenerateSamplesBody(GraphNode& gn, GenerateSamplesNode* n);
+
 void DrawSlicerBody(GraphNode& gn, SlicerNode* n);
 
 void DrawPaulStretchBody(GraphNode& gn, PaulStretchNode* n);

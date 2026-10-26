@@ -268,6 +268,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/NoteNodes.h"
 #include "nodes/MidiOutNode.h"
 #include "nodes/SamplerNode.h"
+#include "app/graph/GenerateSamplesNode.h"
 #include "nodes/SlicerNode.h"
 #include "nodes/PaulStretchNode.h"
 #include "nodes/MolderNode.h"

@@ -209,6 +209,7 @@ namespace app
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
+      REGISTER_NODE(GenerateSamplesNode, Generate Samples, "Synths");
       REGISTER_NODE(SlicerNode, Slicer, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
       REGISTER_NODE(MolderNode, Molder, "Synths");

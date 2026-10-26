@@ -173,15 +173,18 @@ public:
    NoteCable noteInput;
    AudioCable audioInput; // record source
 
-private:
-   // Shared tail of LoadFile()/StopRecording(): builds the waveform cache
-   // and hands the buffer to the audio thread. Takes ownership of `decoded`.
+protected:
+   // Shared tail of LoadFile()/StopRecording() (and Generate Samples' render):
+   // builds the waveform cache and hands the buffer to the audio thread.
+   // Takes ownership of `decoded`.
    void FinishBuffer(Platform::SampleBuffer* decoded, const std::string& fileName,
                       const std::string& filePath, const std::string& status);
 
+   std::string mFilePath;
+
+private:
    std::unique_ptr<AudioSamplerNode> mAudioNode;
    int mLastCookFrame = -1;
-   std::string mFilePath;
    std::string mFileName;
    std::string mStatus = "no sample loaded";
    float mPlayhead = 0.0f;

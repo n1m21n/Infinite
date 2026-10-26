@@ -23,6 +23,22 @@ namespace SampleStyles
    Style At(int i);
    int Find(const std::string& id); // -1 when unknown
 
+   // Which part of the style a sample is: the whole mix, or one layer of it.
+   // A part is drawn from the same seed as the full mix, so "drums" of a seed
+   // is the drum layer of that seed's full loop (percussion and fx, which the
+   // full mix may not have, are made from the card's own figures).
+   enum class Part
+   {
+      Full,
+      Drums,      // kick, snare, hats
+      Percussion, // clap, toms, bell
+      Synths,     // bass, chords, motif on the card's voices
+      Piano,      // chords, bass and motif on a piano voice
+      Fx,         // one held chord through a long effect chain: a texture
+      Count
+   };
+   const char* PartName(Part p); // lowercase: "full", "drums", ...
+
    struct Recipe
    {
       std::string style = "deep_house";
@@ -32,6 +48,8 @@ namespace SampleStyles
       // <= 0: the card picks (its tempo band, a random root). Otherwise these.
       float bpm = 0.0f;
       int key = -1;
+      int scale = -1; // MusicTime scale; < 0: the card picks
+      Part part = Part::Full;
    };
 
    struct Compiled

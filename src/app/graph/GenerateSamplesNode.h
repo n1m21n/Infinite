@@ -1,0 +1,90 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "app/graph/SampleStyles.h"
+#include "nodes/SamplerNode.h"
+
+// Generate Samples: a sample player whose sample is made, not loaded. Pick a
+// music style card and a seed, press generate, and a private patch built
+// from that card (SampleStyles::Compile) renders a loop of 1-8 bars on a
+// worker thread. The result plays back through the sample player it extends:
+// waveform, start/end, pitch, volume, loop, and notes in to play it.
+//
+// Lives in app/graph, not nodes/: the render needs the patch loader and the
+// node factory, which no plain node reaches.
+//
+// Saved as its recipe, not its audio: style, seed, variation, length and
+// tempo source, plus the generator version that made it. Reopening a patch
+// renders it again (deterministic in the recipe; a newer generator may make
+// a slightly different loop, which is fine - patches evolve with the app).
+// "keep as file" writes the loop to a wav, after which it is saved and
+// reloaded as a file like any sample player's.
+class GenerateSamplesNode : public SamplerNode
+{
+public:
+   static INode* Create() { return new GenerateSamplesNode(); }
+   GenerateSamplesNode();
+   ~GenerateSamplesNode() override;
+
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+   // No record-in pin: the sample comes from the generator.
+   AudioCable* AudioInputSlot(int) override { return nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+
+   enum class State
+   {
+      Empty,      // nothing generated yet
+      Generating, // a render is running
+      Ready,      // the sample matches the settings
+      Stale,      // settings changed since the sample was made
+      Failed      // every redraw came out silent or broken
+   };
+   State GetState() const;
+   float Progress() const;
+
+   // Starts a render of the current settings (cancelling one in flight).
+   void Generate();
+   void Cancel();
+   // Writes the loop to a wav in the recordings folder and switches this node
+   // to it. False with nothing generated or when the write fails.
+   bool KeepAsFile();
+   // A new random seed.
+   void RollSeed();
+
+   // Recipe. `style` is a SampleStyles id.
+   std::string style = "deep_house";
+   int seed = 1;
+   float variation = 0.5f;
+   int bars = 2;                 // 1, 2, 4 or 8
+   bool followTransport = false; // tempo, key and scale from the transport, else the card's own
+   int part = 0;                 // SampleStyles::Part: the whole mix or one layer
+
+   static constexpr int kGeneratorVersion = 1;
+   // Last generate's resolved tempo and key, for the status line.
+   float madeBpm = 0.0f;
+   int madeRoot = 0;
+   int madeScale = 0;
+   // "deep house drums 1204, a natural minor": what the sample is, for its
+   // name and a kept file's.
+   std::string MadeLabel() const;
+
+private:
+   struct Job;
+   SampleStyles::Recipe CurrentRecipe() const;
+   bool StartAttempt(int attempt);
+   void Finish();
+
+   std::unique_ptr<Job> mJob;
+   SampleStyles::Recipe mMade; // what the current buffer was made from
+   bool mHasSample = false;
+   bool mFailed = false;
+   bool mGenerated = false;   // saved: a sample existed, so reopening renders it again
+   int mGenVersion = kGeneratorVersion;
+   bool mRestoreRange = false; // reopening: keep the saved start/end/position
+   float mSavedStart = 0.0f, mSavedEnd = 1.0f, mSavedPosition = 0.0f;
+   std::vector<float> mLoopL, mLoopR; // the finished loop, for keep as file
+};
