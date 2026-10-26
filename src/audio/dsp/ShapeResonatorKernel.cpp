@@ -58,7 +58,7 @@ void ShapeResonatorKernel::StartSolve(Kind kind, bool closed, std::vector<float>
    mJobDone.store(false, std::memory_order_relaxed);
    mJobRunning = true;
    mLastSolveStart = std::chrono::steady_clock::now();
-   mWorker = std::thread([this, kind, closed, p = std::move(positions), i = std::move(indices)]() {
+   auto solve = [this, kind, closed, p = std::move(positions), i = std::move(indices)]() {
       const int nv = (int)(p.size() / 3);
       switch (kind)
       {
@@ -73,14 +73,20 @@ void ShapeResonatorKernel::StartSolve(Kind kind, bool closed, std::vector<float>
             break;
       }
       mJobDone.store(true, std::memory_order_release);
-   });
+   };
+#ifdef __EMSCRIPTEN__
+   solve(); // the website build has no threads: solve inline
+#else
+   mWorker = std::thread(std::move(solve));
+#endif
 }
 
 void ShapeResonatorKernel::CollectSolve()
 {
    if (!mJobRunning || !mJobDone.load(std::memory_order_acquire))
       return;
-   mWorker.join();
+   if (mWorker.joinable())
+      mWorker.join();
    mJobRunning = false;
    if (mJobResult.valid)
    {

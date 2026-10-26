@@ -467,7 +467,7 @@ void ConvolutionKernel::StartJob(Job&& job)
    mJobRunning = true;
    mJobUsesFile = job.fromFile;
    mLastJobStart = std::chrono::steady_clock::now();
-   mWorker = std::thread(
+   auto work =
       [this, job = std::move(job)]() mutable
       {
          std::vector<float> l, r;
@@ -478,14 +478,20 @@ void ConvolutionKernel::StartJob(Job&& job)
             DesignImpulse(job.design, job.sampleRate, l, r);
          mJobResult = BuildSet(l, r, job.sampleRate);
          mJobDone.store(true, std::memory_order_release);
-      });
+      };
+#ifdef __EMSCRIPTEN__
+   work(); // the website build has no threads: build the impulse inline
+#else
+   mWorker = std::thread(std::move(work));
+#endif
 }
 
 void ConvolutionKernel::CollectJob()
 {
    if (!mJobRunning || !mJobDone.load(std::memory_order_acquire))
       return;
-   mWorker.join();
+   if (mWorker.joinable())
+      mWorker.join();
    mJobRunning = false;
    IrSet* set = mJobResult;
    mJobResult = nullptr;

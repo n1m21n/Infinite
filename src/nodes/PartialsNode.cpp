@@ -520,7 +520,7 @@ void PartialsNode::LoadMono(int which, std::vector<float> mono, double sr)
    l.ready.store(false, std::memory_order_relaxed);
    l.working.store(true, std::memory_order_release);
    mStatus = "analyzing...";
-   l.thread = std::thread([&l, mono = std::move(mono), sr]() {
+   auto analyse = [&l, mono = std::move(mono), sr]() {
       PartialsModel* m = PartialsModel::Build(mono, sr, &l.abort);
       if (l.abort.load(std::memory_order_relaxed))
       {
@@ -531,7 +531,12 @@ void PartialsNode::LoadMono(int which, std::vector<float> mono, double sr)
       l.result = m;
       l.ready.store(true, std::memory_order_release);
       l.working.store(false, std::memory_order_release);
-   });
+   };
+#ifdef __EMSCRIPTEN__
+   analyse(); // the website build has no threads: analyse inline
+#else
+   l.thread = std::thread(std::move(analyse));
+#endif
 }
 
 bool PartialsNode::LoadFile(int which, const std::string& path)

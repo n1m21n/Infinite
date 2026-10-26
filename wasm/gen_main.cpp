@@ -1,0 +1,159 @@
+// infinite_gen_wasm entry: one call renders a Generate Samples loop the way GenerateSamplesNode does.
+// The redraw rule (seed + attempt * 7919, up to 3) and Master() mirror src/app/graph/GenerateSamplesNode.cpp; the parity test keeps them honest.
+#include "app/graph/GenerateSamplesNode.h"  // PrerollBars
+#include "app/graph/OfflineGraph.h"
+#include "app/graph/SampleStyles.h"
+#include "audio/MusicTime.h"
+#include "core/AudioSummary.h"
+#include "core/Patch.h"
+#include "nodes/DrumSequencerNode.h"
+
+#include <emscripten.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <exception>
+#include <string>
+#include <vector>
+
+void RegisterGenNodes();
+
+namespace
+{
+   constexpr double kRate = 48000.0;
+   constexpr int kMaxRedraws = 3;
+   constexpr double kTargetLufs = -14.0;
+   constexpr double kCeilingDb = -1.0;
+   constexpr double kSilentLufs = -50.0;
+
+   std::vector<float> gPcm; // interleaved
+   std::string gLabel;
+   std::string gStyleId;
+   float gBpm = 0.0f;
+   int gAttempt = 0;
+   bool gReady = false;
+
+   bool Master(const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+   {
+      AudioSummary::Analyzer an(kRate);
+      an.Push(l, r, frames);
+      const AudioSummary::Result s = an.Finish();
+      const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
+      if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (rms > 0.0 && s.samplePeak / rms < 1.2))
+         return false;
+      double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
+      const double ceiling = std::pow(10.0, kCeilingDb / 20.0);
+      if (s.truePeak * gain > ceiling)
+         gain = ceiling / s.truePeak;
+      outL.assign(l, l + frames);
+      outR.assign(r, r + frames);
+      for (int i = 0; i < frames; i++)
+      {
+         outL[i] *= (float)gain;
+         outR[i] *= (float)gain;
+      }
+      return true;
+   }
+
+   std::string Label(const SampleStyles::Recipe& r, int root, int scale)
+   {
+      static const char* kRoots[12] = { "c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b" };
+      using P = SampleStyles::Part;
+      std::string s = SampleStyles::PartName(r.part);
+      s += " " + std::to_string(r.seed);
+      if (r.part != P::Drums && r.part != P::Percussion && r.part != P::Fx && r.part != P::Foley && r.part != P::Kicks &&
+          r.part != P::Snares && r.part != P::Hats && r.part != P::Toms)
+         s += std::string(", ") + kRoots[((root % 12) + 12) % 12] + " " + MusicTime::ScaleTable(scale).name;
+      return s;
+   }
+}
+
+extern "C"
+{
+   EMSCRIPTEN_KEEPALIVE int gen_style_count() { return SampleStyles::Count(); }
+
+   EMSCRIPTEN_KEEPALIVE const char* gen_style_id(int i)
+   {
+      gStyleId = SampleStyles::At(i).id;
+      return gStyleId.c_str();
+   }
+
+   EMSCRIPTEN_KEEPALIVE int gen_scale_count() { return (int)MusicTime::ScaleTypeList().size(); }
+   EMSCRIPTEN_KEEPALIVE const char* gen_scale_name(int i) { return MusicTime::ScaleTable(i).name; }
+
+   // Returns the frame count (0: every attempt failed). key/scale < 0: the card picks.
+   static int RunImpl(int styleIdx, int part, int seed, int bars, int key, int scale);
+   EMSCRIPTEN_KEEPALIVE int gen_run(int styleIdx, int part, int seed, int bars, int key, int scale)
+   {
+      try
+      {
+         return RunImpl(styleIdx, part, seed, bars, key, scale);
+      }
+      catch (const std::exception& e)
+      {
+         gLabel = std::string("exception: ") + e.what();
+         return 0;
+      }
+   }
+
+   static int RunImpl(int styleIdx, int part, int seed, int bars, int key, int scale)
+   {
+      if (!gReady)
+      {
+         RegisterGenNodes();
+         DrumSequencerNode::SetKitDir("/kit");
+         gReady = true;
+      }
+      SampleStyles::Recipe rec;
+      rec.style = SampleStyles::At(styleIdx % SampleStyles::Count()).id;
+      rec.seed = (uint32_t)std::max(0, seed);
+      rec.bars = bars <= 1 ? 1 : bars <= 2 ? 2 : bars <= 4 ? 4 : 8;
+      rec.key = key;
+      rec.scale = scale;
+      rec.part = (SampleStyles::Part)std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
+      rec.personal = false;
+      gPcm.clear();
+      for (int attempt = 0; attempt <= kMaxRedraws; attempt++)
+      {
+         SampleStyles::Recipe r = rec;
+         r.seed += (uint32_t)attempt * 7919u;
+         const SampleStyles::Compiled c = SampleStyles::Compile(r);
+         if (!c.error.empty())
+            return 0;
+         Patch::Data data;
+         std::string err;
+         app::OfflineGraph g;
+         if (!Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+            continue;
+         for (const app::OfflineGraph::Motion& m : c.motions)
+            g.AddMotion(m);
+         if (!g.Prepare(kRate))
+            continue;
+         const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
+         const int pre = bar * GenerateSamplesNode::PrerollBars(r.bars);
+         const int frames = bar * r.bars;
+         std::vector<float> left, right, l, rr;
+         if (!g.Render(pre + frames, left, right))
+            continue;
+         if (!Master(left.data() + pre, right.data() + pre, frames, l, rr))
+            continue;
+         gPcm.resize((size_t)frames * 2);
+         for (int f = 0; f < frames; f++)
+         {
+            gPcm[(size_t)f * 2] = l[f];
+            gPcm[(size_t)f * 2 + 1] = rr[f];
+         }
+         gLabel = Label(rec, c.root, c.scale);
+         gBpm = c.bpm;
+         gAttempt = attempt;
+         return frames;
+      }
+      return 0;
+   }
+
+   EMSCRIPTEN_KEEPALIVE const float* gen_pcm() { return gPcm.data(); }
+   EMSCRIPTEN_KEEPALIVE const char* gen_label() { return gLabel.c_str(); }
+   EMSCRIPTEN_KEEPALIVE float gen_bpm() { return gBpm; }
+   EMSCRIPTEN_KEEPALIVE int gen_attempt() { return gAttempt; }
+}
