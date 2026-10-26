@@ -29,15 +29,17 @@ no app. UX: ler `docs/plans/TIMELINE-UX-PLAN.md`.
     - gravação em loop em takes;
     - lanes de automação com keyframes (tags `autolane`/`autokey`, modo W de escrita).
   - Teste: `ARRANGEEDITPLUSTEST`.
+- Pacote rápido (`feature/timeline-quick`, `TIMELINE-UX-PLAN.md` 4c):
+  - click na gravação;
+  - compensação de latência do Audio In;
+  - arrastar range;
+  - Session: arrastar células, inspector do slot, Send to Timeline (clip e cena).
 - Próximo:
   - tempo map;
-  - compensação de latência do Audio In;
   - comping;
-  - metrônomo na gravação;
-  - arrastar range;
   - Alt+clique para criar key num parâmetro;
   - automação precisa por bloco (hoje é por frame);
-  - o resto da Session (arrastar células, Record/Send to Timeline, inspector de slot);
+  - Record to Timeline da Session (gravar a performance ao vivo);
   - os testes do upstream que dependem da UI dele.
 - Compat: 0 regressões. `001_3d_noise_teste_56fps` difere da referência 0.70 só em nós que dependem
   do tempo (Render 3D, Slideshow). O exe atual é determinístico e a referência foi regravada com ele.

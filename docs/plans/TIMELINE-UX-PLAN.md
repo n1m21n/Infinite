@@ -167,14 +167,32 @@ Cada branch: operações no modelo com teste, UI fina, gate completo, nota em
     cada frame; modo W grava o knob; linhas abaixo das pistas; botão "+ Automation".
 - **Testes:** `ARRANGERECORDTEST` (takes em loop) e `ARRANGEEDITPLUSTEST` (automação, round trip,
   ripple, duplicar trecho).
-- **Ficou de fora:**
+- **Ficou de fora** (os rápidos foram feitos em seguida, ver 4c):
   - mapa de tempo;
-  - compensação da latência de entrada do Audio In;
   - comping (escolher trechos entre takes);
-  - metrônomo próprio na gravação;
-  - mover um trecho arrastando a Range;
   - Alt+clique num parâmetro para criar key;
   - automação com precisão de bloco (hoje é por frame).
+
+## 4c. Pacote rápido (2026-10-26, `feature/timeline-quick`)
+
+- **Metrônomo na gravação:** no clique direito do REC, desligado, só no count-in (padrão) ou no
+  count-in e no take. O motor toca o click enquanto o transporte está antes de um beat
+  (`AudioEngine::SetRecordClickUntil`), então ele para exatamente no fim do count-in.
+- **Latência de entrada:** um take cuja fonte é um Audio In, ou é alimentada por um, lê o arquivo
+  adiantado pelo round trip informado pelo driver mais um ajuste manual em ms. O clip fica no beat
+  em que foi tocado. Liga e desliga no mesmo menu.
+- **Arrastar a Range:** apertar dentro da seleção e arrastar move o conteúdo no tempo e entre
+  pistas do mesmo tipo (Ctrl copia). É um passo de undo. Pistas de outro tipo recusam o movimento
+  inteiro.
+- **Session:**
+  - arrastar um clip para outra célula troca os dois (Ctrl copia);
+  - o clip selecionado aparece no inspector;
+  - Send to Timeline, por clip ou por cena (clique direito na cena), coloca na timeline no compasso
+    da agulha. Com o transporte parado a agulha anda, então mandar cena após cena monta a música.
+  - O corpo do clip agora lança ao soltar, para dar para arrastar. O ícone ▶ e os clips gate
+    continuam lançando ao apertar.
+- **Testes:** `ARRANGEEDITPLUSTEST` ganhou arraste de range (mover, copiar, recusar em pista de outro
+  tipo), Session (trocar, copiar, recusar, mandar cena) e latência (fonte sintetizada intocada).
 
 ## 5. Decisões do dono (2026-10-25)
 
