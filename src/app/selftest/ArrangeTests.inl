@@ -1405,3 +1405,44 @@
          printf("arrange record test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
+      // Turbo 0.72: INFINITE_ARRANGEDEMO - a small arrangement with the panel
+      // open, a Range selection and the Range tool on, for screenshots of the
+      // timeline UI (IMAGERESYNTH_SCREENSHOT + INFINITE_SCREENSHOT_FRAME).
+      if (getenv("INFINITE_ARRANGEDEMO") != nullptr && frameId == 3)
+      {
+         NewPatch();
+         std::vector<uint64_t> uids;
+         const char* kinds[] = { "Oscillator", "Oscillator", "Oscillator" };
+         for (int i = 0; i < 3; i++)
+            if (GraphNode* gn = SpawnNode(kinds[i], "Synths", 220.0f * (float)i, 0.0f))
+               uids.push_back(gn->uid);
+         gArrange = Arrange::Model();
+         gArrange.revision = 1000;
+         Arrange::AddLane(gArrange, Arrange::kLaneVideo);
+         for (size_t i = 0; i < uids.size(); i++)
+         {
+            const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+            for (int k = 0; k < 3; k++)
+            {
+               Arrange::Clip c;
+               c.start = Arrange::kTicksPerBar * (Arrange::Tick)(k * 3 + (int)i);
+               c.length = Arrange::kTicksPerBar * 2;
+               c.srcUid = uids[i];
+               c.fadeIn = k == 1 ? Arrange::kPPQ : 0;
+               Arrange::PlaceOverwrite(gArrange, lane, c);
+            }
+         }
+         Arrange::AddMarker(gArrange, Arrange::kTicksPerBar * 4, "verse");
+         gArrange.settings.loop = { true, Arrange::kTicksPerBar * 2, Arrange::kTicksPerBar * 6 };
+         gArrangeRange.active = true;
+         gArrangeRange.start = Arrange::kTicksPerBar * 7;
+         gArrangeRange.end = Arrange::kTicksPerBar * 9;
+         gArrangeRange.laneLo = 1;
+         gArrangeRange.laneHi = 2;
+         ArrangeSetTool(ArrangeTool::Range);
+         gArrangePanelOpen = true;
+         gArrangePanelHeight = 340.0f;
+         PublishArrangeLoop();
+         printf("arrange demo: OK\n");
+      }
+

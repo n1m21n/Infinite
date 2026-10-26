@@ -74,6 +74,7 @@
 #include "platform/McpBridge.h"
 #include "platform/AISkillContent.h"
 #include "app/ui/design/TokenColors.h" // Turbo 0.57: upstream design tokens (Infinite Dark theme)
+#include "core/TablerIcons.h" // Turbo 0.72: upstream's vector icons (timeline tools and transport)
 #include "platform/ClaudeChat.h"
 #include "platform/McpShare.h"
 #include "core/RuntimeLog.h"

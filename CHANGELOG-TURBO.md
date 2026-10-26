@@ -20,6 +20,15 @@ Timeline aligned with upstream before new timeline features (plan: `docs/plans/T
   what was under it. An armed track is heard while recording or stopped (auto monitoring). Takes
   are linear: the loop is off while recording. Before this, the timeline only gated live nodes, so
   parts played by hand were gone after a rewind.
+- **Timeline toolbar redesigned** on the shared design tokens and theme: icon tiles (upstream's
+  Tabler vector icons), grouped transport / position / tools / snap-loop-follow / tracks / zoom,
+  audio owner, monitor and render on the right.
+- **Editing tools (upstream's set and keys):** Select (A), Trim (T, nearer edge from anywhere in a
+  clip), Range (R, a span over tracks or over all tracks from the ruler; Delete erases it), Blade (B),
+  Zoom (Z: click, Alt+click, drag), Hand (H), Pencil (P: drag on an empty track draws a clip). Keys
+  F (fit), = / - (zoom), Ctrl+L (loop), I / O (loop in / out at the playhead).
+- **Easier to grab:** clip edge zones grow with the clip on screen, a cursor for every zone and tool,
+  a dashed snap guide while dragging.
 - **Self-tests:** `INFINITE_ARRANGETEST`, `INFINITE_ARRANGEAUDIOTEST` (ported from upstream),
   `INFINITE_ARRANGEMULTITRACKTEST` (three tracks side by side, live and in a WAV render) and
   `INFINITE_ARRANGERECORDTEST` (record an Oscillator, delete it, the take still plays at the same

@@ -346,8 +346,29 @@ std::vector<uint64_t> gArrangeSel;      // selected clip ids
 uint64_t gArrangeSelLane = 0;           // last clicked lane (paste target)
 uint64_t gArrangeSettingsClip = 0;      // clip shown in the Clip settings window
 bool gArrangeSettingsOpen = false;
-bool gArrangeBlade = false;
+bool gArrangeBlade = false; // mirrors gArrangeTool == Blade (older call sites read it)
 bool gArrangeFollow = true;
+
+// Turbo 0.72 (timeline UX): upstream's editing tools, same names and keys
+// (A Select, T Trim, R Range, B Blade, Z Zoom, H Hand, P Pencil).
+enum class ArrangeTool { Select, Trim, Range, Blade, Zoom, Hand, Pencil };
+ArrangeTool gArrangeTool = ArrangeTool::Select;
+void ArrangeSetTool(ArrangeTool t)
+{
+   gArrangeTool = t;
+   gArrangeBlade = t == ArrangeTool::Blade;
+}
+
+// Range tool: a span of time on a run of lanes (laneLo..laneHi, indices).
+// Delete erases what is inside; Esc drops it.
+struct ArrangeRangeSel
+{
+   bool active = false;
+   Arrange::Tick start = 0, end = 0;
+   int laneLo = 0, laneHi = -1;
+};
+ArrangeRangeSel gArrangeRange;
+Arrange::Tick gArrangeSnapGuide = -1; // tick of the snap line drawn during a drag (-1 = none)
 bool gArrangeMonitor = true;
 bool gArrangeRenderWindowOpen = false;
 uint64_t gArrangeAudioSig = 0;
@@ -1926,6 +1947,38 @@ std::vector<uint64_t> ArrangeSelectionIds()
    return Arrange::ExpandSelectionToGroups(gArrange, gArrangeSel);
 }
 
+// Turbo 0.72 (Range tool): erases the span on its lanes - a clip crossing an
+// edge is cut there and everything inside goes, in one undo step.
+void ArrangeEraseRange()
+{
+   const ArrangeRangeSel r = gArrangeRange;
+   gArrangeRange = ArrangeRangeSel();
+   if (!r.active || r.end <= r.start)
+      return;
+   ArrangeEdit([&]()
+   {
+      for (int li = std::max(0, r.laneLo); li <= r.laneHi && li < (int)gArrange.lanes.size(); li++)
+      {
+         for (const Arrange::Tick edge : { r.start, r.end })
+         {
+            std::vector<uint64_t> ids;
+            for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+               if (c.start < edge && edge < c.End())
+                  ids.push_back(c.id);
+            for (uint64_t id : ids)
+               Arrange::Split(gArrange, id, edge);
+         }
+         std::vector<uint64_t> inside;
+         for (const Arrange::Clip& c : gArrange.lanes[(size_t)li].clips)
+            if (c.start >= r.start && c.End() <= r.end)
+               inside.push_back(c.id);
+         if (!inside.empty())
+            Arrange::Delete(gArrange, inside);
+      }
+   });
+   ArrangePruneSelection();
+}
+
 void ArrangeDeleteSelection()
 {
    const std::vector<uint64_t> ids = ArrangeSelectionIds();
@@ -2459,7 +2512,9 @@ void ArrangeSetZoomAround(float newZoom, float anchorX)
 enum ArrangeDragMode
 {
    kArrDragNone = 0, kArrDragMove, kArrDragTrimL, kArrDragTrimR, kArrDragFadeIn, kArrDragFadeOut,
-   kArrDragMarquee, kArrDragScrub, kArrDragLoop, kArrDragMarker, kArrDragHScroll, kArrDragRowResize
+   kArrDragMarquee, kArrDragScrub, kArrDragLoop, kArrDragMarker, kArrDragHScroll, kArrDragRowResize,
+   // Turbo 0.72: the tools.
+   kArrDragZoom, kArrDragHand, kArrDragRange, kArrDragPencil
 };
 
 struct ArrangeDragState
@@ -2480,6 +2535,12 @@ struct ArrangeDragState
    bool moved = false;
    float scrollAtStart = 0.0f;
    float heightAtStart = 0.0f;
+   // Turbo 0.72: tool drags.
+   float zoomAtStart = 1.0f;
+   float vscrollAtStart = 0.0f;
+   Arrange::Tick anchorTick = 0;   // Range / Pencil: where the drag began (snapped)
+   Arrange::Tick currentTick = 0;  // Range / Pencil: where it is now (snapped)
+   int anchorLane = -1;            // Range / Pencil: lane under the press (-1 = ruler: all lanes)
 };
 ArrangeDragState gArrDrag;
 
@@ -2970,66 +3031,240 @@ bool ArrangeToggleButton(const char* label, bool on, ImU32 onCol = IM_COL32(60, 
    return pressed;
 }
 
+// Turbo 0.72: fit the whole arrangement in the visible lanes (FIT, F key).
+float gArrangeLastPanelW = 800.0f;
+void ArrangeZoomToFit(float width)
+{
+   const double endBeat = std::max(16.0, Arrange::TicksToBeats(Arrange::ArrangementEnd(gArrange)) + 4.0);
+   const float visible = std::max(100.0f, width - kArrangeHeaderW - 40.0f);
+   gArrange.settings.zoom = std::clamp((float)(visible / endBeat) / kArrangeBasePxPerBeat, 0.02f, 40.0f);
+   gArrange.settings.scroll = 0.0f;
+}
+
+// ---- toolbar components (Turbo 0.72): a small design system -----------------
+// Square icon tiles, text chips, recessed pill groups and fixed gaps, all on
+// the shared design tokens (tok::) and the live theme, so the timeline reads
+// like the rest of the app and follows theme and interface scale. Icons are
+// upstream's Tabler vector set (src/core/TablerIcons.h, verbatim).
+namespace ArrUi
+{
+   using DrawIcon = std::function<void(ImDrawList*, ImVec2, float, ImU32)>;
+
+   inline float Tile() { return std::max(22.0f, ImGui::GetFrameHeight() + 2.0f); }
+   inline ImU32 ThemeU32(const CategoryColors::Color& c, float a = 1.0f)
+   {
+      return ImGui::ColorConvertFloat4ToU32(ImVec4(c.r, c.g, c.b, a));
+   }
+   inline ImU32 TextCol() { return ThemeU32(CategoryColors::CurrentUiTheme().text); }
+   inline ImU32 DimCol() { return ThemeU32(CategoryColors::CurrentUiTheme().textDim); }
+   inline ImU32 Tint(float amount) { return ImGui::ColorConvertFloat4ToU32(DesignAccentTint(amount)); }
+   inline ImU32 RecessCol() { return IsThemeLight() ? IM_COL32(0, 0, 0, 20) : IM_COL32(0, 0, 0, 70); }
+   inline ImU32 Semantic(const tok::Pair8& p) { return tok::U32(p, IsThemeLight()); }
+
+   // Background of a tile or chip for its state; `onCol` 0 = the accent.
+   inline ImU32 FaceCol(bool on, bool hov, bool act, ImU32 onCol)
+   {
+      if (on)
+         return onCol != 0 ? (hov || act ? ArrangeScaleCol(onCol, 1.12f) : onCol) : Tint(act ? tok::accent_pressed : tok::accent_selected);
+      if (act)
+         return Tint(tok::accent_pressed);
+      return hov ? Tint(tok::accent_hover) : 0;
+   }
+
+   // A square tile with an icon. `on` fills it (accent, or onCol for the
+   // semantic ones: play green, record red).
+   bool IconTile(const char* id, const DrawIcon& draw, const char* tip, bool on = false, ImU32 onCol = 0)
+   {
+      const float s = Tile();
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton(id, ImVec2(s, s));
+      const bool hov = ImGui::IsItemHovered(), act = ImGui::IsItemActive();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      if (const ImU32 bg = FaceCol(on, hov, act, onCol))
+         dl->AddRectFilled(p, ImVec2(p.x + s, p.y + s), bg, tok::radius_field);
+      const ImU32 ic = on ? (onCol != 0 ? IM_COL32(255, 255, 255, 255) : TextCol()) : (hov ? TextCol() : DimCol());
+      draw(dl, ImVec2(p.x + s * 0.5f, p.y + s * 0.5f), s * 0.64f, ic);
+      if (hov && tip != nullptr)
+         ImGui::SetTooltip("%s", tip);
+      return pressed;
+   }
+
+   inline float ChipW(const char* label) { return ImGui::CalcTextSize(label, nullptr, true).x + tok::space_3 * 2.0f; }
+
+   // A word on a tile-high chip, same states as IconTile.
+   bool Chip(const char* id, const char* label, const char* tip, bool on = false, ImU32 onCol = 0)
+   {
+      const float h = Tile();
+      const float w = ChipW(label);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, h));
+      const bool hov = ImGui::IsItemHovered(), act = ImGui::IsItemActive();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 bg = FaceCol(on, hov, act, onCol);
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), bg != 0 ? bg : RecessCol(), tok::radius_field);
+      const ImVec2 ts = ImGui::CalcTextSize(label, nullptr, true);
+      const ImU32 tc = on && onCol != 0 ? IM_COL32(255, 255, 255, 255) : (on || hov ? TextCol() : DimCol());
+      dl->AddText(ImVec2(p.x + (w - ts.x) * 0.5f, p.y + (h - ts.y) * 0.5f), tc, label, ImGui::FindRenderedTextEnd(label));
+      if (hov && tip != nullptr)
+         ImGui::SetTooltip("%s", tip);
+      return pressed;
+   }
+
+   // Tiles that belong together sit on one recessed pill.
+   void GroupBegin()
+   {
+      ImGui::GetWindowDrawList()->ChannelsSplit(2);
+      ImGui::GetWindowDrawList()->ChannelsSetCurrent(1);
+      ImGui::BeginGroup();
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 2.0f));
+   }
+   void GroupEnd()
+   {
+      ImGui::PopStyleVar();
+      ImGui::EndGroup();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->ChannelsSetCurrent(0);
+      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+      dl->AddRectFilled(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f), RecessCol(), tok::radius_pill);
+      dl->ChannelsMerge();
+   }
+   inline void Next() { ImGui::SameLine(0.0f, 2.0f); }            // inside a group
+   inline void Gap() { ImGui::SameLine(0.0f, tok::space_3); }     // between groups
+}
+
 void DrawArrangeToolbar(float width)
 {
    Transport& tr = Transport::Instance();
-   if (ArrangeToggleButton(gArrangeTimelineMode ? "TIMELINE ON" : "TIMELINE OFF", gArrangeTimelineMode,
-                           IM_COL32(200, 120, 40, 255)))
-      gArrangeTimelineMode = !gArrangeTimelineMode;
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("Timeline mode: the timeline owns the audio output.\n"
-                        "Canvas Audio Outs go quiet (live ones stay), and only what the audio clips\n"
-                        "play is heard. Off: the canvas plays as usual and the timeline only drives video.");
-   ImGui::SameLine();
-   if (ImGui::Button("|<"))
+   const float rowX0 = ImGui::GetCursorScreenPos().x;
+   gArrangeLastPanelW = width;
+   ImGui::Dummy(ImVec2(0.0f, 2.0f)); // air above the row
+
+   // Transport: start, play / pause, record.
+   ArrUi::GroupBegin();
+   if (ArrUi::IconTile("##arrhome", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawPlayerRewind(dl, c, s, col); },
+                       "to the start (or the loop start)  -  Home"))
       ArrangeSeekTick(gArrange.settings.loop.enabled && ArrangePlayTick() > gArrange.settings.loop.start
                          ? gArrange.settings.loop.start : 0);
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("to the start (or the loop start)  -  Home");
-   ImGui::SameLine();
-   if (ArrangeToggleButton(tr.IsPlaying() ? "PAUSE" : "PLAY", tr.IsPlaying()))
+   ArrUi::Next();
+   const bool playing = tr.IsPlaying();
+   if (ArrUi::IconTile("##arrplay",
+                       [playing](ImDrawList* dl, ImVec2 c, float s, ImU32 col)
+                       {
+                          if (playing)
+                             Tabler::DrawPlayerPause(dl, c, s, col);
+                          else
+                             Tabler::DrawPlayerPlay(dl, c, s, col);
+                       },
+                       playing ? "pause  -  Space" : "play  -  Space", playing, ArrUi::Semantic(tok::action_go)))
       tr.TogglePlay();
-   ImGui::SameLine();
-   // Turbo 0.72: record the armed tracks from the playhead.
-   if (ArrangeToggleButton(gArrangeRecording ? "STOP REC" : "REC", gArrangeRecording, IM_COL32(220, 50, 50, 255)))
+   ArrUi::Next();
+   const bool recording = gArrangeRecording;
+   if (ArrUi::IconTile("##arrrec",
+                       [recording](ImDrawList* dl, ImVec2 c, float s, ImU32 col)
+                       {
+                          dl->AddCircleFilled(c, s * 0.3f, recording ? col : tok::U32(tok::record), 24);
+                       },
+                       gArrangeRecStatus.empty()
+                          ? (recording ? "stop recording (or pause / stop the transport)"
+                                       : "record: every armed track (R) records its node from the playhead.\n"
+                                         "Stop or pause ends the take; it lands on the track as an audio clip.")
+                          : gArrangeRecStatus.c_str(),
+                       recording, ArrUi::Semantic(tok::action_record)))
    {
-      if (gArrangeRecording)
+      if (recording)
          ArrangeRecordStop();
       else
          ArrangeRecordStart();
    }
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("%s", gArrangeRecStatus.empty()
-                                 ? "record: every armed track (R) records its node from the playhead.\n"
-                                   "Stop (or pause) ends the take; it lands on the track as an audio clip."
-                                 : gArrangeRecStatus.c_str());
-   if (!gArrangeRecStatus.empty())
-   {
-      ImGui::SameLine();
-      ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "%s", gArrangeRecStatus.c_str());
-   }
-   ImGui::SameLine();
+   ArrUi::GroupEnd();
+
+   // Position readout: the main unit large, the other and the tempo dim.
+   ArrUi::Gap();
    {
       const Arrange::Tick play = ArrangePlayTick();
-      ImGui::AlignTextToFramePadding();
       const int saved = gArrange.settings.timeDisplay;
       gArrange.settings.timeDisplay = 0;
       const std::string bars = ArrangeFormatPos(play);
       gArrange.settings.timeDisplay = 1;
       const std::string time = ArrangeFormatPos(play);
       gArrange.settings.timeDisplay = saved;
-      ImGui::Text("%s", saved == 0 ? bars.c_str() : time.c_str());
-      ImGui::SameLine();
-      ImGui::TextDisabled("%s  %.1f bpm", saved == 0 ? time.c_str() : bars.c_str(), tr.Tempo());
+      const std::string main = saved == 0 ? bars : time;
+      char sub[96];
+      snprintf(sub, sizeof(sub), "%s   %.1f bpm", saved == 0 ? time.c_str() : bars.c_str(), tr.Tempo());
+      const float h = ArrUi::Tile();
+      const float w = std::max(170.0f, ImGui::CalcTextSize(main.c_str()).x + ImGui::CalcTextSize(sub).x + tok::space_5);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      if (ImGui::InvisibleButton("##arrreadout", ImVec2(w, h)))
+      {
+         gArrange.settings.timeDisplay = saved == 0 ? 1 : 0; // click swaps bars / time
+         gPatchDirty = true;
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("playhead position - click to show %s first", saved == 0 ? "time" : "bars");
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ScopeBgCol(), tok::radius_field);
+      const float ty = p.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
+      dl->AddText(ImVec2(p.x + tok::space_2, ty), ArrUi::TextCol(), main.c_str());
+      dl->AddText(ImVec2(p.x + tok::space_2 + ImGui::CalcTextSize(main.c_str()).x + tok::space_3, ty), ArrUi::DimCol(), sub);
    }
-   ImGui::SameLine(0.0f, 16.0f);
-   ImGui::SetNextItemWidth(78.0f);
+   if (!gArrangeRecStatus.empty())
    {
+      ImGui::SameLine(0.0f, tok::space_2);
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "%s", gArrangeRecStatus.c_str());
+   }
+
+   // Editing tools (upstream's set and keys).
+   ArrUi::Gap();
+   ArrUi::GroupBegin();
+   struct ToolDef { ArrangeTool tool; const char* id; const char* tip; void (*draw)(ImDrawList*, ImVec2, float, ImU32, float); };
+   static const ToolDef kTools[] = {
+      { ArrangeTool::Select, "##tsel", "Select (A): click, drag to move, edges trim, top corners fade",
+        [](ImDrawList* dl, ImVec2 c, float s, ImU32 col, float) { Tabler::DrawPointer(dl, c, s, col, false); } },
+      { ArrangeTool::Trim, "##ttrim", "Trim (T): drag anywhere in a clip to trim its nearer edge", Tabler::DrawTrim },
+      { ArrangeTool::Range, "##trange", "Range (R): drag a span of time over tracks (on the ruler: all tracks).\nDelete erases it, Esc drops it", Tabler::DrawRange },
+      { ArrangeTool::Blade, "##tblade", "Blade (B): click a clip to cut it there", Tabler::DrawScissors },
+      { ArrangeTool::Zoom, "##tzoom", "Zoom (Z): click zooms in, Alt+click out, drag left / right zooms smoothly", Tabler::DrawZoom },
+      { ArrangeTool::Hand, "##thand", "Hand (H): drag to scroll the timeline", Tabler::DrawHand },
+      { ArrangeTool::Pencil, "##tpencil", "Pencil (P): drag on an empty track to draw a clip, then pick its source", Tabler::DrawPencil },
+   };
+   for (int i = 0; i < (int)(sizeof(kTools) / sizeof(kTools[0])); i++)
+   {
+      if (i > 0)
+         ArrUi::Next();
+      const ToolDef& d = kTools[i];
+      if (ArrUi::IconTile(d.id, [&d](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { d.draw(dl, c, s, col, 0.0f); }, d.tip,
+                          gArrangeTool == d.tool))
+         ArrangeSetTool(gArrangeTool == d.tool && d.tool != ArrangeTool::Select ? ArrangeTool::Select : d.tool);
+   }
+   ArrUi::GroupEnd();
+
+   // Snap, loop, follow.
+   ArrUi::Gap();
+   ArrUi::GroupBegin();
+   {
+      static int sLastDivision = 4;
+      const bool snapOn = gArrange.settings.snapDivision != 0;
+      if (ArrUi::IconTile("##arrsnapon", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawMagnet(dl, c, s, col); },
+                          "snap to the grid (hold Alt while dragging to place freely)", snapOn))
+      {
+         if (snapOn)
+         {
+            sLastDivision = gArrange.settings.snapDivision;
+            gArrange.settings.snapDivision = 0;
+         }
+         else
+            gArrange.settings.snapDivision = sLastDivision != 0 ? sLastDivision : 4;
+         gPatchDirty = true;
+      }
+      ArrUi::Next();
       int cur = 0;
       for (int i = 0; i < 10; i++)
          if (kArrangeGridChoices[i].division == gArrange.settings.snapDivision &&
              kArrangeGridChoices[i].triplet == gArrange.settings.snapTriplet)
             cur = i;
+      ImGui::SetNextItemWidth(70.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_2, (ArrUi::Tile() - ImGui::GetTextLineHeight()) * 0.5f));
       if (ImGui::BeginCombo("##arrsnap", kArrangeGridChoices[cur].label))
       {
          for (int i = 0; i < 10; i++)
@@ -3041,87 +3276,87 @@ void DrawArrangeToolbar(float width)
             }
          ImGui::EndCombo();
       }
+      ImGui::PopStyleVar();
       if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("snap grid (hold Alt while dragging to place freely)");
-   }
-   ImGui::SameLine();
-   if (ImGui::Button(gArrange.settings.timeDisplay == 0 ? "BARS" : "TIME"))
-   {
-      gArrange.settings.timeDisplay = gArrange.settings.timeDisplay == 0 ? 1 : 0;
-      gPatchDirty = true;
-   }
-   ImGui::SameLine();
-   if (ArrangeToggleButton("LOOP", gArrange.settings.loop.enabled, IM_COL32(70, 110, 200, 255)))
-   {
-      Arrange::LoopRange l = gArrange.settings.loop;
-      if (!l.enabled && l.end <= l.start)
+         ImGui::SetTooltip("snap grid");
+      ArrUi::Next();
+      if (ArrUi::IconTile("##arrloop", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawRepeat(dl, c, s, col); },
+                          "loop the range shown on the ruler  -  Ctrl+L\nShift+drag on the ruler sets it, I / O set its ends at the playhead",
+                          gArrange.settings.loop.enabled))
       {
-         // No range yet: the bar under the playhead, 4 bars long.
-         const Arrange::Tick bar = ArrangeTicksPerBar();
-         l.start = Arrange::GridFloor(ArrangePlayTick(), bar);
-         l.end = l.start + 4 * bar;
+         Arrange::LoopRange l = gArrange.settings.loop;
+         if (!l.enabled && l.end <= l.start)
+         {
+            // No range yet: the bar under the playhead, 4 bars long.
+            const Arrange::Tick bar = ArrangeTicksPerBar();
+            l.start = Arrange::GridFloor(ArrangePlayTick(), bar);
+            l.end = l.start + 4 * bar;
+         }
+         ArrangeSetLoop(!l.enabled, l.start, l.end);
       }
-      ArrangeSetLoop(!l.enabled, l.start, l.end);
+      ArrUi::Next();
+      if (ArrUi::IconTile("##arrfollow", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawTimeline(dl, c, s, col); },
+                          "follow the playhead while playing", gArrangeFollow))
+         gArrangeFollow = !gArrangeFollow;
    }
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("loop the range shown on the ruler\nShift+drag on the ruler sets it");
-   ImGui::SameLine();
-   if (ArrangeToggleButton("BLADE", gArrangeBlade, IM_COL32(200, 70, 70, 255)))
-      gArrangeBlade = !gArrangeBlade;
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("blade (B): click a clip to cut it there  -  Esc to leave");
-   ImGui::SameLine();
-   if (ArrangeToggleButton("FOLLOW", gArrangeFollow, IM_COL32(90, 90, 140, 255)))
-      gArrangeFollow = !gArrangeFollow;
-   ImGui::SameLine(0.0f, 16.0f);
-   if (ImGui::Button("+ VIDEO"))
-      ArrangeAddTrack(Arrange::kLaneVideo);
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("add a video track  -  Shift+J");
-   ImGui::SameLine();
-   if (ImGui::Button("+ AUDIO"))
+   ArrUi::GroupEnd();
+
+   // Tracks.
+   ArrUi::Gap();
+   if (ArrUi::Chip("##arraddaudio", "+ Audio", "add an audio track  -  Shift+K"))
       ArrangeAddTrack(Arrange::kLaneAudio);
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("add an audio track  -  Shift+K");
-   ImGui::SameLine();
-   if (ImGui::Button("+ GROUP"))
+   ArrUi::Next();
+   if (ArrUi::Chip("##arraddvideo", "+ Video", "add a video track  -  Shift+J"))
+      ArrangeAddTrack(Arrange::kLaneVideo);
+   ArrUi::Next();
+   if (ArrUi::Chip("##arrgroup", "Group", "put the selected track (click its header) in a new group / folder.\n"
+                                          "Right-click a track header > Group to move tracks between groups."))
    {
       const int li = Arrange::LaneIndex(gArrange, gArrangeSelLane);
       if (li >= 0)
       {
          const uint64_t id = gArrangeSelLane;
-         const uint64_t cur = gArrange.lanes[(size_t)li].groupId;
-         ArrangeEdit([&]() { Arrange::GroupSelectedLanes(gArrange, { id }, cur); });
+         const uint64_t curGroup = gArrange.lanes[(size_t)li].groupId;
+         ArrangeEdit([&]() { Arrange::GroupSelectedLanes(gArrange, { id }, curGroup); });
       }
    }
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("put the selected track (click its header) in a new group / folder.\n"
-                        "Right-click a track header > Group to move tracks between groups.");
-   ImGui::SameLine(0.0f, 16.0f);
-   if (ImGui::Button("-"))
+
+   // Zoom.
+   ArrUi::Gap();
+   ArrUi::GroupBegin();
+   if (ArrUi::Chip("##arrzoomout", "-", "zoom out  -  -   (Ctrl+wheel zooms at the mouse)"))
       ArrangeSetZoomAround(gArrange.settings.zoom / 1.25f, gArrangeLaneX0 + 200.0f);
-   ImGui::SameLine();
-   if (ImGui::Button("+"))
+   ArrUi::Next();
+   if (ArrUi::Chip("##arrzoomin", "+", "zoom in  -  ="))
       ArrangeSetZoomAround(gArrange.settings.zoom * 1.25f, gArrangeLaneX0 + 200.0f);
-   ImGui::SameLine();
-   if (ImGui::Button("FIT"))
-   {
-      const double endBeat = std::max(16.0, Arrange::TicksToBeats(Arrange::ArrangementEnd(gArrange)) + 4.0);
-      const float visible = std::max(100.0f, width - kArrangeHeaderW - (gArrangeMonitor ? 0.0f : 0.0f) - 40.0f);
-      gArrange.settings.zoom = std::clamp((float)(visible / endBeat) / kArrangeBasePxPerBeat, 0.02f, 40.0f);
-      gArrange.settings.scroll = 0.0f;
-   }
-   ImGui::SameLine(0.0f, 16.0f);
-   if (ImGui::Button("RENDER..."))
-      gArrangeRenderWindowOpen = true;
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("render the timeline to MP4 / MOV (video + audio) or WAV, with a queue");
-   ImGui::SameLine();
-   if (ArrangeToggleButton("MONITOR", gArrangeMonitor, IM_COL32(90, 90, 140, 255)))
+   ArrUi::Next();
+   if (ArrUi::Chip("##arrfit", "Fit", "fit the whole arrangement  -  F"))
+      ArrangeZoomToFit(width);
+   ArrUi::GroupEnd();
+
+   // Right side: who owns the audio, the monitor, render.
+   const float rightW = ArrUi::ChipW("Timeline audio") + ArrUi::Tile() + ArrUi::ChipW("Render...") + 4.0f * 2.0f + tok::space_3;
+   const float rightX = rowX0 + width - rightW;
+   if (ImGui::GetItemRectMax().x + tok::space_3 < rightX)
+      ImGui::SameLine(rightX - ImGui::GetWindowPos().x + ImGui::GetScrollX());
+   else
+      ArrUi::Gap();
+   if (ArrUi::Chip("##arrtlmode", "Timeline audio",
+                   "on: the timeline owns the audio output - canvas Audio Outs go quiet (live ones stay)\n"
+                   "and only what the audio clips play is heard. Off: the canvas plays as usual and the\n"
+                   "timeline only drives video.",
+                   gArrangeTimelineMode, ArrUi::Semantic(tok::action_learn)))
+      gArrangeTimelineMode = !gArrangeTimelineMode;
+   ArrUi::Next();
+   if (ArrUi::IconTile("##arrmonitor", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawMonitor(dl, c, s, col); },
+                       "video monitor: the composite of the video tracks at the playhead.\n"
+                       "Add a Timeline node (Source) to send it to an Output.",
+                       gArrangeMonitor))
       gArrangeMonitor = !gArrangeMonitor;
-   if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("video monitor: the composite of the video tracks at the playhead.\n"
-                        "Add a Timeline node (Source) to send it to an Output.");
+   ArrUi::Next();
+   if (ArrUi::Chip("##arrrender", "Render...", "render the timeline to MP4 / MOV (video + audio) or WAV, with a queue"))
+      gArrangeRenderWindowOpen = true;
+   ImGui::Dummy(ImVec2(0.0f, 2.0f)); // air below the row
 }
 
 // Header for one lane (name, type, mute/solo/enable, gain/pan or opacity).
@@ -3808,19 +4043,22 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             dl->PopClipRect();
          }
          // Hit test (topmost wins - clips never overlap within a lane).
-         if (mouseInLanes && mouse.y >= y0 && mouse.y < y1 && mouse.x >= x0 - 2.0f && mouse.x < x1 + 2.0f)
+         // Turbo 0.72: the edge grab grows with the clip on screen (4..12 px
+         // inside, 4 px outside) so a trim is easy to catch at any zoom.
+         const float edgePx = std::clamp((x1 - x0) * 0.25f, 4.0f, 12.0f);
+         if (mouseInLanes && mouse.y >= y0 && mouse.y < y1 && mouse.x >= x0 - 4.0f && mouse.x < x1 + 4.0f)
          {
             hit.id = c.id;
             hit.lane = li;
             const float fadeInX = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.start + c.fadeIn));
             const float fadeOutX = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c.End() - c.fadeOut));
-            if (mouse.y < y0 + 9.0f && std::fabs(mouse.x - fadeInX) < 6.0f && x1 - x0 > 24.0f)
+            if (mouse.y < y0 + 9.0f && std::fabs(mouse.x - fadeInX) < 7.0f && x1 - x0 > 24.0f)
                hit.zone = 3;
-            else if (mouse.y < y0 + 9.0f && std::fabs(mouse.x - fadeOutX) < 6.0f && x1 - x0 > 24.0f)
+            else if (mouse.y < y0 + 9.0f && std::fabs(mouse.x - fadeOutX) < 7.0f && x1 - x0 > 24.0f)
                hit.zone = 4;
-            else if (mouse.x < x0 + kArrangeEdgePx)
+            else if (mouse.x < x0 + edgePx)
                hit.zone = 1;
-            else if (mouse.x > x1 - kArrangeEdgePx)
+            else if (mouse.x > x1 - edgePx)
                hit.zone = 2;
             else
                hit.zone = 0;
@@ -3846,6 +4084,39 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    {
       const float bx = ArrangeScreenXOfBeat(Arrange::TicksToBeats(ArrangeSnapMaybe(tickAtX(mouse.x))));
       dl->AddLine(ImVec2(bx, rowsY0), ImVec2(bx, rowsY1), IM_COL32(255, 90, 90, 220), 1.5f);
+   }
+   // Turbo 0.72: Range selection, the clip the Pencil is drawing, the snap guide.
+   {
+      const ImU32 accent = ArrUi::ThemeU32(CategoryColors::CurrentUiTheme().accent);
+      const ImU32 accentFill = ArrUi::ThemeU32(CategoryColors::CurrentUiTheme().accent, 0.18f);
+      if (gArrangeRange.active && gArrangeRange.laneHi >= gArrangeRange.laneLo)
+      {
+         const float rx0 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(gArrangeRange.start));
+         const float rx1 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(gArrangeRange.end));
+         for (int li = std::max(0, gArrangeRange.laneLo); li <= gArrangeRange.laneHi && li < (int)gArrangeRowY.size(); li++)
+         {
+            const auto& ry = gArrangeRowY[(size_t)li];
+            dl->AddRectFilled(ImVec2(rx0, ry.first), ImVec2(rx1, ry.second), accentFill);
+         }
+         const float top = gArrangeRowY.empty() ? rowsY0 : gArrangeRowY[(size_t)std::clamp(gArrangeRange.laneLo, 0, (int)gArrangeRowY.size() - 1)].first;
+         const float bot = gArrangeRowY.empty() ? rowsY1 : gArrangeRowY[(size_t)std::clamp(gArrangeRange.laneHi, 0, (int)gArrangeRowY.size() - 1)].second;
+         dl->AddLine(ImVec2(rx0, top), ImVec2(rx0, bot), accent, 1.5f);
+         dl->AddLine(ImVec2(rx1, top), ImVec2(rx1, bot), accent, 1.5f);
+      }
+      if (gArrDrag.mode == kArrDragPencil && gArrDrag.anchorLane >= 0 && gArrDrag.anchorLane < (int)gArrangeRowY.size())
+      {
+         const auto& ry = gArrangeRowY[(size_t)gArrDrag.anchorLane];
+         const float px0 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(std::min(gArrDrag.anchorTick, gArrDrag.currentTick)));
+         const float px1 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(std::max(gArrDrag.anchorTick, gArrDrag.currentTick)));
+         dl->AddRectFilled(ImVec2(px0, ry.first + 3.0f), ImVec2(std::max(px1, px0 + 4.0f), ry.second - 3.0f), accentFill, tok::radius_field);
+         dl->AddRect(ImVec2(px0, ry.first + 3.0f), ImVec2(std::max(px1, px0 + 4.0f), ry.second - 3.0f), accent, tok::radius_field, 0, 1.5f);
+      }
+      if (gArrangeSnapGuide >= 0 && gArrDrag.mode != kArrDragNone)
+      {
+         const float gx = ArrangeScreenXOfBeat(Arrange::TicksToBeats(gArrangeSnapGuide));
+         for (float yy = rowsY0; yy < rowsY1; yy += 8.0f) // dashed, so it never reads as the playhead
+            dl->AddLine(ImVec2(gx, yy), ImVec2(gx, std::min(yy + 4.0f, rowsY1)), accent, 1.0f);
+      }
    }
    dl->PopClipRect();
 
@@ -3891,10 +4162,30 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    if (hovered && io.MouseWheelH != 0.0f)
       gArrange.settings.scroll = (float)std::max(0.0, scroll - io.MouseWheelH * visBeats * 0.1);
 
-   // Cursor feedback.
-   if (hovered && gArrDrag.mode == kArrDragNone && !inRuler && !inScroll && hit.id != 0 && !gArrangeBlade)
-      if (hit.zone == 1 || hit.zone == 2)
+   // Cursor feedback (Turbo 0.72: one cursor per zone and per tool).
+   if (hovered && gArrDrag.mode == kArrDragNone && !inScroll)
+   {
+      if (inRuler)
+      {
+         if (gArrangeTool == ArrangeTool::Range)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+      }
+      else if (gArrangeTool == ArrangeTool::Hand)
+         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+      else if (gArrangeTool == ArrangeTool::Range || gArrangeBlade)
+         ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+      else if (gArrangeTool == ArrangeTool::Zoom)
          ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      else if (hit.id != 0)
+      {
+         if (hit.zone == 1 || hit.zone == 2 || gArrangeTool == ArrangeTool::Trim)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+         else if (hit.zone == 3 || hit.zone == 4)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         else if (ArrangeIsSelected(hit.id))
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+      }
+   }
 
    static uint64_t sClipMenuId = 0;
    static int sLaneMenuLane = -1;
@@ -3940,11 +4231,44 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             gArrDrag.mode = kArrDragLoop;
             gArrDrag.loopAnchor = ArrangeSnapMaybe(tickAtX(mouse.x));
          }
+         else if (gArrangeTool == ArrangeTool::Range)
+         {
+            // Turbo 0.72 (upstream): Range on the ruler spans every track.
+            gArrDrag.mode = kArrDragRange;
+            gArrDrag.anchorLane = -1;
+            gArrDrag.anchorTick = gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
+         }
          else
          {
             gArrDrag.mode = kArrDragScrub;
             ArrangeSeekTick(tickAtX(mouse.x));
          }
+      }
+      // Turbo 0.72: the tools that act on the lanes as a whole.
+      else if (gArrangeTool == ArrangeTool::Zoom)
+      {
+         gArrDrag.mode = kArrDragZoom;
+         gArrDrag.zoomAtStart = gArrange.settings.zoom;
+      }
+      else if (gArrangeTool == ArrangeTool::Hand)
+      {
+         gArrDrag.mode = kArrDragHand;
+         gArrDrag.scrollAtStart = gArrange.settings.scroll;
+         gArrDrag.vscrollAtStart = gArrangeVScroll;
+      }
+      else if (gArrangeTool == ArrangeTool::Range)
+      {
+         gArrDrag.mode = kArrDragRange;
+         gArrDrag.anchorLane = laneAtY(mouse.y);
+         gArrDrag.anchorTick = gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
+         if (gArrDrag.anchorLane < 0)
+            gArrDrag.mode = kArrDragNone;
+      }
+      else if (gArrangeTool == ArrangeTool::Pencil && hit.id == 0 && laneAtY(mouse.y) >= 0)
+      {
+         gArrDrag.mode = kArrDragPencil;
+         gArrDrag.anchorLane = laneAtY(mouse.y);
+         gArrDrag.anchorTick = gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
       }
       else if (gArrangeBlade)
       {
@@ -3995,6 +4319,13 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             gArrDrag.origStart = c ? c->start : 0;
             gArrDrag.ids = ArrangeSelectionIds();
             gArrDrag.base = gArrange;
+            // Turbo 0.72: the Trim tool trims the nearer edge from anywhere in the clip.
+            if (gArrangeTool == ArrangeTool::Trim && c != nullptr && (hit.zone == 0 || hit.zone == 3 || hit.zone == 4))
+            {
+               const float cx0 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c->start));
+               const float cx1 = ArrangeScreenXOfBeat(Arrange::TicksToBeats(c->End()));
+               hit.zone = mouse.x < 0.5f * (cx0 + cx1) ? 1 : 2;
+            }
             switch (hit.zone)
             {
                case 1: gArrDrag.mode = kArrDragTrimL; break;
@@ -4069,6 +4400,7 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    // ---- drag update ----
    if (gArrDrag.mode != kArrDragNone && ImGui::IsMouseDown(ImGuiMouseButton_Left))
    {
+      gArrangeSnapGuide = -1; // set again below by the drag that is placing an edge
       const float dx = mouse.x - gArrDrag.startMouse.x;
       const float dy = mouse.y - gArrDrag.startMouse.y;
       if (std::fabs(dx) > 2.0f || std::fabs(dy) > 2.0f)
@@ -4168,8 +4500,59 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
             if (Arrange::Lane* l = Arrange::FindLane(gArrange, gArrDrag.laneId))
                l->rowHeight = std::clamp(gArrDrag.heightAtStart + dy, kArrangeRowMinH, 400.0f);
             break;
+         // Turbo 0.72: the tools.
+         case kArrDragZoom:
+            if (gArrDrag.moved)
+            {
+               // Upstream's smooth zoom scrub: right zooms in, left out, around the press.
+               const float factor = std::clamp(std::exp(dx * 0.012f), 0.05f, 20.0f);
+               ArrangeSetZoomAround(gArrDrag.zoomAtStart * factor, gArrDrag.startMouse.x);
+            }
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            break;
+         case kArrDragHand:
+            gArrange.settings.scroll = (float)std::max(0.0, (double)gArrDrag.scrollAtStart - (double)dx / std::max(1e-3f, ArrangePxPerBeat()));
+            gArrangeVScroll = std::max(0.0f, gArrDrag.vscrollAtStart - dy);
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            break;
+         case kArrDragRange:
+         {
+            gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
+            const int laneNow = laneAtY(mouse.y);
+            ArrangeRangeSel r;
+            r.active = gArrDrag.moved && gArrDrag.currentTick != gArrDrag.anchorTick;
+            r.start = std::min(gArrDrag.anchorTick, gArrDrag.currentTick);
+            r.end = std::max(gArrDrag.anchorTick, gArrDrag.currentTick);
+            if (gArrDrag.anchorLane < 0)
+            {
+               r.laneLo = 0;
+               r.laneHi = (int)gArrange.lanes.size() - 1;
+            }
+            else
+            {
+               const int other = laneNow >= 0 ? laneNow : gArrDrag.anchorLane;
+               r.laneLo = std::min(gArrDrag.anchorLane, other);
+               r.laneHi = std::max(gArrDrag.anchorLane, other);
+            }
+            gArrangeRange = r;
+            gArrangeSnapGuide = gArrDrag.currentTick;
+            break;
+         }
+         case kArrDragPencil:
+            gArrDrag.currentTick = ArrangeSnapMaybe(tickAtX(mouse.x));
+            gArrangeSnapGuide = gArrDrag.currentTick;
+            break;
          default:
             break;
+      }
+      // Turbo 0.72: the snap guide follows whatever edge the drag is placing.
+      if (!io.KeyAlt && ArrangeSnapGridTicks() > 0)
+      {
+         if (gArrDrag.mode == kArrDragMove && gArrDrag.moved)
+            gArrangeSnapGuide = ArrangeSnapMaybe(gArrDrag.origStart + tickAtX(mouse.x) - gArrDrag.grabTick);
+         else if (gArrDrag.mode == kArrDragTrimL || gArrDrag.mode == kArrDragTrimR || gArrDrag.mode == kArrDragFadeIn ||
+                  gArrDrag.mode == kArrDragFadeOut || gArrDrag.mode == kArrDragLoop || gArrDrag.mode == kArrDragMarker)
+            gArrangeSnapGuide = ArrangeSnapMaybe(tickAtX(mouse.x));
       }
    }
    // ---- release ----
@@ -4177,6 +4560,36 @@ void DrawArrangeTimeline(ImVec2 areaMin, ImVec2 areaMax)
    {
       if (gArrDrag.mode == kArrDragRowResize)
          gPatchDirty = true;
+      // Turbo 0.72: tool releases.
+      if (gArrDrag.mode == kArrDragZoom && !gArrDrag.moved)
+         ArrangeSetZoomAround(gArrange.settings.zoom * (io.KeyAlt ? 0.75f : 1.35f), mouse.x);
+      if (gArrDrag.mode == kArrDragRange && !gArrDrag.moved)
+         gArrangeRange = ArrangeRangeSel(); // a click drops the range
+      if (gArrDrag.mode == kArrDragPencil && gArrDrag.anchorLane >= 0 && gArrDrag.anchorLane < (int)gArrange.lanes.size())
+      {
+         // Draw a clip over the drag (a click draws one grid step, at least a beat).
+         Arrange::Tick a = std::min(gArrDrag.anchorTick, gArrDrag.currentTick);
+         Arrange::Tick b = std::max(gArrDrag.anchorTick, gArrDrag.currentTick);
+         const Arrange::Tick step = std::max<Arrange::Tick>(ArrangeSnapGridTicks(), Arrange::kPPQ);
+         if (b - a < step)
+            b = a + step;
+         uint64_t made = 0;
+         const uint64_t laneId = gArrange.lanes[(size_t)gArrDrag.anchorLane].id;
+         ArrangeEdit([&]()
+         {
+            Arrange::Clip c;
+            c.start = a;
+            c.length = b - a;
+            Arrange::PlaceOverwrite(gArrange, laneId, c, &made);
+         });
+         if (made != 0)
+         {
+            gArrangeSel = { made };
+            sClipMenuId = made;
+            openClipMenu = true;
+         }
+      }
+      gArrangeSnapGuide = -1;
       ArrangeGestureEnd();
       gArrDrag = ArrangeDragState();
    }
@@ -4553,7 +4966,12 @@ void ArrangeHandleKeys()
    const bool ctrl = io.KeyCtrl || io.KeySuper;
    auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
    if (pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace))
-      ArrangeDeleteSelection();
+   {
+      if (gArrangeRange.active)
+         ArrangeEraseRange(); // Turbo 0.72: a Range selection wins over clip selection
+      else
+         ArrangeDeleteSelection();
+   }
    if ((ctrl && !io.KeyShift && pressed(ImGuiKey_D)) || (!ctrl && io.KeyShift && pressed(ImGuiKey_D)))
       ArrangeDuplicateSelection();
    if (ctrl && pressed(ImGuiKey_C))
@@ -4595,12 +5013,48 @@ void ArrangeHandleKeys()
    }
    if (!ctrl && (pressed(ImGuiKey_0) || pressed(ImGuiKey_Keypad0)))
       ArrangeToggleEnabledSelection();
-   if (!ctrl && !io.KeyShift && pressed(ImGuiKey_B))
-      gArrangeBlade = !gArrangeBlade;
+   // Turbo 0.72: upstream's tool keys (pressing the active tool's key again
+   // goes back to Select) and the keys DAWs and editors share.
+   const bool noMods = !ctrl && !io.KeyShift && !io.KeyAlt;
+   auto toggleTool = [](ArrangeTool t) { ArrangeSetTool(gArrangeTool == t ? ArrangeTool::Select : t); };
+   if (noMods && pressed(ImGuiKey_A))
+      ArrangeSetTool(ArrangeTool::Select);
+   if (noMods && pressed(ImGuiKey_T))
+      toggleTool(ArrangeTool::Trim);
+   if (noMods && pressed(ImGuiKey_R))
+      toggleTool(ArrangeTool::Range);
+   if (noMods && pressed(ImGuiKey_B))
+      toggleTool(ArrangeTool::Blade);
+   if (noMods && pressed(ImGuiKey_Z))
+      toggleTool(ArrangeTool::Zoom);
+   if (noMods && pressed(ImGuiKey_H))
+      toggleTool(ArrangeTool::Hand);
+   if (noMods && pressed(ImGuiKey_P))
+      toggleTool(ArrangeTool::Pencil);
+   if (noMods && pressed(ImGuiKey_F))
+      ArrangeZoomToFit(gArrangeLastPanelW);
+   if (noMods && ImGui::IsKeyPressed(ImGuiKey_Equal, true))
+      ArrangeSetZoomAround(gArrange.settings.zoom * 1.25f, gArrangeLaneX0 + 200.0f);
+   if (noMods && ImGui::IsKeyPressed(ImGuiKey_Minus, true))
+      ArrangeSetZoomAround(gArrange.settings.zoom / 1.25f, gArrangeLaneX0 + 200.0f);
+   if (ctrl && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_L))
+      ArrangeSetLoop(!gArrange.settings.loop.enabled, gArrange.settings.loop.start, gArrange.settings.loop.end);
+   if (noMods && (pressed(ImGuiKey_I) || pressed(ImGuiKey_O)))
+   {
+      // Loop in / out at the playhead (upstream's ArrangeSetLoopEdgeAtPlayhead).
+      const Arrange::LoopRange l = gArrange.settings.loop;
+      const Arrange::Tick t = ArrangePlayTick();
+      if (pressed(ImGuiKey_I))
+         ArrangeSetLoop(l.enabled, t, std::max(t + 1, l.end > t ? l.end : t + ArrangeTicksPerBar()));
+      else
+         ArrangeSetLoop(l.enabled, std::min(l.start, std::max<Arrange::Tick>(0, t - 1)), std::max<Arrange::Tick>(1, t));
+   }
    if (pressed(ImGuiKey_Escape))
    {
-      if (gArrangeBlade)
-         gArrangeBlade = false;
+      if (gArrangeRange.active)
+         gArrangeRange = ArrangeRangeSel();
+      else if (gArrangeTool != ArrangeTool::Select)
+         ArrangeSetTool(ArrangeTool::Select);
       else
          gArrangeSel.clear();
    }
