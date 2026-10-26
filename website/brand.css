@@ -211,3 +211,8 @@
 /* the page only scrolls up and down: nothing may widen it sideways (phones can otherwise drag the whole page left and right) */
 html { overflow-x: hidden; overflow-x: clip; }
 html { touch-action: manipulation; }   /* repeated taps never trigger double-tap zoom on any page; pinch-zoom and scrolling are unchanged */
+
+/* Dropdowns are the browser's own select: a field well and the value, no chevron. */
+.nat-pick { appearance: none; -webkit-appearance: none; border: 0; cursor: pointer; padding: 11px 16px; min-height: 40px; border-radius: 999px; max-width: 220px;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent); color: var(--ink); font: 600 0.85rem/1 var(--font-sans); box-shadow: var(--glass-hi), var(--shadow-1); }
+.nat-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

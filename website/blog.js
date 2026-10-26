@@ -61,24 +61,8 @@
     deck.setMode(m);
   }
 
-  // filter menu
-  function menu(open) { if (!filterMenu) return; filterMenu.hidden = !open; filterBtn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
-  if (filterBtn && filterMenu) {
-    filterBtn.addEventListener('click', function (e) { e.stopPropagation(); menu(filterMenu.hidden); });
-    var opts = filterMenu.querySelectorAll('.blog-opt');
-    opts.forEach(function (o) { o.setAttribute('aria-label', o.getAttribute('data-label') || ''); if (!o.querySelector('span')) { var sp = document.createElement('span'); sp.textContent = o.getAttribute('data-label') || ''; o.appendChild(sp); } });
-    opts.forEach(function (o) {
-      o.addEventListener('click', function () {
-        filter = o.getAttribute('data-filter') || 'all';
-        opts.forEach(function (x) { x.setAttribute('aria-selected', x === o ? 'true' : 'false'); });
-        var svg = o.querySelector('svg'); if (filterIc && svg) filterIc.innerHTML = svg.outerHTML;
-        filterBtn.setAttribute('aria-label', 'Category: ' + (o.getAttribute('data-label') || 'All'));
-        menu(false); rebuild();
-      });
-    });
-    document.addEventListener('click', function (e) { if (filterWrap && !filterWrap.contains(e.target)) menu(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') menu(false); });
-  }
+  // filter: a native select
+  if (filterBtn) filterBtn.addEventListener('change', function () { filter = filterBtn.value || 'all'; rebuild(); });
   document.querySelectorAll('[data-deck-view]').forEach(function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-deck-view') || 'fan'); }); });
   document.querySelectorAll('[data-deck-shuffle]').forEach(function (b) { b.addEventListener('click', shuffle); });
   document.querySelectorAll('[data-deck-prev]').forEach(function (b) { b.addEventListener('click', function () { deck.step(-1); }); });

@@ -204,13 +204,8 @@ def card(p, i):
 
 def build_index(posts, header, footer):
     items = "\n".join(card(p, i) for i, p in enumerate(posts))
-    ic_chev = brand_icon("chevron-down", "select-chev")
-    filter_opts = (
-        f'<button type="button" class="blog-opt" role="option" aria-selected="true" data-filter="all" data-label="All">{chip_icon("all")}<span>All</span></button>'
-        + "".join(
-            f'<button type="button" class="blog-opt" role="option" aria-selected="false" data-filter="{k}" data-label="{e(v)}">{chip_icon(k)}<span>{e(v)}</span></button>'
-            for k, v in CATS.items() if any(p["category"] == k for p in posts)
-        )
+    filter_opts = '<option value="all">All</option>' + "".join(
+        f'<option value="{k}">{e(v)}</option>' for k, v in CATS.items() if any(p["category"] == k for p in posts)
     )
     ic_shuffle = brand_icon("loop", "chip-ic")
     ic_fan = brand_icon("library", "chip-ic")
@@ -244,14 +239,7 @@ def build_index(posts, header, footer):
 
           <div class="blog-toolbar">
             <div class="blog-filter" id="blog-filter">
-              <button type="button" class="blog-select" id="blog-select" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by category">
-                <span class="blog-select-ic" id="blog-select-ic">{chip_icon("all")}</span>
-                <span class="blog-select-val" id="blog-select-val">All</span>
-                {ic_chev}
-              </button>
-              <div class="blog-menu" id="blog-menu" role="listbox" aria-label="Category" hidden>
-                {filter_opts}
-              </div>
+              <select class="nat-pick" id="blog-select" aria-label="Filter by category">{filter_opts}</select>
             </div>
 
             <div class="blog-deck-tools" role="group" aria-label="Deck layout and shuffle">

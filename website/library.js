@@ -18,7 +18,6 @@
   var IC_CHECK = '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5 8.2 14.2 15.5 6.5"/></svg>';
   var IC_DL = '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9.5m0 0-3.5-3.5M10 13l3.5-3.5M4 16.5h12"/></svg>';
   var IC_OPEN = '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 13.5 13.5 6.5M8 6.5h5.5V12"/></svg>';
-  var IC_CHEV = '<svg class="select-chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>';
 
   var CAT_ICONS = {
     'All': '<svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg>',
@@ -106,26 +105,9 @@
 
   function renderDropdown() {
     var cs = ['All'].concat(CATS);
-    chipsEl.innerHTML =
-      '<button class="lib-select" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by category">' +
-        '<span class="lib-select-ic">' + catIcon(activeFilter) + '</span>' +
-        '<span class="lib-select-val">' + esc(activeFilter) + '</span>' +
-        IC_CHEV +
-      '</button>' +
-      '<div class="lib-menu" role="listbox" aria-label="Category" hidden>' +
-        cs.map(function (c) {
-          return '<button class="lib-opt" type="button" role="option" aria-selected="' + (c === activeFilter) + '" data-f="' + esc(c) + '" aria-label="' + esc(c) + '" title="' + esc(c) + '">' +
-            catIcon(c) +
-            '<span>' + esc(c) + '</span>' +
-          '</button>';
-        }).join('') +
-      '</div>';
-  }
-  function setMenuOpen(open) {
-    var m = chipsEl.querySelector('.lib-menu'), t = chipsEl.querySelector('.lib-select');
-    if (!m || !t) return;
-    m.hidden = !open;
-    t.setAttribute('aria-expanded', String(open));
+    chipsEl.innerHTML = '<select class="nat-pick" aria-label="Filter by category">' + cs.map(function (c) {
+      return '<option value="' + esc(c) + '"' + (c === activeFilter ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('') + '</select>';
   }
 
   function buildDots() {
@@ -234,20 +216,10 @@
     });
   }
 
-  chipsEl.addEventListener('click', function (e) {
-    if (e.target.closest('.lib-select')) {
-      var m = chipsEl.querySelector('.lib-menu');
-      if (m) setMenuOpen(m.hidden);
-      return;
-    }
-    var b = e.target.closest('.lib-opt');
-    if (!b) return;
-    activeFilter = b.getAttribute('data-f') || 'All';
-    setMenuOpen(false);
+  chipsEl.addEventListener('change', function (e) {
+    activeFilter = e.target.value || 'All';
     rebuildVisible();
   });
-  document.addEventListener('click', function (e) { if (!chipsEl.contains(e.target)) setMenuOpen(false); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setMenuOpen(false); });
 
   document.querySelectorAll('[data-lib-shuffle]').forEach(function (btn) { btn.addEventListener('click', reshuffleDeck); });
   document.querySelectorAll('[data-lib-prev]').forEach(function (btn) { btn.addEventListener('click', function () { deck.step(-1); }); });
