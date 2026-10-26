@@ -304,7 +304,7 @@ Compiled Compile(const Recipe& recipe)
    // only what reaches the tap). The drums still feed the sidechains.
    const bool pads = part == Part::Pads, plucks = part == Part::Plucks;
    const bool wantBass = full || part == Part::Synths;
-   const bool wantChords = full || pads || plucks;
+   bool wantChords = full || pads || plucks;
    const bool wantMotif = wantBass;
    // Pads and plucks play the chords on a voice whose envelope is set for
    // them (the seeded spread runs attacks up to 4 s, which is neither). The
@@ -484,12 +484,16 @@ Compiled Compile(const Recipe& recipe)
       }
    }
 
+   // A card with no bass or motif (solo piano) has only its chords: they are its synths.
+   if (part == Part::Synths && synths.empty() && !st.hasMotif)
+      wantChords = true;
+
    // Chords: a progression from the Chorder, through the card's note effects.
    bool chordFamily = false;
    for (const char* f : kChordFamilies)
       chordFamily = chordFamily || std::string(st.family) == f;
    const bool chordsInFull = st.hasChords || chordFamily || layers == 0;
-   if (chordsInFull || pads || plucks)
+   if (chordsInFull || wantChords)
    {
       const std::vector<std::string> sizes = Split(st.chordSizes);
       // Pads change chord at most once a bar.
