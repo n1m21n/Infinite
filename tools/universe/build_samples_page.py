@@ -54,8 +54,10 @@ def main():
         <h1 class="slab deck-title" style="text-align:center">Samples</h1>
         <div class="smp-bar">
           <span class="grow"></span>
+          <button type="button" class="smp-genb" id="smp-gen-btn" hidden>generate</button>
           <button type="button" class="lib-icon-pill lib-shuffle-btn" id="smp-shuffle" aria-label="Shuffle" title="Shuffle"><svg class="lib-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg></button>
         </div>
+        <div class="smp-gen" id="smp-gen" hidden></div>
         <div class="smp-list" id="smp-list"></div>
         <div class="smp-pager" id="smp-pager" hidden>
           <button type="button" class="lib-icon-pill" data-pg="-1">Previous</button>
@@ -67,9 +69,9 @@ def main():
     </section>
   </main>"""
     t = re.sub(r"<main>.*?</main>", lambda _: main, t, count=1, flags=re.S)
-    t = re.sub(r'<script src="\.\./library\.js[^"]*"></script>', '<script src="../samples.js?v=13"></script>', t)
+    t = re.sub(r'<script src="\.\./library\.js[^"]*"></script>', '<script src="../samples.js?v=15"></script>', t)
     t = re.sub(r'<script src="\.\./(?:\.\./)?deck\.js[^"]*"></script>', "", t)
-    t = t.replace('</head>', '  <link rel="stylesheet" href="../samples.css?v=11">\n</head>', 1)
+    t = t.replace('</head>', '  <link rel="stylesheet" href="../samples.css?v=12">\n</head>', 1)
     open(os.path.join(a.site, "index.html"), "w", encoding="utf-8").write(t)
     print("pages ->", a.site)
 

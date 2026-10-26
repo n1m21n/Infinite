@@ -176,30 +176,26 @@ ROOTS = ("c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b")
 # MusicTime::ScaleTable order (src/audio/MusicTime.h)
 SCALES = ("major", "natural minor", "harmonic minor", "melodic minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian",
           "major pentatonic", "minor pentatonic", "blues", "whole tone", "chromatic")
-PIANO_VOICES = {"FM", "Partials"}
 SYNTH_TYPES = {"Oscillator", "Wavetable", "Analog", "FM", "Partials", "String", "Wave Terrain", "Equation Synth", "Spectral Synth", "Metallic",
                "Sampler", "Slicer", "PaulStretch", "Molder", "Grain Molder", "Granular", "Field Synth"}
 
 
 def describe(inf):
-    """What a sample is, read from its patch: part (the Generate Samples node's parts: full, drums, percussion, synths, piano, fx),
-    style (display name) and key ("a natural minor"; None for drums). The header's '# style:' line names the card."""
+    """What a sample is, read from its patch: part (the Generate Samples node's parts: synths, pads, plucks, percussion, drums;
+    "mix" for a whole mix, listed only under all), style (display name) and key ("a natural minor"; None for drums and
+    percussion). The header's '# style:' line names the card, and the part when the generator made it."""
     text = open(inf, encoding="utf-8", errors="replace").read()
     types = set(re.findall(r"^node \d+ \S+ (.+)$", text, re.M))
     m = re.search(r"^# style: (\w+)(?:.*\bpart (\w+))?", text, re.M)
     style, part = (m.group(1), m.group(2)) if m else (None, None)
-    fam = None
-    if style:
-        for st in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles_music.json")))["styles"]:
-            if st["id"] == style:
-                fam = st["family"]
     voices = types & SYNTH_TYPES
     if not part:
         drums = "Drum Sequencer" in types
-        part = ("drums" if drums and not voices else "piano" if (fam == "piano" or (voices and voices <= PIANO_VOICES)) and not drums
-                else "synths" if not drums else "full")
+        part = "drums" if drums and not voices else "synths" if not drums else "mix"
     t = re.search(r"^transport \S+ \d+ \d+ (\d+) (\d+)", text, re.M)
     key = None
+    if part == "all":
+        part = "mix"
     if t and part not in ("drums", "percussion"):
         key = "%s %s" % (ROOTS[int(t.group(1)) % 12], SCALES[int(t.group(2))] if int(t.group(2)) < len(SCALES) else "major")
     return {"part": part, "style": style.replace("_", " ") if style else None, "key": key}
@@ -215,6 +211,26 @@ def tag_samples(site):
     json.dump(d, open(path, "w"), separators=(",", ":"))
     from collections import Counter
     print("tagged %d: %s" % (len(d["samples"]), dict(Counter(s.get("part") for s in d["samples"]))))
+
+
+def publish_pool(src, site):
+    """The samples page's generate pool: the loops INFINITE_GENSAMPLEBATCH=<src> rendered (every style x part x 3 seeds,
+    2 bars) as <site>/pool/<file>.m4a, indexed in <site>/pool.json with part, style, key, bpm and peaks. The page
+    picks one that matches the filters and makes the wav download in the browser, so no wav is published."""
+    out = os.path.join(site, "pool")
+    shutil.rmtree(out, ignore_errors=True)
+    os.makedirs(out)
+    items = []
+    for e in json.load(open(os.path.join(src, "pool.json"))):
+        wav = os.path.join(src, e["file"] + ".wav")
+        subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "96000", wav, os.path.join(out, e["file"] + ".m4a")], check=True)
+        part = "mix" if e["part"] == "all" else e["part"]
+        key = None if part in ("drums", "percussion") else "%s %s" % (ROOTS[e["root"] % 12], e["scale"])
+        items.append({"f": e["file"], "part": part, "style": e["style"].replace("_", " "), "key": key, "bpm": round(e["bpm"]),
+                      "label": e["label"], "peaks": peaks(wav, 80)})
+    json.dump({"pool": items}, open(os.path.join(site, "pool.json"), "w"), separators=(",", ":"))
+    mb = sum(os.path.getsize(os.path.join(out, f)) for f in os.listdir(out)) / 1e6
+    print("pool: %d loops, %.1f MB" % (len(items), mb))
 
 
 def _title(nodes):
@@ -268,9 +284,10 @@ def publish_library(lib, site_assets, n=60, samples=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["samples", "library", "all", "tag"])
+    ap.add_argument("cmd", choices=["samples", "library", "all", "tag", "pool"])
     ap.add_argument("--lib", default=os.path.expanduser("~/Infinite/patch-universe-library/samples"))
     ap.add_argument("--n", type=int, default=60)
+    ap.add_argument("--pool", help="pool: the INFINITE_GENSAMPLEBATCH output dir")
     ap.add_argument("--max-mb", type=float, default=150)
     a = ap.parse_args()
     W = os.path.join(ROOT, "website")
@@ -290,6 +307,8 @@ def main():
                         shutil.copy(lib_inf, dest_inf)
                         x["patch"] = "media/%s/patch.inf" % x["id"]
             json.dump({"samples": s}, open(os.path.join(W, "samples", "data.json"), "w"), separators=(",", ":"))
+    if a.cmd == "pool":
+        publish_pool(a.pool, os.path.join(W, "samples"))
     if a.cmd in ("all", "tag"):
         tag_samples(os.path.join(W, "samples"))
 

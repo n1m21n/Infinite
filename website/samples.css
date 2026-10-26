@@ -105,3 +105,11 @@
   .smp-seg { flex-wrap: wrap; border-radius: 18px; }
   .smp-pick { flex: 1; max-width: none; }
 }
+
+/* Generate: the pill that makes a loop, and the loop it made above the list. */
+.smp-genb { border: 0; background: var(--ink); color: var(--paper); font: 600 0.85rem/1 var(--font-sans); padding: 11px 18px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-1); }
+.smp-genb:hover { opacity: 0.88; }
+.smp-genb:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.smp-gen { margin: 0 0 18px; padding: 6px; border-radius: 22px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); box-shadow: var(--glass-hi), var(--shadow-1); }
+.smp-gen .smp-id span { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 3px; }
+.smp-dlb:disabled { opacity: 0.4; cursor: progress; }
