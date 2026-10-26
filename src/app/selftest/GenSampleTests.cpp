@@ -9,11 +9,19 @@
 //           2 bars on a worker, motions on. Same checks, plus the time a
 //           2-bar generate takes against its 0.5 s budget: reported always,
 //           failed past twice that in optimised builds only.
-//   parts   each layer (drums, percussion, synths, piano, fx) alone for one
+//   parts   each layer (synths, pads, plucks, percussion, drums) alone for one
 //           style per family, 1 bar: every part must sound.
+//
+// INFINITE_GENSAMPLEBATCH=<dir>: not a test. Renders the website's generate
+// pool the way the node makes a loop (pre-roll, redraws, -14 LUFS): every
+// style x part at seeds 1-3, 2 bars, as <dir>/<style>-<part>-<seed>.wav plus
+// <dir>/pool.json. tools/catalog/catalog.py pool publishes it.
 #include "app/AppShared.h"
+#include "app/graph/GenerateSamplesNode.h"
 #include "app/graph/OfflineGraph.h"
+#include "audio/AudioFileWriter.h"
 #include "app/graph/SampleStyles.h"
+#include "audio/MusicTime.h"
 
 #include <chrono>
 #include <cmath>
@@ -71,6 +79,69 @@ namespace
       r.ok = r.finite && r.rmsDb > -60.0;
       return r;
    }
+}
+
+bool RunGenSampleBatch(const std::string& dir)
+{
+   FILE* index = fopen((dir + "/pool.json").c_str(), "w");
+   if (index == nullptr)
+   {
+      printf("GENSAMPLEBATCH cannot write %s\n", dir.c_str());
+      return false;
+   }
+   fprintf(index, "[\n");
+   int made = 0, failed = 0;
+   for (int i = 0; i < SampleStyles::Count(); i++)
+      for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
+         for (uint32_t seed = 1; seed <= 3; seed++)
+         {
+            SampleStyles::Recipe rec;
+            rec.style = SampleStyles::At(i).id;
+            rec.part = (SampleStyles::Part)pi;
+            rec.bars = 2;
+            bool ok = false;
+            for (int attempt = 0; attempt <= 3 && !ok; attempt++)
+            {
+               rec.seed = seed + (uint32_t)attempt * 7919u;
+               const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+               const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
+               const int pre = bar * GenerateSamplesNode::PrerollBars(rec.bars);
+               const int frames = bar * rec.bars;
+               Patch::Data data;
+               std::string err;
+               OfflineGraph g;
+               if (!c.error.empty() || !Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+                  continue;
+               for (const OfflineGraph::Motion& m : c.motions)
+                  g.AddMotion(m);
+               std::vector<float> left, right, l, r;
+               if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
+                  continue;
+               if (!GenerateSamplesNode::Master(left.data() + pre, right.data() + pre, frames, l, r))
+                  continue;
+               std::vector<float> inter((size_t)frames * 2);
+               for (int f = 0; f < frames; f++)
+               {
+                  inter[(size_t)f * 2] = l[f];
+                  inter[(size_t)f * 2 + 1] = r[f];
+               }
+               const std::string name = rec.style + "-" + SampleStyles::PartName(rec.part) + "-" + std::to_string(seed);
+               if (!AudioRecordings::WriteWav(dir + "/" + name + ".wav", inter.data(), frames, kRate, 2))
+                  continue;
+               fprintf(index, "%s{\"file\":\"%s\",\"style\":\"%s\",\"part\":\"%s\",\"seed\":%u,\"root\":%d,\"scale\":\"%s\",\"bpm\":%.2f,\"label\":\"%s\"}\n",
+                       made > 0 ? "," : "", name.c_str(), rec.style.c_str(), SampleStyles::PartName(rec.part), rec.seed, c.root,
+                       MusicTime::ScaleTable(c.scale).name, c.bpm, GenerateSamplesNode::Label(rec, c.root, c.scale).c_str());
+               ok = true;
+            }
+            made += ok ? 1 : 0;
+            failed += ok ? 0 : 1;
+            if (!ok)
+               printf("  %-24s %-10s seed %u FAIL\n", rec.style.c_str(), SampleStyles::PartName(rec.part), seed);
+         }
+   fprintf(index, "]\n");
+   fclose(index);
+   printf("GENSAMPLEBATCH %d made, %d failed\n", made, failed);
+   return failed == 0;
 }
 
 bool RunGenSampleTest()

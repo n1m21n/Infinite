@@ -12,6 +12,7 @@ bool RunAliasTest(); // selftest/AliasTests.cpp
 bool RunOversampleTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
+bool RunGenSampleBatch(const std::string& dir);
 bool RunFxAudit(); // selftest/FxAudit.cpp
 bool RunModAudit(); // selftest/ModAudit.cpp
 bool RunSynthAudit(); // selftest/SynthAudit.cpp
@@ -633,6 +634,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    {
       RegisterNodes();
       return RunGenSampleTest() ? 0 : 1;
+   }
+   if (const char* dir = getenv("INFINITE_GENSAMPLEBATCH"))
+   {
+      RegisterNodes();
+      return RunGenSampleBatch(dir) ? 0 : 1;
    }
 
    // Measurement audit of every audio effect: gain, stereo, tail, stress,
