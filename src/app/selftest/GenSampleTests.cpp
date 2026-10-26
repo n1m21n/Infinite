@@ -23,6 +23,7 @@
 #include "audio/AudioFileWriter.h"
 #include "app/graph/SampleStyles.h"
 #include "app/graph/UserStyle.h"
+#include "core/AudioSummary.h"
 #include "audio/NoteModel.h"
 #include "platform/AppPaths.h"
 #include "audio/MusicTime.h"
@@ -130,7 +131,7 @@ bool RunGenSampleBatch(const std::string& dir)
                std::vector<float> left, right, l, r;
                if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
                   continue;
-               if (!GenerateSamplesNode::Master(left.data() + pre, right.data() + pre, frames, l, r))
+               if (!GenerateSamplesNode::Master((int)rec.part, left.data() + pre, right.data() + pre, frames, l, r))
                   continue;
                std::vector<float> inter((size_t)frames * 2);
                for (int f = 0; f < frames; f++)
@@ -198,7 +199,7 @@ bool RunGenSampleDiversity(const std::string& dir, int takes)
             std::vector<float> left, right, l, r;
             if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
                continue;
-            if (!GenerateSamplesNode::Master(left.data() + pre, right.data() + pre, frames, l, r))
+            if (!GenerateSamplesNode::Master((int)rec.part, left.data() + pre, right.data() + pre, frames, l, r))
                continue;
             std::vector<float> inter((size_t)frames * 2);
             for (int f = 0; f < frames; f++)
@@ -233,6 +234,122 @@ bool RunGenSampleDiversity(const std::string& dir, int takes)
    fclose(index);
    printf("GENSAMPLEDIVERSITY %d made, %d failed\n", made, failed);
    return failed == 0;
+}
+
+namespace
+{
+   // One AudioSummary measurement as a JSON line.
+   void WriteSpectrum(FILE* out, const char* part, int take, const char* kind, const std::vector<float>& l, const std::vector<float>& r)
+   {
+      AudioSummary::Analyzer an(kRate);
+      an.Push(l.data(), r.data(), (int)l.size());
+      const AudioSummary::Result s = an.Finish();
+      const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
+      fprintf(out, "{\"part\":\"%s\",\"take\":%d,\"kind\":\"%s\",\"peak\":%.6g,\"rms\":%.6g,\"silence\":%.4f,\"corr\":%.4f,\"bands\":[",
+              part, take, kind, s.samplePeak, rms, s.silenceRatio, s.correlation);
+      for (int b = 0; b < AudioSummary::kBands; b++)
+         fprintf(out, "%s%.6g", b > 0 ? "," : "", s.bandPower[b]);
+      fprintf(out, "]}\n");
+   }
+
+   // Four one-pole passes: a steep enough slope to empty the band above (low) or below (high) `hz`.
+   void OnePole(std::vector<float>& x, double hz, bool high)
+   {
+      const double a = std::exp(-2.0 * M_PI * hz / kRate);
+      for (int pass = 0; pass < 4; pass++)
+      {
+         double y = 0.0;
+         for (float& v : x)
+         {
+            y = (1.0 - a) * v + a * y;
+            v = high ? (float)(v - y) : (float)y;
+         }
+      }
+   }
+}
+
+bool RunGenSampleSpectrum(const std::string& file, int takes)
+{
+   FILE* out = fopen(file.c_str(), "w");
+   if (out == nullptr)
+   {
+      printf("GENSAMPLESPECTRUM cannot write %s\n", file.c_str());
+      return false;
+   }
+   int made = 0;
+   for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
+      for (int i = 0; i < takes; i++)
+      {
+         SampleStyles::Recipe rec;
+         const uint32_t seed = 5000u + (uint32_t)i * 37u + (uint32_t)pi * 100003u;
+         rec.style = SampleStyles::At((int)((seed * 2654435761u >> 8) % (uint32_t)SampleStyles::Count())).id;
+         rec.part = (SampleStyles::Part)pi;
+         rec.bars = 2;
+         rec.seed = seed;
+         const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+         const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
+         const int pre = bar * GenerateSamplesNode::PrerollBars(rec.bars);
+         const int frames = bar * rec.bars;
+         Patch::Data data;
+         std::string err;
+         OfflineGraph g;
+         if (!c.error.empty() || !Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+            continue;
+         for (const OfflineGraph::Motion& m : c.motions)
+            g.AddMotion(m);
+         std::vector<float> left, right;
+         if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
+            continue;
+         std::vector<float> l(left.begin() + pre, left.begin() + pre + frames), r(right.begin() + pre, right.begin() + pre + frames);
+         double peak = 0.0, sum = 0.0;
+         bool finite = true;
+         for (int f = 0; f < frames; f++)
+         {
+            finite = finite && std::isfinite(l[f]) && std::isfinite(r[f]);
+            peak = std::max(peak, (double)std::max(std::abs(l[f]), std::abs(r[f])));
+            sum += 0.5 * ((double)l[f] * l[f] + (double)r[f] * r[f]);
+         }
+         const double rms = std::sqrt(sum / std::max(1, frames));
+         if (!finite || rms < 1e-4) // silent or broken: Master's other checks drop these before the gate
+            continue;
+         const char* part = SampleStyles::PartName(rec.part);
+         WriteSpectrum(out, part, i, "clean", l, r);
+         std::vector<float> wl = l, wr = r; // a sine at 3.2 kHz twice the take's power
+         for (int f = 0; f < frames; f++)
+         {
+            const float s = (float)(2.0 * rms * std::sin(2.0 * M_PI * 3200.0 * f / kRate));
+            wl[f] += s;
+            wr[f] += s;
+         }
+         WriteSpectrum(out, part, i, "whistle", wl, wr);
+         std::vector<float> nr(l.size());
+         for (int f = 0; f < frames; f++)
+            nr[f] = -l[f];
+         WriteSpectrum(out, part, i, "phase", l, nr);
+         std::vector<float> bl = l, br = r; // driven 30x into a hard clip
+         for (int f = 0; f < frames; f++)
+         {
+            bl[f] = std::clamp(bl[f] * (float)(30.0 / std::max(1e-6, peak)), -1.0f, 1.0f);
+            br[f] = std::clamp(br[f] * (float)(30.0 / std::max(1e-6, peak)), -1.0f, 1.0f);
+         }
+         WriteSpectrum(out, part, i, "brickwall", bl, br);
+         std::vector<float> dl = l, dr = r; // the first 8% survives
+         for (int f = frames * 8 / 100; f < frames; f++)
+            dl[f] = dr[f] = 0.0f;
+         WriteSpectrum(out, part, i, "dropout", dl, dr);
+         std::vector<float> ml = l, mr = r;
+         OnePole(ml, 150.0, false);
+         OnePole(mr, 150.0, false);
+         WriteSpectrum(out, part, i, "muffled", ml, mr);
+         std::vector<float> tl = l, tr = r;
+         OnePole(tl, 1500.0, true);
+         OnePole(tr, 1500.0, true);
+         WriteSpectrum(out, part, i, "thin", tl, tr);
+         made++;
+      }
+   fclose(out);
+   printf("GENSAMPLESPECTRUM %d takes measured\n", made);
+   return made > 0;
 }
 
 bool RunGenSampleTest()

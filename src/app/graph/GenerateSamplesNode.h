@@ -81,9 +81,10 @@ public:
    static std::string Label(const SampleStyles::Recipe& r, int root, int scale);
 
    // The step every made loop goes through: false when it is silent,
-   // non-finite or flat (redraw it), else `out` is it at -14 LUFS under a
-   // -1 dBTP ceiling. Shared with the website pool batch.
-   static bool Master(const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR);
+   // non-finite, flat or off its part's spectral gate (redraw it), else
+   // `out` is it at -14 LUFS under a -1 dBTP ceiling. Shared with the
+   // website pool batch. `part` is a SampleStyles::Part index.
+   static bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR);
    // Frames of the pre-roll a loop of `bars` renders first and drops.
    static int PrerollBars(int bars) { return bars == 1 ? 1 : 2; }
 

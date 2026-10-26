@@ -37,13 +37,13 @@ namespace
    int gAttempt = 0;
    bool gReady = false;
 
-   bool Master(const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+   bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
    {
       AudioSummary::Analyzer an(kRate);
       an.Push(l, r, frames);
       const AudioSummary::Result s = an.Finish();
       const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
-      const bool specOk = SampleCriticData::VerifyAudioSpectrum(0, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
+      const bool specOk = SampleCriticData::VerifyAudioSpectrum(part, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
       if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (rms > 0.0 && s.samplePeak / rms < 1.2) || !specOk)
          return false;
       double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
@@ -161,7 +161,7 @@ extern "C"
          std::vector<float> left, right, l, rr;
          if (!g.Render(pre + frames, left, right))
             continue;
-         if (!Master(left.data() + pre, right.data() + pre, frames, l, rr))
+         if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr))
             continue;
          gPcm.resize((size_t)frames * 2);
          for (int f = 0; f < frames; f++)

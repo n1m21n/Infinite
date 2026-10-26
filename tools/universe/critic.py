@@ -154,10 +154,14 @@ def hard_check(p):
     return []
 
 
+# A floor from fewer held-out pieces than this is noise (bass_seq had 4), so it is not applied.
+MIN_FLOOR_N = 50
+
+
 def floor_for(rec, t):
     """Wide plausibility floor: 1st percentile of held-out real data (accepts ~99% of real music)."""
     th = (rec.get("thresholds") or {}).get(t)
-    if not th:
+    if not th or th.get("n", 0) < MIN_FLOOR_N:
         return None
     return th["p1"]
 

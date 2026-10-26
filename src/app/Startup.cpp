@@ -14,6 +14,7 @@ bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleBatch(const std::string& dir);
 bool RunGenSampleDiversity(const std::string& dir, int takes);
+bool RunGenSampleSpectrum(const std::string& file, int takes);
 bool RunFxAudit(); // selftest/FxAudit.cpp
 bool RunModAudit(); // selftest/ModAudit.cpp
 bool RunSynthAudit(); // selftest/SynthAudit.cpp
@@ -647,6 +648,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       RegisterNodes();
       const char* n = getenv("INFINITE_GENSAMPLETAKES");
       return RunGenSampleDiversity(dir, n != nullptr ? std::max(1, atoi(n)) : 200) ? 0 : 1;
+   }
+   if (const char* file = getenv("INFINITE_GENSAMPLESPECTRUM"))
+   {
+      RegisterNodes();
+      const char* n = getenv("INFINITE_GENSAMPLETAKES");
+      return RunGenSampleSpectrum(file, n != nullptr ? std::max(1, atoi(n)) : 40) ? 0 : 1;
    }
 
    // Measurement audit of every audio effect: gain, stereo, tail, stress,

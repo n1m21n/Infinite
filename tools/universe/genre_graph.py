@@ -7,9 +7,12 @@ Unifies 7 musical/acoustic domains across all 34 sub-genres, 12 macro families, 
   4. Directive Synth Voice Archetypes (Bass 0..5, Keys 0..5, Leads 0..5)
   5. Audio FX & Knob Topology (sidechain, drive, delay, chorus, reverb, mod depth)
   6. 32-Band -> 5-Band Spectral & Dynamic Fingerprint (Sub, Low, Mid, Presence, Air, Crest, Silence, Whistle)
-  7. Spotify / Essentia 5 Perceptual Pillars (Danceability, Energy, Valence, Brightness, SpectralContrast)
-Performs Laplacian graph smoothing across connected sub-genres so neighbors share statistical strength."""
+  7. 5 perceptual pillars named after the Spotify/Essentia features (Danceability, Energy, Valence,
+     Brightness, SpectralContrast) but hand-written formulas over the style card: no Spotify or Essentia model
+Blends each style's voice-archetype weights 22% toward its top-4 neighbours (one smoothing step) so neighbours share strength."""
 import argparse, collections, json, math, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import spectral_gates as SG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CATALOG = os.path.join(HERE, "..", "catalog", "styles_music.json")
@@ -207,6 +210,11 @@ PART_SPECTRAL_GATES = {
     "toms":       (0.25, 0.94, 0.04, 0.00, 0.40, 1.75, 0.88, 0.55),
 }
 
+# Calibrated on real renders by spectral_gates.py; the table above is the fallback before that has run.
+_SG_FILE = os.path.join(MODELS, "shippable", "spectral_gates.json")
+if os.path.exists(_SG_FILE):
+    PART_SPECTRAL_GATES = {k: tuple(v) for k, v in json.load(open(_SG_FILE))["gates"].items()}
+
 
 def groove_density_and_sync(drums):
     weights = [4, 1, 2, 1, 3, 1, 2, 1, 3, 1, 2, 1, 3, 1, 2, 1]
@@ -225,7 +233,7 @@ def groove_density_and_sync(drums):
 
 
 def compute_style_pillars(st):
-    """Compute the 5 Spotify/EchoNest/Essentia perceptual pillars for a style card:
+    """Compute the 5 heuristic perceptual pillars for a style card (named after Spotify/EchoNest/Essentia features):
        [Danceability, Energy, Valence, Brightness, SpectralContrast] in [0, 1]^5."""
     bpm_mid = 0.5 * (st["bpm"][0] + st["bpm"][1])
     drums = st.get("drums", {})
@@ -342,7 +350,7 @@ def compute_style_emotions(st, pillars):
     elif fam in ("hard", "drum_and_bass") and sid != "liquid_dnb":
         ser -= 0.22
 
-    # 7. groove_hypnosis: high Witek syncopation + swing + strong dance pocket + repetitive ostinato
+    # 7. groove_hypnosis: high syncopation + swing + strong dance pocket + repetitive ostinato
     sw_bonus = min(0.22, st.get("swing", 0.0) * 1.1)
     grv = 0.38 * pillars["danceability"] + 0.30 * sync + 0.18 * st.get("groove", 0.5) + sw_bonus
     if sid in ("deep_house", "minimal_techno", "dub_techno", "amapiano", "uk_garage", "acid_house", "jungle", "footwork", "breakbeat", "psytrance", "tech_house", "french_filter_house"):
@@ -519,10 +527,12 @@ def extract_corpus_expression_stats(store_dir):
                     em = infer_piece_emotions(r)
                     top_e = max(EMOTION_NAMES, key=lambda k: em[k])
                     emotion_counts[top_e] += 1
-    # Also scan chord_prog and drum_groove from free.jsonl
-    p_free = os.path.join(os.path.expanduser(store_dir), "free.jsonl")
-    if os.path.exists(p_free):
-        with open(p_free) as f:
+    # Also scan chord_prog (chords.jsonl) and drum_groove (public_drums.jsonl)
+    for name in ("chords.jsonl", "public_drums.jsonl"):
+        p_more = os.path.join(os.path.expanduser(store_dir), name)
+        if not os.path.exists(p_more):
+            continue
+        with open(p_more) as f:
             for i, ln in enumerate(f):
                 if i > 15000:
                     break
@@ -535,7 +545,8 @@ def extract_corpus_expression_stats(store_dir):
         "corpus_vel_mean": round(sum(vel_means) / max(1, len(vel_means)), 4) if vel_means else 0.63,
         "corpus_vel_std": round(sum(vel_stds) / max(1, len(vel_stds)), 4) if vel_stds else 0.11,
         "corpus_bend_rate": round(sum(bend_rates) / max(1, len(bend_rates)), 4) if bend_rates else 0.08,
-        "n_pieces_sampled": len(vel_means),
+        "n_velocity_pieces": len(vel_means),
+        "n_emotion_pieces": sum(emotion_counts.values()),
         "corpus_emotion_distribution": dict(emotion_counts),
     }
 
@@ -615,7 +626,7 @@ def build_genre_network(catalog_path=CATALOG, store_dir=STORE):
         neighbors[ni["id"]] = [{"id": sid, "index": j, "weight": round(w, 4)} for w, j, sid in row_nb[:4]]
         ni["neighbors"] = neighbors[ni["id"]]
 
-    # Laplacian Graph Smoothing (alpha = 0.22): connected sub-genres share statistical strength
+    # One neighbour-blend step (alpha = 0.22) on the voice archetypes: connected sub-genres share statistical strength
     # while keeping 78% of their directive signature.
     alpha = 0.22
     for i in range(n):
@@ -643,37 +654,13 @@ def build_genre_network(catalog_path=CATALOG, store_dir=STORE):
 
 
 def verify_spectral_critic(band_power, crest, silence_ratio, correlation, part_name="full"):
-    """Evaluate a 32-band AudioSummary spectrum + dynamics against Category & Genre spectral gates."""
-    gates = PART_SPECTRAL_GATES.get(part_name, PART_SPECTRAL_GATES["full"])
-    min_low, max_low, min_mid, min_high, max_high, min_crest, max_sil, max_whistle = gates
-    tot = sum(band_power)
-    if tot <= 1e-12:
+    """Evaluate a 32-band AudioSummary spectrum + dynamics against a part's spectral gate
+       (spectral_gates.verify: the same checks as SampleCriticData::VerifyAudioSpectrum)."""
+    if sum(max(0.0, x) for x in band_power) <= 1e-12:
         return False, ["silent_spectrum"]
-    low_share = sum(band_power[:11]) / tot
-    mid_share = sum(band_power[11:22]) / tot
-    high_share = sum(band_power[22:]) / tot
-    # Narrow-band resonance whistle check on mid/high bands (bands 12..31, >300 Hz)
-    max_narrow = max(band_power[12:]) / tot if len(band_power) > 12 else 0.0
-
-    fails = []
-    if low_share < min_low:
-        fails.append("thin_low_end")
-    if low_share > max_low:
-        fails.append("muddy_low_end")
-    if mid_share < min_mid:
-        fails.append("scooped_mid")
-    if high_share < min_high:
-        fails.append("dull_highs")
-    if high_share > max_high:
-        fails.append("harsh_highs")
-    if crest < min_crest:
-        fails.append("flat_dynamics")
-    if silence_ratio > max_sil:
-        fails.append("dropout_silence")
-    if max_narrow > max_whistle:
-        fails.append("resonant_whistle")
-    if correlation < -0.40:
-        fails.append("phase_cancellation")
+    g = PART_SPECTRAL_GATES.get(part_name, PART_SPECTRAL_GATES["full"])
+    r = {"bands": band_power, "peak": crest, "rms": 1.0, "silence": silence_ratio, "corr": correlation}
+    fails = SG.verify(g, SG.features(r))
     return len(fails) == 0, fails
 
 

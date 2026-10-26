@@ -11,6 +11,8 @@ Exports:
   - kParamSafeBounds[] (learned [p05, p95] safe knob ranges from hand-made patches)"""
 import argparse, json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import critic as CR
+import spectral_gates as SG
 import genre_graph as GG
 import learn as L
 
@@ -66,7 +68,9 @@ def main():
         f"   constexpr float kMelodyFloor = {m_th['p1']:.5f}f;",
         f"   constexpr float kMelodyMidLl = {m_th['p25']:.5f}f;",
         f"   constexpr float kMelodyHiLl  = {m_th['p95']:.5f}f;",
-        f"   constexpr float kBassFloor   = {b_th['p1']:.5f}f;",
+        # bass_seq has had only a handful of held-out pieces; a floor from them would reject sound bass lines
+        (f"   constexpr float kBassFloor   = {b_th['p1']:.5f}f;" if b_th.get("n", 0) >= CR.MIN_FLOOR_N else
+         f"   constexpr float kBassFloor   = -1e30f; // off: {b_th.get('n', 0)} held-out bass pieces (< {CR.MIN_FLOOR_N})"),
         "",
     ]
 
@@ -170,7 +174,7 @@ def main():
     lines.append("   };")
     lines.append("")
 
-    # 6. Connected Genre-Subgenre Graph Directives, Spotify 5-Pillar & 8-Emotion Vectors
+    # 6. Connected Genre-Subgenre Graph Directives, 5 heuristic pillars & 8-emotion vectors
     net = GG.build_genre_network()
     lines += [
         "   // 8-Node Connected Emotion Indices:",
@@ -187,7 +191,7 @@ def main():
         "      float velBias;       // MIDI velocity shift",
         "      float gateScale;     // note duration/legato multiplier",
         "      float humanizeScale; // micro-timing & strum humanization multiplier",
-        "      float syncTarget;    // target Witek syncopation index",
+        "      float syncTarget;    // target syncopation score (critic.syncopation_score, metric-weight based)",
         "      float euclidProb;    // probability of Euclidean polyrhythmic hat/percussion layer",
         "   };",
         "   constexpr EmotionMidiDirective kEmotionMidiDirectives[kEmotionCount] = {",
@@ -253,26 +257,28 @@ def main():
     lines += [
         "   };",
         "",
+        "   // Same checks, same order as tools/universe/spectral_gates.py verify(); gates fitted on real renders.",
         "   inline bool VerifyAudioSpectrum(int partIdx, const double bandPower[32], double samplePeak, double rms, double silenceRatio, double correlation)",
         "   {",
-        "      if (rms <= 1e-7 || samplePeak / rms < 1.18 || correlation < -0.55 || silenceRatio > 0.92)",
+        "      if (rms <= 1e-7)",
         "         return false;",
-        "      double tot = 0.0, maxNarrow = 0.0;",
+        "      double tot = 0.0, low = 0.0, mid = 0.0, high = 0.0, maxNarrow = 0.0;",
         "      for (int i = 0; i < 32; i++)",
         "      {",
         "         const double p = bandPower[i] > 0.0 ? bandPower[i] : 0.0;",
         "         tot += p;",
-        "         if (i >= 14 && p > maxNarrow)",
+        "         (i < 11 ? low : i < 22 ? mid : high) += p;",
+        "         if (i >= 12 && p > maxNarrow)",
         "            maxNarrow = p;",
         "      }",
         "      if (tot <= 1e-12)",
-        "         return true;",
-        "      const int pi = (partIdx >= 0 && partIdx < 16) ? partIdx : 0;",
-        "      const PartSpectralGate& g = kPartSpectralGates[pi];",
-        "      // Reject severe narrow-band resonant whistles (> 68% energy in a single high FFT band) or dead silence",
-        "      if (maxNarrow / tot > (double)g.maxWhistle + 0.16)",
         "         return false;",
-        "      return true;",
+        "      const PartSpectralGate& g = kPartSpectralGates[(partIdx >= 0 && partIdx < 16) ? partIdx : 0];",
+        "      low /= tot;",
+        "      mid /= tot;",
+        "      high /= tot;",
+        "      return low >= g.minLow && low <= g.maxLow && mid >= g.minMid && high >= g.minHigh && high <= g.maxHigh &&",
+        f"             samplePeak / rms >= g.minCrest && silenceRatio <= g.maxSilence && maxNarrow / tot <= g.maxWhistle && correlation >= {SG.MIN_CORR:.2f};",
         "   }",
         "}",
     ]

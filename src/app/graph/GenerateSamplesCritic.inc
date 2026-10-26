@@ -11,7 +11,7 @@ namespace SampleCriticData
    constexpr float kMelodyFloor = -4.92842f;
    constexpr float kMelodyMidLl = -3.72623f;
    constexpr float kMelodyHiLl  = -2.13046f;
-   constexpr float kBassFloor   = -1.11666f;
+   constexpr float kBassFloor   = -1e30f; // off: 4 held-out bass pieces (< 50)
 
    // P(hit | lane, step) across 8 lanes x 16 steps
    constexpr float kDrumStepP[8][16] = {
@@ -444,7 +444,7 @@ namespace SampleCriticData
       float velBias;       // MIDI velocity shift
       float gateScale;     // note duration/legato multiplier
       float humanizeScale; // micro-timing & strum humanization multiplier
-      float syncTarget;    // target Witek syncopation index
+      float syncTarget;    // target syncopation score (critic.syncopation_score, metric-weight based)
       float euclidProb;    // probability of Euclidean polyrhythmic hat/percussion layer
    };
    constexpr EmotionMidiDirective kEmotionMidiDirectives[kEmotionCount] = {
@@ -515,43 +515,45 @@ namespace SampleCriticData
       float minLow, maxLow, minMid, minHigh, maxHigh, minCrest, maxSilence, maxWhistle;
    };
    constexpr PartSpectralGate kPartSpectralGates[16] = {
-      { 0.120f, 0.820f, 0.080f, 0.010f, 0.550f, 1.350f, 0.550f, 0.480f }, // full
-      { 0.020f, 0.850f, 0.100f, 0.010f, 0.650f, 1.300f, 0.650f, 0.520f }, // synths
-      { 0.020f, 0.800f, 0.120f, 0.005f, 0.500f, 1.220f, 0.450f, 0.450f }, // pads
-      { 0.010f, 0.780f, 0.120f, 0.020f, 0.650f, 1.650f, 0.750f, 0.500f }, // plucks
-      { 0.010f, 0.750f, 0.100f, 0.030f, 0.800f, 1.850f, 0.850f, 0.520f }, // percussion
-      { 0.150f, 0.850f, 0.060f, 0.020f, 0.650f, 1.800f, 0.750f, 0.500f }, // drums
-      { 0.320f, 0.960f, 0.020f, 0.000f, 0.350f, 1.250f, 0.680f, 0.520f }, // bass
-      { 0.000f, 0.920f, 0.030f, 0.005f, 0.850f, 1.220f, 0.820f, 0.600f }, // fx
-      { 0.000f, 0.880f, 0.050f, 0.010f, 0.850f, 1.600f, 0.900f, 0.580f }, // foley
-      { 0.020f, 0.820f, 0.150f, 0.005f, 0.550f, 1.350f, 0.680f, 0.480f }, // keys
-      { 0.000f, 0.700f, 0.180f, 0.020f, 0.700f, 1.300f, 0.720f, 0.500f }, // leads
-      { 0.010f, 0.880f, 0.060f, 0.005f, 0.650f, 1.200f, 0.450f, 0.480f }, // textures
-      { 0.420f, 0.980f, 0.010f, 0.000f, 0.300f, 1.750f, 0.850f, 0.550f }, // kicks
-      { 0.050f, 0.750f, 0.150f, 0.050f, 0.750f, 1.850f, 0.880f, 0.520f }, // snares
-      { 0.000f, 0.250f, 0.020f, 0.420f, 0.990f, 1.750f, 0.880f, 0.580f }, // hats
-      { 0.250f, 0.940f, 0.040f, 0.000f, 0.400f, 1.750f, 0.880f, 0.550f }, // toms
+      { 0.016f, 0.996f, 0.002f, 0.000f, 0.751f, 0.953f, 0.350f, 0.473f }, // full
+      { 0.005f, 1.000f, 0.000f, 0.000f, 0.608f, 1.935f, 1.000f, 0.729f }, // synths
+      { 0.000f, 0.957f, 0.033f, 0.000f, 0.901f, 2.769f, 1.000f, 0.829f }, // pads
+      { 0.000f, 0.914f, 0.066f, 0.000f, 0.865f, 3.659f, 0.740f, 0.832f }, // plucks
+      { 0.001f, 0.954f, 0.031f, 0.001f, 0.770f, 3.943f, 0.559f, 0.815f }, // percussion
+      { 0.059f, 0.993f, 0.002f, 0.002f, 0.867f, 3.303f, 0.711f, 0.505f }, // drums
+      { 0.004f, 1.000f, 0.000f, 0.000f, 0.475f, 2.006f, 0.913f, 0.846f }, // bass
+      { 0.000f, 0.999f, 0.001f, 0.000f, 0.894f, 2.876f, 0.746f, 0.660f }, // fx
+      { 0.000f, 0.959f, 0.032f, 0.000f, 0.830f, 4.519f, 0.825f, 0.627f }, // foley
+      { 0.000f, 0.551f, 0.342f, 0.001f, 0.395f, 3.170f, 0.474f, 0.616f }, // keys
+      { 0.000f, 0.955f, 0.034f, 0.000f, 0.538f, 2.152f, 0.350f, 0.688f }, // leads
+      { 0.000f, 1.000f, 0.000f, 0.000f, 0.926f, 1.409f, 0.350f, 0.646f }, // textures
+      { 0.418f, 0.999f, 0.001f, 0.000f, 0.351f, 2.407f, 0.819f, 0.397f }, // kicks
+      { 0.000f, 0.823f, 0.011f, 0.004f, 0.964f, 7.489f, 0.943f, 0.667f }, // snares
+      { 0.000f, 0.352f, 0.002f, 0.346f, 0.998f, 8.265f, 0.737f, 0.571f }, // hats
+      { 0.327f, 0.997f, 0.002f, 0.000f, 0.350f, 1.937f, 0.877f, 0.405f }, // toms
    };
 
+   // Same checks, same order as tools/universe/spectral_gates.py verify(); gates fitted on real renders.
    inline bool VerifyAudioSpectrum(int partIdx, const double bandPower[32], double samplePeak, double rms, double silenceRatio, double correlation)
    {
-      if (rms <= 1e-7 || samplePeak / rms < 1.18 || correlation < -0.55 || silenceRatio > 0.92)
+      if (rms <= 1e-7)
          return false;
-      double tot = 0.0, maxNarrow = 0.0;
+      double tot = 0.0, low = 0.0, mid = 0.0, high = 0.0, maxNarrow = 0.0;
       for (int i = 0; i < 32; i++)
       {
          const double p = bandPower[i] > 0.0 ? bandPower[i] : 0.0;
          tot += p;
-         if (i >= 14 && p > maxNarrow)
+         (i < 11 ? low : i < 22 ? mid : high) += p;
+         if (i >= 12 && p > maxNarrow)
             maxNarrow = p;
       }
       if (tot <= 1e-12)
-         return true;
-      const int pi = (partIdx >= 0 && partIdx < 16) ? partIdx : 0;
-      const PartSpectralGate& g = kPartSpectralGates[pi];
-      // Reject severe narrow-band resonant whistles (> 68% energy in a single high FFT band) or dead silence
-      if (maxNarrow / tot > (double)g.maxWhistle + 0.16)
          return false;
-      return true;
+      const PartSpectralGate& g = kPartSpectralGates[(partIdx >= 0 && partIdx < 16) ? partIdx : 0];
+      low /= tot;
+      mid /= tot;
+      high /= tot;
+      return low >= g.minLow && low <= g.maxLow && mid >= g.minMid && high >= g.minHigh && high <= g.maxHigh &&
+             samplePeak / rms >= g.minCrest && silenceRatio <= g.maxSilence && maxNarrow / tot <= g.maxWhistle && correlation >= -0.40;
    }
 }
