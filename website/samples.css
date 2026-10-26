@@ -115,12 +115,13 @@
 .smp-h { margin: 0; font: 700 clamp(1.5rem, 1.15rem + 1.1vw, 2.1rem)/1.1 var(--font-sans); letter-spacing: -0.025em; }
 .smp-h2 { margin-top: 8px; }
 .smp-sub { margin: 0; color: var(--muted); font: 400 1rem/1.5 var(--font-sans); max-width: 46ch; }
-.smp-blob { width: 100%; max-width: 520px; height: 300px; display: block; cursor: pointer; border-radius: 24px; }
+.smp-picks { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.smp-blob { width: 100%; max-width: 760px; height: clamp(280px, 52vh, 520px); display: block; cursor: pointer; border-radius: 24px; }
 .smp-blob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .smp-genbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
 .smp-genb.is-busy { opacity: 0.7; cursor: progress; }
 .smp-gen { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 40px; }
 .smp-gen .smp-id { text-align: left; }
 .smp-gen .smp-id span { display: block; color: var(--muted); font-size: 0.8rem; }
-@media (max-width: 680px) { .smp-blob { height: 240px; } .smp-genbar .smp-pick { flex: 1 1 140px; } }
+@media (max-width: 680px) { .smp-blob { height: 260px; } .smp-picks .smp-pick { flex: 1 1 120px; } }
 .smp-dlb:disabled { opacity: 0.4; cursor: progress; }

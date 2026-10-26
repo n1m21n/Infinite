@@ -5,15 +5,18 @@
   var gens = [], genEl = document.getElementById('smp-gen'), genBtn = document.getElementById('smp-gen-btn');
   function byId(id) { return items.concat(gens).filter(function (x) { return x.id === id; })[0]; }
   // Filters: what a sample is (the Generate Samples node's parts; a whole mix is only under "all") and its key.
-  var PARTS = ['synths', 'keys', 'leads', 'pads', 'plucks', 'textures', 'bass', 'drums', 'kicks', 'snares', 'hats', 'toms', 'percussion', 'fx', 'foley'];
-  var filt = { part: '', scale: '' };
+  var PARTS = ['synths', 'keys', 'leads', 'pads', 'plucks', 'textures', 'bass', 'drums', 'kicks', 'snares', 'hats', 'toms', 'percussion', 'fx'];
+  var filt = { part: '', scale: '', key: '' };
+  var NOTES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+  function noteOf(x) { return x.key ? String(x.key).split(' ')[0] : ''; }
   // A key reads "g natural minor": the note, then the scale. Only the scale filters; 49 keys in one list is too many to scan.
   function scaleOf(x) { return x.key ? String(x.key).split(' ').slice(1).join(' ') : ''; }
   // Drums and percussion have no key, so a key filter never hides them.
-  var KEYLESS = { drums: 1, percussion: 1, kicks: 1, snares: 1, hats: 1, toms: 1, fx: 1, foley: 1 };
+  var KEYLESS = { drums: 1, percussion: 1, kicks: 1, snares: 1, hats: 1, toms: 1, fx: 1 };
   function match(x) {
     var keyed = !KEYLESS[x.part];
-    return (!filt.part || x.part === filt.part) && (!keyed || !filt.scale || scaleOf(x) === filt.scale);
+    keyed = keyed && !!x.key;
+    return (!filt.part || x.part === filt.part) && (!keyed || !filt.scale || scaleOf(x) === filt.scale) && (!keyed || !filt.key || noteOf(x) === filt.key);
   }
   var IC_PLAY = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.6v10.8a.6.6 0 0 0 .9.5l8.6-5.4a.6.6 0 0 0 0-1L7.9 4.1a.6.6 0 0 0-.9.5Z"/></svg>';
   var IC_PAUSE = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.6" height="12" rx="1"/><rect x="11.4" y="4" width="3.6" height="12" rx="1"/></svg>';
@@ -101,9 +104,12 @@
     genBtn.textContent = info ? 'Generating…' : 'Loading engine…';
     (info ? Promise.resolve(info) : ask({ cmd: 'info' }).then(function (d) { info = d; return d; })).then(function (d) {
       genBtn.textContent = 'Generating…';
-      var scale = gf.scale ? d.scales.indexOf(gf.scale) : -1, part = gf.part;
-      return ask({ cmd: 'run', style: Math.floor(Math.random() * d.styles.length), part: PART_INDEX[part] || 0, seed: Math.floor(Math.random() * 99999),
-        bars: 2, key: -1, scale: KEYLESS[part] ? -1 : scale });
+      var scale = gf.scale ? d.scales.indexOf(gf.scale) : -1, part = gf.part, key = gf.key ? NOTES.indexOf(gf.key) : -1;
+      // Textures and foley are one choice here: a keyed texture or a keyless found sound, drawn at random.
+      var pi = part === 'textures' && Math.random() < 0.4 ? PART_INDEX.foley : PART_INDEX[part] || 0;
+      if (pi === PART_INDEX.foley) part = 'foley';
+      return ask({ cmd: 'run', style: Math.floor(Math.random() * d.styles.length), part: pi, seed: Math.floor(Math.random() * 99999),
+        bars: 2, key: KEYLESS[part] || part === 'foley' ? -1 : key, scale: KEYLESS[part] || part === 'foley' ? -1 : scale });
     }).then(function (r) {
       stop();
       var url = URL.createObjectURL(wavOf(r.pcm, r.rate));
@@ -144,7 +150,7 @@
   }
 
   // Instrument and scale are always dropdowns: one pair for the generator, one for the saved list.
-  var gf = { part: '', scale: '' };
+  var gf = { part: '', scale: '', key: '' };
   function pick(state, key, label, vals, onchange) {
     var sel = document.createElement('select');
     sel.className = 'smp-pick'; sel.setAttribute('aria-label', label);
@@ -156,12 +162,14 @@
   }
   function buildFilters() {
     var bar = document.getElementById('smp-bar'), grow = bar.querySelector('.grow');
-    var gbar = document.getElementById('smp-genbar');
+    var gpicks = document.getElementById('smp-genpicks');
     var noop = function () {};
-    gbar.insertBefore(pick(gf, 'part', 'full mix', PARTS, noop), genBtn);
-    gbar.insertBefore(pick(gf, 'scale', 'any scale', SCALES, noop), genBtn);
+    gpicks.appendChild(pick(gf, 'part', 'full mix', PARTS, noop));
+    gpicks.appendChild(pick(gf, 'key', 'any note', NOTES, noop));
+    gpicks.appendChild(pick(gf, 'scale', 'any scale', SCALES, noop));
     var onList = function () { applyFilters(); render(); };
     bar.insertBefore(pick(filt, 'part', 'all instruments', PARTS, onList), grow);
+    bar.insertBefore(pick(filt, 'key', 'any note', NOTES, onList), grow);
     bar.insertBefore(pick(filt, 'scale', 'any scale', SCALES, onList), grow);
   }
 
@@ -300,7 +308,7 @@
     bctx.save(); bctx.globalAlpha = 0.35; bctx.strokeStyle = '#fff'; bctx.lineWidth = 1.5; shape(0.78, 0.7, 1.4); bctx.stroke(); bctx.restore();
   }
   // A fragment shader draws the blob: a warped, blurred field in the brand's ember and signal, its edge pushed out by sixteen bands of the loop.
-  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG;\n' +
+  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG; uniform float uL;\n' +
     'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
     'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n' +
     '  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }\n' +
@@ -311,7 +319,7 @@
     '  float t = uT, a = atan(p.y, p.x), r = length(p);\n' +
     '  vec2 q = vec2(fbm(p * 1.3 + t * 0.12), fbm(p * 1.3 - t * 0.1 + 4.0));\n' +
     '  float wob = (fbm(vec2(cos(a), sin(a)) * 1.4 + t * 0.18) - 0.5) * (0.26 + 0.16 * uBusy);\n' +
-    '  float R = 0.5 + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
+    '  float R = 0.62 + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
     '  float d = r - R;\n' +
     '  float body = smoothstep(0.2, -0.22, d);\n' +
     '  float glow = exp(-max(d, 0.0) * 3.4) * 0.5 * smoothstep(1.0, 0.55, r) * smoothstep(1.0, 0.6, abs(p.y));\n' +
@@ -319,7 +327,9 @@
     '  float g = clamp(f * 1.5 + p.y * 0.35 - p.x * 0.2 + 0.25 * uE, 0.0, 1.0);\n' +
     '  vec3 hot = mix(uA, vec3(1.0, 0.82, 0.62), 0.55);\n' +
     '  vec3 c = mix(uS, uA, smoothstep(0.1, 0.55, g)); c = mix(c, hot, smoothstep(0.55, 1.0, g));\n' +
-    '  c = mix(c, vec3(1.0), 0.28 * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
+    '  vec3 cl = mix(uS * 0.8, vec3(0.5, 0.32, 0.88), smoothstep(0.1, 0.55, g)); cl = mix(cl, vec3(0.9, 0.5, 0.82), smoothstep(0.55, 1.0, g));\n' +
+    '  c = mix(c, cl, uL);\n' +
+    '  c = mix(c, vec3(1.0), mix(0.28, 0.1, uL) * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
     '  float edge = smoothstep(-0.5, 0.2, d) * body; c = mix(c, uS, edge * 0.45);\n' +
     '  float al = clamp(body * 0.94 + glow * (1.0 - body), 0.0, 1.0);\n' +
     '  vec3 col = mix(mix(uS, uA, 0.5), c, body);\n' +
@@ -339,12 +349,12 @@
     var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     var loc = gl.getAttribLocation(gp, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
+    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG', 'uL'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     return true;
   }
   function rgb(css, d) { var m = /^#([0-9a-f]{6})$/i.exec((css || '').trim()); if (!m) return d; var n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
-  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0;
+  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0, light = 0;
   for (var bi = 0; bi < 16; bi++) bands.push(0);
   function blobDraw() {
     requestAnimationFrame(blobDraw);
@@ -355,6 +365,7 @@
     if (frame++ % 60 === 0) {
       var cs = getComputedStyle(bcv);
       cA = rgb(cs.getPropertyValue('--accent'), cA); cS = rgb(cs.getPropertyValue('--signal'), cS);
+      var ink = rgb(cs.getPropertyValue('--ink'), [1, 1, 1]); light = (ink[0] + ink[1] + ink[2]) / 3 < 0.5 ? 1 : 0;
     }
     bt += 0.016 + 0.03 * busyK;
     busyK += ((busy ? 1 : 0) - busyK) * 0.08;
@@ -368,7 +379,7 @@
     energy += (sum / 16 - energy) * 0.2;
     gl.viewport(0, 0, bcv.width, bcv.height);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniform2f(gU.uRes, bcv.width, bcv.height); gl.uniform1f(gU.uT, bt); gl.uniform1f(gU.uE, energy); gl.uniform1f(gU.uBusy, busyK);
+    gl.uniform2f(gU.uRes, bcv.width, bcv.height); gl.uniform1f(gU.uT, bt); gl.uniform1f(gU.uE, energy); gl.uniform1f(gU.uBusy, busyK); gl.uniform1f(gU.uL, light);
     gl.uniform1fv(gU.uB, new Float32Array(bands)); gl.uniform3fv(gU.uA, cA); gl.uniform3fv(gU.uS, cS); gl.uniform3fv(gU.uG, [0.08, 0.1, 0.19]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
@@ -376,10 +387,12 @@
   else { bctx = bcv.getContext('2d'); requestAnimationFrame(blobDraw2d); }
 
   genBtn.hidden = typeof Worker === 'undefined' || typeof WebAssembly === 'undefined';
-  fetch('data.json?v=21').then(function (r) { return r.json(); }).then(function (d) {
-    all = d.samples.filter(function (x) { return x.kind === 'A'; }); shuffle(all);
+  fetch('data.json?v=22').then(function (r) { return r.json(); }).then(function (d) {
+    all = d.samples.filter(function (x) { return x.kind === 'A'; });
+    all.forEach(function (x) { if (x.part === 'foley') { x.part = 'textures'; x.name = String(x.name).replace(/^foley/, 'textures'); } });
+    shuffle(all);
     var qp = new URLSearchParams(location.search);
-    ['part', 'scale'].forEach(function (k) { if (qp.get(k)) filt[k] = qp.get(k); });
+    ['part', 'scale', 'key'].forEach(function (k) { if (qp.get(k)) filt[k] = qp.get(k); });
     buildFilters(); applyFilters(); var q0 = new URLSearchParams(location.search).get('s'); if (q0) { var ix = items.findIndex(function (x) { return x.id === q0.replace(/[^\w-]/g, ''); }); if (ix > -1) page = Math.floor(ix / PAGE); } render(); var q = new URLSearchParams(location.search).get('s'), qs = q && q.replace(/[^\w-]/g, ''), tr = qs && (listEl.querySelector('.smp-row[data-id="' + qs + '"]')); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('is-hit'); } })
     .catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the samples.'; });
 })();
