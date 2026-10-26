@@ -96,6 +96,8 @@
   <url><loc>https://infinitedevices.org/embeds/indie-psychedelic-liquid-dream.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/demoscene-plasma-sine-matrix.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/demoscene-plasma-rotozoom-bloom.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/pixel-art-8bit-dither-matrix.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/pixel-art-8bit-scanline-scroller.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-27</lastmod><priority>0.7</priority></url>
@@ -185,6 +187,10 @@
   <url><loc>https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/french-touch-disco-filter-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-robotic-pulse-bass-synth.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
@@ -529,6 +535,16 @@
   <url><loc>https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-sine-matrix.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-bloom.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-manga-panel-grid.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-manga-action-burst.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lilliputian-surreal-monolith-sphere-3d.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lilliputian-surreal-archway-colonnade-3d.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-robotic-pulse-bass-synth.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/pixel-art-8bit-dither-matrix.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/pixel-art-8bit-scanline-scroller.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-27</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>

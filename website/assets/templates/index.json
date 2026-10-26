@@ -1245,6 +1245,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "electro-robotic-pulse-bass-synth",
+      "name": "Electro Robotic Pulse Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Syncopated Detroit electro bass synthesizer with variable pulse-width bite, sub-octave snap, and fast resonant cutoff punch.",
+      "price": 0,
+      "preview": "assets/templates/electro-robotic-pulse-bass-synth.webp",
+      "file": "assets/templates/electro-robotic-pulse-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "electro-cybernetic-sync-lead-synth",
+      "name": "Electro Cybernetic Sync Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width.",
+      "price": 0,
+      "preview": "assets/templates/electro-cybernetic-sync-lead-synth.webp",
+      "file": "assets/templates/electro-cybernetic-sync-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "future-garage-ghost-reverb-fx",
+      "name": "Future Garage Ghost Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-ghost-reverb-fx.webp",
+      "file": "assets/templates/future-garage-ghost-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "future-garage-pitch-drift-delay-fx",
+      "name": "Future Garage Pitch Drift Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback.",
+      "price": 0,
+      "preview": "assets/templates/future-garage-pitch-drift-delay-fx.webp",
+      "file": "assets/templates/future-garage-pitch-drift-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

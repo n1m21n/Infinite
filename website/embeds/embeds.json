@@ -300,6 +300,16 @@
       "slug": "demoscene-plasma-rotozoom-bloom",
       "title": "Demoscene Plasma Rotozoom Bloom",
       "description": "Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. Bass drives dynamic coordinate rotation and zoom breathing, mids expand radial spiral interference bands, highs spark blazing white-hot thermal blooms."
+    },
+    {
+      "slug": "pixel-art-8bit-dither-matrix",
+      "title": "Pixel Art 8-Bit Dither Matrix",
+      "description": "Classic four-tone green Game Boy shader with Bayer ordered matrix dithering, block quantization, and CRT pixel grid scanlines. Bass drives pixel grid stepping and wave ripple, mids expand dynamic dither threshold patterns, highs illuminate brightest phosphor greens."
+    },
+    {
+      "slug": "pixel-art-8bit-scanline-scroller",
+      "title": "Pixel Art 8-Bit Scanline Scroller",
+      "description": "Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells. Bass modulates raster bar amplitude and ripple displacement, mids control parallax layer interference, highs trigger radiant phosphor strobe pulses."
     }
   ]
 }

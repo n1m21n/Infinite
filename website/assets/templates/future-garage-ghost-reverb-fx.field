@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Future Garage Ghost Reverb FX",
+    "author": "Infinite",
+    "description": "Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.65 [0.1, 0.95]\nparam float damping = 0.45 [0.05, 0.9]\nparam float mix = 0.55 [0.0, 1.0]\nparam float drift = 0.35 [0.0, 1.0]\nparam float tone = 1800.0 [300.0, 6000.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + 0.35 / sr) % 1.0\nmodSine = sin(lfo * 6.2831853) * drift * 0.08\n\nd1 = d1 + 0.18 * (in - d1)\nd2 = d2 + 0.12 * (d1 + in * 0.5 - d2)\nd3 = d3 + 0.08 * (d2 - d3)\nd4 = d4 + 0.05 * (d3 - d4)\n\ndiffused = (d1 * 0.4 + d2 * 0.3 + d3 * 0.2 + d4 * 0.1) * (1.0 + modSine)\n\nfCut = clamp(tone / sr * 2.8, 0.01, 0.45)\nlp = lp + fCut * (diffused - lp)\n\nwet = (diffused * 0.6 + lp * 0.4) * decay\nout = (in * (1.0 - mix) + wet * mix) * 1.5\n",
+    "params": {
+      "decay": 0.65,
+      "damping": 0.45,
+      "mix": 0.55,
+      "drift": 0.35,
+      "tone": 1800.0
+    }
+  }
+}

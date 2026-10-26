@@ -1,0 +1,84 @@
+infinite-patch 1
+# Future Garage Pitch Drift Delay FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+  f resonance 0.35
+  f decay 0.25
+  f volume 0.8
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float delayTime = 0.32 [0.05, 1.0]\nparam float feedback = 0.55 [0.1, 0.9]\nparam float flutter = 0.28 [0.0, 1.0]\nparam float tone = 2200.0 [200.0, 7000.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float buf1 = 0\nstate float buf2 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + 0.42 / sr) % 1.0\nwobble = sin(lfo * 6.2831853) * flutter * 0.06\n\nu = in * 1.2\nsat = clamp(u - 0.18 * u * u * u, -0.95, 0.95)\n\nfCut = clamp(tone / sr * 2.5, 0.01, 0.45)\nsig = sat + buf2 * feedback * (1.0 + wobble)\nlp = lp + fCut * (sig - lp)\n\nbuf1 = buf1 + 0.25 * (lp - buf1)\nbuf2 = buf2 + 0.18 * (buf1 - buf2)\n\nwet = (buf1 * 0.6 + buf2 * 0.4)\nout = (in * (1.0 - mix) + wet * mix) * 1.4\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.45 0.15 0.22
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Future Garage Pitch Drift Delay FX. Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

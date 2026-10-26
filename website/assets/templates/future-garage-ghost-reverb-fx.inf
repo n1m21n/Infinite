@@ -1,0 +1,84 @@
+infinite-patch 1
+# Future Garage Ghost Reverb FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+  f resonance 0.35
+  f decay 0.25
+  f volume 0.8
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float decay = 0.65 [0.1, 0.95]\nparam float damping = 0.45 [0.05, 0.9]\nparam float mix = 0.55 [0.0, 1.0]\nparam float drift = 0.35 [0.0, 1.0]\nparam float tone = 1800.0 [300.0, 6000.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + 0.35 / sr) % 1.0\nmodSine = sin(lfo * 6.2831853) * drift * 0.08\n\nd1 = d1 + 0.18 * (in - d1)\nd2 = d2 + 0.12 * (d1 + in * 0.5 - d2)\nd3 = d3 + 0.08 * (d2 - d3)\nd4 = d4 + 0.05 * (d3 - d4)\n\ndiffused = (d1 * 0.4 + d2 * 0.3 + d3 * 0.2 + d4 * 0.1) * (1.0 + modSine)\n\nfCut = clamp(tone / sr * 2.8, 0.01, 0.45)\nlp = lp + fCut * (diffused - lp)\n\nwet = (diffused * 0.6 + lp * 0.4) * decay\nout = (in * (1.0 - mix) + wet * mix) * 1.5\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.45 0.15 0.22
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Future Garage Ghost Reverb FX. Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

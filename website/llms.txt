@@ -119,6 +119,10 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Liquid DnB Rhodes Glide Synth](https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html): Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-glide-synth.inf)
 - [French Touch Disco Filter FX](https://infinitedevices.org/library/french-touch-disco-filter-fx.html): Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character. (file: https://infinitedevices.org/assets/templates/french-touch-disco-filter-fx.inf)
 - [French Touch Phaser Sweep FX](https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html): Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth. (file: https://infinitedevices.org/assets/templates/french-touch-phaser-sweep-fx.inf)
+- [Electro Robotic Pulse Bass Synth](https://infinitedevices.org/library/electro-robotic-pulse-bass-synth.html): Syncopated Detroit electro bass synthesizer with variable pulse-width bite, sub-octave snap, and fast resonant cutoff punch. (file: https://infinitedevices.org/assets/templates/electro-robotic-pulse-bass-synth.inf)
+- [Electro Cybernetic Sync Lead Synth](https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html): Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width. (file: https://infinitedevices.org/assets/templates/electro-cybernetic-sync-lead-synth.inf)
+- [Future Garage Ghost Reverb FX](https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html): Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening. (file: https://infinitedevices.org/assets/templates/future-garage-ghost-reverb-fx.inf)
+- [Future Garage Pitch Drift Delay FX](https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html): Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback. (file: https://infinitedevices.org/assets/templates/future-garage-pitch-drift-delay-fx.inf)
 
 ## Library: Community
 
@@ -301,6 +305,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Indie Psychedelic Liquid Dream](https://infinitedevices.org/library/indie-psychedelic-liquid-dream.html): Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms. (file: https://infinitedevices.org/assets/library/pixel/indie-psychedelic-liquid-dream.field)
 - [Demoscene Plasma Sine Matrix](https://infinitedevices.org/library/demoscene-plasma-sine-matrix.html): Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows. (file: https://infinitedevices.org/assets/library/pixel/demoscene-plasma-sine-matrix.field)
 - [Demoscene Plasma Rotozoom Bloom](https://infinitedevices.org/library/demoscene-plasma-rotozoom-bloom.html): Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. (file: https://infinitedevices.org/assets/library/pixel/demoscene-plasma-rotozoom-bloom.field)
+- [Pixel Art 8-Bit Dither Matrix](https://infinitedevices.org/library/pixel-art-8bit-dither-matrix.html): Classic four-tone green Game Boy shader with Bayer ordered matrix dithering, block quantization, and CRT pixel grid scanlines. (file: https://infinitedevices.org/assets/library/pixel/pixel-art-8bit-dither-matrix.field)
+- [Pixel Art 8-Bit Scanline Scroller](https://infinitedevices.org/library/pixel-art-8bit-scanline-scroller.html): Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells. (file: https://infinitedevices.org/assets/library/pixel/pixel-art-8bit-scanline-scroller.field)
 
 ## Library: Sketch
 
@@ -352,6 +358,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Bauhaus Geometric Rotary](https://infinitedevices.org/library/bauhaus-geometric-rotary.html): Concentric circular arcs, rotating triangular wedges, and cantilever balance bars in dynamic equilibrium. (file: https://infinitedevices.org/assets/library/sketch/bauhaus-geometric-rotary.js)
 - [Minimal Signal Raster Scanner](https://infinitedevices.org/library/minimal-signal-raster-scanner.html): Ryoji Ikeda inspired high-frequency raster scanner with horizontal scanlines, binary barcode pulses, and electric red strobe markers. (file: https://infinitedevices.org/assets/library/sketch/minimal-signal-raster-scanner.js)
 - [Minimal Signal Binary Matrix](https://infinitedevices.org/library/minimal-signal-binary-matrix.html): Precision digital test pattern matrix with algorithmic binary telemetry, segmented waveform ribbons, and focal signal reticles. (file: https://infinitedevices.org/assets/library/sketch/minimal-signal-binary-matrix.js)
+- [Riso Manga Panel Grid](https://infinitedevices.org/library/riso-manga-panel-grid.html): Risograph manga layout with offset halftone dots, dynamic screentone hatchings, and fluorescent misregistered panel borders. (file: https://infinitedevices.org/assets/library/sketch/riso-manga-panel-grid.js)
+- [Riso Manga Action Burst](https://infinitedevices.org/library/riso-manga-action-burst.html): High-energy manga speedline radial explosion with fluorescent pink dot screens and cyan kinetic ink accents. (file: https://infinitedevices.org/assets/library/sketch/riso-manga-action-burst.js)
 
 ## Library: Sketch 3D
 
@@ -398,6 +406,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Suprematist Geometric Cantilever 3D](https://infinitedevices.org/library/suprematist-geometric-cantilever-3d.html): Interlocking constructivist cantilever beams, offset rectangular planes, and hovering geometric volumes. (file: https://infinitedevices.org/assets/library/sketch/suprematist-geometric-cantilever-3d.js)
 - [Data Landscape Contour Mesh 3D](https://infinitedevices.org/library/data-landscape-contour-mesh-3d.html): Peter Saville inspired procedural 3D topological contour mesh with stepped elevation strata and oceanic cyan depth shading. (file: https://infinitedevices.org/assets/library/sketch/data-landscape-contour-mesh-3d.js)
 - [Data Landscape Topological Ridge 3D](https://infinitedevices.org/library/data-landscape-topological-ridge-3d.html): Generative data sculpture with undulating stacked frequency waveform ridges and floating structural datum planes. (file: https://infinitedevices.org/assets/library/sketch/data-landscape-topological-ridge-3d.js)
+- [Lilliputian Surreal Monolith Sphere 3D](https://infinitedevices.org/library/lilliputian-surreal-monolith-sphere-3d.html): Colossal floating bone-ivory sphere hovering over slate indigo stepped plinths with miniature terracotta sentinel pedestals. (file: https://infinitedevices.org/assets/library/sketch/lilliputian-surreal-monolith-sphere-3d.js)
+- [Lilliputian Surreal Archway Colonnade 3D](https://infinitedevices.org/library/lilliputian-surreal-archway-colonnade-3d.html): Vast quiet architectural colonnade with towering slate pillars framing tiny floating terracotta beacon orbs. (file: https://infinitedevices.org/assets/library/sketch/lilliputian-surreal-archway-colonnade-3d.js)
 
 ## Library: Synths
 
@@ -444,6 +454,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Acid House Resonant Sub Synth](https://infinitedevices.org/library/acid-house-resonant-sub-synth.html): Deep resonant acid sub bass synthesizer with transistor glide, soft saturation drive, and sub-octave punch. (file: https://infinitedevices.org/assets/templates/acid-house-resonant-sub-synth.inf)
 - [Liquid DnB Roller Bass Synth](https://infinitedevices.org/library/liquid-dnb-roller-bass-synth.html): Deep dual-oscillator rolling Reese bass synthesizer with smooth detune glide, analog saturation, and low-pass filter warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-roller-bass-synth.inf)
 - [Liquid DnB Rhodes Glide Synth](https://infinitedevices.org/library/liquid-dnb-rhodes-glide-synth.html): Lush electric piano chime synthesizer with velocity hammer bite, stereo harmonic shimmer, and gentle tape warmth. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-glide-synth.inf)
+- [Electro Robotic Pulse Bass Synth](https://infinitedevices.org/library/electro-robotic-pulse-bass-synth.html): Syncopated Detroit electro bass synthesizer with variable pulse-width bite, sub-octave snap, and fast resonant cutoff punch. (file: https://infinitedevices.org/assets/templates/electro-robotic-pulse-bass-synth.inf)
+- [Electro Cybernetic Sync Lead Synth](https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html): Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width. (file: https://infinitedevices.org/assets/templates/electro-cybernetic-sync-lead-synth.inf)
 
 ## Library: Audio Effects
 
@@ -490,6 +502,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Psytrance Spectral Filter FX](https://infinitedevices.org/library/psytrance-spectral-filter-fx.html): Resonant state-variable spectral filter with audio-rate LFO frequency sweeps and feedback overdrive. (file: https://infinitedevices.org/assets/templates/psytrance-spectral-filter-fx.inf)
 - [French Touch Disco Filter FX](https://infinitedevices.org/library/french-touch-disco-filter-fx.html): Classic 4-pole French Touch resonant low-pass filter with rhythmic LFO sweep, saturation drive, and disco pump character. (file: https://infinitedevices.org/assets/templates/french-touch-disco-filter-fx.inf)
 - [French Touch Phaser Sweep FX](https://infinitedevices.org/library/french-touch-phaser-sweep-fx.html): Creamy 6-stage all-pass phaser with wide stereo modulation, regenerative resonance feedback, and analog warmth. (file: https://infinitedevices.org/assets/templates/french-touch-phaser-sweep-fx.inf)
+- [Future Garage Ghost Reverb FX](https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html): Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening. (file: https://infinitedevices.org/assets/templates/future-garage-ghost-reverb-fx.inf)
+- [Future Garage Pitch Drift Delay FX](https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html): Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback. (file: https://infinitedevices.org/assets/templates/future-garage-pitch-drift-delay-fx.inf)
 
 ## Nodes
 
@@ -803,7 +817,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 60 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 62 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -864,6 +878,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Indie Psychedelic Liquid Dream](https://infinitedevices.org/embeds/indie-psychedelic-liquid-dream.html): Flowing reaction-diffusion liquid dream shader with multi-frequency fluid warping and vibrant neon blooms. Bass accelerates fluid warps and center blob eruption, mids blend electric orange and lime contours, highs release pink pulse bloom.
 - [Demoscene Plasma Sine Matrix](https://infinitedevices.org/embeds/demoscene-plasma-sine-matrix.html): Classic demoscene trigonometric sine-plasma shader with multi-frequency wave summing, fire orange palette cycling, and electric cyan edge glows. Bass accelerates plasma turbulence and central pulsation, mids cycle interference harmonics, highs illuminate electric cyan coronal flares.
 - [Demoscene Plasma Rotozoom Bloom](https://infinitedevices.org/embeds/demoscene-plasma-rotozoom-bloom.html): Amiga style rotozoom plasma shader with rotating spiral coordinates, chromatic wave interference, and intense thermal bloom. Bass drives dynamic coordinate rotation and zoom breathing, mids expand radial spiral interference bands, highs spark blazing white-hot thermal blooms.
+- [Pixel Art 8-Bit Dither Matrix](https://infinitedevices.org/embeds/pixel-art-8bit-dither-matrix.html): Classic four-tone green Game Boy shader with Bayer ordered matrix dithering, block quantization, and CRT pixel grid scanlines. Bass drives pixel grid stepping and wave ripple, mids expand dynamic dither threshold patterns, highs illuminate brightest phosphor greens.
+- [Pixel Art 8-Bit Scanline Scroller](https://infinitedevices.org/embeds/pixel-art-8bit-scanline-scroller.html): Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells. Bass modulates raster bar amplitude and ripple displacement, mids control parallax layer interference, highs trigger radiant phosphor strobe pulses.
 
 ## For AI agents
 

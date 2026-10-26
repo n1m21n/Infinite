@@ -4417,6 +4417,216 @@
       "file": "assets/library/pixel/demoscene-plasma-rotozoom-bloom.field",
       "preview": "assets/library/previews/demoscene-plasma-rotozoom-bloom.jpg",
       "bytes": 1638
+    },
+    {
+      "id": "riso-manga-panel-grid",
+      "name": "Riso Manga Panel Grid",
+      "kind": "Generator",
+      "tags": [
+        "riso",
+        "manga",
+        "halftone",
+        "screentone",
+        "drawing",
+        "print"
+      ],
+      "description": "Risograph manga layout with offset halftone dots, dynamic screentone hatchings, and fluorescent misregistered panel borders.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/riso-manga-panel-grid.js",
+      "preview": "assets/library/previews/riso-manga-panel-grid.jpg",
+      "bytes": 3563
+    },
+    {
+      "id": "riso-manga-action-burst",
+      "name": "Riso Manga Action Burst",
+      "kind": "Generator",
+      "tags": [
+        "riso",
+        "manga",
+        "burst",
+        "speedlines",
+        "action",
+        "drawing"
+      ],
+      "description": "High-energy manga speedline radial explosion with fluorescent pink dot screens and cyan kinetic ink accents.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/riso-manga-action-burst.js",
+      "preview": "assets/library/previews/riso-manga-action-burst.jpg",
+      "bytes": 2441
+    },
+    {
+      "id": "lilliputian-surreal-monolith-sphere-3d",
+      "name": "Lilliputian Surreal Monolith Sphere 3D",
+      "kind": "Generator",
+      "tags": [
+        "surreal",
+        "lilliputian",
+        "scale",
+        "monolith",
+        "3d",
+        "geometry"
+      ],
+      "description": "Colossal floating bone-ivory sphere hovering over slate indigo stepped plinths with miniature terracotta sentinel pedestals.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/lilliputian-surreal-monolith-sphere-3d.js",
+      "preview": "assets/library/previews/lilliputian-surreal-monolith-sphere-3d.jpg",
+      "bytes": 1724
+    },
+    {
+      "id": "lilliputian-surreal-archway-colonnade-3d",
+      "name": "Lilliputian Surreal Archway Colonnade 3D",
+      "kind": "Generator",
+      "tags": [
+        "surreal",
+        "colonnade",
+        "architecture",
+        "scale",
+        "3d",
+        "geometry"
+      ],
+      "description": "Vast quiet architectural colonnade with towering slate pillars framing tiny floating terracotta beacon orbs.",
+      "price": 0,
+      "domain": "sketch-3d",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/lilliputian-surreal-archway-colonnade-3d.js",
+      "preview": "assets/library/previews/lilliputian-surreal-archway-colonnade-3d.jpg",
+      "bytes": 1755
+    },
+    {
+      "id": "electro-robotic-pulse-bass-synth",
+      "name": "Electro Robotic Pulse Bass Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "electro",
+        "bass",
+        "pulse",
+        "detroit",
+        "audio"
+      ],
+      "description": "Syncopated Detroit electro bass synthesizer with variable pulse-width bite, sub-octave snap, and fast resonant cutoff punch.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/electro-robotic-pulse-bass-synth.inf",
+      "preview": "assets/library/previews/electro-robotic-pulse-bass-synth.jpg",
+      "bytes": 2265
+    },
+    {
+      "id": "electro-cybernetic-sync-lead-synth",
+      "name": "Electro Cybernetic Sync Lead Synth",
+      "kind": "Synth",
+      "tags": [
+        "synth",
+        "electro",
+        "lead",
+        "sync",
+        "metallic",
+        "audio"
+      ],
+      "description": "Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/electro-cybernetic-sync-lead-synth.inf",
+      "preview": "assets/library/previews/electro-cybernetic-sync-lead-synth.jpg",
+      "bytes": 2353
+    },
+    {
+      "id": "future-garage-ghost-reverb-fx",
+      "name": "Future Garage Ghost Reverb FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "future-garage",
+        "reverb",
+        "ghost",
+        "burial",
+        "audio"
+      ],
+      "description": "Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/future-garage-ghost-reverb-fx.inf",
+      "preview": "assets/library/previews/future-garage-ghost-reverb-fx.jpg",
+      "bytes": 2109
+    },
+    {
+      "id": "future-garage-pitch-drift-delay-fx",
+      "name": "Future Garage Pitch Drift Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "future-garage",
+        "delay",
+        "tape",
+        "flutter",
+        "audio"
+      ],
+      "description": "Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/future-garage-pitch-drift-delay-fx.inf",
+      "preview": "assets/library/previews/future-garage-pitch-drift-delay-fx.jpg",
+      "bytes": 2045
+    },
+    {
+      "id": "pixel-art-8bit-dither-matrix",
+      "name": "Pixel Art 8-Bit Dither Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "8bit",
+        "gameboy",
+        "dither",
+        "retro",
+        "shader"
+      ],
+      "description": "Classic four-tone green Game Boy shader with Bayer ordered matrix dithering, block quantization, and CRT pixel grid scanlines.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/pixel-art-8bit-dither-matrix.field",
+      "preview": "assets/library/previews/pixel-art-8bit-dither-matrix.jpg",
+      "bytes": 2107
+    },
+    {
+      "id": "pixel-art-8bit-scanline-scroller",
+      "name": "Pixel Art 8-Bit Scanline Scroller",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "8bit",
+        "scanline",
+        "raster",
+        "chiptune",
+        "shader"
+      ],
+      "description": "Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/pixel-art-8bit-scanline-scroller.field",
+      "preview": "assets/library/previews/pixel-art-8bit-scanline-scroller.jpg",
+      "bytes": 1900
     }
   ]
 }

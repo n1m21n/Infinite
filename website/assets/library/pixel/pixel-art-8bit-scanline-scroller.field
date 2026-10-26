@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Pixel Art 8-Bit Scanline Scroller",
+    "author": "Infinite",
+    "description": "Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float scrollSpeed = 0.85 [0.1, 3.0];\nparam float pixelBlock = 10.0 [4.0, 24.0];\nparam float scanlineDepth = 0.16 [0.0, 0.4];\nparam float barDensity = 6.0 [2.0, 16.0];\nparam float contrast = 1.3 [0.5, 2.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4;\ntime = t * scrollSpeed;\n\nblocks = 1080.0 / pixelBlock;\nbx = floor(uv.x * blocks) / blocks;\nby = floor(uv.y * blocks) / blocks;\nbp = vec2((bx - 0.5) * aspect, by - 0.5) * 2.4;\n\nhill1 = sin(bp.x * 3.0 + time * 1.5) * 0.25 - 0.2;\nhill2 = sin(bp.x * 6.0 - time * 0.8) * 0.15 - 0.5;\nhill3 = cos(bp.x * 12.0 + time * 2.2) * 0.08 - 0.7;\n\nrasterBar = sin(bp.y * barDensity * 3.14159 - time * 4.0) * 0.5 + 0.5;\nstars = sin(floor(bp.x * 40.0) * 123.45 + floor(bp.y * 40.0) * 678.9) * 0.5 + 0.5;\nstarBrite = if(stars > 0.94, 0.85, 0.1);\n\nsky = rasterBar * 0.35 + starBrite * 0.4;\nground = if(bp.y < hill3, 0.85, if(bp.y < hill2, 0.6, if(bp.y < hill1, 0.4, sky)));\n\nv = clamp((ground - 0.5) * contrast + 0.5, 0.0, 1.0);\n\nc0 = vec3(0.059, 0.220, 0.059);\nc1 = vec3(0.188, 0.384, 0.188);\nc2 = vec3(0.545, 0.675, 0.059);\nc3 = vec3(0.608, 0.737, 0.059);\n\ncol = if(v < 0.25, c0, if(v < 0.50, c1, if(v < 0.75, c2, c3)));\n\nscan = sin(uv.y * 1080.0 * 3.14159) * 0.5 + 0.5;\ncol = col * (1.0 - scan * scanlineDepth);\nalpha = 1.0;\n",
+    "params": {
+      "scrollSpeed": 0.85,
+      "pixelBlock": 10.0,
+      "scanlineDepth": 0.16,
+      "barDensity": 6.0,
+      "contrast": 1.3
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

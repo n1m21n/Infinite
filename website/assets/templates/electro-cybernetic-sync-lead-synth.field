@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Electro Cybernetic Sync Lead Synth",
+    "author": "Infinite",
+    "description": "Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float syncRatio = 2.4 [1.0, 5.0]\nparam float cutoff = 2200.0 [200.0, 7500.0]\nparam float decay = 0.42 [0.05, 1.8]\nparam float resonance = 0.45 [0.0, 0.85]\nparam float drive = 1.35 [0.5, 3.0]\nstate float masterPhase = 0\nstate float slavePhase = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00004, 0.02)\nenv = if(target > env, env + (target - env) * 0.2, env - env * decayRate)\n\nfBase = clamp(freq, 40.0, 4000.0)\nstepMaster = fBase / sr\nstepSlave = (fBase * (syncRatio + env * 1.5)) / sr\n\nnewMaster = masterPhase + stepMaster\nmasterPhase = newMaster % 1.0\n\nslavePhase = if(newMaster >= 1.0, 0.0, (slavePhase + stepSlave) % 1.0)\n\nsawSlave = slavePhase * 2.0 - 1.0\nsquareMaster = if(masterPhase < 0.5, 0.4, -0.4)\n\nraw = (sawSlave * 0.75 + squareMaster * 0.25) * env\n\nu = raw * drive\nsat = clamp(u - 0.2 * u * u * u, -0.95, 0.95)\n\nfCut = clamp(cutoff / sr * 2.8, 0.01, 0.45)\nq = clamp(resonance * 1.4, 0.0, 1.3)\nlp1 = lp1 + fCut * (sat - lp1 - q * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.35\n",
+    "params": {
+      "syncRatio": 2.4,
+      "cutoff": 2200.0,
+      "decay": 0.42,
+      "resonance": 0.45,
+      "drive": 1.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

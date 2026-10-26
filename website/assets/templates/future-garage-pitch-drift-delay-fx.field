@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Future Garage Pitch Drift Delay FX",
+    "author": "Infinite",
+    "description": "Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float delayTime = 0.32 [0.05, 1.0]\nparam float feedback = 0.55 [0.1, 0.9]\nparam float flutter = 0.28 [0.0, 1.0]\nparam float tone = 2200.0 [200.0, 7000.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float buf1 = 0\nstate float buf2 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + 0.42 / sr) % 1.0\nwobble = sin(lfo * 6.2831853) * flutter * 0.06\n\nu = in * 1.2\nsat = clamp(u - 0.18 * u * u * u, -0.95, 0.95)\n\nfCut = clamp(tone / sr * 2.5, 0.01, 0.45)\nsig = sat + buf2 * feedback * (1.0 + wobble)\nlp = lp + fCut * (sig - lp)\n\nbuf1 = buf1 + 0.25 * (lp - buf1)\nbuf2 = buf2 + 0.18 * (buf1 - buf2)\n\nwet = (buf1 * 0.6 + buf2 * 0.4)\nout = (in * (1.0 - mix) + wet * mix) * 1.4\n",
+    "params": {
+      "delayTime": 0.32,
+      "feedback": 0.55,
+      "flutter": 0.28,
+      "tone": 2200.0,
+      "mix": 0.5
+    }
+  }
+}
