@@ -69,6 +69,16 @@ public:
    // Loop range in beats: when enabled and playing, reaching `end` jumps to
    // `start` at the block boundary.
    void SetLoop(bool enabled, double beatStart, double beatEnd);
+   // Turbo 0.72 (upstream's BlockStartBeats): the beat at the first frame of
+   // the block AdvanceAudioClock just opened (after its seek or loop wrap,
+   // before the advance). Beats() already reads the block's END there, so
+   // anything scheduling inside the block (the timeline mix) must use this or
+   // it runs one block early. Without an audio clock it is Beats().
+   double BlockStartBeats() const
+   {
+      return mAudioSampleRate.load(std::memory_order_relaxed) > 0.0 ? mBlockStartBeats.load(std::memory_order_relaxed)
+                                                                    : Beats();
+   }
    bool LoopEnabled() const { return mLoopEnabled.load(std::memory_order_relaxed); }
    double LoopStartBeats() const { return mLoopStartBeats.load(std::memory_order_relaxed); }
    double LoopEndBeats() const { return mLoopEndBeats.load(std::memory_order_relaxed); }
@@ -187,6 +197,7 @@ private:
    std::atomic<double> mAudioSecondsOffset { 0.0 };
 
    std::atomic<double> mPendingSeekBeats { -1.0 };
+   std::atomic<double> mBlockStartBeats { 0.0 }; // Turbo 0.72: see BlockStartBeats()
    std::atomic<bool> mLoopEnabled { false };
    std::atomic<double> mLoopStartBeats { 0.0 };
    std::atomic<double> mLoopEndBeats { 0.0 };

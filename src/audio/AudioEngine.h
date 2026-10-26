@@ -132,6 +132,9 @@ struct ArrangeClipWindow
    bool syncToTempo = false;
    float sampleBpm = 120.0f;
    float pitch = 0.0f;
+   // Turbo 0.72 (timeline align, upstream's ClipWindow::speed): source seconds
+   // per timeline second, signed (negative = reversed, see Arrange::ClipSpeedFactor).
+   float speed = 1.0f;
    // Live waveform: which clip this is, and the shape it was measured under.
    uint64_t clipId = 0;
    uint64_t shape = 0;
@@ -162,6 +165,29 @@ struct ArrangeTerminal
    mutable float peakMax = 0.0f;
 };
 
+// Turbo 0.72 (record to timeline): what an armed audio lane records. The
+// main thread owns it (a fixed pool that is never freed, so a topology
+// generation still holding the pointer can never dangle) and flips `enabled`;
+// the audio thread, while the transport plays, writes the source's buffer
+// into `ring` and stamps the beat of the first frame it wrote.
+struct ArrangeRecordTap
+{
+   AudioCaptureRing ring;
+   std::atomic<bool> enabled { false };
+   std::atomic<bool> started { false };     // audio thread: first block written
+   std::atomic<double> startBeat { 0.0 };   // beat of the first recorded frame
+};
+
+// One armed lane in the topology: the source's buffer, its tap, and whether
+// the engine monitors it (heard through the lane's mix while armed).
+struct ArrangeRecorder
+{
+   int bufferIndex = -1;
+   ArrangeRecordTap* tap = nullptr;
+   int laneSlot = 0;
+   bool monitor = false;
+};
+
 // A full audio-thread topology: nodes in a valid topological order (sources
 // before consumers - AudioEngine::Process relies on this, it does not sort),
 // plus which pooled buffers get summed into the device's own output each
@@ -175,6 +201,7 @@ struct AudioTopology
    // Turbo: Arrangement Timeline terminals (only built in Timeline mode).
    std::vector<ArrangeClipWindow> arrangeWindows;
    std::vector<ArrangeTerminal> arrangeTerminals;
+   std::vector<ArrangeRecorder> arrangeRecorders; // Turbo 0.72: armed lanes
    int numBuffers = 0; // buffer indices used across `order` span [0, numBuffers)
 };
 
@@ -325,6 +352,7 @@ private:
    struct ProcessList;
    void RunArrangeLookahead(ProcessList* list, int numFrames);
    void MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuffer, int numFrames, int numChannels);
+   void RunArrangeRecorders(ProcessList* list, AudioBuffer& deviceBuffer, int numFrames, int numChannels);
 
    std::atomic<bool> mTimelineMode { false };
    std::atomic<bool> mOffline { false };

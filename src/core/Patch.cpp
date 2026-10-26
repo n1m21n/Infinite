@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "INode.h"
+#include "arrange/ArrangeModel.h"
 #include "platform/SettingsPaths.h"
 
 namespace Patch
@@ -556,7 +557,7 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
       // positions and reinterpreting them as ticks would silently corrupt
       // every pre-tick patch. New tag, new grammar, old tag stays readable.
       for (const ClipRecord& c : s.clips)
-         file << "cliptick " << i << " " << c.id << " " << c.startTick << " " << c.lengthTick << " "
+         file << (c.sessionScene >= 0 ? "slotclip " : "cliptick ") << i << " " << c.id << " " << c.startTick << " " << c.lengthTick << " "
               << c.srcUid << " " << c.srcOutput << " " << c.fadeInTick << " " << c.fadeOutTick << " "
               << FloatToString(c.gainDb) << " " << (c.enabled ? 1 : 0) << " " << c.groupId << " "
               << FloatToString(c.colorR) << " " << FloatToString(c.colorG) << " " << FloatToString(c.colorB) << " "
@@ -617,8 +618,20 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
       // only written when non-zero (i.e. the clip is a split-off right
       // half) so an unsplit Sample's patch line stays exactly as it was.
       for (const ClipRecord& c : s.clips)
-         if (c.sampleDropped && c.sourceOffsetSeconds != 0.0f)
+         if ((c.sampleDropped || c.reverse) && c.sourceOffsetSeconds != 0.0f)
             file << "clipsrcoffset " << i << " " << c.id << " " << FloatToString(c.sourceOffsetSeconds) << "\n";
+      // Per-clip speed and direction: own tag, only written when not the
+      // default, so an ordinary clip's patch is unchanged.
+      for (const ClipRecord& c : s.clips)
+         if (c.speed != 1.0f || c.reverse)
+            file << "clipspeed " << i << " " << c.id << " " << FloatToString(c.speed) << " " << (c.reverse ? 1 : 0) << "\n";
+      // Session view slots (see ClipRecord::sessionScene): which row, and the
+      // slot's follow action. Own tag, written only for slot records.
+      for (const ClipRecord& c : s.clips)
+         if (c.sessionScene >= 0)
+            file << "sessionslot " << i << " " << c.id << " " << c.sessionScene << " " << c.followAction << " "
+                 << c.followBars << " " << (c.slotLoop ? 1 : 0) << " " << c.slotLoopTicks << " "
+                 << c.slotQuantize << " " << c.slotLaunchMode << "\n";
    }
    for (const MarkerRecord& mk : data.markers)
       file << "marker " << mk.id << " " << mk.posTick << " " << mk.color << " " << EscapeLine(mk.name) << "\n";
@@ -630,6 +643,14 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
    // stay append-only and an older reader (which still parses that slot as
    // collapsed, harmlessly) doesn't shift. `parentGroupId` is the new 5th
    // token, added after it for the same reason.
+   for (const SceneRecord& sc : data.scenes)
+      file << "scene " << FloatToString(sc.tempo) << " " << EscapeLine(sc.name) << "\n";
+   for (size_t k = 0; k < data.scenes.size(); k++)
+      if (data.scenes[k].quantize != -1 || data.scenes[k].additive || data.scenes[k].followNext)
+         file << "scenemeta " << k << " " << data.scenes[k].quantize << " " << (data.scenes[k].additive ? 1 : 0) << " "
+              << (data.scenes[k].followNext ? 1 : 0) << " " << data.scenes[k].followBars << "\n";
+   if (data.sessionQuantize != 2)
+      file << "sessionmeta " << data.sessionQuantize << "\n";
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -700,6 +721,21 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
    bool turboModMarker = false;
    std::vector<std::vector<float>> modTails; // parallel to outData.modulation
    std::vector<std::vector<std::string>> modTailText;
+
+   // Turbo 0.72 (timeline align, upstream verbatim): legacy `clip` lines are
+   // seconds; converting them needs the file's bpm, which the `transport`
+   // line may carry *after* them. So they are parked here and folded in once
+   // the whole file has been read.
+   struct LegacyClip
+   {
+      int stream = -1;
+      double startSeconds = 0.0, lengthSeconds = 1.0;
+      int srcIndex = -1, srcOutput = 0;
+      float fadeInSec = 0.0f, fadeOutSec = 0.0f, gainDb = 0.0f;
+      float colorR = 0.0f, colorG = 0.0f, colorB = 0.0f;
+      std::string name;
+   };
+   std::vector<LegacyClip> legacyClips;
 
    while (std::getline(file, line))
    {
@@ -1081,6 +1117,7 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          if (!std::isfinite(s.opacity)) s.opacity = 1.0f;
          s.opacity = std::clamp(s.opacity, 0.0f, 1.0f);
          if (!std::isfinite(s.gainDb)) s.gainDb = 0.0f;
+         s.gainDb = std::clamp(s.gainDb, -60.0f, 12.0f); // the lane fader's range; 10^(dB/20) is inf past ~770 dB
          if (!std::isfinite(s.pan)) s.pan = 0.0f;
          s.pan = std::clamp(s.pan, -1.0f, 1.0f);
          outData.streams.push_back(std::move(s));
@@ -1269,7 +1306,125 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                   c.sourceOffsetSeconds = sourceOffsetSeconds;
          }
       }
-      else if (tag == "cliptick")
+      // Turbo 0.72 (timeline align): clipspeed, sessionslot, scenemeta,
+      // sessionmeta, scene, slotclip and legacy `clip`, as upstream reads them.
+      else if (tag == "clipspeed")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float speed = 1.0f;
+         int reverse = 0;
+         if (in >> streamIdx >> clipId >> speed >> reverse &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(speed) || speed < 0.1f || speed > 8.0f) speed = 1.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  c.speed = speed;
+                  c.reverse = reverse != 0;
+               }
+         }
+      }
+      else if (tag == "sessionslot")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int scene = -1, follow = 0, bars = 4;
+         if (in >> streamIdx >> clipId >> scene >> follow >> bars &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0 && scene >= 0 && scene < 4096)
+         {
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId && c.sessionScene >= 0)
+               {
+                  c.sessionScene = scene;
+                  c.followAction = std::clamp(follow, 0, 4);
+                  c.followBars = std::clamp(bars, 1, 64);
+                  int lp = 1, lt = 0, q = -1, lm = 0;   // later versions append these
+                  if (in >> lp >> lt >> q >> lm)
+                  {
+                     c.slotLoop = lp != 0;
+                     c.slotLoopTicks = std::clamp(lt, 0, 1 << 30);
+                     c.slotQuantize = std::clamp(q, -1, 3);
+                     c.slotLaunchMode = lm == 1 ? 1 : 0;   // the old Toggle (2) is now how every clip behaves
+                  }
+               }
+         }
+      }
+      else if (tag == "scenemeta")
+      {
+         size_t idx = 0;
+         int q = -1, add = 0;
+         if (in >> idx >> q >> add && idx < outData.scenes.size())
+         {
+            outData.scenes[idx].quantize = std::clamp(q, -1, 3);
+            outData.scenes[idx].additive = add != 0;
+            int fn = 0, fb = 0;   // later versions append these
+            if (in >> fn >> fb)
+            {
+               outData.scenes[idx].followNext = fn != 0;
+               outData.scenes[idx].followBars = std::clamp(fb, 0, 64);
+            }
+         }
+      }
+      else if (tag == "sessionmeta")
+      {
+         int q = 2;
+         if (in >> q)
+            outData.sessionQuantize = std::clamp(q, 0, 3);
+      }
+      else if (tag == "scene")
+      {
+         SceneRecord sc;
+         if (in >> sc.tempo)
+         {
+            if (!std::isfinite(sc.tempo) || sc.tempo < 0.0f || sc.tempo > 999.0f) sc.tempo = 0.0f;
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            sc.name = UnescapeLine(raw);
+            outData.scenes.push_back(sc);
+         }
+      }
+      else if (tag == "clip")
+      {
+         // LEGACY seconds form. Parked, not stored: see legacyClips above.
+         LegacyClip lc;
+         int triggerMode = 0, loop = 0;
+         float speed = 1.0f;
+         if (in >> lc.stream >> lc.startSeconds >> lc.lengthSeconds >> lc.srcIndex &&
+             lc.stream >= 0 && lc.stream < (int)outData.streams.size() &&
+             std::isfinite(lc.startSeconds) && std::isfinite(lc.lengthSeconds) &&
+             lc.startSeconds >= 0.0 && lc.lengthSeconds > 0.0)
+         {
+            // triggerMode/speed/loop are read and dropped - the engine never
+            // used them (overhaul WP1).
+            in >> lc.srcOutput >> triggerMode >> lc.fadeInSec >> lc.fadeOutSec >> lc.gainDb >> speed >> loop;
+            if (lc.srcOutput < 0) lc.srcOutput = 0;
+            const float len = (float)lc.lengthSeconds;
+            if (!std::isfinite(lc.fadeInSec)) lc.fadeInSec = 0.0f;
+            if (!std::isfinite(lc.fadeOutSec)) lc.fadeOutSec = 0.0f;
+            lc.fadeInSec = std::clamp(lc.fadeInSec, 0.0f, len);
+            lc.fadeOutSec = std::clamp(lc.fadeOutSec, 0.0f, len);
+            if (!std::isfinite(lc.gainDb)) lc.gainDb = 0.0f;
+            lc.gainDb = std::clamp(lc.gainDb, -60.0f, 12.0f);
+            if (in >> lc.colorR >> lc.colorG >> lc.colorB) {}
+            if (!std::isfinite(lc.colorR)) lc.colorR = 0.0f;
+            if (!std::isfinite(lc.colorG)) lc.colorG = 0.0f;
+            if (!std::isfinite(lc.colorB)) lc.colorB = 0.0f;
+            lc.colorR = std::clamp(lc.colorR, 0.0f, 1.0f);
+            lc.colorG = std::clamp(lc.colorG, 0.0f, 1.0f);
+            lc.colorB = std::clamp(lc.colorB, 0.0f, 1.0f);
+            std::string rawName;
+            std::getline(in, rawName);
+            if (!rawName.empty() && rawName[0] == ' ')
+               rawName.erase(0, 1);
+            lc.name = UnescapeLine(rawName);
+            legacyClips.push_back(lc);
+         }
+      }
+      else if (tag == "cliptick" || tag == "slotclip")
       {
          int streamIdx = -1;
          ClipRecord c;
@@ -1289,6 +1444,7 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             if (c.fadeInTick > c.lengthTick) c.fadeInTick = c.lengthTick;
             if (c.fadeOutTick > c.lengthTick) c.fadeOutTick = c.lengthTick;
             if (!std::isfinite(c.gainDb)) c.gainDb = 0.0f;
+            c.gainDb = std::clamp(c.gainDb, -60.0f, 12.0f); // the clip gain slider's range
             if (in >> c.colorR >> c.colorG >> c.colorB) {}
             if (!std::isfinite(c.colorR)) c.colorR = 0.0f;
             if (!std::isfinite(c.colorG)) c.colorG = 0.0f;
@@ -1301,6 +1457,8 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             if (!rawName.empty() && rawName[0] == ' ')
                rawName.erase(0, 1);
             c.name = UnescapeLine(rawName);
+            if (tag == "slotclip")
+               c.sessionScene = 0; // the row arrives on the `sessionslot` line
             outData.streams[streamIdx].clips.push_back(c);
          }
       }
@@ -1370,6 +1528,38 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
    }
 
    ApplyModTails(outData, modTails, modTailText, turboModMarker);
+
+   // Legacy seconds -> ticks, now that the file's own transport bpm is known
+   // (the `transport` line may appear after the clips), so a pre-tick patch
+   // lands on exactly the bar/beat it played at (upstream verbatim).
+   if (!legacyClips.empty())
+   {
+      const double bpm = (std::isfinite(outData.transport.bpm) && outData.transport.bpm > 0.0f)
+                             ? (double)outData.transport.bpm
+                             : 120.0;
+      auto toTicks = [bpm](double sec) -> int64_t {
+         if (!(sec > 0.0)) return 0;
+         return (int64_t)llround(sec * bpm / 60.0 * (double)Arrange::kPPQ);
+      };
+      for (const LegacyClip& lc : legacyClips)
+      {
+         if (lc.stream < 0 || lc.stream >= (int)outData.streams.size())
+            continue;
+         ClipRecord c;
+         c.startTick = toTicks(lc.startSeconds);
+         c.lengthTick = std::max<int64_t>(1, toTicks(lc.lengthSeconds));
+         c.legacySrcIndex = lc.srcIndex;
+         c.srcOutput = lc.srcOutput;
+         c.fadeInTick = std::clamp<int64_t>(toTicks(lc.fadeInSec), 0, c.lengthTick);
+         c.fadeOutTick = std::clamp<int64_t>(toTicks(lc.fadeOutSec), 0, c.lengthTick);
+         c.gainDb = lc.gainDb;
+         c.colorR = lc.colorR;
+         c.colorG = lc.colorG;
+         c.colorB = lc.colorB;
+         c.name = lc.name;
+         outData.streams[lc.stream].clips.push_back(c);
+      }
+   }
 
    for (StreamRecord& st : outData.streams)
       std::stable_sort(st.clips.begin(), st.clips.end(),

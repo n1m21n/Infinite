@@ -365,11 +365,38 @@ namespace Patch
       // loads with every Sample reading from the file's own beginning,
       // exactly like it always has.
       float  sourceOffsetSeconds   = 0.0f;
+      // Per-clip playback speed and direction (see Arrange::Clip::speed).
+      // 1 / false default, so a patch saved before these existed plays as it did.
+      float  speed                 = 1.0f;
+      bool   reverse               = false;
       // Per-clip modulation bypass (see Arrange::Clip::bypassedModParams).
       // Sorted, deduplicated paramIndices on the clip's source node. Empty
       // on every clip saved before this field existed, which is the same as
       // "nothing bypassed" - so an old patch loads identically.
       std::vector<int> bypassedModParams;
+      // Session view (Arrange::SessionSlot): >= 0 = this record is the
+      // stream's session slot in that scene row, not a timeline clip. Written
+      // as `slotclip` (same grammar as `cliptick`, so an older reader skips
+      // it and every follow-on clip* line finds no clip) plus a
+      // `sessionslot` line carrying these three.
+      int    sessionScene = -1;
+      int    followAction = 0;
+      int    followBars   = 4;
+      bool   slotLoop     = true;
+      int    slotLoopTicks = 0;
+      int    slotQuantize = -1;
+      int    slotLaunchMode = 0;
+   };
+
+   // Session view row (Arrange::Scene), one `scene` line each, in order.
+   struct SceneRecord
+   {
+      float tempo = 0.0f;         // > 0 = launching the scene sets the tempo
+      std::string name;
+      int quantize = -1;
+      bool additive = false;
+      bool followNext = false;
+      int followBars = 0;
    };
 
    struct StreamRecord
@@ -457,6 +484,10 @@ namespace Patch
       std::vector<StreamRecord> streams; // clips nested
       std::vector<MarkerRecord> markers; // sorted by pos
       std::vector<TrackGroupRecord> trackGroups;
+      // Turbo 0.72 (timeline align): upstream's Session view rows, carried so
+      // a patch saved by either build keeps them.
+      std::vector<SceneRecord> scenes;   // session view rows
+      int sessionQuantize = 2;           // `sessionmeta` line; absent = 1 bar
       ArrangeSettingsRecord arrangeSettings;
       bool hasArrange = false; // an `arrange` line was read
       std::vector<PerfRecord> performance; // Turbo 0.46: Performance Mode

@@ -5247,6 +5247,7 @@
       }
 
 #include "app/selftest/PatchCompat.inl" // Turbo 0.60: INFINITE_PATCHCOMPAT probe
+#include "app/selftest/ArrangeTests.inl" // Turbo 0.72: INFINITE_ARRANGE*TEST (timeline, ported from upstream)
       if (getenv("INFINITE_PORTEDTEST") != nullptr && frameId == 8)
       {
          int failed = 0;

@@ -56,6 +56,89 @@ int ArrangeLaneTypeForNode(const GraphNode& gn)
 }
 
 // ---- model <-> patch (upstream's straight field copies) ------------------
+// Turbo 0.72 (timeline align): upstream's ArrangeClipToRecord /
+// ArrangeClipFromRecord (src/app/graph/Wiring.cpp) verbatim, so speed,
+// reverse, session slots and scenes round-trip like in upstream.
+
+Patch::ClipRecord ArrangeClipToRecord(const Arrange::Clip& c)
+{
+   Patch::ClipRecord r;
+   r.id = c.id;
+   r.startTick = c.start;
+   r.lengthTick = c.length;
+   r.srcUid = c.srcUid;
+   r.srcOutput = c.srcOutput;
+   r.fadeInTick = c.fadeIn;
+   r.fadeOutTick = c.fadeOut;
+   r.gainDb = c.gainDb;
+   r.pan = c.pan;
+   r.enabled = c.enabled;
+   r.groupId = c.groupId;
+   r.name = c.name;
+   r.colorR = c.colorR;
+   r.colorG = c.colorG;
+   r.colorB = c.colorB;
+   r.blendMode = c.blendMode;
+   r.pitch = c.pitch;
+   r.syncToTempo = c.syncToTempo;
+   r.opacity = c.opacity;
+   r.colorBrightness = c.colorBrightness;
+   r.colorContrast = c.colorContrast;
+   r.colorSaturation = c.colorSaturation;
+   r.retrigger = c.retrigger;
+   r.sampleDropped = c.sampleDropped;
+   r.sampleBpm = c.sampleBpm;
+   r.origBpm = c.origBpm;
+   r.sourceDurationSeconds = c.sourceDurationSeconds;
+   r.sourceOffsetSeconds = c.sourceOffsetSeconds;
+   r.speed = c.speed;
+   r.reverse = c.reverse;
+   r.bypassedModParams = c.bypassedModParams;
+   return r;
+}
+
+Arrange::Clip ArrangeClipFromRecord(const Patch::ClipRecord& c, int streamBlendMode,
+                                    const std::function<uint64_t(int)>& resolveLegacy)
+{
+   Arrange::Clip clip;
+   clip.id = c.id;
+   clip.start = c.startTick;
+   clip.length = c.lengthTick;
+   clip.srcUid = c.srcUid;
+   if (clip.srcUid == 0 && c.legacySrcIndex >= 0 && resolveLegacy)
+      clip.srcUid = resolveLegacy(c.legacySrcIndex);
+   clip.srcOutput = c.srcOutput;
+   clip.fadeIn = c.fadeInTick;
+   clip.fadeOut = c.fadeOutTick;
+   clip.gainDb = c.gainDb;
+   clip.pan = c.pan;
+   clip.enabled = c.enabled;
+   clip.groupId = c.groupId;
+   clip.name = c.name;
+   clip.colorR = c.colorR;
+   clip.colorG = c.colorG;
+   clip.colorB = c.colorB;
+   clip.blendMode = (c.blendMode >= 0) ? c.blendMode : streamBlendMode;
+   clip.pitch = c.pitch;
+   clip.syncToTempo = c.syncToTempo;
+   clip.opacity = c.opacity;
+   clip.colorBrightness = c.colorBrightness;
+   clip.colorContrast = c.colorContrast;
+   clip.colorSaturation = c.colorSaturation;
+   clip.retrigger = c.retrigger;
+   clip.sampleDropped = c.sampleDropped;
+   clip.sampleBpm = c.sampleBpm;
+   // origBpm is the detected tempo, display only. It is written only
+   // when > 0, so a missing line (-1, the load sentinel) means "none
+   // detected" or a patch that predates detection - never a tempo.
+   clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
+   clip.sourceDurationSeconds = c.sourceDurationSeconds;
+   clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
+   clip.speed = c.speed;
+   clip.reverse = c.reverse;
+   clip.bypassedModParams = c.bypassedModParams;
+   return clip;
+}
 
 void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data)
 {
@@ -66,7 +149,7 @@ void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data)
       Patch::StreamRecord s;
       s.id = lane.id;
       s.type = lane.type;
-      s.blendMode = 0;
+      s.blendMode = 0; // per clip now (clipblend); the stream field is legacy input only
       s.opacity = lane.opacity;
       s.gainDb = lane.gainDb;
       s.pan = lane.pan;
@@ -80,37 +163,22 @@ void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data)
       s.colorB = lane.colorB;
       s.rowHeight = lane.rowHeight;
       for (const Arrange::Clip& c : lane.clips)
+         s.clips.push_back(ArrangeClipToRecord(c));
+      // Session slots ride in the same list, flagged by sessionScene.
+      for (size_t k = 0; k < lane.slots.size(); k++)
       {
-         Patch::ClipRecord r;
-         r.id = c.id;
-         r.startTick = c.start;
-         r.lengthTick = c.length;
-         r.srcUid = c.srcUid;
-         r.srcOutput = c.srcOutput;
-         r.fadeInTick = c.fadeIn;
-         r.fadeOutTick = c.fadeOut;
-         r.gainDb = c.gainDb;
-         r.pan = c.pan;
-         r.enabled = c.enabled;
-         r.groupId = c.groupId;
-         r.name = c.name;
-         r.colorR = c.colorR;
-         r.colorG = c.colorG;
-         r.colorB = c.colorB;
-         r.blendMode = c.blendMode;
-         r.pitch = c.pitch;
-         r.syncToTempo = c.syncToTempo;
-         r.opacity = c.opacity;
-         r.colorBrightness = c.colorBrightness;
-         r.colorContrast = c.colorContrast;
-         r.colorSaturation = c.colorSaturation;
-         r.retrigger = c.retrigger;
-         r.sampleDropped = c.sampleDropped;
-         r.sampleBpm = c.sampleBpm;
-         r.origBpm = c.origBpm;
-         r.sourceDurationSeconds = c.sourceDurationSeconds;
-         r.sourceOffsetSeconds = c.sourceOffsetSeconds;
-         r.bypassedModParams = c.bypassedModParams;
+         const Arrange::SessionSlot& sl = lane.slots[k];
+         if (!sl.Has())
+            continue;
+         Patch::ClipRecord r = ArrangeClipToRecord(sl.clip);
+         r.startTick = 0;
+         r.sessionScene = (int)k;
+         r.followAction = sl.followAction;
+         r.followBars = sl.followBars;
+         r.slotLoop = sl.loop;
+         r.slotLoopTicks = (int)sl.loopTicks;
+         r.slotQuantize = sl.quantize;
+         r.slotLaunchMode = sl.launchMode;
          s.clips.push_back(std::move(r));
       }
       data.streams.push_back(std::move(s));
@@ -140,6 +208,11 @@ void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data)
       data.trackGroups.push_back(std::move(r));
    }
 
+   data.scenes.clear();
+   for (const Arrange::Scene& sc : m.scenes)
+      data.scenes.push_back({ sc.tempo, sc.name, sc.quantize, sc.additive, sc.followNext, sc.followBars });
+   data.sessionQuantize = m.sessionQuantize;
+
    Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
    a.nextId = m.nextId;
    a.timeDisplay = m.settings.timeDisplay;
@@ -166,7 +239,11 @@ void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data)
    data.hasArrange = true;
 }
 
-void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m)
+// `resolveLegacy` maps a pre-uid patch's saved node index to the uid of the
+// node ApplyPatchData just spawned for it. Null when there is no graph to
+// resolve against, in which case a legacy clip simply comes back offline.
+void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m,
+                             const std::function<uint64_t(int)>& resolveLegacy = nullptr)
 {
    m = Arrange::Model();
    m.nextId = std::max<uint64_t>(1, data.arrangeSettings.nextId);
@@ -175,7 +252,7 @@ void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m)
       Arrange::Lane lane;
       lane.id = s.id;
       lane.type = (s.type == Patch::kStreamAudio) ? Arrange::kLaneAudio : Arrange::kLaneVideo;
-      lane.blendMode = 0;
+      lane.blendMode = 0; // legacy lane-wide mode migrates onto each clip below
       lane.opacity = s.opacity;
       lane.gainDb = s.gainDb;
       lane.pan = s.pan;
@@ -190,36 +267,23 @@ void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m)
       lane.rowHeight = s.rowHeight;
       for (const Patch::ClipRecord& c : s.clips)
       {
-         Arrange::Clip clip;
-         clip.id = c.id;
-         clip.start = c.startTick;
-         clip.length = c.lengthTick;
-         clip.srcUid = c.srcUid;
-         clip.srcOutput = c.srcOutput;
-         clip.fadeIn = c.fadeInTick;
-         clip.fadeOut = c.fadeOutTick;
-         clip.gainDb = c.gainDb;
-         clip.enabled = c.enabled;
-         clip.groupId = c.groupId;
-         clip.name = c.name;
-         clip.colorR = c.colorR;
-         clip.colorG = c.colorG;
-         clip.colorB = c.colorB;
-         clip.blendMode = (c.blendMode >= 0) ? c.blendMode : s.blendMode;
-         clip.pan = c.pan;
-         clip.pitch = c.pitch;
-         clip.syncToTempo = c.syncToTempo;
-         clip.opacity = c.opacity;
-         clip.colorBrightness = c.colorBrightness;
-         clip.colorContrast = c.colorContrast;
-         clip.colorSaturation = c.colorSaturation;
-         clip.retrigger = c.retrigger;
-         clip.sampleDropped = c.sampleDropped;
-         clip.sampleBpm = c.sampleBpm;
-         clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
-         clip.sourceDurationSeconds = c.sourceDurationSeconds;
-         clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
-         clip.bypassedModParams = c.bypassedModParams;
+         Arrange::Clip clip = ArrangeClipFromRecord(c, s.blendMode, resolveLegacy);
+         if (c.sessionScene >= 0)
+         {
+            // A session slot: rows beyond the scene list grow it below.
+            if ((size_t)c.sessionScene >= lane.slots.size())
+               lane.slots.resize((size_t)c.sessionScene + 1);
+            Arrange::SessionSlot& sl = lane.slots[(size_t)c.sessionScene];
+            clip.start = 0;
+            sl.clip = std::move(clip);
+            sl.followAction = std::clamp(c.followAction, 0, (int)Arrange::kFollowCount - 1);
+            sl.followBars = std::clamp(c.followBars, Arrange::kFollowBarsMin, Arrange::kFollowBarsMax);
+            sl.loop = c.slotLoop;
+            sl.loopTicks = c.slotLoopTicks;
+            sl.quantize = c.slotQuantize;
+            sl.launchMode = c.slotLaunchMode;
+            continue;
+         }
          lane.clips.push_back(std::move(clip));
       }
       m.lanes.push_back(std::move(lane));
@@ -244,6 +308,13 @@ void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m)
       g.name = r.name;
       m.trackGroups.push_back(std::move(g));
    }
+   for (const Patch::SceneRecord& r : data.scenes)
+      m.scenes.push_back({ r.name, r.tempo, r.quantize, r.additive, r.followNext, r.followBars });
+   m.sessionQuantize = data.sessionQuantize;
+   // Every slot row has a scene, so a hand-edited file can't hide a slot.
+   for (const Arrange::Lane& lane : m.lanes)
+      while (m.scenes.size() < lane.slots.size())
+         m.scenes.push_back({});
    const Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
    m.settings.timeDisplay = a.timeDisplay;
    m.settings.snapDivision = a.snapDivision;
@@ -321,7 +392,15 @@ void ArrangeLoadFromPatchData(const Patch::Data& data, bool fileLoad)
    const Arrange::Settings keep = gArrange.settings;
    const uint64_t prevRevision = gArrange.revision;
    Arrange::Model m;
-   PatchDataToArrangeModel(data, m);
+   // Turbo 0.72 (timeline align): a legacy `clip` line names its source by
+   // the node's saved index; ApplyPatchData's remap gives the spawned node.
+   PatchDataToArrangeModel(data, m, [](int savedIndex) -> uint64_t {
+      const auto it = gLastApplyRemap.find(savedIndex);
+      if (it == gLastApplyRemap.end())
+         return 0;
+      GraphNode* gn = FindNodeByIndex(it->second);
+      return gn != nullptr ? gn->uid : 0;
+   });
    if (!fileLoad)
    {
       // Undo/redo rewinds the document, not the view: dock, display unit,
@@ -332,6 +411,11 @@ void ArrangeLoadFromPatchData(const Patch::Data& data, bool fileLoad)
       m.settings.snapTriplet = keep.snapTriplet;
       m.settings.zoom = keep.zoom;
       m.settings.scroll = keep.scroll;
+      // Turbo 0.72 (upstream rule, ARRANGETEST I): ids are never reused, so
+      // undo must not rewind nextId - an id spent by the undone edit stays
+      // spent, or every cache keyed on clip id (selection, waveform,
+      // thumbnail) could attach to the wrong clip.
+      m.nextId = std::max(m.nextId, gArrange.nextId);
    }
    m.revision = prevRevision + 1;
    gArrange = std::move(m);
@@ -360,6 +444,14 @@ void ArrangeOnNodeRemoved(uint64_t uid)
 // snapshot, then forward again).
 void PushArrangeUndoSnapshot(const Arrange::Model& before)
 {
+   // Turbo 0.72: `before` may BE gArrange (upstream's PushArrangeUndo, "the
+   // patch as it is now"); moving gArrange out first would empty it.
+   if (&before == &gArrange)
+   {
+      PushUndoCheckpoint();
+      gPatchDirty = true;
+      return;
+   }
    Arrange::Model now = std::move(gArrange);
    gArrange = before;
    PushUndoCheckpoint();
@@ -408,10 +500,25 @@ bool ArrangeContentEqual(const Arrange::Model& a, const Arrange::Model& b)
              ca.retrigger != cb.retrigger || ca.sampleDropped != cb.sampleDropped ||
              ca.syncToTempo != cb.syncToTempo || ca.sampleBpm != cb.sampleBpm ||
              ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
-             ca.sourceOffsetSeconds != cb.sourceOffsetSeconds)
+             ca.sourceOffsetSeconds != cb.sourceOffsetSeconds || ca.speed != cb.speed ||
+             ca.reverse != cb.reverse || ca.bypassedModParams != cb.bypassedModParams)
+            return false;
+      }
+      // Turbo 0.72 (timeline align): session slots are document data too.
+      if (la.slots.size() != lb.slots.size())
+         return false;
+      for (size_t k = 0; k < la.slots.size(); k++)
+      {
+         const Arrange::SessionSlot& sa = la.slots[k];
+         const Arrange::SessionSlot& sb = lb.slots[k];
+         if (sa.clip.id != sb.clip.id || sa.clip.length != sb.clip.length || sa.clip.srcUid != sb.clip.srcUid ||
+             sa.followAction != sb.followAction || sa.followBars != sb.followBars || sa.loop != sb.loop ||
+             sa.loopTicks != sb.loopTicks || sa.quantize != sb.quantize || sa.launchMode != sb.launchMode)
             return false;
       }
    }
+   if (a.scenes.size() != b.scenes.size() || a.sessionQuantize != b.sessionQuantize)
+      return false;
    for (size_t i = 0; i < a.markers.size(); i++)
       if (a.markers[i].id != b.markers[i].id || a.markers[i].pos != b.markers[i].pos ||
           a.markers[i].name != b.markers[i].name || a.markers[i].color != b.markers[i].color)
@@ -635,6 +742,8 @@ uint64_t ArrangeClipShape(const Arrange::Clip& c)
    std::memcpy(&f, &c.sampleBpm, 4); mix(f);
    std::memcpy(&f, &c.pitch, 4); mix(f);
    mix(c.syncToTempo ? 1 : 0);
+   std::memcpy(&f, &c.speed, 4); mix(f); // Turbo 0.72 (timeline align)
+   mix(c.reverse ? 1 : 0);
    return h;
 }
 
@@ -660,6 +769,210 @@ bool ArrangeLaneAudible(const Arrange::Lane& lane)
    return lane.type == Arrange::kLaneAudio && Arrange::LaneEffectivelyEnabled(gArrange, lane);
 }
 
+// ---- record to timeline (Turbo 0.72) ----------------------------------------
+//
+// An audio lane can be armed with a source node (any audio node: Audio In, a
+// synth played by hand, a Mixer...). REC starts the transport if needed; while
+// it runs the engine writes each armed source into its tap (ArrangeRecordTap,
+// a lock-free ring), the main thread drains the rings into WAV files, and on
+// stop every take becomes an Audio Sample clip on its lane (a private Audio
+// File node, position-locked, tempo sync off) at the beat it was played. A
+// take replaces whatever was under it. Arm state is session-only (not saved).
+// Taps come from a fixed pool that is never freed, so a topology generation
+// the audio thread still holds never points at freed memory.
+constexpr int kArrangeMaxRecordLanes = 16;
+std::unique_ptr<ArrangeRecordTap> gArrangeRecTaps[kArrangeMaxRecordLanes];
+struct ArrangeRecArm
+{
+   uint64_t srcUid = 0;
+   int tap = -1;
+   std::unique_ptr<AudioFileWriter> writer;
+};
+std::map<uint64_t, ArrangeRecArm> gArrangeRecArms; // lane id -> arm
+bool gArrangeRecording = false;
+int gArrangeRecStopFrames = -1;   // > 0: frames left before the stopped takes are committed
+bool gArrangeRecLoopWas = false;  // the loop is off while recording (takes are linear)
+uint32_t gArrangeRecSeekSerial = 0;
+int gArrangeRecTakeCount = 0;
+double gArrangeRecSampleRate = 48000.0; // the rate the takes are written at
+std::string gArrangeRecStatus;
+
+ArrangeRecArm* ArrangeRecArmFor(uint64_t laneId)
+{
+   auto it = gArrangeRecArms.find(laneId);
+   return it == gArrangeRecArms.end() ? nullptr : &it->second;
+}
+
+bool ArrangeSetRecordArm(uint64_t laneId, uint64_t srcUid)
+{
+   if (gArrangeRecording)
+      return false; // arming mid-take would start a take with no start beat
+   ArrangeRecArm* arm = ArrangeRecArmFor(laneId);
+   if (arm == nullptr)
+   {
+      int free = -1;
+      for (int i = 0; i < kArrangeMaxRecordLanes && free < 0; i++)
+      {
+         bool used = false;
+         for (const auto& kv : gArrangeRecArms)
+            used = used || kv.second.tap == i;
+         if (!used)
+            free = i;
+      }
+      if (free < 0)
+         return false;
+      if (!gArrangeRecTaps[free])
+         gArrangeRecTaps[free] = std::make_unique<ArrangeRecordTap>();
+      arm = &gArrangeRecArms[laneId];
+      arm->tap = free;
+   }
+   arm->srcUid = srcUid;
+   return true;
+}
+
+void ArrangeClearRecordArm(uint64_t laneId)
+{
+   if (!gArrangeRecording)
+      gArrangeRecArms.erase(laneId);
+}
+
+void ArrangeRecordDrain()
+{
+   std::vector<float> buf(8192);
+   for (auto& kv : gArrangeRecArms)
+   {
+      ArrangeRecArm& arm = kv.second;
+      if (arm.tap < 0 || !gArrangeRecTaps[arm.tap])
+         continue;
+      ArrangeRecordTap& tap = *gArrangeRecTaps[arm.tap];
+      int n;
+      while ((n = tap.ring.Read(buf.data(), (int)buf.size())) > 0)
+         if (arm.writer && arm.writer->IsOpen())
+            arm.writer->Append(buf.data(), n / 2);
+   }
+}
+
+bool ArrangeRecordStart(double sampleRate = 0.0) // 0 = the engine's rate (the offline self-test passes its own)
+{
+   if (gArrangeRecording)
+      return false;
+   const double sr = sampleRate > 0.0 ? sampleRate : AudioEngine::Instance().SampleRate();
+   if (sr <= 0.0)
+   {
+      gArrangeRecStatus = "start the audio engine first (AUDIO button)";
+      return false;
+   }
+   int armed = 0;
+   for (auto& kv : gArrangeRecArms)
+      if (FindNodeByUid(kv.second.srcUid) != nullptr && Arrange::FindLane(gArrange, kv.first) != nullptr)
+         armed++;
+   if (armed == 0)
+   {
+      gArrangeRecStatus = "arm a track first (R on the track, then pick what it records)";
+      return false;
+   }
+   ArrangeRecordDrain(); // nothing stale from a previous take
+   gArrangeRecSampleRate = sr;
+   for (auto& kv : gArrangeRecArms)
+   {
+      ArrangeRecArm& arm = kv.second;
+      if (arm.tap < 0 || FindNodeByUid(arm.srcUid) == nullptr)
+         continue;
+      arm.writer = std::make_unique<AudioFileWriter>();
+      const std::string path = AudioRecordings::GenerateFilePath("take", "wav");
+      if (!arm.writer->Open(path, sr, 2, AudioFileWriter::Format::Wav))
+      {
+         arm.writer.reset();
+         continue;
+      }
+      ArrangeRecordTap& tap = *gArrangeRecTaps[arm.tap];
+      tap.started.store(false, std::memory_order_relaxed);
+      tap.enabled.store(true, std::memory_order_release);
+   }
+   gArrangeTimelineMode = true; // the timeline owns the output while it records
+   Transport& tr = Transport::Instance();
+   gArrangeRecLoopWas = gArrange.settings.loop.enabled;
+   tr.SetLoop(false, 0.0, 0.0);
+   gArrangeRecSeekSerial = tr.SeekSerial();
+   gArrangeRecording = true;
+   gArrangeRecStopFrames = -1;
+   gArrangeRecStatus.clear();
+   if (!tr.IsPlaying())
+      tr.SetPlaying(true);
+   return true;
+}
+
+void ArrangeRecordStop()
+{
+   if (!gArrangeRecording || gArrangeRecStopFrames > 0)
+      return;
+   for (auto& kv : gArrangeRecArms)
+      if (kv.second.tap >= 0 && gArrangeRecTaps[kv.second.tap])
+         gArrangeRecTaps[kv.second.tap]->enabled.store(false, std::memory_order_release);
+   // Two frames for a block the audio thread was writing to land in the ring.
+   gArrangeRecStopFrames = 2;
+}
+
+// Closes the takes and puts each on its lane. Called two frames after
+// ArrangeRecordStop (or right away by the offline self-test).
+void ArrangeRecordCommit()
+{
+   ArrangeRecordDrain();
+   const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+   const double sr = std::max(1.0, gArrangeRecSampleRate);
+   struct Take { uint64_t laneId; std::string path; double startBeat; double seconds; };
+   std::vector<Take> takes;
+   for (auto& kv : gArrangeRecArms)
+   {
+      ArrangeRecArm& arm = kv.second;
+      if (!arm.writer)
+         continue;
+      ArrangeRecordTap& tap = *gArrangeRecTaps[arm.tap];
+      const int64_t frames = arm.writer->FramesWritten();
+      const std::string path = arm.writer->Path();
+      arm.writer->Close();
+      arm.writer.reset();
+      if (frames > 0 && tap.started.load(std::memory_order_acquire))
+         takes.push_back({ kv.first, path, std::max(0.0, tap.startBeat.load(std::memory_order_relaxed)),
+                           (double)frames / sr });
+      else
+         std::remove(path.c_str());
+   }
+   gArrangeRecording = false;
+   gArrangeRecStopFrames = -1;
+   gArrange.settings.loop.enabled = gArrangeRecLoopWas;
+   PublishArrangeLoop();
+   for (const Take& t : takes)
+   {
+      const std::string category = NodeFactory::Instance().CategoryOf("Audio File");
+      GraphNode* gn = SpawnNode("Audio File", category.empty() ? "Source" : category, gViewCenterCanvas.x,
+                                gViewCenterCanvas.y + 120.0f);
+      auto* af = gn != nullptr ? dynamic_cast<AudioFileNode*>(gn->node.get()) : nullptr;
+      if (af == nullptr)
+         continue;
+      af->loop = false;
+      af->volume = 1.0f; // the node's 0.8 default would play the take 2 dB under what was recorded
+      af->Open(t.path);
+      const uint64_t uid = gn->uid;
+      gArrangeRecTakeCount++;
+      ArrangeEdit([&]()
+      {
+         Arrange::Clip c;
+         c.start = Arrange::BeatsToTicks(t.startBeat);
+         c.length = std::max<Arrange::Tick>(1, Arrange::SampleClipLengthTicks(t.seconds, bpm));
+         c.srcUid = uid;
+         c.sampleDropped = true; // an Audio Sample: position-locked, splits and trims read the file
+         c.syncToTempo = false;  // a take plays at the speed it was played
+         c.sampleBpm = (float)bpm;
+         c.origBpm = 0.0f;
+         c.sourceDurationSeconds = (float)t.seconds;
+         c.name = "Take " + std::to_string(gArrangeRecTakeCount);
+         Arrange::PlaceOverwrite(gArrange, t.laneId, c);
+      });
+   }
+   RuntimeLog::Write("timeline record: %d take(s)", (int)takes.size());
+}
+
 void ArrangeSeedAudio(std::set<INode*>& visited, std::vector<AudioTopologyEntry>& order,
                       std::unordered_map<AudioNode*, int>& bufferIndexOf)
 {
@@ -678,14 +991,42 @@ void ArrangeSeedAudio(std::set<INode*>& visited, std::vector<AudioTopologyEntry>
             CollectAudioChain(gn->node.get(), visited, order, bufferIndexOf);
       }
    }
+   // Turbo 0.72: an armed lane's source runs even when nothing else hears it.
+   for (const auto& kv : gArrangeRecArms)
+   {
+      const Arrange::Lane* lane = Arrange::FindLane(gArrange, kv.first);
+      GraphNode* gn = FindNodeByUid(kv.second.srcUid);
+      if (lane != nullptr && lane->type == Arrange::kLaneAudio && gn != nullptr && ArrangeNodeAudioCompatible(*gn))
+         CollectAudioChain(gn->node.get(), visited, order, bufferIndexOf);
+   }
 }
 
 void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& bufferIndexOf, AudioTopology& topology)
 {
    topology.arrangeWindows.clear();
    topology.arrangeTerminals.clear();
+   topology.arrangeRecorders.clear();
    if (!gArrangeTimelineMode)
       return;
+   // Turbo 0.72: armed lanes (recorded and monitored, see RunArrangeRecorders).
+   for (const auto& kv : gArrangeRecArms)
+   {
+      const int li = Arrange::LaneIndex(gArrange, kv.first);
+      GraphNode* gn = FindNodeByUid(kv.second.srcUid);
+      if (li < 0 || li >= AudioEngine::kMaxArrangeLanes || gn == nullptr || kv.second.tap < 0 ||
+          !gArrangeRecTaps[kv.second.tap] || gArrange.lanes[(size_t)li].type != Arrange::kLaneAudio)
+         continue;
+      AudioNode* an = AudioNodeOfAny(gn->node.get());
+      auto it = an != nullptr ? bufferIndexOf.find(an) : bufferIndexOf.end();
+      if (it == bufferIndexOf.end())
+         continue;
+      ArrangeRecorder r;
+      r.bufferIndex = it->second;
+      r.tap = gArrangeRecTaps[kv.second.tap].get();
+      r.laneSlot = li;
+      r.monitor = true;
+      topology.arrangeRecorders.push_back(r);
+   }
    const int laneCount = std::min((int)gArrange.lanes.size(), AudioEngine::kMaxArrangeLanes);
    for (int li = 0; li < laneCount; li++)
    {
@@ -729,11 +1070,17 @@ void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& buffe
             }
             w.panL = l;
             w.panR = r;
-            w.seekSource = ArrangeClipIsAudioSample(c);
+            // Turbo 0.72 (timeline align, upstream rule): every audio clip is
+            // position-locked, not only dropped Samples; a source that cannot
+            // be positioned (synths, Audio In) ignores SetClipSamplePosition.
+            // Only the source-time mapping (sampleBpm / sync) stays Sample-only.
+            const bool sample = ArrangeClipIsAudioSample(c);
+            w.seekSource = true;
             w.sourceOffsetSeconds = c.sourceOffsetSeconds;
-            w.syncToTempo = c.syncToTempo;
-            w.sampleBpm = c.sampleBpm;
+            w.syncToTempo = sample && c.syncToTempo;
+            w.sampleBpm = sample ? c.sampleBpm : 0.0f;
             w.pitch = c.pitch;
+            w.speed = (float)Arrange::ClipSpeedFactor(c);
             w.clipId = c.id;
             w.shape = ArrangeClipShape(c);
             if (prev != nullptr && prev->End() == c.start)
@@ -761,6 +1108,13 @@ uint64_t ArrangeAudioSignature()
    mix(gArrangeTimelineMode ? 1 : 0);
    if (!gArrangeTimelineMode)
       return h;
+   for (const auto& kv : gArrangeRecArms) // Turbo 0.72: armed lanes are in the topology
+   {
+      mix(kv.first);
+      mix(kv.second.srcUid);
+      GraphNode* gn = FindNodeByUid(kv.second.srcUid);
+      mix((uint64_t)(uintptr_t)(gn != nullptr ? gn->node.get() : nullptr));
+   }
    for (const Arrange::Lane& lane : gArrange.lanes)
    {
       mix(lane.id);
@@ -787,6 +1141,19 @@ uint64_t ArrangeAudioSignature()
    return h;
 }
 
+// Turbo 0.72 (timeline align, upstream's ArrangeAudioRebuildIfStale): the
+// per-frame rebuild trigger on its own, so the self-tests can poll it every
+// block. True when it rebuilt.
+bool ArrangeAudioRebuildIfStale()
+{
+   const uint64_t sig = ArrangeAudioSignature();
+   if (sig == gArrangeAudioSig || gDeferAudioRebuild)
+      return false;
+   gArrangeAudioSig = sig;
+   RebuildAudioTopology();
+   return true;
+}
+
 // Once per frame, before the cook: faders to the engine, schedule rebuild
 // when the arrangement changed, Video Sample seeks.
 std::map<uint64_t, uint64_t> gArrangeVideoActiveClip; // node uid -> clip id under the playhead
@@ -798,6 +1165,17 @@ void ArrangeFrameUpdate()
 {
    ArrangeCollectModBypass();
    ArrangeDrainPeaks();
+   // Turbo 0.72: takes in progress. Stopping the transport or jumping the
+   // playhead ends the take (it is linear); two frames later it is committed.
+   if (gArrangeRecording)
+   {
+      ArrangeRecordDrain();
+      const Transport& rt = Transport::Instance();
+      if (gArrangeRecStopFrames < 0 && (!rt.IsPlaying() || rt.SeekSerial() != gArrangeRecSeekSerial))
+         ArrangeRecordStop();
+      if (gArrangeRecStopFrames > 0 && --gArrangeRecStopFrames == 0)
+         ArrangeRecordCommit();
+   }
    AudioEngine& engine = AudioEngine::Instance();
    engine.SetTimelineMode(gArrangeTimelineMode);
    Arrange::gSampleLiveTempoBpm = std::max(1.0f, Transport::Instance().Tempo());
@@ -823,12 +1201,7 @@ void ArrangeFrameUpdate()
       engine.SetArrangeLaneMix(li, silent ? 0.0f : DspMath::DbToLinear(lane.gainDb), l, r);
    }
 
-   const uint64_t sig = ArrangeAudioSignature();
-   if (sig != gArrangeAudioSig && !gDeferAudioRebuild)
-   {
-      gArrangeAudioSig = sig;
-      RebuildAudioTopology();
-   }
+   ArrangeAudioRebuildIfStale();
 
    // Video Samples (a video file dropped on the timeline) are locked to the
    // timeline: entering the clip, a seek, or drifting more than 0.3 s puts
@@ -1029,10 +1402,13 @@ void DrawArrangeClipWave(ImDrawList* dl, const Arrange::Clip& c, float x0, float
    {
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
       const double eff = c.sampleDropped ? ArrangeSampleEffBpm(c) : bpm;
+      const double sp = Arrange::ClipSpeedFactor(c); // Turbo 0.72 (timeline align): signed speed
       for (float x = vx0; x < vx1; x += 1.0f)
       {
          const double b0 = (double)(x - clipX0) / ppb, b1 = (double)(x + 1.0f - clipX0) / ppb;
-         const double s0 = c.sourceOffsetSeconds + b0 * 60.0 / eff, s1 = c.sourceOffsetSeconds + b1 * 60.0 / eff;
+         double s0 = c.sourceOffsetSeconds + b0 * 60.0 / eff * sp, s1 = c.sourceOffsetSeconds + b1 * 60.0 / eff * sp;
+         if (s1 < s0)
+            std::swap(s0, s1);
          int i0 = (int)(s0 / fw->bucketSeconds), i1 = (int)(s1 / fw->bucketSeconds);
          if (i0 >= (int)fw->minV.size() || i1 < 0)
             continue;
@@ -2614,6 +2990,25 @@ void DrawArrangeToolbar(float width)
    if (ArrangeToggleButton(tr.IsPlaying() ? "PAUSE" : "PLAY", tr.IsPlaying()))
       tr.TogglePlay();
    ImGui::SameLine();
+   // Turbo 0.72: record the armed tracks from the playhead.
+   if (ArrangeToggleButton(gArrangeRecording ? "STOP REC" : "REC", gArrangeRecording, IM_COL32(220, 50, 50, 255)))
+   {
+      if (gArrangeRecording)
+         ArrangeRecordStop();
+      else
+         ArrangeRecordStart();
+   }
+   if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("%s", gArrangeRecStatus.empty()
+                                 ? "record: every armed track (R) records its node from the playhead.\n"
+                                   "Stop (or pause) ends the take; it lands on the track as an audio clip."
+                                 : gArrangeRecStatus.c_str());
+   if (!gArrangeRecStatus.empty())
+   {
+      ImGui::SameLine();
+      ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "%s", gArrangeRecStatus.c_str());
+   }
+   ImGui::SameLine();
    {
       const Arrange::Tick play = ArrangePlayTick();
       ImGui::AlignTextToFramePadding();
@@ -2838,6 +3233,37 @@ void DrawArrangeLaneHeader(int li, ImVec2 tl, float w, float h, bool& openHeader
          ImGui::SameLine();
          if (smallToggle("S", lane.solo, IM_COL32(200, 180, 40, 255), "solo"))
             ArrangeEdit([&]() { if (Arrange::Lane* l = Arrange::FindLane(gArrange, id)) { l->solo = !l->solo; gArrange.revision++; } });
+         // Turbo 0.72: record arm. Click to pick what the track records;
+         // click again to disarm.
+         ImGui::SameLine();
+         const ArrangeRecArm* recArm = ArrangeRecArmFor(id);
+         GraphNode* recSrc = recArm != nullptr ? FindNodeByUid(recArm->srcUid) : nullptr;
+         std::string recTip = "record arm: pick a node, then REC records it onto this track";
+         if (recSrc != nullptr)
+            recTip = "armed: records " + NodeTitleWithInstance(*recSrc) + "  -  click to disarm";
+         if (smallToggle("R", recArm != nullptr, IM_COL32(220, 50, 50, 255), recTip.c_str()) && !gArrangeRecording)
+         {
+            if (recArm != nullptr)
+               ArrangeClearRecordArm(id);
+            else
+               ImGui::OpenPopup("##recsrc");
+         }
+         if (ImGui::BeginPopup("##recsrc"))
+         {
+            ImGui::TextDisabled("record from");
+            int listed = 0;
+            for (GraphNode& gn : gNodes)
+            {
+               if (!ArrangeNodeAudioCompatible(gn) || dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr)
+                  continue; // a take's own file player is not something to record
+               listed++;
+               if (ImGui::MenuItem(NodeTitleWithInstance(gn).c_str()))
+                  ArrangeSetRecordArm(id, gn.uid);
+            }
+            if (listed == 0)
+               ImGui::TextDisabled("no audio node on the canvas (add Audio In, a synth...)");
+            ImGui::EndPopup();
+         }
          Arrange::Lane* l = Arrange::FindLane(gArrange, id);
          if (l != nullptr)
          {

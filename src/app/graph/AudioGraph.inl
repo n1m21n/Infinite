@@ -337,12 +337,15 @@
    // Turbo 0.59: bumped by StartAudioEngine, so the next rebuild prepares
    // every node at the device it just opened (see AudioNode::preparedForEpoch).
    int gAudioPrepareEpoch = 0;
+   // Turbo 0.72 (timeline align, upstream): rebuilds done, for the self-tests.
+   unsigned long long gAudioTopologyRebuildCount = 0;
 
    void RebuildAudioTopology()
    {
       gLatencyWatch.clear(); // never keep pointers past a rebuild (or a deferred one)
       if (gDeferAudioRebuild)
          return;
+      gAudioTopologyRebuildCount++;
       std::vector<AudioTopologyEntry> order;
       std::set<INode*> visited;
       std::unordered_map<AudioNode*, int> bufferIndexOf;

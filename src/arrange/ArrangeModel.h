@@ -128,6 +128,15 @@ namespace Arrange
       // another Split - a Sample BPM edit changes `length` but not where in
       // the file playback starts.
       float    sourceOffsetSeconds = 0.0f;
+      // Playback speed and direction of the source under this clip's box.
+      // speed multiplies how many source seconds pass per timeline second
+      // (2 = twice as fast, 0.5 = half speed), reverse plays the source
+      // backwards from sourceOffsetSeconds. Neither changes the box. Audio
+      // keeps its pitch when going forward (the stretcher); a reversed clip
+      // reads the file backwards at the speed rate, so its pitch follows the
+      // speed. Defaults are a no-op, so older patches play unchanged.
+      float    speed   = 1.0f;
+      bool     reverse = false;
       // Video/image only. Basic color grade, consumed by the compositor as a
       // per-clip shader pass. Defaults are a no-op so every clip that
       // predates this field renders identically.
@@ -191,6 +200,63 @@ namespace Arrange
       Tick End() const { return start + length; }
    };
 
+   inline constexpr float kClipSpeedMin = 0.1f;
+   inline constexpr float kClipSpeedMax = 8.0f;
+
+   // Source seconds per timeline second, signed: negative for a reversed clip.
+   inline double ClipSpeedFactor(const Clip& c)
+   {
+      double sp = (double)c.speed;
+      if (!(sp == sp)) sp = 1.0;
+      sp = std::min((double)kClipSpeedMax, std::max((double)kClipSpeedMin, sp));
+      return c.reverse ? -sp : sp;
+   }
+
+   // Source seconds that `dt` ticks into the clip move the read point by
+   // (signed): what Split, a start trim and an overwrite add to
+   // sourceOffsetSeconds.
+   inline double ClipSourceAdvance(const Clip& c, Tick dt)
+   {
+      return TicksToSeconds(dt, SampleSourceBpm(c.syncToTempo, c.sampleBpm, gSampleLiveTempoBpm)) *
+             ClipSpeedFactor(c);
+   }
+
+   // Session view (clip launcher). A lane's session slots sit beside its
+   // timeline clips: same Clip struct, same source nodes, same engine. A slot
+   // is empty when its clip has length 0. Slot index = scene row; a lane's
+   // slots vector may be shorter than Model::scenes (the tail is empty).
+   // While a slot is launched it plays instead of the lane's timeline clips;
+   // a stopped lane goes back to the arrangement. Launch state itself is
+   // runtime-only (app/panels/ArrangeSession.cpp), never saved.
+   enum FollowAction { kFollowNone = 0, kFollowNext, kFollowPrev, kFollowRandom, kFollowStop, kFollowCount };
+   constexpr int kFollowBarsMin = 1;
+   constexpr int kFollowBarsMax = 64;
+
+   struct SessionSlot
+   {
+      Clip clip;                  // clip.start is unused (always 0); length > 0 = filled
+      int  followAction = kFollowNone;
+      int  followBars   = 4;      // kFollowBarsMin..kFollowBarsMax
+      // Launch settings (Ableton's Launch box). Defaults reproduce the
+      // original behaviour: loop forever at the clip's length, global quantize.
+      bool loop         = true;   // false = one-shot: plays once, then the track goes quiet
+      Tick loopTicks    = 0;      // 0 = the clip's length; else the loop is this long (<= clip length)
+      int  quantize     = -1;     // -1 = the transport's launch quantize, else MusicTime::kLaunch*
+      int  launchMode   = 0;      // 0 trigger, 1 gate (plays while held). Clicking a playing clip always stops it
+      Tick LoopLen() const { return loopTicks > 0 && loopTicks < clip.length ? loopTicks : clip.length; }
+      bool Has() const { return clip.length > 0; }
+   };
+
+   struct Scene
+   {
+      std::string name;           // empty = auto ("Scene 1", ...)
+      float tempo = 0.0f;         // > 0 sets the project tempo when the scene launches
+      int   quantize = -1;        // -1 = global; else MusicTime::kLaunch*. Wins over each clip's own
+      bool  additive = false;     // true = tracks the scene has no clip on keep playing
+      bool  followNext = false;   // true = after followBars, the next scene launches (wraps to the first)
+      int   followBars = 0;       // 0 = the scene's length (its longest loop), else bars
+   };
+
    struct Lane
    {
       uint64_t id        = 0;
@@ -207,6 +273,7 @@ namespace Arrange
       float    colorR = 0.0f, colorG = 0.0f, colorB = 0.0f; // 0,0,0 = default type accent
       float    rowHeight = 0.0f;  // 0 = default row height; drag-resized via the row's bottom border
       std::vector<Clip> clips;    // always sorted by start, never overlapping
+      std::vector<SessionSlot> slots; // session view, index = scene row
    };
 
    // A track group: a named, colored container for lanes AND other track
@@ -291,6 +358,8 @@ namespace Arrange
       std::vector<Lane>       lanes;
       std::vector<Marker>     markers;   // sorted by pos
       std::vector<TrackGroup> trackGroups;
+      std::vector<Scene>      scenes;    // session view rows
+      int sessionQuantize = 2;           // MusicTime::kLaunch*: where a Global launch/stop lands (default 1 bar)
       Settings                settings;
       uint64_t            nextId  = 1; // persisted; never recomputed as max+1
       uint64_t            revision = 0; // bumped by every op that changed data
@@ -303,12 +372,21 @@ namespace Arrange
    {
       int lane = -1;
       int index = -1;
+      int slot = -1;   // session slot row, set only by FindSlot (never by Find)
       bool Valid() const { return lane >= 0 && index >= 0; }
    };
 
    Loc Find(const Model& m, uint64_t clipId);
+   // A Timeline clip, else a session slot's clip (ids are unique across both).
    const Clip* FindClip(const Model& m, uint64_t clipId);
+   // A session slot's clip only: Loc.lane and Loc.slot, lane -1 when none.
+   Loc FindSlot(const Model& m, uint64_t clipId);
+   // The lane holding a Timeline clip or a slot clip.
+   const Lane* LaneOfClip(const Model& m, uint64_t clipId);
    Clip*       FindClip(Model& m, uint64_t clipId);
+   // FindClip, then every lane's session slots. For code that fills a clip in
+   // later by id (a dropped file's decode) and may be holding a slot's id.
+   Clip*       FindClipOrSlot(Model& m, uint64_t clipId);
    const Lane* FindLane(const Model& m, uint64_t laneId);
    Lane*       FindLane(Model& m, uint64_t laneId);
    int         LaneIndex(const Model& m, uint64_t laneId);
