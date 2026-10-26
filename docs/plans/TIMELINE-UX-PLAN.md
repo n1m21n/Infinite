@@ -203,3 +203,32 @@ Cada branch: operações no modelo com teste, UI fina, gate completo, nota em
     - vários clips: duplicar/excluir.
 
     A janela flutuante só aparece se o inspector estiver escondido.
+- `feature/timeline-parity` (saída da `feature/timeline-u1`, mergeada na principal), **paridade com o
+  Naman**:
+  - **Reverse no player de arquivo** e **speed/reverse no inspector**: `ArrangeSetClipSpeed` e
+    `ArrangeSetClipReverse` verbatim. O vídeo segue a velocidade com sinal.
+  - **Stems:**
+    - Render track, Render group e Render selected tracks, pelo menu da pista ou do grupo e pelo
+      inspector;
+    - o job leva `laneScope`, e as outras pistas, de áudio e de vídeo, ficam mudas durante o render;
+    - o arquivo recebe o nome das pistas.
+  - **Stretch por transientes** (v0.6 1.6, verbatim): `TransientDetect.h` e `ClipTimeStretch`.
+  - **Grade de lançamento** (v0.6 2.38): `MusicTime::LaunchQuantize` e `Transport::RequestTogglePlay`,
+    `RequestRewind` e `ResolveLaunch`. O Space e o play usam a grade, que se escolhe no toolbar.
+  - **Aviso de conflito:** o inspector avisa quando um nó toca em várias pistas.
+  - **Session view:**
+    - motor do Naman em `src/arrange/ArrangeSession.inl`, verbatim exceto o modo de áudio
+      (`gArrangeSessionMode`);
+    - o áudio e o vídeo leem `ArrangePlaybackModel()`;
+    - grade nossa em `src/arrange/ArrangeSessionUi.inl`, com o mesmo design system: pistas em
+      colunas, cenas em linhas;
+    - clique lança e para; duplo clique numa célula vazia escolhe a fonte;
+    - o menu do clip tem loop e tamanho do loop, launch trigger/gate, quantize, "then" (follow action)
+      e source/clear;
+    - stop por pista, Stop all (`.`), Timeline | Session no toolbar, chip Session audio;
+    - teste `INFINITE_ARRANGESESSIONTEST`.
+  - **Fica para depois** (o Naman também tem):
+    - na Session: arrastar entre células, mover cena e pista, Record to Timeline e Send Scene to
+      Timeline, inspector de slot;
+    - os testes do upstream que dependem da UI dele (`EDIT`, `KEYS`, `MARKER`, `WAVE`, `VIDEO`,
+      `RENDER`, `SAMPLE`, `SAMPLEEXPORT`).

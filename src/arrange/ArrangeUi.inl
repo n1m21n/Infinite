@@ -346,6 +346,18 @@ std::vector<uint64_t> gArrangeSel;      // selected clip ids
 uint64_t gArrangeSelLane = 0;           // last clicked lane (paste target)
 uint64_t gArrangeSettingsClip = 0;      // clip shown in the Clip settings window
 bool gArrangeSettingsOpen = false;
+// Turbo 0.72 (upstream's Session view, ArrangeSession.inl): Session audio
+// plays only launched slots (Timeline mode stays on underneath); the audio and
+// video paths read ArrangePlaybackModel(), which is gArrange unless slots are
+// launched.
+bool gArrangeSessionMode = false;
+bool gArrangeSessionView = false; // the panel shows the Session grid instead of the timeline
+void DrawArrangeSessionGrid(ImVec2 areaMin, ImVec2 areaMax);
+void ArrangeSessionStopAll();
+const Arrange::Model& ArrangePlaybackModel();
+uint64_t ArrangeSessionGeneration();
+void ArrangeSessionTick();
+
 bool gArrangeBlade = false; // mirrors gArrangeTool == Blade (older call sites read it)
 bool gArrangeFollow = true;
 
@@ -415,6 +427,7 @@ void ArrangeResetSession()
    gArrangeSettingsClip = 0;
    gArrangeSettingsOpen = false;
    gArrangeTimelineMode = false;
+   gArrangeSessionMode = false;
    gArrangeGestureOpen = false;
    PublishArrangeLoop();
 }
@@ -456,6 +469,7 @@ void ArrangeLoadFromPatchData(const Patch::Data& data, bool fileLoad)
    {
       gArrangeSel.clear();
       gArrangeTimelineMode = false;
+      gArrangeSessionMode = false;
       if (!gArrange.lanes.empty())
          gArrangePanelOpen = true;
    }
@@ -1028,7 +1042,7 @@ void ArrangeSeedAudio(std::set<INode*>& visited, std::vector<AudioTopologyEntry>
 {
    if (!gArrangeTimelineMode)
       return;
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
       if (!ArrangeLaneAudible(lane))
          continue;
@@ -1077,10 +1091,10 @@ void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& buffe
       r.monitor = true;
       topology.arrangeRecorders.push_back(r);
    }
-   const int laneCount = std::min((int)gArrange.lanes.size(), AudioEngine::kMaxArrangeLanes);
+   const int laneCount = std::min((int)ArrangePlaybackModel().lanes.size(), AudioEngine::kMaxArrangeLanes);
    for (int li = 0; li < laneCount; li++)
    {
-      const Arrange::Lane& lane = gArrange.lanes[(size_t)li];
+      const Arrange::Lane& lane = ArrangePlaybackModel().lanes[(size_t)li];
       if (!ArrangeLaneAudible(lane))
          continue;
       // One terminal per distinct source node on this lane.
@@ -1158,6 +1172,8 @@ uint64_t ArrangeAudioSignature()
    mix(gArrangeTimelineMode ? 1 : 0);
    if (!gArrangeTimelineMode)
       return h;
+   mix(gArrangeSessionMode ? 1 : 0);    // Turbo 0.72: a launch or stop changes
+   mix(ArrangeSessionGeneration());      // the playback model's clips
    for (const auto& kv : gArrangeRecArms) // Turbo 0.72: armed lanes are in the topology
    {
       mix(kv.first);
@@ -1165,7 +1181,7 @@ uint64_t ArrangeAudioSignature()
       GraphNode* gn = FindNodeByUid(kv.second.srcUid);
       mix((uint64_t)(uintptr_t)(gn != nullptr ? gn->node.get() : nullptr));
    }
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
       mix(lane.id);
       mix(ArrangeLaneAudible(lane) ? 1 : 0);
@@ -1215,6 +1231,7 @@ void ArrangeFrameUpdate()
 {
    ArrangeCollectModBypass();
    ArrangeDrainPeaks();
+   ArrangeSessionTick(); // Turbo 0.72: Session launches, follow actions, the playback copy
    // Turbo 0.72: takes in progress. Stopping the transport or jumping the
    // playhead ends the take (it is linear); two frames later it is committed.
    if (gArrangeRecording)
@@ -1263,9 +1280,9 @@ void ArrangeFrameUpdate()
    const bool jumped = serial != gArrangeVideoSeekSerial;
    gArrangeVideoSeekSerial = serial;
    std::map<uint64_t, uint64_t> active;
-   for (const Arrange::Lane& lane : gArrange.lanes)
+   for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
    {
-      if (!Arrange::LaneEffectivelyEnabled(gArrange, lane))
+      if (!Arrange::LaneEffectivelyEnabled(ArrangePlaybackModel(), lane))
          continue;
       for (const Arrange::Clip& c : lane.clips)
       {
@@ -1536,10 +1553,10 @@ struct ArrangeVideoLayer
 void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out)
 {
    out.clear();
-   for (size_t li = gArrange.lanes.size(); li-- > 0;)
+   for (size_t li = ArrangePlaybackModel().lanes.size(); li-- > 0;)
    {
-      const Arrange::Lane& lane = gArrange.lanes[li];
-      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(gArrange, lane) ||
+      const Arrange::Lane& lane = ArrangePlaybackModel().lanes[li];
+      if (lane.type != Arrange::kLaneVideo || !Arrange::LaneEffectivelyEnabled(ArrangePlaybackModel(), lane) ||
           !ArrangeLaneInRenderScope(lane.id)) // Turbo 0.72: stem render
          continue;
       for (const Arrange::Clip& c : lane.clips)
@@ -3325,6 +3342,18 @@ void DrawArrangeToolbar(float width)
    gArrangeLastPanelW = width;
    ImGui::Dummy(ImVec2(0.0f, 2.0f)); // air above the row
 
+   // Turbo 0.72: Timeline | Session (upstream's two views of one arrangement).
+   ArrUi::GroupBegin();
+   if (ArrUi::Chip("##viewtl", "Timeline", "the arrangement: clips in time", !gArrangeSessionView))
+      gArrangeSessionView = false;
+   ArrUi::Next();
+   if (ArrUi::Chip("##viewsess", "Session",
+                   "the clip launcher: tracks in columns, scenes in rows, clips loop on the launch grid",
+                   gArrangeSessionView))
+      gArrangeSessionView = true;
+   ArrUi::GroupEnd();
+   ArrUi::Gap();
+
    // Transport: start, play / pause, record.
    ArrUi::GroupBegin();
    if (ArrUi::IconTile("##arrhome", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawPlayerRewind(dl, c, s, col); },
@@ -3541,18 +3570,39 @@ void DrawArrangeToolbar(float width)
    ArrUi::GroupEnd();
 
    // Right side: who owns the audio, the monitor, render.
-   const float rightW = ArrUi::ChipW("Timeline audio") + ArrUi::Tile() * 2.0f + ArrUi::ChipW("Render...") + 4.0f * 3.0f + tok::space_3;
+   const float rightW = ArrUi::ChipW("Timeline audio") + (gArrangeSessionView ? ArrUi::ChipW("Stop all") + 2.0f : 0.0f) + ArrUi::Tile() * 2.0f + ArrUi::ChipW("Render...") + 4.0f * 3.0f + tok::space_3;
    const float rightX = rowX0 + width - rightW;
    if (ImGui::GetItemRectMax().x + tok::space_3 < rightX)
       ImGui::SameLine(rightX - ImGui::GetWindowPos().x + ImGui::GetScrollX());
    else
       ArrUi::Gap();
-   if (ArrUi::Chip("##arrtlmode", "Timeline audio",
-                   "on: the timeline owns the audio output - canvas Audio Outs go quiet (live ones stay)\n"
-                   "and only what the audio clips play is heard. Off: the canvas plays as usual and the\n"
-                   "timeline only drives video.",
-                   gArrangeTimelineMode, ArrUi::Semantic(tok::action_learn)))
-      gArrangeTimelineMode = !gArrangeTimelineMode;
+   // Turbo 0.72: who owns the audio - Timeline clips, or (Session) only the
+   // launched slots. Launching a slot switches to Session by itself.
+   const bool tlOwns = gArrangeTimelineMode && !gArrangeSessionMode;
+   if (ArrUi::Chip("##arrtlmode", gArrangeSessionMode ? "Session audio" : "Timeline audio",
+                   gArrangeSessionMode
+                      ? "Session audio: only the launched clips play (launching one switched to it).\n"
+                        "Click to give the output back to the timeline."
+                      : "on: the timeline owns the audio output - canvas Audio Outs go quiet (live ones stay)\n"
+                        "and only what the audio clips play is heard. Off: the canvas plays as usual and the\n"
+                        "timeline only drives video.",
+                   gArrangeTimelineMode, ArrUi::Semantic(gArrangeSessionMode ? tok::action_go : tok::action_learn)))
+   {
+      if (gArrangeSessionMode)
+      {
+         ArrangeSessionStopAll();
+         gArrangeSessionMode = false;
+         gArrangeTimelineMode = true;
+      }
+      else
+         gArrangeTimelineMode = !tlOwns;
+   }
+   if (gArrangeSessionView)
+   {
+      ArrUi::Next();
+      if (ArrUi::Chip("##arrstopall", "Stop all", "stop every launched clip (on the launch grid)  -  ."))
+         ArrangeSessionStopAll();
+   }
    ArrUi::Next();
    if (ArrUi::IconTile("##arrinspector", [](ImDrawList* dl, ImVec2 c, float s, ImU32 col) { Tabler::DrawEdit(dl, c, s, col); },
                        "inspector: the selected clip or track, in a column on the right", gArrangeInspector))
@@ -5433,6 +5483,8 @@ void ArrangeHandleKeys()
       toggleTool(ArrangeTool::Hand);
    if (noMods && pressed(ImGuiKey_P))
       toggleTool(ArrangeTool::Pencil);
+   if (noMods && gArrangeSessionView && pressed(ImGuiKey_Period))
+      ArrangeSessionStopAll(); // upstream's Stop All key
    if (noMods && pressed(ImGuiKey_F))
       ArrangeZoomToFit(gArrangeLastPanelW);
    if (noMods && ImGui::IsKeyPressed(ImGuiKey_Equal, true))
@@ -5521,7 +5573,10 @@ void DrawArrangePanelDocked(const ImVec2& size)
    const float rightX = bodyMin.x + avail.x - (monW > 0.0f ? monW + 8.0f : 0.0f);
    const ImVec2 tlMin = bodyMin;
    const ImVec2 tlMax(rightX - (insW > 0.0f ? insW + 8.0f : 0.0f), bodyMin.y + bodyH);
-   DrawArrangeTimeline(tlMin, tlMax);
+   if (gArrangeSessionView)
+      DrawArrangeSessionGrid(tlMin, tlMax); // Turbo 0.72: the Session view
+   else
+      DrawArrangeTimeline(tlMin, tlMax);
    if (insW > 0.0f)
       DrawArrangeInspector(ImVec2(tlMax.x + 8.0f, bodyMin.y), ImVec2(rightX, bodyMin.y + bodyH));
 
@@ -5999,3 +6054,6 @@ void DrawArrangeRenderWindow()
    }
    ImGui::End();
 }
+
+#include "arrange/ArrangeSession.inl" // Turbo 0.72: upstream Session view engine
+#include "arrange/ArrangeSessionUi.inl" // Turbo 0.72: the Session view grid

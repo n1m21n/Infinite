@@ -10,8 +10,12 @@ no app. UX: ler `docs/plans/TIMELINE-UX-PLAN.md`.
   - seleção de pistas;
   - cabeçalhos novos;
   - inspector fixo.
-- Próximo (resto da U1): no motor, stems (Render Track/Group), reverse no player, stretch por
-  transientes e fades de vídeo, com os testes do upstream de cada um. Depois, a Session view.
+- Paridade com o Naman (`feature/timeline-parity`): reverse, speed, stems, stretch por transientes,
+  grade de lançamento, aviso de conflito e Session view (motor dele e grade nossa).
+- Próximo: o resto da Session (arrastar células, Record/Send to Timeline, inspector de slot), os
+  testes do upstream que dependem da UI dele, e a U2 de `TIMELINE-UX-PLAN.md` (edição nível Reaper).
+- `AUDIORECOVERYTEST` falha às vezes na suíte cheia (intervalo mínimo, depende de tempo) e passa
+  sozinho.
 
 ### Primeira etapa: alinhamento ao upstream (`feature/timeline-align`)
 

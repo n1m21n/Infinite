@@ -1434,6 +1434,118 @@
          printf("arrange record test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
+      // Turbo 0.72: INFINITE_ARRANGESESSIONTEST - the Session view engine
+      // (upstream's, ported). A timeline clip on track 1 and a session slot
+      // on track 2, two Oscillators: launching the slot plays it and, in
+      // Session audio, strips the timeline clip; stopping the track silences
+      // it. Offline, no device; launch grid off so moves land at once.
+      if (getenv("INFINITE_ARRANGESESSIONTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         bool allOk = true;
+         Transport& tr = Transport::Instance();
+         const double kSr = 48000.0;
+         const int kBlock = 256;
+         const double kSamplesPerBeat = kSr * 60.0 / 120.0;
+         const bool hadEngine = AudioEngine::Instance().SampleRate() > 0.0;
+         AudioEngine::Instance().Stop();
+         tr.NotifyAudioEngineStopped();
+         GraphNode* a = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f);
+         const uint64_t uidA = a != nullptr ? a->uid : 0;
+         GraphNode* b = SpawnNode("Oscillator", "Synths", 220.0f, 0.0f);
+         const uint64_t uidB = b != nullptr ? b->uid : 0;
+         gArrange = Arrange::Model();
+         gArrange.revision = 5000;
+         const uint64_t laneA = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         const uint64_t laneB = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         Arrange::Clip c;
+         c.length = Arrange::kTicksPerBar * 8;
+         c.srcUid = uidA;
+         Arrange::PlaceOverwrite(gArrange, laneA, c);
+         ArrSess::SetSlotSource(laneB, 0, uidB);
+         gArrange.sessionQuantize = 0; // launch at once
+         tr.SetTempo(120.0f);
+         tr.SetLoop(false, 0.0, 0.0);
+         tr.SetLaunchQuantize(0);
+         tr.NotifyAudioEngineStarted(kSr);
+         tr.SetPlaying(false);
+         gArrangeTimelineMode = true;
+         gArrangeSessionMode = true; // Session audio already on: no device start from the launch
+
+         int cookFrame = 5000000;
+         auto render = [&](int numBlocks)
+         {
+            ArrangeFrameUpdate();
+            RebuildAudioTopology();
+            gArrangeAudioSig = ArrangeAudioSignature();
+            cookFrame++;
+            for (GraphNode& gn : gNodes)
+               gn.node->CookIfNeeded(cookFrame);
+            for (GraphNode& gn : gNodes)
+               if (AudioNode* an = AudioNodeOfAny(gn.node.get()))
+                  if (an->preparedForSampleRate != kSr)
+                  {
+                     an->PrepareToPlay(kSr, kAudioMaxBlockFrames);
+                     an->preparedForSampleRate = kSr;
+                  }
+            std::vector<float> ch0((size_t)kBlock), ch1((size_t)kBlock);
+            float* chans[2] = { ch0.data(), ch1.data() };
+            AudioBuffer buffer;
+            buffer.channels = chans;
+            buffer.numChannels = 2;
+            buffer.numFrames = kBlock;
+            float peak = 0.0f;
+            for (int blk = 0; blk < numBlocks; blk++)
+            {
+               ArrangeSessionTick();
+               ArrangeAudioRebuildIfStale();
+               AudioEngine::Instance().RenderOfflineBlock(buffer);
+               for (int i = 0; i < kBlock; i++)
+                  if ((double)(blk * kBlock + i) > 0.25 * kSamplesPerBeat)
+                     peak = std::max(peak, std::fabs(ch0[(size_t)i]));
+            }
+            return peak;
+         };
+         const int blocks = (int)(2.0 * kSamplesPerBeat / kBlock);
+
+         const bool ok0 = uidA != 0 && uidB != 0 && !gArrange.lanes[1].slots.empty() && gArrange.lanes[1].slots[0].Has();
+         ArrangeSessionLaunch(laneB, 0);
+         const bool started = tr.IsPlaying();
+         const float launched = render(blocks);
+         const ArrangeSessionSlotState st = ArrangeSessionQuery(laneB, 0);
+         // One oscillator, not two: the timeline clip on track 1 is out of Session audio.
+         const bool playOk = ok0 && started && st.playing && launched > 0.3f && launched < 0.8f;
+         printf("arrange session launch: %s (playing %d, peak %.4f - one oscillator, timeline clip stripped)\n",
+                playOk ? "OK" : "FAIL", (int)st.playing, launched);
+         allOk = allOk && playOk;
+
+         ArrangeSessionStopLane(laneB);
+         const float stopped = render(blocks);
+         const bool stopOk = stopped < 1e-4f && !ArrangeSessionQuery(laneB, 0).playing;
+         printf("arrange session stop: %s (peak %.6f)\n", stopOk ? "OK" : "FAIL", stopped);
+         allOk = allOk && stopOk;
+
+         // Back to the timeline: its clip plays again.
+         gArrangeSessionMode = false;
+         tr.SeekBeats(0.0);
+         const float timeline = render(blocks);
+         const bool backOk = timeline > 0.3f;
+         printf("arrange session back to timeline: %s (peak %.4f)\n", backOk ? "OK" : "FAIL", timeline);
+         allOk = allOk && backOk;
+
+         tr.NotifyAudioEngineStopped();
+         tr.SetPlaying(true);
+         gArrangeTimelineMode = false;
+         if (hadEngine)
+         {
+            std::string startErr;
+            if (AudioEngine::Instance().Start(startErr))
+               tr.NotifyAudioEngineStarted(AudioEngine::Instance().SampleRate());
+         }
+         RebuildAudioTopology();
+         printf("arrange session test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
       // Turbo 0.72: INFINITE_ARRANGEDEMO - a small arrangement with the panel
       // open, a Range selection and the Range tool on, for screenshots of the
       // timeline UI (IMAGERESYNTH_SCREENSHOT + INFINITE_SCREENSHOT_FRAME).
@@ -1470,6 +1582,17 @@
          gArrangeRange.laneHi = 2;
          ArrangeSetTool(ArrangeTool::Range);
          gArrangeRowSel = { gArrange.lanes[1].id }; // the inspector shows a track
+         if (std::string(getenv("INFINITE_ARRANGEDEMO")) == "session")
+         {
+            // The Session view: a clip per track in the first rows, scene 1 launched.
+            for (size_t i = 0; i < uids.size(); i++)
+               for (int row = 0; row <= (int)i; row++)
+                  ArrSess::SetSlotSource(gArrange.lanes[i + 1].id, row, uids[i]);
+            gArrange.scenes.resize(3);
+            gArrange.scenes[0].name = "intro";
+            gArrangeSessionView = true;
+            ArrangeSessionLaunchScene(0);
+         }
          gArrangePanelOpen = true;
          gArrangePanelHeight = 340.0f;
          PublishArrangeLoop();
