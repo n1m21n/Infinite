@@ -44,7 +44,7 @@ Replace the template's synth with a **Sampler** or an audio file, or load a **VS
 
 ## 5. Save and share
 
-Patches are plain-text `.inf` files. Send the file to a friend and they get exactly your setup. If you make something you like, the [Discord](https://discord.gg/7cpQfCxnx) is a good place to post it.
+Patches are plain-text `.inf` files. Send the file to a friend and they get exactly your setup. If you make something you like, the [Discord](https://discord.gg/GMeQTyJqkH) is a good place to post it.
 
 ## Where to go next
 
