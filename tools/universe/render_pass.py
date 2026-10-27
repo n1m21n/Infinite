@@ -332,7 +332,15 @@ def work_items(binp, args, cache):
     only = (args.only or "").lower()
     kinds = set(args.kinds.split(","))
     fmts = set(args.formats.split(","))
+    retry_ids, retry_names = set(), set()
+    if args.retry_from:
+        for r in read_jsonl(os.path.expanduser(args.retry_from)):
+            if r.get("setting") == "default":
+                retry_ids.add(r.get("plugin_id"))
+                retry_names.add((r.get("plugin") or "").lower())
     def keep(t):
+        if args.retry_from and t["id"] not in retry_ids and t["name"].lower() not in retry_names:
+            return False
         return ("instrument" if t["instrument"] else "effect") in kinds and (not only or only in (t["name"] + " " + t["vendor"] + " " + t["bundle"]).lower())
     if "au" in fmts:
         for t in list_aus():
@@ -359,6 +367,8 @@ def main():
     ap.add_argument("--budget", type=float, default=20, help="minutes; no new render starts after it")
     ap.add_argument("--timeout", type=int, default=60, help="seconds per render")
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--retry-from", help="a render_failures.jsonl from another machine: render only the plug-ins that failed to load or hung "
+                    "at their default setting there (typically a library that lives on a drive attached to this machine)")
     ap.add_argument("--list", action="store_true", help="print the plug-ins and exit")
     ap.add_argument("--scratch", default=None)
     args = ap.parse_args()
