@@ -83,13 +83,18 @@ class Acc:
 
 def audio_index(data):
     """normalised file path -> audio row (all machines), and LABS pack -> Acc."""
-    by_path, by_pack = {}, collections.defaultdict(Acc)
+    by_path, by_pack, dups = {}, collections.defaultdict(Acc), []
     for p in ("audio/features.jsonl", "audio/air_features.jsonl", "spitfire/labs_audio.jsonl", "steam/soundsource_audio.jsonl"):
         for r in rows(os.path.join(data, p)):
-            if r.get("bands"):
+            if r.get("dup_of"):
+                dups.append(r)
+            elif r.get("bands"):
                 by_path[norm(r["src"])] = r
                 if r.get("pack"):
                     by_pack[r["pack"].split("/")[0].lower()].add(r)
+    for r in dups:  # identical copies share the original's features
+        if norm(r["dup_of"]) in by_path:
+            by_path[norm(r["src"])] = by_path[norm(r["dup_of"])]
     return by_path, by_pack
 
 

@@ -15,7 +15,7 @@ One JSON row per file:
 Statistics only: no audio leaves the drive. Sample-pack licences cover making music, not redistribution, so every
 row is local-only (license "sample pack, local only"; the owner's own folders are "owner", bought records
 "commercial recording, local only"). Personal media folders (NOT_MUSIC) are skipped."""
-import argparse, json, math, os, re, struct, subprocess, sys, time
+import hashlib, argparse, json, math, os, re, struct, subprocess, sys, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 
@@ -319,6 +319,15 @@ def licence(path, root):
     return "sample pack, local only"
 
 
+def fingerprint(path):
+    """size + md5 of the first 64 KB: identical copies of a sample share it, and it costs no decode."""
+    try:
+        with open(path, "rb") as f:
+            return os.path.getsize(path), hashlib.md5(f.read(65536)).hexdigest()
+    except OSError:
+        return None
+
+
 def _one(args):
     root, path, seconds = args
     try:
@@ -333,11 +342,12 @@ def main():
     ap.add_argument("--out", default="~/Infinite/training-data/audio/features.jsonl")
     ap.add_argument("--per-folder", type=int, default=40, help="0 = every file")
     ap.add_argument("--seconds", type=float, default=30)
-    ap.add_argument("--jobs", type=int, default=3)
+    ap.add_argument("--jobs", type=int, default=3, help="0 = cores - 2")
     ap.add_argument("--budget", type=float, default=20, help="minutes")
     ap.add_argument("--resume", action="store_true")
     a = ap.parse_args()
     out = os.path.expanduser(a.out)
+    jobs = a.jobs or max(1, (os.cpu_count() or 4) - 2)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     done = set()
     if a.resume and os.path.exists(out):
@@ -346,11 +356,17 @@ def main():
                 done.add(json.loads(ln)["src"])
     t0, n, bad = time.time(), 0, 0
     todo = ((r, p, a.seconds) for r, p in files(a.roots, a.per_folder) if p not in done)
-    with open(out, "a" if a.resume else "w") as fo, ProcessPoolExecutor(a.jobs) as ex:
-        pending = set()
+    with open(out, "a" if a.resume else "w") as fo, ProcessPoolExecutor(jobs) as ex:
+        pending, seen = set(), {}
         for job in todo:
+            fp = fingerprint(job[1])
+            if fp and fp in seen:  # a copy of a file already queued: keep a pointer row, skip the decode
+                fo.write(json.dumps({"src": job[1], "dup_of": seen[fp]}, separators=(",", ":")) + "\n")
+                continue
+            if fp:
+                seen[fp] = job[1]
             pending.add(ex.submit(_one, job))
-            if len(pending) >= a.jobs * 8:
+            if len(pending) >= jobs * 8:
                 for fut in as_completed(pending):
                     pending.discard(fut)
                     r = fut.result()
