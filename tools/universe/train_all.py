@@ -64,7 +64,7 @@ def main():
     ap.add_argument("--export-cpp", action="store_true", default=True)
     a = ap.parse_args()
     if not a.skip_ingest:
-        _, out_ing = run("midi_ingest.py", "--cap", "12000", "--budget", "35")
+        _, out_ing = run("midi_ingest.py", "--cap", "0", "--budget", "40")
         print(out_ing.strip().splitlines()[-1])
     report()
     for scope in ("local", "shippable"):

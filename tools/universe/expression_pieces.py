@@ -103,8 +103,8 @@ def _events(d):
     return ev
 
 
-def windows(path, size=16):
-    tracks, div = parse_midi(path)
+def windows(path, size=16, parsed=None):
+    tracks, div = parsed or parse_midi(path)
     for ti, ev in enumerate(tracks):
         for ch in sorted({e[2] for e in ev if e[1] == 0x90 and e[2] != 9}):
             ons = [(t, a, v) for t, k, c, a, v in ev if k == 0x90 and c == ch and v > 0]
