@@ -17,7 +17,7 @@ def tenths(bars):
     n = len(bars)
     if n < 10:
         return None
-    return [float(np.mean(np.array(bars[int(i * n / 10):max(int((i + 1) * n / 10), int(i * n / 10) + 1)]) > 0)) for i in range(10)]
+    return [float(np.mean(np.array(bars[int(i * n / 10):max(int((i + 1) * n / 10), int(i * n / 10) + 1)])) / 127) for i in range(10)]
 
 
 def build(a):
@@ -59,30 +59,40 @@ def bin3(v):
     return None if v is None else min(2, int(v * 3))
 
 
+def context(s):
+    """genre label when the song has one, else its source corpus (Lakh, POP909, ... carry no genre but each corpus has a character)"""
+    return s["family"] if s["family"] not in (None, "unlabeled") else s["src"].replace("inbox:", "").split("/")[0]
+
+
 def evaluate(a):
     songs = [json.loads(l) for l in open(os.path.join(TD, "link", "songs.jsonl"))]
-    songs = [s for s in songs if s["family"] not in (None, "unlabeled")]
-    tr = [s for s in songs if int(hashlib.md5(s["src"].encode()).hexdigest(), 16) % 5 != 0]
-    te = [s for s in songs if int(hashlib.md5(s["src"].encode()).hexdigest(), 16) % 5 == 0]
-    print("labelled songs: %d train / %d test; genres %d" % (len(tr), len(te), len({s["family"] for s in songs})))
+    h = lambda s: int(hashlib.md5(s["src"].encode()).hexdigest(), 16) % 5
+    tr = [s for s in songs if h(s) != 0]
+    te = [s for s in songs if h(s) == 0]
+    print("songs: %d train / %d test; contexts %d" % (len(tr), len(te), len({context(s) for s in songs})))
+    vals = collections.defaultdict(list)  # event = the role is busier than its own train median (continuous activity, not >= 0.5)
+    for s in tr:
+        for r, v in s["act"].items():
+            vals[r] += v
+    med = {r: float(np.median(v)) for r, v in vals.items()}
 
     def events(S):
         for s in S:
-            g = s["family"]
+            g = context(s)
             mb = (bin3(s["mood"]["valence"]), bin3(s["mood"]["energy"]))
             for r, v in s["act"].items():
                 for t, x in enumerate(v):
-                    yield g, mb, r, t, 1 if x >= 0.5 else 0
+                    yield g, mb, r, t, 1 if x > med[r] else 0
     tabs = [collections.defaultdict(lambda: [0, 0]) for _ in range(3)]
-    keys = [lambda g, mb, r, t: (r,), lambda g, mb, r, t: (r, g), lambda g, mb, r, t: (r, g, mb, t)]
+    keys = [lambda g, mb, r, t: (r, t), lambda g, mb, r, t: (r, t, g), lambda g, mb, r, t: (r, t, g, mb)]
     for g, mb, r, t, y in events(tr):
         for i in range(3):
             tabs[i][keys[i](g, mb, r, t)][y] += 1
-    # back-off: B2 smooths toward B1, B1 toward B0 (additive prior of 4 pseudo-counts at the parent's rate)
-    def p(i, g, mb, r, t):
+
+    def p(i, g, mb, r, t):  # back-off: each level smooths toward its parent (4 pseudo-counts); the root is the role+tenth rate
         c = tabs[i].get(keys[i](g, mb, r, t), [0, 0])
-        par = 0.5 if i == 0 else p(i - 1, g, mb, r, t)
-        return (c[1] + 4 * par) / (c[0] + c[1] + 4)
+        par = (tabs[0][(r, t)][1] + 1) / (sum(tabs[0][(r, t)]) + 2) if i == 0 else p(i - 1, g, mb, r, t)
+        return (c[1] + (4 if i else 0) * par + (0 if i else 0)) / (c[0] + c[1] + (4 if i else 0)) if (c[0] + c[1] or i) else par
     tot = [0.0] * 3
     n = 0
     for g, mb, r, t, y in events(te):
@@ -90,11 +100,11 @@ def evaluate(a):
             q = min(max(p(i, g, mb, r, t), 1e-4), 1 - 1e-4)
             tot[i] += -math.log2(q if y else 1 - q)
         n += 1
-    names = ["B0 role only", "B1 + genre", "B2 + genre + mood + tenth"]
+    names = ["B0 role + tenth", "B1 + context", "B2 + context + mood"]
     print("held-out events: %d" % n)
     for i in range(3):
         print("%-28s %.4f bits/event" % (names[i], tot[i] / n))
-    print("B2 vs B1: %+.4f bits; B1 vs B0: %+.4f bits" % ((tot[1] - tot[2]) / n, (tot[0] - tot[1]) / n))
+    print("B1 vs B0: %+.4f bits; B2 vs B1: %+.4f bits" % ((tot[0] - tot[1]) / n, (tot[1] - tot[2]) / n))
 
 
 if __name__ == "__main__":
