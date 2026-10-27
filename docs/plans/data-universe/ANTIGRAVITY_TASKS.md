@@ -100,3 +100,17 @@ Done = `git diff --stat` shows only those two docs, and every number in them was
   2. Defined for criterion C2 in `training-plan.md` the permanently "metadata-only" binary container formats: `.asd`, `.amxd`, `.cst`, `.bwproject`, `.nksn`, `.nka`.
   3. Added storage rule under `training-plan.md` Section 5: `Completed store/*.jsonl tables over 20 MB are mirrored to Drive as .gz (handled automatically by sync_drive.py).`
 - **Done verification**: `git diff --stat docs/plans/data-universe/README.md docs/plans/data-universe/training-plan.md` shows only those two docs updated.
+
+## Round 2 (2026-10-27, Claude): same ground rules as above
+
+## Task D: criteria scoreboard (read only)
+
+Read `training-plan.md` C1-C6 and G1-G5. For each, measure today's value from the files (counts, `audio/features.jsonl`, `store/`, `collect_check.md`, `models/*/current.json`, `eval/`), and write a table at the bottom of `training-plan.md`: criterion, target, measured, met yes/no, what is missing. Do not edit anything else. Done = every row has a number and a date.
+
+## Task E: rebuild atlas and clusters with the new rows
+
+New rows today: `presets/air_ffp.jsonl`, `presets/air_serum2.jsonl`, `store/formats_meta.jsonl`. Re-run `instrument_atlas.py` then `sound_clusters.py` (plain `python3`, one at a time, each under 2 min; stop and report if one is slower). Check that `formats_meta.jsonl` rows (key `kind`, not `engine`) do not break either script; if they do, fix the reader side only. Done = new `atlas/summary.json` with the instrument and cluster counts before and after.
+
+## Task F: node proposals draft (step 7, design only)
+
+From `atlas/`, `genres.json` and the benchmark gaps, draft up to 3 node proposals (what it does, inputs and outputs, which data feeds it, how it is tested) in `docs/plans/data-universe/node-proposals.md`. No code. Naman sees this before anything is built (new features need approval).
