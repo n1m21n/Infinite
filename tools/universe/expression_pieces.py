@@ -85,6 +85,8 @@ def _events(d):
                 ev.append((t, 0xff, 0, d[i], d[i + 1]))  # time signature: numerator, log2(denominator)
             elif mt == 0x51 and n == 3:
                 ev.append((t, 0xff, 1, int.from_bytes(d[i:i + 3], "big"), 0))  # tempo: microseconds per quarter
+            elif mt in (0x01, 0x03, 0x06) and 0 < n <= 64:
+                ev.append((t, 0xff, 6, d[i:i + n].decode("latin-1").strip(), mt))  # text, track name, marker
             i += n
             continue
         if s in (0xf0, 0xf7):

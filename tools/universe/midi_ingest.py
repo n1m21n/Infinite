@@ -4,18 +4,23 @@
 Layout: inbox/<source>/**/*.mid plus an optional SOURCE.txt with lines `family: house` and `license: CC-BY-4.0`.
 A source with no licence line is `unknown`: it trains the local model only. A folder or file name containing a
 family word (house, techno, trance, dnb, breaks, ambient ...) sets the family when SOURCE.txt does not.
-Every file is read once (identical bytes in two sources count once). From each 4/4 file:
-  drum_groove   channel 10 bars, with each hit's velocity (vel, 0-9) and its distance from the 16th grid (off)
-  bass_seq      the bass channel (GM program 32-39, else the lowest busy channel) as 16 scale degrees per bar
-  chord_prog    one triad per bar from every pitched channel, repeats merged, as numerals in the detected key
-and from every file: melody_contour + note_expression windows, tagged with a role from the median pitch.
-Bars are spread over the song, not taken from the start. Chord-pack folders are left to chord_pieces.py."""
-import argparse, collections, glob, hashlib, json, multiprocessing, os, re, signal, statistics, sys, time
+Every file is read once (identical bytes in two sources count once). Bars come from the file's whole time-signature
+map, so a song that changes meter keeps its 4/4 bars. Into the store:
+  drum_groove   4/4 channel 10 bars on the 16th grid, with each hit's velocity (vel, 0-9) and its grid offset (off)
+  bass_seq      4/4 bars of the bass channel (GM program 32-39, else the lowest busy channel) as 16 scale degrees
+  chord_prog    one chord per bar in any meter, repeats merged, as triad numerals in the detected key plus the full
+                quality (qual: maj7, 7, m7, sus4 ...) and inversion (inv) of each
+  melody_contour + note_expression windows from every file, tagged with a role from the median pitch.
+Into --arcs (song_detail.py): drum_meter / bass_meter (other meters and triplet-grid bars), song_arc (per-bar curves
+of the whole song) and cc_motion (controller automation). Bars are spread over the song, not taken from the start.
+Chord-pack folders are left to chord_pieces.py."""
+import argparse, bisect, collections, gzip, glob, hashlib, json, multiprocessing, os, re, signal, statistics, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pieces as P
 import expression_pieces as E
 import public_drums as D
 import chord_pieces as C
+import song_detail as S
 
 FAMILY_WORDS = {"house": "house", "techno": "techno", "trance": "trance", "dnb": "drum_and_bass", "drum_and_bass": "drum_and_bass",
                 "jungle": "drum_and_bass", "breaks": "breaks", "breakbeat": "breaks", "ambient": "ambient", "downtempo": "downtempo",
@@ -49,17 +54,6 @@ def guess_family(path, meta):
         if w in toks:
             return fam
     return "unlabeled"
-
-
-def meta(tracks):
-    sig, tempo = (4, 2), 500000
-    for ev in tracks:
-        for t, k, ch, a, v in ev:
-            if k == 0xff and ch == 0 and t == 0 and sig == (4, 2):
-                sig = (a, v)
-            if k == 0xff and ch == 1 and tempo == 500000:
-                tempo = a
-    return sig, 60e6 / max(1, tempo)
 
 
 def spread(items, n):
@@ -101,23 +95,38 @@ def key_of(ns, div):
                key=lambda rm: corr(KK_MAJOR if rm[1] == "Major" else KK_MINOR, rm[0]))
 
 
-def drum_bars(ns, div, per_file):
-    """one-bar windows of the drum channel with velocity and grid offset per hit. Bars with under 85% of hits near
-    the 16th grid are dropped (triplets: their lanes would be wrong). Bar 0 is skipped when the file has more than
-    3 bars (count-ins, pickups). vel: '0'-'9' per hit. off: 'a'-'q' = -8..+8 sixteenths of a sixteenth (half a step either way), 'i' on grid."""
+def full_44(bars, div):
+    """index -> bar start of every whole 4/4 bar"""
+    return {i: t0 for i, (t0, L, num, den) in enumerate(bars) if (num, den) == (4, 2) and L == 4 * div}
+
+
+def drum_bars(ns, bars, div, per_file):
+    """one-bar windows of the drum channel in the song's 4/4 bars, with velocity and grid offset per hit. Bars with
+    under 85% of hits near the 16th grid are left to song_detail.drum_meter (triplet grids). Bar 0 is skipped when the
+    file has more than 3 bars (count-ins, pickups). vel: '0'-'9' per hit. off: 'a'-'q' = -8..+8 sixteenths of a
+    sixteenth (half a step either way), 'i' on grid."""
     sixteenth = div / 4.0
     grid = collections.defaultdict(lambda: [["."] * 16 for _ in D.LANE_NOTES])
     vel = collections.defaultdict(lambda: [["."] * 16 for _ in D.LANE_NOTES])
     off = collections.defaultdict(lambda: [["."] * 16 for _ in D.LANE_NOTES])
     near = collections.defaultdict(lambda: [0, 0])
+    four = full_44(bars, div)
+    starts = [b[0] for b in bars]
     for on, _, a, ch, v, _ in ns:
         if ch != 9:
             continue
+        b = bisect.bisect_right(starts, on) - 1
+        if b not in four:
+            continue
         for li, lane_notes in enumerate(D.LANE_NOTES):
             if a in lane_notes:
-                x = on / sixteenth
+                x = (on - four[b]) / sixteenth
                 s = round(x)
-                b, k = s // 16, s % 16
+                if s >= 16:  # a hit a hair before the next bar line plays that bar's downbeat
+                    if b + 1 not in four:
+                        continue
+                    b, x, s = b + 1, x - 16, 0
+                k = s
                 vq = str(min(9, round(v / 127 * 9)))
                 if grid[b][li][k] == "." or vq > vel[b][li][k]:  # two hits on one cell: keep the louder
                     grid[b][li][k], vel[b][li][k] = "x", vq
@@ -160,7 +169,7 @@ def degree(pitch, root, mode, base):
     return sc.index(pc) + 7 * (rel // 12) if pc in sc else None
 
 
-def bass_bars(ns, div, key, per_file):
+def bass_bars(ns, bars, div, key, per_file):
     ch = bass_channel(ns)
     if ch is None or key is None:
         return
@@ -169,53 +178,30 @@ def bass_bars(ns, div, key, per_file):
     lo = min(a for _, a in line)
     base = lo - (lo - root) % 12
     sixteenth = div / 4.0
-    bars = collections.defaultdict(dict)
+    four = full_44(bars, div)
+    starts = [b[0] for b in bars]
+    low = collections.defaultdict(dict)
     for on, a in line:
-        s = round(on / sixteenth)
-        b, k = s // 16, s % 16
-        if k not in bars[b] or a < bars[b][k]:
-            bars[b][k] = a  # lowest note on a step
+        b = bisect.bisect_right(starts, on) - 1
+        if b not in four:
+            continue
+        k = round((on - four[b]) / sixteenth)
+        if k < 16 and (k not in low[b] or a < low[b][k]):
+            low[b][k] = a  # lowest note on a step
     keep = []
-    for b in sorted(bars):
+    for b in sorted(low):
         steps = ["."] * 16
         chrom = 0
-        for k, a in bars[b].items():
+        for k, a in low[b].items():
             d = degree(a, root, mode, base)
             if d is None:
                 chrom += 1
             elif d <= 9:
                 steps[k] = str(d)
-        if sum(c != "." for c in steps) >= 2 and chrom <= 0.25 * len(bars[b]):
+        if sum(c != "." for c in steps) >= 2 and chrom <= 0.25 * len(low[b]):
             keep.append("".join(steps))
     for st in spread(keep, per_file):
         yield st
-
-
-def chord_bars(ns, div, key, bass_ch):
-    """one triad per bar by template match on duration-weighted pitch classes (the bass counts double for the root);
-    None where the best triad covers under 60% of the bar's weight"""
-    root, mode = key
-    bar = div * 4
-    w = collections.defaultdict(lambda: [0.0] * 12)
-    for on, off, a, ch, v, p in ns:
-        if ch == 9:
-            continue
-        for b in range(on // bar, min(off - 1, on + 4 * bar) // bar + 1):
-            lap = min(off, (b + 1) * bar) - max(on, b * bar)
-            if lap > 0:
-                w[b][a % 12] += lap / bar * (2.0 if ch == bass_ch else 1.0)
-    out = []
-    for b in range(max(w) + 1 if w else 0):
-        x = w.get(b)
-        tot = sum(x) if x else 0.0
-        if tot <= 0:
-            out.append(None)
-            continue
-        best = max(((r, q) for r in range(12) for q in (4, 3)), key=lambda rq: x[rq[0]] * 1.2 + x[(rq[0] + rq[1]) % 12] + x[(rq[0] + 7) % 12])
-        r, q = best
-        cover = (x[r] + x[(r + q) % 12] + x[(r + 7) % 12]) / tot
-        out.append((r, q == 3) if cover >= 0.6 else None)
-    return out
 
 
 def numeral(r, minor, root, mode):
@@ -230,22 +216,24 @@ def numeral(r, minor, root, mode):
     return acc + (ROMAN[d] if minor else ROMAN[d].upper())
 
 
-def progressions(ns, div, key, bass_ch, per_file=2, length=4):
-    """runs of `length` distinct consecutive chords (repeats merged), spread over the song"""
+def progressions(ns, bars, key, bass_ch, per_file=4, length=4):
+    """runs of `length` distinct consecutive chords (repeats merged) in any meter, spread over the song:
+    (triad numerals, qualities, inversions)"""
     root, mode = key
     runs, cur = [], []
-    for c in chord_bars(ns, div, key, bass_ch):
+    for c in S.chord_per_bar(ns, bars, bass_ch):
         if c is None:
             cur = []
             continue
-        if cur and cur[-1] == c:
+        if cur and cur[-1][:3] == c[:3]:
             continue
         cur.append(c)
         if len(cur) == length:
             runs.append(cur)
             cur = []
     for run in spread(runs, per_file):
-        yield [numeral(r, m, root, mode) for r, m in run]
+        yield ([numeral(r, q in S.MINORISH, root, mode) for r, q, _, _ in run], [q for _, q, _, _ in run],
+               [i for _, _, i, _ in run])
 
 
 def pick(files, cap):
@@ -262,25 +250,39 @@ def _too_slow(*_):
 def one_file(job):
     """every piece one file gives, ungated; [] when unreadable or over 5 s (a few broken files hold notes for hours)"""
     f, name, fam, lic, per_file, windows = job
-    out = []
+    out, detail = [], []
     signal.signal(signal.SIGALRM, _too_slow)
     signal.alarm(5)
     try:
         tracks, div = E.parse_midi(f)
-        sig, bpm = meta(tracks)
         ns = notes(tracks)
-        if sig == (4, 2) and ns:
-            for i, (lanes, vel, off) in enumerate(drum_bars(ns, div, per_file)):
+        if ns:
+            tm = S.tempo_map(tracks)
+            bpm = S.bpm_at(tm, 0)
+            bars = S.bar_map(tracks, div, max(n[1] for n in ns))
+            key = key_of(ns, div)
+            bass_ch = bass_channel(ns)
+            for i, (lanes, vel, off) in enumerate(drum_bars(ns, bars, div, per_file)):
                 out.append({"type": "drum_groove", "src": "inbox:%s#bar%d" % (name, i), "family": fam, "lanes": lanes, "vel": vel,
                             "off": off, "swing": 0.0, "groove": None, "bpm": round(bpm), "license": lic})
-            key = key_of(ns, div)
             if key:
-                for i, st in enumerate(bass_bars(ns, div, key, per_file)):
+                for i, st in enumerate(bass_bars(ns, bars, div, key, per_file)):
                     out.append({"type": "bass_seq", "src": "inbox:%s#bass%d" % (name, i), "family": fam, "steps": st,
                                 "root": key[0], "mode": key[1], "bpm": round(bpm), "license": lic})
-                for i, nums in enumerate(progressions(ns, div, key, bass_channel(ns))):
+                for i, (nums, qual, inv) in enumerate(progressions(ns, bars, key, bass_ch)):
                     out.append({"type": "chord_prog", "src": "inbox:%s#prog%d" % (name, i), "family": fam, "mode": key[1],
-                                "style": fam, "key": key[0], "numerals": nums, "mood": [], "license": lic})
+                                "style": fam, "key": key[0], "numerals": nums, "qual": qual, "inv": inv, "mood": [], "license": lic})
+            for i, d in enumerate(S.drum_meter(ns, bars, div, D.LANE_NOTES, per_file)):
+                d["bpm"] = round(S.bpm_at(tm, bars[d["bar"]][0]))
+                detail.append(dict(d, type="drum_meter", src="inbox:%s#meter%d" % (name, i)))
+            for i, d in enumerate(S.bass_meter(ns, bars, div, key, bass_ch, degree, per_file)):
+                detail.append(dict(d, type="bass_meter", src="inbox:%s#mbass%d" % (name, i), root=key[0], mode=key[1]))
+            mix = {}
+            for i, d in enumerate(S.cc_motion(tracks, ns, div, bars, mix)):
+                detail.append(dict(d, type="cc_motion", src="inbox:%s#cc%d" % (name, i)))
+            detail.append(dict(S.song_arc(tracks, ns, div, bars, key, bass_ch), type="song_arc", src="inbox:%s" % name, mix=mix))
+            for d in detail:
+                d.update(family=fam, license=lic)
         ws = spread(list(E.windows(f, parsed=(tracks, div))), windows)
         for k, w in enumerate(ws):
             steps = [b - a for a, b in zip(w["pitches"], w["pitches"][1:])]
@@ -289,14 +291,14 @@ def one_file(job):
                         ("lead" if statistics.median(w["pitches"]) >= 72 else "mid"), "pitches": w["pitches"], "steps": steps, "license": lic})
             out.append({"type": "note_expression", "src": nm, "family": fam, "vel": w["vel"], "bend": w["bend"],
                         "pressure": w["pressure"], "slide": w["slide"], "license": lic})
-        for p in out:
+        for p in out + detail:
             h, s = GATES[p["type"]](p)
             p.update(id=P.digest({k: v for k, v in p.items() if k not in ("src", "family", "license")}), hard=h, soft=s)
     except Exception:
         return []
     finally:
         signal.alarm(0)
-    return out
+    return out + detail
 
 
 def jobs(inbox, cap, per_file, windows, done=frozenset()):
@@ -329,13 +331,16 @@ def gate_chord_inbox(p):
 
 
 GATES = {"drum_groove": P.gate_drum, "bass_seq": P.gate_bass, "chord_prog": gate_chord_inbox,
-         "melody_contour": E.gate_contour, "note_expression": E.gate_expr}
+         "melody_contour": E.gate_contour, "note_expression": E.gate_expr,
+         "drum_meter": S.gate, "bass_meter": S.gate, "cc_motion": S.gate, "song_arc": S.gate}
+DETAIL = {"drum_meter", "bass_meter", "cc_motion", "song_arc"}  # rows for --arcs, which no model reads yet
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--inbox", default="~/Infinite/training-data/inbox")
     ap.add_argument("--store", default="~/Infinite/training-data/store")
+    ap.add_argument("--arcs", default="~/Infinite/training-data/arcs", help="where the song_detail rows go")
     ap.add_argument("--cap", type=int, default=0, help="max files per source (0 = all)")
     ap.add_argument("--per-file", type=int, default=4, help="drum and bass bars per file")
     ap.add_argument("--windows", type=int, default=3, help="melody windows per file")
@@ -343,23 +348,26 @@ def main():
     ap.add_argument("--resume", action="store_true", help="keep inbox.jsonl.tmp from a stopped run and add the files it lacks")
     ap.add_argument("--budget", type=float, default=60, help="minutes before it stops and keeps what it has")
     a = ap.parse_args()
-    inbox, store = os.path.expanduser(a.inbox), os.path.expanduser(a.store)
+    inbox, store, arcs = (os.path.expanduser(x) for x in (a.inbox, a.store, a.arcs))
     os.makedirs(store, exist_ok=True)
+    os.makedirs(arcs, exist_ok=True)
     deadline, t0 = time.time() + 60 * a.budget, time.time()
     counts = collections.defaultdict(lambda: [0, 0])
     fam = collections.defaultdict(collections.Counter)
     lic = collections.Counter()
     seen, nfiles = set(), 0
-    out = os.path.join(store, "inbox.jsonl")
+    out, out_d = os.path.join(store, "inbox.jsonl"), os.path.join(arcs, "detail.jsonl.gz")
     done = set()
     if a.resume and os.path.exists(out + ".tmp"):
-        # a file's rows are written together, so every file named in the .tmp is complete
-        for ln in open(out + ".tmp"):
-            p = json.loads(ln)
-            done.add(p["src"][len("inbox:"):].split("#")[0])
-            seen.add(p["id"])
+        # a file's rows are written together, so every file named in the .tmp files is complete
+        for path in (out + ".tmp", out_d + ".tmp"):
+            for ln in (gzip.open if path.endswith(".gz.tmp") else open)(path, "rt") if os.path.exists(path) else ():
+                p = json.loads(ln)
+                done.add(p["src"][len("inbox:"):].split("#")[0])
+                seen.add(p["id"])
         sys.stderr.write("resuming: %d files, %d pieces already written\n" % (len(done), len(seen)))
-    with open(out + ".tmp", "a" if a.resume else "w") as fo, multiprocessing.Pool(a.jobs) as pool:
+    mode = "a" if a.resume else "w"
+    with open(out + ".tmp", mode) as fo, gzip.open(out_d + ".tmp", mode + "t", compresslevel=6) as fd, multiprocessing.Pool(a.jobs) as pool:
         for rows in pool.imap_unordered(one_file, jobs(inbox, a.cap, a.per_file, a.windows, done), chunksize=32):
             nfiles += 1
             if nfiles % 5000 == 0:
@@ -369,7 +377,7 @@ def main():
                     p["hard"] = ["duplicate of an earlier piece"]
                 seen.add(p["id"])
                 p["ok"] = not p["hard"]
-                fo.write(json.dumps(p, separators=(",", ":")) + "\n")
+                (fd if p["type"] in DETAIL else fo).write(json.dumps(p, separators=(",", ":")) + "\n")
                 counts[p["type"]][0] += 1
                 counts[p["type"]][1] += p["ok"]
                 fam[p["type"]][p["family"]] += p["ok"]
@@ -381,15 +389,17 @@ def main():
     if nfiles == 0 and not a.resume and os.path.exists(out):
         # the raw MIDI is deleted once it has been read: keep the pieces already extracted from it
         os.remove(out + ".tmp")
+        os.remove(out_d + ".tmp")
         print("no MIDI files under %s: kept %s as it is" % (inbox, out))
         return
     os.replace(out + ".tmp", out)
+    os.replace(out_d + ".tmp", out_d)
     print("%d files in %.1f min" % (nfiles, (time.time() - t0) / 60))
     print("%-16s %8s %8s  %s" % ("type", "total", "ok", "by family (ok)"))
     for t in GATES:
         print("%-16s %8d %8d  %s" % (t, counts[t][0], counts[t][1], dict(fam[t].most_common(6))))
     print("licenses:", dict(lic))
-    print("wrote", out)
+    print("wrote", out, "and", out_d)
 
 
 if __name__ == "__main__":
