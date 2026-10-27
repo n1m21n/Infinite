@@ -21,7 +21,7 @@ flowchart LR
 | Stage | State | Evidence |
 |---|---|---|
 | 1. Collect WD-Black | **done except the audio pass** (20-min chunks, `--resume`) | `collect_check.py`: 0 non-audio misses |
-| 2. Collect Pro + Air | **Air inventoried**, readers not run yet | table below |
+| 2. Collect Pro + Air | **Air: plain formats, Logic and audio done**; binary formats and the render pass left | table below |
 | 3. Instrument atlas | **data ready, builder not written** | 2,114 fully playable EXS maps, 229 Kontakt maps, 11,519 labelled Omnisphere soundsources |
 | 4. Sound clusters | not started (drums only: `mix.py`) | |
 | 5. Genres / subgenres | partial: genre graph and arcs are built from MIDI | `genre_graph.py`, `arc_analysis.py` |
@@ -39,7 +39,7 @@ flowchart LR
 | `wt_reader` | 1,432 | wavetable harmonic shapes |
 | `als_reader` | 443 | Live-set automation arcs and device chains |
 | `midi_ingest` | 2,600 | drive MIDI plus Live-set clips |
-| `audio_features` | 8,580 and growing | spectrum, energy, attack, loudness per loop and one-shot |
+| `audio_features` | 26,595 and growing | spectrum, energy, attack, loudness per loop and one-shot |
 
 ### EXS instruments by family (playable = every zone has its audio)
 
@@ -68,7 +68,8 @@ flowchart LR
 | grooves | 219 | Ableton `.agr` groove templates (swing and velocity per step) |
 | clips / LFOs | 350 `.alc`, 346 `.xlfo`, 408 `.vec` | Ableton clips, Xfer LFO shapes |
 | plugins | 246 AU, 183 VST3, 131 VST | for the render pass (step 2d) |
-| DAWs | Ableton Live 12 Suite, Bitwig Studio | their factory content is counted above |
+| DAWs | Ableton Live 12 Suite, Bitwig Studio, Logic Pro | their factory content is counted above; the Air's Logic library folder links to WD-Black |
+| Logic (app bundle + `~/Music/Audio Music Apps`) | 26,216 `.cst`, 7,429 `.pst`, 18 `.mid` | channel strips = whole FX chains |
 
 ## Steps
 
@@ -78,9 +79,10 @@ flowchart LR
 | 2a | Air: existing readers. `preset_reader` gave 23,509 rows: Diva 15,173, Hive 3,876, Repro 1,783, Ableton 2,665. MIDI copied into `inbox/air_*`: EZkeys 13,038, Kontakt 8 2,206, KORG 184, u-he 74 | Air | `presets/air_presets.jsonl`, `inbox/air_*` | **done** |
 | 2b | Air: new `plain_preset_reader.py` gave 16,487 rows: NI `.nksf` 5,979 (types and characters), Valhalla 3,331, AU 1,744, Phase Plant 1,111, Vital 800, Kilohearts 1,162, Serum 2 tags 626, FabFilter / soothe / TAL / Audio Damage. Ableton clips: 350 `.alc` written as MIDI; Core Library sets 37,908 notes; owner crash-copy sets 26,291 notes | Air | `presets/air_plain.jsonl`, `arcs/air_als.jsonl`, `inbox/air_ableton_clips`, `air_als_*` | **done** |
 | 2b+ | Still unread on the Air: Bitwig `.bwpreset` (binary), NI `.ngrr` / `.nkp` (zlib), Ableton `.agr` grooves (binary), 3,103 `.ffp` not in `FT3i` form, Serum 2 knob bodies (zstd), Vital wavetable shapes | | | next |
-| 2c | Air: audio pass (`numpy` installed for the user's Python, ffmpeg from Homebrew) | Air | `audio/air_features.jsonl` | running |
-| 1b | Fix found on the way: Live 12 notes have no `IsEnabled`, so `als_reader` had dropped most notes. The owner's 87 sets now give 88,482 notes (was 16,913) and 76 `.mid` (was 28) | Pro | `inbox/als_owner` | **done**, re-ingest pending |
-| 2d | Render pass: plugins whose files cannot be read play a fixed note set (C2/C3/C4 at velocity 40/90/120) in a headless host, and only the measured features are kept | Air | `audio/render_features.jsonl` | |
+| 2c | Air: audio pass (`numpy` installed for the user's Python, ffmpeg from Homebrew) | Air | `audio/air_features.jsonl` | **done**: 12,122 rows, 3 unreadable |
+| 2e | Logic on the Air: new `.cst` reader gives each channel strip's plug-in chain in order (25,486 strips; top slots Channel EQ 13,329, Phat FX 5,327, Enveloper 3,495, Compressor 2,865); `preset_reader` read 896 `.pst` knob sets; 18 MIDI to `inbox/air_logic` | Air | `presets/air_logic_strips.jsonl`, `presets/air_logic_pst.jsonl` | **done** |
+| 1b | Fix found on the way: Live 12 notes have no `IsEnabled`, so `als_reader` had dropped most notes. The owner's 87 sets now give 88,482 notes (was 16,913) and 76 `.mid` (was 28) | Pro | `inbox/als_owner` | **done**, re-ingested: store 3,212,198 rows |
+| 2d | Render pass: see *Universal reader and render pass* below | Air | `audio/render_features.jsonl` | planned, owner approved the approach |
 | 3 | Instrument atlas: one row per instrument that joins its key map, presets, audio features, labels and family | Pro | `atlas/instruments.jsonl` | |
 | 4 | Sound clusters per family in one timbre space (32-band spectrum + envelope) | Pro | `atlas/clusters.json` | |
 | 5 | Genres / subgenres: which clusters, grooves and arcs each uses | Pro | `atlas/genres.json` | |
@@ -90,15 +92,38 @@ flowchart LR
 Each step ends with `collect_check.py` (or its atlas equivalent) showing what was taken, what was
 skipped, and why.
 
+## Universal reader and render pass (next session)
+
+```mermaid
+flowchart LR
+  W["universe.py ROOT ...<br/>one walk per machine"] --> D{"magic bytes,<br/>then extension"}
+  D -->|known| RD["reader registry<br/>preset, plain_preset, exs, wt, als,<br/>steam, spitfire, midi copy"]
+  D -->|audio| AF["audio_features<br/>fast WAV/AIFF path"]
+  D -->|unknown| U["unknown.jsonl<br/>ext, magic, size: triage list"]
+  RD --> MF["manifest.jsonl<br/>path, size, mtime, reader, rows"]
+  AF --> MF
+  P["installed plugins<br/>249 AU, 184 VST3 on the Air"] --> RP["render_pass.py<br/>Infinite --audio-summary --wav --notes<br/>--plugin-params --set"]
+  RP --> AF
+  MF --> CC["collect_check reads the manifest"]
+```
+
+| Piece | What it does | Built from |
+|---|---|---|
+| `universe.py` | One command per machine: walks every root once, sends each file to its reader by magic bytes (extension as fallback), writes a manifest so a re-run only reads new or changed files (size + mtime), and lists every unknown format with its first bytes | the existing readers, unchanged |
+| `render_pass.py` | For each plug-in: a small `.inf` (note source -> plug-in node -> Audio Out), rendered by `Infinite --audio-summary out.json --wav tmp.wav --notes notes.json --plugin-params`; instruments play C2/C3/C4 at velocity 40/90/120, effects get a fixed test signal (drum loop, pink-noise burst, sine sweep); `--set` sweeps the first 16 parameters at 0 / 0.5 / 1 so every knob gets a measured timbre change; the WAV is measured and deleted | Infinite's own headless host, so no new dependency; a plug-in that crashes or hangs is logged for `plugin-host-hardening` |
+| Audio speed | WAV/AIFF read in Python instead of ffprobe + ffmpeg: **1.7x per file** measured on the Air, features within 0.02 of the ffmpeg path. Next: skip duplicate files (same size + first 64 KB), and `--jobs` = cores - 2 when nothing else runs | `audio_features.py` |
+
+Session order: (1) smoke-test `render_pass.py` on one AU instrument and one effect; (2) run it in 20-minute chunks on the Air while (3) `universe.py` replaces the hand-run reader list on the Pro; (4) the 2b+ binary formats; (5) the atlas (step 3).
+
 ## Decisions (settled)
 
 | Question | Decision | Why |
 |---|---|---|
 | Copy raw audio between laptops? | **No.** Each machine measures its own files and only rows travel. | Both disks have about 12 to 15 GB free; rows are tiny |
-| Rows from vendor containers that `steam_reader` / `spitfire_reader` decode (Spectrasonics, LABS) | Kept **local only** and outside the `shippable` scope. Any new encrypted format goes through the render pass (2d), not key recovery. | Their licences cover playing the sounds, not unpacking them; the render pass is normal use of an installed plugin |
+| Rows from vendor containers that `steam_reader` / `spitfire_reader` decode (Spectrasonics, LABS) | **In the dataset** (owner, 2026-10-27), with the same licence handling as every other library row. Any new encrypted format goes through the render pass (2d), not key recovery (owner confirmed). | The render pass is normal use of an installed plugin |
 | Which scope trains shipped models | `--scope shippable`: owner data, public datasets, our own renders. Sample-pack and library rows guide the critic and the benchmarks. | Data is a guardrail, not a template |
 | The in-app instrument (sampler node built from the atlas) | **A new feature: owner approves the design first.** Steps 1 to 6 are data and tooling only. | new-features-need-approval |
-| DAW re-downloads | Not needed: Ableton 12 Suite and Bitwig are on the Air, and Logic content is on WD-Black | |
+| DAW re-downloads | Not needed: Ableton 12 Suite, Bitwig and Logic Pro are on the Air, and Logic content is on WD-Black | |
 | Order | Presets and MIDI first (cheap, large), then audio, then renders | most rows per minute |
 | Budget | Jobs are capped at 20 minutes and resumable; one heavy job per laptop | 8 GB machines |
 

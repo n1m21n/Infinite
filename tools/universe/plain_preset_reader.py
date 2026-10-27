@@ -11,6 +11,8 @@ Pure Python (runs on a laptop without numpy). Read only. Formats, by first bytes
   .vpreset .talmod .pjunoxl .noisemakerpreset .bassline .adpreset .preset .aupreset   XML: numeric attributes of the
                     root and its children (Valhalla, TAL, Audio Damage, oeksound ...); .aupreset plist numbers
   .ffp .xlfo        FabFilter / Xfer 'FT3i': u32 version, u32 byte length, then little-endian float32 values (unnamed)
+  .cst              Logic channel strip: 'OCuA' then one 'UCuA' block per slot, the plug-in name 0x9c bytes in; read as
+                    the ordered chain of plug-in names (the slot knobs are not read)
   .alc              Ableton MIDI clip, gzip XML: written as .mid into --clips with als_reader
 Licence: "preset library, local only"."""
 import argparse, collections, gzip, json, os, re, struct, sys, time
@@ -172,7 +174,24 @@ def ft3i(path):
     return row(path, eng.lower(), {"main": {"p%d" % k: round(v, 5) for k, v in enumerate(vals) if v == v and abs(v) < 1e9}})
 
 
-READERS = {".vital": vital, ".serumpreset": serum, ".phaseplant": kilohearts, ".multipass": kilohearts, ".snapheap": kilohearts,
+def cst(path):
+    b = open(path, "rb").read()
+    if b[:4] != b"OCuA":
+        return None
+    chain = []
+    for m in re.finditer(b"UCuA", b):
+        nm = b[m.start() + 0x9C:m.start() + 0xBC].split(b"\0")[0]
+        if re.fullmatch(rb"[A-Za-z0-9][A-Za-z0-9 .+&()/'-]{1,30}", nm):
+            chain.append(nm.decode())
+    if not chain:
+        return None
+    parts = path.split(os.sep)
+    patch = next((x[:-6] for x in reversed(parts) if x.endswith(".patch")), None)
+    tags = {"chain": chain, "patch": patch, "folder": "/".join(x for x in parts[-5:-1] if not x.endswith(".patch"))}
+    return row(path, "logic channel strip", {}, tags, patch or os.path.splitext(parts[-1])[0])
+
+
+READERS = {".cst": cst, ".vital": vital, ".serumpreset": serum, ".phaseplant": kilohearts, ".multipass": kilohearts, ".snapheap": kilohearts,
            ".nksf": nksf, ".ffp": ft3i, ".xlfo": ft3i, **{e: xml_preset for e in XML}}
 
 

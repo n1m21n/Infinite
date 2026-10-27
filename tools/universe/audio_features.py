@@ -15,7 +15,7 @@ One JSON row per file:
 Statistics only: no audio leaves the drive. Sample-pack licences cover making music, not redistribution, so every
 row is local-only (license "sample pack, local only"; the owner's own folders are "owner", bought records
 "commercial recording, local only"). Personal media folders (NOT_MUSIC) are skipped."""
-import argparse, json, math, os, re, subprocess, sys, time
+import argparse, json, math, os, re, struct, subprocess, sys, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 
@@ -62,9 +62,97 @@ def _band_matrix():
 _BM = _band_matrix()
 
 
+def read_pcm(path, seconds):
+    """WAV / AIFF PCM or float read in Python: (channels x samples float64, rate), or None for anything else.
+    Skips the two ffmpeg/ffprobe processes, which took about 75% of each file's time"""
+    with open(path, "rb") as f:
+        head = f.read(12)
+        if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+            big, fmt = False, None
+        elif head[:4] == b"FORM" and head[8:12] in (b"AIFF", b"AIFC"):
+            big, fmt = True, None
+        else:
+            return None
+        e = ">" if big else "<"
+        while True:
+            ch = f.read(8)
+            if len(ch) < 8:
+                return None
+            cid, size = ch[:4], struct.unpack(e + "I", ch[4:])[0]
+            if not big and cid == b"fmt ":
+                b = f.read(size)
+                tag, nch, rate = struct.unpack("<HHI", b[:8])
+                bits = struct.unpack("<H", b[14:16])[0]
+                if tag == 0xFFFE and len(b) >= 26:
+                    tag = struct.unpack("<H", b[24:26])[0]
+                if tag not in (1, 3):
+                    return None
+                fmt = (nch, rate, bits, tag == 3)
+            elif big and cid == b"COMM":
+                b = f.read(size)
+                nch, bits = struct.unpack(">h", b[:2])[0], struct.unpack(">h", b[6:8])[0]
+                ex, hi, lo = struct.unpack(">HII", b[8:18])  # 80-bit extended rate
+                rate = int(round((hi * 2.0 ** 32 + lo) * 2.0 ** ((ex & 0x7FFF) - 16383 - 63)))
+                comp = b[18:22] if head[8:12] == b"AIFC" else b"NONE"
+                if comp == b"sowt":
+                    e = "<"
+                elif comp in (b"fl32", b"FL32"):
+                    bits = -32
+                elif comp != b"NONE":
+                    return None
+                fmt = (nch, rate, abs(bits), bits < 0)
+            elif cid in (b"data", b"SSND") and fmt:
+                nch, rate, bits, flt = fmt
+                if cid == b"SSND":
+                    off = struct.unpack(">I", f.read(8)[:4])[0]
+                    f.read(off)
+                    size -= 8 + off
+                w = bits // 8
+                if nch < 1 or w not in (1, 2, 3, 4, 8) or rate < 8000:
+                    return None
+                n = min(size // (w * nch), int(seconds * rate))
+                raw = f.read(n * w * nch)
+                n = len(raw) // (w * nch)
+                raw = raw[:n * w * nch]
+                if flt:
+                    x = np.frombuffer(raw, dtype=e + ("f4" if w == 4 else "f8")).astype(np.float64)
+                elif w == 3:
+                    u = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
+                    v = (u[:, 2] << 16 | u[:, 1] << 8 | u[:, 0]) if e == "<" else (u[:, 0] << 16 | u[:, 1] << 8 | u[:, 2])
+                    x = ((v ^ 0x800000) - 0x800000) / 8388608.0
+                elif w == 1:
+                    x = (np.frombuffer(raw, dtype=np.uint8 if not big else np.int8).astype(np.float64) - (128 if not big else 0)) / 128.0
+                else:
+                    x = np.frombuffer(raw, dtype=e + "i%d" % w).astype(np.float64) / float(2 ** (bits - 1))
+                return x.reshape(-1, nch).T, rate
+            else:
+                f.seek(size + (size & 1), 1)
+
+
+def resample(x, rate):
+    """band-limited FFT resample to FS; zero padding keeps the end from wrapping into the attack"""
+    if rate == FS:
+        return x
+    n = x.shape[1]
+    pad = 1 << int(math.ceil(math.log2(n + 8192)))
+    m = int(round(pad * FS / rate))
+    X = np.fft.rfft(x, pad)
+    k = min(X.shape[1], m // 2 + 1)
+    Y = np.zeros((x.shape[0], m // 2 + 1), dtype=complex)
+    Y[:, :k] = X[:, :k]
+    return np.fft.irfft(Y, m)[:, :int(round(n * FS / rate))] * (m / pad)
+
+
 def decode(path, seconds):
-    """stereo float64 at 48 kHz, at most `seconds` long, via ffmpeg; mono is copied to both sides at full level
-    (ffmpeg's own -ac 2 upmix lowers it 3 dB)"""
+    """stereo float64 at 48 kHz, at most `seconds` long; WAV / AIFF in Python, the rest via ffmpeg; mono is copied to
+    both sides at full level (ffmpeg's own -ac 2 upmix lowers it 3 dB)"""
+    try:
+        r = read_pcm(path, seconds) if path.lower().endswith((".wav", ".aif", ".aiff")) else None
+    except (OSError, struct.error, ValueError):
+        r = None
+    if r is not None and r[0].shape[1] >= 2:
+        x = resample(r[0][:2], r[1])
+        return np.stack([x[0], x[0]]) if x.shape[0] == 1 else x
     ch = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels", "-of", "csv=p=0",
                          path], capture_output=True, text=True, timeout=30).stdout.strip()
     mono = ch == "1"
