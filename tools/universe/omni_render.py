@@ -38,6 +38,24 @@ def make_state(tmpl_xml, tmpl_tail, patch):
     return base64.b64encode(s).decode()
 
 
+def make_multi_state(multi, tmpl_tail):
+    """a factory multi (.mlt_omn) is a whole <SynthMaster> document: it replaces the template's XML outright"""
+    xml = multi.strip()
+    if not xml.startswith(b"<SynthMaster"):
+        return None
+    xml += b"\n"
+    s = struct.pack("<QIIIIQ", len(xml) + len(tmpl_tail) + 16, 999999999, 0, 1, 0, len(xml)) + xml + tmpl_tail
+    return base64.b64encode(s).decode()
+
+
+def multis(lib):
+    """yield (src, bytes) for every loose .mlt_omn under lib (the Multis folder)"""
+    for root, _, fs in os.walk(lib):
+        for f in sorted(fs):
+            if f.endswith(".mlt_omn") and not f.startswith("._"):
+                yield "omni-multi:%s" % os.path.relpath(os.path.join(root, f), lib), open(os.path.join(root, f), "rb").read()
+
+
 def patches(lib):
     """yield (src, bytes) for every patch under lib: .db containers and loose .prt_omn"""
     for root, _, fs in os.walk(lib):
@@ -90,6 +108,7 @@ def main():
     ap.add_argument("--lead", type=float, default=8.0, help="seconds of silence while the samples stream in (Omnisphere loads async)")
     ap.add_argument("--notes", default="36:100:C2,48:100:C3,60:100:C4,72:100:C5,48:30:C3p,48:127:C3f",
                     help="midi:velocity:label list; default = 4 octaves at vel 100 + C3 soft (30) and hard (127) for the velocity response")
+    ap.add_argument("--multis", action="store_true", help="--lib is the Multis folder: render each .mlt_omn as a whole multi")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
@@ -107,7 +126,7 @@ def main():
     t = {"instrument": True, "format": kv["plugin_format"], "id": kv["plugin_id"], "name": kv.get("plugin_name", ""), "vendor": ""}
     binp = rp.infinite_bin()
     t0, n, ok, bad = time.time(), 0, 0, 0
-    for i, (src, patch) in enumerate(patches(a.lib)):
+    for i, (src, patch) in enumerate(multis(a.lib) if a.multis else patches(a.lib)):
         if i % a.stride != a.offset:
             continue
         if a.list:
@@ -118,10 +137,14 @@ def main():
             continue
         if a.limit and n >= a.limit or a.budget and time.time() - t0 > a.budget * 60:
             break
+        state = make_multi_state(patch, ttail) if a.multis else make_state(txml, ttail, patch)
+        if state is None:
+            print("skip (not a SynthMaster document)", src, flush=True)
+            continue
         n += 1
         with tempfile.TemporaryDirectory() as tmp:
             inf = os.path.join(tmp, "p.inf")
-            open(inf, "w").write(rp.patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % make_state(txml, ttail, patch), 1))
+            open(inf, "w").write(rp.patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state, 1))
             ep, mp = rp.write_notes(tmp)
             js, wav = os.path.join(tmp, "s.json"), os.path.join(tmp, "o.wav")
             try:
