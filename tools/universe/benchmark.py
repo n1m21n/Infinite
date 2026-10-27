@@ -232,7 +232,7 @@ def main():
     d_sample = rng.sample(d_test, min(1000, len(d_test)))
     m_sample = rng.sample(m_test, min(1000, len(m_test)))
     frr_d = 100.0 * sum(not CR.judge(p, rec)["accept"] for p in d_sample) / len(d_sample)
-    frr_m = 100.0 * sum(not CR.judge(p, rec)["accept"] for p in m_sample) / len(m_sample)
+    frr_m = 100.0 * sum(not CR.judge(p, rec)["accept"] for p in m_sample) / max(1, len(m_sample))
     frr_c = 100.0 * sum(not CR.judge(p, rec)["accept"] for p in c_test) / max(1, len(c_test))
     frr_all = (frr_d * len(d_sample) + frr_m * len(m_sample) + frr_c * len(c_test)) / (len(d_sample) + len(m_sample) + len(c_test))
     b2_ok = frr_all <= 3.0
