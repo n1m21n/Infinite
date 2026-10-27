@@ -268,6 +268,48 @@ namespace
    }
 }
 
+// INFINITE_GENSAMPLEDRUMS=<file>: the compiled patch of `takes` seeds per style for the full mix and the
+// drums part, one JSON line each, no render. tools/universe/benchmark.py B4 reads the Drum Sequencer's
+// lane steps from them, so the realism test scores the grooves the app ships, not a Python stand-in.
+bool RunGenSampleDrums(const std::string& file, int takes)
+{
+   FILE* out = fopen(file.c_str(), "w");
+   if (out == nullptr)
+   {
+      printf("GENSAMPLEDRUMS cannot write %s\n", file.c_str());
+      return false;
+   }
+   int made = 0;
+   for (int i = 0; i < SampleStyles::Count(); i++)
+      for (SampleStyles::Part part : { SampleStyles::Part::Full, SampleStyles::Part::Drums })
+         for (int t = 0; t < takes; t++)
+         {
+            SampleStyles::Recipe rec;
+            rec.style = SampleStyles::At(i).id;
+            rec.part = part;
+            rec.bars = 2;
+            rec.seed = 9000u + (uint32_t)t * 131u;
+            const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+            if (!c.error.empty())
+               continue;
+            std::string esc;
+            for (char ch : c.patch)
+            {
+               if (ch == '"' || ch == '\\')
+                  esc += '\\', esc += ch;
+               else if (ch == '\n')
+                  esc += "\\n";
+               else if ((unsigned char)ch >= 0x20)
+                  esc += ch;
+            }
+            fprintf(out, "{\"style\":\"%s\",\"part\":%d,\"seed\":%u,\"bpm\":%.2f,\"patch\":\"%s\"}\n", rec.style.c_str(), (int)part, rec.seed, c.bpm, esc.c_str());
+            made++;
+         }
+   fclose(out);
+   printf("GENSAMPLEDRUMS %d patches written\n", made);
+   return made > 0;
+}
+
 bool RunGenSampleSpectrum(const std::string& file, int takes)
 {
    FILE* out = fopen(file.c_str(), "w");

@@ -8,6 +8,7 @@ The corpus is for robustness to avoid mishappenings, NOT a template the generato
 import argparse, collections, json, math, os, random, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chord_pieces as C
+import feel_analysis as F
 import expression_pieces as E
 import learn as L
 import pieces as P
@@ -202,9 +203,29 @@ def novelty_score(p, rec, ll):
     return round(surp, 4)
 
 
+_FEEL = {}
+
+
+def feel_gate(models="~/Infinite/training-data/models/shippable"):
+    """feel.json's gate (feel_analysis.py), loaded once; None before feel_analysis has run."""
+    if "gate" not in _FEEL:
+        path = os.path.join(os.path.expanduser(models), "feel.json")
+        _FEEL["gate"] = json.load(open(path))["gate"] if os.path.exists(path) else None
+    return _FEEL["gate"]
+
+
+def feel_check(p):
+    """A drum bar with velocity and timing must sit inside the real bars' feel bands."""
+    g = feel_gate()
+    f = F.feel_features(p["lanes"], p.get("vel"), p.get("off")) if g else None
+    return ["feel outside real bars: %s" % ", ".join(bad) for bad in [F.verify(g, f)] if bad] if f else []
+
+
 def judge(p, rec):
     """Evaluate a piece with the 3-layer critic. Returns dict with accept, hard, ll, floor, novelty, score."""
     h = hard_check(p)
+    if p["type"] == "drum_groove":
+        h += feel_check(p)
     model = rec["model"]
     ll = L.piece_ll(model, p)
     fl = floor_for(rec, p["type"])
@@ -221,7 +242,8 @@ def judge(p, rec):
 # ---- Deterministic corruption suite for robustness testing ------------------------------------
 
 CORRUPTIONS = ("no_kick", "stuck_16ths", "wrong_meter", "kick_snare_clash",
-               "off_key_strong", "unmusical_leaps", "stuck_note", "silent_filter", "random_noise")
+               "off_key_strong", "unmusical_leaps", "stuck_note", "silent_filter", "random_noise",
+               "inverted_accents", "sloppy_timing")
 
 
 def corrupt(p, kind, rng):
@@ -246,6 +268,17 @@ def corrupt(p, kind, rng):
     if kind == "kick_snare_clash" and q["type"] == "drum_groove":
         q["lanes"][0] = "x..xx..xx..xx..x"
         q["lanes"][1] = "x..xx..xx..xx..x"
+        return q
+    if kind in ("inverted_accents", "sloppy_timing") and q["type"] == "drum_groove":
+        q["lanes"][2] = q["lanes"][2] or "x" * 16
+        q["vel"] = [v or "7" * 16 for v in q.get("vel") or [""] * 8]
+        q["off"] = [o or "i" * 16 for o in q.get("off") or [""] * 8]
+        if kind == "inverted_accents":
+            # soft quarters, every other hit loud: the metric hierarchy turned upside down
+            q["vel"] = ["".join("1" if s % 4 == 0 else "9" for s in range(16)) for _ in range(8)]
+        else:
+            # every hit thrown up to half a step off the grid at random
+            q["off"] = ["".join(chr(ord("i") + rng.randint(-8, 8)) for _ in range(16)) for _ in range(8)]
         return q
     if kind == "off_key_strong" and q["type"] == "melody_contour":
         tonic, mode = L.key_of(q["pitches"])
