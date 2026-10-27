@@ -23,7 +23,7 @@ flowchart LR
 | 1. Collect WD-Black | **done except the audio pass** (20-min chunks, `--resume`) | `collect_check.py`: 0 non-audio misses |
 | 2. Collect Pro + Air | **Air: plain formats, Logic and audio done**; binary formats and the render pass left | table below |
 | 3. Instrument atlas | **built** (`instrument_atlas.py`, 14,161 rows); audio cover grows with the audio pass | 2,114 fully playable EXS maps, 229 Kontakt maps, 11,519 labelled Omnisphere soundsources |
-| 4. Sound clusters | not started (drums only: `mix.py`) | |
+| 4. Sound clusters | **built, thin audio base**: 477 audio-clustered, 9,790 tag-assigned, 3,894 unassigned (of 14,161); re-run after the audio pass | `sound_clusters.py` -> `atlas/clusters.json`, `instruments_clustered.jsonl` |
 | 5. Genres / subgenres | partial: genre graph and arcs are built from MIDI | `genre_graph.py`, `arc_analysis.py` |
 | 6. Full mix | not started on real-sound data | |
 | 7. Node improvements | not started | |
