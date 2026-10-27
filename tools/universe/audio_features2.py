@@ -145,13 +145,30 @@ def harmonic_ratio(S):
     return eh / (eh + ep) if eh + ep > 0 else None
 
 
-def chroma(S):
-    f = np.fft.rfftfreq(N, 1 / FS)
-    ok = (f >= 55) & (f <= 2000)
-    pc = np.round(12 * np.log2(f[ok] / 440.0) + 69).astype(int) % 12
-    p = (S[:, ok].mean(0)) ** 1.0
-    c = np.bincount(pc, weights=p, minlength=12)
-    return c / (c.sum() or 1)
+def chroma(m):
+    """12-bin pitch-class profile from long frames (16384 samples, 2.9 Hz bins): the 1024-sample STFT used for timbre has 47 Hz bins,
+    which cannot tell semitones apart below ~1 kHz and put every song in the key of its sub-bass. Spectral peaks only, 110 Hz-2 kHz,
+    square-root compression so one loud partial does not decide the key."""
+    L = 16384
+    if m.size < L:
+        m = np.pad(m, (0, L - m.size))
+    starts = np.linspace(0, m.size - L, min(48, max(1, m.size // L))).astype(int)
+    f = np.fft.rfftfreq(L, 1 / FS)
+    ok = (f >= 110) & (f <= 2000)
+    win = np.hanning(L)
+    acc = np.zeros(12)
+    for a in starts:
+        mag = np.abs(np.fft.rfft(m[a:a + L] * win))
+        pk = (mag[1:-1] > mag[:-2]) & (mag[1:-1] >= mag[2:])
+        pk = np.concatenate([[False], pk, [False]]) & ok
+        if not pk.any():
+            continue
+        fr = f[pk]
+        w = np.sqrt(mag[pk])
+        cents = 1200 * np.log2(fr / 440.0) + 6900
+        pc = np.round(cents / 100).astype(int) % 12
+        acc += np.bincount(pc, weights=w, minlength=12)
+    return acc / (acc.sum() or 1)
 
 
 def key_of(c):
@@ -235,7 +252,7 @@ def analyse(path, root, seconds):
                 if "note_midi" in lab:
                     row["label_oct_agree"] = int(round(mid)) == lab["note_midi"]
     if not one_shot or row.get("pitch_hz"):
-        c = chroma(S)
+        c = chroma(m)
         (r, k, mode), second = key_of(c)
         row.update(chroma=[round(float(v), 3) for v in c], key=NAMES[k] + ("m" if mode == "min" else ""),
                    key_conf=round(float(r - second), 3))
