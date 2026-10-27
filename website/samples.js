@@ -20,7 +20,7 @@
   }
   var IC_PLAY = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.6v10.8a.6.6 0 0 0 .9.5l8.6-5.4a.6.6 0 0 0 0-1L7.9 4.1a.6.6 0 0 0-.9.5Z"/></svg>';
   var IC_PAUSE = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3.6" height="12" rx="1"/><rect x="11.4" y="4" width="3.6" height="12" rx="1"/></svg>';
-  var IC_SH = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 12.5l5-5M8 5.5l1.2-1.2a3 3 0 014.2 4.2L12.2 9.7M12 14.5l-1.2 1.2a3 3 0 01-4.2-4.2L7.8 10.3"/></svg>';
+  var IC_SH = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg>';
   var IC_DL = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9.5m0 0-3.5-3.5M10 13l3.5-3.5M4 16.5h12"/></svg>';
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -210,8 +210,13 @@
     if (!sb) return;
     var link = location.origin + location.pathname + '?' + sb.getAttribute('data-share');
     var done = function () { sb.classList.add('copied'); sb.setAttribute('title', 'Link copied'); setTimeout(function () { sb.classList.remove('copied'); sb.setAttribute('title', 'Copy link'); }, 1600); };
+    // Phones: the native share sheet. Elsewhere (or if it is dismissed unsupported): copy the link.
+    if (navigator.share) { navigator.share({ title: 'Infinite sample', text: 'A sample made with Infinite', url: link }).catch(function (err) { if (err && err.name !== 'AbortError') copy(); }); return; }
+    copy();
+    function copy() {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, function () { window.prompt('Copy this link', link); });
     else window.prompt('Copy this link', link);
+    }
   });
 
   document.addEventListener('click', function (e) {
