@@ -16,6 +16,7 @@ import argparse, base64, json, os, re, struct, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import render_pass as rp  # noqa: E402
+import nks_state  # noqa: E402
 
 
 def load_template(path, plugin):
@@ -74,13 +75,15 @@ def splice_xfer(raw, name, preset):
 SPLICERS = {"uhe": splice_uhe, "vital": splice_vital, "tal": splice_tal, "xfer": splice_xfer}
 
 
-def fmt_of(plugin):
+def fmt_of(plugin, ext=""):
+    if ext == "nksf":
+        return "nks"
     p = plugin.lower()
     if p in ("diva", "hive", "repro-1", "repro-5", "zebra2", "zebralette", "bazille", "podolski", "repro-1"):
         return "uhe"
     if p == "vital":
         return "vital"
-    if p.startswith("tal "):
+    if p.startswith("tal"):
         return "tal"
     if p == "serum 2":
         return "xfer"
@@ -113,7 +116,9 @@ def main():
     a = ap.parse_args()
     rp.LEAD = a.lead
     rp.NOTES = [(int(m), int(v), l) for m, v, l in (x.split(":") for x in a.notes.split(","))]
-    kind = fmt_of(a.plugin)
+    kind = fmt_of(a.plugin, a.ext)
+    if kind == "nks":
+        SPLICERS["nks"] = lambda raw, name, data: nks_state.splice_nks(a.plugin, raw, nks_state.read_nksf(data)[2])
     if kind not in SPLICERS:
         raise SystemExit("no splicer for %s yet" % a.plugin)
     tmpl = load_template(a.states, a.plugin)
@@ -137,7 +142,11 @@ def main():
         if a.limit and n >= a.limit or a.budget and time.time() - t0 > a.budget * 60:
             break
         n += 1
-        state = base64.b64encode(SPLICERS[kind](raw0, os.path.splitext(os.path.basename(rel))[0] + "." + a.ext, data)).decode()
+        new = SPLICERS[kind](raw0, os.path.splitext(os.path.basename(rel))[0] + "." + a.ext, data)
+        if new is None:
+            print("skip (no splice)", rel, flush=True)
+            continue
+        state = base64.b64encode(new).decode()
         with tempfile.TemporaryDirectory() as tmp:
             inf = os.path.join(tmp, "p.inf")
             open(inf, "w").write(rp.patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state, 1))
@@ -155,9 +164,10 @@ def main():
                 print("fail", rel, flush=True)
                 continue
             rows = rp.measure_windows(wav, tmp, [x for _, _, x in rp.NOTES])
+        tg = nks_state.tags_of(nks_state.read_nksf(data)[0]) if kind == "nks" else {}
         with open(out, "a") as fo:
             for lab, feat in rows:
-                row = {"src": label, "label": os.path.basename(rel), "plugin": tmpl["name"], "plugin_id": tmpl["id"], "note": lab,
+                row = {"src": label, "label": os.path.basename(rel), "plugin": tmpl["name"], "plugin_id": tmpl["id"], "note": lab, "tags": tg,
                        "license": "plugin render, local only"}
                 row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop", "license")})
                 fo.write(json.dumps(row, separators=(",", ":")) + "\n")
