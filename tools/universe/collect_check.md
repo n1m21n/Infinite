@@ -59,7 +59,7 @@
 | library.fcpbundle | 64 | not music (skipped) | | | | | skipped |
 | Luftrum Vangelis for Omnisphere 2 | 23 | steam_reader (1 files) | 232 | 22 | 0 | 0 | captured |
 | Music Downloads | 1291 | audio_features (1249 files), read_formats (42 files) | 1289 | 0 | 0 | 0 | captured |
-| my music | 4472 | audio_features (2245 files), read_formats (1848 files), als_reader (355 files), midi_ingest (16 files), preset_reader (8 files) | 3019 | 0 | 0 | 0 | missed: audio_features |
+| my music | 4472 | audio_features (2245 files), read_formats (1848 files), als_reader (355 files), midi_ingest (16 files), preset_reader (8 files) | 5448 | 0 | 0 | 0 | captured |
 | Noire Library | 177 | read_formats (154 files), spitfire_reader (10 files) | 162 | 13 | 0 | 0 | captured |
 | Old Skool House | 2047 | audio_features (1592 files), read_formats (110 files) | 1702 | 345 | 0 | 0 | captured |
 | Omisphere Patch and Soundsource Library Update | 23 | preset_reader (20 files), steam_reader (3 files) | 24219 | 0 | 0 | 0 | captured |
@@ -73,7 +73,7 @@
 | PitchLoop89 | 19 | read_formats (1 files) | 1 | 0 | 0 | 18 | captured |
 | PML - Melodic Techno and Trance Diva Presets by Aiyn Zahev Vol.1 | 260 | preset_reader (130 files), midi_ingest (130 files) | 623 | 0 | 0 | 0 | captured |
 | Pulsed Records - Foley Ambient Works (WAV) | 259 | audio_features (244 files), read_formats (15 files) | 259 | 0 | 0 | 0 | captured |
-| random unreleased | 7 | audio_features (7 files) | 0 | 0 | 0 | 0 | missed: audio_features |
+| random unreleased | 7 | audio_features (7 files) | 7 | 0 | 0 | 0 | captured |
 | S+A BUNDLE | 6329 | audio_features (1 files) | 1 | 0 | 6328 | 0 | captured |
 | Sample Library Soundbox | 2654 | audio_features (2496 files), read_formats (158 files) | 2654 | 0 | 0 | 0 | captured |
 | Sample Magic - Ambient Textures 2 | 496 | audio_features (332 files), read_formats (93 files), midi_ingest (71 files) | 527 | 0 | 0 | 0 | captured |
@@ -96,22 +96,22 @@
 | Samplephonics - Afro-Latin Percussion | 576 | audio_features (485 files), read_formats (57 files), preset_reader (8 files), exs_reader (8 files) | 558 | 8 | 0 | 10 | captured |
 | Samplephonics - House and Techno Toploops | 351 | audio_features (153 files), read_formats (51 files) | 204 | 147 | 0 | 0 | captured |
 | Samplephonics El-B Old School House and Garage MULTiFORMAT-MAGNETRiXX | 1189 | audio_features (450 files), read_formats (45 files), exs_reader (29 files) | 524 | 0 | 665 | 0 | captured |
-| Samples | 15636 | audio_features (14280 files), read_formats (899 files) | 5111 | 457 | 0 | 0 | captured |
-| Samplestar - Piano & Sax House | 117 | audio_features (88 files), midi_ingest (23 files), read_formats (6 files) | 83 | 0 | 0 | 0 | missed: audio_features |
+| Samples | 15636 | audio_features (14280 files), read_formats (899 files) | 15045 | 457 | 0 | 0 | captured |
+| Samplestar - Piano & Sax House | 117 | audio_features (88 files), midi_ingest (23 files), read_formats (6 files) | 171 | 0 | 0 | 0 | captured |
 | Scene - Saffron [Native Instruments] | 215 | read_formats (209 files), spitfire_reader (2 files) | 210 | 4 | 0 | 0 | captured |
 | Sequis 1.0.3 [Native Instruments] | 823 | read_formats (813 files), spitfire_reader (4 files) | 816 | 6 | 0 | 0 | captured |
 | Session Guitarist - Electric Sunburst Deluxe | 355 | read_formats (342 files), spitfire_reader (5 files) | 347 | 8 | 0 | 0 | captured |
 | SHARP - Dark Techno Dystopia | 155 | audio_features (126 files), midi_ingest (12 files), read_formats (5 files) | 155 | 0 | 0 | 12 | captured |
 | Silver Linings Playbook (2012) [1080p] | 3 | not music (skipped) | | | | | skipped |
 | SM White Label - 90s Deep House & Garage | 2446 | audio_features (1803 files), read_formats (380 files), midi_ingest (168 files), preset_reader (58 files), exs_reader (14 files), als_reader (6 files) | 2334 | 7 | 0 | 10 | captured |
-| sm white label - 90s deep house & garage - sampler formats Project | 188 | audio_features (152 files), read_formats (35 files), als_reader (1 files) | 36 | 0 | 0 | 0 | missed: audio_features |
+| sm white label - 90s deep house & garage - sampler formats Project | 188 | audio_features (152 files), read_formats (35 files), als_reader (1 files) | 187 | 0 | 0 | 0 | captured |
 | SM61 - Acid House - Wav Replacement | 1250 | audio_features (67 files), read_formats (16 files), preset_reader (6 files), exs_reader (6 files) | 94 | 0 | 1152 | 3 | captured |
 | Sonible - PrimeVocal v1.0.1 | 0 | (.nfo 2, .txt 1, .exe 1) | | | | | nothing musical |
 | Sonic Extensions - Nylon Sky | 6 | preset_reader (6 files), steam_reader (0 files) | 152 | 0 | 0 | 0 | captured |
-| Sonniss.com-GDC2026-GameAudioBundle | 360 | audio_features (347 files), read_formats (13 files) | 13 | 0 | 0 | 0 | missed: audio_features |
-| Soundbox - Berlin Deep House | 252 | audio_features (240 files), read_formats (11 files) | 11 | 0 | 0 | 1 | missed: audio_features |
-| Soundbox - Berlin Deep House 2 | 282 | audio_features (260 files), read_formats (22 files) | 22 | 0 | 0 | 0 | missed: audio_features |
-| Sounds of KSHMR Vol 4 Complete Edition | 7686 | audio_features (6912 files), read_formats (615 files), midi_ingest (156 files) | 1163 | 2 | 0 | 1 | missed: audio_features |
+| Sonniss.com-GDC2026-GameAudioBundle | 360 | audio_features (347 files), read_formats (13 files) | 360 | 0 | 0 | 0 | captured |
+| Soundbox - Berlin Deep House | 252 | audio_features (240 files), read_formats (11 files) | 251 | 0 | 0 | 1 | captured |
+| Soundbox - Berlin Deep House 2 | 282 | audio_features (260 files), read_formats (22 files) | 282 | 0 | 0 | 0 | captured |
+| Sounds of KSHMR Vol 4 Complete Edition | 7686 | audio_features (6912 files), read_formats (615 files), midi_ingest (156 files) | 9702 | 2 | 0 | 1 | captured |
 | spark ar | 2602 | not music (skipped) | | | | | skipped |
 | Spectrasonics | 1192 | preset_reader (377 files), steam_reader (8 files) | 13038 | 514 | 0 | 293 | captured |
 | Spectrasonics - Omnisphere v2.8.5f | 0 | (.exe 1, .dmg 1, .nfo 1) | | | | | nothing musical |
@@ -119,35 +119,34 @@
 | SPECTRES | 10 | - | 0 | 0 | 10 | 0 | incomplete download |
 | Spitfire Audio Olafur Arnalds Stratus | 633 | spitfire_reader (198 files) | 191 | 435 | 0 | 0 | captured |
 | Spitfire_Studio_Woodwinds | 590 | - | 0 | 0 | 590 | 0 | incomplete download |
-| Star Power Drums Classic DnB Jungle Drum Loops | 219 | audio_features (195 files), read_formats (24 files) | 24 | 0 | 0 | 0 | missed: audio_features |
-| Time Rival - 2025 - Ambient Textures, Vol. 1 (Sample Pack) [WEB, Other, 24bit] | 43 | audio_features (40 files), read_formats (3 files) | 3 | 0 | 0 | 0 | missed: audio_features |
-| Tom Wolfe Sleep Binaural Edition Omnisphere Presets-ARCADiA | 12 | audio_features (10 files), read_formats (1 files), steam_reader (1 files) | 207 | 0 | 0 | 0 | missed: audio_features |
+| Star Power Drums Classic DnB Jungle Drum Loops | 219 | audio_features (195 files), read_formats (24 files) | 414 | 0 | 0 | 0 | captured |
+| Time Rival - 2025 - Ambient Textures, Vol. 1 (Sample Pack) [WEB, Other, 24bit] | 43 | audio_features (40 files), read_formats (3 files) | 83 | 0 | 0 | 0 | captured |
+| Tom Wolfe Sleep Binaural Edition Omnisphere Presets-ARCADiA | 12 | audio_features (10 files), read_formats (1 files), steam_reader (1 files) | 227 | 0 | 0 | 0 | captured |
 | Toontrack - EZkeys 2 | 2 | - | 0 | 2 | 0 | 0 | locked |
 | Transmission - Afro House Session 1 | 3 | - | 0 | 0 | 3 | 0 | incomplete download |
-| Trilian Patch Library Update v1.4.9c | 15 | audio_features (11 files), preset_reader (4 files), steam_reader (0 files) | 880 | 0 | 0 | 0 | missed: audio_features |
+| Trilian Patch Library Update v1.4.9c | 15 | audio_features (11 files), preset_reader (4 files), steam_reader (0 files) | 902 | 0 | 0 | 0 | captured |
 | Triple Spiral Audio Rust Extended for Omnisphere 2 | 1 | steam_reader (1 files) | 286 | 0 | 0 | 0 | captured |
 | User Library | 73 | preset_reader (23 files) | 15 | 0 | 0 | 50 | captured |
 | Users | 211 | read_formats (200 files) | 200 | 11 | 0 | 0 | captured |
-| VA - 80s House Classics (VEXDIGI034) WEB | 21 | audio_features (21 files) | 0 | 0 | 0 | 0 | missed: audio_features |
-| Vengeance Samples | 33519 | audio_features (32537 files), read_formats (982 files) | 982 | 0 | 0 | 0 | missed: audio_features |
-| White Label Old Skool Rave | 561 | audio_features (400 files), read_formats (97 files), midi_ingest (64 files) | 208 | 0 | 0 | 0 | missed: audio_features |
+| VA - 80s House Classics (VEXDIGI034) WEB | 21 | audio_features (21 files) | 42 | 0 | 0 | 0 | captured |
+| Vengeance Samples | 33519 | audio_features (32537 files), read_formats (982 files) | 37455 | 0 | 0 | 0 | captured |
+| White Label Old Skool Rave | 561 | audio_features (400 files), read_formats (97 files), midi_ingest (64 files) | 606 | 0 | 0 | 0 | captured |
 | XLN Audio | 71 | - | 0 | 71 | 0 | 0 | locked |
 | Xynth Audio - Chroma v1.1.1 | 0 | (.nfo 2, .pkg 1, .txt 1) | | | | | nothing musical |
-| Zenhiser - Berlin House Grooves 01 | 310 | audio_features (260 files), read_formats (50 files) | 50 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - Flex_DnB | 587 | audio_features (474 files), read_formats (83 files), midi_ingest (30 files) | 348 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - Hydrogen. Melodic House & Techno | 732 | audio_features (627 files), read_formats (105 files) | 105 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - Mist | 587 | audio_features (436 files), read_formats (151 files) | 151 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - Organic House | 629 | audio_features (452 files), read_formats (177 files) | 177 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - Sexy Deep House Drums | 439 | audio_features (340 files), read_formats (99 files) | 99 | 0 | 0 | 0 | missed: audio_features |
-| Zenhiser - TR-909. The Drum Machine | 1388 | audio_features (1168 files), read_formats (220 files) | 220 | 0 | 0 | 0 | missed: audio_features |
+| Zenhiser - Berlin House Grooves 01 | 310 | audio_features (260 files), read_formats (50 files) | 310 | 0 | 0 | 0 | captured |
+| Zenhiser - Flex_DnB | 587 | audio_features (474 files), read_formats (83 files), midi_ingest (30 files) | 822 | 0 | 0 | 0 | captured |
+| Zenhiser - Hydrogen. Melodic House & Techno | 732 | audio_features (627 files), read_formats (105 files) | 732 | 0 | 0 | 0 | captured |
+| Zenhiser - Mist | 587 | audio_features (436 files), read_formats (151 files) | 587 | 0 | 0 | 0 | captured |
+| Zenhiser - Organic House | 629 | audio_features (452 files), read_formats (177 files) | 629 | 0 | 0 | 0 | captured |
+| Zenhiser - Sexy Deep House Drums | 439 | audio_features (340 files), read_formats (99 files) | 439 | 0 | 0 | 0 | captured |
+| Zenhiser - TR-909. The Drum Machine | 1388 | audio_features (1168 files), read_formats (220 files) | 1388 | 0 | 0 | 0 | captured |
 
 ## Totals
 
 | status | folders |
 |---|---:|
 | not music files | 26428 |
-| captured | 80 |
-| missed | 22 |
+| captured | 102 |
 | locked | 12 |
 | incomplete download | 4 |
 | not parsed | 2 |
@@ -156,7 +155,7 @@
 
 | tool | rows | from folders |
 |---|---:|---:|
-| audio_features | 131903 | 46 |
+| audio_features | 195081 | 69 |
 | preset_reader | 19118 | 12 |
 | exs_reader | 2413 | 5 |
 | als_reader | 443 | 4 |
