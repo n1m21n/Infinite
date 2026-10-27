@@ -58,17 +58,29 @@ preset row (modules -> {param: value})
 or, where a template state exists: splice the preset into the saved state (omni_render.py). One output schema for every plug-in, the same
 rows as Omnisphere's, so the join with the parsed recipe is by `src`.
 
-## Needed from the owner (one step)
+## Headless state templates (no GUI step)
 
-One Infinite patch on the Air with a Plugin node for each of: Diva, Hive, Repro-1, Vital, Serum 2, Phase Plant, Massive X, Pigments,
-Zenology, Triton Extreme, KORG M1, TAL-J-8, Analog Lab V, Kontakt 8, LABS. No need to open the windows or pick sounds: add the nodes,
-save as `templates.inf` on the Desktop. Each node's saved state shows whether it is text (splice exact) or binary (level 2 only).
+`Infinite --audio-summary p.inf out.json --plugin-state` returns each loaded plug-in's saved state; `plugin_states.py` runs it over every
+installed plug-in (rows in `plugin_states.jsonl`, key synths in `plugin_states_key.jsonl`). Splice formats found (2026-10-28):
+
+| Plug-in | State container | Splicer | Status |
+|---|---|---|---|
+| Diva | u64 len + `#pgm=name` + .h2p text, twice | `uhe` | tested on the Pro, presets sound different |
+| Hive, Repro-1, Repro-5 | u64 + u32 + text, twice | `uhe` | written, test on the Air |
+| Vital | JUCE chunk with the preset JSON | `vital` | written, test on the Air |
+| TAL (BassLine, J-8, NoiseMaker, Mod, Sampler, U-NO) | JUCE chunk with `<tal>` XML; 1,800 presets in ~/Library/Application Support/ToguAudioLine | `tal` | written, test on the Air |
+| Omnisphere | 32-byte header + multi XML | `omni_render.py` (+ `--multis`) | running |
+| Massive X, Pigments, Arturia, SubLab | zlib block or wrapper; preset's own chunk is PCHK inside the .nksf | `nks_state.py --probe` finds the variant per plug-in | probe on the Air |
+| Serum 2 | XferJson header + zstd | file-as-state variants all rendered the default | open: level 2 or level 1 |
+| Zenology, Triton Extreme | presets live in Roland/KORG packs (.exz/.sdz, PCM bin), no per-preset files | none | level 1 plus pack name lists |
+| KORG MS-20, Polysix, M1 | 594 .fxp | fxp reader (chunk) | to build |
+
+Gap tracker: see the numbered list in the session notes; every row above is closed only when its rows are in a jsonl and the audit passes.
 
 ## Order
 
-1. Finish level 1 on the Air (running) and merge into `render_features.jsonl`.
-2. Omnisphere level 3 (running) and join with `omni_params.jsonl.gz`.
-3. `templates.inf`, then level 3 for the text-state synths: Diva, Hive, Repro, Vital, Serum 2 (about 40,000 presets).
-4. NKS reader for Arturia, Massive X, Pigments, Hive/Repro/Diva NKS; fxp reader for KORG.
-5. Level 2 for the effects with preset libraries (FabFilter, Valhalla, soothe2, Plugin Alliance).
-6. Coverage audit again; fill the thin instrument families (`coverage_audit.py`).
+1. Level 1 loop and `plugin_states.py` on the Air (running), merge into `render_features.jsonl`.
+2. Omnisphere level 3 (running, about 7 hours at the current shared rate) and join with `omni_params.jsonl.gz`.
+3. `preset_state.py` for Diva (Pro, running), Hive, Repro, Vital, TAL (Air).
+4. NKS probe + render, fxp reader, level 2 for effects with preset libraries and for Serum 2.
+5. Coverage audit again; fill the thin instrument families (`coverage_audit.py`).
