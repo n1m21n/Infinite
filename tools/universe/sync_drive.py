@@ -60,6 +60,9 @@ def main():
     for f in glob.glob(os.path.join(CODE, "*.py")) + glob.glob(os.path.join(CODE, "*.json")):
         sync(f, os.path.join(a.drive, "universe", os.path.basename(f)), bad)
         n += 1
+    for f in glob.glob(os.path.join(CODE, "..", "catalog", "*.json")) + glob.glob(os.path.join(CODE, "..", "catalog", "*.py")):
+        sync(os.path.abspath(f), os.path.join(a.drive, "catalog", os.path.basename(f)), bad)  # pieces.py reads ../catalog/styles_music.json
+        n += 1
     print("synced and verified %d files, %d failed" % (n, len(bad)))
     for b in bad:
         print("  FAILED", b)
