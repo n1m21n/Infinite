@@ -86,7 +86,10 @@
 .smp-acts { position: relative; }
 .smp-dlb { width: 36px; height: 36px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; cursor: pointer; color: var(--muted); background: transparent;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); transition: background var(--dur-small) var(--ease-out), color var(--dur-small) var(--ease-out); }
-.smp-dlb svg { width: 16px; height: 16px; }
+.smp-dlb svg, .smp-shb svg { width: 16px; height: 16px; }
+.smp-shb { width: 36px; height: 36px; border-radius: 50%; border: 0; display: inline-grid; place-items: center; cursor: pointer; background: var(--nm-up); color: var(--nm-ink); box-shadow: var(--nm-raise); transition: box-shadow 160ms ease, transform 160ms ease; }
+.smp-shb:active { box-shadow: var(--nm-pocket, inset 0 1px 3px rgba(0,0,0,.25)); }
+.smp-shb.copied { background: var(--nm-pearl); color: var(--nm-ink-on-pearl); box-shadow: var(--nm-pearl-raise); }
 .smp-dlb:hover, .smp-dlb[aria-expanded="true"] { background: var(--ink); color: var(--paper); }
 .smp-row.menu-open { z-index: 5; }
 .smp-menu { position: absolute; right: 0; top: calc(100% + 6px); min-width: 150px; display: grid; padding: 6px; border-radius: 14px;
