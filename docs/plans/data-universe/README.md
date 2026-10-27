@@ -22,7 +22,7 @@ flowchart LR
 |---|---|---|
 | 1. Collect WD-Black | **done except the audio pass** (20-min chunks, `--resume`) | `collect_check.py`: 0 non-audio misses |
 | 2. Collect Pro + Air | **Air: plain formats, Logic and audio done**; binary formats and the render pass left | table below |
-| 3. Instrument atlas | **data ready, builder not written** | 2,114 fully playable EXS maps, 229 Kontakt maps, 11,519 labelled Omnisphere soundsources |
+| 3. Instrument atlas | **built** (`instrument_atlas.py`, 14,161 rows); audio cover grows with the audio pass | 2,114 fully playable EXS maps, 229 Kontakt maps, 11,519 labelled Omnisphere soundsources |
 | 4. Sound clusters | not started (drums only: `mix.py`) | |
 | 5. Genres / subgenres | partial: genre graph and arcs are built from MIDI | `genre_graph.py`, `arc_analysis.py` |
 | 6. Full mix | not started on real-sound data | |
@@ -91,7 +91,7 @@ flowchart LR
 | 2k | Clean the `grid: none` leftovers: `arcs/detail.jsonl.gz` still holds rock_piano_drums meter / arc rows; re-run ingest for that one source into the arcs file | Pro | `arcs/detail.jsonl.gz` | |
 | 2l | Audio pass speed: dedupe identical files before decoding and scale `--jobs` to the machine (one heavy job per machine, 20-min chunks) | Pro, Air | `audio_features.py` | |
 | 2m | `universe.py`: one entry point that runs each reader, the audio pass and `collect_check` per machine and prints what is left | Pro | `tools/universe/universe.py` | |
-| 3 | Instrument atlas: one row per instrument that joins its key map, presets, audio features, labels and family | Pro | `atlas/instruments.jsonl` | |
+| 3 | Instrument atlas: one row per instrument that joins its key map, presets, audio features, labels and family. `tools/universe/instrument_atlas.py` (the name `universe.py` is taken by the patch-universe work, so 2m becomes `data_universe.py`): EXS 2,413 + Kontakt 229 + Omnisphere 11,519 = 14,161 rows; 477 of 2,413 EXS instruments have audio features so far (the rest wait for the audio pass); Kontakt families are mostly `other` (library names), needs sample-name tagging | Pro | `atlas/instruments.jsonl`, `atlas/summary.json` | **built 2026-10-27**, re-run after each audio chunk |
 | 4 | Sound clusters per family in one timbre space (32-band spectrum + envelope) | Pro | `atlas/clusters.json` | |
 | 5 | Genres / subgenres: which clusters, grooves and arcs each uses | Pro | `atlas/genres.json` | |
 | 6 | Full mix: levels, FX chains (from Live sets and preset chains), arrangement arcs | Pro | generator update + B4/B8/B10 runs | |
