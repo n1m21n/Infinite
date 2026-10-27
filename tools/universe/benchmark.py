@@ -14,8 +14,9 @@ Verifies:
   B7: Genre graph regression check (archetypes reach the graph, neighbours well-formed) + leave-one-out neighbour signal
   B8: Spectral gate on real renders (held-out FRR <= 2%, catch >= 96% on damaged copies)
   B9: 5-pillar + graph learner on simulated personas (Keep@20 >= 82%)
-  B10: Emotion layer: mood from chord features alone beats the majority baseline, MIDI cue monotonicity, simulated keep"""
-import argparse, collections, json, math, os, random, sys
+  B10: Emotion layer: valence (chords) and arousal (melody) ranked against held-out listener labels (EMOPIA, VGMIDI),
+       MIDI cue monotonicity, simulated keep"""
+import argparse, collections, json, math, os, random, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import critic as CR
 import genre_graph as GG
@@ -411,6 +412,30 @@ def main():
     val_acc = 100.0 * v_hits / max(1, v_tot)
     base_acc = 100.0 * max(v_pos, v_tot - v_pos) / max(1, v_tot)  # always answer the majority sign
 
+    # (1b) The same inference against real listeners (affect_eval_set.py: EMOPIA quadrants, VGMIDI labels, never
+    # trained on): valence from each clip's chords, arousal from its melody windows, as rank AUC per set.
+    listen = {}
+    lpath = os.path.expanduser("~/Infinite/training-data/eval/affect_midi.jsonl")
+    if os.path.exists(lpath):
+        import song_detail as SD
+        clips = collections.defaultdict(list)
+        for ln in open(lpath):
+            c = json.loads(ln)
+            ch = [{"minor": q in SD.MINORISH, "acc": "", "ext": "dim" if "dim" in q or "b5" in q else ""}
+                  for cell in c["arc"]["chords"] for h in cell.split("|") for q in re.findall(r"^\d+([a-z0-9]+)", h)]
+            pv = GG.infer_piece_affect({"type": "chord_prog", "chords": ch, "mode": c["features"]["mode"] or "", "mood": []})["valence"]
+            ars = [GG.infer_piece_affect(dict(w, type="melody_contour"))["arousal"] for w in c.get("windows", [])]
+            clips[c["set"]].append((pv, sum(ars) / len(ars) if ars else 0.5, c["valence"], c["arousal"]))
+
+        def auc(xs, ys):
+            pos = [x for x, y in zip(xs, ys) if y > 0]
+            neg = [x for x, y in zip(xs, ys) if y < 0]
+            return sum((p > n) + 0.5 * (p == n) for p in pos for n in neg) / max(1, len(pos) * len(neg))
+        for ds, cs in clips.items():
+            listen[ds] = (auc([c[0] for c in cs], [c[2] for c in cs]), auc([c[1] for c in cs], [c[3] for c in cs]), len(cs))
+    lv = sum(x[0] for x in listen.values()) / max(1, len(listen))
+    la = sum(x[1] for x in listen.values()) / max(1, len(listen))
+
     # (2) Affect-conditioned proposer monotonicity, one check per axis direction
     r_emo = random.Random(303)
     prop = lambda va: [PR.propose_filtered("melody_contour", rec, r_emo, k=5, affect=va) for _ in range(30)]
@@ -421,12 +446,13 @@ def main():
     mean_step = lambda ms: sum(sum(x["steps"]) / len(x["steps"]) for x in ms) / len(ms)
     mean_reg = lambda ms: sum(sum(x["pitches"]) / len(x["pitches"]) for x in ms) / len(ms)
     mean_leap = lambda ms: sum(sum(1 for s in x["steps"] if abs(s) >= 4) / len(x["steps"]) for x in ms) / len(ms)
+    mean_rate = lambda ms: sum(float(x.get("rate") or 0) for x in ms) / len(ms)
     mean_tens_iv = lambda ms: sum(sum(1 for s in x["steps"] if abs(s) in (1, 6, 10, 11)) / len(x["steps"]) for x in ms) / len(ms)
 
     midi_checks = [
         mean_step(m_hap) > mean_step(m_sad) + 0.35,
         mean_reg(m_hap) > mean_reg(m_sad) + 4.0,
-        mean_leap(m_hi) > mean_leap(m_lo),
+        mean_rate(m_hi) > mean_rate(m_lo),  # listeners hear arousal in note rate, not leaps (B10 1b)
         mean_tens_iv(m_ten) > mean_tens_iv(m_ser),
     ]
     midi_align_rate = 100.0 * sum(midi_checks) / len(midi_checks)
@@ -457,10 +483,14 @@ def main():
         hits_e = sum(u_fn(max(r_es.sample(net["styles"], 6), key=score)) >= e_thresh for _ in range(40))
         emo_keep20.append(hits_e / 40.0)
     b10_keep = sum(emo_keep20) / len(emo_keep20)
-    b10_ok = val_acc >= base_acc + 10.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
+    # valence and arousal are gated on listener labels (mean AUC over the sets >= 0.70 / 0.65); the tag-based
+    # valence accuracy above is printed for comparison only: the tags are pack names, not listeners
+    b10_ok = bool(listen) and lv >= 0.70 and la >= 0.65 and midi_align_rate == 100.0 and b10_keep >= 0.84
     print("\n[B10] Two-axis affect (valence, arousal) & affect-to-MIDI alignment")
-    print("      Valence-from-chords=%.1f%% vs majority sign %.1f%% (n=%d, tags hidden, need +10 pp) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, Leap hi/lo arousal=%.2f/%.2f) | Simulated-Keep@20=%.1f%%  -> %s" % (
-        val_acc, base_acc, v_tot, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_leap(m_hi), mean_leap(m_lo), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
+    print("      Listeners (held out): " + " | ".join("%s n=%d valence AUC %.3f arousal AUC %.3f" % (ds, x[2], x[0], x[1]) for ds, x in sorted(listen.items()))
+          + "  -> mean %.3f / %.3f (need 0.70 / 0.65)" % (lv, la))
+    print("      Valence-from-chords vs pack tags=%.1f%% vs majority sign %.1f%% (n=%d, info) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, Rate hi/lo arousal=%.2f/%.2f) | Simulated-Keep@20=%.1f%%  -> %s" % (
+        val_acc, base_acc, v_tot, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_rate(m_hi), mean_rate(m_lo), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
 
     gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok, b10_ok]
     all_ok = all(gates_list)

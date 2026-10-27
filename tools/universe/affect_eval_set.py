@@ -4,7 +4,8 @@
   EMOPIA    1,078 pop-piano clips, each in one Russell quadrant (Q1 +v+a, Q2 -v+a, Q3 -v-a, Q4 +v-a)
   VGMIDI    labelled game-music phrases with valence and arousal of -1 or +1
 One row per clip: the labels, summary features (mode, tempo, note rate, velocity, register, span, polyphony, minor-chord
-share) and the clip's song_arc, so the analysis can test any feature against what listeners said."""
+share), the clip's song_arc and its melody windows (pitches, rate), so B10 and the analysis can test any feature
+against what listeners said."""
 import argparse, csv, json, os, re, statistics, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import expression_pieces as E
@@ -47,7 +48,7 @@ def features(path):
             "reg": statistics.median(ps), "span": max(ps) - min(ps),
             "poly": round(sum(n[1] - n[0] for n in pitched) / div / max(1, len(bars)) / 4, 2),
             "minor_chords": round(sum(c[1] in S.MINORISH for c in chords) / len(chords), 2) if chords else None,
-            "seconds": round(secs, 1)}, arc
+            "seconds": round(secs, 1)}, arc, [{"pitches": w["pitches"], "rate": w["rate"]} for w in E.windows(path, parsed=(tracks, div))]
 
 
 def main():
@@ -66,8 +67,8 @@ def main():
             if not got:
                 bad += 1
                 continue
-            f, arc = got
-            fo.write(json.dumps({"set": ds, "id": cid, "valence": v, "arousal": ar, "features": f, "arc": arc},
+            f, arc, ws = got
+            fo.write(json.dumps({"set": ds, "id": cid, "valence": v, "arousal": ar, "features": f, "arc": arc, "windows": ws},
                                 separators=(",", ":")) + "\n")
             n[ds] = n.get(ds, 0) + 1
     print("wrote", out, n, "unreadable", bad)
