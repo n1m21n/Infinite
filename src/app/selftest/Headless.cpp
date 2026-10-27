@@ -166,7 +166,7 @@ std::string ExplainLive(bool json, bool all)
 // "plugins" block names every plugin node and whether it loaded; with
 // --plugin-params it also carries the parameters with the plugin's own ranges
 // (what a patch's map<N>_min/max/value must use - not the display units).
-static void ReportPlugins(Headless::Status& st, bool withParams)
+static void ReportPlugins(Headless::Status& st, bool withParams, bool withState = false)
 {
    std::string json;
    for (int i = 0; i < (int)gNodes.size(); i++)
@@ -198,6 +198,8 @@ static void ReportPlugins(Headless::Status& st, bool withParams)
          }
          json += "]";
       }
+      if (withState)
+         json += ",\"state\":\"" + Headless::JsonEscape(plugin->LiveState()) + "\"";
       json += "}";
    }
    if (!json.empty())
@@ -1697,7 +1699,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       if (!Headless::MovieHasIndex(job.out))
          return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
       sStatus.files.push_back(job.out);
-      ReportPlugins(sStatus, job.pluginParams);
+      ReportPlugins(sStatus, job.pluginParams, job.pluginState);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
       return;
@@ -1781,7 +1783,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.height = sNodeRecH;
       sStatus.frames = written;
       sStatus.files.push_back(job.out);
-      ReportPlugins(sStatus, job.pluginParams);
+      ReportPlugins(sStatus, job.pluginParams, job.pluginState);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
       return;
@@ -1965,7 +1967,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
                                      "],\"cells\":" + std::to_string(sSheet.Count()) +
                                      ",\"cell_width\":" + std::to_string(ContactSheet::kCellWidth) + "}");
       }
-      ReportPlugins(sStatus, job.pluginParams);
+      ReportPlugins(sStatus, job.pluginParams, job.pluginState);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
       return;
@@ -2121,7 +2123,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       if (!std::isfinite(res.integratedLufs))
          sStatus.warnings.push_back({ "W_SILENT", "the whole range is silent (nothing above -70 LUFS)", 0, -1,
                                       "check that a note or audio source is playing in this range" });
-      ReportPlugins(sStatus, job.pluginParams);
+      ReportPlugins(sStatus, job.pluginParams, job.pluginState);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
    }

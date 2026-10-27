@@ -133,6 +133,8 @@ public:
    bool IsIsolated() const { return mIsolated; }
    bool IsLoading() const { return mHandle != nullptr && !mReady && mLoadFailed == false; }
    bool HasPlugin() const { return !pluginId.empty(); }
+   // The plugin's live state (base64), refreshed from the handle; headless --plugin-state uses it to hand back a template.
+   const std::string& LiveState() { if (mHandle != nullptr && mReady) Platform::PluginSaveState(mHandle, mPluginState); return mPluginState; }
    NodeIssue Issue() const override
    {
       if (!mLoadFailed || pluginId.empty())

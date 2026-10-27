@@ -459,6 +459,8 @@ namespace Headless
             job.timeline = true;
          else if (a == "--plugin-params" && (job.mode == Mode::Render || job.mode == Mode::AudioSummary))
             job.pluginParams = true;
+         else if (a == "--plugin-state" && (job.mode == Mode::Render || job.mode == Mode::AudioSummary))
+            job.pluginState = true;
          else if (a == "--lenient")
             job.lenient = true;
          else if (a.rfind("--", 0) == 0)

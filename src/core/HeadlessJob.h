@@ -79,6 +79,7 @@ namespace Headless
       double sampleRate = 48000.0;
       bool noAudio = false;
       bool timeline = false;     // --audio-summary --timeline: the arrangement's audio lanes, not the canvas
+      bool pluginState = false;  // --plugin-state: each loaded plugin's saved state (base64), a template for splicing presets in
       bool pluginParams = false; // --plugin-params: list each loaded plugin's parameters (address, name, real min/max/default, unit)
       std::string describeType; // --describe <type>, empty = every type
       bool forRender = false;    // --validate --for-render: a missing Output is an error

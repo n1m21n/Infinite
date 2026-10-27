@@ -88,12 +88,13 @@ def main():
     ap.add_argument("--stride", type=int, default=1, help="render every Nth patch (shard with --offset)")
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--lead", type=float, default=8.0, help="seconds of silence while the samples stream in (Omnisphere loads async)")
-    ap.add_argument("--notes", default="C3", help="comma list of rp.NOTES labels to render (C3 = first pass; C2,C4 = second)")
+    ap.add_argument("--notes", default="36:100:C2,48:100:C3,60:100:C4,72:100:C5,48:30:C3p,48:127:C3f",
+                    help="midi:velocity:label list; default = 4 octaves at vel 100 + C3 soft (30) and hard (127) for the velocity response")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
     rp.LEAD = a.lead
-    rp.NOTES = [x for x in rp.NOTES if x[2] in a.notes.split(",")]
+    rp.NOTES = [(int(m), int(v), l) for m, v, l in (x.split(":") for x in a.notes.split(","))]
     out = os.path.expanduser(a.out)
     done = set()
     if a.resume and os.path.exists(out):
@@ -140,7 +141,7 @@ def main():
             for lab, feat in rows:
                 row = {"src": label, "label": os.path.basename(src), "plugin": kv.get("plugin_name"), "plugin_id": kv["plugin_id"], "note": lab,
                        "tags": tg, "license": "plugin render, local only"}
-                row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop")})
+                row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop", "license")})
                 fo.write(json.dumps(row, separators=(",", ":")) + "\n")
         ok += 1
         if ok % 10 == 0:
