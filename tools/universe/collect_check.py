@@ -24,16 +24,17 @@ TOOL = {**{e: "audio_features" for e in AUDIO}, ".mid": "midi_ingest", ".midi": 
         ".mlt_trl": "preset_reader"}
 LOCKED = {".spitfire": "Spitfire LABS, encrypted", ".zmulti": "Spitfire LABS", ".zpreset": "Spitfire LABS",
           ".zconfig": "Spitfire LABS", ".ch1": "NI Play Series, encrypted", ".nki": "Kontakt", ".nkx": "Kontakt, encrypted",
-          ".nkc": "Kontakt", ".nka": "Kontakt", ".nksn": "Kontakt", ".nkr": "Kontakt", ".ncw": "Kontakt, compressed",
+          ".nkc": "Kontakt", ".nkr": "Kontakt", ".ncw": "Kontakt, compressed",
           ".nicnt": "Kontakt", ".xpak": "XLN Addictive Drums, encrypted", ".obw": "Toontrack EZkeys",
           ".db2": "Spectrasonics soundsource", ".rx2": "Propellerhead REX, compressed", ".logicx": "Logic project, binary",
           ".aaz": "Alchemy resynthesis data", ".fxp_rmx": "Stylus RMX", ".fxr_rmx": "Stylus RMX"}
-NOT_PARSED = {".cst": "Logic channel strips (binary)", ".bwproject": "Bitwig project (binary)", ".bwpreset": "Bitwig preset (binary)",
-              ".asd": "Ableton warp analysis (audio_features re-measures the audio)", ".fxp": "VST preset chunks (plugin-private)",
+NOT_PARSED = {".bwpreset": "Bitwig preset (binary)",
               ".spf": "Spire preset", ".mxgrp": "Maschine group", ".multisample": "Bitwig multisample (zip)",
-              ".sfz": "SFZ map", ".omnisphere": "Omnisphere preset bundle", ".tun": "tuning tables", ".env": "Omnisphere envelopes",
-              ".pbpack": "plugin preset bank", ".sbpack": "plugin preset bank", ".amxd": "Max device", ".nbkt": "Battery kit",
+              ".omnisphere": "Omnisphere preset bundle", ".tun": "tuning tables", ".env": "Omnisphere envelopes",
+              ".pbpack": "plugin preset bank", ".sbpack": "plugin preset bank", ".nbkt": "Battery kit",
               ".xmp": "Ableton metadata", ".crate": "Serato crate", ".sfk": "Sound Forge peaks"}
+READ_FORMATS = {".sfz", ".fxp", ".asd", ".cst", ".bwproject", ".nksn", ".nka", ".amxd"}
+TOOL.update({e: "read_formats" for e in READ_FORMATS})
 WT_DUPES = {"Bitwig Studio": "KRC wavetables (same audio, written once)"}
 DECODED_BY_SPITFIRE = {".spitfire", ".zmulti", ".zpreset", ".zconfig", ".db_app", ".nkc"}
 DECODED_BY_STEAM = {".db2", ".omnisphere", ".db_app"}
@@ -81,6 +82,7 @@ def main():
                                collections.Counter()),
         "steam_reader": sum((rows_by_top(os.path.join(TD, "steam", f), a.root) for f in ("arp_and_mods.jsonl", "omnisphere_packs.jsonl",
                             "soundsource_audio.jsonl", "soundsources.jsonl", "wavetables.jsonl")), collections.Counter()),
+        "read_formats": rows_by_top(os.path.join(TD, "store/formats_meta.jsonl"), a.root),
     }
     # MIDI: inbox folder wd_<slug> came from top folder <top>; count ingest rows per inbox folder
     slug = lambda top: "wd_" + re.sub(r"[^a-z0-9]+", "_", top.lower()).strip("_")[:60]

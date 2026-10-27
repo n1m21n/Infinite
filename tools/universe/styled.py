@@ -20,7 +20,10 @@ MOD_KEYS = ("cutoff", "position", "res", "mix", "detune", "drive", "warp", "size
 
 
 def styles():
-    return {s["id"]: s for s in json.load(open(os.path.join(ROOT, "tools", "catalog", "styles_music.json")))["styles"]}
+    _p = os.path.join(ROOT, "tools", "catalog", "styles_music.json")
+    if not os.path.exists(_p):
+        _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "styles_music.json")  # Colab
+    return {s["id"]: s for s in json.load(open(_p))["styles"]}
 
 
 def degree_note(deg, root, scale, octave):

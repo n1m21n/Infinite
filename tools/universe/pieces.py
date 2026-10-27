@@ -9,6 +9,8 @@ import argparse, collections, glob, hashlib, json, os, struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CARDS = os.path.join(HERE, "..", "catalog", "styles_music.json")
+if not os.path.exists(CARDS):
+    CARDS = os.path.join(HERE, "styles_music.json")  # Colab: the notebook copies Drive universe/* next to the tools
 LANES = ["kick", "snare", "chat", "ohat", "clap", "tom", "htom", "bell"]
 FOUR_FLOOR = {"house", "techno", "trance", "hard"}
 

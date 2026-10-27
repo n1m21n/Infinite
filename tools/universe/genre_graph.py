@@ -16,6 +16,8 @@ import spectral_gates as SG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CATALOG = os.path.join(HERE, "..", "catalog", "styles_music.json")
+if not os.path.exists(CATALOG):
+    CATALOG = os.path.join(HERE, "styles_music.json")  # Colab
 STORE = os.path.expanduser("~/Infinite/training-data/store")
 MODELS = os.path.expanduser("~/Infinite/training-data/models")
 
