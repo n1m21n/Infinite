@@ -100,6 +100,23 @@ flowchart LR
 Each step ends with `collect_check.py` (or its atlas equivalent) showing what was taken, what was
 skipped, and why.
 
+## Next session setup (checklist)
+
+The owner does 1-2; the session starts at 3 and checks each line before going on.
+
+| # | Who | Do | Check it worked |
+|---|---|---|---|
+| 1 | Owner | Plug Wd-Black into the Pro; Disk Utility -> Wd-Black -> First Aid; then Mount | `ls /Volumes/Wd-Black` lists folders |
+| 2 | Owner | Air awake, on the same Wi-Fi, plugged in; System Settings -> General -> Sharing -> Remote Login on | `ssh ... namansoni@Namans-MacBook-Air.local hostname` answers |
+| 3 | Session | Read `docs/NOW.md`, this README, `git log --oneline -5` on `feat/gs-full-data` | last commit is the steps-table update |
+| 4 | Session | Pro: `audio_features.py --resume --budget 20` (one chunk at a time, about 5 chunks a day) | the log grows past 18,015 rows |
+| 5 | Session | Air (while the Pro decodes): render-pass smoke test, step 2d | one row in `audio/render_features.jsonl` |
+| 6 | Session | Pro, between audio chunks: step 2h in `groove_sim.py` only (no C++ yet) | AUC and escape table for the owner |
+| 7 | Owner | Look at the 2h numbers and A/B takes: yes or no to the C++ port | decision recorded under *Decisions* |
+| 8 | Session | Then the 2j, 2k, 2l and 2m steps as time allows; the atlas (step 3) once the audio pass is done | steps table updated, one commit per step |
+
+Rules that hold: one heavy job per machine, 20-minute chunks, Wd-Black is read only, builds only through `scripts/ibuild.py`, no push without asking.
+
 ## Universal reader and render pass (next session)
 
 ```mermaid
