@@ -21,6 +21,7 @@ _hash = lambda f: __import__("hashlib").md5(open(os.path.join(os.path.dirname(os
 SYSTEM_VERSION, SCALE_VERSION, NEUMO_VERSION = _hash("system.css"), _hash("scale.css"), _hash("neumo.css")
 BIRD_VERSION = _hash("bird.js")
 SEARCH_CSS_VERSION, SEARCH_JS_VERSION = _hash("search.css"), _hash("search.js")
+SHARE_JS_VERSION = _hash("share.js")
 JS_VERSION = "21"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -247,6 +248,8 @@ def header_html(rel, brand_href=None):
     return re.sub(r'<nav class="nav-links".*?</nav>', lambda m: nav_html(rel), h, count=1, flags=re.S)
 
 
+SHARE_ICON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg>'
+SHARE_BTN = '<button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share">' + SHARE_ICON + '</button>'
 SEARCH_BTN = ('<button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false">'
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'
               '<span class="search-label">Search</span></button>')
@@ -280,11 +283,16 @@ def sync(rel, text):
                   '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'neumo.css?v=' + NEUMO_VERSION + '">\n</head>', 1)
     # the search button sits right after the brand: left on desktop, centred on phones (search.css)
     s = re.sub(r'\n?[ \t]*<button type="button" class="search-btn".*?</button>', '', s, flags=re.S)
+    s = re.sub(r'\n?[ \t]*<button type="button" class="(?:search-btn|icon-btn) share-btn".*?</button>', '', s, flags=re.S)
     s = re.sub(r'(<a href="[^"]*" class="brand"[^>]*>.*?</a>)', lambda m: m.group(1) + '\n      ' + SEARCH_BTN, s, count=1, flags=re.S)
+    # the share button sits in the top actions, right before the theme switch, and stays on phones
+    s = re.sub(r'([ \t]*)(<button type="button" class="icon-btn" data-mode-toggle)', lambda m: m.group(1) + SHARE_BTN + '\n' + m.group(1) + m.group(2), s, count=1)
     s = re.sub(r'\n?[ \t]*<link rel="stylesheet" href="(?:\.\./)*search\.css[^"]*">', '', s)
     s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'search.css?v=' + SEARCH_CSS_VERSION + '">\n</head>', 1)
     s = re.sub(r'\n?[ \t]*<script src="(?:\.\./)*search\.js[^"]*" defer></script>', '', s)
     s = s.replace('</body>', '  <script src="' + depth_prefix(rel) + 'search.js?v=' + SEARCH_JS_VERSION + '" defer></script>\n</body>', 1)
+    s = re.sub(r'\n?[ \t]*<script src="(?:\.\./)*share\.js[^"]*" defer></script>', '', s)
+    s = s.replace('</body>', '  <script src="' + depth_prefix(rel) + 'share.js?v=' + SHARE_JS_VERSION + '" defer></script>\n</body>', 1)
     s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
     # the digit bird is on every page

@@ -52,9 +52,9 @@
       '<div class="smp-id"><b>' + esc(it.name) + '</b>' + (it.bpm ? '<span>' + it.bpm + ' bpm</span>' : '') + '</div>' +
       '<canvas class="smp-wave"></canvas>' +
       '<div class="smp-acts">' +
-        '<button class="smp-shb" type="button" data-share="s=' + esc(it.id) + '" aria-label="Copy link to ' + esc(it.name) + '" title="Copy link">' + IC_SH + '</button>' +
         '<button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</button>' +
         '<div class="smp-menu" role="menu" hidden>' + links + '</div>' +
+        '<button class="smp-shb" type="button" data-share="s=' + esc(it.id) + '" aria-label="Share ' + esc(it.name) + '" title="Share">' + IC_SH + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -185,11 +185,11 @@
       genEl.hidden = false;
       var gf0 = genFile(gens[0]);
       genEl.innerHTML = '<div class="smp-id"><b>' + esc(gens[0].name) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
-        '<div class="smp-acts"><button class="smp-shb" type="button" data-share="g=' + gens[0].share + '" aria-label="Copy link to this sample" title="Copy link">' + IC_SH + '</button><button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(gens[0].name) + '" title="Download">' + IC_DL + '</button>' +
+        '<div class="smp-acts"><button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(gens[0].name) + '" title="Download">' + IC_DL + '</button>' +
         '<div class="smp-menu" role="menu" hidden>' +
           '<a href="' + url + '" download="' + esc(gf0) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' +
           '<a href="' + infUrl + '" download="' + esc(gf0) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' +
-        '</div></div>';
+        '</div><button class="smp-shb" type="button" data-share="g=' + gens[0].share + '" aria-label="Share this sample" title="Share">' + IC_SH + '</button></div>';
       blobPlay(gens[0]);
     }).catch(function () {
       genEl.hidden = false; genEl.innerHTML = '<p class="lib-empty">Could not generate a loop here. Try again.</p>';
@@ -209,7 +209,7 @@
     var sb = e.target.closest('.smp-shb');
     if (!sb) return;
     var link = location.origin + location.pathname + '?' + sb.getAttribute('data-share');
-    var done = function () { sb.classList.add('copied'); sb.setAttribute('title', 'Link copied'); setTimeout(function () { sb.classList.remove('copied'); sb.setAttribute('title', 'Copy link'); }, 1600); };
+    var done = function () { sb.classList.add('copied'); sb.setAttribute('title', 'Link copied'); setTimeout(function () { sb.classList.remove('copied'); sb.setAttribute('title', 'Share'); }, 1600); };
     // Phones: the native share sheet. Elsewhere (or if it is dismissed unsupported): copy the link.
     if (navigator.share) { navigator.share({ title: 'Infinite sample', text: 'A sample made with Infinite', url: link }).catch(function (err) { if (err && err.name !== 'AbortError') copy(); }); return; }
     copy();

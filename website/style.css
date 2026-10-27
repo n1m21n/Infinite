@@ -768,7 +768,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   .brand-name { display: none; }
   .brand-icon { width: 32px; height: 32px; }
   .nav-actions { margin-left: auto; }
-  .nav-download, .nav-actions .icon-btn:not([data-mode-toggle]) { display: none; }   /* phones: the theme switch stays; Download and the social icons live in the sheet and footer */
+  .nav-download, .nav-actions .icon-btn:not([data-mode-toggle]):not(.share-btn) { display: none; }   /* phones: the theme switch stays; Download and the social icons live in the sheet and footer */
   .hide-sm { display: none; }
 
   .predict-card { grid-template-columns: 1fr; }

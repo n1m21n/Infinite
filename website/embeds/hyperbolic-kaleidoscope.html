@@ -47,6 +47,7 @@
 
   <div class="controls">
     <button class="btn" id="btn-audio" type="button" aria-label="Enable microphone" title="Enable microphone"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
+    <button class="btn" id="btn-share" type="button" aria-label="Share" title="Share"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
   </div>
 
   <a href="https://infinitedevices.org/" target="_blank" rel="noopener" class="badge" title="Infinite, a DAW for you">
@@ -215,5 +216,20 @@
     }
     render();
   </script>
+<!--share--><script>
+(function () {
+  var b = document.getElementById('btn-share'), c = document.querySelector('link[rel="canonical"]');
+  if (!b) return;
+  b.addEventListener('click', function () {
+    var url = c && c.href ? c.href : location.href, title = document.title.replace(/\s*\|\s*Infinite$/, '');
+    function copy() {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { b.classList.add('on'); setTimeout(function () { b.classList.remove('on'); }, 1400); }, function () { window.prompt('Copy this link', url); });
+      else window.prompt('Copy this link', url);
+    }
+    if (navigator.share) navigator.share({ title: title, url: url }).catch(function (err) { if (err && err.name !== 'AbortError') copy(); });
+    else copy();
+  });
+})();
+</script><!--/share-->
 </body>
 </html>

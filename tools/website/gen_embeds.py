@@ -82,6 +82,7 @@ SHELL_HEAD = """<!DOCTYPE html>
 
   <div class="controls">
     <button class="btn" id="btn-audio" type="button" aria-label="Enable microphone" title="Enable microphone"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></button>
+    <button class="btn" id="btn-share" type="button" aria-label="Share" title="Share"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
   </div>
 
   <a href="https://infinitedevices.org/" target="_blank" rel="noopener" class="badge" title="Infinite, a DAW for you">
@@ -100,6 +101,24 @@ SCRIPT_FIXES = [
 ]
 
 
+SHARE_JS = '''<!--share--><script>
+(function () {
+  var b = document.getElementById('btn-share'), c = document.querySelector('link[rel="canonical"]');
+  if (!b) return;
+  b.addEventListener('click', function () {
+    var url = c && c.href ? c.href : location.href, title = document.title.replace(/\\s*\\|\\s*Infinite$/, '');
+    function copy() {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function () { b.classList.add('on'); setTimeout(function () { b.classList.remove('on'); }, 1400); }, function () { window.prompt('Copy this link', url); });
+      else window.prompt('Copy this link', url);
+    }
+    if (navigator.share) navigator.share({ title: title, url: url }).catch(function (err) { if (err && err.name !== 'AbortError') copy(); });
+    else copy();
+  });
+})();
+</script><!--/share-->
+'''
+
+
 def build_widget(it):
     path = os.path.join(E, it["slug"] + ".html")
     if not os.path.exists(path):
@@ -108,9 +127,10 @@ def build_widget(it):
     i = s.find("<script>")
     if i < 0:
         sys.exit(f"no script in {path}")
-    body = s[i:]
+    body = re.sub(r'<!--share-->.*?<!--/share-->\n?', '', s[i:], flags=re.S)
     for a, b in SCRIPT_FIXES:
         body = body.replace(a, b)
+    body = body.replace('</body>', SHARE_JS + '</body>', 1)
     head = (SHELL_HEAD.replace("@@TITLE@@", e(it["title"])).replace("@@DESC@@", e(it["description"]))
             .replace("@@URL@@", f"{BASE}embeds/{it['slug']}.html").replace("@@LD@@", ld(it)))
     return head + body
@@ -142,6 +162,7 @@ CARD = """      <section class="reel-slide" aria-label="{title}">
           <div class="reel-rail">
             <button type="button" class="rail-btn" data-copy="snip-{slug}" aria-label="Copy embed code for {title}">{ic_copy}<span>Copy</span></button>
             <a class="rail-btn" href="{slug}.html" target="_blank" rel="noopener" aria-label="Open {title} full screen">{ic_full}<span>Open</span></a>
+            <button type="button" class="rail-btn share-btn" data-share-url="{slug}.html" aria-label="Share {title}">{ic_share}<span>Share</span></button>
           </div>
           <textarea id="snip-{slug}" class="snippet mono" readonly rows="6" aria-label="Embed code for {title}">{code}</textarea>
         </div>
@@ -152,7 +173,7 @@ def build_gallery(items):
     rel = "embeds/index.html"
     header = chrome.header_html(rel)
     footer = chrome.footer_html(rel)
-    cards = "\n".join(CARD.format(ic_copy=icon("capture"), ic_full=icon("viewport"), slug=i["slug"], title=e(i["title"]), code=e(snippet(i))) for i in items)
+    cards = "\n".join(CARD.format(ic_copy=icon("capture"), ic_full=icon("viewport"), ic_share=chrome.SHARE_ICON, slug=i["slug"], title=e(i["title"]), code=e(snippet(i))) for i in items)
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite embeds", "url": BASE + "embeds/",
           "description": "Audio-reactive WebGL visuals you can put on any page with one iframe.",
           "isPartOf": {"@type": "WebSite", "url": BASE},
