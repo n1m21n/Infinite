@@ -73,7 +73,9 @@ def judge(m, card, ambient, real=None):
             min(max(1 - 0.7 * (ll - MID) / max(1e-4, HI - MID), 0.15), 1.0))
     return (real or default_score)(m, card, cd, sy, surp, ll), sy
 def default_score(m, card, cd, sy, surp, ll): return 0.38 * cd + 0.35 * sy + 0.27 * surp
+CUR = [None]  # the card being proposed for, so a generator variant can read its family
 def propose(cr, card, score=None, gen=None):
+    CUR[0] = card
     d = DIRS.get(card["id"]); intel = d[0] if d else 0.5; pocket = d[1] if d else 0.5
     base = [mask(s) for s in card["lanes"]]
     ghost = [sum(1 << i for i, c in enumerate(s[:16]) if c == "o") for s in card["lanes"]]
@@ -125,7 +127,7 @@ def bars(card, lanes, rng):
     out = []
     for b in range(2):
         out.append({"lanes": ["".join("x" if steps[i][b * 16 + k] else "." for k in range(16)) if any(steps[i]) else "" for i in range(8)],
-                    "vel": [""] * 8, "off": [""] * 8})
+                    "vel": [""] * 8, "off": [""] * 8, "v": [steps[i][b * 16:(b + 1) * 16] for i in range(8)]})
     return out
 def run(score=None, gen=None, seeds=20, skip_propose=False):
     out = []
