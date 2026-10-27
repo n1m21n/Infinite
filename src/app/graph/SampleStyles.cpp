@@ -440,8 +440,8 @@ namespace
    void ProposeGroove(Rng& cr, const GenStyle& st, bool mine, const char* inLanes[8], std::string outLanes[8], float& outNov, float& outSync)
    {
       const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
-      const float emoIntel  = dir.emotions[3]; // Intelligence / Complexity
-      const float emoGroove = dir.emotions[7]; // Groove / Hypnosis
+      const float emoIntel  = dir.complexity; // style complexity
+      const float emoGroove = dir.pocket;     // groove pocket
       uint16_t baseM[8] = {}, baseG[8] = {};
       for (int l = 0; l < 8; l++)
       {
@@ -701,9 +701,9 @@ namespace
    void ProposeMotif(Rng& cr, const GenStyle& st, bool mine, int root, int scaleId, std::vector<std::pair<int, bool>>& seq, float& outNov)
    {
       const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
-      const float emoHappy = dir.emotions[0]; // Valence / Happiness
-      const float emoSad   = dir.emotions[1]; // Sadness / Melancholy
-      const float emoIntel = dir.emotions[3]; // Intelligence / Complexity
+      const float emoHappy = dir.affect[0];        // valence
+      const float emoSad   = 1.0f - dir.affect[0]; // its opposite pole
+      const float emoIntel = dir.complexity;
       std::vector<std::pair<int, bool>> best = seq;
       float bestScore = -1.0f;
       CriticJudgeMelody(seq, root, scaleId, st.motifOctave, bestScore);
@@ -1334,6 +1334,12 @@ Compiled Compile(const Recipe& recipe)
             break;
          }
       const int fn = (fillLane != nullptr && rng.Uniform() < st.fill) ? 2 + rng.Range(3) : 0;
+      // Velocity feel: one metric accent depth per take, downbeats over 8ths over 16ths, drawn wide from
+      // theory (feel.json's corpus bands are the critic's limits, not a target). Its own stream, so the
+      // patterns and the kit voicing do not move when the feel does.
+      Rng fr(std::string("feel:") + std::to_string(recipe.seed));
+      const double accentDepth = std::min(0.45, fr.Uniform(0.0, 0.32) * (0.6 + 0.8 * st.groove));
+      static const double kLaneAccent[8] = { 0.6, 0.6, 1.0, 0.8, 0.6, 0.8, 0.8, 1.0 }; // hats carry the alternation
       for (int i = 0; i < 8; i++)
       {
          const std::string lane = "lane" + std::to_string(i);
@@ -1346,7 +1352,11 @@ Compiled Compile(const Recipe& recipe)
             const char c = pat.empty() ? '.' : pat[(size_t)(k % 16)];
             double v = c == 'x' ? 1.0 : c == 'o' ? 0.45 : 0.0;
             if (v > 0.0)
+            {
+               const double metric = k % 4 == 0 ? 1.0 : k % 2 == 0 ? 0.72 : 0.5;
+               v *= 1.0 - 2.0 * accentDepth * kLaneAccent[i] * (1.0 - metric);
                v = std::clamp(v + rng.Uniform(-0.12, 0.12) * st.groove, 0.2, 1.0);
+            }
             if (v > 0.0 && mine && user.hasVelocity)
                v = std::clamp(v * (1.0 + (std::clamp(user.velMean / 0.75, 0.6, 1.15) - 1.0) * user.velW), 0.2, 1.0); // as hard as they play
             else if (!pat.empty() && ghostLane && k % 2 == 1 && rng.Uniform() < 0.22 * st.groove * (1.0 + 2.0 * (mine && user.hasTiming ? user.offGrid * user.timingW : 0.0)))
@@ -1607,9 +1617,10 @@ Compiled Compile(const Recipe& recipe)
       p["scale"] = { 'i', std::to_string(out.scale) };
       p["chordSize"] = { 'i', sizes.empty() ? "3" : rng.Choice(sizes) };
       const SampleCriticData::StyleDirective& cDir = StyleDirectiveFor(st.id);
-      if (p["chordSize"].second == "3" && (cDir.emotions[3] > 0.62f || cDir.emotions[5] > 0.72f) &&
-          criticRng.Uniform() < 0.35 * (cDir.emotions[3] + cDir.emotions[5]))
-         p["chordSize"] = { 'i', "4" }; // Emotion network: 7th chord extension for intelligence/nostalgia
+      const float calm = 1.0f - cDir.affect[1];
+      if (p["chordSize"].second == "3" && (cDir.complexity > 0.62f || calm > 0.72f) &&
+          criticRng.Uniform() < 0.35 * (cDir.complexity + calm))
+         p["chordSize"] = { 'i', "4" }; // 7th chords for complex or calm styles
       if (mine && user.hasChords && rng.Uniform() < user.chordW)
       {
          // The chord sizes this player actually plays, by how often they play them.
@@ -2586,12 +2597,13 @@ Compiled Compile(const Recipe& recipe)
       phi[7] = (float)st.motifRange / 8.0f;
       phi[8] = melNov;
       phi[9] = (float)bassHits / 16.0f;
-      // Perceptual Pillars + 8-Node Connected Emotion Network activations
-      phi[10] = 0.5f * (dir.pillars[0] + dir.emotions[7]); // Danceability & Groove Hypnosis
-      phi[11] = 0.5f * (dir.pillars[1] + dir.emotions[2]); // Energy & Drive
-      phi[12] = 0.5f * (dir.pillars[2] + dir.emotions[0] - 0.5f * dir.emotions[1] + 0.25f); // Valence / Happiness vs Melancholy
-      phi[13] = 0.5f * (dir.pillars[3] + dir.emotions[3]); // Brightness & Intelligence/Complexity
-      phi[14] = 0.5f * (dir.pillars[4] + dir.emotions[4] - 0.3f * dir.emotions[6] + 0.15f); // Contrast & Tension vs Serenity
+      // Perceptual pillars + valence/arousal + style descriptors
+      const float tension = std::clamp(2.0f * dir.affect[1] * (1.0f - dir.affect[0]), 0.0f, 1.0f); // tense quadrant
+      phi[10] = 0.5f * (dir.pillars[0] + dir.pocket);     // danceability & pocket
+      phi[11] = 0.5f * (dir.pillars[1] + dir.affect[1]);  // energy & arousal
+      phi[12] = 0.5f * (dir.pillars[2] + dir.affect[0]);  // valence
+      phi[13] = 0.5f * (dir.pillars[3] + dir.complexity); // brightness & complexity
+      phi[14] = 0.5f * (dir.pillars[4] + tension);        // contrast & tension
       phi[15] = 1.0f;
       UserStyle::NoteFeatures(phi);
    }

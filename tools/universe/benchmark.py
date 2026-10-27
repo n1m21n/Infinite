@@ -7,7 +7,7 @@ learner converges, not that people like the output). B7 is a regression check of
 Verifies:
   B1: Held-out compression (bits saved per cell/step/value on unseen source files)
   B2: Real-music False-Reject Rate (FRR <= 3.0%)
-  B3: Mishap Catch Rate on 9 corruption types (MCR >= 96%, 100% on critical mishaps)
+  B3: Mishap Catch Rate on 11 corruption types (MCR >= 96%, 100% on critical mishaps)
   B4: Structural Realism Two-Sample Classifier AUC (cross-validated, unfolded, <= 0.65 for melodies and drums)
   B5: Out-of-Distribution Novelty & Diversity (Card-escape >= 85%, Pairwise diversity >= real, Cluster entropy >= 0.75)
   B6: Personal Taste Adaptation Speed (5 simulated personas reach >= 75% keep-rate by click 20 vs card-only bandit)
@@ -34,6 +34,38 @@ def struct_features_drum(p):
     run = max((CR.max_run(l) for i, l in enumerate(lanes) if i not in (2, 3) and l), default=0)
     return [cnt(k) / 16.0, cnt(lanes[1]) / 16.0 if len(lanes) > 1 else 0.0, (cnt(lanes[2]) + cnt(lanes[3])) / 32.0 if len(lanes) > 3 else 0.0,
             on_beat / 4.0, run / 16.0, CR.syncopation_score(lanes)]
+
+
+def app_drum_bars(path):
+    """Drum bars from the app's compiled patches (INFINITE_GENSAMPLEDRUMS): each Drum Sequencer's two bars, with
+       per-hit velocity as '0'-'9'. The app writes no micro-timing per hit, so off is all on-grid."""
+    out = []
+    for ln in open(os.path.expanduser(path)):
+        r = json.loads(ln)
+        steps, inside = {}, False
+        for row in r["patch"].split("\n"):
+            if row.startswith("node "):
+                if inside:
+                    break
+                inside = row.endswith("Drum Sequencer")
+            elif inside:
+                f = row.split()
+                if len(f) == 3 and f[1].startswith("lane") and "_step" in f[1]:
+                    li, k = f[1][4:].split("_step")
+                    steps[(int(li), int(k))] = float(f[2])
+        if not steps:
+            continue
+        for b in range(2):
+            lanes, vel = [], []
+            for li in range(8):
+                v = [steps.get((li, b * 16 + k), 0.0) for k in range(16)]
+                has = any(x > 0.0 for x in v)
+                lanes.append("".join("x" if x > 0.0 else "." for x in v) if has else "")
+                vel.append("".join(str(min(9, round(x * 9))) if x > 0.0 else "." for x in v) if has else "")
+            if any(lanes):
+                out.append({"type": "drum_groove", "src": "app:%s:%d:%d" % (r["style"], r["part"], r["seed"]), "lanes": lanes,
+                            "vel": vel, "off": [l.replace("x", "i") for l in lanes], "bpm": r["bpm"]})
+    return out
 
 
 def struct_features_melody(p):
@@ -212,7 +244,7 @@ def main():
     crit_ok = True
     per_kind = {}
     for kind in CR.CORRUPTIONS:
-        src = d_sample[:100] if kind in ("no_kick", "stuck_16ths", "wrong_meter", "kick_snare_clash") else m_sample[:100]
+        src = d_sample[:100] if kind in ("no_kick", "stuck_16ths", "wrong_meter", "kick_snare_clash", "inverted_accents", "sloppy_timing") else m_sample[:100]
         if kind == "silent_filter":
             src = d_sample[:50]
         c = sum(not CR.judge(CR.corrupt(p, kind, rng), rec)["accept"] for p in src)
@@ -228,7 +260,12 @@ def main():
     print("     overall=%.1f%% | " % mcr + " | ".join("%s=%.0f%%" % (k, v) for k, v in per_kind.items()) + "  -> %s" % ("PASS" if b3_ok else "FAIL"))
 
     # ---- B4: Structural Realism Two-Sample Classifier AUC ----------------------------------------
-    gen_drums = [PR.propose_filtered("drum_groove", rec, rng, k=6) for _ in range(250)]
+    # Score the grooves the app ships when its dump is there (the Python proposer is a different algorithm).
+    app_path = os.path.expanduser("~/Infinite/training-data/renders/app_drums.jsonl")
+    app_drums = app_drum_bars(app_path) if os.path.exists(app_path) else []
+    gen_drums = rng.sample(app_drums, min(250, len(app_drums))) if len(app_drums) >= 100 else \
+        [PR.propose_filtered("drum_groove", rec, rng, k=6) for _ in range(250)]
+    drum_src = "app's compiled patches" if len(app_drums) >= 100 else "Python proposer, no app dump"
     gen_mels = [PR.propose_filtered("melody_contour", rec, rng, k=6) for _ in range(250)]
     real_m_feats = [struct_features_melody(p) for p in m_sample[:250]]
     gen_m_feats = [struct_features_melody(p) for p in gen_mels]
@@ -236,8 +273,8 @@ def main():
     drum_auc = cross_val_auc([struct_features_drum(p) for p in d_sample[:250]], [struct_features_drum(p) for p in gen_drums])
     b4_ok = struct_auc <= 0.65 and drum_auc <= 0.65
     print("\n[B4] Structural Realism (cross-validated linear 2-sample AUC, unfolded, target <= 0.65)")
-    print("     Melody-AUC=%.3f (3 features: key, strong-beat key, leap resolution) | Drum-AUC=%.3f (6 features)  -> %s" % (
-        struct_auc, drum_auc, "PASS" if b4_ok else "FAIL"))
+    print("     Melody-AUC=%.3f (3 features: key, strong-beat key, leap resolution) | Drum-AUC=%.3f (6 features, %s)  -> %s" % (
+        struct_auc, drum_auc, drum_src, "PASS" if b4_ok else "FAIL"))
     print("     (a linear test on a few features: 0.50 = these features cannot tell them apart, not that the music is indistinguishable)")
 
     # ---- B5: Out-of-Distribution Novelty & Diversity (QD-Score) ----------------------------------
@@ -355,100 +392,75 @@ def main():
     print("     Multi-Modal Graph Keep-Rate@20=%.1f%% (target >= 82.0%%)  -> %s" % (
         100.0 * b9_keep, "PASS" if b9_ok else "FAIL"))
 
-    # ---- B10: Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment ----------------
-    # (1) Chord-pack mood tags (from file names) -> 8-Emotion inference from the chords ALONE: the tags are
-    # stripped before inference, which otherwise blends 65% toward the tag's own emotion and scores itself.
-    mood_hits = mood_tot = 0
-    expected_counts = collections.Counter()
+    # ---- B10: Two-axis affect (valence, arousal) & affect-to-MIDI alignment ----------------------
+    # (1) Valence from the chords ALONE, mood tags stripped (inference otherwise blends 65% toward the tag).
+    # Ground truth = the tag's circumplex valence. Arousal is not scored here: a chord progression without
+    # a tempo carries no arousal cue, so any arousal "accuracy" would be the tag scoring itself.
+    v_hits = v_tot = v_pos = 0
     for cp in c_test:
-        moods = [m for m in cp.get("mood", []) if m in GG.CORPUS_MOOD_TO_EMOTIONS]
+        moods = [m for m in cp.get("mood", []) if m in GG.MOOD_VA]
         if not moods:
             continue
-        em_vec = GG.infer_piece_emotions(dict(cp, mood=[]))
-        top2_em = set(sorted(GG.EMOTION_NAMES, key=lambda k: -em_vec[k])[:2])
-        expected_em = set()
-        for m in moods:
-            top_m = max(GG.CORPUS_MOOD_TO_EMOTIONS[m].items(), key=lambda kv: kv[1])[0]
-            expected_em.add(top_m)
-        mood_tot += 1
-        if top2_em & expected_em:
-            mood_hits += 1
-        expected_counts.update(expected_em)
-    mood_acc = 100.0 * mood_hits / max(1, mood_tot)
-    # Baseline: always answer the two most common expected emotions
-    base2 = {e for e, _ in expected_counts.most_common(2)}
-    base_hits = 0
-    for cp in c_test:
-        moods = [m for m in cp.get("mood", []) if m in GG.CORPUS_MOOD_TO_EMOTIONS]
-        if moods:
-            exp = {max(GG.CORPUS_MOOD_TO_EMOTIONS[m].items(), key=lambda kv: kv[1])[0] for m in moods}
-            base_hits += int(bool(base2 & exp))
-    base_acc = 100.0 * base_hits / max(1, mood_tot)
+        mv = sum(GG.MOOD_VA[m][0] for m in moods) / len(moods)
+        if abs(mv - 0.5) < 0.08:  # neutral tags (Nostalgic, Mysterious) have no valence sign to get right
+            continue
+        pv = GG.infer_piece_affect(dict(cp, mood=[]))["valence"]
+        v_tot += 1
+        v_pos += mv > 0.5
+        v_hits += (pv > 0.5) == (mv > 0.5)
+    val_acc = 100.0 * v_hits / max(1, v_tot)
+    base_acc = 100.0 * max(v_pos, v_tot - v_pos) / max(1, v_tot)  # always answer the majority sign
 
-    # (2) Emotion-Conditioned MIDI Proposer Technical Monotonicity (Happy vs Sad, Complex vs Simple, Tense vs Serene)
+    # (2) Affect-conditioned proposer monotonicity, one check per axis direction
     r_emo = random.Random(303)
-    m_hap = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="valence_happiness") for _ in range(30)]
-    m_sad = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="sadness_melancholy") for _ in range(30)]
-    m_int = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="intelligence_complexity") for _ in range(30)]
-    m_ten = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="tension_aggression") for _ in range(30)]
-    m_ser = [PR.propose_filtered("melody_contour", rec, r_emo, k=5, emotion="serenity_transcendence") for _ in range(30)]
+    prop = lambda va: [PR.propose_filtered("melody_contour", rec, r_emo, k=5, affect=va) for _ in range(30)]
+    m_hap, m_sad = prop((0.85, 0.6)), prop((0.15, 0.3))
+    m_hi, m_lo = prop((0.5, 0.9)), prop((0.5, 0.1))
+    m_ten, m_ser = prop((0.15, 0.85)), prop((0.85, 0.15))
 
     mean_step = lambda ms: sum(sum(x["steps"]) / len(x["steps"]) for x in ms) / len(ms)
     mean_reg = lambda ms: sum(sum(x["pitches"]) / len(x["pitches"]) for x in ms) / len(ms)
-    mean_distinct_iv = lambda ms: sum(len(set(x["steps"])) for x in ms) / len(ms)
+    mean_leap = lambda ms: sum(sum(1 for s in x["steps"] if abs(s) >= 4) / len(x["steps"]) for x in ms) / len(ms)
     mean_tens_iv = lambda ms: sum(sum(1 for s in x["steps"] if abs(s) in (1, 6, 10, 11)) / len(x["steps"]) for x in ms) / len(ms)
 
     midi_checks = [
         mean_step(m_hap) > mean_step(m_sad) + 0.35,
         mean_reg(m_hap) > mean_reg(m_sad) + 4.0,
-        mean_distinct_iv(m_int) >= 5.2,
+        mean_leap(m_hi) > mean_leap(m_lo),
         mean_tens_iv(m_ten) > mean_tens_iv(m_ser),
     ]
     midi_align_rate = 100.0 * sum(midi_checks) / len(midi_checks)
 
-    # (3) 6 Affective User Personas with Emotion-Graph + Subgenre-Graph Propagation
+    # (3) 6 affective personas over the style graph: preference = weights on (valence, arousal), SIMULATED
     emo_personas = [
-        ("Euphoric Uplift",        {"valence_happiness": +2.0, "energy_drive": +1.4, "sadness_melancholy": -1.6}),
-        ("Melancholic Nocturne",   {"sadness_melancholy": +2.0, "nostalgia_warmth": +1.5, "energy_drive": -1.4}),
-        ("Cerebral IDM / Jazz",    {"intelligence_complexity": +2.2, "groove_hypnosis": +1.0, "serenity_transcendence": +0.4}),
-        ("Dark Industrial Tension",{"tension_aggression": +2.2, "energy_drive": +1.6, "serenity_transcendence": -1.8}),
-        ("Bittersweet Nostalgia",  {"nostalgia_warmth": +2.0, "sadness_melancholy": +1.0, "serenity_transcendence": +1.0}),
-        ("Hypnotic Pocket Groove", {"groove_hypnosis": +2.2, "energy_drive": +1.0, "valence_happiness": +0.8}),
+        ("Euphoric",    (+2.0, +1.4)), ("Melancholic", (-2.0, -1.4)), ("Tense",  (-1.6, +2.0)),
+        ("Serene",      (+1.4, -2.0)), ("Driving",     (+0.2, +2.2)), ("Bright", (+2.2, 0.0)),
     ]
+    axes = GG.AFFECT_AXES
     emo_keep20 = []
     for _, ep in emo_personas:
-        w_emo = {k: 0.0 for k in GG.EMOTION_NAMES}
+        w = [0.0, 0.0]
         node_b = [0.0] * len(net["styles"])
         r_es = random.Random(88)
-        u_fn = lambda s: sum(ep.get(k, 0.0) * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES)
+        u_fn = lambda s: sum(ep[i] * (s["affect"][axes[i]] - 0.5) for i in range(2))
+        score = lambda s: sum(w[i] * (s["affect"][axes[i]] - 0.5) for i in range(2)) + node_b[s["index"]]
         all_u = sorted(u_fn(s) for s in net["styles"])
         e_thresh = all_u[int(0.62 * len(all_u))]
         for step in range(20):
-            cands = r_es.sample(net["styles"], 6)
-            best_s = max(cands, key=lambda s: sum(w_emo[k] * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES) + node_b[s["index"]])
-            kept = u_fn(best_s) >= e_thresh
-            sgn = 1.0 if kept else -1.0
-            for k in GG.EMOTION_NAMES:
-                dv = sgn * (best_s["emotions"][k] - 0.5)
-                w_emo[k] += 0.45 * dv
-                # Propagate across Emotion Network adjacency!
-                for nb_e, ew in GG.EMOTION_ADJACENCY[k].items():
-                    w_emo[nb_e] += 0.08 * ew * dv
+            best_s = max(r_es.sample(net["styles"], 6), key=score)
+            sgn = 1.0 if u_fn(best_s) >= e_thresh else -1.0
+            for i in range(2):
+                w[i] += 0.45 * sgn * (best_s["affect"][axes[i]] - 0.5)
             node_b[best_s["index"]] += 0.35 * sgn
             for nb in best_s["neighbors"]:
                 node_b[nb["index"]] += 0.20 * nb["weight"] * sgn
-        hits_e = 0
-        for _ in range(40):
-            cands = r_es.sample(net["styles"], 6)
-            best_s = max(cands, key=lambda s: sum(w_emo[k] * (s["emotions"][k] - 0.5) for k in GG.EMOTION_NAMES) + node_b[s["index"]])
-            if u_fn(best_s) >= e_thresh:
-                hits_e += 1
+        hits_e = sum(u_fn(max(r_es.sample(net["styles"], 6), key=score)) >= e_thresh for _ in range(40))
         emo_keep20.append(hits_e / 40.0)
     b10_keep = sum(emo_keep20) / len(emo_keep20)
-    b10_ok = mood_acc >= base_acc + 10.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
-    print("\n[B10] Connected 8-Emotion Network & Affective-to-Technical MIDI Alignment")
-    print("      Mood-from-chords=%.1f%% vs majority baseline %.1f%% (n=%d, need +10 pp) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, IntIv=%.1f) | Simulated-Keep@20=%.1f%%  -> %s" % (
-        mood_acc, base_acc, mood_tot, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_distinct_iv(m_int), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
+    b10_ok = val_acc >= base_acc + 10.0 and midi_align_rate == 100.0 and b10_keep >= 0.84
+    print("\n[B10] Two-axis affect (valence, arousal) & affect-to-MIDI alignment")
+    print("      Valence-from-chords=%.1f%% vs majority sign %.1f%% (n=%d, tags hidden, need +10 pp) | MIDI-Cue-Monotonicity=%.0f%% (HappyStep=%+.2f vs SadStep=%+.2f, Leap hi/lo arousal=%.2f/%.2f) | Simulated-Keep@20=%.1f%%  -> %s" % (
+        val_acc, base_acc, v_tot, midi_align_rate, mean_step(m_hap), mean_step(m_sad), mean_leap(m_hi), mean_leap(m_lo), 100.0 * b10_keep, "PASS" if b10_ok else "FAIL"))
 
     gates_list = [b1_ok, b2_ok, b3_ok, b4_ok, b5_ok, b6_ok, b7_ok, b8_ok, b9_ok, b10_ok]
     all_ok = all(gates_list)
