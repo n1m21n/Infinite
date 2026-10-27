@@ -92,7 +92,7 @@ def main():
     print("\n" + "=" * 70 + "\nBENCHMARK VERIFICATION (6 GATES)")
     rc, bench_out = run("benchmark.py", "--scope", "shippable")
     for ln in bench_out.splitlines():
-        if ln.startswith(("[B", "  ", "OVERALL:")):
+        if ln.startswith(("[B", "  ", "OVERALL")):
             print(ln)
     if rc == 0 and a.export_cpp:
         _, exp_out = run("export_critic_inc.py")

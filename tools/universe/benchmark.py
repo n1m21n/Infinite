@@ -499,6 +499,7 @@ def main():
         "ALL GATES PASSED" if all_ok else "NEEDS ATTENTION",
         sum(gates_list), len(gates_list)))
     print("=" * 78)
+    sys.exit(0 if all_ok else 1)  # train_all exports the app's critic only on a pass
 
 
 if __name__ == "__main__":
