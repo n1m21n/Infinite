@@ -13,7 +13,8 @@ import argparse, collections, gzip, json, os, re, struct, sys, time
 
 SKIP = {".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems", ".DocumentRevisions-V100"}
 PPQ = 480
-NOTE = re.compile(r'<MidiNoteEvent Time="([-\d.e]+)" Duration="([-\d.e]+)" Velocity="([\d.]+)"[^>]*IsEnabled="(true|false)"')
+# Live 12 drops IsEnabled (every note is on), earlier versions write it
+NOTE = re.compile(r'<MidiNoteEvent Time="([-\d.e]+)" Duration="([-\d.e]+)" Velocity="([\d.]+)"(?:[^>]*?IsEnabled="(true|false)")?')
 TRACK = re.compile(r"<(MidiTrack|AudioTrack|GroupTrack|ReturnTrack|MasterTrack|MainTrack)\b[^>]*>(.*?)</\1>", re.S)
 DEVICE = re.compile(r"<(OriginalSimpler|MultiSampler|Operator|InstrumentVector|UltraAnalog|Drift|Meld|Tension|Collision|"
                     r"DrumGroupDevice|InstrumentGroupDevice|AudioEffectGroupDevice|PluginDevice|AuPluginDevice|MxDeviceAudioEffect|"
@@ -75,7 +76,7 @@ def clips(body):
             if not k:
                 continue
             for n in NOTE.finditer(kt[1]):
-                if n[4] == "true":
+                if n[4] != "false":
                     notes.append((float(n[1]), float(n[2]), int(k[1]), round(float(n[3]))))
         if not notes:
             continue
@@ -143,7 +144,7 @@ def sets(roots):
         for d, subs, fs in os.walk(root):
             subs[:] = sorted(s for s in subs if s not in SKIP and not s.startswith(".") and s != "Backup")
             for f in sorted(fs):
-                if f.endswith(".als") and not f.startswith("._"):
+                if f.endswith(".als") and not f.startswith("._") and f != "DefaultLiveSet.als":
                     yield os.path.join(d, f)
 
 
@@ -153,6 +154,7 @@ def main():
     ap.add_argument("--inbox", default="~/Infinite/training-data/inbox")
     ap.add_argument("--arcs", default="~/Infinite/training-data/arcs/als.jsonl")
     ap.add_argument("--budget", type=float, default=1200)
+    ap.add_argument("--owner", action="store_true", help="every set under the roots is the owner's own (e.g. Live crash copies)")
     a = ap.parse_args()
     inbox, arcs = os.path.expanduser(a.inbox), os.path.expanduser(a.arcs)
     os.makedirs(os.path.dirname(arcs), exist_ok=True)
@@ -167,7 +169,7 @@ def main():
             if time.time() - t0 > a.budget:
                 print("budget hit", file=sys.stderr)
                 break
-            owner = "/my music/" in p.lower() or "/my music" in os.path.dirname(p).lower()
+            owner = a.owner or "/my music/" in p.lower() or "/my music" in os.path.dirname(p).lower()
             try:
                 bpm, num, den, tracks, autos, devices = read_set(p)
             except (OSError, EOFError, ValueError) as e:
