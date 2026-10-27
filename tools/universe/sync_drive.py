@@ -11,7 +11,7 @@ import argparse, glob, gzip, hashlib, os, shutil
 
 DATA = os.path.expanduser("~/Infinite/training-data")
 CODE = os.path.join(os.path.dirname(os.path.abspath(__file__)))
-SKIP = {"inbox", "store"}  # raw MIDI corpus and ingested store already live on Drive
+SKIP = {"inbox"}  # raw MIDI corpus folder (store/ IS synced: Colab trains on store/inbox.jsonl)
 BIG = 20_000_000
 
 
