@@ -279,12 +279,14 @@ def main():
     print("     (a linear test on a few features: 0.50 = these features cannot tell them apart, not that the music is indistinguishable)")
 
     # ---- B5: Out-of-Distribution Novelty & Diversity (QD-Score) ----------------------------------
-    escape = 100.0 * sum(CR.min_card_dist_drum(L.cells(p)) >= 0.25 for p in gen_drums) / len(gen_drums)
+    # Every app groove, not B4's 250: entropy over a sample of 250 swung +-0.03 around the 0.75 bar with the seed.
+    qd = app_drums if len(app_drums) >= 100 else gen_drums
+    escape = 100.0 * sum(CR.min_card_dist_drum(L.cells(p)) >= 0.25 for p in qd) / len(qd)
     div_gen = pairwise_hamming(gen_drums)
     div_real = pairwise_hamming(d_sample[:120])
     mix_prep = L.prep_mix(rec["model"]["drum"].get("mix"))
-    clusters = collections.Counter(L.drum_fam({"family": "unlabeled"}, L.cells(p), mix_prep) for p in gen_drums)
-    ent = -sum((v / len(gen_drums)) * math.log2(v / len(gen_drums)) for v in clusters.values()) / max(1.0, math.log2(len(clusters))) if len(clusters) > 1 else 0.0
+    clusters = collections.Counter(L.drum_fam({"family": "unlabeled"}, L.cells(p), mix_prep) for p in qd)
+    ent = -sum((v / len(qd)) * math.log2(v / len(qd)) for v in clusters.values()) / max(1.0, math.log2(len(clusters))) if len(clusters) > 1 else 0.0
     b5_ok = escape >= 85.0 and div_gen >= 0.95 * div_real and ent >= 0.75
     print("\n[B5] Out-of-Distribution Novelty & Diversity (QD-Score)")
     print("     Card-Escape=%.1f%% (>=85%%) | Pairwise-Div=%.3f (real=%.3f) | Cluster-Entropy=%.3f (>=0.75)  -> %s" % (

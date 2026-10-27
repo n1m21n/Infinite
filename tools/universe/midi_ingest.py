@@ -2,6 +2,8 @@
 """Inbox MIDI -> gated pieces.
     midi_ingest.py [--inbox ~/Infinite/training-data/inbox] [--store ~/Infinite/training-data/store] [--cap 0] [--jobs 4]
 Layout: inbox/<source>/**/*.mid plus an optional SOURCE.txt with lines `family: house` and `license: CC-BY-4.0`.
+`grid: none` marks a source whose bar lines do not follow the music (one tempo and resolution for every file): it
+gives melody_contour and note_expression rows only: every bar-grid piece (drums, bass, chords, meters, arcs) is skipped.
 A source with no licence line is `unknown`: it trains the local model only. A folder or file name containing a
 family word (house, techno, trance, dnb, breaks, ambient ...) sets the family when SOURCE.txt does not.
 Every file is read once (identical bytes in two sources count once). Bars come from the file's whole time-signature
@@ -38,12 +40,14 @@ ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii"]
 
 
 def source_meta(folder):
-    meta = {"family": None, "license": "unknown"}
+    meta = {"family": None, "license": "unknown", "grid": True}
     f = os.path.join(folder, "SOURCE.txt")
     if os.path.exists(f):
         for ln in open(f, errors="replace"):
-            m = re.match(r"\s*(family|license|licence)\s*:\s*(.+?)\s*$", ln, re.I)
-            if m:
+            m = re.match(r"\s*(family|license|licence|grid)\s*:\s*(.+?)\s*$", ln, re.I)
+            if m and m[1].lower() == "grid":
+                meta["grid"] = m[2].lower() != "none"
+            elif m:
                 meta["family" if m[1].lower() == "family" else "license"] = m[2]
     return meta
 
@@ -251,14 +255,14 @@ def _too_slow(*_):
 
 def one_file(job):
     """every piece one file gives, ungated; [] when unreadable or over 5 s (a few broken files hold notes for hours)"""
-    f, name, fam, lic, per_file, windows = job
+    f, name, fam, lic, grid, per_file, windows = job
     out, detail = [], []
     signal.signal(signal.SIGALRM, _too_slow)
     signal.alarm(5)
     try:
         tracks, div = E.parse_midi(f)
         ns = notes(tracks)
-        if ns:
+        if ns and grid:
             tm = S.tempo_map(tracks)
             bpm = S.bpm_at(tm, 0)
             bars = S.bar_map(tracks, div, max(n[1] for n in ns))
@@ -322,7 +326,7 @@ def jobs(inbox, cap, per_file, windows, done=frozenset()):
             name = os.path.basename(src) + "/" + os.path.relpath(f, os.path.realpath(src))
             if name in done:
                 continue
-            yield f, name, guess_family(name, smeta), smeta["license"], per_file, windows
+            yield f, name, guess_family(name, smeta), smeta["license"], smeta["grid"], per_file, windows
 
 
 def gate_chord_inbox(p):
