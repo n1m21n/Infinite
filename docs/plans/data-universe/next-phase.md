@@ -115,7 +115,7 @@ One system where **genre + mood + section** select **notes, instrument, sound an
 
 These extend the five pillars already declared per genre (danceability, energy, valence, brightness, contrast, the Spotify-style audio features the project was built on). The `character-sim` emotion model (valence, arousal, stress, energy, dominance) is the richer target; the first cut uses the five and reserves two more axes for it. Declared genre values become a prior, measured values the evidence.
 
-**W5 Link layer.** Start count-based like the existing models: P(instrument cluster | genre, mood bin, section tenth) from atlas rows and the arc tables, then P(sound feature bins | cluster), then preset parameter ranges per cluster. Move to a small numpy model only if counting stops improving held-out bits.
+**W5 Link layer.** Two stages. (a) Count baseline: P(instrument cluster | genre, mood bin, section tenth) from atlas rows and the arc tables, then P(sound feature bins | cluster), then preset parameter ranges per cluster. (b) Matrix link: context vector x = [genre | mood | section]; scores s = Vt(Ux) with low rank 8-32 (bilinear genre x mood optional), one W with three output blocks (cluster, sound features, params); numpy least squares / short SGD. Must beat (a) by >= 0.10 bits held-out.
 
 **W6 Gates.** Sim-first for drums (`groove_sim.py`, A/B in `eval/groove_ab`): cluster sampler versus rules plus critic; owner sees the A/B before any C++ port (the 2h port needs sign-off). Colab: notebook now fetches the inbox table through the Drive API; parity run in progress.
 
@@ -171,4 +171,4 @@ Decision rule: ship, iterate or abandon each workstream at its section 10 table;
 
 | Date | Sections | By | Note |
 |---|---|---|---|
-| | | | |
+| 2026-10-27 | 1-7 | Naman | Approved in chat. W5 uses count baseline then low-rank matrix link. |
