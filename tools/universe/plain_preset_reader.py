@@ -15,7 +15,7 @@ Pure Python (runs on a laptop without numpy). Read only. Formats, by first bytes
                     the ordered chain of plug-in names (the slot knobs are not read)
   .alc              Ableton MIDI clip, gzip XML: written as .mid into --clips with als_reader
 Licence: "preset library, local only"."""
-import argparse, collections, gzip, json, os, re, struct, sys, time
+import argparse, collections, gzip, json, os, re, struct, subprocess, sys, time
 import xml.etree.ElementTree as ET
 
 SKIP = {".Spotlight-V100", ".Trashes", ".fseventsd", ".TemporaryItems", ".DocumentRevisions-V100"}
@@ -47,13 +47,75 @@ def vital(path):
     return row(path, "vital", {"main": knobs}, tags, j.get("preset_name"))
 
 
+def cbor(b, i=0):
+    """minimal CBOR decoder (Serum 2 body): returns (value, next index)"""
+    ib = b[i]
+    mt, ai = ib >> 5, ib & 31
+    i += 1
+    v = ai
+    if ai == 24:
+        v, i = b[i], i + 1
+    elif ai in (25, 26, 27):
+        w = {25: 2, 26: 4, 27: 8}[ai]
+        v, i = int.from_bytes(b[i:i + w], "big"), i + w
+    elif ai == 31:
+        v = None
+    if mt == 0:
+        return v, i
+    if mt == 1:
+        return -1 - v, i
+    if mt in (2, 3):
+        s = b[i:i + v]
+        return (s if mt == 2 else s.decode("utf-8", "replace")), i + v
+    if mt in (4, 5):
+        out = [] if mt == 4 else {}
+        n = 0
+        while (b[i] != 0xFF) if v is None else n < v:
+            x, i = cbor(b, i)
+            if mt == 4:
+                out.append(x)
+            else:
+                y, i = cbor(b, i)
+                out[x] = y
+            n += 1
+        return out, i + (1 if v is None else 0)
+    if mt == 6:
+        return cbor(b, i)
+    if ai == 25:
+        return struct.unpack(">e", v.to_bytes(2, "big"))[0], i
+    if ai == 26:
+        return struct.unpack(">f", v.to_bytes(4, "big"))[0], i
+    if ai == 27:
+        return struct.unpack(">d", v.to_bytes(8, "big"))[0], i
+    return {20: False, 21: True}.get(ai), i
+
+
+def serum_body(raw):
+    """XferJson header + zstd(CBOR) body -> {module: {param: value}} for every module with plainParams"""
+    j = raw.find(b"\x28\xb5\x2f\xfd")
+    if j < 0:
+        return {}
+    p = subprocess.run(["zstd", "-dc"], input=raw[j:], capture_output=True)
+    if p.returncode != 0 or not p.stdout:
+        return {}
+    o, _ = cbor(p.stdout)
+    mods = {}
+    for k, v in (o.items() if isinstance(o, dict) else []):
+        pp = v.get("plainParams") if isinstance(v, dict) else None
+        if isinstance(pp, dict):
+            mods[k] = {a: (num(x) if not isinstance(x, str) else x) for a, x in pp.items() if x is not None}
+    return mods
+
+
 def serum(path):
-    b = open(path, "rb").read(65536)
-    if not b.startswith(b"XferJson"):
+    raw = open(path, "rb").read()
+    if not raw.startswith(b"XferJson"):
         return None
-    j = first_json(b[9:])
+    j = first_json(raw[9:65536])
     tags = {k: j[k] for k in ("presetAuthor", "presetDescription", "tags") if j.get(k)}
-    return row(path, "serum2", {}, tags, j.get("presetName"))
+    mods = serum_body(raw)
+    tags["body"] = "knobs" if mods else "header-only"
+    return row(path, "serum2", mods, tags, j.get("presetName"))
 
 
 def first_json(b):
@@ -165,13 +227,31 @@ def xml_preset(path):
 
 
 def ft3i(path):
+    """FabFilter / Xfer binary presets: 4-byte magic (FT3i, FT2i, FTwi, FTms, FV2l, FPRr, FSat ...), u32 version, u32 float count,
+    float32 values. The count must equal the file's float payload, so an unknown file is never read as numbers by luck.
+    Pro-Q 4 and friends write a '[Preset]' text file instead: Key=value lines."""
     b = open(path, "rb").read()
-    if b[:4] != b"FT3i" or len(b) < 12:
-        return None
-    n = min((len(b) - 12) // 4, 2048)
-    vals = struct.unpack("<%df" % n, b[12:12 + 4 * n])
     eng = "fabfilter " + os.path.basename(os.path.dirname(os.path.dirname(path))) if path.lower().endswith(".ffp") else "xfer lfo"
-    return row(path, eng.lower(), {"main": {"p%d" % k: round(v, 5) for k, v in enumerate(vals) if v == v and abs(v) < 1e9}})
+    if b[:8] == b"[Preset]":
+        vals = {}
+        for ln in b.decode("utf-8", "replace").splitlines()[1:]:
+            k, _, v = ln.partition("=")
+            try:
+                vals[k.strip()] = round(float(v), 5)
+            except ValueError:
+                continue
+        return row(path, eng.lower(), {"main": dict(list(vals.items())[:2048])}) if vals else None
+    if len(b) < 12 or not (b[:1] == b"F" and b[1:4].isalnum()):
+        return None
+    cnt = struct.unpack("<I", b[8:12])[0]
+    if 0 < cnt and 12 + 4 * cnt <= len(b):   # counted layout; the count may be shorter than the payload (trailing data)
+        off, n, layout = 12, min(cnt, 2048), "counted" if 12 + 4 * cnt == len(b) else "counted+tail"
+    elif (len(b) - 8) % 4 == 0 and len(b) > 8:  # raw layout (FFPr ...): floats start right after the version word
+        off, n, layout = 8, min((len(b) - 8) // 4, 2048), "raw"
+    else:
+        return None
+    vals = struct.unpack("<%df" % n, b[off:off + 4 * n])
+    return row(path, eng.lower(), {"main": {"p%d" % k: round(v, 5) for k, v in enumerate(vals) if v == v and abs(v) < 1e9}}, {"layout": layout, "magic": b[:4].decode("latin1")})
 
 
 def cst(path):
