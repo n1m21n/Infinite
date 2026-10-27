@@ -14,6 +14,13 @@ ROOM = os.path.expanduser("~/music videos/n1m21n-room/site/public")
 OUT = os.path.expanduser("~/Infinite/training-data/albums/n1m21n_tracks.jsonl")
 
 
+def _as_songs():
+    """the library tagger reads a filename to decide loop vs one-shot; whole songs are loops, so tempo, key and groove run"""
+    t1, t2 = af.tags, af2.labels
+    af.tags = lambda *a, **k: {**t1(*a, **k), "loop": True}
+    af2.labels = lambda *a, **k: {**t2(*a, **k), "loop": True}
+
+
 def tracks():
     d = json.load(open(os.path.join(ROOM, "data", "music.json")))
     for al in d["albums"]:
@@ -22,6 +29,7 @@ def tracks():
 
 
 def run(a):
+    _as_songs()
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     done = set()
     if a.resume and os.path.exists(OUT):
@@ -38,7 +46,7 @@ def run(a):
                 continue
             row = {"album": al["title"], "kind": al["kind"], "released": al.get("released"), "genre": al.get("genre"),
                    "n": t["n"], "title": t["title"], "dur": t.get("dur"), **{k: v for k, v in r1.items() if k not in ("src", "bands")},
-                   **{k: v for k, v in r2.items() if k not in ("src", "mfcc_d") and k not in r1 or k in ("rolloff",)}, "src": p}
+                   **{k: v for k, v in r2.items() if k not in ("src", "mfcc_d") and (k not in r1 or r1[k] is None or k == "rolloff") and v is not None}, "src": p}
             fo.write(json.dumps(row, separators=(",", ":")) + "\n"); fo.flush()
             n += 1
             print("%3d %-28s %-28s %.0fs" % (n, al["title"][:28], t["title"][:28], time.time() - t0), flush=True)
@@ -69,7 +77,7 @@ def report(a):
         mn = [r["key"].endswith("m") for r in rs if r.get("key")]
         print("%-26s %3d " % (name[:26], len(rs)) + " ".join("%10s" % ("%.3g" % med([r.get(c) for r in rs]) if med([r.get(c) for r in rs]) is not None else "-") for c, _ in cols)
               + "  %3.0f" % (100 * sum(mn) / max(1, len(mn))))
-    print("%-26s %3d " % ("ALL (median)", len(rows)) + " ".join("%10s" % ("%.3g" % med([r.get(c) for r in rows])) for c, _ in cols))
+    print("%-26s %3d " % ("ALL (median)", len(rows)) + " ".join("%10s" % ("%.3g" % med([r.get(c) for r in rows]) if med([r.get(c) for r in rows]) is not None else "-") for c, _ in cols))
     print("%-26s %3d " % ("library loops (median)", len(lib)) + " ".join("%10s" % ("%.3g" % med([r.get(c) for r in lib]) if med([r.get(c) for r in lib]) is not None else "-") for c, _ in cols))
     # where the owner sits inside the library distribution: percentile of the owner's median per column
     print("\nowner median as a percentile of the library:")
