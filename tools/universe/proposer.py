@@ -161,8 +161,25 @@ def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, affect=None
             note += rng.choice([-1, 1])
         pitches.append(max(36, min(96, note)))
     steps = [b - a for a, b in zip(pitches, pitches[1:])]
+    ioi = melody_rhythm(rng, a)
     return {"type": "melody_contour", "src": "proposer:" + arc_type, "family": fam, "role": "lead",
-            "mode_name": scale_name, "pitches": pitches, "steps": steps}
+            "mode_name": scale_name, "pitches": pitches, "steps": steps, "ioi": ioi,
+            "rate": round(15 / max(0.25, sum(ioi) / 4.0), 2)}
+
+
+def melody_rhythm(rng, arousal):
+    """15 onset gaps in 16ths (the corpus's `ioi`). Arousal sets the note rate on the corpus's own scale (notes per
+    quarter, p10 0.6 / median 1.4 / p90 3.8): the gaps mix the two steady grids around it, as real top lines move
+    in runs of 16ths, 8ths or quarters, and the phrase breathes once at its middle"""
+    rate = max(0.4, min(4.0, 0.5 + 3.5 * arousal + rng.uniform(-0.3, 0.3)))
+    gap = 4.0 / rate
+    grids = (1, 2, 4, 8, 16)
+    lo = max(g for g in grids if g <= max(1.0, gap))
+    hi = min(g for g in grids if g >= lo and g >= gap)
+    p_hi = (gap - lo) / (hi - lo) if hi > lo else 0.0
+    ioi = [hi if rng.random() < p_hi else lo for _ in range(15)]
+    ioi[7] = min(16, ioi[7] * 2)
+    return ioi
 
 
 def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house", affect=None):

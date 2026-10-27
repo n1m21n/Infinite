@@ -156,29 +156,13 @@ PART_NAMES = [
     "foley", "keys", "leads", "textures", "kicks", "snares", "hats", "toms"
 ]
 
-PART_SPECTRAL_GATES = {
-    # part: (min_low_share, max_low_share, min_mid_share, min_high_share, max_high_share, min_crest, max_silence_ratio, max_whistle_ratio)
-    "full":       (0.12, 0.82, 0.08, 0.01, 0.55, 1.35, 0.55, 0.48),
-    "synths":     (0.02, 0.85, 0.10, 0.01, 0.65, 1.30, 0.65, 0.52),
-    "pads":       (0.02, 0.80, 0.12, 0.005, 0.50, 1.22, 0.45, 0.45),
-    "plucks":     (0.01, 0.78, 0.12, 0.02, 0.65, 1.65, 0.75, 0.50),
-    "percussion": (0.01, 0.75, 0.10, 0.03, 0.80, 1.85, 0.85, 0.52),
-    "drums":      (0.15, 0.85, 0.06, 0.02, 0.65, 1.80, 0.75, 0.50),
-    "bass":       (0.32, 0.96, 0.02, 0.00, 0.35, 1.25, 0.68, 0.52),
-    "fx":         (0.00, 0.92, 0.03, 0.005, 0.85, 1.22, 0.82, 0.60),
-    "foley":      (0.00, 0.88, 0.05, 0.01, 0.85, 1.60, 0.90, 0.58),
-    "keys":       (0.02, 0.82, 0.15, 0.005, 0.55, 1.35, 0.68, 0.48),
-    "leads":      (0.00, 0.70, 0.18, 0.02, 0.70, 1.30, 0.72, 0.50),
-    "textures":   (0.01, 0.88, 0.06, 0.005, 0.65, 1.20, 0.45, 0.48),
-    "kicks":      (0.42, 0.98, 0.01, 0.00, 0.30, 1.75, 0.85, 0.55),
-    "snares":     (0.05, 0.75, 0.15, 0.05, 0.75, 1.85, 0.88, 0.52),
-    "hats":       (0.00, 0.25, 0.02, 0.42, 0.99, 1.75, 0.88, 0.58),
-    "toms":       (0.25, 0.94, 0.04, 0.00, 0.40, 1.75, 0.88, 0.55),
-}
+# Fallback before spectral_gates.py has run (tuple order = spectral_gates.CHECKS): silence, peak, rms,
+# whistle, peaky, high_w, high_m, bot4, high_t, corr; logs of level, share or band ratio; muffle/thin checks off.
+PART_SPECTRAL_GATES = {p: (0.85, -0.05, -0.5, -1.2, 4.0, -0.5, -1e9, -1e9, 1e9, -0.40) for p in PART_NAMES}
 
 # Calibrated on real renders by spectral_gates.py; the table above is the fallback before that has run.
 _SG_FILE = os.path.join(MODELS, "shippable", "spectral_gates.json")
-if os.path.exists(_SG_FILE):
+if os.path.exists(_SG_FILE) and "checks" in json.load(open(_SG_FILE)):
     PART_SPECTRAL_GATES = {k: tuple(v) for k, v in json.load(open(_SG_FILE))["gates"].items()}
 
 
@@ -530,13 +514,13 @@ def build_genre_network(catalog_path=CATALOG, store_dir=STORE):
     }
 
 
-def verify_spectral_critic(band_power, crest, silence_ratio, correlation, part_name="full"):
+def verify_spectral_critic(band_power, peak, rms, silence_ratio, correlation, part_name="full"):
     """Evaluate a 32-band AudioSummary spectrum + dynamics against a part's spectral gate
        (spectral_gates.verify: the same checks as SampleCriticData::VerifyAudioSpectrum)."""
     if sum(max(0.0, x) for x in band_power) <= 1e-12:
         return False, ["silent_spectrum"]
     g = PART_SPECTRAL_GATES.get(part_name, PART_SPECTRAL_GATES["full"])
-    r = {"bands": band_power, "peak": crest, "rms": 1.0, "silence": silence_ratio, "corr": correlation}
+    r = {"bands": band_power, "peak": peak, "rms": rms, "silence": silence_ratio, "corr": correlation}
     fails = SG.verify(g, SG.features(r))
     return len(fails) == 0, fails
 

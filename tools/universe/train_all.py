@@ -89,7 +89,9 @@ def main():
             keep |= ln.startswith("KEPT")
         print("-> model %s" % ("UPDATED" if keep else "unchanged"))
 
-    print("\n" + "=" * 70 + "\nBENCHMARK VERIFICATION (6 GATES)")
+    _, sg_out = run("spectral_gates.py")
+    print("\n" + sg_out.strip().splitlines()[0])
+    print("\n" + "=" * 70 + "\nBENCHMARK VERIFICATION (10 GATES)")
     rc, bench_out = run("benchmark.py", "--scope", "shippable")
     for ln in bench_out.splitlines():
         if ln.startswith(("[B", "  ", "OVERALL")):
