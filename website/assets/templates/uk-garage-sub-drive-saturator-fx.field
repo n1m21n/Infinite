@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "UK Garage Sub Drive Saturator FX",
+    "author": "Infinite",
+    "description": "Heavy 2-step bass overdrive and saturation processor with asymmetrical diode clipping, low-end punch preservation, and tape warmth harmonics.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 2.2 [1.0, 5.0]\nparam float subGain = 1.25 [0.8, 2.2]\nparam float tone = 2400.0 [500.0, 6000.0]\nparam float asym = 0.28 [0.0, 0.7]\nparam float mix = 0.7 [0.0, 1.0]\nstate float subLp1 = 0\nstate float subLp2 = 0\nstate float midLp = 0\n\nfSub = clamp(140.0 / sr * 2.8, 0.005, 0.15)\nsubLp1 = subLp1 + fSub * (in - subLp1)\nsubLp2 = subLp2 + fSub * (subLp1 - subLp2)\nsub = subLp2 * subGain\n\nhighPass = in - subLp2\nu = highPass * drive\nsat = clamp(u + asym * u * u - 0.25 * u * u * u, -0.95, 0.95)\n\nfTone = clamp(tone / sr * 2.6, 0.02, 0.45)\nmidLp = midLp + fTone * (sat - midLp)\n\nwet = sub * 0.6 + midLp * 0.55\nout = (in * (1.0 - mix) + wet * mix) * 1.35\n",
+    "params": {
+      "drive": 2.2,
+      "subGain": 1.25,
+      "tone": 2400.0,
+      "asym": 0.28,
+      "mix": 0.7
+    }
+  }
+}

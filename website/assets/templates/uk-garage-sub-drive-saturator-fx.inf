@@ -1,0 +1,84 @@
+infinite-patch 1
+# UK Garage Sub Drive Saturator FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+  f resonance 0.35
+  f decay 0.25
+  f volume 0.8
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float drive = 2.2 [1.0, 5.0]\nparam float subGain = 1.25 [0.8, 2.2]\nparam float tone = 2400.0 [500.0, 6000.0]\nparam float asym = 0.28 [0.0, 0.7]\nparam float mix = 0.7 [0.0, 1.0]\nstate float subLp1 = 0\nstate float subLp2 = 0\nstate float midLp = 0\n\nfSub = clamp(140.0 / sr * 2.8, 0.005, 0.15)\nsubLp1 = subLp1 + fSub * (in - subLp1)\nsubLp2 = subLp2 + fSub * (subLp1 - subLp2)\nsub = subLp2 * subGain\n\nhighPass = in - subLp2\nu = highPass * drive\nsat = clamp(u + asym * u * u - 0.25 * u * u * u, -0.95, 0.95)\n\nfTone = clamp(tone / sr * 2.6, 0.02, 0.45)\nmidLp = midLp + fTone * (sat - midLp)\n\nwet = sub * 0.6 + midLp * 0.55\nout = (in * (1.0 - mix) + wet * mix) * 1.35\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.45 0.15 0.22
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text UK Garage Sub Drive Saturator FX. Heavy 2-step bass overdrive and saturation processor with asymmetrical diode clipping, low-end punch preservation, and tape warmth harmonics.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

@@ -1,0 +1,75 @@
+infinite-patch 1
+# Detroit Techno Machine Lead Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 48
+  i note4 51
+  i note5 48
+  i note6 55
+  i note7 58
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 48
+  i note12 51
+  i note13 53
+  i note14 55
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float fmRatio = 2.0 [0.5, 6.0]\nparam float fmIndex = 1.6 [0.0, 4.0]\nparam float cutoff = 2400.0 [300.0, 6000.0]\nparam float decay = 0.36 [0.08, 1.2]\nparam float subLevel = 0.35 [0.0, 0.8]\nstate float pCar = 0\nstate float pMod = 0\nstate float pSub = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00008, 0.02)\nenv = if(target > env, env + (target - env) * 0.28, env - env * decayRate)\n\nfBase = clamp(freq, 40.0, 4000.0)\nfMod = fBase * fmRatio\nfSub = fBase * 0.5\n\npMod = (pMod + fMod / sr) % 1.0\nmodSine = sin(pMod * 6.2831853) * fmIndex * env\n\npCar = (pCar + (fBase + modSine * fBase) / sr) % 1.0\ncarSaw = pCar * 2.0 - 1.0\n\npSub = (pSub + fSub / sr) % 1.0\nsubSq = if(pSub < 0.5, 1.0, -1.0) * subLevel\n\nraw = (carSaw * 0.75 + subSq) * env\n\nfCut = clamp((cutoff + env * 1800.0) / sr * 2.4, 0.01, 0.45)\nlp1 = lp1 + fCut * (raw - lp1 - 0.45 * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * 1.3\nsat = clamp(u - 0.22 * u * u * u, -0.92, 0.92)\n\nout = sat * 0.35\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.25 0.15 0.45
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Detroit Techno Machine Lead Synth. Piercing Belleville machine lead synthesizer with hard frequency modulation bite, resonant high-pass bite, and syncopated harmonic bite.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

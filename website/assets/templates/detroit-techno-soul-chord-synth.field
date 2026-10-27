@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Detroit Techno Soul Chord Synth",
+    "author": "Infinite",
+    "description": "Soulful Detroit techno chord synthesizer with detuned sawtooth triads, warm analog filter resonance, and velocity-sensitive exponential decay envelope.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1300.0 [200.0, 5500.0]\nparam float resonance = 0.35 [0.0, 0.85]\nparam float spread = 0.012 [0.002, 0.04]\nparam float decay = 0.45 [0.1, 1.5]\nparam float drive = 0.35 [0.0, 0.9]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.02)\nenv = if(target > env, env + (target - env) * 0.22, env - env * decayRate)\n\nfBase = clamp(freq, 30.0, 3200.0)\nfRoot = fBase * (1.0 - spread)\nfThird = fBase * 1.189207 * (1.0 + spread * 0.5)\nfFifth = fBase * 1.498307 * (1.0 + spread)\n\np1 = (p1 + fRoot / sr) % 1.0\np2 = (p2 + fThird / sr) % 1.0\np3 = (p3 + fFifth / sr) % 1.0\n\nsaw1 = (p1 * 2.0 - 1.0)\nsaw2 = (p2 * 2.0 - 1.0)\nsaw3 = (p3 * 2.0 - 1.0)\nraw = (saw1 * 0.36 + saw2 * 0.32 + saw3 * 0.32) * env\n\nfCut = clamp((cutoff + env * 2400.0) / sr * 2.5, 0.008, 0.45)\nq = clamp(resonance * 1.6, 0.0, 1.4)\nlp1 = lp1 + fCut * (raw - lp1 - q * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * (1.0 + drive * 1.5)\nsat = clamp(u - 0.2 * u * u * u, -0.95, 0.95)\n\nout = sat * 0.34\n",
+    "params": {
+      "cutoff": 1300.0,
+      "resonance": 0.35,
+      "spread": 0.012,
+      "decay": 0.45,
+      "drive": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "UK Garage Chopped Vocal Delay FX",
+    "author": "Infinite",
+    "description": "Syncopated ping-pong dub delay with rhythmic 3/16 dotted divisions, resonant high-cut damping, and subtle pitch-drift tape modulation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float feedback = 0.52 [0.1, 0.85]\nparam float damping = 0.38 [0.05, 0.85]\nparam float tone = 2100.0 [400.0, 5500.0]\nparam float mix = 0.55 [0.0, 1.0]\nparam float flutter = 0.22 [0.0, 0.8]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float lp = 0\nstate float lfo = 0\n\nlfo = (lfo + 0.42 / sr) % 1.0\nflut = sin(lfo * 6.2831853) * flutter * 0.06\n\nsig = in + d4 * feedback\n\nd1 = d1 + 0.22 * (sig - d1)\nd2 = d2 + 0.16 * (d1 - d2)\nd3 = d3 + 0.11 * (d2 - d3)\nd4 = d4 + 0.08 * (d3 - d4)\n\ndel = (d1 * 0.35 + d2 * 0.3 + d3 * 0.2 + d4 * 0.15) * (1.0 + flut)\n\nfCut = clamp(tone / sr * 2.8, 0.015, 0.45)\nlp = lp + fCut * (del - lp)\n\nwet = (del * (1.0 - damping) + lp * damping) * 1.2\nout = (in * (1.0 - mix) + wet * mix) * 1.42\n",
+    "params": {
+      "feedback": 0.52,
+      "damping": 0.38,
+      "tone": 2100.0,
+      "mix": 0.55,
+      "flutter": 0.22
+    }
+  }
+}
