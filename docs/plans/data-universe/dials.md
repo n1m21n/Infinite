@@ -51,3 +51,9 @@ Each word is a number 0..1 under it, shown as a percentile among all rows (the `
 ## Where it plugs in
 
 W5 matrix link: add c as a column of the context vector x, and the param block outputs a mean and a spread per knob so the spread can be scaled by T. The per-knob u_k table comes from the preset and param rows already gathered; build it first (small, no drive needed for the MIDI and param side).
+
+## The character x node matrix (owner request 2026-10-27)
+
+Every word (spacious, glitchy, dirty, lofi, warm, moving, phat, dark, bright, clean, aggressive) gets a row of weights over Infinite's 28 audio effects and its synths, so a requested character picks nodes by measured use, not by guess. `tools/universe/character_matrix.py` learns it: for each preset (Logic channel strips with plugin chains, Guitar Rig FX tags; 26,915 with an effect or synth) the words in its name, folder and tags give its characters, its chain gives the Infinite nodes it used, and the cell is log2 lift of P(node | character) over P(node), kept at support >= 30. Output: `atlas/character_matrix.json`. The owner's own examples are the declared prior (spacious = reverb + delay, glitchy = bitcrush + shifters, dirty = drive, moving = chorus / phaser / flanger) and the tool prints where data agrees.
+
+Reading the matrix: lift is distinctiveness, not popularity. Delay is common in every character, so its lift is about 0 even for spacious; the `p` field keeps popularity. The generator should use both: the dial picks from lift (what makes a word sound like itself), the base rate keeps the usual chain in place. Where a character needs something no node or plugin mapping supplies, the gap is written as a Field Effect or Field Synth (Phat FX, Pedalboard and an amp model are the biggest unmapped plugin names in the data).
