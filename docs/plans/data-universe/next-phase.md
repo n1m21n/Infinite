@@ -58,7 +58,7 @@ One system where **genre + mood + section** select **notes, instrument, sound an
 | H2 | Filenames like "Piano A#" give free labels; measured pitch confirms them, so labelled multisamples are mostly reliable | Agreement between filename note and measured pitch >= 90% on files that have both |
 | H3 | A shared (genre, mood, section) key lets the link layer predict instrument cluster and sound features better than genre alone | Held-out bits saved for cluster choice beats the genre-only baseline |
 | H4 | Mood measured per row (not declared per genre) separates tracks inside a genre | Within-genre variance of measured valence/energy is larger than the noise of the measurement |
-| H5 | Hat doubling in the C++ groove proposer causes B4/B5; sampling grooves from real clusters instead of rules plus a critic fixes both | Sim already reaches AUC 0.591; a cluster sampler reaches <= 0.65 with entropy >= 0.75 |
+| H5 | Hat doubling in the C++ groove proposer causes B4/B5; rules plus empirical parameter limits (hats drawn from the real distribution, capped at card+4) fix both; pure cluster sampling rejected (it breaks B5 and the data-is-a-guardrail rule) | Sim already reaches AUC 0.591; a cluster sampler reaches <= 0.65 with entropy >= 0.75 |
 | H6 | Synthetic wavetables improve held-out param prediction only if they stay inside the real manifold | Param bits saved rises with synthetic data capped at a fixed share of real |
 
 ## 6. Baseline (recorded once, 2026-10-27; do not re-measure before the final comparison)
@@ -117,7 +117,7 @@ These extend the five pillars already declared per genre (danceability, energy, 
 
 **W5 Link layer.** Two stages. (a) Count baseline: P(instrument cluster | genre, mood bin, section tenth) from atlas rows and the arc tables, then P(sound feature bins | cluster), then preset parameter ranges per cluster. (b) Matrix link: context vector x = [genre | mood | section]; scores s = Vt(Ux) with low rank 8-32 (bilinear genre x mood optional), one W with three output blocks (cluster, sound features, params); numpy least squares / short SGD. Must beat (a) by >= 0.10 bits held-out.
 
-**W6 Gates.** Sim-first for drums (`groove_sim.py`, A/B in `eval/groove_ab`): cluster sampler versus rules plus critic; owner sees the A/B before any C++ port (the 2h port needs sign-off). Colab: notebook now fetches the inbox table through the Drive API; parity run in progress.
+**W6 Gates.** Sim-first for drums (`groove_sim.py`, A/B in `eval/groove_ab`): port 2h (hat-density limits in the C++ proposer, SampleStyles.cpp) is APPROVED 2026-10-27, as is the B5 redefinition (H_gen >= 0.90 x H_real); build via scripts/ibuild.py. Colab parity is confirmed (8/10, matches Pro).
 
 **W7 Join test.** One `.inf` with an `AudioEffects Plugin` node carrying `plugin_state`; render with `--audio-summary`; compare the rendered spectrum to the preset's stored tags. Needs a real state chunk from the Air.
 

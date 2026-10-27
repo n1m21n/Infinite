@@ -98,7 +98,7 @@ New goals this data adds (tracked in the README step rows, measured by the liste
 | G1 Timbre coverage | instruments per family with an audio-based cluster | C3, C4 above |
 | G2 Mix realism (step 6) | B8 on full-mix renders: FRR <= 2%, catch >= 96% with FX chains from Live sets and strips | pass |
 | G3 Genre evidence (step 5) | genres whose clusters and grooves come from counted rows, not MIDI alone | >= 80% of the graph's genres |
-| G4 Drum groove | B4 drums <= 0.65 and B5 escape >= 85% after the owner approves the port | both |
+| G4 Drum groove | B4 drums <= 0.65 and B5 escape >= 85% (port of 2h approved by the owner 2026-10-27) | both |
 | G5 No regression | a retrained model replaces the old one only if no gate gets worse by more than its noise and at least one improves | per retrain |
 
 Retrain procedure: criteria C1 to C6 hold, then `train_all.py --scope shippable`, `benchmark.py`, compare with `models/retrain_history.jsonl`, keep only if G5 holds, and ship the critic header (step 2i) only at 10 / 10.
