@@ -1311,6 +1311,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "detroit-techno-soul-chord-synth",
+      "name": "Detroit Techno Soul Chord Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Soulful Detroit techno chord synthesizer with detuned sawtooth triads, warm analog filter resonance, and velocity-sensitive exponential decay envelope.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-soul-chord-synth.webp",
+      "file": "assets/templates/detroit-techno-soul-chord-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "detroit-techno-machine-lead-synth",
+      "name": "Detroit Techno Machine Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Piercing Belleville machine lead synthesizer with hard frequency modulation bite, resonant high-pass bite, and syncopated harmonic bite.",
+      "price": 0,
+      "preview": "assets/templates/detroit-techno-machine-lead-synth.webp",
+      "file": "assets/templates/detroit-techno-machine-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-garage-sub-drive-saturator-fx",
+      "name": "UK Garage Sub Drive Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Heavy 2-step bass overdrive and saturation processor with asymmetrical diode clipping, low-end punch preservation, and tape warmth harmonics.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-sub-drive-saturator-fx.webp",
+      "file": "assets/templates/uk-garage-sub-drive-saturator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "uk-garage-chopped-vocal-delay-fx",
+      "name": "UK Garage Chopped Vocal Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Syncopated ping-pong dub delay with rhythmic 3/16 dotted divisions, resonant high-cut damping, and subtle pitch-drift tape modulation.",
+      "price": 0,
+      "preview": "assets/templates/uk-garage-chopped-vocal-delay-fx.webp",
+      "file": "assets/templates/uk-garage-chopped-vocal-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

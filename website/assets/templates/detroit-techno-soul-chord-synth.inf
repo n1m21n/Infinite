@@ -1,0 +1,75 @@
+infinite-patch 1
+# Detroit Techno Soul Chord Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 48
+  i note4 51
+  i note5 48
+  i note6 55
+  i note7 58
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 48
+  i note12 51
+  i note13 53
+  i note14 55
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 1300.0 [200.0, 5500.0]\nparam float resonance = 0.35 [0.0, 0.85]\nparam float spread = 0.012 [0.002, 0.04]\nparam float decay = 0.45 [0.1, 1.5]\nparam float drive = 0.35 [0.0, 0.9]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00005, 0.02)\nenv = if(target > env, env + (target - env) * 0.22, env - env * decayRate)\n\nfBase = clamp(freq, 30.0, 3200.0)\nfRoot = fBase * (1.0 - spread)\nfThird = fBase * 1.189207 * (1.0 + spread * 0.5)\nfFifth = fBase * 1.498307 * (1.0 + spread)\n\np1 = (p1 + fRoot / sr) % 1.0\np2 = (p2 + fThird / sr) % 1.0\np3 = (p3 + fFifth / sr) % 1.0\n\nsaw1 = (p1 * 2.0 - 1.0)\nsaw2 = (p2 * 2.0 - 1.0)\nsaw3 = (p3 * 2.0 - 1.0)\nraw = (saw1 * 0.36 + saw2 * 0.32 + saw3 * 0.32) * env\n\nfCut = clamp((cutoff + env * 2400.0) / sr * 2.5, 0.008, 0.45)\nq = clamp(resonance * 1.6, 0.0, 1.4)\nlp1 = lp1 + fCut * (raw - lp1 - q * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * (1.0 + drive * 1.5)\nsat = clamp(u - 0.2 * u * u * u, -0.95, 0.95)\n\nout = sat * 0.34\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.25 0.15 0.45
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Detroit Techno Soul Chord Synth. Soulful Detroit techno chord synthesizer with detuned sawtooth triads, warm analog filter resonance, and velocity-sensitive exponential decay envelope.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

@@ -4627,6 +4627,216 @@
       "file": "assets/library/pixel/pixel-art-8bit-scanline-scroller.field",
       "preview": "assets/library/previews/pixel-art-8bit-scanline-scroller.jpg",
       "bytes": 1900
+    },
+    {
+      "id": "swiss-typographic-modular-grid",
+      "name": "Swiss Typographic Modular Grid",
+      "kind": "Generator",
+      "tags": [
+        "swiss",
+        "typography",
+        "grid",
+        "international-style",
+        "minimal",
+        "vector"
+      ],
+      "description": "Asymmetric International Typographic Style layout with multi-column modular grid proportions, bold red architectural numerals, and hairline alignment rules.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/swiss-typographic-modular-grid.js",
+      "preview": "assets/library/previews/swiss-typographic-modular-grid.jpg",
+      "bytes": 2842
+    },
+    {
+      "id": "swiss-typographic-geometric-axis",
+      "name": "Swiss Typographic Geometric Axis",
+      "kind": "Generator",
+      "tags": [
+        "swiss",
+        "constructivism",
+        "axis",
+        "geometry",
+        "signal",
+        "drawing"
+      ],
+      "description": "Constructive Swiss modernism with dynamic 45-degree diagonal coordinate axes, cantilevered rectangular color blocks, and typographic signal hierarchy.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/swiss-typographic-geometric-axis.js",
+      "preview": "assets/library/previews/swiss-typographic-geometric-axis.jpg",
+      "bytes": 2290
+    },
+    {
+      "id": "brutalist-concrete-cantilever-3d",
+      "name": "Brutalist Concrete Cantilever 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "architecture",
+        "concrete",
+        "cantilever",
+        "monumental",
+        "3d"
+      ],
+      "description": "Monumental poured-concrete cantilever structure with interlocking stepped cubic volumes, deep recessed fenestration apertures, and raw structural facets.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/brutalist-concrete-cantilever-3d.js",
+      "preview": "assets/library/previews/brutalist-concrete-cantilever-3d.jpg",
+      "bytes": 2208
+    },
+    {
+      "id": "brutalist-concrete-megastructure-3d",
+      "name": "Brutalist Concrete Megastructure 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "megastructure",
+        "architecture",
+        "tower",
+        "geometry",
+        "3d"
+      ],
+      "description": "Colossal brutalist civic tower complex with repeating heavy precast spandrels, tiered geometric buttresses, and raw textured chamfers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/brutalist-concrete-megastructure-3d.js",
+      "preview": "assets/library/previews/brutalist-concrete-megastructure-3d.jpg",
+      "bytes": 2014
+    },
+    {
+      "id": "detroit-techno-soul-chord-synth",
+      "name": "Detroit Techno Soul Chord Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "detroit",
+        "techno",
+        "chord",
+        "analog",
+        "audio"
+      ],
+      "description": "Soulful Detroit techno chord synthesizer with detuned sawtooth triads, warm analog filter resonance, and velocity-sensitive exponential decay envelope.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/detroit-techno-soul-chord-synth.inf",
+      "preview": "assets/library/previews/detroit-techno-soul-chord-synth.jpg",
+      "bytes": 2409
+    },
+    {
+      "id": "detroit-techno-machine-lead-synth",
+      "name": "Detroit Techno Machine Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "detroit",
+        "techno",
+        "lead",
+        "fm",
+        "audio"
+      ],
+      "description": "Piercing Belleville machine lead synthesizer with hard frequency modulation bite, resonant high-pass bite, and syncopated harmonic bite.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/detroit-techno-machine-lead-synth.inf",
+      "preview": "assets/library/previews/detroit-techno-machine-lead-synth.jpg",
+      "bytes": 2328
+    },
+    {
+      "id": "uk-garage-sub-drive-saturator-fx",
+      "name": "UK Garage Sub Drive Saturator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "uk-garage",
+        "drive",
+        "saturator",
+        "bass",
+        "audio"
+      ],
+      "description": "Heavy 2-step bass overdrive and saturation processor with asymmetrical diode clipping, low-end punch preservation, and tape warmth harmonics.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/uk-garage-sub-drive-saturator-fx.inf",
+      "preview": "assets/library/previews/uk-garage-sub-drive-saturator-fx.jpg",
+      "bytes": 2057
+    },
+    {
+      "id": "uk-garage-chopped-vocal-delay-fx",
+      "name": "UK Garage Chopped Vocal Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "uk-garage",
+        "delay",
+        "dub",
+        "echo",
+        "audio"
+      ],
+      "description": "Syncopated ping-pong dub delay with rhythmic 3/16 dotted divisions, resonant high-cut damping, and subtle pitch-drift tape modulation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/uk-garage-chopped-vocal-delay-fx.inf",
+      "preview": "assets/library/previews/uk-garage-chopped-vocal-delay-fx.jpg",
+      "bytes": 2147
+    },
+    {
+      "id": "holographic-iridescent-thin-film",
+      "name": "Holographic Iridescent Thin Film",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "holographic",
+        "iridescent",
+        "optics",
+        "pearl",
+        "shader"
+      ],
+      "description": "Optical thin-film interference shader with refractive spectral dispersion, pearlescent fluid ripples, and dynamic chromatic caustic sheen.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/holographic-iridescent-thin-film.field",
+      "preview": "assets/library/previews/holographic-iridescent-thin-film.jpg",
+      "bytes": 1712
+    },
+    {
+      "id": "holographic-iridescent-prismatic-flux",
+      "name": "Holographic Iridescent Prismatic Flux",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "holographic",
+        "prismatic",
+        "crystal",
+        "dispersion",
+        "shader"
+      ],
+      "description": "Multi-layered prismatic crystal dispersion with rotating Fresnel polarization angles, liquid metallic sheen, and spectral caustic flares.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/holographic-iridescent-prismatic-flux.field",
+      "preview": "assets/library/previews/holographic-iridescent-prismatic-flux.jpg",
+      "bytes": 1603
     }
   ]
 }

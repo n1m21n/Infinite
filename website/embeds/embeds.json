@@ -310,6 +310,16 @@
       "slug": "pixel-art-8bit-scanline-scroller",
       "title": "Pixel Art 8-Bit Scanline Scroller",
       "description": "Retro chiptune raster parallax scroller with 4-level olive green palette quantization, scanline raster bars, and sprite mosaic cells. Bass modulates raster bar amplitude and ripple displacement, mids control parallax layer interference, highs trigger radiant phosphor strobe pulses."
+    },
+    {
+      "slug": "holographic-iridescent-thin-film",
+      "title": "Holographic Iridescent Thin Film",
+      "description": "Optical thin-film interference shader with refractive spectral dispersion, pearlescent fluid ripples, and dynamic chromatic caustic sheen. Bass modulates refractive index depth, mids warp iridescent wave curves, highs trigger shimmering caustic highlights."
+    },
+    {
+      "slug": "holographic-iridescent-prismatic-flux",
+      "title": "Holographic Iridescent Prismatic Flux",
+      "description": "Multi-layered prismatic crystal dispersion with rotating Fresnel polarization angles, liquid metallic sheen, and spectral caustic flares. Bass drives crystal facet breathing, mids rotate refractive polarization angles, highs illuminate shimmering spectral caustic dispersion."
     }
   ]
 }
