@@ -38,11 +38,11 @@ All under `~/Infinite/training-data/`; each machine writes its own files and onl
 
 | Source | Done | Target for "collected" |
 |---|---|---|
-| WD-Black audio | about 66,000 of 102,239 files | every file measured or marked duplicate |
+| WD-Black audio | 75,760 of 102,239 files (2026-10-27: 52 folders left) | every file measured or marked duplicate |
 | WD-Black presets / maps / wavetables / Live sets / MIDI | all readers run (see README) | `collect_check` shows 0 missed |
 | Air presets and audio | done | unchanged |
 | Air binary formats | 9,810 rows (`.agr` 219, Bitwig 2,781 headers, NI 6,684, Vital 126); Serum 2 knobs, 3,103 `.ffp` unread | decoded or metadata-only, none silent |
-| Not-parsed musical types (`.fxp`, `.sfz`, `.amxd`, `.asd`, ...) | agent running (step 2n) | all metadata-only or better |
+| Unread musical types (`.fxp`, `.sfz`, `.amxd`, `.asd`, `.cst`, `.bwproject`, `.nksn`, `.nka`) | 22,194 rows in `store/formats_meta.jsonl` (2026-10-27) | `.sfz`/`.fxp` parsed, 6 formats permanently metadata-only |
 | Render pass | Air running AU + VST3 (hundreds of rows); WD-Black-library plug-ins queued for the Pro | one default row for 90% of installed plug-ins; every failure classified |
 | Omnisphere / LABS / Kontakt / Keyscape / Trilian sounds | Air has LABS, Omnisphere, Kontakt 8; Pro has Omnisphere with no library | per-patch rows, see section 7 |
 | Atlas | 14,161 instruments; 2,154 clustered by audio, 9,751 by tags, 2,256 none | see section 4 |
@@ -51,8 +51,8 @@ All under `~/Infinite/training-data/`; each machine writes its own files and onl
 
 | # | Criterion | Check |
 |---|---|---|
-| C1 | Audio pass: every WD-Black audio file has a row or a `dup_of` row | `collect_check` shows 0 audio misses |
-| C2 | No silent skips: every musical extension is decoded or metadata-only; unknown formats triaged | `data_universe.py --status` lists 0 untriaged |
+| C1 | Audio pass: every WD-Black audio file has a row or a `dup_of` row (measured 75,760 of 102,239 rows, 52 folders remaining as of 2026-10-27) | `collect_check` shows 0 audio misses |
+| C2 | No silent skips: every musical extension is decoded or metadata-only (permanently metadata-only: `.asd` Ableton warp markers, `.amxd` Max device patcher meta, `.cst` Logic channel strip, `.bwproject` Bitwig project, `.nksn` Kontakt snapshot, `.nka` Kontakt array); unknown formats triaged | `data_universe.py --status` lists 0 untriaged |
 | C3 | EXS instruments with audio features >= 90% | `instrument_atlas.py` summary |
 | C4 | Audio-clustered share of EXS + Kontakt >= 60%; every family with >= 50 audio rows has silhouette >= 0.40 | `sound_clusters.py` table |
 | C5 | Render pass: >= 90% of installed AU/VST3 plug-ins have a default row on some machine; failures classified (library missing, hang, crash, not ready) | `render_failures` per host |
@@ -69,6 +69,8 @@ All under `~/Infinite/training-data/`; each machine writes its own files and onl
 | `~/Infinite/media`, `films_work`, `behance` | 7.2, 2.5, 0.9 GB | candidates to move to an external drive (tools reference these paths: leave a symlink) |
 | `~/Infinite/worktrees` | 4.0 GB | remove merged worktrees |
 | `training-data` | 5.1 GB | rows only; compress finished big files (`presets.jsonl` 195 MB, `exs.jsonl` 141 MB) to `.gz` and read through gzip |
+
+Completed `store/*.jsonl` tables over 20 MB are mirrored to Drive as `.gz` (`sync_drive.py` already does this).
 
 Moves to an external drive need the owner's yes per folder; nothing is moved or deleted without it.
 

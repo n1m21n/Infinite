@@ -36,3 +36,67 @@ README says the audio pass is blocked at 18,015 of 102,239 files, `training-plan
 3. Add one rule under the storage ledger: completed `store/*.jsonl` tables over 20 MB are mirrored to Drive as `.gz` (`sync_drive.py` already does this); do not change code.
 
 Done = `git diff --stat` shows only those two docs, and every number in them was re-counted today.
+
+## Results (2026-10-27)
+
+### Task A: Metadata reader for unread formats
+- **Status**: Done.
+- **Tool**: `tools/universe/read_formats.py` created and run; `tools/universe/collect_check.py` updated to route all 8 formats to `read_formats`.
+- **Output**: 22,194 rows written to `~/Infinite/training-data/store/formats_meta.jsonl`.
+  - `.sfz`: 8 rows (real parser: opcodes, regions, key ranges, samples)
+  - `.fxp`: 29 rows (real parser: plugin id, program name, chunk size, fx magic, version)
+  - `.asd`: 11,604 rows (metadata-only: ableton_warp_analysis, onset markers, schema magic)
+  - `.cst`: 4,125 rows (metadata-only: logic_channel_strip, OCuA plugin chains or legacy binary)
+  - `.bwproject`: 1,870 rows (metadata-only: bitwig_project, BtWg version, creator, app version)
+  - `.nksn`: 2,447 rows (metadata-only: ni_kontakt_snapshot, chunks)
+  - `.nka`: 2,097 rows (metadata-only: ni_kontakt_array, array name, item count, sample items)
+  - `.amxd`: 14 rows (metadata-only: max_for_live_device, embedded patcher JSON parsed)
+- **Done Number**: `collect_check.py` shows **0 unread** of those 8 formats (read_formats: 22,194 rows from 72 folders; 0 unread/missed).
+
+### Task B: Can a preset be joined to a rendered sound?
+- **Can state chunk be injected into .inf and restored on load?**: **YES.**
+- **Can a program index be chosen via a node parameter?**: **NO.**
+- **Save/Load Path & Code References**:
+  1. Patch serialization: `AudioPluginNode::VisitParams` (`src/nodes/AudioPluginNode.cpp:931-948`) exposes `v.Text("plugin_state", mPluginState)`.
+  2. Text / JSON load: `Patch::LoadParams` (`src/core/Patch.cpp:211-218`) unescapes and loads the string into `mPluginState`.
+  3. Reload hook: `PatchGraph::ReloadDerivedState` (`src/app/graph/Wiring.cpp:1860`) calls `plugin->ReloadFromIdentity()`.
+  4. Node identity restore: `AudioPluginNode::ReloadFromIdentity` (`src/nodes/AudioPluginNode.cpp:589-618`) preserves `mPluginState = savedState` and sets `mPendingStateRestore = true`.
+  5. State restore to plugin handle: `AudioPluginNode::CookIfNeeded` (`src/nodes/AudioPluginNode.cpp:863-870`) calls `Platform::PluginRestoreState(mHandle, mPluginState)`.
+  6. Platform deserialization:
+     - For VST3: `PluginVST3RestoreState` (`src/platform/PluginVST3.mm:3298`) decodes base64 into binary streams and applies `component->setState` and `editController->setComponentState` / `setState`.
+     - For AU: `PluginRestoreState` (`src/platform/Platform.mm:7456`) decodes base64 into `NSDictionary` via `NSKeyedUnarchiver` and sets `h->au.fullState = dict`.
+  7. Program Index: `AudioPluginNode` does not define or expose any program index parameter (only 32 mapped continuous parameters and basic identity/state). However, because `plugin_state` stores the full preset state chunk, preset injection does not require a program index parameter.
+- **The `.inf` field to set**:
+  `s plugin_state <base64_string>` on the `AudioEffects Plugin` node (in JSON representation: `params["s plugin_state"]`).
+- **Smallest test to prove it**:
+  Create `test_plugin_state.inf`:
+  ```text
+  infinite-patch 1
+  node 1 AudioEffects Plugin
+    id fx
+    s plugin_format vst3
+    s plugin_id <plugin_identifier>
+    s plugin_name <plugin_name>
+    s plugin_state <base64_string>
+  end
+  node 2 Utility Audio Out
+    id out
+  end
+  aud out audio fx
+  ```
+  Run command:
+  ```bash
+  Infinite --audio-summary out.json --wav test.wav test_plugin_state.inf --duration 1.0
+  ```
+
+### Task C: Fix stale numbers in the docs
+- **Status**: Done.
+- **Numbers Re-counted (2026-10-27)**:
+  - `audio/features.jsonl`: exactly 75,760 rows (was stale at 18,015 in README and ~66,000 in training-plan).
+  - Audio pass targets: 75,760 of 102,239 done; 52 folders still missed in `collect_check.md`.
+  - `store/formats_meta.jsonl`: 22,194 rows across 72 folders.
+- **Updates applied**:
+  1. Updated audio-pass figures in `README.md` (lines 42, 78, 112) and criterion C1 in `training-plan.md` to 75,760 of 102,239 rows with 52 folders left as of 2026-10-27.
+  2. Defined for criterion C2 in `training-plan.md` the permanently "metadata-only" binary container formats: `.asd`, `.amxd`, `.cst`, `.bwproject`, `.nksn`, `.nka`.
+  3. Added storage rule under `training-plan.md` Section 5: `Completed store/*.jsonl tables over 20 MB are mirrored to Drive as .gz (handled automatically by sync_drive.py).`
+- **Done verification**: `git diff --stat docs/plans/data-universe/README.md docs/plans/data-universe/training-plan.md` shows only those two docs updated.

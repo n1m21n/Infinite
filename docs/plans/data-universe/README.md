@@ -39,7 +39,7 @@ flowchart LR
 | `wt_reader` | 1,432 | wavetable harmonic shapes |
 | `als_reader` | 443 | Live-set automation arcs and device chains |
 | `midi_ingest` | 2,600 | drive MIDI plus Live-set clips |
-| `audio_features` | 26,595 and growing | spectrum, energy, attack, loudness per loop and one-shot |
+| `audio_features` | 75,760 and growing (52 folders left) | spectrum, energy, attack, loudness per loop and one-shot |
 
 ### EXS instruments by family (playable = every zone has its audio)
 
@@ -75,7 +75,7 @@ flowchart LR
 
 | # | Step | Machine | Output | Status |
 |---|---|---|---|---|
-| 1 | WD-Black: finish the audio pass, then re-run `collect_check` until it shows no misses | Pro | `audio/features.jsonl` | 18,015 of 102,239 files done (chunk 1); **blocked 2026-10-27**: the exFAT volume will not mount after the trip (unplugged without eject?). The owner runs First Aid in Disk Utility, then `--resume` |
+| 1 | WD-Black: finish the audio pass, then re-run `collect_check` until it shows no misses | Pro | `audio/features.jsonl` | 75,760 of 102,239 files done (2026-10-27: WD-Black mounted, 52 folders missed in `collect_check.md`; resume next chunk) |
 | 2a | Air: existing readers. `preset_reader` gave 23,509 rows: Diva 15,173, Hive 3,876, Repro 1,783, Ableton 2,665. MIDI copied into `inbox/air_*`: EZkeys 13,038, Kontakt 8 2,206, KORG 184, u-he 74 | Air | `presets/air_presets.jsonl`, `inbox/air_*` | **done** |
 | 2b | Air: new `plain_preset_reader.py` gave 16,487 rows: NI `.nksf` 5,979 (types and characters), Valhalla 3,331, AU 1,744, Phase Plant 1,111, Vital 800, Kilohearts 1,162, Serum 2 tags 626, FabFilter / soothe / TAL / Audio Damage. Ableton clips: 350 `.alc` written as MIDI; Core Library sets 37,908 notes; owner crash-copy sets 26,291 notes | Air | `presets/air_plain.jsonl`, `arcs/air_als.jsonl`, `inbox/air_ableton_clips`, `air_als_*` | **done** |
 | 2b+ | Air: new `binary_preset_reader.py` (read only, Air-run, rows only travel back) gave 9,810 rows: Ableton `.agr` grooves 219 (116 plain XML, 103 binary `ab1e5678`; per note time / duration / velocity, off-grid timing, quantise / timing / random / velocity amounts; 8 binary files lack amounts), Bitwig `.bwpreset` 2,781 (154 kind-0002 factory defaults decoded: device metadata plus 1,826 named parameter values; 2,627 kind-0004 content presets are **undecodable**, body 7.9 bits/byte with no zlib / lzma / bzip2 stream, so header, name and folder only), NI `.ngrr` 2,826 and `.nkp` 3,858 (2,826 + 644 with embedded XML soundinfo: name, author, bank, components, tags; 3,214 Kontakt effect `.nkp` carry no metadata, folder and name only; the NI binary chain is not read), Vital wavetable shapes 126 distinct tables from 794 presets (722 had audio-file or no wave source, 1,552 duplicates). Rows in `grooves/air_agr.jsonl`, `wavetables/air_vital_wt.jsonl`, `presets/air_bitwig.jsonl`, `presets/air_ni_guitarrig_nkp.jsonl`. Still unread: 3,103 `.ffp` not in `FT3i` form, Serum 2 knob bodies (zstd) | Air | `tools/universe/binary_preset_reader.py` | **done** (undecodable parts listed) |
@@ -109,7 +109,7 @@ The owner does 1-2; the session starts at 3 and checks each line before going on
 | 1 | Owner | Plug Wd-Black into the Pro; Disk Utility -> Wd-Black -> First Aid; then Mount | `ls /Volumes/Wd-Black` lists folders |
 | 2 | Owner | Air awake, on the same Wi-Fi, plugged in; System Settings -> General -> Sharing -> Remote Login on | `ssh ... namansoni@Namans-MacBook-Air.local hostname` answers |
 | 3 | Session | Read `docs/NOW.md`, this README, `git log --oneline -5` on `feat/gs-full-data` | last commit is the steps-table update |
-| 4 | Session | Pro: `audio_features.py --resume --budget 20` (one chunk at a time, about 5 chunks a day) | the log grows past 18,015 rows |
+| 4 | Session | Pro: `audio_features.py --resume --budget 20` (one chunk at a time, about 5 chunks a day) | the log grows past 75,760 rows |
 | 5 | Session | Air (while the Pro decodes): render-pass smoke test, step 2d | one row in `audio/render_features.jsonl` |
 | 6 | Session | Pro, between audio chunks: step 2h in `groove_sim.py` only (no C++ yet) | AUC and escape table for the owner |
 | 7 | Owner | Look at the 2h numbers and A/B takes: yes or no to the C++ port | decision recorded under *Decisions* |
