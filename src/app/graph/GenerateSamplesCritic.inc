@@ -61,6 +61,13 @@ namespace SampleCriticData
       { 0x05c1u, 0x1010u, 0xffffu, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u },
    };
 
+   // Hat counts of real unique bars: [0] closed hat lane, [1] open hat lane (quantiles, 64 each)
+   constexpr int kHatCountN = 64;
+   constexpr uint8_t kHatCount[2][64] = {
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 10, 10, 11, 12, 13, 14, 14, 14, 14 },
+      { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 4, 4, 4, 6, 8 },
+   };
+
    // Log2 P(interval -12..+12 | prev_interval_bin 0..6, pitch_class_in_key 0..11)
    constexpr float kMelodyLogP[7][12][25] = {
       {

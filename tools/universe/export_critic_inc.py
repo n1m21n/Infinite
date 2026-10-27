@@ -110,6 +110,28 @@ def main():
     lines.append("   };")
     lines.append("")
 
+    # Real hat counts (lane 2 closed, lane 3 open) from unique TRAIN bars, as 64 evenly spaced quantiles: ProposeGroove
+    # draws the hat count of a candidate from these, capped at the card's count + 4 (groove-2h.md)
+    rows = L.load("~/Infinite/training-data/store", "shippable")
+    train, _ = L.split([r for r in rows if not r.get("synthetic")])
+    seen, uniq = set(), []
+    for r in train:
+        if r["type"] != "drum_groove":
+            continue
+        k = tuple(r["lanes"])
+        if k not in seen:
+            seen.add(k)
+            uniq.append(r)
+    lines.append("   // Hat counts of real unique bars: [0] closed hat lane, [1] open hat lane (quantiles, 64 each)")
+    lines.append("   constexpr int kHatCountN = 64;")
+    lines.append("   constexpr uint8_t kHatCount[2][64] = {")
+    for lane in (2, 3):
+        c = sorted(sum(ch != "." for ch in r["lanes"][lane]) if r["lanes"][lane] else 0 for r in uniq)
+        q = [min(14, c[min(len(c) - 1, int((i + 0.5) * len(c) / 64))]) for i in range(64)]
+        lines.append("      { " + ", ".join(str(v) for v in q) + " },")
+    lines.append("   };")
+    lines.append("")
+
     # 3. Melody log2 P(interval | prev_bin, rel_pc, strong)
     # Compact table: [7 prev_bins][12 rel_pc][25 intervals (-12..+12)]
     mm = model["melody"]

@@ -9,7 +9,7 @@ Verifies:
   B2: Real-music False-Reject Rate (FRR <= 3.0%)
   B3: Mishap Catch Rate on 11 corruption types (MCR >= 96%, 100% on critical mishaps)
   B4: Structural Realism Two-Sample Classifier AUC (cross-validated, unfolded, <= 0.65 for melodies and drums)
-  B5: Out-of-Distribution Novelty & Diversity (Card-escape >= 85%, Pairwise diversity >= real, Cluster entropy >= 0.75)
+  B5: Out-of-Distribution Novelty & Diversity (Card-escape >= 85%, Pairwise diversity >= real, Cluster entropy >= 0.90 x real)
   B6: Personal Taste Adaptation Speed (5 simulated personas reach >= 75% keep-rate by click 20 vs card-only bandit)
   B7: Genre graph regression check (archetypes reach the graph, neighbours well-formed) + leave-one-out neighbour signal
   B8: Spectral gate on real renders (held-out FRR <= 2%, catch >= 96% on damaged copies)
@@ -286,11 +286,16 @@ def main():
     div_real = pairwise_hamming(d_sample[:120])
     mix_prep = L.prep_mix(rec["model"]["drum"].get("mix"))
     clusters = collections.Counter(L.drum_fam({"family": "unlabeled"}, L.cells(p), mix_prep) for p in qd)
-    ent = -sum((v / len(qd)) * math.log2(v / len(qd)) for v in clusters.values()) / max(1.0, math.log2(len(clusters))) if len(clusters) > 1 else 0.0
-    b5_ok = escape >= 85.0 and div_gen >= 0.95 * div_real and ent >= 0.75
+    def cluster_entropy(bars):
+        c = collections.Counter(L.drum_fam({"family": "unlabeled"}, L.cells(p), mix_prep) for p in bars)
+        return -sum((v / len(bars)) * math.log2(v / len(bars)) for v in c.values()) / max(1.0, math.log2(len(c))) if len(c) > 1 else 0.0
+    ent = cluster_entropy(qd)
+    ent_real = cluster_entropy(d_sample)
+    # owner 2026-10-27: the generator must spread over the clusters as much as real music does (>= 0.90 x real), not hit a fixed 0.75
+    b5_ok = escape >= 85.0 and div_gen >= 0.95 * div_real and ent >= 0.90 * ent_real
     print("\n[B5] Out-of-Distribution Novelty & Diversity (QD-Score)")
-    print("     Card-Escape=%.1f%% (>=85%%) | Pairwise-Div=%.3f (real=%.3f) | Cluster-Entropy=%.3f (>=0.75)  -> %s" % (
-        escape, div_gen, div_real, ent, "PASS" if b5_ok else "FAIL"))
+    print("     Card-Escape=%.1f%% (>=85%%) | Pairwise-Div=%.3f (real=%.3f) | Cluster-Entropy=%.3f (real=%.3f, >=0.90x)  -> %s" % (
+        escape, div_gen, div_real, ent, ent_real, "PASS" if b5_ok else "FAIL"))
 
     # ---- B6: Simulated User Adaptation Speed (Taste-Regret@20) -----------------------------------
     k0, k20, card20 = simulate_taste_benchmark(rec)

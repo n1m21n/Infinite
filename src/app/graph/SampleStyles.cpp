@@ -440,7 +440,6 @@ namespace
    void ProposeGroove(Rng& cr, const GenStyle& st, bool mine, const char* inLanes[8], std::string outLanes[8], float& outNov, float& outSync)
    {
       const SampleCriticData::StyleDirective& dir = StyleDirectiveFor(st.id);
-      const float emoIntel  = dir.complexity; // style complexity
       const float emoGroove = dir.pocket;     // groove pocket
       uint16_t baseM[8] = {}, baseG[8] = {};
       for (int l = 0; l < 8; l++)
@@ -452,8 +451,6 @@ namespace
                baseG[l] |= (uint16_t)(1u << i);
       }
       const bool ambient = std::string(st.family) == "ambient";
-      const bool fourFloor = std::string(st.family) == "house" || std::string(st.family) == "techno" ||
-                             std::string(st.family) == "trance" || std::string(st.family) == "hard";
       uint16_t bestM[8];
       for (int l = 0; l < 8; l++) bestM[l] = baseM[l];
       float bestScore = -1.0f, bestSync = 0.2f;
@@ -463,40 +460,43 @@ namespace
       {
          uint16_t m[8];
          for (int l = 0; l < 8; l++) m[l] = baseM[l];
-         const int mode = (emoIntel > 0.65f && cr.Uniform() < 0.45) ? 1 : cr.Range(3);
-         const int cl = cr.Range(32);
-         if (mode == 0)
+         // Hat density from real bars (groove-2h.md): the hat count is drawn from the counts of real unique bars, capped at
+         // the card's count + 4, and its steps from the shipped step table, tripled where the card already hits.
+         // Euclidean hat masks and cluster hats doubled the hat lane (B4 AUC 0.79).
+         for (int lane = 2; lane <= 3; lane++)
          {
-            // Cross-cluster hybrid: keep genre kick anchor, blend hats/percussion from learned cluster + syncopated kick pickup
-            if (!fourFloor && (SampleCriticData::kDrumClusters[cl][0] & 1u))
-               m[0] = SampleCriticData::kDrumClusters[cl][0];
-            else if (fourFloor && cr.Uniform() < 0.65)
-               m[0] = (uint16_t)(0x1111u | (1u << (cr.Range(2) ? 14 : 15)) | (cr.Uniform() < 0.4 ? (1u << 6) : 0u));
-            m[2] = SampleCriticData::kDrumClusters[cl][2] ? SampleCriticData::kDrumClusters[cl][2] : EuclideanMask(cr.Int(5, 11), cr.Range(4));
-            if (cr.Uniform() < 0.5)
-               m[5] = (uint16_t)(SampleCriticData::kDrumClusters[cl][5] & 0x6c6cu);
-         }
-         else if (mode == 1)
-         {
-            // Euclidean polyrhythmic hats + syncopated ghost snare/percussion
-            m[2] = EuclideanMask(cr.Int(5, 13), cr.Range(4));
-            if (m[3] == 0 && cr.Uniform() < 0.6)
-               m[3] = 0x4444u;
-            if (m[1] != 0)
-               m[1] |= (uint16_t)(1u << (cr.Range(2) ? 7 : 15));
-            if (cr.Uniform() < 0.45 + 0.25 * emoIntel)
-               m[5] = EuclideanMask(cr.Int(2, 5), cr.Range(8));
-         }
-         else
-         {
-            // Pocket mutation: displace 1-3 offbeat hits while preserving Beat 1 and backbeats
-            for (int flips = 0; flips < 3; flips++)
+            if (lane == 3 && baseM[3] == 0 && cr.Uniform() >= 0.3)
+               continue;
+            int n = std::min((int)SampleCriticData::kHatCount[lane - 2][cr.Range(SampleCriticData::kHatCountN)],
+                             PopCount16(baseM[lane]) + 4);
+            if (n == 0 && m[lane])
+               n = PopCount16(m[lane]);
+            n = std::min(n, 14);
+            m[lane] = 0;
+            float w[16];
+            for (int s = 0; s < 16; s++)
+               w[s] = SampleCriticData::kDrumStepP[lane][s] * ((baseM[lane] >> s) & 1u ? 3.0f : 1.0f);
+            for (int k = 0; k < n; k++)
             {
-               const int l = cr.Range(6);
-               const int s = 1 + cr.Range(15);
-               if ((l == 0 || l == 1) && (s == 0 || s == 4 || s == 8 || s == 12) && fourFloor)
-                  continue;
-               m[l] ^= (uint16_t)(1u << s);
+               float tot = 0.0f;
+               for (int s = 0; s < 16; s++)
+                  tot += w[s];
+               if (tot <= 0.0f)
+                  break;
+               float u = (float)cr.Uniform() * tot;
+               for (int s = 0; s < 16; s++)
+               {
+                  u -= w[s];
+                  if (u <= 0.0f || s == 15)
+                  {
+                     if (w[s] > 0.0f)
+                     {
+                        m[lane] |= (uint16_t)(1u << s);
+                        w[s] = 0.0f;
+                     }
+                     break;
+                  }
+               }
             }
          }
          if (!ambient && m[0] == 0)
