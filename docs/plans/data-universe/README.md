@@ -92,7 +92,7 @@ flowchart LR
 | 2l | Audio pass speed: dedupe identical files before decoding and scale `--jobs` to the machine (one heavy job per machine, 20-min chunks) | Pro, Air | `audio_features.py` | |
 | 2m | `universe.py`: one entry point that runs each reader, the audio pass and `collect_check` per machine and prints what is left | Pro | `tools/universe/universe.py` | |
 | 3 | Instrument atlas: one row per instrument that joins its key map, presets, audio features, labels and family. `tools/universe/instrument_atlas.py` (the name `universe.py` is taken by the patch-universe work, so 2m becomes `data_universe.py`): EXS 2,413 + Kontakt 229 + Omnisphere 11,519 = 14,161 rows; 477 of 2,413 EXS instruments have audio features so far (the rest wait for the audio pass); Kontakt families are mostly `other` (library names), needs sample-name tagging | Pro | `atlas/instruments.jsonl`, `atlas/summary.json` | **built 2026-10-27**, re-run after each audio chunk |
-| 4 | Sound clusters per family in one timbre space (32-band spectrum + envelope) | Pro | `atlas/clusters.json` | |
+| 4 | Sound clusters per family in one timbre space (32-band spectrum + envelope) | Pro | `atlas/clusters.json` **built** (thin audio base; re-run after audio pass) |
 | 5 | Genres / subgenres: which clusters, grooves and arcs each uses | Pro | `atlas/genres.json` | |
 | 6 | Full mix: levels, FX chains (from Live sets and preset chains), arrangement arcs | Pro | generator update + B4/B8/B10 runs | |
 | 7 | Node work: wavetable presets from the harmonic shapes, preset banks per node from the clusters, missing synthesis types listed | Pro | proposals, each **shown to the owner before building** | |
