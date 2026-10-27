@@ -345,6 +345,7 @@ def main():
     ap.add_argument("--jobs", type=int, default=3, help="0 = cores - 2")
     ap.add_argument("--budget", type=float, default=20, help="minutes")
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--list", help="file of paths (one per line) to analyse instead of walking the roots")
     a = ap.parse_args()
     out = os.path.expanduser(a.out)
     jobs = a.jobs or max(1, (os.cpu_count() or 4) - 2)
@@ -355,7 +356,12 @@ def main():
             if ln.endswith("\n"):
                 done.add(json.loads(ln)["src"])
     t0, n, bad = time.time(), 0, 0
-    todo = ((r, p, a.seconds) for r, p in files(a.roots, a.per_folder) if p not in done)
+    if a.list:  # targeted pass: exactly these files, each under the first root that contains it
+        listed = [l.rstrip("\n") for l in open(a.list) if l.strip()]
+        pairs = ((next((r for r in a.roots if p.startswith(r)), a.roots[0]), p) for p in listed if os.path.exists(p))
+    else:
+        pairs = files(a.roots, a.per_folder)
+    todo = ((r, p, a.seconds) for r, p in pairs if p not in done)
     with open(out, "a" if a.resume else "w") as fo, ProcessPoolExecutor(jobs) as ex:
         pending, seen = set(), {}
         for job in todo:

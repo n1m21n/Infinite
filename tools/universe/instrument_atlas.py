@@ -98,10 +98,28 @@ def audio_index(data):
     return by_path, by_pack
 
 
+def write_targets(data, dest, per=4):
+    """Instruments with no analysed zone file get `per` zone files spread over their key range."""
+    by_path, _ = audio_index(data)
+    want, inst = [], 0
+    for r in rows(os.path.join(data, "samplers/exs.jsonl")):
+        fs = list(dict.fromkeys(z["file"] for z in r["zones"] if z.get("file")))
+        if not fs or any(norm(f) in by_path for f in fs):
+            continue
+        inst += 1
+        want += fs if len(fs) <= per else [fs[i * len(fs) // per] for i in range(per)]
+    want = list(dict.fromkeys(want))
+    open(dest, "w").write("\n".join(want) + "\n")
+    print("%d instruments, %d files -> %s" % (inst, len(want), dest))
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--targets", help="write the zone files still needing audio (4 spread per instrument) to this file, then exit")
     ap.add_argument("--data", default=os.path.expanduser("~/Infinite/training-data"))
     a = ap.parse_args()
+    if a.targets:
+        return write_targets(a.data, a.targets)
     out_dir = os.path.join(a.data, "atlas")
     os.makedirs(out_dir, exist_ok=True)
     by_path, by_pack = audio_index(a.data)
