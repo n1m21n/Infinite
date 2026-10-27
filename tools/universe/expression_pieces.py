@@ -124,7 +124,11 @@ def windows(path, size=16, parsed=None):
                 chunk = seq[w:w + size]
                 t0, t1 = chunk[0][0], chunk[-1][0] + div
                 inside = lambda xs: [round(x, 3) for t, x in xs if t0 <= t < t1]
+                ts = [c[0] for c in chunk]
                 yield {"pitches": [c[1][0] for c in chunk], "vel": [c[1][1] for c in chunk],
+                       # rhythm: gaps between onsets in 16ths (capped at a bar), and top-line notes per quarter
+                       "ioi": [min(16, round((b - a) / (div / 4.0))) for a, b in zip(ts, ts[1:])],
+                       "rate": round((size - 1) / max(0.25, (ts[-1] - ts[0]) / div), 2),
                        "bend": inside(bends), "pressure": inside(press), "slide": inside(slide),
                        "track": ti, "channel": ch, "bar_pos": round(t0 / (div * 4.0), 2)}
 

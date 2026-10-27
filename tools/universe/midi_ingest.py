@@ -10,7 +10,8 @@ map, so a song that changes meter keeps its 4/4 bars. Into the store:
   bass_seq      4/4 bars of the bass channel (GM program 32-39, else the lowest busy channel) as 16 scale degrees
   chord_prog    one chord per bar in any meter, repeats merged, as triad numerals in the detected key plus the full
                 quality (qual: maj7, 7, m7, sus4 ...) and inversion (inv) of each
-  melody_contour + note_expression windows from every file, tagged with a role from the median pitch.
+  melody_contour + note_expression windows from every file, tagged with a role from the median pitch; contours
+                carry their rhythm (ioi: onset gaps in 16ths, rate: notes per quarter)
 Into --arcs (song_detail.py): drum_meter / bass_meter (other meters and triplet-grid bars), song_arc (per-bar curves
 of the whole song) and cc_motion (controller automation). Bars are spread over the song, not taken from the start.
 Chord-pack folders are left to chord_pieces.py."""
@@ -21,6 +22,7 @@ import expression_pieces as E
 import public_drums as D
 import chord_pieces as C
 import song_detail as S
+import arc_analysis as A
 
 FAMILY_WORDS = {"house": "house", "techno": "techno", "trance": "trance", "dnb": "drum_and_bass", "drum_and_bass": "drum_and_bass",
                 "jungle": "drum_and_bass", "breaks": "breaks", "breakbeat": "breaks", "ambient": "ambient", "downtempo": "downtempo",
@@ -288,7 +290,7 @@ def one_file(job):
             steps = [b - a for a, b in zip(w["pitches"], w["pitches"][1:])]
             nm = "inbox:%s#%d" % (name, k)
             out.append({"type": "melody_contour", "src": nm, "family": fam, "role": "bass" if statistics.median(w["pitches"]) < 55 else
-                        ("lead" if statistics.median(w["pitches"]) >= 72 else "mid"), "pitches": w["pitches"], "steps": steps, "license": lic})
+                        ("lead" if statistics.median(w["pitches"]) >= 72 else "mid"), "pitches": w["pitches"], "steps": steps, "ioi": w["ioi"], "rate": w["rate"], "license": lic})
             out.append({"type": "note_expression", "src": nm, "family": fam, "vel": w["vel"], "bend": w["bend"],
                         "pressure": w["pressure"], "slide": w["slide"], "license": lic})
         for p in out + detail:
@@ -361,7 +363,9 @@ def main():
     if a.resume and os.path.exists(out + ".tmp"):
         # a file's rows are written together, so every file named in the .tmp files is complete
         for path in (out + ".tmp", out_d + ".tmp"):
-            for ln in (gzip.open if path.endswith(".gz.tmp") else open)(path, "rt") if os.path.exists(path) else ():
+            for ln in (A.lines(path) if path.endswith(".gz.tmp") else open(path)) if os.path.exists(path) else ():
+                if not ln.endswith("\n"):
+                    break  # the last line of a stopped run can be cut off
                 p = json.loads(ln)
                 done.add(p["src"][len("inbox:"):].split("#")[0])
                 seen.add(p["id"])

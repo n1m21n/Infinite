@@ -328,6 +328,10 @@ def infer_piece_affect(r):
             v = (0.45 * (1.0 - is_minor) + 0.25 * max(0.0, min(1.0, 0.5 + up_bias * 0.9))
                  + 0.15 * max(0.0, min(1.0, (reg - 52.0) / 24.0)) + 0.15 * (1.0 - min(1.0, tens_rate * 2.5)))
             a = 0.45 * min(1.0, leap_rate * 2.2) + 0.35 * min(1.0, span / 18.0) + 0.20 * max(0.0, min(1.0, (reg - 48.0) / 36.0))
+            if r.get("rate"):
+                # listener labels (EMOPIA, VGMIDI): note rate ranks arousal at AUC 0.88 / 0.68 on both sets, while
+                # leaps, span and register flip sign between them, so the rate leads where the row has its rhythm
+                a = 0.75 * max(0.0, min(1.0, (float(r["rate"]) - 0.5) / 3.5)) + 0.25 * a
     elif t == "drum_groove":
         lanes = r.get("lanes", [])
         dens, sync = groove_density_and_sync({str(i): lanes[i] for i in range(min(8, len(lanes))) if lanes[i]})
