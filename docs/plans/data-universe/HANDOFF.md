@@ -1,46 +1,37 @@
-# Sound model: handoff plan (2026-10-28)
+# Sound model: handoff plan (2026-10-28, rewritten after the owner's survey, section 6)
 
-For the next Claude account. Read this, then `SOUND-MODEL.md` sections 1, 4 and 4b. This file replaces "keep rendering presets"
-as the next step.
+For the next Claude account. Read this whole file first (section 6 holds the owner's own answers and wins over anything else), then
+`SOUND-MODEL.md` sections 4 and 4b for the measured state. This replaces "keep rendering presets" and the earlier pick-first plan.
 
-## 1. The purpose, in one line
+## 1. The purpose
 
-Infinite's generator picks a sound that fits a (genre, mood, section) and the owner prefers it in a blind test (M5). Everything
-below serves that test. A forward model of Diva is a means, not the goal.
-
-## 2. Think broadly: two roads to M5
+**A model that understands sound at an intelligent level and can therefore make new sounds.** Understanding means one shared,
+mathematical space where timbre (synth knobs, samples) and music (pitches, chords, changes over time) are described by measurable
+rules, not by human labels. "Built" means: it understands the **characteristics** of a sound (brightness, dullness, darkness, and a
+defined set like them), for any sound or phrase, including ones it never heard. Emotion, genre and clusters are maps on top of
+that space, by rule. No UI/UX now.
 
 ```
- ROAD A: PICK  (reaches M5 first)                         ROAD B: MAKE  (research, gated)
- every sound we already have                              knobs ──M1 forward──▶ sound
-   ├─ 195k sample/loop features (features.jsonl)          sound ──M2 inverse──▶ knobs
-   ├─ Diva 3,873 presets (v1 desc) + 1,631 (v2 mel)        needs many renders per synth,
-   ├─ Vital, Omnisphere rows (partial)                     R2 bars 0.50 / 0.40 far away
-   ▼                                                       (0.22 / 0.17 at 1,125 presets)
- one sound embedding for all of it
-   ▼
- words <-> sound (M4) from the tags already in presets and packs
-   ▼
- generator retrieves the best existing sound or preset for (genre, mood, section)  ──▶  M5 blind test
+ inputs                          the shared space (core)                         maps on top (later)
+ synth knobs + note ─┐     ┌─ characteristic set, each a math rule,      ┐     ┌─ instrument / sound clusters
+ samples, loops      ├──▶  │  each measured as a curve over time:        ├──▶  ├─ emotion by rule (owner's rules)
+ MIDI phrases        ┘     │  brightness, darkness, roughness, attack,   │     └─ make new sounds: set knobs/notes
+                           │  loudness, pitch, chord tension, density ... ┘        to reach a target point
+                           └─ datasets = reference points for structure, never emotion truth
 ```
 
-Road A uses data that already exists, works for every plug-in and sample at once, and answers the owner's question ("does the model
-pick better sounds?") soonest. Road B is only needed to *invent* settings no preset has; it resumes when Road A shows that picking from
-existing presets is the limit.
+## 2. The plan, one touch point per phase
 
-## 3. The plan, with one touch point per phase
-
-| Phase | Work | Bar (done when) | Budget |
+| Phase | Work | Done when | Budget |
 |---|---|---|---|
-| P1 Inventory | one table of every sound source: rows, features present (desc / mel / tags), plug-in, licence, machine. Read only | the table exists in this file | 1 h |
-| P2 Sound embedding | one vector per sound from what is stored (43 descriptors + 64 x 48 mel where present); standardise across sources; nearest-neighbour sanity check by ear on 20 queries | 15 of 20 neighbours judged "same kind of sound" by the owner | 1 session |
-| P3 Words <-> sound (M4) | tags from preset names, banks and pack metadata; per word with >= 30 sounds, a classifier on the embedding, scored on held-out banks | AUC >= 0.75 for the majority of words; recall@10 >= 0.5 | 1 session |
-| P4 Generator pick (M5 lite) | (genre, mood, section) -> words -> top sounds -> the patch; compare with today's tag lookup | owner prefers the model's pick in >= 6 of 10 blind trials | 1 session + owner's 20 min |
-| P5 Road B, only if P4 shows the limit is "no preset sounds right" | the D2 one-knob-variant pilot vs more presets at equal cost (`SOUND-MODEL.md` 4b), then M1 / M2 | M1 bars | per 4b |
+| P1 Characteristic set | Write the set (about 12-16), each with: name, the math rule, unit, how it is measured over time, and the literature it rests on (Timbre Toolbox, Peeters 2011; sharpness, Zwicker and Fastl; roughness, Sethares / Vassilakis; consonance and tension, Plomp-Levelt, Lerdahl). Timbre side (brightness = spectral centroid, darkness, dullness, warmth, roughness, noisiness, attack, decay, width, movement) and music side (pitch height, register spread, chord consonance / tension, harmonic rhythm, note density, contour). Opposites (bright / dark) are one axis, not two | the owner signs off the list | 1 session |
+| P2 Measure everything | One tool: characteristics of any audio / mel / MIDI, as curves over time. Run it on what is held: Diva v2 mel rows (1,631), Diva v1 descriptors (3,873), sample features (195k), MIDI corpus. Table of which characteristic each source can give | coverage table in this file; repeat measurement identical | 1 session |
+| P3 Understands | Forward model predicts the characteristic curves from knobs + notes, scored on held-out presets and phrases (`m1_forward.py` with characteristic targets instead of the 43 raw descriptors) | each characteristic R2 >= 0.6 on the group split, or a learning curve that says which data closes the gap (data contract, `SOUND-MODEL.md` 4b) | 1-2 sessions |
+| P4 Shared across sources | A sound from Diva, Vital or a sample with similar characteristics lands in the same place; timbre and phrases share the axes | nearest neighbours across sources agree on the characteristic values within the repeat noise | 1 session |
+| P5 Makes | Set knobs (and notes) to reach a target characteristic point; render; measure | rendered point within a set distance of the target, better than the closest existing preset | after P3 |
+| P6 Maps | Clusters (instrument families) and the owner's emotion rules over the characteristic curves | owner's rules written; clusters checked against reference datasets | after P4 |
 
-Optional, owner's approval needed (a download): a pretrained audio-text model (for example LAION-CLAP, open weights) gives
-words <-> sound without our tags, but it needs audio, and only mel is stored. That means re-rendering the chosen sounds locally (raw
-audio never leaves the machine). Weigh it after P3: use it only if our tags are too thin.
+Data rule for every phase: collect only what a learning curve or an error says is missing (section 4).
 
 ## 4. Rules that keep the project honest
 
@@ -62,3 +53,20 @@ audio never leaves the machine). Weigh it after P3: use it only if our tags are 
 | M1 learning-curve results | `~/Infinite/training-data/models/m1_diva_lc/` |
 | Renderer (fast, batched) | `tools/universe/render_pass.py` (`render_states`), `preset_state.py`; Pro script `~/Infinite/scratch_omni/diva_v3.sh` |
 | Torch venv | `~/Infinite/ml-venv` (CPU) |
+
+## 6. Owner's answers (survey, 2026-10-28)
+
+1. What the sound model is for: "understand sound at an intelligent level", meaning the context of mood, genre, frequency, instrument,
+   knob data and every other data point together, "and hence have the ability to make new sounds". So **making new sounds is the
+   goal and understanding is how**: one shared space for all those data kinds. Road A (pick) is a step on the way, not the end.
+2. First proof: none of the user-facing ones (edit by words, text to sound, recreate, blend). Words are the model's *internal*
+   understanding, not a feature. If the model understands words and sounds together, it can cluster sounds and instruments, give a
+   robust algorithm, and map everything to emotions. No UI/UX work now; the owner designs that once the model exists. So the proofs
+   are internal: held-out scores on the shared space (clusters, instruments, emotions), not demos.
+3. Emotion ground truth: not human labels. Public datasets and industry songs carry human *perception* (memory, nostalgia, culture),
+   which shifts as cultures and sub-cultures change, so it is not trustable as truth. Music is a mathematical entity: describe it by
+   scientific rules (loudness, brightness, frequency, pitches, chords, and how each changes over time). Datasets are reference points
+   for how structure looks (a melody, a chord, a strong form), not emotion labels. So the model's core is a measurable description
+   space; emotion is a rule-based map on top of it, never a learned label.
+4. Timbre and notes: **one shared space**. A sound's timbre and a phrase's pitches, chords and changes over time are one vector,
+   so a pad and a chord progression can be compared and matched. The note-model track (MIDI, B1-B10) and the sound track join.
