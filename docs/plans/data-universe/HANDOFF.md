@@ -367,3 +367,20 @@ Held-out bank vs the owner's Analog patches (same ensemble, trained outside the 
 | density | 0.67 | 0.01 |
 Mean R2: bank 0.696, human -0.306. Error in bank spreads: bank 0.54, human 0.52, i.e. the absolute error on the owner's patches equals the held-out bank's.
 Why R2 collapses: the owner's Analog patches span only a sliver of the bank on warmth (0.11 of the bank sd) and weight (0.08), so R2 divides by a tiny variance. Read the error-in-spreads column, not R2, for this engine. The model cannot rank the owner's patches against each other on warmth/weight (resolution), but it is no less accurate in absolute terms.
+
+### C2 String result (2026-10-28)
+| tier | axis moves | direction right (bar 90) | size r (bar 0.7) | verdict |
+|---|---|---|---|---|
+| single moves | 893 | 73.6% | 0.604 | MISS |
+| combined moves | 414 | 81.9% | 0.453 | MISS |
+Exploratory (|change| >= 0.5 sd): single 114 moves, 81.6% / r 0.631; combined 33 moves, 81.8% / r 0.643.
+
+### C2 across all six engines (single / combined; direction %, size r)
+| engine | single | combined | verdict |
+|---|---|---|---|
+| Analog, Oscillator | see earlier entries | | MISS |
+| Wavetable | 55.8 / -0.47 | 53.8 / 0.55 | MISS |
+| FM | 65.7 / 0.67 | 71.0 / 0.69 | MISS |
+| Metallic | 62.8 / 0.18 | 77.6 / 0.97 | MISS (direction) |
+| String | 73.6 / 0.60 | 81.9 / 0.45 | MISS |
+No engine reaches 90% direction. C2 stays a MISS in the claims freeze.
