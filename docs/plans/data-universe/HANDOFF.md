@@ -384,3 +384,6 @@ Exploratory (|change| >= 0.5 sd): single 114 moves, 81.6% / r 0.631; combined 33
 | Metallic | 62.8 / 0.18 | 77.6 / 0.97 | MISS (direction) |
 | String | 73.6 / 0.60 | 81.9 / 0.45 | MISS |
 No engine reaches 90% direction. C2 stays a MISS in the claims freeze.
+
+### Preset anchors from existing Diva measurements (2026-10-28)
+`tools/universe/preset_anchors.py`: k-means in standardized axis space over `characteristics/preset_diva_v1.jsonl` (18,907 note-renders, 10 axes; `movement` dropped, <85% coverage), one medoid per cluster. k=12 gives anchors from distinct families (drones/FX, chord leads, keys, basses, percussion, hi-hats), each a real human preset with its source path; output `training-data/own/anchors_diva.json`. These are audio-space anchors (route A): use as reach targets / coverage checks, no knob mapping. Same recipe applies to the other engines once rendered (Vital next: open JSON).
