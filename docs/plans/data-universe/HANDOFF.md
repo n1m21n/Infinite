@@ -471,3 +471,13 @@ Dev build (`ibuild.py build --mode dev`, -j2) running; Vital/Serum state re-run 
 
 ## Block 3 (2026-10-28, evening)
 The unassigned count is 2,252 (not 3,894: earlier tag passes placed more). They are not timbre-ambiguous instruments but Omnisphere phrases (948), one-shots (194), psychoacoustic FX (414), retro textures (408), Spitfire loop libraries (209) and 79 generic: Omnisphere sound sources cannot be rendered on their own (only patches that use them), so `tools/universe/assign_rest.py` assigns them a content-kind cluster from the library path (`assigned: "path"`, `kind_cluster: true`) -> `atlas/instruments_assigned.jsonl`. Unassigned 0 of 14,161 (bar < 5%). A kind is not a timbre cluster; a timbre model should skip `kind_cluster` rows. Rendering them stays open.
+
+## 2026-10-28 (later) — Blocks 2 and 4 follow-up
+- Block 4: no Harmonix Set and the Ableton mixer data is unusable (faders at 0 dB, sends off; `mix_als.py`, 89 sets, 1,787 tracks, kept for devices/pan only).
+  Replacement: `mix_audio.py` measured 1,680 finished tracks on the WD drive (LUFS, crest, side/mid, 6 band shares, section arc).
+  `mix_to_csv.py` wrote 33 measured rows into `feel/dataset/4_Mix.csv` (evidence M). The 496 'role x band energy share' rows are still priors: no stems exist, only masters.
+- Block 2 robustness (`v_boost.py`, 53 features, 10 song-grouped splits, 4 model families):
+  E r = 0.82-0.87 (sd 0.02-0.03), acc 91-92%: passes, stable across families.
+  V r = 0.51-0.58, acc 73-76%: plateaued across all families and added harmony features. Feature-limited; the bar (0.8) stays unmet.
+- Sign-off (decided by the agent, owner delegated 2026-10-28): E rules approved for use. V rules are ADVISORY only: compose may nudge mode/brightness from V but no
+  decision may depend on V alone. Owner's 40-clip check is still the real V test.
