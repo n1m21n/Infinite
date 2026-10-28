@@ -79,11 +79,60 @@ own island (coverage 0): effects measured on one broadband test signal, so they 
 Step-by-step execution from here: `EXECUTION.md` (start at Step 0). What the model claims and the numbers that prove it
 (C1 axes, C2 ingredients, C3 good, C4 words, C5 moods and emotions, C6 creative, C7 makes): the claims registry in `EXECUTION.md`.
 
-Data rule for every phase: collect only what a learning curve or an error says is missing (section 4).
+Data rule for every phase: measure everything held, fully and losslessly (section 3); learning curves decide only how many new renders to make.
+
+## 3. Data map: every data kind, its job, and the gap that is filled (owner 2026-10-28)
+
+Owner: the learning algorithm is only as good as its data; no lossy, missing or thin data. So every kind held is measured fully and
+placed, and every gap below is filled (`EXECUTION.md` Step G). The learning-curve rule decides only how many *new renders* to make,
+never whether to measure what is held.
+
+Five jobs in the one shared space (the 22 axes, plus the audio embedding as the full fingerprint, below):
+
+| Job | What it gives the model | Claims |
+|---|---|---|
+| teacher | ingredients -> sound, rendered without limit from Infinite's engines | C1, C2 |
+| map | where real, good sounds live | C3, C7 |
+| words | warm, glitchy, dark ... from names, tags, folders | C4 |
+| structure | notes, chords, grooves, song form, genres | C6, C8 |
+| mood | the owner's rules, with references beside them | C5 |
+
+| Data | Held | Job | Gap filled by Step G |
+|---|---|---|---|
+| node params of our engines | `atlas/node_registry.json`, `--describe` | teacher | ranges per param (G1) |
+| renders of our engines | made in Step 2 | teacher | lossless record: recipe + partials + velocities + release (G1) |
+| presets (Diva, Omnisphere, Ableton, Logic, Bitwig ...) | `presets/`, `steam/`, `audio/diva_*` | map, words | - |
+| audio samples | `features.jsonl` 182k, Air 12k | map | curves, partials, pitch from the drive (G3) |
+| pitch, frequency, spectrum | measured (P2) | axes 2-7, 13 | finer: partials (G2) |
+| wavetables | `wavetables/` 1,432 tables, 20k spectra | map (oscillator level) | measured on the axes (G10) |
+| instruments (EXS, Spitfire, Omnisphere) | `atlas/instruments*.jsonl` 14k | map, cluster names | - |
+| clusters, character matrix | `atlas/clusters.json`, `character_matrix.json` | checks, words | - |
+| MIDI (pitch, velocity, chords) | `store/inbox.jsonl` 3.16M | structure | CCs, meters, tempo changes, orchestration, EMOPIA (G4) |
+| chords, grooves, song arcs | `store/chords`, `grooves/`, `arcs/` | structure | mix data from Ableton sets (G8) |
+| mood | `mood/song_mood.jsonl` 203k, owner's albums | mood reference | - |
+| genres, subgenres | `atlas/genres.json` | structure | placed as regions + structure, claim C8 (G5) |
+| node expressions, patch pieces | `store/expression_pieces` 1,271, `patch_pieces` 892 | teacher, level 2: chains | claim C9 (G6) |
+| user behaviour (keep / undo / tweak) | local Prediction data | personal map | claim C10, local only (G7) |
+| audio embedding | not made | full fingerprint beside the axes | claim C11 (G9) |
+
+Musical data per level, all to be measured (G2, G4, G8):
+
+| Level | Data |
+|---|---|
+| one sound | fundamental, partials (frequency, level, decay each), inharmonicity, odd / even balance, formants, spectral envelope, noise part, transient, ADSR, pitch envelope and glide, vibrato, tremolo, modulation, stereo width and phase, room tail, loudness, velocity response, tuning in cents |
+| notes and music | velocity, microtiming, swing, duration and articulation, register, intervals, chords and voicing, key and mode, harmonic rhythm, contour, rhythm pattern, meter, tempo, CC automation, instrumentation, song form |
+| mix | level balance, panning, EQ masking, compression and crest factor, loudness (LUFS), effect chain order |
+
+**Audio embedding: where it sits.** The 22 axes are what the model can explain; they are not the whole sound. An embedding (a
+pretrained audio network's fingerprint) holds the rest. Jobs: (1) gap finder: predict the embedding from the 22 axes; what the axes
+cannot explain points to the next missing characteristic (C11); (2) nearest neighbours across sources for P4 and start points for
+P5; (3) Frechet Audio Distance (Kilgour 2019) for whole-set checks (C3, C6); (4) a text-audio embedding (CLAP) as a second view of
+words (C4). It never replaces the axes: the axes stay the understanding, the embedding is the check that nothing is lost. A neural
+codec (EnCodec / DAC) can also store any audio near-losslessly in little space. Model download: owner's yes first.
 
 ## 4. Rules that keep the project honest
 
-- No data collection without a learning curve or error diagnosis that names the data, its budget and its proof (`SOUND-MODEL.md` 4b).
+- Everything held is measured fully (section 3). New renders need a learning curve or error diagnosis that names them, their budget and their proof (`SOUND-MODEL.md` 4b).
 - Each phase ends at its bar or its budget, whichever comes first. Write the number into this file, then stop.
 - One heavy job on one machine (the Pro). The Air is parked; its Diva shards stalled for an unknown reason (2026-10-28).
 - Builds only via `scripts/ibuild.py`. New nodes, panels or downloads need the owner's yes. No Claude attribution in commits.

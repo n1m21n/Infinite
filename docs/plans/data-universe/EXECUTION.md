@@ -9,7 +9,7 @@ done in the session. Decisions are written as rules below, so the session runs t
 |---|---|
 | Phase order | P3 bar (each characteristic mean R2 >= 0.6 on the group split) before P5; P4 before P6. No skipping |
 | Bars do not move | a miss is recorded with its learning curve, never re-scored with an easier bar |
-| Data rule | no render without a step here that names the error it fixes and the test that shows it helped |
+| Data rule | everything held is measured fully and losslessly (Step G, owner 2026-10-28); new renders need a step that names the error they fix |
 | One heavy job | renders and training run one at a time on the Pro; the Air stays parked |
 | Budgets | about 20 min per job; check rows appear within 3 min of starting; stop file for every render |
 | Map vs learner | other synths and samples = map (measured, never shipped); Infinite's nodes = learner (owner, 2026-10-28) |
@@ -51,6 +51,33 @@ Record the group and random medians in the 4b pilot table, then apply:
 | any two results within 0.03 | rerun both with `--seeds 3` before deciding (1 seed is the noise level) |
 
 Done when: the table has the two rows, HANDOFF status names the decision, commit.
+
+## Step G - fill every data gap (owner 2026-10-28: no lossy, missing or thin data)
+
+Runs before Step 2's first batch (G1, G2 decide the render format) and then beside the steps, one heavy job at a time. Each gap:
+tool, output, check. Done = row in `HANDOFF.md` section 3 says "filled" with the count.
+
+| # | Gap | Do | Output | Check |
+|---|---|---|---|---|
+| G1 | lossless renders of our engines | each render row stores: the full recipe (engine, every param, note, velocity; renders are deterministic, so the recipe *is* the lossless record, re-renderable any time), 128-band mel at 10 ms, the partial list (top 64 peaks: frequency, level, decay each), noise envelope in 32 bands, the release tail; velocities pp / mf / ff; notes C1-C6 spread; param ranges read from the node sources; wav kept for every frozen test row and listening set | `own_<engine>.jsonl` schema 3 | re-render of 20 recipes matches its stored row bit for bit (or r >= 0.999) |
+| G2 | missing measurements | add to `characteristics.py`: partials (roughness, inharmonicity, odd / even, decay per partial), formants (21), glide by YIN (22), space from the release (20), vibrato and tremolo rate / depth, velocity response (brightness change pp -> ff), tuning in cents | new axis columns | `characteristics.py test` gets one synthetic check per new measurement (bell inharmonic, square odd-only, 808 glide down, dry vs reverb tail ...) |
+| G3 | samples as full data | re-measure the 195k samples from the WD-Black drive: curves over time, partials, pitch by YIN, G2 measurements | `features_v3.jsonl` | 50 files measured twice identical; pitch matches the key in the file name on >= 90% where named |
+| G4 | MIDI fully extracted | CCs (which, when, how fast), meters incl. non-4/4, tempo changes, instrumentation / orchestration, EMOPIA (raw MIDI kept until done) | `store/midi_full.jsonl` | counts per field reported; 20 files checked by hand |
+| G5 | genres, subgenres | `atlas/genres.json` + tracks with genre: each genre as a region of the 22 axes plus structure (tempo, groove, chords, form) | `atlas/genre_regions.json` | claim C8 |
+| G6 | node expressions, patch pieces | chains of nodes as the second learner level: ingredient = a node or Field expression in a chain; parsed from `expression_pieces`, `patch_pieces`, Ableton device chains | `store/chains.jsonl` | claim C9 (after C1, C2 pass on single engines) |
+| G7 | user behaviour | from the local Prediction data: what a user keeps, undoes, tweaks; stays on the machine, never uploaded | per-user critic offset | claim C10 |
+| G8 | mix data | from Ableton sets (`arcs/als*.jsonl`): track levels, pans, sends, device chains; from album and loop audio: balance, masking, crest, LUFS | `store/mix.jsonl` | counts reported; 10 sets checked by hand |
+| G9 | audio embedding | a pretrained embedding (CLAP for audio + text, and a codec, EnCodec or DAC) on every render, sample and map row; model download needs the owner's yes | `embeddings/*.npy` | claim C11 |
+| G10 | wavetables measured | every frame of `wt.jsonl`, `wt_synth.jsonl`, Vital tables on the 22 axes + partials (tables are single cycles, partials are exact) | `characteristics/wavetables.jsonl` | 64 built-in tables measured from the node agree with their source |
+
+New claims from the gaps (same rules as C1-C7):
+
+| # | Claim | Dataset | Frozen test set | Bar |
+|---|---|---|---|---|
+| C8 | understands genres and subgenres | genre regions (G5), tracks and loops with genre in name or folder | tracks of held-out packs | genre from axes + structure: top-3 accuracy >= 0.7; a reference check, not truth (owner 6.3) |
+| C9 | knows what a node in a chain does | chains (G6), rendered with one node changed | 200 held-out chain moves | C2 bars on chains |
+| C10 | learns a user's taste | local behaviour (G7) | the user's last 20% of actions | personal critic beats the shared critic on that user's keeps, AUC +0.05 |
+| C11 | the axes hold the sound | embeddings (G9) of held-out rows | 2,000 rows | R2 of the embedding from the 22 axes, reported per round; each new axis must raise it; what stays unexplained is listened to and named |
 
 ## Step 2 - Analog sweep generator (P3 on the learner) - one session
 
