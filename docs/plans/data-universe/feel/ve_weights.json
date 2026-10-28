@@ -1,0 +1,58 @@
+{
+ "n_clips": 1078,
+ "heldout": {
+  "V_ridge": {
+   "r_mean": 0.508,
+   "r_sd": 0.037,
+   "acc_mean": 0.724
+  },
+  "V_gbr": {
+   "r_mean": 0.547,
+   "r_sd": 0.04,
+   "acc_mean": 0.744
+  },
+  "E_ridge": {
+   "r_mean": 0.816,
+   "r_sd": 0.021,
+   "acc_mean": 0.913
+  },
+  "E_gbr": {
+   "r_mean": 0.844,
+   "r_sd": 0.03,
+   "acc_mean": 0.909
+  }
+ },
+ "ridge_weights_raw_units": {
+  "V": {
+   "band_presence": -3.55195,
+   "deg6": 2.59039,
+   "band_sub": -1.82243,
+   "key_r": 1.80399,
+   "deg10": 1.61895,
+   "deg0": -1.46155,
+   "silence": 1.39276,
+   "major_ness": 1.25604,
+   "deg8": -0.90948,
+   "deg2": -0.79186,
+   "deg9": 0.7771,
+   "poly_rough": 0.68762,
+   "_alpha": 71.96856730011514
+  },
+  "E": {
+   "band_presence": -1.99602,
+   "deg2": 0.94583,
+   "deg10": -0.93365,
+   "band_sub": 0.69405,
+   "deg6": 0.65346,
+   "poly_rough": -0.51358,
+   "chromatic": 0.46409,
+   "key_r": 0.44185,
+   "silence": 0.40899,
+   "deg0": 0.37713,
+   "deg3": -0.32954,
+   "ioi_med": -0.29539,
+   "_alpha": 19.306977288832496
+  }
+ },
+ "bar": "held-out r >= 0.8 on V and E"
+}
