@@ -256,3 +256,7 @@ Why (reading, not yet tested): a pack's single loops and one-shots (kicks, hats,
 | Oscillator, all | 1,276 | 61.8% | 0.549 | MISS | 103 moves: 84.5%, r 0.614 |
 
 Reading: most axis changes from a 1-3 knob move are near zero, and the sign of noise is a coin flip, so 'direction right' is dragged to ~60%. Big moves are predicted with the right sign 75-85% of the time. The claim as frozen stays MISS; no wording about 'knows what each knob does' is allowed yet. Next: more rounds (data), ensemble size, score only the axes the activity map says the knob drives.
+
+## G3 sample library, features_v3 (2026-10-28)
+
+`samples_v3.py run --budget 30`: 11,316 rows in ~29 min. Repeat check: 50/50 identical. Pitch class from the audio vs the pitch in the file name: **462/691 = 66.9% (bar 90) -> below the bar.** The pitch feature stays out of any claim until the mismatches are split into 'file name wrong' and 'estimator wrong' (octave errors, percussive and noisy sounds have no pitch). Next: list the 229 mismatches by instrument family.
