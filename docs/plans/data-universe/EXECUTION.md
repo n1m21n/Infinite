@@ -24,6 +24,7 @@ cat docs/plans/data-universe/HANDOFF.md docs/plans/data-universe/EXECUTION.md
 ls ~/Infinite/scratch_omni/diva_d1b.done ~/Infinite/scratch_omni/diva_d2w.done
 grep -h "extra rows\|characteristic means" ~/Infinite/training-data/models/p3_d1b.log ~/Infinite/training-data/models/p3_d2w.log
 pgrep -fl "preset_state|p3_characteristics"     # nothing heavy may be running before a step starts
+python3 tools/universe/claims.py table              # once claims.py exists: today's state of C1-C7
 ```
 
 If a log is missing and nothing runs: rerun the missing line from Step 1 (commands there).
@@ -112,6 +113,8 @@ Designs, each a folder name (= bank):
 | `pair` | two or more knobs moved together on a base point; first batch uniform, later rounds where the models disagree most about the combined effect | 10% |
 
 First batch: 2,000 renders (about 30 min at 4 shards; split into two 15 min jobs), stop file `~/STOP_OWN`.
+Before Step 3: build `claims.py` and run `claims.py freeze` for C1, C2 and C3 (their test sets are drawn from the first batch and
+the map rows, then never trained on); C4-C7 are frozen when their step starts.
 Check: row count grows within 3 min; `characteristics.py test` still passes; 2 renders of the same point agree r >= 0.97.
 
 ## The self-learning loop (as agreed with the owner; nothing in it is hand-picked)
@@ -139,15 +142,8 @@ What is learned and what is not. The rule: **nothing about sound is decided by h
 | What is new | novelty N and reach R from `dials.md`, measured against everything rendered so far | a hand-cut grid of the space |
 | Clusters (pluck, pad, bass ...) | regions found in the data (density of the map on the 22 axes), named afterwards from preset and sample names | categories decided first |
 
-How sure: no claim counts until a render the model never saw confirms it.
-
-| Claim | Test, written down before the render | Counts when |
-|---|---|---|
-| the model understands an axis | P3: group split, whole designs held out, 3 seeds | R2 >= 0.6 (bar unchanged) |
-| the model knows what a knob does here | it predicts the change of a real one-knob or pair render before it happens | predicted vs measured change: sign right >= 90%, size r >= 0.7, on 200 held-out moves |
-| the model can make a sound | P5: target point, the model's knobs, render, measure | closer than the nearest existing render, within repeat noise on passed axes |
-| the critic knows good | held-out map rows vs held-out random renders | AUC >= 0.8, and the owner hears 20 of its top and bottom picks blind |
-| creativity is real | `dials.md` checks: c = 0 reproduces typical, N and R rise with c, K stays above floor at c = 0.7 | all three hold on held-out contexts |
+How sure: every claim has its own dataset and bar, in the claims registry below. No claim counts until a render the model never saw
+confirms it.
 
 ```
   map (Diva, Omnisphere, samples, wavetables)        learner (Oscillator, Analog, Wavetable, FM, Metallic, String)
@@ -159,6 +155,35 @@ How sure: no claim counts until a render the model never saw confirms it.
   target = any point, or current + a move ------> search knobs on the network -> render -> measure
                                                   '-- every miss is new training data ----------------'
 ```
+
+## Claims registry: what the model claims, and the numbers that prove it (owner 2026-10-28)
+
+Each claim has one dataset, a test set frozen before any training touches it, one metric, one bar and the step that produces it.
+Tool: `tools/universe/claims.py` (new) with `freeze` (writes `eval/splits/claims.json` once; a frozen set is never retrained on),
+`predict` (stores the model's predictions with a hash and time before the render), `score` (renders exist -> metric -> pass / miss),
+`table` (prints this registry with today's numbers into `HANDOFF.md` status).
+
+| # | Claim | Dataset (held now or made in the step) | Frozen test set | Metric | Bar | Step |
+|---|---|---|---|---|---|---|
+| C1 | understands each characteristic axis | `own_<engine>.jsonl` renders; `diva_m1.jsonl` as the cross-check | whole designs held out (group split), and the 7 Diva banks of `sound_data.split` | R2 per axis mean, 3 seeds | >= 0.6 on the group split (P3, unchanged) | 3, 4 |
+| C2 | knows what each ingredient does (one knob, combinations) | `one` and `pair` designs of `own_sweeps.py` | 200 moves (100 single, 100 combined) never trained on | prediction stored before render vs measured change | direction right >= 90%; size r >= 0.7 | 4 |
+| C3 | knows what a good sound is | map rows (`diva_m1`, `features.jsonl` samples, Air samples) vs uniform random renders | 1,000 map rows + 1,000 random renders, held out | AUC on the 22 axes only | AUC >= 0.8; owner blind listen: of its 20 top and 20 bottom picks, owner agrees on >= 30 of 40 | 5 |
+| C4 | understands characteristics in words (warm, glitchy, dark, spacious ...) | words in preset and sample names, folders, tags; `atlas/character_matrix.json` for word -> nodes | presets of held-out banks, per word with >= 30 examples | word from the 22 axes, AUC; word -> made sound | AUC >= 0.75 per word (M4, unchanged); asked for a word, >= 70% of 50 made sounds are scored as that word | 5, then 6 |
+| C5 | understands moods and emotions | the owner's emotion rules on the axes (P6; draft from the owner's stance: arousal from loudness, density, attack, brightness; valence from tension, roughness, brightness; Russell's valence-arousal plane), signed by the owner | 500 held-out renders; 50 made sounds per mood | (a) rule on predicted axes vs rule on measured axes; (b) asked for a mood, where the made sound lands | (a) r >= 0.8 per dimension; (b) >= 80% in the asked region; owner blind listen >= 70% agree | P6 |
+| C5r | mood reference check (never truth, owner section 6.3) | `mood/song_mood.jsonl` (203k rows, valence / energy), its 965 chord files named by mood, the owner's albums `albums/n1m21n_tracks.jsonl` | fixed 2,000-row sample | agreement of the rule with each reference | reported, no bar; disagreement > 30% goes to the owner, the rule does not change by itself | P6 |
+| C6 | is creative | renders from 20 held-out contexts at c = 0, 0.5, 1 | the 20 contexts | `dials.md`: N, R, K, V | c = 0 is typical (N < 0.1); N and R rise with c; K above floor at c = 0.7; owner hears c = 0 / 0.5 / 1 | 5, 6 |
+| C7 | can make a sound | targets from the map | 300 targets (150 Diva, 150 samples) | distance of the render to the target on the 22 axes | closer than the nearest existing render, within repeat noise on passed axes (P5, unchanged) | 6 |
+
+Rules that make the numbers trustworthy:
+
+| Rule | Why |
+|---|---|
+| test sets frozen by `claims.py freeze` before the first model of that claim; a file hash is checked on every score | no leakage, no quiet re-picking |
+| predictions written before the render (`claims.py predict`) | the model cannot be scored on what it already saw |
+| 3 seeds for every number; a difference under the seed spread is "no change" | 1 seed is the noise level (about +-0.03) |
+| every claim beats a named baseline (k-NN in knob space, random knobs, nearest existing render) | a bar passed by the baseline proves nothing |
+| owner listening is blind (order shuffled, no labels) and stored in `eval/listen/` | perception checks stay honest |
+| a miss is written with its learning curve, never re-scored with an easier bar | bars do not move |
 
 ## Step 3 - understand: P3 on each engine (the real P3 bar)
 
@@ -214,5 +239,5 @@ attack) - shown to the owner, not built here.
 | Omnisphere and other synths as map rows | Step 6 shows the map needs regions Diva lacks |
 | owner's preset drive | a learning curve says more map rows help |
 | piano / wind / resynthesis nodes | Step 7 numbers, then owner approval of a design |
-| P6 maps (families, emotion rules) | P4 passes |
+| P6 maps (families, emotion rules; C5 needs the owner's signed rules) | P4 passes |
 | loading collected wavetables into the node | Step 5 shows the built-in tables miss a large part of their region; owner design first |
