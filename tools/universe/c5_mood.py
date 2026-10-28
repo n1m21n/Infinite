@@ -33,6 +33,7 @@ def real_part(path, secs):
             t0, v = on.pop(m.note)
             if t0 < secs: ev.append((t0, m.note, v / 127.0, max(t - t0, 0.05)))
     table, sw, fixed = ow.param_table("Analog"); rec = ow.recipe("Analog", sw, fixed, [0.5] * len(sw))
+    rec.update({**cp.CLEAN, "wave1": 0, "wave2": 2, "oscMix": 0.3, "osc1Vol": 0.8, "osc2Vol": 0.5, "sub": 0.0, "voices": 1, "cutoff": 5000.0, "attack": 8.0, "decay": 500.0, "sustain": 0.4, "release": 350.0, "keyTrack": 0.5})
     return [cp.Part("pad", "Analog", rec, ev, -8.0, 0.0, 0.25)]
 
 

@@ -505,3 +505,9 @@ Axes 23-31 measured on all locally pulled MIDI (a31 223,824 rows, 293 errors); `
 - Instrument-weighted held-out accuracy: seed 0 93.8%, seed 1 93.9% (2,130 held-out each); seeds differ by 0.1 pt. Bar >= 85% and stable: MET on this reading.
 - Caveat, stated plainly: the weighted number is carried by large k=2 families (drums 789, synth 491, bass 174). Family-macro accuracy is ~85% (seed 0) and the many-cluster families are weak: strings 66-70% (k=12), mallets 67-77%, other 29-40%. Those are misses and the reference labels are themselves k-means on the same features (circular), so this measures stability of assignment, not agreement with human-named timbres.
 - Not yet done: per-part critic evaluation; the 2,252 `none` (no audio, no usable tags) rows in instruments_clustered stay unassigned there.
+
+## C5 mood test, round 1: MISS, and the test was invalid (2026-10-28)
+Owner's answers: real 6/20, composed 6/20, total 12/40 (chance is 10). Every answer was "tense" or "sad": no clip read as happy or calm. Owner: the clips sounded like noisy pads, "even the live generator".
+Cause (mine, not the mood model): clips used default-0.5 / randomly drawn Analog recipes, so noise, drive, fm and detune sat in every voice and real EMOPIA piano was rendered through the same noisy pad. The test measured the timbre, not the mood. Same cause explains compose.py (and the site generator's random recipe draws) sounding like noisy pads.
+Fix: compose.CLEAN forces noise 0, drive 0, fm 0, low resonance, small detune on every part; C5 real clips use a fixed clean pluck voice. Round 2 rebuilt at training-data/eval/listen/c5_mood. Round 1 stays recorded as a miss.
+Determinism (item 8): `own_sweeps.py check` worst mel r = 1.00000 on Analog, FM, Oscillator, Metallic, Equation Synth, Sampler, Field Synth (bar 0.97): MET for those 7.

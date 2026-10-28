@@ -14,6 +14,7 @@ import own_sweeps as ow
 MIDI_GLOB = os.path.expanduser("~/Infinite/datasets/midi/data/chord_progressions/**/*.mid")
 SR = 44100
 # role shaping: values forced on the recipe after the draw (only keys the engine has). The sound layer replaces this with a target point.
+CLEAN = {"noise": 0.0, "drive": 0.0, "fm": 0.0, "resonance": 0.15, "detune": 8.0, "sync": 0, "filterType": 3}   # random draws put noise/drive/fm in every voice
 ROLE = {
     "bass": {"oct1": -1, "sub": 0.6, "cutoff": 500.0, "resonance": 0.2, "attack": 0.01, "release": 0.25, "voices": 1, "detune": 0.0},
     "pad":  {"attack": 0.6, "release": 1.5, "sustain": 0.8, "cutoff": 3500.0, "voices": 3, "spread": 0.6},
@@ -89,7 +90,7 @@ def build_parts(rng, secs):
     for role in ("bass", "pad", "lead"):
         node = rng.choice(engines[role]); table, sw, fixed = ow.param_table(node)
         rec = ow.recipe(node, sw, fixed, [rng.random() for _ in sw])
-        for k, v in ROLE[role].items():
+        for k, v in {**CLEAN, **ROLE[role]}.items():
             if k in rec: rec[k] = v
         if MOOD and "cutoff" in rec: rec["cutoff"] = rec["cutoff"] * (1.6 if MOOD[1] > 0 else 0.55)
         oct_ = {"bass": -12, "pad": 0, "lead": 0}[role]
