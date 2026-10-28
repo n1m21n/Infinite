@@ -17,7 +17,8 @@ def models():
     from transformers import ClapModel, ClapProcessor, EncodecModel
     cm, cp = ClapModel.from_pretrained(CLAP).eval(), ClapProcessor.from_pretrained(CLAP)
     em = EncodecModel.from_pretrained(ENC).eval()
-    return torch, cm, cp, em
+    dev = "mps" if torch.backends.mps.is_available() else "cpu"
+    return torch, cm.to(dev), cp, em.to(dev)
 
 
 def resample(x, a, b):
@@ -28,10 +29,11 @@ def resample(x, a, b):
 def embed(M, mono48):
     torch, cm, cp, em = M; x = np.asarray(mono48, np.float32)
     with torch.no_grad():
-        ci = cp(audio=[x], sampling_rate=48000, return_tensors="pt")
-        o = cm.get_audio_features(**ci); c = (o.pooler_output if hasattr(o, 'pooler_output') else o)[0].numpy()
+        dev = next(cm.parameters()).device
+        ci = {k: v.to(dev) for k, v in cp(audio=[x], sampling_rate=48000, return_tensors="pt").items()}
+        o = cm.get_audio_features(**ci); c = (o.pooler_output if hasattr(o, 'pooler_output') else o)[0].cpu().numpy()
         x24 = resample(x, 48000, 24000).astype(np.float32)
-        z = em.encoder(torch.from_numpy(x24)[None, None])[0].numpy()          # 128 x frames
+        z = em.encoder(torch.from_numpy(x24)[None, None].to(dev))[0].cpu().numpy()          # 128 x frames
     return np.concatenate([c / (np.linalg.norm(c) + 1e-9), z.mean(1), z.std(1)]).astype(np.float32)
 
 
