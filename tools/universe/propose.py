@@ -20,13 +20,18 @@ import sound_data as sd  # noqa: E402
 import sound_eval as se  # noqa: E402
 
 
-def candidates(node, sw, fixed, rendered, n, rng):
+def candidates(node, sw, fixed, rendered, n, rng, mid=False):
     """n points as 0-1 vectors: 1/3 fresh, 1/3 one-knob moves of rendered points, 1/3 two-to-three-knob moves; c = 0.5 edge bias."""
     def draw():
         return rng.betavariate(.5, .5) if rng.random() < .5 else rng.random()
     out = []
     for k in range(n):
         kind = k % 3
+        if mid and rendered and k % 5 == 4:           # 4-12 knobs moved at once: the range round r01 never tested
+            u = list(rng.choice(rendered))
+            for i in rng.sample(range(len(sw)), min(len(sw), rng.randint(4, 12))):
+                u[i] = draw()
+            out.append(("mid", u)); continue
         if kind == 0 or not rendered:
             out.append(("fresh", [draw() for _ in sw]))
         else:
@@ -41,7 +46,7 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--node", required=True); ap.add_argument("--round", required=True)
     ap.add_argument("--n", type=int, default=2000); ap.add_argument("--uniform", type=int, default=200)
     ap.add_argument("--candidates", type=int, default=20000); ap.add_argument("--seeds", type=int, default=3)
-    ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--epochs", type=int, default=300); ap.add_argument("--mid", action="store_true", help="add 4-12 knob moves (from round r02)")
     a = ap.parse_args(); t0 = time.time()
     table, sw, fixed = o.param_table(a.node); path = o.out_path(a.node)
     d = sd.load(path); keep = np.flatnonzero(d["ok"][:, 0])
@@ -50,7 +55,7 @@ def main():
         V[i] = p3.vec(d["mel"][i, 0].astype(np.float64) / 2 - 120)
     rng = random.Random("%s/%s" % (a.node, a.round))
     rendered = [list(map(float, k)) for k in d["knobs"][keep]]
-    cand = candidates(a.node, sw, fixed, rendered, a.candidates, rng)
+    cand = candidates(a.node, sw, fixed, rendered, a.candidates, rng, a.mid)
     CU = np.array([c[1] for c in cand])
     XX = se.encode(np.vstack([d["knobs"], CU]))          # one encoding, as p3 does for extra rows
     X, XC = XX[:len(d["knobs"])], XX[len(d["knobs"]):]
@@ -70,7 +75,9 @@ def main():
     dis = (P.std(0) / spread).mean(1)
     n_dis = a.n - a.uniform
     kinds_c = np.array([c[0] for c in cand]); top = []          # single knobs, combinations and fresh points alike: a third each
-    for k, share in (("one", n_dis // 3), ("pair", n_dis // 3), ("fresh", n_dis - 2 * (n_dis // 3))):
+    shares = (("one", n_dis // 4), ("pair", n_dis // 4), ("mid", n_dis // 4), ("fresh", n_dis - 3 * (n_dis // 4))) if a.mid else \
+        (("one", n_dis // 3), ("pair", n_dis // 3), ("fresh", n_dis - 2 * (n_dis // 3)))
+    for k, share in shares:
         idx = np.flatnonzero(kinds_c == k); top += list(idx[np.argsort(-dis[idx])[:share]])
     top = np.array(top)
     items = [{"u": [round(x, 4) for x in cand[i][1]], "design": "propose", "kind": cand[i][0], "disagreement": round(float(dis[i]), 4),
