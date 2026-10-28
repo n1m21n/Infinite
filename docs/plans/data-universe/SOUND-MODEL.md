@@ -154,6 +154,9 @@ Then re-render Diva in row v2 (about 3,900 presets, 3 h on the Pro) and start M1
 (`scratch_omni/diva_v2.sh` -> `audio/preset_diva_v2.jsonl`), starting with the 0.7 repeat pass (`audio/noise_diva_b.jsonl`, 51 presets).
 Not yet on the Air: Omnisphere there still writes v1 rows until the Air gets this build and these tools.
 
+**Noise floor, Diva (0.7, 51 presets rendered twice):** descriptor R2 ceiling 0.994 at C3, 0.996 at C4, 0.987 at C3f; log-mel
+repeat error 0.18 / 0.30 / 0.35 dB. Render noise is far below every bar, so any gap to the bars is the model's or the data's.
+
 ```
  render_state (one per preset) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
    host knobs + mel + desc          per plug-in      groups, split        seconds        95% intervals, noise ceiling)
