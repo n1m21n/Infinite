@@ -1,6 +1,6 @@
 # Revised plan: plug-in data collection, restart point for the next session (2026-10-28)
 
-Read this first. It replaces the "Order" list in `plugin-plan.md`; the other documents stay as the record.
+**Superseded as the entry point by [SOUND-MODEL.md](SOUND-MODEL.md) (goal, milestones M0-M5, order).** This file stays as the record of the plug-in render work; its section 6 steps 1-4 are still the data steps that plan calls on.
 
 ## 1. Documents this plan builds on
 

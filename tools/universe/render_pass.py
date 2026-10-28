@@ -250,6 +250,42 @@ def finite(v):
     return isinstance(v, (int, float)) and math.isfinite(v)
 
 
+MEL_BINS, MEL_FRAMES = 64, 48   # log-mel over one window: 64 bands 20 Hz - 16 kHz, 48 frames (62.5 ms each over 3 s)
+_melfb = {}
+
+
+def mel_fb(rate, nfft):
+    """Slaney-style triangular mel filterbank (HTK mel formula), MEL_BINS x (nfft/2+1)."""
+    k = (rate, nfft)
+    if k not in _melfb:
+        hz = lambda m: 700 * (10 ** (m / 2595) - 1)
+        mel = lambda f: 2595 * math.log10(1 + f / 700)
+        edges = np.array([hz(m) for m in np.linspace(mel(20), mel(min(16000, rate / 2)), MEL_BINS + 2)])
+        f = np.fft.rfftfreq(nfft, 1 / rate)
+        lo, mid, hi = edges[:-2, None], edges[1:-1, None], edges[2:, None]
+        fb = np.maximum(0, np.minimum((f - lo) / (mid - lo), (hi - f) / (hi - mid)))
+        _melfb[k] = fb * (2 / (hi - lo))
+    return _melfb[k]
+
+
+def logmel(seg, rate):
+    """Log-mel spectrogram of a window (channels x samples), stored compact: base64 of uint8, 0.5 dB steps, 0 = -120 dB
+    (relative level: the filterbank is area-normalised, so compare rows with rows, not with dBFS meters).
+    Decode: np.frombuffer(base64.b64decode(s), np.uint8).reshape(MEL_BINS, MEL_FRAMES) / 2 - 120. The target the
+    sound models learn (industry practice: mel frames over time, not one averaged spectrum)."""
+    import base64
+    x = seg.mean(0); nfft, hop = 2048, 512
+    if len(x) < nfft:
+        return None
+    n = 1 + (len(x) - nfft) // hop
+    fr = np.lib.stride_tricks.as_strided(x, (n, nfft), (x.strides[0] * hop, x.strides[0])) * np.hanning(nfft)
+    p = (np.abs(np.fft.rfft(fr, axis=1)) ** 2) / (np.hanning(nfft).sum() ** 2 / 4)
+    m = mel_fb(rate, nfft) @ p.T
+    m = np.stack([c.mean(1) for c in np.array_split(m, MEL_FRAMES, axis=1)], 1)
+    q = np.clip(np.round((10 * np.log10(np.maximum(m, 1e-12)) + 120) * 2), 0, 255).astype(np.uint8)
+    return base64.b64encode(q.tobytes()).decode()
+
+
 def measure_windows(wav, tmp, labels):
     """Cut the render into its 3 windows and measure each with audio_features.analyse. [(label, row or None)]"""
     r = af.read_pcm(wav, 60)
@@ -280,6 +316,8 @@ def measure_windows(wav, tmp, labels):
             row = af.analyse(sp, tmp, WIN + 1)
         except Exception as e:
             row = {"error": str(e)[:120]}
+        if "error" not in row:
+            row["mel"] = logmel(seg, rate)
         os.remove(sp)
         rows.append((lab, row))
     return rows

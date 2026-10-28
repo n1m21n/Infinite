@@ -24,12 +24,16 @@ def knobs(modules):
     return {"%s.%s" % (m, k): float(v) for m, ps in (modules or {}).items() for k, v in (ps or {}).items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
 
 
-def main():
+def args(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine", default=""); ap.add_argument("--root", default=""); ap.add_argument("--params", default="", help="gz jsonl of {src, params:{flat knobs}} (omni_params)"); ap.add_argument("--renders", required=True)
     ap.add_argument("--prefix", required=True); ap.add_argument("--note", default="C3"); ap.add_argument("--cost", type=float, default=6.3)
     ap.add_argument("--model", default="rff", choices=("rff", "ridge")); ap.add_argument("--min-gain", type=float, default=0.01); ap.add_argument("--presets", default="~/Infinite/training-data/presets")
-    a = ap.parse_args()
+    return ap.parse_args(argv)
+
+
+def load(a):
+    """Join recipes to C3 renders: standardised knobs X, targets Y, ids, fixed held-out split (te) and training pool."""
     ren = {}
     for l in open(os.path.expanduser(a.renders)):
         r = json.loads(l)
@@ -59,7 +63,12 @@ def main():
     sd = X.std(0); ok = sd > 1e-9; X = (X[:, ok] - X[:, ok].mean(0)) / sd[ok]
     Y = np.array([ren[i] for i in ids])
     rng = np.random.default_rng(0); p = rng.permutation(len(ids)); nt = len(ids) // 5
-    te, pool = p[:nt], p[nt:]
+    return X, Y, ids, p[:nt], p[nt:], rng
+
+
+def main():
+    a = args()
+    X, Y, ids, te, pool, rng = load(a); nt = len(te)
     D = 1500
     Wr = rng.normal(0, 1 / math.sqrt(X.shape[1]) * 0.7, (X.shape[1], D)); br = rng.uniform(0, 2 * math.pi, D)
     if a.model == "rff":
@@ -88,4 +97,5 @@ def main():
         print("%7d %8.3f %10s %12s %s" % (n, s, "-" if g is None else "%+.3f" % g, "-" if g is None else "%+.4f" % (g / max(hrs, 1e-9)), v))
         prev = (n, s)
     print("held-out R2 with all rendered:", "%.3f" % prev[1], "| stop at about", stop or "not reached yet (keep rendering)")
-main()
+if __name__ == "__main__":
+    main()
