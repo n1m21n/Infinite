@@ -276,3 +276,5 @@ Direction right on clearly-changed axes vs all non-zero changes. Analog: sharpne
 ### C2 with a derivative-informed loss (Analog, lam 1): no gain
 
 `c2_delta.py` (descriptor-only model, extra loss on f(a)-f(b) over 6,629 training pairs differing in <= 3 knobs): direction right **63.9%** (was 63.5%), size r **0.626** (was 0.635), 1,412 moves -> MISS; moves >= 0.5 sd: 78.2%, r 0.716 (was 75.5%, 0.707). Within noise of the plain model. Reading: with this much data the difference loss adds nothing at weight 1; testing lam 10 next. If that is also flat, the limit is data on the weak axes (fullness, noisiness, movement) or the axes themselves (P1/P3 in SECOND-OPINION.md), not the training loss.
+
+C2 delta-loss lam 10 (Analog): direction right **61.8%**, size r **0.549** (worse than plain 63.5% / 0.635 and lam 1 63.9% / 0.626); moves >= 0.5 sd 70.7%, r 0.640. Conclusion: the difference loss does not help here at either weight. The limit is not the training objective.

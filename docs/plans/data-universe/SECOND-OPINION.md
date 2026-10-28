@@ -93,3 +93,17 @@ Caveats we already know: every held-out score is **same generator** (unseen bank
 - Frozen claims file with bars, per-engine prediction files with hashes and times, and the scoring code (`tools/universe/claims.py`).
 - Full tables per round in `HANDOFF.md`; design docs `RESEARCH-LANDSCAPE.md`, `CHAIN-TRACK.md`, `EFFICIENCY.md`.
 - Our own request to the owner: 30-40 listening judgements for the critic, and any real patches or recordings to match.
+
+## 6. Response to the review (SECOND-OPINION-REVIEW.md, 2026-10-28)
+
+| Review item | Decision | Why / status |
+|---|---|---|
+| P0 equal-size random control | **Adopt, running** | `control.py`: base = the 1,965 renders before r01; arm A adds the 2,000 model-chosen rows, arm B adds 2,000 random rows (same one/pair/fresh mix, same edge-biased draw); `p3_characteristics.py --extra` scores both on the same test banks. Driver6 runs it after the Oscillator reach2 render. |
+| Two-tier C2 (strict + audible-sensitivity C2.1) | **Adopt, tau = 0.5 sd, not 0.3** | The review ties 0.3 sd to one JND, but we have not measured a JND for these axes. 0.5 sd is the cut already shown as exploratory, so there is no further tuning. C2.1 is pre-registered for the four engines not yet scored (Wavetable, FM, Metallic, String); for Analog and Oscillator it stays post hoc and is labelled so. 0.3 sd is reported as a sensitivity check. Strict C2 stays a MISS. |
+| Sobolev / difference loss (`c2_delta.py`) | **Done: no gain** | Analog lam 1: 63.9% / r 0.626; lam 10: 61.8% / r 0.549; plain model 63.5% / r 0.635. |
+| Pessimistic LCB + top-K real renders, CMA-ES stage | **Adopt** | `--beta` and `--refine` are in `reach.py`; reach3 plan runs with them. Top-K closed-loop rendering is the next change. CMA-ES is not added until the beta/refine result is in. |
+| Out-of-gamut advisory | **Adopt** | Needs a distance of the target to the engine's own renders (Mahalanobis on the 11 axes); build after reach3. |
+| Dual representation (axes for UI, embeddings for loss) | **Adopt as direction** | The embeddings job (CLAP + EnCodec) is queued; the claim that genre failure "proves the axes are free of genre bias" is not adopted: it shows the axes do not carry genre, not that they are unbiased. |
+| Held-out unit = unseen node combinations; depth curve; lesion with null controls; additive baseline | **Adopt** | Added to the CHAIN-TRACK proofs. Null lesion (mix = 0 or unity gain must predict delta = 0) is a good test we did not have. |
+| 2AFC listening test (15-20 producers, 30 triplets) | **Adopt as the external-evidence plan; needs the owner** | The "70% win rate gives p < 0.001" figure needs checking: with 30 trials 70% is p ~ 0.02 one-sided; p < 0.001 needs about 80% at 30 trials or more trials. |
+| Literature list | **Partly unverified** | InverSynth II is real (Barkan et al., ISMIR 2023) but the review's title differs from the paper's; 'Combes et al. JAES 2025' and 'CMA-ES vs gradient search (2026)' have no citation and are not used until found; micro-tcn is a compressor-modelling repo, not a general surrogate-synth reference. |

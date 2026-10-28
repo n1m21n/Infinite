@@ -79,7 +79,8 @@ def cmd_plan(a):
     items = []
     for ti, (pid, tv) in enumerate(T):
         sl = slice(ti * per, (ti + 1) * per); dist = (((P[sl] - tv) / spread) ** 2).sum(1) ** .5; b = int(np.argmin(dist))
-        cu_b, p_b, d_b = CU[sl][b], P[sl][b], float(dist[b])
+        cu_b, p_b, d_b = CU[sl][b], P[sl][b], float(dist[b])      # with --beta the climb compares pessimistic scores; the stored pred_dist is the plain mean distance
+        if a.refine and a.beta: d_b = 1e9      # first refined child always replaces the unrefined pick when scores are pessimistic
         if a.refine:
             order = np.argsort(dist)[:8]; pop = [list(CU[sl][i]) for i in order]
             for g in range(a.refine):
@@ -90,10 +91,11 @@ def cmd_plan(a):
                         for j in rng.sample(range(len(sw)), rng.choice((1, 2))): c[j] = min(1., max(0., c[j] + rng.gauss(0, .15))) if rng.random() < .7 else draw()
                         kids.append(c)
                 K = np.array(kids); XK = se.encode(np.vstack([d["knobs"], K]))[len(d["knobs"]):]
-                PK = np.mean([f(np.hstack([XK, np.repeat(mv, len(XK), 0)]).astype(np.float32))[0] for f in fs_], 0)
-                dk = (((PK - tv) / spread) ** 2).sum(1) ** .5; o_ = np.argsort(dk)[:8]; pop = [kids[i] for i in o_]
+                PS = np.stack([f(np.hstack([XK, np.repeat(mv, len(XK), 0)]).astype(np.float32))[0] for f in fs_]); PK = PS.mean(0)
+                dk = (((PK - tv) / spread) ** 2).sum(1) ** .5 + a.beta * (PS.std(0) / spread).sum(1) ** 1   # lower-confidence bound: pessimistic by the seeds' spread
+                o_ = np.argsort(dk)[:8]; pop = [kids[i] for i in o_]
                 if dk[o_[0]] < d_b: cu_b, p_b, d_b = K[o_[0]], PK[o_[0]], float(dk[o_[0]])
-        dist = np.array([d_b]); b = 0; CUsl = np.array([cu_b]); Psl = np.array([p_b])
+        dist = np.array([float((((p_b - tv) / spread) ** 2).sum() ** .5)]); b = 0; CUsl = np.array([cu_b]); Psl = np.array([p_b])
         d0 = float((((Vk - tv) / spread) ** 2).sum(1).min() ** .5)
         items.append({"u": [round(float(x), 4) for x in CUsl[b]], "design": "reach", "kind": "reach", "target": pid,
                       "pred_dist": round(float(dist[b]), 4), "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in Psl[b]]})
@@ -125,7 +127,7 @@ def cmd_score(a):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["plan", "score"]); ap.add_argument("--node", required=True)
     ap.add_argument("--round", default="reach1"); ap.add_argument("--targets", type=int, default=300)
-    ap.add_argument("--candidates", type=int, default=45000); ap.add_argument("--epochs", type=int, default=300); ap.add_argument("--refine", type=int, default=0, help="generations of model-only hill-climb per target")
+    ap.add_argument("--candidates", type=int, default=45000); ap.add_argument("--epochs", type=int, default=300); ap.add_argument("--beta", type=float, default=0., help="weight of the seeds' spread added to the distance while refining"); ap.add_argument("--refine", type=int, default=0, help="generations of model-only hill-climb per target")
     a = ap.parse_args(); {"plan": cmd_plan, "score": cmd_score}[a.cmd](a)
 
 

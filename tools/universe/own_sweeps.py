@@ -332,7 +332,7 @@ def shard_job(args):
 # ------------------------------------------------------------------ commands
 
 def out_path(node):
-    return os.path.join(OUT_DIR, "own_%s.jsonl" % node.lower())
+    return os.path.join(OUT_DIR, "own_%s%s.jsonl" % (node.lower(), os.environ.get("INF_OUT_TAG", "")))   # INF_OUT_TAG: a side file (random control) that never mixes with the real dataset
 
 
 def existing_ids(path):
