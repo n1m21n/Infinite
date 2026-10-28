@@ -335,3 +335,10 @@ Reading: Wavetable has 65 swept knobs, so a single-knob step rarely changes anyt
 | **mean** | **0.565** | **0.243** |
 Error in bank spreads: bank 0.67, human 0.53 (the human patches' absolute error is not larger). The human patches vary much less than the bank on most axes (spread vs bank: sharpness 0.41, warmth 0.29, weight 0.37, movement 0.38, brightness 0.60), so R2 against their own mean is a harsh yardstick there; fullness 1.02, decay 1.14, density 0.95 vary as much as the bank.
 Reading: a same-generator gap exists in R2 terms (0.565 -> 0.243: P3 bar 0.6 would be missed on human settings) but it is mostly resolution, not blindness: the model does not separate the owner's settings from each other on brightness, sharpness, warmth, weight. Loudness and movement hold up. Caveats: static knobs only (no cables), a few non-swept knobs differ, 37 points, Oscillator only so far.
+
+### C2 FM result (2026-10-28)
+| tier | axis moves | direction right (bar 90) | size r (bar 0.7) | verdict |
+|---|---|---|---|---|
+| single moves | 627 | 65.7% | 0.666 | MISS |
+| combined moves | 627 | 71.0% | 0.688 | MISS |
+Exploratory (|change| >= 0.5 sd): single 60 moves, 85.0% / r 0.704; combined 104 moves, 87.5% / r 0.724. Closest of the engines to the bar; the pre-registered C2.1 effect-size tier is still under 90% direction.
