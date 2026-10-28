@@ -1,0 +1,758 @@
+{
+ "summary": {
+  "trials": 80,
+  "sign": 0.912,
+  "median_gain": 0.94,
+  "noise_drift_ok": 0.838,
+  "loud_drift_ok": 0.295,
+  "by_axis": {
+   "loudness": [
+    1.0,
+    19
+   ],
+   "brightness": [
+    0.93,
+    14
+   ],
+   "sharpness": [
+    0.92,
+    12
+   ],
+   "warmth": [
+    0.82,
+    11
+   ],
+   "fullness": [
+    0.92,
+    13
+   ],
+   "movement": [
+    0.82,
+    11
+   ]
+  },
+  "verdict": "INCONCLUSIVE"
+ },
+ "rows": [
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.7863029999459716,
+   "noise_drift": 0.004601824978426144,
+   "loud_drift": 1.7863029999459716
+  },
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.3176044128821144,
+   "noise_drift": 0.1671996408828166,
+   "loud_drift": 2.2399242430367474
+  },
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.9283831454097287,
+   "noise_drift": 0.1671996408828166,
+   "loud_drift": 2.2399242430367474
+  },
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": 0.006262130274328257,
+   "noise_drift": 0.1671996408828166,
+   "loud_drift": 2.2399242430367474
+  },
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.7052337653930052,
+   "noise_drift": 0.1671996408828166,
+   "loud_drift": 2.2399242430367474
+  },
+  {
+   "voice": "acid_house_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.6669639820941313,
+   "noise_drift": 0.0,
+   "loud_drift": 1.6669639820941313
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.6633988177644595,
+   "noise_drift": 0.03604762899767147,
+   "loud_drift": 3.7269262908731706
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.7762759920442938,
+   "noise_drift": 0.03604762899767147,
+   "loud_drift": 3.7269262908731706
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.317262256515345,
+   "noise_drift": 0.03604762899767147,
+   "loud_drift": 3.7269262908731706
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.5607139673657654,
+   "noise_drift": 0.03604762899767147,
+   "loud_drift": 3.724661948108296
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.6416914075266257,
+   "noise_drift": 0.021475183232655348,
+   "loud_drift": 1.8247215579372742
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.569741508810019,
+   "noise_drift": 0.0,
+   "loud_drift": 1.569741508810019
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.22525506197284198,
+   "noise_drift": 0.0,
+   "loud_drift": 0.22525506197284198
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.48596671179910833,
+   "got": 0.6223025643665332,
+   "noise_drift": 0.8007175462461493,
+   "loud_drift": 0.18903185015247098
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.30492769811976195,
+   "got": -0.12655778035043208,
+   "noise_drift": 0.0,
+   "loud_drift": 2.328848307794738
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": 0.3109250928617272,
+   "got": 0.059275416500775724,
+   "noise_drift": 0.8007175462461493,
+   "loud_drift": 0.18903185015247098
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 0.6415538230147172,
+   "got": 1.9170294157289207,
+   "noise_drift": 0.8007175462461493,
+   "loud_drift": 0.18903185015247098
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -0.40255335545015786,
+   "got": -0.26961796311801267,
+   "noise_drift": 0.0,
+   "loud_drift": 2.328848307794738
+  },
+  {
+   "voice": "amapiano_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.7314018945124672,
+   "got": 0.06201574600776843,
+   "noise_drift": 0.0,
+   "loud_drift": 0.11815980333716859
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.32796720496714316,
+   "got": 1.2950974304088478,
+   "noise_drift": 0.0007669708297376929,
+   "loud_drift": 1.2950974304088478
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -0.4536526051789315,
+   "noise_drift": 0.0007669708297376929,
+   "loud_drift": 0.4536526051789315
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7456681252386886,
+   "got": -0.2986271140506337,
+   "noise_drift": 0.026077008211081488,
+   "loud_drift": 2.5211731772036066
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8173119681271014,
+   "got": -0.7540075628200742,
+   "noise_drift": 0.026077008211081488,
+   "loud_drift": 2.5211731772036066
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.47708397603108144,
+   "got": -0.7333612322056524,
+   "noise_drift": 0.026077008211081488,
+   "loud_drift": 2.5211731772036066
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -0.9844012456656817,
+   "got": -0.9281255645638709,
+   "noise_drift": 0.026077008211081488,
+   "loud_drift": 2.5211731772036066
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 1.1303889703690504,
+   "noise_drift": 0.009203649956852288,
+   "loud_drift": 1.1468613845299167
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.4261282347253066,
+   "noise_drift": 0.0,
+   "loud_drift": 1.4261282347253066
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.20119406793943184,
+   "noise_drift": 0.0,
+   "loud_drift": 0.20119406793943184
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.48383281026070224,
+   "got": 0.20093860261610008,
+   "noise_drift": 0.24543066551606108,
+   "loud_drift": 0.1516482410703221
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.30706159965816815,
+   "got": -0.5311520932453059,
+   "noise_drift": 0.0,
+   "loud_drift": 2.5185450342161197
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": 0.5303194987341852,
+   "got": 1.1042819756010398,
+   "noise_drift": 0.24543066551606108,
+   "loud_drift": 0.1516482410703221
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.3365640985023189,
+   "got": -0.11699992292725152,
+   "noise_drift": 0.0,
+   "loud_drift": 2.5185450342161197
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": 0.30955980689073875,
+   "got": -0.015193365255747257,
+   "noise_drift": 0.24543066551606108,
+   "loud_drift": 0.1516482410703221
+  },
+  {
+   "voice": "breakbeat_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.5359383673823744,
+   "noise_drift": 0.0,
+   "loud_drift": 1.0174488639623163
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.6207864434929935,
+   "noise_drift": 0.053687958081638405,
+   "loud_drift": 1.6207864434929935
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.23152747960407513,
+   "noise_drift": 0.018407299913704576,
+   "loud_drift": 0.23152747960407513
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -1.0789040161172536,
+   "noise_drift": 0.3259626026385186,
+   "loud_drift": 2.660395758946456
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -1.057423977950076,
+   "noise_drift": 0.3259626026385186,
+   "loud_drift": 2.660395758946456
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.8156053973325466,
+   "noise_drift": 0.3259626026385186,
+   "loud_drift": 2.660395758946456
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -1.3594000606530652,
+   "noise_drift": 0.3259626026385186,
+   "loud_drift": 2.659066006408634
+  },
+  {
+   "voice": "classic_trance_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.8037610322120475,
+   "got": 0.44491451839826823,
+   "noise_drift": 0.04601824978426149,
+   "loud_drift": 0.9630544582642627
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.5310281471900484,
+   "noise_drift": 0.003834854148688431,
+   "loud_drift": 1.5310281471900484
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.21954716192841958,
+   "noise_drift": 0.003834854148688431,
+   "loud_drift": 0.21954716192841958
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": 0.18353213165210258,
+   "noise_drift": 0.31982683600061707,
+   "loud_drift": 0.0016935527604327698
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": 0.3420053543719721,
+   "noise_drift": 0.31982683600061707,
+   "loud_drift": 0.0016935527604327698
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.013140207788754382,
+   "noise_drift": 0.31982683600061707,
+   "loud_drift": 0.0016935527604327698
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": 0.743163072068929,
+   "noise_drift": 0.31982683600061707,
+   "loud_drift": 0.001768821772007614
+  },
+  {
+   "voice": "deep_house_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.03844952173372347,
+   "noise_drift": 0.0007669708297376862,
+   "loud_drift": 1.0302445959300315
+  },
+  {
+   "voice": "detroit_techno_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.7902671678889108,
+   "noise_drift": 0.0,
+   "loud_drift": 1.7902671678889108
+  },
+  {
+   "voice": "detroit_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.544183594605588,
+   "got": -0.5217695808476388,
+   "noise_drift": 0.0,
+   "loud_drift": 2.3090964646739853
+  },
+  {
+   "voice": "detroit_techno_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.5964687904383783,
+   "got": -0.2642471910874007,
+   "noise_drift": 0.0,
+   "loud_drift": 2.3090964646739853
+  },
+  {
+   "voice": "detroit_techno_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.34817268462724654,
+   "got": -0.8741203851418433,
+   "noise_drift": 0.0,
+   "loud_drift": 2.3090964646739853
+  },
+  {
+   "voice": "detroit_techno_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 0.325697754394223,
+   "got": 0.026276326914043635,
+   "noise_drift": 0.004601824978426145,
+   "loud_drift": 0.003424740026653296
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.5915883394196035,
+   "noise_drift": 0.003067883318950758,
+   "loud_drift": 1.5915883394196035
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.22802119814821578,
+   "noise_drift": 0.0015339416594753858,
+   "loud_drift": 0.22802119814821578
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.8195051439464581,
+   "noise_drift": 0.06059069554927758,
+   "loud_drift": 2.5247923621768282
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.849464412523895,
+   "noise_drift": 0.06059069554927758,
+   "loud_drift": 2.5247923621768282
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -1.263463677322468,
+   "noise_drift": 0.06059069554927758,
+   "loud_drift": 2.5247923621768282
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.9789645448975639,
+   "noise_drift": 0.06059069554927758,
+   "loud_drift": 2.5247923621768282
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.6436870402646258,
+   "noise_drift": 0.0,
+   "loud_drift": 1.6436870402646258
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.6102714472393197,
+   "got": 0.19138627098951635,
+   "noise_drift": 0.013038504105540744,
+   "loud_drift": 1.369576117362109
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": 0.6689063683328057,
+   "got": 0.6650063815232746,
+   "noise_drift": 0.013038504105540744,
+   "loud_drift": 1.369576117362109
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": 0.3904561810443212,
+   "got": 0.5217985638058664,
+   "noise_drift": 0.013038504105540744,
+   "loud_drift": 1.369576117362109
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 0.805655964795711,
+   "got": 0.6778149894826989,
+   "noise_drift": 0.013038504105540744,
+   "loud_drift": 1.369576117362109
+  },
+  {
+   "voice": "downtempo_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.6907718560172623,
+   "noise_drift": 0.0,
+   "loud_drift": 1.826778910920319
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.6773636505267158,
+   "noise_drift": 0.0,
+   "loud_drift": 1.6773636505267158
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.6226846383043645,
+   "noise_drift": 0.37888358989041926,
+   "loud_drift": 3.100399583359825
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -1.538764553066319,
+   "noise_drift": 0.37888358989041926,
+   "loud_drift": 3.100399583359825
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.00505902086438835,
+   "noise_drift": 0.0,
+   "loud_drift": 0.24455529102414594
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": 0.44342979179637054,
+   "got": 1.505261055560943,
+   "noise_drift": 0.0,
+   "loud_drift": 1.505261055560943
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "loudness",
+   "knob": "release",
+   "req": -0.9130340215685792,
+   "got": -0.2015578681620434,
+   "noise_drift": 0.0,
+   "loud_drift": 0.2015578681620434
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.3703319242811931,
+   "got": 0.23078433209827198,
+   "noise_drift": 0.08590073293062138,
+   "loud_drift": 0.1312817010217079
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.42056248563767723,
+   "got": -0.4125758166539751,
+   "noise_drift": 0.0,
+   "loud_drift": 2.49875555658958
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": 0.405913440108053,
+   "got": 0.7286926383925411,
+   "noise_drift": 0.08590073293062138,
+   "loud_drift": 0.1312817010217079
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.460970157128451,
+   "got": -0.16646920218105535,
+   "noise_drift": 0.0,
+   "loud_drift": 2.49875555658958
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 0.4888973998392129,
+   "got": 0.6489110298772507,
+   "noise_drift": 0.08590073293062138,
+   "loud_drift": 0.1312817010217079
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -0.5552097786256622,
+   "got": -0.3832916382461579,
+   "noise_drift": 0.0,
+   "loud_drift": 2.49875555658958
+  },
+  {
+   "voice": "drone_kosmische_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 1.3681003453111167,
+   "noise_drift": 0.0,
+   "loud_drift": 1.0325591180359563
+  }
+ ]
+}

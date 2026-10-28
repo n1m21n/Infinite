@@ -511,3 +511,10 @@ Owner's answers: real 6/20, composed 6/20, total 12/40 (chance is 10). Every ans
 Cause (mine, not the mood model): clips used default-0.5 / randomly drawn Analog recipes, so noise, drive, fm and detune sat in every voice and real EMOPIA piano was rendered through the same noisy pad. The test measured the timbre, not the mood. Same cause explains compose.py sounding like noisy pads. This says nothing about the live node, which the owner confirms is fine.
 Fix: compose.CLEAN forces noise 0, drive 0, fm 0, low resonance, small detune on every part; C5 real clips use a fixed clean pluck voice. Round 2 rebuilt at training-data/eval/listen/c5_mood. Round 1 stays recorded as a miss.
 Determinism (item 8): `own_sweeps.py check` worst mel r = 1.00000 on Analog, FM, Oscillator, Metallic, Equation Synth, Sampler, Field Synth (bar 0.97): MET for those 7.
+
+## Dot test on live-style Analog voices (2026-10-29)
+tools/universe/dot_test.py: 12 Analog voices from the 34 live style cards, one trusted non-banned knob per axis moved by one spread, base/up/down rendered (100 renders), 80 trials.
+- Direction correct: 91.2% (bar 85%). Median gain 0.94 of the requested move (bar 0.5). Per axis: loudness 100%, brightness 93%, sharpness 92%, fullness 92%, warmth 82%, movement 82%.
+- Noisiness stays put (|shift| < 0.3 sd): 83.8% (bar 90%) -> MISS on this bar, so verdict INCONCLUSIVE.
+- Loudness drift: 29.5% stay put. Not a defect for export (-14 LUFS normalises) but the dot must compensate gain.
+- Reading: a single dot works on a live voice. Next: pick the knob with least noise coupling per axis and re-test; this is tuned on the same voices, so confirm on fresh voices before it counts.
