@@ -387,3 +387,11 @@ No engine reaches 90% direction. C2 stays a MISS in the claims freeze.
 
 ### Preset anchors from existing Diva measurements (2026-10-28)
 `tools/universe/preset_anchors.py`: k-means in standardized axis space over `characteristics/preset_diva_v1.jsonl` (18,907 note-renders, 10 axes; `movement` dropped, <85% coverage), one medoid per cluster. k=12 gives anchors from distinct families (drones/FX, chord leads, keys, basses, percussion, hi-hats), each a real human preset with its source path; output `training-data/own/anchors_diva.json`. These are audio-space anchors (route A): use as reach targets / coverage checks, no knob mapping. Same recipe applies to the other engines once rendered (Vital next: open JSON).
+
+### Random-control A/B for active learning, Analog (2026-10-28)
+Same base data plus the same number of extra renders, either the model-chosen points or random points.
+| arm | group means at the bar | median R2 head | median R2 via mel | k-NN |
+|---|---|---|---|---|
+| chosen | 7 / 11 | 0.731 | 0.493 | -0.119 |
+| random | 10 / 11 | 0.763 | 0.516 | -0.115 |
+Random beat chosen on every column. The active-learning pick did not help on this engine; do not claim the chosen-points gain (Step 4 rounds). Remaining to check from the render files: failed/silent rate and extreme-knob share of the chosen set (a pick that crowds the edges can hurt held-out folders). Single run, one seed per arm: treat the 0.03 head gap as a direction, not a size.
