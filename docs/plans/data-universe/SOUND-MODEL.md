@@ -48,6 +48,17 @@ Two tracks feed the generator and stay separate:
 Reading: the ridge gate said "barely worth rendering more"; a real model says the opposite. The gate's yardstick, not the data,
 was the limit. Rendering Diva further is justified.
 
+**Frozen split (M0, `sound_eval.py`, 3,694 presets):**
+
+| Model | Random split R2 | Bank split R2 (whole folders held out) |
+|---|---|---|
+| ridge | 0.282 | 0.156 |
+| k-NN (k=5) | 0.261 | 0.031 |
+| MLP | 0.384 | **0.211** |
+
+The bank split is the honest number. Presets inside one bank are near-copies, so a random split rewards memory (k-NN collapses from
+0.26 to 0.03 once banks are held out). Every bar in section 4 is judged on the bank split first.
+
 ## 3. Why it felt cluttered, and the fix
 
 | Cause | Fix |
@@ -69,7 +80,7 @@ Fréchet Audio Distance on embeddings for whole-set comparisons (Kilgour et al. 
 | # | Milestone | Done when (bar) | Baseline today |
 |---|---|---|---|
 | M0 | **Evaluation harness** | `sound_eval.py` scores any model on a frozen split (`eval/splits/diva.json`): random-preset split **and** bank split (whole preset folders held out, no near-duplicate leakage). Prints R2 per descriptor group, log-mel L1 in dB, spectral convergence. Same model twice gives the same numbers within 0.005 | probes use ad-hoc splits |
-| M1 | **Forward model, Diva** | descriptor R2 >= 0.50 random split, >= 0.40 bank split; log-mel L1 at least 20% below the nearest-preset baseline (k-NN in knob space) | R2 0.349 random; bank split unmeasured; mel not yet rendered |
+| M1 | **Forward model, Diva** | descriptor R2 >= 0.50 random split, >= 0.40 bank split; log-mel L1 at least 20% below the nearest-preset baseline (k-NN in knob space) | MLP R2 0.384 random, 0.211 bank; mel rows start 2026-10-28 |
 | M2 | **Inverse model, Diva** | for 200 held-out sounds: re-render the predicted knobs; log-mel L1 to the target at least 10% below the retrieval baseline (knobs of the closest rendered preset) | not built |
 | M3 | **Second and third synth** (Vital, open format; Omnisphere, largest library) in one shared sound space | M1 bars per synth; cross-synth match ("this Diva sound in Vital") beats retrieval by 10% on re-render | Vital partly rendered; Omnisphere rows being redone at lead 30 |
 | M4 | **Words <-> sound** | per word with >= 30 tagged presets: AUC >= 0.75 from the sound embedding on held-out presets; recall@10 >= 0.5 for word -> preset | tags exist, no sound embedding |
@@ -98,7 +109,7 @@ Model choices, settled:
 |---|---|---|---|
 | 1 | Re-run the gate on Diva; first real model (`sound_model_probe.py`) | 1 min | **done 2026-10-28** (table in section 2) |
 | 2 | Store log-mel (64 x 48, uint8 0.5 dB) with every render (`render_pass.logmel`) | none extra | **done 2026-10-28**, picked up by each new render chunk |
-| 3 | M0: frozen splits + `sound_eval.py` | 1 session | next |
+| 3 | M0: frozen splits + `sound_eval.py` | 1 session | **split frozen and scoring works 2026-10-28** (`eval/splits/diva.json`, 22 banks, 768 presets). Left: log-mel L1 and spectral convergence once mel rows exist; repeat-run check |
 | 4 | Verify every render file (features present, presets differ, silent share) on both machines | 30 min | REVISED-PLAN 6.1 |
 | 5 | M1 on Colab: MLP with one-hot selectors, then mel decoder | 1-2 sessions | after 3 |
 | 6 | Omnisphere on the Air at lead 30; Vital prefix of 500 | machine hours | REVISED-PLAN 6.2, 6.4 |
