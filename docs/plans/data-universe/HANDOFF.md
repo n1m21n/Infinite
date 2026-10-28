@@ -424,3 +424,11 @@ Scorer fix: `reach.py score` crashed when a plan has no `pred_spread` (None in a
 
 ## Vital / plug-in presets: blocked on the build (2026-10-28)
 Plug-ins installed here: Vital, Serum 2, Diva, Omnisphere, Phase Plant (AU and VST3 for most). `~/Music/Vital` holds 75 `.vital` files (the 800 Vital records in `presets/` came from the Air). `plugin_states.py` needs the headless `--plugin-state` flag, which is in source on main but in no release (latest is v0.6.6); the only binary on this Mac is the Desktop copy at 0.6.6 (no `build/` or `build-dev/` exists), so the Vital state template comes back `ready: false`. To render Vital / Serum 2 / Hive / Repro presets, a build of current main is needed (`scripts/ibuild.py build`, release or dev; heavy on this 8 GB Mac, run when nothing else is). Diva presets are already measured (18,907 rows), so the Diva anchors stand.
+
+### C3 owner listening test built, 2026-10-28 (`tools/universe/listen_c3.py`)
+
+`pick` scores the frozen C3 held-out sample files with the critic and takes the top 20 and bottom 20; `build` cuts 6 s clips, loudness-matches them (the critic's strongest single axis is loudness, 0.80 AUC alone, so the owner judges the sound, not the volume), shuffles with a fixed seed and writes `eval/listen/c3/index.html` (blind, Good / Not good per clip) plus the key `eval/listen/c3_key.json`; `score FILE` compares the saved answers with the critic's side. Bar: agree on >= 30 of 40.
+
+Decision made before any listening: the picks are real sample files only (top 20 score 9.6..14.3, bottom 20 score -9.0..-4.0). Taking them from the whole test set put 20 samples on top and 11 synth renders in the bottom, so the owner could agree just by hearing sample versus synth. Synth renders are not in this test.
+
+Owner answers: Anchors and recipes: the owner says the 40 anchors were AI generated, while the presets inside each plug-in and the Patches folder are human made (the 40 recipes' source is now answered).
