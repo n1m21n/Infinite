@@ -91,3 +91,18 @@ Model activity (redraw one knob on 200 rendered bases, mean scaled change of pre
 - The strongest interaction in both engines is filterType + cutoff: what the cutoff does depends on the filter type, which matches how the node works. This is the "functional connectivity" result: knobs that fire together are learned as connected.
 - Caveats: the model trained on the same renders the measured activity comes from (so not an independent test); the interaction floor from model noise is not measured yet (a pair of knobs known to be independent would give it).
 - Test to make it independent: measure activity on the new reach/round renders (not in training) and compare to the model's earlier prediction.
+
+## Tuning curves v1 (tools/universe/tuning.py): what each knob does, per the model (Analog)
+
+| knob | strongest axis | shape | change over sweep (spreads) |
+|---|---|---|---|
+| cutoff | brightness | up | 1.86 |
+| attack | attack | up | 2.39 |
+| release | decay | up | 1.79 |
+| noise | noisiness | up | 0.51 |
+| resonance | loudness | up | 0.64 |
+| sustain | loudness | up | 0.59 |
+| filterType | fullness | (selector: read as steps, 'dip' is level order) | 0.96 |
+| pw1 | movement | down | 0.09 (nearly inert) |
+
+Each strongest axis is the one the knob is named for (cutoff -> brightness, noise -> noisiness, release -> decay). That is the C2 'understands each part' check in a form a user can read, and it needs no new render. Still to do: score the direction on the frozen C2 moves (claims.py score).
