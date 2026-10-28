@@ -84,3 +84,10 @@ Real patches are graphs, so the model must be one too. Same idea, one more rule:
 59 types output audio: 14 pure sources and **45 with an audio input as well**. By category: AudioEffects 30, Synths 10 (Field Synth, Grain Molder, Granular, Looper, Molder, Oscillator, PaulStretch, Sampler, Slicer, Wavetable: these take audio in too, e.g. FM/sidechain/material), Utility 5 (Audio Meter, Blend Audio, Gain, Mixer, Splitter).
 
 Render-first list for L1 (single audio-in effect, 1 input, 3-20 knobs): Audio Filter 8, Bitcrush 5, Chorus 9, Convolution Reverb 7, Cycle Shaper 5, Delay 14, Drive 6, EQ 20, Flanger 8, Formant Filter 3, Frequency Shifter 6, Key-Snap 6, Limiter 4, Phaser 8, Pitch Shifter 5, Resonator Bank 9, Reverb 7, Ring Mod 4, Saturator 10, Spec Blur 6, Stereo 3, Stutter 3, Transient Shaper 3, Tremolo 6, Wavetable Shaper 8 = 25 effects, ~190 knobs. Held back for L2+: two-input nodes (Dynamics sidechain, Shape Resonator, Spectrum Slide, Blend Audio, Mixer, Splitter). Left out: Plugin (0 knobs, third-party), Field Effect (user code), Audio Meter (no output change). Caveat: 'audio in' counts any audio-kind input pin, so a Synths-category node may use it only as a modulator; confirm per node with a render before it is in a held-out chain shape.
+
+## Additions from the external review (2026-10-28)
+
+- **Held-out unit = unseen node combinations**: train on A->B and B->C, test on A->C and A->B->C (in addition to unseen chain shapes).
+- **Depth curve**: report held-out R2 at depth 1, 2, 3, 4 and the error against the sum of per-node errors; the claim 'no depth cost' needs the curve, not one number.
+- **Null lesions**: bypassing a node whose effect is nil (mix = 0, unity gain, a filter wide open) must be predicted as zero change; the model's lesion-vs-measured rank correlation (>= 0.7) is only reported together with its null-lesion error.
+- **Additive baseline**: the composed model must beat 'sum of single-node changes' on the interaction pairs; report where the two differ (saturation after filter, delay into reverb).
