@@ -70,7 +70,18 @@ def fast_sec(meta, div):
     return f
 
 
+def _alarm(*_): raise TimeoutError("file over 20 s")
+
+
 def row(src):
+    import signal
+    signal.signal(signal.SIGALRM, _alarm); signal.alarm(20)
+    try: return _row(src)
+    except TimeoutError as e: return {"src": src, "error": str(e)}
+    finally: signal.alarm(0)
+
+
+def _row(src):
     r = {"src": src}
     p = find(src)
     if p is None: r["missing"] = 1; return r
