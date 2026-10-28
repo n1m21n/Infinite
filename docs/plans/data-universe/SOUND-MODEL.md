@@ -144,6 +144,24 @@ Diagnosis before any collection:
 
 So the gap is knob interactions the library never shows apart, which is what D2 is for.
 
+**Pilot result, equal cost (2026-10-28, 1 seed, same held-out presets)**, median head R2 of the 11 characteristic means:
+
+| Fit data | random | group (unseen banks, the bar) |
+|---|---|---|
+| baseline (1,125-1,135 presets) | 0.153 | 0.082 |
+| + D2: 967 one-knob variants of 50 bases | **0.212** | 0.062 |
+| + D1: 1,000 new presets from training banks | 0.162 | **0.160** |
+| trim 0.9 (335 of 465 knob columns), no new data | 0.115 | 0.061 |
+
+Reading: D1 wins on the bar. Unseen banks need breadth (new regions of sound); D2 teaches how knobs act around its 50 bases,
+which helps presets near them (random split) and not new banks. Trimming rare knobs hurts: the rare settings carry sound.
+D1's +0.08 on group for about one doubling matches the earlier curve, so the whole Diva library (about 15,000) projects to
+about 0.35-0.40 on group, short of 0.6: presets alone do not reach the bar. Next, in order:
+1. D1 next doubling (2,600 presets, `d1_batch.py` + `diva_d1b.sh`, about 36 min): confirms the slope.
+2. D2 wide pilot at equal cost: one knob move on each of 1,000 bases from every training bank (breadth and isolation together).
+3. If the projection holds, the gap is closed on the owner's own synths (unlimited, licence-free renders), with Diva as the
+   map of where good sounds live (HANDOFF, the owner's ladder).
+
 **Data types, what each teaches, and the test it must pass:**
 
 | Data | Teaches | Fixes which error | Cost | Proof it helped |
