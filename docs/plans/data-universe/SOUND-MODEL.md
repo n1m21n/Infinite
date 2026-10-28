@@ -80,7 +80,7 @@ Fréchet Audio Distance on embeddings for whole-set comparisons (Kilgour et al. 
 | # | Milestone | Done when (bar) | Baseline today |
 |---|---|---|---|
 | M0 | **Evaluation harness** | `sound_eval.py` scores any model on a frozen split (`eval/splits/diva.json`): random-preset split **and** bank split (whole preset folders held out, no near-duplicate leakage). Prints R2 per descriptor group, log-mel L1 in dB, spectral convergence. Same model twice gives the same numbers within 0.005 | probes use ad-hoc splits |
-| M1 | **Forward model, Diva** | descriptor R2 >= 0.50 random split, >= 0.40 bank split; log-mel L1 at least 20% below the nearest-preset baseline (k-NN in knob space) | MLP R2 0.384 random, 0.211 bank; mel rows start 2026-10-28 |
+| M1 | **Forward model, Diva** | descriptor R2 >= 0.50 random split, >= 0.40 bank split; log-mel L1 at least 20% below the nearest-preset baseline (k-NN in knob space) | row v2, 1,631 presets, C3: MLP R2 0.218 random, 0.173 group; mel 9.96 / 10.30 dB vs bar 9.84 / 9.89 (section 4b) |
 | M2 | **Inverse model, Diva** | for 200 held-out sounds: re-render the predicted knobs; log-mel L1 to the target at least 10% below the retrieval baseline (knobs of the closest rendered preset) | not built |
 | M3 | **Second and third synth** (Vital, open format; Omnisphere, largest library) in one shared sound space | M1 bars per synth; cross-synth match ("this Diva sound in Vital") beats retrieval by 10% on re-render | Vital partly rendered; Omnisphere rows being redone at lead 30 |
 | M4 | **Words <-> sound** | per word with >= 30 tagged presets: AUC >= 0.75 from the sound embedding on held-out presets; recall@10 >= 0.5 for word -> preset | tags exist, no sound embedding |
@@ -95,6 +95,59 @@ Model choices, settled:
 | Knob encoding | standardised continuous knobs now; one-hot for selector knobs (oscillator model, filter type) in M1 | selectors are categories, not amounts |
 | Note and velocity | inputs to the model (C3, C4, C3 forte rendered; others predicted only if `note_predict.py` holds) | sound depends on both |
 | Gate stop line | rerun `marginal_gate.py` with the MLP curve (`sound_model_probe.py`); stop a library when two doublings gain < 0.01 **on the MLP** | ridge undersells the data |
+
+## 4b. Data contract: what the model needs, and how each data point moves a bar
+
+No data is collected unless this section names it, the error it fixes, its budget and the test that shows it helped.
+The model is a function; the data has to show it every input it will be asked about, with the inputs varied independently.
+
+```
+ input (what the model sees)              target (what it predicts)             bar it serves
+ knobs, 0-1 by host address  ─┐
+ selector knobs one-hot       ├─▶  M1 forward  ─▶  43 descriptors (R2)     ─▶  R2 0.50 random / 0.40 group
+ note, velocity              ─┘                    64 x 48 log-mel (dB)    ─▶  mel 20% below k-NN
+ sound (mel)                 ───▶  M2 inverse  ─▶  knobs, scored by re-render ─▶ 10% below retrieval
+ sound embedding + tags      ───▶  M4 words    ─▶  word AUC / recall@10
+```
+
+**Learning curve, Diva M1, C3, 1 seed (2026-10-28)** - the test that decides whether more presets help:
+
+| Fit presets | R2 random | R2 group | mel random dB | mel group dB |
+|---|---|---|---|---|
+| 281 | 0.074 | 0.018 | 11.68 | 11.69 |
+| 562 | 0.153 | 0.073 | 10.66 | 11.27 |
+| 1,125 | 0.218 | 0.173 | 9.96 (bar 9.84) | 10.30 (bar 9.89) |
+| bar | 0.50 | 0.40 | 20% below k-NN | 20% below k-NN |
+
+Reading: every doubling adds about 0.07-0.10 R2 and takes 0.7-1.0 dB off mel, and the curve has not flattened. Mel passes at
+about one more doubling (about 2,300 fit presets, about 3,300 rendered). R2 at this slope needs 3-4 more doublings (10-20k presets),
+which is the whole Diva library or more: presets alone are the slow road to the R2 bars. Baselines: mean and k-NN both sit at R2 about 0,
+so knob distance does not predict sound; the model has to learn which knobs matter.
+
+**Data types, what each teaches, and the test it must pass:**
+
+| Data | Teaches | Fixes which error | Cost | Proof it helped |
+|---|---|---|---|---|
+| D1 more presets (3 notes) | the realistic region of sound space | everything, slowly (curve above) | 1 s per preset, Pro | the curve's next point |
+| D2 one-knob variants of real presets (base preset, one knob moved to 3-5 values) | each knob's own effect, unconfounded: in a library knobs move together, so the model cannot tell which one made the sound | R2 on knobs the library rarely varies; M2 needs it most | 1 s per variant; 100 bases x 10 knobs = 1,000 renders = 17 min | at equal render count, D2 lifts held-out preset R2 more than D1 |
+| D3 more notes / velocities | note and velocity dependence | error at C4 / C3f above C3's | 1 s per note | per-note error gap closes |
+| D4 tags already in presets | words | M4 only | none | M4 |
+| D5 other synths | shared space | M3 only | per synth | M3 |
+
+Not data (the model side, free to try first): drop knobs that never vary or are inactive (oscillator off, its knobs moot);
+465 features for 1,125 presets is wide; a larger mel decoder only if mel stays the failing bar.
+
+**Next, in order, each a fixed budget:**
+1. D1 to about 3,300 Diva presets (Pro alone, `diva_v3.sh`, about 1 h): expected to pass the mel bar; rerun the curve.
+2. D2 pilot vs D1 at equal cost (1,000 renders each), scored on the same held-out presets. Needs one tool: write variant states
+   (set one host parameter in a preset's state, `render_pass` today renders saved states only). The winner decides how the rest of
+   the render budget is spent.
+3. Model-side trims above, on the same rows, before any further rendering.
+
+**Execution, honest:** most of the sessions to here went into render infrastructure (speed, shards, a second machine, a memory
+hunt) and almost none into the model. The curve above could have been run at 701 presets and would have said the same thing.
+Rule from now on: a learning curve or an error diagnosis comes before any collection, and collection runs on the one machine that
+works (the Pro) until a curve says it is the bottleneck.
 
 ## 5. Order of work
 
@@ -190,7 +243,7 @@ lets the files merge (address, name, unit, range equal).
 each Diva render process holds about 3.9 GB, live, allocated by Diva's own state load in 128 MB blocks (flat across a batch, so not a
 leak; mostly zero pages, so 4 shards on 8 GB still give 1.08 presets/s against 1.02 for 3). The Air shards stalled after 09:02 with
 empty logs (cause not found; a hand run of the same command works) and are stopped (`~/STOP_V3` on the Air). Collection was eating the
-time meant for the model, so the next session starts with the model, not the shards:
+time meant for the model, so the next session starts with the model, not the shards (steps 1-3 done the same day, section 4b):
 
 1. Stop the Pro (`touch ~/STOP_V3`), merge the two Diva files (`same_knobs` allows it).
 2. Run M1 on them, 3 seeds: `OMP_NUM_THREADS=4 nice -n 5 ~/Infinite/ml-venv/bin/python -I m1_forward.py <rows> --seeds 3`.

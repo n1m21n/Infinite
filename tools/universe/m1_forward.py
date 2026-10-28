@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """M1 of SOUND-MODEL.md: forward model, knobs + note + velocity -> sound, in PyTorch (Colab; any machine with torch).
 
-    m1_forward.py preset_diva_v2.jsonl [--seeds 3] [--epochs 300] [--out DIR] [--dry]
+    m1_forward.py preset_diva_v2.jsonl [--seeds 3] [--epochs 300] [--out DIR] [--dry] [--frac 0.5]
 
 Data, split, knob encoding and scores are the M0 ones (sound_data, sound_eval.encode / score), so a number printed here is the same
 number sound_eval would print for this model. One network for every note: input = encoded knobs + midi/127 + velocity/127; a shared
@@ -84,6 +84,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("rows"); ap.add_argument("--seeds", type=int, default=3); ap.add_argument("--epochs", type=int, default=300)
     ap.add_argument("--boot", type=int, default=1000); ap.add_argument("--out", default=""); ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--frac", type=float, default=1.0, help="fit on this share of the training presets (learning curve); test unchanged")
     a = ap.parse_args()
     d = sd.load(a.rows); keep = np.flatnonzero(d["ok"].any(1))
     plugin = os.path.basename(a.rows).split(".")[0]
@@ -92,7 +93,7 @@ def main():
     def log(s):
         print(s, flush=True); lines.append(s)
     X = se.encode(d["knobs"])  # same encoding as sound_eval
-    log("M1 forward | %s | %d presets, %d knob features, notes %s | %s" % (a.rows, len(keep), X.shape[1], list(map(str, d["notes"])),
+    log("M1 forward | frac %.2f | %s | %d presets, %d knob features, notes %s | %s" % (a.frac, a.rows, len(keep), X.shape[1], list(map(str, d["notes"])),
                                                                          time.strftime("%Y-%m-%d %H:%M")))
     verdict = []
     for sn, m in sd.split(d).items():
@@ -103,6 +104,8 @@ def main():
         gtr = np.unique(d["group"][tr_p]); rng = np.random.default_rng(0); va_g = set(rng.choice(gtr, max(1, int(0.15 * len(gtr))), False))
         va_p = tr_p[np.isin(d["group"][tr_p], list(va_g))] if sn == "group" else tr_p[rng.random(len(tr_p)) < 0.15]
         fit_p = np.setdiff1d(tr_p, va_p)
+        if a.frac < 1:
+            fit_p = np.sort(np.random.default_rng(1).choice(fit_p, max(1, int(a.frac * len(fit_p))), False))
         Xa, Da, Ma, Ia, Ta = samples(d, X, fit_p); Xv, Dv, Mv, _, _ = samples(d, X, va_p); Xt, Dt, Mt, It, Tt = samples(d, X, te_p)
         Mt2, Ma2 = Mt.reshape(len(Mt), -1), Ma.reshape(len(Ma), -1)
         log("\n%s split: fit %d, validation %d, test %d presets (%d test notes)" % (sn, len(fit_p), len(va_p), len(te_p), len(Xt)))
@@ -122,7 +125,7 @@ def main():
                 log("  seed %d: R2 at %s %.3f" % (s, d["notes"][0], r2s))
                 if s == 0:
                     import torch
-                    torch.save(blob, os.path.join(out, "model_%s.pt" % sn))
+                    torch.save(blob, os.path.join(out, "model_%s%s.pt" % (sn, "" if a.frac >= 1 else "_f%g" % a.frac)))
             preds["mlp"] = (np.mean([r[0] for r in runs], 0), np.mean([r[1] for r in runs], 0))
         res = {}
         for t in np.unique(Tt):
