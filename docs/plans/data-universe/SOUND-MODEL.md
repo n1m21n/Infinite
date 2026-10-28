@@ -162,6 +162,18 @@ about 0.35-0.40 on group, short of 0.6: presets alone do not reach the bar. Next
 3. If the projection holds, the gap is closed on the owner's own synths (unlimited, licence-free renders), with Diva as the
    map of where good sounds live (HANDOFF, the owner's ladder).
 
+**Pilot close-out, EXECUTION Step 1 (2026-10-28, 1 seed, same held-out presets, `p3_d1b.log`, `p3_d2w.log`)**, median head R2 of the
+11 characteristic means (0 of 11 at the bar in every row):
+
+| Fit data | random | group |
+|---|---|---|
+| + D1 + D1b: about 3,500 new presets (3,484 in fit after 15 dropped) | 0.239 | **0.200** |
+| + D2w: one knob moved on 1,000 bases from every training bank | 0.181 | 0.113 |
+
+Decision by the Step 1 rules: D1b group 0.200 - D1 0.160 = +0.040 >= 0.04, so the curve holds; Diva rendering stops for P3 (the
+projection stays under 0.6) and continues only as map rows for P4. D2w group 0.113 < 0.160, so the Step 2 sweep design is 30%
+one-knob moves on base points, 70% fresh base points. No two compared results are within 0.03, so no 3-seed rerun.
+
 **Data types, what each teaches, and the test it must pass:**
 
 | Data | Teaches | Fixes which error | Cost | Proof it helped |

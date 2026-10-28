@@ -76,6 +76,10 @@ have a neighbour as close as their own median, self = 0.50); Diva and samples 0.
 per-source offset) is left out, the rest is content (samples hold drums and loops, much lighter low end). Plug-in renders form their
 own island (coverage 0): effects measured on one broadband test signal, so they stay out of the instrument space.
 
+**Step 1 closed 2026-10-28** (`SOUND-MODEL.md` 4b, pilot close-out): group median head R2 0.200 with D1 + D1b (~3,500 presets), 0.113
+with D2w; 0 of 11 at the bar. Decision: the curve holds, Diva rendering stops for P3 and continues only as map rows for P4; the Step 2
+sweep is 30% one-knob moves, 70% fresh base points.
+
 Step-by-step execution from here: `EXECUTION.md` (start at Step 0). What the model claims and the numbers that prove it
 (C1 axes, C2 ingredients, C3 good, C4 words, C5 moods and emotions, C6 creative, C7 makes): the claims registry in `EXECUTION.md`.
 
