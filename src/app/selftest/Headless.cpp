@@ -193,8 +193,12 @@ static void ReportPlugins(Headless::Status& st, bool withParams, bool withState 
          {
             const Platform::PluginParamInfo& p = params[k];
             std::snprintf(num, sizeof(num), "\"min\":%.9g,\"max\":%.9g,\"default\":%.9g", p.minValue, p.maxValue, p.defaultValue);
+            float value = 0.0f;
+            char cur[48] = "";
+            if (plugin->CurrentParamValue(p.address, value) && std::isfinite(value))
+               std::snprintf(cur, sizeof(cur), ",\"value\":%.9g", value); // after the state loaded: the preset's knob
             json += std::string(k ? "," : "") + "{\"address\":\"" + std::to_string(p.address) + "\",\"name\":\"" +
-                    Headless::JsonEscape(p.displayName) + "\"," + num + ",\"unit\":\"" + Headless::JsonEscape(p.unit) + "\"}";
+                    Headless::JsonEscape(p.displayName) + "\"," + num + cur + ",\"unit\":\"" + Headless::JsonEscape(p.unit) + "\"}";
          }
          json += "]";
       }
