@@ -359,6 +359,16 @@ def cmd_run(a):
     have = existing_ids(path); t0 = time.time(); added = 0; failed = 0
     print("%s: %d swept, %d fixed, %d presets stored" % (node, len(sw), len(fixed), len(have)), flush=True)
     work, bank = [], 0
+    if a.queue:
+        q = json.load(open(os.path.expanduser(a.queue)))
+        for n, it in enumerate(q["items"]):
+            rec = recipe(node, sw, fixed, it["u"]); i = rid(node, rec)
+            if i in have or any(w["id"] == i for w in work):
+                continue
+            b = "%sb%04d" % (q["round"], n // a.bank_size)
+            work.append({"id": i, "rec": rec, "knobs": [round(to_u(p, rec[p["key"]]), 4) for p in sw], "design": it["design"], "bank": b,
+                         "src": "own:%s:%s/%s_%03d" % (node.lower(), b, it["design"], n), "label": "%s %s %s" % (node, q["round"], it["design"])})
+        a.count = len(have) + len(work)
     while len(have) + len(work) < a.count:
         seen = {w["id"] for w in work}
         its = [it for it in items_for_bank(node, sw, fixed, bank, a.bank_size) if it["id"] not in have and it["id"] not in seen]
@@ -461,6 +471,7 @@ def main():
     ap.add_argument("--bank-size", type=int, default=20)
     ap.add_argument("--budget", type=float, default=0, help="minutes; 0 = none")
     ap.add_argument("--n", type=int, default=20)
+    ap.add_argument("--queue", default="", help="a propose.py queue file: render exactly these points (Step 4)")
     a = ap.parse_args()
     sys.exit({"run": cmd_run, "check": cmd_check, "repeat": cmd_repeat, "show": cmd_show}[a.cmd](a) or 0)
 
