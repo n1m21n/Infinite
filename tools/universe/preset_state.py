@@ -90,6 +90,14 @@ def fmt_of(plugin, ext=""):
     return None
 
 
+def presets_in_order(root, order):
+    """a coreset_order.py list: farthest-first, so any prefix covers the library"""
+    for rel in open(order).read().splitlines():
+        p = os.path.join(root, rel)
+        if os.path.isfile(p):
+            yield rel, open(p, "rb").read()
+
+
 def presets(root, ext):
     for r, _, fs in os.walk(root):
         for f in sorted(fs):
@@ -103,6 +111,7 @@ def main():
     ap.add_argument("--plugin", required=True)
     ap.add_argument("--presets", required=True)
     ap.add_argument("--ext", default="h2p")
+    ap.add_argument("--order", default="", help="coreset_order.py list: render in this order (stride/offset then pick every Nth of it)")
     ap.add_argument("--states", default="~/Infinite/training-data/audio/plugin_states_key.jsonl")
     ap.add_argument("--out", default="")
     ap.add_argument("--budget", type=float, default=0)
@@ -130,7 +139,7 @@ def main():
     t = {"instrument": True, "format": "vst3", "id": tmpl["id"], "name": tmpl["name"], "vendor": ""}
     binp = rp.infinite_bin()
     t0, n, ok, bad = time.time(), 0, 0, 0
-    for i, (rel, data) in enumerate(presets(a.presets, a.ext)):
+    for i, (rel, data) in enumerate(presets_in_order(a.presets, a.order) if a.order else presets(a.presets, a.ext)):
         if i % a.stride != a.offset:
             continue
         if a.list:
