@@ -260,3 +260,5 @@ Reading: most axis changes from a 1-3 knob move are near zero, and the sign of n
 ## G3 sample library, features_v3 (2026-10-28)
 
 `samples_v3.py run --budget 30`: 11,316 rows in ~29 min. Repeat check: 50/50 identical. Pitch class from the audio vs the pitch in the file name: **462/691 = 66.9% (bar 90) -> below the bar.** The pitch feature stays out of any claim until the mismatches are split into 'file name wrong' and 'estimator wrong' (octave errors, percussive and noisy sounds have no pitch). Next: list the 229 mismatches by instrument family.
+
+Pitch mismatches split (691 named files): bass 81%, guitar 94% (18 files), synth 68% (432), other 56% (158), piano 33% (6 files). Mismatch intervals mod 12 are spread (5 st: 35, 7 st: 31, 3 st: 28, 2 st: 23, 9 st: 22), with fifths/fourths the largest, which is the signature of the estimator locking onto the 3rd/4th harmonic, not of wrong file names alone. Decision: pitch from audio is NOT used where the file name gives the note; the audio estimator needs a harmonic-product fix before it is trusted for synths. Not fixed yet.
