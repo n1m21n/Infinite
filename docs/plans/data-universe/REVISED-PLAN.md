@@ -107,3 +107,76 @@ Success is **a model that learns the knobs-to-sound map and generalises to prese
 - **Held-out presets for every claim**: no number in this plan counts unless it was scored on presets the model never saw.
 - **Gate per library**: effort goes where the next doubling still helps; nothing runs on a calendar.
 - **Final evaluation** for the model: train with and without predicted rows, compare on real rendered rows, and use the difference to settle section 5's decision.
+
+## 10. How the pieces fit (plain language)
+
+### Flow of work
+
+```
+ COLLECT              ORGANISE                  TRAIN                 FINAL MODEL
+ read every file  ->  one row per instrument -> note models,        -> generator that picks
+ render plug-ins      place on axes, cluster     sound models,          notes + instrument + sound
+ measure audio        link recipe to sound       judged on held-out     for (genre, mood, section)
+ (this plan)          (atlas, clusters, matrix)  gates B1-B10           and passes the benchmarks
+```
+
+| Stage | Where we are (2026-10-28) |
+|---|---|
+| Collect | Drive files mostly read; audio pass about 74% (75,760 of 102,239 files, 2026-10-27); plug-in renders in progress (this plan) |
+| Organise | Atlas of 14,161 instruments and clusters built, on a thin audio base; must be re-run after collection |
+| Train | Models train on MIDI only today. **No plug-in render has trained anything yet** (`next-phase.md` P1) |
+| Final model | Not built. Needs the linked model of `next-phase.md` |
+
+Share of work that is collection: my estimate, not measured: about half the remaining effort is collection (plug-in renders are the
+slow part, hours of machine time), about a quarter organising (join recipe to sound, matrix, clusters), about a quarter training and
+evaluation. The plug-in renders feed organise and train, so stopping them early (the gate) is what frees the time.
+
+### Why the data is useful
+
+- Knobs -> sound: how a preset's settings turn into measured sound, so the generator can choose settings for a wanted sound.
+- Sound -> words: which sounds people call warm, spacious, glitchy (tags on presets give the words).
+- Words -> nodes: which Infinite nodes reproduce that character (the character x node matrix).
+- Guardrail: critics and benchmarks judge generator output against real instruments.
+
+### Matrix and axes
+
+- **Axis** = one measured direction that describes a sound, such as brightness (spectral centre), attack time, loudness, roughness,
+  or for affect arousal and valence. `axes-strategy.md` proposes four layers: perceptual, musical structure, affect, words.
+- **Matrix** = a table that lines two lists up. In this project: character (rows: warm, spacious, glitchy...) by Infinite node
+  (columns). Each cell is how much more often presets with that character use that node: log2 of P(node | character) / P(node)
+  (`character_matrix.py`, kept only where at least 30 presets support it).
+- A second matrix is recipe by sound: each row a preset, columns its knobs and its measured features. That is what the renders build.
+
+### What "learning sound" means here
+
+```
+ knobs + note + velocity  --render-->  measured sound (spectrum, envelope, attack, loudness)
+        recipe                                   features
+           ^                                          |
+           +------------- the model learns -----------+
+ forward: recipe -> predicted sound      inverse: wanted sound or word -> recipe
+```
+
+The model is never given audio samples to imitate. It learns the map between settings and measured sound, so it can propose
+settings. That is why held-out presets are the test: a good model scores well on presets it never saw.
+
+### Instrument generation
+
+```
+ (genre, mood, section)  ->  sound cluster  ->  pick an existing preset or sample map   [works with data now]
+                                            ->  build a playable sample instrument      [from the library; approved]
+                                            ->  propose new knob settings               [needs the learned map above]
+```
+
+A wavetable generator is approved to improve the model, not to ship as a feature (`next-phase.md`).
+
+### Audio analysis
+
+Each sound is reduced to a row of numbers (`render_pass.py`, `audio_features.py`):
+
+| Group | Fields now | Planned (`next-phase.md` P2) |
+|---|---|---|
+| Spectrum | 32 band energies, centroid, rolloff, flatness | MFCC, perceptual (ERB) bands |
+| Time | attack, decay, envelope (40 points), onsets, crest | harmonic/percussive split |
+| Level | rms, peak, low/mid/high share | loudness (LUFS) |
+| Pitch/key | none in render rows | pitch, key, tempo grid |
