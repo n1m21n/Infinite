@@ -152,6 +152,13 @@ So the gap is knob interactions the library never shows apart, which is what D2 
 | + D2: 967 one-knob variants of 50 bases | **0.212** | 0.062 |
 | + D1: 1,000 new presets from training banks | 0.162 | **0.160** |
 | trim 0.9 (335 of 465 knob columns), no new data | 0.115 | 0.061 |
+| + D1 + D1b: 3,484 new presets (about 1.1 doublings over D1) | 0.239 | **0.200** |
+| + D2 wide: one knob moved on each of 1,000 bases, 44 banks | 0.181 | 0.113 |
+
+Step 1 result (`EXECUTION.md`, 2026-10-28): D1b adds +0.040 on group for about 1.1 doublings, down from +0.08 for the first, so
+the curve is flattening; the whole library projects to about 0.27-0.30, far from 0.6. Decision: Diva rendering stops for P3 and
+continues only as map rows. D2 wide (0.113) is below D1 (0.160), so the first own-engine batch is 30% one-knob moves, 70% fresh
+base points; later rounds are chosen by the model (Step 4). Differences are over the 0.03 seed noise, so no 3-seed rerun.
 
 Reading: D1 wins on the bar. Unseen banks need breadth (new regions of sound); D2 teaches how knobs act around its 50 bases,
 which helps presets near them (random split) and not new banks. Trimming rare knobs hurts: the rare settings carry sound.

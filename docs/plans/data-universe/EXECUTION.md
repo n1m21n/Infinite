@@ -29,7 +29,7 @@ python3 tools/universe/claims.py table              # once claims.py exists: tod
 
 If a log is missing and nothing runs: rerun the missing line from Step 1 (commands there).
 
-## Step 1 - close the Diva pilot (P3, data contract) - 10 min reading, no new renders
+## Step 1 - close the Diva pilot (P3, data contract) - DONE 2026-10-28: D1b 0.200, D2w 0.113 group; Diva stops for P3; first batch 30% one-knob / 70% base
 
 Inputs: `p3_d1b.log` (diva_m1 + D1 + D1b, about 3,600 extra presets) and `p3_d2w.log` (one knob moved on 1,000 bases, 44 banks).
 Rerun if needed (one at a time):

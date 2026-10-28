@@ -70,7 +70,7 @@ and band forms of the same render. P3 first pass (`p3_characteristics.py`, Diva 
 means at the 0.6 bar; median head R2 0.153 random, 0.082 group (best: attack 0.44, density 0.23 on group). Not the renders: repeat
 r >= 0.97 on every axis, so the ceiling is about 1. Not one knob either: the strongest single knob explains |r| 0.28 of brightness
 (VCF frequency) and 0.15 of warmth, so the sound comes from knob interactions. Presets alone add 0.04-0.07 per doubling (7+ doublings
-to the bar). Running now: D2 one-knob variants vs D1 more presets at 1,000 renders each, plus knob trims (`SOUND-MODEL.md` 4b).
+to the bar). Diva pilot closed (EXECUTION Step 1): more presets reach 0.200 group and are flattening (+0.04 for the last doubling), one-knob moves on 1,000 bases 0.113; Diva stops for P3 and stays the map; the learner moves to Infinite's engines (`SOUND-MODEL.md` 4b).
 P4 dry run (`p4_shared.py`, band form, 3,000 rows per source, 6 spectral axes): samples and Air cover each other (0.44 / 0.37 of rows
 have a neighbour as close as their own median, self = 0.50); Diva and samples 0.26 / 0.39, up from 0.16 / 0.27 once loudness (a
 per-source offset) is left out, the rest is content (samples hold drums and loops, much lighter low end). Plug-in renders form their
