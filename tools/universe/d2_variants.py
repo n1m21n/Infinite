@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """D2 of SOUND-MODEL.md 4b: one-knob variants of real Diva presets, so the model sees each knob's own effect unconfounded.
 
-    d2_variants.py ROWS.jsonl --presets ~/Infinite/scratch_omni/diva_air --out ~/Infinite/scratch_omni/diva_d2 [--bases 50] [--per 2]
+    d2_variants.py ROWS.jsonl --presets ~/Infinite/scratch_omni/diva_air --out ~/Infinite/scratch_omni/diva_d2 [--bases 50] [--per 2] [--knobs 1]
 
 Bases: presets of ROWS that are in training on both frozen splits (sound_data.split), picked by crc of their id (stable). For each base
 and each knob in KNOBS, --per new values are drawn from that knob's spread over the whole library (deciles 1-9 of every .h2p under
@@ -37,6 +37,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("rows"); ap.add_argument("--presets", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--bases", type=int, default=50); ap.add_argument("--per", type=int, default=2)
+    ap.add_argument("--knobs", type=int, default=len(KNOBS), help="knobs moved per base, picked by crc (wide pilot: 1)")
     a = ap.parse_args()
     root = os.path.expanduser(a.presets); out = os.path.expanduser(a.out)
     lib = collections.defaultdict(list)
@@ -55,13 +56,10 @@ def main():
     for i in ids:
         rel = str(d["src"][i]).split(":", 2)[2]; text = open(os.path.join(root, rel), encoding="latin-1").read()
         lines, w = text.split("\n"), where(text)
-        for k in KNOBS:
-            if k not in w or k not in dec:
-                continue
-            li, v0 = w[k]
-            cand = [x for x in dec[k] if abs(x - v0) > 0.1 * rng_[k]]
-            if not cand:
-                continue
+        moves = {k: [x for x in dec[k] if abs(x - w[k][1]) > 0.1 * rng_[k]] for k in KNOBS if k in w and k in dec}
+        ks = sorted([k for k, c in moves.items() if c], key=lambda k: zlib.crc32(("%s%s" % (rel, k)).encode()))[:a.knobs]
+        for k in ks:
+            li, cand = w[k][0], moves[k]
             pick = sorted(cand, key=lambda x: zlib.crc32(("%s%s%s" % (rel, k, x)).encode()))[:a.per]
             for x in pick:
                 new = list(lines); new[li] = re.sub(r"=.*$", "=%.2f" % x, new[li])
