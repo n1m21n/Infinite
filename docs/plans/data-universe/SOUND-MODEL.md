@@ -115,6 +115,40 @@ Model choices, settled:
 | 6 | Omnisphere on the Air at lead 30; Vital prefix of 500 | machine hours | REVISED-PLAN 6.2, 6.4 |
 | 7 | M2, then M3, M4, M5 | | after M1 passes |
 
+## 5b. Readiness audit before M1 (2026-10-28)
+
+Owner's bar: well built (robust, universal), efficient (only what we need), scalable (any plug-in, preset, sound, knob), coherent
+(the data joins into one space). Verdict: **the approach passes; the row format and render tools do not yet.** Block 0 below fixes
+them before M1 starts, so M1 trains on the final format and nothing is rendered twice later.
+
+| Check | Finding (measured) | Criterion failed |
+|---|---|---|
+| Knob source | Level 3 rows take knobs from the preset file (per-format parser, 545 usable Diva columns); level 1 sweep rows use the host's parameter list. Two knob spaces for one plug-in | coherent, universal |
+| Host parameter values | Headless already reads every parameter (`PluginGetParameter`) but `--plugin-params` reports name, min, max, default, unit and **not the current value**; `preset_state.py` does not even pass the flag | universal |
+| Join recipe -> sound | by file path string; 214 of 3,908 rendered Diva presets (5%) do not join | robust |
+| Note stimulus | label `C3` is MIDI 48 velocity 90 in level 1 and velocity 100 in level 3; level 3 rows store no midi or velocity | coherent |
+| Render code | the render-and-write loop exists twice (`preset_state.py`, `omni_render.py`) beside `render_pass.py` | well built |
+| Loader | `marginal_gate.load` string-scans about 500 MB of preset files on every run | efficient, scalable |
+| Split | bank = top folder, Diva-specific; Omnisphere has no folders | universal |
+| Scores | one split, one seed, no confidence interval: a 0.02 difference cannot be called | robust |
+| Render noise | 14 presets rendered twice by resume: band levels differ 0.17 dB on average, 0.9 dB worst (Diva drift). Sets the ceiling; unmeasured for other plug-ins | robust |
+| Data quality | Diva: 2 of 3,908 near-silent, 97 exact duplicate spectra, 3% near-identical: clean | passes |
+| Approach | forward + inverse, held-out banks, mel target, re-render round trip: matches the published practice for synth sound matching | passes |
+
+### Block 0: one row contract (before M1)
+
+| # | Fix | Result |
+|---|---|---|
+| 0.1 | Headless `--plugin-params` adds `value` (current, after the state loads) per parameter; one build | every plug-in gives its knobs in one form, whatever preset route loaded it |
+| 0.2 | One render function in `render_pass.py` used by every route; `preset_state.py` and `omni_render.py` call it | one code path to fix and test |
+| 0.3 | Row v2: `plugin_id`, `preset_id` (hash of the state bytes), `route` (1/2/3), `midi`, `velocity`, `knobs` (normalised 0-1 by address), `mel`, descriptors, `schema: 2`. Parameter table (address, name, unit, range) once per plug-in in `params/<plugin_id>.json` | joins by construction: knobs and sound come from the same render; no path join |
+| 0.4 | One stimulus for all routes: C3 v100, C4 v100, C3 v127 | same label means same sound test everywhere |
+| 0.5 | Group split for any library: top folder, merged with presets whose knob vectors are near-identical; bootstrap 95% interval on every score | universal split; differences can be called |
+| 0.6 | Loader caches one `npz` per plug-in (knobs, mel, descriptors, groups) | seconds to load at any size |
+| 0.7 | Noise floor: render 50 presets twice per plug-in at the start | ceiling per metric, per plug-in |
+
+Then re-render Diva in row v2 (about 3,900 presets, 3 h on the Pro) and start M1. The Diva rows made so far stay as the record.
+
 ## 6. Parked until a milestone needs it
 
 Each item returns only when a milestone's bar cannot be reached without it. Nothing here is deleted.
