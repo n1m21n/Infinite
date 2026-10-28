@@ -107,3 +107,23 @@ Caveats we already know: every held-out score is **same generator** (unseen bank
 | Held-out unit = unseen node combinations; depth curve; lesion with null controls; additive baseline | **Adopt** | Added to the CHAIN-TRACK proofs. Null lesion (mix = 0 or unity gain must predict delta = 0) is a good test we did not have. |
 | 2AFC listening test (15-20 producers, 30 triplets) | **Adopt as the external-evidence plan; needs the owner** | The "70% win rate gives p < 0.001" figure needs checking: with 30 trials 70% is p ~ 0.02 one-sided; p < 0.001 needs about 80% at 30 trials or more trials. |
 | Literature list | **Partly unverified** | InverSynth II is real (Barkan et al., ISMIR 2023) but the review's title differs from the paper's; 'Combes et al. JAES 2025' and 'CMA-ES vs gradient search (2026)' have no citation and are not used until found; micro-tcn is a compressor-modelling repo, not a general surrogate-synth reference. |
+
+## 7. Reply to SECTION-6-RESPONSE.md (2026-10-28)
+
+| Reviewer statement | Checked | Result |
+|---|---|---|
+| 2AFC: 70% of 30 trials is p ~ 0.02; 80% needed for p < 0.001 | exact binomial | **Agreed**: P(>=21/30) = 0.0214; P(>=24/30) = 0.0007. |
+| 15 raters x 30 trials, 70% pooled: p ~ 1e-18 | exact normal tail | pooled p = 1.1e-17 (reviewer's figure is close), **but the pooled test is the wrong test**: raters share the same 30 triplets, so the trials are not independent. The model needs a random effect for the item as well as for the rater (crossed); the effective sample for 'is it the triplets' is closer to 30 than 450. We will pre-register the crossed mixed model and report the item-level result. |
+| Difference-loss failure 'proves the derivative representation is fine' and gating at 0.5 sd 'solves the root problem' | own data | **Not accepted.** The noise explanation is a hypothesis we have not tested (e.g. drop pairs with |change| < 0.3 sd from the loss). Gating does not fix the model: on clearly-changed axes (> 0.3 sd) direction is still only 62-69% for fullness and 71-74% for movement/noisiness (Oscillator). Gating makes the claim measurable, not the model correct. |
+| 'Convex hull / Mahalanobis' out-of-gamut | reach2 | We use the target's distance to the nearest existing render in sd units; it correlates 0.89 (Analog) and 0.77 (Oscillator) with the measured outcome. A convex hull in 11 dimensions would contain almost everything; the nearest-render distance is the measure that works. |
+| InverSynth II title 'Fine-Tuning a Neural Synthesizer Proxy for Target-Matching', authors 'Barkan, Tsiris, et al.' | ISMIR 2023 listing | **Wrong again.** Title: 'InverSynth II: Sound Matching via Self-Supervised Synthesizer-Proxy and Inference-Time Finetuning'; Barkan, Shvartzman, Uzrad, Laufer, Elharar, Koenigstein. |
+| Combes et al. 'Surrogate Models for Virtual Analog and Digital Synthesizers' (JAES 2025), arXiv:2509.07635 | arXiv | **Real paper, wrong title**: 'Neural Proxies for Sound Synthesizers: Learning Perceptually Informed Preset Representations' (Combes, Weinzierl, Obermayer; code pcmbs/synth-proxy). Journal venue not checked. |
+
+### What the Combes paper adds (read 2026-10-28, abstract and results via arXiv HTML)
+
+- Same shape as ours: a preset encoder maps synth parameters into a frozen audio model's embedding space (L1 loss), trained on ~10M random presets; Dexed (FM, 100 params), Diva (analog, 173), TAL-NoiseMaker.
+- **A transformer encoder beat MLP and highway networks on every synth**, and attention helped on interdependent parameters (Dexed algorithm, Diva mode-dependent). Our forward model is a plain MLP; the 'MLP vs transformer' comparison already on our list is now justified, particularly for Analog (mode switches) and chains.
+- **Same-generator gap quantified**: MRR 0.87 / 0.81 on synthetic presets fell to 0.12 / 0.46 on hand-crafted ones. This is the evidence for P6 in someone else's data: random-preset scores do not carry to what people actually build. Our 'hand-built' check set would be the owner's real patches.
+- **An embedding loss improved sound matching** over parameter loss alone, in-domain and on NSynth: supports using learned embeddings as the reach objective (P3).
+- **A non-circular test for embeddings** (P3): rank embedding distances against monotonic sweeps of a known attribute (envelope, brightness, pitch). Our own knob sweeps (tuning curves) are exactly such sweeps; scoring CLAP / EnCodec by monotonicity along them tests the embedding without using genre or the axes as the ruler.
+- Caveats they state: LFO parameters (time and frequency at once) are the least stable; synthetic sampling covers many unmusical regions; one note and velocity only (as ours: C3).
