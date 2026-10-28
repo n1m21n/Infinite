@@ -85,7 +85,7 @@ Model activity (redraw one knob on 200 rendered bases, mean scaled change of pre
 | Engine | Rank correlation, model vs measured, over all swept knobs | Strongest interaction (beyond the sum of each) |
 |---|---|---|
 | Analog (24 knobs) | 0.68 | filterType + cutoff 0.21, filterType + resonance 0.11 |
-| Oscillator | see run below | filterType + cutoff 0.37, filterType + sync 0.16 |
+| Oscillator (13 knobs) | 0.84 | filterType + cutoff 0.37, filterType + sync 0.16 |
 
 - The model ranks the busy knobs like the measurements (filter, cutoff, envelope first). Biggest misses: Analog filterType (0.57 measured, 0.32 model), Oscillator envelope release/decay (model too active).
 - The strongest interaction in both engines is filterType + cutoff: what the cutoff does depends on the filter type, which matches how the node works. This is the "functional connectivity" result: knobs that fire together are learned as connected.
