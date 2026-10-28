@@ -209,3 +209,20 @@ Model-chosen 2,000 renders (3-seed disagreement over 20,000 candidates; one / pa
 ## Claims frozen for the four new engines (2026-10-28, after the first 2,000 renders each)
 
 Wavetable, FM, Metallic, String: first batch 2,000 presets each, 0 failed (854, 880, 717, 728 s). C1 group sets, C2 moves and C3 random sets frozen (C3 keys `random:own_<engine>.jsonl`); `claims.py check`: all hashes match. Frozen before any model was trained on them.
+
+## Step 7 first look and a reach bug (2026-10-28)
+
+**String vs acoustic families** (`string_families.py --n 1900`, equal render count, ratio = distance to nearest render / family's own inner distance, 11 axes, random knobs):
+
+| engine | guitar | harp | pluck | violin | cello | piano |
+|---|---|---|---|---|---|---|
+| String | 7.02 | 5.46 | 5.53 | 7.11 | 4.30 | 6.90 |
+| Analog | 4.78 | 3.48 | 3.27 | 4.98 | 2.79 | 4.48 |
+| Oscillator | 3.88 | 2.90 | 2.72 | 3.99 | 2.84 | 3.63 |
+| Wavetable (1,525) | 5.18 | 3.75 | 3.67 | 5.15 | 3.45 | 4.88 |
+| FM | 5.99 | 4.89 | 4.48 | 6.21 | 3.43 | 6.08 |
+| Metallic | 5.56 | 4.76 | 4.26 | 7.58 | 4.36 | 5.03 |
+
+Reading: no engine lands inside any family at random knobs (all ratios > 1, 0% within inner distance), and the dedicated String engine is the *farthest* from real strings, Oscillator the nearest. Caveat: random knobs cover the engine's whole space uniformly, mostly not string-like; this does not yet say String cannot reach them. The reach test (steering to a target) is the fair one.
+
+**Reach reach1 was invalid:** silent axes are NaN in the characteristic vectors, so every start distance was NaN and "closer than nearest" printed 0.0% (Analog and Oscillator). Fixed in `reach.py` (NaN filled with the engine's column median, stored in the queue). The reach1 renders (287 Analog, 294 Oscillator) stay as training rows. Rerun as `reach2` in driver5 after the library measuring finishes, then Step 4 rounds and embeddings.

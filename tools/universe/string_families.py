@@ -12,10 +12,12 @@ FAM = {"guitar": r"guitar|gtr", "harp": r"harp", "pluck": r"pluck", "violin": r"
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--node", default="String"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--node", default="String"); ap.add_argument("--n", type=int, default=0, help="subsample renders to n (equal-size comparison)"); a = ap.parse_args()
     S, _, _ = ss.own_matrix(os.path.join(ss.AUDIO, "own_%s.jsonl" % a.node.lower()))
     X, N = ss.sample_matrix(None, 200000)
     ok = np.isfinite(S).all(1); S = S[ok]
+    if a.n and len(S) > a.n: S = S[np.random.default_rng(0).choice(len(S), a.n, replace=False)]
+    print('%s: %d renders' % (a.node, len(S)))
     z = ss.prep(X, S); Sz, Xz = z(S), z(X)
     print("| family | samples | nearest String render (median z) | inner distance (median z) | ratio | share within inner |\n|---|---|---|---|---|---|")
     for fam, pat in FAM.items():

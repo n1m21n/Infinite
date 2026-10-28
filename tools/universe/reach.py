@@ -51,7 +51,8 @@ def cmd_plan(a):
     draw = lambda: rng.betavariate(.5, .5) if rng.random() < .5 else rng.random()
     # models (same recipe as propose.py)
     CU = []
-    Vk = V[keep]; Tm = np.array([t[1] for t in T])
+    fill_ = np.nanmedian(V[keep], 0); Vk = np.where(np.isfinite(V[keep]), V[keep], fill_)   # a silent axis is NaN: fill it, or every distance is NaN (reach1 bug)
+    Tm = np.array([t[1] for t in T])
     near = [np.argsort((((Vk - t) / spread) ** 2).sum(1))[:30] for t in Tm]
     for ti, nb in enumerate(near):
         for k in range(a.candidates // len(T)):
@@ -77,7 +78,7 @@ def cmd_plan(a):
         items.append({"u": [round(float(x), 4) for x in CU[sl][b]], "design": "reach", "kind": "reach", "target": pid,
                       "pred_dist": round(float(dist[b]), 4), "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in P[sl][b]]})
     q = {"engine": a.node, "round": a.round, "cols": p3.COLS, "made": time.strftime("%Y-%m-%d %H:%M:%S"), "items": items,
-         "targets": {pid: [round(float(x), 4) for x in tv] for pid, tv in T}, "spread": spread.tolist()}
+         "targets": {pid: [round(float(x), 4) for x in tv] for pid, tv in T}, "spread": spread.tolist(), "fill": fill_.tolist()}
     q["sha"] = hashlib.sha1(json.dumps(items, sort_keys=True).encode()).hexdigest()[:16]
     out = os.path.join(o.CACHE_DIR, "queue_%s_%s.json" % (a.node.lower(), a.round)); json.dump(q, open(out, "w"))
     print("wrote %s | %d targets | median start dist %.2f, median predicted dist %.2f" %
@@ -92,7 +93,8 @@ def cmd_score(a):
         pid = o.rid(a.node, o.recipe(a.node, sw, fixed, it["u"]))
         i = rid.get(pid)
         if i is None or not d["ok"][i, 0]: continue
-        tv = np.array(q["targets"][it["target"]]); got = float((((V[i] - tv) / spread) ** 2).sum() ** .5)
+        tv = np.array(q["targets"][it["target"]]); vi = np.where(np.isfinite(V[i]), V[i], np.array(q["fill"]))
+        got = float((((vi - tv) / spread) ** 2).sum() ** .5)
         res.append((it["start_dist"], it["pred_dist"], got))
     if not res: print("no rendered picks found (check o.rid signature)"); return
     R = np.array(res)
