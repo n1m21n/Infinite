@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--n", type=int, default=2000); ap.add_argument("--uniform", type=int, default=200)
     ap.add_argument("--candidates", type=int, default=20000); ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--epochs", type=int, default=300); ap.add_argument("--mid", action="store_true", help="add 4-12 knob moves (from round r02)")
+    ap.add_argument("--diverse", action="store_true", help="pick by disagreement AND spread: farthest-point choice among the top 3x pool, in predicted-characteristic space")
     a = ap.parse_args(); t0 = time.time()
     table, sw, fixed = o.param_table(a.node); path = o.out_path(a.node)
     d = sd.load(path); keep = np.flatnonzero(d["ok"][:, 0])
@@ -78,7 +79,14 @@ def main():
     shares = (("one", n_dis // 4), ("pair", n_dis // 4), ("mid", n_dis // 4), ("fresh", n_dis - 3 * (n_dis // 4))) if a.mid else \
         (("one", n_dis // 3), ("pair", n_dis // 3), ("fresh", n_dis - 2 * (n_dis // 3)))
     for k, share in shares:
-        idx = np.flatnonzero(kinds_c == k); top += list(idx[np.argsort(-dis[idx])[:share]])
+        idx = np.flatnonzero(kinds_c == k)
+        if a.diverse and len(idx) > share:
+            pool = idx[np.argsort(-dis[idx])[:3 * share]]; Z = P.mean(0)[pool] / spread; pick = [0]; dmin = ((Z - Z[0]) ** 2).sum(1)
+            while len(pick) < min(share, len(pool)):
+                j = int(np.argmax(dmin)); pick.append(j); dmin = np.minimum(dmin, ((Z - Z[j]) ** 2).sum(1))
+            top += list(pool[pick])
+        else:
+            top += list(idx[np.argsort(-dis[idx])[:share]])
     top = np.array(top)
     items = [{"u": [round(x, 4) for x in cand[i][1]], "design": "propose", "kind": cand[i][0], "disagreement": round(float(dis[i]), 4),
               "pred": [round(float(x), 4) for x in P.mean(0)[i]]} for i in top]

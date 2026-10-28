@@ -70,3 +70,4 @@ Allow: /
 
 Sitemap: https://infinitedevices.org/sitemap.xml
 # Plain-text summary for language models: https://infinitedevices.org/llms.txt
+# Full documentation for language models: https://infinitedevices.org/llms-full.txt

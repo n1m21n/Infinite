@@ -31,3 +31,10 @@ Rule: a speed-up is kept only if the frozen test scores and the stored rows of t
 ## Brain parallel (for the chain track)
 
 Efficient coding: spend resources where surprise is high. Active learning is that for rendering (render where the seeds disagree); #1 is the same idea for what we measure (measure only the windows that carry information for the claim being tested).
+
+## Added: spend renders where they teach most (quality per render)
+
+| # | Idea | Why | Test | State |
+|---|---|---|---|---|
+| 8 | `propose.py --diverse`: choose by disagreement and spread (farthest-point among the top 3x pool, in predicted-axes space) | pure top-disagreement batches cluster in a few regions (the same hard spot 100 times); known weakness of query-by-committee (Seung 1992); batch methods add diversity | one round on one engine each way, same size, frozen group set: keep only if group median gain is larger | built, not yet run |
+| 9 | Equal-size random control per round (already the 200 uniform points) | proves model-chosen beats random, which the Analog 0.298 -> 0.686 jump alone does not | compare R2 of the 200 uniform vs the chosen on the same frozen set | in `round_score` |

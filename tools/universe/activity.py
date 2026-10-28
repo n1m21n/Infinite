@@ -13,9 +13,9 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import own_sweeps as o, p3_characteristics as p3, sound_data as sd  # noqa: E402
 
 
-def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--node", required=True); ap.add_argument("--top", type=int, default=15); a = ap.parse_args()
-    table, sw, fixed = o.param_table(a.node); d = sd.load(o.out_path(a.node)); keys = [p["key"] for p in sw]
+def measure(node):
+    """-> (keys, d, V, means, names, eff): eff[j] = list of scaled |axis change| vectors over the one-knob pairs of knob j."""
+    table, sw, fixed = o.param_table(node); d = sd.load(o.out_path(node)); keys = [p["key"] for p in sw]
     keep = np.flatnonzero(d["ok"][:, 0]); V = {i: p3.vec(d["mel"][i, 0].astype(float) / 2 - 120) for i in keep}
     means = [j for j, n in enumerate(p3.COLS) if n.endswith(".mean")]; names = [p3.COLS[j].split(".")[0] for j in means]
     sd_ = np.nanstd(np.array([V[i][means] for i in keep]), 0) + 1e-9
@@ -30,6 +30,12 @@ def main():
             for y in one:
                 if y > x:
                     eff[int(np.flatnonzero(diff[y])[0])].append(np.abs(V[ix[y]][means] - V[ix[x]][means]) / sd_)
+    return keys, d, V, means, names, eff
+
+
+def main():
+    ap = argparse.ArgumentParser(); ap.add_argument("--node", required=True); ap.add_argument("--top", type=int, default=15); a = ap.parse_args()
+    keys, d, V, means, names, eff = measure(a.node)
     rows = []
     for j, e in eff.items():
         if len(e) >= 5:
