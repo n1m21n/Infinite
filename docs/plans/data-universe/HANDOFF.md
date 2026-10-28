@@ -82,6 +82,8 @@ sweep is 30% one-knob moves, 70% fresh base points.
 
 G1 + G2 + Step 2 first batch closed 2026-10-28: `tools/universe/detail.py` measures 15 more axes (13 synthetic checks pass); `tools/universe/own_sweeps.py` renders Infinite's own engines to schema-3 rows (recipe, knobs, 8 windows C3/C4/C3f/C1/C5/C6/C3pp/C3mf, 128-band mel, top-64 partials, noise envelope, release tail, velocity response; designs base 30% / one 60% / pair 10%, bank = group). Notes go to input slot 0 (EXECUTION.md says 1; wrong). Release build, 4 shards, 0.4 s per preset (a debug build is 10x slower). Oscillator: 1,984 presets (13 swept, 9 fixed) in 773 s; `check` 20 recipes bit-identical, `repeat` r 1.00000. P3 (`ml-venv`, 1 seed): random split 8 / 11 means at 0.6, median head R2 0.624; **group split 0 / 11, median 0.192** (head: loudness.std 0.79, loudness.slope 0.80, attack 0.58, decay 0.56 pass or near; brightness, warmth, weight 0.1-0.36). Reading: sparse 13-knob space, 101 banks; Step 3 learning curve decides whether data or model.
 
+G10 filled 2026-10-28: `tools/universe/wavetables.py` measured 21,558 tables (1,432 wt, 20,000 synthetic, 126 Vital) at 220 Hz reference: centroid, rolloff, odd/even, fundamental share, flatness, Sethares roughness, two spectral peaks; 5 synthetic checks pass -> `characteristics/wavetables.jsonl`. Open: the check against the node's 64 built-in tables (needs the node's table source).
+
 Step-by-step execution from here: `EXECUTION.md` (start at Step 0). What the model claims and the numbers that prove it
 (C1 axes, C2 ingredients, C3 good, C4 words, C5 moods and emotions, C6 creative, C7 makes): the claims registry in `EXECUTION.md`.
 
