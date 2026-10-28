@@ -31,6 +31,10 @@ that space, by rule. No UI/UX now.
 | P5 Makes | Set knobs (and notes) to reach a target characteristic point; render; measure | rendered point within a set distance of the target, better than the closest existing preset | after P3 |
 | P6 Maps | Clusters (instrument families) and the owner's emotion rules over the characteristic curves | owner's rules written; clusters checked against reference datasets | after P4 |
 
+**Status 2026-10-28:** P1 written (`CHARACTERISTICS.md`, 18 axes; owner sign-off pending, work continues on it). P2 done: every
+held source measured, coverage and cross-form agreement in `CHARACTERISTICS.md`; brightness / sharpness agree 0.96 / 0.92 between mel
+and band forms of the same render. Next: P3.
+
 Data rule for every phase: collect only what a learning curve or an error says is missing (section 4).
 
 ## 4. Rules that keep the project honest
