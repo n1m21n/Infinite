@@ -91,3 +91,7 @@ Render-first list for L1 (single audio-in effect, 1 input, 3-20 knobs): Audio Fi
 - **Depth curve**: report held-out R2 at depth 1, 2, 3, 4 and the error against the sum of per-node errors; the claim 'no depth cost' needs the curve, not one number.
 - **Null lesions**: bypassing a node whose effect is nil (mix = 0, unity gain, a filter wide open) must be predicted as zero change; the model's lesion-vs-measured rank correlation (>= 0.7) is only reported together with its null-lesion error.
 - **Additive baseline**: the composed model must beat 'sum of single-node changes' on the interaction pairs; report where the two differ (saturation after filter, delay into reverb).
+
+
+## Intermediate ablation (from WEAKNESSES.md, vulnerability 1)
+Passing 22 axes between nodes may lose what a nonlinear effect needs (a saturator sees a square and an FM cluster differently even if their axes match). Test, on held-out chain shapes and unseen combinations, an effect proxy fed with: (a) the true 22 axes of its input, (b) the predicted mel from the source model, (c) both. If (a) is clearly worse than (b) on the effect's output, chains carry mel between nodes and the axes stay a read-out only. Needs the L1 renders.
