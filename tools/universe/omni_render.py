@@ -106,8 +106,7 @@ def main():
     ap.add_argument("--stride", type=int, default=1, help="render every Nth patch (shard with --offset)")
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--lead", type=float, default=8.0, help="seconds of silence while the samples stream in (Omnisphere loads async)")
-    ap.add_argument("--notes", default="36:100:C2,48:100:C3,60:100:C4,72:100:C5,48:30:C3p,48:127:C3f",
-                    help="midi:velocity:label list; default = 4 octaves at vel 100 + C3 soft (30) and hard (127) for the velocity response")
+    ap.add_argument("--notes", default=rp.STIMULUS, help="midi:velocity:label list; default = the shared stimulus (render_pass.STIMULUS)")
     ap.add_argument("--multis", action="store_true", help="--lib is the Multis folder: render each .mlt_omn as a whole multi")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--list", action="store_true")
@@ -143,28 +142,13 @@ def main():
             continue
         n += 1
         with tempfile.TemporaryDirectory() as tmp:
-            inf = os.path.join(tmp, "p.inf")
-            open(inf, "w").write(rp.patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state, 1))
-            ep, mp = rp.write_notes(tmp)
-            js, wav = os.path.join(tmp, "s.json"), os.path.join(tmp, "o.wav")
-            try:
-                p = subprocess.run([binp, "--audio-summary", inf, js, "--duration", "%g" % (rp.LEAD + rp.WIN * len(rp.NOTES)), "--sample-rate", str(rp.SR),
-                                    "--wav", wav, "--lenient", "--notes", ep, "--note-map", mp], capture_output=True, text=True, timeout=120)
-            except subprocess.TimeoutExpired:
-                bad += 1
-                print("timeout", src, flush=True)
-                continue
-            if p.returncode != 0 or not os.path.exists(wav):
-                bad += 1
-                print("fail", src, (p.stderr.strip().splitlines() or ["rc %d" % p.returncode])[-1][:100], flush=True)
-                continue
-            rows = rp.measure_windows(wav, tmp, [x for _, _, x in rp.NOTES])
-        tg = tags(patch)
+            win, params = rp.render_state(binp, t, state, tmp)
+        if win is None:
+            bad += 1
+            print("fail", src, params, flush=True)
+            continue
         with open(out, "a") as fo:
-            for lab, feat in rows:
-                row = {"src": label, "label": os.path.basename(src), "plugin": kv.get("plugin_name"), "plugin_id": kv["plugin_id"], "note": lab,
-                       "tags": tg, "license": "plugin render, local only"}
-                row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop", "license")})
+            for row in rp.state_rows(t, 3, label, os.path.basename(src), patch if isinstance(patch, bytes) else patch.encode(), win, params, tags(patch)):
                 fo.write(json.dumps(row, separators=(",", ":")) + "\n")
         ok += 1
         if ok % 10 == 0:

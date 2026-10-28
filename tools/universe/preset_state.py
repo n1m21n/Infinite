@@ -11,7 +11,7 @@ Needs a template: the plug-in's default state from plugin_states.py (--plugin-st
   tal    TAL VST3: JUCE chunk holding a <tal ...> XML document; the preset file (.pjp8, .bassline ...) is that XML.
   vital  Vital: JUCE chunk with the preset JSON ({"settings": ...}); the .vital file is that JSON.
 
-Rows: same schema as omni_render.py (src "state:<plugin>:<rel path>", note windows, 32-band row), so recipe rows join by src."""
+Rows: row v2 from render_pass.state_rows (knobs from the host after the state loads, preset_id = hash of the preset file)."""
 import argparse, base64, json, os, re, struct, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -119,7 +119,7 @@ def main():
     ap.add_argument("--stride", type=int, default=1)
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--lead", type=float, default=2.0)
-    ap.add_argument("--notes", default="36:100:C2,48:100:C3,60:100:C4,72:100:C5,48:30:C3p,48:127:C3f")
+    ap.add_argument("--notes", default=rp.STIMULUS)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
@@ -157,28 +157,14 @@ def main():
             continue
         state = base64.b64encode(new).decode()
         with tempfile.TemporaryDirectory() as tmp:
-            inf = os.path.join(tmp, "p.inf")
-            open(inf, "w").write(rp.patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state, 1))
-            ep, mp = rp.write_notes(tmp)
-            js, wav = os.path.join(tmp, "s.json"), os.path.join(tmp, "o.wav")
-            try:
-                p = subprocess.run([binp, "--audio-summary", inf, js, "--duration", "%g" % (rp.LEAD + rp.WIN * len(rp.NOTES)), "--sample-rate", str(rp.SR),
-                                    "--wav", wav, "--lenient", "--notes", ep, "--note-map", mp], capture_output=True, text=True, timeout=120)
-            except subprocess.TimeoutExpired:
-                bad += 1
-                print("timeout", rel, flush=True)
-                continue
-            if p.returncode != 0 or not os.path.exists(wav):
-                bad += 1
-                print("fail", rel, flush=True)
-                continue
-            rows = rp.measure_windows(wav, tmp, [x for _, _, x in rp.NOTES])
+            win, params = rp.render_state(binp, t, state, tmp)
+        if win is None:
+            bad += 1
+            print("fail", rel, params, flush=True)
+            continue
         tg = nks_state.tags_of(nks_state.read_nksf(data)[0]) if kind == "nks" else {}
         with open(out, "a") as fo:
-            for lab, feat in rows:
-                row = {"src": label, "label": os.path.basename(rel), "plugin": tmpl["name"], "plugin_id": tmpl["id"], "note": lab, "tags": tg,
-                       "license": "plugin render, local only"}
-                row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop", "license")})
+            for row in rp.state_rows(t, 3, label, os.path.basename(rel), data, win, params, tg):
                 fo.write(json.dumps(row, separators=(",", ":")) + "\n")
         ok += 1
         if ok % 10 == 0:

@@ -7,8 +7,8 @@
 
 Per plug-in, one small .inf patch is written and rendered with
     Infinite --audio-summary p.inf s.json --wav tmp.wav [--notes e.json --note-map m.json] --plugin-params --lenient
-  instrument   Keyboard -> Plugin -> Audio Out; plays C2 / C3 / C4 (MIDI 36 / 48 / 60) at velocity 40 / 90 / 120,
-               3 s apart, 1.5 s held (one render, three rows)
+  instrument   Keyboard -> Plugin -> Audio Out; plays STIMULUS (C3 v100, C4 v100, C3 v127), the same note test every preset
+               route uses, 3 s apart, 1.5 s held (one render, three rows)
   effect       Audio File (fixed test signal, 3 s each: drum loop | pink-noise burst | sine sweep) -> Plugin -> Audio Out
                (one render, three rows); a `(dry)` row per stimulus is written once so a plug-in's change is a difference
   --sweep-params   after the default render, the first 16 parameters one at a time at 0 / 0.5 / 1 of the plug-in's own
@@ -33,7 +33,11 @@ SR = 48000
 LEAD = 0.5            # silence before the first window: the plug-in finishes loading
 WIN = 3.0             # seconds per note / stimulus window
 HOLD = 1.5            # note length
-NOTES = [(36, 40, "C2"), (48, 90, "C3"), (60, 120, "C4")]  # MIDI, velocity (0-127), name
+STIMULUS = "48:100:C3,60:100:C4,48:127:C3f"  # midi:velocity:label, the one note test of every route (SOUND-MODEL.md 0.4)
+NOTES = [(int(m), int(v), l) for m, v, l in (x.split(":") for x in STIMULUS.split(","))]
+SCHEMA = 2            # row v2: schema, route, preset_id, midi, velocity, knobs (SOUND-MODEL.md 0.3)
+PARAMS_DIR = "~/Infinite/training-data/params"
+MIDI_PROXY = re.compile(r"^CC \d+, CH \d+$")  # VST3 MIDI-CC proxy slots (2,080 of Diva's 2,362): not sound knobs
 STIMS = ["drum_loop", "pink_burst", "sine_sweep"]
 SWEEP_N, SWEEP_FRACS = 16, (0.0, 0.5, 1.0)
 LICENSE = "plugin render, local only"
@@ -246,6 +250,77 @@ def run_render(binp, t, tmp, slots, timeout, stim_wav):
 
 # ------------------------------------------------------------------ measuring
 
+def status_line(out):
+    """The headless status JSON: the last stdout line that parses."""
+    for line in reversed(out.strip().splitlines()):
+        try:
+            return json.loads(re.sub(r":(-?)(inf|nan)\b", ":null", line))
+        except ValueError:
+            continue
+    return {}
+
+
+def render_state(binp, t, state_b64, tmp, timeout=120):
+    """Render one saved plug-in state (a preset spliced into the plug-in's own state) over NOTES. Every preset route calls this.
+    Returns (windows, params) or (None, why): windows from measure_windows, params the host's list with current values."""
+    inf, js, wav = (os.path.join(tmp, n) for n in ("p.inf", "s.json", "o.wav"))
+    open(inf, "w").write(patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state_b64, 1))
+    ep, mp = write_notes(tmp)
+    try:
+        p = subprocess.run([binp, "--audio-summary", inf, js, "--duration", "%g" % (LEAD + WIN * len(NOTES)), "--sample-rate", str(SR),
+                            "--wav", wav, "--lenient", "--plugin-params", "--notes", ep, "--note-map", mp],
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, "timeout"
+    plug = (status_line(p.stdout).get("plugins") or [{}])[0]
+    if p.returncode != 0 or not os.path.exists(wav):
+        return None, "rc %d: %s" % (p.returncode, (p.stderr.strip().splitlines() or [""])[-1][:100])
+    if not plug.get("ready"):
+        return None, "plug-in not ready"
+    win = measure_windows(wav, tmp, [x for _, _, x in NOTES])
+    params = [q for q in plug.get("params") or [] if not MIDI_PROXY.match(q.get("name", ""))]
+    return (win, params) if win else (None, "unreadable wav")
+
+
+def param_table(plugin_id, params):
+    """Write the plug-in's parameter table once (address, name, unit, range, default) and return its hash. knobs[] in every row
+    is aligned to this table, so the hash says which table a row's knob list belongs to (a plug-in update changes it)."""
+    import hashlib
+    tab = [{k: p.get(k) for k in ("address", "name", "unit", "min", "max", "default")} for p in params]
+    h = hashlib.sha1(json.dumps(tab, sort_keys=True).encode()).hexdigest()[:12]
+    d = os.path.expanduser(PARAMS_DIR); os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "%s_%s.json" % (re.sub(r"\W+", "_", plugin_id), h))
+    if not os.path.exists(path):
+        json.dump({"plugin_id": plugin_id, "hash": h, "params": tab}, open(path, "w"), indent=0)
+    return h
+
+
+def knob_vector(params):
+    """Current value of each parameter normalised to 0-1 of its own range, 4 decimals; None where the host gave no value."""
+    out = []
+    for p in params:
+        v, lo, hi = p.get("value"), p.get("min"), p.get("max")
+        out.append(None if not finite(v) or not finite(lo) or not finite(hi) else round((v - lo) / (hi - lo), 4) if hi > lo else 0.0)
+    return out
+
+
+def state_rows(t, route, src, label, preset_bytes, windows, params, tags):
+    """Row v2 for one rendered preset: one row per note window. Knobs ride on the first row only (the others share preset_id)."""
+    import hashlib
+    pid = hashlib.sha1(preset_bytes).hexdigest()[:16]
+    ph = param_table(t["id"], params) if params else None
+    rows = []
+    for i, ((midi, vel, lab), (_, feat)) in enumerate(zip(NOTES, windows)):
+        row = {"schema": SCHEMA, "route": route, "src": src, "preset_id": pid, "label": label, "plugin": t["name"], "plugin_id": t["id"],
+               "note": lab, "midi": midi, "velocity": vel, "tags": tags or {}, "license": LICENSE}
+        if i == 0 and params:
+            row["params_hash"] = ph
+            row["knobs"] = knob_vector(params)
+        row.update({k: v for k, v in (feat or {}).items() if k not in ("src", "pack", "part", "bpm", "key", "loop", "license")})
+        rows.append(row)
+    return rows
+
+
 def finite(v):
     return isinstance(v, (int, float)) and math.isfinite(v)
 
@@ -325,7 +400,7 @@ def measure_windows(wav, tmp, labels):
 
 def make_row(t, setting, lab, feat, extra):
     row = {"src": "plugin:%s:%s" % (t["id"], setting["key"]), "plugin": t["name"], "vendor": t["vendor"], "format": t["format"],
-           "plugin_id": t["id"], "kind": "instrument" if t["instrument"] else "effect", "setting": setting["key"]}
+           "plugin_id": t["id"], "kind": "instrument" if t["instrument"] else "effect", "setting": setting["key"], "schema": SCHEMA, "route": 1}
     if setting.get("param"):
         row["param"] = setting["param"]
         row["frac"] = setting["frac"]
