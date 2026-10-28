@@ -152,7 +152,16 @@ Then re-render Diva in row v2 (about 3,900 presets, 3 h on the Pro) and start M1
 **Block 0 state (2026-10-28):** 0.1-0.6 built and committed; checked end to end on 12 Diva presets (knobs follow the preset: 53-171 of
 282 differ from default; 2,080 host MIDI-CC proxy slots dropped; 5.7 KB per row). Diva v2 re-render running in 3 shards
 (`scratch_omni/diva_v2.sh` -> `audio/preset_diva_v2.jsonl`), starting with the 0.7 repeat pass (`audio/noise_diva_b.jsonl`, 51 presets).
-Not yet on the Air: Omnisphere there still writes v1 rows until the Air gets this build and these tools.
+**Air on row v2 (2026-10-28):** old jobs stopped (level-1 sweep, v1 Omnisphere, v1 preset queue; their files stay as the record).
+`~/air_v2.command` (copy in `scratch_omni/`) runs build `~/al-bin-v2` with Homebrew Python: Omnisphere in 2 shards at lead 30 ->
+`audio/omni_v2_t0|1.jsonl`, and the whole Vital library (800) -> `audio/preset_vital_v2.jsonl`. Stop with `touch ~/STOP_V2`.
+Found while checking the first rows, fixed for every plug-in:
+
+| Finding | Fix |
+|---|---|
+| Each plug-in names its MIDI proxy slots its own way (Diva `CC 3, CH 1`, Vital `MIDI CC 3\|1`, Omnisphere `MIDI CC 3:1`, plus program change, pitch bend, pressure) | one `MIDI_PROXY` pattern for all forms: Vital 2,855 -> 775 real knobs |
+| Omnisphere and Vital keep every preset under one generic root (`Factory`, `Presets`): one group, no held-out set possible | `sound_data.banks()`: a folder holding over half the library gives way to its next folder down; `.db#` counts as a folder. Diva unchanged (36 banks) |
+| Omnisphere exposes no patch settings to the host: its 993 `Spec n` slots are unassigned automation (all 0.5), 8 part levels | Omnisphere is a **sound-only** library: it joins M3 through the sound space (mel, descriptors) and M4 through its words, not through knobs. Patch-file knobs are parked (section 6) |
 
 **Noise floor, Diva (0.7, 51 presets rendered twice):** descriptor R2 ceiling 0.994 at C3, 0.996 at C4, 0.987 at C3f; log-mel
 repeat error 0.18 / 0.30 / 0.35 dB. Render noise is far below every bar, so any gap to the bars is the model's or the data's.
@@ -175,6 +184,7 @@ Each item returns only when a milestone's bar cannot be reached without it. Noth
 | Wavetable generator W3, sample-instrument builder W2 | after M3 |
 | Level 2 renders (Serum 2, KORG) | M3, only if Vital and Omnisphere are not enough |
 | Atlas and cluster rebuild | M4 |
+| Omnisphere knobs from the patch files (`.prt_omn` XML), the level-1 sweep on the Air | M3, only if a sound-only Omnisphere cannot reach the bar |
 
 ## 7. Rules carried over
 
