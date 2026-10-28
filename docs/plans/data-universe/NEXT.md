@@ -1,5 +1,7 @@
 # Next session: start here
 
+**Newer: read `WEB.md` first (2026-10-28 map of every model, link and doc). The rest of this file is the 2026-10-27 state.**
+
 Read this, then `next-phase.md` (approved plan, sections 1-12) and `README.md` (tracker). Nothing else.
 Approved by the owner 2026-10-27: the whole of `next-phase.md` (incl. matrix link for W5, wavetable generator to improve the model only), the 2h C++ drum port, and the B5 redefinition (H_gen >= 0.90 x H_real).
 
