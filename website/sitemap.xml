@@ -112,6 +112,8 @@
   <url><loc>https://infinitedevices.org/artworks.html</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
   <url><loc>https://infinitedevices.org/assets/library/catalog.json</loc><lastmod>2026-10-27</lastmod><priority>0.3</priority></url>
   <url><loc>https://infinitedevices.org/assets/benchmarks.json</loc><lastmod>2026-10-27</lastmod><priority>0.3</priority></url>
+  <url><loc>https://infinitedevices.org/llms.txt</loc><lastmod>2026-10-27</lastmod><priority>0.6</priority></url>
+  <url><loc>https://infinitedevices.org/llms-full.txt</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/first-sound.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/first-image.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/first-music-image.html</loc><lastmod>2026-10-27</lastmod><priority>0.5</priority></url>

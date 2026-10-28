@@ -7,9 +7,10 @@ Models are count tables, no neural net:
   params  per node/knob empirical distribution                                  (where settings sit)
 Split is by source file (leave-source-out). Synthetic pieces train but are never in the held-out set.
 Score = bits saved per cell/step/value against a fixed baseline (higher is better); a candidate is kept only
-when every model it covers is at least as good as the last kept model on the same held-out set.
+model by model: each of the five (independent, one per piece type) keeps whichever of the candidate and the last
+kept one saves more bits on the same held-out set, so the kept set is never worse on any model.
 Scopes: `shippable` trains on owner / CC-BY pieces only; `local` adds third-party and unknown-licence pieces."""
-import argparse, collections, glob, hashlib, json, math, os, random, sys, time
+import argparse, collections, glob, hashlib, json, math, os, random, re, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 CLEAR = ("owner", "cleared", "cc0", "public-domain", "mit", "cc-by-4.0", "cc-by")
@@ -26,13 +27,36 @@ def clear(lic):
     return l.startswith(CLEAR)
 
 
-def load(store, scope):
-    rows = []
-    for f in sorted(glob.glob(os.path.join(os.path.expanduser(store), "*.jsonl"))):
+CAP = 100000  # passed rows per inbox source: Lakh alone is 1.09 M of 1.6 M, which swaps an 8 GB laptop and drowns the rest
+_SRC = re.compile(r'"src": ?"(inbox:([^/"#]+)[^"]*)"')
+_OK = re.compile(r'"ok": ?true')
+
+
+def load(store, scope, cap=CAP):
+    """passed pieces of the scope; each inbox source keeps at most `cap` rows, whole files picked by a stable hash so
+    the held-out split by file still works; the owner's own sources (`*_owner`) are never sampled"""
+    files = sorted(glob.glob(os.path.join(os.path.expanduser(store), "*.jsonl")))
+    count = collections.Counter()
+    for f in files:
         for ln in open(f):
+            m = _OK.search(ln) and _SRC.search(ln)
+            if m:
+                count[m[2]] += 1
+    frac = {k: min(1.0, cap / n) for k, n in count.items() if not k.endswith("_owner")}
+    rows = []
+    for f in files:
+        for ln in open(f):
+            if not _OK.search(ln):
+                continue
+            m = _SRC.search(ln)
+            if m and frac.get(m[2], 1.0) < 1 and (unit_hash(m[1]) // 5) % 10000 >= frac[m[2]] * 10000:
+                continue
             r = json.loads(ln)
             if r.get("ok") and (scope == "local" or clear(r.get("license"))):
                 rows.append(r)
+    cut = {k: "%.0f%%" % (100 * v) for k, v in frac.items() if v < 1}
+    if cut:
+        print("inbox sources sampled to %d rows each: %s" % (cap, cut))
     return rows
 
 
@@ -569,10 +593,15 @@ def main():
     print("\nheld-out bits saved vs baseline (higher is better)")
     print("%-8s %10s %10s" % ("model", "candidate", "last kept"))
     ok = True
+    kept_old = []
     for k in cand_s:
         print("%-8s %10s %10s" % (k, fmt(cand_s[k]), fmt(last_s[k]) if last_s else "-"))
-        if last_s and cand_s[k] is not None and last_s[k] is not None and cand_s[k] < last_s[k] - 5e-4:
-            ok = False
+        if last_s and cand_s[k] is not None and last_s[k] is not None and cand_s[k] < last_s[k] - 5e-4 and k in last["model"]:
+            cand[k], cand_s[k] = last["model"][k], last_s[k]
+            kept_old.append(k)
+    if kept_old:
+        print("kept the last model for: %s (candidate was worse on held-out)" % ", ".join(kept_old))
+        thresholds = calibrate_thresholds(cand, test)
     dm = [p for p in test if p["type"] == "drum_groove"]
     mm = [p for p in test if p["type"] == "melody_contour"]
     print("\nwhat context adds (same model, levels switched off):")
@@ -590,7 +619,7 @@ def main():
         json.dump({k: v for k, v in rec.items() if k != "model"}, open(os.path.join(mdir, "log-%d.json" % int(time.time())), "w"))
         print("\nKEPT: wrote", last_f)
     else:
-        print("\nREJECTED: candidate is worse than the last kept model on at least one model")
+        print("\nREJECTED: nothing to keep")
     rng = random.Random(1)
     for f in ("house", "drum_and_bass"):
         print("\nsample groove for %s (kick, snare, chat, ohat, clap, tom, htom, bell):" % f)

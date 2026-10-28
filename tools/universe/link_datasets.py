@@ -2,7 +2,9 @@
 """Link the big MIDI corpus (~/Infinite/datasets/midi/data) into the training inbox without copying it.
     link_datasets.py
 Writes a SOURCE.txt (licence + family) next to each chosen dataset and a symlink in the inbox.
-The owner has cleared the licensing of the whole corpus, so every set is tagged `cleared-by-owner` and trains both scopes."""
+The owner cleared the licensing of the first 13 sets, tagged `cleared-by-owner` (both scopes). Sets added later carry
+their own licence: CC-BY / MIT train both scopes, NC-SA and unknown train the local model only.
+EMOPIA and VGMIDI's labelled clips are not linked: affect_eval_set.py keeps them as a held-out listener-label set."""
 import os
 
 DATA = os.path.expanduser("~/Infinite/datasets/midi/data")
@@ -23,6 +25,14 @@ SETS = {
     "chord_progressions": (CLEARED, None),
     "chords_and_scales": (CLEARED, None),
     "modal_chord_progressions": (CLEARED, None),
+    # added 2026-10-27, licences from each set's own LICENSE file
+    "groove_drumset": ("CC-BY-4.0", None),                 # Magenta GMD: human drummers on an e-kit
+    "chopin_scores": ("MIT", None),
+    "maestro_piano": ("CC-BY-NC-SA-4.0", None),           # piano competition performances
+    "asap_piano_scores": ("CC-BY-NC-SA-4.0", None),
+    "acpas_aligned_piano": ("unknown, from ASAP/MAPS/MAESTRO", None),
+    "endless_midi_carousel": ("unknown", None),
+    "vgmidi_game_tracks/unlabelled": ("unknown", None),   # the labelled clips stay out (eval set)
 }
 
 
@@ -37,7 +47,7 @@ def main():
             f.write("license: %s\n" % lic)
             if fam:
                 f.write("family: %s\n" % fam)
-        dst = os.path.join(INBOX, name)
+        dst = os.path.join(INBOX, name.replace("/", "_"))
         if not os.path.islink(dst):
             os.symlink(src, dst)
         print("linked", name, "->", lic)

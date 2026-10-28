@@ -1716,6 +1716,7 @@ namespace Platform
       Steinberg::IPtr<Steinberg::IPluginFactory> factory;
       Steinberg::IPtr<Steinberg::Vst::IComponent> component;
       Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
+      bool singleComponent = false; // the controller is the component itself (queried, not created): one object, one state
       Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> processor;
       Steinberg::IPtr<Steinberg::IPlugView> plugView;
       Steinberg::IPtr<HostComponentHandler> componentHandler;
@@ -2305,6 +2306,7 @@ namespace Platform
              ctrlRaw != nullptr)
          {
             v->controller = Steinberg::owned(ctrlRaw);
+            v->singleComponent = true;
          }
          else
          {
@@ -3351,7 +3353,11 @@ namespace Platform
          uint64_t ctrlSize = 0;
          std::memcpy(&ctrlSize, ptr, sizeof(uint64_t));
          ptr += sizeof(uint64_t);
-         if (ctrlSize > 0 && ptr + ctrlSize <= end && h->vst3->controller)
+         // One object: the controller state it saved is the component state again (u-he), and loading it a second
+         // time redoes the whole preset load, the slowest part of opening a patch. The component call already applied it.
+         const bool repeat = h->vst3->singleComponent && ctrlSize == compSize && compSize > 0 && ptr + ctrlSize <= end &&
+                             std::memcmp(ptr, ptr - compSize - sizeof(uint64_t), (size_t)ctrlSize) == 0;
+         if (ctrlSize > 0 && ptr + ctrlSize <= end && h->vst3->controller && !repeat)
          {
             if (!RunPluginCallGuarded("setState (controller)", h, [&]
                    {

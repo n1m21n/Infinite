@@ -38,22 +38,29 @@ def report():
     p = os.path.join(ROOT, "store", "inbox.jsonl")
     if not os.path.exists(p):
         return
-    rows = [json.loads(l) for l in open(p)]
+    total, passed, why, fam, bad = collections.Counter(), collections.Counter(), collections.defaultdict(collections.Counter), collections.Counter(), 0
+    for ln in open(p):  # streamed: the store is 3 M rows, too big to hold on an 8 GB laptop
+        x = json.loads(ln)
+        t = x["type"]
+        total[t] += 1
+        passed[t] += bool(x["ok"])
+        why[t].update(x["hard"])
+        if t == "drum_groove":
+            if x["ok"]:
+                fam[x["family"]] += 1
+            else:
+                bad += 1
     print("\npieces from the inbox")
     print("%-16s %7s %7s  %s" % ("type", "total", "passed", "top rejection reasons"))
     for t in ("drum_groove", "melody_contour", "note_expression"):
-        r = [x for x in rows if x["type"] == t]
-        why = collections.Counter(h for x in r for h in x["hard"])
-        print("%-16s %7d %7d  %s" % (t, len(r), sum(x["ok"] for x in r), "; ".join("%s x%d" % kv for kv in why.most_common(3)) or "-"))
-    fam = collections.Counter(x["family"] for x in rows if x["type"] == "drum_groove" and x["ok"])
+        print("%-16s %7d %7d  %s" % (t, total[t], passed[t], "; ".join("%s x%d" % kv for kv in why[t].most_common(3)) or "-"))
     print("\ndrum bars passed per family (need %d each):" % NEED)
     for f, n in sorted(fam.items(), key=lambda kv: -kv[1]):
         print("  %-14s %5d %s" % (f, n, "" if n >= NEED else "<- thin"))
     if fam.get("unlabeled"):
         print("  'unlabeled' = no family in SOURCE.txt or the path; add `family: house` to the SOURCE.txt so it trains the right table")
-    bad = [x for x in rows if x["type"] == "drum_groove" and not x["ok"]]
     if bad:
-        print("\nrejected drum bars: %d (gates are tuned on house/techno cards; if a whole genre is refused, tell me and I'll check the gate, not the data)" % len(bad))
+        print("\nrejected drum bars: %d (gates are tuned on house/techno cards; if a whole genre is refused, tell me and I'll check the gate, not the data)" % bad)
 
 
 def main():
@@ -64,7 +71,7 @@ def main():
     ap.add_argument("--export-cpp", action="store_true", default=True)
     a = ap.parse_args()
     if not a.skip_ingest:
-        _, out_ing = run("midi_ingest.py", "--cap", "12000", "--budget", "35")
+        _, out_ing = run("midi_ingest.py", "--cap", "0", "--budget", "40")
         print(out_ing.strip().splitlines()[-1])
     report()
     for scope in ("local", "shippable"):
@@ -82,10 +89,12 @@ def main():
             keep |= ln.startswith("KEPT")
         print("-> model %s" % ("UPDATED" if keep else "unchanged"))
 
-    print("\n" + "=" * 70 + "\nBENCHMARK VERIFICATION (6 GATES)")
+    _, sg_out = run("spectral_gates.py")
+    print("\n" + sg_out.strip().splitlines()[0])
+    print("\n" + "=" * 70 + "\nBENCHMARK VERIFICATION (10 GATES)")
     rc, bench_out = run("benchmark.py", "--scope", "shippable")
     for ln in bench_out.splitlines():
-        if ln.startswith(("[B", "  ", "OVERALL:")):
+        if ln.startswith(("[B", "  ", "OVERALL")):
             print(ln)
     if rc == 0 and a.export_cpp:
         _, exp_out = run("export_critic_inc.py")

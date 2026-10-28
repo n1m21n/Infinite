@@ -1,0 +1,335 @@
+# Sound model: the one plan (2026-10-28)
+
+**Start here.** This file sets the goal, the milestones, the benchmark of every milestone and the order of work for the sound side
+of the data universe. It supersedes the "Order" lists in `REVISED-PLAN.md` (section 6 and 11), `NEXT.md` and `next-phase.md` section 8+.
+Those files stay as the record of what was measured and decided. The note-model track (MIDI, gates B1-B10 in `training-plan.md`)
+is unchanged and is tracked there.
+
+## 1. What we are building
+
+**An intelligent sound model**: a model that has learned how a synth's settings turn into sound, so it can (a) predict the sound of
+settings it never heard, (b) find settings for a sound or a word it is given, and (c) let Infinite's generator pick sounds for a
+(genre, mood, section). "Real learning" means one thing here: **every claim is scored on presets the model never saw**.
+
+```
+                        FORWARD  (M1)
+   recipe ------------------------------------------>  sound
+   knobs + note + velocity                              log-mel frames + timbre descriptors
+          <------------------------------------------
+                        INVERSE  (M2)
+                              |
+             shared sound space across synths (M3)
+                              |
+             words <-> sound  (M4: warm, glitchy, wide ...)
+                              |
+             generator in Infinite (M5): (genre, mood, section) -> sound -> recipe
+```
+
+Two tracks feed the generator and stay separate:
+
+| Track | Learns | Data | Benchmark | Where |
+|---|---|---|---|---|
+| Note model | which notes, grooves, chords | MIDI | B1-B10 (8 / 10) | `training-plan.md` |
+| **Sound model** | which settings make which sound | plug-in renders + presets | M0-M5 below | this file |
+
+## 2. Honest state (measured 2026-10-28)
+
+| Item | Number |
+|---|---|
+| Diva presets rendered (3 notes each) | 3,613, still rendering (3 shards on the Pro) |
+| Knobs -> sound, linear ridge, held out | R2 0.263 |
+| Knobs -> sound, 2-layer MLP (numpy), held out | **R2 0.349** (bands 0.350, scalars 0.345), first real model |
+| MLP learning curve | 0.117 at 400, 0.202 at 800, 0.252 at 1,600, 0.349 at 2,891: **+0.10 per doubling, still data-limited** |
+| Plug-in renders that trained any model before today | none |
+| Sound target stored per render | 43 numbers (32 averaged bands + 11 scalars); from today also a 64 x 48 log-mel spectrogram |
+| Tools in `tools/universe/` | 107 scripts, no index |
+| Plan documents in this folder | 13 |
+
+Reading: the ridge gate said "barely worth rendering more"; a real model says the opposite. The gate's yardstick, not the data,
+was the limit. Rendering Diva further is justified.
+
+**Frozen split (M0, `sound_eval.py`, 3,694 presets):**
+
+| Model | Random split R2 | Bank split R2 (whole folders held out) |
+|---|---|---|
+| ridge | 0.282 | 0.156 |
+| k-NN (k=5) | 0.261 | 0.031 |
+| MLP | 0.384 | **0.211** |
+
+The bank split is the honest number. Presets inside one bank are near-copies, so a random split rewards memory (k-NN collapses from
+0.26 to 0.03 once banks are held out). Every bar in section 4 is judged on the bank split first.
+
+## 3. Why it felt cluttered, and the fix
+
+| Cause | Fix |
+|---|---|
+| Collection ran ahead of learning: 100k+ rows, zero sound models | Every new data step must serve a milestone below and show held-out gain |
+| Many workstreams open at once (mood, wavetables, chains, node responses, replaceability, moving knobs, audio v2, atlas) | One milestone at a time; the rest is in the parked list (section 6) |
+| Weak yardstick (ridge on averaged features) decided what to render | Gate re-set against the MLP; later against the M1 model |
+| Target averaged time away (one spectrum per 3 s note) | Log-mel frames stored with every render from now on |
+| No fixed evaluation: each probe made its own split | M0: one frozen split file, one metric module, one command |
+
+## 4. Milestones, metrics, bars
+
+Metrics follow common practice in synth sound matching and neural audio work: log-mel distance and multi-scale spectral distance
+(DDSP, Engel et al. 2020), timbre descriptors (Timbre Toolbox, Peeters et al. 2011), parameter error plus re-render round trip for the
+inverse task (Yee-King et al. 2018, Barkan et al. 2019 InverSynth, Esling et al. 2020 Flow Synthesizer, which also used Diva),
+Fréchet Audio Distance on embeddings for whole-set comparisons (Kilgour et al. 2019), and blind listening in the MUSHRA format
+(ITU-R BS.1534) for the final judgement.
+
+| # | Milestone | Done when (bar) | Baseline today |
+|---|---|---|---|
+| M0 | **Evaluation harness** | `sound_eval.py` scores any model on a frozen split (`eval/splits/diva.json`): random-preset split **and** bank split (whole preset folders held out, no near-duplicate leakage). Prints R2 per descriptor group, log-mel L1 in dB, spectral convergence. Same model twice gives the same numbers within 0.005 | probes use ad-hoc splits |
+| M1 | **Forward model, Diva** | descriptor R2 >= 0.50 random split, >= 0.40 bank split; log-mel L1 at least 20% below the nearest-preset baseline (k-NN in knob space) | row v2, 1,631 presets, C3: MLP R2 0.218 random, 0.173 group; mel 9.96 / 10.30 dB vs bar 9.84 / 9.89 (section 4b) |
+| M2 | **Inverse model, Diva** | for 200 held-out sounds: re-render the predicted knobs; log-mel L1 to the target at least 10% below the retrieval baseline (knobs of the closest rendered preset) | not built |
+| M3 | **Second and third synth** (Vital, open format; Omnisphere, largest library) in one shared sound space | M1 bars per synth; cross-synth match ("this Diva sound in Vital") beats retrieval by 10% on re-render | Vital partly rendered; Omnisphere rows being redone at lead 30 |
+| M4 | **Words <-> sound** | per word with >= 30 tagged presets: AUC >= 0.75 from the sound embedding on held-out presets; recall@10 >= 0.5 for word -> preset | tags exist, no sound embedding |
+| M5 | **Generator uses the sound model** | owner's blind listening, 10 trials, MUSHRA-style: model's pick preferred over tag lookup in >= 60%; B1-B10 no regression (G5) | not built |
+
+Model choices, settled:
+
+| Choice | Decision | Why |
+|---|---|---|
+| Probe models | numpy on the Pro (ridge, k-NN, MLP) | no install, seconds to run, fine at 4k rows |
+| Training models beyond the probe (M1, M2, M3) | PyTorch CPU on the Pro (`~/Infinite/ml-venv`, Python 3.12, torch 2.14.1), one heavy job at a time; Colab notebook kept as the fallback | Colab refused a backend on 2026-10-28 (location restriction, Chrome and Safari); M1 at 3,000 presets is about 10 min on CPU |
+| Knob encoding | standardised continuous knobs now; one-hot for selector knobs (oscillator model, filter type) in M1 | selectors are categories, not amounts |
+| Note and velocity | inputs to the model (C3, C4, C3 forte rendered; others predicted only if `note_predict.py` holds) | sound depends on both |
+| Gate stop line | rerun `marginal_gate.py` with the MLP curve (`sound_model_probe.py`); stop a library when two doublings gain < 0.01 **on the MLP** | ridge undersells the data |
+
+## 4b. Data contract: what the model needs, and how each data point moves a bar
+
+No data is collected unless this section names it, the error it fixes, its budget and the test that shows it helped.
+The model is a function; the data has to show it every input it will be asked about, with the inputs varied independently.
+
+```
+ input (what the model sees)              target (what it predicts)             bar it serves
+ knobs, 0-1 by host address  ─┐
+ selector knobs one-hot       ├─▶  M1 forward  ─▶  43 descriptors (R2)     ─▶  R2 0.50 random / 0.40 group
+ note, velocity              ─┘                    64 x 48 log-mel (dB)    ─▶  mel 20% below k-NN
+ sound (mel)                 ───▶  M2 inverse  ─▶  knobs, scored by re-render ─▶ 10% below retrieval
+ sound embedding + tags      ───▶  M4 words    ─▶  word AUC / recall@10
+```
+
+**Learning curve, Diva M1, C3, 1 seed (2026-10-28)** - the test that decides whether more presets help:
+
+| Fit presets | R2 random | R2 group | mel random dB | mel group dB |
+|---|---|---|---|---|
+| 281 | 0.074 | 0.018 | 11.68 | 11.69 |
+| 562 | 0.153 | 0.073 | 10.66 | 11.27 |
+| 1,125 | 0.218 | 0.173 | 9.96 (bar 9.84) | 10.30 (bar 9.89) |
+| bar | 0.50 | 0.40 | 20% below k-NN | 20% below k-NN |
+
+Reading: every doubling adds about 0.07-0.10 R2 and takes 0.7-1.0 dB off mel, and the curve has not flattened. Mel passes at
+about one more doubling (about 2,300 fit presets, about 3,300 rendered). R2 at this slope needs 3-4 more doublings (10-20k presets),
+which is the whole Diva library or more: presets alone are the slow road to the R2 bars. Baselines: mean and k-NN both sit at R2 about 0,
+so knob distance does not predict sound; the model has to learn which knobs matter.
+
+**Learning curve, P3 characteristics (HANDOFF P3), C3, 1 seed (2026-10-28)**, median head R2 over the 11 characteristic means:
+
+| Fit presets | random | group |
+|---|---|---|
+| ~281 | 0.045 | -0.074 |
+| ~562 | 0.084 | 0.010 |
+| ~1,125 | 0.153 | 0.082 |
+| bar | 0.6 each | 0.6 each |
+
+Diagnosis before any collection:
+
+| Question | Test | Answer |
+|---|---|---|
+| Is the target noisy? | same preset rendered twice (`noise_diva_b`, 153 note pairs) | no: repeat r >= 0.97 on every axis, ceiling about 1 |
+| Does one knob carry an axis? | best single-knob correlation per axis | no: brightness vs VCF frequency 0.28, attack vs attack 0.48, warmth 0.15 |
+| Do more presets close it? | the curve above | slowly: +0.04-0.07 per doubling, 7+ doublings |
+| Through the predicted mel? | characteristics measured on predicted mel | worse than the direct head; k-NN about 0 |
+
+So the gap is knob interactions the library never shows apart, which is what D2 is for.
+
+**Pilot result, equal cost (2026-10-28, 1 seed, same held-out presets)**, median head R2 of the 11 characteristic means:
+
+| Fit data | random | group (unseen banks, the bar) |
+|---|---|---|
+| baseline (1,125-1,135 presets) | 0.153 | 0.082 |
+| + D2: 967 one-knob variants of 50 bases | **0.212** | 0.062 |
+| + D1: 1,000 new presets from training banks | 0.162 | **0.160** |
+| trim 0.9 (335 of 465 knob columns), no new data | 0.115 | 0.061 |
+| + D1 + D1b: 3,484 new presets (about 1.1 doublings over D1) | 0.239 | **0.200** |
+| + D2 wide: one knob moved on each of 1,000 bases, 44 banks | 0.181 | 0.113 |
+
+Step 1 result (`EXECUTION.md`, 2026-10-28): D1b adds +0.040 on group for about 1.1 doublings, down from +0.08 for the first, so
+the curve is flattening; the whole library projects to about 0.27-0.30, far from 0.6. Decision: Diva rendering stops for P3 and
+continues only as map rows. D2 wide (0.113) is below D1 (0.160), so the first own-engine batch is 30% one-knob moves, 70% fresh
+base points; later rounds are chosen by the model (Step 4). Differences are over the 0.03 seed noise, so no 3-seed rerun.
+
+Reading: D1 wins on the bar. Unseen banks need breadth (new regions of sound); D2 teaches how knobs act around its 50 bases,
+which helps presets near them (random split) and not new banks. Trimming rare knobs hurts: the rare settings carry sound.
+D1's +0.08 on group for about one doubling matches the earlier curve, so the whole Diva library (about 15,000) projects to
+about 0.35-0.40 on group, short of 0.6: presets alone do not reach the bar. Next, in order:
+1. D1 next doubling (2,600 presets, `d1_batch.py` + `diva_d1b.sh`, about 36 min): confirms the slope.
+2. D2 wide pilot at equal cost: one knob move on each of 1,000 bases from every training bank (breadth and isolation together).
+3. If the projection holds, the gap is closed on the owner's own synths (unlimited, licence-free renders), with Diva as the
+   map of where good sounds live (HANDOFF, the owner's ladder).
+
+**Pilot close-out, EXECUTION Step 1 (2026-10-28, 1 seed, same held-out presets, `p3_d1b.log`, `p3_d2w.log`)**, median head R2 of the
+11 characteristic means (0 of 11 at the bar in every row):
+
+| Fit data | random | group |
+|---|---|---|
+| + D1 + D1b: about 3,500 new presets (3,484 in fit after 15 dropped) | 0.239 | **0.200** |
+| + D2w: one knob moved on 1,000 bases from every training bank | 0.181 | 0.113 |
+
+Decision by the Step 1 rules: D1b group 0.200 - D1 0.160 = +0.040 >= 0.04, so the curve holds; Diva rendering stops for P3 (the
+projection stays under 0.6) and continues only as map rows for P4. D2w group 0.113 < 0.160, so the Step 2 sweep design is 30%
+one-knob moves on base points, 70% fresh base points. No two compared results are within 0.03, so no 3-seed rerun.
+
+**Data types, what each teaches, and the test it must pass:**
+
+| Data | Teaches | Fixes which error | Cost | Proof it helped |
+|---|---|---|---|---|
+| D1 more presets (3 notes) | the realistic region of sound space | everything, slowly (curve above) | 1 s per preset, Pro | the curve's next point |
+| D2 one-knob variants of real presets (base preset, one knob moved to 3-5 values) | each knob's own effect, unconfounded: in a library knobs move together, so the model cannot tell which one made the sound | R2 on knobs the library rarely varies; M2 needs it most | 1 s per variant; 100 bases x 10 knobs = 1,000 renders = 17 min | at equal render count, D2 lifts held-out preset R2 more than D1 |
+| D3 more notes / velocities | note and velocity dependence | error at C4 / C3f above C3's | 1 s per note | per-note error gap closes |
+| D4 tags already in presets | words | M4 only | none | M4 |
+| D5 other synths | shared space | M3 only | per synth | M3 |
+
+Not data (the model side, free to try first): drop knobs that never vary or are inactive (oscillator off, its knobs moot);
+465 features for 1,125 presets is wide; a larger mel decoder only if mel stays the failing bar.
+
+**Next, in order, each a fixed budget:**
+1. D1 to about 3,300 Diva presets (Pro alone, `diva_v3.sh`, about 1 h): expected to pass the mel bar; rerun the curve.
+2. D2 pilot vs D1 at equal cost (1,000 renders each), scored on the same held-out presets. Needs one tool: write variant states
+   (set one host parameter in a preset's state, `render_pass` today renders saved states only). The winner decides how the rest of
+   the render budget is spent.
+3. Model-side trims above, on the same rows, before any further rendering.
+
+**Execution, honest:** most of the sessions to here went into render infrastructure (speed, shards, a second machine, a memory
+hunt) and almost none into the model. The curve above could have been run at 701 presets and would have said the same thing.
+Rule from now on: a learning curve or an error diagnosis comes before any collection, and collection runs on the one machine that
+works (the Pro) until a curve says it is the bottleneck.
+
+## 5. Order of work
+
+```
+ M0 harness ──> M1 forward Diva ──> M2 inverse Diva ──> M3 Vital + Omnisphere ──> M4 words ──> M5 in Infinite
+     │               │                   │
+     │               └─ keep Diva rendering (mel rows) until the MLP gate says stop
+     └─ data check of every render file (REVISED-PLAN 6.1) feeds the split file
+```
+
+| Step | Work | Cost | State |
+|---|---|---|---|
+| 1 | Re-run the gate on Diva; first real model (`sound_model_probe.py`) | 1 min | **done 2026-10-28** (table in section 2) |
+| 2 | Store log-mel (64 x 48, uint8 0.5 dB) with every render (`render_pass.logmel`) | none extra | **done 2026-10-28**, picked up by each new render chunk |
+| 3 | M0: frozen splits + `sound_eval.py` | 1 session | **split frozen and scoring works 2026-10-28** (`eval/splits/diva.json`, 22 banks, 768 presets). Left: log-mel L1 and spectral convergence once mel rows exist; repeat-run check |
+| 4 | Verify every render file (features present, presets differ, silent share) on both machines | 30 min | REVISED-PLAN 6.1 |
+| 5 | M1: MLP with one-hot selectors and mel head | 1-2 sessions | **built 2026-10-28**: `m1_forward.py` (one net for all notes, descriptor head + dense mel head, 3 seeds, k-NN and mean baselines, bars as PASS/FAIL). Run: `~/Infinite/ml-venv/bin/python -I m1_forward.py <rows>`. First reading at 701 presets, C3: MLP R2 0.096 random / 0.072 group, mel 11.1 / 11.4 dB vs k-NN 12.0 / 12.5 and mean 13.3 / 13.7 (beats both baselines, far from the bars). Full run when Diva v2 reaches 3,000 |
+| 6 | Omnisphere on the Air at lead 30; Vital prefix of 500 | machine hours | REVISED-PLAN 6.2, 6.4 |
+| 7 | M2, then M3, M4, M5 | | after M1 passes |
+
+## 5b. Readiness audit before M1 (2026-10-28)
+
+Owner's bar: well built (robust, universal), efficient (only what we need), scalable (any plug-in, preset, sound, knob), coherent
+(the data joins into one space). Verdict: **the approach passes; the row format and render tools do not yet.** Block 0 below fixes
+them before M1 starts, so M1 trains on the final format and nothing is rendered twice later.
+
+| Check | Finding (measured) | Criterion failed |
+|---|---|---|
+| Knob source | Level 3 rows take knobs from the preset file (per-format parser, 545 usable Diva columns); level 1 sweep rows use the host's parameter list. Two knob spaces for one plug-in | coherent, universal |
+| Host parameter values | Headless already reads every parameter (`PluginGetParameter`) but `--plugin-params` reports name, min, max, default, unit and **not the current value**; `preset_state.py` does not even pass the flag | universal |
+| Join recipe -> sound | by file path string; 214 of 3,908 rendered Diva presets (5%) do not join | robust |
+| Note stimulus | label `C3` is MIDI 48 velocity 90 in level 1 and velocity 100 in level 3; level 3 rows store no midi or velocity | coherent |
+| Render code | the render-and-write loop exists twice (`preset_state.py`, `omni_render.py`) beside `render_pass.py` | well built |
+| Loader | `marginal_gate.load` string-scans about 500 MB of preset files on every run | efficient, scalable |
+| Split | bank = top folder, Diva-specific; Omnisphere has no folders | universal |
+| Scores | one split, one seed, no confidence interval: a 0.02 difference cannot be called | robust |
+| Render noise | 14 presets rendered twice by resume: band levels differ 0.17 dB on average, 0.9 dB worst (Diva drift). Sets the ceiling; unmeasured for other plug-ins | robust |
+| Data quality | Diva: 2 of 3,908 near-silent, 97 exact duplicate spectra, 3% near-identical: clean | passes |
+| Approach | forward + inverse, held-out banks, mel target, re-render round trip: matches the published practice for synth sound matching | passes |
+
+### Block 0: one row contract (before M1)
+
+| # | Fix | Result |
+|---|---|---|
+| 0.1 | Headless `--plugin-params` adds `value` (current, after the state loads) per parameter; one build | every plug-in gives its knobs in one form, whatever preset route loaded it |
+| 0.2 | One render function in `render_pass.py` used by every route; `preset_state.py` and `omni_render.py` call it | one code path to fix and test |
+| 0.3 | Row v2: `plugin_id`, `preset_id` (hash of the state bytes), `route` (1/2/3), `midi`, `velocity`, `knobs` (normalised 0-1 by address), `mel`, descriptors, `schema: 2`. Parameter table (address, name, unit, range) once per plug-in in `params/<plugin_id>.json` | joins by construction: knobs and sound come from the same render; no path join |
+| 0.4 | One stimulus for all routes: C3 v100, C4 v100, C3 v127 | same label means same sound test everywhere |
+| 0.5 | Group split for any library: top folder, merged with presets whose knob vectors are near-identical; bootstrap 95% interval on every score | universal split; differences can be called |
+| 0.6 | Loader caches one `npz` per plug-in (knobs, mel, descriptors, groups) | seconds to load at any size |
+| 0.7 | Noise floor: render 50 presets twice per plug-in at the start | ceiling per metric, per plug-in |
+
+Then re-render Diva in row v2 (about 3,900 presets, 3 h on the Pro) and start M1. The Diva rows made so far stay as the record.
+
+**Block 0 state (2026-10-28):** 0.1-0.6 built and committed; checked end to end on 12 Diva presets (knobs follow the preset: 53-171 of
+282 differ from default; 2,080 host MIDI-CC proxy slots dropped; 5.7 KB per row). Diva v2 re-render running in 3 shards
+(`scratch_omni/diva_v2.sh` -> `audio/preset_diva_v2.jsonl`), starting with the 0.7 repeat pass (`audio/noise_diva_b.jsonl`, 51 presets).
+**Air on row v2 (2026-10-28):** old jobs stopped (level-1 sweep, v1 Omnisphere, v1 preset queue; their files stay as the record).
+`~/air_v2.command` (copy in `scratch_omni/`) runs build `~/al-bin-v2` with Homebrew Python: Omnisphere in 2 shards at lead 30 ->
+`audio/omni_v2_t0|1.jsonl`, and the whole Vital library (800) -> `audio/preset_vital_v2.jsonl`. Stop with `touch ~/STOP_V2`.
+Found while checking the first rows, fixed for every plug-in:
+
+| Finding | Fix |
+|---|---|
+| Each plug-in names its MIDI proxy slots its own way (Diva `CC 3, CH 1`, Vital `MIDI CC 3\|1`, Omnisphere `MIDI CC 3:1`, plus program change, pitch bend, pressure) | one `MIDI_PROXY` pattern for all forms: Vital 2,855 -> 775 real knobs |
+| Omnisphere and Vital keep every preset under one generic root (`Factory`, `Presets`): one group, no held-out set possible | `sound_data.banks()`: a folder holding over half the library gives way to its next folder down; `.db#` counts as a folder. Diva unchanged (36 banks) |
+| Omnisphere exposes no patch settings to the host: its 993 `Spec n` slots are unassigned automation (all 0.5), 8 part levels | Omnisphere is a **sound-only** library: it joins M3 through the sound space (mel, descriptors) and M4 through its words, not through knobs. Patch-file knobs are parked (section 6) |
+
+**Noise floor, Diva (0.7, 51 presets rendered twice):** descriptor R2 ceiling 0.994 at C3, 0.996 at C4, 0.987 at C3f; log-mel
+repeat error 0.18 / 0.30 / 0.35 dB. Render noise is far below every bar, so any gap to the bars is the model's or the data's.
+
+**Render speed (2026-10-28): 8.2 s -> about 1 s per preset per machine.** Measured, not guessed. Python is 0.07 s of a preset. Each headless run
+paid a full app start and exit (about 3 s), and Diva's preset load ran twice:
+
+| Cost per preset (Diva, Pro) | Before | Now | Fix |
+|---|---|---|---|
+| App start and exit | 2.8 s | 0.12 s | `--audio-summary --batch <list>`: one Infinite process measures 25 presets (`render_pass.render_states`, `BATCH`); every out.json carries its own plugins block; a job that kills the process is marked failed and the rest rerun |
+| Preset state load | 1.4-2.4 s | 0.68 s | single-component VST3 (component is the controller, u-he): the controller blob equal to the component blob is not loaded a second time (`PluginVST3RestoreState`); fresh-process sound bit-identical, knobs identical |
+| Render 11 s of audio + measure | about 1 s | about 1 s | the stimulus itself; unchanged |
+
+Throughput: 1.9 s per preset in one process; 0.97 s per preset with 4 shards on the Pro (8 cores: 6 shards is no faster, CPU bound).
+The full Diva library (15,248 presets, 966 done) is split across both machines: `order_diva_rest.txt` (the 3,000 coreset first,
+then the other banks) at stride 8, Pro shards 0-3 (`scratch_omni/diva_v3.sh` -> `preset_diva_v2.jsonl`), Air shards 4-7
+(`~/air_v3.command` -> `preset_diva_v2_air.jsonl`, then Omnisphere and Vital, batched too). About 2 h for both, against 11 h before.
+Two things the batch changes, both accepted: (1) Diva's free-running analog drift now continues from job to job in one process, so
+a preset's 2nd-25th render is a different take of it (mel 1.2 dB median from the fresh-process take, zero mean; the first job of a
+batch is bit-identical to it); the noise floor above is for a fresh process, and the batch takes are the more honest spread.
+(2) The Air has Diva 1.4.8, the Pro 1.4.5: the parameter tables differ only in two pitch-bend defaults, so `sound_data.same_knobs`
+lets the files merge (address, name, unit, range equal).
+
+**Stop point (2026-10-28): collect no more until M1 says more data helps.** Diva rows: 3,810 (Pro `preset_diva_v2.jsonl`, coreset
+3,000 included, still growing at 1.08 presets/s while `diva_v3.sh` runs) + 225 (Air `preset_diva_v2_air.jsonl`). Found on the way:
+each Diva render process holds about 3.9 GB, live, allocated by Diva's own state load in 128 MB blocks (flat across a batch, so not a
+leak; mostly zero pages, so 4 shards on 8 GB still give 1.08 presets/s against 1.02 for 3). The Air shards stalled after 09:02 with
+empty logs (cause not found; a hand run of the same command works) and are stopped (`~/STOP_V3` on the Air). Collection was eating the
+time meant for the model, so the next session starts with the model, not the shards (steps 1-3 done the same day, section 4b):
+
+1. Stop the Pro (`touch ~/STOP_V3`), merge the two Diva files (`same_knobs` allows it).
+2. Run M1 on them, 3 seeds: `OMP_NUM_THREADS=4 nice -n 5 ~/Infinite/ml-venv/bin/python -I m1_forward.py <rows> --seeds 3`.
+3. Learning curve: the same M1 on 25 / 50 / 100% of the training presets. If group R2 and mel still climb from 50 to 100%,
+   render more (resume the shards); if flat, more presets will not move the bars, so improve the model (encoding, mel decoder)
+   or the stimulus instead, and Diva collection ends.
+
+```
+ render_states (25 presets per process) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
+   host knobs + mel + desc          per plug-in      groups, split        seconds        95% intervals, noise ceiling)
+```
+
+## 6. Parked until a milestone needs it
+
+Each item returns only when a milestone's bar cannot be reached without it. Nothing here is deleted.
+
+| Item | Returns at |
+|---|---|
+| Moving knobs (sweep over a note), REVISED-PLAN step 8 | after M2, if time-varying sounds are the error |
+| Node responses, replaceability, chain value (steps 9-11) | M5 (mapping the model's sound onto Infinite nodes) |
+| Audio analysis upgrade (step 12: LUFS, log-attack, MFCC, f0) | M1, only if descriptors limit the score; the mel target already covers most |
+| Mood layer W4, axes S1-S5 | M4 |
+| Wavetable generator W3, sample-instrument builder W2 | after M3 |
+| Level 2 renders (Serum 2, KORG) | M3, only if Vital and Omnisphere are not enough |
+| Atlas and cluster rebuild | M4 |
+| Omnisphere knobs from the patch files (`.prt_omn` XML), the level-1 sweep on the Air | M3, only if a sound-only Omnisphere cannot reach the bar |
+
+## 7. Rules carried over
+
+One heavy job per machine; 20-minute resumable chunks; nothing raw leaves a machine (mel rows are features); held-out numbers only;
+commit per step, no attribution lines; new nodes, panels and downloads need the owner's yes; python for these tools is
+`~/music videos/n1m21n-room/.venv/bin/python3 -I`.

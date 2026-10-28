@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_model": "infinite_engine",
+  "name_for_human": "Infinite Audio-Visual Engine",
+  "description_for_model": "Infinite is a free, open-source DAW for visuals, music and code on one infinite canvas. AI agents can validate, explain, inspect, synthesize audio, and render video patches.",
+  "description_for_human": "Create music, audio-reactive visuals, and GLSL shaders with Infinite.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://infinitedevices.org/.well-known/mcp.json"
+  },
+  "logo_url": "https://infinitedevices.org/assets/favicon.svg",
+  "contact_email": "hello@infinitedevices.org",
+  "legal_info_url": "https://infinitedevices.org/philosophy.html"
+}

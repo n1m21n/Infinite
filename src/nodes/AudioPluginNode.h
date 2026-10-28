@@ -133,6 +133,10 @@ public:
    bool IsIsolated() const { return mIsolated; }
    bool IsLoading() const { return mHandle != nullptr && !mReady && mLoadFailed == false; }
    bool HasPlugin() const { return !pluginId.empty(); }
+   // The plugin's live state (base64), refreshed from the handle; headless --plugin-state uses it to hand back a template.
+   const std::string& LiveState() { if (mHandle != nullptr && mReady) Platform::PluginSaveState(mHandle, mPluginState); return mPluginState; }
+   // Current value of one plugin parameter (real range, as AvailableParams reports it). Main thread only.
+   bool CurrentParamValue(unsigned long long address, float& out) const { return mHandle != nullptr && mReady && Platform::PluginGetParameter(mHandle, address, out); }
    NodeIssue Issue() const override
    {
       if (!mLoadFailed || pluginId.empty())

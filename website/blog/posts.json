@@ -29,7 +29,7 @@
  {
   "slug": "node-based-daw-modular-audio-routing",
   "title": "Node-based DAW workflows: modular audio routing on an infinite canvas",
-  "description": "Explore node-based DAW workflows in Infinite: connect synthesiser modules, route MIDI through generative sequencers, and patch audio directly into live visual shaders.",
+  "description": "Explore node-based DAW workflows in Infinite: wire synths, route MIDI into generative sequencers, and patch audio directly into live visual shaders.",
   "date": "2026-10-25",
   "updated": "2026-10-25",
   "category": "creative",
@@ -101,7 +101,7 @@
  {
   "slug": "paulstretch-extreme-spectral-time-stretching",
   "title": "PaulStretch on Mac: extreme spectral time stretching in Infinite",
-  "description": "Explore PaulStretch on Mac with Infinite. Discover how real-time spectral time stretching, phase randomisation, and FFT analysis transform audio into ambient drones.",
+  "description": "Explore PaulStretch on Mac with Infinite. Learn how real-time spectral time stretching, phase randomisation, and FFT analysis turn audio into ambient drones.",
   "date": "2026-10-21",
   "updated": "2026-10-21",
   "category": "creative",

@@ -323,6 +323,13 @@ namespace Headless
                return true;
             job.wavPath = v;
          }
+         else if (a == "--batch" && job.mode == Mode::AudioSummary)
+         {
+            const char* v = next("--batch");
+            if (v == nullptr)
+               return true;
+            job.batch = v;
+         }
          else if ((a == "--notes" || a == "--note-map" || a == "--stems" || a == "--stems-dir") && job.mode == Mode::AudioSummary)
          {
             const char* v = next(a.c_str());
@@ -459,6 +466,8 @@ namespace Headless
             job.timeline = true;
          else if (a == "--plugin-params" && (job.mode == Mode::Render || job.mode == Mode::AudioSummary))
             job.pluginParams = true;
+         else if (a == "--plugin-state" && (job.mode == Mode::Render || job.mode == Mode::AudioSummary))
+            job.pluginState = true;
          else if (a == "--lenient")
             job.lenient = true;
          else if (a.rfind("--", 0) == 0)

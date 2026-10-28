@@ -186,7 +186,7 @@ void GenerateSamplesNode::Finish()
    }
    const int from = job.barFrames * job.prerollBars;
    const int frames = job.barFrames * job.recipe.bars;
-   if (!Master(job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR))
+   if (!Master((int)job.recipe.part, job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR))
    {
       if (job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
          return;
@@ -221,7 +221,7 @@ void GenerateSamplesNode::Finish()
    mGenVersion = kGeneratorVersion;
 }
 
-bool GenerateSamplesNode::Master(const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+bool GenerateSamplesNode::Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
 {
    AudioSummary::Analyzer an(kRate);
    an.Push(l, r, frames);
@@ -230,7 +230,7 @@ bool GenerateSamplesNode::Master(const float* l, const float* r, int frames, std
    const bool finite = s.nonFiniteFrames == 0;
    const bool silent = !(s.integratedLufs > kSilentLufs); // NaN for silence
    const bool flat = rms > 0.0 && s.samplePeak / rms < 1.2; // DC or a stuck square, not music
-   const bool specOk = SampleCriticData::VerifyAudioSpectrum(0, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
+   const bool specOk = SampleCriticData::VerifyAudioSpectrum(part, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
    if (!finite || silent || flat || !specOk)
       return false;
    // -14 LUFS, then held under a -1 dBTP ceiling.

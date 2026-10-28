@@ -82,12 +82,12 @@ def propose_drum_raw(rng, fam=None, mix=None):
     return {"type": "drum_groove", "src": "proposer:" + mode, "family": f1, "lanes": str_lanes, "swing": round(rng.uniform(0.0, 0.25), 2), "groove": mode}
 
 
-EMOTION_SCALES = dict(S.SCALES, lydian=[0, 2, 4, 6, 7, 9, 11], harm_minor=[0, 2, 3, 5, 7, 8, 11])
+AFFECT_SCALES = dict(S.SCALES, lydian=[0, 2, 4, 6, 7, 9, 11], harm_minor=[0, 2, 3, 5, 7, 8, 11])
 
 
-def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, emotion=None):
-    """Compositional call-and-response melody proposer with emotion-conditioned contour, mode, and intervals."""
-    if emotion is None:
+def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, affect=None):
+    """Compositional call-and-response melody proposer; affect = (valence, arousal) conditions contour, mode and intervals."""
+    if affect is None:
         scale_name = mode_name if mode_name in S.SCALES else rng.choice(S.FAM_SCALE.get(fam, ["minor", "dorian"]))
         scale = S.SCALES[scale_name]
         tonic = rng.randrange(12) if tonic is None else tonic
@@ -119,26 +119,21 @@ def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, emotion=Non
         return {"type": "melody_contour", "src": "proposer:" + arc_type, "family": fam, "role": "lead",
                 "pitches": pitches, "steps": steps}
 
-    edir = GG.EMOTION_MIDI_DIRECTIVES.get(emotion, {})
-    if mode_name in EMOTION_SCALES:
+    v, a = affect
+    edir = GG.affect_directive(v, a)
+    if mode_name in AFFECT_SCALES:
         scale_name = mode_name
-    elif emotion == "valence_happiness":
+    elif v >= 0.62:
         scale_name = rng.choice(["major", "lydian", "mixolydian"])
-    elif emotion == "sadness_melancholy":
-        scale_name = rng.choice(["minor", "dorian"])
-    elif emotion == "tension_aggression":
-        scale_name = rng.choice(["phrygian", "harm_minor", "minor"])
-    elif emotion == "serenity_transcendence":
-        scale_name = rng.choice(["lydian", "major", "dorian"])
-    elif emotion == "intelligence_complexity":
-        scale_name = rng.choice(["dorian", "lydian", "harm_minor", "mixolydian"])
+    elif v <= 0.38:
+        scale_name = rng.choice(["phrygian", "harm_minor", "minor"] if a >= 0.6 else ["minor", "dorian"])
     else:
         scale_name = rng.choice(S.FAM_SCALE.get(fam, ["minor", "dorian"]))
-    scale = EMOTION_SCALES[scale_name]
+    scale = AFFECT_SCALES[scale_name]
     tonic = rng.randrange(12) if tonic is None else tonic
-    base_oct = 72 if emotion == "valence_happiness" else (48 if emotion in ("sadness_melancholy", "tension_aggression") else rng.choice([48, 60, 60, 72]))
+    base_oct = 72 if v >= 0.62 else (48 if v <= 0.38 else rng.choice([48, 60, 60, 72]))
     pos = rng.choice([0, 2, 4])
-    arc_type = "climb" if emotion == "valence_happiness" else ("cascade" if emotion in ("sadness_melancholy", "nostalgia_warmth") else rng.choice(["arch", "wave", "climb", "cascade"]))
+    arc_type = "climb" if v >= 0.62 else ("cascade" if v <= 0.38 and a < 0.6 else rng.choice(["arch", "wave", "climb", "cascade"]))
     step_bias = edir.get("step_bias", 0.0)
     leap_prob = edir.get("leap_prob", 0.20)
     tens_prob = edir.get("tension_iv_prob", 0.04)
@@ -166,18 +161,33 @@ def propose_melody_raw(rng, fam="house", tonic=None, mode_name=None, emotion=Non
             note += rng.choice([-1, 1])
         pitches.append(max(36, min(96, note)))
     steps = [b - a for a, b in zip(pitches, pitches[1:])]
+    ioi = melody_rhythm(rng, a)
     return {"type": "melody_contour", "src": "proposer:" + arc_type, "family": fam, "role": "lead",
-            "mode_name": scale_name, "pitches": pitches, "steps": steps}
+            "mode_name": scale_name, "pitches": pitches, "steps": steps, "ioi": ioi,
+            "rate": round(15 / max(0.25, sum(ioi) / 4.0), 2)}
 
 
-def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house", emotion=None):
-    """Coupled bass proposer that locks to or syncopates around the kick lane."""
-    if emotion == "groove_hypnosis":
-        style = "offbeat_pocket"
-    elif emotion == "intelligence_complexity":
-        style = "walking"
-    elif emotion in ("energy_drive", "tension_aggression"):
+def melody_rhythm(rng, arousal):
+    """15 onset gaps in 16ths (the corpus's `ioi`). Arousal sets the note rate on the corpus's own scale (notes per
+    quarter, p10 0.6 / median 1.4 / p90 3.8): the gaps mix the two steady grids around it, as real top lines move
+    in runs of 16ths, 8ths or quarters, and the phrase breathes once at its middle"""
+    rate = max(0.4, min(4.0, 0.5 + 3.5 * arousal + rng.uniform(-0.3, 0.3)))
+    gap = 4.0 / rate
+    grids = (1, 2, 4, 8, 16)
+    lo = max(g for g in grids if g <= max(1.0, gap))
+    hi = min(g for g in grids if g >= lo and g >= gap)
+    p_hi = (gap - lo) / (hi - lo) if hi > lo else 0.0
+    ioi = [hi if rng.random() < p_hi else lo for _ in range(15)]
+    ioi[7] = min(16, ioi[7] * 2)
+    return ioi
+
+
+def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house", affect=None):
+    """Coupled bass proposer that locks to or syncopates around the kick lane; high arousal locks to the kick."""
+    if affect is not None and affect[1] >= 0.65:
         style = "lock"
+    elif affect is not None and affect[1] <= 0.35:
+        style = rng.choice(["offbeat_pocket", "walking"])
     else:
         style = rng.choice(["lock", "offbeat_pocket", "syncopated_answer", "walking"])
     chars = []
@@ -209,14 +219,14 @@ def propose_bass_raw(rng, kick_lane="x...x...x...x...", fam="house", emotion=Non
 def propose_filtered(kind, rec, rng, k=12, **kw):
     """Best-of-K proposal: generate K candidates, keep those passing Critic, pick highest novelty/score."""
     cands = []
-    emotion = kw.get("emotion")
+    affect = kw.get("affect")
     for _ in range(k * 2):
         if kind == "drum_groove":
             p = propose_drum_raw(rng, fam=kw.get("fam"))
         elif kind == "melody_contour":
-            p = propose_melody_raw(rng, fam=kw.get("fam", "house"), tonic=kw.get("tonic"), mode_name=kw.get("mode_name"), emotion=emotion)
+            p = propose_melody_raw(rng, fam=kw.get("fam", "house"), tonic=kw.get("tonic"), mode_name=kw.get("mode_name"), affect=affect)
         elif kind == "bass_seq":
-            p = propose_bass_raw(rng, kick_lane=kw.get("kick_lane", "x...x...x...x..."), fam=kw.get("fam", "house"), emotion=emotion)
+            p = propose_bass_raw(rng, kick_lane=kw.get("kick_lane", "x...x...x...x..."), fam=kw.get("fam", "house"), affect=affect)
         else:
             raise ValueError("unknown kind " + kind)
         res = CR.judge(p, rec)
@@ -227,8 +237,12 @@ def propose_filtered(kind, rec, rng, k=12, **kw):
                 break
     if not cands:
         return p
-    if emotion:
-        cands.sort(key=lambda x: 0.65 * GG.infer_piece_emotions(x).get(emotion, 0.5) + 0.35 * x["_critic"]["novelty"], reverse=True)
+    if affect:
+        def near(x):
+            va = GG.infer_piece_affect(x)
+            d2 = (va["valence"] - affect[0]) ** 2 + ((va["arousal"] if va["arousal"] is not None else 0.5) - affect[1]) ** 2
+            return 1.0 - math.sqrt(d2 / 2.0)
+        cands.sort(key=lambda x: 0.65 * near(x) + 0.35 * x["_critic"]["novelty"], reverse=True)
     else:
         cands.sort(key=lambda x: x["_critic"]["novelty"], reverse=True)
     return cands[0]
