@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """M0 of SOUND-MODEL.md: one evaluation for every knobs -> sound model, any plug-in (row v2).
 
-    sound_eval.py preset_diva_v2.jsonl [--models ridge,knn,mlp] [--target desc,mel] [--note C3] [--boot 1000]
+    sound_eval.py preset_diva_v2.jsonl [--models mean,ridge,knn,mlp] [--target desc,mel] [--note C3] [--boot 1000]
 
 Data, groups and the two held-out sets come from sound_data.py (random: by preset; group: whole banks and their copies held out).
 Knobs: NaN -> column mean; a parameter with <= 12 distinct values across the library is a selector and is one-hot encoded
@@ -44,6 +44,8 @@ def boot(per, groups, n, rng):
 
 
 def fit(name, X, Y, Xq, rng):
+    if name == "mean":  # the floor every model must beat: the training average, whatever the knobs
+        return np.tile(Y.mean(0), (len(Xq), 1))
     if name == "ridge":
         return smp.ridge(X, Y, Xq, 300)
     if name == "knn":
@@ -55,7 +57,7 @@ def fit(name, X, Y, Xq, rng):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("rows"); ap.add_argument("--models", default="ridge,knn,mlp"); ap.add_argument("--target", default="desc,mel")
+    ap.add_argument("rows"); ap.add_argument("--models", default="mean,ridge,knn,mlp"); ap.add_argument("--target", default="desc,mel")
     ap.add_argument("--note", default="C3"); ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--noise", default="", help="rows of the same presets rendered a second time: prints the ceiling (render vs render)")
     a = ap.parse_args()
