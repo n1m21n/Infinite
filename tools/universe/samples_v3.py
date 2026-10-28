@@ -92,7 +92,7 @@ def cmd_check(a):
     pick = sorted(rows)[:: max(1, len(rows) // a.n)][: a.n]
     same = sum(measure_file(s) == rows[s] for s in pick)
     print("repeat: %d / %d identical" % (same, len(pick)))
-    named = [r for r in rows.values() if r.get("name_pc") is not None and r.get("pitch_pc") is not None]
+    named = [r for r in rows.values() if r.get("name_midi") is not None and r.get("pitch_pc") is not None]   # single notes only: pc-only names are loop keys / chord labels
     ok = sum(r["name_pc"] == r["pitch_pc"] for r in named)
     print("pitch class vs file name: %d / %d = %.1f%% (bar 90)" % (ok, len(named), 100 * ok / max(1, len(named))))
 
