@@ -71,12 +71,32 @@ def cmd_plan(a):
     XCi = np.hstack([XC, np.repeat(mv, len(XC), 0)]).astype(np.float32)
     P = np.mean([m1.train(Xa, fill(V[Ia]).astype(np.float32), Ma, Xv, fill(V[Iv]).astype(np.float32), Mv, s, a.epochs, print)[0](XCi)[0]
                  for s in range(3)], 0)
+    # refine: per target, hill-climb on the ensemble (keep the best 8, mutate 1-2 knobs, 120 children, a.refine generations); model-only, no renders
+    fs_ = None
+    if a.refine:
+        fs_ = [m1.train(Xa, fill(V[Ia]).astype(np.float32), Ma, Xv, fill(V[Iv]).astype(np.float32), Mv, s, a.epochs, lambda s: None)[0] for s in range(3)]
+    best = {}
     items = []
     for ti, (pid, tv) in enumerate(T):
         sl = slice(ti * per, (ti + 1) * per); dist = (((P[sl] - tv) / spread) ** 2).sum(1) ** .5; b = int(np.argmin(dist))
+        cu_b, p_b, d_b = CU[sl][b], P[sl][b], float(dist[b])
+        if a.refine:
+            order = np.argsort(dist)[:8]; pop = [list(CU[sl][i]) for i in order]
+            for g in range(a.refine):
+                kids = []
+                for u in pop:
+                    for _ in range(15):
+                        c = list(u)
+                        for j in rng.sample(range(len(sw)), rng.choice((1, 2))): c[j] = min(1., max(0., c[j] + rng.gauss(0, .15))) if rng.random() < .7 else draw()
+                        kids.append(c)
+                K = np.array(kids); XK = se.encode(np.vstack([d["knobs"], K]))[len(d["knobs"]):]
+                PK = np.mean([f(np.hstack([XK, np.repeat(mv, len(XK), 0)]).astype(np.float32))[0] for f in fs_], 0)
+                dk = (((PK - tv) / spread) ** 2).sum(1) ** .5; o_ = np.argsort(dk)[:8]; pop = [kids[i] for i in o_]
+                if dk[o_[0]] < d_b: cu_b, p_b, d_b = K[o_[0]], PK[o_[0]], float(dk[o_[0]])
+        dist = np.array([d_b]); b = 0; CUsl = np.array([cu_b]); Psl = np.array([p_b])
         d0 = float((((Vk - tv) / spread) ** 2).sum(1).min() ** .5)
-        items.append({"u": [round(float(x), 4) for x in CU[sl][b]], "design": "reach", "kind": "reach", "target": pid,
-                      "pred_dist": round(float(dist[b]), 4), "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in P[sl][b]]})
+        items.append({"u": [round(float(x), 4) for x in CUsl[b]], "design": "reach", "kind": "reach", "target": pid,
+                      "pred_dist": round(float(dist[b]), 4), "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in Psl[b]]})
     q = {"engine": a.node, "round": a.round, "cols": p3.COLS, "made": time.strftime("%Y-%m-%d %H:%M:%S"), "items": items,
          "targets": {pid: [round(float(x), 4) for x in tv] for pid, tv in T}, "spread": spread.tolist(), "fill": fill_.tolist()}
     q["sha"] = hashlib.sha1(json.dumps(items, sort_keys=True).encode()).hexdigest()[:16]
@@ -105,7 +125,7 @@ def cmd_score(a):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["plan", "score"]); ap.add_argument("--node", required=True)
     ap.add_argument("--round", default="reach1"); ap.add_argument("--targets", type=int, default=300)
-    ap.add_argument("--candidates", type=int, default=45000); ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--candidates", type=int, default=45000); ap.add_argument("--epochs", type=int, default=300); ap.add_argument("--refine", type=int, default=0, help="generations of model-only hill-climb per target")
     a = ap.parse_args(); {"plan": cmd_plan, "score": cmd_score}[a.cmd](a)
 
 
