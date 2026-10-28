@@ -310,3 +310,28 @@ Reading: fullness is the least consistent axis, which fits the "composite" idea,
 Per field (of the parsed): with CCs 207,879 | more than one tempo 71,576 | first meter not 4/4 39,459 | meter changes 45,233 | more than one instrument family 179,391 | EMOPIA emotion label 1,078 of 1,078.
 Hand check: 20 random files re-parsed by an independent byte-level reader: note counts and CC counts equal in 20 of 20, meter messages consistent with the stored meters.
 G4 closed. Raw MIDI `datasets/midi/data` (8.6 GB, the extracted copy) may be removed once `archives/` (2.3 GB, the original downloads) is on Drive and the owner says yes.
+
+### C2 on Wavetable (untouched engine, pre-registered; first of the four)
+| set | moves | strict C2 (bar 90 % / r 0.7) | C2.1: moves >= 0.5 sd |
+|---|---|---|---|
+| single (100) | 346 axis moves | 55.8 %, r -0.470 -> MISS | 22 moves: 45.5 %, r -0.638 -> MISS |
+| combined (60) | 355 axis moves | 53.8 %, r 0.549 -> MISS | 42 moves: 85.7 %, r 0.673 -> MISS (close; n small) |
+Reading: Wavetable has 65 swept knobs, so a single-knob step rarely changes anything audible (only 22 of 346 single moves reach 0.5 sd), and those few are predicted no better than chance. Combined moves reach 85.7 % when audible. Reported as a MISS on both tiers; no rescoring.
+
+### Human-patch benchmark: Oscillator (owner's 37 distinct settings from ~/Downloads/Patches vs 836 held-out bank rows; same ensemble, same metric)
+| axis | bank R2 | human R2 |
+|---|---|---|
+| loudness | 0.68 | 0.78 |
+| brightness | 0.73 | 0.22 |
+| sharpness | 0.75 | -0.46 |
+| warmth | 0.57 | 0.16 |
+| weight | 0.60 | 0.19 |
+| fullness | 0.38 | 0.31 |
+| noisiness | 0.40 | 0.30 |
+| movement | 0.46 | 0.57 |
+| attack | 0.70 | 0.38 |
+| decay | 0.60 | 0.33 |
+| density | 0.35 | -0.11 |
+| **mean** | **0.565** | **0.243** |
+Error in bank spreads: bank 0.67, human 0.53 (the human patches' absolute error is not larger). The human patches vary much less than the bank on most axes (spread vs bank: sharpness 0.41, warmth 0.29, weight 0.37, movement 0.38, brightness 0.60), so R2 against their own mean is a harsh yardstick there; fullness 1.02, decay 1.14, density 0.95 vary as much as the bank.
+Reading: a same-generator gap exists in R2 terms (0.565 -> 0.243: P3 bar 0.6 would be missed on human settings) but it is mostly resolution, not blindness: the model does not separate the owner's settings from each other on brightness, sharpness, warmth, weight. Loudness and movement hold up. Caveats: static knobs only (no cables), a few non-swept knobs differ, 37 points, Oscillator only so far.
