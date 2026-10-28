@@ -157,7 +157,7 @@ def cmd_predict(a):
 def axis_values(row):
     import characteristics as ch
     r = ch.from_row(row)
-    return {k: v["mean"] for k, v in r["axes"].items() if "mean" in v}
+    return {k: v["mean"] for k, v in (r["axes"] or {}).items() if "mean" in v}      # a silent or failed render has no axes: no moves from it
 
 
 def cmd_score(a):
