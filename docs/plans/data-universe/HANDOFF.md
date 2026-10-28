@@ -481,3 +481,18 @@ The unassigned count is 2,252 (not 3,894: earlier tag passes placed more). They 
   V r = 0.51-0.58, acc 73-76%: plateaued across all families and added harmony features. Feature-limited; the bar (0.8) stays unmet.
 - Sign-off (decided by the agent, owner delegated 2026-10-28): E rules approved for use. V rules are ADVISORY only: compose may nudge mode/brightness from V but no
   decision may depend on V alone. Owner's 40-clip check is still the real V test.
+
+## 2026-10-28 (goal item 3) — knob direction, held-out banks (`knob_direction.py`)
+Measured-slope model, 5 folds split by bank (no leakage). Two readings, both reported:
+| Engine | all moves, dominant axis | gated (>= 0.5 sd) | RELIABLE cells only (train consistency >= 0.8): acc, share of knob-axis cells |
+|---|---|---|---|
+| Analog | 65.4% +- 4.4 | 64.8% | **89.5%** (400 moves; 23 of 49 cells) |
+| Oscillator | 67.6% +- 4.2 | 70.4% | **91.6%** (793 moves; 25 of 79 cells) |
+| Sampler | 69.8% +- 8.4 | 76.2% | **90.9%** (99 moves; 8 of 12 cells) |
+| Equation Synth | 58.1% +- 9.5 | 57.0% | no reliable cells (formula text drives the sound; knobs are weak) |
+Reading: the all-moves bar (90%) is still MISSED (about 65%): a knob's effect on the dominant axis depends on context. What does reach 90% is a selective
+predictor that abstains on non-reliable (knob, axis) cells; it covers about half the cells. This is a different claim from the original bar (abstaining),
+so the original bar stays open until the owner decides whether the selective reading counts. compose should use only reliable cells either way.
+Also measured this session: 6 more engines (Equation, Partials, Sampler, Slicer, Grain Molder, Field Synth; 240 presets each). Partials, Grain Molder and
+Field Synth produced no one-knob pairs in 240 presets (bank design needs more presets); Wave Terrain and Spectral Synth need an image input, Granular,
+PaulStretch, Molder and Looper need an audio input: not yet measured.

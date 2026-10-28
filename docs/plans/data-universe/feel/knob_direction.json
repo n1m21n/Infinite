@@ -1,0 +1,66 @@
+{
+ "Analog": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": 0.895,
+   "scored_moves": 400,
+   "reliable_cells_per_fold": 23.2,
+   "cells_with_data": 49.4
+  },
+  "pairs": 1300,
+  "banks": 101,
+  "dominant_acc": 0.654,
+  "dominant_sd": 0.044,
+  "gated_acc": 0.648,
+  "gated_sd": 0.04,
+  "gated_moves_per_fold": 91
+ },
+ "Oscillator": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": 0.916,
+   "scored_moves": 793,
+   "reliable_cells_per_fold": 24.6,
+   "cells_with_data": 78.8
+  },
+  "pairs": 1278,
+  "banks": 101,
+  "dominant_acc": 0.676,
+  "dominant_sd": 0.042,
+  "gated_acc": 0.704,
+  "gated_sd": 0.057,
+  "gated_moves_per_fold": 140
+ },
+ "Sampler": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": 0.909,
+   "scored_moves": 99,
+   "reliable_cells_per_fold": 7.6,
+   "cells_with_data": 11.8
+  },
+  "pairs": 162,
+  "banks": 12,
+  "dominant_acc": 0.698,
+  "dominant_sd": 0.084,
+  "gated_acc": 0.762,
+  "gated_sd": 0.109,
+  "gated_moves_per_fold": 17
+ },
+ "Equation Synth": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": null,
+   "scored_moves": 0,
+   "reliable_cells_per_fold": 0.2,
+   "cells_with_data": 0.2
+  },
+  "pairs": 147,
+  "banks": 12,
+  "dominant_acc": 0.581,
+  "dominant_sd": 0.095,
+  "gated_acc": 0.57,
+  "gated_sd": 0.049,
+  "gated_moves_per_fold": 14
+ }
+}
