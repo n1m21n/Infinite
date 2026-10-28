@@ -446,3 +446,14 @@ Owner answers: Anchors and recipes: the owner says the 40 anchors were AI genera
 Fix, `listen_model.py build --context --tag m1ctx`: the same engine settings are played by a real phrase (Bach chorale 068, first 12 s, as note events) through a Reverb, 10 model-proposed + 10 uniform-random Analog settings, plus 4 of the site generator's own samples as the reference bar, all 24 shuffled, loudness-matched. Page: `eval/listen/model_m1ctx/index.html`. Wiring found while building: the MIDI File node plays nothing in a headless render (silence), so notes go in as `--notes` events instead.
 
 **C11 Analog, 2026-10-28 (G9 embeddings, 2,000 rows, test 429):** R2 of the embedding (PCA-32) from the 11 axes: variance-weighted **0.523**, median component 0.042. C11 has no pass bar; it is reported per round and each new axis must raise it. Reading: the 11 axes explain about half of the embedding's variance (the large, shared components), and almost nothing of most small components. The unexplained half goes to listening and naming, as the claim says. Baseline for the next round: 0.523.
+
+## Note layer 2j: sloppy_timing fix (2026-10-28)
+Cause: the feel gate widens every band by 25% of its width; for jitter that put the live limit at 0.229 (p99 is 0.1835), so random-offset bars passed.
+Change: `feel_analysis.MARGINS = {"jitter": 0.0}` (other features keep 0.25). Measured on a fresh seed (777), 1,000 real test bars and 300 corrupted:
+
+| | before | after |
+|---|---:|---:|
+| feel_check false reject on real bars | 0.7% | 1.1% (bar: B2 total <= 3%) |
+| sloppy_timing caught | 83.3% | 93.3% |
+
+Not tuned further: a 0.15 limit would catch 97.6% at 1.0% false reject on the first sample, but that is picking on the data; kept the plain p99. Still to do: re-run full `benchmark.py` B2/B3 with the daemon paused.

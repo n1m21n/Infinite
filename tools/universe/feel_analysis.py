@@ -81,6 +81,7 @@ def feel_features(lanes, vel, off):
 
 
 MARGIN = 0.25  # gate = the training bars' p1..p99 band, widened by a quarter of its width each side; fixed before testing
+MARGINS = {"jitter": 0.0}  # 2026-10-28: with the quarter margin the live limit was 0.229 and 5% of random-offset bars passed; plain p99 (0.18) is the limit
 # Gated: what a listener hears. drag (a whole-bar offset) is inaudible against itself, and layback's band is
 # squeezed to the grid by quantized files, so both are reported but never gated.
 GATED = ["vel_sd", "accent", "hat_alt", "backbeat", "swing", "jitter"]
@@ -93,7 +94,7 @@ def verify(gates, f):
         x = f.get(ft)
         if x is None or g is None:
             continue
-        m = MARGIN * (g["p99"] - g["p1"])
+        m = MARGINS.get(ft, MARGIN) * (g["p99"] - g["p1"])
         if x < g["p1"] - m or x > g["p99"] + m:
             out.append(ft)
     return out
