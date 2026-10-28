@@ -74,6 +74,7 @@ def row(src):
     r = {"src": src}
     p = find(src)
     if p is None: r["missing"] = 1; return r
+    if os.path.getsize(p) > 4_000_000: r["error"] = "file over 4 MB"; return r
     try:
         fmt, div, ev, meta = mf.parse(open(p, "rb").read()); sec = fast_sec(meta, div)
         nt, end = notes_of(ev)
@@ -132,7 +133,7 @@ def row(src):
         for pn, b in DRUM_BAND.items(): share[b] += float(e[drum & (pit == pn)].sum())
         tot = sum(share.values()) or 1.0; r["a28"] = {k: round(v / tot, 4) for k, v in share.items()}
         # 29 dynamics proxy
-        beat = 60.0 / bpm_map; nb = int(max(1, secs // (4 * beat))); bar = np.minimum((s0 / (4 * beat)).astype(int), nb - 1)
+        beat = 60.0 / bpm_map; nb = int(min(2048, max(1, secs // (4 * max(beat, 0.05))))); bar = np.minimum((s0 / (4 * beat)).astype(int), nb - 1)
         lvl = np.bincount(bar, weights=vel / 127.0, minlength=nb)
         r["a29"] = {"vel_mean": round(float(vel.mean()), 2), "vel_crest": round(float(vel.max() / max(vel.mean(), 1e-3)), 3),
                     "loudness_range": round(float(np.percentile(lvl, 95) - np.percentile(lvl, 10)), 3) if nb >= 4 else None}

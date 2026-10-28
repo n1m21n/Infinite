@@ -1,0 +1,132 @@
+{
+ "bass": {
+  "n": 59,
+  "sets": 43,
+  "vol_db_median": 0.0,
+  "vol_db_p25": -5.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "drums": {
+  "n": 6,
+  "sets": 3,
+  "vol_db_median": -5.1,
+  "vol_db_p25": -5.1,
+  "vol_db_p75": -5.1,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "fx": {
+  "n": 36,
+  "sets": 19,
+  "vol_db_median": -4.1,
+  "vol_db_p25": -11.1,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "hat": {
+  "n": 176,
+  "sets": 55,
+  "vol_db_median": -5.0,
+  "vol_db_p25": -9.3,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "keys": {
+  "n": 33,
+  "sets": 28,
+  "vol_db_median": 0.0,
+  "vol_db_p25": -6.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "kick": {
+  "n": 105,
+  "sets": 66,
+  "vol_db_median": 0.0,
+  "vol_db_p25": 0.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "lead": {
+  "n": 55,
+  "sets": 24,
+  "vol_db_median": 0.0,
+  "vol_db_p25": -6.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "pad": {
+  "n": 74,
+  "sets": 31,
+  "vol_db_median": -5.0,
+  "vol_db_p25": -9.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "perc": {
+  "n": 145,
+  "sets": 55,
+  "vol_db_median": -3.4,
+  "vol_db_p25": -9.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "return": {
+  "n": 177,
+  "sets": 87,
+  "vol_db_median": 0.0,
+  "vol_db_p25": 0.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "snare": {
+  "n": 41,
+  "sets": 27,
+  "vol_db_median": 0.0,
+  "vol_db_p25": -6.0,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "sub": {
+  "n": 2,
+  "sets": 2,
+  "vol_db_median": -3.0,
+  "vol_db_p25": -3.0,
+  "vol_db_p75": -3.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ },
+ "vocal": {
+  "n": 36,
+  "sets": 14,
+  "vol_db_median": 0.0,
+  "vol_db_p25": -4.7,
+  "vol_db_p75": 0.0,
+  "abs_pan_median": 0.0,
+  "send_a_active_frac": 0.0,
+  "send_a_db_median": null
+ }
+}
