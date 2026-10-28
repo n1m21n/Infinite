@@ -84,6 +84,17 @@ G1 + G2 + Step 2 first batch closed 2026-10-28: `tools/universe/detail.py` measu
 
 G10 filled 2026-10-28: `tools/universe/wavetables.py` measured 21,558 tables (1,432 wt, 20,000 synthetic, 126 Vital) at 220 Hz reference: centroid, rolloff, odd/even, fundamental share, flatness, Sethares roughness, two spectral peaks; 5 synthetic checks pass -> `characteristics/wavetables.jsonl`. Open: the check against the node's 64 built-in tables (needs the node's table source).
 
+Step 2 Analog + Step 3 first curves, 2026-10-28: Analog 1,965 presets (check 20 recipes bit-identical); C1, C2 frozen for Analog (`claims.py check` hashes match; C3 map set kept). P3 median head R2 by data fraction (1 seed):
+
+| Engine | split | 0.25 | 0.5 | 1.0 | means at 0.6 (1.0) |
+|---|---|---|---|---|---|
+| Oscillator | random | 0.319 | 0.457 | 0.624 | 8 / 11 |
+| Oscillator | group | 0.104 | 0.123 | 0.192 | 0 / 11 |
+| Analog | random | 0.280 | 0.406 | 0.725 | 8 / 11 |
+| Analog | group | 0.198 | 0.254 | 0.298 | 1 / 11 |
+
+All four curves still rise with data and the k-NN baseline stays far below the head, so per the plan Step 4 chooses the next 2,000 (not more uniform draws). Group bar not met on either engine; recorded as a miss with its curve, bar unchanged. Analog renders cost ~0.65 s/preset (Oscillator 0.4).
+
 Step-by-step execution from here: `EXECUTION.md` (start at Step 0). What the model claims and the numbers that prove it
 (C1 axes, C2 ingredients, C3 good, C4 words, C5 moods and emotions, C6 creative, C7 makes): the claims registry in `EXECUTION.md`.
 
