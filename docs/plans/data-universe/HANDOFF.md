@@ -518,3 +518,7 @@ tools/universe/dot_test.py: 12 Analog voices from the 34 live style cards, one t
 - Noisiness stays put (|shift| < 0.3 sd): 83.8% (bar 90%) -> MISS on this bar, so verdict INCONCLUSIVE.
 - Loudness drift: 29.5% stay put. Not a defect for export (-14 LUFS normalises) but the dot must compensate gain.
 - Reading: a single dot works on a live voice. Next: pick the knob with least noise coupling per axis and re-test; this is tuned on the same voices, so confirm on fresh voices before it counts.
+
+### Dot test round 2: fresh voices, least-noise-coupling knob (2026-10-29)
+12 other live-style Analog voices (--skip 12 --lowcouple), 63 trials. Noisiness holds 93.7% (bar 90%, MET). Direction 79.4% overall (bar 85%, MISS), but by axis: brightness 100%, sharpness 100%, warmth 91%, fullness 91%, loudness 75% (normalised at export), movement 11% (FAIL: the low-coupling knob for movement is wrong).
+Decision: ship dots only for brightness, sharpness, warmth, fullness (>= 91% on fresh voices, noise held). Movement is not a dot until a knob passes. Whole-test verdict stays INCONCLUSIVE, recorded as a miss on the all-axes reading.

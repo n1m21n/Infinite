@@ -27,7 +27,7 @@ def voices(pattern):
     return out
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--voices", type=int, default=12)
+    ap = argparse.ArgumentParser(); ap.add_argument("--voices", type=int, default=12); ap.add_argument("--skip", type=int, default=0); ap.add_argument("--lowcouple", action="store_true"); ap.add_argument("--out", default=OUT)
     ap.add_argument("--glob", default=os.path.expanduser("~/Infinite/render-runs/styled/*_1.inf")); a = ap.parse_args()
     table, sw, fixed = ow.param_table(NODE); tags = ow.tag_of(table); keys = [p["key"] for p in sw]
     P, nk = kd.pairs(NODE); means = [j for j, n in enumerate(p3.COLS) if n.endswith(".mean")]
@@ -37,7 +37,7 @@ def main():
     for g, j, dk, mv in P:
         num[j] += mv * dk; den[j] += dk * dk; m = np.abs(mv) >= 0.3; n[j] += m; up[j] += m * (np.sign(mv) * np.sign(dk) > 0)
     slope = num / np.maximum(den, 1e-9)[:, None]; cons = np.where(n >= 8, np.maximum(up, n - up) / np.maximum(n, 1), 0)
-    vs = voices(a.glob)[: a.voices]; print(len(vs), "style-card Analog voices")
+    vs = voices(a.glob)[a.skip: a.skip + a.voices]; print(len(vs), "style-card Analog voices")
     trials = []; recs = []
     for name, v in vs:
         base = dict(fixed); 
@@ -48,6 +48,7 @@ def main():
             if AX[ax] in ("attack", "decay", "density"): continue
             c = [j for j in np.argsort(-np.abs(slope[:, ax])) if cons[j, ax] >= 0.8 and keys[j] not in BAN and abs(slope[j, ax]) > 0.5]
             if not c: continue
+            if a.lowcouple: c.sort(key=lambda j: abs(slope[j, AX.index('noisiness')] / slope[j, ax]))
             j = c[0]
             for sgn in (1, -1):
                 u = u0.copy(); u[j] = np.clip(u[j] + sgn / slope[j, ax], 0.02, 0.98); req = (u[j] - u0[j]) * slope[j, ax]
@@ -68,6 +69,6 @@ def main():
     byax = {x: (round(float(np.mean([np.sign(r["got"]) == np.sign(r["req"]) for r in res if r["axis"] == x])), 2), sum(r["axis"] == x for r in res)) for x in AX if any(r["axis"] == x for r in res)}
     verdict = "PASS" if nt >= 60 and sign >= .85 and gain >= .5 and nd >= .9 else "FAIL" if sign < .75 or nd < .8 else "INCONCLUSIVE"
     out = {"trials": nt, "sign": round(float(sign), 3), "median_gain": round(float(gain), 2), "noise_drift_ok": round(float(nd), 3), "loud_drift_ok": round(float(ld), 3), "by_axis": byax, "verdict": verdict}
-    json.dump({"summary": out, "rows": res}, open(OUT, "w"), indent=1); print(json.dumps(out, indent=1))
+    json.dump({"summary": out, "rows": res}, open(a.out, "w"), indent=1); print(json.dumps(out, indent=1))
 
 main()

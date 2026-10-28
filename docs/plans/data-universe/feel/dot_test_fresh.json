@@ -1,0 +1,605 @@
+{
+ "summary": {
+  "trials": 63,
+  "sign": 0.794,
+  "median_gain": 0.87,
+  "noise_drift_ok": 0.937,
+  "loud_drift_ok": 0.176,
+  "by_axis": {
+   "loudness": [
+    0.75,
+    12
+   ],
+   "brightness": [
+    1.0,
+    10
+   ],
+   "sharpness": [
+    1.0,
+    10
+   ],
+   "warmth": [
+    0.91,
+    11
+   ],
+   "fullness": [
+    0.91,
+    11
+   ],
+   "movement": [
+    0.11,
+    9
+   ]
+  },
+  "verdict": "INCONCLUSIVE"
+ },
+ "rows": [
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": 0.5552542957212194,
+   "got": 0.41954319810028606,
+   "noise_drift": 0.0069027374676392025,
+   "loud_drift": 0.41954319810028606
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.7604010442919201,
+   "got": 2.8087251366735626,
+   "noise_drift": 0.1656656992233412,
+   "loud_drift": 2.4584490008912763
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": 0.833460427019319,
+   "got": 4.006286263557319,
+   "noise_drift": 0.1656656992233412,
+   "loud_drift": 2.4584490008912763
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": 0.4865102064981674,
+   "got": -4.419029826926047,
+   "noise_drift": 0.1656656992233412,
+   "loud_drift": 2.4584490008912763
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 1.0,
+   "got": -1.1830059356300937,
+   "noise_drift": 0.1656656992233412,
+   "loud_drift": 2.4192652079489627
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": -0.15305885827931667,
+   "noise_drift": 0.0007669708297376862,
+   "loud_drift": 0.330732036859657
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": -1.0678728292997988,
+   "noise_drift": 0.0084366791271146,
+   "loud_drift": 1.0678728292997988
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.2938297208337272,
+   "noise_drift": 0.09893923703616211,
+   "loud_drift": 1.8241382230975698
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -1.0424091087337457,
+   "noise_drift": 0.09893923703616211,
+   "loud_drift": 1.8241382230975698
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -1.08072125632973,
+   "noise_drift": 0.09893923703616211,
+   "loud_drift": 1.8241382230975698
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -1.1222276490289147,
+   "noise_drift": 0.09893923703616211,
+   "loud_drift": 1.818549498988141
+  },
+  {
+   "voice": "dub_techno_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": -0.0072020615922824705,
+   "noise_drift": 0.0007669708297376862,
+   "loud_drift": 0.056577207033722335
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": 0.3124358558838399,
+   "got": 0.08658445298154126,
+   "noise_drift": 0.0015339416594753724,
+   "loud_drift": 0.08658445298154126
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.41589883319541987,
+   "got": -0.13996899944096589,
+   "noise_drift": 0.0,
+   "loud_drift": 0.13996899944096589
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7805973368472472,
+   "got": -0.3212130714966016,
+   "noise_drift": 0.09280347039826059,
+   "loud_drift": 2.154017211159379
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8555971807017716,
+   "got": -1.0176019335067648,
+   "noise_drift": 0.09280347039826059,
+   "loud_drift": 2.154017211159379
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.4994319436990141,
+   "got": -0.8855230133705686,
+   "noise_drift": 0.09280347039826059,
+   "loud_drift": 2.154017211159379
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -1.0374579335062175,
+   "noise_drift": 0.09280347039826059,
+   "loud_drift": 1.9583742328235887
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.5159839505430672,
+   "got": -0.0044835301520662054,
+   "noise_drift": 0.0,
+   "loud_drift": 0.22171741842882647
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": -1.0609480802349176,
+   "noise_drift": 0.01764032908396689,
+   "loud_drift": 1.0609480802349176
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.14859156845842308,
+   "noise_drift": 0.040649453976097615,
+   "loud_drift": 2.6313983722372662
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.01302391855739549,
+   "noise_drift": 0.040649453976097615,
+   "loud_drift": 2.6276411940761566
+  },
+  {
+   "voice": "dubstep_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": -0.017724632357335988,
+   "noise_drift": 0.0,
+   "loud_drift": 0.007319911375649089
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.4600821949536582,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.6577523284029672,
+   "noise_drift": 0.028377920700294563,
+   "loud_drift": 2.992564179443665
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.854832046929733,
+   "noise_drift": 0.028377920700294563,
+   "loud_drift": 2.992564179443665
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.7470945743737601,
+   "noise_drift": 0.028377920700294563,
+   "loud_drift": 2.992564179443665
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.8614065431821253,
+   "noise_drift": 0.028377920700294563,
+   "loud_drift": 2.992564179443665
+  },
+  {
+   "voice": "electro_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.4132196051847194,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.41482592143712604,
+   "noise_drift": 0.020708212402917654,
+   "loud_drift": 3.2080844492528335
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.8711525569474834,
+   "noise_drift": 0.020708212402917654,
+   "loud_drift": 3.2080844492528335
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.3473866391282793,
+   "noise_drift": 0.020708212402917654,
+   "loud_drift": 3.2080844492528335
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.7283346890792597,
+   "got": -0.9922776520081775,
+   "noise_drift": 0.0015339416594753724,
+   "loud_drift": 0.9922776520081775
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.16922486161584122,
+   "noise_drift": 0.06902737467639217,
+   "loud_drift": 1.24886971246666
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.9971468942845175,
+   "noise_drift": 0.06902737467639217,
+   "loud_drift": 1.24886971246666
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.49927086382080577,
+   "noise_drift": 0.06902737467639217,
+   "loud_drift": 1.24886971246666
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.7510459701431421,
+   "noise_drift": 0.06902737467639217,
+   "loud_drift": 1.237108929408098
+  },
+  {
+   "voice": "footwork_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": 0.00025042273674270285,
+   "noise_drift": 0.0,
+   "loud_drift": 0.004666678717637223
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.6370343824750869,
+   "noise_drift": 0.07209525799534294,
+   "loud_drift": 2.4275887061456096
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -0.97277493265801,
+   "noise_drift": 0.07209525799534294,
+   "loud_drift": 2.4275887061456096
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -0.9466956994565842,
+   "noise_drift": 0.07209525799534294,
+   "loud_drift": 2.4275887061456096
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -0.8715743392488638,
+   "noise_drift": 0.07209525799534294,
+   "loud_drift": 2.426660388336187
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.45872065878580887,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": -1.0073126370702437,
+   "noise_drift": 0.006135766637901529,
+   "loud_drift": 1.0073126370702437
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.3000705774964286,
+   "noise_drift": 0.059056753889802194,
+   "loud_drift": 2.082204301699392
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.8311190229652903,
+   "got": -1.0102758378987968,
+   "noise_drift": 0.059056753889802194,
+   "loud_drift": 2.082204301699392
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.485143474577979,
+   "got": -1.5063636120980972,
+   "noise_drift": 0.059056753889802194,
+   "loud_drift": 2.082204301699392
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -1.0,
+   "got": -1.2137378136295622,
+   "noise_drift": 0.059056753889802194,
+   "loud_drift": 2.0821353051054485
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": -0.02006512178150788,
+   "noise_drift": 0.0,
+   "loud_drift": 0.05934961562672735
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5120450816096245,
+   "got": -0.980328696420679,
+   "noise_drift": 0.0038348541486884578,
+   "loud_drift": 0.980328696420679
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.713110762033127,
+   "got": -1.0372558502253466,
+   "noise_drift": 0.5905675388980219,
+   "loud_drift": 2.5826240527367967
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.7816264913071707,
+   "got": -1.2443482193533788,
+   "noise_drift": 0.5905675388980219,
+   "loud_drift": 2.5826240527367967
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.4562535344962158,
+   "got": -0.8245518408877952,
+   "noise_drift": 0.5905675388980219,
+   "loud_drift": 2.5826240527367967
+  },
+  {
+   "voice": "french_filter_house_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -0.9414203164689485,
+   "got": -1.616451084812187,
+   "noise_drift": 0.5905675388980219,
+   "loud_drift": 2.5826240527367967
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "loudness",
+   "knob": "sustain",
+   "req": -0.5538378364873537,
+   "got": -1.0031540241807357,
+   "noise_drift": 0.0,
+   "loud_drift": 1.0031540241807357
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.5195490400745738,
+   "got": -0.629137788330444,
+   "noise_drift": 0.0015339416594753817,
+   "loud_drift": 2.8730620787334136
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "sharpness",
+   "knob": "cutoff",
+   "req": -0.5694673462754906,
+   "got": -0.39560916283027264,
+   "noise_drift": 0.0015339416594753817,
+   "loud_drift": 2.8730620787334136
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "warmth",
+   "knob": "cutoff",
+   "req": -0.3324113146214565,
+   "got": -0.612563332420781,
+   "noise_drift": 0.0015339416594753817,
+   "loud_drift": 2.8730620787334136
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": 0.3582193083482518,
+   "got": 0.4031702507811301,
+   "noise_drift": 0.22395548228340573,
+   "loud_drift": 0.02855204505737279
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "fullness",
+   "knob": "cutoff",
+   "req": -0.6858878701166233,
+   "got": -0.562199151060907,
+   "noise_drift": 0.0015339416594753817,
+   "loud_drift": 2.8730620787334136
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "movement",
+   "knob": "decay",
+   "req": 0.3590797954920976,
+   "got": -0.00525165373880561,
+   "noise_drift": 0.0,
+   "loud_drift": 0.06362113203359693
+  }
+ ]
+}
