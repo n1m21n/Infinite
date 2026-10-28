@@ -407,3 +407,14 @@ Control follow-up: each arm is ~2,000 distinct settings (about 8 note rows each)
 Start distance vs measured distance r 0.85. The model-guided pick lands about 0.9 sd farther than simply taking the nearest render in 90.7% of targets: the predicted gain is not real (optimizer's curse again, now with LCB and model-only refine). Seed-spread calibration line did not print (no stored `pred_spread` in this plan file); the plan ran on the pre-spread code path, so that check is still open.
 Out-of-gamut advisory fit again: expected landing = 1.22 x gamut distance + 0.36 (resid sd 1.67). Advised within 2.5 sd: 12% of targets, 76% of those land within 2.5 sd vs 9% of the rest (held-out half: 89% vs 13%). Advisory works; steering does not.
 Reading for the claims: do not claim "reach beats retrieval" on Analog. What is supported: knowing before rendering which targets are reachable.
+
+## reach1 String (Step 6/7, 2026-10-28)
+300 Diva map targets, plain plan (no `--refine`; so no seed-spread calibration), 295 new String renders, 0 failed. Median distance in sd units: nearest existing String render **4.52**, predicted **4.48**, measured **5.02**; closer than nearest **17.3%**. **MISS** (bar: closer than the nearest existing render).
+| targets | start dist | measured | closer than nearest |
+|---|---|---|---|
+| near (n=100) | 3.28 | 3.65 | 20.0% |
+| middle | 4.52 | 4.97 | 16.0% |
+| far | 6.50 | 7.03 | 16.0% |
+Start distance vs measured r 0.94. Advisory fit: expected landing = 1.11 x gamut distance + 0.12 (resid sd 1.11). Only 2% of targets are advised reachable within 2.5 sd (all of those do land within it; 3% of the rest do): String's renders sit far from almost all map sounds, so the advisory has nothing to select. Compared with Analog (nearest 3.02, 12% advised) String is the least reachable engine for map sounds, consistent with the family table (String farthest from real strings).
+Step 7 reading: steering does not close the gap. The dedicated String engine reaches map sounds worse than Analog or Oscillator; the open design question (better String, piano or wind model, hybrid attack) stands and goes to the owner as a decision, not a build.
+Scorer fix: `reach.py score` crashed when a plan has no `pred_spread` (None in an object array); now treated as missing.

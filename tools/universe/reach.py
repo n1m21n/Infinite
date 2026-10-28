@@ -139,7 +139,7 @@ def cmd_score(a):
         if i is None or not d["ok"][i, 0]: continue
         tv = np.array(q["targets"][it["target"]]); vi = np.where(np.isfinite(V[i]), V[i], np.array(q["fill"]))
         got = float((((vi - tv) / spread) ** 2).sum() ** .5)
-        res.append((it["start_dist"], it["pred_dist"], got, it.get("pred_spread", np.nan)))
+        res.append((it["start_dist"], it["pred_dist"], got, it.get("pred_spread") if it.get("pred_spread") is not None else np.nan))
     if not res: print("no rendered picks found (check o.rid signature)"); return
     R = np.array(res)
     print("%s %s: %d targets | nearest existing render %.2f | predicted %.2f | measured %.2f (median) | closer than nearest: %.1f%%" %
