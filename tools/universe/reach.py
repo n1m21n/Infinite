@@ -148,6 +148,12 @@ def cmd_score(a):
     for name, m in (("near targets", R[:, 0] <= cut[0]), ("middle", (R[:, 0] > cut[0]) & (R[:, 0] <= cut[1])), ("far targets", R[:, 0] > cut[1])):
         if m.sum(): print("    %-13s start %.2f (n=%d): measured %.2f, closer than nearest %.1f%%" % (name, np.median(R[m, 0]), m.sum(), np.median(R[m, 2]), 100 * (R[m, 2] < R[m, 0]).mean()))
     print("    correlation of start dist with measured dist: %.2f" % np.corrcoef(R[:, 0], R[:, 2])[0, 1])
+    # advisory: the fitted line measured ~ a*start + b is what the app can quote before any render ("this sound is ~X sd from anything this engine makes")
+    a_, b_ = np.polyfit(R[:, 0], R[:, 2], 1); res_sd = float(np.std(R[:, 2] - (a_ * R[:, 0] + b_)))
+    print("    advisory fit: expected landing distance = %.2f * gamut distance + %.2f (residual sd %.2f)" % (a_, b_, res_sd))
+    for lim in (1.5, 2.5):
+        ok_ = R[:, 0] * a_ + b_ <= lim; print("    targets advised reachable within %.1f sd: %.0f%%; actually within: %.0f%% (of advised), %.0f%% (of the rest)" %
+              (lim, 100 * ok_.mean(), 100 * (R[ok_, 2] <= lim).mean() if ok_.any() else float("nan"), 100 * (R[~ok_, 2] <= lim).mean() if (~ok_).any() else float("nan")))
 
 
 def main():

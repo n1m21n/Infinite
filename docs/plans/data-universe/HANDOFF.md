@@ -295,3 +295,7 @@ Correlation of start distance with measured distance 0.89. Two findings: (1) the
 
 ### C2 delta-loss with near-zero pairs filtered (reviewer hypothesis) - Analog
 `c2_delta.py --lam 1 --min-change 0.3` (drop training pairs whose largest axis change is < 0.3 sd): direction 63.0%, size r 0.609 (bar 90 / 0.7) -> MISS. Plain model 63.5% / 0.635; lam1 63.9% / 0.626. So neither the difference loss nor filtering the noisy pairs helps; the gap is not a derivative-fit problem. At >= 0.5 sd (188 moves) direction is 73.9%, r 0.694, consistent with the C2.1 effect-size-gated reading.
+
+### Out-of-gamut advisory (reach.py score, on reach2)
+Fit: expected landing distance = a * (distance of target to nearest existing render) + b. Oscillator 1.12x + 0.40 (resid sd 1.07); Analog 1.16x + 0.27 (resid sd 1.40).
+Targets the fit advises "reachable within 2.5 sd" land within 2.5 sd: Oscillator 84% (vs 24% of the rest), Analog 86% (vs 6% of the rest). At 1.5 sd: Oscillator 80% vs 6%, Analog 67% vs 1%. So the pre-render advice separates reachable from unreachable targets; it can be quoted in the app before any render. (Fit and check use the same targets: in-sample; a held-out target split is still to do.)
