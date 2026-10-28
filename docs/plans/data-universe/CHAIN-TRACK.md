@@ -46,6 +46,6 @@ One small model per node type; the chain prediction is the composition. No chain
 
 ## Open before rendering
 
-1. Which effect nodes render headless with a fixed input (census of nodes with audio in/out).
+1. Which effect nodes render headless with a fixed input. `docs/node_param_audit.md` lists only 2 under AudioEffects (Field Effect, Plugin), so it is not a census; use `Infinite --describe <node> --json` per candidate name (as own_sweeps.describe does), never `--help` (it launches the app and hangs).
 2. Reference input sounds: pick ~50 from held-out source renders, spanning the axes.
 3. Cost: one render per chain, so pairs 2,400 + triples 4,000 + moves 600 ~ 7,000 renders, about the size of one engine's first batch.
