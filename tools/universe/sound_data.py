@@ -23,7 +23,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import marginal_gate as mg  # noqa: E402
 
 MEL_SHAPE = (64, 48)
-CACHE = 2  # bump when build() changes, so old caches rebuild
+COMPAT = ("C3", "C4", "C3f")  # schema 3 rows (own_sweeps.py) carry more windows; the readers below take these three
+CACHE = 3  # bump when build() changes, so old caches rebuild
 
 
 def banks(srcs):
@@ -77,7 +78,7 @@ def build(path):
     by, order, notes, ph = {}, [], [], None
     for line in open(path):
         r = json.loads(line)
-        if r.get("schema") != 2:
+        if r.get("schema") not in (2, 3) or (r["schema"] == 3 and r["note"] not in COMPAT):
             continue
         p = by.get(r["preset_id"])
         if p is None:
