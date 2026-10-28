@@ -49,3 +49,32 @@ One small model per node type; the chain prediction is the composition. No chain
 1. Which effect nodes render headless with a fixed input. `docs/node_param_audit.md` lists only 2 under AudioEffects (Field Effect, Plugin), so it is not a census; use `Infinite --describe <node> --json` per candidate name (as own_sweeps.describe does), never `--help` (it launches the app and hangs).
 2. Reference input sounds: pick ~50 from held-out source renders, spanning the axes.
 3. Cost: one render per chain, so pairs 2,400 + triples 4,000 + moves 600 ~ 7,000 renders, about the size of one engine's first batch.
+
+## Beyond a line: graphs (multiple sources, effects, interlinked chains)
+
+Real patches are graphs, so the model must be one too. Same idea, one more rule: a node with several inputs gets a combine step.
+
+```
+ serial      S ─► E ─► E                      f_E(knobs, x)
+ mix (fan-in)  S1 ─┐
+               S2 ─┴► Mixer ─► E              x = combine(x1, x2)   (sum of signals, not of axes)
+ split (fan-out) S ─► E1 ─┐
+                  └─► E2 ─┴► Mixer            same x feeds two nodes
+ modulation   LFO ──► knob of E               the cable moves a knob over time, not the signal
+ feedback     E ─► Delay ─► E                 needs state; last stage
+ interlinked  chain A ⇄ chain B               A's output modulates or feeds B
+```
+
+| Level | Adds | New data (about) | Held-out test |
+|---|---|---|---|
+| L1 serial (above) | composition | 7,000 | unseen node combinations |
+| L2 mix / split | combine rule for 2+ inputs | 5,000 | unseen source pairs |
+| L3 modulation | cable drives a knob | 3,000 | unseen modulator-target pairs |
+| L4 graphs | any wiring, 3-6 nodes | 6,000, chosen by model disagreement | unseen topologies (whole graph shapes) |
+| L5 feedback | state across time | later | only after L1-L4 pass |
+
+- Combine step is learned from rendered mixes: input = the axes of each source plus their level ratio and masking, output = axes of the mix. The mix model is its own node model (the Mixer), so it gets its own held-out score.
+- Modulation is a different kind of link: it changes the node's knob per time step, so the target's tuning curve (axis vs knob) is what gets composed.
+- Each level has a pass bar before the next level is rendered; the active-learning loop picks L4 graphs because random wiring would waste most renders.
+- Bypass rule (2+ input nodes never bypass) means lesion tests on mixers remove an input instead.
+- Brain parallel: this is the move from a single pathway to networks with convergence (fan-in), divergence (fan-out), neuromodulation (L3) and recurrence (L5).
