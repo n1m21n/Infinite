@@ -8,7 +8,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import own_sweeps as o, p3_characteristics as p3, sound_data as sd
 OUT = os.path.join(HERE, "../../docs/plans/data-universe/feel/dataset/_measured.json")
-ENGINES = ["Analog", "Oscillator", "FM", "Metallic", "String", "Wavetable"]
+ENGINES = ["Analog", "Oscillator", "FM", "Metallic", "String", "Wavetable", "Equation Synth", "Partials", "Sampler", "Slicer", "Grain Molder", "Field Synth"]
 
 
 def synth(node):

@@ -3291,6 +3291,911 @@
 ]
 }
 ]
+},
+"Equation Synth": {
+"n_swept": 17,
+"n_fixed": 14,
+"knobs": [
+{
+"knob": "preset",
+"pairs": 5,
+"activity": 0.0,
+"slope": {
+"loudness": 0.0,
+"brightness": 0.0,
+"sharpness": 0.0,
+"warmth": 0.0,
+"weight": 0.0,
+"fullness": 0.0,
+"noisiness": 0.0,
+"movement": 0.0,
+"attack": 0.0,
+"decay": 0.0,
+"density": 0.0
+},
+"range": [
+0.0,
+11.0
+]
+},
+{
+"knob": "domainMode",
+"pairs": 6,
+"activity": 1.3144324628471755,
+"slope": {
+"loudness": 0.096,
+"brightness": 1.575,
+"sharpness": 1.068,
+"warmth": -1.321,
+"weight": -2.621,
+"fullness": -0.144,
+"noisiness": 0.544,
+"movement": 2.144,
+"attack": 0.221,
+"decay": -1.074,
+"density": 3.65
+},
+"range": [
+0.0,
+2.0
+]
+},
+{
+"knob": "knobA",
+"pairs": 8,
+"activity": 0.13818271708710556,
+"slope": {
+"loudness": -0.059,
+"brightness": 0.085,
+"sharpness": -0.006,
+"warmth": -0.043,
+"weight": 0.06,
+"fullness": -0.181,
+"noisiness": 0.042,
+"movement": -0.119,
+"attack": 0.0,
+"decay": -0.401,
+"density": -0.525
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "knobB",
+"pairs": 14,
+"activity": 0.11832171029959825,
+"slope": {
+"loudness": -0.087,
+"brightness": 0.215,
+"sharpness": 0.074,
+"warmth": -0.109,
+"weight": -0.084,
+"fullness": 0.34,
+"noisiness": -0.054,
+"movement": 0.033,
+"attack": 0.155,
+"decay": 0.038,
+"density": -0.113
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "knobC",
+"pairs": 5,
+"activity": 0.33290874795823816,
+"slope": {
+"loudness": 0.107,
+"brightness": 0.305,
+"sharpness": 0.075,
+"warmth": -0.159,
+"weight": 0.048,
+"fullness": -0.147,
+"noisiness": -0.184,
+"movement": -1.683,
+"attack": 0.0,
+"decay": -0.07,
+"density": 0.884
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "knobD",
+"pairs": 15,
+"activity": 0.0,
+"slope": {
+"loudness": 0.0,
+"brightness": 0.0,
+"sharpness": 0.0,
+"warmth": 0.0,
+"weight": 0.0,
+"fullness": 0.0,
+"noisiness": 0.0,
+"movement": 0.0,
+"attack": 0.0,
+"decay": 0.0,
+"density": 0.0
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "fine",
+"pairs": 8,
+"activity": 0.13739023762496766,
+"slope": {
+"loudness": -0.026,
+"brightness": 0.063,
+"sharpness": 0.02,
+"warmth": -0.019,
+"weight": -0.036,
+"fullness": 0.011,
+"noisiness": 0.002,
+"movement": 0.549,
+"attack": 0.0,
+"decay": -0.724,
+"density": -0.06
+},
+"range": [
+-50.0,
+50.0
+]
+},
+{
+"knob": "unison",
+"pairs": 12,
+"activity": 0.20535882577284245,
+"slope": {
+"loudness": 0.031,
+"brightness": 0.034,
+"sharpness": 0.001,
+"warmth": 0.052,
+"weight": 0.117,
+"fullness": -0.594,
+"noisiness": 0.564,
+"movement": 0.544,
+"attack": 0.026,
+"decay": -0.09,
+"density": 0.205
+},
+"range": [
+1.0,
+8.0
+]
+},
+{
+"knob": "detune",
+"pairs": 11,
+"activity": 0.12079201121004123,
+"slope": {
+"loudness": 0.141,
+"brightness": 0.106,
+"sharpness": 0.035,
+"warmth": -0.055,
+"weight": 0.012,
+"fullness": -0.039,
+"noisiness": 0.286,
+"movement": -0.13,
+"attack": 0.399,
+"decay": -0.116,
+"density": -0.008
+},
+"range": [
+0.0,
+100.0
+]
+},
+{
+"knob": "ampAttack",
+"pairs": 6,
+"activity": 0.5550316674902273,
+"slope": {
+"loudness": 0.233,
+"brightness": 0.027,
+"sharpness": 0.114,
+"warmth": 0.058,
+"weight": -0.02,
+"fullness": 0.398,
+"noisiness": 0.012,
+"movement": 0.395,
+"attack": 2.785,
+"decay": -1.233,
+"density": 0.83
+},
+"range": [
+0.0,
+4000.0
+]
+},
+{
+"knob": "ampDecay",
+"pairs": 13,
+"activity": 0.1833301028708254,
+"slope": {
+"loudness": 0.168,
+"brightness": 0.004,
+"sharpness": 0.085,
+"warmth": 0.048,
+"weight": 0.045,
+"fullness": 0.09,
+"noisiness": 0.135,
+"movement": -0.107,
+"attack": -0.951,
+"decay": 0.254,
+"density": -0.129
+},
+"range": [
+0.0,
+4000.0
+]
+},
+{
+"knob": "ampSustain",
+"pairs": 15,
+"activity": 0.2097098225112206,
+"slope": {
+"loudness": 0.384,
+"brightness": 0.012,
+"sharpness": 0.213,
+"warmth": 0.028,
+"weight": 0.22,
+"fullness": 0.147,
+"noisiness": 0.643,
+"movement": -0.21,
+"attack": 0.124,
+"decay": 0.231,
+"density": -0.095
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "ampRelease",
+"pairs": 7,
+"activity": 0.3125233173439743,
+"slope": {
+"loudness": 1.116,
+"brightness": 0.02,
+"sharpness": -0.045,
+"warmth": -0.271,
+"weight": -0.044,
+"fullness": -0.174,
+"noisiness": -0.241,
+"movement": -0.042,
+"attack": 0.0,
+"decay": 1.318,
+"density": 0.168
+},
+"range": [
+0.0,
+4000.0
+]
+},
+{
+"knob": "filterType",
+"pairs": 6,
+"activity": 0.4805430833248566,
+"slope": {
+"loudness": 0.728,
+"brightness": 0.312,
+"sharpness": 0.034,
+"warmth": -0.162,
+"weight": -0.206,
+"fullness": 0.82,
+"noisiness": -0.011,
+"movement": -0.285,
+"attack": 0.217,
+"decay": 0.7,
+"density": -1.813
+},
+"range": [
+0.0,
+12.0
+]
+},
+{
+"knob": "cutoff",
+"pairs": 11,
+"activity": 0.5729928666944525,
+"slope": {
+"loudness": -0.515,
+"brightness": 0.45,
+"sharpness": 0.201,
+"warmth": -1.004,
+"weight": -0.566,
+"fullness": -0.665,
+"noisiness": 0.224,
+"movement": 1.124,
+"attack": -0.547,
+"decay": 0.609,
+"density": 0.398
+},
+"range": [
+20.0,
+20000.0
+]
+},
+{
+"knob": "resonance",
+"pairs": 1,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "drive",
+"pairs": 4,
+"activity": 0.3193706805343778,
+"slope": {
+"loudness": 0.317,
+"brightness": 0.001,
+"sharpness": 0.362,
+"warmth": 0.001,
+"weight": 0.895,
+"fullness": 0.111,
+"noisiness": 0.03,
+"movement": 0.27,
+"attack": 0.0,
+"decay": -1.15,
+"density": -0.375
+},
+"range": [
+0.0,
+1.0
+]
+}
+]
+},
+"Partials": {
+"n_swept": 8,
+"n_fixed": 3,
+"knobs": [
+{
+"knob": "pitch",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "formant",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "partials",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "morph",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "speed",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "noise",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "release",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "loop",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+}
+]
+},
+"Sampler": {
+"n_swept": 9,
+"n_fixed": 6,
+"knobs": [
+{
+"knob": "pitch",
+"pairs": 27,
+"activity": 0.7253754355999841,
+"slope": {
+"loudness": 0.249,
+"brightness": 2.296,
+"sharpness": 1.915,
+"warmth": -0.287,
+"weight": -0.923,
+"fullness": 1.359,
+"noisiness": 0.132,
+"movement": -0.283,
+"attack": -0.338,
+"decay": 0.179,
+"density": -0.018
+},
+"range": [
+-24.0,
+24.0
+]
+},
+{
+"knob": "finetune",
+"pairs": 22,
+"activity": 0.09863873261288053,
+"slope": {
+"loudness": -0.001,
+"brightness": 0.036,
+"sharpness": 0.026,
+"warmth": 0.027,
+"weight": -0.017,
+"fullness": 0.043,
+"noisiness": -0.055,
+"movement": 0.11,
+"attack": 0.388,
+"decay": -0.121,
+"density": 0.26
+},
+"range": [
+-50.0,
+50.0
+]
+},
+{
+"knob": "speed",
+"pairs": 21,
+"activity": 0.32239714668402636,
+"slope": {
+"loudness": 0.126,
+"brightness": -0.467,
+"sharpness": -0.766,
+"warmth": 0.845,
+"weight": 0.48,
+"fullness": -0.196,
+"noisiness": 0.073,
+"movement": -0.088,
+"attack": 0.016,
+"decay": 0.219,
+"density": -0.272
+},
+"range": [
+-2.0,
+2.0
+]
+},
+{
+"knob": "start",
+"pairs": 14,
+"activity": 0.48814757860340574,
+"slope": {
+"loudness": -0.147,
+"brightness": 0.574,
+"sharpness": 1.236,
+"warmth": 0.281,
+"weight": -0.251,
+"fullness": 0.189,
+"noisiness": 1.078,
+"movement": 0.544,
+"attack": -0.925,
+"decay": 0.116,
+"density": 0.029
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "end",
+"pairs": 21,
+"activity": 0.6295106071863995,
+"slope": {
+"loudness": 0.214,
+"brightness": -0.729,
+"sharpness": -1.199,
+"warmth": 0.119,
+"weight": -1.154,
+"fullness": 0.723,
+"noisiness": -0.526,
+"movement": 0.187,
+"attack": 0.784,
+"decay": -0.155,
+"density": 1.134
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "position",
+"pairs": 14,
+"activity": 0.0316584501989607,
+"slope": {
+"loudness": 0.002,
+"brightness": -0.0,
+"sharpness": 0.0,
+"warmth": 0.0,
+"weight": 0.0,
+"fullness": 0.0,
+"noisiness": 0.0,
+"movement": -0.013,
+"attack": 0.158,
+"decay": -0.012,
+"density": -0.162
+},
+"range": [
+0.0,
+1.0
+]
+},
+{
+"knob": "decay",
+"pairs": 14,
+"activity": 0.6657621964604368,
+"slope": {
+"loudness": 2.192,
+"brightness": -0.005,
+"sharpness": 0.175,
+"warmth": 0.21,
+"weight": -0.0,
+"fullness": -0.019,
+"noisiness": 0.034,
+"movement": -1.978,
+"attack": 0.318,
+"decay": 2.357,
+"density": 0.036
+},
+"range": [
+0.0500000007,
+10.0
+]
+},
+{
+"knob": "fadeIn",
+"pairs": 13,
+"activity": 0.11179318243942134,
+"slope": {
+"loudness": 0.064,
+"brightness": -0.016,
+"sharpness": 0.085,
+"warmth": -0.07,
+"weight": 0.016,
+"fullness": -0.093,
+"noisiness": -0.041,
+"movement": -0.0,
+"attack": 0.355,
+"decay": -0.176,
+"density": 0.313
+},
+"range": [
+0.0,
+250.0
+]
+},
+{
+"knob": "fadeOut",
+"pairs": 16,
+"activity": 0.19017256738290217,
+"slope": {
+"loudness": -0.086,
+"brightness": 0.021,
+"sharpness": -0.442,
+"warmth": 0.024,
+"weight": 0.146,
+"fullness": -0.005,
+"noisiness": -0.197,
+"movement": 0.154,
+"attack": 0.0,
+"decay": -0.083,
+"density": 0.933
+},
+"range": [
+0.0,
+250.0
+]
+}
+]
+},
+"Slicer": {
+"n_swept": 10,
+"n_fixed": 3,
+"knobs": [
+{
+"knob": "sliceBy",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "onsets",
+"pairs": 4,
+"activity": 0.0,
+"slope": {
+"loudness": 0.0,
+"brightness": 0.0,
+"sharpness": 0.0,
+"warmth": 0.0,
+"weight": 0.0,
+"fullness": 0.0,
+"noisiness": 0.0,
+"movement": 0.0,
+"attack": 0.0,
+"decay": 0.0,
+"density": 0.0
+},
+"range": [
+1.0,
+64.0
+]
+},
+{
+"knob": "division",
+"pairs": 2,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "sensitivity",
+"pairs": 2,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "pitch",
+"pairs": 7,
+"activity": 0.5067545661320219,
+"slope": {
+"loudness": 0.102,
+"brightness": 1.573,
+"sharpness": 0.914,
+"warmth": -0.667,
+"weight": -0.843,
+"fullness": 0.578,
+"noisiness": 0.0,
+"movement": 0.252,
+"attack": -0.567,
+"decay": -0.078,
+"density": 0.0
+},
+"range": [
+-24.0,
+24.0
+]
+},
+{
+"knob": "finetune",
+"pairs": 1,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "attack",
+"pairs": 4,
+"activity": 0.5320033040966519,
+"slope": {
+"loudness": -2.015,
+"brightness": 0.298,
+"sharpness": 0.217,
+"warmth": 2.017,
+"weight": -0.048,
+"fullness": 1.104,
+"noisiness": 0.0,
+"movement": -0.153,
+"attack": 0.0,
+"decay": 0.0,
+"density": 0.0
+},
+"range": [
+0.0,
+500.0
+]
+},
+{
+"knob": "decay",
+"pairs": 2,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "speed",
+"pairs": 4,
+"activity": 0.6899728342567228,
+"slope": {
+"loudness": -0.015,
+"brightness": 1.241,
+"sharpness": 4.076,
+"warmth": -2.231,
+"weight": 0.0,
+"fullness": -0.026,
+"noisiness": 0.0,
+"movement": 0.0,
+"attack": 0.0,
+"decay": 0.0,
+"density": 0.0
+},
+"range": [
+0.25,
+4.0
+]
+},
+{
+"knob": "crossthrough",
+"pairs": 2,
+"activity": null,
+"slope": null,
+"range": null
+}
+]
+},
+"Grain Molder": {
+"n_swept": 10,
+"n_fixed": 5,
+"knobs": [
+{
+"knob": "grain",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "amount",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "key",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "descending",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "level",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "pitch",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "decay",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "start",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "end",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "position",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+}
+]
+},
+"Field Synth": {
+"n_swept": 8,
+"n_fixed": 5,
+"knobs": [
+{
+"knob": "maxVoices",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "exposeRmsOutput",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.detune",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.cutoff",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.res",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.sub",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.warmth",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+},
+{
+"knob": "p.attack",
+"pairs": 0,
+"activity": null,
+"slope": null,
+"range": null
+}
+]
 }
 },
 "effects": {

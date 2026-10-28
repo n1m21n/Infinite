@@ -5803,35 +5803,35 @@ Wave Terrain,Synths,filterRelease,float,,,no,no,decay +1.0,0.075,-0.1,-0.075,"Ne
 Wave Terrain,Synths,drive,float,0,1,yes,no,roughness +1.0; noisiness +0.6; brightness +0.4; loudness +0.4,-0.185,0.205,0.33,"Robotic, Serious, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,velCurve,int,,,no,no,loudness +0.6; attack -0.3,0.0,0.045,0.008,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,formula,text,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,preset,int,0,11,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,domainMode,int,0,2,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,knobA,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,knobB,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,knobC,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,knobD,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
+Equation Synth,Synths,preset,int,0,11,yes,yes,loudness +0.00; brightness +0.00; sharpness +0.00; warmth +0.00; weight +0.00; fullness +0.00,0.0,0.0,0.0,,sound model (recipe),0.0,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,domainMode,int,0,2,yes,yes,density +3.65; weight -2.62; movement +2.14; brightness +1.57; warmth -1.32; decay -1.07,-0.375,1.0,1.0,"Chaotic, Frantic, Fierce",sound model (recipe),1.314,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,knobA,float,0,1,yes,yes,density -0.53; decay -0.40; fullness -0.18; movement -0.12; brightness +0.09; weight +0.06,-0.101,-0.097,0.001,"Neutral, Emotional, Thin",sound model (recipe),0.138,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,knobB,float,0,1,yes,yes,fullness +0.34; brightness +0.21; attack +0.15; density -0.11; warmth -0.11; loudness -0.09,0.072,0.078,0.028,"Neutral, Synthetic, Emotional",sound model (recipe),0.118,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,knobC,float,0,1,yes,yes,movement -1.68; density +0.88; brightness +0.30; noisiness -0.18; warmth -0.16; fullness -0.15,-0.075,0.047,0.022,"Neutral, Synthetic, Emotional",sound model (recipe),0.333,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,knobD,float,0,1,yes,yes,loudness +0.00; brightness +0.00; sharpness +0.00; warmth +0.00; weight +0.00; fullness +0.00,0.0,0.0,0.0,,sound model (recipe),0.0,"M (one-knob pairs, own sweep)"
 Equation Synth,Synths,volume,float,0,2,yes,no,loudness +1.0,0.0,0.15,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,pan,float,-1,1,yes,no,width +1.0,0.075,0.0,-0.05,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,frequency,float,,,no,no,brightness +1.0; sharpness +0.5; warmth -0.5,-0.025,0.2,0.175,"Synthetic, Robotic, Cinematic",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,octave,int,,,no,no,pitch +1.0,0.075,0.05,0.05,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,semi,int,,,no,no,pitch +1.0,0.075,0.05,0.05,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,fine,float,-50,50,yes,no,fullness +0.8; width +0.4; roughness +0.2,0.06,0.05,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
+Equation Synth,Synths,fine,float,-50,50,yes,yes,decay -0.72; movement +0.55; brightness +0.06; density -0.06; weight -0.04; loudness -0.03,-0.075,0.246,0.168,"Synthetic, Robotic, Serious",sound model (recipe),0.137,"M (one-knob pairs, own sweep)"
 Equation Synth,Synths,glide,float,0,1,yes,no,contour +0.5,0.025,0.025,0.013,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,unison,int,1,8,yes,no,fullness +0.8; width +0.4; roughness +0.2,0.06,0.05,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,detune,float,0,100,yes,no,fullness +0.8; width +0.4; roughness +0.2,0.06,0.05,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
+Equation Synth,Synths,unison,int,1,8,yes,yes,fullness -0.59; noisiness +0.56; movement +0.54; density +0.20; weight +0.12; decay -0.09,-0.2,0.252,0.298,"Robotic, Serious, Synthetic",sound model (recipe),0.205,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,detune,float,0,100,yes,yes,attack +0.40; noisiness +0.29; loudness +0.14; movement -0.13; decay -0.12; brightness +0.11,-0.104,0.237,0.197,"Robotic, Synthetic, Serious",sound model (recipe),0.121,"M (one-knob pairs, own sweep)"
 Equation Synth,Synths,stereoWidth,float,,,no,no,width +1.0,0.075,0.0,-0.05,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,ampAttack,float,0,4000,yes,no,loudness +1.0; attack -1.0,0.0,0.0,-0.025,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,ampDecay,float,0,4000,yes,no,loudness +1.0; decay +1.0,0.075,0.05,-0.025,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,ampSustain,float,0,1,yes,no,loudness +1.0; decay +1.0,0.075,0.05,-0.025,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,ampRelease,float,0,4000,yes,no,loudness +1.0; decay +1.0,0.075,0.05,-0.025,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,filterType,int,0,12,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Equation Synth,Synths,cutoff,float,20,20000,yes,no,brightness +1.0; sharpness +0.5; warmth -0.5,-0.025,0.2,0.175,"Synthetic, Robotic, Cinematic",sound model (recipe),,R (keyword rule; unmeasured)
+Equation Synth,Synths,ampAttack,float,0,4000,yes,yes,attack +2.79; decay -1.23; density +0.83; fullness +0.40; movement +0.40; loudness +0.23,-0.108,1.0,0.799,"Frantic, Intense, Urgent",sound model (recipe),0.555,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,ampDecay,float,0,4000,yes,yes,attack -0.95; decay +0.25; loudness +0.17; noisiness +0.14; density -0.13; movement -0.11,0.008,-0.297,-0.142,"Lofi, Bittersweet, Nostalgic",sound model (recipe),0.183,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,ampSustain,float,0,1,yes,yes,noisiness +0.64; loudness +0.38; decay +0.23; weight +0.22; sharpness +0.21; movement -0.21,-0.157,0.223,0.232,"Robotic, Serious, Synthetic",sound model (recipe),0.21,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,ampRelease,float,0,4000,yes,yes,decay +1.32; loudness +1.12; warmth -0.27; noisiness -0.24; fullness -0.17; density +0.17,0.164,0.076,-0.086,"Neutral, Trance, Stately",sound model (recipe),0.313,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,filterType,int,0,12,yes,yes,density -1.81; fullness +0.82; loudness +0.73; decay +0.70; brightness +0.31; movement -0.28,0.234,-0.307,-0.271,"Touching, Sentimental, Lofi",sound model (recipe),0.481,"M (one-knob pairs, own sweep)"
+Equation Synth,Synths,cutoff,float,20,20000,yes,yes,movement +1.12; warmth -1.00; fullness -0.67; decay +0.61; weight -0.57; attack -0.55,-0.231,0.039,0.354,"Serious, Strange, Robotic",sound model (recipe),0.573,"M (one-knob pairs, own sweep)"
 Equation Synth,Synths,resonance,float,0,1,yes,no,sharpness +0.8; roughness +0.4; tension +0.4,-0.2,0.12,0.32,"Serious, Robotic, Strange",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,filterAmount,float,,,no,no,movement +0.3,0.007,0.03,0.015,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,filterAttack,float,,,no,no,attack -1.0,0.0,-0.15,-0.075,"Neutral, Lofi, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,filterDecay,float,,,no,no,decay +1.0,0.075,-0.1,-0.075,"Neutral, Emotional, Lofi",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,filterSustain,float,,,no,no,decay +1.0,0.075,-0.1,-0.075,"Neutral, Emotional, Lofi",sound model (recipe),,R (keyword rule; unmeasured)
 Equation Synth,Synths,filterRelease,float,,,no,no,decay +1.0,0.075,-0.1,-0.075,"Neutral, Emotional, Lofi",sound model (recipe),,R (keyword rule; unmeasured)
-Equation Synth,Synths,drive,float,0,1,yes,no,roughness +1.0; noisiness +0.6; brightness +0.4; loudness +0.4,-0.185,0.205,0.33,"Robotic, Serious, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
+Equation Synth,Synths,drive,float,0,1,yes,yes,decay -1.15; weight +0.90; density -0.38; sharpness +0.36; loudness +0.32; movement +0.27,-0.267,0.489,0.287,"Robotic, Dirty, Glitchy",sound model (recipe),0.319,"M (one-knob pairs, own sweep)"
 Spectral Synth,Synths,scanMode,int,0,5,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Spectral Synth,Synths,rate,int,0,18,yes,no,movement +1.0,0.025,0.1,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Spectral Synth,Synths,scanSpeed,float,0.0500000007,10,yes,no,movement +1.0,0.025,0.1,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
@@ -5881,30 +5881,30 @@ Metallic,Synths,drive,float,0,1,yes,yes,loudness +0.49; noisiness +0.41; decay +
 Metallic,Synths,width,float,0,1,yes,yes,noisiness -0.04; brightness -0.03; sharpness -0.02; fullness -0.02; weight +0.02; loudness -0.02,0.004,-0.02,-0.02,"Neutral, Emotional, Synthetic",sound model (recipe),0.013,"M (one-knob pairs, own sweep)"
 Metallic,Synths,volume,float,0,2,yes,no,loudness +1.0,0.0,0.15,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Sampler,Synths,path,text,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Sampler,Synths,pitch,float,-24,24,yes,no,pitch +1.0,0.075,0.05,0.05,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
-Sampler,Synths,finetune,float,-50,50,yes,no,fullness +0.8; width +0.4; roughness +0.2,0.06,0.05,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Sampler,Synths,speed,float,-2,2,yes,no,movement +1.0,0.025,0.1,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
-Sampler,Synths,start,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Sampler,Synths,end,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Sampler,Synths,position,float,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Sampler,Synths,decay,float,0.0500000007,10,yes,no,decay +1.0,0.075,-0.1,-0.075,"Neutral, Emotional, Lofi",sound model (recipe),,R (keyword rule; unmeasured)
+Sampler,Synths,pitch,float,-24,24,yes,yes,brightness +2.30; sharpness +1.92; fullness +1.36; weight -0.92; attack -0.34; warmth -0.29,0.22,0.878,0.75,"Wild, Frantic, Driving",sound model (recipe),0.725,"M (one-knob pairs, own sweep)"
+Sampler,Synths,finetune,float,-50,50,yes,yes,attack +0.39; density +0.26; decay -0.12; movement +0.11; noisiness -0.06; fullness +0.04,0.018,0.245,0.114,"Synthetic, Moving, Cinematic",sound model (recipe),0.099,"M (one-knob pairs, own sweep)"
+Sampler,Synths,speed,float,-2,2,yes,yes,warmth +0.84; sharpness -0.77; weight +0.48; brightness -0.47; density -0.27; decay +0.22,0.27,-0.392,-0.481,"Mellow, Intimate, Smooth",sound model (recipe),0.322,"M (one-knob pairs, own sweep)"
+Sampler,Synths,start,float,0,1,yes,yes,sharpness +1.24; noisiness +1.08; attack -0.93; brightness +0.57; movement +0.54; warmth +0.28,-0.232,0.278,0.574,"Glitchy, Nervous, Robotic",sound model (recipe),0.488,"M (one-knob pairs, own sweep)"
+Sampler,Synths,end,float,0,1,yes,yes,sharpness -1.20; weight -1.15; density +1.13; attack +0.78; brightness -0.73; fullness +0.72,0.413,0.094,-0.299,"Clean, Light, Sensual",sound model (recipe),0.63,"M (one-knob pairs, own sweep)"
+Sampler,Synths,position,float,0,1,yes,yes,density -0.16; attack +0.16; movement -0.01; decay -0.01; loudness +0.00; brightness -0.00,-0.002,-0.001,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),0.032,"M (one-knob pairs, own sweep)"
+Sampler,Synths,decay,float,0.0500000007,10,yes,yes,decay +2.36; loudness +2.19; movement -1.98; attack +0.32; warmth +0.21; sharpness +0.17,0.27,-0.087,-0.258,"Sensual, Clean, Stately",sound model (recipe),0.666,"M (one-knob pairs, own sweep)"
 Sampler,Synths,volume,float,0,1,yes,no,loudness +1.0,0.0,0.15,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
-Sampler,Synths,fadeIn,float,0,250,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Sampler,Synths,fadeOut,float,0,250,yes,no,loudness +1.0,0.0,0.15,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
+Sampler,Synths,fadeIn,float,0,250,yes,yes,attack +0.35; density +0.31; decay -0.18; fullness -0.09; sharpness +0.09; warmth -0.07,-0.072,0.262,0.163,"Synthetic, Robotic, Cinematic",sound model (recipe),0.112,"M (one-knob pairs, own sweep)"
+Sampler,Synths,fadeOut,float,0,250,yes,yes,density +0.93; sharpness -0.44; noisiness -0.20; movement +0.15; weight +0.15; loudness -0.09,0.136,0.208,-0.035,"Trance, Moving, Synthetic",sound model (recipe),0.19,"M (one-knob pairs, own sweep)"
 Sampler,Synths,loop,bool,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Sampler,Synths,rateFix,int,,,no,no,movement +1.0,0.025,0.1,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Sampler,Synths,reverse,bool,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Sampler,Synths,pingpong,bool,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Slicer,Synths,path,text,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Slicer,Synths,sliceBy,int,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Slicer,Synths,onsets,int,1,64,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
+Slicer,Synths,onsets,int,1,64,yes,yes,loudness +0.00; brightness +0.00; sharpness +0.00; warmth +0.00; weight +0.00; fullness +0.00,0.0,0.0,0.0,,sound model (recipe),0.0,"M (one-knob pairs, own sweep)"
 Slicer,Synths,division,int,0,5,yes,no,density +1.0,0.0,0.15,0.075,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Slicer,Synths,sensitivity,float,0,100,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
-Slicer,Synths,pitch,float,-24,24,yes,no,pitch +1.0,0.075,0.05,0.05,"Neutral, Synthetic, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
+Slicer,Synths,pitch,float,-24,24,yes,yes,brightness +1.57; sharpness +0.91; weight -0.84; warmth -0.67; fullness +0.58; attack -0.57,0.061,0.501,0.498,"Dramatic, Pulsing, Cinematic",sound model (recipe),0.507,"M (one-knob pairs, own sweep)"
 Slicer,Synths,finetune,float,-100,100,yes,no,fullness +0.8; width +0.4; roughness +0.2,0.06,0.05,0.0,"Neutral, Emotional, Synthetic",sound model (recipe),,R (keyword rule; unmeasured)
-Slicer,Synths,attack,float,0,500,yes,no,attack -1.0,0.0,-0.15,-0.075,"Neutral, Lofi, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
+Slicer,Synths,attack,float,0,500,yes,yes,warmth +2.02; loudness -2.02; fullness +1.10; brightness +0.30; sharpness +0.22; movement -0.15,0.782,-0.616,-0.581,"Comforting, Cozy, Peaceful",sound model (recipe),0.532,"M (one-knob pairs, own sweep)"
 Slicer,Synths,decay,float,5,5000,yes,no,decay +1.0,0.075,-0.1,-0.075,"Neutral, Emotional, Lofi",sound model (recipe),,R (keyword rule; unmeasured)
-Slicer,Synths,speed,float,0.25,4,yes,no,movement +1.0,0.025,0.1,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
+Slicer,Synths,speed,float,0.25,4,yes,yes,sharpness +4.08; warmth -2.23; brightness +1.24; fullness -0.03; loudness -0.01; weight +0.00,-1.0,1.0,1.0,"Angry, Brutal, Aggressive",sound model (recipe),0.69,"M (one-knob pairs, own sweep)"
 Slicer,Synths,volume,float,0,1,yes,no,loudness +1.0,0.0,0.15,0.05,"Synthetic, Neutral, Emotional",sound model (recipe),,R (keyword rule; unmeasured)
 Slicer,Synths,crossthrough,bool,0,1,yes,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
 Slicer,Synths,slices,text,,,no,no,no rule match,0.0,0.0,0.0,,sound model (recipe),,none
