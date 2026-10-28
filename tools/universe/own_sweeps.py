@@ -28,6 +28,8 @@ import audio_features as af  # noqa: E402
 SR, LEAD, WIN, HOLD = rp.SR, rp.LEAD, rp.WIN, rp.HOLD
 # midi:velocity:label. The first three are rp.NOTES (the compat windows); the rest widen the pitch and velocity range (G1).
 STIM = [(48, 100, "C3"), (60, 100, "C4"), (48, 127, "C3f"), (24, 100, "C1"), (72, 100, "C5"), (84, 100, "C6"), (48, 30, "C3pp"), (48, 64, "C3mf")]
+if os.environ.get("INF_STIM"):  # quick rounds: only these windows (`run --notes C3`); the rest are not read by sound_data / p3
+    STIM = [t for t in STIM if t[2] in os.environ["INF_STIM"].split(",")]
 COMPAT = 3
 SCHEMA = 3
 OUT_DIR = os.path.expanduser("~/Infinite/training-data/audio")
@@ -471,8 +473,11 @@ def main():
     ap.add_argument("--bank-size", type=int, default=20)
     ap.add_argument("--budget", type=float, default=0, help="minutes; 0 = none")
     ap.add_argument("--n", type=int, default=20)
+    ap.add_argument("--notes", default="", help="comma list of windows to render (e.g. C3); default all 8. Same audio for the windows kept")
     ap.add_argument("--queue", default="", help="a propose.py queue file: render exactly these points (Step 4)")
     a = ap.parse_args()
+    if a.notes:
+        os.environ["INF_STIM"] = a.notes; STIM[:] = [t for t in STIM if t[2] in a.notes.split(",")]
     sys.exit({"run": cmd_run, "check": cmd_check, "repeat": cmd_repeat, "show": cmd_show}[a.cmd](a) or 0)
 
 
