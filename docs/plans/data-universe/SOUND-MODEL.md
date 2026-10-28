@@ -149,6 +149,16 @@ them before M1 starts, so M1 trains on the final format and nothing is rendered 
 
 Then re-render Diva in row v2 (about 3,900 presets, 3 h on the Pro) and start M1. The Diva rows made so far stay as the record.
 
+**Block 0 state (2026-10-28):** 0.1-0.6 built and committed; checked end to end on 12 Diva presets (knobs follow the preset: 53-171 of
+282 differ from default; 2,080 host MIDI-CC proxy slots dropped; 5.7 KB per row). Diva v2 re-render running in 3 shards
+(`scratch_omni/diva_v2.sh` -> `audio/preset_diva_v2.jsonl`), starting with the 0.7 repeat pass (`audio/noise_diva_b.jsonl`, 51 presets).
+Not yet on the Air: Omnisphere there still writes v1 rows until the Air gets this build and these tools.
+
+```
+ render_state (one per preset) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
+   host knobs + mel + desc          per plug-in      groups, split        seconds        95% intervals, noise ceiling)
+```
+
 ## 6. Parked until a milestone needs it
 
 Each item returns only when a milestone's bar cannot be reached without it. Nothing here is deleted.
