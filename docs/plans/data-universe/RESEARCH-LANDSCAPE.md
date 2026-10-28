@@ -106,3 +106,14 @@ Model activity (redraw one knob on 200 rendered bases, mean scaled change of pre
 | pw1 | movement | down | 0.09 (nearly inert) |
 
 Each strongest axis is the one the knob is named for (cutoff -> brightness, noise -> noisiness, release -> decay). That is the C2 'understands each part' check in a form a user can read, and it needs no new render. Still to do: score the direction on the frozen C2 moves (claims.py score).
+
+## Research pass for the two open weaknesses (2026-10-28)
+
+| Problem in Infinite | Idea from the literature | How it maps | Status |
+|---|---|---|---|
+| C2 direction/size weak: forward model fits values, not differences | Derivative-informed / gradient-matching surrogates (DINO; ocean-model Jacobian surrogates; Hoang et al. ICML 2024): add a loss on derivatives so the surrogate is right about how outputs MOVE | Our data is base + 1-3 knob variants, so pairs differing in <=3 knobs give finite-difference targets for free: loss on f(a)-f(b) | built: `c2_delta.py` (lam sweep next) |
+| reach: predicted 3.65 but measured 4.20 (optimiser exploits model error) | Lower-confidence-bound acquisition (mean + beta * ensemble spread); optimizer's-curse correction | rank candidates by predicted distance + beta * seed disagreement, not predicted distance alone | next: add `--beta` to reach.py |
+| reach: model alone does not reach samples | Sound matching with inference-time refinement (Inversynth II: self-supervised fine-tune at inference); loops that render, compare, adjust | render the top few per target, retrain, repeat: our Step 4 loop with the target as the objective | next: reach rounds with real renders |
+| Generalising beyond rendered synth sounds | Parameter-loss models fit only the target synth; spectral-loss models can use out-of-domain audio but struggle with frequency-type knobs | the sample library is out-of-domain; so keep the reach claim modest | stays a stated limit |
+
+Sources: KAIST parameter-estimation overview (mac.kaist.ac.kr/synth_parameter_estimation), arXiv 2510.06204 (AST sound matching), arXiv 2503.01883 (gradient-matching surrogates), arXiv 2311.08421 (Jacobian surrogates).
