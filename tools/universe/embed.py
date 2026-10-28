@@ -28,8 +28,8 @@ def resample(x, a, b):
 def embed(M, mono48):
     torch, cm, cp, em = M; x = np.asarray(mono48, np.float32)
     with torch.no_grad():
-        ci = cp(audios=[x], sampling_rate=48000, return_tensors="pt")
-        c = cm.get_audio_features(**ci)[0].numpy()
+        ci = cp(audio=[x], sampling_rate=48000, return_tensors="pt")
+        o = cm.get_audio_features(**ci); c = (o.pooler_output if hasattr(o, 'pooler_output') else o)[0].numpy()
         x24 = resample(x, 48000, 24000).astype(np.float32)
         z = em.encoder(torch.from_numpy(x24)[None, None])[0].numpy()          # 128 x frames
     return np.concatenate([c / (np.linalg.norm(c) + 1e-9), z.mean(1), z.std(1)]).astype(np.float32)
@@ -50,6 +50,8 @@ def cmd_samples(a):
             if st is None: continue
             E.append(embed(M, st.mean(0))); ids.append(s)
         except Exception as e:
+            fails = globals().setdefault("_fails", [0]); fails[0] += 1
+            if fails[0] <= 3: print("skip", s, type(e).__name__, str(e)[:100], flush=True)
             continue
         if a.limit and len(ids) >= a.limit: break
         if len(ids) % 500 == 0: print(len(ids), "%.0f s" % (time.time() - t0), flush=True)
