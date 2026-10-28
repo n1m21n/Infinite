@@ -396,3 +396,14 @@ Same base data plus the same number of extra renders, either the model-chosen po
 | random | 10 / 11 | 0.763 | 0.516 | -0.115 |
 Random beat chosen on every column. The active-learning pick did not help on this engine; do not claim the chosen-points gain (Step 4 rounds). Remaining to check from the render files: failed/silent rate and extreme-knob share of the chosen set (a pick that crowds the edges can hurt held-out folders). Single run, one seed per arm: treat the 0.03 head gap as a direction, not a size.
 Control follow-up: each arm is ~2,000 distinct settings (about 8 note rows each). Extreme-knob share (inside 5% of the range edge): chosen 0.257, random 0.241. Silent renders (peak < 1e-3): chosen 0.1%, random 0.2%. So the chosen set is not crowding the edges or producing silence; the arms differ only in where the points sit, and random was at least as good.
+
+## reach3 Analog (refine + LCB, 2026-10-28)
+300 targets, same bar as reach2 (P5: closer than the nearest existing render). Median distance in sd units: nearest existing render **3.02**, predicted **3.27**, measured **3.96**; closer than nearest **9.3%** (reach2: 3.43 / 4.20). **MISS.**
+| targets | start dist | measured | closer than nearest |
+|---|---|---|---|
+| near (n=100) | 1.88 | 2.49 | 6.0% |
+| middle | 3.02 | 3.83 | 10.0% |
+| far | 5.75 | 7.09 | 12.0% |
+Start distance vs measured distance r 0.85. The model-guided pick lands about 0.9 sd farther than simply taking the nearest render in 90.7% of targets: the predicted gain is not real (optimizer's curse again, now with LCB and model-only refine). Seed-spread calibration line did not print (no stored `pred_spread` in this plan file); the plan ran on the pre-spread code path, so that check is still open.
+Out-of-gamut advisory fit again: expected landing = 1.22 x gamut distance + 0.36 (resid sd 1.67). Advised within 2.5 sd: 12% of targets, 76% of those land within 2.5 sd vs 9% of the rest (held-out half: 89% vs 13%). Advisory works; steering does not.
+Reading for the claims: do not claim "reach beats retrieval" on Analog. What is supported: knowing before rendering which targets are reachable.
