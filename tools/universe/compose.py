@@ -71,8 +71,15 @@ def stretch(ev, tempo, base=0.5):
     return [(t * k, p, v, l * k) for t, p, v, l in ev]
 
 
+MOOD = None   # (V, E), each +1 / -1: valence (major / minor source) and energy (tempo, density, brightness, velocity); None = unasked
+
+
 def build_parts(rng, secs):
     files = sorted(glob.glob(MIDI_GLOB, recursive=True)); tempo = rng.choice([70, 84, 96, 110])
+    if MOOD:
+        V, E = MOOD; want = "Major" if V > 0 else "Minor"
+        files = [f for f in files if "/%s/" % want in f] or files
+        tempo = rng.choice([118, 128, 138]) if E > 0 else rng.choice([58, 66, 74])
     for _ in range(50):
         try: roles = midi_parts(rng.choice(files), secs * 2, rng); break
         except Exception as e: err = e; continue
@@ -84,8 +91,10 @@ def build_parts(rng, secs):
         rec = ow.recipe(node, sw, fixed, [rng.random() for _ in sw])
         for k, v in ROLE[role].items():
             if k in rec: rec[k] = v
+        if MOOD and "cutoff" in rec: rec["cutoff"] = rec["cutoff"] * (1.6 if MOOD[1] > 0 else 0.55)
         oct_ = {"bass": -12, "pad": 0, "lead": 0}[role]
         ev = [(t, p + shift + oct_, v, l) for t, p, v, l in stretch(roles[role], tempo) if t < secs]
+        if MOOD: ev = [(t, p, min(1.0, v * (1.1 if MOOD[1] > 0 else 0.7)), l) for t, p, v, l in ev]
         g, pn, s = MIX[role]
         parts.append(Part(role, node, rec, ev, g, pn + rng.uniform(-0.1, 0.1), s))
     return parts, tempo, shift, roles["mood"]
