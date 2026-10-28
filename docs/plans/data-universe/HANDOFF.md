@@ -60,6 +60,9 @@ The model chooses the engine and its knobs for a target point: the most synth-li
 else the next one; a hybrid patch (a sampled attack from the library on a String or Analog body) covers the gap, as Omnisphere does
 with sample layers on a synth engine. Labels for "piano", "guitar" come from sample and preset names and folders (D4). Order:
 Analog sweeps, then String sweeps (target: the library's acoustic points), then hybrids.
+Owner 2026-10-28: a piano model, a wind model and a better String model are wanted for this (design shown before building). No
+preloaded sample libraries: an instrument ships as a compact learned parameter set (partial frequencies, levels and decays at a few
+keys and velocities, plus a noise envelope; kilobytes, not gigabytes), measured from the library and played by Infinite's engines.
 
 **Status 2026-10-28:** P1 approved by the owner (`CHARACTERISTICS.md`, 18 axes + space added). P2 done: every
 held source measured, coverage and cross-form agreement in `CHARACTERISTICS.md`; brightness / sharpness agree 0.96 / 0.92 between mel
