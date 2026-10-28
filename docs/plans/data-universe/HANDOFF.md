@@ -70,3 +70,6 @@ Data rule for every phase: collect only what a learning curve or an error says i
    space; emotion is a rule-based map on top of it, never a learned label.
 4. Timbre and notes: **one shared space**. A sound's timbre and a phrase's pitches, chords and changes over time are one vector,
    so a pad and a chord progression can be compared and matched. The note-model track (MIDI, B1-B10) and the sound track join.
+5. Built when: it understands the characteristics of a sound (brightness, dullness, darkness, ...), with a defined set of
+   characteristics for this purpose. Not the other offered tests (reach a target, predict held-out, cross-synth, clusters) as the
+   definition; those stay as the checks of each phase.
