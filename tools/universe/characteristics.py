@@ -19,6 +19,10 @@ np.seterr(divide="ignore", invalid="ignore")  # silent frames give NaN by design
 
 AXES = ["loudness", "brightness", "sharpness", "warmth", "weight", "fullness", "noisiness", "roughness", "attack", "decay",
         "movement", "width", "pitch", "spread", "tension", "harmonic_rhythm", "density", "contour"]
+# G2 columns (detail.py): one number per note window; the three planned axes 20-22 plus the finer sound data
+DETAIL = ["space", "f1", "f2", "glide", "inharmonicity", "oddeven", "partial_roughness", "partial_decay", "vibrato_rate", "vibrato_depth",
+          "tremolo_rate", "tremolo_depth", "tuning", "noise_share", "f0"]
+AXES += DETAIL
 AUDIO_DT, MIDI_DT, MIDI_MAX_S = 0.0625, 0.25, 120.0
 SILENT_DB = 60.0  # frames this far under the peak are dropped from the spectral axes
 
@@ -185,6 +189,10 @@ def from_row(r):
         c["width"] = 1 - r["corr"]
     if r.get("midi") is not None:
         c["pitch"] = float(r["midi"])
+    for k in DETAIL:                                  # G2: stored by own_sweeps.py in the row's detail, one number per window
+        v = (r.get("detail") or {}).get(k)
+        if v is not None:
+            c[k] = float(v)
     one = {k for k, v in c.items() if np.ndim(v) == 0}
     src = "%s#%s" % (r.get("src", ""), r.get("note", "")) if r.get("note") else r.get("src", "")
     return pack(src, "mel" if r.get("mel") else "bands", dt, c, one, keep=bool(r.get("mel")))
@@ -393,6 +401,9 @@ def cmd_test(_a):
         for ax in ("brightness", "sharpness", "fullness"):
             agree.append((k, ax, m(k, ax), float(np.nanmean(mel[ax])), float(b32[ax])))
     ok = True
+    import detail as det
+    print("-- detail.py (G2: partials, formants, glide, space, vibrato, tremolo, tuning, velocity response inputs)")
+    ok &= bool(det.run_checks()); print("-- spectral axes")
     for name, good in checks:
         print("%s  %s" % ("PASS" if good else "FAIL", name)); ok &= bool(good)
     print("\nwav vs mel row vs 32-band row (bands are a time average, so they weight loud frames more):")
