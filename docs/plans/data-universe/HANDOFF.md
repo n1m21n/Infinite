@@ -44,6 +44,23 @@ is the knob combination that moves a sound between clusters; synth presets give 
 knob is to be mapped onto Infinite's own synths and effects so each sound can be made in Infinite. The owner holds many more presets
 on the drive: ask only when a curve says they make the model more robust.
 
+**Map and learner (owner, 2026-10-28).** Presets of other synths (Diva, Omnisphere, ...) and the sample library are the **map**:
+measured points of where good and real sounds live. Infinite's own nodes are the **learner**: rendered without limit with one-knob
+sweeps, knob pairs and active learning, and for its own DSP the known math is a prior. Moves between clusters are generative (target
+point minus current point; the model finds the knobs), never a fixed list. Real instruments come from engines Infinite already has,
+on one line from synth to real:
+
+```
+ Analog / FM / Wavetable   ->   String (waveguide + modal body)   ->   Granular        ->   Sampler
+ invented sounds                pluck = guitar, harp; bow = violin,    textures from        exact recordings,
+                                cello; strike = piano-like, dulcimer   real audio           picked from the map
+```
+
+The model chooses the engine and its knobs for a target point: the most synth-like engine that reaches it within the repeat noise,
+else the next one; a hybrid patch (a sampled attack from the library on a String or Analog body) covers the gap, as Omnisphere does
+with sample layers on a synth engine. Labels for "piano", "guitar" come from sample and preset names and folders (D4). Order:
+Analog sweeps, then String sweeps (target: the library's acoustic points), then hybrids.
+
 **Status 2026-10-28:** P1 approved by the owner (`CHARACTERISTICS.md`, 18 axes + space added). P2 done: every
 held source measured, coverage and cross-form agreement in `CHARACTERISTICS.md`; brightness / sharpness agree 0.96 / 0.92 between mel
 and band forms of the same render. P3 first pass (`p3_characteristics.py`, Diva v2 rows, C3, 1 seed): 0 of 11 characteristic
