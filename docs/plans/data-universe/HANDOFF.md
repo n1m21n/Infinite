@@ -299,3 +299,4 @@ Correlation of start distance with measured distance 0.89. Two findings: (1) the
 ### Out-of-gamut advisory (reach.py score, on reach2)
 Fit: expected landing distance = a * (distance of target to nearest existing render) + b. Oscillator 1.12x + 0.40 (resid sd 1.07); Analog 1.16x + 0.27 (resid sd 1.40).
 Targets the fit advises "reachable within 2.5 sd" land within 2.5 sd: Oscillator 84% (vs 24% of the rest), Analog 86% (vs 6% of the rest). At 1.5 sd: Oscillator 80% vs 6%, Analog 67% vs 1%. So the pre-render advice separates reachable from unreachable targets; it can be quoted in the app before any render. (Fit and check use the same targets: in-sample; a held-out target split is still to do.)
+Held-out half (fit on one half of the targets, judged on the other): "within 2.5 sd" advice holds - Oscillator 88% landed within vs 27% of the rest; Analog 94% vs 7%. The 1.5 sd advice has too few advised targets (1-3%) to judge. Use the 2.5 sd line.

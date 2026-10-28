@@ -151,6 +151,12 @@ def cmd_score(a):
     # advisory: the fitted line measured ~ a*start + b is what the app can quote before any render ("this sound is ~X sd from anything this engine makes")
     a_, b_ = np.polyfit(R[:, 0], R[:, 2], 1); res_sd = float(np.std(R[:, 2] - (a_ * R[:, 0] + b_)))
     print("    advisory fit: expected landing distance = %.2f * gamut distance + %.2f (residual sd %.2f)" % (a_, b_, res_sd))
+    h = np.random.default_rng(0).permutation(len(R)); tr, te = h[:len(R) // 2], h[len(R) // 2:]      # held-out check: fit on half the targets, judge the other half
+    at, bt = np.polyfit(R[tr, 0], R[tr, 2], 1)
+    for lim in (1.5, 2.5):
+        okt = R[te, 0] * at + bt <= lim
+        print("    held-out half (fit on the other): advised within %.1f sd -> %.0f%% of targets, actually within %.0f%% (advised) vs %.0f%% (rest)" %
+              (lim, 100 * okt.mean(), 100 * (R[te][okt, 2] <= lim).mean() if okt.any() else float("nan"), 100 * (R[te][~okt, 2] <= lim).mean() if (~okt).any() else float("nan")))
     for lim in (1.5, 2.5):
         ok_ = R[:, 0] * a_ + b_ <= lim; print("    targets advised reachable within %.1f sd: %.0f%%; actually within: %.0f%% (of advised), %.0f%% (of the rest)" %
               (lim, 100 * ok_.mean(), 100 * (R[ok_, 2] <= lim).mean() if ok_.any() else float("nan"), 100 * (R[~ok_, 2] <= lim).mean() if (~ok_).any() else float("nan")))
