@@ -118,8 +118,9 @@ def cmd_plan(a):
                 if dk[o_[0]] < d_b: cu_b, p_b, d_b = K[o_[0]], PK[o_[0]], float(dk[o_[0]])
         dist = np.array([float((((p_b - tv) / spread) ** 2).sum() ** .5)]); b = 0; CUsl = np.array([cu_b]); Psl = np.array([p_b])
         d0 = float((((Vk - tv) / spread) ** 2).sum(1).min() ** .5)
+        ps_ = float((np.stack([f(np.hstack([enc(CUsl), mv]).astype(np.float32))[0][0] for f in fs_]).std(0) / spread).sum()) if fs_ else None   # seeds' spread at the pick, for the calibration check in score
         items.append({"u": [round(float(x), 4) for x in CUsl[b]], "design": "reach", "kind": "reach", "target": pid,
-                      "pred_dist": round(float(dist[b]), 4), "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in Psl[b]]})
+                      "pred_dist": round(float(dist[b]), 4), "pred_spread": ps_, "start_dist": round(d0, 4), "pred": [round(float(x), 4) for x in Psl[b]]})
     q = {"engine": a.node, "round": a.round, "cols": p3.COLS, "made": time.strftime("%Y-%m-%d %H:%M:%S"), "items": items,
          "targets": {pid: [round(float(x), 4) for x in tv] for pid, tv in T}, "spread": spread.tolist(), "fill": fill_.tolist()}
     q["sha"] = hashlib.sha1(json.dumps(items, sort_keys=True).encode()).hexdigest()[:16]
@@ -138,11 +139,14 @@ def cmd_score(a):
         if i is None or not d["ok"][i, 0]: continue
         tv = np.array(q["targets"][it["target"]]); vi = np.where(np.isfinite(V[i]), V[i], np.array(q["fill"]))
         got = float((((vi - tv) / spread) ** 2).sum() ** .5)
-        res.append((it["start_dist"], it["pred_dist"], got))
+        res.append((it["start_dist"], it["pred_dist"], got, it.get("pred_spread", np.nan)))
     if not res: print("no rendered picks found (check o.rid signature)"); return
     R = np.array(res)
     print("%s %s: %d targets | nearest existing render %.2f | predicted %.2f | measured %.2f (median) | closer than nearest: %.1f%%" %
           (a.node, a.round, len(R), np.median(R[:, 0]), np.median(R[:, 1]), np.median(R[:, 2]), 100 * (R[:, 2] < R[:, 0]).mean()))
+    if np.isfinite(R[:, 3]).sum() > 10:      # calibration: does the seeds' spread at the pick say how wrong the prediction was?
+        m_ = np.isfinite(R[:, 3]); print("    seed-spread calibration: corr(spread, measured - predicted) = %.2f, corr(spread, |measured - predicted|) = %.2f (n=%d)" %
+              (np.corrcoef(R[m_, 3], R[m_, 2] - R[m_, 1])[0, 1], np.corrcoef(R[m_, 3], np.abs(R[m_, 2] - R[m_, 1]))[0, 1], m_.sum()))
     # out-of-gamut view: does the target's distance to the engine's own renders (start dist) say how far the pick lands? tertiles of start dist
     cut = np.quantile(R[:, 0], [1 / 3, 2 / 3])
     for name, m in (("near targets", R[:, 0] <= cut[0]), ("middle", (R[:, 0] > cut[0]) & (R[:, 0] <= cut[1])), ("far targets", R[:, 0] > cut[1])):
