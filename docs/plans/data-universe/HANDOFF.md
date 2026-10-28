@@ -395,3 +395,4 @@ Same base data plus the same number of extra renders, either the model-chosen po
 | chosen | 7 / 11 | 0.731 | 0.493 | -0.119 |
 | random | 10 / 11 | 0.763 | 0.516 | -0.115 |
 Random beat chosen on every column. The active-learning pick did not help on this engine; do not claim the chosen-points gain (Step 4 rounds). Remaining to check from the render files: failed/silent rate and extreme-knob share of the chosen set (a pick that crowds the edges can hurt held-out folders). Single run, one seed per arm: treat the 0.03 head gap as a direction, not a size.
+Control follow-up: each arm is ~2,000 distinct settings (about 8 note rows each). Extreme-knob share (inside 5% of the range edge): chosen 0.257, random 0.241. Silent renders (peak < 1e-3): chosen 0.1%, random 0.2%. So the chosen set is not crowding the edges or producing silence; the arms differ only in where the points sit, and random was at least as good.
