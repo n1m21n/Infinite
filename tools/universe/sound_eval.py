@@ -7,7 +7,7 @@ Data, groups and the two held-out sets come from sound_data.py (random: by prese
 Knobs: NaN -> column mean; a parameter with <= 12 distinct values across the library is a selector and is one-hot encoded
 (oscillator model, filter type: categories, not amounts); the rest are standardised.
 Targets: desc = 32 log bands + 11 scalars at one note, scored as mean R2 over outputs; mel = the 64 x 48 log-mel at that note,
-scored as mean absolute error in dB (lower is better). Every score carries a 95% bootstrap interval over held-out presets
+scored as mean absolute error in dB (lower is better) and spectral convergence. Every score carries a 95% bootstrap interval over held-out presets
 (resampled by group on the group split), so two models differ only when their intervals do. The group split is the one the
 milestone bars use."""
 import argparse, os, sys
@@ -36,11 +36,29 @@ def encode(K, max_levels=12):
 
 def boot(per, groups, n, rng):
     """95% interval of the mean of a per-preset score, resampling groups (clusters) with replacement."""
+    if n <= 0:
+        return np.array([np.nan, np.nan])
     u = np.unique(groups); idx = [np.flatnonzero(groups == g) for g in u]; out = []
     for _ in range(n):
         pick = np.concatenate([idx[k] for k in rng.integers(0, len(u), len(u))])
         out.append(per[pick].mean())
     return np.percentile(out, [2.5, 97.5])
+
+
+def score(tg, Y, P, g, n=1000):
+    """(score, unit, lo, hi, extra) of predictions P for held-out targets Y. desc: mean R2 over outputs; mel (dB): mean absolute
+    error, extra = spectral convergence ||S - P|| / ||S|| on linear magnitude. 95% interval: cluster bootstrap over groups g."""
+    if tg == "desc":
+        v = ((Y - Y.mean(0)) ** 2).sum(0); e = (Y - P) ** 2
+        # per-preset share of the R2 so the bootstrap resamples presets: R2 = 1 - sum_i e_i / v, averaged over outputs
+        per = 1 - (e / np.maximum(v, 1e-12)).mean(1) * len(Y)
+        s, unit, extra = smp.r2(Y, P).mean(), "R2", ""
+    else:
+        per = np.abs(Y - P).mean(1); s, unit = per.mean(), "dB"
+        S, Q = 10 ** (Y / 20), 10 ** (P / 20)
+        extra = " SC %.3f" % (np.linalg.norm(S - Q, axis=1) / np.maximum(np.linalg.norm(S, axis=1), 1e-12)).mean()
+    lo, hi = boot(per, g, n, np.random.default_rng(1))
+    return s, unit, lo, hi, extra
 
 
 def fit(name, X, Y, Xq, rng):
@@ -87,15 +105,8 @@ def main():
                 print("%-7s %-5s  too few held out (%d presets, %d groups): no score" % (sn, tg, len(te), len(np.unique(g[te])))); continue
             for mn in a.models.split(","):
                 P = fit(mn, X[tr], Y[tr], X[te], np.random.default_rng(0))
-                if tg == "desc":
-                    v = ((Y[te] - Y[te].mean(0)) ** 2).sum(0); e = (Y[te] - P) ** 2
-                    # per-preset share of the R2 so the bootstrap resamples presets: R2 = 1 - sum_i e_i / v, averaged over outputs
-                    per = 1 - (e / np.maximum(v, 1e-12)).mean(1) * len(te)
-                    score, unit = smp.r2(Y[te], P).mean(), "R2"
-                else:
-                    per = np.abs(Y[te] - P).mean(1); score, unit = per.mean(), "dB"
-                lo, hi = boot(per, g[te], a.boot, np.random.default_rng(1))
-                print("%-7s %-5s %-6s %5d %5d  %s %.3f [%.3f, %.3f]" % (sn, tg, mn, len(tr), len(te), unit, score, lo, hi))
+                sc, unit, lo, hi, extra = score(tg, Y[te], P, g[te], a.boot)
+                print("%-7s %-5s %-6s %5d %5d  %s %.3f [%.3f, %.3f]%s" % (sn, tg, mn, len(tr), len(te), unit, sc, lo, hi, extra))
 
 
 if __name__ == "__main__":

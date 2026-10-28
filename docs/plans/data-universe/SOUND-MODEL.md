@@ -111,7 +111,7 @@ Model choices, settled:
 | 2 | Store log-mel (64 x 48, uint8 0.5 dB) with every render (`render_pass.logmel`) | none extra | **done 2026-10-28**, picked up by each new render chunk |
 | 3 | M0: frozen splits + `sound_eval.py` | 1 session | **split frozen and scoring works 2026-10-28** (`eval/splits/diva.json`, 22 banks, 768 presets). Left: log-mel L1 and spectral convergence once mel rows exist; repeat-run check |
 | 4 | Verify every render file (features present, presets differ, silent share) on both machines | 30 min | REVISED-PLAN 6.1 |
-| 5 | M1 on Colab: MLP with one-hot selectors, then mel decoder | 1-2 sessions | after 3 |
+| 5 | M1 on Colab: MLP with one-hot selectors, then mel decoder | 1-2 sessions | **built 2026-10-28**: `m1_forward.py` (one net for all notes, descriptor head + transposed-conv mel decoder, 3 seeds, k-NN and mean baselines, bars as PASS/FAIL) and `M1_Forward_Trainer.ipynb`; data and baseline path checked on the Pro (`--dry`). Runs when Diva v2 reaches 3,000 presets |
 | 6 | Omnisphere on the Air at lead 30; Vital prefix of 500 | machine hours | REVISED-PLAN 6.2, 6.4 |
 | 7 | M2, then M3, M4, M5 | | after M1 passes |
 
