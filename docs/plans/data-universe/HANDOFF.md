@@ -288,3 +288,7 @@ C2 delta-loss lam 10 (Analog): direction right **61.8%**, size r **0.549** (wors
 | far | 6.17 | 7.14 | 16.0% |
 
 Correlation of start distance with measured distance 0.89. Two findings: (1) the target's distance to the engine's own renders is an excellent out-of-gamut warning: far targets (> ~5 sd) end ~7 sd away whatever the search does; `reach.py score` now prints this table. (2) In every tertile the model-picked point is ~0.5-1.0 sd WORSE than simply returning the nearest render that already exists. Plain nearest-neighbour retrieval is the baseline reach has not yet beaten; reach3 (pessimistic hill-climb) is the test, and a gain must be reported against this baseline, not against zero.
+
+### reach2 Oscillator (same method, 150 candidates per target)
+
+300 targets: nearest existing render **2.03** sd, predicted 2.01, **measured 2.57**; closer than nearest for **7.0%**. By tertile (near / middle / far): start 1.47 / 2.03 / 3.16, measured 1.80 / 2.45 / 4.05, closer 5% / 9% / 7%. Correlation of start distance with measured distance 0.77. Same picture as Analog: the model-picked point is worse than the nearest existing render, and the target's distance to the engine's own renders predicts the outcome. Oscillator's renders cover the target space better (median nearest 2.03 vs 3.43).
