@@ -1,0 +1,25 @@
+exec(open('make2.py').read().split('# 4 sound')[0])
+p=P("Data: what we have, what we want","Corrected. Nothing here needs you to hand over files.")
+p.card("MIDI: about 3 lakh files (294,582)",["22 folders: lakh clean + full, maestro, groove drumset, pop909, bach, nottingham, vgmidi, nes, emopia and more","4 part types: drums, melody, chords, bass","Per note: pitch, velocity, start time, length","Timing offset from the grid (micro-timing), swing, drum grooves","Quantization: we measure how far each note sits from the grid; we do not force it onto the grid","Curves over time: pitch height, velocity, density, tension"],"teal");p.arrow()
+p.card("Sound data: what 'doubling' means",["Doubling = twice as many presets rendered and fitted for the same plugin","Measured: each doubling adds about 0.07 to 0.10 R2 (Diva), still rising","Diva library is about 15,000 presets; we have fitted about 2,900, so about 12,000 are left, all already on this Mac","Same for Vital (800 records now), Omnisphere (Air)"],"amber");p.arrow()
+p.card("Who supplies it",["Presets: already on your machines; I render them, you give nothing","Own sweeps (synthetic): I generate them, no limit","From you: only the final listening and rating, plus the Ableton sets for the mix model"],"purple");p.arrow()
+p.card("From the Air: only if a result needs it",["Exact ask now: none","If Omnisphere or Vital stays short after the Mac's own presets, I pull just that plugin's preset folder, not the 60,000"],"coral")
+p.render("14_data_corrected.png")
+
+p=P("Does each stage map to the 22 or to mood?","Both. Mood is computed on top of the 22.")
+p.card("Rule (draft, your sign-off pending)",["Arousal (calm to excited) from loudness, density, attack, brightness","Valence (sad to happy) from tension, roughness, brightness","Both measured per row; today mood is only a flat number per genre, so per-row mood is the next job"],"purple");p.arrow()
+p.card("Note model, per stage",["Pitch curve: 22 = pitch height, contour. Mood = valence/arousal","Velocity curve: loudness. Mood = arousal","Timing offset: density, roughness. Mood = tight vs loose feel","Drum groove: density, attack. Mood = energy, danceability","Chords: tonal tension. Mood = valence"],"teal");p.arrow()
+p.card("Sound model, per stage",["Each knob move: change in the 22. Mood from the same rule","Cluster: region of the 22 and its mood centre","Effects: space, width, noisiness shift the mood"],"amber")
+p.render("15_stage_mapping.png")
+
+p=P("How things feel (draft for your approval)","Rules from music psychology, on our axes. Not measured yet.")
+rows=[("Slow melody","low density","calm, sad or tender"),("Fast melody","high density","excited, tense or joyful"),("Slow drum beat","low density, soft attack","relaxed, heavy"),("Fast drum beat","high density, sharp attack","driving, urgent"),("High pitches","pitch height up","bright, light, tense if loud"),("Low pitches","pitch height down","dark, heavy, calm if soft"),("Major scale, simple chords","low tension","happy, stable"),("Minor, dissonant chords","high tension, roughness","sad, anxious"),("Bright, sharp sound","brightness, attack up","energetic, harsh"),("Soft, warm sound","warmth up, attack slow","calm, safe")]
+p.card("Feel table",["%s: %s: %s"%r for r in rows],"teal");p.arrow()
+p.card("Instruments",["Mood per instrument comes from the sounds' own 22 numbers (not hand-labelled)","I show you the result for approval before anything trains on it"],"coral")
+p.render("16_feel_table.png")
+
+p=P("Why 3,894 clusters are unassigned","Of 14,161 sound groups.")
+p.card("How a group gets a cluster",["477 by audio (we have a render)","9,790 by name and tag words, plus a bright or dark nudge","3,894 have no audio and no useful name or tag, so nothing to place them with"],"amber");p.arrow()
+p.card("Why not guess",["A guess would put noise into the clusters and the models would learn it","So they wait"],"coral");p.arrow()
+p.card("Plan to assign them",["Render them (they are presets, so the plugin can make audio)","Measure the 22 numbers","Place them by the audio, not the name","Then the count drops to near zero"],"teal")
+p.render("17_unassigned.png")

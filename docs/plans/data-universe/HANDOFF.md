@@ -499,3 +499,9 @@ PaulStretch, Molder and Looper need an audio input: not yet measured.
 
 ## Block 1 progress (2026-10-28)
 Axes 23-31 measured on all locally pulled MIDI (a31 223,824 rows, 293 errors); `midi_axes.py check --n 20` = 20/20 consistent. Remaining corpora (tegridy onward) still pulling; re-run `midi_axes.py run --local` after the pull ends.
+
+## Goal item 4: cluster assignment from audio (2026-10-28)
+`tools/universe/cluster_eval.py` -> `feel/cluster_eval.json`. Per family (>=24 audio instruments), reference clusters from the whole family; 5 random 80/20 splits per seed, re-cluster on 80%, assign held-out 20% by nearest train centroid, score against the reference label.
+- Instrument-weighted held-out accuracy: seed 0 93.8%, seed 1 93.9% (2,130 held-out each); seeds differ by 0.1 pt. Bar >= 85% and stable: MET on this reading.
+- Caveat, stated plainly: the weighted number is carried by large k=2 families (drums 789, synth 491, bass 174). Family-macro accuracy is ~85% (seed 0) and the many-cluster families are weak: strings 66-70% (k=12), mallets 67-77%, other 29-40%. Those are misses and the reference labels are themselves k-means on the same features (circular), so this measures stability of assignment, not agreement with human-named timbres.
+- Not yet done: per-part critic evaluation; the 2,252 `none` (no audio, no usable tags) rows in instruments_clustered stay unassigned there.

@@ -1,0 +1,102 @@
+{
+ "per_seed": {
+  "0": {
+   "acc": 0.938,
+   "sd_over_splits": 0.216,
+   "heldout_n": 2130
+  },
+  "1": {
+   "acc": 0.939,
+   "sd_over_splits": 0.201,
+   "heldout_n": 2130
+  }
+ },
+ "families": {
+  "bass": {
+   "n": 174,
+   "k": 2,
+   "acc_seed0": 1.0,
+   "acc_seed1": 0.976
+  },
+  "brass": {
+   "n": 81,
+   "k": 2,
+   "acc_seed0": 1.0,
+   "acc_seed1": 1.0
+  },
+  "choir": {
+   "n": 65,
+   "k": 10,
+   "acc_seed0": 0.815,
+   "acc_seed1": 0.785
+  },
+  "drums": {
+   "n": 789,
+   "k": 2,
+   "acc_seed0": 0.997,
+   "acc_seed1": 0.995
+  },
+  "guitar": {
+   "n": 47,
+   "k": 2,
+   "acc_seed0": 1.0,
+   "acc_seed1": 1.0
+  },
+  "keys": {
+   "n": 70,
+   "k": 2,
+   "acc_seed0": 0.943,
+   "acc_seed1": 0.986
+  },
+  "mallets": {
+   "n": 34,
+   "k": 10,
+   "acc_seed0": 0.667,
+   "acc_seed1": 0.767
+  },
+  "other": {
+   "n": 36,
+   "k": 9,
+   "acc_seed0": 0.286,
+   "acc_seed1": 0.4
+  },
+  "piano": {
+   "n": 54,
+   "k": 2,
+   "acc_seed0": 0.98,
+   "acc_seed1": 1.0
+  },
+  "strings": {
+   "n": 118,
+   "k": 12,
+   "acc_seed0": 0.661,
+   "acc_seed1": 0.704
+  },
+  "synth": {
+   "n": 491,
+   "k": 3,
+   "acc_seed0": 0.986,
+   "acc_seed1": 0.943
+  },
+  "texture": {
+   "n": 112,
+   "k": 3,
+   "acc_seed0": 0.782,
+   "acc_seed1": 0.945
+  },
+  "woodwind": {
+   "n": 62,
+   "k": 11,
+   "acc_seed0": 0.933,
+   "acc_seed1": 0.85
+  },
+  "world": {
+   "n": 25,
+   "k": 6,
+   "acc_seed0": 0.84,
+   "acc_seed1": 0.92
+  }
+ },
+ "gap": 0.001,
+ "bar": ">= 0.85 held-out, seeds within 0.03"
+}
