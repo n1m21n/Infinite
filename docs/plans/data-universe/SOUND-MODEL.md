@@ -91,7 +91,7 @@ Model choices, settled:
 | Choice | Decision | Why |
 |---|---|---|
 | Probe models | numpy on the Pro (ridge, k-NN, MLP) | no install, seconds to run, fine at 4k rows |
-| Training models beyond the probe (M1 mel decoder, M2, M3) | PyTorch on Colab through the existing parity setup (`results/colab_2026-10-27.txt`) | 8 GB Macs; rows are features, allowed to travel |
+| Training models beyond the probe (M1, M2, M3) | PyTorch CPU on the Pro (`~/Infinite/ml-venv`, Python 3.12, torch 2.14.1), one heavy job at a time; Colab notebook kept as the fallback | Colab refused a backend on 2026-10-28 (location restriction, Chrome and Safari); M1 at 3,000 presets is about 10 min on CPU |
 | Knob encoding | standardised continuous knobs now; one-hot for selector knobs (oscillator model, filter type) in M1 | selectors are categories, not amounts |
 | Note and velocity | inputs to the model (C3, C4, C3 forte rendered; others predicted only if `note_predict.py` holds) | sound depends on both |
 | Gate stop line | rerun `marginal_gate.py` with the MLP curve (`sound_model_probe.py`); stop a library when two doublings gain < 0.01 **on the MLP** | ridge undersells the data |
@@ -111,7 +111,7 @@ Model choices, settled:
 | 2 | Store log-mel (64 x 48, uint8 0.5 dB) with every render (`render_pass.logmel`) | none extra | **done 2026-10-28**, picked up by each new render chunk |
 | 3 | M0: frozen splits + `sound_eval.py` | 1 session | **split frozen and scoring works 2026-10-28** (`eval/splits/diva.json`, 22 banks, 768 presets). Left: log-mel L1 and spectral convergence once mel rows exist; repeat-run check |
 | 4 | Verify every render file (features present, presets differ, silent share) on both machines | 30 min | REVISED-PLAN 6.1 |
-| 5 | M1 on Colab: MLP with one-hot selectors, then mel decoder | 1-2 sessions | **built 2026-10-28**: `m1_forward.py` (one net for all notes, descriptor head + transposed-conv mel decoder, 3 seeds, k-NN and mean baselines, bars as PASS/FAIL) and `M1_Forward_Trainer.ipynb`; data and baseline path checked on the Pro (`--dry`). Runs when Diva v2 reaches 3,000 presets |
+| 5 | M1: MLP with one-hot selectors and mel head | 1-2 sessions | **built 2026-10-28**: `m1_forward.py` (one net for all notes, descriptor head + dense mel head, 3 seeds, k-NN and mean baselines, bars as PASS/FAIL). Run: `~/Infinite/ml-venv/bin/python -I m1_forward.py <rows>`. First reading at 701 presets, C3: MLP R2 0.096 random / 0.072 group, mel 11.1 / 11.4 dB vs k-NN 12.0 / 12.5 and mean 13.3 / 13.7 (beats both baselines, far from the bars). Full run when Diva v2 reaches 3,000 |
 | 6 | Omnisphere on the Air at lead 30; Vital prefix of 500 | machine hours | REVISED-PLAN 6.2, 6.4 |
 | 7 | M2, then M3, M4, M5 | | after M1 passes |
 

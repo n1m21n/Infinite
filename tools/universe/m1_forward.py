@@ -5,8 +5,8 @@
 
 Data, split, knob encoding and scores are the M0 ones (sound_data, sound_eval.encode / score), so a number printed here is the same
 number sound_eval would print for this model. One network for every note: input = encoded knobs + midi/127 + velocity/127; a shared
-trunk (2 x 512, ReLU, dropout) feeds two heads, the 43 descriptors (standardised) and the 64 x 48 log-mel (a small transposed-conv
-decoder, 8 x 6 -> 64 x 48). Loss = MSE on descriptors + L1 on mel / 10 dB. AdamW, early stopping on 15% of the training groups (whole
+trunk (2 x 512, ReLU, dropout) feeds two heads, the 43 descriptors (standardised) and the 64 x 48 log-mel (dense, 512 -> 1024 -> 3072:
+a transposed-conv decoder cost 100x more per example on CPU and returns only if mel error is what limits M1). Loss = MSE on descriptors + L1 on mel / 10 dB. AdamW, early stopping on 15% of the training groups (whole
 groups, so validation leaks no near-duplicates). Each seed is scored on its own (the spread is the repeat-run check, M0 asks <= 0.005)
 and the seeds' average is the model. Baselines (training mean, k-NN in knob space) are scored on the same held-out presets, and the
 M1 bars are printed as PASS / FAIL. --dry runs everything except the network (no torch needed): data, split, baselines.
@@ -21,6 +21,7 @@ import sound_model_probe as smp  # noqa: E402
 
 BARS = {"random": 0.50, "group": 0.40}  # descriptor R2; mel bar: L1 at least 20% below k-NN on both splits
 MEL_DB = 10.0
+MEL = sd.MEL_SHAPE
 
 
 def samples(d, X, rows):
@@ -44,13 +45,11 @@ def train(Xtr, Dtr, Mtr, Xva, Dva, Mva, seed, epochs, log):
             super().__init__()
             s.trunk = nn.Sequential(nn.Linear(n_in, 512), nn.ReLU(), nn.Dropout(0.2), nn.Linear(512, 512), nn.ReLU(), nn.Dropout(0.2))
             s.desc = nn.Linear(512, Dtr.shape[1])
-            s.seed = nn.Linear(512, 128 * 8 * 6)
-            up = lambda a, b: [nn.ConvTranspose2d(a, b, 4, 2, 1), nn.ReLU()]
-            s.dec = nn.Sequential(*up(128, 64), *up(64, 32), *up(32, 16), nn.Conv2d(16, 1, 3, 1, 1))
+            s.dec = nn.Sequential(nn.Linear(512, 1024), nn.ReLU(), nn.Linear(1024, MEL[0] * MEL[1]))
 
         def forward(s, x):
             h = s.trunk(x)
-            return s.desc(h), s.dec(s.seed(h).view(-1, 128, 8, 6)).squeeze(1)
+            return s.desc(h), s.dec(h).view(-1, *MEL)
 
     t = lambda a: torch.tensor(a, device=dev)
     xs, ds, ms = t(Xtr), t((Dtr - dmu) / dsd), t((Mtr - mmu) / MEL_DB)
