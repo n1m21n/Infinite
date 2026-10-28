@@ -52,3 +52,17 @@ Product tie: the same model that picks training renders answers the user's knob 
 | D | C11 numbers and a timbre check: do axis distances track CLAP/EnCodec distances on held-out rows |
 | A | an inverse net audio -> knobs trained from our renders, scored by render distance, not parameter loss |
 | C | read-only: note that a harmonic-plus-noise engine would be the DDSP-style option if Wavetable/String need it |
+
+## Owner direction (2026-10-28): the chain is the model
+
+A node chain is already shaped like a neural net: nodes are regions, cables are connections, knobs are weights, and any tweak changes the result. So the sound model should be a chain of per-node models, not one flat model.
+
+| Idea | Test that would prove it |
+|---|---|
+| Each node has its own forward model (input characteristics + knobs -> output characteristics) | per-node held-out-bank score (what we have now) |
+| A chain is the composition of those models | predict an unseen chain from its parts, never trained on that chain; score on held-out chains |
+| Some nodes matter more than others ("activity") | per-node sensitivity: output change per knob sweep, and ablation (bypass the node) |
+| A tweak anywhere moves the result in a predictable way | chain-level C2: direction and size of a single-knob change deep in the chain |
+| The chain is really learned, not memorised | error does not grow with depth beyond the sum of per-node errors; held-out chain shapes score |
+
+Step G6 (chains) is where the data for this is made. Dive deeper there as its own track.
