@@ -241,3 +241,7 @@ Why (reading, not yet tested): a pack's single loops and one-shots (kicks, hats,
 | A folder of full tracks you consider good examples per genre (even 10 per genre, any length) | genre needs track-level audio; sample packs gave chance | C8 |
 | Ableton sets / projects you actually like (G8 reads track levels, pans, sends, device chains) | mix and chain data from real use | G8, C9 |
 | Patches (.inf) you made and kept vs discarded | the best signal of taste: what a user keeps, undoes, tweaks stays local | C10 |
+
+## C8 on structure: drum grooves carry some genre (2026-10-28)
+
+`genre_groove.py`: Groove MIDI (store/public_drums.jsonl), 8 lanes x 16 steps + lane densities + log tempo + swing, softmax, leave-drummer-out (only 4 drummers). 3,790 grooves, 12 families: per-family mean **top-1 0.184, top-3 0.394** (chance 0.083 / 0.250; bar 0.7) -> above chance, below the bar. Best: rock 0.78, dance 0.73, funk 0.69, hiphop 0.58; worst: punk 0.00, latin 0.04, afrobeat 0.10. Limits: four drummers (the test is mostly 'a new drummer'), family from file names, grooves alone. Next: add chord progression and bass rows of the same genre words (midi_chord_prog, midi_bass_seq) and the 22-axis description of full tracks; both are in the owner asks above.
