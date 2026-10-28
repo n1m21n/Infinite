@@ -457,3 +457,7 @@ Change: `feel_analysis.MARGINS = {"jitter": 0.0}` (other features keep 0.25). Me
 | sloppy_timing caught | 83.3% | 93.3% |
 
 Not tuned further: a 0.15 limit would catch 97.6% at 1.0% false reject on the first sample, but that is picking on the data; kept the plain p99. Still to do: re-run full `benchmark.py` B2/B3 with the daemon paused.
+
+## G9 monotonicity, Analog (2026-10-28)
+Does the embedding move steadily when one knob is swept? Spearman rho per knob sweep: CLAP mean 0.91 (85% of sweeps >= 0.8, 92% >= 0.5, none negative); EnCodec mean 0.89 (81%, 89%, 0%). Weakest knobs (CLAP): pw1 0.62, fine1 0.64, fine2 0.82, fm 0.82, drive 0.83. Strongest: attack, release, resonance, noise, spread (1.00). The embeddings carry knob direction well; pulse width and fine tune are the thin ones.
+Dev build (`ibuild.py build --mode dev`, -j2) running; Vital/Serum state re-run waits on it.
