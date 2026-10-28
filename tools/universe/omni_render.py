@@ -109,6 +109,7 @@ def main():
     ap.add_argument("--notes", default=rp.STIMULUS, help="midi:velocity:label list; default = the shared stimulus (render_pass.STIMULUS)")
     ap.add_argument("--multis", action="store_true", help="--lib is the Multis folder: render each .mlt_omn as a whole multi")
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--batch", type=int, default=rp.BATCH, help="patches per Infinite process")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
     rp.LEAD = a.lead
@@ -125,6 +126,24 @@ def main():
     t = {"instrument": True, "format": kv["plugin_format"], "id": kv["plugin_id"], "name": kv.get("plugin_name", ""), "vendor": ""}
     binp = rp.infinite_bin()
     t0, n, ok, bad = time.time(), 0, 0, 0
+    pend = []
+
+    def flush():
+        nonlocal ok, bad
+        with tempfile.TemporaryDirectory() as tmp:
+            got = rp.render_states(binp, t, [x[2] for x in pend], tmp)
+        for (src, patch, _), (win, params) in zip(pend, got):
+            if win is None:
+                bad += 1
+                print("fail", src, params, flush=True)
+                continue
+            with open(out, "a") as fo:
+                for row in rp.state_rows(t, 3, "state:" + src, os.path.basename(src), patch if isinstance(patch, bytes) else patch.encode(), win, params, tags(patch)):
+                    fo.write(json.dumps(row, separators=(",", ":")) + "\n")
+            ok += 1
+        pend.clear()
+        print("%d ok %d bad %.2fs/patch" % (ok, bad, (time.time() - t0) / max(1, n)), flush=True)
+
     for i, (src, patch) in enumerate(multis(a.lib) if a.multis else patches(a.lib)):
         if i % a.stride != a.offset:
             continue
@@ -141,18 +160,11 @@ def main():
             print("skip (not a SynthMaster document)", src, flush=True)
             continue
         n += 1
-        with tempfile.TemporaryDirectory() as tmp:
-            win, params = rp.render_state(binp, t, state, tmp)
-        if win is None:
-            bad += 1
-            print("fail", src, params, flush=True)
-            continue
-        with open(out, "a") as fo:
-            for row in rp.state_rows(t, 3, label, os.path.basename(src), patch if isinstance(patch, bytes) else patch.encode(), win, params, tags(patch)):
-                fo.write(json.dumps(row, separators=(",", ":")) + "\n")
-        ok += 1
-        if ok % 10 == 0:
-            print("%d ok %d bad %.1fs/patch" % (ok, bad, (time.time() - t0) / max(1, n)), flush=True)
+        pend.append((src, patch, state))
+        if len(pend) >= a.batch:
+            flush()
+    if pend:
+        flush()
     print("done: %d ok %d bad" % (ok, bad))
 
 

@@ -17,7 +17,7 @@ Groups, for any library: the preset's bank (banks(): first folder, or the next o
 presets whose knob vectors are identical at 2 decimals (copies saved under another name) are merged with union-find. The split rule
 lives here too: a group is held out when crc32(name of its first member's folder) % 5 == 0, unless it holds more than 15% of the
 presets (holding out a whole category tests another task). The rule depends only on names, so it is stable as more presets arrive."""
-import base64, collections, json, os, re, sys, zlib
+import base64, collections, glob, json, os, re, sys, zlib
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import marginal_gate as mg  # noqa: E402
@@ -60,6 +60,19 @@ def _groups(folders, knobs):
     return np.array([ids[r] for r in roots])
 
 
+PARAMS_DIR = "~/Infinite/training-data/params"  # render_pass.param_table writes one table per params_hash here
+
+
+def same_knobs(h1, h2):
+    """Two parameter tables mean the same knob vector when address, name, unit and range agree (a plug-in update that only moves a
+    default, Diva 1.4.5 -> 1.4.8, changes the hash but not what knobs[] says)."""
+    def tab(h):
+        f = glob.glob(os.path.join(os.path.expanduser(PARAMS_DIR), "*_%s.json" % h))
+        return [{k: q.get(k) for k in ("address", "name", "unit", "min", "max")} for q in json.load(open(f[0]))["params"]] if f else None
+    t1 = tab(h1)
+    return t1 is not None and t1 == tab(h2)
+
+
 def build(path):
     by, order, notes, ph = {}, [], [], None
     for line in open(path):
@@ -71,7 +84,7 @@ def build(path):
             p = by[r["preset_id"]] = {"src": r["src"], "label": r.get("label", ""), "notes": {}}
             order.append(r["preset_id"])
         if "knobs" in r:
-            if ph not in (None, r["params_hash"]):
+            if ph not in (None, r["params_hash"]) and not same_knobs(ph, r["params_hash"]):
                 raise SystemExit("%s mixes parameter tables %s and %s: split the file per plug-in version" % (path, ph, r["params_hash"]))
             ph = r["params_hash"]; p["knobs"] = r["knobs"]
         if r["note"] not in notes:

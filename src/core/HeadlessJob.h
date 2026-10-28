@@ -19,6 +19,8 @@
 //   --bpm <N> overrides the patch tempo in --render, --frame, --frames-dir and --audio-summary.
 //   --timeline (--audio-summary): play the arrangement's audio lanes (Timeline audio mode) instead of the canvas Audio Outs.
 //   --plugin-params (--render, --audio-summary): the status's "plugins" block also lists every loaded plugin's parameters with their real ranges.
+//   --batch <list> (--audio-summary): after the first job, each line "patch<TAB>out.json[<TAB>out.wav]" is measured in this one
+//            process (the app starts once); every out.json then carries its own "plugins" block. One status line at the end.
 //   --size WxH rescales --frame / --frames-dir / --render --node output; --codec h264|prores4444 is for --render; --render --node tapped-node video needs --duration.
 //   --set also applies to --render, --frame and --audio-summary.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
@@ -56,6 +58,7 @@ namespace Headless
       std::string patch;
       std::string out;           // file for --render, file or directory for --frame, .json for --audio-summary
       std::string wavPath;       // --audio-summary --wav: the measured samples, as a file
+      std::string batch;         // --audio-summary --batch: more jobs, one "patch\tout.json[\tout.wav]" per line
       std::string notes;         // --audio-summary --notes: film events as JSON, injected as note-ons
       std::string noteMap;       // --note-map: event type -> note target (R471 7.5)
       std::string stemsDir;      // --stems-dir: where the per-node WAVs go

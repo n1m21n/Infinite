@@ -260,26 +260,60 @@ def status_line(out):
     return {}
 
 
+BATCH = 25  # presets per Infinite process: the app start (~3 s) is paid once per batch, not once per preset
+
+
 def render_state(binp, t, state_b64, tmp, timeout=120):
-    """Render one saved plug-in state (a preset spliced into the plug-in's own state) over NOTES. Every preset route calls this.
-    Returns (windows, params) or (None, why): windows from measure_windows, params the host's list with current values."""
-    inf, js, wav = (os.path.join(tmp, n) for n in ("p.inf", "s.json", "o.wav"))
-    open(inf, "w").write(patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % state_b64, 1))
+    """Render one saved plug-in state over NOTES: render_states with one state."""
+    return render_states(binp, t, [state_b64], tmp, timeout)[0]
+
+
+def render_states(binp, t, states, tmp, timeout=120):
+    """Render saved plug-in states (presets spliced into the plug-in's own state) over NOTES, all in one Infinite process
+    (--audio-summary --batch). Every preset route calls this. Returns one (windows, params) or (None, why) per state: windows from
+    measure_windows, params the host's list with current values. A job that ends the process is marked failed and the rest rerun."""
     ep, mp = write_notes(tmp)
-    try:
-        p = subprocess.run([binp, "--audio-summary", inf, js, "--duration", "%g" % (LEAD + WIN * len(NOTES)), "--sample-rate", str(SR),
-                            "--wav", wav, "--lenient", "--plugin-params", "--notes", ep, "--note-map", mp],
-                           capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return None, "timeout"
-    plug = (status_line(p.stdout).get("plugins") or [{}])[0]
-    if p.returncode != 0 or not os.path.exists(wav):
-        return None, "rc %d: %s" % (p.returncode, (p.stderr.strip().splitlines() or [""])[-1][:100])
-    if not plug.get("ready"):
-        return None, "plug-in not ready"
-    win = measure_windows(wav, tmp, [x for _, _, x in NOTES])
-    params = [q for q in plug.get("params") or [] if not MIDI_PROXY.match(q.get("name", ""))]
-    return (win, params) if win else (None, "unreadable wav")
+    jobs = []
+    for k, st in enumerate(states):
+        inf, js, wav = (os.path.join(tmp, "%s%d.%s" % (n, k, e)) for n, e in (("p", "inf"), ("s", "json"), ("o", "wav")))
+        open(inf, "w").write(patch_text(t, "", []).replace("  s plugin_name", "  s plugin_state %s\n  s plugin_name" % st, 1))
+        jobs.append((inf, js, wav))
+    res = [None] * len(jobs)
+    todo = list(range(len(jobs)))
+    while todo:
+        for k in todo:
+            for f in jobs[k][1:]:
+                if os.path.exists(f):
+                    os.remove(f)
+        lst = os.path.join(tmp, "batch.txt")
+        open(lst, "w").write("".join("%s\t%s\t%s\n" % jobs[k] for k in todo[1:]))
+        inf, js, wav = jobs[todo[0]]
+        try:
+            p = subprocess.run([binp, "--audio-summary", inf, js, "--duration", "%g" % (LEAD + WIN * len(NOTES)), "--sample-rate", str(SR),
+                                "--wav", wav, "--lenient", "--plugin-params", "--notes", ep, "--note-map", mp, "--batch", lst,
+                                "--timeout", "%d" % (timeout * len(todo))], capture_output=True, text=True, timeout=timeout * len(todo) + 30)
+            why = "rc %d: %s" % (p.returncode, (p.stderr.strip().splitlines() or [""])[-1][:100])
+        except subprocess.TimeoutExpired:
+            why = "timeout"
+        left = []
+        for k in todo:
+            js, wav = jobs[k][1:]
+            if left or not os.path.exists(js) or not os.path.exists(wav):
+                left.append(k); continue
+            try:
+                plug = (json.loads(re.sub(r":(-?)(inf|nan)\b", ":null", open(js).read())).get("plugins") or [{}])[0]
+            except ValueError:
+                plug = {}
+            if not plug.get("ready"):
+                res[k] = (None, "plug-in not ready"); continue
+            win = measure_windows(wav, tmp, [x for _, _, x in NOTES])
+            params = [q for q in plug.get("params") or [] if not MIDI_PROXY.match(q.get("name", ""))]
+            res[k] = (win, params) if win else (None, "unreadable wav")
+            os.remove(wav)
+        if left:
+            res[left[0]] = (None, why)  # the job the process died on
+        todo = left[1:]
+    return res
 
 
 def param_table(plugin_id, params):

@@ -802,6 +802,14 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
    static size_t sSchedNext = 0;
    static int sNoteTag = 0; // NoteEvent::source for injected notes: any stable address
    static std::string sNotesJson;
+   static int sPrepTicks = 0;
+   struct BatchJob
+   {
+      std::string patch, out, wav;
+   };
+   static std::vector<BatchJob> sBatch; // --batch: the jobs after the first, read when the first one is done
+   static size_t sBatchNext = 0;
+   static bool sBatchRead = false;
 
    const Headless::Job& job = gHeadlessJob;
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
@@ -1270,7 +1278,6 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       // Wait for it, bounded so a patch that keeps re-solving still renders.
       if (job.mode == Headless::Mode::AudioSummary || job.mode == Headless::Mode::Render)
       {
-         static int sPrepTicks = 0;
          bool preparing = false;
          for (GraphNode& g : gNodes)
             if (auto* fx = dynamic_cast<AudioEffectNode*>(g.node.get()))
@@ -2093,7 +2100,16 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          // The file carries everything; the status line repeats the headline
          // numbers so one read of stdout is enough to judge the take.
          std::ofstream f(job.out, std::ios::binary | std::ios::trunc);
-         f << "{\"patch\":\"" << Headless::JsonEscape(job.patch) << "\"," << context << ","
+         // A batch prints one status line for every job, so each file carries its own plugins block.
+         std::string plugins;
+         if (!job.batch.empty())
+         {
+            Headless::Status ps;
+            ReportPlugins(ps, job.pluginParams, job.pluginState);
+            for (const std::string& x : ps.extraJson)
+               plugins += x + ",";
+         }
+         f << "{\"patch\":\"" << Headless::JsonEscape(job.patch) << "\"," << plugins << context << ","
            << AudioSummary::ToJson(res, true).substr(1) << "\n";
          f.close();
          if (!f)
@@ -2104,6 +2120,54 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       {
          sSummaryWav.Close();
          sStatus.files.push_back(job.wavPath);
+      }
+      if (!job.batch.empty())
+      {
+         if (!sBatchRead)
+         {
+            sBatchRead = true;
+            std::ifstream in(job.batch);
+            if (!in)
+               return fail("E_USAGE", "--batch: could not read " + job.batch);
+            for (std::string line; std::getline(in, line);)
+            {
+               if (!line.empty() && line.back() == '\r')
+                  line.pop_back();
+               std::vector<std::string> col;
+               for (size_t a = 0, b; a <= line.size(); a = b + 1)
+               {
+                  b = std::min(line.find('\t', a), line.size());
+                  col.push_back(line.substr(a, b - a));
+               }
+               if (col.size() >= 2 && !col[0].empty() && !col[1].empty())
+                  sBatch.push_back({ col[0], col[1], col.size() > 2 ? col[2] : std::string() });
+            }
+         }
+         if (sBatchNext < sBatch.size())
+         {
+            // The next job in this same process: load its patch the way the first one was (lenient, no strict pass),
+            // and run Warm -> Audio again. The app, the plugin index and the audio engine stay up; that start was the cost.
+            const BatchJob& b = sBatch[sBatchNext++];
+            gHeadlessJob.patch = b.patch;
+            gHeadlessJob.out = b.out;
+            gHeadlessJob.wavPath = b.wav;
+            Patch::Data data;
+            std::string err;
+            if (!Patch::Read(b.patch, data, err))
+               return fail("E_LOAD", err);
+            std::vector<Headless::Issue> ignored;
+            PatchSchema::Resolve(data, MakeSchemaEnv(false), ignored);
+            gHeadlessPatch = data;
+            sStatus.files.clear();
+            sStatus.extraJson.clear();
+            sStatus.patch = b.patch;
+            sStatus.out = b.out;
+            sTicks = 0;
+            sPrepTicks = 0;
+            sPhase = Phase::Warm;
+            LoadPatchFrom(b.patch);
+            return;
+         }
       }
       sStatus.audioSampleRate = rate;
       sStatus.audioFrames = sAudioTotal;

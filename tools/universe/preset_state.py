@@ -2,7 +2,7 @@
 """Level-3 coverage for plug-ins whose saved state embeds the preset text: render every preset file headless, no GUI.
 
     preset_state.py --plugin Diva --presets "/Library/Audio/Presets/u-he/Diva" [--ext h2p] [--states plugin_states_key.jsonl]
-                    [--budget 20] [--limit N] [--stride/--offset] [--lead 4] [--resume] [--list]
+                    [--budget 20] [--limit N] [--stride/--offset] [--lead 4] [--batch 25] [--resume] [--list]
 
 Needs a template: the plug-in's default state from plugin_states.py (--plugin-state). A splicer per container format:
 
@@ -121,6 +121,7 @@ def main():
     ap.add_argument("--lead", type=float, default=2.0)
     ap.add_argument("--notes", default=rp.STIMULUS)
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--batch", type=int, default=rp.BATCH, help="presets per Infinite process")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
     rp.LEAD = a.lead
@@ -139,6 +140,25 @@ def main():
     t = {"instrument": True, "format": "vst3", "id": tmpl["id"], "name": tmpl["name"], "vendor": ""}
     binp = rp.infinite_bin()
     t0, n, ok, bad = time.time(), 0, 0, 0
+    pend = []
+
+    def flush():
+        nonlocal ok, bad
+        with tempfile.TemporaryDirectory() as tmp:
+            got = rp.render_states(binp, t, [x[3] for x in pend], tmp)
+        for (label, rel, data, _), (win, params) in zip(pend, got):
+            if win is None:
+                bad += 1
+                print("fail", rel, params, flush=True)
+                continue
+            tg = nks_state.tags_of(nks_state.read_nksf(data)[0]) if kind == "nks" else {}
+            with open(out, "a") as fo:
+                for row in rp.state_rows(t, 3, label, os.path.basename(rel), data, win, params, tg):
+                    fo.write(json.dumps(row, separators=(",", ":")) + "\n")
+            ok += 1
+        pend.clear()
+        print("%d ok %d bad %.2fs/preset" % (ok, bad, (time.time() - t0) / max(1, n)), flush=True)
+
     for i, (rel, data) in enumerate(presets_in_order(a.presets, a.order) if a.order else presets(a.presets, a.ext)):
         if i % a.stride != a.offset:
             continue
@@ -155,20 +175,11 @@ def main():
         if new is None:
             print("skip (no splice)", rel, flush=True)
             continue
-        state = base64.b64encode(new).decode()
-        with tempfile.TemporaryDirectory() as tmp:
-            win, params = rp.render_state(binp, t, state, tmp)
-        if win is None:
-            bad += 1
-            print("fail", rel, params, flush=True)
-            continue
-        tg = nks_state.tags_of(nks_state.read_nksf(data)[0]) if kind == "nks" else {}
-        with open(out, "a") as fo:
-            for row in rp.state_rows(t, 3, label, os.path.basename(rel), data, win, params, tg):
-                fo.write(json.dumps(row, separators=(",", ":")) + "\n")
-        ok += 1
-        if ok % 10 == 0:
-            print("%d ok %d bad %.1fs/preset" % (ok, bad, (time.time() - t0) / max(1, n)), flush=True)
+        pend.append((label, rel, data, base64.b64encode(new).decode()))
+        if len(pend) >= a.batch:
+            flush()
+    if pend:
+        flush()
     print("done: %d ok %d bad" % (ok, bad))
 
 

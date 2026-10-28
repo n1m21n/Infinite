@@ -323,6 +323,13 @@ namespace Headless
                return true;
             job.wavPath = v;
          }
+         else if (a == "--batch" && job.mode == Mode::AudioSummary)
+         {
+            const char* v = next("--batch");
+            if (v == nullptr)
+               return true;
+            job.batch = v;
+         }
          else if ((a == "--notes" || a == "--note-map" || a == "--stems" || a == "--stems-dir") && job.mode == Mode::AudioSummary)
          {
             const char* v = next(a.c_str());

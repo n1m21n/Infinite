@@ -166,8 +166,27 @@ Found while checking the first rows, fixed for every plug-in:
 **Noise floor, Diva (0.7, 51 presets rendered twice):** descriptor R2 ceiling 0.994 at C3, 0.996 at C4, 0.987 at C3f; log-mel
 repeat error 0.18 / 0.30 / 0.35 dB. Render noise is far below every bar, so any gap to the bars is the model's or the data's.
 
+**Render speed (2026-10-28): 8.2 s -> about 1 s per preset per machine.** Measured, not guessed. Python is 0.07 s of a preset. Each headless run
+paid a full app start and exit (about 3 s), and Diva's preset load ran twice:
+
+| Cost per preset (Diva, Pro) | Before | Now | Fix |
+|---|---|---|---|
+| App start and exit | 2.8 s | 0.12 s | `--audio-summary --batch <list>`: one Infinite process measures 25 presets (`render_pass.render_states`, `BATCH`); every out.json carries its own plugins block; a job that kills the process is marked failed and the rest rerun |
+| Preset state load | 1.4-2.4 s | 0.68 s | single-component VST3 (component is the controller, u-he): the controller blob equal to the component blob is not loaded a second time (`PluginVST3RestoreState`); fresh-process sound bit-identical, knobs identical |
+| Render 11 s of audio + measure | about 1 s | about 1 s | the stimulus itself; unchanged |
+
+Throughput: 1.9 s per preset in one process; 0.97 s per preset with 4 shards on the Pro (8 cores: 6 shards is no faster, CPU bound).
+The full Diva library (15,248 presets, 966 done) is split across both machines: `order_diva_rest.txt` (the 3,000 coreset first,
+then the other banks) at stride 8, Pro shards 0-3 (`scratch_omni/diva_v3.sh` -> `preset_diva_v2.jsonl`), Air shards 4-7
+(`~/air_v3.command` -> `preset_diva_v2_air.jsonl`, then Omnisphere and Vital, batched too). About 2 h for both, against 11 h before.
+Two things the batch changes, both accepted: (1) Diva's free-running analog drift now continues from job to job in one process, so
+a preset's 2nd-25th render is a different take of it (mel 1.2 dB median from the fresh-process take, zero mean; the first job of a
+batch is bit-identical to it); the noise floor above is for a fresh process, and the batch takes are the more honest spread.
+(2) The Air has Diva 1.4.8, the Pro 1.4.5: the parameter tables differ only in two pitch-bend defaults, so `sound_data.same_knobs`
+lets the files merge (address, name, unit, range equal).
+
 ```
- render_state (one per preset) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
+ render_states (25 presets per process) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
    host knobs + mel + desc          per plug-in      groups, split        seconds        95% intervals, noise ceiling)
 ```
 
