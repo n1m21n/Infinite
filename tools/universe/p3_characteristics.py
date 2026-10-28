@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """P3 of the sound-model handoff: does the forward model understand the characteristics? knobs + note -> characteristic summaries.
 
-    p3_characteristics.py diva_m1.jsonl [--frac 0.5] [--seeds 1] [--epochs 300] [--out DIR] [--extra ROWS.jsonl ...]
+    p3_characteristics.py diva_m1.jsonl [--frac 0.5] [--seeds 1] [--epochs 300] [--out DIR] [--extra ROWS.jsonl ...] [--trim 0.95]
 
 Same data, split, knob encoding and network as M1 (m1_forward.train), with the 43 raw descriptors replaced by the characteristics of
 each note (characteristics.from_mel on the stored mel: mean, std and slope of loudness, brightness, sharpness, warmth, weight,
@@ -46,7 +46,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("rows"); ap.add_argument("--seeds", type=int, default=1); ap.add_argument("--epochs", type=int, default=300)
     ap.add_argument("--frac", type=float, default=1.0); ap.add_argument("--out", default="~/Infinite/training-data/models/p3_char")
-    ap.add_argument("--extra", nargs="*", default=[])
+    ap.add_argument("--extra", nargs="*", default=[]); ap.add_argument("--trim", type=float, default=1.0)
     a = ap.parse_args()
     out = os.path.expanduser(a.out); os.makedirs(out, exist_ok=True); lines = []
     def log(s):
@@ -70,6 +70,10 @@ def main():
     log("P3 | frac %.2f | %s | %d presets, %d targets | extra %s (%d presets) | targets measured in %.0f s | %s"
         % (a.frac, a.rows, len(keep), len(COLS), ",".join(os.path.basename(p) for p in a.extra) or "none",
            0 if e is None else len(e["src"]), time.time() - t0, time.strftime("%Y-%m-%d %H:%M")))
+    if a.trim < 1:  # a column whose commonest value covers >= trim of the main presets teaches too little to keep
+        share = np.array([np.unique(np.round(X[:, j], 6), return_counts=True)[1].max() / len(X) for j in range(X.shape[1])])
+        X, XE = X[:, share < a.trim], XE[:, share < a.trim]
+        log("trim %.2f: %d of %d knob columns kept" % (a.trim, X.shape[1], len(share)))
     for sn, m in sd.split(d).items():
         te_p, tr_p = keep[m[keep]], keep[~m[keep]]
         gtr = np.unique(d["group"][tr_p]); rng = np.random.default_rng(0); va_g = set(rng.choice(gtr, max(1, int(0.15 * len(gtr))), False))

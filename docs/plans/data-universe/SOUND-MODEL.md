@@ -124,6 +124,26 @@ about one more doubling (about 2,300 fit presets, about 3,300 rendered). R2 at t
 which is the whole Diva library or more: presets alone are the slow road to the R2 bars. Baselines: mean and k-NN both sit at R2 about 0,
 so knob distance does not predict sound; the model has to learn which knobs matter.
 
+**Learning curve, P3 characteristics (HANDOFF P3), C3, 1 seed (2026-10-28)**, median head R2 over the 11 characteristic means:
+
+| Fit presets | random | group |
+|---|---|---|
+| ~281 | 0.045 | -0.074 |
+| ~562 | 0.084 | 0.010 |
+| ~1,125 | 0.153 | 0.082 |
+| bar | 0.6 each | 0.6 each |
+
+Diagnosis before any collection:
+
+| Question | Test | Answer |
+|---|---|---|
+| Is the target noisy? | same preset rendered twice (`noise_diva_b`, 153 note pairs) | no: repeat r >= 0.97 on every axis, ceiling about 1 |
+| Does one knob carry an axis? | best single-knob correlation per axis | no: brightness vs VCF frequency 0.28, attack vs attack 0.48, warmth 0.15 |
+| Do more presets close it? | the curve above | slowly: +0.04-0.07 per doubling, 7+ doublings |
+| Through the predicted mel? | characteristics measured on predicted mel | worse than the direct head; k-NN about 0 |
+
+So the gap is knob interactions the library never shows apart, which is what D2 is for.
+
 **Data types, what each teaches, and the test it must pass:**
 
 | Data | Teaches | Fixes which error | Cost | Proof it helped |
