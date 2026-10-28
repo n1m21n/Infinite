@@ -109,40 +109,56 @@ Designs, each a folder name (= bank):
 |---|---|---|
 | `base` | base points: every swept knob drawn uniformly in its range (log for times and frequencies) | per Step 1 mix |
 | `one` | one knob moved on a base point to a value drawn the same way (|move| > 10% of range) | per Step 1 mix |
-| `pair` | two knobs moved together on a base point (filter x resonance, attack x decay, fm x detune, noise x cutoff) | 10% |
+| `pair` | two or more knobs moved together on a base point; first batch uniform, later rounds where the models disagree most about the combined effect | 10% |
 
 First batch: 2,000 renders (about 30 min at 4 shards; split into two 15 min jobs), stop file `~/STOP_OWN`.
 Check: row count grows within 3 min; `characteristics.py test` still passes; 2 renders of the same point agree r >= 0.97.
 
-## The self-learning loop (owner 2026-10-28: understand first, recipes come out of it)
+## The self-learning loop (as agreed with the owner; nothing in it is hand-picked)
 
-The goal is not a recipe list. The model **understands** sound through the P1 characteristics, and from that understanding it
-**invents its own recipes** by changing ingredients (engine, knobs, notes), keeps what is good and new, and learns from every miss.
-Recipes are a by-product of understanding; creativity is the point. The map (Diva, Omnisphere, samples, wavetable data) is a
-guardrail for "this is a real, good sound", never a template to copy (same rule as the MIDI corpus).
+Built only from what the owner already approved, so later sessions do not reinvent it:
+
+| Agreed (where) | What it means here |
+|---|---|
+| Map vs learner ("correct you cracked it", this plan) | other synths, presets, samples, wavetables = map of real, good sounds; Infinite's engines learn, without limit |
+| Five ways to learn what each ingredient does (owner "okay good") | 1 one-knob tests, 2 sweeps, 3 knob combinations, 4 render where the model is unsure, 5 the DSP math of our own engines as a prior |
+| Moves are generative, no limit (owner) | a move = target point minus current point on the 22 axes; the model finds the knobs. No list of moves, no fixed recipes |
+| Creativity, defined (`dials.md`, approved 2026-10-27) | novelty N + reach R (rare knobs, rare values), above the critic floor K; variety V reported; freedom dial c |
+| Understand through the characteristics (owner, P1) | every judgement is made on the 22 axes, never on knob names |
+| Everything connected to everything (owner) | one model over all engines and all knobs; no hand-made pairs, cells or groups |
+
+What is learned and what is not. The rule: **nothing about sound is decided by hand; only the bars, the budgets and the axes' math are**.
+
+| Part | Learned how | Not allowed |
+|---|---|---|
+| Ingredient -> sound | a nonlinear network per engine (M1 trunk: knobs + note -> 22 axis curves), with a DSP prior for our engines (way 5): the known part of the response (e.g. cutoff -> centroid, envelope times -> attack / decay) is an input feature, the network learns the rest | a straight-line (linear) map, one effect per knob |
+| What each knob does | read off the network along the whole knob range at the current sound (way 2, a curve, not a slope); combinations from the network's mixed response (way 3) | a fixed table "attack up = softer" |
+| Which combinations to test | the pairs and groups where the models disagree most about the combined effect | fixed pairs (filter x resonance ...) |
+| What to render next | expected information gain: candidates where 3 seeds disagree most (way 4), drawn by the freedom dial so rare knobs and values get their share | fixed ratios of designs |
+| What is good | critic learned from the map vs random renders, on the axes only (dials.md floor K); hard checks (silence, clipping, DC, tuning) | hand rules of taste |
+| What is new | novelty N and reach R from `dials.md`, measured against everything rendered so far | a hand-cut grid of the space |
+| Clusters (pluck, pad, bass ...) | regions found in the data (density of the map on the 22 axes), named afterwards from preset and sample names | categories decided first |
+
+How sure: no claim counts until a render the model never saw confirms it.
+
+| Claim | Test, written down before the render | Counts when |
+|---|---|---|
+| the model understands an axis | P3: group split, whole designs held out, 3 seeds | R2 >= 0.6 (bar unchanged) |
+| the model knows what a knob does here | it predicts the change of a real one-knob or pair render before it happens | predicted vs measured change: sign right >= 90%, size r >= 0.7, on 200 held-out moves |
+| the model can make a sound | P5: target point, the model's knobs, render, measure | closer than the nearest existing render, within repeat noise on passed axes |
+| the critic knows good | held-out map rows vs held-out random renders | AUC >= 0.8, and the owner hears 20 of its top and bottom picks blind |
+| creativity is real | `dials.md` checks: c = 0 reproduces typical, N and R rise with c, K stays above floor at c = 0.7 | all three hold on held-out contexts |
 
 ```
-           +--------------------------- learns from every render -------------------------------+
-           v                                                                                      |
- 1 UNDERSTAND                 2 CHANGE INGREDIENTS            3 RENDER + MEASURE          4 JUDGE |
- forward model per engine     curiosity: where the models     Infinite headless,          critic: good? (map vs random)
- knobs + note -> the 22 axes  disagree (unknown) and where    characteristics.py          novelty: a new place in the space?
- + "what does this knob do    the space is empty (new);       (same rules as the map)     keep -> the sound space (atlas)
-   here" (gradient)           mutate kept sounds, cross       miss = model was wrong  ----+  drop -> still training data
-                              engines, pairs of knobs
+  map (Diva, Omnisphere, samples, wavetables)        learner (Oscillator, Analog, Wavetable, FM, Metallic, String)
+        |  measured on the 22 axes                        |  rendered without limit, chosen by the model
+        v                                                 v
+  critic: what is good  ----------------->  network: ingredients -> 22 axes  (+ DSP prior)
+  clusters: found, not given                      |  unsure where? -> render there (way 4)
+                                                  |  predicts each change before it is rendered -> checked
+  target = any point, or current + a move ------> search knobs on the network -> render -> measure
+                                                  '-- every miss is new training data ----------------'
 ```
-
-| Part | What it is | Serves | Done / bar |
-|---|---|---|---|
-| Understand | forward model per engine (Step 3) + the knob-effect read-out: for any sound, which knob moves which axis and how far (finite differences on the model, checked by real one-knob renders) | P3 | P3 bar unchanged; read-out agrees in sign with real renders on >= 80% of checked moves |
-| Change ingredients | proposals = ensemble disagreement (unknown) + empty cells of the space (new) + mutations of kept sounds (small knob moves, pairs, engine swap) | P3 data rule: every render is chosen because it teaches or explores | each round's renders raise the curve or fill cells; two flat rounds -> stop (Step 4) |
-| Judge: good | critic trained on characteristic curves: map rows (human-made presets, samples) vs uniform random renders; plus hard checks (silence, clipping, DC, tuning off > 30 cents, stuck notes) | guardrail | held-out map rows ranked above random renders, AUC >= 0.8; the critic never sees knobs, only the shared space |
-| Judge: new | the sound space as a grid over 6 axes (brightness, attack, decay, noisiness, weight, movement; 5 bins each) = MAP-Elites (Mouret and Clune 2015) / novelty search (Lehman and Stanley 2011); each cell keeps its best-judged sound with its recipe | P4 / P5 index | cells filled, and share of map-occupied cells reached, recorded per round |
-| Learn from misses | every render is a training row; where the model predicted wrong, the next round draws more near it | P3 | the curve point per round in `SOUND-MODEL.md` 4b |
-
-Making a sound (P5, after P3 passes): target = any point (a map sound, a word later, or "this pluck, but as a pad" = current point
-plus a move). Start from the nearest kept sound of any engine, search its knobs on the forward model, render, measure; the miss
-goes back into training. Moves are generative (target minus current), never a fixed list.
 
 ## Step 3 - understand: P3 on each engine (the real P3 bar)
 
@@ -159,25 +175,27 @@ p3_characteristics.py own_<engine>.jsonl --frac 0.25 / 0.5    # learning curve, 
 
 Order: Oscillator (proves the tool), Analog, then the others in the Step 2 table, one engine per run.
 
-## Step 4 - change ingredients: active learning + curiosity (P3), repeat until the bar or the curve flattens
+## Step 4 - change ingredients: the model picks the next renders (P3), until the bar or the curve flattens
 
-Per round, 2,000 renders: 50% where 3 seeds disagree most (from 20,000 unrendered candidates), 30% mutations of kept sounds into
-empty cells, 20% uniform (keeps the curve honest). Refit, record the curve point and cells filled. Stop rule: two rounds with < 0.02
-gain on the group median -> write the miss and the curve, go on with what passed. Tool: `own_sweeps.py --propose <model dir>`.
+Per round, 2,000 renders chosen by the model: from 20,000 unrendered candidates (drawn with the freedom dial c = 0.5, so rare knobs
+and values are present), take the ones with the largest disagreement of 3 seeds on the 22 axes, single knobs and combinations alike;
+200 uniform draws stay in every round as the honest check. Before rendering, each model writes its predictions; after, record the
+prediction test (sign, size) and the P3 curve point. Stop rule: two rounds with < 0.02 gain on the group median -> write the miss and
+the curve, go on with what passed. Tool: `own_sweeps.py --propose <model dir>`.
 
-## Step 5 - judge: the critic and the sound space
+## Step 5 - judge: good and new
 
-Tool `tools/universe/sound_space.py` (new): `critic` (train / score, logistic or small MLP on characteristic summaries), `atlas`
-(cell grid, best sound per cell, recipe = engine + knobs + note), `report` (cells filled, map cells reached, per engine). Runs on
-rows that exist; no renders of its own. Critic bar: AUC >= 0.8 on held-out map rows vs held-out random renders.
+Tool `tools/universe/sound_space.py` (new): `critic` (train / score on axis summaries, map vs random renders), `novelty` (N and R
+of `dials.md` for any render against all renders so far), `clusters` (regions found in the map's density on the 22 axes, named
+from preset and sample names afterwards), `report`. Runs on rows that exist; no renders of its own. Bars in the "how sure" table.
 
 Wavetable data as the oscillator-level map: measure each frame of `wt.jsonl` and `wt_synth.jsonl` (brightness, odd / even,
-formant) into the same grid; report the share of their cells the 64 built-in tables reach. A large unreached share is the evidence
+formant) into the same space; report how much of their region the 64 built-in tables reach. A large unreached share is the evidence
 for loading table files into the node (owner design first).
 
 ## Step 6 - reach test: map -> Infinite engines (P4 then P5 preview)
 
-For 300 map sounds (Diva, samples), start from the nearest kept sound, search knobs on the forward model, render, measure the
+For 300 map sounds (Diva, samples), start from the nearest rendered sound of any engine, search knobs on the forward model, render, measure the
 distance. Bar (P5): closer than the nearest existing render, and within the repeat noise on the axes that passed P3. Misses are
 rendered rows for the next Step 4 round. Tool: `p4_shared.py` for distances, `sound_space.py` for the start points.
 
@@ -197,4 +215,4 @@ attack) - shown to the owner, not built here.
 | owner's preset drive | a learning curve says more map rows help |
 | piano / wind / resynthesis nodes | Step 7 numbers, then owner approval of a design |
 | P6 maps (families, emotion rules) | P4 passes |
-| loading collected wavetables into the node | Step 5 shows the built-in tables miss a large share of their cells; owner design first |
+| loading collected wavetables into the node | Step 5 shows the built-in tables miss a large part of their region; owner design first |
