@@ -180,3 +180,55 @@ Each sound is reduced to a row of numbers (`render_pass.py`, `audio_features.py`
 | Time | attack, decay, envelope (40 points), onsets, crest | harmonic/percussive split |
 | Level | rms, peak, low/mid/high share | loudness (LUFS) |
 | Pitch/key | none in render rows | pitch, key, tempo grid |
+
+## 11. Depth audit and gaps to fill (steps 7-12, added 2026-10-28)
+
+Nothing in this section is started except where marked. Every step passes the marginal-value gate (`marginal_gate.py`) before it
+runs in full: a small pilot first, extend only if held-out scores gain more than 0.01 per doubling.
+
+### Depth by area (checked in `~/Infinite/training-data`)
+
+| Area | Have | Depth |
+|---|---|---|
+| Number of knobs | 9,599 Diva knob columns; up to about 1,600 per Omnisphere patch; 6,974 params over 342 Infinite node types (`atlas/node_registry.json`) | Deep |
+| Value of knobs | every preset stores them; 99,771 presets scanned | Deep |
+| Knobs over time | 902 Live-set arcs (`arcs/als.jsonl` 443 + `air_als.jsonl` 459); 11,029 Omnisphere arps; a preset is otherwise one static snapshot | Thin |
+| Sounds | plug-in renders in progress | In progress |
+| Clusters of sounds | 14,161 instruments, 477 clustered by audio, 9,790 by tags, 3,894 unassigned | Thin |
+| Frequency / spectrum | 32 log bands, centroid, rolloff, flatness, 40-point envelope; one vector per note | Shallow (no spectrogram) |
+| Nodes | 342 node types; 68 are audio-related; 32 have a measured response (30 effects, 2 synths); 36 do not (18 of them are synth nodes) | Half measured |
+| Change of nodes | each knob measured alone at 0 / 0.5 / 1 | Shallow |
+| Replaceability | none measured as a pair | Missing |
+| Node chains | chain order from Logic strips and Guitar Rig; 23 connection types in `compat` | Order only |
+
+Correction to an earlier message: "32 of 342" mixed in image, 3D and utility nodes that make no sound. The real gap is the 36
+audio-related nodes without a response.
+
+### Steps
+
+| # | Step | Why (owner's point) | Pilot and gate | Tool | State |
+|---|---|---|---|---|---|
+| 7 | **Spectrogram**: 8 time slices per note in every render row | A sound that moves over time needs a spectrum over time, not one average | Re-run 200 Diva presets with slices; compare held-out R2 of the sound model with and without. Keep only if it gains | `render_pass.measure_windows` extension | not started |
+| 8 | **Moving knobs**: render a knob sweeping from 0 to 1 over the note, for 5 to 10 knobs that matter, on ~100 presets; add the Live-set arcs as shape priors | Moving a knob changes the sound; static snapshots cannot teach that | Gate on a 100-preset pilot; extend to the knobs whose motion changes the spectrogram most | new `--sweep-time` mode in `preset_state.py` | not started |
+| 9 | **Node responses**: only the 36 audio nodes without one, not 310. Sweepable knobs only, 3 settings, measure representatives of similar nodes first | Efficient: skip image / 3D nodes (no sound) and skip a node whose response its nearest measured sibling already predicts | Run the cheap representatives first; extend while the gate gains | `response_harness.py` | **bug found and patched** (uncommitted before this commit): synth nodes with an audio input slot rejected the keyboard note line (`E_KIND_MISMATCH`), so 14 of 16 failed; the other 2 rendered silent. Patch renders them free-running. Rerun not verified. |
+| 10 | **Replaceability**: for each node pair in the same family, distance between measured responses at matched knob settings | A node can stand in for another if their responses are close | Compute from step 9 data; no new renders | new script on `response_native*.jsonl` | not started |
+| 11 | **Chain value**: render about 200 chains (2 to 4 nodes) from real Logic and Guitar Rig chains; test whether the chain's sound is predicted from its parts' responses; score each chain's coherence; cluster chains | A chain gets a value and a place in a cluster, not just an order | Gate: if parts predict the chain well (held-out R2 high), measure fewer chains and predict the rest | new `chain_render.py` | not started |
+| 12 | **Audio analysis upgrade** (below) | The formulas should match what the field uses | Compare old and new features on 200 presets: do clusters or the sound model improve? | `audio_features.py`, `render_pass.py` | not started |
+
+### Audio analysis vs industry practice (read from `audio_features.py`)
+
+| Item | What we do | Industry practice | Verdict |
+|---|---|---|---|
+| Window and FFT | Hann, 4096 at 48 kHz, hop 1024 | Hann, 2048 to 4096, hop a quarter of the window | Standard |
+| Spectrum bands | 32 bands, geometric from 20 Hz to 20 kHz, mean power over the whole window | Mel, Bark or ERB bands (perceptual); frames kept over time | Usable, not perceptual; time averaged away |
+| Centroid, 85% rolloff | Power-weighted centroid; 85% rolloff | Same definitions (librosa, Timbre Toolbox, MPEG-7) | Standard |
+| Flatness | Geometric / arithmetic mean of magnitude (sqrt of power) | Same ratio on power (MPEG-7) | Small variant, fine as a feature, not comparable with others' numbers |
+| Loudness | RMS and peak only | LUFS (ITU-R BS.1770, K-weighted) and psychoacoustic loudness (ISO 532) | Below standard |
+| Attack, decay | Time of the 10 ms RMS peak; time to fall to 10% of peak | Log-attack-time (about 20% to 80% of rise), temporal centroid, effective duration (Timbre Toolbox, Peeters 2011) | Crude |
+| Onsets | Log-compressed spectral flux | Same family (SuperFlux) | Standard |
+| Missing | pitch (f0), MFCC, harmonicity, roughness, spectral flux over time, harmonic/percussive split | Standard in timbre work | Add in step 12; test value before keeping |
+
+### Order after this addition
+
+Finish step 1 to 4 of section 6 first (the data already running), then 9 and 10 (cheap, no new renders for 10), then 7, then 8 and 11,
+then 12. Each is dropped if its pilot does not pass the gate.

@@ -35,23 +35,23 @@ def sweepable(t, cap):
 
 
 def patch(t, wav, values):
-    synth = t["category"] in ("Synths",)
+    synth = t["category"] in ("Synths",) and not t.get("nonote")
     L = ["infinite-patch 1"]
     if synth:
         L += ["node 1 Notes Keyboard", "  id keys", "end"]
-    else:
+    elif not t.get("nonote"):
         L += ["node 1 Modulators Audio File", "  id src", "  s path " + wav, "  b loop 0", "  f volume 1", "  f gain 1", "  f attack 0", "  f release 0", "end"]
     L += ["node 2 %s %s" % (t["category"], t["type"]), "  id fx"]
     for k, (tag, v) in values.items():
         L.append("  %s %s %s" % (tag, k, ("%r" % v) if tag == "f" else int(v)))
-    L += ["end", "node 3 Utility Audio Out", "  id out", "end", "aud out audio fx", "note fx 1 keys" if synth else "aud fx 0 src"]
+    L += ["end", "node 3 Utility Audio Out", "  id out", "end", "aud out audio fx"] + (["note fx 1 keys"] if synth else [] if t.get("nonote") else ["aud fx 0 src"])
     return "\n".join(L) + "\n"
 
 
 def render(binp, t, values, tmp, stim, timeout):
     inf, js, wav = (os.path.join(tmp, n) for n in ("p.inf", "s.json", "out.wav"))
     open(inf, "w").write(patch(t, stim, values))
-    synth = t["category"] == "Synths"
+    synth = t["category"] == "Synths" and not t.get("nonote")
     cmd = [binp, "--audio-summary", inf, js, "--duration", "%g" % (rp.LEAD + rp.WIN * 3), "--sample-rate", str(rp.SR), "--wav", wav, "--lenient",
            "--timeout", str(max(5, int(timeout) - 5))]
     if synth:
@@ -63,9 +63,12 @@ def render(binp, t, values, tmp, stim, timeout):
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return None, "hang"
+    if p.returncode != 0 and "E_KIND_MISMATCH" in p.stdout and t["category"] == "Synths" and not t.get("nonote"):
+        t["nonote"] = True  # free-running generator (audio slot, no note input): render it without the keyboard
+        return render(binp, t, values, tmp, stim, timeout)
     if p.returncode != 0 or not os.path.exists(wav):
         return None, "rc %d: %s" % (p.returncode, (p.stderr.strip().splitlines() or [""])[-1][:120])
-    labels = [n for _, _, n in rp.NOTES] if synth else rp.STIMS
+    labels = [n for _, _, n in rp.NOTES] if synth else ["t0", "t1", "t2"] if t.get("nonote") else rp.STIMS
     return rp.measure_windows(wav, tmp, labels), None
 
 
