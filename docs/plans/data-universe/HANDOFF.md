@@ -272,3 +272,7 @@ Direction right on clearly-changed axes vs all non-zero changes. Analog: sharpne
 ## G7/reach2 Analog (first valid reach result, NaN fix applied)
 
 300 sample-library targets (from the 11 axes + distribution columns), one chosen point per target from 150 model-ranked candidates (3 seeds). Median distance in sd units: nearest existing Analog render **3.43**, predicted for the chosen point 3.65, **measured 4.20**; chosen point closer than the nearest existing render for **13.7%** of targets. Reading: the planner picked from too few candidates (150 per target) to beat the 4,250 renders already there, and the model is optimistic by 0.55 sd. reach.py now has `--refine G` (model-only hill-climb: best 8, 120 children per generation). Next: reach3 on Analog with `--refine 6`; if the measured distance still sits above the nearest-render baseline the model cannot steer toward samples and that stays a stated limit, not a claim.
+
+### C2 with a derivative-informed loss (Analog, lam 1): no gain
+
+`c2_delta.py` (descriptor-only model, extra loss on f(a)-f(b) over 6,629 training pairs differing in <= 3 knobs): direction right **63.9%** (was 63.5%), size r **0.626** (was 0.635), 1,412 moves -> MISS; moves >= 0.5 sd: 78.2%, r 0.716 (was 75.5%, 0.707). Within noise of the plain model. Reading: with this much data the difference loss adds nothing at weight 1; testing lam 10 next. If that is also flat, the limit is data on the weak axes (fullness, noisiness, movement) or the axes themselves (P1/P3 in SECOND-OPINION.md), not the training loss.
