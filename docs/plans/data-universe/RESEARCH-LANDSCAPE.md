@@ -66,3 +66,14 @@ A node chain is already shaped like a neural net: nodes are regions, cables are 
 | The chain is really learned, not memorised | error does not grow with depth beyond the sum of per-node errors; held-out chain shapes score |
 
 Step G6 (chains) is where the data for this is made. Dive deeper there as its own track.
+
+## Activity map v1 (tools/universe/activity.py, from stored one-knob moves, no render)
+
+| Engine | Pairs | Top knobs (activity = mean scaled change of the 11 axes) | Top-3 share |
+|---|---|---|---|
+| Analog | 1,269 | filterType 0.56, cutoff 0.38, attack 0.27, resonance 0.18, noise 0.18 | 40% |
+| Oscillator | see run | filterType 0.54, cutoff 0.46, sync 0.37, unison 0.22, waveform 0.21 | 50% |
+
+- Same shape in both engines: the filter is the busiest region, then envelope and oscillator shape; a few knobs carry half the change, most carry little (like sparse neural activity).
+- **Finding:** Analog `detune` = 0.000 and `spread` = 0.02 because `voices` is fixed at 1 in the sweep (the node itself disables spread below 2 voices). The map shows a knob is dead *given the other knobs*, so activity depends on context. Next: sweep `voices` so those knobs are exercised, and measure activity per context (conditional activity), as in neuroscience where a region's response depends on network state.
+- Neuroscience ideas to borrow: sparse coding (few active units), lesion studies (bypass a node and measure the loss), functional connectivity (which node pairs change the result together = interaction strength), and tuning curves (output axis vs one knob swept).
