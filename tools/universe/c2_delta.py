@@ -51,7 +51,7 @@ def train(X, V, P, seed, epochs, lam):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--node", required=True); ap.add_argument("--epochs", type=int, default=200)
-    ap.add_argument("--seeds", type=int, default=3); ap.add_argument("--lam", type=float, default=1.0); a = ap.parse_args()
+    ap.add_argument("--seeds", type=int, default=3); ap.add_argument("--lam", type=float, default=1.0); ap.add_argument("--min-change", type=float, default=0., help="drop training pairs whose largest axis change is below this many sd"); a = ap.parse_args()
     fn = "own_%s.jsonl" % a.node.lower(); fz = cl.load()["C2"]["sets"][fn]["data"]; d = sd.load(o.out_path(a.node)); pos = {p: i for i, p in enumerate(d["preset_id"])}
     held = sd.split(d)["group"]; keep = np.flatnonzero(d["ok"][:, 0] & ~held)
     Vall = np.full((len(d["preset_id"]), len(p3.COLS)), np.nan)
@@ -59,7 +59,10 @@ def main():
     means = [j for j, n in enumerate(p3.COLS) if n.endswith(".mean")]; names = [p3.COLS[j].split(".")[0] for j in means]
     X = se.encode(d["knobs"]); mv = np.array([[48, 100]], float) / 127; Xi = np.hstack([X, np.repeat(mv, len(X), 0)]).astype(np.float32)
     Vk = Vall[keep]; Vk = np.where(np.isfinite(Vk), Vk, np.nanmean(Vk, 0))
-    P = pairs(d["knobs"][keep]); print("%d training rows, %d near-neighbour pairs" % (len(keep), len(P)), flush=True)
+    P = pairs(d["knobs"][keep])
+    if a.min_change:
+        z = (Vk - Vk.mean(0)) / (Vk.std(0) + 1e-9); P = P[np.abs(z[P[:, 0]] - z[P[:, 1]]).max(1) >= a.min_change]
+    print("%d training rows, %d near-neighbour pairs" % (len(keep), len(P)), flush=True)
     fs = [train(Xi[keep], Vk, P, s, a.epochs, a.lam) for s in range(a.seeds)]
     pred = lambda i: np.mean([f(Xi[i:i + 1])[0][means] for f in fs], 0)
     out = {}
@@ -67,7 +70,7 @@ def main():
         if m["variant"] in pos and m["base"] in pos:
             dv = pred(pos[m["variant"]]) - pred(pos[m["base"]]); out[m["variant"]] = {n: float(x) for n, x in zip(names, dv)}
     tmp = os.path.join(tempfile.gettempdir(), "c2d_%s.json" % a.node); json.dump(out, open(tmp, "w"))
-    subprocess.run([sys.executable, os.path.join(HERE, "claims.py"), "predict", "C2", "--model", "m1d_%s_lam%g" % (a.node.lower(), a.lam), "--file", tmp])
+    subprocess.run([sys.executable, os.path.join(HERE, "claims.py"), "predict", "C2", "--model", "m1d_%s_lam%g_min%g" % (a.node.lower(), a.lam, a.min_change), "--file", tmp])
     class A: pass
     b = A(); b.claim = "C2"; b.file = tmp; cl.cmd_score(b)
 

@@ -292,3 +292,6 @@ Correlation of start distance with measured distance 0.89. Two findings: (1) the
 ### reach2 Oscillator (same method, 150 candidates per target)
 
 300 targets: nearest existing render **2.03** sd, predicted 2.01, **measured 2.57**; closer than nearest for **7.0%**. By tertile (near / middle / far): start 1.47 / 2.03 / 3.16, measured 1.80 / 2.45 / 4.05, closer 5% / 9% / 7%. Correlation of start distance with measured distance 0.77. Same picture as Analog: the model-picked point is worse than the nearest existing render, and the target's distance to the engine's own renders predicts the outcome. Oscillator's renders cover the target space better (median nearest 2.03 vs 3.43).
+
+### C2 delta-loss with near-zero pairs filtered (reviewer hypothesis) - Analog
+`c2_delta.py --lam 1 --min-change 0.3` (drop training pairs whose largest axis change is < 0.3 sd): direction 63.0%, size r 0.609 (bar 90 / 0.7) -> MISS. Plain model 63.5% / 0.635; lam1 63.9% / 0.626. So neither the difference loss nor filtering the noisy pairs helps; the gap is not a derivative-fit problem. At >= 0.5 sd (188 moves) direction is 73.9%, r 0.694, consistent with the C2.1 effect-size-gated reading.

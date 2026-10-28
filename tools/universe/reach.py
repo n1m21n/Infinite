@@ -44,6 +44,26 @@ def own_state(node):
     return d, keep, V
 
 
+def make_encoder(K0, max_levels=12):
+    """sound_eval.encode with its column layout and scaling frozen on K0, so new points (refine children) get the training width."""
+    spec = []
+    for j in range(K0.shape[1]):
+        c = K0[:, j]; f = np.isfinite(c)
+        if not f.any(): continue
+        c = np.where(f, c, np.nanmean(c)); lv = np.unique(np.round(c, 4))
+        if len(lv) <= 1: continue
+        spec.append(("sel", j, lv) if (len(lv) <= max_levels and len(lv) < len(c) / 10) else ("num", j, None))
+    def raw(K):
+        cols = []
+        for kind, j, lv in spec:
+            c = np.where(np.isfinite(K[:, j]), K[:, j], np.nanmean(K0[:, j]))
+            if kind == "sel": cols += [(np.round(c, 4) == v).astype(np.float64) for v in lv]
+            else: cols.append(c.astype(np.float64))
+        return np.stack(cols, 1)
+    R0 = raw(K0); mu, sd_ = R0.mean(0), R0.std(0) + 1e-9
+    return lambda K: (raw(K) - mu) / sd_
+
+
 def cmd_plan(a):
     table, sw, fixed = o.param_table(a.node); d, keep, V = own_state(a.node)
     spread = np.nanstd(V[keep], 0) + 1e-9; T = targets(a.targets)
@@ -63,6 +83,7 @@ def cmd_plan(a):
                 CU.append(u)
     CU = np.array(CU); per = a.candidates // len(T)
     XX = se.encode(np.vstack([d["knobs"], CU])); X, XC = XX[:len(d["knobs"])], XX[len(d["knobs"]):]
+    enc = make_encoder(np.vstack([d["knobs"], CU]))          # same layout and scaling as XX, for the refine children
     mv = np.array([[48, 100]], float) / 127
     perm = np.random.default_rng(0).permutation(keep); nva = max(1, int(.15 * len(perm))); va, fit = perm[:nva], perm[nva:]
     Xa, _, Ma, Ia, Ta = m1.samples(d, X, fit[d["ok"][fit, 0]]); Xv, _, Mv, Iv, Tv = m1.samples(d, X, va[d["ok"][va, 0]])
@@ -90,7 +111,7 @@ def cmd_plan(a):
                         c = list(u)
                         for j in rng.sample(range(len(sw)), rng.choice((1, 2))): c[j] = min(1., max(0., c[j] + rng.gauss(0, .15))) if rng.random() < .7 else draw()
                         kids.append(c)
-                K = np.array(kids); XK = se.encode(np.vstack([d["knobs"], K]))[len(d["knobs"]):]
+                K = np.array(kids); XK = enc(K)
                 PS = np.stack([f(np.hstack([XK, np.repeat(mv, len(XK), 0)]).astype(np.float32))[0] for f in fs_]); PK = PS.mean(0)
                 dk = (((PK - tv) / spread) ** 2).sum(1) ** .5 + a.beta * (PS.std(0) / spread).sum(1) ** 1   # lower-confidence bound: pessimistic by the seeds' spread
                 o_ = np.argsort(dk)[:8]; pop = [kids[i] for i in o_]
