@@ -3,7 +3,7 @@
 The core of the sound model (HANDOFF.md section 1): one space whose axes are measurable rules, for timbre and music alike.
 Each axis is one opposite pair (dark / bright is one axis), has one math rule, one unit, and is measured as a **curve over time**;
 a sound or phrase is the set of its curves, summarised as mean, spread (std) and slope per second.
-Tool: `tools/universe/characteristics.py` (P2). Status: proposed, owner sign-off pending; P2 runs on this list meanwhile.
+Tool: `tools/universe/characteristics.py` (P2). Status: approved by the owner 2026-10-28; axis 20 (space) added the same day.
 
 ```
             timbre axes (audio, mel, band rows)                    music axes (MIDI; synth rows give pitch from their note)
@@ -29,6 +29,7 @@ Tool: `tools/universe/characteristics.py` (P2). Status: proposed, owner sign-off
 | 10 | **decay** short ↔ long | time from the peak until the level is 20 dB under it; censored at the window end (flagged) | s | decay / release in Peeters 2011 |
 | 11 | **movement** static ↔ evolving | spectral flux: mean over audible bands of the absolute dB change frame to frame | dB per second | spectral flux / variation, Peeters 2011; McAdams 1995 "spectral flux" timbre axis |
 | 12 | **width** mono ↔ wide | 1 - correlation of left and right | 0-2 | inter-channel coherence (Blauert 1997) |
+| 20 | **space** dry ↔ roomy | level of the tail after note release relative to the held level, in dB (reverb and delay leave a tail; a dry pluck drops to the floor); not measured yet, needs renders that record the release | dB | reverberance and clarity C50 / C80 (ISO 3382) |
 
 ## Music axes
 

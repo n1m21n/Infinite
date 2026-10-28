@@ -31,7 +31,20 @@ that space, by rule. No UI/UX now.
 | P5 Makes | Set knobs (and notes) to reach a target characteristic point; render; measure | rendered point within a set distance of the target, better than the closest existing preset | after P3 |
 | P6 Maps | Clusters (instrument families) and the owner's emotion rules over the characteristic curves | owner's rules written; clusters checked against reference datasets | after P4 |
 
-**Status 2026-10-28:** P1 written (`CHARACTERISTICS.md`, 18 axes; owner sign-off pending, work continues on it). P2 done: every
+**The owner's ladder (2026-10-28).** Each level has its own structure and its own characteristics, and is built from the one under it:
+
+```
+data > interpretation > sound > cluster of sounds > instrument > cluster of instruments > mix > full song
+ P2       P1 axes        P3/P5      P4 map            P6 families     P6 + arrangement      later    later
+```
+
+Owner's view of sound: every sound is mouldable into another cluster by knobs (pluck -> pad: longer attack and decay, more space;
+pluck -> bass: lower pitch; chord -> melody: pick pitches; percussion = short high-transient sounds, high or low). So the model's job
+is the knob combination that moves a sound between clusters; synth presets give the anchors (a kick, a bass, a pad), and every
+knob is to be mapped onto Infinite's own synths and effects so each sound can be made in Infinite. The owner holds many more presets
+on the drive: ask only when a curve says they make the model more robust.
+
+**Status 2026-10-28:** P1 approved by the owner (`CHARACTERISTICS.md`, 18 axes + space added). P2 done: every
 held source measured, coverage and cross-form agreement in `CHARACTERISTICS.md`; brightness / sharpness agree 0.96 / 0.92 between mel
 and band forms of the same render. P3 first pass (`p3_characteristics.py`, Diva v2 rows, C3, 1 seed): 0 of 11 characteristic
 means at the 0.6 bar; median head R2 0.153 random, 0.082 group (best: attack 0.44, density 0.23 on group). Not the renders: repeat
