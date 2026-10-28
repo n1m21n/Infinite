@@ -507,7 +507,7 @@ Axes 23-31 measured on all locally pulled MIDI (a31 223,824 rows, 293 errors); `
 - Not yet done: per-part critic evaluation; the 2,252 `none` (no audio, no usable tags) rows in instruments_clustered stay unassigned there.
 
 ## C5 mood test, round 1: MISS, and the test was invalid (2026-10-28)
-Owner's answers: real 6/20, composed 6/20, total 12/40 (chance is 10). Every answer was "tense" or "sad": no clip read as happy or calm. Owner: the clips sounded like noisy pads, "even the live generator".
-Cause (mine, not the mood model): clips used default-0.5 / randomly drawn Analog recipes, so noise, drive, fm and detune sat in every voice and real EMOPIA piano was rendered through the same noisy pad. The test measured the timbre, not the mood. Same cause explains compose.py (and the site generator's random recipe draws) sounding like noisy pads.
+Owner's answers: real 6/20, composed 6/20, total 12/40 (chance is 10). Every answer was "tense" or "sad": no clip read as happy or calm. Owner: the clips in MY TEST sounded like noisy pads. Correction (owner, 2026-10-29): the live Generate Samples node and the website generator are fine; the complaint was only about the test I built.
+Cause (mine, not the mood model): clips used default-0.5 / randomly drawn Analog recipes, so noise, drive, fm and detune sat in every voice and real EMOPIA piano was rendered through the same noisy pad. The test measured the timbre, not the mood. Same cause explains compose.py sounding like noisy pads. This says nothing about the live node, which the owner confirms is fine.
 Fix: compose.CLEAN forces noise 0, drive 0, fm 0, low resonance, small detune on every part; C5 real clips use a fixed clean pluck voice. Round 2 rebuilt at training-data/eval/listen/c5_mood. Round 1 stays recorded as a miss.
 Determinism (item 8): `own_sweeps.py check` worst mel r = 1.00000 on Analog, FM, Oscillator, Metallic, Equation Synth, Sampler, Field Synth (bar 0.97): MET for those 7.
