@@ -122,6 +122,11 @@ def cmd_score(a):
     R = np.array(res)
     print("%s %s: %d targets | nearest existing render %.2f | predicted %.2f | measured %.2f (median) | closer than nearest: %.1f%%" %
           (a.node, a.round, len(R), np.median(R[:, 0]), np.median(R[:, 1]), np.median(R[:, 2]), 100 * (R[:, 2] < R[:, 0]).mean()))
+    # out-of-gamut view: does the target's distance to the engine's own renders (start dist) say how far the pick lands? tertiles of start dist
+    cut = np.quantile(R[:, 0], [1 / 3, 2 / 3])
+    for name, m in (("near targets", R[:, 0] <= cut[0]), ("middle", (R[:, 0] > cut[0]) & (R[:, 0] <= cut[1])), ("far targets", R[:, 0] > cut[1])):
+        if m.sum(): print("    %-13s start %.2f (n=%d): measured %.2f, closer than nearest %.1f%%" % (name, np.median(R[m, 0]), m.sum(), np.median(R[m, 2]), 100 * (R[m, 2] < R[m, 0]).mean()))
+    print("    correlation of start dist with measured dist: %.2f" % np.corrcoef(R[:, 0], R[:, 2])[0, 1])
 
 
 def main():
