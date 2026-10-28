@@ -185,6 +185,19 @@ batch is bit-identical to it); the noise floor above is for a fresh process, and
 (2) The Air has Diva 1.4.8, the Pro 1.4.5: the parameter tables differ only in two pitch-bend defaults, so `sound_data.same_knobs`
 lets the files merge (address, name, unit, range equal).
 
+**Stop point (2026-10-28): collect no more until M1 says more data helps.** Diva rows: 3,810 (Pro `preset_diva_v2.jsonl`, coreset
+3,000 included, still growing at 1.08 presets/s while `diva_v3.sh` runs) + 225 (Air `preset_diva_v2_air.jsonl`). Found on the way:
+each Diva render process holds about 3.9 GB, live, allocated by Diva's own state load in 128 MB blocks (flat across a batch, so not a
+leak; mostly zero pages, so 4 shards on 8 GB still give 1.08 presets/s against 1.02 for 3). The Air shards stalled after 09:02 with
+empty logs (cause not found; a hand run of the same command works) and are stopped (`~/STOP_V3` on the Air). Collection was eating the
+time meant for the model, so the next session starts with the model, not the shards:
+
+1. Stop the Pro (`touch ~/STOP_V3`), merge the two Diva files (`same_knobs` allows it).
+2. Run M1 on them, 3 seeds: `OMP_NUM_THREADS=4 nice -n 5 ~/Infinite/ml-venv/bin/python -I m1_forward.py <rows> --seeds 3`.
+3. Learning curve: the same M1 on 25 / 50 / 100% of the training presets. If group R2 and mel still climb from 50 to 100%,
+   render more (resume the shards); if flat, more presets will not move the bars, so improve the model (encoding, mel decoder)
+   or the stimulus instead, and Diva collection ends.
+
 ```
  render_states (25 presets per process) ──▶ row v2 jsonl ──▶ sound_data.load ──▶ .npz cache ──▶ sound_eval (random + group split,
    host knobs + mel + desc          per plug-in      groups, split        seconds        95% intervals, noise ceiling)
