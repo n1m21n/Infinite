@@ -496,3 +496,6 @@ so the original bar stays open until the owner decides whether the selective rea
 Also measured this session: 6 more engines (Equation, Partials, Sampler, Slicer, Grain Molder, Field Synth; 240 presets each). Partials, Grain Molder and
 Field Synth produced no one-knob pairs in 240 presets (bank design needs more presets); Wave Terrain and Spectral Synth need an image input, Granular,
 PaulStretch, Molder and Looper need an audio input: not yet measured.
+
+## Block 1 progress (2026-10-28)
+Axes 23-31 measured on all locally pulled MIDI (a31 223,824 rows, 293 errors); `midi_axes.py check --n 20` = 20/20 consistent. Remaining corpora (tegridy onward) still pulling; re-run `midi_axes.py run --local` after the pull ends.
