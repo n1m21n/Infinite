@@ -202,3 +202,6 @@ Dumped the built-in tables' first 64 harmonics per frame with a 20-line C++ prog
 
 ## Step 4 round r01 — Analog (2026-10-28)
 Model-chosen 2,000 renders (3-seed disagreement over 20,000 candidates; one / pair / fresh thirds + 200 uniform) rendered in 953 s, 0 failed. `round_score.py` (stored prediction vs measured, median R2 of the means): propose/one **0.768**, propose/pair **0.633**, propose/fresh 0.325, uniform/fresh 0.356. The model predicts moves from known points well and fresh points no better than before: the new data goes where it was uncertain. P3 after the round (3,963 presets): random 8/11 at the bar, head median **0.751** (was 0.725); **group 7/11 at the bar, head median 0.686 (was 0.298, 1/11)**, via mel 0.409, k-NN 0.317. The group split went from a miss to near the bar in one round, so the Step 4 stop rule (two rounds < 0.02 gain) is far off: more rounds are justified.
+
+## Step 4 round r01 — Oscillator (2026-10-28)
+2,000 model-chosen renders, 0 failed, 1,122 s. Stored prediction vs measured (median R2 of means): one 0.584, pair 0.505, fresh 0.280, uniform 0.420. P3 after (3,982 presets): random 6/11 at the bar, head 0.616 (was 0.457); **group 4/11, head 0.551 (was 0/11, 0.192)**. Same pattern as Analog: one round moves the group split most; stop rule far off, round 2 (with 4–12 knob moves) queued.
