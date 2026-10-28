@@ -304,3 +304,9 @@ Held-out half (fit on one half of the targets, judged on the other): "within 2.5
 ### Weak-axis sign-flip diagnostic (c2_signflip.py, Analog, 1,612 one-knob bank pairs, report only)
 Mean over knobs of "share of pairs where the knob pushes the axis the same way" (1.0 = always, 0.5 = coin flip), moves >= 0.5 sd: fullness 0.62, warmth 0.66, decay 0.68, movement 0.69, attack 0.70, noisiness 0.71, density 0.71, weight 0.72, sharpness 0.78, loudness 0.81, brightness 0.81.
 Reading: fullness is the least consistent axis, which fits the "composite" idea, but decay (0.68) is just as context-dependent and is predicted well (88-97% direction), so context-dependence alone does not explain the weak C2 axes; the model learns context. Movement and noisiness are mid-table. The composite hypothesis is only supported for fullness and warmth. No change to axes or claims.
+
+### G4 gate: MIDI fully extracted (counts and hand check, 2026-10-28)
+`store/midi_full.jsonl`: 294,571 rows over 21 corpora; 293,573 parsed, 998 unparseable (error rows, nothing to extract).
+Per field (of the parsed): with CCs 207,879 | more than one tempo 71,576 | first meter not 4/4 39,459 | meter changes 45,233 | more than one instrument family 179,391 | EMOPIA emotion label 1,078 of 1,078.
+Hand check: 20 random files re-parsed by an independent byte-level reader: note counts and CC counts equal in 20 of 20, meter messages consistent with the stored meters.
+G4 closed. Raw MIDI `datasets/midi/data` (8.6 GB, the extracted copy) may be removed once `archives/` (2.3 GB, the original downloads) is on Drive and the owner says yes.
