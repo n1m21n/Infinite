@@ -136,7 +136,7 @@ def main():
     out = os.path.expanduser(a.out or "~/Infinite/training-data/audio/preset_%s.jsonl" % re.sub(r"\W+", "", a.plugin.lower()))
     done = set()
     if a.resume and os.path.exists(out):
-        done = {m.group(1) for m in (re.search(r'"src":"([^"]+)"', l) for l in open(out)) if m}
+        done = {json.loads(l)["src"] for l in open(out) if l.strip()}  # parsed, so names with escaped bytes match too
     t = {"instrument": True, "format": "vst3", "id": tmpl["id"], "name": tmpl["name"], "vendor": ""}
     binp = rp.infinite_bin()
     t0, n, ok, bad = time.time(), 0, 0, 0
