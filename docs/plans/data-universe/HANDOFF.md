@@ -226,3 +226,18 @@ Wavetable, FM, Metallic, String: first batch 2,000 presets each, 0 failed (854, 
 Reading: no engine lands inside any family at random knobs (all ratios > 1, 0% within inner distance), and the dedicated String engine is the *farthest* from real strings, Oscillator the nearest. Caveat: random knobs cover the engine's whole space uniformly, mostly not string-like; this does not yet say String cannot reach them. The reach test (steering to a target) is the fair one.
 
 **Reach reach1 was invalid:** silent axes are NaN in the characteristic vectors, so every start distance was NaN and "closer than nearest" printed 0.0% (Analog and Oscillator). Fixed in `reach.py` (NaN filled with the engine's column median, stored in the queue). The reach1 renders (287 Analog, 294 Oscillator) stay as training rows. Rerun as `reach2` in driver5 after the library measuring finishes, then Step 4 rounds and embeddings.
+
+## G5 / C8 first pass: genre from the sample library's axes is at chance (2026-10-28)
+
+`genre_regions.py`: rows labelled by genre words in pack / file name (reference, not truth), 11 shared axes + tempo, softmax regression, leave-packs-out (every pack held out once). 16,978 rows, 11 genres, 38 packs: per-genre mean top-3 **0.274** against chance 0.273 (bar 0.7); top-1 0.107 vs 0.091. **C8 as measured here: MISS (no signal).** First attempt with one held-out fifth had only 5 test packs, mostly house, and was not usable.
+
+Why (reading, not yet tested): a pack's single loops and one-shots (kicks, hats, pads) carry the pack's character in the *combination* and the *structure* (tempo, groove, chords, form), not in each file's tone; names are a noisy label. Next tests: (a) genre from MIDI drum grooves + chords + tempo (`midi_drum_groove`, `midi_chord_prog` rows with a genre word in the path, atlas evidence lists counts per genre); (b) full tracks with a genre label (needs data from the owner, below).
+
+## Asks for the owner (things that would improve the model)
+
+| Ask | Why it helps | Claim |
+|---|---|---|
+| Listen to 40 pairs (critic picks vs not), say agree / disagree | C3 owner-agreement bar 30/40 is the one open half of C3 | C3 |
+| A folder of full tracks you consider good examples per genre (even 10 per genre, any length) | genre needs track-level audio; sample packs gave chance | C8 |
+| Ableton sets / projects you actually like (G8 reads track levels, pans, sends, device chains) | mix and chain data from real use | G8, C9 |
+| Patches (.inf) you made and kept vs discarded | the best signal of taste: what a user keeps, undoes, tweaks stays local | C10 |
