@@ -349,3 +349,21 @@ Exploratory (|change| >= 0.5 sd): single 60 moves, 85.0% / r 0.704; combined 104
 | single moves | 760 | 62.8% | 0.178 | MISS |
 | combined moves | 313 | 77.6% | 0.965 | MISS (direction) |
 Exploratory (|change| >= 0.5 sd): single 48 moves, 83.3% / r 0.194; combined 25 moves, 96.0% / r 0.969 (would clear the effect-size tier on the combined moves, but only 25 moves). Pre-registered C2.1 tier is scored by claims.py; check its line before quoting.
+
+### Human-patch benchmark: Analog (2026-10-28)
+Held-out bank vs the owner's Analog patches (same ensemble, trained outside the held-out banks).
+| axis | bank R2 | human R2 |
+|---|---|---|
+| loudness | 0.75 | 0.31 |
+| brightness | 0.77 | -0.03 |
+| sharpness | 0.74 | -0.86 |
+| warmth | 0.70 | -3.78 |
+| weight | 0.75 | -1.08 |
+| fullness | 0.53 | -0.05 |
+| noisiness | 0.49 | 0.39 |
+| movement | 0.67 | 0.50 |
+| attack | 0.84 | 0.64 |
+| decay | 0.74 | 0.57 |
+| density | 0.67 | 0.01 |
+Mean R2: bank 0.696, human -0.306. Error in bank spreads: bank 0.54, human 0.52, i.e. the absolute error on the owner's patches equals the held-out bank's.
+Why R2 collapses: the owner's Analog patches span only a sliver of the bank on warmth (0.11 of the bank sd) and weight (0.08), so R2 divides by a tiny variance. Read the error-in-spreads column, not R2, for this engine. The model cannot rank the owner's patches against each other on warmth/weight (resolution), but it is no less accurate in absolute terms.
