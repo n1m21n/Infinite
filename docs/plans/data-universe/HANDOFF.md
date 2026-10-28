@@ -189,3 +189,10 @@ codec (EnCodec / DAC) can also store any audio near-losslessly in little space. 
 5. Built when: it understands the characteristics of a sound (brightness, dullness, darkness, ...), with a defined set of
    characteristics for this purpose. Not the other offered tests (reach a target, predict held-out, cross-synth, clusters) as the
    definition; those stay as the checks of each phase.
+
+## Step 5 — sound_space.py (critic, novelty, clusters), 2026-10-28
+`tools/universe/sound_space.py` (numpy only; no sklearn on this Mac). Features = the 11 axes shared by Diva rows and samples (loudness … density), standardised on the map.
+- **C3 critic** (logistic, map vs random, frozen C3 sets, Oscillator renders as the random side): train map 5,252 / random 483, test map 1,370 (393 Diva + 977 samples) vs random 118 → **AUC 0.924 (bar 0.8) — PASS**; loudness alone 0.802, so the critic is not only a loudness gate. Owner-agreement half of C3 (30/40) still open. Only 118 test randoms until more engines are frozen.
+- **Novelty N** (distance to nearest map row / median map nearest-neighbour distance, capped, 0-1): Oscillator base 0.883, one 0.874, pair 0.864; **R** (axes outside the map 5–95% band) 0.16 / 0.16 / 0.14. Random Oscillator patches sit far from the map on these axes; the N<0.1 at c=0 half of C6 needs the generator, not this file.
+- **Clusters**: `clusters --k 30` names regions from preset/sample words (drum loops, pads, one-shots …); table printed on demand, not stored.
+Still open in Step 5: C4 words, wavetable reach of the 64 built-in tables (needs the node's table source).
