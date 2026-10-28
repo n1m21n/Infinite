@@ -205,3 +205,7 @@ Model-chosen 2,000 renders (3-seed disagreement over 20,000 candidates; one / pa
 
 ## Step 4 round r01 — Oscillator (2026-10-28)
 2,000 model-chosen renders, 0 failed, 1,122 s. Stored prediction vs measured (median R2 of means): one 0.584, pair 0.505, fresh 0.280, uniform 0.420. P3 after (3,982 presets): random 6/11 at the bar, head 0.616 (was 0.457); **group 4/11, head 0.551 (was 0/11, 0.192)**. Same pattern as Analog: one round moves the group split most; stop rule far off, round 2 (with 4–12 knob moves) queued.
+
+## Claims frozen for the four new engines (2026-10-28, after the first 2,000 renders each)
+
+Wavetable, FM, Metallic, String: first batch 2,000 presets each, 0 failed (854, 880, 717, 728 s). C1 group sets, C2 moves and C3 random sets frozen (C3 keys `random:own_<engine>.jsonl`); `claims.py check`: all hashes match. Frozen before any model was trained on them.

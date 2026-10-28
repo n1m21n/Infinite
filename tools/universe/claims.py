@@ -116,6 +116,8 @@ def freeze_c3(engines, n=1000, seed=7):
                 except ValueError:
                     pass
         random.Random(seed).shuffle(srcs); out["map"]["features.jsonl"] = srcs[:n]
+    for k, v in out["random"].items():          # one key per engine so an engine added later can be frozen on its own
+        out["random:" + k] = v
     return out
 
 
