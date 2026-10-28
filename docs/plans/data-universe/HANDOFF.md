@@ -342,3 +342,10 @@ Reading: a same-generator gap exists in R2 terms (0.565 -> 0.243: P3 bar 0.6 wou
 | single moves | 627 | 65.7% | 0.666 | MISS |
 | combined moves | 627 | 71.0% | 0.688 | MISS |
 Exploratory (|change| >= 0.5 sd): single 60 moves, 85.0% / r 0.704; combined 104 moves, 87.5% / r 0.724. Closest of the engines to the bar; the pre-registered C2.1 effect-size tier is still under 90% direction.
+
+### C2 Metallic result (2026-10-28)
+| tier | axis moves | direction right (bar 90) | size r (bar 0.7) | verdict |
+|---|---|---|---|---|
+| single moves | 760 | 62.8% | 0.178 | MISS |
+| combined moves | 313 | 77.6% | 0.965 | MISS (direction) |
+Exploratory (|change| >= 0.5 sd): single 48 moves, 83.3% / r 0.194; combined 25 moves, 96.0% / r 0.969 (would clear the effect-size tier on the combined moves, but only 25 moves). Pre-registered C2.1 tier is scored by claims.py; check its line before quoting.
