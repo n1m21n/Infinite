@@ -245,3 +245,14 @@ Why (reading, not yet tested): a pack's single loops and one-shots (kicks, hats,
 ## C8 on structure: drum grooves carry some genre (2026-10-28)
 
 `genre_groove.py`: Groove MIDI (store/public_drums.jsonl), 8 lanes x 16 steps + lane densities + log tempo + swing, softmax, leave-drummer-out (only 4 drummers). 3,790 grooves, 12 families: per-family mean **top-1 0.184, top-3 0.394** (chance 0.083 / 0.250; bar 0.7) -> above chance, below the bar. Best: rock 0.78, dance 0.73, funk 0.69, hiphop 0.58; worst: punk 0.00, latin 0.04, afrobeat 0.10. Limits: four drummers (the test is mostly 'a new drummer'), family from file names, grooves alone. Next: add chord progression and bass rows of the same genre words (midi_chord_prog, midi_bass_seq) and the 22-axis description of full tracks; both are in the owner asks above.
+
+## C2 (knows what each ingredient does) on Analog and Oscillator: MISS (2026-10-28)
+
+`c2_predict.py`: 3 forward models trained only on rows outside the held-out banks; predicted f(variant) - f(base) for every frozen C2 move, stored with `claims.py predict` before scoring.
+
+| engine | moves | direction right (bar 90%) | size r (bar 0.7) | verdict | exploratory: moves >= 0.5 sd (post hoc, NOT the frozen bar) |
+|---|---|---|---|---|---|
+| Analog, all | 1,412 | 63.5% | 0.635 | MISS | 188 moves: 75.5%, r 0.707 |
+| Oscillator, all | 1,276 | 61.8% | 0.549 | MISS | 103 moves: 84.5%, r 0.614 |
+
+Reading: most axis changes from a 1-3 knob move are near zero, and the sign of noise is a coin flip, so 'direction right' is dragged to ~60%. Big moves are predicted with the right sign 75-85% of the time. The claim as frozen stays MISS; no wording about 'knows what each knob does' is allowed yet. Next: more rounds (data), ensemble size, score only the axes the activity map says the knob drives.

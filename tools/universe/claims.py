@@ -185,6 +185,9 @@ def cmd_score(a):
     r = float(np.corrcoef(P, M)[0, 1]) if len(P) > 2 else float("nan")
     print("C2: %d axis moves, direction right %.1f%% (bar 90), size r %.3f (bar 0.7) -> %s" %
           (len(dirs), 100 * np.mean(dirs), r, "PASS" if np.mean(dirs) >= 0.9 and r >= 0.7 else "MISS"))
+    big = np.abs(np.array(M)) >= 0.5 * np.std(M)     # exploratory (not the frozen bar): moves that changed the axis noticeably
+    print("    exploratory: moves with |change| >= 0.5 sd (%d): direction right %.1f%%, size r %.3f" %
+          (big.sum(), 100 * np.mean(np.array(dirs)[big]), float(np.corrcoef(np.array(P)[big], np.array(M)[big])[0, 1])))
 
 
 def cmd_table(_a):
