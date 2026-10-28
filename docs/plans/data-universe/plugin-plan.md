@@ -84,3 +84,10 @@ Gap tracker: see the numbered list in the session notes; every row above is clos
 3. `preset_state.py` for Diva (Pro, running), Hive, Repro, Vital, TAL (Air).
 4. NKS probe + render, fxp reader, level 2 for effects with preset libraries and for Serum 2.
 5. Coverage audit again; fill the thin instrument families (`coverage_audit.py`).
+
+## Efficiency rule (2026-10-28, measured)
+
+- Order: farthest-first coreset (`coreset_order.py`); any prefix covers the library. Diva: first 3,000 of 15,173.
+- Notes: render C3, C4, C3f only. C2, C5, C3p are predicted from them (`note_predict.py`, held-out R2: spectrum 0.88, scalars 0.81,
+  envelope 0.69). Predicted rows must carry `predicted: true` and their held-out score. Cost per preset about 6.3 s instead of 9 s.
+- Open: train with and without predicted rows and compare on real rows; nonlinear predictor; velocity check.
