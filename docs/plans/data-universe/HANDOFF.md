@@ -782,3 +782,26 @@ for this bar. Register (MET for both roles) is unaffected.
 **Words (C4).** **Decision: only the five words that reach AUC 0.75 drive generation** (sub, distorted, mellow, punchy, digital). The other 23 testable words stay in the vocabulary
 for search and names but are not linked to any sound change, because the audio cannot be shown to carry them. The C4 verdict stays FAIL (5 of 28, bar 70%); not re-scored.
 Reason for both: neither choice moves a bar; each keeps the product honest about what the models can do.
+
+### Goal item 4, role critic v3, and the critic inside Generate Samples (`RoleCritic.cpp`, `feel/role_critic_v3_calshaped.json`)
+v3: 10,191 renders (5,097 at rest, 5,094 dot-shaped). The model is trained on all of them, and its cut-offs come from out-of-fold scores on the dot-shaped renders. Whole styles held out, 5 folds:
+
+| Model | Rest FRR / catch | Dots FRR / catch | Verdict |
+|---|---|---|---|
+| MLP (shipped) | **1.3% / 98.5%** | **2.9% / 98.0%** | **MET** (bars FRR <= 3%, catch >= 96%) |
+| Linear | 1.8% / 97.1% | 2.9% / 96.7% | MET |
+
+Doubling the dot renders closed the 0.3-point miss from v2; no bar or percentile moved.
+**Shipped into the engine:**
+- `tools/universe/export_role_critic.py` writes `src/app/graph/RoleCriticWeights.inc`: the MLP (132 -> 128 -> 64 -> 15) and one cut-off per role (3rd percentile, out of fold, dot-shaped renders).
+- `src/app/graph/RoleCritic.cpp` ports frame_features.measure + vector to C++.
+- `GenerateSamplesNode::Finish` and `wasm/gen_main.cpp` redraw a part that fails its role's cut-off, inside the existing 3-redraw budget. The last attempt is kept. Pinned dot moves are never judged.
+
+**Checks:**
+- **Parity:** `critic_parity.py` (60 fresh parts) gives a feature difference of median 5e-10 and max 4e-5 training spreads. P(role) differs by at most 4e-7, and the accept calls agree 60/60.
+- **Redraws:** `critic_reroll.js` (1,020 first takes, dots at rest, same cards). Redrawn takes go from 8.9% to **9.4%**, 0 failed, +5% time per take (767 -> 808 ms in node).
+  Most critic rejections fall on takes the old gate already redraws. The new redraws are in Leads (4.4% -> 5.9%), Textures (2.9% -> 7.4%) and Pads (14.7% -> 16.2%).
+- **Not done:**
+  - The app build has only had a syntax check against build-dev flags; no full build or run yet.
+  - `website/gen` is not updated: deploying the new wasm needs Naman's yes.
+  - The blind test (does a redrawn take sound better?) needs Naman.
