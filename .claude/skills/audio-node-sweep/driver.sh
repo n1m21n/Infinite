@@ -86,31 +86,18 @@ else
     echo "$skips node(s)/param(s) skipped — see SKILL.md's blind-spots section for why a SKIP or a"
     echo "residual FAIL on a param gated by another param's value is not necessarily a mailbox bug."
   fi
-  # Known blind spots (known-blind-spots.txt) do not fail the run; any other [FAIL] does.
-  BASELINE="$ROOT/.claude/skills/audio-node-sweep/known-blind-spots.txt"
-  failKeys=$(grep -E '^  \[FAIL\]' "$OUT" |
-    sed -E "s/^  \[FAIL\] +(.*[^ ]) +param '([^']+)' reaches audio thread within one block$/\1	\2/")
-  known=$(grep -v '^#' "$BASELINE" | grep -v '^$')
-  newFails=$(printf '%s\n' "$failKeys" | grep -v '^$' | grep -vxF -f <(printf '%s\n' "$known"))
-  nowPass=$(printf '%s\n' "$known" | grep -vxF -f <(printf '%s\n' "$failKeys" | grep -v '^$'))
-  nKnown=$(printf '%s\n' "$failKeys" | grep -v '^$' | grep -cxF -f <(printf '%s\n' "$known"))
-  if [ -n "$nowPass" ]; then
-    echo "these known blind spots now pass - remove them from known-blind-spots.txt:"
-    printf '%s\n' "$nowPass" | sed 's/^/  /'
-  fi
+  # One baseline owns the blind spots: run-infinite-hygiene/audio-param-sweep-expected.txt,
+  # graded by scripts/audio_param_sweep_check.sh (the same grader the hygiene driver uses).
+  # shellcheck source=../../../scripts/audio_param_sweep_check.sh
+  source "$ROOT/scripts/audio_param_sweep_check.sh"
   if ! grep -qE '^AUDIO PARAM SWEEP (OK|FAIL)$' "$OUT"; then
     echo "no verdict line found — see $OUT"
     overallOk=0
-  elif [ -n "$newFails" ]; then
-    echo "AUDIO PARAM SWEEP FAILED — $(printf '%s\n' "$newFails" | wc -l | tr -d ' ') [FAIL] not in known-blind-spots.txt:"
-    printf '%s\n' "$newFails" | sed 's/^/  /'
-    overallOk=0
-  elif grep -qE '^AUDIO PARAM SWEEP FAIL$' "$OUT"; then
-    echo "every [FAIL] is a known blind spot ($nKnown) - no new param failures."
-  elif grep -qE '^AUDIO PARAM SWEEP OK$' "$OUT"; then
-    echo "every testable param round-trips through save/load and reaches the audio thread."
+  elif audio_param_sweep_grade "$OUT"; then
+    echo "no new param failures ($APS_XFAIL baselined in audio-param-sweep-expected.txt)."
   else
-    echo "no verdict line found — see $OUT"
+    echo "AUDIO PARAM SWEEP FAILED — $APS_NEWFAIL new, $APS_NOWPASS now passing (baseline: $APS_EXPECTED_FILE):"
+    printf '  %s\n' "${APS_DETAIL[@]}"
     overallOk=0
   fi
 fi
