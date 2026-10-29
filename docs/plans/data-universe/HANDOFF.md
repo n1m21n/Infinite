@@ -533,3 +533,17 @@ midi_axes.jsonl: 293,573 of 293,573 indexed files have a row; 292,452 measured (
 ### Dot test round 3: the five model directions on 12 fresh voices (2026-10-29)
 One dominant knob per direction, 57 trials: Tone (cutoff -> brightness) 92% (12), Tail (release -> decay) 89% (19), Punch (attack -> attack) 62% (16, FAIL), Motion (sustain -> movement) 50% (10, chance, FAIL). Resonance->warmth produced no usable trial. Overall sign 75.4%, noisiness held 91%, median gain 0.49 -> INCONCLUSIVE, recorded as a miss.
 What the data supports on Analog today: TWO real dots, Tone (cutoff; 92-100% over rounds 2-3) and Tail (release; 89%). The 3rd and 4th dot are not supported yet; they need either better knobs (an envelope-shape macro, tested) or more sweeps. The product claim must be "2 proven dots on Analog", not 3-4 on all instruments, until measured otherwise.
+
+### Goal item 3 status, all engines (knob_direction.py, 5 folds by bank, 2026-10-29)
+| engine | reliable-cell acc | all moves (dominant) | note |
+|---|---|---|---|
+| Analog | 89.5% | 65.4 +- 4.4 | reliable just under 90 |
+| Oscillator | 91.6% | 67.6 +- 4.2 | |
+| FM | 91.6% | 76.6 +- 2.9 | |
+| Metallic | 95.6% | 78.2 +- 1.8 | |
+| String | 92.8% | 76.7 +- 1.8 | |
+| Sampler | 90.9% | 69.8 +- 8.4 | only 12 banks |
+| Wavetable | none (0 reliable cells) | 52.8 +- 4.4 | MISS, chance |
+| Equation Synth | none | 58.1 +- 9.5 | MISS, 12 banks |
+| Partials, Slicer, Grain Molder, Field Synth | too few one-knob pairs | - | NOT MEASURABLE yet |
+Bar (>= 90% on all 13 engines, all moves): MISS on every engine. Only on the "reliable cells only" reading do 5 of 13 engines pass (Oscillator, FM, Metallic, String, Sampler), Analog is 0.5 pt short. Closing it needs new one-knob sweeps on Wavetable, Equation Synth, Partials, Slicer, Grain Molder, Field Synth (+ Spectral Synth, Granular for the 13) and a better model than a per-knob slope for the all-moves reading.
