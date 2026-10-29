@@ -836,3 +836,8 @@ misses are not interactions a model can learn from these pairs; the likeliest ca
 note-on phase) and measure the repeatability ceiling; if the same preset disagrees with itself ~20% of the time, 90% is not
 reachable with these characteristics and the finding goes to Naman (the bar does not move without sign-off).
 `knob_direction.py` now also reports the neighbour model (`local`) per engine.
+
+## Goal item 3, Analog after one-knob sweeps (2026-10-29): slope 89.5% (MISS by 0.5), neighbour model 91.2% (MET)
++1,350 one-knob presets (C3 only, 645 s). Reliable-cell slope unchanged at 89.5% (1,062 moves). The neighbour model (sign from the
+24 training moves of that knob whose other knobs are nearest) reaches 91.2% on 704 held-out moves, folds by bank, same tau/eff.
+It covers fewer moves (it abstains where neighbours disagree); compose should use it for Analog and the slope elsewhere.

@@ -3,17 +3,23 @@
   "reliable": {
    "tau": 0.8,
    "acc": 0.895,
-   "scored_moves": 400,
-   "reliable_cells_per_fold": 23.2,
-   "cells_with_data": 49.4
+   "scored_moves": 1062,
+   "reliable_cells_per_fold": 36.4,
+   "cells_with_data": 100.0
   },
-  "pairs": 1300,
-  "banks": 101,
-  "dominant_acc": 0.654,
-  "dominant_sd": 0.044,
-  "gated_acc": 0.648,
-  "gated_sd": 0.04,
-  "gated_moves_per_fold": 91
+  "local": {
+   "k": 24,
+   "tau": 0.8,
+   "acc": 0.912,
+   "scored_moves": 704
+  },
+  "pairs": 2526,
+  "banks": 169,
+  "dominant_acc": 0.64,
+  "dominant_sd": 0.031,
+  "gated_acc": 0.669,
+  "gated_sd": 0.029,
+  "gated_moves_per_fold": 189
  },
  "Wavetable": {
   "reliable": {
@@ -22,6 +28,12 @@
    "scored_moves": 512,
    "reliable_cells_per_fold": 35.2,
    "cells_with_data": 206.4
+  },
+  "local": {
+   "k": 24,
+   "tau": 0.8,
+   "acc": 0.775,
+   "scored_moves": 276
   },
   "pairs": 3842,
   "banks": 276,
