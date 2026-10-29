@@ -10,6 +10,7 @@ file(GLOB DSP_SRC ${R}/src/audio/dsp/*.cpp)
 file(GLOB FIELD_SRC ${R}/src/core/field/*.cpp)
 set(SRC
     ${R}/src/app/graph/OfflineGraph.cpp
+    ${R}/src/app/graph/RoleCritic.cpp
     ${R}/src/app/graph/SampleStyles.cpp
     ${R}/src/audio/AudioEngine.cpp
     ${R}/src/audio/AudioVoice.cpp

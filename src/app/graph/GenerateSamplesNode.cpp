@@ -4,6 +4,7 @@
 #include "app/graph/UserStyle.h"
 
 #include "app/graph/OfflineGraph.h"
+#include "app/graph/RoleCritic.h"
 #include "audio/AudioFileWriter.h"
 #include "core/AudioSummary.h"
 #include "core/Patch.h"
@@ -194,6 +195,10 @@ void GenerateSamplesNode::Finish()
       mFailed = true;
       return;
    }
+   // The role critic: a part that does not sound like the part asked for is redrawn (the last attempt is kept).
+   if (job.attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(job.recipe.part), mLoopL.data(), mLoopR.data(), frames, kRate) &&
+       StartAttempt(job.attempt + 1))
+      return;
    auto* buf = new Platform::SampleBuffer();
    buf->channels = 2;
    buf->numFrames = frames;

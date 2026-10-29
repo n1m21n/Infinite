@@ -494,6 +494,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchShare.cpp
     src/app/graph/PatchIO.cpp
     src/app/graph/OfflineGraph.cpp
+    src/app/graph/RoleCritic.cpp
     src/app/graph/SampleStyles.cpp
     src/app/graph/UserStyle.cpp
     src/app/graph/GenerateSamplesNode.cpp

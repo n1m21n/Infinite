@@ -3,6 +3,7 @@
 #include "app/graph/GenerateSamplesNode.h"  // PrerollBars
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/OfflineGraph.h"
+#include "app/graph/RoleCritic.h"
 #include "app/graph/SampleStyles.h"
 #include "audio/MusicTime.h"
 #include "core/AudioSummary.h"
@@ -177,6 +178,9 @@ extern "C"
          if (!g.Render(pre + frames, left, right))
             continue;
          if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr, gPinned))
+            continue;
+         // The role critic: a part that does not sound like the part asked for is redrawn (the last attempt is kept).
+         if (!gPinned && attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(r.part), l.data(), rr.data(), frames, kRate))
             continue;
          gPcm.resize((size_t)frames * 2);
          for (int f = 0; f < frames; f++)
