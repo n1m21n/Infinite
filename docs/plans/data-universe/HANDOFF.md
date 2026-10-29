@@ -814,3 +814,10 @@ Doubling the dot renders closed the 0.3-point miss from v2; no bar or percentile
   the corpus (loops built from short motifs). Register 0% is the all-voice median and was already known (per-role register is the bar, MET).
 - `v_boost.py` with its feature cache rebuilt (old cache kept as `mix/ve_feats.pre-restrike.npz`): same numbers to the third decimal
   (V r 0.51-0.58, E r 0.82-0.87). Valence stays MISS (advisory only).
+
+### Goal item 3, Wavetable after one-knob sweeps (2026-10-29): MISS, improved
+`own_sweeps.py --design sweep --notes C3`: 1,332 presets in 338 s (one base + 19 one-knob moves per bank, knobs rotating; C3 only, 8x less audio).
+`knob_direction.py`: reliable cells **79.3%** on 512 scored moves (was 75.0% on 220; bar 90%), 35 reliable cells of 206 with data, 3,842 pairs over 276 banks.
+Reading: more pairs made more cells measurable but most Wavetable (knob, axis) cells stay inconsistent (the effect of a knob depends on the others),
+so a per-knob slope cannot reach 90% here. Next: a slope conditioned on the base (k-NN or small net over the base knobs), not more of the same renders.
+`knob_direction.py` now keeps other engines' results when run on a subset.

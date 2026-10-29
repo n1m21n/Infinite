@@ -73,7 +73,7 @@ def run(node, folds):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("--engines", default=",".join(ALL)); ap.add_argument("--folds", type=int, default=5); a = ap.parse_args()
-    res = {}
+    res = json.load(open(OUT)) if os.path.exists(OUT) else {}  # a run on some engines keeps the others' results
     for e in a.engines.split(","):
         try: res[e] = run(e, a.folds)
         except Exception as ex: res[e] = {"error": repr(ex)[:160]}
