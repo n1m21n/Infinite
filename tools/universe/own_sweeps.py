@@ -41,7 +41,7 @@ FIXED_KEYS = {"volume": 0.8, "freq": 220, "frequency": 220, "glide": 0, "pitchBe
 # per engine, parameters that do nothing in this patch (an input pin we do not connect) or that would move the pitch
 SRC = os.path.expanduser("~/Infinite/training-data/own/src_tone.wav")  # steady harmonic tone for the file-driven synths
 FIXED_ENGINE = {"Oscillator": {"fmDepth": 0, "fmMode": 0}, "Analog": {}, "Sampler": {"path": SRC, "loop": 1}, "Granular": {"filePath": SRC},
-                "Partials": {"path": SRC}, "PaulStretch": {"filePath": SRC, "path": SRC}, "Looper": {}, "Slicer": {"path": SRC, "filePath": SRC},
+                "Partials": {"path": SRC}, "PaulStretch": {"filePath": SRC, "path": SRC}, "Looper": {}, "Slicer": {"path": SRC, "filePath": SRC, "sliceBy": 1},
                 "Molder": {"path": SRC, "filePath": SRC}, "Grain Molder": {"path": SRC, "filePath": SRC}}
 TIME_HINT = re.compile(r"(attack|decay|release|time)$", re.I)
 FREQ_HINT = re.compile(r"(cutoff|freq)", re.I)
@@ -168,7 +168,7 @@ def patch_text(node, tags, rec):
     for k, v in rec.items():
         tg = tags.get(k, "f")
         if tg == "s":
-            L.append("  s %s %s" % (k, v))
+            L.append("  s %s %s" % (k, str(v).replace("\\", "\\\\").replace("\n", "\\n")))  # the format is one line per parameter
         else:
             L.append("  %s %s %s" % (tg, k, int(float(v)) if tg in ("i", "b") else repr(float(v))))
     L += ["end", "node 3 Utility Audio Out", "  id out", "end", "aud out audio syn", "note syn 0 keys"]

@@ -503,6 +503,7 @@ AudioNode* GrainMolderNode::GetAudioNode()
 
 void GrainMolderNode::VisitParams(ParamVisitor& v)
 {
+   v.Text("path", mFilePath); // ReloadFromPath() restores the source from this on patch load
    v.Float("grain", grain);
    v.Float("amount", amount);
    v.Int("key", key);

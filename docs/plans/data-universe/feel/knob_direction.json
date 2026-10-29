@@ -98,18 +98,18 @@
  "Equation Synth": {
   "reliable": {
    "tau": 0.8,
-   "acc": null,
-   "scored_moves": 0,
-   "reliable_cells_per_fold": 0.2,
-   "cells_with_data": 0.2
+   "acc": 0.876,
+   "scored_moves": 485,
+   "reliable_cells_per_fold": 17.8,
+   "cells_with_data": 65.0
   },
-  "pairs": 147,
-  "banks": 12,
-  "dominant_acc": 0.581,
-  "dominant_sd": 0.095,
-  "gated_acc": 0.57,
-  "gated_sd": 0.049,
-  "gated_moves_per_fold": 14
+  "pairs": 1257,
+  "banks": 100,
+  "dominant_acc": 0.697,
+  "dominant_sd": 0.032,
+  "gated_acc": 0.726,
+  "gated_sd": 0.028,
+  "gated_moves_per_fold": 120
  },
  "Partials": {
   "pairs": 0,
@@ -132,8 +132,20 @@
   "gated_moves_per_fold": 17
  },
  "Slicer": {
-  "pairs": 28,
-  "error": "too few one-knob pairs"
+  "reliable": {
+   "tau": 0.8,
+   "acc": 0.994,
+   "scored_moves": 180,
+   "reliable_cells_per_fold": 8.8,
+   "cells_with_data": 12.6
+  },
+  "pairs": 300,
+  "banks": 79,
+  "dominant_acc": 0.795,
+  "dominant_sd": 0.04,
+  "gated_acc": 0.832,
+  "gated_sd": 0.077,
+  "gated_moves_per_fold": 23
  },
  "Grain Molder": {
   "pairs": 0,
