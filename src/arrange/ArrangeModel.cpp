@@ -20,6 +20,157 @@ namespace
       if (c.fadeOut > c.length) c.fadeOut = c.length;
    }
 
+   const char* LaneTypeName(int type)
+   {
+      return type == kLaneAudio ? "Audio" : type == kLaneMidi ? "MIDI" : "Video";
+   }
+
+   bool NoteLess(const Note& a, const Note& b)
+   {
+      return a.start != b.start ? a.start < b.start : a.pitch < b.pitch;
+   }
+
+   void ClampExpr(std::vector<ExprPoint>& pts, Tick len, float lo, float hi)
+   {
+      for (ExprPoint& p : pts)
+      {
+         p.at = std::clamp<Tick>(p.at, 0, len);
+         if (!std::isfinite(p.v)) p.v = 0.0f;
+         p.v = std::clamp(p.v, lo, hi);
+      }
+      std::stable_sort(pts.begin(), pts.end(), [](const ExprPoint& a, const ExprPoint& b) { return a.at < b.at; });
+   }
+
+   // Sorts, and cuts a note where the next note on its pitch starts (a note
+   // fully covered at the same start is dropped). Leaves the invariants of
+   // README §5 true. Returns true if anything changed.
+   bool ResolveNoteOverlaps(Clip& c)
+   {
+      bool changed = false;
+      if (!std::is_sorted(c.notes.begin(), c.notes.end(), NoteLess))
+      {
+         std::stable_sort(c.notes.begin(), c.notes.end(), NoteLess);
+         changed = true;
+      }
+      int lastOnPitch[128];
+      std::fill(std::begin(lastOnPitch), std::end(lastOnPitch), -1);
+      std::vector<bool> drop(c.notes.size(), false);
+      for (int i = 0; i < (int)c.notes.size(); i++)
+      {
+         Note& n = c.notes[i];
+         const int prev = lastOnPitch[n.pitch];
+         if (prev >= 0)
+         {
+            Note& p = c.notes[prev];
+            if (p.start == n.start) { drop[prev] = true; changed = true; }
+            else if (p.End() > n.start) { p.length = n.start - p.start; changed = true; }
+         }
+         lastOnPitch[n.pitch] = i;
+      }
+      if (changed)
+      {
+         std::vector<Note> kept;
+         kept.reserve(c.notes.size());
+         for (size_t i = 0; i < c.notes.size(); i++)
+            if (!drop[i]) kept.push_back(std::move(c.notes[i]));
+         c.notes.swap(kept);
+      }
+      for (Note& n : c.notes)
+      {
+         ClampExpr(n.bend, n.length, -48.0f, 48.0f);
+         ClampExpr(n.pressure, n.length, 0.0f, 1.0f);
+         ClampExpr(n.timbre, n.length, 0.0f, 1.0f);
+      }
+      return changed;
+   }
+
+   void ClampNote(Note& n)
+   {
+      if (n.start < 0) n.start = 0;
+      if (n.start > kMaxTick - 1) n.start = kMaxTick - 1;
+      n.length = std::clamp<Tick>(n.length, 1, kMaxTick - n.start);
+      if (n.pitch > 127) n.pitch = 127;
+      n.vel = (uint8_t)std::clamp<int>(n.vel, 1, 127);
+      if (n.relVel > 127) n.relVel = 127;
+      if (!std::isfinite(n.chance)) n.chance = 1.0f;
+      n.chance = std::clamp(n.chance, 0.0f, 1.0f);
+      if (!std::isfinite(n.gainDb)) n.gainDb = 0.0f;
+      n.gainDb = std::clamp(n.gainDb, -60.0f, 12.0f);
+      if (!std::isfinite(n.pan)) n.pan = 0.0f;
+      n.pan = std::clamp(n.pan, -1.0f, 1.0f);
+   }
+
+   void ClampMidiClip(Clip& c)
+   {
+      if (c.contentOffset < 0) c.contentOffset = 0;
+      if (c.loopStart < 0) c.loopStart = 0;
+      if (c.loopLength < 0) c.loopLength = 0;
+      if (c.midiLoop && c.loopLength <= 0) c.midiLoop = false;
+      c.transpose = std::clamp(c.transpose, -48, 48);
+      if (!std::isfinite(c.velScale)) c.velScale = 1.0f;
+      c.velScale = std::clamp(c.velScale, 0.0f, 2.0f);
+      if (!std::isfinite(c.swing)) c.swing = 0.0f;
+      c.swing = std::clamp(c.swing, 0.0f, 1.0f);
+   }
+
+   void NormalizeNotes(const Lane& l, Clip& c)
+   {
+      if (l.type != kLaneMidi)
+      {
+         c.notes.clear();
+         return;
+      }
+      ClampMidiClip(c);
+      std::unordered_set<uint32_t> seen;
+      uint32_t maxId = 0;
+      for (Note& n : c.notes)
+      {
+         ClampNote(n);
+         if (n.id == 0 || !seen.insert(n.id).second) n.id = 0; // re-minted below
+         else maxId = std::max(maxId, n.id);
+      }
+      if (c.nextNoteId <= maxId) c.nextNoteId = maxId + 1;
+      if (c.nextNoteId == 0) c.nextNoteId = 1;
+      for (Note& n : c.notes)
+         if (n.id == 0) n.id = c.nextNoteId++;
+      ResolveNoteOverlaps(c);
+   }
+
+   bool ValidateNotes(const Lane& l, const Clip& c, std::string& why)
+   {
+      if (l.type != kLaneMidi)
+      {
+         if (!c.notes.empty()) { why = "notes on a non-MIDI lane"; return false; }
+         return true;
+      }
+      if (c.contentOffset < 0) { why = "negative content offset"; return false; }
+      if (c.midiLoop && c.loopLength <= 0) { why = "loop with no length"; return false; }
+      std::unordered_set<uint32_t> ids;
+      Tick lastEnd[128];
+      std::fill(std::begin(lastEnd), std::end(lastEnd), (Tick)-1);
+      const Note* prev = nullptr;
+      for (const Note& n : c.notes)
+      {
+         if (n.id == 0 || n.id >= c.nextNoteId) { why = "note id 0 or >= nextNoteId"; return false; }
+         if (!ids.insert(n.id).second) { why = "duplicate note id " + std::to_string(n.id); return false; }
+         if (n.start < 0 || n.length <= 0) { why = "note start < 0 or length <= 0"; return false; }
+         if (n.pitch > 127 || n.vel < 1 || n.vel > 127 || n.relVel > 127) { why = "note pitch or velocity out of range"; return false; }
+         if (!(n.chance >= 0.0f && n.chance <= 1.0f)) { why = "note chance out of range"; return false; }
+         if (prev && NoteLess(n, *prev)) { why = "notes unsorted"; return false; }
+         if (lastEnd[n.pitch] > n.start) { why = "notes overlap on pitch " + std::to_string(n.pitch); return false; }
+         lastEnd[n.pitch] = n.End();
+         for (const std::vector<ExprPoint>* pts : { &n.bend, &n.pressure, &n.timbre })
+            for (size_t k = 0; k < pts->size(); k++)
+               if ((*pts)[k].at < 0 || (*pts)[k].at > n.length || (k > 0 && (*pts)[k].at < (*pts)[k - 1].at))
+               {
+                  why = "note expression outside the note or unsorted";
+                  return false;
+               }
+         prev = &n;
+      }
+      return true;
+   }
+
    void SortLane(Lane& l)
    {
       std::stable_sort(l.clips.begin(), l.clips.end(),
@@ -59,6 +210,7 @@ namespace
             right.start = b;
             right.length = e - b;
             right.sourceOffsetSeconds = c.sourceOffsetSeconds + (float)ClipSourceAdvance(c, b - s);
+            right.contentOffset = c.contentOffset + (b - s);
             ClampFades(right);
             out.push_back(right);
             continue;
@@ -74,6 +226,7 @@ namespace
          // forward to `b`, so (like TrimEdge's start-edge case) it now
          // starts further into the source file too.
          c.sourceOffsetSeconds = c.sourceOffsetSeconds + (float)ClipSourceAdvance(c, b - s);
+         c.contentOffset += b - s;
          c.start = b;
          c.length = e - b;
          ClampFades(c);
@@ -197,6 +350,9 @@ void Normalize(Model& m)
       SortLane(l);
       ResolveOverlaps(l);
       if (l.id == 0) l.id = m.NewId();
+      if (l.type != kLaneMidi) l.noteNodeUid = 0;
+      for (Clip& clip : l.clips) NormalizeNotes(l, clip);
+      for (SessionSlot& sl : l.slots) NormalizeNotes(l, sl.clip);
       // Session slots: a slot clip has no timeline position and no clip group.
       for (SessionSlot& sl : l.slots)
       {
@@ -262,6 +418,10 @@ void Normalize(Model& m)
       for (const TrackGroup& g : m.trackGroups) liveGroups.insert(g.id);
       for (Lane& l : m.lanes)
          if (l.groupId != 0 && !liveGroups.count(l.groupId)) l.groupId = 0;
+      // One page per node: a second lane claiming the same node lets go.
+      std::unordered_set<uint64_t> linked;
+      for (Lane& l : m.lanes)
+         if (l.noteNodeUid != 0 && !linked.insert(l.noteNodeUid).second) l.noteNodeUid = 0;
       for (TrackGroup& g : m.trackGroups)
          if (g.parentGroupId != 0 && !liveGroups.count(g.parentGroupId)) g.parentGroupId = 0;
 
@@ -411,13 +571,24 @@ bool Validate(const Model& m, std::string* why)
    auto fail = [&](const std::string& msg) { if (why) *why = msg; return false; };
 
    std::unordered_set<uint64_t> ids;
+   std::unordered_set<uint64_t> linkedNodes;
    std::unordered_map<uint64_t, int> groupCounts;
    for (const Lane& l : m.lanes)
    {
       if (l.id == 0) return fail("lane with id 0");
       if (!ids.insert(l.id).second) return fail("duplicate lane id " + std::to_string(l.id));
       if (l.id >= m.nextId) return fail("lane id " + std::to_string(l.id) + " >= nextId");
-      if (l.type != kLaneVideo && l.type != kLaneAudio) return fail("bad lane type");
+      if (l.type != kLaneVideo && l.type != kLaneAudio && l.type != kLaneMidi) return fail("bad lane type");
+      if (l.type != kLaneMidi && l.noteNodeUid != 0) return fail("note link on a non-MIDI lane");
+      if (l.noteNodeUid != 0 && !linkedNodes.insert(l.noteNodeUid).second)
+         return fail("node " + std::to_string(l.noteNodeUid) + " linked to two lanes");
+      {
+         std::string noteWhy;
+         for (const Clip& c : l.clips)
+            if (!ValidateNotes(l, c, noteWhy)) return fail(noteWhy);
+         for (const SessionSlot& sl : l.slots)
+            if (!ValidateNotes(l, sl.clip, noteWhy)) return fail(noteWhy);
+      }
 
       Tick prevEnd = 0;
       bool first = true;
@@ -591,6 +762,8 @@ bool TrimEdge(Model& m, uint64_t id, int edge, Tick tick)
       // the source read-point must skip forward by the same amount, in
       // source seconds (see SampleSourceBpm) - same formula Split uses.
       c.sourceOffsetSeconds += (float)ClipSourceAdvance(c, tick - c.start);
+      // MIDI: the notes stay put in content time; the left edge moves into them.
+      c.contentOffset += tick - c.start;
       c.start = tick;
       c.length = end - tick;
    }
@@ -631,6 +804,8 @@ bool Split(Model& m, uint64_t id, Tick tick, uint64_t* outRightId)
    // exactly where the cut sits, in source seconds (see SampleSourceBpm), so
    // the two halves play back as one uninterrupted take.
    right.sourceOffsetSeconds = c.sourceOffsetSeconds + (float)ClipSourceAdvance(c, tick - c.start);
+   // MIDI: both halves keep every note; each shows its own part of the content.
+   right.contentOffset = c.contentOffset + (tick - c.start);
 
    c.length = tick - c.start;
    c.fadeOut = 0;
@@ -662,6 +837,13 @@ bool DuplicateBlock(Model& m, const std::vector<uint64_t>& ids, std::vector<uint
       src.push_back(Src{c, loc.lane});
    }
    if (src.empty()) return false;
+   // A copy that would push a MIDI lane past its note cap is refused whole.
+   {
+      std::unordered_map<int, int> added;
+      for (const Src& s : src) added[s.lane] += (int)s.clip.notes.size();
+      for (const auto& kv : added)
+         if (kv.second > 0 && LaneNoteCount(m.lanes[kv.first]) + kv.second > kMaxNotesPerLane) return false;
+   }
 
    // One block delta for every copy - copying each clip to just after itself
    // is what made the first copy overwrite the second original (WP5).
@@ -956,8 +1138,8 @@ uint64_t AddLane(Model& m, int type, int atIndex)
 {
    Lane l;
    l.id = m.NewId();
-   l.type = (type == kLaneAudio) ? kLaneAudio : kLaneVideo;
-   l.name = UniqueLaneName(m, l.type == kLaneAudio ? "Audio" : "Video", l.type);
+   l.type = (type == kLaneAudio || type == kLaneMidi) ? type : kLaneVideo;
+   l.name = UniqueLaneName(m, LaneTypeName(l.type), l.type);
    const int at = (atIndex < 0 || atIndex > (int)m.lanes.size()) ? (int)m.lanes.size() : atIndex;
    m.lanes.insert(m.lanes.begin() + at, l);
    m.revision++;
@@ -986,7 +1168,7 @@ std::string UniqueLaneName(const Model& m, const std::string& baseName, int type
    int startNum = 1;
    if (stem.empty())
    {
-      stem = (type == kLaneVideo ? "Video" : "Audio");
+      stem = LaneTypeName(type);
       startNum = 1;
    }
    else
@@ -1099,7 +1281,8 @@ bool DuplicateLane(Model& m, uint64_t laneId, uint64_t* outLaneId)
 
    Lane nl = m.lanes[i];
    nl.id = m.NewId();
-   nl.name = UniqueLaneName(m, nl.name.empty() ? (nl.type == kLaneVideo ? "Video" : "Audio") : nl.name, nl.type);
+   nl.noteNodeUid = 0; // a Piano Roll node plays one page; the copy comes out unlinked
+   nl.name = UniqueLaneName(m, nl.name.empty() ? LaneTypeName(nl.type) : nl.name, nl.type);
    std::unordered_map<uint64_t, uint64_t> clipGroupRemap;
    for (Clip& c : nl.clips)
    {
@@ -1472,8 +1655,9 @@ bool DuplicateTrackGroup(Model& m, uint64_t groupId, uint64_t* outGroupId)
       if (srcLane.groupId == 0 || !groupRemap.count(srcLane.groupId)) continue;
       Lane nl = srcLane;
       nl.id = m.NewId();
+      nl.noteNodeUid = 0;
       nl.groupId = groupRemap[srcLane.groupId];
-      nl.name = UniqueLaneName(m, nl.name.empty() ? (nl.type == kLaneVideo ? "Video" : "Audio") : nl.name, nl.type);
+      nl.name = UniqueLaneName(m, nl.name.empty() ? LaneTypeName(nl.type) : nl.name, nl.type);
       for (Clip& c : nl.clips)
       {
          c.id = m.NewId();
@@ -1661,5 +1845,269 @@ const Marker* NextMarker(const Model& m, Tick t, Tick tolerance)
    for (const Marker& mk : m.markers)
       if (mk.pos > t + tolerance) return &mk;
    return nullptr;
+}
+}
+
+// --- notes (piano-roll README §5) ---------------------------------------
+namespace Arrange
+{
+namespace
+{
+   // The MIDI clip with this id (a Timeline clip or a session slot) and its lane.
+   Clip* FindMidiClip(Model& m, uint64_t clipId, Lane** outLane)
+   {
+      if (clipId == 0) return nullptr;
+      for (Lane& l : m.lanes)
+      {
+         if (l.type != kLaneMidi) continue;
+         for (Clip& c : l.clips)
+            if (c.id == clipId) { *outLane = &l; return &c; }
+         for (SessionSlot& sl : l.slots)
+            if (sl.Has() && sl.clip.id == clipId) { *outLane = &l; return &sl.clip; }
+      }
+      return nullptr;
+   }
+
+   int NoteIndex(const Clip& c, uint32_t id)
+   {
+      for (int i = 0; i < (int)c.notes.size(); i++)
+         if (c.notes[i].id == id) return i;
+      return -1;
+   }
+
+   // Snaps a pitch to the nearest pitch class in mask; up first on a tie.
+   int SnapPitchToMask(int p, uint16_t mask)
+   {
+      if ((mask & 0x0FFF) == 0) return p;
+      for (int d = 0; d < 12; d++)
+      {
+         if (p + d <= 127 && (mask >> ((p + d) % 12)) & 1) return p + d;
+         if (p - d >= 0 && (mask >> ((p - d) % 12)) & 1) return p - d;
+      }
+      return p;
+   }
+}
+
+const Note* FindNote(const Clip& c, uint32_t noteId)
+{
+   const int i = NoteIndex(c, noteId);
+   return i >= 0 ? &c.notes[i] : nullptr;
+}
+
+int LaneNoteCount(const Lane& l)
+{
+   size_t n = 0;
+   for (const Clip& c : l.clips) n += c.notes.size();
+   for (const SessionSlot& sl : l.slots) n += sl.clip.notes.size();
+   return (int)n;
+}
+
+bool AddNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes, std::vector<uint32_t>* outIds)
+{
+   if (outIds) outIds->clear();
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || notes.empty()) return false;
+   if (LaneNoteCount(*lane) + (int)notes.size() > kMaxNotesPerLane) return false;
+   for (Note n : notes)
+   {
+      ClampNote(n);
+      n.id = c->nextNoteId++;
+      if (outIds) outIds->push_back(n.id);
+      c->notes.push_back(std::move(n));
+   }
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool EditNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c) return false;
+   bool changed = false;
+   for (Note n : notes)
+   {
+      const int i = NoteIndex(*c, n.id);
+      if (i < 0) continue;
+      ClampNote(n);
+      if (c->notes[i] == n) continue;
+      c->notes[i] = std::move(n);
+      changed = true;
+   }
+   if (!changed) return false;
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool DeleteNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || ids.empty()) return false;
+   std::unordered_set<uint32_t> kill(ids.begin(), ids.end());
+   const size_t before = c->notes.size();
+   c->notes.erase(std::remove_if(c->notes.begin(), c->notes.end(),
+                                 [&](const Note& n) { return kill.count(n.id) != 0; }),
+                  c->notes.end());
+   if (c->notes.size() == before) return false;
+   m.revision++;
+   return true;
+}
+
+bool MoveNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tick dTick, int dPitch, uint16_t scaleMask)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || ids.empty()) return false;
+   std::unordered_set<uint32_t> want(ids.begin(), ids.end());
+   Tick minStart = kMaxTick;
+   int lo = 127, hi = 0;
+   for (const Note& n : c->notes)
+      if (want.count(n.id))
+      {
+         minStart = std::min(minStart, n.start);
+         lo = std::min(lo, (int)n.pitch);
+         hi = std::max(hi, (int)n.pitch);
+      }
+   if (minStart == kMaxTick) return false;
+   // The block moves as one piece: clamp the deltas, not each note.
+   if (minStart + dTick < 0) dTick = -minStart;
+   dPitch = std::clamp(dPitch, -lo, 127 - hi);
+   if (dTick == 0 && dPitch == 0 && scaleMask == 0) return false;
+   bool changed = false;
+   for (Note& n : c->notes)
+   {
+      if (!want.count(n.id)) continue;
+      int p = (int)n.pitch + dPitch;
+      if (scaleMask != 0) p = SnapPitchToMask(p, scaleMask);
+      const Tick s = n.start + dTick;
+      if (s != n.start || p != n.pitch) changed = true;
+      n.start = s;
+      n.pitch = (uint8_t)std::clamp(p, 0, 127);
+   }
+   if (!changed) return false;
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool SplitNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tick at)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || ids.empty()) return false;
+   std::unordered_set<uint32_t> want(ids.begin(), ids.end());
+   std::vector<Note> rights;
+   for (Note& n : c->notes)
+   {
+      if (!want.count(n.id) || at <= n.start || at >= n.End()) continue;
+      Note r = n;
+      r.id = c->nextNoteId++;
+      r.start = at;
+      r.length = n.End() - at;
+      const Tick cut = at - n.start;
+      // Expression: each half keeps its own points, the right one re-based.
+      for (auto member : { &Note::bend, &Note::pressure, &Note::timbre })
+      {
+         std::vector<ExprPoint> left, right;
+         for (const ExprPoint& p : n.*member)
+            if (p.at <= cut) left.push_back(p);
+            else right.push_back({ p.at - cut, p.v });
+         n.*member = left;
+         r.*member = right;
+      }
+      n.length = cut;
+      rights.push_back(std::move(r));
+   }
+   if (rights.empty()) return false;
+   for (Note& r : rights) c->notes.push_back(std::move(r));
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool JoinNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || ids.size() < 2) return false;
+   std::unordered_set<uint32_t> want(ids.begin(), ids.end());
+   std::map<int, std::vector<int>> byPitch; // indices, already in start order
+   for (int i = 0; i < (int)c->notes.size(); i++)
+      if (want.count(c->notes[i].id)) byPitch[c->notes[i].pitch].push_back(i);
+   std::unordered_set<uint32_t> kill;
+   for (auto& kv : byPitch)
+   {
+      if (kv.second.size() < 2) continue;
+      Note& first = c->notes[kv.second.front()];
+      Tick end = first.End();
+      for (size_t k = 1; k < kv.second.size(); k++)
+      {
+         const Note& n = c->notes[kv.second[k]];
+         end = std::max(end, n.End());
+         kill.insert(n.id);
+      }
+      first.length = end - first.start;
+   }
+   if (kill.empty()) return false;
+   c->notes.erase(std::remove_if(c->notes.begin(), c->notes.end(),
+                                 [&](const Note& n) { return kill.count(n.id) != 0; }),
+                  c->notes.end());
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool QuantizeNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, const QuantizeSpec& q)
+{
+   Lane* lane = nullptr;
+   Clip* c = FindMidiClip(m, clipId, &lane);
+   if (!c || ids.empty() || q.grid <= 0) return false;
+   const float strength = std::clamp(q.strength, 0.0f, 1.0f);
+   const float swing = std::clamp(q.swing, 0.0f, 1.0f);
+   // Grid line k sits at k*grid, every odd line pushed by swing * grid/2.
+   auto target = [&](Tick t) -> Tick {
+      const Tick k = (t + q.grid / 2) / q.grid;
+      Tick g = k * q.grid;
+      if (k % 2 == 1) g += (Tick)llround((double)swing * (double)q.grid * 0.5);
+      return g;
+   };
+   std::unordered_set<uint32_t> want(ids.begin(), ids.end());
+   bool changed = false;
+   for (Note& n : c->notes)
+   {
+      if (!want.count(n.id)) continue;
+      const Tick end = n.End();
+      const Tick s = n.start + (Tick)llround((double)(target(n.start) - n.start) * strength);
+      Tick e = end;
+      if (q.ends)
+         e = end + (Tick)llround((double)(target(end) - end) * strength);
+      else
+         e = s + n.length;
+      if (e <= s) e = s + std::max<Tick>(1, q.grid / 4);
+      if (s != n.start || e != end) changed = true;
+      n.start = std::max<Tick>(0, s);
+      n.length = e - n.start;
+   }
+   if (!changed) return false;
+   ResolveNoteOverlaps(*c);
+   m.revision++;
+   return true;
+}
+
+bool LinkLane(Model& m, uint64_t laneId, uint64_t nodeUid)
+{
+   Lane* target = FindLane(m, laneId);
+   if (!target || target->type != kLaneMidi) return false;
+   if (target->noteNodeUid == nodeUid) return false;
+   if (nodeUid != 0)
+      for (Lane& l : m.lanes)
+         if (l.noteNodeUid == nodeUid) l.noteNodeUid = 0;
+   target->noteNodeUid = nodeUid;
+   m.revision++;
+   return true;
 }
 }

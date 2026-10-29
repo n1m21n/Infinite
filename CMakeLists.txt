@@ -1025,6 +1025,10 @@ if(APPLE)
     target_link_libraries(slice-check PRIVATE "-framework Accelerate")
 endif()
 
+# Headless checks for the Piano Roll's note model (docs/plans/piano-roll/README.md §10 Block A).
+add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp)
+target_include_directories(pianoroll-check PRIVATE src/arrange)
+
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch3d-check PRIVATE src/core/sketch src/core)
 target_link_libraries(sketch3d-check PRIVATE sketch_deps lunasvg_lib)

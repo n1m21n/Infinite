@@ -1109,6 +1109,8 @@ namespace app
    {
       for (const Arrange::Lane& l : gArrange.lanes)
       {
+         if (l.type == Arrange::kLaneMidi)
+            continue;
          const bool isVideo = l.type == Arrange::kLaneVideo;
          if (isVideo ? !wantVideo : !wantAudio)
             continue;
