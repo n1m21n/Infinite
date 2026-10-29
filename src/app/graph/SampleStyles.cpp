@@ -2296,7 +2296,7 @@ Compiled Compile(const Recipe& recipe)
             vel[0] = 1.0;
             g.Connect(sequence(vel, note, loopBeats, std::clamp(secs * 1000.0 / (loopBeats * beatMs) * 100.0, 5.0, 100.0), 1), nv, true);
             Params f = F({ { "freq", 800.0 }, { "q", sp.Uniform(0.8, 2.5) }, { "mix", 1.0 } });
-            f["type"] = { 'i', "6" };
+            f["type"] = { 'f', "6" }; // effect params are floats: an "i" key is never read
             const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
             g.Connect(nv, af, false);
             const double lo = sp.Uniform(250.0, 600.0), hi = sp.Uniform(4000.0, 9000.0);
@@ -2445,60 +2445,113 @@ Compiled Compile(const Recipe& recipe)
             k["a.octave"] = { 'i', "0" };
             k["a.unison"] = { 'i', std::to_string(1 + sp.Range(2)) };
             k["a.detune"] = { 'f', num(sp.Uniform(2.0, 9.0)) };
+            // How the keys are played (owner's review, 2026-10-29: "note effects, chord progressions, melody, arps"):
+            // held chords through a progression, a comped rhythm that re-strikes and pushes the change onto an offbeat,
+            // an arpeggio over the progression, or held chords with a top line. Organs and pipes hold; a clav comps.
+            enum { kHeld, kComp, kArp, kTopLine };
+            int play = sp.Range(4);
+            if ((kind == 1 || kind == 5) && play == kArp)
+               play = kTopLine;
+            if (kind == 4 && play == kHeld)
+               play = kComp;
+            // Degrees per chord: I-V-vi-IV, I-vi-IV-V, ii-V-I-I, I-IV-V-IV, vi-IV-I-V, i-VII-VI-v, I-iii-IV-V, IV-V-I-vi.
+            static const int kKeysProg[][4] = { { 0, 4, 5, 3 }, { 0, 5, 3, 4 }, { 1, 4, 0, 0 }, { 0, 3, 4, 3 },
+                                                { 5, 3, 0, 4 }, { 0, 6, 5, 4 }, { 0, 2, 3, 4 }, { 3, 4, 0, 5 } };
+            const int pi = sp.Range(8);
+            const int* pk = kKeysProg[pi];
+            const int nChords = loopBeats >= 8 ? 4 : 2;
+            std::vector<int> cells;
+            if (play == kComp)
+            {
+               // Eight cells: a strikes the first chord, b the second, - lets it ring.
+               static const char* kCompPat[] = { "a--a-b-b", "a-a--b-b", "a--a--b-", "a-ab--b-", "a--ab-b-", "a-a-b-bb" };
+               const char* pat = kCompPat[sp.Range(6)];
+               rate = loopBeats >= 8 ? 1.0 : 0.5;
+               for (int i = 0; i < 8; i++)
+                  cells.push_back(pat[i] == 'a' ? pk[0] : pat[i] == 'b' ? pk[1] : -1);
+               strum = std::min(strum, 10.0);
+            }
+            else
+            {
+               rate = (double)loopBeats / nChords;
+               for (int i = 0; i < nChords; i++)
+                  cells.push_back(pk[i]);
+            }
             Params p = F({ { "rateBeats", rate }, { "strumMs", strum }, { "humanizeTimingMs", sp.Uniform(3.0, 14.0) }, { "humanizeVelocity", sp.Uniform(5.0, 20.0) } });
             p["root"] = { 'i', std::to_string(root) };
             p["scale"] = { 'i', std::to_string(out.scale) };
-            p["chordSize"] = { 'i', std::to_string(3 + sp.Range(2)) };
-            p["progSteps"] = { 'i', std::to_string(2 + sp.Range(3)) };
+            p["chordSize"] = { 'i', pi == 2 ? "4" : std::to_string(3 + sp.Range(2)) }; // the ii-V-I wants its sevenths
+            p["mode"] = { 'i', "1" };
+            p["progSteps"] = { 'i', std::to_string(cells.size()) };
+            for (size_t i = 0; i < cells.size(); i++)
+               p["progDeg" + std::to_string(i)] = { 'i', std::to_string(cells[i]) };
             const int ch = g.Add("Chorder", sp.Range(1 << 30), p);
+            int notes = ch;
+            if (play == kArp)
+            {
+               static const int kArpMode[] = { 0, 2, 2, 6, 11, 13, 1, 8 }; // up, up-down, random, spread, stairs, down, repeat
+               Params a = F({ { "rateBeats", sp.Uniform() < 0.7 ? 0.25 : 0.5 }, { "gatePercent", sp.Uniform(45.0, 85.0) } });
+               a["rateMode"] = { 'i', "0" };
+               a["octaves"] = { 'i', std::to_string(1 + sp.Range(2)) };
+               a["mode"] = { 'i', std::to_string(kArpMode[sp.Range(8)]) };
+               notes = g.Add("Arpeggiator", sp.Range(1 << 30), a);
+               g.Connect(ch, notes, true);
+            }
             g.melodic = true;
             const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
             g.melodic = false;
-            g.Connect(ch, sy, true);
+            g.Connect(notes, sy, true);
             synths.push_back(sy);
-            chans.push_back({ sy, 0.0f });
+            chans.push_back({ sy, play == kTopLine ? -2.0f : 0.0f });
+            if (play == kTopLine)
+            {
+               // The right hand: a line above the chords that lands on each chord's tones on the beat.
+               std::vector<double> vel(16, 0.0);
+               std::vector<int> note(16, 0);
+               const double lineRate = loopBeats >= 8 ? 0.5 : 0.25;
+               const int per = 16 / nChords;
+               int d = 4;
+               for (int i = 0; i < 16; i++)
+               {
+                  const int c = pk[std::min(nChords - 1, i / per)];
+                  const bool beat = i % 2 == 0;
+                  if (!(i == 0 || sp.Uniform() < (beat ? 0.7 : 0.3)))
+                     continue;
+                  if (beat || i % per == 0)
+                  {
+                     static const int kTone[] = { 0, 2, 4, 7 };
+                     const int t = c + kTone[sp.Range(4)];
+                     d = std::abs(t - d) <= 4 ? t : t + (t < d ? 7 : -7); // the nearest chord tone, not a leap
+                  }
+                  else
+                     d += sp.Range(2) ? 1 : -1;
+                  d = std::clamp(d, -2, 11);
+                  vel[(size_t)i] = std::clamp((beat ? 0.8 : 0.65) + sp.Uniform(-0.1, 0.1), 0.3, 1.0);
+                  note[(size_t)i] = degreeNote(d, 3);
+               }
+               const int lq = sequence(vel, note, lineRate, sp.Uniform(70.0, 95.0), 16);
+               g.melodic = true;
+               const int ly = g.Add("Wavetable", sp.Range(1 << 30), k);
+               g.melodic = false;
+               g.Connect(lq, ly, true);
+               synths.push_back(ly);
+               chans.push_back({ ly, 0.0f });
+            }
             specialWet = sp.Uniform(0.1, 0.3);
             specialDecay = sp.Uniform(1.0, 2.4);
          }
          else
          {
-            // One voice playing a line: stepwise, with rests and a few leaps.
+            // One massive voice playing a line: stacked unison engines (owner: "leads should sound massive").
             const int kind = PickDirectiveKind(sp, dir.leadW);
-            switch (kind)
+            static const Voice kLeadVoice[] = { Voice::BrassStack, Voice::SawStack, Voice::Supersaw, Voice::SquareLead, Voice::Supersaw, Voice::FmStack };
+            k = DesignVoice(kLeadVoice[std::clamp(kind, 0, 5)], sp);
+            if (kind == 4) // vowel: a sung stack on top of the supersaw
             {
-            case 0: // brass
-               wt(k, 53, sp.Uniform(0.2, 0.8), 1, sp.Uniform(2200.0, 5000.0), 0.0);
-               k["a.filterAmount"] = { 'f', num(sp.Uniform(1.0, 2.0)) };
-               k["a.filterDecay"] = { 'f', "250" };
-               k["a.filterSustain"] = { 'f', "0.5" };
-               k["a.ampAttack"] = { 'f', num(sp.Uniform(15.0, 60.0)) };
-               break;
-            case 1: // reed
-               wt(k, 52, sp.Uniform(0.1, 0.7), 1, sp.Uniform(2500.0, 6000.0), 0.0);
-               k["a.ampAttack"] = { 'f', num(sp.Uniform(10.0, 40.0)) };
-               break;
-            case 2: // detuned saw lead
-               wt(k, 24, sp.Uniform(0.4, 0.85), 2, sp.Uniform(2000.0, 5500.0), sp.Uniform(0.0, 0.25));
-               k["a.unison"] = { 'i', std::to_string(2 + sp.Range(3)) };
-               k["a.detune"] = { 'f', num(sp.Uniform(8.0, 22.0)) };
-               k["a.stereoWidth"] = { 'f', "0.7" };
-               break;
-            case 3: // pulse
-               wt(k, 4, sp.Uniform(0.15, 0.7), 1, sp.Uniform(2500.0, 6000.0), 0.1);
-               break;
-            case 4: // vowel: a sung line
-               wt(k, 47, sp.Uniform(0.0, 0.9), 1, sp.Uniform(3500.0, 8000.0), 0.0);
-               k["a.ampAttack"] = { 'f', num(sp.Uniform(30.0, 90.0)) };
-               break;
-            default: // fm lead: bright and glassy
-               wt(k, sp.Range(2) ? 12 : 32, sp.Uniform(0.1, 0.6), 1, sp.Uniform(4500.0, 9000.0), 0.0);
-               break;
+               Engine(k, 'a', 47, sp.Uniform(0.0, 0.9), 3, sp.Uniform(10.0, 18.0), 0, 1.0);
+               k["a.ampAttack"] = { 'f', num(sp.Uniform(20.0, 60.0)) };
             }
-            k["a.ampDecay"] = { 'f', "300" };
-            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.6, 0.95)) };
-            k["a.ampRelease"] = { 'f', num(sp.Uniform(80.0, 260.0)) };
-            k["glide"] = { 'f', num(sp.Uniform(0.0, 0.14)) };
-            k["a.octave"] = { 'i', std::to_string(sp.Range(2)) };
+            k["glide"] = { 'f', num(sp.Uniform(0.0, 0.06)) };
             std::vector<double> vel(16, 0.0);
             std::vector<int> note(16, 0);
             // Energy fills or thins the line (the draw stays, so the line is the same one, busier or sparser).
@@ -2849,8 +2902,9 @@ Compiled Compile(const Recipe& recipe)
    // The master's floor: nothing under 30 Hz. A voice an octave down under a low note plays near 20 Hz, which no
    // speaker gives back; left in, it is half the loop's power and the loudness match turns everything audible down.
    {
-      Params hp = F({ { "freq", 30.0 }, { "q", 0.707 }, { "mix", 1.0 } });
-      hp["type"] = { 'i', "4" }; // AudioFilterDsp::kHP24
+      // Every knob pinned: Add() draws the ones left out, and a drawn envAmount sweeps the cutoff into the loop.
+      Params hp = F({ { "freq", 30.0 }, { "q", 0.707 }, { "mix", 1.0 }, { "gain", 0.0 }, { "envAmount", 0.0 }, { "drive", 0.0 } });
+      hp["type"] = { 'f', "4" }; // AudioFilterDsp::kHP24; an "i" key is never read (effect params are floats)
       const int hpf = g.Add("Audio Filter", 0, hp);
       g.Connect(end, hpf, false);
       end = hpf;
@@ -2872,6 +2926,10 @@ Compiled Compile(const Recipe& recipe)
    {
       const GenRow& row = *targets[i].second;
       const float depth = 0.1f + 0.5f * st.mod * (float)rng.Uniform();
+      // A sweep around the middle of a knob's whole range overrides a designed voice (a bass's 1 kHz cutoff swept
+      // to 9 kHz, drive swept to half): only the parts with no designed voice keep it (pads, textures, fx, foley).
+      // The draws stay, so nothing after moves.
+      const bool keep = pads || part == Part::Textures || part == Part::Fx || part == Part::Foley;
       app::OfflineGraph::Motion m;
       m.node = targets[i].first;
       m.key = row.key;
