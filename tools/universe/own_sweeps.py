@@ -42,7 +42,9 @@ FIXED_KEYS = {"volume": 0.8, "freq": 220, "frequency": 220, "glide": 0, "pitchBe
 SRC = os.path.expanduser("~/Infinite/training-data/own/src_tone.wav")  # steady harmonic tone for the file-driven synths
 FIXED_ENGINE = {"Oscillator": {"fmDepth": 0, "fmMode": 0}, "Analog": {}, "Sampler": {"path": SRC, "loop": 1}, "Granular": {"filePath": SRC},
                 "Partials": {"path": SRC}, "PaulStretch": {"filePath": SRC, "path": SRC}, "Looper": {}, "Slicer": {"path": SRC, "filePath": SRC, "sliceBy": 1},
-                "Molder": {"path": SRC, "filePath": SRC}, "Grain Molder": {"path": SRC, "filePath": SRC}}
+                "Molder": {"path": SRC, "filePath": SRC}, "Grain Molder": {"path": SRC, "filePath": SRC},
+                # both oscillators on at a fixed level: with B off (its default) mix near 1 is silence, and every b.* knob reads as dead
+                "Wavetable": {"a.on": 1, "b.on": 1, "a.volume": 0.8, "b.volume": 0.8}}
 TIME_HINT = re.compile(r"(attack|decay|release|time)$", re.I)
 FREQ_HINT = re.compile(r"(cutoff|freq)", re.I)
 

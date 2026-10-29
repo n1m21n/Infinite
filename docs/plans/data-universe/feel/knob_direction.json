@@ -15,6 +15,22 @@
   "gated_sd": 0.04,
   "gated_moves_per_fold": 91
  },
+ "Wavetable": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": 1.0,
+   "scored_moves": 3,
+   "reliable_cells_per_fold": 1.0,
+   "cells_with_data": 2.0
+  },
+  "pairs": 683,
+  "banks": 56,
+  "dominant_acc": 0.511,
+  "dominant_sd": 0.03,
+  "gated_acc": 0.523,
+  "gated_sd": 0.087,
+  "gated_moves_per_fold": 39
+ },
  "Oscillator": {
   "reliable": {
    "tau": 0.8,
@@ -30,22 +46,6 @@
   "gated_acc": 0.704,
   "gated_sd": 0.057,
   "gated_moves_per_fold": 140
- },
- "FM": {
-  "reliable": {
-   "tau": 0.8,
-   "acc": 0.916,
-   "scored_moves": 522,
-   "reliable_cells_per_fold": 35.0,
-   "cells_with_data": 50.0
-  },
-  "pairs": 1182,
-  "banks": 100,
-  "dominant_acc": 0.766,
-  "dominant_sd": 0.029,
-  "gated_acc": 0.773,
-  "gated_sd": 0.03,
-  "gated_moves_per_fold": 79
  },
  "Metallic": {
   "reliable": {
@@ -79,21 +79,37 @@
   "gated_sd": 0.023,
   "gated_moves_per_fold": 165
  },
- "Wavetable": {
+ "FM": {
   "reliable": {
    "tau": 0.8,
-   "acc": null,
-   "scored_moves": 0,
-   "reliable_cells_per_fold": 0.0,
-   "cells_with_data": 0.0
+   "acc": 0.916,
+   "scored_moves": 522,
+   "reliable_cells_per_fold": 35.0,
+   "cells_with_data": 50.0
   },
-  "pairs": 911,
+  "pairs": 1182,
   "banks": 100,
-  "dominant_acc": 0.528,
-  "dominant_sd": 0.044,
-  "gated_acc": 0.516,
-  "gated_sd": 0.069,
-  "gated_moves_per_fold": 40
+  "dominant_acc": 0.766,
+  "dominant_sd": 0.029,
+  "gated_acc": 0.773,
+  "gated_sd": 0.03,
+  "gated_moves_per_fold": 79
+ },
+ "Sampler": {
+  "reliable": {
+   "tau": 0.8,
+   "acc": 0.909,
+   "scored_moves": 99,
+   "reliable_cells_per_fold": 7.6,
+   "cells_with_data": 11.8
+  },
+  "pairs": 162,
+  "banks": 12,
+  "dominant_acc": 0.698,
+  "dominant_sd": 0.084,
+  "gated_acc": 0.762,
+  "gated_sd": 0.109,
+  "gated_moves_per_fold": 17
  },
  "Equation Synth": {
   "reliable": {
@@ -114,22 +130,6 @@
  "Partials": {
   "pairs": 0,
   "error": "too few one-knob pairs"
- },
- "Sampler": {
-  "reliable": {
-   "tau": 0.8,
-   "acc": 0.909,
-   "scored_moves": 99,
-   "reliable_cells_per_fold": 7.6,
-   "cells_with_data": 11.8
-  },
-  "pairs": 162,
-  "banks": 12,
-  "dominant_acc": 0.698,
-  "dominant_sd": 0.084,
-  "gated_acc": 0.762,
-  "gated_sd": 0.109,
-  "gated_moves_per_fold": 17
  },
  "Slicer": {
   "reliable": {
