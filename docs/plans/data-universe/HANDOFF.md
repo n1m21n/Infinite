@@ -583,3 +583,15 @@ Not done: chord prediction on the 294k full-song corpus (needs a chord recognise
 
 ### Register miss, diagnosed (not a restated pass)
 Corpus register by instrument family (first 120k files, range midpoint, p5/p50/p95): piano 47/60/75, guitar 47.5/59.5/72.5, ensemble 50.5/66/79.5, **bass 31.5/38.5/56**, strings 39/63/77.5. The generated Note Sequencer lines (26/36/44) are bass-role lines compared above against an all-family corpus. Against the bass family alone, 71.9% (23 of 32) sit inside the corpus 5th-95th range. That is still under the 90% bar. **The original item-2 verdict stays MISS.** A per-role version of the test (each generated layer against its own family) would be the fair test; it changes the test, so it waits for Naman's sign-off. The sequencer layers carry only the bass/low roles; Chorder/Arpeggiator layers are not yet measured.
+
+### Item 1 figures from the feel workbook (~/Downloads/feel_dataset.xlsx, sheet 1_Instruments, 14,161 rows)
+| Column | Count | Share |
+|---|---|---|
+| audio_measured = yes | 2,158 | 15.2% |
+| audio_measured = no (evidence "R, prior") | 12,003 | 84.8% |
+| cluster_assignment from audio | 2,158 | 15.2% |
+| cluster_assignment from tags only | 9,751 | 68.9% |
+| cluster_assignment none (unassigned) | 2,252 | **15.9%** |
+| Best knobs "engine unmeasured" | 2,156 | 15.2% |
+
+**Item 1 verdict: MISS.** Bar is unassigned < 5% (now 15.9%) and the measured column covering every audio node. Sources: steam 11,519, exs 2,413, nkc 229. Next step is a render-and-measure pass over the 12,003 unmeasured instruments (many are Steam library entries with no sample audio on this Mac, which has to be checked first, since an instrument with no audio cannot be measured here).
