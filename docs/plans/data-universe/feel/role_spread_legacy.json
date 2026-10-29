@@ -1,0 +1,60 @@
+{
+ "patches": "/private/tmp/claude-501/-Users-namansoni--claude-spares-spare-FGlpnI/888d4042-7ee0-484e-98d4-d69c9068dad6/scratchpad/p-base.jsonl",
+ "layers": 888,
+ "count": "legacy",
+ "bass": {
+  "n": 615,
+  "register": {
+   "corpus_p5": 31.5,
+   "corpus_p50": 38.5,
+   "corpus_p95": 56.0,
+   "n_corpus": 80892,
+   "gen_p5": 30.0,
+   "gen_p50": 35.0,
+   "gen_p95": 45.5,
+   "inside": 0.891,
+   "below": 67,
+   "above": 0
+  },
+  "density": {
+   "corpus_p5": 0.38,
+   "corpus_p50": 1.75,
+   "corpus_p95": 3.94,
+   "n_corpus": 80892,
+   "gen_p5": 1.08,
+   "gen_p50": 2.95,
+   "gen_p95": 7.34,
+   "inside": 0.628,
+   "below": 4,
+   "above": 225
+  }
+ },
+ "melodic": {
+  "n": 273,
+  "register": {
+   "corpus_p5": 46.5,
+   "corpus_p50": 63.5,
+   "corpus_p95": 79.0,
+   "n_corpus": 688083,
+   "gen_p5": 49.0,
+   "gen_p50": 60.0,
+   "gen_p95": 84.0,
+   "inside": 0.619,
+   "below": 0,
+   "above": 104
+  },
+  "density": {
+   "corpus_p5": 0.07,
+   "corpus_p50": 1.25,
+   "corpus_p95": 6.91,
+   "n_corpus": 688083,
+   "gen_p5": 0.56,
+   "gen_p50": 2.05,
+   "gen_p95": 7.11,
+   "inside": 0.945,
+   "below": 0,
+   "above": 15
+  }
+ },
+ "verdict": "MISS"
+}

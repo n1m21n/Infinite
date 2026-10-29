@@ -1,0 +1,60 @@
+{
+ "patches": "/private/tmp/claude-501/-Users-namansoni--claude-spares-spare-FGlpnI/888d4042-7ee0-484e-98d4-d69c9068dad6/scratchpad/p-base.jsonl",
+ "layers": 508,
+ "count": "audible steps, synth drums excluded",
+ "bass": {
+  "n": 443,
+  "register": {
+   "corpus_p5": 31.5,
+   "corpus_p50": 38.5,
+   "corpus_p95": 56.0,
+   "n_corpus": 80892,
+   "gen_p5": 31.5,
+   "gen_p50": 36.0,
+   "gen_p95": 46.0,
+   "inside": 0.975,
+   "below": 11,
+   "above": 0
+  },
+  "density": {
+   "corpus_p5": 0.38,
+   "corpus_p50": 1.75,
+   "corpus_p95": 3.94,
+   "n_corpus": 80892,
+   "gen_p5": 1.27,
+   "gen_p50": 3.7,
+   "gen_p95": 7.58,
+   "inside": 0.535,
+   "below": 0,
+   "above": 206
+  }
+ },
+ "melodic": {
+  "n": 65,
+  "register": {
+   "corpus_p5": 46.5,
+   "corpus_p50": 63.5,
+   "corpus_p95": 79.0,
+   "n_corpus": 688083,
+   "gen_p5": 48.1,
+   "gen_p50": 53.0,
+   "gen_p95": 61.4,
+   "inside": 1.0,
+   "below": 0,
+   "above": 0
+  },
+  "density": {
+   "corpus_p5": 0.07,
+   "corpus_p50": 1.25,
+   "corpus_p95": 6.91,
+   "n_corpus": 688083,
+   "gen_p5": 2.17,
+   "gen_p50": 5.63,
+   "gen_p95": 8.2,
+   "inside": 0.785,
+   "below": 0,
+   "above": 14
+  }
+ },
+ "verdict": "MISS"
+}
