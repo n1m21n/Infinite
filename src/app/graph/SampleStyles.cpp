@@ -70,6 +70,7 @@ namespace
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/GenerateSamplesGrooves.inc"
 #include "app/graph/GenerateSamplesVoices.inc"
+#include "app/graph/GenerateSamplesNotes.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -1177,6 +1178,41 @@ namespace
          EngineAmp(k, e, aa, ad, as, ar);
       }
       return k;
+   }
+   // The note bank (tools/universe/note_bank.py): progressions and one-bar lines the owner's note library plays, as
+   // degrees of the family the scale belongs to (a degree is a different chord in the other family).
+   bool MinorFamily(int scale)
+   {
+      using namespace MusicTime;
+      return !(scale == kMajor || scale == kLydian || scale == kMixolydian || scale == kMajorPentatonic);
+   }
+   const int* BankProg(int scale, Rng& r)
+   {
+      std::vector<int> pool;
+      for (int i = 0; i < (int)(sizeof(kNoteProgs) / sizeof(kNoteProgs[0])); i++)
+         if (kNoteProgs[i].minor == (MinorFamily(scale) ? 1 : 0))
+            pool.push_back(i);
+      return kNoteProgs[pool[(size_t)r.Range((int)pool.size())]].d;
+   }
+   // A bank line as 16 (degree, velocity 0..1) steps, velocity 0 a rest. The slight variation that makes one line many:
+   // a note now and then steps to its neighbour degree, never the downbeat.
+   std::vector<std::pair<int, double>> BankLine(int scale, bool bass, Rng& r)
+   {
+      std::vector<int> pool;
+      for (int i = 0; i < (int)(sizeof(kNoteLines) / sizeof(kNoteLines[0])); i++)
+         if (kNoteLines[i].minor == (MinorFamily(scale) ? 1 : 0) && kNoteLines[i].bass == (bass ? 1 : 0))
+            pool.push_back(i);
+      const NoteLine& l = kNoteLines[pool[(size_t)r.Range((int)pool.size())]];
+      std::vector<std::pair<int, double>> out(16, { 0, 0.0 });
+      for (int i = 0; i < 16; i++)
+         if (l.d[i] != '.')
+         {
+            int d = l.d[i] - 'a';
+            if (i > 0 && r.Uniform() < 0.1)
+               d += r.Range(2) ? 1 : -1;
+            out[(size_t)i] = { d, (l.v[i] - '0') / 9.0 };
+         }
+      return out;
    }
    // A pluck is a note that is struck and then dies: a bright start that
    // closes fast. Each kit is a Wavetable voice whose own filter envelope
@@ -2362,6 +2398,17 @@ Compiled Compile(const Recipe& recipe)
          }
       }
       p["progSteps"] = { 'i', std::to_string(st.chordSteps) };
+      if (plucks) // a progression from the note bank, on its own stream: pads and the card's draws stay put
+      {
+         Rng nb(std::string("notes:plucks:") + st.id + ":" + std::to_string(recipe.seed));
+         if (nb.Uniform() < 0.6)
+         {
+            const int* pg = BankProg(out.scale, nb);
+            p["progSteps"] = { 'i', "4" };
+            for (int i = 0; i < 4; i++)
+               p["progDeg" + std::to_string(i)] = { 'i', std::to_string(pg[i]) };
+         }
+      }
       const int ch = g.Add("Chorder", seed(), p);
       int notes = noteChain(ch, st.notefx);
       const std::string fam = st.family;
@@ -2452,12 +2499,28 @@ Compiled Compile(const Recipe& recipe)
       }
       seq.insert(seq.end(), answer.begin(), answer.end());
       ProposeMotif(criticRng, st, mine, root, out.scale, seq, melNov);
+      Rng nb(std::string("notes:motif:") + st.id + ":" + std::to_string(recipe.seed)); // its own stream: the card's draws stay put
+      if (!mine && nb.Uniform() < 0.5) // a bar from the note library, folded into the motif's range
+      {
+         const auto line = BankLine(out.scale, false, nb);
+         for (int k = 0; k < 16; k++)
+         {
+            int d = line[(size_t)k].first;
+            while (d > std::max(4, st.motifRange + 2))
+               d -= 7;
+            seq[(size_t)k] = { d, line[(size_t)k].second > 0.0 };
+         }
+      }
       Params p = F({ { "rateBeats", st.motifRate }, { "gatePercent", myGate(st.motifGate, st.motifRate) } });
       p["steps"] = { 'i', "16" };
       p["rateMode"] = { 'i', "0" };
+      // The card's motif octave sits over its bass in the full mix; played alone as the synths part it would be the
+      // bass (owner's review, 2026-10-29: synths "not dark or muddy"), so it rises an octave or so. Octave 3 brightens more
+      // but turns a sine motif into a whistle the spectral gate rejects (4 of 34 takes failed), so 2.
+      const int motifOct = part == Part::Synths ? std::max(st.motifOctave, 2) : st.motifOctave;
       for (int k = 0; k < 16; k++)
       {
-         p["note" + std::to_string(k)] = { 'i', std::to_string(degreeNote(seq[k].first, st.motifOctave)) };
+         p["note" + std::to_string(k)] = { 'i', std::to_string(degreeNote(seq[k].first, motifOct)) };
          p["en" + std::to_string(k)] = { 'b', seq[k].second ? "1" : "0" };
          double v = 0.65 + 0.2 * rng.Uniform();
          if (mine && user.hasVelocity)
@@ -2569,6 +2632,9 @@ Compiled Compile(const Recipe& recipe)
          static const int kProg[][4] = { { 0, 5, 3, 4 }, { 0, 4, 5, 3 }, { 0, 6, 5, 6 }, { 0, 3, 4, 0 },
                                          { 0, 0, 3, 4 }, { 0, 5, 0, 4 }, { 0, 3, 0, 3 }, { 0, 5, 6, 4 } };
          const int* prog = kProg[sp.Range(8)];
+         Rng nb(std::string("notes:bass:") + st.id + ":" + std::to_string(recipe.seed)); // its own stream: every other draw stays put
+         if (nb.Uniform() < 0.6)
+            prog = BankProg(out.scale, nb);
          const int chords = loopBeats >= 8 ? 4 : 2;
          std::vector<double> vel(16, 0.0);
          std::vector<int> note(16, 0);
@@ -2601,6 +2667,15 @@ Compiled Compile(const Recipe& recipe)
          }
          case kMelodic: // a walking line: the chord's root, its tones, and a step into the next chord
          {
+            if (nb.Uniform() < 0.6) // or a bar a bass player in the note library plays
+            {
+               gate = sp.Uniform(55.0, 85.0);
+               const auto line = BankLine(out.scale, true, nb);
+               for (int i = 0; i < 16; i++)
+                  if (line[(size_t)i].second > 0.0)
+                     hit(i, line[(size_t)i].first % 14, 1, 0.45 + 0.55 * line[(size_t)i].second);
+               break;
+            }
             static const char* kWalk[] = { "x.x.x.xx", "x..x.xx.", "x.xxx.x.", "x..x..x.", "x.x..xx." };
             rate = loopBeats >= 8 ? 0.5 : 0.25;
             gate = sp.Uniform(65.0, 90.0);
@@ -3021,6 +3096,9 @@ Compiled Compile(const Recipe& recipe)
                                                 { 5, 3, 0, 4 }, { 0, 6, 5, 4 }, { 0, 2, 3, 4 }, { 3, 4, 0, 5 } };
             const int pi = sp.Range(8);
             const int* pk = kKeysProg[pi];
+            Rng nb(std::string("notes:keys:") + st.id + ":" + std::to_string(recipe.seed)); // its own stream: every other draw stays put
+            if (nb.Uniform() < 0.6)
+               pk = BankProg(out.scale, nb);
             const int nChords = loopBeats >= 8 ? 4 : 2;
             std::vector<int> cells;
             if (play == kComp)
@@ -3161,6 +3239,13 @@ Compiled Compile(const Recipe& recipe)
                      dg = std::clamp(dg, -2, 7);
                      first = false;
                   }
+            }
+            Rng nb(std::string("notes:lead:") + st.id + ":" + std::to_string(recipe.seed));
+            if (!mine && nb.Uniform() < 0.5) // a bar a player in the note library plays, in place of the drawn line
+            {
+               const auto line = BankLine(out.scale, false, nb);
+               for (int i = 0; i < 16; i++)
+                  leadSeq[(size_t)i] = { line[(size_t)i].first > 9 ? line[(size_t)i].first - 7 : line[(size_t)i].first, line[(size_t)i].second > 0.0 };
             }
             for (int i = 0; i < 16; i++)
                if (leadSeq[(size_t)i].second)
