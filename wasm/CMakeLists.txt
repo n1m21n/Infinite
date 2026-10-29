@@ -57,6 +57,6 @@ target_compile_options(infinite_gen_wasm PRIVATE -O2 -fwasm-exceptions -sUSE_GLF
 target_link_options(infinite_gen_wasm PRIVATE
     -O2 -fwasm-exceptions -sUSE_GLFW=3 -sMODULARIZE=1 -sEXPORT_NAME=InfiniteGen -sENVIRONMENT=worker,web,node
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=128MB -sFILESYSTEM=1 -sEXPORT_ES6=0
-    "-sEXPORTED_FUNCTIONS=['_gen_style_count','_gen_style_id','_gen_scale_count','_gen_scale_name','_gen_run','_gen_pcm','_gen_label','_gen_patch','_gen_bpm','_gen_attempt','_malloc','_free']"
+    "-sEXPORTED_FUNCTIONS=['_gen_style_count','_gen_style_id','_gen_scale_count','_gen_scale_name','_gen_run','_gen_set_shape','_gen_pcm','_gen_label','_gen_patch','_gen_bpm','_gen_attempt','_malloc','_free']"
     "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','HEAPF32','FS']"
     --preload-file ${R}/assets/drumkits/infinite-basic@/kit)

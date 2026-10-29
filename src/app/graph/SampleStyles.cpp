@@ -7,8 +7,10 @@
 #include "nodes/DrumSequencerNode.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <set>
 
@@ -140,6 +142,60 @@ namespace
       std::set<std::pair<int, int>> used; // (dst, slot) already wired
       int n = 0;
       float variation = 0.5f;
+      float tone = 0.0f, energy = 0.0f, space = 0.0f, mood = 0.0f; // the recipe's dots
+
+      // The dots, applied to one node's params as it is placed. A key the
+      // seed left at its default starts from the node's own default, so a dot
+      // moves every voice, not only the ones the seed touched.
+      void Shape(const std::string& type, Params& ps) const
+      {
+         auto scale = [&](const char* key, double fallback, double mul, double lo, double hi, bool fill)
+         {
+            auto it = ps.find(key);
+            if (it == ps.end() && !fill)
+               return;
+            const double v = it == ps.end() ? fallback : std::stod(it->second.second);
+            ps[key] = { 'f', Num(std::clamp(v * mul, lo, hi)) };
+         };
+         const bool synth = type == "Analog" || type == "Wavetable" || type == "Metallic" || type == "Oscillator" || type == "Spectral Synth" ||
+                            type == "Field Synth" || type == "Partials";
+         const double bright = std::pow(2.0, 1.2 * tone + 0.35 * energy + 0.25 * mood);
+         if (synth && bright != 1.0)
+         {
+            for (const char* k : { "cutoff", "a.cutoff", "filterCutoff" })
+               scale(k, 12000.0, bright, 80.0, 18000.0, (type == "Analog" && !strcmp(k, "cutoff")) || (type == "Wavetable" && !strcmp(k, "a.cutoff")) ||
+                                                            (type == "Metallic" && !strcmp(k, "filterCutoff")));
+            scale("b.cutoff", 12000.0, bright, 80.0, 18000.0, false);
+            scale("p.cutoff", 6000.0, bright, 200.0, 10000.0, false);
+         }
+         const double tail = std::pow(2.0, 1.5 * space);
+         if (synth && tail != 1.0)
+         {
+            scale("release", 250.0, tail, 5.0, 8000.0, type == "Analog" || type == "Partials");
+            scale("a.ampRelease", 260.0, tail, 5.0, 8000.0, type == "Wavetable");
+            scale("b.ampRelease", 260.0, tail, 5.0, 8000.0, false);
+            scale("ampRelease", 250.0, tail, 5.0, 8000.0, type == "Spectral Synth");
+         }
+         auto add = [&](const char* key, double by, double lo, double hi)
+         {
+            auto it = ps.find(key);
+            if (it != ps.end() && it->second.first == 'f')
+               it->second.second = Num(std::clamp(std::stod(it->second.second) + by, lo, hi));
+         };
+         if (type == "Reverb" && space != 0.0f)
+         {
+            add("mix", 0.25 * space, 0.0, 0.9);
+            scale("decay", 1.2, std::pow(2.0, (double)space), 0.2, 12.0, false);
+         }
+         // A tempo delay, not the few-ms bursts that build a clap.
+         auto tm = ps.find("timeMs");
+         if (type == "Delay" && space != 0.0f && tm != ps.end() && std::stod(tm->second.second) > 60.0)
+            add("mix", 0.15 * space, 0.0, 0.8);
+         if ((type == "Note Sequencer" || type == "Drum Sequencer") && energy != 0.0f)
+            for (auto& [k, v] : ps)
+               if (k.rfind("vel", 0) == 0 && k.size() > 3 && isdigit((unsigned char)k[3]) && v.first == 'f' && std::stod(v.second) > 0.0)
+                  v.second = Num(std::clamp(std::stod(v.second) * (1.0 + 0.3 * energy), 0.15, 1.0));
+      }
 
       // Seeded params (universe.py seeded_params): each ui row leaves its
       // default with chance 0.7 * variation, to a uniform (log for wide
@@ -220,6 +276,7 @@ namespace
          Params ps = Seeded(type, seed);
          for (const auto& kv : force)
             ps[kv.first] = kv.second;
+         Shape(type, ps);
          for (const auto& [k, v] : ps)
             lines.push_back(std::string("  ") + v.first + " " + k + " " + v.second);
          lines.push_back("end");
@@ -964,6 +1021,37 @@ Compiled Compile(const Recipe& recipe)
       tempoFromUser = true, out.bpm = std::clamp(myBpm + (float)rng.Uniform(-1.5, 1.5), (float)st.bpmLo * 0.6f, (float)st.bpmHi * 1.6f);
    else
       out.bpm = recipe.bpm > 0.0f ? recipe.bpm : (float)cardBpm;
+   // Energy and mood lean the tempo (busier and brighter feel faster), within
+   // reach of the card's band; a set tempo is the player's and stays.
+   auto leanTempo = [&]()
+   {
+      if (recipe.bpm > 0.0f || tempoFromUser || (recipe.energy == 0.0f && recipe.mood == 0.0f))
+         return;
+      out.bpm = std::round(out.bpm * (1.0f + 0.1f * recipe.energy + 0.03f * recipe.mood) * 10.0f) / 10.0f;
+   };
+   leanTempo();
+   // Mood swaps the scale family when the card picked it: mode is the
+   // strongest single happy/sad cue in music, so a minor card turns major.
+   if (recipe.scale < 0)
+   {
+      using namespace MusicTime;
+      if (recipe.mood > 0.35f)
+         switch (scale0)
+         {
+            case kNaturalMinor: case kHarmonicMinor: case kMelodicMinor: case kPhrygian: case kLocrian: scale0 = kMajor; break;
+            case kDorian: scale0 = kMixolydian; break;
+            case kMinorPentatonic: case kBlues: scale0 = kMajorPentatonic; break;
+            default: break;
+         }
+      else if (recipe.mood < -0.35f)
+         switch (scale0)
+         {
+            case kMajor: scale0 = recipe.mood < -0.75f ? kHarmonicMinor : kNaturalMinor; break;
+            case kLydian: case kMixolydian: scale0 = kDorian; break;
+            case kMajorPentatonic: scale0 = kMinorPentatonic; break;
+            default: break;
+         }
+   }
    out.root = root0;
    out.scale = scale0;
    const int root = out.root;
@@ -1135,6 +1223,10 @@ Compiled Compile(const Recipe& recipe)
 
    Graph g;
    g.variation = recipe.variation;
+   g.tone = std::clamp(recipe.tone, -1.0f, 1.0f);
+   g.energy = std::clamp(recipe.energy, -1.0f, 1.0f);
+   g.space = std::clamp(recipe.space, -1.0f, 1.0f);
+   g.mood = std::clamp(recipe.mood, -1.0f, 1.0f);
    std::vector<std::pair<int, float>> chans; // (node, gain dB)
    std::vector<int> synths;
    int layers = 0; // layers the full mix has, whatever the part keeps
@@ -1222,7 +1314,10 @@ Compiled Compile(const Recipe& recipe)
       const Feel& f = kFeels[feel.Range(nf)];
       const bool own = recipe.bpm > 0.0f || tempoFromUser;
       if (subPart && !own)
+      {
          out.bpm = (float)feel.Uniform(f.lo, f.hi);
+         leanTempo();
+      }
       if (subPart)
       {
          lanes[0] = f.k;
@@ -1317,6 +1412,31 @@ Compiled Compile(const Recipe& recipe)
          lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
    }
 
+   // Energy thins or fills the closed hats: the cheapest measured lever on how
+   // busy a groove feels (groove-2h). Calm keeps the eighths, then quarters;
+   // driving fills the eighths, then every sixteenth with ghosts between.
+   std::string hatLane;
+   const char* cardHats = lanes[2];
+   if (lanes[2] && *lanes[2] && std::abs(recipe.energy) > 0.3f)
+   {
+      std::string h = lanes[2];
+      h.resize(16, '.');
+      const int keep = recipe.energy < -0.7f ? 4 : 2;
+      std::string thin = h;
+      for (int k = 0; k < 16; k++)
+      {
+         if (recipe.energy < 0.0f && k % keep)
+            thin[(size_t)k] = '.';
+         else if (recipe.energy > 0.0f && thin[(size_t)k] == '.' && (k % 2 == 0 || recipe.energy > 0.7f))
+            thin[(size_t)k] = k % 2 ? 'o' : 'x';
+      }
+      if (thin.find_first_not_of('.') != std::string::npos)
+      {
+         hatLane = thin;
+         lanes[2] = hatLane.c_str();
+      }
+   }
+
    int drums = 0, duckKey = 0;
    bool is808Kick = false;
    if (hasDrums)
@@ -1340,27 +1460,45 @@ Compiled Compile(const Recipe& recipe)
       Rng fr(std::string("feel:") + std::to_string(recipe.seed));
       const double accentDepth = std::min(0.45, fr.Uniform(0.0, 0.32) * (0.6 + 0.8 * st.groove));
       static const double kLaneAccent[8] = { 0.6, 0.6, 1.0, 0.8, 0.6, 0.8, 0.8, 1.0 }; // hats carry the alternation
+      // The hats energy added or took away draw from their own stream: the
+      // shared one is spent on the card's lane exactly as with the dots at
+      // zero, so the voices picked after it stay the same sample.
+      Rng hx(std::string("hats:") + std::to_string(recipe.seed));
       for (int i = 0; i < 8; i++)
       {
          const std::string lane = "lane" + std::to_string(i);
          force[lane + "_path"] = { 's', DrumSequencerNode::KitDir() + "/" + kKitFiles[i] + ".wav" };
          force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : part == Part::Percussion && i == 5 ? 0.6 : 0.85) };
          const std::string pat = lanes[i];
+         const std::string cardPat = i == 2 && !hatLane.empty() ? std::string(cardHats) : pat;
          const bool ghostLane = i == 1 || i == 2 || i == 3 || i == 4;
-         for (int k = 0; k < 32; k++)
+         auto stepVel = [&](const std::string& p, int k, Rng& r)
          {
-            const char c = pat.empty() ? '.' : pat[(size_t)(k % 16)];
+            const char c = p.empty() ? '.' : p[(size_t)(k % 16)];
             double v = c == 'x' ? 1.0 : c == 'o' ? 0.45 : 0.0;
             if (v > 0.0)
             {
                const double metric = k % 4 == 0 ? 1.0 : k % 2 == 0 ? 0.72 : 0.5;
                v *= 1.0 - 2.0 * accentDepth * kLaneAccent[i] * (1.0 - metric);
-               v = std::clamp(v + rng.Uniform(-0.12, 0.12) * st.groove, 0.2, 1.0);
+               v = std::clamp(v + r.Uniform(-0.12, 0.12) * st.groove, 0.2, 1.0);
             }
             if (v > 0.0 && mine && user.hasVelocity)
                v = std::clamp(v * (1.0 + (std::clamp(user.velMean / 0.75, 0.6, 1.15) - 1.0) * user.velW), 0.2, 1.0); // as hard as they play
-            else if (!pat.empty() && ghostLane && k % 2 == 1 && rng.Uniform() < 0.22 * st.groove * (1.0 + 2.0 * (mine && user.hasTiming ? user.offGrid * user.timingW : 0.0)))
-               v = 0.18 + 0.1 * rng.Uniform();
+            else if (!p.empty() && ghostLane && k % 2 == 1 && r.Uniform() < 0.22 * st.groove * (1.0 + 2.0 * (mine && user.hasTiming ? user.offGrid * user.timingW : 0.0)))
+               v = 0.18 + 0.1 * r.Uniform();
+            return v;
+         };
+         for (int k = 0; k < 32; k++)
+         {
+            double v = stepVel(cardPat, k, rng);
+            if (cardPat != pat)
+            {
+               const char was = cardPat[(size_t)(k % 16)], now = pat[(size_t)(k % 16)];
+               if (now == '.')
+                  v = 0.0;
+               else if (now != was)
+                  v = stepVel(pat, k, hx);
+            }
             if (fn > 0 && k >= 32 - fn)
             {
                if (lanes[i] == fillLane)

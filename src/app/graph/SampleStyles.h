@@ -65,6 +65,13 @@ namespace SampleStyles
       // key and scale, motif steps and rhythm, velocities, ghost notes. Off
       // for the website pool and the tests, which must not depend on a player.
       bool personal = false;
+      // The dots, each -1..1; 0 everywhere is the sample as it always was.
+      // The same seed with other dots is the same sample, shifted:
+      //   tone   darker .. brighter     (synth filter cutoff, measured: cutoff moves brightness 92% of the time)
+      //   energy calm .. driving        (tempo, note velocity, hat density, a little cutoff)
+      //   space  dry, close .. wide     (envelope release, measured 89%; reverb and delay amount)
+      //   mood   dark .. bright feeling (minor or major family scale, a little tempo and cutoff; a cue, not a guarantee)
+      float tone = 0.0f, energy = 0.0f, space = 0.0f, mood = 0.0f;
    };
 
    struct Compiled

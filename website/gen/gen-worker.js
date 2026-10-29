@@ -1,5 +1,5 @@
 // Runs Infinite's Generate Samples engine (wasm) off the page's thread. Loaded lazily on the first generate press.
-var V = '?v=8'; // bump with every rebuild: the worker, glue, wasm and data are all cached by the browser
+var V = '?v=9'; // bump with every rebuild: the worker, glue, wasm and data are all cached by the browser
 importScripts('infinite_gen_wasm.js' + V);
 
 var mod = null;
@@ -19,6 +19,8 @@ onmessage = function (e) {
       postMessage({ id: m.id, styles: styles, scales: scales });
       return;
     }
+    // The studio's dots and edits; a plain generate sends none and gets the plain engine.
+    if (M._gen_set_shape) M._gen_set_shape(m.tone || 0, m.energy || 0, m.space || 0, m.mood || 0, m.variation == null ? 0.5 : m.variation, m.bpm || 0, m.pinned ? 1 : 0);
     var frames = M._gen_run(m.style, m.part, m.seed, m.bars, m.key, m.scale);
     if (!frames) { postMessage({ id: m.id, error: 'no loop' }); return; }
     var pcm = new Float32Array(M.HEAPF32.buffer, M._gen_pcm(), frames * 2).slice();

@@ -36,15 +36,20 @@ namespace
    float gBpm = 0.0f;
    int gAttempt = 0;
    bool gReady = false;
+   // The studio panel's dots and edits, set before a run; all zero is the plain generator.
+   float gTone = 0.0f, gEnergy = 0.0f, gSpace = 0.0f, gMood = 0.0f, gVariation = 0.5f, gBpmSet = 0.0f;
+   bool gPinned = false; // the seed is the one a first take landed on: no redraw to another seed
 
-   bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+   // lenient: the studio's shaped renders keep the sample the player is shaping; only silence or
+   // broken audio is refused, never a timbre the taste gate would redraw.
+   bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR, bool lenient = false)
    {
       AudioSummary::Analyzer an(kRate);
       an.Push(l, r, frames);
       const AudioSummary::Result s = an.Finish();
       const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
       const bool specOk = SampleCriticData::VerifyAudioSpectrum(part, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
-      if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (rms > 0.0 && s.samplePeak / rms < 1.2) || !specOk)
+      if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (!lenient && ((rms > 0.0 && s.samplePeak / rms < 1.2) || !specOk)))
          return false;
       double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
       const double ceiling = std::pow(10.0, kCeilingDb / 20.0);
@@ -104,6 +109,13 @@ extern "C"
       return gStyleId.c_str();
    }
 
+   // tone, energy, space, mood: -1..1. variation 0..1. bpm <= 0: the card picks.
+   // pinned: render this exact seed, gated only for silence (the studio, once a take exists).
+   EMSCRIPTEN_KEEPALIVE void gen_set_shape(float tone, float energy, float space, float mood, float variation, float bpm, int pinned)
+   {
+      gTone = tone, gEnergy = energy, gSpace = space, gMood = mood, gVariation = variation, gBpmSet = bpm, gPinned = pinned != 0;
+   }
+
    EMSCRIPTEN_KEEPALIVE int gen_scale_count() { return (int)MusicTime::ScaleTypeList().size(); }
    EMSCRIPTEN_KEEPALIVE const char* gen_scale_name(int i) { return MusicTime::ScaleTable(i).name; }
 
@@ -138,8 +150,11 @@ extern "C"
       rec.scale = scale;
       rec.part = (SampleStyles::Part)std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
       rec.personal = false;
+      rec.tone = gTone, rec.energy = gEnergy, rec.space = gSpace, rec.mood = gMood;
+      rec.variation = gVariation;
+      rec.bpm = gBpmSet;
       gPcm.clear();
-      for (int attempt = 0; attempt <= kMaxRedraws; attempt++)
+      for (int attempt = 0; attempt <= (gPinned ? 0 : kMaxRedraws); attempt++)
       {
          SampleStyles::Recipe r = rec;
          r.seed += (uint32_t)attempt * 7919u;
@@ -161,7 +176,7 @@ extern "C"
          std::vector<float> left, right, l, rr;
          if (!g.Render(pre + frames, left, right))
             continue;
-         if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr))
+         if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr, gPinned))
             continue;
          gPcm.resize((size_t)frames * 2);
          for (int f = 0; f < frames; f++)
