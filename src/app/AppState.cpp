@@ -445,6 +445,8 @@ bool gHeadlessNeedProbe = false;
    bool  gSampleStudioOpen = false;
    float gSampleStudioHeight = 260.0f;
    int   gSampleStudioDock = 0;
+   bool  gSampleStudioClaimedKeys = false;
+   ImVec2 gSampleStudioRectMin(0.0f, 0.0f), gSampleStudioRectMax(0.0f, 0.0f);
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top

@@ -563,9 +563,10 @@ void DrawLinks(FrameCtx& fc)
 
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
       // anyone used to the Windows/Linux binding.
-      if (!typing && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      // Over the Sample Studio's waveform, Cmd+Z undoes the Studio's own edits (SampleStudioPanel.cpp).
+      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
          Undo();
-      if (!typing && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
+      if (!typing && !(gSampleStudioOpen && gSampleStudioClaimedKeys) && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
 

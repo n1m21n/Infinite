@@ -130,7 +130,7 @@ void DrawLayout(FrameCtx& fc)
 
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
-         gArrangeFocused = inArrange || inSession;
+         gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -141,7 +141,7 @@ void DrawLayout(FrameCtx& fc)
             gArrangeClaimedKeys = false;
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
-         gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys;
+         gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys);
 
          if (!gPerfPanelOpen)
          {
@@ -431,5 +431,7 @@ void DrawLayout(FrameCtx& fc)
       dropInsideArrangePanel = (gDropPos.x >= gArrangePanelRectMin.x && gDropPos.x < gArrangePanelRectMax.x &&
                                 gDropPos.y >= gArrangePanelRectMin.y && gDropPos.y < gArrangePanelRectMax.y) ||
                                (gSessionPanelOpen && gDropPos.x >= gSessionPanelRectMin.x && gDropPos.x < gSessionPanelRectMax.x &&
-                                gDropPos.y >= gSessionPanelRectMin.y && gDropPos.y < gSessionPanelRectMax.y);}
+                                gDropPos.y >= gSessionPanelRectMin.y && gDropPos.y < gSessionPanelRectMax.y) ||
+                               (gSampleStudioOpen && gDropPos.x >= gSampleStudioRectMin.x && gDropPos.x < gSampleStudioRectMax.x &&
+                                gDropPos.y >= gSampleStudioRectMin.y && gDropPos.y < gSampleStudioRectMax.y);}
 }

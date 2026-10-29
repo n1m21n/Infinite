@@ -5723,6 +5723,13 @@ extern bool gSampleStudioOpen;
 extern float gSampleStudioHeight;
 extern int gSampleStudioDock; // 0 = bottom, 3 = top (the Timeline's codes)
 void DrawSampleStudioDocked(const char* id, const ImVec2& size);
+// The Studio's work as text for the patch (`studio` lines), and back; empty text clears it.
+std::string SampleStudioSerialize();
+void SampleStudioApply(const std::string& text);
+// True while the pointer is over the Studio's waveform: its keys (split, join, zoom, undo) beat the canvas's.
+extern bool gSampleStudioClaimedKeys;
+// The Studio's screen rect last frame, so a file dropped on it isn't also dropped on the canvas.
+extern ImVec2 gSampleStudioRectMin, gSampleStudioRectMax;
 
 extern Patch::Data gDragStartSnapshot;
 

@@ -333,7 +333,7 @@ void DrawKeyboard(FrameCtx& fc)
          gArrangeClaimedKeys = false;
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
-      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys;
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys);
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
