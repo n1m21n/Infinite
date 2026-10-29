@@ -1007,5 +1007,5 @@ p.mono { font-size: 0.84375rem; }
 .slab-link:hover span, .slab-link:focus-visible span { color: var(--signal, var(--ink)); }
 
 /* two links under a page's main content (library, nodes, blog) */
-.page-cta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 420px); margin: 28px auto 8px; }
+.page-cta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 420px); margin: 36px auto 72px; }
 .page-cta .btn { justify-content: center; white-space: nowrap; }
