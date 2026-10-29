@@ -44,7 +44,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <link rel="stylesheet" href="../samples.css?v=26">
+  <link rel="stylesheet" href="../samples.css?v=28">
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=3a020cee">
@@ -128,13 +128,18 @@
       <div class="container smp-wrap">
         <header class="smp-head">
           <span class="blog-hand hand">make</span>
-          <h1 class="slab deck-title">Free unlimited samples</h1>
-          <a class="lib-icon-pill" href="studio.html">Shape one in the studio</a>
-        </header>
+          <h1 class="slab deck-title">Free unlimited samples</h1>        </header>
         <section class="smp-genp" id="smp-genp" aria-labelledby="smp-gen-h">
           <h2 class="smp-h" id="smp-gen-h">Generator</h2>
           <div class="smp-picks" id="smp-genpicks"></div>
-          <canvas class="smp-blob" id="smp-blob" role="button" tabindex="0" aria-label="Play or pause the generated loop"></canvas>
+          <div class="smp-stage" id="smp-stage" role="group" aria-label="Shape the sound: drag the dots">
+            <canvas class="smp-blob" id="smp-blob" role="button" tabindex="0" aria-label="Play or pause the generated loop"></canvas>
+            <svg class="smp-spokes" id="smp-spokes" aria-hidden="true"></svg>
+            <button type="button" class="smp-dot" aria-label="Shape dot 1: drag anywhere, arrows nudge, double-click resets"></button>
+            <button type="button" class="smp-dot" aria-label="Shape dot 2: drag anywhere, arrows nudge, double-click resets"></button>
+            <button type="button" class="smp-dot" aria-label="Shape dot 3: drag anywhere, arrows nudge, double-click resets"></button>
+            <button type="button" class="smp-dot" aria-label="Shape dot 4: drag anywhere, arrows nudge, double-click resets"></button>
+          </div>
           <div class="smp-genbar" id="smp-genbar">
             <button type="button" class="smp-genb" id="smp-gen-btn" hidden>generate</button>
           </div>
@@ -239,7 +244,7 @@
   
   <script src="../site.js?v=21" defer></script>
   
-  <script src="../samples.js?v=36"></script>
+  <script src="../samples.js?v=39"></script>
 <nav class="dock" id="dock" aria-label="Main">
   <div class="dock-bar">
     <span class="dock-thumb" aria-hidden="true"></span>

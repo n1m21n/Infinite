@@ -153,6 +153,109 @@
     return Math.floor(Math.random() * n);
   }
   setInterval(function () { settleWebTaste(false); }, 2000);
+  // Dots: four label-free glass dots that drag anywhere on the stage (free XY). The sound is read from the whole constellation:
+  // centroid left/right = tone (dark..bright), centroid up/down = energy (calm..driving), spread = space (dry..wide),
+  // wide vs tall spread = mood (minor..major). Home is a square around the blob, every axis 0. Before a take they set the
+  // next generate; after one, a moved dot re-renders the same seed (pinned, latest wins) and the loop swaps in where it was playing.
+  var HOME = [[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]];
+  var pos = HOME.map(function (p) { return p.slice(); }), dots = { tone: 0, energy: 0, space: 0, mood: 0 };
+  var stage = document.getElementById('smp-stage'), spokes = document.getElementById('smp-spokes'), dotEls = stage.querySelectorAll('.smp-dot'), geo = null;
+  function clamp1(v) { return Math.max(-1, Math.min(1, v)); }
+  function readDots() {
+    var cu = 0, cv = 0, s = 0, sx = 0, sy = 0;
+    pos.forEach(function (p) { cu += p[0] / 4; cv += p[1] / 4; });
+    pos.forEach(function (p) { var du = p[0] - cu, dv = p[1] - cv; s += Math.sqrt(du * du + dv * dv) / 4; sx += Math.abs(du) / 4; sy += Math.abs(dv) / 4; });
+    function z(v) { return Math.abs(v) < 0.04 ? 0 : Math.round(clamp1(v) * 100) / 100; }
+    dots = { tone: z(cu / 0.5), energy: z(cv / 0.5), space: z(s / Math.SQRT1_2 - 1), mood: z(sx + sy > 1e-6 ? (sx - sy) / (sx + sy) * 2 : 0) };
+  }
+  function dotCode() {
+    var moved = pos.some(function (p, i) { return p[0] !== HOME[i][0] || p[1] !== HOME[i][1]; });
+    return moved ? '&d=' + pos.map(function (p) { return Math.round(p[0] * 100) + '.' + Math.round(p[1] * 100); }).join('.') : '';
+  }
+  // The .inf names the shape it was made with, so the patch reads back as what was heard.
+  function dotNote(patch) {
+    return dotCode() ? String(patch).replace(/\n# style: /, '\n# Dots: tone ' + dots.tone.toFixed(2) + ' energy ' + dots.energy.toFixed(2) + ' space ' + dots.space.toFixed(2) + ' mood ' + dots.mood.toFixed(2) + '\n# style: ') : patch;
+  }
+  function layoutDots() {
+    var w = stage.clientWidth, h = stage.clientHeight, m = dotEls[0] ? dotEls[0].offsetWidth / 2 + 4 : 18;
+    if (!w) return;
+    geo = { cx: w / 2, cy: h / 2, rx: w / 2 - m, ry: h / 2 - m };
+    placeDots();
+  }
+  function placeDots() {
+    if (!geo) return;
+    var pts = pos.map(function (p) { return [geo.cx + p[0] * geo.rx, geo.cy - p[1] * geo.ry]; });
+    Array.prototype.forEach.call(dotEls, function (el, i) {
+      el.style.left = pts[i][0] + 'px'; el.style.top = pts[i][1] + 'px';
+      el.classList.toggle('is-moved', pos[i][0] !== HOME[i][0] || pos[i][1] !== HOME[i][1]);
+    });
+    // A faint outline joins the dots, so the shape being read is visible.
+    spokes.innerHTML = '<polygon points="' + pts.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '"/>';
+    stage.setAttribute('aria-valuetext', 'tone ' + dots.tone + ', energy ' + dots.energy + ', space ' + dots.space + ', mood ' + dots.mood);
+  }
+  function setDots(p) { pos = p.map(function (q) { return [clamp1(q[0]), clamp1(q[1])]; }); readDots(); placeDots(); }
+  function moveDot(i, u, v) {
+    u = clamp1(u); v = clamp1(v);
+    if (u === pos[i][0] && v === pos[i][1]) return;
+    var before = JSON.stringify(dots);
+    pos[i] = [u, v]; readDots(); placeDots();
+    if (JSON.stringify(dots) !== before) reshape();
+  }
+  var shaping = false, shapeAgain = false;
+  function reshape() {
+    var g0 = gens[0];
+    if (!g0 || !g0.take || busy) return;
+    if (shaping) { shapeAgain = true; return; }
+    shaping = true; shapeAgain = false;
+    var t = g0.take;
+    ask(Object.assign({ cmd: 'run', style: t.style, part: t.part, seed: t.seed, bars: 2, key: t.key, scale: t.scale, pinned: true }, dots)).then(function (r) {
+      if (gens[0] && gens[0].take === t) showGen(r, t, playPos());
+    }).catch(function () {}).then(function () { shaping = false; if (shapeAgain) reshape(); });
+  }
+  Array.prototype.forEach.call(dotEls, function (el, i) {
+    var id = null, off = [0, 0];
+    el.addEventListener('pointerdown', function (e) {
+      id = e.pointerId; try { el.setPointerCapture(id); } catch (_) {}
+      var r = el.getBoundingClientRect(); off = [e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)];
+      el.classList.add('is-drag'); e.preventDefault();
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== id || !geo) return;
+      var b = stage.getBoundingClientRect();
+      moveDot(i, (e.clientX - off[0] - b.left - geo.cx) / geo.rx, -(e.clientY - off[1] - b.top - geo.cy) / geo.ry);
+    });
+    function up(e) { if (e.pointerId !== id) return; id = null; el.classList.remove('is-drag'); }
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    el.addEventListener('dblclick', function () { moveDot(i, HOME[i][0], HOME[i][1]); });
+    el.addEventListener('keydown', function (e) {
+      var st = { ArrowRight: [0.05, 0], ArrowLeft: [-0.05, 0], ArrowUp: [0, 0.05], ArrowDown: [0, -0.05] }[e.key];
+      if (st) { e.preventDefault(); moveDot(i, Math.round((pos[i][0] + st[0]) * 100) / 100, Math.round((pos[i][1] + st[1]) * 100) / 100); }
+      else if (e.key === 'Home' || e.key === '0') { e.preventDefault(); moveDot(i, HOME[i][0], HOME[i][1]); }
+    });
+  });
+  window.addEventListener('resize', layoutDots);
+  if (window.ResizeObserver) new ResizeObserver(layoutDots).observe(stage);
+  layoutDots();
+  // A finished render becomes the generated take: its files, its row above the list, and the loop under the blob.
+  var pendTake = null;
+  function showGen(r, take, offset) {
+      if (!offset) stop();
+      shareCode = [take.style, take.part, take.seed, take.key, take.scale].join('.') + dotCode();
+      var url = URL.createObjectURL(wavOf(r.pcm, r.rate, r.label, r.label + ', ' + Math.round(r.bpm) + ' bpm. Generated by Infinite, https://infinitedevices.org/samples/'));
+      var infUrl = URL.createObjectURL(new Blob([dotNote(r.patch)], { type: 'text/plain' }));
+      if (gens[0] && gens[0].patch) URL.revokeObjectURL(gens[0].patch);
+      if (gens[0] && gens[0].audio) URL.revokeObjectURL(gens[0].audio);
+      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label.replace(/ \d+(?=,|$)/, ''), bpm: Math.round(r.bpm), audio: url, patch: infUrl, pcm: r.pcm, rate: r.rate, share: shareCode, take: take }];
+      genEl.hidden = false;
+      var gf0 = genFile(gens[0]);
+      genEl.innerHTML = '<div class="smp-id"><b>' + esc(gens[0].name) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
+        '<div class="smp-acts"><button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(gens[0].name) + '" title="Download">' + IC_DL + '</button>' +
+        '<div class="smp-menu" role="menu" hidden>' +
+          '<a href="' + url + '" download="' + esc(gf0) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' +
+          '<a href="' + infUrl + '" download="' + esc(gf0) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' +
+        '</div><button class="smp-shb" type="button" data-share="g=' + gens[0].share + '" aria-label="Share this sample" title="Share">' + IC_SH + '</button></div>';
+      blobPlay(gens[0], offset);
+  }
   function generate(fixed) {
     if (busy) return;
     if (!fixed || !fixed.seed) fixed = null;
@@ -172,25 +275,14 @@
       pendGen = { style: stIdx, part: pi, t: Date.now(), kept: false, settled: false };
       var seed = fixed ? fixed.seed : Math.floor(Math.random() * 99999);
       if (fixed) { key = fixed.key; scale = fixed.scale; }
-      shareCode = [stIdx, pi, seed, key, scale].join('.');
-      return ask({ cmd: 'run', style: stIdx, part: pi, seed: seed,
-        bars: 2, key: fixed ? key : KEYLESS[part] || part === 'foley' ? -1 : key, scale: fixed ? scale : KEYLESS[part] || part === 'foley' ? -1 : scale });
+      if (fixed && fixed.dots) setDots(fixed.dots);
+      var keyless = !fixed && (KEYLESS[part] || part === 'foley');
+      pendTake = { style: stIdx, part: pi, partName: part, seed: seed, key: keyless ? -1 : key, scale: keyless ? -1 : scale, pinned: !!(fixed && fixed.dots) };
+      return ask(Object.assign({ cmd: 'run', style: stIdx, part: pi, seed: seed, bars: 2, key: pendTake.key, scale: pendTake.scale, pinned: pendTake.pinned }, dots));
     }).then(function (r) {
-      stop();
-      var url = URL.createObjectURL(wavOf(r.pcm, r.rate, r.label, r.label + ', ' + Math.round(r.bpm) + ' bpm. Generated by Infinite, https://infinitedevices.org/samples/'));
-      var infUrl = URL.createObjectURL(new Blob([r.patch], { type: 'text/plain' }));
-      if (gens[0] && gens[0].patch) URL.revokeObjectURL(gens[0].patch);
-      if (gens[0] && gens[0].audio) URL.revokeObjectURL(gens[0].audio);
-      gens = [{ id: 'gen-' + (++serial), gen: true, name: r.label.replace(/ \d+(?=,|$)/, ''), bpm: Math.round(r.bpm), audio: url, patch: infUrl, pcm: r.pcm, rate: r.rate, share: shareCode }];
-      genEl.hidden = false;
-      var gf0 = genFile(gens[0]);
-      genEl.innerHTML = '<div class="smp-id"><b>' + esc(gens[0].name) + '</b><span>' + Math.round(r.bpm) + ' bpm</span></div>' +
-        '<div class="smp-acts"><button class="smp-dlb" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Download ' + esc(gens[0].name) + '" title="Download">' + IC_DL + '</button>' +
-        '<div class="smp-menu" role="menu" hidden>' +
-          '<a href="' + url + '" download="' + esc(gf0) + '.wav" role="menuitem"><b>.wav</b><span>sound</span></a>' +
-          '<a href="' + infUrl + '" download="' + esc(gf0) + '.inf" role="menuitem"><b>.inf</b><span>patch</span></a>' +
-        '</div><button class="smp-shb" type="button" data-share="g=' + gens[0].share + '" aria-label="Share this sample" title="Share">' + IC_SH + '</button></div>';
-      blobPlay(gens[0]);
+      // The seed the take landed on is pinned, so every later dot move shifts this same loop.
+      pendTake.seed += pendTake.pinned ? 0 : (r.attempt || 0) * 7919; pendTake.pinned = true;
+      showGen(r, pendTake, 0);
     }).catch(function () {
       genEl.hidden = false; genEl.innerHTML = '<p class="lib-empty">Could not generate a loop here. Try again.</p>';
     }).then(function () {
@@ -203,7 +295,9 @@
   (function () {
     var g = new URLSearchParams(location.search).get('g');
     var m = g && /^(\d+)\.(\d+)\.(\d+)\.(-?\d+)\.(-?\d+)$/.exec(g);
-    if (m) generate({ style: +m[1], part: +m[2], seed: +m[3], key: +m[4], scale: +m[5] });
+    var dn = (new URLSearchParams(location.search).get('d') || '').split('.').map(Number), dp = null;
+    if (dn.length === 8 && dn.every(isFinite)) dp = [0, 1, 2, 3].map(function (i) { return [dn[2 * i] / 100, dn[2 * i + 1] / 100]; });
+    if (m) generate({ style: +m[1], part: +m[2], seed: +m[3], key: +m[4], scale: +m[5], dots: dp });
   })();
   document.addEventListener('click', function (e) {
     var sb = e.target.closest('.smp-shb');
@@ -364,14 +458,28 @@
     if (!ac) { ac = new AC(); an = ac.createAnalyser(); an.fftSize = 256; an.smoothingTimeConstant = 0.78; an.connect(ac.destination); bin = new Uint8Array(an.frequencyBinCount); }
     if (ac.state === 'suspended') ac.resume();
   }
-  function blobStop() { if (src) { try { src.stop(); } catch (e) {} src.disconnect(); src = null; } }
-  function blobPlay(g) {
+  var srcGain = null, srcAt = 0;
+  // Stop the loop; a fade (seconds) lets a reshaped take cross in without a click.
+  function blobStop(fade) {
+    if (!src) return;
+    var s0 = src, g0 = srcGain; src = null; srcGain = null;
+    if (fade && g0) { g0.gain.setTargetAtTime(0, ac.currentTime, fade / 3); setTimeout(function () { try { s0.stop(); } catch (e) {} s0.disconnect(); g0.disconnect(); }, fade * 1000 + 60); }
+    else { try { s0.stop(); } catch (e) {} s0.disconnect(); if (g0) g0.disconnect(); }
+  }
+  // Where in the loop the playing take is, in seconds (0 when nothing plays).
+  function playPos() { return src && src.buffer ? (ac.currentTime - srcAt) % src.buffer.duration : 0; }
+  function blobPlay(g, offset) {
     if (!ac) wakeAudio();
     if (!ac) return;
-    stop(); blobStop();
+    var fade = offset ? 0.04 : 0;
+    stop(); blobStop(fade);
     var n = g.pcm.length / 2, buf = ac.createBuffer(2, n, g.rate), l = buf.getChannelData(0), r = buf.getChannelData(1);
     for (var i = 0; i < n; i++) { l[i] = g.pcm[i * 2]; r[i] = g.pcm[i * 2 + 1]; }
-    src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(an); src.start();
+    offset = (offset || 0) % buf.duration;
+    srcGain = ac.createGain(); srcGain.connect(an);
+    if (fade) { srcGain.gain.setValueAtTime(0, ac.currentTime); srcGain.gain.setTargetAtTime(1, ac.currentTime, fade / 3); }
+    src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(srcGain); src.start(0, offset);
+    srcAt = ac.currentTime - offset;
     bcv.setAttribute('aria-pressed', 'true');
   }
   function blobToggle() {
@@ -424,7 +532,7 @@
     bctx.save(); bctx.globalAlpha = 0.35; bctx.strokeStyle = '#fff'; bctx.lineWidth = 1.5; shape(0.78, 0.7, 1.4); bctx.stroke(); bctx.restore();
   }
   // A fragment shader draws the blob: a warped, blurred field in the brand's ember and signal, its edge pushed out by sixteen bands of the loop.
-  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG; uniform float uL;\n' +
+  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG; uniform float uL, uTone, uHarsh, uSpace, uMood;\n' +
     'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
     'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n' +
     '  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }\n' +
@@ -435,21 +543,28 @@
     '  float t = uT, a = atan(p.y, p.x), r = length(p);\n' +
     '  vec2 q = vec2(fbm(p * 1.3 + t * 0.12), fbm(p * 1.3 - t * 0.1 + 4.0));\n' +
     '  float wob = (fbm(vec2(cos(a), sin(a)) * 1.4 + t * 0.18) - 0.5) * (0.26 + 0.16 * uBusy);\n' +
+    '  wob += uHarsh * ((noise(vec2(a * 5.0 + t * 1.6, t * 0.9)) - 0.5) * 0.24 + 0.05 * sin(a * 21.0 + t * 5.0));\n' +
     '  float R = 0.62 + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
     '  float d = r - R;\n' +
-    '  float body = smoothstep(0.2, -0.22, d);\n' +
-    '  float glow = exp(-max(d, 0.0) * 3.4) * 0.5 * smoothstep(1.0, 0.55, r) * smoothstep(1.0, 0.6, abs(p.y));\n' +
+    '  float soft = mix(1.0, 0.3, uHarsh) * (1.0 + 0.6 * max(uSpace, 0.0));\n' +
+    '  float body = smoothstep(0.2 * soft, -0.22 * soft, d);\n' +
+    '  float glow = exp(-max(d, 0.0) * mix(4.2, 1.8, uSpace * 0.5 + 0.5)) * (0.5 + 0.2 * uSpace) * smoothstep(1.0, 0.55, r) * smoothstep(1.0, 0.6, abs(p.y));\n' +
     '  float f = fbm(p * 1.1 + q * 1.6 + t * 0.07);\n' +
-    '  float g = clamp(f * 1.5 + p.y * 0.35 - p.x * 0.2 + 0.25 * uE, 0.0, 1.0);\n' +
-    '  vec3 hot = mix(uA, vec3(1.0, 0.82, 0.62), 0.55);\n' +
-    '  vec3 c = mix(uS, uA, smoothstep(0.1, 0.55, g)); c = mix(c, hot, smoothstep(0.55, 1.0, g));\n' +
+    '  float g = clamp(f * 1.5 + p.y * 0.35 - p.x * 0.2 + 0.25 * uE + 0.2 * uTone, 0.0, 1.0);\n' +
+    '  g = mix(g, smoothstep(0.35, 0.65, fract(g * 2.5 + t * 0.15)) * 0.5 + g * 0.5, uHarsh * 0.6);\n' +
+    '  vec3 A = mix(uA, vec3(1.0, 0.66, 0.3), max(uMood, 0.0) * 0.55); A = mix(A, vec3(0.45, 0.38, 0.95), max(-uMood, 0.0) * 0.6);\n' +
+    '  vec3 Sg = mix(uS, vec3(0.32, 0.5, 1.0), max(-uMood, 0.0) * 0.4);\n' +
+    '  vec3 hot = mix(A, mix(vec3(1.0, 0.82, 0.62), vec3(1.0, 0.3, 0.16), uHarsh), 0.55);\n' +
+    '  float w = mix(0.45, 0.1, uHarsh);\n' +
+    '  vec3 c = mix(Sg, A, smoothstep(0.55 - w, 0.55, g)); c = mix(c, hot, smoothstep(1.0 - w, 1.0, g));\n' +
+    '  c *= mix(0.66, 1.08, uTone * 0.5 + 0.5);\n' +
     '  vec3 cl = mix(uS * 0.8, vec3(0.5, 0.32, 0.88), smoothstep(0.1, 0.55, g)); cl = mix(cl, vec3(0.9, 0.5, 0.82), smoothstep(0.55, 1.0, g));\n' +
     '  c = mix(c, cl, uL);\n' +
-    '  c = mix(c, vec3(1.0), mix(0.28, 0.1, uL) * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
+    '  c = mix(c, vec3(1.0), mix(0.28, 0.1, uL) * (0.6 + 0.6 * max(uTone, 0.0)) * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
     '  float edge = smoothstep(-0.5, 0.2, d) * body; c = mix(c, uS, edge * 0.45);\n' +
     '  float al = clamp(body * 0.94 + glow * (1.0 - body), 0.0, 1.0);\n' +
     '  vec3 col = mix(mix(uS, uA, 0.5), c, body);\n' +
-    '  col += (hash(gl_FragCoord.xy + t) - 0.5) / 120.0;\n' +
+    '  col += (hash(gl_FragCoord.xy + t) - 0.5) * (1.0 / 120.0 + 0.07 * uHarsh * body);\n' +
     '  gl_FragColor = vec4(col * al, al);\n' +
     '}';
   var gl = null, gp = null, gU = {};
@@ -465,12 +580,12 @@
     var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     var loc = gl.getAttribLocation(gp, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG', 'uL'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
+    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG', 'uL', 'uTone', 'uHarsh', 'uSpace', 'uMood'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     return true;
   }
   function rgb(css, d) { var m = /^#([0-9a-f]{6})$/i.exec((css || '').trim()); if (!m) return d; var n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
-  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0, light = 0;
+  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0, light = 0, chr = { tone: 0, harsh: 0, space: 0, mood: 0 };
   for (var bi = 0; bi < 16; bi++) bands.push(0);
   function blobDraw() {
     requestAnimationFrame(blobDraw);
@@ -483,10 +598,13 @@
       cA = rgb(cs.getPropertyValue('--accent'), cA); cS = rgb(cs.getPropertyValue('--signal'), cS);
       var ink = rgb(cs.getPropertyValue('--ink'), [1, 1, 1]); light = (ink[0] + ink[1] + ink[2]) / 3 < 0.5 ? 1 : 0;
     }
-    bt += 0.016 + 0.03 * busyK;
+    var i, j, sum = 0, cw = 0, cs = 0;
+    if (src) { an.getByteFrequencyData(bin); for (i = 0; i < bin.length; i++) { cw += bin[i] * i; cs += bin[i]; } }
+    var cen = cs ? cw / cs / bin.length : 0, harshT = Math.max(0, dots.tone) * 0.45 + Math.max(0, dots.energy) * 0.3;
+    if (src && cs) harshT = Math.min(1, harshT * 0.6 + Math.max(0, (cen - 0.1) * 3.2) * 0.6);
+    chr.tone += (dots.tone - chr.tone) * 0.06; chr.space += (dots.space - chr.space) * 0.06; chr.mood += (dots.mood - chr.mood) * 0.05; chr.harsh += (harshT - chr.harsh) * 0.05;
+    bt += (0.016 + 0.03 * busyK + 0.02 * (shaping ? 1 : 0)) * (1 + 0.7 * Math.max(0, dots.energy) - 0.4 * Math.max(0, -dots.energy));
     busyK += ((busy ? 1 : 0) - busyK) * 0.08;
-    var i, j, sum = 0;
-    if (src) an.getByteFrequencyData(bin);
     for (i = 0; i < 16; i++) {
       var v = 0;
       if (src) { var lo = Math.floor(Math.pow(i / 16, 1.6) * 70), hi = Math.max(lo + 1, Math.floor(Math.pow((i + 1) / 16, 1.6) * 70)); for (j = lo; j < hi; j++) v += bin[j]; v = v / (hi - lo) / 255; }
@@ -496,6 +614,7 @@
     gl.viewport(0, 0, bcv.width, bcv.height);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(gU.uRes, bcv.width, bcv.height); gl.uniform1f(gU.uT, bt); gl.uniform1f(gU.uE, energy); gl.uniform1f(gU.uBusy, busyK); gl.uniform1f(gU.uL, light);
+    gl.uniform1f(gU.uTone, chr.tone); gl.uniform1f(gU.uHarsh, chr.harsh); gl.uniform1f(gU.uSpace, chr.space); gl.uniform1f(gU.uMood, chr.mood);
     gl.uniform1fv(gU.uB, new Float32Array(bands)); gl.uniform3fv(gU.uA, cA); gl.uniform3fv(gU.uS, cS); gl.uniform3fv(gU.uG, [0.08, 0.1, 0.19]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

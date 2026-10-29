@@ -176,3 +176,19 @@
 .smp-steps { margin: 28px 0 0; }
 .smp-license { display: block; margin: 18px 0 0; padding: 0; background: none; box-shadow: none; border-radius: 0; color: var(--muted); font: 400 .78rem/1.5 var(--font-sans); max-width: 70ch; }
 .smp-license b { color: var(--muted); font-weight: 600; }
+
+/* Dots: four glass pills around the blob, each on its own spoke. Near the blob is -1, the rim of the stage is +1; a moved pill re-renders the same loop. */
+.smp-stage { position: relative; width: 100%; max-width: 760px; touch-action: none; }
+.smp-stage .smp-blob { max-width: none; }
+.smp-spokes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.smp-spokes polygon { fill: color-mix(in srgb, var(--ink) 3%, transparent); stroke: color-mix(in srgb, var(--ink) 16%, transparent); stroke-width: 1; stroke-dasharray: 2 5; stroke-linecap: round; stroke-linejoin: round; }
+.smp-dot { position: absolute; left: 0; top: 0; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; color: var(--ink); transform: translate(-50%, -50%);
+  background: color-mix(in srgb, var(--surface-2) 38%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5);
+  box-shadow: var(--glass-hi), inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent), var(--shadow-1);
+  transition: box-shadow .2s ease, background .2s ease; }
+.smp-dot:hover, .smp-dot.is-drag { background: color-mix(in srgb, var(--surface-2) 58%, transparent); }
+.smp-dot.is-drag { cursor: grabbing; box-shadow: var(--glass-hi), inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), var(--shadow-1); }
+.smp-dot.is-moved::after { content: ""; position: absolute; inset: 11px; border-radius: 50%; background: var(--accent); }
+.smp-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 680px) { .smp-dot { width: 26px; height: 26px; } .smp-dot.is-moved::after { inset: 9px; } }
