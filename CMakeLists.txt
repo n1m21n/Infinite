@@ -802,6 +802,8 @@ set(COMMON_SOURCES
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
     src/audio/dsp/SlicerDsp.cpp
+    src/audio/SliceSet.cpp
+    src/audio/SliceRender.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
     src/nodes/FMNode.cpp
@@ -1015,6 +1017,13 @@ target_include_directories(field-preset-check PRIVATE src src/core)
 add_executable(sketch-check src/core/sketch/SketchCheck.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch-check PRIVATE src/core/sketch)
 target_link_libraries(sketch-check PRIVATE sketch_deps lunasvg_lib)
+
+# Headless checks for the Sample Studio's slice document and render (docs/plans/sample-studio/SLICE-EDITOR.md).
+add_executable(slice-check src/audio/SliceCheck.cpp src/audio/SliceSet.cpp src/audio/SliceRender.cpp)
+target_include_directories(slice-check PRIVATE src src/audio external)
+if(APPLE)
+    target_link_libraries(slice-check PRIVATE "-framework Accelerate")
+endif()
 
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch3d-check PRIVATE src/core/sketch src/core)
