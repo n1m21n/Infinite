@@ -65,6 +65,15 @@ bool RenderSliceSet(const SourceAudio& src, const SliceSet& set, SliceRenderCach
 // Length-preserving pitch for a whole buffer (Signalsmith Stretch), used by the sample-wide pitch.
 void PitchShiftBuffer(std::vector<float>& l, std::vector<float>& r, double sr, float semis);
 
+// Length change at the same pitch for a whole buffer (Signalsmith Stretch): the Studio plays the edit at the
+// transport's tempo with it.
+void StretchBuffer(std::vector<float>& l, std::vector<float>& r, double sr, int64_t outLen);
+
+// Looping round, the last frame meets the first: a step there (a trimmed or edited end) clicks. Playback only - the
+// render and the exports stay bit-exact.
+bool LoopSeamSteps(const std::vector<float>& l, const std::vector<float>& r);
+void DeclickLoopSeam(std::vector<float>& l, std::vector<float>& r, double sr); // 2 ms ramps at both ends
+
 // The output frame a source frame plays at, and back, through `outStart` (before the sample-wide pass).
 double SourceToLaid(const SliceSet& set, const SliceRenderResult& res, int64_t frame);
 double LaidToSource(const SliceSet& set, const SliceRenderResult& res, double laid);

@@ -258,6 +258,11 @@ void SliceRenderCache::Retain(const SliceSet& set)
       it = set.IndexOfId(it->first) < 0 ? mEntries.erase(it) : std::next(it);
 }
 
+void StretchBuffer(std::vector<float>& l, std::vector<float>& r, double sr, int64_t outLen)
+{
+   Stretch(l, r, sr, outLen, 0.0f, true);
+}
+
 void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool withTail, std::vector<float>& l,
                  std::vector<float>& r, int64_t& body)
 {
@@ -297,17 +302,13 @@ void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool wi
       ratio = steps * six / (double)srcBody;
    }
    const float semis = p.pitchSt + p.fineCt / 100.0f;
+   // Pitch never changes the length: a length-preserving shift first (modes 0 and 1), then the length.
+   if (p.stretchMode <= 1 && std::fabs(semis) > 1e-4f)
+      Stretch(l, r, sr, (int64_t)l.size(), semis, true);
    if (p.stretchMode == 0)
    {
-      // Off: pitch resamples, as a sampler plays it; the length then fills by looping or silence.
-      const double rate = std::pow(2.0, (double)semis / 12.0);
-      const int64_t pitched = (int64_t)std::lround((double)l.size() / rate);
-      if (std::fabs(rate - 1.0) > 1e-6)
-      {
-         Resample(l, pitched, rate);
-         Resample(r, pitched, rate);
-      }
-      const int64_t pBody = std::min<int64_t>((int64_t)l.size(), (int64_t)std::lround((double)srcBody / rate));
+      // Off: the length fills by looping or silence, or cuts short.
+      const int64_t pBody = std::min<int64_t>((int64_t)l.size(), srcBody);
       body = (int64_t)std::lround((double)pBody * ratio);
       if (std::fabs(ratio - 1.0) > 1e-6)
       {
@@ -333,7 +334,7 @@ void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool wi
    }
    else if (p.stretchMode == 1)
    {
-      // Repitch: the length sets the rate, the pitch follows (a turntable).
+      // Repitch: the length sets the rate and moves the pitch with it (a turntable), on top of the slice's pitch.
       const double rate = 1.0 / ratio;
       body = (int64_t)std::lround((double)srcBody * ratio);
       const int64_t total = (int64_t)std::lround((double)l.size() * ratio);
@@ -477,6 +478,27 @@ bool RenderSliceSet(const SourceAudio& src, const SliceSet& set, SliceRenderCach
       }
    }
    return true;
+}
+
+bool LoopSeamSteps(const std::vector<float>& l, const std::vector<float>& r)
+{
+   if (l.size() <= 512)
+      return false;
+   const size_t last = l.size() - 1;
+   return std::max(std::fabs(l[last] - l[0]), std::fabs(r[last] - r[0])) > 0.05f;
+}
+
+void DeclickLoopSeam(std::vector<float>& l, std::vector<float>& r, double sr)
+{
+   const size_t n = std::min(l.size() / 4, (size_t)std::lround(sr * 0.002));
+   for (size_t i = 0; i < n; i++)
+   {
+      const float g = (float)i / (float)n;
+      l[i] *= g;
+      r[i] *= g;
+      l[l.size() - 1 - i] *= g;
+      r[r.size() - 1 - i] *= g;
+   }
 }
 
 void PitchShiftBuffer(std::vector<float>& l, std::vector<float>& r, double sr, float semis)

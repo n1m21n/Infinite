@@ -972,7 +972,7 @@ namespace app
       // every frame (not just while overPanel) so a gesture that starts
       // outside the panel doesn't dump its whole backlog as one jump the
       // moment the mouse crosses in.
-      const double pinchDelta = Platform::PollTrackpadMagnificationDelta();
+      const double pinchDelta = TrackpadPinchThisFrame();
 
       // Zoom keeps the time under the mouse fixed (pinch and Cmd/Ctrl+wheel
       // alike). The ruler's left edge is only known further down, so the

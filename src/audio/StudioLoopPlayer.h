@@ -10,7 +10,7 @@
 
 // The Sample studio's take, played on the global transport (SampleStudioPanel.cpp). The buffer is one pass of the
 // take as heard (trimmed, pitched, reversed, faded) spanning `loopBeats` beats; the read position is the transport's
-// beat position inside that span, so the take stays locked to the grid at any tempo (a tempo change varispeeds it).
+// beat position inside that span, so the take stays locked to the grid at any tempo (the panel renders it again at the new tempo; until then a tempo change varispeeds it).
 // Silent while the transport is stopped. Loop off: one pass from where play started (or the last Restart), then
 // Finished() turns true so the panel can stop the transport.
 // Owned by AudioEngine and mixed after RunTopology like the preview player: it is not a node, so it never reaches
@@ -48,6 +48,13 @@ public:
    {
       mSlot.SwapIn();
       const Platform::SampleBuffer* b = mSlot.Active();
+      // A new buffer (an edit, a new take, a tempo change) comes in from silence over the gain ramp, so the jump
+      // between the two never clicks.
+      if (b != mLastBuffer)
+      {
+         mLastBuffer = b;
+         mGainNow = 0.0f;
+      }
       if (playing && (!mWasPlaying || mRestart.exchange(false, std::memory_order_relaxed)))
       {
          mAnchor = blockStartBeats;
@@ -102,6 +109,7 @@ public:
 private:
    SampleSlot mSlot;
    float mGainNow = 0.0f; // audio thread only
+   const Platform::SampleBuffer* mLastBuffer = nullptr; // audio thread only, compared, never read
    double mAnchor = 0.0;  // audio thread only: beat where the one-shot pass started
    bool mWasPlaying = false;
    std::atomic<bool> mRestart { false };

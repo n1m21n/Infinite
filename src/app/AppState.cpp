@@ -447,6 +447,17 @@ bool gHeadlessNeedProbe = false;
    int   gSampleStudioDock = 0;
    bool  gSampleStudioClaimedKeys = false;
    ImVec2 gSampleStudioRectMin(0.0f, 0.0f), gSampleStudioRectMax(0.0f, 0.0f);
+   double TrackpadPinchThisFrame()
+   {
+      static int sFrame = -1;
+      static double sDelta = 0.0;
+      if (ImGui::GetFrameCount() != sFrame)
+      {
+         sFrame = ImGui::GetFrameCount();
+         sDelta = Platform::PollTrackpadMagnificationDelta();
+      }
+      return sDelta;
+   }
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top

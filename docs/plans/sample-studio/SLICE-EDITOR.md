@@ -335,3 +335,16 @@ Built: phases 1-6 in one pass, with these gaps against §4-§8.
 | Drop from the in-app Samples browser (§4.2) | Not built. Drops from Finder work. | The browser's drag payload is not wired to the Studio rect yet. |
 | Shaper and compressor share the Dynamics node's DSP core (§8) | They live in `SliceRender.cpp`. | Moving the cores out of `TransientShaperKernel` / `DynamicsKernel` touches shipping nodes; kept for a separate refactor. |
 | "Replace the slices?" (§4.3) | An in-panel `DialogParts` modal, not a platform dialog. | There is no platform confirm call; the modal matches the Arrange overwrite prompt. |
+
+Owner test pass (2026-10-29), changes against the spec:
+
+| Spec | Now | Why |
+|---|---|---|
+| Per-slice pitch with Length off repitches (§4.4) | Pitch never changes a slice's length; only Length = repitch moves time with pitch. | Owner: pitch up must not speed up. |
+| Studio plays at the sample's own tempo | The edit is stretched (Signalsmith) to the transport tempo, so a faster transport plays faster at the same pitch. | Owner: tempo up raised the pitch. |
+| Per-slice compress and filter (§4.4) | Hidden from the inspector; the fields still save and render. | Owner: too much per slice. |
+| Fades as numbers | Fades are drawn as curves with corner handles; drag sets length, Shift-drag the curve. The wave shows gain and fades live. | Owner request. |
+| Delete / copy / paste | Delete removes the slice's audio from the source; Cmd+C / Cmd+V pastes the slices right after the selection; Cmd+X cuts. | Owner request. |
+| Split button | Scissors is a tool (C, Esc back); Shift+click splits with any tool; double-click opens settings; click auditions. | Owner request. |
+| Generate by style | Style dropdown removed; Wild stays. | Owner request. |
+| Convert to patch | Pastes only the chain that feeds the take's part (e.g. one Wavetable for a bass), not the whole arrangement. | Owner: drums showed up for a bass take. |

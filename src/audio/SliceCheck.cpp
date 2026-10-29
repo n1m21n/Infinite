@@ -135,8 +135,18 @@ int main()
    SliceSet up = plain;
    up.slices[1].p.pitchSt = 12.0f;
    RenderSliceSet(src, up, &cache, nullptr, r2);
-   const int64_t wantUp = src.Frames() - (up.EndOf(1) - up.slices[1].start) / 2;
-   Check(std::llabs((int64_t)r2.l.size() - wantUp) <= 2, "pitch +12 with stretch off plays the slice in half the time");
+   Check(r2.l.size() == src.l.size(), "pitch +12 keeps the length");
+
+   SliceSet panned = plain;
+   panned.slices[2].p.pan = 1.0f;
+   RenderSliceSet(src, panned, &cache, nullptr, r2);
+   const size_t pa = (size_t)panned.slices[2].start + 200, pb = (size_t)panned.EndOf(2) - 200;
+   Check(Rms(r2.l, pa, pb) < 1e-6 && std::fabs(Rms(r2.r, pa, pb) / Rms(src.r, pa, pb) - 1.414f) < 0.02f,
+         "pan right: left silent, right +3 dB");
+
+   std::vector<float> tl(src.l), tr(src.r);
+   StretchBuffer(tl, tr, src.sr, (int64_t)tl.size() / 2);
+   Check((int64_t)tl.size() == src.Frames() / 2 && Rms(tl, 0, tl.size()) > 0.5f * Rms(src.l, 0, src.l.size()), "tempo stretch halves the length");
 
    SliceSet rev = plain;
    rev.slices[2].p.reverse = true;
