@@ -632,6 +632,7 @@ set(COMMON_SOURCES
     src/core/PatchLayout.cpp
     src/arrange/ArrangeModel.cpp
     src/arrange/NoteSchedule.cpp
+    src/arrange/MidiImport.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
     src/core/PatchJson.cpp
@@ -1028,7 +1029,7 @@ if(APPLE)
 endif()
 
 # Headless checks for the Piano Roll's note model (docs/plans/piano-roll/README.md §10 Block A).
-add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp)
+add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)

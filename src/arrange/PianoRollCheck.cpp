@@ -3,6 +3,7 @@
 // rewriting notes. Exit code 0 when all pass.
 #include "ArrangeModel.h"
 #include "NoteSchedule.h"
+#include "MidiImport.h"
 
 #include <cstdio>
 #include <string>
@@ -297,6 +298,37 @@ int main()
          plays += ChancePlays(12345u, pass, 0.25f) ? 1 : 0;
       Check(plays > 180 && plays < 320, "chance 0.25 plays about a quarter of passes");
       Check(ChancePlays(7u, 3u, 0.5f) == ChancePlays(7u, 3u, 0.5f), "chance roll repeats");
+   }
+
+   // --- .mid import ----------------------------------------------------------
+   {
+      auto ev = [](double beat, int note, int vel, int track, bool on) {
+         MidiFile::Event e;
+         e.beat = beat;
+         e.note = (uint8_t)note;
+         e.velocity = (uint8_t)vel;
+         e.track = (uint8_t)track;
+         e.on = on;
+         return e;
+      };
+      MidiFile::Song song;
+      song.events = { ev(0, 60, 90, 0, true), ev(0, 36, 120, 1, true), ev(0.5, 36, 0, 1, false),
+                      ev(1, 60, 0, 0, false), ev(4.5, 67, 70, 0, true) }; // the G is never closed
+      song.lengthBeats = 5.0;
+      song.noteCount = 3;
+      Model m;
+      const uint64_t lane = AddLane(m, kLaneMidi);
+      const uint64_t clip = ImportSong(m, lane, song, 4 * kPPQ, true);
+      Check(clip != 0, "ImportSong places a clip");
+      const Clip& c = ClipOf(m, clip);
+      Check(c.start == 4 * kPPQ && c.length == 8 * kPPQ && c.midiLoop && c.loopLength == 8 * kPPQ,
+            "whole bars, looping its own length");
+      Check(c.notes.size() == 3 && c.notes[0].pitch == 36 && c.notes[0].length == kPPQ / 2 && c.notes[0].vel == 120 &&
+            c.notes[1].pitch == 60 && c.notes[1].length == kPPQ, "notes paired by pitch and track");
+      Check(c.notes[2].pitch == 67 && c.notes[2].End() == 5 * kPPQ, "an open note ends at the file end");
+      CheckValid(m, "after import");
+      const uint64_t audio = AddLane(m, kLaneAudio);
+      Check(ImportSong(m, audio, song, 0) == 0, "import refuses an audio lane");
    }
 
    printf(gFails == 0 ? "pianoroll-check: all passed\n" : "pianoroll-check: %d failed\n", gFails);
