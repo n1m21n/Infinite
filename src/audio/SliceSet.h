@@ -57,6 +57,10 @@ struct SampleWide
 {
    float pitch = 0.0f, fine = 0.0f, speed = 1.0f, fadeInMs = 0.0f, fadeOutMs = 0.0f, gainDb = 0.0f;
    bool loop = true, reverse = false, pingPong = false;
+   // Playback tempo: the project's (the default), or its own `ownBpm`. Either way the edit is stretched from the
+   // sample's tempo to it, at the same pitch.
+   bool followTempo = true;
+   float ownBpm = 120.0f;
    bool operator==(const SampleWide& o) const;
 };
 

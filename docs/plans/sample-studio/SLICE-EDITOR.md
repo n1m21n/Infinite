@@ -348,3 +348,11 @@ Owner test pass (2026-10-29), changes against the spec:
 | Split button | Scissors is a tool (C, Esc back); Shift+click splits with any tool; double-click opens settings; click auditions. | Owner request. |
 | Generate by style | Style dropdown removed; Wild stays. | Owner request. |
 | Convert to patch | Pastes only the chain that feeds the take's part (e.g. one Wavetable for a bass), not the whole arrangement. | Owner: drums showed up for a bass take. |
+| Generate re-runs on part / bars / scale | Only Generate makes a take; the pickers set the next one. | Owner request. |
+| Studio audio | "Enable Sample Audio" chip, the twin of Session's and the Timeline's; right-click menu: Dock Position, Close Sample Studio. | Owner request. |
+| Studio plays at the transport tempo | Tempo: Follow project tempo (default) or Play at its own bpm; Sample bpm sets the grid and the stretch ratio. | Owner: tempo changes did nothing. |
+| Split copies the slice's settings | The new slice starts clean; the cut-from one keeps its fades. | Owner: fades carried over. |
+| Shift+click splits | Double-click above the wave splits; double-click a cut removes it (joins); Shift+click selects a range, Cmd+click toggles. | Owner request. |
+| Slices keep their order | Drag a slice (or an unbroken selection) to another boundary: its audio and settings move there. | Owner request. |
+| Wave = source x gain and fades | The wave draws the render (stretch, transient, pitch), scaled live by level edits until the next render. Fade curves at lower opacity; Shift-drag on the curve shapes it. | Owner request. |
+| Buffer swap | The Studio player crossfades 20 ms into each new render, and renders while a control is held at most every 120 ms. | Fade drags stuttered. |

@@ -14,7 +14,8 @@
 // Silent while the transport is stopped. Loop off: one pass from where play started (or the last Restart), then
 // Finished() turns true so the panel can stop the transport.
 // Owned by AudioEngine and mixed after RunTopology like the preview player: it is not a node, so it never reaches
-// an Audio Out recording. Buffers cross to the audio thread through SampleSlot (Push here, SwapIn there).
+// an Audio Out recording. Buffers cross to the audio thread through an atomic pending slot and are freed on the main thread
+// (DrainRetired), as SampleSlot does; this one keeps the old buffer for a 20 ms crossfade.
 class StudioLoopPlayer
 {
 public:
@@ -23,7 +24,8 @@ public:
    {
       mLoopBeats.store(std::max(1.0 / 16.0, loopBeats), std::memory_order_relaxed);
       mLoop.store(loop, std::memory_order_relaxed);
-      mSlot.Push(buf);
+      Platform::SampleBuffer* old = mPending.exchange(buf, std::memory_order_acq_rel);
+      delete old; // never seen by the audio thread
    }
    void SetLoop(bool loop) { mLoop.store(loop, std::memory_order_relaxed); }
    void SetGain(float g) { mGain.store(g, std::memory_order_relaxed); }
@@ -41,20 +43,34 @@ public:
    // Main thread: the level of the last block (peak), for the panel's blob.
    float Level() const { return mLevel.load(std::memory_order_relaxed); }
 
-   void DrainRetired() { mSlot.DrainRetired(); }
+   // Main thread, once a frame: frees buffers the audio thread is done with.
+   void DrainRetired()
+   {
+      while (Platform::SampleBuffer* b = mRetired.Drain())
+         delete b;
+   }
+   ~StudioLoopPlayer()
+   {
+      delete mActive;
+      delete mPrev;
+      delete mPending.exchange(nullptr);
+      DrainRetired();
+   }
 
    // Audio thread. Adds into `out`.
    void ProcessBlock(AudioBuffer& out, bool playing, double blockStartBeats, double beatsPerSample)
    {
-      mSlot.SwapIn();
-      const Platform::SampleBuffer* b = mSlot.Active();
-      // A new buffer (an edit, a new take, a tempo change) comes in from silence over the gain ramp, so the jump
-      // between the two never clicks.
-      if (b != mLastBuffer)
+      // A new buffer (an edit, a new take, a tempo change) crossfades in over the old one at the same place, so an
+      // edit while it plays neither clicks nor drops out.
+      if (Platform::SampleBuffer* fresh = mPending.exchange(nullptr, std::memory_order_acq_rel))
       {
-         mLastBuffer = b;
-         mGainNow = 0.0f;
+         if (mPrev != nullptr)
+            mRetired.Retire(mPrev);
+         mPrev = mActive;
+         mActive = fresh;
+         mXfade = mPrev != nullptr && mPrev->numFrames > 1 ? 0.0f : 1.0f;
       }
+      const Platform::SampleBuffer* b = mActive;
       if (playing && (!mWasPlaying || mRestart.exchange(false, std::memory_order_relaxed)))
       {
          mAnchor = blockStartBeats;
@@ -66,13 +82,12 @@ public:
          mPhase.store(-1.0f, std::memory_order_relaxed);
          mLevel.store(0.0f, std::memory_order_relaxed);
          mGainNow = 0.0f;
+         RetirePrev();
          return;
       }
       const double span = mLoopBeats.load(std::memory_order_relaxed);
       const bool loop = mLoop.load(std::memory_order_relaxed);
       const float target = mGain.load(std::memory_order_relaxed);
-      const int n = b->numFrames;
-      const int chans = std::max(1, b->channels);
       float peak = 0.0f;
       double u = -1.0;
       for (int i = 0; i < out.numFrames; i++)
@@ -89,27 +104,52 @@ public:
          u = loop ? std::fmod(beats, span) / span : rel / span;
          // A short ramp on every gain change (start, stop, a new take) keeps edits click-free.
          mGainNow += (target - mGainNow) * 0.002f;
-         const double pos = u * (double)(n - 1);
-         const int i0 = (int)pos;
-         const float frac = (float)(pos - (double)i0);
-         const int i1 = std::min(i0 + 1, n - 1);
+         if (mXfade < 1.0f)
+            mXfade = std::min(1.0f, mXfade + kXfadeStep);
          for (int ch = 0; ch < out.numChannels; ch++)
          {
-            const int base = std::min(ch, chans - 1) * n;
-            const float a = b->channelData[(size_t)(base + i0)], c = b->channelData[(size_t)(base + i1)];
-            const float s = (a + (c - a) * frac) * mGainNow;
+            float s = Read(*b, ch, u);
+            if (mXfade < 1.0f)
+               s = s * mXfade + Read(*mPrev, ch, u) * (1.0f - mXfade);
+            s *= mGainNow;
             out.channels[ch][i] += s;
             peak = std::max(peak, std::fabs(s));
          }
       }
+      if (mXfade >= 1.0f)
+         RetirePrev();
       mPhase.store((float)u, std::memory_order_relaxed);
       mLevel.store(peak, std::memory_order_relaxed);
    }
 
 private:
-   SampleSlot mSlot;
+   static constexpr float kXfadeStep = 1.0f / 960.0f; // 20 ms at 48 kHz
+
+   static float Read(const Platform::SampleBuffer& b, int ch, double u)
+   {
+      const int n = b.numFrames;
+      const int base = std::min(ch, std::max(1, b.channels) - 1) * n;
+      const double pos = u * (double)(n - 1);
+      const int i0 = std::clamp((int)pos, 0, n - 1);
+      const int i1 = std::min(i0 + 1, n - 1);
+      const float frac = (float)(pos - (double)i0);
+      const float a = b.channelData[(size_t)(base + i0)], c = b.channelData[(size_t)(base + i1)];
+      return a + (c - a) * frac;
+   }
+   void RetirePrev()
+   {
+      if (mPrev != nullptr)
+         mRetired.Retire(mPrev);
+      mPrev = nullptr;
+      mXfade = 1.0f;
+   }
+
+   std::atomic<Platform::SampleBuffer*> mPending { nullptr };
+   Platform::SampleBuffer* mActive = nullptr; // audio thread
+   Platform::SampleBuffer* mPrev = nullptr;   // audio thread: the buffer fading out
+   float mXfade = 1.0f;                       // audio thread
+   SampleSlotDetail::BufferRetireRing<Platform::SampleBuffer> mRetired;
    float mGainNow = 0.0f; // audio thread only
-   const Platform::SampleBuffer* mLastBuffer = nullptr; // audio thread only, compared, never read
    double mAnchor = 0.0;  // audio thread only: beat where the one-shot pass started
    bool mWasPlaying = false;
    std::atomic<bool> mRestart { false };

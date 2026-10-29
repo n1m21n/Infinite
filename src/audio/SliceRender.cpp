@@ -431,6 +431,9 @@ bool RenderSliceSet(const SourceAudio& src, const SliceSet& set, SliceRenderCach
    out.l.resize((size_t)pos);
    out.r.resize((size_t)pos);
    out.laidFrames = pos;
+   out.laidMono.resize((size_t)pos);
+   for (size_t k = 0; k < (size_t)pos; k++)
+      out.laidMono[k] = 0.5f * (out.l[k] + out.r[k]);
 
    // The sample-wide pass.
    const SampleWide& w = set.wide;

@@ -32,6 +32,7 @@ struct SliceRenderResult
    std::vector<int64_t> outStart;
    int64_t laidFrames = 0;
    bool bounced = false; // ping-pong doubled the output
+   std::vector<float> laidMono; // the slices laid end to end, before the sample-wide pass, mono: what the wave draws
 };
 
 // Per-slice renders kept between passes, keyed on the slice's bounds and settings: moving one marker re-renders the

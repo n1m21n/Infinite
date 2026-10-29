@@ -138,7 +138,8 @@ void CopyChangedFields(const SliceParams& before, const SliceParams& after, Slic
 bool SampleWide::operator==(const SampleWide& o) const
 {
    return pitch == o.pitch && fine == o.fine && speed == o.speed && fadeInMs == o.fadeInMs && fadeOutMs == o.fadeOutMs &&
-          gainDb == o.gainDb && loop == o.loop && reverse == o.reverse && pingPong == o.pingPong;
+          gainDb == o.gainDb && loop == o.loop && reverse == o.reverse && pingPong == o.pingPong &&
+          followTempo == o.followTempo && ownBpm == o.ownBpm;
 }
 
 const std::vector<const char*>& SliceFilterNames()
@@ -195,11 +196,10 @@ int SliceSet::SplitAt(int64_t frame, int64_t minGap)
    const int i = IndexAt(frame);
    if (frame - slices[(size_t)i].start < minGap || EndOf(i) - frame < minGap)
       return -1;
-   Slice s = slices[(size_t)i];
+   // The new slice starts clean: the one it was cut from keeps its settings (its fades included).
+   Slice s;
    s.id = nextId++;
    s.start = frame;
-   s.name.clear();
-   s.note = -1;
    slices.insert(slices.begin() + i + 1, s);
    mHandEdited = true;
    return i + 1;
@@ -316,6 +316,8 @@ std::string SliceSet::Serialize() const
    wb("loop", wide.loop, kWide.loop);
    wb("rev", wide.reverse, kWide.reverse);
    wb("pp", wide.pingPong, kWide.pingPong);
+   wb("follow", wide.followTempo, kWide.followTempo);
+   wf("own", wide.ownBpm, kWide.ownBpm);
    if (!w.empty())
       o += "sample" + w + "\n";
    for (const Slice& s : slices)
@@ -388,6 +390,8 @@ bool SliceSet::Parse(const std::string& text, SliceSet& out)
             else if (k == "loop") w.loop = v == "1";
             else if (k == "rev") w.reverse = v == "1";
             else if (k == "pp") w.pingPong = v == "1";
+            else if (k == "follow") w.followTempo = v == "1";
+            else if (k == "own") w.ownBpm = std::clamp(f, 20.0f, 400.0f);
          }
       }
       else if (tag == "slice")
