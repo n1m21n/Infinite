@@ -26,7 +26,7 @@ def render(a):
             h = f.readline()
             if not h: break
             r = json.loads(h); x = np.frombuffer(f.read(r["frames"] * 8), np.float32).reshape(-1, 2).astype(float)
-            r["role"] = r["label"].split()[0]; r["seconds"] = round(r["frames"] / 48000, 2)
+            r["role"] = r["label"].split()[0]; r["seconds"] = round(r["frames"] / 48000, 2); r["dots"] = r.pop("shape")   # frame features also write 'shape'
             r.update(ff.measure(x[:, 0], x[:, 1], 48000)); o.write(json.dumps(r) + "\n"); n += 1
             if n % 200 == 0: print(n, "measured", flush=True)
     p.wait(); print(n, "rows ->", a.rows)
@@ -40,7 +40,7 @@ def train(a):
     nested = np.zeros((len(names), len(names)), bool)
     for p, q in NESTED:
         if p in names and q in names: nested[names.index(p), names.index(q)] = nested[names.index(q), names.index(p)] = True
-    shaped = np.array([r.get("shape") is not None for r in rows]); allowed = shaped | ~shaped if a.train_on == "all" else ~shaped
+    shaped = np.array([bool(r.get("dots")) for r in rows]); allowed = shaped | ~shaped if a.train_on == "all" else ~shaped
     print("shaped renders:", int(shaped.sum()), "| training on:", a.train_on)
     subsets = {"rest": ~shaped, "shaped": shaped}
     res = {m: {k: [] for k in subsets} for m in ("Linear", "MLP")}; per_role = {m: collections.defaultdict(list) for m in res}; conf = np.zeros((len(names), len(names)))
@@ -62,7 +62,7 @@ def train(a):
                 for k in range(a.inner):
                     hold = tr & np.array([inner.get(s, -1) == k for s in g]); fit = tr & ~hold
                     Pc[hold] = make[name](100 + 10 * f + k).fit(Z[fit], y[fit], wt(fit)).proba(Z[hold])
-                Pc, yc = Pc[tr], y[tr]
+                cm = tr & (shaped if a.calib_on == "shaped" else True); Pc, yc = Pc[cm], y[cm]
             th = np.array([np.percentile(Pc[yc == c, c], a.pct) if (yc == c).sum() >= 10 else 0.0 for c in range(len(names))])
             for sub, sm in subsets.items():
                 t = te & sm
@@ -76,7 +76,7 @@ def train(a):
                         for t_, p_ in zip(yt, P.argmax(1)): conf[t_, p_] += 1
                 print("fold %d %-6s %-6s FRR %.3f catch %.3f top-1 %.3f (%d test renders)" % (f, name, sub, frr, catch, top1, t.sum()), flush=True)
     out = {"roles": names, "n": int(len(y)), "shaped": int(shaped.sum()), "train_on": a.train_on, "styles": len(styles),
-           "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py (+ notes)", "calib": a.calib, "pct": a.pct}
+           "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py (+ notes)", "calib": a.calib, "calib_on": a.calib_on, "pct": a.pct}
     for name in res:
         out[name] = {"catch_by_role": {k: round(float(np.mean(v)), 3) for k, v in per_role[name].items()}}
         for sub, R in res[name].items():
@@ -96,4 +96,5 @@ if __name__ == "__main__":
     ap.add_argument("--style-from", type=int, default=0); ap.add_argument("--style-step", type=int, default=1); ap.add_argument("--rows", default=OUT, help="render: file to append rows to")
     ap.add_argument("--train-on", choices=["rest", "all"], default="all", help="train: rows used for training (the test always reports rest and shaped apart)")
     ap.add_argument("--calib", choices=["val", "oof"], default="oof"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--pct", type=float, default=3)
+    ap.add_argument("--calib-on", choices=["all", "shaped"], default="all", help="train, oof: training rows whose out-of-fold scores set the cut-offs")
     a = ap.parse_args(); render(a) if a.cmd == "render" else train(a)
