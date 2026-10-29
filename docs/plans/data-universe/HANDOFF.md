@@ -574,3 +574,9 @@ Test fixed before the run: share of the 32 style-card patches (render-runs/style
 | swing | 0 / 0 / 0.5 | 0 / 0 / 0.25 | 100% |
 
 **Verdict: MISS on tempo (88%), register (0%) and density (69%).** Cause for register: `styled.py` places sequencer lines at octave 2 (bass/low layers); Chorder and Arpeggiator voices are not counted, so register may read low partly because of what is measured. Rest and swing agree only loosely (rest compares step silence with time silence). Fix route: let the learned note model set register and density per role from corpus percentiles, then re-run this same test. No bar moved.
+
+### Note model: held-out key and chord accuracy (item 2, first half)
+Objective/baseline/test written in each tool header. No bar was set for these in the goal text beyond "held-out accuracy and loss", so these are reported, not graded.
+- **Key** (`key_eval.py`, labels = keys in the chord-progression file names, detector = midi_axes fixed profiles, 1,500 unseen files): exact tonic+mode **51.1%** (major 59.4%, minor 44.1%); counting the relative key **69.9%**. Short 4-8 chord files are hard for a pitch-class profile; this is the detector the axes use, so axis 23 inherits this error on short files.
+- **Next chord** (`chord_eval.py`, back-off trigram, 5 random 80/20 splits by progression): top-1 **23.7% +- 2.2**, top-3 **52.5% +- 1.9**, cross-entropy **4.99 +- 0.26 bits** (uniform 6.46). Baseline "most frequent chord" top-1 18.1%. Beats baseline, but only **194 distinct progressions** exist once the 12 keys are merged, so the estimate is thin and the model is a small table, not a learned song model.
+Not done: chord prediction on the 294k full-song corpus (needs a chord recogniser run over audio-free MIDI), so item 2 stays open.
