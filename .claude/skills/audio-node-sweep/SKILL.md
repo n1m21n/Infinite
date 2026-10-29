@@ -20,12 +20,18 @@ Add `--skip-build` to reuse the existing `build/` tree. Runs both sweeps
 below in one pass.
 
 The param sweep's own verdict is FAIL whenever any param reads `[FAIL]`, and
-the blind spots below guarantee some always do. So `driver.sh` judges it
-against `known-blind-spots.txt` (one `<node>\t<param>` per line): it fails
-only on a `[FAIL]` that is not listed, and lists entries that now pass so they
-can be removed. Don't add a line to make a run green. First confirm by hand
-that the param is wired, or give the node a `SweepPrerequisitesFor` so the rig
-can see it (Mixer's strips 8-11 went that way).
+the blind spots below guarantee some always do. So `driver.sh` grades it with
+`scripts/audio_param_sweep_check.sh` against **one baseline, the single source
+of truth: `.claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt`**
+(`Node|param|reason`; `run-infinite-hygiene/driver.sh` and `scripts/sweep_runner.sh`
+use the same file). A `[FAIL]` not listed there fails the run; a listed param
+that now passes also fails it, so delete that line. There is no second list
+(`known-blind-spots.txt` was removed). Don't add a line to make a run green:
+first confirm by hand that the param is wired, or give the node a
+`SweepPrerequisitesFor` so the rig can see it (Mixer's strips 8-11 went that
+way). A line needs a reason naming why the rig cannot see it; a real dropped
+mailbox push gets fixed, not baselined. `INFINITE_BIN=build-dev/Infinite.app/Contents/MacOS/Infinite`
+runs a dev build.
 
 ## What this catches
 

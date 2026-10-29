@@ -467,3 +467,10 @@ Generate Samples|followTransport|a recipe param, read only by generate's offline
 Generate Samples|part|a recipe param, read only by generate's offline render (GENSAMPLETEST parts)
 Generate Samples|generated|not a control: saved state that the patch held a generated loop
 Generate Samples|genVersion|not a control: the generator version that made the saved loop
+Generate Samples|card|a recipe param, read only by generate's offline render (CurrentRecipe picks the style from it); GENSAMPLETEST covers the render
+Generate Samples|followScale|a recipe param, read only by generate's offline render (CurrentRecipe copies Transport key/scale at generate time); GENSAMPLETEST covers the render
+Generate Samples|tone|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.tone); GENSAMPLETEST covers the render
+Generate Samples|energy|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.energy); GENSAMPLETEST covers the render
+Generate Samples|space|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.space); GENSAMPLETEST covers the render
+Generate Samples|mood|a recipe param, read only by generate's offline render (CurrentRecipe -> Recipe.mood); GENSAMPLETEST covers the render
+Generate Samples|keepSeed|a recipe param: only decides whether Generate() pins the seed (mJob->pinned), never the audio thread; GENSAMPLETEST covers the render
