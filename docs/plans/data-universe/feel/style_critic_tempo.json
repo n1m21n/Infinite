@@ -1,0 +1,126 @@
+{
+ "tempo_feature": true,
+ "styles": [
+  "acid_house",
+  "amapiano",
+  "ambient",
+  "ambient_piano",
+  "breakbeat",
+  "classic_trance",
+  "dark_ambient",
+  "deep_house",
+  "detroit_techno",
+  "downtempo",
+  "drone_kosmische",
+  "dub_techno",
+  "dubstep",
+  "electro",
+  "footwork",
+  "french_filter_house",
+  "future_garage",
+  "gabber",
+  "glitch",
+  "idm",
+  "industrial_techno",
+  "jungle",
+  "liquid_dnb",
+  "lofi_beats",
+  "minimal_techno",
+  "neo_classical",
+  "neurofunk",
+  "progressive_house",
+  "psytrance",
+  "solo_piano",
+  "synthwave",
+  "tech_house",
+  "uk_garage",
+  "vaporwave"
+ ],
+ "n_parts": 7645,
+ "n_takes": 510,
+ "split": "5 folds by seed offset (whole takes held out)",
+ "rest_part_top1": {
+  "mean": 0.183,
+  "sd": 0.011
+ },
+ "rest_part_top3": {
+  "mean": 0.397,
+  "sd": 0.002
+ },
+ "rest_take_top1": {
+  "mean": 0.526,
+  "sd": 0.025
+ },
+ "rest_take_top3": {
+  "mean": 0.794,
+  "sd": 0.031
+ },
+ "dots_part_top1": {
+  "mean": 0.131,
+  "sd": 0.014
+ },
+ "dots_part_top3": {
+  "mean": 0.323,
+  "sd": 0.024
+ },
+ "dots_take_top1": {
+  "mean": 0.394,
+  "sd": 0.086
+ },
+ "dots_take_top3": {
+  "mean": 0.741,
+  "sd": 0.068
+ },
+ "top_confusions": [
+  [
+   "ambient_piano",
+   "drone_kosmische",
+   0.5
+  ],
+  [
+   "uk_garage",
+   "classic_trance",
+   0.4
+  ],
+  [
+   "psytrance",
+   "industrial_techno",
+   0.4
+  ],
+  [
+   "liquid_dnb",
+   "neurofunk",
+   0.4
+  ],
+  [
+   "breakbeat",
+   "detroit_techno",
+   0.4
+  ],
+  [
+   "solo_piano",
+   "neo_classical",
+   0.3
+  ],
+  [
+   "ambient",
+   "dark_ambient",
+   0.3
+  ],
+  [
+   "neo_classical",
+   "solo_piano",
+   0.3
+  ],
+  [
+   "detroit_techno",
+   "future_garage",
+   0.3
+  ],
+  [
+   "acid_house",
+   "tech_house",
+   0.3
+  ]
+ ]
+}

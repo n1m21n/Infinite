@@ -758,3 +758,16 @@ Reading: on these three axes a direction learned at C3 carries across notes and 
 - Real audio on this Mac: `/Library/Audio/Apple Loops` holds only Final Cut Pro sound effects (1,337), no music loops; the real-instrument and genre checks still
   wait on the WD Black drive.
 - Pitch from audio (IMPROVEMENT-PLAN 9.3) is already answered above: single named notes agree 97.9% (bar 90); the 66.9% figure mixed loop-key names in. No fix needed.
+
+### Genre step 1: style from the generator's own audio (`tools/universe/style_critic.py` -> `feel/style_critic*.json`)
+34 styles, 7,645 part renders (one take = the 15 parts of one style at one seed). MLP per part on frame features; a take's style = sum of its parts' log P.
+5 folds by seed offset, so whole takes are held out. Chance: top-1 2.9%, top-3 8.8%.
+
+| Features | Rest takes top-1 / top-3 | Dot-shaped takes top-1 / top-3 | One part alone, top-3 |
+|---|---|---|---|
+| frame features | 24.1% / 45.3% | 20.6% / 43.5% | 17.5% |
+| + tempo (log2 bpm) | 52.6% / **79.4%** | 39.4% / **74.1%** | 39.7% |
+
+Confusions are between near neighbours (ambient / dark ambient, solo piano / neo-classical, liquid dnb / neurofunk, acid house / tech house).
+Scope: this is the "does this take sound like its style" critic (IMPROVEMENT-PLAN 7.2) on generator audio, on isolated parts, not on a mix. It is not C8:
+C8 asks for top-3 >= 0.7 on real music, which needs frame features and a tempo estimate on real loops (WD Black drive). C8 stays FAIL.
