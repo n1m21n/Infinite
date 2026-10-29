@@ -771,3 +771,14 @@ Reading: on these three axes a direction learned at C3 carries across notes and 
 Confusions are between near neighbours (ambient / dark ambient, solo piano / neo-classical, liquid dnb / neurofunk, acid house / tech house).
 Scope: this is the "does this take sound like its style" critic (IMPROVEMENT-PLAN 7.2) on generator audio, on isolated parts, not on a mix. It is not C8:
 C8 asks for top-3 >= 0.7 on real music, which needs frame features and a tempo estimate on real loops (WD Black drive). C8 stays FAIL.
+
+### Decisions taken 2026-10-29 (Naman delegated both: "take your decision")
+**Density (item 2).** Per-style reading of the corrected count (same patches, same corpus): the bass density miss is not confined to four styles. Inside share by style:
+industrial techno 0%, acid house 6%, neurofunk 12%, footwork 18%, psytrance 20%, gabber 21%, IDM 33%, and also tech house 38%, deep house 39%, classic trance 40%, minimal techno 44%.
+Pop bass in the corpus tops out at 3.9 notes/s (p95); a house bass on 8ths at 124 bpm is 4.1 notes/s and a 16th line is 8.3. So the corpus is a pop yardstick and dance bass sits
+above it by design. **Decision: do not thin the music** (thinning dance bass to pop density would make the styles wrong, which the blind test would punish). The item-2 density verdict
+**stays MISS** against this corpus; it is not re-scored. The fair test is option (b), a genre-matched corpus (electronic MIDI with genre labels), and it is logged as the next step
+for this bar. Register (MET for both roles) is unaffected.
+**Words (C4).** **Decision: only the five words that reach AUC 0.75 drive generation** (sub, distorted, mellow, punchy, digital). The other 23 testable words stay in the vocabulary
+for search and names but are not linked to any sound change, because the audio cannot be shown to carry them. The C4 verdict stays FAIL (5 of 28, bar 70%); not re-scored.
+Reason for both: neither choice moves a bar; each keeps the product honest about what the models can do.

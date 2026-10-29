@@ -18,8 +18,8 @@ Branch feature/sample-dots, nothing pushed. `tools/seo/ledger.json` has an unrel
 |---|---|---|---|
 | 1 | Role critic (item 4) | rest MET (1.7% / 98.5%); dots FRR 3.3% MISS by 0.3 | real-instrument check once frame features run on real audio (WD Black drive); export for the app |
 | 2 | Knob direction (item 3) | six engines 89.5-95.6%; **Wavetable 75.0% MISS**; across notes (knob_notes): Analog/Osc/FM hold, Metallic/String miss at C1/C5/C6 | one-knob Wavetable renders (`own_sweeps.py`, raise the "one" share), rerun knob_direction; one heavy job at a time |
-| 3 | Words (C4) | **5 of 28** words reach 0.75 (words_eval2) | Naman: may words the audio cannot carry (clean, soft, ...) be dropped? Then the made-sounds half |
-| 4 | Note model (item 2) | key lenient 76.5% MET (Temperley); chord +14.3 MET; register MET; **density MISS** | Naman: density bar vs a pop corpus (options in HANDOFF); bass-lift diff sits in `git stash` |
+| 3 | Words (C4) | **5 of 28** words reach 0.75 (words_eval2) | decided 2026-10-29: only those 5 drive generation, the rest stay unlinked; next the made-sounds half |
+| 4 | Note model (item 2) | key lenient 76.5% MET (Temperley); chord +14.3 MET; register MET; **density MISS** | decided 2026-10-29: music not thinned, MISS stays; next a genre-matched (electronic) MIDI corpus; bass-lift diff sits in `git stash` |
 | 5 | Sound model (C1/C2) | R2 0.21, data-limited | more own-engine renders; cross-engine model on spectrograms |
 | 6 | Note / audio effects | not measured | input->output per note node; effects on renders, frame_features before/after |
 | 7 | Genre (C8) | style critic on own renders top-3 79% (with tempo); real music untested | groove + frame features per style, exact labels from generator renders |
@@ -27,7 +27,7 @@ Branch feature/sample-dots, nothing pushed. `tools/seo/ledger.json` has an unrel
 | 9 | Instruments | String far from acoustic families | guitar body into String, then bowed / wind / piano (designs first) |
 | 10 | Wire dots to learned models | hand rules in SampleStyles.cpp | only after the bars above pass |
 | 11 | Sample studio app panel | plan settled | build per plan |
-| 12 | Needs Naman | | 40-pair blind test, 40 mood clips, C10 on people; the density and words questions above |
+| 12 | Needs Naman | | 40-pair blind test, 40 mood clips, C10 on people |
 
 ## Rules (from memory)
 One heavy job at a time; ask before agent batches; build via scripts/ibuild.py (never bare -j); no Claude attribution in commits; commit per step;
