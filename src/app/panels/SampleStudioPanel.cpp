@@ -1076,7 +1076,9 @@ namespace
       for (size_t at = 0; (at = chain.find("node ", at)) != std::string::npos; at += 5)
          if (at == 0 || chain[at - 1] == '\n')
             out++;
-      const std::string text = "infinite-nodes v" + std::to_string(Patch::FormatVersion()) + "\n" + chain + "node " +
+      // The clipboard header, then the patch body's own header line: without it the reader rejects the paste.
+      const std::string ver = std::to_string(Patch::FormatVersion());
+      const std::string text = "infinite-nodes v" + ver + "\ninfinite-patch " + ver + "\n" + chain + "node " +
                                std::to_string(out + 1) + " Utility Audio Out\nend\naud " + std::to_string(out + 1) +
                                " 0 " + std::to_string(tap) + "\n";
       const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
@@ -2864,30 +2866,22 @@ namespace
 
       // Out, pinned right: export, convert to patch, convert to node, Sample Audio.
       const char* exportL = L("Export##studioExport");
-      const char* patchL = L("Convert to patch##studioPatch");
-      const char* nodeL = L("Convert to node##studioNode");
+      const char* convertL = L("Convert##studioConvert");
       // Sample Audio: the twin of Session's and the Timeline's chip.
       const bool studioMode = gAudioMode == AudioMode::Studio;
       const char* audioL = studioMode ? T("Sample Audio On") : T("Enable Sample Audio");
       const float audioW = ImGui::CalcTextSize(audioL).x + 2.0f * tok::space_2;
-      const float rightW = TextW(exportL) + TextW(patchL) + TextW(nodeL) + audioW + 3.0f * in;
+      const float rightW = TextW(exportL) + TextW(convertL) + audioW + 2.0f * in;
       FormParts::Inline(0.0f, 0.0f);
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + between, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
       ImGui::BeginDisabled(!has || s.busy);
       if (TextChip(exportL))
          ImGui::OpenPopup("##studioExportMenu");
       FormParts::Inline(0.0f, in);
-      ImGui::BeginDisabled(!s.take);
-      if (TextChip(patchL))
-         ConvertToPatch();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", s.take ? T("The graph that made the take, as a group on the canvas") : T("Only for a generated take"));
-      ImGui::EndDisabled();
-      FormParts::Inline(0.0f, in);
-      if (TextChip(nodeL))
+      if (TextChip(convertL))
          ImGui::OpenPopup("##studioNodeMenu");
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("A sample node holding the edit"));
+         HelpTip("%s", T("Put the edit on the canvas: the patch that made it, or a node that plays it"));
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
       if (ChipButton::Draw(audioL, studioMode, tok::tile))
@@ -2920,6 +2914,11 @@ namespace
       }
       if (MenuParts::BeginPopup("##studioNodeMenu"))
       {
+         if (MenuParts::Item(T("Patch"), nullptr, false, s.take.has_value()))
+            ConvertToPatch();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            HelpTip("%s", s.take ? T("The graph that made the take, as a group on the canvas") : T("Only for a generated take"));
+         MenuParts::Separator();
          static const char* const types[] = { "Generate Samples", "Sampler", "Slicer", "Molder", "Grain Molder", "PaulStretch", "Granular" };
          for (const char* t : types)
          {
