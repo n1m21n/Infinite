@@ -39,7 +39,7 @@ def notes_of(ev):
     for t, k, ch, a, v in sorted(ev, key=lambda e: e[0]):
         key = (ch, a)
         if k == 0x90 and v > 0:
-            if key in on: out.append((*on[key], t, key[1], key[0]))  # re-strike closes the old note
+            if key in on: t0, v0 = on[key]; out.append((t0, t, a, v0, ch))  # re-strike closes the old note (was stored out of order before 2026-10-29)
             on[key] = (t, v)
         elif k == 0x80 or (k == 0x90 and v == 0):
             if key in on: t0, v0 = on.pop(key); out.append((t0, t, a, v0, ch))
@@ -70,12 +70,15 @@ def fast_sec(meta, div):
     return f
 
 
-def _alarm(*_): raise TimeoutError("file over 20 s")
+LIMIT_S = int(os.environ.get("MIDI_AXES_LIMIT", "60"))
+
+
+def _alarm(*_): raise TimeoutError("file over %d s" % LIMIT_S)
 
 
 def row(src):
     import signal
-    signal.signal(signal.SIGALRM, _alarm); signal.alarm(20)
+    signal.signal(signal.SIGALRM, _alarm); signal.alarm(LIMIT_S)
     try: return _row(src)
     except TimeoutError as e: return {"src": src, "error": str(e)}
     finally: signal.alarm(0)
@@ -90,7 +93,7 @@ def _row(src):
         fmt, div, ev, meta = mf.parse(open(p, "rb").read()); sec = fast_sec(meta, div)
         nt, end = notes_of(ev)
         if not nt: r["error"] = "no notes"; return r
-        t0 = np.array([n[0] for n in nt], float); t1 = np.array([n[1] for n in nt], float); pit = np.array([n[2] for n in nt]); vel = np.array([n[3] for n in nt], float)
+        t0 = np.array([n[0] for n in nt], float); t1 = np.array([n[1] for n in nt], float); pit = np.array([n[2] for n in nt], int); vel = np.array([n[3] for n in nt], float)
         ch = np.array([n[4] for n in nt]); drum = ch == 9; secs = max(float(sec(np.array([end], float))[0]), 1e-3)
         s0 = sec(t0); s1 = sec(t1); dur = np.maximum(s1 - s0, 0.02)
         # 23 mode
@@ -121,6 +124,7 @@ def _row(src):
             if len(x) < 16: return None, None, None
             cands = [bpm_map] + ([est] if est else []) + ([est * 2, est / 2] if est else [])
             fits = [(grid_fit(x, c), c) for c in cands if 40 <= c <= 260]
+            if not fits: return None, None, None
             (d, off), bpm = min(fits, key=lambda f: f[0][0]); b = 60.0 / bpm
             ph = ((x - off) / b) % 1.0; o = ph[(ph > 0.40) & (ph < 0.85)]
             conf = float(np.mean(np.abs(((x - off) / (b / 4)) - np.round((x - off) / (b / 4))) < 0.1))  # share of onsets within 10% of a 16th
