@@ -970,6 +970,130 @@ namespace
       k["fmDepth"] = { 'f', "0" };
       k["b.on"] = { 'b', "0" };
    }
+   // Designed voices (owner's review, 2026-10-29: "too dark, too distorted, too muddy"; leads "should sound
+   // massive"). Every Wavetable key is pinned, so nothing is left to the seeded draw. Numbers follow Welsh's
+   // Synthesizer Cookbook (lead, bass and pluck patches) and Szabo's supersaw: seven voices spread wide with
+   // free-running phases, a second stack an octave up, a gentle low-pass that stays open.
+   enum class Voice { Supersaw, SawStack, SquareLead, BrassStack, FmStack, SynthBass, ReeseBass, SynthPluck };
+
+   // One engine: its table and frame, its unison stack, its register and level; pitch envelope off.
+   void Engine(Params& k, char e, int table, double pos, int unison, double detune, int octave, double vol)
+   {
+      const std::string p = std::string(1, e) + ".";
+      k[p + "on"] = { 'b', "1" };
+      k[p + "table"] = { 'i', std::to_string(table) };
+      k[p + "position"] = { 'f', Num(pos) };
+      k[p + "unison"] = { 'i', std::to_string(unison) };
+      k[p + "detune"] = { 'f', Num(std::round(detune * 10.0) / 10.0) };
+      k[p + "stereoWidth"] = { 'f', unison > 1 ? "1" : "0" };
+      k[p + "phaseRandomize"] = { 'f', unison > 1 ? "1" : "0" };
+      k[p + "octave"] = { 'i', std::to_string(octave) };
+      k[p + "semi"] = { 'i', "0" };
+      k[p + "fine"] = { 'f', "0" };
+      k[p + "phase"] = { 'f', "0" };
+      k[p + "pan"] = { 'f', "0" };
+      k[p + "volume"] = { 'f', Num(vol) };
+      k[p + "warpMode"] = { 'i', "0" };
+      k[p + "warpAmount"] = { 'f', "0" };
+      k[p + "warpRatio"] = { 'f', "1" };
+      for (const char* s : { "pitchAmount", "pitchAttack", "pitchDecay", "pitchSustain", "pitchRelease" })
+         k[p + s] = { 'f', "0" };
+   }
+   // The engine's filter and its envelope: `amt` octaves of opening at the envelope's peak (ms, sustain 0-1).
+   void EngineFilter(Params& k, char e, int type, double cut, double res, double amt, double a, double d, double s, double r)
+   {
+      const std::string p = std::string(1, e) + ".";
+      k[p + "filterType"] = { 'i', std::to_string(type) };
+      k[p + "cutoff"] = { 'f', Num(std::round(cut)) };
+      k[p + "resonance"] = { 'f', Num(std::round(res * 100.0) / 100.0) };
+      k[p + "filterAmount"] = { 'f', Num(std::round(amt * 100.0) / 100.0) };
+      k[p + "filterAttack"] = { 'f', Num(std::round(a)) };
+      k[p + "filterDecay"] = { 'f', Num(std::round(d)) };
+      k[p + "filterSustain"] = { 'f', Num(std::round(s * 100.0) / 100.0) };
+      k[p + "filterRelease"] = { 'f', Num(std::round(r)) };
+   }
+   void EngineAmp(Params& k, char e, double a, double d, double s, double r)
+   {
+      const std::string p = std::string(1, e) + ".";
+      k[p + "ampAttack"] = { 'f', Num(std::round(a)) };
+      k[p + "ampDecay"] = { 'f', Num(std::round(d)) };
+      k[p + "ampSustain"] = { 'f', Num(std::round(s * 100.0) / 100.0) };
+      k[p + "ampRelease"] = { 'f', Num(std::round(r)) };
+   }
+
+   // Basic Shapes frames: sine 0, triangle 1/3, saw 2/3, square 1.
+   constexpr double kSine = 0.0, kSaw = 0.667, kSquare = 1.0;
+
+   // A whole voice: both engines, the A/B balance (equal power), one filter and one amp shape on both.
+   Params DesignVoice(Voice v, Rng& r)
+   {
+      Params k;
+      k["volume"] = { 'f', "0.9" };
+      k["frequency"] = { 'f', "440" };
+      k["glide"] = { 'f', "0" };
+      k["pitchBend"] = { 'f', "0" };
+      k["fmDepth"] = { 'f', "0" };
+      k["fmMode"] = { 'i', "0" };
+      double mix = 0.4, cut = 8000.0, res = 0.1, amt = 1.0, fa = 2.0, fd = 400.0, fs = 0.6, fr = 300.0;
+      double aa = 3.0, ad = 300.0, as = 0.85, ar = r.Uniform(180.0, 320.0);
+      int filter = 1; // LP12
+      switch (v)
+      {
+      case Voice::Supersaw:
+      {
+         const bool multi = r.Uniform() < 0.5; // Basic Shapes' saw, or the Multi Saw table's frames
+         Engine(k, 'a', multi ? 24 : 0, multi ? r.Uniform(0.3, 0.7) : kSaw, 7, r.Uniform(34.0, 48.0), 0, 1.0);
+         Engine(k, 'b', 0, kSaw, 5, r.Uniform(18.0, 28.0), 1, 0.7);
+         mix = r.Uniform(0.3, 0.42), cut = r.Uniform(6500.0, 10000.0), amt = 0.8;
+         break;
+      }
+      case Voice::SawStack: // a wide saw stack over a square an octave down
+         Engine(k, 'a', 0, kSaw, 5, r.Uniform(24.0, 34.0), 0, 1.0);
+         Engine(k, 'b', 0, kSquare, 1, 0.0, -1, 0.8);
+         mix = r.Uniform(0.35, 0.45), cut = r.Uniform(5000.0, 8000.0), amt = 1.2, fs = 0.5;
+         break;
+      case Voice::SquareLead: // a hollow square stack with a saw an octave up for edge
+         Engine(k, 'a', 0, kSquare, 3, r.Uniform(12.0, 20.0), 0, 1.0);
+         Engine(k, 'b', 0, kSaw, 3, r.Uniform(16.0, 24.0), 1, 0.6);
+         filter = 2, mix = 0.35, cut = r.Uniform(4000.0, 6500.0), res = 0.15, amt = 1.5, fd = 250.0, fs = 0.45;
+         break;
+      case Voice::BrassStack: // brass frames, swelled in, a saw stack under it for width
+         Engine(k, 'a', 53, r.Uniform(0.3, 0.7), 3, r.Uniform(10.0, 18.0), 0, 1.0);
+         Engine(k, 'b', 0, kSaw, 5, r.Uniform(26.0, 34.0), 0, 0.7);
+         mix = 0.45, cut = r.Uniform(3500.0, 6000.0), amt = 1.5, fa = 40.0, fd = 350.0, aa = 25.0;
+         break;
+      case Voice::FmStack: // a bell tone on top of a supersaw body
+         Engine(k, 'a', 12, r.Uniform(0.2, 0.5), 2, 8.0, 0, 1.0);
+         Engine(k, 'b', 0, kSaw, 7, r.Uniform(30.0, 40.0), 0, 0.7);
+         mix = 0.5, cut = r.Uniform(8000.0, 11000.0), amt = 0.6;
+         break;
+      case Voice::SynthBass: // one saw or square over a sine at its root; the envelope gives the bite
+         Engine(k, 'a', 0, r.Uniform() < 0.6 ? kSaw : kSquare, 1, 0.0, 0, 1.0);
+         Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.9); // at the note: an octave under a bass note is under 40 Hz, sub no speaker gives back
+         filter = 2, mix = 0.45, cut = r.Uniform(900.0, 1600.0), res = r.Uniform(0.1, 0.3), amt = 2.0, fa = 0.0;
+         fd = r.Uniform(160.0, 280.0), fs = 0.25, fr = 80.0, aa = 1.0, ad = 300.0, as = 0.8, ar = 60.0;
+         break;
+      case Voice::ReeseBass: // two saws beating against each other over a clean sine
+         Engine(k, 'a', 0, kSaw, 2, r.Uniform(10.0, 18.0), 0, 1.0);
+         Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.9); // at the note: an octave under a bass note is under 40 Hz, sub no speaker gives back
+         filter = 2, mix = 0.45, cut = r.Uniform(1200.0, 2200.0), res = 0.1, amt = 0.8, fa = 0.0, fd = 300.0, fs = 0.5, fr = 100.0;
+         aa = 2.0, ad = 300.0, as = 0.9, ar = 80.0;
+         break;
+      case Voice::SynthPluck: // a short bright stab: the filter snaps shut
+         Engine(k, 'a', 0, kSaw, 3, r.Uniform(10.0, 18.0), 0, 1.0);
+         Engine(k, 'b', 0, kSquare, 1, 0.0, 1, 0.4);
+         filter = 2, mix = 0.3, cut = r.Uniform(1400.0, 2400.0), res = 0.2, amt = 3.0, fa = 0.0;
+         fd = r.Uniform(180.0, 320.0), fs = 0.1, fr = 200.0, aa = 1.0, ad = r.Uniform(350.0, 600.0), as = 0.25, ar = 250.0;
+         break;
+      }
+      k["mix"] = { 'f', Num(std::round(mix * 100.0) / 100.0) };
+      for (char e : { 'a', 'b' })
+      {
+         EngineFilter(k, e, filter, cut, res, amt, fa, fd, fs, fr);
+         EngineAmp(k, e, aa, ad, as, ar);
+      }
+      return k;
+   }
    // A pluck is a note that is struck and then dies: a bright start that
    // closes fast. Each kit is a Wavetable voice whose own filter envelope
    // (octaves of sweep from a dark cutoff) gives the snap, whose amp envelope
@@ -1357,7 +1481,10 @@ Compiled Compile(const Recipe& recipe)
    std::vector<int> synths;
    int layers = 0; // layers the full mix has, whatever the part keeps
 
-   auto chain = [&](int src, int fxN)
+   // `clean`: a melodic voice keeps only an echo or a chorus, set by hand. Drive, saturation, crushing and a second
+   // filter drawn at random are what made the synths distorted and muddy (owner's review, 2026-10-29). The card's
+   // picks are drawn either way, so every part after keeps its draws.
+   auto chain = [&](int src, int fxN, bool clean = false)
    {
       int end = src;
       for (int i = 0; i < fxN; i++)
@@ -1365,7 +1492,25 @@ Compiled Compile(const Recipe& recipe)
          const std::string n = pick(st.fx);
          if (n.empty())
             break;
-         const int id = g.Add(n, seed());
+         const int sd = seed();
+         int id = 0;
+         if (!clean)
+            id = g.Add(n, sd);
+         else if (n == "Delay")
+         {
+            Rng fr(std::string("cleanfx:") + std::to_string(sd));
+            id = g.Add("Delay", sd, F({ { "mix", fr.Uniform(0.15, 0.25) }, { "timeMs", (fr.Uniform() < 0.6 ? 0.75 : 0.5) * 60000.0 / out.bpm },
+                                         { "feedback", fr.Uniform(25.0, 40.0) }, { "tone", -0.2 }, { "sync", 0.0 }, { "wow", 0.0 }, { "flutter", 0.0 },
+                                         { "saturation", 0.0 }, { "diffusion", 0.0 } })); // sync off, or timeMs is ignored
+         }
+         else if (n == "Chorus")
+         {
+            Rng fr(std::string("cleanfx:") + std::to_string(sd));
+            id = g.Add("Chorus", sd, F({ { "mix", fr.Uniform(0.2, 0.35) }, { "delay", fr.Uniform(10.0, 16.0) }, { "depth", fr.Uniform(2.0, 5.0) },
+                                          { "rate", fr.Uniform(0.2, 0.6) }, { "spread", 0.8 } }));
+         }
+         if (id == 0)
+            continue;
          g.Connect(end, id, false);
          end = id;
       }
@@ -1525,6 +1670,79 @@ Compiled Compile(const Recipe& recipe)
       lanes[0] = lanes[1] = lanes[4] = lanes[5] = lanes[6] = lanes[7] = "";
    if (part == Part::Toms)
       lanes[0] = lanes[1] = lanes[2] = lanes[3] = lanes[4] = lanes[7] = ""; // no bell: it is the high metallic ring
+
+   // The Drums part plays a groove of its genre, not the card's one figure (owner's review, 2026-10-29: "after some
+   // generation the pattern repeats"). A groove is a skeleton, hats and maybe ghost notes, each a figure several
+   // Groove MIDI drummers share, put together from the genres whose drummers play the card's family: breaks and
+   // drum & bass take funk and hip-hop breaks at their own tempo, as jungle does; four-on-the-floor families keep the
+   // kick and backbeat and take the hats and ghosts; bass music is half-time. Its own stream: only this part moves.
+   std::string bank[4];
+   if (part == Part::Drums && hasDrums)
+   {
+      Rng gb(std::string("groove-bank:") + std::to_string(recipe.seed));
+      const std::string fam = st.family;
+      enum { kFunk, kHiphop, kRock, kPop, kSoul, kReggae, kLatin, kAfrobeat, kNewOrleans, kDance };
+      std::vector<int> pool;
+      const bool four = fam == "house" || fam == "techno" || fam == "trance" || fam == "hard";
+      const bool half = fam == "bass_music";
+      if (fam == "breaks" || fam == "drum_and_bass")
+         pool = { kFunk, kFunk, kHiphop, kRock };
+      else if (fam == "downtempo" || fam == "piano")
+         pool = { kHiphop, kFunk, kSoul, kPop, kLatin };
+      else if (fam == "retro")
+         pool = { kRock, kPop, kDance };
+      else if (four)
+         pool = { kFunk, kLatin, kAfrobeat, kDance, kRock };
+      else if (half)
+         pool = { kHiphop, kFunk };
+      else
+         pool = { kFunk, kHiphop, kRock, kLatin, kAfrobeat };
+      auto inPool = [&](int genre) { return std::find(pool.begin(), pool.end(), genre) != pool.end(); };
+      std::vector<const GrooveSkeleton*> sk;
+      std::vector<const GrooveHats*> hs;
+      std::vector<const GrooveGhosts*> gh;
+      for (const GrooveSkeleton& x : kGrooveSkeletons)
+         if (inPool(x.genre))
+            sk.push_back(&x);
+      for (const GrooveHats& x : kGrooveHats)
+         if (inPool(x.genre))
+            hs.push_back(&x);
+      for (const GrooveGhosts& x : kGrooveGhosts)
+         if (inPool(x.genre))
+            gh.push_back(&x);
+      if (!sk.empty() && !hs.empty())
+      {
+         const GrooveSkeleton& s0 = *sk[(size_t)gb.Range((int)sk.size())];
+         const GrooveHats& h0 = *hs[(size_t)gb.Range((int)hs.size())];
+         std::string kick = s0.k, snare = s0.s;
+         if (four)
+         {
+            kick = "x...x...x...x...";
+            snare = *lanes[1] ? std::string(lanes[1]) : std::string("....x.......x...");
+            snare.resize(16, '.');
+         }
+         else if (half)
+         {
+            snare = "........x.......";
+            for (int i = 6; i <= 9; i++) // the half-time backbeat on 3 stands alone
+               kick[(size_t)i] = '.';
+         }
+         if (!gh.empty() && gb.Uniform() < 0.6)
+         {
+            const std::string gs = gh[(size_t)gb.Range((int)gh.size())]->s;
+            for (int i = 0; i < 16; i++)
+               if (snare[(size_t)i] == '.' && gs[(size_t)i] == 'o')
+                  snare[(size_t)i] = 'o';
+         }
+         bank[0] = kick, bank[1] = snare, bank[2] = h0.h, bank[3] = h0.o;
+         if (bank[3].find_first_not_of('.') == std::string::npos)
+            bank[3].clear();
+         for (int i = 0; i < 4; i++)
+            lanes[i] = bank[i].c_str();
+         if (!four)
+            lanes[4] = ""; // the skeleton's snare is the backbeat; a card clap on top doubles it
+      }
+   }
 
    Rng criticRng(std::string("critic:") + st.id + ":" + std::to_string(recipe.seed));
    std::string propLanes[8];
@@ -1937,7 +2155,7 @@ Compiled Compile(const Recipe& recipe)
             m.phase = drift.Uniform();
             out.motions.push_back(m);
          }
-         int pad = chain(sy, 1 + rng.Range(2));
+         int pad = chain(sy, 1 + rng.Range(2), !pads);
          if (st.sidechain && drums != 0)
          {
             // The kick ducks the chords: the pump that makes house breathe.
@@ -2009,12 +2227,14 @@ Compiled Compile(const Recipe& recipe)
          synth = Split(st.motifSynth).empty() ? "" : Split(st.motifSynth)[0];
       if (!synth.empty() && TypeOf(synth) != nullptr)
       {
+         Rng dv(std::string("voice:motif:") + std::to_string(recipe.seed));
+         static const Voice kMotifVoice[] = { Voice::SynthPluck, Voice::SynthPluck, Voice::SawStack, Voice::SquareLead, Voice::FmStack, Voice::Supersaw };
          g.melodic = true;
-         const int sy = g.Add(synth, seed());
+         const int sy = g.Add("Wavetable", seed(), DesignVoice(kMotifVoice[dv.Range(6)], dv));
          g.melodic = false;
          g.Connect(mn, sy, true);
          synths.push_back(sy);
-         int lead = chain(sy, 1);
+         int lead = chain(sy, 1, true);
          if (st.sidechain && drums != 0)
          {
             const int dy = g.Add("Dynamics", seed(), F({ { "sidechainExternal", 1.0 }, { "ratio", 4.0 }, { "threshold", -26.0 },
@@ -2091,123 +2311,220 @@ Compiled Compile(const Recipe& recipe)
 
       if (bassPart)
       {
-         // A figure of one to eight hits in sixteen steps, on the root, its fifth and its neighbours.
-         const double density = sp.Uniform(0.15, 0.65);
+         // A bass is a sound and a way of playing it (owner's review, 2026-10-29: "rhythmic, melodic, long, wobbly,
+         // funky"; Lunacy, eMastered and Beat Kitchen's bass guides). The card's learned weights pick the sound; the
+         // sound picks the roles it is played in; each role writes its own line over a short progression.
+         enum Role { kLong, kRolling, kMelodic, kFunk, kWobble, kTrap, kAcid };
+         const int kind = PickDirectiveKind(sp, dir.bassW); // 0 sub, 1 808, 2 reese, 3 plucked, 4 fm, 5 acid
+         static const int kRoles[6][4] = { { kLong, kLong, kRolling, kMelodic }, { kTrap, kTrap, kTrap, kLong },
+                                           { kLong, kWobble, kWobble, kRolling }, { kFunk, kFunk, kMelodic, kRolling },
+                                           { kWobble, kRolling, kFunk, kMelodic }, { kAcid, kAcid, kAcid, kRolling } };
+         const int role = kRoles[kind][sp.Range(4)];
+         // Progressions as scale degrees, one chord each: I-vi-IV-V, I-V-vi-IV, i-VII-VI-VII, i-iv-v-i, I-IV, i-VI ...
+         static const int kProg[][4] = { { 0, 5, 3, 4 }, { 0, 4, 5, 3 }, { 0, 6, 5, 6 }, { 0, 3, 4, 0 },
+                                         { 0, 0, 3, 4 }, { 0, 5, 0, 4 }, { 0, 3, 0, 3 }, { 0, 5, 6, 4 } };
+         const int* prog = kProg[sp.Range(8)];
+         const int chords = loopBeats >= 8 ? 4 : 2;
          std::vector<double> vel(16, 0.0);
-         std::vector<int> note(16, 0), deg16(16, 0);
-         static const int kDeg[] = { 0, 0, 0, 0, 2, 3, 4, 4, 5, 6, 7 };
-         static const int kOct[] = { 0, 0, 0, 1 };
-         std::string rawBass(16, '.');
-         int prev = 0;
-         for (int k = 0; k < 16; k++)
+         std::vector<int> note(16, 0);
+         int steps = 16;
+         double rate = 0.25, gate = 70.0;
+         auto hit = [&](int i, int deg, int oct, double v) {
+            vel[(size_t)i] = std::clamp(v + sp.Uniform(-dir.velSpread, dir.velSpread) * 0.5, 0.2, 1.0);
+            note[(size_t)i] = degreeNote(deg, oct);
+         };
+         switch (role)
          {
-            const bool strong = k % 4 == 0;
-            if (sp.Uniform() < density * (strong ? 1.8 : 0.8) || k == 0)
-            {
-               prev = sp.Uniform() < 0.55 ? prev : kDeg[sp.Range(11)];
-               rawBass[(size_t)k] = (char)('0' + std::clamp(prev, 0, 7));
-            }
-         }
-         rawBass = ProposeBass(criticRng, mine, rawBass, lanes[0]);
-         for (int k = 0; k < 16; k++)
+         case kLong: // one held note per chord
+         case kWobble: // held notes; the movement is a synced sweep on the filter
+            steps = role == kLong ? chords : std::min(16, loopBeats / 2);
+            rate = (double)loopBeats / steps;
+            gate = 96.0;
+            for (int i = 0; i < steps; i++)
+               hit(i, prog[(i * chords / steps) % 4], kind == 1 ? 0 : 1, i == 0 ? 1.0 : 0.85);
+            break;
+         case kRolling: // driving 16ths around the kick: offbeat 8ths, a gallop, or every 16th but the downbeat
          {
-            if (rawBass[(size_t)k] != '.')
-            {
-               const bool strong = k % 4 == 0;
-               vel[(size_t)k] = std::clamp((strong ? dir.velMean + 0.15 : dir.velMean) + sp.Uniform(-dir.velSpread, dir.velSpread), 0.3, 1.0);
-               deg16[(size_t)k] = Degree(rawBass[(size_t)k]);
-               note[(size_t)k] = degreeNote(deg16[(size_t)k], 1 + kOct[sp.Range(4)]);
-            }
+            static const char* kRoll[] = { "..x...x...x...x.", ".xxx.xxx.xxx.xxx", "x.xx.xxx.xx.x.xx", "..xx..xx..xx..xx", ".x.x.x.x.x.x.x.x" };
+            const char* pat = kRoll[sp.Range(5)];
+            gate = sp.Uniform(45.0, 70.0);
+            const int turn = sp.Uniform() < 0.6 ? (sp.Range(2) ? 4 : 7) : 0; // the last beat moves to the fifth or octave
+            for (int i = 0; i < 16; i++)
+               if (pat[i] == 'x')
+                  hit(i, i >= 12 ? turn : 0, 1, (i % 4 == 2) ? 0.95 : 0.7);
+            break;
          }
-         const double rate = sp.Range(5) == 0 ? 0.5 : 0.25;
-         const int kind = PickDirectiveKind(sp, dir.bassW);
+         case kMelodic: // a walking line: the chord's root, its tones, and a step into the next chord
+         {
+            static const char* kWalk[] = { "x.x.x.xx", "x..x.xx.", "x.xxx.x.", "x..x..x.", "x.x..xx." };
+            rate = loopBeats >= 8 ? 0.5 : 0.25;
+            gate = sp.Uniform(65.0, 90.0);
+            const int per = 16 / 2;
+            for (int c = 0; c < 2; c++)
+            {
+               const char* pat = kWalk[sp.Range(5)];
+               const int r0 = prog[(c * 2) % 4], next = prog[((c + 1) * 2) % 4];
+               int last = -1;
+               for (int j = 0; j < per; j++)
+                  if (pat[j] == 'x')
+                     last = j;
+               for (int j = 0; j < per; j++)
+                  if (pat[j] == 'x')
+                  {
+                     static const int kTone[] = { 0, 2, 4, 7, 4, 2 };
+                     int d = j == 0 ? r0 : r0 + kTone[sp.Range(6)];
+                     if (j == last && j != 0 && sp.Uniform() < 0.6)
+                        d = next + (sp.Range(2) ? 1 : -1); // approach note
+                     hit(c * per + j, d, 1, j == 0 ? 1.0 : 0.8);
+                  }
+            }
+            break;
+         }
+         case kFunk: // root on the one, octave pops on the 16ths, ghost notes, the flat seventh and the fifth
+         {
+            static const char* kFunkPat[] = { "R..gO.R.g.R.O5.7", "R.gR..O.R.g.5.O.", "R..R.gO..R.gO.7.", "R.O.gR.O.R.gO.5g", "R...O.gRR.O.g5O." };
+            std::string pat = kFunkPat[sp.Range(5)];
+            for (int i = 1; i < 16; i++) // a little variation per take, never on the one
+               if (sp.Uniform() < 0.12)
+                  std::swap(pat[(size_t)i], pat[(size_t)(1 + sp.Range(15))]);
+            gate = sp.Uniform(35.0, 55.0);
+            for (int i = 0; i < 16; i++)
+               switch (pat[(size_t)i])
+               {
+               case 'R': hit(i, 0, 1, i == 0 ? 1.0 : 0.85); break;
+               case 'O': hit(i, 7, 1, 0.9); break;
+               case '5': hit(i, 4, 1, 0.75); break;
+               case '7': hit(i, 6, 1, 0.75); break;
+               case 'g': hit(i, 0, 1, 0.28); break; // a muted ghost
+               }
+            break;
+         }
+         case kTrap: // 808: syncopated hits that ring, a slide up to the octave at the end
+         {
+            static const char* kTrapPat[] = { "x..x..x...x.x...", "x.....x.x..x....", "x..x......x..x..", "x......xx.....x.", "x..x...x..x....." };
+            const char* pat = kTrapPat[sp.Range(5)];
+            rate = loopBeats >= 8 && sp.Uniform() < 0.4 ? 0.5 : 0.25;
+            gate = 95.0;
+            int lastHit = 0;
+            for (int i = 0; i < 16; i++)
+               if (pat[i] == 'x')
+                  lastHit = i;
+            for (int i = 0; i < 16; i++)
+               if (pat[i] == 'x')
+                  hit(i, i == lastHit && sp.Uniform() < 0.5 ? (sp.Range(2) ? 7 : 4) : (i >= 8 ? prog[1] : 0), 0, i == 0 ? 1.0 : 0.9);
+            break;
+         }
+         default: // acid: a busy 303 line, accents and slides, octave jumps
+         {
+            std::string raw(16, '.');
+            const double density = sp.Uniform(0.55, 0.85);
+            static const int kDeg[] = { 0, 0, 0, 0, 2, 3, 4, 6, 7 };
+            for (int i = 0; i < 16; i++)
+               if (i == 0 || sp.Uniform() < density)
+                  raw[(size_t)i] = (char)('0' + std::clamp(kDeg[sp.Range(9)], 0, 7));
+            raw = ProposeBass(criticRng, mine, raw, lanes[0]);
+            gate = sp.Uniform(80.0, 100.0); // long gates are what lets a step slide into the next
+            for (int i = 0; i < 16; i++)
+               if (raw[(size_t)i] != '.')
+                  hit(i, Degree(raw[(size_t)i]), sp.Uniform() < 0.3 ? 2 : 1, sp.Uniform() < 0.3 || i == 0 ? 1.0 : sp.Uniform(0.45, 0.65));
+            break;
+         }
+         }
+
+         // The sound. Cutoffs sit where the note's harmonics speak on a laptop (a bass that is only sub vanishes there),
+         // and a filter envelope gives each note its bite.
          Params k;
-         double gate = 70.0;
-         if (kind == 1) // an 808 is tuned to the key: the root sits at 30-60 Hz, never above about 100
-            for (int i = 0; i < 16; i++)
-               note[(size_t)i] = degreeNote(deg16[(size_t)i], 0);
-         if (kind == 5) // acid: a few accented steps, the rest softer; the 303's accent lifts level and sweep together
-            for (int i = 0; i < 16; i++)
-               if (vel[(size_t)i] > 0.0)
-                  vel[(size_t)i] = sp.Uniform() < 0.3 || i == 0 ? 1.0 : sp.Uniform(0.45, 0.65);
+         CleanWavetable(k);
+         k["volume"] = { 'f', "0.9" };
+         k["b.on"] = { 'b', "0" };
+         int filter = 2; // LP24
+         double cut = 1000.0, res = 0.1, amt = 1.0, fd = 250.0, fs = 0.3, aa = 1.0, ad = 400.0, as = 0.85, ar = 80.0;
          switch (kind)
          {
-         case 0: // sub: a clean low sine, long notes
-            wt(k, 10, sp.Uniform(0.0, 0.3), 1, 700, 0.0);
-            k["a.ampDecay"] = { 'f', "400" };
-            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.7, 1.0)) };
-            k["a.ampRelease"] = { 'f', num(sp.Uniform(60.0, 220.0)) };
-            gate = sp.Uniform(60.0, 95.0);
+         case 0: // sub: a sine with a quiet triangle on top, so the note is heard and not only felt
+            Engine(k, 'a', 0, kSine, 1, 0.0, 0, 1.0);
+            Engine(k, 'b', 0, 0.333, 1, 0.0, 0, 0.35);
+            k["mix"] = { 'f', "0.35" };
+            cut = sp.Uniform(900.0, 1400.0), amt = 0.0, as = sp.Uniform(0.8, 1.0), ar = sp.Uniform(60.0, 160.0);
             break;
          case 1: // 808: a pitch-dropped boom that rings
-            wt(k, sp.Range(2) ? 10 : 0, 0.1, 1, 1200, 0.0);
-            k["a.pitchAmount"] = { 'f', num(sp.Uniform(6.0, 18.0)) };
-            k["a.pitchDecay"] = { 'f', num(sp.Uniform(40.0, 120.0)) };
-            k["a.pitchSustain"] = { 'f', "0" };
-            k["a.ampDecay"] = { 'f', num(sp.Uniform(500.0, 1400.0)) };
-            k["a.ampSustain"] = { 'f', "0" };
-            k["a.ampRelease"] = { 'f', "80" };
-            k["glide"] = { 'f', num(sp.Uniform(0.0, 0.12)) };
-            gate = 50.0;
+            Engine(k, 'a', 0, sp.Uniform() < 0.5 ? kSine : 0.2, 1, 0.0, 0, 1.0);
+            k["a.pitchAmount"] = { 'f', num(sp.Uniform(7.0, 14.0)) };
+            k["a.pitchDecay"] = { 'f', num(sp.Uniform(30.0, 80.0)) };
+            k["glide"] = { 'f', num(sp.Uniform(0.06, 0.12)) };
+            cut = 2500.0, amt = 0.0, ad = sp.Uniform(600.0, 1400.0), as = 0.0, ar = 90.0;
             break;
-         case 2: // reese: detuned saws through a slow low-pass
-            wt(k, sp.Range(2) ? 24 : 0, sp.Uniform(0.4, 0.8), 2, sp.Uniform(250.0, 700.0), sp.Uniform(0.05, 0.3));
-            k["a.unison"] = { 'i', std::to_string(2 + sp.Range(2)) };
-            k["a.detune"] = { 'f', num(sp.Uniform(20.0, 60.0)) };
-            k["a.stereoWidth"] = { 'f', "0.3" };
-            k["a.ampSustain"] = { 'f', "0.9" };
-            k["a.ampRelease"] = { 'f', "120" };
+         case 2: // reese: saws beating against each other over a clean sine on the note
+            Engine(k, 'a', sp.Range(2) ? 24 : 0, sp.Uniform(0.55, 0.75), sp.Range(2) ? 2 : 3, sp.Uniform(16.0, 32.0), 0, 1.0);
+            if (k["a.table"].second == "0")
+               k["a.position"] = { 'f', num(kSaw) };
+            k["a.stereoWidth"] = { 'f', "0.4" };
+            Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.85); // an octave under a bass note is under 40 Hz
+            k["mix"] = { 'f', "0.55" };
+            cut = sp.Uniform(500.0, 1000.0), res = sp.Uniform(0.1, 0.25), amt = 1.0, fd = 400.0, fs = 0.4, ar = 120.0;
             break;
-         case 3: // plucked: the string or slap, a filter snap
-            wt(k, sp.Range(2) ? 54 : 50, sp.Uniform(0.1, 0.7), 2, sp.Uniform(250.0, 600.0), sp.Uniform(0.0, 0.2));
-            k["a.filterAmount"] = { 'f', num(sp.Uniform(2.5, 4.0)) };
-            k["a.filterDecay"] = { 'f', num(sp.Uniform(120.0, 300.0)) };
-            k["a.filterSustain"] = { 'f', "0" };
-            k["a.ampDecay"] = { 'f', num(sp.Uniform(250.0, 600.0)) };
-            k["a.ampSustain"] = { 'f', "0" };
-            k["a.ampRelease"] = { 'f', "90" };
+         case 3: // plucked or slap: the string's frames and a filter that snaps shut
+            Engine(k, 'a', sp.Range(2) ? 54 : 50, sp.Uniform(0.1, 0.6), 1, 0.0, 0, 1.0);
+            Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.8); // the body under the snap: bass loops are mostly fundamental
+            k["mix"] = { 'f', "0.5" };
+            cut = sp.Uniform(500.0, 900.0), amt = sp.Uniform(2.5, 3.5), fd = sp.Uniform(120.0, 260.0), fs = 0.0;
+            ad = sp.Uniform(250.0, 500.0), as = 0.0, ar = 90.0;
             break;
          case 4: // fm: a bright, hollow growl that closes
-            wt(k, sp.Range(2) ? 12 : 32, sp.Uniform(0.1, 0.7), 1, sp.Uniform(600.0, 1600.0), 0.1);
-            k["a.ampDecay"] = { 'f', num(sp.Uniform(250.0, 500.0)) };
-            k["a.ampSustain"] = { 'f', num(sp.Uniform(0.2, 0.5)) };
-            k["a.ampRelease"] = { 'f', "100" };
+            Engine(k, 'a', sp.Range(2) ? 12 : 32, sp.Uniform(0.1, 0.5), 1, 0.0, 0, 1.0);
+            Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.8);
+            k["mix"] = { 'f', "0.5" };
+            cut = sp.Uniform(700.0, 1400.0), amt = 1.5, fd = 200.0, fs = 0.3, ad = sp.Uniform(250.0, 500.0), as = sp.Uniform(0.3, 0.6), ar = 100.0;
             break;
-         default: // acid: a squelching, resonant saw with a fast sweep
-            wt(k, sp.Range(2) ? 35 : 4, sp.Uniform(0.2, 0.7), 2, sp.Uniform(250.0, 600.0), sp.Uniform(0.45, 0.75));
-            k["a.filterAmount"] = { 'f', num(sp.Uniform(3.0, 5.0)) };
-            k["a.filterDecay"] = { 'f', num(sp.Uniform(110.0, 260.0)) };
-            k["a.filterSustain"] = { 'f', "0.05" };
-            k["a.ampDecay"] = { 'f', "300" };
-            k["a.ampSustain"] = { 'f', "0.6" };
-            k["a.ampRelease"] = { 'f', "70" };
+         default: // acid: a saw or square into a resonant ladder-like low-pass with a fast, deep sweep
+            Engine(k, 'a', 0, sp.Uniform() < 0.6 ? kSaw : kSquare, 1, 0.0, 0, 1.0);
+            Engine(k, 'b', 0, kSine, 1, 0.0, 0, 0.6);
+            k["mix"] = { 'f', "0.4" };
+            cut = sp.Uniform(300.0, 700.0), res = sp.Uniform(0.5, 0.75), amt = sp.Uniform(3.0, 4.5), fd = sp.Uniform(110.0, 240.0), fs = 0.05;
+            ad = 300.0, as = 0.6, ar = 70.0;
             k["glide"] = { 'f', num(sp.Uniform(0.05, 0.07)) }; // the 303's slide is about 60 ms
-            gate = sp.Uniform(85.0, 110.0);                    // long gates are what lets a step slide into the next
             break;
          }
-         const int sq = sequence(vel, note, rate, gate, 16);
+         if (k["b.on"].second == "0")
+            k["mix"] = { 'f', "0" };
+         for (char e : { 'a', 'b' })
+         {
+            EngineFilter(k, e, filter, cut, res, amt, 0.0, fd, fs, 80.0);
+            EngineAmp(k, e, aa, ad, as, ar);
+         }
+         if (kind == 1) // the 808's sine takes no filter
+            k["b.filterType"] = k["a.filterType"] = { 'i', "0" };
+         const int sq = sequence(vel, note, rate, gate, steps);
          const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
          g.Connect(sq, sy, true);
-         int end = sy;
-         if (sp.Uniform() < 0.5)
-         {
-            const int dr2 = g.Add("Drive", sp.Range(1 << 30), F({ { "mix", sp.Uniform(0.3, 0.8) }, { "drive", sp.Uniform(4.0, 16.0) }, { "output", -4.0 } }));
-            g.Connect(end, dr2, false);
-            end = dr2;
-         }
          synths.push_back(sy);
-         chans.push_back({ end, 0.0f });
-         if (kind == 2)
+         chans.push_back({ sy, 0.0f });
+         if (role == kWobble)
          {
-            // A clean sine an octave under the beating saws, as the reese recipes layer it.
-            Params sb;
-            wt(sb, 10, 0.0, 1, 600, 0.0);
-            sb["a.ampSustain"] = { 'f', "0.9" };
-            sb["a.ampRelease"] = { 'f', "120" };
-            sb["a.octave"] = { 'i', "-1" };
-            const int sub = g.Add("Wavetable", sp.Range(1 << 30), sb);
-            g.Connect(sq, sub, true);
-            chans.push_back({ sub, -6.0f });
+            // The wobble: the filter swept in time, a quarter, eighth, triplet or sixteenth.
+            static const double kWob[] = { 1.0, 0.5, 0.5, 2.0 / 3.0, 0.25 };
+            const double period = kWob[sp.Range(5)], lo = sp.Uniform(250.0, 450.0), hi = sp.Uniform(2500.0, 4500.0);
+            sweep(sy, "a.cutoff", lo, hi, period, 0.0);
+            if (k["b.on"].second == "1")
+               sweep(sy, "b.cutoff", lo, hi, period, 0.0);
+         }
+         // The click: a separate short, high layer on each note's start (a sine pitched down from four octaves up in a
+         // few ms, high-passed), as bass and kick designers layer their transients. It is what lets a bass cut through.
+         if (sp.Uniform() < (kind == 1 ? 0.35 : kind == 0 ? 0.5 : 0.6))
+         {
+            Params c;
+            CleanWavetable(c);
+            c["volume"] = { 'f', "0.9" };
+            c["mix"] = { 'f', "0" };
+            c["glide"] = { 'f', "0" };
+            Engine(c, 'a', 0, sp.Uniform() < 0.5 ? kSine : 0.333, 1, 0.0, 1, 1.0);
+            c["a.pitchAmount"] = { 'f', num(sp.Uniform(30.0, 44.0)) };
+            c["a.pitchDecay"] = { 'f', num(sp.Uniform(2.0, 6.0)) };
+            EngineFilter(c, 'a', 4, sp.Uniform(1200.0, 3000.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0); // HP12
+            EngineAmp(c, 'a', 0.0, sp.Uniform(6.0, 14.0), 0.0, 6.0);
+            const int ck = g.Add("Wavetable", sp.Range(1 << 30), c);
+            g.Connect(sq, ck, true);
+            chans.push_back({ ck, (float)sp.Uniform(-12.0, -7.0) });
          }
       }
       else if (fxPart)
@@ -2239,7 +2556,7 @@ Compiled Compile(const Recipe& recipe)
             const int nv = noiseVoice(up ? loopBeats * beatMs * 0.9 : 30.0, up ? 200.0 : loopBeats * beatMs * 0.5);
             g.Connect(hold(loopBeats), nv, true);
             Params f = F({ { "freq", 1000.0 }, { "q", sp.Uniform(1.5, 6.0 ) }, { "mix", 1.0 } });
-            f["type"] = { 'i', "6" };
+            f["type"] = { 'f', "6" }; // effect params are floats: an "i" key is never read
             const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
             g.Connect(nv, af, false);
             sweep(af, "freq", sp.Uniform(200.0, 500.0), sp.Uniform(5000.0, 12000.0), period, up ? rise : fall);
@@ -2602,9 +2919,10 @@ Compiled Compile(const Recipe& recipe)
             g.melodic = false;
             g.Connect(sq, sy, true);
             int end = sy;
-            if (sp.Uniform() < 0.7) // a dotted echo is how a lead gets its space
+            if (sp.Uniform() < 0.85) // a dotted echo is how a lead gets its space
             {
-               const int dl = g.Add("Delay", sp.Range(1 << 30), F({ { "mix", sp.Uniform(0.15, 0.35) }, { "timeMs", 0.75 * beatMs }, { "feedback", sp.Uniform(25.0, 50.0) }, { "tone", -0.3 } }));
+               const int dl = g.Add("Delay", sp.Range(1 << 30), F({ { "mix", sp.Uniform(0.18, 0.3) }, { "timeMs", 0.75 * beatMs }, { "feedback", sp.Uniform(25.0, 45.0) }, { "tone", -0.1 },
+                                                                    { "sync", 0.0 }, { "wow", 0.0 }, { "flutter", 0.0 }, { "saturation", 0.0 }, { "diffusion", 0.0 } }));
                g.Connect(end, dl, false);
                end = dl;
             }
@@ -2670,7 +2988,7 @@ Compiled Compile(const Recipe& recipe)
             vel[0] = 1.0;
             g.Connect(sequence(vel, std::vector<int>(16, 60), loopBeats, 100.0, 1), nv, true);
             Params f = F({ { "freq", 700.0 }, { "q", sp.Uniform(0.8, 3.0) }, { "mix", 1.0 } });
-            f["type"] = { 'i', "6" };
+            f["type"] = { 'f', "6" }; // effect params are floats: an "i" key is never read
             const int af = g.Add("Audio Filter", sp.Range(1 << 30), f);
             g.Connect(nv, af, false);
             sweep(af, "freq", sp.Uniform(250.0, 500.0), sp.Uniform(1800.0, 4000.0), cyc, sp.Uniform(0.0, 1.0));
@@ -2938,7 +3256,8 @@ Compiled Compile(const Recipe& recipe)
       const double periods[] = { 4.0, 8.0, 16.0 };
       m.periodBeats = periods[rng.Range(3)];
       m.phase = rng.Uniform();
-      out.motions.push_back(m);
+      if (keep)
+         out.motions.push_back(m);
    }
 
    char head[96];
