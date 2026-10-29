@@ -805,3 +805,12 @@ Doubling the dot renders closed the 0.3-point miss from v2; no bar or percentile
   - The app build has only had a syntax check against build-dev flags; no full build or run yet.
   - `website/gen` is not updated: deploying the new wasm needs Naman's yes.
   - The blind test (does a redrawn take sound better?) needs Naman.
+
+## 2026-10-29 (late) — MIDI axes rerun after the re-strike fix
+- `midi_axes.py run --jobs 3` then `counts`: 293,573 rows, 292,825 measured, 748 errors, 0 not found (4,939 s).
+- `note_spread.py` (32 style-card patches vs 19,845 corpus files) -> `feel/note_spread.json`: bpm 88% inside, register 0%, density 75%,
+  rest **34% (was 100%)**, swing 100%. MISS as before. Rest moved because the fix measures rests properly: the corpus p95 of rest share fell
+  from 1.00 to 0.275, and the generator's patches (median 0.34) now sit above it. A new miss, recorded as one; the generator rests far more than
+  the corpus (loops built from short motifs). Register 0% is the all-voice median and was already known (per-role register is the bar, MET).
+- `v_boost.py` with its feature cache rebuilt (old cache kept as `mix/ve_feats.pre-restrike.npz`): same numbers to the third decimal
+  (V r 0.51-0.58, E r 0.82-0.87). Valence stays MISS (advisory only).

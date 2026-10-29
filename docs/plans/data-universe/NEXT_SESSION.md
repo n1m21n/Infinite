@@ -5,8 +5,7 @@ Branch feature/sample-dots, nothing pushed. `tools/seo/ledger.json` has an unrel
 
 ## Running when this was written (check, then finish these first)
 1. Done: the dot-shaped critic renders and v3 (see HANDOFF).
-2. MIDI axes full rerun after the re-strike fix (`midi_axes.py run --jobs 3`, then `counts`) -> `store/midi_axes.jsonl`. Record counts (item 1), then rerun
-   `note_spread.py` and `v_boost.py` (fit_ve.py was rerun already: unchanged).
+2. Done: MIDI axes rerun (292,825 measured), note_spread (rest now 34% inside: new MISS) and v_boost (unchanged). See HANDOFF "2026-10-29 (late)".
 3. Note effects (plan 8.2): no headless note dump exists (`--audio-summary` only). Route: note phrase -> note node -> sine Oscillator -> Audio Out, measure
    onsets and pitch from audio. Needs the release build (the dev build is ~10x slower); run when nothing else is heavy.
 

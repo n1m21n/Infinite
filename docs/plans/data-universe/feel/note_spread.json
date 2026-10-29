@@ -2,46 +2,46 @@
  "bpm": {
   "corpus_p5": 66.0,
   "corpus_p50": 120.0,
-  "corpus_p95": 171.044,
+  "corpus_p95": 170.0,
   "gen_p5": 69.0,
   "gen_p50": 125.5,
   "gen_p95": 175.0,
   "inside": 0.875,
   "n_gen": 32,
-  "n_corpus": 19827
+  "n_corpus": 19845
  },
  "register": {
   "corpus_p5": 52.5,
   "corpus_p50": 60.5,
-  "corpus_p95": 70.25,
+  "corpus_p95": 70.0,
   "gen_p5": 26.0,
   "gen_p50": 35.625,
   "gen_p95": 44.062,
   "inside": 0.0,
   "n_gen": 32,
-  "n_corpus": 19827
+  "n_corpus": 19845
  },
  "density": {
-  "corpus_p5": 2.218,
-  "corpus_p50": 12.334,
-  "corpus_p95": 36.242,
+  "corpus_p5": 2.101,
+  "corpus_p50": 12.31,
+  "corpus_p95": 36.064,
   "gen_p5": 0.288,
   "gen_p50": 6.508,
   "gen_p95": 11.384,
-  "inside": 0.688,
+  "inside": 0.75,
   "n_gen": 32,
-  "n_corpus": 19827
+  "n_corpus": 19845
  },
  "rest": {
   "corpus_p5": 0.0,
-  "corpus_p50": 0.036,
-  "corpus_p95": 1.0,
+  "corpus_p50": 0.027,
+  "corpus_p95": 0.275,
   "gen_p5": 0.159,
   "gen_p50": 0.344,
   "gen_p95": 0.938,
-  "inside": 1.0,
+  "inside": 0.344,
   "n_gen": 32,
-  "n_corpus": 19827
+  "n_corpus": 19845
  },
  "swing": {
   "corpus_p5": 0.0,
@@ -52,7 +52,7 @@
   "gen_p95": 0.247,
   "inside": 1.0,
   "n_gen": 32,
-  "n_corpus": 19827
+  "n_corpus": 19845
  },
  "verdict": "MISS"
 }
