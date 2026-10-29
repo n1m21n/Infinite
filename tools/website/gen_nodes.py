@@ -580,8 +580,8 @@ def index_page(items):
     opts = '<button type="button" class="ns-opt" role="option" data-fam="" aria-selected="true"><span>All</span><small class="mono">%d</small></button>' % len(items) + "".join(
         '<button type="button" class="ns-opt" role="option" data-fam="%s" aria-selected="false"><span>%s</span><small class="mono">%d</small></button>'
         % (slug(c), e(CAT_LABEL[c]), len([i for i in items if i["cat"] == c])) for c in fams)
-    chips = ('<div class="ns-sel"><button type="button" class="ns-select" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by family">%s<span class="ns-select-val">All</span>%s</button>'
-             '<div class="ns-menu" role="listbox" aria-label="Family" hidden>%s</div></div>' % (SEL_IC, CHEV, opts))
+    chips = ('<select class="nat-pick" id="ns-fam" aria-label="Filter by family"><option value="" selected>All</option>' + "".join(
+        '<option value="%s">%s</option>' % (slug(c), e(CAT_LABEL[c])) for c in fams) + '</select>')
     cards = []
     for n, i in enumerate(sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower()))):
         sh = i["shot"]
@@ -609,6 +609,7 @@ def index_page(items):
         {deck}
       </div>
       <noscript><div class="ns-list">{"".join(secs)}</div></noscript>
+      <nav class="page-cta" aria-label="More from Infinite"><a class="btn btn-ghost" href="../library.html">Explore library</a><a class="btn btn-ghost" href="../samples/">Sample generator</a></nav>
     </div>
   </main>
 

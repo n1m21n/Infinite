@@ -285,6 +285,7 @@ def build_index(posts, header, footer):
         </div>
 
         <p class="blog-empty" id="blog-empty" hidden>No posts in this group yet.</p>
+        <nav class="page-cta" aria-label="More from Infinite"><a class="btn btn-ghost" href="../nodes/">Nodes in Infinite</a><a class="btn btn-ghost" href="../samples/">Sample Generator</a></nav>
         <p class="blog-feed"><a href="feed.xml">RSS feed</a></p>
       </div>
     </section>
