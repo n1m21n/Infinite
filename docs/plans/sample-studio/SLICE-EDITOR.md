@@ -361,3 +361,4 @@ Owner test pass (2026-10-29), changes against the spec:
 | One Sampler per slice (Convert to node menu) | Removed; the slice inspector's button and the wave menu's item are "Convert to node" (Sampler per selected slice). | Owner request. |
 | Stretch off by default; Length moves the whole sample's timing | Stretch defaults to repitch. A slice's stretch stays inside its own span: longer is cut at its end, shorter leaves silence or the Fill loop (2 ms fade at the cut), so the sample's timing never moves. | Owner request. |
 | Convert to patch, Convert to node (two chips) | One Convert chip: its menu holds Patch, then the node types. Patch pastes again (it had lost the patch header line, so nothing spawned). | Owner request; owner bug report. |
+| Muted slice drew as a flat line | Muted and soloed-out slices keep their wave, faded; only Delete empties it. Shift+Left/Right moulds the selected slices (Length x/÷1.05 a press, landing on 1x). | Owner request. |

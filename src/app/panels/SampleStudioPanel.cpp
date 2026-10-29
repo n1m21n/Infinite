@@ -1275,6 +1275,9 @@ namespace
       s.dirty = true;
    }
 
+   // A Shift+arrow step of a slice's Length, landing exactly on 1x on the way through.
+   static float Mould(float r) { return std::fabs(r - 1.0f) < 0.02f ? 1.0f : std::clamp(r, 0.25f, 4.0f); }
+
    void SelectStep(int dir)
    {
       Studio& s = S();
@@ -1970,10 +1973,11 @@ namespace
          ZoomAround(mf, 0.7);
       else if (ImGui::IsKeyPressed(ImGuiKey_Minus) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract))
          ZoomAround(mf, 1.0 / 0.7);
+      // Shift+arrows mould the selected slices: right stretches them, left compacts them (their Length).
       else if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
-         SelectStep(-1);
+         io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio / 1.05f); }) : SelectStep(-1);
       else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
-         SelectStep(1);
+         io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio * 1.05f); }) : SelectStep(1);
       else if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
          Audition(s.sel.empty() ? s.doc.IndexAt((int64_t)mf) : s.doc.IndexOfId(s.primary));
       else if (ImGui::IsKeyPressed(ImGuiKey_M, false))
@@ -2172,7 +2176,8 @@ namespace
             const bool inside = m >= s.heardDoc.StartFrame() && m < s.heardDoc.endFrame;
             const int hi0 = useHeard && inside ? s.heardDoc.IndexAt(m) : -1;
             const float was = hi0 >= 0 ? LevelAt(s.heardDoc, hi0, m) : 0.0f;
-            if (hi0 >= 0 && was > 1e-3f)
+            // A muted (or soloed-out) slice keeps its wave, faded: the render of it is silence.
+            if (hi0 >= 0 && was > 1e-3f && audible(a))
             {
                double la = SourceToLaid(s.heardDoc, *s.heard, a), lb = SourceToLaid(s.heardDoc, *s.heard, std::max(a + 1, b));
                if (la > lb)
@@ -2443,7 +2448,7 @@ namespace
          static const std::vector<const char*> modes = { "off", "repitch", "beats", "tonal" };
          t.Changed(ComboRow(T("Stretch"), "##sliceStretch", e.stretchMode, modes, fieldW));
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch"));
+            HelpTip("%s", T("The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices"));
       }
       Row(T("Length"), fieldW);
       FieldWell::Slider("##sliceLen", &e.lengthRatio, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
