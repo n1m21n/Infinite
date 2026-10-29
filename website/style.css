@@ -794,8 +794,8 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   .menu-btn:focus-visible { box-shadow: 0 0 0 2px var(--signal); }
   .brand-name { display: none; }
   .brand-icon { width: 32px; height: 32px; }
-  .nav-actions { margin-left: auto; gap: 8px; display: flex; align-items: center; }
-  .nav-actions .icon-btn { width: 40px; height: 40px; }   /* thumb-sized, spaced apart */
+  .nav-actions { margin-left: auto; gap: 6px; display: flex; align-items: center; }
+  .nav-actions .icon-btn { width: 36px; height: 36px; }   /* thumb-sized, fits on mobile */
   .nav-actions .icon-btn svg { width: 18px; height: 18px; }
   .nav-actions [data-mode-toggle] { display: none; }   /* phones stay dark: no light/dark switch */
   .nav-download { display: none; }
