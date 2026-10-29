@@ -2154,6 +2154,13 @@ namespace
       const double fpp = s.viewLen / w;
       const ImU32 waveCol = ImGui::GetColorU32(ImGuiCol_Text, 0.78f), mutedCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.35f);
       const bool anySolo = s.doc.AnySolo();
+      // The source frame drawn at `f`: a reversed slice shows back to front.
+      const auto Mirror = [&](int64_t f)
+      {
+         const int i = s.doc.IndexAt(f);
+         const Slice& sl = s.doc.slices[(size_t)i];
+         return sl.p.reverse ? std::clamp<int64_t>(sl.start + s.doc.EndOf(i) - 1 - f, sl.start, s.doc.EndOf(i) - 1) : f;
+      };
       const auto audible = [&](int64_t f)
       {
          const int i = s.doc.IndexAt(f);
@@ -2180,6 +2187,13 @@ namespace
             if (hi0 >= 0 && was > 1e-3f && audible(a))
             {
                double la = SourceToLaid(s.heardDoc, *s.heard, a), lb = SourceToLaid(s.heardDoc, *s.heard, std::max(a + 1, b));
+               // SourceToLaid gives where a frame is heard; a reversed slice is drawn as it plays, back to front.
+               if (s.heardDoc.slices[(size_t)hi0].p.reverse && (size_t)hi0 + 1 < s.heard->outStart.size())
+               {
+                  const double o = (double)(s.heard->outStart[(size_t)hi0] + s.heard->outStart[(size_t)hi0 + 1]);
+                  la = o - la;
+                  lb = o - lb;
+               }
                if (la > lb)
                   std::swap(la, lb);
                LaidMinMax((int64_t)la, std::max((int64_t)la + 1, (int64_t)std::ceil(lb)), lo, hi);
@@ -2189,7 +2203,8 @@ namespace
             }
             else
             {
-               RangeMinMax(a, std::max(a + 1, b), lo, hi);
+               const int64_t ma = Mirror(a), mb = Mirror(std::min(std::max(a + 1, b), s.doc.EndOf(s.doc.IndexAt(a))) - 1);
+               RangeMinMax(std::min(ma, mb), std::max(ma, mb) + 1, lo, hi);
                // The slice's gain and fades show at once, before the render lands.
                lo *= k;
                hi *= k;
@@ -2204,7 +2219,8 @@ namespace
          ImVec2 prev;
          for (int64_t f = a; f < b; f++)
          {
-            const float v = 0.5f * (s.src->l[(size_t)f] + s.src->r[(size_t)f]) * LevelAt(s.doc.IndexAt(f), f);
+            const size_t mf0 = (size_t)Mirror(f);
+            const float v = 0.5f * (s.src->l[mf0] + s.src->r[mf0]) * LevelAt(s.doc.IndexAt(f), f);
             const ImVec2 p(g.XOf((double)f), mid - v * amp);
             const ImU32 c = audible(f) ? waveCol : mutedCol;
             if (f > a)
