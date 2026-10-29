@@ -323,8 +323,8 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   }
 }
 .hero-mobile-sub { font-size: 0.8125rem; color: var(--ink-2); margin-bottom: 12px; text-align: center; }
-.hero-mobile-buttons { display: inline-flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.hero-mobile-btn { min-height: 40px; padding: 0 18px; font-size: 0.8125rem; }
+.hero-mobile-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 380px); }
+.hero-mobile-btn { min-height: 40px; height: 40px; padding: 0 12px; font-size: 0.8125rem; justify-content: center; white-space: nowrap; }
 .download-mobile-note { display: none; }
 @media (max-width: 768px) {
   .download-mobile-note:not([hidden]) {
