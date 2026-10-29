@@ -69,7 +69,13 @@
         });
       } else {
         a.href = '#download';
-        if (OS === 'mobile') a.style.display = 'none'; // a phone cannot install it, so no button at all
+        if (OS === 'mobile') {
+          a.style.display = 'none'; // a phone cannot install desktop binary
+          const mobHero = document.getElementById('hero-mobile-cta');
+          if (mobHero) mobHero.hidden = false;
+          const mobDl = document.getElementById('download-mobile-note');
+          if (mobDl) mobDl.hidden = false;
+        }
         else if (label) label.textContent = 'Download Infinite';
       }
     });

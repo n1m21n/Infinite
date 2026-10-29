@@ -311,6 +311,32 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 }
 
 .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.hero-mobile-cta { display: none; }
+@media (max-width: 768px) {
+  .hero-mobile-cta:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 14px;
+    width: 100%;
+  }
+}
+.hero-mobile-sub { font-size: 0.8125rem; color: var(--ink-2); margin-bottom: 12px; text-align: center; }
+.hero-mobile-buttons { display: inline-flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.hero-mobile-btn { min-height: 40px; padding: 0 18px; font-size: 0.8125rem; }
+.download-mobile-note { display: none; }
+@media (max-width: 768px) {
+  .download-mobile-note:not([hidden]) {
+    margin-top: 24px;
+    font-size: 0.875rem;
+    color: var(--ink-2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+}
 .platform-chip {
   margin-top: 18px; display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 16px; border-radius: var(--r-pill);
