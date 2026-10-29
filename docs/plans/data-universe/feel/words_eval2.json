@@ -1,0 +1,413 @@
+{
+ "bar": "AUC >= 0.75 per word, groups held out",
+ "features": "32 log bands + 8 scalars + attack/decay + width, onsets, length + 40-point envelope",
+ "runs": {
+  "diva": {
+   "dark": {
+    "auc": 0.676,
+    "fold_sd": 0.054,
+    "positives": 105,
+    "folds_scored": 3
+   },
+   "soft": {
+    "auc": 0.801,
+    "fold_sd": 0.149,
+    "positives": 45,
+    "folds_scored": 3
+   },
+   "hard": {
+    "auc": 0.825,
+    "fold_sd": 0.059,
+    "positives": 82,
+    "folds_scored": 4
+   },
+   "deep": {
+    "auc": 0.766,
+    "fold_sd": 0.086,
+    "positives": 79,
+    "folds_scored": 4
+   },
+   "lofi": {
+    "auc": 0.586,
+    "fold_sd": 0.174,
+    "positives": 80,
+    "folds_scored": 4
+   },
+   "distorted": {
+    "auc": 0.678,
+    "fold_sd": 0.088,
+    "positives": 75,
+    "folds_scored": 5
+   }
+  },
+  "ableton": {
+   "bright": {
+    "auc": 0.61,
+    "fold_sd": 0.21,
+    "positives": 67,
+    "folds_scored": 5
+   },
+   "soft": {
+    "auc": 0.564,
+    "fold_sd": 0.084,
+    "positives": 56,
+    "folds_scored": 4
+   },
+   "lofi": {
+    "auc": 0.552,
+    "fold_sd": 0.083,
+    "positives": 65,
+    "folds_scored": 4
+   },
+   "metallic": {
+    "auc": 0.706,
+    "fold_sd": 0.061,
+    "positives": 68,
+    "folds_scored": 5
+   },
+   "analog": {
+    "auc": 0.793,
+    "fold_sd": 0.066,
+    "positives": 226,
+    "folds_scored": 4
+   },
+   "digital": {
+    "auc": 0.783,
+    "fold_sd": 0.166,
+    "positives": 136,
+    "folds_scored": 5
+   }
+  },
+  "samples": {
+   "warm": {
+    "auc": 0.707,
+    "fold_sd": 0.05,
+    "positives": 155,
+    "folds_scored": 4
+   },
+   "bright": {
+    "auc": 0.457,
+    "fold_sd": 0.11,
+    "positives": 110,
+    "folds_scored": 5
+   },
+   "dark": {
+    "auc": 0.692,
+    "fold_sd": 0.185,
+    "positives": 525,
+    "folds_scored": 4
+   },
+   "soft": {
+    "auc": 0.375,
+    "fold_sd": 0.091,
+    "positives": 670,
+    "folds_scored": 4
+   },
+   "hard": {
+    "auc": 0.601,
+    "fold_sd": 0.091,
+    "positives": 1224,
+    "folds_scored": 4
+   },
+   "punchy": {
+    "auc": 0.782,
+    "fold_sd": 0.125,
+    "positives": 257,
+    "folds_scored": 4
+   },
+   "airy": {
+    "auc": 0.482,
+    "fold_sd": 0.198,
+    "positives": 125,
+    "folds_scored": 3
+   },
+   "wet": {
+    "auc": 0.603,
+    "fold_sd": 0.15,
+    "positives": 286,
+    "folds_scored": 4
+   },
+   "dry": {
+    "auc": 0.619,
+    "fold_sd": 0.11,
+    "positives": 438,
+    "folds_scored": 5
+   },
+   "smooth": {
+    "auc": 0.576,
+    "fold_sd": 0.026,
+    "positives": 132,
+    "folds_scored": 3
+   },
+   "deep": {
+    "auc": 0.606,
+    "fold_sd": 0.128,
+    "positives": 854,
+    "folds_scored": 5
+   },
+   "dirty": {
+    "auc": 0.7,
+    "fold_sd": 0.094,
+    "positives": 298,
+    "folds_scored": 4
+   },
+   "clean": {
+    "auc": 0.329,
+    "fold_sd": 0.113,
+    "positives": 507,
+    "folds_scored": 4
+   },
+   "lofi": {
+    "auc": 0.68,
+    "fold_sd": 0.101,
+    "positives": 1078,
+    "folds_scored": 5
+   },
+   "distorted": {
+    "auc": 0.801,
+    "fold_sd": 0.04,
+    "positives": 494,
+    "folds_scored": 4
+   },
+   "mellow": {
+    "auc": 0.707,
+    "fold_sd": 0.144,
+    "positives": 117,
+    "folds_scored": 3
+   },
+   "sub": {
+    "auc": 0.952,
+    "fold_sd": 0.019,
+    "positives": 707,
+    "folds_scored": 5
+   },
+   "heavy": {
+    "auc": 0.677,
+    "fold_sd": 0.109,
+    "positives": 157,
+    "folds_scored": 4
+   },
+   "light": {
+    "auc": 0.539,
+    "fold_sd": 0.198,
+    "positives": 251,
+    "folds_scored": 4
+   },
+   "metallic": {
+    "auc": 0.574,
+    "fold_sd": 0.041,
+    "positives": 454,
+    "folds_scored": 3
+   },
+   "glassy": {
+    "auc": 0.584,
+    "fold_sd": 0.089,
+    "positives": 134,
+    "folds_scored": 3
+   },
+   "tight": {
+    "auc": 0.616,
+    "fold_sd": 0.049,
+    "positives": 112,
+    "folds_scored": 4
+   },
+   "dusty": {
+    "auc": 0.687,
+    "fold_sd": 0.096,
+    "positives": 126,
+    "folds_scored": 3
+   },
+   "analog": {
+    "auc": 0.486,
+    "fold_sd": 0.108,
+    "positives": 1509,
+    "folds_scored": 4
+   },
+   "digital": {
+    "auc": 0.532,
+    "fold_sd": 0.149,
+    "positives": 175,
+    "folds_scored": 3
+   }
+  },
+  "all": {
+   "warm": {
+    "auc": 0.714,
+    "fold_sd": 0.084,
+    "positives": 191,
+    "folds_scored": 5
+   },
+   "bright": {
+    "auc": 0.679,
+    "fold_sd": 0.135,
+    "positives": 213,
+    "folds_scored": 5
+   },
+   "dark": {
+    "auc": 0.734,
+    "fold_sd": 0.105,
+    "positives": 667,
+    "folds_scored": 5
+   },
+   "soft": {
+    "auc": 0.48,
+    "fold_sd": 0.122,
+    "positives": 771,
+    "folds_scored": 5
+   },
+   "hard": {
+    "auc": 0.668,
+    "fold_sd": 0.109,
+    "positives": 1345,
+    "folds_scored": 5
+   },
+   "punchy": {
+    "auc": 0.783,
+    "fold_sd": 0.091,
+    "positives": 269,
+    "folds_scored": 5
+   },
+   "fat": {
+    "auc": 0.616,
+    "fold_sd": 0.046,
+    "positives": 333,
+    "folds_scored": 4
+   },
+   "thin": {
+    "auc": 0.589,
+    "fold_sd": 0.031,
+    "positives": 66,
+    "folds_scored": 3
+   },
+   "airy": {
+    "auc": 0.493,
+    "fold_sd": 0.084,
+    "positives": 153,
+    "folds_scored": 4
+   },
+   "wet": {
+    "auc": 0.585,
+    "fold_sd": 0.132,
+    "positives": 293,
+    "folds_scored": 4
+   },
+   "dry": {
+    "auc": 0.65,
+    "fold_sd": 0.1,
+    "positives": 462,
+    "folds_scored": 5
+   },
+   "smooth": {
+    "auc": 0.592,
+    "fold_sd": 0.104,
+    "positives": 171,
+    "folds_scored": 4
+   },
+   "deep": {
+    "auc": 0.668,
+    "fold_sd": 0.081,
+    "positives": 966,
+    "folds_scored": 5
+   },
+   "dirty": {
+    "auc": 0.667,
+    "fold_sd": 0.087,
+    "positives": 325,
+    "folds_scored": 5
+   },
+   "clean": {
+    "auc": 0.389,
+    "fold_sd": 0.152,
+    "positives": 536,
+    "folds_scored": 5
+   },
+   "lofi": {
+    "auc": 0.656,
+    "fold_sd": 0.073,
+    "positives": 1223,
+    "folds_scored": 5
+   },
+   "distorted": {
+    "auc": 0.833,
+    "fold_sd": 0.062,
+    "positives": 596,
+    "folds_scored": 5
+   },
+   "mellow": {
+    "auc": 0.784,
+    "fold_sd": 0.141,
+    "positives": 135,
+    "folds_scored": 5
+   },
+   "sub": {
+    "auc": 0.945,
+    "fold_sd": 0.025,
+    "positives": 761,
+    "folds_scored": 5
+   },
+   "heavy": {
+    "auc": 0.708,
+    "fold_sd": 0.067,
+    "positives": 170,
+    "folds_scored": 4
+   },
+   "light": {
+    "auc": 0.527,
+    "fold_sd": 0.113,
+    "positives": 281,
+    "folds_scored": 5
+   },
+   "metallic": {
+    "auc": 0.568,
+    "fold_sd": 0.079,
+    "positives": 534,
+    "folds_scored": 5
+   },
+   "glassy": {
+    "auc": 0.621,
+    "fold_sd": 0.052,
+    "positives": 160,
+    "folds_scored": 4
+   },
+   "tight": {
+    "auc": 0.629,
+    "fold_sd": 0.044,
+    "positives": 120,
+    "folds_scored": 4
+   },
+   "wide": {
+    "auc": 0.52,
+    "fold_sd": 0.137,
+    "positives": 42,
+    "folds_scored": 3
+   },
+   "dusty": {
+    "auc": 0.708,
+    "fold_sd": 0.09,
+    "positives": 146,
+    "folds_scored": 3
+   },
+   "analog": {
+    "auc": 0.704,
+    "fold_sd": 0.105,
+    "positives": 1748,
+    "folds_scored": 5
+   },
+   "digital": {
+    "auc": 0.772,
+    "fold_sd": 0.17,
+    "positives": 337,
+    "folds_scored": 5
+   }
+  }
+ },
+ "testable_words": 28,
+ "met_words": [
+  "digital",
+  "distorted",
+  "mellow",
+  "punchy",
+  "sub"
+ ],
+ "verdict": "MISS"
+}
