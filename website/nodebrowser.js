@@ -41,19 +41,11 @@
     if (c && c === cards[deck.index]) location.href = c.getAttribute('data-href');
   });
 
-  var sel = root.querySelector('.ns-select'), menu = root.querySelector('.ns-menu'), opts = root.querySelectorAll('.ns-opt'), val = root.querySelector('.ns-select-val');
-  function menuOpen(o) { menu.hidden = !o; sel.setAttribute('aria-expanded', String(o)); }
-  sel.addEventListener('click', function () { menuOpen(menu.hidden); });
-  document.addEventListener('click', function (e) { if (!e.target.closest('.ns-sel')) menuOpen(false); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') menuOpen(false); });
-  Array.prototype.forEach.call(opts, function (c) {
-    c.addEventListener('click', function () {
-      Array.prototype.forEach.call(opts, function (o) { o.setAttribute('aria-selected', o === c ? 'true' : 'false'); });
-      val.textContent = c.firstChild.textContent; menuOpen(false);
-      var f = c.getAttribute('data-fam') || '';
-      var keep = all.filter(function (a) { return !f || a.getAttribute('data-fam') === f; });
-      all.forEach(function (a) { if (keep.indexOf(a) < 0) { a.style.display = 'none'; var im = a.querySelector('img'); if (im && im.getAttribute('src')) { im.setAttribute('data-src', im.getAttribute('src')); im.removeAttribute('src'); } } });
-      cards = spin(keep); deck.refresh(false);
-    });
+  var sel = root.querySelector('.nat-pick');
+  sel.addEventListener('change', function () {
+    var f = sel.value || '';
+    var keep = all.filter(function (a) { return !f || a.getAttribute('data-fam') === f; });
+    all.forEach(function (a) { if (keep.indexOf(a) < 0) { a.style.display = 'none'; var im = a.querySelector('img'); if (im && im.getAttribute('src')) { im.setAttribute('data-src', im.getAttribute('src')); im.removeAttribute('src'); } } });
+    cards = spin(keep); deck.refresh(false);
   });
 })();
