@@ -1,7 +1,6 @@
 // Sample studio: the website's studio as a panel docked bottom or top, like the Timeline (SAMPLE-STUDIO-DESIGN.md).
-// A toolbar (generate, instrument, snap to scale, bars; play, loop, ping-pong, reverse; export, convert) over two
-// areas: on the left the blob, moving with the take; on the right the take's waveform with its start and end handles
-// and the transport's playhead. The settings inspector (pitch, fine, speed, fades, style, wild, key and scale) opens
+// A toolbar (generate, instrument, snap to scale, bars; play, loop, ping-pong, reverse; export, convert) over the
+// take's waveform with its start and end handles and the transport's playhead. The settings inspector (pitch, fine, speed, fades, style, wild, key and scale) opens
 // on the right like the Timeline's clip inspector. The take plays on the global transport through StudioLoopPlayer;
 // its play button switches audio to Studio mode, which bypasses the canvas the way Timeline audio does.
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
@@ -24,7 +23,6 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioFileWriter.h"
 #include "audio/MusicTime.h"
-#include "core/GLUtil.h"
 #include "core/Patch.h"
 #include "core/Transport.h"
 #include "nodes/GrainMolderNode.h"
@@ -82,7 +80,7 @@ namespace
       // Engine.
       bool busy = false, busyPinned = false;
       int busyCard = 0;
-      // The take as heard (main-thread copy, for the blob's bands and for export) and what was handed to the player.
+      // The take as heard (main-thread copy, for export and conversion) and what was handed to the player.
       std::vector<float> outL, outR;
       bool dirty = false;
       int dragHandle = -1; // 0 start, 1 end
@@ -437,163 +435,6 @@ namespace
          AudioEngine::Instance().StudioLoop().Restart();
       }
       LaunchRequestTogglePlay();
-   }
-
-   // ---- the blob ----
-
-   const char* const kBlobFs =
-      "#version 150\n"
-      "in vec2 vUv;\n"
-      "out vec4 fragColor;\n"
-      "uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS;\n"
-      "uniform float uL, uTone, uHarsh, uSpace, uMood; uniform vec3 uP[4], uC[4];\n"
-      "float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
-      "float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n"
-      "  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }\n"
-      "float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + 7.1; a *= 0.5; } return v; }\n"
-      "float band(float m){ float s = 0.0, w = 0.0; for (int i = 0; i < 16; i++) { float d = m * 15.0 - float(i); float k = exp(-d * d * 0.35); s += uB[i] * k; w += k; } return s / w; }\n"
-      "void main(){\n"
-      "  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / min(uRes.x, uRes.y) * 2.0;\n"
-      "  float t = uT, a = atan(p.y, p.x), r = length(p);\n"
-      "  vec2 q = vec2(fbm(p * 1.3 + t * 0.12), fbm(p * 1.3 - t * 0.1 + 4.0));\n"
-      "  float wob = (fbm(vec2(cos(a), sin(a)) * 1.4 + t * 0.18) - 0.5) * (0.26 + 0.16 * uBusy);\n"
-      "  wob += uHarsh * ((noise(vec2(a * 5.0 + t * 1.6, t * 0.9)) - 0.5) * 0.24 + 0.05 * sin(a * 21.0 + t * 5.0));\n"
-      "  vec2 n = p / max(r, 1e-4); float lean = 0.0; vec3 tint = vec3(0.0); float tw = 0.0;\n"
-      "  for (int i = 0; i < 4; i++) { float k = pow(max(dot(n, normalize(uP[i].xy + 1e-4)), 0.0), 5.0); lean += uP[i].z * k; float pw = max(uP[i].z, 0.0) * k; tint += uC[i] * pw; tw += pw; }\n"
-      "  float R = 0.62 + 0.17 * lean + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n"
-      "  float d = r - R;\n"
-      "  float soft = mix(1.0, 0.3, uHarsh) * (1.0 + 0.6 * max(uSpace, 0.0));\n"
-      "  float body = smoothstep(0.2 * soft, -0.22 * soft, d);\n"
-      "  float glow = exp(-max(d, 0.0) * mix(4.2, 1.8, uSpace * 0.5 + 0.5)) * (0.5 + 0.2 * uSpace) * smoothstep(1.0, 0.55, r) * smoothstep(1.0, 0.6, abs(p.y));\n"
-      "  float f = fbm(p * 1.1 + q * 1.6 + t * 0.07);\n"
-      "  float g = clamp(f * 1.5 + p.y * 0.35 - p.x * 0.2 + 0.25 * uE + 0.2 * uTone, 0.0, 1.0);\n"
-      "  g = mix(g, smoothstep(0.35, 0.65, fract(g * 2.5 + t * 0.15)) * 0.5 + g * 0.5, uHarsh * 0.6);\n"
-      "  vec3 A = mix(uA, vec3(1.0, 0.66, 0.3), max(uMood, 0.0) * 0.55); A = mix(A, vec3(0.45, 0.38, 0.95), max(-uMood, 0.0) * 0.6);\n"
-      "  vec3 Sg = mix(uS, vec3(0.32, 0.5, 1.0), max(-uMood, 0.0) * 0.4);\n"
-      "  vec3 hot = mix(A, mix(vec3(1.0, 0.82, 0.62), vec3(1.0, 0.3, 0.16), uHarsh), 0.55);\n"
-      "  float w = mix(0.45, 0.1, uHarsh);\n"
-      "  vec3 c = mix(Sg, A, smoothstep(0.55 - w, 0.55, g)); c = mix(c, hot, smoothstep(1.0 - w, 1.0, g));\n"
-      "  c *= mix(0.66, 1.08, uTone * 0.5 + 0.5);\n"
-      "  vec3 cl = mix(uS * 0.8, vec3(0.5, 0.32, 0.88), smoothstep(0.1, 0.55, g)); cl = mix(cl, vec3(0.9, 0.5, 0.82), smoothstep(0.55, 1.0, g));\n"
-      "  c = mix(c, cl, uL);\n"
-      "  c = mix(c, vec3(1.0), mix(0.28, 0.1, uL) * (0.6 + 0.6 * max(uTone, 0.0)) * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n"
-      "  c = mix(c, tint / max(tw, 1e-4), clamp(tw, 0.0, 1.0) * 0.6 * smoothstep(-0.45, 0.05, d));\n"
-      "  float edge = smoothstep(-0.5, 0.2, d) * body; c = mix(c, uS, edge * 0.45);\n"
-      "  float al = clamp(body * 0.94 + glow * (1.0 - body), 0.0, 1.0);\n"
-      "  vec3 col = mix(mix(mix(uS, uA, 0.5), tint / max(tw, 1e-4), clamp(tw, 0.0, 1.0) * 0.7), c, body);\n"
-      "  col += (hash(gl_FragCoord.xy + t) - 0.5) * (1.0 / 120.0 + 0.07 * uHarsh * body);\n"
-      "  fragColor = vec4(col, al);\n"
-      "}\n";
-
-   struct Blob
-   {
-      GLUtil::Fbo fbo;
-      unsigned int prog = 0;
-      bool tried = false;
-      int uRes = -1, uT = -1, uE = -1, uBusy = -1, uB = -1, uA = -1, uS = -1, uL = -1, uTone = -1, uHarsh = -1, uSpace = -1,
-          uMood = -1, uP = -1, uC = -1;
-      float t = 0.0f, busyK = 0.0f, energy = 0.0f;
-      float bands[16] = {};
-   };
-
-   Blob& B()
-   {
-      static Blob b;
-      if (!b.tried)
-      {
-         b.tried = true;
-         b.prog = GLUtil::CompileProgram(kBlobFs);
-         if (b.prog != 0)
-         {
-            const auto loc = [&](const char* n) { return glGetUniformLocation(b.prog, n); };
-            b.uRes = loc("uRes"); b.uT = loc("uT"); b.uE = loc("uE"); b.uBusy = loc("uBusy"); b.uB = loc("uB");
-            b.uA = loc("uA"); b.uS = loc("uS"); b.uL = loc("uL"); b.uTone = loc("uTone"); b.uHarsh = loc("uHarsh");
-            b.uSpace = loc("uSpace"); b.uMood = loc("uMood"); b.uP = loc("uP"); b.uC = loc("uC");
-         }
-      }
-      return b;
-   }
-
-   // Sixteen bands of the take as heard, at the playhead: a short windowed DFT at log-spaced frequencies.
-   void TakeBands(float out[16])
-   {
-      const Studio& s = S();
-      for (int i = 0; i < 16; i++)
-         out[i] = 0.0f;
-      const float phase = AudioEngine::Instance().StudioLoop().Phase();
-      const int n = (int)s.outL.size();
-      constexpr int W = 512;
-      if (phase < 0.0f || n < W)
-         return;
-      const int at = std::clamp((int)(phase * (float)n), 0, n - W);
-      for (int b = 0; b < 16; b++)
-      {
-         const double hz = 60.0 * std::pow(200.0, (double)b / 15.0); // 60 Hz .. 12 kHz
-         const double w = 6.283185307 * hz / kRate;
-         double re = 0.0, im = 0.0;
-         for (int i = 0; i < W; i++)
-         {
-            const double win = 0.5 - 0.5 * std::cos(6.283185307 * i / W);
-            const double v = 0.5 * (s.outL[(size_t)(at + i)] + s.outR[(size_t)(at + i)]) * win;
-            re += v * std::cos(w * i);
-            im -= v * std::sin(w * i);
-         }
-         out[b] = std::clamp((float)(std::sqrt(re * re + im * im) / (W * 0.25)) * 4.0f, 0.0f, 1.0f);
-      }
-   }
-
-   ImVec4 Rgb(const tok::Rgba8& c) { return ImGui::ColorConvertU32ToFloat4(tok::U32(c)); }
-
-   // The blob, filling a square: it breathes with the take's bands at the playhead and quickens while a take is made.
-   void DrawBlob(ImVec2 mn, float side)
-   {
-      Studio& s = S();
-      Blob& b = B();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-
-      // Smoothing, as the website does it.
-      float bandsNow[16];
-      TakeBands(bandsNow);
-      float sum = 0.0f;
-      for (int i = 0; i < 16; i++)
-      {
-         b.bands[i] += (bandsNow[i] - b.bands[i]) * 0.3f;
-         sum += b.bands[i];
-      }
-      b.energy += (sum / 16.0f - b.energy) * 0.2f;
-      b.busyK += ((s.busy ? 1.0f : 0.0f) - b.busyK) * 0.08f;
-      b.t += 0.016f + 0.03f * b.busyK;
-
-      const ImVec2 fbs = ImGui::GetIO().DisplayFramebufferScale;
-      const int px = std::max(8, (int)(side * fbs.x)), py = std::max(8, (int)(side * fbs.y));
-      if (b.prog == 0 || !GLUtil::EnsureFbo(b.fbo, px, py))
-         return;
-      const ImVec4 a = Rgb(tok::pal::c_F97316FF), sg = Rgb(tok::pal::c_7890E6FF);
-      const float zero[12] = {};
-      const GLboolean blendWas = glIsEnabled(GL_BLEND);
-      GLUtil::RunShaderPass(b.fbo, b.prog, [&]()
-      {
-         glDisable(GL_BLEND);
-         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-         glClear(GL_COLOR_BUFFER_BIT);
-         glUniform2f(b.uRes, (float)px, (float)py);
-         glUniform1f(b.uT, b.t);
-         glUniform1f(b.uE, b.energy);
-         glUniform1f(b.uBusy, b.busyK);
-         glUniform1fv(b.uB, 16, b.bands);
-         glUniform3f(b.uA, a.x, a.y, a.z);
-         glUniform3f(b.uS, sg.x, sg.y, sg.z);
-         glUniform1f(b.uL, CategoryColors::IsThemeLight() ? 1.0f : 0.0f);
-         glUniform1f(b.uTone, 0.0f);
-         glUniform1f(b.uHarsh, 0.0f);
-         glUniform1f(b.uSpace, 0.0f);
-         glUniform1f(b.uMood, 0.0f);
-         glUniform3fv(b.uP, 4, zero);
-         glUniform3fv(b.uC, 4, zero);
-      });
-      if (blendWas)
-         glEnable(GL_BLEND);
-      dl->AddImage((ImTextureID)(intptr_t)b.fbo.tex, mn, ImVec2(mn.x + side, mn.y + side), ImVec2(0, 1), ImVec2(1, 0));
    }
 
    // ---- the waveform ----
@@ -1075,8 +916,7 @@ namespace
       const float h = std::max(40.0f, avail.y);
       const float gap = ImGui::GetStyle().ItemSpacing.x;
       const float settingsW = s.settingsOpen ? kSettingsW + gap : 0.0f;
-      DrawBlob(origin, h);
-      DrawWave(ImVec2(origin.x + h + gap, origin.y), ImVec2(std::max(40.0f, avail.x - settingsW - h - gap), h));
+      DrawWave(origin, ImVec2(std::max(40.0f, avail.x - settingsW), h));
       if (s.settingsOpen)
       {
          ImGui::SetCursorScreenPos(ImVec2(origin.x + avail.x - kSettingsW, origin.y));
