@@ -28,7 +28,7 @@ def pairs(node):
             for y in np.flatnonzero(diff.sum(1) == 1):
                 if y > x:
                     j = int(np.flatnonzero(diff[y])[0]); dk = float(K[y, j] - K[x, j])
-                    P.append((g, j, dk, np.nan_to_num((V[ix[y]][means] - V[ix[x]][means]) / sd_)))
+                    P.append((g, j, dk, np.nan_to_num((V[ix[y]][means] - V[ix[x]][means]) / sd_), K[x].copy()))
     return P, nk
 
 def reliable(P, nk, banks, fold_of, folds, tau=0.8, eff=0.3):
@@ -39,14 +39,36 @@ def reliable(P, nk, banks, fold_of, folds, tau=0.8, eff=0.3):
     for f in range(folds):
         tr = [p for p in P if fold_of[p[0]] != f]; te = [p for p in P if fold_of[p[0]] == f]
         up = np.zeros((nk, A)); n = np.zeros((nk, A))
-        for g, j, dk, mv in tr:
+        for g, j, dk, mv, _ in tr:
             m = np.abs(mv) >= eff; up[j] += np.where(m, np.sign(mv) * np.sign(dk) > 0, 0); n[j] += m
         cons = np.where(n >= 8, np.maximum(up, n - up) / np.maximum(n, 1), 0); maj = np.where(up * 2 >= n, 1, -1)
         allcells += int((n >= 8).sum()); cells += int((cons >= tau).sum())
-        for g, j, dk, mv in te:
+        for g, j, dk, mv, _ in te:
             for a in np.flatnonzero((cons[j] >= tau) & (np.abs(mv) >= eff)):
                 tot += 1; hit += int(np.sign(dk) * maj[j, a] == np.sign(mv[a]))
     return {"tau": tau, "acc": round(hit / tot, 3) if tot else None, "scored_moves": tot, "reliable_cells_per_fold": round(cells / folds, 1), "cells_with_data": round(allcells / folds, 1)}
+
+def local(P, nk, fold_of, folds, k=24, tau=0.8, eff=0.3, need=8):
+    """The same reliable-cell test, but a knob's direction is read from the k training moves of that knob whose BASE (the other knobs)
+    is nearest the test move's base, not from all its moves: for engines whose knobs interact (what cutoff does depends on the
+    wavetable position), one slope per knob is the wrong model. Abstains where the neighbours do not agree (>= tau) or are too few."""
+    hit, tot, cov = 0, 0, 0
+    for f in range(folds):
+        tr = [p for p in P if fold_of[p[0]] != f]; te = [p for p in P if fold_of[p[0]] == f]
+        by = {}
+        for p in tr: by.setdefault(p[1], []).append(p)
+        arr = {j: (np.array([p[4] for p in ps]), np.array([np.sign(p[2]) * np.sign(p[3]) * (np.abs(p[3]) >= eff) for p in ps])) for j, ps in by.items()}
+        for g, j, dk, mv, base in te:
+            if j not in arr: continue
+            B, S = arr[j]; mask = np.ones(nk, bool); mask[j] = False
+            d = np.abs(B[:, mask] - base[mask]).sum(1); nn = np.argsort(d)[:k]; s = S[nn]
+            n = (s != 0).sum(0); up = (s > 0).sum(0)
+            ok = (n >= need) & (np.maximum(up, n - up) >= tau * np.maximum(n, 1))
+            for a in np.flatnonzero(ok & (np.abs(mv) >= eff)):
+                tot += 1; hit += int(np.sign(dk) * (1 if up[a] * 2 >= n[a] else -1) == np.sign(mv[a]))
+            cov += 1
+    return {"k": k, "tau": tau, "acc": round(hit / tot, 3) if tot else None, "scored_moves": tot}
+
 
 def run(node, folds):
     P, nk = pairs(node)
@@ -57,10 +79,10 @@ def run(node, folds):
         tr = [p for p in P if fold_of[p[0]] != f]; te = [p for p in P if fold_of[p[0]] == f]
         if not te: continue
         num = np.zeros((nk, len(P[0][3]))); den = np.zeros(nk)
-        for g, j, dk, mv in tr: num[j] += mv * dk; den[j] += dk * dk
+        for g, j, dk, mv, _ in tr: num[j] += mv * dk; den[j] += dk * dk
         S = num / np.maximum(den, 1e-9)[:, None]
         ok, gok = [], []
-        for g, j, dk, mv in te:
+        for g, j, dk, mv, _ in te:
             a = int(np.argmax(np.abs(mv)))
             if mv[a] == 0 or S[j, a] == 0: continue
             hit = np.sign(S[j, a] * dk) == np.sign(mv[a]); ok.append(hit)
@@ -68,7 +90,7 @@ def run(node, folds):
         if ok: accs.append(np.mean(ok))
         if gok: gacc.append(np.mean(gok)); gn.append(len(gok))
     rel = reliable(P, nk, banks, fold_of, folds)
-    return {"reliable": rel, "pairs": len(P), "banks": len(banks), "dominant_acc": round(float(np.mean(accs)), 3), "dominant_sd": round(float(np.std(accs)), 3),
+    return {"reliable": rel, "local": local(P, nk, fold_of, folds), "pairs": len(P), "banks": len(banks), "dominant_acc": round(float(np.mean(accs)), 3), "dominant_sd": round(float(np.std(accs)), 3),
             "gated_acc": round(float(np.mean(gacc)), 3) if gacc else None, "gated_sd": round(float(np.std(gacc)), 3) if gacc else None, "gated_moves_per_fold": int(np.mean(gn)) if gn else 0}
 
 if __name__ == "__main__":

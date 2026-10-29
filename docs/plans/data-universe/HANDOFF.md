@@ -821,3 +821,18 @@ Doubling the dot renders closed the 0.3-point miss from v2; no bar or percentile
 Reading: more pairs made more cells measurable but most Wavetable (knob, axis) cells stay inconsistent (the effect of a knob depends on the others),
 so a per-knob slope cannot reach 90% here. Next: a slope conditioned on the base (k-NN or small net over the base knobs), not more of the same renders.
 `knob_direction.py` now keeps other engines' results when run on a subset.
+
+## Wavetable knob model that uses the other knobs (2026-10-29): MISS, no model beats the plain slope
+Same data (3,842 one-knob pairs, 276 banks), same reliable-cell test (tau 0.8, eff 0.3, folds by bank):
+| Model | Held-out acc | Scored moves |
+|---|---|---|
+| One slope per knob (current) | 79.3% | 512 |
+| Nearest 24 / 48 / 96 bases (the other knobs) decide the sign | 77.5 / 78.2 / 79.3% | 276 / 496 / 512 |
+| Slope conditioned linearly on every knob (ridge 0.1-100) | 54-64% | 3,237-1,261 |
+| Curve per knob (sign of f(end) - f(start), 4 or 8 segments) | 67 / 64% | 982 / 1,480 |
+Bigger moves are no easier (eff 0.5: 80.8%, 0.8: 76.3%, 1.2: 68.4%), while Oscillator holds 90-92% at every size. So the
+misses are not interactions a model can learn from these pairs; the likeliest cause is measurement noise on Wavetable renders
+(a characteristic that differs between two renders of the same preset). Next: render 100 Wavetable presets twice (different
+note-on phase) and measure the repeatability ceiling; if the same preset disagrees with itself ~20% of the time, 90% is not
+reachable with these characteristics and the finding goes to Naman (the bar does not move without sign-off).
+`knob_direction.py` now also reports the neighbour model (`local`) per engine.
