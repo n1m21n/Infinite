@@ -27,6 +27,10 @@ REGISTRY = {
     "C5": ("understands moods and emotions", "r >= 0.8 per dimension; >= 80% in region", "P6"),
     "C6": ("is creative", "N < 0.1 at c = 0; N and R rise with c", "5, 6"),
     "C7": ("can make a sound", "closer than the nearest render on 300 targets", "6"),
+    "C8": ("understands genres", "per-genre top-3 >= 0.7 on held-out packs", "G5"),
+    "C9": ("understands chains", "direction right >= 90%; size r >= 0.7 on 200 held-out chain moves", "G6"),
+    "C10": ("learns taste", "keep rate >= 75% by click 20 (local data only)", "G7"),
+    "C11": ("nothing is lost", "variance-weighted R2 of the embedding from the axes rises each round (no pass bar)", "G9"),
 }
 
 

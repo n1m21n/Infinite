@@ -606,3 +606,18 @@ Corpus register by instrument family (first 120k files, range midpoint, p5/p50/p
 Each Note Sequencer layer (55 across the 32 style patches) against its own family's 5th-95th range, corpus first 150k files: layers with midpoint < 48 count as bass (corpus bass 31.5-56), the rest as melodic (corpus 46.5-79).
 - Bass layers inside the bass range: **26 of 48**. Melodic layers inside: **7 of 7**. Overall **60.0%** (bar 90%). **MISS.**
 - The misses are all on the low side: bass layers whose range midpoint sits under 31.5 (sub-bass, below the corpus bass 5th percentile). Cause: `styled.py` / SampleStyles place sequencer bass at octave 2 with a narrow span. Fix candidate: lift the bass octave in the style cards where the card allows it; it ships only if it wins the blind test against the unchanged live node (goal item 7).
+
+## 2026-10-29 Claims ledger C1-C11 (goal item 8). Verdict = what the evidence in this file shows today; "not run" counts as FAIL until measured.
+| Claim | Bar | Evidence | Verdict |
+|---|---|---|---|
+| C1 axes understood | R2 per axis mean >= 0.6, group split | median head R2 0.082-0.200 (group), best axes attack 0.44, density 0.23 | **FAIL** |
+| C2 ingredients | direction >= 90%, size r >= 0.7 | Analog 63.5% / r 0.635; Oscillator 61.8%; reliable cells 89.5% Analog | **FAIL** |
+| C3 good sound | AUC >= 0.8; owner >= 30/40 | AUC 0.924 PASS; owner 24/40 | **FAIL** (owner half) |
+| C4 words | AUC >= 0.75 per word; >= 70% of 50 | not run | **FAIL (not run)** |
+| C5 moods | r >= 0.8 per dim; >= 80% in region | E r 0.816-0.844 PASS; V r 0.508-0.547; clips unscored (round 1 invalid) | **FAIL** (V) |
+| C6 creative | N < 0.1 at c = 0; N, R rise with c | Oscillator base N 0.883 (needs generator) | **FAIL (not run)** |
+| C7 can make | nearer than nearest render on 300 targets | not run | **FAIL (not run)** |
+| C8 genres | top-3 >= 0.7 | sample axes at chance 0.274 vs 0.273; drum grooves carry some genre | **FAIL** |
+| C9 chains | direction >= 90%, size r >= 0.7 | chain track not measured | **FAIL (not run)** |
+| C10 taste | keep >= 75% by click 20 | simulated personas only (B6 75.2%); no real user data | **FAIL (not run on people)** |
+| C11 nothing lost | R2 rises each round | 0.523 (Analog, 2,000 rows) | reported, no bar |
