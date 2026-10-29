@@ -68,6 +68,7 @@ namespace
 
 #include "app/graph/GenerateSamplesTables.inc"
 #include "app/graph/GenerateSamplesCritic.inc"
+#include "app/graph/GenerateSamplesGrooves.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -289,7 +290,10 @@ namespace
                if (ps.count(k) || (type == "Wavetable" && !strcmp(k, "a.resonance")))
                   ps[k] = { 'f', Num(std::clamp((ps.count(k) ? std::stod(ps[k].second) : 0.0) + 0.45 * t, 0.0, 0.85)) };
             if (type == "Wavetable")
-               ps["a.detune"] = { 'f', Num(std::clamp((ps.count("a.detune") ? std::stod(ps["a.detune"].second) : 0.0) + 14.0 * t, 0.0, 40.0)) };
+            {
+               const double d = ps.count("a.detune") ? std::stod(ps["a.detune"].second) : 0.0;
+               ps["a.detune"] = { 'f', Num(std::clamp(d + 14.0 * t, 0.0, std::max(40.0, d))) };
+            }
          }
          if (synth && tail != 1.0)
          {
@@ -2007,21 +2011,175 @@ Compiled Compile(const Recipe& recipe)
          force["lane4_volume"] = { 'f', "0" };
          synthDrums.push_back({ 4, bursts, -4.0f });
       }
-      if ((*lanes[5] || *lanes[6]) && dr.Uniform() < (part == Part::Toms ? 1.0 : subPart ? 0.75 : 0.33))
+      // A struck head (owner's review, 2026-10-29: toms "sound like bass"; Farnell's Designing Sound and the membrane
+      // modes): a body that drops in pitch as the head relaxes, the head's second mode about 1.59 times higher and
+      // shorter, and the stick's noise on the front. Short and bright enough that it never rings as a bass note.
+      auto headVoice = [&](double dropSemis, double dropMs, double decMs, double modeVol, double brightness)
       {
-         const bool perc = part == Part::Percussion; // percussion keeps its brighter toms
-         const int notes[2] = { perc ? 40 + dr.Range(8) : 37 + dr.Range(8), perc ? 52 + dr.Range(8) : 47 + dr.Range(8) }; // toms: floor 75-140 Hz, rack 125-230 Hz
+         Params k;
+         CleanWavetable(k);
+         k["volume"] = { 'f', "0.9" };
+         k["mix"] = { 'f', "0.4" };
+         Engine(k, 'a', 0, kSine, 1, 0.0, 0, 1.0);
+         Engine(k, 'b', 0, kSine, 1, 0.0, 0, modeVol);
+         k["b.semi"] = { 'i', "8" };
+         k["b.fine"] = { 'f', "4" };
+         for (char e : { 'a', 'b' })
+         {
+            const std::string p = std::string(1, e) + ".";
+            k[p + "pitchAmount"] = { 'f', Num(std::round(dropSemis * 100.0) / 100.0) };
+            k[p + "pitchDecay"] = { 'f', Num(std::round(dropMs)) };
+            EngineFilter(k, e, 1, brightness, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            EngineAmp(k, e, 0.0, e == 'a' ? decMs : decMs * 0.45, 0.0, 30.0);
+         }
+         return g.Add("Wavetable", dr.Range(1 << 30), k);
+      };
+      if (part != Part::Percussion && (*lanes[5] || *lanes[6]) && dr.Uniform() < (part == Part::Toms ? 1.0 : subPart ? 0.75 : 0.33))
+      {
+         // Floor 98-130 Hz, rack 165-233 Hz: tom pitch, an octave above where a bass plays.
+         const int notes[2] = { 43 + dr.Range(6), 52 + dr.Range(7) };
          for (int ti = 0; ti < 2; ti++)
          {
             if (!*lanes[5 + ti])
                continue;
             int sq = 0;
             drumSeq(5 + ti, notes[ti], 70.0, sq);
-            const int tm = toneVoice(perc ? dr.Uniform(8.0, 22.0) : dr.Uniform(4.0, 9.0), perc ? dr.Uniform(40.0, 110.0) : dr.Uniform(35.0, 80.0),
-                                   perc ? dr.Uniform(180.0, 460.0) : dr.Uniform(300.0, 600.0), perc && dr.Range(3) == 0 ? 10 : 0, perc ? 9000.0 : 1500.0);
+            const int tm = headVoice(dr.Uniform(3.0, 7.0), dr.Uniform(60.0, 140.0), ti == 0 ? dr.Uniform(220.0, 380.0) : dr.Uniform(160.0, 300.0),
+                                     dr.Uniform(0.25, 0.45), dr.Uniform(5000.0, 9000.0));
             g.Connect(sq, tm, true);
+            const int st2 = noiseVoice(8, dr.Uniform(2500.0, 5000.0), 0.2, dr.Uniform(8.0, 18.0), 0.8); // the stick
+            g.Connect(sq, st2, true);
             force["lane" + std::to_string(5 + ti) + "_volume"] = { 'f', "0" };
-            synthDrums.push_back({ 5 + ti, tm, -5.0f });
+            synthDrums.push_back({ 5 + ti, tm, -4.0f });
+            synthDrums.push_back({ 5 + ti, st2, -14.0f });
+          }
+      }
+      if (part == Part::Percussion)
+      {
+         // Percussion is hand drums, shakers and struck wood or metal playing interlocking figures (MusicRadar's clave,
+         // shaker and percussion guides; Production Expert): one drum pair, one continuous shaker or tambourine, one
+         // accent instrument, each with its own pattern. All synthesised; the kit's samples are left silent.
+         Rng pe(std::string("perc-ens:") + std::to_string(recipe.seed));
+         for (int i = 4; i < 8; i++)
+            force["lane" + std::to_string(i) + "_volume"] = { 'f', "0" };
+         const std::string fam = st.family;
+         const bool four = fam == "house" || fam == "techno" || fam == "trance" || fam == "hard";
+         auto patSeq = [&](const std::string& pat, int note, double gate)
+         {
+            Params p = F({ { "rateBeats", 0.25 }, { "gatePercent", gate } });
+            p["steps"] = { 'i', "16" };
+            p["rateMode"] = { 'i', "0" };
+            for (int k = 0; k < 16; k++)
+            {
+               const char c = pat[(size_t)k];
+               const double v = c == 'x' ? pe.Uniform(0.85, 1.0) : c == 'o' ? pe.Uniform(0.35, 0.55) : 0.0;
+               p["note" + std::to_string(k)] = { 'i', std::to_string(note) };
+               p["en" + std::to_string(k)] = { 'b', v > 0.0 ? "1" : "0" };
+               p["vel" + std::to_string(k)] = { 'f', Num(std::round(v * 100.0) / 100.0) };
+            }
+            return g.Add("Note Sequencer", pe.Range(1 << 30), p);
+         };
+         auto place = [&](int node, float gain, double pan)
+         {
+            if (std::abs(pan) > 0.01)
+            {
+               const int pn = g.Add("Mixer", pe.Range(1 << 30), F({ { "pan0", pan } }));
+               g.Connect(node, pn, false);
+               node = pn;
+            }
+            chans.push_back({ node, gain });
+         };
+         // 1. Hand drums: congas (low tone + high slap) or bongos (macho + hembra), tumbao- or martillo-like figures.
+         {
+            static const char* kDrumPat[][2] = {
+               { "......x.....x.x.", "....x.......x..." }, // tumbao: open tones on the and of 2 and on 4, slaps on 2 and 4
+               { "x.....x.x.....x.", "..x.x.....x.x..." },
+               { "x..x..x...x.....", "....x.o.....x.o." },
+               { "xooo.ooox.oo.ooo", "....x.......x..." }, // martillo: steady strokes, the open note on the beat
+               { "x.....x...x.....", "...x..x....x..x." },
+            };
+            const bool bongo = pe.Uniform() < 0.35;
+            const int pk = pe.Range(5);
+            const int low = bongo ? 64 + pe.Range(4) : 52 + pe.Range(5), high = low + (bongo ? 5 : 7);
+            for (int d = 0; d < 2; d++)
+            {
+               const int sq = patSeq(kDrumPat[pk][d], d == 0 ? low : high, 60.0);
+               const int hv = headVoice(pe.Uniform(1.5, 3.5), pe.Uniform(15.0, 35.0), bongo ? pe.Uniform(90.0, 160.0) : pe.Uniform(140.0, 260.0),
+                                        pe.Uniform(0.35, 0.6), 12000.0);
+               g.Connect(sq, hv, true);
+               const int slap = noiseVoice(8, pe.Uniform(3000.0, 6000.0), 0.3, pe.Uniform(6.0, 14.0), 0.8);
+               g.Connect(sq, slap, true);
+               place(hv, -5.0f, d == 0 ? -0.35 : 0.35);
+               place(slap, -16.0f, d == 0 ? -0.35 : 0.35);
+            }
+         }
+         // 2. A shaker (soft attack, high hiss) or a tambourine (hiss plus jingles), on 16ths or offbeats.
+         {
+            static const char* kShake[] = { "xoxoxoxoxoxoxoxo", "oxoxoxoxoxoxoxox", "x.o.x.o.x.o.x.o.", "..x...x...x...x.", "xoox xoox xoox xoox" };
+            std::string pat = four ? kShake[pe.Range(2) ? 3 : 1] : kShake[pe.Range(4)];
+            pat.erase(std::remove(pat.begin(), pat.end(), ' '), pat.end());
+            pat.resize(16, '.');
+            const int sq = patSeq(pat, 84, 30.0);
+            const bool tamb = pe.Uniform() < 0.35;
+            Params nn = F({ { "volume", 0.8 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", pe.Uniform(4.0, 12.0) },
+                            { "decay", tamb ? pe.Uniform(80.0, 140.0) : pe.Uniform(35.0, 70.0) }, { "sustain", 0.0 }, { "release", 30.0 },
+                            { "cutoff", pe.Uniform(6000.0, 9000.0) }, { "resonance", 0.2 }, { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            nn["filterType"] = { 'i', "8" };
+            const int sh = g.Add("Analog", pe.Range(1 << 30), nn);
+            g.Connect(sq, sh, true);
+            place(sh, tamb ? -11.0f : -9.0f, pe.Uniform(-0.5, 0.5));
+            if (tamb)
+            {
+               Params h = F({ { "transient", 1.0 }, { "decay", pe.Uniform(0.08, 0.14) }, { "stiffness", 1.6 }, { "filterCutoff", 12000.0 },
+                              { "filterResonance", 0.1 }, { "volume", 0.7 }, { "width", 0.6 } });
+               h["material"] = { 'i', "2" };
+               const int jg = g.Add("Metallic", pe.Range(1 << 30), h);
+               g.Connect(sq, jg, true);
+               place(jg, -17.0f, 0.3);
+            }
+         }
+         // 3. An accent: clave (son or rumba), cowbell, woodblock or rim, the figure the others lock to.
+         {
+            static const char* kAccent[] = { "x..x..x...x.x...", "x..x...x..x.x...", "x..x..x...x..x..", "x.x.x.xx.x.x.xx.", "..x..x..x...x...", "...x..x....x..x." };
+            const int kind = pe.Range(4); // 0 clave, 1 cowbell, 2 woodblock, 3 rim
+            const std::string pat = kAccent[four ? 4 + pe.Range(2) : kind == 1 ? 3 : pe.Range(3)];
+            Params k;
+            CleanWavetable(k);
+            k["volume"] = { 'f', "0.9" };
+            int note = 96;
+            double dec = 40.0;
+            if (kind == 1) // the 808 cowbell: two squares a fifth apart, band-limited, ringing a little
+            {
+               Engine(k, 'a', 0, kSquare, 1, 0.0, 0, 1.0);
+               Engine(k, 'b', 0, kSquare, 1, 0.0, 0, 0.8);
+               k["b.semi"] = { 'i', "7" };
+               k["mix"] = { 'f', "0.5" };
+               note = 72 + pe.Range(3), dec = pe.Uniform(150.0, 280.0);
+            }
+            else
+            {
+               Engine(k, 'a', 0, kind == 3 ? 0.333 : kSine, 1, 0.0, 0, 1.0);
+               k["mix"] = { 'f', "0" };
+               note = kind == 0 ? 98 + pe.Range(3) : kind == 2 ? 84 + pe.Range(5) : 76 + pe.Range(4);
+               dec = kind == 0 ? pe.Uniform(25.0, 45.0) : kind == 2 ? pe.Uniform(35.0, 70.0) : pe.Uniform(15.0, 30.0);
+               k["a.pitchAmount"] = { 'f', Num(kind == 2 ? 2.0 : 1.0) };
+               k["a.pitchDecay"] = { 'f', "8" };
+            }
+            for (char e : { 'a', 'b' })
+            {
+               EngineFilter(k, e, kind == 1 ? 7 : 0, kind == 1 ? 2600.0 : 12000.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0);
+               EngineAmp(k, e, 0.0, dec, 0.0, 20.0);
+            }
+            const int sq = patSeq(pat, note, 30.0);
+            const int ac = g.Add("Wavetable", pe.Range(1 << 30), k);
+            g.Connect(sq, ac, true);
+            place(ac, kind == 1 ? -10.0f : -8.0f, pe.Uniform(-0.3, 0.3));
+            if (kind == 3) // the rim's crack
+            {
+               const int ck = noiseVoice(8, 3500.0, 0.3, 10.0, 0.8);
+               g.Connect(sq, ck, true);
+               place(ck, -12.0f, 0.0);
+            }
          }
       }
       drums = g.Add("Drum Sequencer", seed(), force);
@@ -2057,10 +2215,12 @@ Compiled Compile(const Recipe& recipe)
       const std::string picked = pickVoice(st.synth);
       if (!picked.empty())
       {
-         const int sy = g.Add(picked, seed());
+         // A designed bass from its own stream (the card's pick is still drawn, so the parts after it keep their draws).
+         Rng dv(std::string("voice:bass:") + std::to_string(recipe.seed));
+         const int sy = g.Add("Wavetable", seed(), DesignVoice(dv.Uniform() < 0.7 ? Voice::SynthBass : Voice::ReeseBass, dv));
          g.Connect(sq, sy, true);
          const int fxChoices[] = { 0, 1, 1, 2 };
-         int end = chain(sy, fxChoices[rng.Range(4)]);
+         int end = chain(sy, fxChoices[rng.Range(4)], true);
          if (wantBass && (is808Kick || st.sidechain) && drums != 0)
          {
             // Kick-Bass frequency slotting: duck the bass under an 808 sub or sidechain kick so 30-90 Hz stays clean.
@@ -2885,6 +3045,15 @@ Compiled Compile(const Recipe& recipe)
                leadSeq.push_back({ d, on });
             }
             ProposeMotif(criticRng, st, mine, root, out.scale, leadSeq, melNov);
+            // Call and response: the second half opens like the first and then lands somewhere new, on the root or fifth.
+            for (int i = 8; i < 13; i++)
+               leadSeq[(size_t)i] = leadSeq[(size_t)i - 8];
+            for (int i = 15; i >= 13; i--)
+               if (leadSeq[(size_t)i].second || i == 13)
+               {
+                  leadSeq[(size_t)i] = { sp.Uniform() < 0.6 ? 0 : 4, true };
+                  break;
+               }
             // A named mood leans the line onto the chord: the beats land on root, third or fifth and the
             // line opens on the third, the note that says major or minor.
             if (g.Quadrant() != Graph::kNoQuad)
@@ -2909,7 +3078,7 @@ Compiled Compile(const Recipe& recipe)
                if (leadSeq[(size_t)i].second)
                {
                   vel[(size_t)i] = std::clamp((i % 4 == 0 ? dir.velMean + 0.15 : dir.velMean) + sp.Uniform(-dir.velSpread, dir.velSpread), 0.3, 1.0);
-                  note[(size_t)i] = degreeNote(leadSeq[(size_t)i].first, 2);
+                  note[(size_t)i] = degreeNote(leadSeq[(size_t)i].first, 3);
                }
             const double leadRate = sp.Uniform() < 0.3 || recipe.energy < -0.35f ? 0.5 : 0.25;
             const double leadGate = sp.Uniform(60.0, 100.0) * (recipe.energy > 0.35f ? 0.7 : 1.0);
