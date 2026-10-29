@@ -31,7 +31,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 
 BUILD_DIR="build"
-BIN="$BUILD_DIR/Infinite.app/Contents/MacOS/Infinite"
+# INFINITE_BIN runs another binary (a dev build in build-dev), as scripts/sweep_runner.sh does.
+BIN="${INFINITE_BIN:-$BUILD_DIR/Infinite.app/Contents/MacOS/Infinite}"
 SKIP_BUILD=0
 for arg in "$@"; do
   case "$arg" in

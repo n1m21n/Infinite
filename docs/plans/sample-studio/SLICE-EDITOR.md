@@ -322,3 +322,16 @@ help tables (stage 7). Windows and Linux: the only new platform-facing piece is 
 1. **Scope:** phases 1-6 as listed, with free warp markers and live per-slice modulation left for later. Or cut it to phases 1-4 first
    (zoom, drop, slices, every per-slice setting except stretch) and decide the rest after using it.
 2. **Keys (§4.7):** `Cmd+E` split, `Q` audition, `M`/`S`/`R`, and the Studio's own undo, all only while hovering the Studio.
+
+## 12. What the build does differently (2026-10-29)
+
+Built: phases 1-6 in one pass, with these gaps against §4-§8.
+
+| Spec | Built | Why / next |
+|---|---|---|
+| `.slices` sidecar files (§4.6) | Not built. The slice set saves only inside the patch's `studio` section. | The patch section covers "reopen my edit". A sidecar is a small follow-up on `SliceSet::Serialize()`. |
+| Slices to a note clip (§4.6) | Not built. | Needs the Timeline clip API; its own step. |
+| Choke carried to the Slicer (§4.4) | The choke field is edited and saved in the Studio, but the Slicer has no choke groups, so Convert drops it. | Choke groups in the Slicer are a Slicer change (new param), so they wait for the owner's yes. |
+| Drop from the in-app Samples browser (§4.2) | Not built. Drops from Finder work. | The browser's drag payload is not wired to the Studio rect yet. |
+| Shaper and compressor share the Dynamics node's DSP core (§8) | They live in `SliceRender.cpp`. | Moving the cores out of `TransientShaperKernel` / `DynamicsKernel` touches shipping nodes; kept for a separate refactor. |
+| "Replace the slices?" (§4.3) | An in-panel `DialogParts` modal, not a platform dialog. | There is no platform confirm call; the modal matches the Arrange overwrite prompt. |
