@@ -442,6 +442,8 @@ bool gHeadlessNeedProbe = false;
    bool  gModMatrixOpen = false;
    bool  gHistoryOpen = false;
    float gHistoryWidth = 300.0f;
+   bool  gSampleStudioOpen = false;
+   float gSampleStudioWidth = 360.0f;
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top

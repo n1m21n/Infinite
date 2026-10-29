@@ -46,8 +46,12 @@ public:
    State GetState() const;
    float Progress() const;
 
-   // Starts a render of the current settings (cancelling one in flight).
-   void Generate();
+   // Starts a render of the current settings (cancelling one in flight). Pinned: the seed is the one a take already
+   // landed on (a dot move in the Sample studio), so there is no redraw to another seed and only silent or broken audio
+   // is refused, as the website studio's shaped renders do.
+   void Generate(bool pinned = false);
+   // Takes a finished render (CookIfNeeded calls it; the Sample studio's private node, which is never cooked, calls it itself).
+   void Poll();
    void Cancel();
    // Writes the loop to a wav in the recordings folder and switches this node
    // to it. False with nothing generated or when the write fails.
@@ -69,6 +73,11 @@ public:
    bool followTransport = false; // "follow tempo": the transport's tempo, else the card's own (name kept for saved patches)
    bool followScale = false;     // "follow scale": the transport's key and scale, else the card's own
    int part = (int)SampleStyles::Part::Synths; // SampleStyles::Part: synths, pads, plucks, percussion or drums
+   // The Sample studio's dots (SampleStyles::Recipe), each -1..1; 0 is the sample as it always was. No control on the node.
+   float tone = 0.0f, energy = 0.0f, space = 0.0f, mood = 0.0f;
+   // A take brought over from the Sample studio: its seed is the one it landed on, so every render of it is pinned (no
+   // redraw to another seed). The node's own generate button clears it.
+   bool keepSeed = false;
 
    static constexpr int kGeneratorVersion = 1;
    // Last generate's resolved tempo and key, for the status line.
@@ -78,13 +87,20 @@ public:
    // "synths 1204, a natural minor": what the sample is, for its
    // name and a kept file's.
    std::string MadeLabel() const;
+   // The take as made: its recipe with the seed it landed on (after any redraws), and that loop at -14 LUFS.
+   SampleStyles::Recipe MadeRecipe() const;
+   const std::vector<float>& LoopL() const { return mLoopL; }
+   const std::vector<float>& LoopR() const { return mLoopR; }
+   static constexpr double kLoopRate = 48000.0;
    static std::string Label(const SampleStyles::Recipe& r, int root, int scale);
 
    // The step every made loop goes through: false when it is silent,
    // non-finite, flat or off its part's spectral gate (redraw it), else
    // `out` is it at -14 LUFS under a -1 dBTP ceiling. Shared with the
    // website pool batch. `part` is a SampleStyles::Part index.
-   static bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR);
+   // lenient (pinned renders): only silence or broken audio is refused, never a timbre the gate would redraw.
+   static bool Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR,
+                      bool lenient = false);
    // Frames of the pre-roll a loop of `bars` renders first and drops.
    static int PrerollBars(int bars) { return bars == 1 ? 1 : 2; }
 
@@ -96,6 +112,7 @@ private:
 
    std::unique_ptr<Job> mJob;
    SampleStyles::Recipe mMade; // what the current buffer was made from
+   int mMadeAttempt = 0;       // the redraw it landed on (its seed is mMade.seed + attempt * 7919)
    bool mHasSample = false;
    bool mFailed = false;
    bool mGenerated = false;   // saved: a sample existed, so reopening renders it again

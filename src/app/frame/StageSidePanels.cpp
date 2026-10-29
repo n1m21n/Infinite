@@ -403,6 +403,12 @@ void DrawSidePanels(FrameCtx& fc)
          DrawHistoryDocked("##historypanel_right", ImVec2(gHistoryWidth, graphHeight));
       }
 
+      // Right-docked Sample studio (View > Sample Studio or Shift+W)
+      if (gSampleStudioOpen)
+      {
+         DrawSampleStudioDocked("##samplestudio_right", ImVec2(gSampleStudioWidth, graphHeight));
+      }
+
       // ---- node browser / search panel ----
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)

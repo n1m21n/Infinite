@@ -624,6 +624,7 @@ namespace app
          { I18N_KEY("Canvas & View"), I18N_KEY("Viewport Panel"), "Shift+V", I18N_KEY("Toggle viewport panel (or dock selected nodes)") },
          { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
+         { I18N_KEY("Canvas & View"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample studio: generate, shape and export a loop") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },

@@ -354,6 +354,11 @@ void DrawLayout(FrameCtx& fc)
          gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));
          rightReserved += gHistoryWidth;
       }
+      if (gSampleStudioOpen)
+      {
+         gSampleStudioWidth = std::min(gSampleStudioWidth, std::max(300.0f, ImGui::GetContentRegionAvail().x * 0.5f));
+         rightReserved += gSampleStudioWidth;
+      }
       const float graphWidth = rightReserved > 0.0f
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;

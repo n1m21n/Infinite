@@ -521,6 +521,7 @@ set(COMMON_SOURCES
     src/app/panels/NoticeStack.cpp
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
+    src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp

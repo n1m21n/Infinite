@@ -177,6 +177,10 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_U, false))
          gHistoryOpen = !gHistoryOpen;
 
+      // Shift+W: the docked Sample studio (plain W pans the canvas)
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
+         gSampleStudioOpen = !gSampleStudioOpen;
+
       // Shift+Y: fit view to content, replacing the old menu-only entry
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_Y, false))
          gRequestFitView = true;

@@ -38,6 +38,7 @@ struct GenerateSamplesNode::Job
 {
    SampleStyles::Recipe recipe; // as asked; attempts move only the seed
    int attempt = 0;
+   bool pinned = false; // one attempt, lenient gate
    int barFrames = 0;
    int prerollBars = 0;
    std::unique_ptr<app::OfflineGraph> graph;
@@ -83,6 +84,10 @@ SampleStyles::Recipe GenerateSamplesNode::CurrentRecipe() const
    }
    r.part = (SampleStyles::Part)std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
    r.personal = true;
+   r.tone = tone;
+   r.energy = energy;
+   r.space = space;
+   r.mood = mood;
    return r;
 }
 
@@ -97,7 +102,8 @@ GenerateSamplesNode::State GenerateSamplesNode::GetState() const
    const SampleStyles::Recipe r = CurrentRecipe();
    const bool same = r.style == mMade.style && r.seed == mMade.seed && std::fabs(r.variation - mMade.variation) < 1e-4f &&
                      r.bars == mMade.bars && std::fabs(r.bpm - mMade.bpm) < 0.01f && r.key == mMade.key &&
-                     r.scale == mMade.scale && r.part == mMade.part;
+                     r.scale == mMade.scale && r.part == mMade.part && r.tone == mMade.tone &&
+                     r.energy == mMade.energy && r.space == mMade.space && r.mood == mMade.mood;
    return same ? State::Ready : State::Stale;
 }
 
@@ -109,6 +115,7 @@ float GenerateSamplesNode::Progress() const
 void GenerateSamplesNode::RollSeed()
 {
    std::random_device rd;
+   keepSeed = false;
    seed = (int)(rd() % 100000u); // hidden: only so a reopened patch renders the same loop
    // The card is drawn once, here, so a reopened patch keeps its style however taste has moved since.
    card = UserStyle::DrawCard(std::clamp(part, 0, (int)SampleStyles::Part::Count - 1), (double)(rd() % 1000000u) / 1000000.0, SampleStyles::Count());
@@ -120,12 +127,13 @@ void GenerateSamplesNode::Cancel()
    mJob.reset(); // cancels and joins
 }
 
-void GenerateSamplesNode::Generate()
+void GenerateSamplesNode::Generate(bool pinned)
 {
    Cancel();
    mFailed = false;
    mJob = std::make_unique<Job>();
    mJob->recipe = CurrentRecipe();
+   mJob->pinned = pinned || keepSeed;
    if (!StartAttempt(0))
    {
       mJob.reset();
@@ -187,16 +195,16 @@ void GenerateSamplesNode::Finish()
    }
    const int from = job.barFrames * job.prerollBars;
    const int frames = job.barFrames * job.recipe.bars;
-   if (!Master((int)job.recipe.part, job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR))
+   if (!Master((int)job.recipe.part, job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR, job.pinned))
    {
-      if (job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
+      if (!job.pinned && job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
          return;
       mJob.reset();
       mFailed = true;
       return;
    }
    // The role critic: a part that does not sound like the part asked for is redrawn (the last attempt is kept).
-   if (job.attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(job.recipe.part), mLoopL.data(), mLoopR.data(), frames, kRate) &&
+   if (!job.pinned && job.attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(job.recipe.part), mLoopL.data(), mLoopR.data(), frames, kRate) &&
        StartAttempt(job.attempt + 1))
       return;
    auto* buf = new Platform::SampleBuffer();
@@ -211,8 +219,10 @@ void GenerateSamplesNode::Finish()
    }
 
    const SampleStyles::Recipe made = job.recipe;
+   const int attempt = job.attempt;
    mJob.reset();
    mMade = made;
+   mMadeAttempt = attempt;
    FinishBuffer(buf, MadeLabel(), "", "generated");
    if (mRestoreRange)
    {
@@ -226,7 +236,8 @@ void GenerateSamplesNode::Finish()
    mGenVersion = kGeneratorVersion;
 }
 
-bool GenerateSamplesNode::Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR)
+bool GenerateSamplesNode::Master(int part, const float* l, const float* r, int frames, std::vector<float>& outL, std::vector<float>& outR,
+                                 bool lenient)
 {
    AudioSummary::Analyzer an(kRate);
    an.Push(l, r, frames);
@@ -236,7 +247,7 @@ bool GenerateSamplesNode::Master(int part, const float* l, const float* r, int f
    const bool silent = !(s.integratedLufs > kSilentLufs); // NaN for silence
    const bool flat = rms > 0.0 && s.samplePeak / rms < 1.2; // DC or a stuck square, not music
    const bool specOk = SampleCriticData::VerifyAudioSpectrum(part, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
-   if (!finite || silent || flat || !specOk)
+   if (!finite || silent || (!lenient && (flat || !specOk)))
       return false;
    // -14 LUFS, then held under a -1 dBTP ceiling.
    double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
@@ -264,6 +275,13 @@ std::string GenerateSamplesNode::Label(const SampleStyles::Recipe& r, int root, 
        r.part != P::Snares && r.part != P::Hats && r.part != P::Toms)
       s += std::string(", ") + kRoots[((root % 12) + 12) % 12] + " " + MusicTime::ScaleTable(scale).name;
    return s;
+}
+
+SampleStyles::Recipe GenerateSamplesNode::MadeRecipe() const
+{
+   SampleStyles::Recipe r = mMade;
+   r.seed += (uint32_t)mMadeAttempt * 7919u;
+   return r;
 }
 
 std::string GenerateSamplesNode::MadeLabel() const
@@ -298,8 +316,7 @@ void GenerateSamplesNode::CookIfNeeded(int frameId)
 {
    SamplerNode::CookIfNeeded(frameId);
    UserStyle::SettleTaste();
-   if (mJob && mJob->done.load(std::memory_order_acquire))
-      Finish();
+   Poll();
    // A kept file reloaded from a patch: it is the sample, made from the saved recipe.
    if (!mHasSample && !mJob && !mFilePath.empty())
    {
@@ -318,6 +335,12 @@ void GenerateSamplesNode::CookIfNeeded(int frameId)
    }
 }
 
+void GenerateSamplesNode::Poll()
+{
+   if (mJob && mJob->done.load(std::memory_order_acquire))
+      Finish();
+}
+
 void GenerateSamplesNode::VisitParams(ParamVisitor& v)
 {
    SamplerNode::VisitParams(v);
@@ -328,10 +351,19 @@ void GenerateSamplesNode::VisitParams(ParamVisitor& v)
    v.Bool("followTransport", followTransport);
    v.Bool("followScale", followScale);
    v.Int("part", part);
+   v.Float("tone", tone);
+   v.Float("energy", energy);
+   v.Float("space", space);
+   v.Float("mood", mood);
+   v.Bool("keepSeed", keepSeed);
    v.Bool("generated", mGenerated);
    v.Int("genVersion", mGenVersion); // not a control: the generator that made the saved sample
    seed = std::clamp(seed, 0, 99999);
    variation = std::clamp(variation, 0.0f, 1.0f);
    bars = SnapBars(bars);
    part = std::clamp(part, 0, (int)SampleStyles::Part::Count - 1);
+   tone = std::clamp(tone, -1.0f, 1.0f);
+   energy = std::clamp(energy, -1.0f, 1.0f);
+   space = std::clamp(space, -1.0f, 1.0f);
+   mood = std::clamp(mood, -1.0f, 1.0f);
 }

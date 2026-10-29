@@ -5713,6 +5713,10 @@ void JumpInHistory(int undos, int redos);
 extern bool gHistoryOpen;
 extern float gHistoryWidth;
 void DrawHistoryDocked(const char* id, const ImVec2& size);
+// Sample studio (Shift+W): generate, shape, trim and export a loop; docked right.
+extern bool gSampleStudioOpen;
+extern float gSampleStudioWidth;
+void DrawSampleStudioDocked(const char* id, const ImVec2& size);
 
 extern Patch::Data gDragStartSnapshot;
 

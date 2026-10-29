@@ -48,6 +48,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railHistory", groupTop + 6.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
+   if (PanelRail::Item("##railStudio", groupTop + 7.0f * step, IconsInfinite::FamilySynths, nullptr, gSampleStudioOpen,
+                       T("Sample studio - generate and shape a loop (Shift+W)")))
+      gSampleStudioOpen = !gSampleStudioOpen;
    PanelRail::End();
 }
 
@@ -405,6 +408,8 @@ void DrawMenuBar(FrameCtx& fc)
                }
                ImGui::EndMenu();
             }
+
+            MenuParts::Check(L("Sample Studio"), &gSampleStudioOpen);
 
             if (MenuParts::SubMenu(L("Show Set")))
             {

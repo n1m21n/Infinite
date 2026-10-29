@@ -12,7 +12,7 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Button | 4 | 5 | 6 | 6 | 18 | · | 2 | 48 | 5 | · | 22 | · | · | **116** |
 | Toggle (bypass/eye/viewport/scale) | · | 4 | · | · | · | · | 5 | · | · | · | · | · | 1 | **10** |
 | Checkbox | · | 2 | · | · | · | · | 1 | 140 | · | · | · | · | · | **143** |
-| Dropdown | 1 | · | 1 | 2 | 3 | 1 | · | 177 | 1 | · | 2 | 14 | · | **202** |
+| Dropdown | 1 | · | 1 | 2 | 3 | 2 | · | 177 | 1 | · | 2 | 16 | · | **205** |
 | Knob | · | 7 | 2 | · | 2 | · | 4 | 357 | · | · | · | · | · | **372** |
 | Slider / fader / drag | · | 14 | 2 | · | 3 | · | 2 | 750 | 3 | 1 | 1 | 9 | · | **785** |
 | Text / number field | 1 | 4 | 2 | · | 17 | · | 6 | 14 | · | 3 | 11 | 2 | · | **60** |
@@ -22,14 +22,14 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Tabs | · | · | · | · | · | · | · | · | · | · | · | 8 | · | **8** |
 | Menu / menu item | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
 | Popup / context menu | 5 | 2 | 2 | 2 | 41 | · | 7 | · | · | 18 | · | 2 | 3 | **82** |
-| Tooltip | 9 | 1 | 5 | · | 40 | 3 | 3 | 4 | 4 | 3 | 4 | 13 | 2 | **91** |
+| Tooltip | 9 | 1 | 5 | · | 41 | 3 | 3 | 4 | 4 | 3 | 4 | 14 | 2 | **93** |
 | Mouse cursor | 1 | 1 | 1 | 1 | 23 | · | · | 13 | · | 3 | 1 | · | · | **44** |
 | Drag and drop | · | · | 3 | · | 4 | · | · | · | · | · | · | · | · | **7** |
 | Mod dot / pin | · | 3 | · | · | · | · | 6 | 4 | 2 | · | · | · | · | **15** |
-| Separator | 11 | 3 | 8 | 1 | 20 | · | 1 | 78 | · | 23 | · | 1 | · | **146** |
-| Hand-drawn shape | 7 | 45 | 36 | 6 | 104 | 1 | 14 | 369 | 7 | 11 | · | 2 | · | **602** |
-| Hand-drawn text | · | 7 | 6 | 1 | 17 | 1 | 10 | 78 | 2 | 1 | 2 | 2 | · | **127** |
-| Literal colour | · | 2 | 2 | · | 12 | · | 2 | 52 | 1 | · | · | · | · | **71** |
+| Separator | 11 | 3 | 8 | 1 | 21 | · | 1 | 78 | · | 23 | · | 1 | · | **147** |
+| Hand-drawn shape | 7 | 45 | 36 | 6 | 106 | 1 | 14 | 369 | 7 | 11 | · | 2 | · | **604** |
+| Hand-drawn text | · | 7 | 6 | 1 | 16 | 1 | 10 | 78 | 2 | 1 | 2 | 2 | · | **126** |
+| Literal colour | · | 2 | 2 | · | 11 | · | 2 | 52 | 1 | · | · | · | · | **70** |
 | Close / cross control | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
 
 ## Drawn icons in use (each must get an Infinite Glyph)

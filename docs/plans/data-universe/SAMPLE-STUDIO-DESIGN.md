@@ -51,3 +51,13 @@ The website studio stays the reference and keeps working as is. When the panel s
 3. Feel field and pills (pinned re-render), waveform with trim, reverse, fade (`node-ui-pillars` for widget grammar).
 4. Export WAV (credit tags as on the website), Convert to patch, drag to canvas (`data-accuracy-sweep` for save/load of the take).
 5. Windows and Linux checks (`windows-parity`, `linux-parity`); the wasm parity test (`wasm/parity_dump.js`) stays green.
+
+## Built 2026-10-29 (first cut, for Naman's review)
+`src/app/panels/SampleStudioPanel.cpp`, Shift+W, View menu "Sample Studio", rail item (Synths family glyph until a studio icon is drawn).
+- Engine: a private Generate Samples node (never in the graph). The node gained the dots (tone, energy, space, mood: saved, no control on the
+  node), a pinned render (one attempt, lenient gate, as the website's shaped renders) and `keepSeed` for takes brought to the canvas.
+- Done: style / part / length, Generate with progress and cancel, feel field (energy across, mood up), tone / space / wild, waveform with 16th
+  trim, play / loop / reverse / fade, takes (last 6), Export WAV as heard, Save patch (.inf with an Audio Out), To canvas (a Generate Samples
+  node with the take's recipe and trim). Review shots: `INFINITE_OPENPANELS=studio,studiodemo`.
+- Not yet: top and bottom docks (right only), true drag to canvas (a button for now), credit tags in the WAV, opening the patch straight onto
+  the canvas (saved to a file instead, so the open patch is never replaced), Windows / Linux runs, the panels-sweep.

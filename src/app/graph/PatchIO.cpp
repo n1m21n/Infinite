@@ -363,6 +363,10 @@ namespace app
             gHistoryOpen = (val != "0");
          else if (key == "panelHistoryW")
             gHistoryWidth = std::max(220.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelStudioOpen")
+            gSampleStudioOpen = (val != "0");
+         else if (key == "panelStudioW")
+            gSampleStudioWidth = std::max(300.0f, std::strtof(val.c_str(), nullptr));
       }
    }
 
@@ -397,6 +401,8 @@ namespace app
       file << "panelPerfH=" << gPerfPanelHeight << "\n";
       file << "panelHistoryOpen=" << (gHistoryOpen ? 1 : 0) << "\n";
       file << "panelHistoryW=" << gHistoryWidth << "\n";
+      file << "panelStudioOpen=" << (gSampleStudioOpen ? 1 : 0) << "\n";
+      file << "panelStudioW=" << gSampleStudioWidth << "\n";
    }
 
 
@@ -409,10 +415,10 @@ namespace app
       if (sTestRun)
          return;
       char buf[256];
-      std::snprintf(buf, sizeof buf, "%d%d%d%d%d|%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
-                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d|%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
-                    gPerfPanelHeight, gHistoryWidth);
+                    gPerfPanelHeight, gHistoryWidth, gSampleStudioWidth);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;
