@@ -27,7 +27,7 @@ def voices(pattern):
     return out
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--voices", type=int, default=12); ap.add_argument("--skip", type=int, default=0); ap.add_argument("--lowcouple", action="store_true"); ap.add_argument("--out", default=OUT)
+    ap = argparse.ArgumentParser(); ap.add_argument("--voices", type=int, default=12); ap.add_argument("--skip", type=int, default=0); ap.add_argument("--lowcouple", action="store_true"); ap.add_argument("--map", default=""); ap.add_argument("--out", default=OUT)
     ap.add_argument("--glob", default=os.path.expanduser("~/Infinite/render-runs/styled/*_1.inf")); a = ap.parse_args()
     table, sw, fixed = ow.param_table(NODE); tags = ow.tag_of(table); keys = [p["key"] for p in sw]
     P, nk = kd.pairs(NODE); means = [j for j, n in enumerate(p3.COLS) if n.endswith(".mean")]
@@ -45,8 +45,10 @@ def main():
         u0 = np.array([min(max(ow.to_u(p, base[p["key"]]), 0.02), 0.98) for p in sw])
         recs.append(ow.recipe(NODE, sw, fixed, list(u0))); bi = len(recs) - 1
         for ax in range(A):
-            if AX[ax] in ("attack", "decay", "density"): continue
-            c = [j for j in np.argsort(-np.abs(slope[:, ax])) if cons[j, ax] >= 0.8 and keys[j] not in BAN and abs(slope[j, ax]) > 0.5]
+            fm = dict(x.split("=") for x in a.map.split(",")) if a.map else {}
+            if fm and AX[ax] not in fm: continue
+            if not fm and AX[ax] in ("attack", "decay", "density"): continue
+            c = [j for j in np.argsort(-np.abs(slope[:, ax])) if cons[j, ax] >= 0.8 and keys[j] not in BAN and abs(slope[j, ax]) > 0.5 and (not fm or keys[j] == fm[AX[ax]])]
             if not c: continue
             if a.lowcouple: c.sort(key=lambda j: abs(slope[j, AX.index('noisiness')] / slope[j, ax]))
             j = c[0]

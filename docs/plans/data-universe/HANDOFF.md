@@ -529,3 +529,7 @@ Decision: the dots are defined from these model directions (named after what the
 
 ### Block 1 axes pass complete (2026-10-29)
 midi_axes.jsonl: 293,573 of 293,573 indexed files have a row; 292,452 measured (a24-a30), a23 287,614, a31 271,588; 1,121 error rows (unparseable or >4 MB or >20 s). 20-file spot check 20/20 consistent. Goal count is 294,582: 1,009 files are not in the midi_full index (not yet extracted) -> bar "all 294,582" = 99.3% measured, a MISS until those are indexed.
+
+### Dot test round 3: the five model directions on 12 fresh voices (2026-10-29)
+One dominant knob per direction, 57 trials: Tone (cutoff -> brightness) 92% (12), Tail (release -> decay) 89% (19), Punch (attack -> attack) 62% (16, FAIL), Motion (sustain -> movement) 50% (10, chance, FAIL). Resonance->warmth produced no usable trial. Overall sign 75.4%, noisiness held 91%, median gain 0.49 -> INCONCLUSIVE, recorded as a miss.
+What the data supports on Analog today: TWO real dots, Tone (cutoff; 92-100% over rounds 2-3) and Tail (release; 89%). The 3rd and 4th dot are not supported yet; they need either better knobs (an envelope-shape macro, tested) or more sweeps. The product claim must be "2 proven dots on Analog", not 3-4 on all instruments, until measured otherwise.

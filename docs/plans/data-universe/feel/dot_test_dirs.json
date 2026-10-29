@@ -1,0 +1,543 @@
+{
+ "summary": {
+  "trials": 57,
+  "sign": 0.754,
+  "median_gain": 0.49,
+  "noise_drift_ok": 0.912,
+  "loud_drift_ok": 0.491,
+  "by_axis": {
+   "brightness": [
+    0.92,
+    12
+   ],
+   "movement": [
+    0.5,
+    10
+   ],
+   "attack": [
+    0.62,
+    16
+   ],
+   "decay": [
+    0.89,
+    19
+   ]
+  },
+  "verdict": "INCONCLUSIVE"
+ },
+ "rows": [
+  {
+   "voice": "gabber_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.5949616685108876,
+   "noise_drift": 0.10584197450380134,
+   "loud_drift": 2.7872428607028823
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": -0.8119216909579362,
+   "got": -0.2973481049507791,
+   "noise_drift": 0.024543066551606117,
+   "loud_drift": 1.0963182432574405
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": 1.0,
+   "got": 0.48700193681321535,
+   "noise_drift": 0.0015339416594753858,
+   "loud_drift": 0.07248405814652932
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.005124565204717284
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 0.0,
+   "noise_drift": 0.0038348541486884578,
+   "loud_drift": 0.7189194192214096
+  },
+  {
+   "voice": "gabber_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": 0.0,
+   "noise_drift": 0.005368795808163843,
+   "loud_drift": 0.08145361535919264
+  },
+  {
+   "voice": "glitch_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -2.5341698983219207,
+   "noise_drift": 4.497516945581819,
+   "loud_drift": 2.447817253006336
+  },
+  {
+   "voice": "glitch_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "glitch_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -1.0000000000000002,
+   "got": -1.5037196015754224,
+   "noise_drift": 0.0007669708297376064,
+   "loud_drift": 0.4364348187811968
+  },
+  {
+   "voice": "glitch_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.3409738159242487,
+   "got": 1.2051600554873942,
+   "noise_drift": 0.029911862359770055,
+   "loud_drift": 1.300999775399838
+  },
+  {
+   "voice": "glitch_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -1.0,
+   "got": -0.5624080258941173,
+   "noise_drift": 0.0076697082973769155,
+   "loud_drift": 0.5179637031519645
+  },
+  {
+   "voice": "industrial_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.799933477813768,
+   "noise_drift": 0.14572445765016126,
+   "loud_drift": 2.4941202399600986
+  },
+  {
+   "voice": "industrial_techno_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "industrial_techno_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.9999999999999999,
+   "got": -1.0167176647622072,
+   "noise_drift": 0.0030678833189507716,
+   "loud_drift": 0.5656591668198605
+  },
+  {
+   "voice": "industrial_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.6872240776823517,
+   "noise_drift": 0.0015339416594753724,
+   "loud_drift": 1.5562369936499743
+  },
+  {
+   "voice": "industrial_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.24103201109747882,
+   "noise_drift": 0.0007669708297376862,
+   "loud_drift": 0.220738921278354
+  },
+  {
+   "voice": "jungle_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.4708488119243348,
+   "got": 1.7943524275447893,
+   "noise_drift": 1.0921664615464717,
+   "loud_drift": 1.4535386997737954
+  },
+  {
+   "voice": "jungle_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.3200455979945356,
+   "got": -1.2181557838292347,
+   "noise_drift": 1.0154693785727027,
+   "loud_drift": 0.6591620964486516
+  },
+  {
+   "voice": "jungle_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.00023835186998719246
+  },
+  {
+   "voice": "jungle_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.6872240776823517,
+   "noise_drift": 0.0015339416594754257,
+   "loud_drift": 1.533229765778611
+  },
+  {
+   "voice": "jungle_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.24103201109747882,
+   "noise_drift": 0.0076697082973769155,
+   "loud_drift": 0.22027476237364293
+  },
+  {
+   "voice": "liquid_dnb_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.22836440808620398,
+   "noise_drift": 0.00920364995685229,
+   "loud_drift": 2.3512847456616592
+  },
+  {
+   "voice": "liquid_dnb_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "liquid_dnb_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.9999999999999999,
+   "got": -1.9481695419162535,
+   "noise_drift": 0.0,
+   "loud_drift": 0.311990052977533
+  },
+  {
+   "voice": "liquid_dnb_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.6068800739831923,
+   "noise_drift": 0.0,
+   "loud_drift": 1.594153758230778
+  },
+  {
+   "voice": "liquid_dnb_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.24103201109747882,
+   "noise_drift": 0.0007669708297376912,
+   "loud_drift": 0.23106332069936364
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.5531161174603106,
+   "got": 0.2987969332795511,
+   "noise_drift": 0.08896861624957213,
+   "loud_drift": 0.2984165412235442
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6328794260735287,
+   "got": 1.0302006123845335,
+   "noise_drift": 0.0,
+   "loud_drift": 1.0131020785438718
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": 1.0,
+   "got": 0.48700193681321535,
+   "noise_drift": 0.0,
+   "loud_drift": 0.01795793167822054
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.00025089670524962933
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.6872240776823517,
+   "noise_drift": 0.0,
+   "loud_drift": 1.527258424193677
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.24103201109747882,
+   "noise_drift": 0.0,
+   "loud_drift": 0.2191896341234397
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -0.19800922091728138,
+   "noise_drift": 0.049086133103212214,
+   "loud_drift": 2.391001694102627
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": -0.8119216909579362,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.9999999999999999,
+   "got": -1.4611676051030384,
+   "noise_drift": 0.0,
+   "loud_drift": 0.5622971509695197
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.6068800739831923,
+   "noise_drift": 0.001533941659475379,
+   "loud_drift": 1.5928302781105879
+  },
+  {
+   "voice": "minimal_techno_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.24103201109747882,
+   "noise_drift": 0.002300912489213072,
+   "loud_drift": 0.23258751818375306
+  },
+  {
+   "voice": "progressive_house_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": 0.0030142913132777923,
+   "noise_drift": 0.02607700821108149,
+   "loud_drift": 0.00020698978183065453
+  },
+  {
+   "voice": "progressive_house_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.6359822507110784,
+   "noise_drift": 0.013805474935278431,
+   "loud_drift": 1.487064772012736
+  },
+  {
+   "voice": "progressive_house_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": 1.0,
+   "got": 0.48700193681321535,
+   "noise_drift": 0.0007669708297376862,
+   "loud_drift": 0.007840522039041335
+  },
+  {
+   "voice": "progressive_house_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 4.3906923418529145e-05
+  },
+  {
+   "voice": "progressive_house_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.044472048089075,
+   "noise_drift": 0.003067883318950758,
+   "loud_drift": 1.0110509979784585
+  },
+  {
+   "voice": "psytrance_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.7582648827777376,
+   "got": -2.968567485891737,
+   "noise_drift": 1.8537684954759988,
+   "loud_drift": 0.8397387276342209
+  },
+  {
+   "voice": "psytrance_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": 0.6173987858325973,
+   "got": 0.1267741025650554,
+   "noise_drift": 0.18944179494520963,
+   "loud_drift": 0.2235426919595151
+  },
+  {
+   "voice": "psytrance_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": 1.0,
+   "got": 0.48700193681321535,
+   "noise_drift": 0.0076697082973769155,
+   "loud_drift": 0.003142481233247797
+  },
+  {
+   "voice": "psytrance_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.00026971395814306184
+  },
+  {
+   "voice": "psytrance_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.9282560887798306,
+   "noise_drift": 0.04371733729504846,
+   "loud_drift": 1.7396299403519662
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": -0.6729202120545875,
+   "got": -2.097564660776183,
+   "noise_drift": 1.9319995201092433,
+   "loud_drift": 0.6146718381903156
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": -0.622284693758289,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.0
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.9999999999999999,
+   "got": -1.5037196015754224,
+   "noise_drift": 0.018407299913704683,
+   "loud_drift": 0.008655936331101515
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -1.0,
+   "got": -1.847912085080671,
+   "noise_drift": 0.017640329083967076,
+   "loud_drift": 1.6559621615689486
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "brightness",
+   "knob": "cutoff",
+   "req": 0.7256888286462786,
+   "got": 0.5429969844622701,
+   "noise_drift": 0.15646204926648893,
+   "loud_drift": 2.740870877155176
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "movement",
+   "knob": "sustain",
+   "req": -0.6956502760539527,
+   "got": -0.7396428162569699,
+   "noise_drift": 0.0,
+   "loud_drift": 0.09126367653444104
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": 1.0,
+   "got": 0.48700193681321535,
+   "noise_drift": 0.0,
+   "loud_drift": 0.01852244926503109
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "attack",
+   "knob": "attack",
+   "req": -0.563687279608797,
+   "got": 0.0,
+   "noise_drift": 0.0,
+   "loud_drift": 0.003060939804041734
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": 0.4762551276839268,
+   "got": 1.7675680813815113,
+   "noise_drift": 0.0,
+   "loud_drift": 1.4554894216571084
+  },
+  {
+   "voice": "synthwave_1.inf",
+   "axis": "decay",
+   "knob": "release",
+   "req": -0.9806222824144311,
+   "got": -0.16068800739831923,
+   "noise_drift": 0.0,
+   "loud_drift": 0.20089299189313248
+  }
+ ]
+}
