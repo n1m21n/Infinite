@@ -9,7 +9,7 @@ Goal: GOAL.md. Status per bar: HANDOFF.md (newest sections at the end). Branch f
 ## Remaining work, in order (all approved by Naman)
 | # | Item | State | Next action |
 |---|---|---|---|
-| 1 | Role critic (item 4) | own-audio critic: catch 98.4% MET, FRR 6.1% MISS | thresholds from out-of-fold probs over all training styles; retest |
+| 1 | Role critic (item 4) | own-audio critic MET: FRR 2.6%, catch 97.9% (out-of-fold cut-offs) | check against real instruments once frame features run on real audio; export the model for the app |
 | 2 | Knob direction (item 3) | 6 engines 89.5-95.6; Wavetable short of data | rerun after the render above; then test held-out notes (C1/C5/C6, pp) for all engines |
 | 3 | Words / tagging (C4) | 5 of 30 words testable | label words from ~40k preset names + tags (presets.jsonl, air_*), measured features; pack held out |
 | 4 | Note model (item 2) | key 51%, chord +5.6 (bar +10), register MISS | compare n-gram vs sequence models on held-out MIDI; retry 372 MIDI files; bass-lift wasm rebuild + role_spread vs scratch baseline, then commit SampleStyles.cpp |

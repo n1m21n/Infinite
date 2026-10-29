@@ -41,13 +41,25 @@ def train(a):
         if p in names and q in names: nested[names.index(p), names.index(q)] = nested[names.index(q), names.index(p)] = True
     res = {"Linear": [], "MLP": []}; per_role = {k: collections.defaultdict(list) for k in res}; conf = np.zeros((len(names), len(names)))
     for f in range(a.folds):
-        te = fold_of == f; trs = np.unique(g[~te]); val = set(rng.choice(trs, max(1, len(trs) // 6), replace=False))
-        va = np.isin(g, list(val)) & ~te; tr = ~te & ~va
+        te = fold_of == f; trs = np.unique(g[~te])
+        if a.calib == "val":   # one validation slice of training styles sets the cut-offs; the model trains on the rest
+            val = set(rng.choice(trs, max(1, len(trs) // 6), replace=False)); va = np.isin(g, list(val)) & ~te; tr = ~te & ~va
+        else:                  # out-of-fold: every training style is scored once by a model that never saw it; the model trains on all of them
+            tr = ~te; inner = {s: i % a.inner for i, s in enumerate(rng.permutation(trs))}
         mu, sd = X[tr].mean(0), X[tr].std(0) + 1e-9; Z = (X - mu) / sd
-        w = (1.0 / np.maximum(np.bincount(y[tr], minlength=len(names)), 1))[y[tr]]
-        for name, M in (("Linear", Linear(len(names), a.epochs)), ("MLP", MLP(len(names), a.epochs, h=(128, 64), seed=f))):
-            M.fit(Z[tr], y[tr], w)
-            Pv = M.proba(Z[va]); th = np.array([np.percentile(Pv[y[va] == c, c], 3) if (y[va] == c).sum() >= 10 else 0.0 for c in range(len(names))])
+        wt = lambda m: (1.0 / np.maximum(np.bincount(y[m], minlength=len(names)), 1))[y[m]]
+        make = {"Linear": lambda s: Linear(len(names), a.epochs), "MLP": lambda s: MLP(len(names), a.epochs, h=(128, 64), seed=s)}
+        for name in ("Linear", "MLP"):
+            M = make[name](f).fit(Z[tr], y[tr], wt(tr))
+            if a.calib == "val":
+                Pc, yc = M.proba(Z[va]), y[va]
+            else:
+                Pc = np.zeros((len(y), len(names)))
+                for k in range(a.inner):
+                    hold = tr & np.array([inner.get(s, -1) == k for s in g]); fit = tr & ~hold
+                    Pc[hold] = make[name](100 + 10 * f + k).fit(Z[fit], y[fit], wt(fit)).proba(Z[hold])
+                Pc, yc = Pc[tr], y[tr]
+            th = np.array([np.percentile(Pc[yc == c, c], a.pct) if (yc == c).sum() >= 10 else 0.0 for c in range(len(names))])
             P = M.proba(Z[te]); frr, catch, top1, per = score(P, y[te], th)
             rej = P < th[None, :]; yt = y[te]; mask = ~nested[yt] ; mask[np.arange(len(yt)), yt] = False
             catch_flat = float(rej[mask].mean())
@@ -56,7 +68,7 @@ def train(a):
             if name == "MLP":
                 for t, p_ in zip(yt, P.argmax(1)): conf[t, p_] += 1
             print("fold %d %-6s FRR %.3f catch %.3f (non-nested %.3f) top-1 %.3f (%d test renders, %d styles)" % (f, name, frr, catch, catch_flat, top1, te.sum(), len(np.unique(g[te]))), flush=True)
-    out = {"roles": names, "n": int(len(y)), "styles": len(styles), "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py"}
+    out = {"roles": names, "n": int(len(y)), "styles": len(styles), "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py", "calib": a.calib, "pct": a.pct}
     for name, R in res.items():
         R = np.array(R); out[name] = {"frr": R[:, 0].tolist(), "catch": R[:, 1].tolist(), "top1": R[:, 2].tolist(), "catch_non_nested": R[:, 3].tolist(),
                                        "catch_by_role": {k: round(float(np.mean(v)), 3) for k, v in per_role[name].items()}}
@@ -71,4 +83,5 @@ def train(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["render", "train"]); ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--first", type=int, default=9000); ap.add_argument("--folds", type=int, default=5); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--out")
+    ap.add_argument("--calib", choices=["val", "oof"], default="oof"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--pct", type=float, default=3)
     a = ap.parse_args(); render(a) if a.cmd == "render" else train(a)

@@ -667,3 +667,11 @@ FRR miss: the thresholds come from ~5 validation styles (~55 renders per role), 
 Next: set thresholds on out-of-fold probabilities over all training styles (about 6x more rows per role), then retest. The bar is unchanged.
 Limit: this checks the generator's parts against each other, not against real instruments. The real-sample check needs the same frame
 features on real audio (WD Black, or any local library run through frame_features.measure).
+
+### Role critic cut-offs from out-of-fold probabilities (2026-10-29): MET
+Same data, features, model and 3rd-percentile target; only where the cut-offs come from changed. Each outer fold now trains on all its
+training styles, and the cut-offs come from 4 inner style-held-out models that score every training style once (about 6x more rows per role).
+`role_critic_render.py train --calib oof` (default now; `--calib val` reproduces the earlier run). Result `feel/role_critic_render_oof.json`.
+- MLP: FRR 2.6% +- 0.6 (bar <= 3%: MET), catch 97.9% +- 0.2 (bar >= 96%: MET), top-1 93.9%. Worst fold FRR 3.7% (fold 1); the bar is read on the mean.
+- Linear: FRR 2.9%, catch 96.9%, also inside both bars.
+Scope: parts of the generator against each other, on styles never seen in training. Not yet checked against real instruments (needs frame features on real audio).
