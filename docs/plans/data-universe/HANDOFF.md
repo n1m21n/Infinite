@@ -621,3 +621,10 @@ Each Note Sequencer layer (55 across the 32 style patches) against its own famil
 | C9 chains | direction >= 90%, size r >= 0.7 | chain track not measured | **FAIL (not run)** |
 | C10 taste | keep >= 75% by click 20 | simulated personas only (B6 75.2%); no real user data | **FAIL (not run on people)** |
 | C11 nothing lost | R2 rises each round | 0.523 (Analog, 2,000 rows) | reported, no bar |
+
+### Item 4, sound-side role critic first measurement (`tools/universe/role_critic.py` -> `feel/role_critic.json`)
+Objective: softmax regression P(role | audio features), 2,158 audio-measured instruments, 14 roles (families); accept a voice in a role when P(role) is above the 3rd percentile of train P(true role). Test: 2 seeds x 5 random 80/20 splits, mean +- sd; "catch" = share of held-out voices rejected when declared as every wrong role.
+- False reject **5.6% +- 1.1** (bar <= 3%) — **MISS**
+- Catch of swapped roles **73.7% +- 1.2** (bar >= 96%) — **MISS**
+- Top-1 role accuracy 70.0% +- 1.3 (baseline: biggest role share).
+Reading: roles that overlap in sound (piano / keys / mallets, synth / texture / other) cannot be told apart from 43 spectral features; swapping within them is not detectable. Next: add temporal/envelope features and merge indistinguishable roles into role groups, then re-run on the same splits.
