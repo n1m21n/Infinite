@@ -121,7 +121,7 @@ table.t tr { break-inside: avoid; }
 def doc(body, footer_left, footer_right, extra_css=""):
     foot = (f'<div class="foot folio"><span>{esc(footer_left)}</span><span>{esc(footer_right)}</span></div>'
             if footer_left else "")
-    return (f'<!doctype html><html data-mode="paper"><head><meta charset="utf-8"><style>{CSS}{extra_css}</style></head><body>'
+    return (f'<!doctype html><html data-mode="midnight"><head><meta charset="utf-8"><style>{CSS}{extra_css}</style></head><body>'
             '<table class="w"><thead><tr><td><div class="sp t"></div></td></tr></thead>'
             '<tfoot><tr><td><div class="sp b"></div></td></tr></tfoot><tbody><tr><td>'
             f'{body}</td></tr></tbody></table>{foot}</body></html>')

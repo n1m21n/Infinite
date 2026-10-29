@@ -98,7 +98,7 @@ body.print .deck{{position:static;transform:none!important}} body.print section{
   <div class="foot"><span>{E(f["site"].replace("https://", ""))}</span><span>01</span></div>
 </section>
 <!-- STATEMENT: one idea, nothing else -->
-<section data-mode="paper">
+<section data-mode="midnight">
   <div class="k">The idea</div>
   <h2 style="margin:auto 0;max-width:16ch">Patch anything into anything, and play it live.</h2>
   <div class="rule"></div>
@@ -186,7 +186,7 @@ table{{border-collapse:collapse;width:100%;font-size:10pt}} th,td{{text-align:le
 th{{width:42mm;font-weight:600;color:var(--ink-2)}}
 .use{{margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6mm;font-size:8.5pt;color:var(--ink-2);line-height:1.4}}
 .use b{{display:block;color:var(--ink);font-weight:600;margin-bottom:1mm}}
-</style></head><body data-mode="paper">
+</style></head><body data-mode="midnight">
 <div class="top">{svg("lockup-on-light.svg")}<span class="k">Press fact sheet · {E(f["version"])}</span></div>
 <h1>A DAW for <span class="hand">you</span></h1>
 <p class="lede">Infinite is a live instrument and audio-visual workstation: visuals, music and code on one canvas, with modulation that reaches every control.</p>
