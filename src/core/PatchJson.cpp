@@ -147,6 +147,36 @@ namespace PatchJson
                {"reverse", c.reverse},
                {"bypassedModParams", c.bypassedModParams}
             });
+            if (s.type == Patch::kStreamMidi)
+            {
+               json notes = json::array();
+               auto curve = [](const std::vector<Arrange::ExprPoint>& pts) {
+                  json a = json::array();
+                  for (const Arrange::ExprPoint& p : pts)
+                     a.push_back({ p.at, p.v });
+                  return a;
+               };
+               for (const Arrange::Note& n : c.notes)
+               {
+                  json jn = { {"id", n.id}, {"start", n.start}, {"length", n.length}, {"pitch", n.pitch},
+                              {"vel", n.vel}, {"relVel", n.relVel}, {"chance", n.chance}, {"mute", n.mute},
+                              {"gainDb", n.gainDb}, {"pan", n.pan} };
+                  if (!n.bend.empty()) jn["bend"] = curve(n.bend);
+                  if (!n.pressure.empty()) jn["pressure"] = curve(n.pressure);
+                  if (!n.timbre.empty()) jn["timbre"] = curve(n.timbre);
+                  notes.push_back(std::move(jn));
+               }
+               json& jc = clips.back();
+               jc["nextNoteId"] = c.nextNoteId;
+               jc["contentOffset"] = c.contentOffset;
+               jc["midiLoop"] = c.midiLoop;
+               jc["loopStart"] = c.loopStart;
+               jc["loopLength"] = c.loopLength;
+               jc["transpose"] = c.transpose;
+               jc["velScale"] = c.velScale;
+               jc["swing"] = c.swing;
+               jc["notes"] = std::move(notes);
+            }
          }
          out["streams"].push_back({
             {"id", s.id},
@@ -166,6 +196,11 @@ namespace PatchJson
             {"name", s.name},
             {"clips", clips}
          });
+         if (s.type == Patch::kStreamMidi)
+         {
+            out["streams"].back()["noteNodeUid"] = s.noteNodeUid;
+            out["streams"].back()["scaleSnap"] = s.scaleSnap;
+         }
       }
 
       // Track groups. Flat, like the model's own storage - nesting is carried

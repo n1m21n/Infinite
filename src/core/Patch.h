@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../arrange/ArrangeModel.h"
+
 #include <cstdint>
 #include <functional>
 #include <iosfwd>
@@ -91,6 +93,18 @@ class INode;
 //     name. Only written when the list is non-empty; a patch without it
 //     loads with nothing bypassed, i.e. exactly the behaviour that predates
 //     the field.
+//   streamnote <streamIndex> <noteNodeUid> <scaleSnap>
+//     MIDI lane (stream type 2): the Piano Roll node it is linked to. Only
+//     written for a MIDI stream with a link or scale snap on.
+//   clipmidi <streamIndex> <clipId> <nextNoteId> <contentOffset> <loop>
+//            <loopStart> <loopLength> <transpose> <velScale> <swing>
+//     A MIDI clip's content window and clip-wide note settings. Every MIDI
+//     clip gets one, so nextNoteId round-trips.
+//   clipnote <streamIndex> <clipId> id=<n> s=<start> l=<length> p=<pitch> [v=] [r=]
+//        [c=] [m=1] [g=] [pan=] [bend=at:v,at:v...] [press=...] [timbre=...]
+//     One note, content ticks (docs/plans/piano-roll/README.md §5, §8).
+//     Named fields, defaults left out (v 100, r 64, c 1, m 0, g 0, pan 0,
+//     curves empty); an unknown field is skipped.
 //   marker <id> <posTick> <colorRGBA8> <name to end of line>
 //   arrange <nextId> <timeDisplay> <snap> <triplet> <zoom> <scroll> <loopOn>
 //           <loopStart> <loopEnd> <dock> <w> <h> <fps> <sr> <format>
@@ -342,7 +356,7 @@ namespace Patch
    // so reordering or deleting a stream can never leave a clip on the wrong
    // lane. Clips within one stream never overlap - enforced by the editor,
    // not here.
-   enum StreamType { kStreamVideo = 0, kStreamAudio = 1 };
+   enum StreamType { kStreamVideo = 0, kStreamAudio = 1, kStreamMidi = 2 };
 
    struct ClipRecord
    {
@@ -417,6 +431,17 @@ namespace Patch
       int    slotLoopTicks = 0;
       int    slotQuantize = -1;
       int    slotLaunchMode = 0;
+      // MIDI clips only (stream type kStreamMidi): `clipmidi`, `clipnote` and
+      // `noteexpr` lines. Same meaning as the Arrange::Clip fields.
+      std::vector<Arrange::Note> notes;
+      uint32_t nextNoteId    = 1;
+      int64_t  contentOffset = 0;
+      bool     midiLoop      = false;
+      int64_t  loopStart     = 0;
+      int64_t  loopLength    = 0;
+      int      transpose     = 0;
+      float    velScale      = 1.0f;
+      float    swing         = 0.0f;
    };
 
    // Session view row (Arrange::Scene), one `scene` line each, in order.
@@ -450,6 +475,8 @@ namespace Patch
       std::string name;         // empty = auto ("V1", "A2", ...) - label derived by the UI
       float colorR = 0.0f, colorG = 0.0f, colorB = 0.0f;
       float rowHeight = 0.0f;   // 0 = default; new field, older patches load at the default height
+      uint64_t noteNodeUid = 0; // MIDI only: the linked Piano Roll node (`streamnote`)
+      bool  scaleSnap = false;  // MIDI only
       std::vector<ClipRecord> clips;
    };
 
