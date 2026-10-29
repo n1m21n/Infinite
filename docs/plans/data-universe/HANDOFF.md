@@ -601,3 +601,8 @@ Corpus register by instrument family (first 120k files, range midpoint, p5/p50/p
 
 ### Item 1, MIDI axes accounting (2026-10-29)
 292,452 files carry axes 23-30 (axis 31 on 271,588: files without enough bars skip it); 1,121 error rows, split: **747 "no notes"** (empty files, correctly unmeasurable), **365 over the 20 s parse limit** (large files; retryable with a higher limit), 5 dtype errors and 2 empty-list errors (code bugs, fixable), 2 "not midi". So 747 + 2 are legitimately unmeasurable; **about 372 are fixable** (365 timeouts + 7 bugs). Not yet re-run. Bar "all 294,582" cannot be met literally: at most 294,582 - 749 = 293,833 have notes.
+
+### Item 2, per-role register test (signed off 2026-10-29)
+Each Note Sequencer layer (55 across the 32 style patches) against its own family's 5th-95th range, corpus first 150k files: layers with midpoint < 48 count as bass (corpus bass 31.5-56), the rest as melodic (corpus 46.5-79).
+- Bass layers inside the bass range: **26 of 48**. Melodic layers inside: **7 of 7**. Overall **60.0%** (bar 90%). **MISS.**
+- The misses are all on the low side: bass layers whose range midpoint sits under 31.5 (sub-bass, below the corpus bass 5th percentile). Cause: `styled.py` / SampleStyles place sequencer bass at octave 2 with a narrow span. Fix candidate: lift the bass octave in the style cards where the card allows it; it ships only if it wins the blind test against the unchanged live node (goal item 7).
