@@ -2857,7 +2857,7 @@ namespace
       DrawMagnifier(false);
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
-      if (IconChip("##studioSettings", IconsInfinite::Mixer, s.settingsOpen, T("Sample and slice settings")))
+      if (IconChip("##studioSettings", IconsInfinite::Edit, s.settingsOpen, T("Sample and slice settings")))
          s.settingsOpen = !s.settingsOpen;
       DrawSliceMenu();
       DrawReplaceConfirm();
