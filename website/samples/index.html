@@ -44,7 +44,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <link rel="stylesheet" href="../samples.css?v=28">
+  <link rel="stylesheet" href="../samples.css?v=29">
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
   <link rel="stylesheet" href="../neumo.css?v=3a020cee">
@@ -132,14 +132,15 @@
         <section class="smp-genp" id="smp-genp" aria-labelledby="smp-gen-h">
           <h2 class="smp-h" id="smp-gen-h">Generator</h2>
           <div class="smp-picks" id="smp-genpicks"></div>
-          <div class="smp-stage" id="smp-stage" role="group" aria-label="Shape the sound: drag the dots">
+          <div class="smp-stage" id="smp-stage" role="group" aria-label="Shape the sound: pull the dots toward the blob or push them away">
             <canvas class="smp-blob" id="smp-blob" role="button" tabindex="0" aria-label="Play or pause the generated loop"></canvas>
             <svg class="smp-spokes" id="smp-spokes" aria-hidden="true"></svg>
-            <button type="button" class="smp-dot" aria-label="Shape dot 1: drag anywhere, arrows nudge, double-click resets"></button>
-            <button type="button" class="smp-dot" aria-label="Shape dot 2: drag anywhere, arrows nudge, double-click resets"></button>
-            <button type="button" class="smp-dot" aria-label="Shape dot 3: drag anywhere, arrows nudge, double-click resets"></button>
-            <button type="button" class="smp-dot" aria-label="Shape dot 4: drag anywhere, arrows nudge, double-click resets"></button>
+            <button type="button" class="smp-dot" data-k="tone" role="slider" aria-label="Bright: pull toward the blob for more, push away for less" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"></button>
+            <button type="button" class="smp-dot" data-k="energy" role="slider" aria-label="Drive: pull toward the blob for more, push away for less" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"></button>
+            <button type="button" class="smp-dot" data-k="space" role="slider" aria-label="Space: pull toward the blob for more, push away for less" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"></button>
+            <button type="button" class="smp-dot" data-k="mood" role="slider" aria-label="Mood: pull toward the blob for more, push away for less" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"></button>
           </div>
+          <p class="smp-legend" aria-hidden="true">Pull a dot in for more, push it out for less: <i data-k="tone"></i>bright <i data-k="energy"></i>drive <i data-k="space"></i>space <i data-k="mood"></i>mood</p>
           <div class="smp-genbar" id="smp-genbar">
             <button type="button" class="smp-genb" id="smp-gen-btn" hidden>generate</button>
           </div>
@@ -244,7 +245,7 @@
   
   <script src="../site.js?v=21" defer></script>
   
-  <script src="../samples.js?v=39"></script>
+  <script src="../samples.js?v=40"></script>
 <nav class="dock" id="dock" aria-label="Main">
   <div class="dock-bar">
     <span class="dock-thumb" aria-hidden="true"></span>

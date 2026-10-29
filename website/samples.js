@@ -153,24 +153,21 @@
     return Math.floor(Math.random() * n);
   }
   setInterval(function () { settleWebTaste(false); }, 2000);
-  // Dots: four label-free glass dots that drag anywhere on the stage (free XY). The sound is read from the whole constellation:
-  // centroid left/right = tone (dark..bright), centroid up/down = energy (calm..driving), spread = space (dry..wide),
-  // wide vs tall spread = mood (minor..major). Home is a square around the blob, every axis 0. Before a take they set the
-  // next generate; after one, a moved dot re-renders the same seed (pinned, latest wins) and the loop swaps in where it was playing.
-  var HOME = [[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]];
+  // Dots: four label-free glass dots, one per character, each with its own colour: tone (bright), energy (drive), space, mood.
+  // Drag anywhere. Pulling a dot toward the blob gives more of its character (+1 touching the blob), pushing it away gives the
+  // opposite (-1 far out: dark, calm, dry, minor); the middle ring is neutral. The blob leans toward pulled dots and dents
+  // away from pushed ones, tinted by their colour. Positions are in blob radii from the centre, so they survive a resize.
+  // Before a take they set the next generate; after one, a moved dot re-renders the same seed (pinned, latest wins).
+  var KEYS = ['tone', 'energy', 'space', 'mood'], NEAR = 1.08, FAR = 2.4, MID = (NEAR + FAR) / 2;
+  var HOME = [145, 35, -35, -145].map(function (deg) { var a = deg * Math.PI / 180; return [MID * Math.cos(a), MID * Math.sin(a)]; });
   var pos = HOME.map(function (p) { return p.slice(); }), dots = { tone: 0, energy: 0, space: 0, mood: 0 };
   var stage = document.getElementById('smp-stage'), spokes = document.getElementById('smp-spokes'), dotEls = stage.querySelectorAll('.smp-dot'), geo = null;
   function clamp1(v) { return Math.max(-1, Math.min(1, v)); }
-  function readDots() {
-    var cu = 0, cv = 0, s = 0, sx = 0, sy = 0;
-    pos.forEach(function (p) { cu += p[0] / 4; cv += p[1] / 4; });
-    pos.forEach(function (p) { var du = p[0] - cu, dv = p[1] - cv; s += Math.sqrt(du * du + dv * dv) / 4; sx += Math.abs(du) / 4; sy += Math.abs(dv) / 4; });
-    function z(v) { return Math.abs(v) < 0.04 ? 0 : Math.round(clamp1(v) * 100) / 100; }
-    dots = { tone: z(cu / 0.5), energy: z(cv / 0.5), space: z(s / Math.SQRT1_2 - 1), mood: z(sx + sy > 1e-6 ? (sx - sy) / (sx + sy) * 2 : 0) };
-  }
+  function dotVal(p) { var v = clamp1((MID - Math.sqrt(p[0] * p[0] + p[1] * p[1])) / ((FAR - NEAR) / 2)); return Math.abs(v) < 0.05 ? 0 : Math.round(v * 100) / 100; }
+  function readDots() { KEYS.forEach(function (k, i) { dots[k] = dotVal(pos[i]); }); }
+  function isHome(i) { return Math.abs(pos[i][0] - HOME[i][0]) < 1e-3 && Math.abs(pos[i][1] - HOME[i][1]) < 1e-3; }
   function dotCode() {
-    var moved = pos.some(function (p, i) { return p[0] !== HOME[i][0] || p[1] !== HOME[i][1]; });
-    return moved ? '&d=' + pos.map(function (p) { return Math.round(p[0] * 100) + '.' + Math.round(p[1] * 100); }).join('.') : '';
+    return pos.some(function (p, i) { return !isHome(i); }) ? '&d=' + pos.map(function (p) { return Math.round(p[0] * 100) + '.' + Math.round(p[1] * 100); }).join('.') : '';
   }
   // The .inf names the shape it was made with, so the patch reads back as what was heard.
   function dotNote(patch) {
@@ -179,27 +176,35 @@
   function layoutDots() {
     var w = stage.clientWidth, h = stage.clientHeight, m = dotEls[0] ? dotEls[0].offsetWidth / 2 + 4 : 18;
     if (!w) return;
-    geo = { cx: w / 2, cy: h / 2, rx: w / 2 - m, ry: h / 2 - m };
+    // The shader draws the blob at radius 0.62 in units of half the short side, so one blob radius is 0.31 x the short side.
+    geo = { cx: w / 2, cy: h / 2, br: Math.min(w, h) * 0.31, mx: w / 2 - m, my: h / 2 - m };
     placeDots();
+  }
+  function fitPos(p) {
+    if (!geo) return p;
+    return [Math.max(-geo.mx, Math.min(geo.mx, p[0] * geo.br)) / geo.br, Math.max(-geo.my, Math.min(geo.my, p[1] * geo.br)) / geo.br];
   }
   function placeDots() {
     if (!geo) return;
-    var pts = pos.map(function (p) { return [geo.cx + p[0] * geo.rx, geo.cy - p[1] * geo.ry]; });
+    var svg = '';
     Array.prototype.forEach.call(dotEls, function (el, i) {
-      el.style.left = pts[i][0] + 'px'; el.style.top = pts[i][1] + 'px';
-      el.classList.toggle('is-moved', pos[i][0] !== HOME[i][0] || pos[i][1] !== HOME[i][1]);
+      var p = pos[i], x = geo.cx + p[0] * geo.br, y = geo.cy - p[1] * geo.br, v = dots[KEYS[i]], r = Math.sqrt(p[0] * p[0] + p[1] * p[1]) || 1;
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.style.setProperty('--amt', ((v + 1) / 2).toFixed(3));
+      el.setAttribute('aria-valuenow', Math.round(v * 100));
+      // A tether from the blob's edge to the dot; brighter the harder it pulls.
+      var ex = geo.cx + p[0] / r * geo.br, ey = geo.cy - p[1] / r * geo.br;
+      if (r > 1) svg += '<line x1="' + ex.toFixed(1) + '" y1="' + ey.toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) + '" style="opacity:' + (0.25 + 0.6 * Math.max(0, v)).toFixed(2) + '"/>';
     });
-    // A faint outline joins the dots, so the shape being read is visible.
-    spokes.innerHTML = '<polygon points="' + pts.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '"/>';
-    stage.setAttribute('aria-valuetext', 'tone ' + dots.tone + ', energy ' + dots.energy + ', space ' + dots.space + ', mood ' + dots.mood);
+    spokes.innerHTML = svg;
   }
-  function setDots(p) { pos = p.map(function (q) { return [clamp1(q[0]), clamp1(q[1])]; }); readDots(); placeDots(); }
+  function setDots(p) { pos = p.map(fitPos); readDots(); placeDots(); }
   function moveDot(i, u, v) {
-    u = clamp1(u); v = clamp1(v);
-    if (u === pos[i][0] && v === pos[i][1]) return;
-    var before = JSON.stringify(dots);
-    pos[i] = [u, v]; readDots(); placeDots();
-    if (JSON.stringify(dots) !== before) reshape();
+    var q = fitPos([u, v]);
+    if (q[0] === pos[i][0] && q[1] === pos[i][1]) return;
+    var before = dots[KEYS[i]];
+    pos[i] = q; readDots(); placeDots();
+    if (dots[KEYS[i]] !== before) reshape();
   }
   var shaping = false, shapeAgain = false;
   function reshape() {
@@ -222,14 +227,14 @@
     el.addEventListener('pointermove', function (e) {
       if (e.pointerId !== id || !geo) return;
       var b = stage.getBoundingClientRect();
-      moveDot(i, (e.clientX - off[0] - b.left - geo.cx) / geo.rx, -(e.clientY - off[1] - b.top - geo.cy) / geo.ry);
+      moveDot(i, (e.clientX - off[0] - b.left - geo.cx) / geo.br, -(e.clientY - off[1] - b.top - geo.cy) / geo.br);
     });
     function up(e) { if (e.pointerId !== id) return; id = null; el.classList.remove('is-drag'); }
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     el.addEventListener('dblclick', function () { moveDot(i, HOME[i][0], HOME[i][1]); });
     el.addEventListener('keydown', function (e) {
-      var st = { ArrowRight: [0.05, 0], ArrowLeft: [-0.05, 0], ArrowUp: [0, 0.05], ArrowDown: [0, -0.05] }[e.key];
-      if (st) { e.preventDefault(); moveDot(i, Math.round((pos[i][0] + st[0]) * 100) / 100, Math.round((pos[i][1] + st[1]) * 100) / 100); }
+      var st = { ArrowRight: [0.08, 0], ArrowLeft: [-0.08, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+      if (st) { e.preventDefault(); moveDot(i, pos[i][0] + st[0], pos[i][1] + st[1]); }
       else if (e.key === 'Home' || e.key === '0') { e.preventDefault(); moveDot(i, HOME[i][0], HOME[i][1]); }
     });
   });
@@ -532,7 +537,7 @@
     bctx.save(); bctx.globalAlpha = 0.35; bctx.strokeStyle = '#fff'; bctx.lineWidth = 1.5; shape(0.78, 0.7, 1.4); bctx.stroke(); bctx.restore();
   }
   // A fragment shader draws the blob: a warped, blurred field in the brand's ember and signal, its edge pushed out by sixteen bands of the loop.
-  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG; uniform float uL, uTone, uHarsh, uSpace, uMood;\n' +
+  var FS = 'precision highp float; uniform vec2 uRes; uniform float uT, uE, uBusy; uniform float uB[16]; uniform vec3 uA, uS, uG; uniform float uL, uTone, uHarsh, uSpace, uMood; uniform vec3 uP[4], uC[4];\n' +
     'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
     'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n' +
     '  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }\n' +
@@ -544,7 +549,9 @@
     '  vec2 q = vec2(fbm(p * 1.3 + t * 0.12), fbm(p * 1.3 - t * 0.1 + 4.0));\n' +
     '  float wob = (fbm(vec2(cos(a), sin(a)) * 1.4 + t * 0.18) - 0.5) * (0.26 + 0.16 * uBusy);\n' +
     '  wob += uHarsh * ((noise(vec2(a * 5.0 + t * 1.6, t * 0.9)) - 0.5) * 0.24 + 0.05 * sin(a * 21.0 + t * 5.0));\n' +
-    '  float R = 0.62 + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
+    '  vec2 n = p / max(r, 1e-4); float lean = 0.0; vec3 tint = vec3(0.0); float tw = 0.0;\n' +
+    '  for (int i = 0; i < 4; i++) { float k = pow(max(dot(n, normalize(uP[i].xy + 1e-4)), 0.0), 5.0); lean += uP[i].z * k; float pw = max(uP[i].z, 0.0) * k; tint += uC[i] * pw; tw += pw; }\n' +
+    '  float R = 0.62 + 0.17 * lean + wob + 0.24 * band(abs(a) / 3.14159) + 0.1 * uE + 0.04 * uBusy * sin(t * 5.0);\n' +
     '  float d = r - R;\n' +
     '  float soft = mix(1.0, 0.3, uHarsh) * (1.0 + 0.6 * max(uSpace, 0.0));\n' +
     '  float body = smoothstep(0.2 * soft, -0.22 * soft, d);\n' +
@@ -561,9 +568,10 @@
     '  vec3 cl = mix(uS * 0.8, vec3(0.5, 0.32, 0.88), smoothstep(0.1, 0.55, g)); cl = mix(cl, vec3(0.9, 0.5, 0.82), smoothstep(0.55, 1.0, g));\n' +
     '  c = mix(c, cl, uL);\n' +
     '  c = mix(c, vec3(1.0), mix(0.28, 0.1, uL) * (0.6 + 0.6 * max(uTone, 0.0)) * smoothstep(0.6, 0.0, length(p - vec2(-0.18, 0.2))) * body);\n' +
+    '  c = mix(c, tint / max(tw, 1e-4), clamp(tw, 0.0, 1.0) * 0.6 * smoothstep(-0.45, 0.05, d));\n' +
     '  float edge = smoothstep(-0.5, 0.2, d) * body; c = mix(c, uS, edge * 0.45);\n' +
     '  float al = clamp(body * 0.94 + glow * (1.0 - body), 0.0, 1.0);\n' +
-    '  vec3 col = mix(mix(uS, uA, 0.5), c, body);\n' +
+    '  vec3 col = mix(mix(mix(uS, uA, 0.5), tint / max(tw, 1e-4), clamp(tw, 0.0, 1.0) * 0.7), c, body);\n' +
     '  col += (hash(gl_FragCoord.xy + t) - 0.5) * (1.0 / 120.0 + 0.07 * uHarsh * body);\n' +
     '  gl_FragColor = vec4(col * al, al);\n' +
     '}';
@@ -580,12 +588,12 @@
     var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     var loc = gl.getAttribLocation(gp, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG', 'uL', 'uTone', 'uHarsh', 'uSpace', 'uMood'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
+    ['uRes', 'uT', 'uE', 'uBusy', 'uB', 'uA', 'uS', 'uG', 'uL', 'uTone', 'uHarsh', 'uSpace', 'uMood', 'uP', 'uC'].forEach(function (n) { gU[n] = gl.getUniformLocation(gp, n); });
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     return true;
   }
   function rgb(css, d) { var m = /^#([0-9a-f]{6})$/i.exec((css || '').trim()); if (!m) return d; var n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
-  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], bands = [], busyK = 0, light = 0, chr = { tone: 0, harsh: 0, space: 0, mood: 0 };
+  var cA = [1, 0.42, 0.21], cS = [0.65, 0.69, 1], cD = [[1, 0.8, 0.66], [1, 0.42, 0.21], [0.65, 0.69, 1], [0.4, 0.42, 0.9]], lp = [0, 0, 0, 0], bands = [], busyK = 0, light = 0, chr = { tone: 0, harsh: 0, space: 0, mood: 0 };
   for (var bi = 0; bi < 16; bi++) bands.push(0);
   function blobDraw() {
     requestAnimationFrame(blobDraw);
@@ -596,6 +604,7 @@
     if (frame++ % 60 === 0) {
       var cs = getComputedStyle(bcv);
       cA = rgb(cs.getPropertyValue('--accent'), cA); cS = rgb(cs.getPropertyValue('--signal'), cS);
+      Array.prototype.forEach.call(dotEls, function (el, i) { cD[i] = rgb(getComputedStyle(el).getPropertyValue('--c'), cD[i]); });
       var ink = rgb(cs.getPropertyValue('--ink'), [1, 1, 1]); light = (ink[0] + ink[1] + ink[2]) / 3 < 0.5 ? 1 : 0;
     }
     var i, j, sum = 0, cw = 0, cs = 0;
@@ -615,6 +624,9 @@
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(gU.uRes, bcv.width, bcv.height); gl.uniform1f(gU.uT, bt); gl.uniform1f(gU.uE, energy); gl.uniform1f(gU.uBusy, busyK); gl.uniform1f(gU.uL, light);
     gl.uniform1f(gU.uTone, chr.tone); gl.uniform1f(gU.uHarsh, chr.harsh); gl.uniform1f(gU.uSpace, chr.space); gl.uniform1f(gU.uMood, chr.mood);
+    var P = [], C = [];
+    for (i = 0; i < 4; i++) { lp[i] += (dots[KEYS[i]] - lp[i]) * 0.08; P.push(pos[i][0], pos[i][1], lp[i]); C.push(cD[i][0], cD[i][1], cD[i][2]); }
+    gl.uniform3fv(gU.uP, new Float32Array(P)); gl.uniform3fv(gU.uC, new Float32Array(C));
     gl.uniform1fv(gU.uB, new Float32Array(bands)); gl.uniform3fv(gU.uA, cA); gl.uniform3fv(gU.uS, cS); gl.uniform3fv(gU.uG, [0.08, 0.1, 0.19]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
