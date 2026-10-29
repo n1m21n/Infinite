@@ -16,6 +16,8 @@ Designs (src = own:<engine>:bNNNN/<design>_<n>, the bank bNNNN is the group, so 
   base  every swept parameter drawn uniformly in its range (log for frequencies, log1p for times)       30%
   one   one parameter of a base of the same bank moved by more than 10% of its range                    60%
   pair  two or three parameters of a base moved together                                                10%
+--design sweep: banks from b5000, each one base and every other preset a one-knob move of it, the knobs rotating
+across banks so each gets pairs in many banks (knob_direction.py needs many one-knob pairs per knob, not per bank).
 Stop: ~/STOP_OWN exists, --budget minutes pass, or --count presets exist. Re-running resumes (ids are content hashes)."""
 import argparse, base64, hashlib, json, math, multiprocessing as mp, os, random, re, subprocess, sys, tempfile, time, zlib
 import numpy as np
@@ -126,10 +128,23 @@ def params_hash(node, sw):
 
 # ------------------------------------------------------------------ designs
 
+SWEEP_BANK0 = 5000
+
+
 def design_bank(node, sw, bank, size):
     """The recipes of one bank, a pure function of (node, bank): [(design, u-vector)]. Order inside a bank is fixed, so a
     bank is complete or absent, and a later run reproduces exactly the same points."""
     rng = random.Random("%s/%d" % (node, bank))
+    if bank >= SWEEP_BANK0:
+        base = [rng.random() for _ in sw]; out = [("base", base)]
+        for k in range(size - 1):
+            u = list(base); i = ((bank - SWEEP_BANK0) * (size - 1) + k) % len(sw)
+            for _ in range(50):
+                x = rng.random()
+                if abs(x - u[i]) > 0.10:
+                    break
+            u[i] = x; out.append(("one", u))
+        return out
     n_base = max(1, round(size * MIX[0][1])); n_pair = max(1, round(size * MIX[2][1])); n_one = size - n_base - n_pair
     bases = [[rng.random() for _ in sw] for _ in range(n_base)]
     out = [("base", u) for u in bases]
@@ -368,7 +383,7 @@ def cmd_run(a):
     os.makedirs(OUT_DIR, exist_ok=True)
     have = existing_ids(path); t0 = time.time(); added = 0; failed = 0
     print("%s: %d swept, %d fixed, %d presets stored" % (node, len(sw), len(fixed), len(have)), flush=True)
-    work, bank = [], 0
+    work, bank = [], (SWEEP_BANK0 if a.design == "sweep" else 0)
     if a.queue:
         q = json.load(open(os.path.expanduser(a.queue)))
         for n, it in enumerate(q["items"]):
@@ -383,7 +398,7 @@ def cmd_run(a):
         seen = {w["id"] for w in work}
         its = [it for it in items_for_bank(node, sw, fixed, bank, a.bank_size) if it["id"] not in have and it["id"] not in seen]
         work += its; bank += 1
-        if bank > 100000:
+        if bank > 100000 or (a.design != "sweep" and bank >= SWEEP_BANK0):
             break
     work = work[: a.count - len(have)]
     chunks = [work[i:i + a.chunk] for i in range(0, len(work), a.chunk)]
@@ -479,6 +494,7 @@ def main():
     ap.add_argument("--shards", type=int, default=4)
     ap.add_argument("--chunk", type=int, default=20, help="presets per Infinite process")
     ap.add_argument("--bank-size", type=int, default=20)
+    ap.add_argument("--design", choices=["mix", "sweep"], default="mix", help="sweep: one-knob banks from b5000 (see top)")
     ap.add_argument("--budget", type=float, default=0, help="minutes; 0 = none")
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--notes", default="", help="comma list of windows to render (e.g. C3); default all 8. Same audio for the windows kept")

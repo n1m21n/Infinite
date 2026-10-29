@@ -1,5 +1,7 @@
 # Start here (written 2026-10-29, night)
 
+**2026-10-29 status, gaps and plan per model: `STATUS-2026-10-29.md`.**
+
 Goal: GOAL.md. Work reference for every model: IMPROVEMENT-PLAN.md. Status per bar: HANDOFF.md (newest sections at the end, "2026-10-29 (night)").
 Branch feature/sample-dots, nothing pushed. `tools/seo/ledger.json` has an unrelated uncommitted change: leave it.
 
