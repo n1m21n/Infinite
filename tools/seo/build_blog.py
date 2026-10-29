@@ -109,7 +109,7 @@ def thumb(img, width):
 def head(title, desc, url, image, extra="", kind="website", depth="../"):
     img = image if image.startswith("http") else BASE + image.lstrip("/")
     return f"""<!DOCTYPE html>
-<html lang="en" data-mode="paper">
+<html lang="en" data-mode="midnight">
 <head>
   <!-- Google Tag Manager -->
   <script>(function(w,d,s,l,i){{w[l]=w[l]||[];w[l].push({{'gtm.start':
@@ -121,7 +121,7 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FBFAF6">
-  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="{depth}theme.js?v=2"></script>
   <title>{e(title)}</title>
   <meta name="description" content="{e(desc)}">

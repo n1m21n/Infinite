@@ -614,12 +614,12 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
     if os.path.exists(faq):   # FAQPage schema kept as a file per audience page, so a regenerate does not drop it
         ldtags += "\n" + open(faq, encoding="utf-8").read().rstrip("\n")
     return f'''<!DOCTYPE html>
-<html lang="en" data-mode="paper">
+<html lang="en" data-mode="midnight">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#151930">
-  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="theme.js?v=2"></script>
   <title>{e(title)}</title>
   <meta name="description" content="{e(desc)}">

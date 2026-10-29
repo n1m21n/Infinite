@@ -313,6 +313,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
 .hero-mobile-cta { display: none; }
 @media (max-width: 768px) {
+  #hero-download { display: none; }   /* a phone cannot install the desktop app: Email + Star replace it */
   .hero-mobile-cta:not([hidden]) {
     display: flex;
     flex-direction: column;
@@ -793,8 +794,10 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   .menu-btn:focus-visible { box-shadow: 0 0 0 2px var(--signal); }
   .brand-name { display: none; }
   .brand-icon { width: 32px; height: 32px; }
-  .nav-actions { margin-left: auto; }
-  .nav-download, .nav-actions .icon-btn:not([data-mode-toggle]):not(.share-btn) { display: none; }   /* phones: the theme switch stays; Download and the social icons live in the sheet and footer */
+  .nav-actions { margin-left: auto; gap: 2px; display: flex; align-items: center; }
+  .nav-actions .icon-btn { width: 32px; height: 32px; }
+  .nav-actions .icon-btn svg { width: 16px; height: 16px; }
+  .nav-download { display: none; }
   .hide-sm { display: none; }
 
   .predict-card { grid-template-columns: 1fr; }
@@ -997,3 +1000,7 @@ p.mono { font-size: 0.84375rem; }
 .modal-quiet[hidden] { display: none; }
 .modal-quiet .ic { width: 18px; height: 18px; }
 @media (max-width: 680px) { .modal-quiet { min-height: 44px; } }
+
+/* section headings that link out (the nodes count -> /nodes/) */
+.slab-link { color: inherit; text-decoration: none; display: inline-block; }
+.slab-link:hover span, .slab-link:focus-visible span { color: var(--signal, var(--ink)); }

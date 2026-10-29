@@ -180,12 +180,12 @@ def build_gallery(items):
           "mainEntity": {"@type": "ItemList", "numberOfItems": len(items), "itemListElement": [
               {"@type": "ListItem", "position": n + 1, "url": f"{BASE}embeds/{i['slug']}.html", "name": i["title"]} for n, i in enumerate(items)]}}
     return f"""<!DOCTYPE html>
-<html lang="en" data-mode="paper" class="has-reels">
+<html lang="en" data-mode="midnight" class="has-reels">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#151930">
-  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
   <script src="../theme.js?v=2"></script>
   <title>Infinite embeds: audio-reactive visuals for any page</title>
   <meta name="description" content="Free audio-reactive WebGL visuals made in Infinite. Copy one iframe into a portfolio, blog or landing page.">
