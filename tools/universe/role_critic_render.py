@@ -13,12 +13,12 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import frame_features as ff
 from role_critic_samples import MLP, Linear, score
 
-OUT = os.path.expanduser("~/Infinite/training-data/audio/gen_parts.jsonl")
+OUT = os.path.expanduser("~/Infinite/training-data/audio/gen_parts_v2.jsonl")   # v2: note features; gen_parts.jsonl is the first run
 GEN = os.path.join(HERE, "../../website/gen")
 NESTED = {("drums", "kicks"), ("drums", "snares"), ("drums", "hats"), ("synths", "bass"), ("synths", "leads"), ("percussion", "toms"), ("percussion", "snares")}
 
 def render(a):
-    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), GEN, str(a.first), str(a.seeds)], stdout=subprocess.PIPE)
+    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), GEN, str(a.first), str(a.seeds), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"] + (["shaped"] if a.shaped else []), stdout=subprocess.PIPE)
     f, n = p.stdout, 0
     with open(OUT, "a") as o:
         while True:
@@ -39,13 +39,16 @@ def train(a):
     nested = np.zeros((len(names), len(names)), bool)
     for p, q in NESTED:
         if p in names and q in names: nested[names.index(p), names.index(q)] = nested[names.index(q), names.index(p)] = True
-    res = {"Linear": [], "MLP": []}; per_role = {k: collections.defaultdict(list) for k in res}; conf = np.zeros((len(names), len(names)))
+    shaped = np.array([r.get("shape") is not None for r in rows]); allowed = shaped | ~shaped if a.train_on == "all" else ~shaped
+    print("shaped renders:", int(shaped.sum()), "| training on:", a.train_on)
+    subsets = {"rest": ~shaped, "shaped": shaped}
+    res = {m: {k: [] for k in subsets} for m in ("Linear", "MLP")}; per_role = {m: collections.defaultdict(list) for m in res}; conf = np.zeros((len(names), len(names)))
     for f in range(a.folds):
-        te = fold_of == f; trs = np.unique(g[~te])
+        te = fold_of == f; trs = np.unique(g[~te & allowed])
         if a.calib == "val":   # one validation slice of training styles sets the cut-offs; the model trains on the rest
-            val = set(rng.choice(trs, max(1, len(trs) // 6), replace=False)); va = np.isin(g, list(val)) & ~te; tr = ~te & ~va
+            val = set(rng.choice(trs, max(1, len(trs) // 6), replace=False)); va = np.isin(g, list(val)) & ~te & allowed; tr = ~te & ~va & allowed
         else:                  # out-of-fold: every training style is scored once by a model that never saw it; the model trains on all of them
-            tr = ~te; inner = {s: i % a.inner for i, s in enumerate(rng.permutation(trs))}
+            tr = ~te & allowed; inner = {s: i % a.inner for i, s in enumerate(rng.permutation(trs))}
         mu, sd = X[tr].mean(0), X[tr].std(0) + 1e-9; Z = (X - mu) / sd
         wt = lambda m: (1.0 / np.maximum(np.bincount(y[m], minlength=len(names)), 1))[y[m]]
         make = {"Linear": lambda s: Linear(len(names), a.epochs), "MLP": lambda s: MLP(len(names), a.epochs, h=(128, 64), seed=s)}
@@ -60,28 +63,35 @@ def train(a):
                     Pc[hold] = make[name](100 + 10 * f + k).fit(Z[fit], y[fit], wt(fit)).proba(Z[hold])
                 Pc, yc = Pc[tr], y[tr]
             th = np.array([np.percentile(Pc[yc == c, c], a.pct) if (yc == c).sum() >= 10 else 0.0 for c in range(len(names))])
-            P = M.proba(Z[te]); frr, catch, top1, per = score(P, y[te], th)
-            rej = P < th[None, :]; yt = y[te]; mask = ~nested[yt] ; mask[np.arange(len(yt)), yt] = False
-            catch_flat = float(rej[mask].mean())
-            res[name].append((frr, catch, top1, catch_flat))
-            for c, v in per.items(): per_role[name][names[c]].append(v)
-            if name == "MLP":
-                for t, p_ in zip(yt, P.argmax(1)): conf[t, p_] += 1
-            print("fold %d %-6s FRR %.3f catch %.3f (non-nested %.3f) top-1 %.3f (%d test renders, %d styles)" % (f, name, frr, catch, catch_flat, top1, te.sum(), len(np.unique(g[te]))), flush=True)
-    out = {"roles": names, "n": int(len(y)), "styles": len(styles), "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py", "calib": a.calib, "pct": a.pct}
-    for name, R in res.items():
-        R = np.array(R); out[name] = {"frr": R[:, 0].tolist(), "catch": R[:, 1].tolist(), "top1": R[:, 2].tolist(), "catch_non_nested": R[:, 3].tolist(),
-                                       "catch_by_role": {k: round(float(np.mean(v)), 3) for k, v in per_role[name].items()}}
-        print("%-6s FRR %.3f+-%.3f | catch %.3f+-%.3f (non-nested %.3f) | top-1 %.3f" % (name, R[:, 0].mean(), R[:, 0].std(), R[:, 1].mean(), R[:, 1].std(), R[:, 3].mean(), R[:, 2].mean()))
+            for sub, sm in subsets.items():
+                t = te & sm
+                if not t.any(): continue
+                P = M.proba(Z[t]); yt = y[t]; frr, catch, top1, per = score(P, yt, th)
+                rej = P < th[None, :]; mask = ~nested[yt]; mask[np.arange(len(yt)), yt] = False
+                res[name][sub].append((frr, catch, top1, float(rej[mask].mean())))
+                if sub == "shaped" or not shaped.any():
+                    for c, v in per.items(): per_role[name][names[c]].append(v)
+                    if name == "MLP":
+                        for t_, p_ in zip(yt, P.argmax(1)): conf[t_, p_] += 1
+                print("fold %d %-6s %-6s FRR %.3f catch %.3f top-1 %.3f (%d test renders)" % (f, name, sub, frr, catch, top1, t.sum()), flush=True)
+    out = {"roles": names, "n": int(len(y)), "shaped": int(shaped.sum()), "train_on": a.train_on, "styles": len(styles),
+           "split": "%d-fold, whole styles held out" % a.folds, "features": "frame_features.py (+ notes)", "calib": a.calib, "pct": a.pct}
+    for name in res:
+        out[name] = {"catch_by_role": {k: round(float(np.mean(v)), 3) for k, v in per_role[name].items()}}
+        for sub, R in res[name].items():
+            if not R: continue
+            R = np.array(R); out[name][sub] = {"frr": R[:, 0].tolist(), "catch": R[:, 1].tolist(), "top1": R[:, 2].tolist(), "catch_non_nested": R[:, 3].tolist()}
+            print("%-6s %-6s FRR %.3f+-%.3f | catch %.3f+-%.3f (non-nested %.3f) | top-1 %.3f" % (name, sub, R[:, 0].mean(), R[:, 0].std(), R[:, 1].mean(), R[:, 1].std(), R[:, 3].mean(), R[:, 2].mean()))
     cn = conf / np.maximum(conf.sum(1, keepdims=True), 1); np.fill_diagonal(cn, 0)
     out["top_confusions"] = [[names[i], names[j], round(float(cn[i, j]), 3)] for i, j in zip(*np.unravel_index(np.argsort(-cn, None)[:10], cn.shape))]
     print("confusions", out["top_confusions"])
-    best = max(("Linear", "MLP"), key=lambda k: np.mean(out[k]["catch"]))
-    out["verdict"] = "MET" if np.mean(out[best]["frr"]) <= 0.03 and np.mean(out[best]["catch"]) >= 0.96 else "MISS"; print("verdict", out["verdict"], "(", best, ")")
+    ok = lambda m: all(np.mean(out[m][s]["frr"]) <= 0.03 and np.mean(out[m][s]["catch"]) >= 0.96 for s in subsets if s in out[m])
+    out["verdict"] = {m: "MET" if ok(m) else "MISS" for m in res}; print("verdict (every subset inside both bars)", out["verdict"])
     if a.out: json.dump(out, open(a.out, "w"), indent=1)
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["render", "train"]); ap.add_argument("--seeds", type=int, default=10)
-    ap.add_argument("--first", type=int, default=9000); ap.add_argument("--folds", type=int, default=5); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--out")
+    ap.add_argument("--first", type=int, default=9000); ap.add_argument("--folds", type=int, default=5); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--out"); ap.add_argument("--shaped", action="store_true", help="render: random dots and variation per render")
+    ap.add_argument("--train-on", choices=["rest", "all"], default="all", help="train: rows used for training (the test always reports rest and shaped apart)")
     ap.add_argument("--calib", choices=["val", "oof"], default="oof"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--pct", type=float, default=3)
     a = ap.parse_args(); render(a) if a.cmd == "render" else train(a)

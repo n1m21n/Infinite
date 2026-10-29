@@ -63,15 +63,43 @@ def measure(L, R, fs=48000):
     pk_abs = float(np.abs(np.r_[L, R]).max()); rms = float(np.sqrt((m ** 2).mean()) + 1e-12)
     den = math.sqrt(float((L * L).sum()) * float((R * R).sum())); corr = float((L * R).sum()) / den if den > 0 else 1.0
     tot = np.power(10, sh_mean)
-    return {"shape": sh_mean.tolist(), "shape_sd": sh_std.tolist(), "env": env.tolist(),
+    notes = _notes(pw[act], freqs, rate)
+    return {"notes": notes, "shape": sh_mean.tolist(), "shape_sd": sh_std.tolist(), "env": env.tolist(),
             "scalars": [len(on) / dur, float(np.median(att)) if att else 0, float(np.median(dec)) if dec else 0, float(np.median(sus)) if sus else 0,
                         float(act.mean()), float(np.std(loud[act])), float(np.median(hv)) if hv else 0, float(np.mean(cen[act])), float(np.std(cen[act])),
                         float(np.mean(flat[act])), float(np.std(flat[act])), float(np.mean(tf[act])), float(np.mean(flux)), float(np.std(flux)),
                         float(np.std(ioi) / (np.mean(ioi) + 1e-9)), math.log10(pk_abs / rms + 1e-9), corr,
                         float(tot[:11].sum() / tot.sum()), float(tot[11:22].sum() / tot.sum()), float(tot[22:].sum() / tot.sum())]}
 
+_chroma_cache = {}
+
+def _notes(pw, freqs, rate):
+    """What separates pad / pluck / lead / synth: how many notes sound at once, how long a note holds, how steady the pitch is.
+    12-bin pitch profile per frame from 55 Hz - 4 kHz bins; peaks over 30% of the frame's largest = notes sounding."""
+    key = (len(freqs), float(freqs[1]))
+    if key not in _chroma_cache:
+        ok = (freqs >= 55) & (freqs <= 4000); pc = np.zeros((12, len(freqs)))
+        pc[(np.round(12 * np.log2(freqs[ok] / 440.0)).astype(int) % 12), np.flatnonzero(ok)] = 1
+        _chroma_cache[key] = pc
+    if len(pw) < 2: return [0.0] * 8
+    pk = np.zeros_like(pw); pk[:, 1:-1] = (pw[:, 1:-1] > pw[:, :-2]) & (pw[:, 1:-1] >= pw[:, 2:]) & (pw[:, 1:-1] > 1e-3 * pw.max(1, keepdims=True))
+    C = (pw * pk) @ _chroma_cache[key].T; C = C / (C.max(1, keepdims=True) + 1e-20)   # spectral peaks only: window leakage is not a note
+    if len(C) >= 3: C = (C + np.r_[C[:1], C[:-1]] + np.r_[C[1:], C[-1:]]) / 3   # 3-frame smoothing
+    C = C / (C.max(1, keepdims=True) + 1e-20); poly = (C > 0.3).sum(1); top = C.argmax(1)
+    runs, r = [], 1
+    for i in range(1, len(top)):
+        if top[i] == top[i - 1] or C[i, top[i - 1]] > 0.6: r += 1   # a note holds while its pitch stays near the top
+        else: runs.append(r); r = 1
+    runs.append(r)
+    Cn = C / (np.linalg.norm(C, axis=1, keepdims=True) + 1e-12); steady = (Cn[1:] * Cn[:-1]).sum(1)
+    p = C.mean(0); p = p / p.sum(); ent = float(-(p * np.log(p + 1e-12)).sum() / np.log(12))
+    return [float(np.mean(poly)), float(np.percentile(poly, 90)), float(np.mean(runs) / rate), float(np.percentile(runs, 90) / rate),
+            float(np.mean(steady)), float(np.std(steady)), ent, float(len(set(top.tolist())) / 12)]
+
+NOTES = ["poly_mean", "poly_p90", "note_len_s", "note_len_p90_s", "pitch_steady", "pitch_steady_sd", "pitch_entropy", "pitch_classes_used"]
+
 SCALARS = ["onsets_per_s", "attack_ms", "decay_ms", "sustain_200ms", "active_share", "loud_sd", "pitchedness", "centroid", "centroid_sd",
            "flatness", "flatness_sd", "timbre_change", "flux", "flux_sd", "ioi_cv", "crest_log", "corr", "low", "mid", "high"]
 
 def vector(d):
-    return np.r_[d["shape"], d["shape_sd"], d["env"], d["scalars"]]
+    return np.r_[d["shape"], d["shape_sd"], d["env"], d["scalars"], d.get("notes", [])]

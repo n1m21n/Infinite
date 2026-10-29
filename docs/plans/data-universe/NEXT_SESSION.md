@@ -1,6 +1,6 @@
 # Start here (written 2026-10-29, evening)
 
-Goal: GOAL.md. Status per bar: HANDOFF.md (newest sections at the end). Branch feature/sample-dots, nothing pushed.
+Goal: GOAL.md. Work reference for every model: IMPROVEMENT-PLAN.md. Status per bar: HANDOFF.md (newest sections at the end). Branch feature/sample-dots, nothing pushed.
 
 ## Running or just finished when this was written
 - Wavetable render: `own_sweeps.py run --node Wavetable --count 6000 --shards 2 --budget 120` (log in the old session's scratchpad). It stops by itself.
