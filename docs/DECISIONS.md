@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-10-29 Agent (owner delegated the call): sound words (C4) in three tiers, from `feel/words_eval2.json` (AUC held out by pack). Heard (>= 0.75, Infinite may tag a sound with it): sub, distorted, mellow, punchy, digital. Close (0.70-0.75, kept and worked on, never claimed yet): dark, warm, heavy, dusty, analog. Name-only (the word follows the pack, not the audio; search by preset name only, never a claim about the sound): clean, soft, airy, light, wide, metallic, thin, wet, smooth, and every other word under 0.70 until it reaches 0.75.
 - 2026-10-24 Owner: Visual art and library generator work must be creative, grounded in authentic art movements (the art taxonomy in `tools/spread/art_taxonomy.py`: Risograph Manga, Ukiyo-e Woodblock, 1-Bit Ditherpunk, Swiss Neo-Brutalism, Chavetta Collage, Analog CRT, Liminal Void, etc.), and never default to esoteric mathematics or raw differential equations. Visuals do not need to be audio-reactive; pure visual and pixel art stands on its own.
 - 2026-10-24 Owner: P8 Phase 3 is approved: Displacement gets a Noise source (5a), Feedback carries
   geometry (5b), and Point Trails is a new node (5c). Plan: `docs/plans/gpu-points/README.md`.
