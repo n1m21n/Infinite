@@ -205,12 +205,8 @@ namespace
    double Sr() { return S().src ? S().src->sr : kRate; }
    double Bpm() { return S().doc.sampleBpm > 0.0f ? (double)S().doc.sampleBpm : Transport::Instance().Tempo(); }
    double FramesPerBeat() { return Sr() * 60.0 / std::max(1.0, Bpm()); }
-   // What the edit plays at: the project's tempo, or the sample's own playback tempo.
-   double TargetBpm()
-   {
-      const SampleWide& w = S().doc.wide;
-      return w.followTempo ? Transport::Instance().Tempo() : (double)w.ownBpm;
-   }
+   // What the edit plays at: always the project's tempo.
+   double TargetBpm() { return Transport::Instance().Tempo(); }
 
    ImU32 SliceColour(const SliceSet& d, int i, float alpha = 1.0f)
    {
@@ -2539,37 +2535,10 @@ namespace
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Set the gain so the edit peaks at -0.3 dB"));
 
-      SectionCard::Begin(T("Tempo"));
-      Row(T("Follow"), fieldW);
-      if (ImGui::Checkbox(L("Project tempo##studiofollow"), &w.followTempo) && !w.followTempo)
-         w.ownBpm = (float)Transport::Instance().Tempo(); // starts where it was playing
-      t.Item();
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Play the edit at the project's tempo; off plays it at its own tempo below"));
-      ImGui::BeginDisabled(w.followTempo);
-      Row(T("Play at"), fieldW);
-      FieldWell::Slider("##studioown", &w.ownBpm, 20.0f, 400.0f, "%.1f bpm");
-      t.Item();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("The edit's own playback tempo: it stretches to this, at the same pitch"));
-      ImGui::EndDisabled();
-      Row(T("Sample"), fieldW);
-      FieldWell::Slider("##studiobpm", &s.doc.sampleBpm, 0.0f, 300.0f, s.doc.sampleBpm > 0.0f ? "%.1f bpm" : "unknown");
-      t.Item();
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("The sample's own tempo: the grid, Fit to 16ths and the beats ruler use it"));
-
       if (t.activated)
          PushUndo(snap);
       if (t.changed || !(w == before))
          s.dirty = true;
-
-      // What the next Generate makes.
-      SectionCard::Begin(T("Generate"));
-      {
-         Row(T("Wild"), fieldW);
-         FieldWell::Slider("##studiowild", &s.variation, 0.0f, 1.0f, "%.2f");
-      }
 
       // The project's key and scale, which "snap to scale" follows (the same values as the top bar's key).
       SectionCard::Begin(T("Scale"));
@@ -2887,10 +2856,13 @@ namespace
          ZoomAround(viewMid, 1.0 / 0.6);
       DrawMagnifier(false);
       ImGui::EndDisabled();
+      FormParts::Inline(0.0f, in);
+      if (IconChip("##studioSettings", IconsInfinite::Mixer, s.settingsOpen, T("Sample and slice settings")))
+         s.settingsOpen = !s.settingsOpen;
       DrawSliceMenu();
       DrawReplaceConfirm();
 
-      // Out, pinned right: export, convert to patch, convert to node, settings.
+      // Out, pinned right: export, convert to patch, convert to node, Sample Audio.
       const char* exportL = L("Export##studioExport");
       const char* patchL = L("Convert to patch##studioPatch");
       const char* nodeL = L("Convert to node##studioNode");
@@ -2898,7 +2870,7 @@ namespace
       const bool studioMode = gAudioMode == AudioMode::Studio;
       const char* audioL = studioMode ? T("Sample Audio On") : T("Enable Sample Audio");
       const float audioW = ImGui::CalcTextSize(audioL).x + 2.0f * tok::space_2;
-      const float rightW = TextW(exportL) + TextW(patchL) + TextW(nodeL) + kIconW + audioW + 4.0f * in;
+      const float rightW = TextW(exportL) + TextW(patchL) + TextW(nodeL) + audioW + 3.0f * in;
       FormParts::Inline(0.0f, 0.0f);
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + between, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
       ImGui::BeginDisabled(!has || s.busy);
@@ -2917,9 +2889,6 @@ namespace
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", T("A sample node holding the edit"));
       ImGui::EndDisabled();
-      FormParts::Inline(0.0f, in);
-      if (IconChip("##studioSettings", IconsInfinite::Settings, s.settingsOpen, T("Sample and slice settings")))
-         s.settingsOpen = !s.settingsOpen;
       FormParts::Inline(0.0f, in);
       if (ChipButton::Draw(audioL, studioMode, tok::tile))
          SetStudioAudio(!studioMode);
