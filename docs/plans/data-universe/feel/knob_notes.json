@@ -1,0 +1,332 @@
+{
+ "Analog": {
+  "pairs_C3": 1300,
+  "banks": 101,
+  "by_window": {
+   "C3": {
+    "acc": 0.933,
+    "scored_moves": 150,
+    "pairs": 1300
+   },
+   "C4": {
+    "acc": 0.93,
+    "scored_moves": 142,
+    "pairs": 1300
+   },
+   "C3f": {
+    "acc": 0.945,
+    "scored_moves": 146,
+    "pairs": 1300
+   },
+   "C1": {
+    "acc": 0.934,
+    "scored_moves": 152,
+    "pairs": 1300
+   },
+   "C5": {
+    "acc": 0.939,
+    "scored_moves": 148,
+    "pairs": 1300
+   },
+   "C6": {
+    "acc": 0.938,
+    "scored_moves": 146,
+    "pairs": 1300
+   },
+   "C3pp": {
+    "acc": 0.92,
+    "scored_moves": 150,
+    "pairs": 1300
+   },
+   "C3mf": {
+    "acc": 0.921,
+    "scored_moves": 152,
+    "pairs": 1300
+   }
+  },
+  "by_axis_C3": null
+ },
+ "Oscillator": {
+  "pairs_C3": 1270,
+  "banks": 101,
+  "by_window": {
+   "C3": {
+    "acc": 0.966,
+    "scored_moves": 296,
+    "pairs": 1270
+   },
+   "C4": {
+    "acc": 0.97,
+    "scored_moves": 270,
+    "pairs": 1267
+   },
+   "C3f": {
+    "acc": 0.96,
+    "scored_moves": 300,
+    "pairs": 1271
+   },
+   "C1": {
+    "acc": 0.947,
+    "scored_moves": 318,
+    "pairs": 1275
+   },
+   "C5": {
+    "acc": 0.962,
+    "scored_moves": 238,
+    "pairs": 1265
+   },
+   "C6": {
+    "acc": 0.96,
+    "scored_moves": 225,
+    "pairs": 1265
+   },
+   "C3pp": {
+    "acc": 0.954,
+    "scored_moves": 304,
+    "pairs": 1274
+   },
+   "C3mf": {
+    "acc": 0.954,
+    "scored_moves": 303,
+    "pairs": 1274
+   }
+  },
+  "by_axis_C3": null
+ },
+ "FM": {
+  "pairs_C3": 1182,
+  "banks": 100,
+  "by_window": {
+   "C3": {
+    "acc": 0.938,
+    "scored_moves": 192,
+    "pairs": 1182
+   },
+   "C4": {
+    "acc": 0.957,
+    "scored_moves": 186,
+    "pairs": 1182
+   },
+   "C3f": {
+    "acc": 0.938,
+    "scored_moves": 193,
+    "pairs": 1182
+   },
+   "C1": {
+    "acc": 0.92,
+    "scored_moves": 201,
+    "pairs": 1182
+   },
+   "C5": {
+    "acc": 0.951,
+    "scored_moves": 183,
+    "pairs": 1182
+   },
+   "C6": {
+    "acc": 0.945,
+    "scored_moves": 164,
+    "pairs": 1182
+   },
+   "C3pp": {
+    "acc": 0.928,
+    "scored_moves": 181,
+    "pairs": 1182
+   },
+   "C3mf": {
+    "acc": 0.932,
+    "scored_moves": 192,
+    "pairs": 1182
+   }
+  },
+  "by_axis_C3": null
+ },
+ "Metallic": {
+  "pairs_C3": 1320,
+  "banks": 100,
+  "by_window": {
+   "C3": {
+    "acc": 0.935,
+    "scored_moves": 526,
+    "pairs": 1320
+   },
+   "C4": {
+    "acc": 0.923,
+    "scored_moves": 507,
+    "pairs": 1320
+   },
+   "C3f": {
+    "acc": 0.923,
+    "scored_moves": 543,
+    "pairs": 1320
+   },
+   "C1": {
+    "acc": 0.898,
+    "scored_moves": 620,
+    "pairs": 1320
+   },
+   "C5": {
+    "acc": 0.875,
+    "scored_moves": 553,
+    "pairs": 1320
+   },
+   "C6": {
+    "acc": 0.835,
+    "scored_moves": 528,
+    "pairs": 1320
+   },
+   "C3pp": {
+    "acc": 0.913,
+    "scored_moves": 597,
+    "pairs": 1320
+   },
+   "C3mf": {
+    "acc": 0.903,
+    "scored_moves": 559,
+    "pairs": 1320
+   }
+  },
+  "by_axis_C3": null
+ },
+ "String": {
+  "pairs_C3": 1350,
+  "banks": 96,
+  "by_window": {
+   "C3": {
+    "acc": 0.945,
+    "scored_moves": 398,
+    "pairs": 1350
+   },
+   "C4": {
+    "acc": 0.909,
+    "scored_moves": 494,
+    "pairs": 1350
+   },
+   "C3f": {
+    "acc": 0.945,
+    "scored_moves": 451,
+    "pairs": 1350
+   },
+   "C1": {
+    "acc": 0.875,
+    "scored_moves": 368,
+    "pairs": 1350
+   },
+   "C5": {
+    "acc": 0.896,
+    "scored_moves": 492,
+    "pairs": 1350
+   },
+   "C6": {
+    "acc": 0.849,
+    "scored_moves": 358,
+    "pairs": 1350
+   },
+   "C3pp": {
+    "acc": 0.904,
+    "scored_moves": 354,
+    "pairs": 1350
+   },
+   "C3mf": {
+    "acc": 0.939,
+    "scored_moves": 360,
+    "pairs": 1350
+   }
+  },
+  "by_axis_C3": null
+ },
+ "Wavetable": {
+  "pairs_C3": 2491,
+  "banks": 204,
+  "by_window": {
+   "C3": {
+    "acc": 0.833,
+    "scored_moves": 102,
+    "pairs": 2491
+   },
+   "C4": {
+    "acc": 0.859,
+    "scored_moves": 99,
+    "pairs": 2488
+   },
+   "C3f": {
+    "acc": 0.859,
+    "scored_moves": 99,
+    "pairs": 2490
+   },
+   "C1": {
+    "acc": 0.869,
+    "scored_moves": 99,
+    "pairs": 2491
+   },
+   "C5": {
+    "acc": 0.825,
+    "scored_moves": 97,
+    "pairs": 2488
+   },
+   "C6": {
+    "acc": 0.85,
+    "scored_moves": 100,
+    "pairs": 2483
+   },
+   "C3pp": {
+    "acc": 0.853,
+    "scored_moves": 95,
+    "pairs": 2492
+   },
+   "C3mf": {
+    "acc": 0.863,
+    "scored_moves": 95,
+    "pairs": 2492
+   }
+  },
+  "by_axis_C3": null
+ },
+ "Sampler": {
+  "pairs_C3": 162,
+  "banks": 12,
+  "by_window": {
+   "C3": {
+    "acc": 0.848,
+    "scored_moves": 33,
+    "pairs": 162
+   },
+   "C4": {
+    "acc": 0.875,
+    "scored_moves": 32,
+    "pairs": 162
+   },
+   "C3f": {
+    "acc": 0.848,
+    "scored_moves": 33,
+    "pairs": 162
+   },
+   "C1": {
+    "acc": null,
+    "scored_moves": 0,
+    "pairs": 0
+   },
+   "C5": {
+    "acc": null,
+    "scored_moves": 0,
+    "pairs": 0
+   },
+   "C6": {
+    "acc": null,
+    "scored_moves": 0,
+    "pairs": 0
+   },
+   "C3pp": {
+    "acc": null,
+    "scored_moves": 0,
+    "pairs": 0
+   },
+   "C3mf": {
+    "acc": null,
+    "scored_moves": 0,
+    "pairs": 0
+   }
+  },
+  "by_axis_C3": null
+ },
+ "bar": "held-out banks, >= 90% per window"
+}
