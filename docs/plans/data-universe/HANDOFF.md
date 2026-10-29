@@ -611,9 +611,9 @@ Each Note Sequencer layer (55 across the 32 style patches) against its own famil
 | Claim | Bar | Evidence | Verdict |
 |---|---|---|---|
 | C1 axes understood | R2 per axis mean >= 0.6, group split | median head R2 0.082-0.200 (group), best axes attack 0.44, density 0.23 | **FAIL** |
-| C2 ingredients | direction >= 90%, size r >= 0.7 | Analog 63.5% / r 0.635; Oscillator 61.8%; reliable cells 89.5% Analog | **FAIL** |
+| C2 ingredients | direction >= 90%, size r >= 0.7 | Analog 63.5% / r 0.635; Oscillator 61.8%; reliable cells 89.5-95.6% on six engines, Wavetable 75.0% | **FAIL** |
 | C3 good sound | AUC >= 0.8; owner >= 30/40 | AUC 0.924 PASS; owner 24/40 | **FAIL** (owner half) |
-| C4 words | AUC >= 0.75 per word; >= 70% of 50 | not run | **FAIL (not run)** |
+| C4 words | AUC >= 0.75 per word; >= 70% of 50 | words_eval2: 5 of 28 testable words >= 0.75 (sub, distorted, mellow, punchy, digital); made-sounds half not run | **FAIL** |
 | C5 moods | r >= 0.8 per dim; >= 80% in region | E r 0.816-0.844 PASS; V r 0.508-0.547; clips unscored (round 1 invalid) | **FAIL** (V) |
 | C6 creative | N < 0.1 at c = 0; N, R rise with c | Oscillator base N 0.883 (needs generator) | **FAIL (not run)** |
 | C7 can make | nearer than nearest render on 300 targets | not run | **FAIL (not run)** |
@@ -675,3 +675,52 @@ training styles, and the cut-offs come from 4 inner style-held-out models that s
 - MLP: FRR 2.6% +- 0.6 (bar <= 3%: MET), catch 97.9% +- 0.2 (bar >= 96%: MET), top-1 93.9%. Worst fold FRR 3.7% (fold 1); the bar is read on the mean.
 - Linear: FRR 2.9%, catch 96.9%, also inside both bars.
 Scope: parts of the generator against each other, on styles never seen in training. Not yet checked against real instruments (needs frame features on real audio).
+
+## 2026-10-29 (night): improvement-plan pass, results per bar
+Bars unchanged throughout; misses recorded as misses.
+
+### Goal item 3, Wavetable knob direction (4,080 own renders, 5 folds by bank): MISS
+`knob_direction.py` on the finished Wavetable render: reliable cells **75.0%** on 220 scored moves (bar 90%), dominant-axis 55.9% +- 1.1, 2,492 pairs over 204 banks.
+The other six engines stay at 89.5-95.6%. Reading: most Wavetable pairs move several knobs at once, so few (knob, axis) cells are reliable. Next: renders that move one knob
+at a time (`own_sweeps.py` with the "one" share raised), then rerun; one heavy job at a time, after the critic renders.
+
+### C4 words, second measurement (`tools/universe/words_eval2.py` -> `feel/words_eval2.json`): MISS
+Labels now come from Diva preset names, descriptions, usage, type tags and folders (4,326 rendered presets joined by name), Ableton device previews (12,119) and sample names (182,276);
+features add attack/decay, stereo width, onsets, length and the 40-point envelope. Logistic per word, 5 folds by group (bank / device folder / pack), AUC mean over folds.
+- **28 of 33 words testable** (was 5). On all sources together, **5 reach 0.75**: sub 0.945, distorted 0.833, mellow 0.784, punchy 0.783, digital 0.772.
+- The rest fall below; clean 0.389 and soft 0.48 are under chance (the word follows the pack, not the sound). Verdict read on the all-sources run, not on the best source per word.
+Next: dropping words the audio cannot carry needs Naman's sign-off; the "made sounds" half of C4 (>= 70% of 50) still not run.
+
+### Item 1, MIDI axes bug fix (`tools/universe/midi_axes.py`)
+Re-strikes of a held note stored fields in the wrong order ((t0, v0, t, pitch, ch) instead of (t0, t, pitch, v0, ch)); about 40% of files have re-strikes (158 of a 400-file sample),
+so every axis built on note lengths, pitch or velocity was off for them. Also fixed: the dtype-object error, the empty min() error, and the parse limit (20 s -> 60 s, `MIDI_AXES_LIMIT`).
+The old output is kept as `store/midi_axes.pre-restrike.jsonl`; the full rerun is recorded below when it finishes. `key_eval.py` is unchanged by the fix (exact 0.511, lenient 0.699):
+the chord-progression files have no re-strikes.
+
+### Item 2, key accuracy, detector variants (`tools/universe/key_variants.py` -> `feel/key_variants.json`): lenient MET
+Grid of profile (Krumhansl-Kessler, Temperley, Albrecht) x bass weight x first/last-chord weight, chosen on 1,500 tuning files that are disjoint from key_eval.py's 1,500 test files
+(`key_eval_files.py`). Chosen: Temperley, no extra weights. Test: **lenient 76.5%** (bar 70%: MET), exact 44.1% (KK: 51.1%).
+The trade: Temperley confuses relative major/minor more often. midi_axes keeps the KK mode axis (it feeds major-ness for mood); key reporting can use Temperley. Both numbers recorded.
+
+### Item 2, next chord (`tools/universe/chord_eval2.py` -> `feel/chord_eval2.json`): MET
+Same data, splits and baseline as chord_eval.py. Model: numeral n-gram mixed with a chord-class back-off (root semitone from the tonic + quality), mode context,
+the chord one bar back, and the first chord. Weights chosen on split seeds 10-19, reported on seeds 0-4. Top-1 32.3% vs baseline 18.1%: **gain +14.3 +- 2.5 points**
+(bar +10: MET; the old n-gram gave +5.6). Caveat: 194 distinct progressions; selection and report splits are different shuffles of the same pool.
+
+### Item 2, per-role register and density, corrected count (`tools/universe/role_spread.py` -> `feel/role_spread.json`)
+The old count took every Note Sequencer step as a note and counted synth drum lanes (a Wavetable with a pitch drop and no sustain, or a noise-only Analog, fed one pitch on every step)
+as bass or melodic lines. Now only audible steps (enabled, velocity > 0) count and drum lanes are left out. `--legacy` reproduces the old numbers (`feel/role_spread_legacy.json`).
+Patches: the live generator's style patches dumped with `wasm_patches.js` (all seeds), 508 pitched layers (888 under the old count).
+
+| Role | Axis | Old count inside | Corrected inside | Generator median | Corpus 5-95% | Verdict |
+|---|---|---|---|---|---|---|
+| Bass | register | 89.1% | **97.5%** | 36 | 31.5-56 | MET |
+| Bass | density | 62.8% | **53.5%** | 3.7 notes/s | 0.38-3.94 | MISS (206 above) |
+| Melodic | register | 61.9% | **100%** | 53 | 46.5-79 | MET |
+| Melodic | density | 94.5% | **78.5%** | 5.6 notes/s | 0.07-6.91 | MISS |
+
+The 104 "too high" melodic layers in the old count were hat and cymbal lanes. The bass-octave lift in SampleStyles.cpp is no longer needed for register; it is set aside in
+`git stash` ("bass-lift octave") and would ship only after a blind test.
+**Question for Naman (density):** the misses sit in styles built on dense 16th lines (industrial techno, acid, neurofunk, gabber). The corpus is mostly Lakh pop/rock MIDI with no genre
+field, so its density range is a pop range. Options: (a) keep the bar against this corpus and thin those styles, (b) compare against a genre-matched corpus subset (needs genre labels),
+(c) read density per style family. No change to the music made.
