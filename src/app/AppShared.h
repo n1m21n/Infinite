@@ -3830,6 +3830,7 @@ void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n);
 void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n);
 
 void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n);
+void DrawPianoRollBody(GraphNode& gn, PianoRollNode* n);
 
 void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n);
 
@@ -4971,6 +4972,8 @@ void ForceAudioRepare();
 void RebuildAudioTopology();
 
 bool ArrangeAudioRebuildIfStale();
+// Piano Roll nodes get their linked MIDI lane's notes; once a frame, and at every topology rebuild.
+void ArrangeNoteSchedulesPublish();
 
 // ---- Session view (app/panels/ArrangeSession.cpp) ----
    // The Timeline panel shows the session grid instead of the lanes.
@@ -6208,6 +6211,7 @@ bool RunCycleShaperFixture();
 bool RunMidiFileFixture();
 bool RunRestartTest();
 bool RunChordProgTest();
+bool RunPianoRollTest();
 
 bool RunMpeFixture();
 

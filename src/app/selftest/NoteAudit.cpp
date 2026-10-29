@@ -38,6 +38,8 @@
 #include "audio/NoteEventQueue.h"
 #include "core/Transport.h"
 #include "nodes/NoteNodes.h"
+#include "nodes/PianoRollNode.h"
+#include "arrange/NoteSchedule.h"
 #include "audio/NoteTheory.h"
 #include "core/Patch.h"
 
@@ -1210,6 +1212,269 @@ bool RunChordProgTest()
    tr.SetKey(savedKey);
    tr.SetScale(savedScale);
    printf("CHORDPROGTEST %s\n", ok ? "ALL OK" : "FAILED");
+   return ok;
+}
+
+// INFINITE_PIANOROLLTEST: the Piano Roll node against its spec
+// (docs/plans/piano-roll/README.md §7, §10 Block A). A known MIDI lane gives
+// the expected NoteEvents at the expected frames at two tempos; edits during
+// playback end the notes they remove; chance repeats per pass; expression
+// and thru reach the outbox; and the lane survives save -> load -> save with
+// the same bytes.
+bool RunPianoRollTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("PIANOROLLTEST %s %s\n", what, cond ? "OK" : "FAIL");
+      ok = ok && cond;
+   };
+   using namespace Arrange;
+   auto N = [](Tick s, Tick l, int p) {
+      Note n;
+      n.start = s;
+      n.length = l;
+      n.pitch = (uint8_t)p;
+      n.vel = 100;
+      return n;
+   };
+   // One clip at beat 4, four beats long, looping a two-beat phrase: C for a
+   // beat, then E for half a beat.
+   Model m;
+   const uint64_t lane = AddLane(m, kLaneMidi);
+   uint64_t clip = 0;
+   {
+      Clip c;
+      c.start = 4 * kPPQ;
+      c.length = 4 * kPPQ;
+      c.midiLoop = true;
+      c.loopStart = 0;
+      c.loopLength = 2 * kPPQ;
+      PlaceOverwrite(m, lane, c, &clip);
+   }
+   AddNotes(m, clip, { N(0, kPPQ, 60), N(kPPQ, kPPQ / 2, 64) });
+   auto schedule = [&]() {
+      auto s = std::make_unique<NoteSchedule>();
+      BuildNoteSchedule(*FindLane(m, lane), *s);
+      return s;
+   };
+   auto pairsOk = [&](const Rig& rig) {
+      const PairReport p = Pairs(rig.got);
+      if (p.Bad())
+         printf("PIANOROLLTEST pairs: on %d off %d stuck %d orphan-off %d dup-on %d off-before-on %d\n", p.ons, p.offs,
+                p.stuck, p.orphanOff, p.dupOn, p.offBeforeOn);
+      return !p.Bad();
+   };
+   auto stopAndFlush = [&](Rig& rig) {
+      StopTransport();
+      for (int b = 0; b < 8; b++)
+         rig.Step();
+   };
+
+   // 1. Timing at two tempos, with a block size that does not divide a beat.
+   for (const double bpm : { 120.0, 87.0 })
+   {
+      const double spb = kRate * 60.0 / bpm;
+      auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+      Rig rig;
+      check(rig.Init(pr, 333), "rig");
+      pr->SetSchedule(schedule());
+      StartTransport(bpm);
+      while ((double)rig.pos < 9.0 * spb)
+         rig.Step();
+      const double on[4] = { 4.0, 5.0, 6.0, 7.0 }, off[4] = { 5.0, 5.5, 7.0, 7.5 };
+      const int pitch[4] = { 60, 64, 60, 64 };
+      int nOn = 0, nOff = 0;
+      bool timesOk = true;
+      for (const Evt& e : rig.got)
+      {
+         if (e.e.bendUpdate)
+            continue;
+         const int k = e.e.isNoteOn ? nOn++ : nOff++;
+         if (k >= 4)
+         {
+            timesOk = false;
+            continue;
+         }
+         const double want = (e.e.isNoteOn ? on[k] : off[k]) * spb;
+         if (std::fabs((double)e.sample - want) > 1.0 || e.e.note != pitch[k])
+         {
+            printf("PIANOROLLTEST %.0f bpm: event %d %s note %d at %lld, want %d at %.1f\n", bpm, k,
+                   e.e.isNoteOn ? "on" : "off", e.e.note, e.sample, pitch[k], want);
+            timesOk = false;
+         }
+      }
+      char what[96];
+      snprintf(what, sizeof(what), "%.0f bpm: 4 ons and 4 offs on the beat grid, loop unrolled", bpm);
+      check(timesOk && nOn == 4 && nOff == 4, what);
+      stopAndFlush(rig);
+      check(pairsOk(rig), "every note-on has its off");
+   }
+
+   const double bpm = 120.0, spb = kRate * 60.0 / bpm;
+
+   // 2. An edit while a note is held: deleting it ends it at once; a note
+   // that survives the edit plays on to its own off.
+   {
+      Model live = m;
+      Clip* c = FindClipOrSlot(live, clip);
+      c->midiLoop = false;
+      c->notes[0].length = 3 * kPPQ; // C held beats 4..7
+      Note d = N(0, 3 * kPPQ, 67);   // G under it, beats 4..7
+      d.id = c->nextNoteId++;
+      c->notes.push_back(d);
+      Normalize(live);
+      auto build = [&]() {
+         auto s = std::make_unique<NoteSchedule>();
+         BuildNoteSchedule(*FindLane(live, lane), *s);
+         return s;
+      };
+      auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+      Rig rig;
+      rig.Init(pr);
+      pr->SetSchedule(build());
+      StartTransport(bpm);
+      while ((double)rig.pos < 5.0 * spb)
+         rig.Step();
+      const long long editAt = rig.pos;
+      DeleteNotes(live, clip, { c->notes[0].id == d.id ? c->notes[1].id : c->notes[0].id }); // drop the C
+      pr->SetSchedule(build());
+      while ((double)rig.pos < 8.0 * spb)
+         rig.Step();
+      long long cOff = -1, gOff = -1;
+      for (const Evt& e : rig.got)
+         if (!e.e.isNoteOn && !e.e.bendUpdate)
+            (e.e.note == 60 ? cOff : gOff) = e.sample;
+      check(cOff >= editAt && cOff < editAt + rig.block, "a deleted held note ends in the block of the edit");
+      check(std::fabs((double)gOff - 7.0 * spb) <= 1.0, "a held note the edit kept plays to its off");
+      stopAndFlush(rig);
+      check(pairsOk(rig), "edit: every note-on has its off");
+   }
+
+   // 3. Chance: 0 never plays, 1 always does, and a pass repeats.
+   {
+      Model ch = m;
+      Clip* c = FindClipOrSlot(ch, clip);
+      c->length = 64 * kPPQ;
+      c->notes[0].chance = 0.5f;
+      c->notes[1].chance = 0.0f;
+      auto run = [&]() {
+         auto s = std::make_unique<NoteSchedule>();
+         BuildNoteSchedule(*FindLane(ch, lane), *s);
+         auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+         Rig rig;
+         rig.Init(pr, 512);
+         pr->SetSchedule(std::move(s));
+         StartTransport(bpm);
+         while ((double)rig.pos < 70.0 * spb)
+            rig.Step();
+         std::vector<long long> ons;
+         int e64 = 0;
+         for (const Evt& e : rig.got)
+            if (e.e.isNoteOn)
+            {
+               ons.push_back(e.sample);
+               e64 += e.e.note == 64 ? 1 : 0;
+            }
+         stopAndFlush(rig);
+         return std::make_pair(ons, e64);
+      };
+      const auto a = run(), b = run();
+      check(a.second == 0, "chance 0 never plays");
+      check(a.first.size() > 6 && a.first.size() < 26, "chance 0.5 plays about half of 32 passes");
+      check(a.first == b.first, "the same pass plays the same notes");
+   }
+
+   // 4. Expression: a bend curve goes out as bendUpdates on the held voice.
+   {
+      Model ex = m;
+      Clip* c = FindClipOrSlot(ex, clip);
+      c->midiLoop = false;
+      c->notes[0].bend = { { 0, 0.0f }, { kPPQ, 2.0f } };
+      c->notes[0].pressure = { { 0, 0.5f } };
+      auto s = std::make_unique<NoteSchedule>();
+      BuildNoteSchedule(*FindLane(ex, lane), *s);
+      auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+      Rig rig;
+      rig.Init(pr);
+      pr->SetSchedule(std::move(s));
+      StartTransport(bpm);
+      while ((double)rig.pos < 5.0 * spb)
+         rig.Step();
+      int voice = -1, updates = 0;
+      float maxBend = 0.0f;
+      bool sameVoice = true, pressure = true;
+      for (const Evt& e : rig.got)
+      {
+         if (e.e.isNoteOn && e.e.note == 60)
+            voice = e.e.voiceId;
+         if (e.e.bendUpdate)
+         {
+            updates++;
+            sameVoice = sameVoice && e.e.voiceId == voice;
+            pressure = pressure && e.e.hasExpression && std::fabs(e.e.pressure - 0.5f) < 1e-4f;
+            maxBend = std::max(maxBend, e.e.bendSemitones);
+         }
+      }
+      check(updates > 100 && sameVoice, "bend goes out as bendUpdates on the note's voice");
+      check(maxBend > 1.9f && maxBend <= 2.0f, "bend rises to the curve's end");
+      check(pressure, "pressure rides along");
+      stopAndFlush(rig);
+      check(pairsOk(rig), "expression: every note-on has its off");
+   }
+
+   // 5. Thru: input notes pass, and stop passing with thru off.
+   {
+      auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+      Rig rig;
+      rig.Init(pr);
+      StartTransport(bpm);
+      Push(rig.in[0], 72, 0.8f, true, 7001);
+      rig.Step();
+      Push(rig.in[0], 72, 0.0f, false, 7001);
+      rig.Step();
+      check(rig.got.size() == 2 && rig.got[0].e.note == 72 && rig.got[0].e.isNoteOn, "thru passes the input");
+      pr->thru = false;
+      Push(rig.in[0], 74, 0.8f, true, 7002);
+      rig.Step();
+      check(rig.got.size() == 2, "thru off drops the input");
+      StopTransport();
+   }
+
+   // 6. Save -> load -> save gives the same bytes, notes and expression included.
+   {
+      Model full = m;
+      Clip* c = FindClipOrSlot(full, clip);
+      c->notes[0].bend = { { 0, -1.5f }, { 480, 0.25f } };
+      c->notes[0].timbre = { { 10, 0.75f } };
+      c->notes[1].chance = 0.4f;
+      c->notes[1].relVel = 12;
+      c->notes[1].gainDb = -3.0f;
+      c->notes[1].pan = 0.5f;
+      c->swing = 0.3f;
+      c->transpose = -5;
+      LinkLane(full, lane, 4242);
+      Patch::Data d1;
+      ArrangeModelToPatchData(full, d1);
+      std::string t1, t2, err;
+      Patch::WriteText(d1, t1);
+      Patch::Data d2;
+      Patch::ReadText(t1, d2, err); // "no nodes" is expected: this patch is the arrangement alone
+      Model back;
+      PatchDataToArrangeModel(d2, back, nullptr);
+      Patch::Data d3;
+      ArrangeModelToPatchData(back, d3);
+      Patch::WriteText(d3, t2);
+      if (t1 != t2)
+         printf("PIANOROLLTEST first save:\n%s\nsecond save:\n%s\nerr %s\n", t1.c_str(), t2.c_str(), err.c_str());
+      check(t1 == t2, "save -> load -> save is byte-stable");
+      const Clip* bc = FindClipOrSlot(back, clip);
+      check(bc && bc->notes == c->notes && bc->swing == c->swing && bc->midiLoop && FindLane(back, lane)->noteNodeUid == 4242,
+            "notes, clip settings and the link come back");
+      check(t1.find("\nclipnote ") != std::string::npos && t1.find("streamnote") != std::string::npos, "the file has the note lines");
+   }
+
+   printf("PIANOROLLTEST %s\n", ok ? "ALL OK" : "FAILED");
    return ok;
 }
 

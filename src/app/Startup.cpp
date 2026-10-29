@@ -578,6 +578,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunRestartTest() ? 0 : 1;
    if (getenv("INFINITE_CHORDPROGTEST") != nullptr)
       return RunChordProgTest() ? 0 : 1;
+   if (getenv("INFINITE_PIANOROLLTEST") != nullptr)
+      return RunPianoRollTest() ? 0 : 1;
 
    if (getenv("INFINITE_MPETEST") != nullptr)
       return RunMpeFixture() ? 0 : 1;

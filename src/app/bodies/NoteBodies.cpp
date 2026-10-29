@@ -1,4 +1,5 @@
 // Audio-in, mixer, keyboard and note node bodies (moved verbatim from main.cpp).
+#include "arrange/NoteSchedule.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -1981,6 +1982,92 @@ namespace app
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
          row.Knob("gate", &n->gatePercent, 1.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+
+   // The Piano Roll node's card: the linked page's notes as a mini roll over
+   // the lane's span, the transport playhead, and the node's four controls.
+   void DrawPianoRollBody(GraphNode& gn, PianoRollNode* n)
+   {
+      const Arrange::NoteSchedule* s = n->Schedule();
+      char stat[96];
+      if (n->laneId == 0)
+         snprintf(stat, sizeof(stat), "no page linked");
+      else
+         snprintf(stat, sizeof(stat), "%s - %d notes", n->laneName.c_str(), s ? (int)s->notes.size() : 0);
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         const float w = gAudioBodyW;
+         const float h = 96.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         const ImVec2 br(origin.x + w, origin.y + h);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const bool isLight = IsThemeLight();
+         dl->AddRectFilled(origin, br, isLight ? tok::U32(tok::pal::c_ECF0F8FF) : tok::U32(tok::pal::c_101016FF), 4.0f);
+         if (s && !s->notes.empty())
+         {
+            // Span: whole bars from the first note to the last off.
+            double t0 = s->notes.front().on, t1 = t0;
+            int lo = 127, hi = 0;
+            for (const Arrange::SchedNote& e : s->notes)
+            {
+               t1 = std::max(t1, e.off);
+               lo = std::min(lo, (int)e.pitch);
+               hi = std::max(hi, (int)e.pitch);
+            }
+            t0 = std::floor(t0 / 4.0) * 4.0;
+            t1 = std::max(t0 + 4.0, std::ceil(t1 / 4.0) * 4.0);
+            lo = std::max(0, lo - 1);
+            hi = std::min(127, hi + 1);
+            const double len = t1 - t0;
+            const float noteH = std::max(1.5f, (h - 6.0f) / (float)(hi - lo + 1));
+            const ImU32 on = IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
+                                      (int)(gAudioTint.b * 255.0f), 220);
+            dl->PushClipRect(origin, br, true);
+            // A dense page draws at most ~2 notes per pixel column's worth.
+            const size_t step = std::max<size_t>(1, s->notes.size() / 4096);
+            for (size_t i = 0; i < s->notes.size(); i += step)
+            {
+               const Arrange::SchedNote& e = s->notes[i];
+               const float x0 = origin.x + (float)((e.on - t0) / len) * w;
+               const float x1 = std::max(x0 + 1.0f, origin.x + (float)((e.off - t0) / len) * w);
+               const float y = br.y - 3.0f - (float)(e.pitch - lo + 1) * noteH;
+               dl->AddRectFilled(ImVec2(x0, y), ImVec2(x1, y + noteH - 0.5f), on);
+            }
+            const double ph = n->PlayheadBeats();
+            if (ph >= t0 && ph <= t1)
+            {
+               const float x = origin.x + (float)((ph - t0) / len) * w;
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? tok::U32(tok::pal::c_28283CE6) : tok::U32(tok::pal::c_F0F0FFE6), 1.5f);
+            }
+            dl->PopClipRect();
+         }
+         else
+            AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, n->laneId == 0 ? "link a Piano Roll page" : "empty page");
+         ImGui::Dummy(ImVec2(w, h));
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f)); // the skeleton's gap under the visualizer
+
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("transpose", &n->transpose, -48, 48);
+         row.Knob("vel", &n->velocity, 0.0f, 2.0f, "%.2f", kKnobSmall);
+         row.Skip();
+         row.Skip();
+         row.End();
+      }
+      {
+         AudioKnobRow row(4, 20.0f, 0.0f, false);
+         row.Checkbox("thru", &n->thru);
+         row.Skip();
+         row.Skip();
+         row.Skip();
          row.End();
       }
 

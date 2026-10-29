@@ -2,6 +2,7 @@
 // every note op keeps the invariants, bumps revision once, and trim/split/duplicate move content without
 // rewriting notes. Exit code 0 when all pass.
 #include "ArrangeModel.h"
+#include "NoteSchedule.h"
 
 #include <cstdio>
 #include <string>
@@ -248,6 +249,54 @@ int main()
       Check(AddNotes(m, clip, many), "AddNotes up to the cap");
       Check(!AddNotes(m, clip, { N(0, 1, 100) }), "AddNotes past the cap is refused");
       Check(!DuplicateBlock(m, { clip }), "duplicate past the cap is refused");
+   }
+
+   // --- schedule: what the audio thread plays ------------------------------
+   {
+      Model m;
+      uint64_t lane = 0;
+      const uint64_t clip = OneClip(m, &lane);
+      Note bent = N(kPPQ, kPPQ, 62);
+      bent.bend = { { 0, 0.0f }, { kPPQ, 2.0f } };
+      Note muted = N(2 * kPPQ, kPPQ, 64);
+      muted.mute = true;
+      AddNotes(m, clip, { N(0, kPPQ, 60), bent, muted });
+      Clip* c = FindClipOrSlot(m, clip);
+      c->start = 4 * kPPQ;
+      c->length = 8 * kPPQ;
+      c->midiLoop = true;
+      c->loopStart = 0;
+      c->loopLength = 2 * kPPQ;
+      c->transpose = 12;
+      NoteSchedule s;
+      BuildNoteSchedule(*FindLane(m, lane), s);
+      Check(s.notes.size() == 8, "loop unrolls 4 passes of 2 notes, muted note skipped");
+      Check(s.notes[0].on == 4.0 && s.notes[0].off == 5.0 && s.notes[0].pitch == 72, "clip start and transpose");
+      Check(s.notes[7].on == 11.0 && s.notes[7].off == 12.0, "last pass ends at the clip edge");
+      Check(s.notes[0].key != s.notes[2].key, "each loop pass gets its own chance key");
+      const SchedNote& b = s.notes[1];
+      Check(b.exprN[0] == 2 && SampleExpr(&s.exprs[b.expr[0]], b.exprN[0], 0.5) == 1.0f, "bend curve sampled mid-note");
+
+      c->transpose = 0;
+      c->midiLoop = false;
+      c->notes[0].length = 20 * kPPQ;
+      BuildNoteSchedule(*FindLane(m, lane), s);
+      Check(s.notes.size() == 2 && s.notes[0].off == 12.0, "a note past the clip edge is cut there");
+
+      c->swing = 1.0f;
+      c->notes[1].start = kPPQ / 4;
+      BuildNoteSchedule(*FindLane(m, lane), s);
+      Check(s.notes[1].on == 4.0 + 1.0 / 3.0, "full swing moves the off 16th to the triplet");
+
+      FindLane(m, lane)->mute = true;
+      BuildNoteSchedule(*FindLane(m, lane), s);
+      Check(s.notes.empty(), "a muted lane schedules nothing");
+
+      int plays = 0;
+      for (uint32_t pass = 0; pass < 1000; pass++)
+         plays += ChancePlays(12345u, pass, 0.25f) ? 1 : 0;
+      Check(plays > 180 && plays < 320, "chance 0.25 plays about a quarter of passes");
+      Check(ChancePlays(7u, 3u, 0.5f) == ChancePlays(7u, 3u, 0.5f), "chance roll repeats");
    }
 
    printf(gFails == 0 ? "pianoroll-check: all passed\n" : "pianoroll-check: %d failed\n", gFails);

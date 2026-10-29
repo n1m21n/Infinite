@@ -725,6 +725,8 @@ namespace app
          DrawRandomNoteGeneratorBody(gn, n);
       else if (auto* n = dynamic_cast<MidiFileNode*>(gn.node.get()))
          DrawMidiFileBody(gn, n);
+      else if (auto* n = dynamic_cast<PianoRollNode*>(gn.node.get()))
+         DrawPianoRollBody(gn, n);
       else if (auto* n = dynamic_cast<ChorderNode*>(gn.node.get()))
          DrawChorderBody(gn, n);
       else if (auto* n = dynamic_cast<NoteStackNode*>(gn.node.get()))

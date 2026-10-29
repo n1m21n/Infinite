@@ -631,6 +631,7 @@ set(COMMON_SOURCES
     src/core/Patch.cpp
     src/core/PatchLayout.cpp
     src/arrange/ArrangeModel.cpp
+    src/arrange/NoteSchedule.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
     src/core/PatchJson.cpp
@@ -789,6 +790,7 @@ set(COMMON_SOURCES
     src/audio/dsp/HrtfKemarData.cpp
     src/nodes/AudioMeterNode.cpp
     src/nodes/NoteNodes.cpp
+    src/nodes/PianoRollNode.cpp
     src/nodes/WavetableNode.cpp
     src/nodes/AnalogNode.cpp
     src/nodes/WaveTerrainNode.cpp
@@ -1026,7 +1028,7 @@ if(APPLE)
 endif()
 
 # Headless checks for the Piano Roll's note model (docs/plans/piano-roll/README.md §10 Block A).
-add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp)
+add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)

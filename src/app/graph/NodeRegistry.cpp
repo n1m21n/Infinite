@@ -280,6 +280,7 @@ namespace app
       REGISTER_NODE(NoteSequencerNode, Note Sequencer, "Notes");
       REGISTER_NODE(RandomNoteGeneratorNode, Random Note Generator, "Notes");
       REGISTER_NODE(MidiFileNode, MIDI File, "Notes");
+      REGISTER_NODE(PianoRollNode, Piano Roll, "Notes");
       REGISTER_NODE(ChorderNode, Chorder, "Notes");
       REGISTER_NODE(NoteStackNode, Note Stack, "Notes");
       REGISTER_NODE(NoteCapturerNode, Note Capturer, "Notes");

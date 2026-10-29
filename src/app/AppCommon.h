@@ -266,6 +266,7 @@ inline std::string TmpPath(const std::string& name)
 #include "audio/Wavetable.h"
 #include "audio/AudioFileWriter.h"
 #include "nodes/NoteNodes.h"
+#include "nodes/PianoRollNode.h"
 #include "nodes/MidiOutNode.h"
 #include "nodes/SamplerNode.h"
 #include "app/graph/GenerateSamplesNode.h"
