@@ -2,9 +2,18 @@
 
 Goal: GOAL.md. Work reference for every model: IMPROVEMENT-PLAN.md. Status per bar: HANDOFF.md (newest sections at the end). Branch feature/sample-dots, nothing pushed.
 
-## Running or just finished when this was written
-- Wavetable render: `own_sweeps.py run --node Wavetable --count 6000 --shards 2 --budget 120` (log in the old session's scratchpad). It stops by itself.
-  Then: `python3 tools/universe/knob_direction.py --engines Wavetable` and commit feel/knob_direction.json. Re-runs resume (content hashes).
+## Running or just finished when this was written (check, then finish these first)
+1. Wavetable render (`own_sweeps.py run --node Wavetable --count 6000 --shards 2 --budget 120`) stops by itself; a waiter then reruns
+   knob_direction for Wavetable only and writes feel/knob_direction.json. Check: `git diff docs/plans/data-universe/feel/knob_direction.json`.
+   If it did not run: `python3 -c "import sys,json;sys.path.insert(0,'tools/universe');import knob_direction as k;d=json.load(open(k.OUT));d['Wavetable']=k.run('Wavetable',5);json.dump(d,open(k.OUT,'w'),indent=1)"`
+   Record in HANDOFF (bar >= 90%) and commit.
+2. Role critic v2 renders -> ~/Infinite/training-data/audio/gen_parts_v2.jsonl: 5,100 at rest (seeds from 20000) then 2,550 with random
+   dots (`--shaped`, seeds from 40000). Expect 7,650 rows: `wc -l` it. If short, delete the file and rerun both:
+   `python3 tools/universe/role_critic_render.py render --seeds 10 --first 20000` and `... render --seeds 5 --first 40000 --shaped`.
+3. Then two tests, both style-held-out, and record both in HANDOFF (IMPROVEMENT-PLAN.md section 1, steps 1-2):
+   `python3 tools/universe/role_critic_render.py train --train-on rest --out docs/plans/data-universe/feel/role_critic_v2_rest.json` (does a critic trained with dots at rest hold when dots move?)
+   `python3 tools/universe/role_critic_render.py train --train-on all --out docs/plans/data-universe/feel/role_critic_v2_all.json` (trained on both)
+   Compare with feel/role_critic_render_oof.json (FRR 2.6%, catch 97.9%) to see what the note features added.
 
 ## Remaining work, in order (all approved by Naman)
 | # | Item | State | Next action |
