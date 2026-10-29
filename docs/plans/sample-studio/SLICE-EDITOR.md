@@ -356,3 +356,6 @@ Owner test pass (2026-10-29), changes against the spec:
 | Slices keep their order | Drag a slice (or an unbroken selection) to another boundary: its audio and settings move there. | Owner request. |
 | Wave = source x gain and fades | The wave draws the render (stretch, transient, pitch), scaled live by level edits until the next render. Fade curves at lower opacity; Shift-drag on the curve shapes it. | Owner request. |
 | Buffer swap | The Studio player crossfades 20 ms into each new render, and renders while a control is held at most every 120 ms. | Fade drags stuttered. |
+| Delete closes the gap | Delete (and Cut) leaves the slice as silence with its settings reset; the slices after it keep their place. | Owner request. |
+| Wave in source time | The wave, ruler and grid are drawn in time as heard: a 2x slice is twice as wide, 0.5x half; the playhead moves at the project tempo. A click above the wave plays from there. | Owner: the playhead slowed inside a stretched slice. |
+| One Sampler per slice (Convert to node menu) | Removed; the slice inspector's button and the wave menu's item are "Convert to node" (Sampler per selected slice). | Owner request. |

@@ -51,6 +51,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -1192,42 +1193,6 @@ namespace
       gPatchDirty = true;
    }
 
-   // One Sampler per slice, in a group named after the source.
-   void SlicesToSamplers()
-   {
-      Studio& s = S();
-      if (!s.src)
-         return;
-      const std::vector<std::string> paths = WriteSlices(std::string());
-      if (paths.empty())
-         return;
-      PushUndoCheckpoint("Slices to Samplers");
-      gSuppressUndoCheckpoints = true;
-      const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
-      std::set<int> members;
-      ImVec2 pos = at;
-      for (const std::string& p : paths)
-      {
-         pos = FindFreeSpawnPosition(pos);
-         if (GraphNode* gn = SpawnNode("Sampler", "Synths", pos.x, pos.y))
-         {
-            if (auto* n = dynamic_cast<SamplerNode*>(gn->node.get()))
-               n->LoadFile(p);
-            members.insert(gn->index);
-         }
-      }
-      if (GraphNode* ggn = SpawnNode("Group", "Compositing", at.x, at.y))
-         if (auto* grp = dynamic_cast<GroupNode*>(ggn->node.get()))
-         {
-            grp->label = SourceName() + " slices";
-            grp->width = 8.0f;
-            grp->height = 8.0f;
-            gGroupMembers[grp] = members;
-         }
-      gSuppressUndoCheckpoints = false;
-      gPatchDirty = true;
-   }
-
    // Play: the edit on the transport, with audio handed to the studio the way Timeline audio takes it from the canvas.
    void SetStudioAudio(bool on)
    {
@@ -1241,6 +1206,23 @@ namespace
             fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
       }
       RebuildAudioTopology();
+   }
+
+   // Play the edit from a source frame (its place in the render as heard).
+   void PlayFrom(double frame)
+   {
+      Studio& s = S();
+      if (!s.heard || s.heard->laidFrames <= 0 || s.heardDoc.Empty())
+         return;
+      double u = SourceToLaid(s.heardDoc, *s.heard, (int64_t)frame) / (double)s.heard->laidFrames;
+      if (s.doc.wide.reverse)
+         u = 1.0 - u;
+      if (s.heard->bounced)
+         u *= 0.5;
+      SetStudioAudio(true);
+      AudioEngine::Instance().StudioLoop().PlayFrom(std::clamp(u, 0.0, 0.999));
+      if (!Transport::Instance().IsPlaying())
+         LaunchRequestTogglePlay();
    }
 
    void TogglePlay()
@@ -1313,11 +1295,63 @@ namespace
 
    // ---- the waveform ----
 
+   // The wave is drawn in time as heard: a slice stretched to 2x is twice as wide, so the playhead crosses every
+   // slice at the same speed. `W` maps a source frame to that time (in frames, equal to the source where nothing is
+   // stretched); each slice's stretch comes from the last render, by slice id, so it lags an edit by one render.
    struct WaveGeom
    {
       ImVec2 mn, mx; // the main wave area
-      double FrameAt(float x) const { return S().viewStart + (double)(x - mn.x) / (double)(mx.x - mn.x) * S().viewLen; }
-      float XOf(double f) const { return mn.x + (float)((f - S().viewStart) / S().viewLen) * (mx.x - mn.x); }
+      std::vector<double> src, warped; // slice boundaries (then the end marker), in source frames and as heard
+      double w0 = 0.0, w1 = 1.0;       // the view, as heard
+
+      void Build()
+      {
+         const Studio& s = S();
+         src.clear();
+         warped.clear();
+         std::map<uint16_t, double> ratio;
+         if (s.heard && s.heard->outStart.size() >= (size_t)s.heardDoc.Count() + 1)
+            for (int i = 0; i < s.heardDoc.Count(); i++)
+               if (const double len = (double)(s.heardDoc.EndOf(i) - s.heardDoc.slices[(size_t)i].start); len > 0.0)
+                  ratio[s.heardDoc.slices[(size_t)i].id] = (double)(s.heard->outStart[(size_t)i + 1] - s.heard->outStart[(size_t)i]) / len;
+         double at = (double)s.doc.StartFrame();
+         for (int i = 0; i < s.doc.Count(); i++)
+         {
+            src.push_back((double)s.doc.slices[(size_t)i].start);
+            warped.push_back(at);
+            const auto it = ratio.find(s.doc.slices[(size_t)i].id);
+            at += (double)(s.doc.EndOf(i) - s.doc.slices[(size_t)i].start) * (it != ratio.end() ? std::clamp(it->second, 0.01, 100.0) : 1.0);
+         }
+         src.push_back((double)s.doc.endFrame);
+         warped.push_back(at);
+         w0 = W(s.viewStart);
+         w1 = std::max(w0 + 1.0, W(s.viewStart + s.viewLen));
+      }
+      // Source frame -> as heard, and back (identity before the first slice and past the end marker).
+      double W(double f) const
+      {
+         if (src.size() < 2 || f <= src.front())
+            return f;
+         if (f >= src.back())
+            return warped.back() + (f - src.back());
+         const size_t k = (size_t)(std::upper_bound(src.begin(), src.end(), f) - src.begin()) - 1;
+         const double len = src[k + 1] - src[k];
+         return warped[k] + (len > 0.0 ? (f - src[k]) / len * (warped[k + 1] - warped[k]) : 0.0);
+      }
+      double Unwarp(double v) const
+      {
+         if (src.size() < 2 || v <= warped.front())
+            return v;
+         if (v >= warped.back())
+            return src.back() + (v - warped.back());
+         const size_t k = (size_t)(std::upper_bound(warped.begin(), warped.end(), v) - warped.begin()) - 1;
+         const double len = warped[k + 1] - warped[k];
+         return src[k] + (len > 0.0 ? (v - warped[k]) / len * (src[k + 1] - src[k]) : 0.0);
+      }
+      float XOfW(double v) const { return mn.x + (float)((v - w0) / (w1 - w0)) * (mx.x - mn.x); }
+      double WAt(float x) const { return w0 + (double)(x - mn.x) / (double)(mx.x - mn.x) * (w1 - w0); }
+      double FrameAt(float x) const { return Unwarp(WAt(x)); }
+      float XOf(double f) const { return XOfW(W(f)); }
    };
 
    // Ruler step: the smallest of 1-2-5 x 10^n units that leaves at least `minPx` between ticks.
@@ -1341,11 +1375,11 @@ namespace
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("Click: bars, seconds or samples"));
       const ImU32 tick = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.6f), txt = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      const double fpp = s.viewLen / std::max(1.0f, mx.x - mn.x);
-      const double v0 = s.viewStart, v1 = s.viewStart + s.viewLen;
+      const double fpp = (g.w1 - g.w0) / std::max(1.0f, mx.x - mn.x);
+      const double v0 = g.w0, v1 = g.w1;
       const auto label = [&](double f, const char* text)
       {
-         const float x = g.XOf(f);
+         const float x = g.XOfW(f);
          dl->AddLine(ImVec2(x, mx.y - 5.0f), ImVec2(x, mx.y), tick);
          dl->AddText(ImVec2(x + 2.0f, mn.y), txt, text);
       };
@@ -1575,39 +1609,24 @@ namespace
 
    // ---- cutting the audio: delete, copy, paste ----
 
-   // Takes slice i's audio out of the source; the slices after it close the gap.
-   void RemoveSliceAudio(SourceAudio& a, int i)
-   {
-      SliceSet& d = S().doc;
-      const int64_t from = d.slices[(size_t)i].start, to = d.EndOf(i), len = to - from;
-      a.l.erase(a.l.begin() + from, a.l.begin() + to);
-      a.r.erase(a.r.begin() + from, a.r.begin() + to);
-      d.slices.erase(d.slices.begin() + i);
-      for (Slice& sl : d.slices)
-         if (sl.start >= to)
-            sl.start -= len;
-      d.endFrame -= len;
-   }
-
    void DeleteSelected()
    {
       Studio& s = S();
       const std::vector<int> idx = SelectedIndices();
       if (!s.src || idx.empty())
          return;
-      if ((int)idx.size() >= s.doc.Count())
-      {
-         s.status = T("At least one slice stays");
-         return;
-      }
+      // Deleting leaves the slice as silence, so the slices after it keep their place on the grid.
       PushUndo();
       auto a = std::make_shared<SourceAudio>(*s.src);
-      for (auto it = idx.rbegin(); it != idx.rend(); ++it)
-         RemoveSliceAudio(*a, *it);
+      for (int i : idx)
+      {
+         Slice& sl = s.doc.slices[(size_t)i];
+         std::fill(a->l.begin() + sl.start, a->l.begin() + s.doc.EndOf(i), 0.0f);
+         std::fill(a->r.begin() + sl.start, a->r.begin() + s.doc.EndOf(i), 0.0f);
+         sl.p = SliceParams(); // a stretch or a gain on silence would only move the slices after it
+      }
       s.src = std::move(a);
       s.doc.MarkHandEdited(true);
-      SelectOnly(std::min(idx.front(), s.doc.Count() - 1));
-      ClampView();
       s.dirty = true;
    }
 
@@ -1718,6 +1737,8 @@ namespace
          HelpTip("%s", T("Drag: fade length; Shift-drag up or down (or on the curve): its shape"));
       else if (hovered && near == 0 && idx > 0 && s.dragKind < 0)
          HelpTip("%s", T("Drag: move the cut; double-click: remove it"));
+      else if (hovered && inTabs && near < 0 && s.dragKind < 0)
+         HelpTip("%s", T("Click: play from here; double-click: a new slice here"));
 
       // A press starts a drag; nothing changes (and nothing goes to undo) until the pointer moves.
       const auto beginDrag = [&](int kind, int index)
@@ -1759,6 +1780,8 @@ namespace
          }
          else if (dbl && inTabs)
             Split(GridFrame(mf)); // double-click above the wave: a new slice here
+         else if (inTabs)
+            PlayFrom(mf); // a click above the wave: play from there
          else if (s.tool == 1)
             Split(GridFrame(mf)); // the scissors
          else if (!s.doc.Empty())
@@ -2033,7 +2056,7 @@ namespace
       if (MenuParts::Item(T("Settings"), "Double-click", false, any))
          s.settingsOpen = true;
       MenuParts::Separator();
-      if (MenuParts::Item(s.sel.size() > 1 ? T("Slices to Samplers") : T("Slice to Sampler"), nullptr, false, any))
+      if (MenuParts::Item(T("Convert to node"), nullptr, false, any))
          SelectedToSamplers();
       MenuParts::Separator();
       if (MenuParts::Item(T("Zoom to selection"), "Z", false, any))
@@ -2071,6 +2094,7 @@ namespace
       WaveGeom g;
       g.mn = ImVec2(mn.x, mn.y + kOverviewH + kRulerH + 2.0f);
       g.mx = mx;
+      g.Build();
       DrawRuler(dl, ImVec2(mn.x, mn.y + kOverviewH + 1.0f), ImVec2(mx.x, mn.y + kOverviewH + kRulerH + 1.0f), g);
 
       ImGui::SetCursorScreenPos(g.mn);
@@ -2112,12 +2136,12 @@ namespace
       // Beat grid, when the sample has a tempo and the beats are far enough apart.
       if (s.doc.sampleBpm > 0.0f)
       {
-         const double fpb = FramesPerBeat(), pxPerBeat = fpb / s.viewLen * w;
+         const double fpb = FramesPerBeat(), pxPerBeat = fpb / (g.w1 - g.w0) * w;
          const double step = pxPerBeat > 40.0 ? 0.25 : pxPerBeat > 8.0 ? 1.0 : 4.0;
          if (pxPerBeat * step > 6.0)
-            for (double b = std::ceil(s.viewStart / fpb / step) * step; b * fpb < s.viewStart + s.viewLen; b += step)
+            for (double b = std::ceil(g.w0 / fpb / step) * step; b * fpb < g.w1; b += step)
             {
-               const float x = g.XOf(b * fpb);
+               const float x = g.XOfW(b * fpb);
                const bool bar = std::fabs(std::fmod(b, 4.0)) < 1e-6, beat = std::fabs(b - std::round(b)) < 1e-6;
                dl->AddLine(ImVec2(x, top), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_TextDisabled, bar ? 0.28f : beat ? 0.14f : 0.06f));
             }
@@ -2141,7 +2165,7 @@ namespace
       {
          for (int x = 0; x < (int)w; x++)
          {
-            const int64_t a = (int64_t)(s.viewStart + fpp * x), b = (int64_t)(s.viewStart + fpp * (x + 1));
+            const int64_t a = (int64_t)g.FrameAt(g.mn.x + (float)x), b = (int64_t)g.FrameAt(g.mn.x + (float)(x + 1));
             if (a >= n)
                break;
             float lo, hi;
@@ -2302,8 +2326,7 @@ namespace
             k = k < 0.5 ? k * 2.0 : 2.0 - k * 2.0;
          if (s.doc.wide.reverse)
             k = 1.0 - k;
-         const double src = LaidToSource(s.doc, *s.heard, k * (double)s.heard->laidFrames);
-         const float x = g.XOf(src);
+         const float x = g.XOfW((double)s.doc.StartFrame() + k * (double)s.heard->laidFrames);
          dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text), 1.0f);
       }
       if (s.job || s.onsetJob || s.busy)
@@ -2379,7 +2402,7 @@ namespace
       SectionCard::RowLabel(T("Colour"));
       ColourChips(pi, 7, true);
       SectionCard::RowLabel("");
-      if (ActionButton::Draw(L(s.sel.size() > 1 ? "Slices to Samplers##sliceToSampler" : "Slice to Sampler##sliceToSampler"), ImVec2(fieldW, 0.0f)))
+      if (ActionButton::Draw(L("Convert to node##sliceToSampler"), ImVec2(fieldW, 0.0f)))
          SelectedToSamplers();
       if (ImGui::IsItemHovered())
          HelpTip("%s", T("A Sampler on the canvas holding this slice as you hear it"));
@@ -2937,9 +2960,6 @@ namespace
             if (gen)
                MenuParts::Separator();
          }
-         MenuParts::Separator();
-         if (MenuParts::Item(T("One Sampler per slice"), nullptr, false, s.doc.Count() > 1))
-            SlicesToSamplers();
          MenuParts::EndPopup();
       }
    }

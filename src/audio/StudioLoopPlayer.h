@@ -35,6 +35,12 @@ public:
       mDone.store(false, std::memory_order_relaxed);
       mRestart.store(true, std::memory_order_relaxed);
    }
+   // Main thread: like Restart, from `u` (0..1) of the take.
+   void PlayFrom(double u)
+   {
+      mStartU.store(u, std::memory_order_relaxed);
+      Restart();
+   }
    // Main thread: loop off and the one pass has played out.
    bool Finished() const { return mDone.load(std::memory_order_relaxed); }
 
@@ -73,7 +79,11 @@ public:
       const Platform::SampleBuffer* b = mActive;
       if (playing && (!mWasPlaying || mRestart.exchange(false, std::memory_order_relaxed)))
       {
-         mAnchor = blockStartBeats;
+         // Looping stays on the transport's grid unless play started from a place in the take.
+         const double startU = mStartU.exchange(-1.0, std::memory_order_relaxed);
+         const double span0 = mLoopBeats.load(std::memory_order_relaxed);
+         mAnchor = blockStartBeats - (startU > 0.0 ? startU * span0 : 0.0);
+         mLoopOrigin = startU >= 0.0 ? mAnchor : 0.0;
          mDone.store(false, std::memory_order_relaxed);
       }
       mWasPlaying = playing;
@@ -101,7 +111,13 @@ public:
             u = -1.0;
             continue;
          }
-         u = loop ? std::fmod(beats, span) / span : rel / span;
+         if (loop)
+         {
+            const double m = std::fmod(beats - mLoopOrigin, span);
+            u = (m < 0.0 ? m + span : m) / span;
+         }
+         else
+            u = rel / span;
          // A short ramp on every gain change (start, stop, a new take) keeps edits click-free.
          mGainNow += (target - mGainNow) * 0.002f;
          if (mXfade < 1.0f)
@@ -153,6 +169,8 @@ private:
    double mAnchor = 0.0;  // audio thread only: beat where the one-shot pass started
    bool mWasPlaying = false;
    std::atomic<bool> mRestart { false };
+   std::atomic<double> mStartU { -1.0 }; // PlayFrom's place, taken by the next restart
+   double mLoopOrigin = 0.0;             // the transport beat the loop counts from
    std::atomic<bool> mDone { false };
    std::atomic<double> mLoopBeats { 4.0 };
    std::atomic<bool> mLoop { true };
