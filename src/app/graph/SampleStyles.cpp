@@ -69,6 +69,7 @@ namespace
 #include "app/graph/GenerateSamplesTables.inc"
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/GenerateSamplesGrooves.inc"
+#include "app/graph/GenerateSamplesVoices.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -1094,6 +1095,81 @@ namespace
       for (char e : { 'a', 'b' })
       {
          EngineFilter(k, e, filter, cut, res, amt, fa, fd, fs, fr);
+         EngineAmp(k, e, aa, ad, as, ar);
+      }
+      return k;
+   }
+   // A voice from the Vital bank (owner, 2026-10-30: "data is gold and a slight variation can give many results"):
+   // a real preset's oscillators, filter sweep and envelopes, drawn from the presets of the part's style and jittered.
+   // The guardrails keep the review's complaints out: melodic voices open to at least 2.5 kHz at the sweep's peak,
+   // nothing resonates past 0.6, releases stay short enough for a loop, and the louder engine plays the note itself
+   // (the part's own register logic places it), the other keeping its interval to it.
+   enum class BankRole { Bass, Lead, Synth, Pluck };
+   Params BankVoice(BankRole role, Rng& r)
+   {
+      static const int kStyles[][2] = { { 0, 0 }, { 2, 2 }, { 1, 4 }, { 4, 1 } }; // Bass; Lead; Keys, Sequence; Sequence, Keys
+      std::vector<const VitalVoice*> pool;
+      for (const VitalVoice& v : kVitalVoices)
+         if (v.style == kStyles[(int)role][0] || v.style == kStyles[(int)role][1])
+            pool.push_back(&v);
+      const VitalVoice& v = *pool[(size_t)r.Range((int)pool.size())];
+      const bool bass = role == BankRole::Bass, pluck = role == BankRole::Pluck;
+      const VitalOsc* o[2] = { &v.a, &v.b };
+      if (!v.a.on || (v.b.on && v.b.level > v.a.level))
+         std::swap(o[0], o[1]); // engine A is the louder one
+      Params k;
+      k["volume"] = { 'f', "0.9" };
+      k["frequency"] = { 'f', "440" };
+      k["glide"] = { 'f', "0" };
+      k["pitchBend"] = { 'f', "0" };
+      k["fmDepth"] = { 'f', "0" };
+      k["fmMode"] = { 'i', "0" };
+      const auto jit = [&](double x, double spread) { return x * std::exp2(r.Uniform(-spread, spread)); };
+      for (int i = 0; i < 2; i++)
+      {
+         const char e = i ? 'b' : 'a';
+         if (!o[i]->on)
+         {
+            Engine(k, e, 0, kSaw, 1, 0.0, 0, 0.0);
+            k[std::string(1, e) + ".on"] = { 'b', "0" };
+            continue;
+         }
+         // Semitones off engine A, folded into octaves the node takes (+-4) and a semi it takes (+-12).
+         const int rel = std::clamp(o[i]->semi - o[0]->semi, -12, 24); // nothing more than an octave under the note: that is the mud
+         int oct = (int)std::floor((rel + 6) / 12.0);
+         const int semi = rel - 12 * oct;
+         if (!bass && o[i]->table == 0 && o[i]->pos < 0.4f)
+            oct += 1; // a sine or triangle carries only its fundamental: an octave up, or the line measures as bass
+         const double detune = std::min(50.0, jit(o[i]->detune, 0.25));
+         Engine(k, e, o[i]->table, std::clamp(o[i]->pos + (o[i]->table ? r.Uniform(-0.08, 0.08) : 0.0), 0.0, 1.0),
+                bass && i == 0 ? std::min(o[i]->unison, 4) : o[i]->unison, detune, oct, i ? std::clamp(o[1]->level / std::max(0.05f, o[0]->level), 0.2f, 1.0f) : 1.0);
+         k[std::string(1, e) + ".semi"] = { 'i', std::to_string(semi) };
+      }
+      k["mix"] = { 'f', o[1]->on ? "0.45" : "0" };
+      int type = v.filter;
+      double cut = jit(v.cutoff, 0.3), amt = std::clamp((double)v.famt, -3.0, 5.0), res = std::min(0.6, (double)v.res);
+      if (type >= 4 && type <= 6)
+         cut = std::min(cut, bass ? 60.0 : 400.0); // a high-pass stays under the note
+      else if (type == 7 || type == 8)
+         type = 1, cut = std::max(cut, 1500.0); // a band-pass thins a loop to a phone: a low-pass at its centre instead
+      if (type >= 1 && type <= 3)
+      {
+         const double floorPeak = bass ? 500.0 : 2500.0, roof = bass ? 3500.0 : 16000.0;
+         if (cut * std::exp2(std::max(0.0, amt)) < floorPeak)
+            cut = floorPeak / std::exp2(std::max(0.0, amt));
+         if (!bass && cut * std::exp2(std::max(0.0, amt) * v.fs) < 1500.0)
+            cut = 1500.0 / std::exp2(std::max(0.0, amt) * v.fs); // where the sweep settles stays open too
+         cut = std::clamp(cut, bass ? 150.0 : 400.0, roof);
+      }
+      double fa = std::min(200.0, (double)v.fa), fd = jit(std::clamp((double)v.fd, 40.0, 2000.0), 0.3), fs = v.fs, fr = std::min(600.0, (double)v.fr);
+      double aa = std::min(bass || pluck ? 5.0 : role == BankRole::Lead ? 60.0 : 30.0, (double)v.aa);
+      double ad = jit(std::clamp((double)v.ad, 60.0, 3000.0), 0.25), as = v.as;
+      double ar = std::min(bass ? 120.0 : pluck ? 350.0 : 600.0, (double)v.ar);
+      if (pluck)
+         as = std::min(as, 0.25), ad = std::clamp(ad, 200.0, 900.0);
+      for (char e : { 'a', 'b' })
+      {
+         EngineFilter(k, e, type, cut, res, amt, fa, fd, fs, fr);
          EngineAmp(k, e, aa, ad, as, ar);
       }
       return k;
@@ -2218,7 +2294,8 @@ Compiled Compile(const Recipe& recipe)
       {
          // A designed bass from its own stream (the card's pick is still drawn, so the parts after it keep their draws).
          Rng dv(std::string("voice:bass:") + std::to_string(recipe.seed));
-         const int sy = g.Add("Wavetable", seed(), DesignVoice(dv.Uniform() < 0.7 ? Voice::SynthBass : Voice::ReeseBass, dv));
+         const double bp = dv.Uniform();
+         const int sy = g.Add("Wavetable", seed(), bp < 0.5 ? BankVoice(BankRole::Bass, dv) : DesignVoice(bp < 0.85 ? Voice::SynthBass : Voice::ReeseBass, dv));
          g.Connect(sq, sy, true);
          const int fxChoices[] = { 0, 1, 1, 2 };
          int end = chain(sy, fxChoices[rng.Range(4)], true);
@@ -2393,7 +2470,8 @@ Compiled Compile(const Recipe& recipe)
          Rng dv(std::string("voice:motif:") + std::to_string(recipe.seed));
          static const Voice kMotifVoice[] = { Voice::SynthPluck, Voice::SynthPluck, Voice::SawStack, Voice::SquareLead, Voice::FmStack, Voice::Supersaw };
          g.melodic = true;
-         const int sy = g.Add("Wavetable", seed(), DesignVoice(kMotifVoice[dv.Range(6)], dv));
+         const int mv = dv.Range(10); // 0-5 a designed voice, 6-9 a Vital preset's
+         const int sy = g.Add("Wavetable", seed(), mv < 6 ? DesignVoice(kMotifVoice[mv], dv) : BankVoice(mv < 8 ? BankRole::Synth : BankRole::Pluck, dv));
          g.melodic = false;
          g.Connect(mn, sy, true);
          synths.push_back(sy);
@@ -3025,7 +3103,10 @@ Compiled Compile(const Recipe& recipe)
             // One massive voice playing a line: stacked unison engines (owner: "leads should sound massive").
             const int kind = PickDirectiveKind(sp, dir.leadW);
             static const Voice kLeadVoice[] = { Voice::BrassStack, Voice::SawStack, Voice::Supersaw, Voice::SquareLead, Voice::Supersaw, Voice::FmStack };
+            Rng bv(std::string("vital:lead:") + std::to_string(recipe.seed)); // its own stream: the line's draws stay put
             k = DesignVoice(kLeadVoice[std::clamp(kind, 0, 5)], sp);
+            if (kind != 4 && bv.Uniform() < 0.5)
+               k = BankVoice(BankRole::Lead, bv);
             if (kind == 4) // vowel: a sung stack on top of the supersaw
             {
                Engine(k, 'a', 47, sp.Uniform(0.0, 0.9), 3, sp.Uniform(10.0, 18.0), 0, 1.0);
