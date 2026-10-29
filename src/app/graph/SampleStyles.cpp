@@ -2109,8 +2109,9 @@ Compiled Compile(const Recipe& recipe)
                g.Connect(sq, hv, true);
                const int slap = noiseVoice(8, pe.Uniform(3000.0, 6000.0), 0.3, pe.Uniform(6.0, 14.0), 0.8);
                g.Connect(sq, slap, true);
-               place(hv, -5.0f, d == 0 ? -0.35 : 0.35);
-               place(slap, -16.0f, d == 0 ? -0.35 : 0.35);
+               // The drums sit under the shaker and accent, as in percussion loops (low-mid 0.80 against the library's 0.30).
+               place(hv, -9.0f, d == 0 ? -0.35 : 0.35);
+               place(slap, -15.0f, d == 0 ? -0.35 : 0.35);
             }
          }
          // 2. A shaker (soft attack, high hiss) or a tambourine (hiss plus jingles), on 16ths or offbeats.
@@ -2127,7 +2128,7 @@ Compiled Compile(const Recipe& recipe)
             nn["filterType"] = { 'i', "8" };
             const int sh = g.Add("Analog", pe.Range(1 << 30), nn);
             g.Connect(sq, sh, true);
-            place(sh, tamb ? -11.0f : -9.0f, pe.Uniform(-0.5, 0.5));
+            place(sh, tamb ? -9.0f : -7.0f, pe.Uniform(-0.5, 0.5));
             if (tamb)
             {
                Params h = F({ { "transient", 1.0 }, { "decay", pe.Uniform(0.08, 0.14) }, { "stiffness", 1.6 }, { "filterCutoff", 12000.0 },
@@ -2231,7 +2232,9 @@ Compiled Compile(const Recipe& recipe)
             end = dy;
          }
          layers++;
-         if (wantBass)
+         // A synth loop is the melodic layer: with the card's bass under it the Synths part measured as a bass (low
+         // share 0.93 against the library's 0.08). The bass stays in the full mix only.
+         if (full)
          {
             synths.push_back(sy);
             chans.push_back({ end, -4.0f });
@@ -2239,8 +2242,8 @@ Compiled Compile(const Recipe& recipe)
       }
    }
 
-   // A card with no bass or motif (solo piano) has only its chords: they are its synths.
-   if (part == Part::Synths && synths.empty() && !st.hasMotif)
+   // A card with no motif (solo piano, a bass-and-drums card) has only its chords: they are its synths.
+   if (part == Part::Synths && !st.hasMotif)
       wantChords = true;
 
    // Chords: a progression from the Chorder, through the card's note effects.
