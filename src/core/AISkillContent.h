@@ -701,7 +701,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-342 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+343 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -1064,7 +1064,8 @@ R"AISKILL(| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
 | `Equation Synth` | notes:note | out:audio | 31 | bypass |
 | `FM` | notes:note | out:audio | 35 | bypass |
 | `Field Synth` | notes:note, in:audio | out:audio | 13 | bypass |
-| `Grain Molder` | notes:note, record_in:audio | out:audio | 15 | bypass |
+| `Generate Samples` | notes:note | out:audio | 29 | bypass |
+| `Grain Molder` | notes:note, record_in:audio | out:audio | 16 | bypass |
 | `Granular` | record_in:audio | out:audio | 21 | bypass |
 | `Looper` | audio:audio | out:audio | 10 | bypass |
 | `MPC` | notes:note | out:audio | 177 | bypass |
