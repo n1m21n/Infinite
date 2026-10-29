@@ -349,6 +349,31 @@ void RenderSlice(const SourceAudio& src, const SliceSet& set, int index, bool wi
       Stretch(l, r, sr, total, semis, p.stretchMode == 3);
    }
    body = std::clamp<int64_t>(body, 0, (int64_t)l.size());
+   // The slice keeps its place and span: stretched longer, it is cut at its end (what runs on fades out as the
+   // tail); shorter, the rest of the span is silence, or the Fill loop.
+   if (body < srcBody)
+   {
+      l.resize((size_t)body);
+      r.resize((size_t)body);
+      if (p.loopMode > 0 && body > 1)
+      {
+         const int64_t ls = (int64_t)(p.loopStart * body), le = (int64_t)(p.loopEnd * body);
+         LoopFill(l, srcBody + X, ls, le, p.loopMode == 2);
+         LoopFill(r, srcBody + X, ls, le, p.loopMode == 2);
+      }
+      else
+      {
+         // A 2 ms ramp into the silence, so the cut never clicks.
+         const int64_t n = std::min<int64_t>(body, (int64_t)(sr * 0.002));
+         for (int64_t i = 0; i < n; i++)
+         {
+            const float g = (float)(n - i) / (float)n;
+            l[(size_t)(body - n + i)] *= g;
+            r[(size_t)(body - n + i)] *= g;
+         }
+      }
+   }
+   body = srcBody;
    if (!withTail)
    {
       l.resize((size_t)body);

@@ -17,7 +17,7 @@ struct SliceParams
    float pan = 0.0f;     // -1..+1, constant power
    float pitchSt = 0.0f; // -48..+48
    float fineCt = 0.0f;  // -100..+100
-   int stretchMode = 0;  // 0 off (pitch resamples), 1 repitch, 2 beats, 3 tonal
+   int stretchMode = 1;  // 0 off (pitch resamples), 1 repitch, 2 beats, 3 tonal
    float lengthRatio = 1.0f; // 0.25..4, the slice's length against its source length
    bool fitToGrid = false;   // length snaps to whole 16ths of the sample tempo
    float compAmount = 0.0f;  // 0..1, the compressed signal's share (parallel)

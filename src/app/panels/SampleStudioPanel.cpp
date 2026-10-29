@@ -2239,7 +2239,7 @@ namespace
             flags += "S ";
          if (p.reverse)
             flags += "R ";
-         if (p.stretchMode != 0 || p.lengthRatio != 1.0f)
+         if (p.lengthRatio != 1.0f)
             flags += "T ";
          if (!flags.empty() && xn - x - tabW > 30.0f)
             dl->AddText(ImVec2(x + tabW + 3.0f, g.mn.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), flags.c_str());
@@ -2445,7 +2445,7 @@ namespace
          static const std::vector<const char*> modes = { "off", "repitch", "beats", "tonal" };
          t.Changed(ComboRow(T("Stretch"), "##sliceStretch", e.stretchMode, modes, fieldW));
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Pitch never changes the length. Length - off: loops or leaves silence; repitch: moves the pitch too; beats and tonal: stretches"));
+            HelpTip("%s", T("The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch"));
       }
       Row(T("Length"), fieldW);
       FieldWell::Slider("##sliceLen", &e.lengthRatio, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
@@ -2459,7 +2459,7 @@ namespace
       }
       {
          static const std::vector<const char*> loops = { "off", "forward", "ping-pong" };
-         ImGui::BeginDisabled(e.stretchMode != 0 || e.lengthRatio <= 1.0f);
+         ImGui::BeginDisabled(e.lengthRatio >= 1.0f);
          t.Changed(ComboRow(T("Fill"), "##sliceLoop", e.loopMode, loops, fieldW));
          ImGui::EndDisabled();
       }
