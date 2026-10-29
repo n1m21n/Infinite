@@ -724,3 +724,37 @@ The 104 "too high" melodic layers in the old count were hat and cymbal lanes. Th
 **Question for Naman (density):** the misses sit in styles built on dense 16th lines (industrial techno, acid, neurofunk, gabber). The corpus is mostly Lakh pop/rock MIDI with no genre
 field, so its density range is a pop range. Options: (a) keep the bar against this corpus and thin those styles, (b) compare against a genre-matched corpus subset (needs genre labels),
 (c) read density per style family. No change to the music made.
+
+### Goal item 4, role critic v2: note features and moving dots (`role_critic_render.py`, `feel/role_critic_v2_*.json`)
+7,645 renders of the live generator: 5,097 with dots at rest, 2,548 with random dots and variation (`--shaped`); 5 parts rendered silent and were skipped.
+Bug found and fixed on the way: `frame_features.measure` also returns a field called `shape`, which overwrote the dots record, so every row looked dot-shaped.
+Rows now keep the flag as `dots`; the existing rows were relabelled exactly from their seed (seed = first + style*1009 + part*101 + k; first 20000 = rest, 40000 = dots).
+5-fold, whole styles held out, MLP (Linear in the json):
+
+| Trained on | Cut-offs from | Rest FRR / catch | Dots FRR / catch | Verdict |
+|---|---|---|---|---|
+| rest | all training rows | 2.7% / 98.2% | 6.4% / 97.5% | MISS (dots FRR) |
+| rest + dots | all training rows | 1.7% / 98.5% | 4.4% / 98.0% | MISS (dots FRR) |
+| rest + dots | dot-shaped training rows | 1.7% / 98.2% | **3.3%** / 97.6% | MISS by 0.3 (dots FRR) |
+
+Rest renders meet both bars (note features: FRR 2.6 -> 1.7 when trained on both). With dots moving, catch holds but false rejects rise; the dots move
+sounds out of the at-rest region. The cut-off percentile was not tuned on test results. Next (running): 2,550 more dot-shaped renders (seeds from 60000),
+so the shaped cut-offs rest on ~2x more rows; then the same third test.
+
+### Goal item 3, knob direction across the keyboard (`tools/universe/knob_notes.py` -> `feel/knob_notes.json`)
+own_sweeps stores mel and bands only for C3, C4 and C3f; the other windows (C1, C5, C6, C3pp, C3mf) keep rms, partials and the release tail. So this test
+uses three axes every window has: brightness (partial centroid over f0), loudness (rms dB), tail length. Reliable (knob, axis) cells are learned at C3 on
+training banks and scored on held-out banks in every window. Bar 90% per window.
+- Analog 92.0-94.5%, Oscillator 94.7-97.0%, FM 92.0-95.7%: **MET in all 8 windows.**
+- Metallic: C1 89.8%, C5 87.5%, C6 83.5% (MISS at the extremes; 90-93.5% elsewhere). String: C1 87.5%, C5 89.6%, C6 84.9% (MISS at the extremes).
+- Wavetable 82.5-86.9% everywhere (MISS; same data gap as above). Sampler: only C3/C4/C3f stored, 84.8% on 33 moves (too few).
+Reading: on these three axes a direction learned at C3 carries across notes and velocities for the subtractive/FM engines; the physical models
+(Metallic, String) change behaviour at the keyboard ends, so their knob model needs per-register slopes.
+
+### Smaller checks (2026-10-29, night)
+- Valence after the MIDI re-strike fix: `fit_ve.py` (ml-venv) gives the same numbers to the third decimal (V r 0.508 / 0.547, E 0.816 / 0.844): EMOPIA's piano
+  files are not affected. C5 V still MISS. Outside V/A data: MERP's repo states no dataset licence, so nothing was downloaded; DEAM / PMEmo / EMOPIA audio
+  licences still to check on their own pages.
+- Real audio on this Mac: `/Library/Audio/Apple Loops` holds only Final Cut Pro sound effects (1,337), no music loops; the real-instrument and genre checks still
+  wait on the WD Black drive.
+- Pitch from audio (IMPROVEMENT-PLAN 9.3) is already answered above: single named notes agree 97.9% (bar 90); the 66.9% figure mixed loop-key names in. No fix needed.
