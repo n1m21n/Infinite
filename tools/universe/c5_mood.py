@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""C5 listening test: does the listener hear the mood that was asked for? 40 blind clips = 20 real EMOPIA pieces (labelled Q1-Q4) rendered
-through the same Analog patch + 20 compose.py clips asked for the same four moods (5 each). Listener picks one of four moods per clip.
+"""C5 listening test: does the listener hear the mood that was asked for? 40 blind clips = 20 real EMOPIA pieces (labelled Q1-Q4) played
+on an FM electric piano (EMOPIA is piano) + 20 Keys parts (chords, no drums) from the live generator (website wasm, the node's own mood / energy dots) asked
+for the same four moods (5 each). The same 5 styles appear in every mood, so the style never gives the mood away; each clip has its own
+seed, so voices differ. Listener picks one of four moods per clip.
+Round 2 (one Analog voice for all 40, compose.py) is kept at eval/listen/c5_mood_r2 + c5_mood_key_r2.json: the voice coloured every clip.
     c5_mood.py build [--secs 12]     render + loudness-match + shuffle -> eval/listen/c5_mood/ (index.html); key in c5_mood_key.json
     c5_mood.py score FILE            agreement with the intended mood, split real / composed. Bar (goal item 5): >= 28 of 40."""
 import argparse, glob, json, os, random, subprocess, sys
@@ -32,9 +35,31 @@ def real_part(path, secs):
         elif m.type in ("note_off", "note_on") and m.note in on:
             t0, v = on.pop(m.note)
             if t0 < secs: ev.append((t0, m.note, v / 127.0, max(t - t0, 0.05)))
-    table, sw, fixed = ow.param_table("Analog"); rec = ow.recipe("Analog", sw, fixed, [0.5] * len(sw))
-    rec.update({**cp.CLEAN, "wave1": 0, "wave2": 2, "oscMix": 0.3, "osc1Vol": 0.8, "osc2Vol": 0.5, "sub": 0.0, "voices": 1, "cutoff": 5000.0, "attack": 8.0, "decay": 500.0, "sustain": 0.4, "release": 350.0, "keyTrack": 0.5})
-    return [cp.Part("pad", "Analog", rec, ev, -8.0, 0.0, 0.25)]
+    table, sw, fixed = ow.param_table("FM"); rec = ow.recipe("FM", sw, fixed, [0.5] * len(sw))
+    rec.update(EPIANO)
+    return [cp.Part("pad", "FM", rec, ev, -8.0, 0.0, 0.25)]
+
+
+# FM electric piano on "4>3, 2>1": 2>1 is the body (1:1, the bend fades as the note dies), 4>3 the tine (14:1 click that dies in ~0.1 s)
+EPIANO = {"algorithm": 4, "feedback": 0.0, **{"fixed%d" % o: 0 for o in (1, 2, 3, 4)},
+          "ratio1": 1.0, "level1": 0.9, "attack1": 2.0, "decay1": 3000.0, "sustain1": 0.0, "release1": 500.0,
+          "ratio2": 1.0, "level2": 0.35, "attack2": 2.0, "decay2": 1500.0, "sustain2": 0.1, "release2": 500.0,
+          "ratio3": 1.0, "level3": 0.4, "attack3": 2.0, "decay3": 1200.0, "sustain3": 0.0, "release3": 300.0,
+          "ratio4": 14.0, "level4": 0.25, "attack4": 1.0, "decay4": 120.0, "sustain4": 0.0, "release4": 100.0}
+STYLES = [0, 11, 22, 24, 29]   # deep_house, liquid_dnb, downtempo, synthwave, neo_classical: no style that is a mood by itself
+DOTS = {"Q1": (0.8, 0.7), "Q2": (-0.8, 0.7), "Q3": (-0.8, -0.7), "Q4": (0.8, -0.7)}   # (mood, energy) asked of the node
+GEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../website/gen")
+
+
+def composed(d, rng):
+    """5 clips per mood from the live generator, one per style, each with its own seed. Part 9 = Keys (chords on a piano / tine / organ / clav
+    voice): the full mix is drum-led and buries the notes (HANDOFF, round 3 finding), so no drums."""
+    jobs = [{"style": s, "part": 9, "seed": rng.randrange(100000), "bars": 8, "mood": DOTS[q][0], "energy": DOTS[q][1], "out": os.path.join(d, "_c_%s_%d.wav" % (q, i)), "q": q}
+            for q in QV for i, s in enumerate(STYLES)]
+    jf = os.path.join(d, "_jobs.json"); json.dump(jobs, open(jf, "w"))
+    r = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "wasm_render_mood.js"), GEN, jf], capture_output=True, text=True, check=True)
+    done = {json.loads(l)["out"]: json.loads(l) for l in r.stdout.splitlines() if l.startswith("{")}
+    return [("composed", j["q"], j["out"]) for j in jobs if done.get(j["out"], {}).get("frames")]
 
 
 def cmd_build(a):
@@ -46,17 +71,12 @@ def cmd_build(a):
             if got == 5: break
             wav, _ = cp.render(real_part(p, a.secs), cp.Chain(), os.path.join(d, "_r_%s_%d" % (q, got)), a.secs)
             if wav and cp.measure(wav)["ok"]: clips.append(("real", q, wav)); got += 1
-        got = 0; cp.MOOD = QV[q]
-        for s in range(300, 400):
-            if got == 5: break
-            r = cp.make(s + 100 * int(q[1]), a.secs, os.path.join(d, "_c_%s_%d" % (q, got)))
-            if r.get("measure", {}).get("ok"): clips.append(("composed", q, os.path.join(d, "_c_%s_%d" % (q, got), "sample.wav"))); got += 1
-        cp.MOOD = None
+    clips += composed(d, rng)
     rng.shuffle(clips); key = {}
     for i, (side, q, src) in enumerate(clips, 1):
         cid = "clip_%02d" % i
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", src, "-t", str(a.secs), "-ac", "2", "-ar", "44100", "-af", "loudnorm=I=-20:TP=-2:LRA=11",
-                        os.path.join(d, cid + ".wav")], check=True); key[cid] = {"side": side, "mood": q}
+                        os.path.join(d, cid + ".wav")], check=True); key[cid] = {"side": side, "mood": q, "src": os.path.relpath(src, d)}
     json.dump(key, open(os.path.join(OUT, "c5_mood_key.json"), "w"), indent=1)
     open(os.path.join(d, "index.html"), "w").write(PAGE.replace("__N__", str(len(key))).replace("__L__", json.dumps(LABEL)))
     print("built %d clips in %s" % (len(key), d))
