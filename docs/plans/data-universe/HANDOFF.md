@@ -547,3 +547,17 @@ What the data supports on Analog today: TWO real dots, Tone (cutoff; 92-100% ove
 | Equation Synth | none | 58.1 +- 9.5 | MISS, 12 banks |
 | Partials, Slicer, Grain Molder, Field Synth | too few one-knob pairs | - | NOT MEASURABLE yet |
 Bar (>= 90% on all 13 engines, all moves): MISS on every engine. Only on the "reliable cells only" reading do 5 of 13 engines pass (Oscillator, FM, Metallic, String, Sampler), Analog is 0.5 pt short. Closing it needs new one-knob sweeps on Wavetable, Equation Synth, Partials, Slicer, Grain Molder, Field Synth (+ Spectral Synth, Granular for the 13) and a better model than a per-knob slope for the all-moves reading.
+
+## 2026-10-29 (goal item 2) — note model, held-out benchmark run (`benchmark.py --scope shippable`, log kept at /tmp/bench_note.log)
+Run with sweeps running alongside; B2/B3 here are NOT the daemon-paused runs the goal asks for (item 8 still open).
+
+| Gate | Result | Bar | Verdict |
+|---|---|---|---|
+| B1 held-out compression, bits saved on unseen files | drum +0.204, drum_mix +0.166, melody +0.813, bass +0.111, chord +0.058, params +1.997 | positive for every part | MET |
+| B2 real-music false rejects | overall 1.38% (drums 2.90%, melody 2.40%, chords 1.28%) | <= 3.0% | MET (not daemon-paused) |
+| B3 mishap catch | 98.0%; critical types 100%; sloppy_timing 91%, inverted_accents 93% | >= 96%, 100% critical | MET (not daemon-paused) |
+| B4 structural realism AUC | melody 0.535, drums 0.632 | <= 0.65 | MET (linear test on few features) |
+| B5 novelty/diversity | card escape 88.4%, diversity 0.137 vs real 0.116, cluster entropy 0.672 vs real 0.936 | entropy >= 0.90 x real | **MISS** (0.72 x real) |
+| B10 emotion | valence AUC 0.763, arousal 0.717 mean over held-out listeners; vgmidi arousal 0.549 weak | 0.70 / 0.65 | MET |
+
+Not measured yet for item 2: held-out key accuracy and chord-prediction accuracy by name, and generated-note spread against the corpus on tempo, register, density, rest, swing. B1 chord +0.058 bits is the nearest evidence for chords. These two are the next tool (`note_spread.py`).
