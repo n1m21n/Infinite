@@ -873,3 +873,17 @@ rhythm on every melodic part; mood -> full major / minor triads, not pentatonic)
 - `tools/universe/mood_check.py`: 14/30 cues right on the old generator, 24/30 on the new one (2 seeds). Still missing: tense keys brightness, leads mode and maj_minus_min, the full mix's maj_minus_min, and pads/leads tail.
 - Polish: mixes put 19% of their power under 40 Hz (DEAM songs: 1.2%) and are hollow from 250 Hz to 2 kHz. Just added a master 24 dB/oct high-pass at 30 Hz before the Limiter. **Not built or measured yet.**
 - Next: rebuild the wasm (`nice -n 10 cmake --build build-wasm -j2`), re-run bands.py and mood_check.py, fix the octave −1 voices under low notes at the source, then work on the low-mid/mid balance. Don't copy anything into website/gen without asking.
+
+## 2026-10-30 Plan item 2: next chord, small neural nets vs the n-gram (`chord_nn.py` -> `feel/chord_nn.json`)
+Same held-out splits as chord_eval2 (test 20% never seen), 5 seeds.
+
+| Model | Next-chord top-1 | Gain over most-frequent (points) | Cross-entropy (bits, lower is better) |
+|---|---|---|---|
+| n-gram (shipped) | 32.3% | 14.25 | 4.64 |
+| LSTM | 30.6% ± 2.0 | 12.5 ± 1.6 | 4.09 |
+| **Transformer** | **33.9% ± 1.6** | **15.8 ± 1.1** | **3.83** |
+
+- The transformer is the first neural model to beat the n-gram on held-out data. Top-1 is ahead by about one sd, a small
+  lead; cross-entropy is clearly lower, so its probabilities are better calibrated, which matters for item 3 (sampling with temperature for variety).
+- Only next chord is scored here. Key, register, density per role and B5 variety need the generator to sample from the
+  transformer (item 3) before it can replace the n-gram.

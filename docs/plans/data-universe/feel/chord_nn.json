@@ -1,0 +1,35 @@
+{
+ "ngram (chord_eval2 chosen)": {
+  "top1": 0.3233,
+  "gain_points": 14.25,
+  "ce_bits": 4.642
+ },
+ "lstm": {
+  "top1": 0.3061,
+  "top1_sd": 0.02,
+  "gain_points": 12.53,
+  "gain_sd": 1.63,
+  "ce_bits": 4.085,
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ]
+ },
+ "transformer": {
+  "top1": 0.3385,
+  "top1_sd": 0.0163,
+  "gain_points": 15.77,
+  "gain_sd": 1.11,
+  "ce_bits": 3.831,
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ]
+ }
+}
