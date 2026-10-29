@@ -641,3 +641,14 @@ Of 30 candidate words (warm, bright, dark, soft, ...), **only 5 have >= 40 posit
 - Knob-direction on reliable pairs (old run): Analog 89.5, Oscillator 91.6, FM 91.6, Metallic 95.6, String 92.8, Sampler 90.9; Wavetable none (silence). Rerun knob_direction.py after Wavetable is fixed.
 - C4 word AUC (pack-held-out): dark 0.749, punchy 0.726, hard 0.524, clean 0.500, tight 0.507. Plan: label from own render knobs, add word-specific measured features, drop words the sound cannot carry only with owner sign-off.
 - Next: (1) find which Wavetable knob silences it, fix its fixed/swept ranges, rerun its sweep; (2) rerun knob_direction.py, commit knob_direction.json; (3) item 1 MIDI retries; then remaining GOAL.md items.
+
+## Goal item 4, role critic retrained on part-labelled samples, packs held out (2026-10-29): MISS
+`tools/universe/role_critic_samples.py` (result `feel/role_critic_samples.json`). 124,830 samples from audio/features.jsonl in the generator's 13 parts
+(clap with snare, cymbal with hat, `unknown` left out), 331 packs, 5-fold with whole packs held out, per-role 3% thresholds set on a validation split of training packs.
+- Softmax regression: FRR 4.3% +- 1.6, catch 40.4% +- 5.4, top-1 50.8%.
+- Two-layer MLP (256-128): FRR 4.6% +- 1.4, catch 43.9% +- 5.2, top-1 54.2%.
+- Bars FRR <= 3%, catch >= 96%: MISS on both, far off. More rows did not help: the instrument-level critic (2,158 voices) had catch 75%.
+Why: the stored features are whole-file summaries (32 band means, peak, rms, onsets, crest, centroid). They hold no envelope over time,
+which is what separates pluck / lead / keys / pad and kick / tom. Labels come from folder names and are noisy (fx, synth, drums are catch-alls).
+What would move it: per-frame features (attack, decay, spectral change over time) from the audio itself. The source files are on the WD Black
+drive, which is not connected, so that re-analysis waits on the drive.
