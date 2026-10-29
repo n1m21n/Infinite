@@ -652,3 +652,18 @@ Why: the stored features are whole-file summaries (32 band means, peak, rms, ons
 which is what separates pluck / lead / keys / pad and kick / tom. Labels come from folder names and are noisy (fx, synth, drums are catch-alls).
 What would move it: per-frame features (attack, decay, spectral change over time) from the audio itself. The source files are on the WD Black
 drive, which is not connected, so that re-analysis waits on the drive.
+
+## Goal item 4 on the generator's own audio, frame-by-frame features (2026-10-29): catch MET, FRR MISS
+Idea (Naman): render the parts with Infinite itself, so labels are exact and the audio can be measured frame by frame without the drive.
+`tools/universe/wasm_render_parts.js` (live generator via website wasm, `_gen_pcm`) -> `frame_features.py` (per-hit envelope, attack, decay,
+sustain, timbre change over time, pitchedness, hit regularity, spectral shape mean and spread) -> `role_critic_render.py`. Data:
+`training-data/audio/gen_parts.jsonl`, 5,097 renders = 34 styles x 15 parts x 10 seeds (features only, no audio kept). Result `feel/role_critic_render.json`.
+Test: 5-fold with whole styles held out; per-role 3% thresholds from a validation split of training styles.
+- MLP (128-64): catch 98.4% +- 1.0 (bar >= 96%: MET), FRR 6.1% +- 1.4 (bar <= 3%: MISS), top-1 93.5%.
+- Linear: catch 98.0%, FRR 6.1%, top-1 93.0%. Nested pairs (drums holds kicks etc.) change catch by < 0.2 points.
+- Biggest confusions: plucks->pads 5.3%, pads->textures 5.0%, plucks->leads 4.4%, synths->leads 4.4%.
+- Same task on whole-file summaries of real packs: top-1 54%, catch 44%. The frame features are what moved it.
+FRR miss: the thresholds come from ~5 validation styles (~55 renders per role), so the 3rd percentile is noisy and does not carry to new styles.
+Next: set thresholds on out-of-fold probabilities over all training styles (about 6x more rows per role), then retest. The bar is unchanged.
+Limit: this checks the generator's parts against each other, not against real instruments. The real-sample check needs the same frame
+features on real audio (WD Black, or any local library run through frame_features.measure).

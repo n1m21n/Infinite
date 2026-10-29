@@ -1,24 +1,32 @@
-# Start here (written 2026-10-29)
+# Start here (written 2026-10-29, evening)
 
-Goal: GOAL.md (cleared on 2026-10-29; re-set with `/goal <text of GOAL.md>` if wanted). Status per bar: HANDOFF.md, last section "Session wrap". Last commit: 097688f2.
+Goal: GOAL.md. Status per bar: HANDOFF.md (newest sections at the end). Branch feature/sample-dots, nothing pushed.
 
-## State in one table
-| Bar | Today | Next action |
-|---|---|---|
-| 1 data | unassigned 15.9% (bar <5%); ~372 MIDI files not retried | retry 365 timeouts (raise 20 s) + 7 dtype bugs; assign Steam by tags+nearest cluster; measure instruments with audio |
-| 2 notes | key 51% exact / 70% incl. relative; chord +5.6 (bar +10); register/density per role missed | lift bass octave + density per role; ships only if it wins blind test |
-| 3 knobs | Analog 89.5, Osc 91.6, FM 91.6, Metallic 95.6, String 92.8, Sampler 90.9; Wavetable none (silent) | focus ONLY on the 7 main synths (owner, 2026-10-29): Analog, Wavetable, Oscillator, Metallic, String, FM, Sampler |
-| 4 critic | note-side done; sound-side role critic missed | more measured audio per instrument |
-| 5 feel | E, V met; C4 word AUC: dark .749, punchy .726, hard .524, clean .500, tight .507 | label words from own render knobs, add measured features; drop un-audible words only with Naman's sign-off |
-| 6-9 | mix, blind tests, determinism, B2/B3, deploy: not started | after 1-5 |
+## Running or just finished when this was written
+- Wavetable render: `own_sweeps.py run --node Wavetable --count 6000 --shards 2 --budget 120` (log in the old session's scratchpad). It stops by itself.
+  Then: `python3 tools/universe/knob_direction.py --engines Wavetable` and commit feel/knob_direction.json. Re-runs resume (content hashes).
 
-## First three jobs
-1. Wavetable silence: scan one knob at a time (tools/universe/own_sweeps.py: param_table, recipe, render_batch; peak of o0.wav) -> fix ranges -> `own_sweeps.py run --node Wavetable --count 2000 --budget 20` -> rerun knob_direction.py -> commit feel/knob_direction.json.
-2. Word labels from own renders (Analog first), rerun tools/universe/words_eval.py.
-3. MIDI retries (item 1).
+## Remaining work, in order (all approved by Naman)
+| # | Item | State | Next action |
+|---|---|---|---|
+| 1 | Role critic (item 4) | own-audio critic: catch 98.4% MET, FRR 6.1% MISS | thresholds from out-of-fold probs over all training styles; retest |
+| 2 | Knob direction (item 3) | 6 engines 89.5-95.6; Wavetable short of data | rerun after the render above; then test held-out notes (C1/C5/C6, pp) for all engines |
+| 3 | Words / tagging (C4) | 5 of 30 words testable | label words from ~40k preset names + tags (presets.jsonl, air_*), measured features; pack held out |
+| 4 | Note model (item 2) | key 51%, chord +5.6 (bar +10), register MISS | compare n-gram vs sequence models on held-out MIDI; retry 372 MIDI files; bass-lift wasm rebuild + role_spread vs scratch baseline, then commit SampleStyles.cpp |
+| 5 | Sound model (C1/C2) | R2 0.21, data-limited | more own-engine renders; one cross-engine model on full spectrograms, using renders/spectrum.jsonl and the own_*.jsonl mel windows |
+| 6 | Note effects / audio effects | not measured | each note node input->output on corpus phrases; effects applied to renders (frame_features before/after) |
+| 7 | Genre (C8) | at chance on axes | groove + frame features per style; generator renders give exact style labels |
+| 8 | Valence (C5 V r 0.51-0.55) | needs outside data | download a public V/A dataset after a licence check (Naman OK'd); untrusted files read with python -I in their own folder |
+| 9 | Instruments | String far from acoustic families | guitar body fit into String -> re-test string_families; then bowed, wind node, piano node (show designs first; prior art in docs/prior-art/physical-models-2026-10-29.md) |
+| 10 | Wire dots to learned models | hand rules in SampleStyles.cpp (:162, :1030, :1038, :1420) | only after the bars above pass |
+| 11 | Sample studio app panel | plan settled (summary in the old session; planner output) | build per plan: Shift+W, dock right/top/bottom, brand tokens ember-200/400, signal-300/500 |
+| 12 | Leftovers | | pitch-from-audio harmonic fix; Grain Molder `path` in the param table; C6, C7, C9, C10; 40-pair blind test and 40 mood clips (need Naman); claims ledger in HANDOFF |
 
-## Fixed this session (do not redo)
-- patch_text now escapes newlines (Field Synth `code` works; peaks .29-.41); Slicer pinned to sliceBy 1; Grain Molder saves `path` (src/nodes/GrainMolderNode.cpp) but its `path` is not in the param table so sweeps still render silent. Field Synth/Slicer/Partials/Grain Molder are out of the main set; Field Synth is for custom-code sounds, later.
+## New tools this session
+- `tools/universe/wasm_render_parts.js`: render any part of any style with the live generator, audio streamed to stdout.
+- `tools/universe/frame_features.py`: frame-by-frame measurement, reusable for real audio, effects and genre.
+- `tools/universe/role_critic_render.py` (render / train), `role_critic_samples.py` (real-pack summary critic, MISS, kept as the baseline).
 
 ## Rules (from memory)
-One heavy job at a time; ask before agent batches; build via scripts/ibuild.py; deploy via scripts/deploy_desktop.sh; no Claude attribution in commits; commit per step; chat corpora never pushed; no bar moves without Naman; release only when he says.
+One heavy job at a time; ask before agent batches; build via scripts/ibuild.py (never bare -j); no Claude attribution in commits; commit per step;
+no bar moves without Naman; record a miss as a miss; no push or deploy without asking; never read GPL/LGPL source.
