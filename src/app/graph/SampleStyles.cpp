@@ -1108,13 +1108,15 @@ namespace
    Params BankVoice(BankRole role, Rng& r)
    {
       static const int kStyles[][2] = { { 0, 0 }, { 2, 2 }, { 1, 4 }, { 4, 1 } }; // Bass; Lead; Keys, Sequence; Sequence, Keys
-      std::vector<const VitalVoice*> pool;
-      for (const VitalVoice& v : kVitalVoices)
-         if (v.style == kStyles[(int)role][0] || v.style == kStyles[(int)role][1])
+      std::vector<const BankRow*> pool;
+      // Diva rows (src 1) stay out for now: on the same 27 takes they made leads darker (centroid 689 -> 581 Hz, low
+      // share 0.13 -> 0.20) and synths lower (low 0.58 -> 0.65). Their cutoffs are fitted to the renders' average.
+      for (const BankRow& v : kBankVoices)
+         if (v.src == 0 && (v.style == kStyles[(int)role][0] || v.style == kStyles[(int)role][1]))
             pool.push_back(&v);
-      const VitalVoice& v = *pool[(size_t)r.Range((int)pool.size())];
+      const BankRow& v = *pool[(size_t)r.Range((int)pool.size())];
       const bool bass = role == BankRole::Bass, pluck = role == BankRole::Pluck;
-      const VitalOsc* o[2] = { &v.a, &v.b };
+      const BankOsc* o[2] = { &v.a, &v.b };
       if (!v.a.on || (v.b.on && v.b.level > v.a.level))
          std::swap(o[0], o[1]); // engine A is the louder one
       Params k;
@@ -1135,7 +1137,9 @@ namespace
             continue;
          }
          // Semitones off engine A, folded into octaves the node takes (+-4) and a semi it takes (+-12).
-         const int rel = std::clamp(o[i]->semi - o[0]->semi, -12, 24); // nothing more than an octave under the note: that is the mud
+         int rel = std::clamp(o[i]->semi - o[0]->semi, -12, 24); // nothing more than an octave under the note: that is the mud
+         if (!bass && rel < 0)
+            rel += 12; // a melodic line keeps its second engine over the note, not under it
          int oct = (int)std::floor((rel + 6) / 12.0);
          const int semi = rel - 12 * oct;
          if (!bass && o[i]->table == 0 && o[i]->pos < 0.4f)
