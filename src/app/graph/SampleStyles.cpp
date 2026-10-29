@@ -143,12 +143,91 @@ namespace
       int n = 0;
       float variation = 0.5f;
       float tone = 0.0f, energy = 0.0f, space = 0.0f, mood = 0.0f; // the recipe's dots
+      // Set by a builder around the Add of a voice that plays above the bass
+      // (keys, leads, chords, plucks, pads): mood and energy move its octave.
+      bool melodic = false;
+
+      // Mood and energy are felt through every part of a sound, not only its
+      // notes (music-emotion studies, e.g. Juslin and Laukka 2003; Eerola 2013):
+      //   happy  (bright, driving): major, high register, bright, quick even strikes, dry
+      //   tense  (dark, driving):   harmonic minor, sharp attacks, resonant and rough, dry
+      //   sad    (dark, calm):      natural minor, low register, dark, soft and slow, long tail
+      //   calm   (bright, calm):    major with sevenths, soft swells, slow, wide and wet
+      // The quadrant is only named past 0.35 on a dot; below that nothing changes its kind.
+      enum Quad { kNoQuad, kHappy, kTense, kSad, kCalm };
+      Quad Quadrant() const
+      {
+         if (mood > 0.35f)
+            return energy < -0.2f ? kCalm : kHappy;
+         if (mood < -0.35f)
+            return energy > 0.2f ? kTense : kSad;
+         return kNoQuad;
+      }
+      // Reverb and tail: calm and sad music sits in more room, driving music closer.
+      double Room() const { return std::clamp((double)space - 0.5 * energy + 0.2 * std::max(0.0f, -mood) * std::max(0.0f, -energy), -1.0, 1.0); }
+      double Tension() const { return (double)std::max(0.0f, -mood) * std::max(0.0f, energy); }
+
+      // Chords: a mood picks a progression that says it (in the scale mood chose), energy
+      // picks how often the chord is struck and how often it changes.
+      void ShapeChords(Params& ps, int seed) const
+      {
+         if (std::abs(mood) <= 0.35f && std::abs(energy) <= 0.35f)
+            return;
+         auto num = [&](const char* k, double d) { auto it = ps.find(k); return it == ps.end() ? d : std::stod(it->second.second); };
+         const double r0 = num("rateBeats", 1.0);
+         double strike = r0, change = std::max(r0, 4.0);
+         if (energy > 0.35f)
+            strike = std::min(r0, energy > 0.75f ? 0.5 : 1.0), change = 2.0;
+         else if (energy < -0.35f)
+            strike = std::max(r0, 4.0), change = strike;
+         ps["rateBeats"] = { 'f', Num(strike) };
+         ps["strumMs"] = { 'f', Num(std::clamp(num("strumMs", 15.0) * std::pow(2.0, -1.2 * energy), 0.0, 120.0)) };
+         const Quad q = Quadrant();
+         if (q == kNoQuad)
+            return;
+         // Scale degrees, 0-based; types: 0 the chord knob, 1 seventh, 2 sus2, 3 sus4.
+         struct Prog { int n; int deg[4]; int type[4]; };
+         static const Prog kHappyP[] = { { 4, { 0, 4, 5, 3 }, {} }, { 4, { 0, 3, 4, 0 }, {} }, { 4, { 0, 5, 3, 4 }, {} }, { 4, { 3, 0, 4, 4 }, { 0, 0, 3, 0 } } };
+         static const Prog kTenseP[] = { { 4, { 0, 3, 4, 0 }, {} }, { 4, { 0, 5, 6, 4 }, {} }, { 4, { 0, 1, 4, 4 }, { 0, 0, 3, 0 } }, { 4, { 0, 0, 5, 4 }, {} } };
+         // Sad stays on the minor chords (i, iv, v of natural minor): VI, III and VII are major and lift it.
+         static const Prog kSadP[] = { { 4, { 0, 3, 0, 4 }, {} }, { 4, { 0, 4, 3, 0 }, {} }, { 4, { 0, 3, 5, 4 }, {} }, { 4, { 0, 0, 3, 3 }, {} } };
+         static const Prog kCalmP[] = { { 4, { 0, 3, 0, 3 }, { 1, 1, 1, 1 } }, { 4, { 0, 5, 3, 0 }, { 1, 1, 1, 2 } }, { 4, { 3, 0, 1, 0 }, { 1, 1, 1, 2 } }, { 4, { 0, 2, 3, 3 }, { 1, 1, 1, 2 } } };
+         const Prog* list = q == kHappy ? kHappyP : q == kTense ? kTenseP : q == kSad ? kSadP : kCalmP;
+         Rng r("affect-chords:" + std::to_string(seed));
+         const Prog& p = list[r.Range(4)];
+         const int per = std::clamp((int)std::lround(change / strike), 1, 8);
+         const int chords = std::max(1, std::min(p.n, 8 / per));
+         ps["mode"] = { 'i', "1" };
+         ps["progSteps"] = { 'i', std::to_string(chords * per) };
+         for (int c = 0; c < 8; c++)
+         {
+            const int i = std::min(c / per, chords - 1);
+            ps["progDeg" + std::to_string(c)] = { 'i', std::to_string(c < chords * per ? p.deg[i] : 0) };
+            ps["progType" + std::to_string(c)] = { 'i', std::to_string(c < chords * per ? p.type[i] : 0) };
+         }
+         if (q == kCalm)
+            ps["chordSize"] = { 'i', "4" };
+         else if (q == kTense || q == kHappy)
+            ps["chordSize"] = { 'i', "3" };
+         ps["upperHarmonics"] = { 'f', Num(q == kHappy ? 35.0 : q == kSad ? 5.0 : 15.0) };
+      }
 
       // The dots, applied to one node's params as it is placed. A key the
       // seed left at its default starts from the node's own default, so a dot
       // moves every voice, not only the ones the seed touched.
-      void Shape(const std::string& type, Params& ps) const
+      void Shape(const std::string& type, Params& ps, int seed) const
       {
+         if (type == "Chorder")
+            ShapeChords(ps, seed);
+         if (type == "Arpeggiator" && std::abs(energy) > 0.35f)
+         {
+            auto it = ps.find("rateBeats");
+            if (it != ps.end())
+            {
+               const double rb = std::stod(it->second.second);
+               it->second.second = Num(energy > 0.0f ? std::min(rb, 0.25) : std::min(rb * 2.0, 1.0));
+            }
+         }
          auto scale = [&](const char* key, double fallback, double mul, double lo, double hi, bool fill)
          {
             auto it = ps.find(key);
@@ -159,7 +238,10 @@ namespace
          };
          const bool synth = type == "Analog" || type == "Wavetable" || type == "Metallic" || type == "Oscillator" || type == "Spectral Synth" ||
                             type == "Field Synth" || type == "Partials";
-         const double bright = std::pow(2.0, 1.2 * tone + 0.35 * energy + 0.25 * mood);
+         // Tense is not dark: anger and fear are bright and harsh, so tension opens the filter back up.
+         // The bass takes half of it: darkened as much as the voices above it, it turns to sub and muddies the mix.
+         const double feel = 0.6 * energy + 0.45 * mood + 0.9 * Tension();
+         const double bright = std::pow(2.0, 1.2 * tone + (melodic ? feel : 0.5 * feel));
          if (synth && bright != 1.0)
          {
             for (const char* k : { "cutoff", "a.cutoff", "filterCutoff" })
@@ -168,7 +250,47 @@ namespace
             scale("b.cutoff", 12000.0, bright, 80.0, 18000.0, false);
             scale("p.cutoff", 6000.0, bright, 200.0, 10000.0, false);
          }
-         const double tail = std::pow(2.0, 1.5 * space);
+         // Energy shapes how long the voices above the bass hold; a bass held longer only rings as sub.
+         const double tail = std::pow(2.0, 1.5 * space - (melodic ? 0.6 * energy : 0.0));
+         if (synth && energy != 0.0f)
+         {
+            // Calm swells in and holds its notes; driving strikes hard and lets go.
+            const double soft = 60.0 * std::max(0.0f, -energy);
+            auto attack = [&](const char* key)
+            {
+               auto it = ps.find(key);
+               if (it == ps.end() || it->second.first != 'f')
+                  return;
+               const double v = std::stod(it->second.second);
+               it->second.second = Num(std::clamp(energy > 0.0f ? v * (1.0 - 0.6 * energy) : v + soft, 0.5, 8000.0));
+            };
+            for (const char* k : { "attack", "a.ampAttack", "ampAttack" })
+               attack(k);
+            const double hold = melodic ? std::pow(2.0, -0.8 * energy) : 1.0;
+            for (const char* k : { "decay", "a.ampDecay", "ampDecay" })
+               scale(k, 0.0, hold, 20.0, 12000.0, false);
+         }
+         if (synth && melodic && (mood != 0.0f || energy != 0.0f))
+         {
+            // Register: happy sits higher, sad lower.
+            const int lift = std::clamp((int)std::lround(0.55 * mood + 0.3 * energy), -1, 1);
+            auto it = ps.find("a.octave");
+            if (type == "Wavetable" && lift != 0)
+            {
+               const int o = it == ps.end() ? 0 : std::stoi(it->second.second);
+               ps["a.octave"] = { 'i', std::to_string(std::clamp(o + lift, -2, 2)) };
+            }
+         }
+         if (synth && Tension() > 0.0)
+         {
+            // Tense: a resonant edge and beating voices, the roughness of anger and fear.
+            const double t = Tension();
+            for (const char* k : { "a.resonance", "resonance" })
+               if (ps.count(k) || (type == "Wavetable" && !strcmp(k, "a.resonance")))
+                  ps[k] = { 'f', Num(std::clamp((ps.count(k) ? std::stod(ps[k].second) : 0.0) + 0.45 * t, 0.0, 0.85)) };
+            if (type == "Wavetable")
+               ps["a.detune"] = { 'f', Num(std::clamp((ps.count("a.detune") ? std::stod(ps["a.detune"].second) : 0.0) + 14.0 * t, 0.0, 40.0)) };
+         }
          if (synth && tail != 1.0)
          {
             scale("release", 250.0, tail, 5.0, 8000.0, type == "Analog" || type == "Partials");
@@ -182,15 +304,16 @@ namespace
             if (it != ps.end() && it->second.first == 'f')
                it->second.second = Num(std::clamp(std::stod(it->second.second) + by, lo, hi));
          };
-         if (type == "Reverb" && space != 0.0f)
+         const double room = Room();
+         if (type == "Reverb" && room != 0.0)
          {
-            add("mix", 0.25 * space, 0.0, 0.9);
-            scale("decay", 1.2, std::pow(2.0, (double)space), 0.2, 12.0, false);
+            add("mix", 0.25 * room, 0.0, 0.9);
+            scale("decay", 1.2, std::pow(2.0, room), 0.2, 12.0, false);
          }
          // A tempo delay, not the few-ms bursts that build a clap.
          auto tm = ps.find("timeMs");
-         if (type == "Delay" && space != 0.0f && tm != ps.end() && std::stod(tm->second.second) > 60.0)
-            add("mix", 0.15 * space, 0.0, 0.8);
+         if (type == "Delay" && room != 0.0 && tm != ps.end() && std::stod(tm->second.second) > 60.0)
+            add("mix", 0.15 * room, 0.0, 0.8);
          if ((type == "Note Sequencer" || type == "Drum Sequencer") && energy != 0.0f)
             for (auto& [k, v] : ps)
                if (k.rfind("vel", 0) == 0 && k.size() > 3 && isdigit((unsigned char)k[3]) && v.first == 'f' && std::stod(v.second) > 0.0)
@@ -276,7 +399,7 @@ namespace
          Params ps = Seeded(type, seed);
          for (const auto& kv : force)
             ps[kv.first] = kv.second;
-         Shape(type, ps);
+         Shape(type, ps, seed);
          for (const auto& [k, v] : ps)
             lines.push_back(std::string("  ") + v.first + " " + k + " " + v.second);
          lines.push_back("end");
@@ -1027,28 +1150,31 @@ Compiled Compile(const Recipe& recipe)
    {
       if (recipe.bpm > 0.0f || tempoFromUser || (recipe.energy == 0.0f && recipe.mood == 0.0f))
          return;
-      out.bpm = std::round(out.bpm * (1.0f + 0.1f * recipe.energy + 0.03f * recipe.mood) * 10.0f) / 10.0f;
+      out.bpm = std::round(out.bpm * (1.0f + 0.15f * recipe.energy + 0.05f * recipe.mood) * 10.0f) / 10.0f;
    };
    leanTempo();
    // Mood swaps the scale family when the card picked it: mode is the
    // strongest single happy/sad cue in music, so a minor card turns major.
+   // A strong mood takes a seven-note scale: a pentatonic has no full triads,
+   // so its chords never sound plainly major or minor. Dark and driving is
+   // tense (harmonic minor: the raised seventh pulls); dark and calm is sad.
    if (recipe.scale < 0)
    {
       using namespace MusicTime;
       if (recipe.mood > 0.35f)
          switch (scale0)
          {
-            case kNaturalMinor: case kHarmonicMinor: case kMelodicMinor: case kPhrygian: case kLocrian: scale0 = kMajor; break;
+            case kNaturalMinor: case kHarmonicMinor: case kMelodicMinor: case kPhrygian: case kLocrian: case kMinorPentatonic: case kBlues:
+            case kMajorPentatonic: scale0 = kMajor; break;
             case kDorian: scale0 = kMixolydian; break;
-            case kMinorPentatonic: case kBlues: scale0 = kMajorPentatonic; break;
             default: break;
          }
       else if (recipe.mood < -0.35f)
          switch (scale0)
          {
-            case kMajor: scale0 = recipe.mood < -0.75f ? kHarmonicMinor : kNaturalMinor; break;
+            case kMajor: case kMajorPentatonic: case kMinorPentatonic: case kBlues: case kNaturalMinor:
+               scale0 = recipe.energy > 0.35f || recipe.mood < -0.85f ? kHarmonicMinor : kNaturalMinor; break;
             case kLydian: case kMixolydian: scale0 = kDorian; break;
-            case kMajorPentatonic: scale0 = kMinorPentatonic; break;
             default: break;
          }
    }
@@ -1791,7 +1917,9 @@ Compiled Compile(const Recipe& recipe)
       const std::string picked = pickVoice(st.synth);
       if (!picked.empty())
       {
+         g.melodic = true;
          const int sy = (pads || plucks) ? g.Add(shapedVoice, seed(), shapedEnv) : g.Add(picked, seed());
+         g.melodic = false;
          g.Connect(notes, sy, true);
          if (wantChords)
             synths.push_back(sy);
@@ -1851,7 +1979,7 @@ Compiled Compile(const Recipe& recipe)
          if (mine && user.hasTiming)
             density += (0.25 + 0.75 * user.onset[(k * 2) % 16] - density) * user.timingW;
          deg = std::clamp(deg + move, -2, st.motifRange);
-         seq.push_back({ deg, k % 4 == 0 || rng.Uniform() < density });
+         seq.push_back({ deg, k % 4 == 0 || rng.Uniform() < std::clamp(density * (1.0 + 0.6 * recipe.energy), 0.05, 0.95) });
       }
       std::vector<std::pair<int, bool>> answer(seq.begin(), seq.begin() + 5);
       for (int k = 0; k < 3; k++)
@@ -1881,7 +2009,9 @@ Compiled Compile(const Recipe& recipe)
          synth = Split(st.motifSynth).empty() ? "" : Split(st.motifSynth)[0];
       if (!synth.empty() && TypeOf(synth) != nullptr)
       {
+         g.melodic = true;
          const int sy = g.Add(synth, seed());
+         g.melodic = false;
          g.Connect(mn, sy, true);
          synths.push_back(sy);
          int lead = chain(sy, 1);
@@ -2253,7 +2383,16 @@ Compiled Compile(const Recipe& recipe)
          if (keysPart)
          {
             // Chords struck on an instrument: a tine piano, organ, mallet keys, a clav or a plucked-string piano.
-            const int kind = PickDirectiveKind(sp, dir.keysW);
+            int kind = PickDirectiveKind(sp, dir.keysW);
+            // A named mood picks the instrument too (its own stream, so the notes do not move): bright tines,
+            // mallets and clav for happy; clav and organ for tense; felt piano and pipes for sad; felt, vibes
+            // and tines for calm.
+            if (g.Quadrant() != Graph::kNoQuad)
+            {
+               static const int kByQuad[5][3] = { { 0, 0, 0 }, { 0, 3, 4 }, { 4, 1, 4 }, { 2, 5, 2 }, { 2, 3, 0 } };
+               Rng vr(std::string("affect-voice:") + std::to_string(recipe.seed));
+               kind = kByQuad[g.Quadrant()][vr.Range(3)];
+            }
             double rate = sp.Uniform() < 0.5 ? 2.0 : 4.0, strum = sp.Uniform(4.0, 28.0);
             switch (kind)
             {
@@ -2312,7 +2451,9 @@ Compiled Compile(const Recipe& recipe)
             p["chordSize"] = { 'i', std::to_string(3 + sp.Range(2)) };
             p["progSteps"] = { 'i', std::to_string(2 + sp.Range(3)) };
             const int ch = g.Add("Chorder", sp.Range(1 << 30), p);
+            g.melodic = true;
             const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.melodic = false;
             g.Connect(ch, sy, true);
             synths.push_back(sy);
             chans.push_back({ sy, 0.0f });
@@ -2360,7 +2501,8 @@ Compiled Compile(const Recipe& recipe)
             k["a.octave"] = { 'i', std::to_string(sp.Range(2)) };
             std::vector<double> vel(16, 0.0);
             std::vector<int> note(16, 0);
-            const double density = sp.Uniform(0.35, 0.7);
+            // Energy fills or thins the line (the draw stays, so the line is the same one, busier or sparser).
+            const double density = std::clamp(sp.Uniform(0.35, 0.7) * (1.0 + 0.6 * recipe.energy), 0.12, 0.95);
             static const int kMove[] = { -2, -1, -1, 0, 1, 1, 2, 3 };
             int d = sp.Range(4);
             std::vector<std::pair<int, bool>> leadSeq;
@@ -2373,14 +2515,38 @@ Compiled Compile(const Recipe& recipe)
                leadSeq.push_back({ d, on });
             }
             ProposeMotif(criticRng, st, mine, root, out.scale, leadSeq, melNov);
+            // A named mood leans the line onto the chord: the beats land on root, third or fifth and the
+            // line opens on the third, the note that says major or minor.
+            if (g.Quadrant() != Graph::kNoQuad)
+            {
+               bool first = true;
+               for (int i = 0; i < 16; i++)
+                  if (leadSeq[(size_t)i].second && (i % 4 == 0 || first))
+                  {
+                     int& dg = leadSeq[(size_t)i].first;
+                     const int m = ((dg % 7) + 7) % 7;
+                     if (first)
+                        dg += 2 - m;
+                     else if (m == 1 || m == 3 || m == 5)
+                        dg -= 1;
+                     else if (m == 6)
+                        dg += 1;
+                     dg = std::clamp(dg, -2, 7);
+                     first = false;
+                  }
+            }
             for (int i = 0; i < 16; i++)
                if (leadSeq[(size_t)i].second)
                {
                   vel[(size_t)i] = std::clamp((i % 4 == 0 ? dir.velMean + 0.15 : dir.velMean) + sp.Uniform(-dir.velSpread, dir.velSpread), 0.3, 1.0);
                   note[(size_t)i] = degreeNote(leadSeq[(size_t)i].first, 2);
                }
-            const int sq = sequence(vel, note, sp.Uniform() < 0.3 ? 0.5 : 0.25, sp.Uniform(60.0, 100.0), 16);
+            const double leadRate = sp.Uniform() < 0.3 || recipe.energy < -0.35f ? 0.5 : 0.25;
+            const double leadGate = sp.Uniform(60.0, 100.0) * (recipe.energy > 0.35f ? 0.7 : 1.0);
+            const int sq = sequence(vel, note, leadRate, leadGate, 16);
+            g.melodic = true;
             const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            g.melodic = false;
             g.Connect(sq, sy, true);
             int end = sy;
             if (sp.Uniform() < 0.7) // a dotted echo is how a lead gets its space
@@ -2679,6 +2845,15 @@ Compiled Compile(const Recipe& recipe)
       const int rv = g.Add("Reverb", seed(), F({ { "mix", pads ? padWet : ownSpace ? specialWet : wide ? 0.45 : drumPart ? 0.05 : 0.15 }, { "decay", pads ? padDecay : ownSpace ? specialDecay : wide ? 3.0 : drumPart ? 0.5 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
+   }
+   // The master's floor: nothing under 30 Hz. A voice an octave down under a low note plays near 20 Hz, which no
+   // speaker gives back; left in, it is half the loop's power and the loudness match turns everything audible down.
+   {
+      Params hp = F({ { "freq", 30.0 }, { "q", 0.707 }, { "mix", 1.0 } });
+      hp["type"] = { 'i', "4" }; // AudioFilterDsp::kHP24
+      const int hpf = g.Add("Audio Filter", 0, hp);
+      g.Connect(end, hpf, false);
+      end = hpf;
    }
    const int lm = g.Add("Limiter", 0);
    g.Connect(end, lm, false);

@@ -841,3 +841,35 @@ reachable with these characteristics and the finding goes to Naman (the bar does
 +1,350 one-knob presets (C3 only, 645 s). Reliable-cell slope unchanged at 89.5% (1,062 moves). The neighbour model (sign from the
 24 training moves of that knob whose other knobs are nearest) reaches 91.2% on 704 held-out moves, folds by bank, same tau/eff.
 It covers fewer moves (it abstains where neighbours disagree); compose should use it for Analog and the slope elsewhere.
+
+## C5 mood test, round 2: MISS, timbre held fixed (2026-10-29)
+Owner's answers (`eval/listen/c5_answers_owner_2026-10-29.json`): real 12/20, composed 4/20, **total 16/40 (bar 28) - MISS** (chance 10).
+Answers lean tense (20 of 40) and only one clip was called calm. Owner: every clip is the same synth with a different melody, a dark synth.
+Cause (the test, again): the 20 real EMOPIA clips all play one fixed Analog voice (saw + square, cutoff 5 kHz) and the 20 composed clips
+come from compose.py (retired), also Analog with compose.CLEAN. Mood was asked to come from notes alone through one buzzy voice, so the
+voice pulled every clip towards tense / sad. The machine check before handing over (noise / flatness per clip) passed and did not catch this.
+Real clips (notes from real music) beat composed ones 12 vs 4: the composed note side is the weaker half on this reading.
+Next (round 3): real clips through a piano-like voice (EMOPIA is piano), composed clips from the live Generate Samples node with its own
+voice choice per mood instead of compose.py. Round 2 stays recorded as a miss.
+
+### Finding while building C5 round 3: the full mix is drum-led (2026-10-29)
+Owner, on the live generator's full mix (downtempo, seed 500, four moods): "all just drums". Measured by projecting the full mix on each
+part rendered alone: the Drums layer explains 10-41% of the mix, Synths (bass + motif) 0-13%, Pads / Keys / Plucks / Leads ~0% (their
+voices differ when rendered alone, so this undercounts them, but the ear agrees). Mood moves scale (major / minor pentatonic) and tempo
+(89.7 -> 74.3 bpm), so the notes do change, but they sit under the drums. Round 3 composed clips therefore use melodic parts, no drums.
+Open (product, not this test): the Full part's melodic layers are buried; balance check per style before any change ships.
+
+### C5 round 3 built: machine check before listening (2026-10-29)
+40 clips at eval/listen/c5_mood (key c5_mood_key.json, with each clip's source). None noisy (flatness <= 0.001), none silent.
+Real (EMOPIA on the FM electric piano) separate by measurement: mode (Krumhansl major - minor) Q1 +0.27, Q4 +0.12, Q2 -0.05, Q3 -0.10;
+onsets/s Q1 4.1, Q2 4.5 vs Q3 2.6, Q4 3.1. Composed (live generator, Keys part, mood / energy dots at +-0.8 / +-0.7) do NOT separate:
+mode -0.03..+0.03 in every quadrant, onsets/s 0.6-0.7 in every quadrant (about 7 chords in 12 s). Reading: the energy dot does not reach
+the Keys part's rhythm or density, and mood only swaps major / minor pentatonic, which barely moves the chord colour. Prediction before the
+owner listens: real half well above chance, composed half near chance. If that holds, the fix is in SampleStyles (energy -> chord rate /
+rhythm on every melodic part; mood -> full major / minor triads, not pentatonic), not in the test.
+
+## Paused 2026-10-29: mood across sound, plus polish (SampleStyles)
+- Mood and energy now also move voice choice (keys by quadrant), register, brightness, attack and hold, reverb and delay, tension (resonance, detune), chord progressions and rhythm, lead contour, and tempo. Zero dots stay byte-identical except for the new master high-pass.
+- `tools/universe/mood_check.py`: 14/30 cues right on the old generator, 24/30 on the new one (2 seeds). Still missing: tense keys brightness, leads mode and maj_minus_min, the full mix's maj_minus_min, and pads/leads tail.
+- Polish: mixes put 19% of their power under 40 Hz (DEAM songs: 1.2%) and are hollow from 250 Hz to 2 kHz. Just added a master 24 dB/oct high-pass at 30 Hz before the Limiter. **Not built or measured yet.**
+- Next: rebuild the wasm (`nice -n 10 cmake --build build-wasm -j2`), re-run bands.py and mood_check.py, fix the octave −1 voices under low notes at the source, then work on the low-mid/mid balance. Don't copy anything into website/gen without asking.

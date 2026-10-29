@@ -1,0 +1,250 @@
+{
+ "Reverb": {
+  "rows": 672,
+  "pairs": 576,
+  "held_out_acc": 0.861,
+  "scored": 360,
+  "knobs": {
+   "mix": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 0.82,
+      "median_per_turn": 2.103
+     },
+     {
+      "measure": "bright",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.329
+     },
+     {
+      "measure": "air",
+      "dir": "down",
+      "agree": 0.83,
+      "median_per_turn": -8.922
+     },
+     {
+      "measure": "tail",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 9.554
+     },
+     {
+      "measure": "width",
+      "dir": "up",
+      "agree": 0.81,
+      "median_per_turn": 7.457
+     },
+     {
+      "measure": "grit",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.223
+     }
+    ]
+   },
+   "size": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 0.92,
+      "median_per_turn": -0.68
+     },
+     {
+      "measure": "bright",
+      "dir": "up",
+      "agree": 0.94,
+      "median_per_turn": 0.256
+     },
+     {
+      "measure": "air",
+      "dir": "up",
+      "agree": 0.86,
+      "median_per_turn": 1.158
+     }
+    ]
+   },
+   "decay": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 1.967
+     },
+     {
+      "measure": "bright",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.132
+     },
+     {
+      "measure": "tail",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 7.309
+     },
+     {
+      "measure": "crest",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.351
+     }
+    ]
+   },
+   "damping": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.473
+     },
+     {
+      "measure": "bright",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.123
+     },
+     {
+      "measure": "tail",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -2.177
+     },
+     {
+      "measure": "width",
+      "dir": "down",
+      "agree": 0.9,
+      "median_per_turn": -1.074
+     },
+     {
+      "measure": "crest",
+      "dir": "up",
+      "agree": 0.91,
+      "median_per_turn": 0.192
+     },
+     {
+      "measure": "wobble",
+      "dir": "up",
+      "agree": 0.85,
+      "median_per_turn": 0.206
+     }
+    ]
+   },
+   "predelay": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "tail",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 3.298
+     }
+    ]
+   },
+   "width": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "width",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 19.487
+     }
+    ]
+   }
+  }
+ },
+ "Drive": {
+  "rows": 672,
+  "pairs": 576,
+  "held_out_acc": 0.92,
+  "scored": 150,
+  "knobs": {
+   "mix": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 0.9,
+      "median_per_turn": -16.066
+     },
+     {
+      "measure": "low",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.002
+     },
+     {
+      "measure": "air",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 1.105
+     },
+     {
+      "measure": "width",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 11.914
+     },
+     {
+      "measure": "grit",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 3.782
+     }
+    ]
+   },
+   "drive": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "grit",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.058
+     }
+    ]
+   },
+   "bias": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 0.86,
+      "median_per_turn": 0.006
+     }
+    ]
+   },
+   "tone": {
+    "pairs": 96,
+    "moves": []
+   },
+   "color": {
+    "pairs": 96,
+    "moves": []
+   },
+   "output": {
+    "pairs": 96,
+    "moves": [
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.635
+     }
+    ]
+   }
+  }
+ }
+}
