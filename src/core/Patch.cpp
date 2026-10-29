@@ -519,6 +519,18 @@ static void WriteBody(std::ostream& file, const Data& data)
               << (data.scenes[k].followNext ? 1 : 0) << " " << data.scenes[k].followBars << "\n";
    if (data.sessionQuantize != 2)
       file << "sessionmeta " << data.sessionQuantize << "\n";
+   {
+      // The Studio escapes its own text, so a line never holds a newline.
+      size_t at = 0;
+      while (at < data.studio.size())
+      {
+         const size_t nl = data.studio.find('\n', at);
+         const std::string line = data.studio.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+         if (!line.empty())
+            file << "studio " << line << "\n";
+         at = nl == std::string::npos ? data.studio.size() : nl + 1;
+      }
+   }
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -1282,6 +1294,14 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                outData.scenes[idx].followBars = std::clamp(fb, 0, 64);
             }
          }
+      }
+      else if (tag == "studio")
+      {
+         std::string rest;
+         std::getline(in, rest);
+         if (!rest.empty() && rest[0] == ' ')
+            rest.erase(0, 1);
+         outData.studio += rest + "\n";
       }
       else if (tag == "sessionmeta")
       {

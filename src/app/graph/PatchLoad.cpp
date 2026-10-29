@@ -678,6 +678,7 @@ namespace app
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
          ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+         SampleStudioApply(data.studio); // here, not in ApplyPatchData: undo leaves the Studio alone
          PostSkippedTypes(path);
          ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
          StashPendingKeyed(pending);
@@ -696,6 +697,7 @@ namespace app
          return true;
       }
       ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+      SampleStudioApply(data.studio);
       PostSkippedTypes(path);
       ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
       StashPendingKeyed(pending);

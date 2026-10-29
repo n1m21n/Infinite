@@ -990,6 +990,35 @@ void SlicerNode::ReloadFromPath()
    }
 }
 
+void SlicerNode::SetSlices(const std::vector<float>& fracs)
+{
+   mAbort.store(true, std::memory_order_release);
+   if (mWorkerThread.joinable())
+      mWorkerThread.join();
+   mWorking.store(false, std::memory_order_release);
+   mResultReady.store(false, std::memory_order_release);
+   mCurrentJob = Job::None;
+
+   mCandidateFrac.clear();
+   mCandidateStrength.clear();
+   for (size_t i = 0; i < fracs.size() && (int)i < kMaxSlices; i++)
+   {
+      mCandidateFrac.push_back(std::clamp(fracs[i], 0.0f, 1.0f));
+      // Descending strengths: the top-N prune keeps every one of them, in time order.
+      mCandidateStrength.push_back(i == 0 ? SlicerDsp::kForcedOnsetStrength : (float)(kMaxSlices - (int)i));
+   }
+   if (mCandidateFrac.empty() || mCandidateFrac.front() > 0.0f)
+   {
+      mCandidateFrac.insert(mCandidateFrac.begin(), 0.0f);
+      mCandidateStrength.insert(mCandidateStrength.begin(), SlicerDsp::kForcedOnsetStrength);
+   }
+   sliceBy = 0;
+   onsets = std::clamp((int)mCandidateFrac.size(), 1, kMaxSlices);
+   mSliceBlob = SerializeSlices();
+   mLastDispatched = { sensitivity };
+   mSlicesDirty = true;
+}
+
 void SlicerNode::LaunchJob(Job job)
 {
    if (mWorkerThread.joinable())

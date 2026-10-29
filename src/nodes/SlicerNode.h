@@ -154,6 +154,9 @@ public:
    // boundaries are derived, so a drag there would be silently undone on the
    // next recompute.
    void MoveSliceMarker(int index, float frac);
+   // Replaces the markers with `fracs` (0..1, ascending, the first at 0), as hand-placed onsets: the Sample Studio's
+   // slices handed over with the sample. Cancels any analysis in flight so it can't overwrite them.
+   void SetSlices(const std::vector<float>& fracs);
    bool MarkersAreEditable() const { return sliceBy == 0; }
 
    static constexpr int kWaveformCacheSize = 256;

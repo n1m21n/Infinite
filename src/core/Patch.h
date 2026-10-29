@@ -525,6 +525,9 @@ namespace Patch
       std::vector<TrackGroupRecord> trackGroups;
       std::vector<SceneRecord> scenes;   // session view rows
       int sessionQuantize = 2;           // `sessionmeta` line; absent = 1 bar
+      // The Sample Studio's work (its source and slices), one `studio` line per line of its own text; empty: none.
+      // Not part of undo: the Studio keeps its own history.
+      std::string studio;
       ArrangeSettingsRecord arrangeSettings;
       ViewportRecord viewport;
       // True when the file used an `id` line or a word where an index goes, so

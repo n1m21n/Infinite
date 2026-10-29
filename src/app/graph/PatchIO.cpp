@@ -208,6 +208,7 @@ namespace app
       data.viewport.width = gViewportPanelWidth;
       data.viewport.height = gViewportPanelHeight;
       data.viewport.nodes = gViewportPanelNodes;
+      data.studio = SampleStudioSerialize();
       return data;
    }
 
