@@ -161,7 +161,7 @@
   var KEYS = ['tone', 'energy', 'space', 'mood'], NEAR = 1.08, FAR = 2.4, MID = (NEAR + FAR) / 2;
   var HOME = [145, 35, -35, -145].map(function (deg) { var a = deg * Math.PI / 180; return [MID * Math.cos(a), MID * Math.sin(a)]; });
   var pos = HOME.map(function (p) { return p.slice(); }), dots = { tone: 0, energy: 0, space: 0, mood: 0 };
-  var stage = document.getElementById('smp-stage'), spokes = document.getElementById('smp-spokes'), dotEls = stage.querySelectorAll('.smp-dot'), geo = null;
+  var stage = document.getElementById('smp-stage'), spokes = null, dotEls = stage.querySelectorAll('.smp-dot'), geo = null;
   function clamp1(v) { return Math.max(-1, Math.min(1, v)); }
   function dotVal(p) { var v = clamp1((MID - Math.sqrt(p[0] * p[0] + p[1] * p[1])) / ((FAR - NEAR) / 2)); return Math.abs(v) < 0.05 ? 0 : Math.round(v * 100) / 100; }
   function readDots() { KEYS.forEach(function (k, i) { dots[k] = dotVal(pos[i]); }); }
@@ -196,7 +196,7 @@
       var ex = geo.cx + p[0] / r * geo.br, ey = geo.cy - p[1] / r * geo.br;
       if (r > 1) svg += '<line x1="' + ex.toFixed(1) + '" y1="' + ey.toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) + '" style="opacity:' + (0.25 + 0.6 * Math.max(0, v)).toFixed(2) + '"/>';
     });
-    spokes.innerHTML = svg;
+    if (spokes) spokes.innerHTML = svg;
   }
   function setDots(p) { pos = p.map(fitPos); readDots(); placeDots(); }
   function moveDot(i, u, v) {
