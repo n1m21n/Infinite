@@ -561,3 +561,16 @@ Run with sweeps running alongside; B2/B3 here are NOT the daemon-paused runs the
 | B10 emotion | valence AUC 0.763, arousal 0.717 mean over held-out listeners; vgmidi arousal 0.549 weak | 0.70 / 0.65 | MET |
 
 Not measured yet for item 2: held-out key accuracy and chord-prediction accuracy by name, and generated-note spread against the corpus on tempo, register, density, rest, swing. B1 chord +0.058 bits is the nearest evidence for chords. These two are the next tool (`note_spread.py`).
+
+### Note spread, live generator vs corpus (`tools/universe/note_spread.py` -> `feel/note_spread.json`)
+Test fixed before the run: share of the 32 style-card patches (render-runs/styled/*_1.inf, Note Sequencer layers only) inside the corpus 5th-95th percentile (19,827 files); pass = >= 90% on every axis.
+
+| Axis | Corpus p5 / p50 / p95 | Generated p5 / p50 / p95 | Inside |
+|---|---|---|---|
+| tempo (bpm) | 66 / 120 / 171 | 69 / 126 / 175 | 88% (just under) |
+| register (range midpoint, MIDI) | 52.5 / 60.5 / 70 | 26 / 36 / 44 | **0%** |
+| density (notes/s) | 2.2 / 12.3 / 36 | 0.3 / 6.5 / 11 | 69% |
+| rest | 0 / 0.04 / 1.0 | 0.16 / 0.34 / 0.94 | 100% |
+| swing | 0 / 0 / 0.5 | 0 / 0 / 0.25 | 100% |
+
+**Verdict: MISS on tempo (88%), register (0%) and density (69%).** Cause for register: `styled.py` places sequencer lines at octave 2 (bass/low layers); Chorder and Arpeggiator voices are not counted, so register may read low partly because of what is measured. Rest and swing agree only loosely (rest compares step silence with time silence). Fix route: let the learned note model set register and density per role from corpus percentiles, then re-run this same test. No bar moved.
