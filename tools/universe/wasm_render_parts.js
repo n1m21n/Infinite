@@ -3,6 +3,7 @@
 // shaped: every render gets its own dots (tone, energy, space, mood uniform in -1..1) and variation (0..1), drawn from the seed.
 // Per render: one header line {style, id, part, seed, bpm, frames, label} then frames*2 float32 (interleaved stereo, 48 kHz).
 // Otherwise dots at rest, variation 0.5: the generator as a visitor first hears it. Always 2 bars, card key/scale.
+// STYLE_FROM / STYLE_STEP (env): render styles FROM, FROM+STEP, ... only (resume a cut run, or shard it over processes).
 const path = require('path'), fs = require('fs');
 const out = b => { for (let o = 0; o < b.length;) o += fs.writeSync(1, b, o); };  // sync: process.exit drops queued pipe writes
 const dir = path.resolve(process.argv[2] || path.join(__dirname, '../../website/gen'));
@@ -13,7 +14,7 @@ const M0 = require(path.join(dir, 'infinite_gen_wasm.js'));
 M0({ locateFile: f => path.join(dir, f), print: () => {}, printErr: () => {} }).then(M => {
   if (M._gen_set_shape) M._gen_set_shape(0, 0, 0, 0, 0.5, 0, 0);
   const n = M._gen_style_count();
-  for (let style = 0; style < n; style++) {
+  for (let style = +(process.env.STYLE_FROM || 0); style < n; style += +(process.env.STYLE_STEP || 1)) {
     const id = M.UTF8ToString(M._gen_style_id(style));
     for (const part of parts)
       for (let k = 0; k < seeds; k++) {

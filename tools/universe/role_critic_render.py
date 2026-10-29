@@ -18,9 +18,10 @@ GEN = os.path.join(HERE, "../../website/gen")
 NESTED = {("drums", "kicks"), ("drums", "snares"), ("drums", "hats"), ("synths", "bass"), ("synths", "leads"), ("percussion", "toms"), ("percussion", "snares")}
 
 def render(a):
-    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), GEN, str(a.first), str(a.seeds), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"] + (["shaped"] if a.shaped else []), stdout=subprocess.PIPE)
+    env = dict(os.environ, STYLE_FROM=str(a.style_from), STYLE_STEP=str(a.style_step))
+    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), GEN, str(a.first), str(a.seeds), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"] + (["shaped"] if a.shaped else []), stdout=subprocess.PIPE, env=env)
     f, n = p.stdout, 0
-    with open(OUT, "a") as o:
+    with open(a.rows, "a") as o:
         while True:
             h = f.readline()
             if not h: break
@@ -28,7 +29,7 @@ def render(a):
             r["role"] = r["label"].split()[0]; r["seconds"] = round(r["frames"] / 48000, 2)
             r.update(ff.measure(x[:, 0], x[:, 1], 48000)); o.write(json.dumps(r) + "\n"); n += 1
             if n % 200 == 0: print(n, "measured", flush=True)
-    p.wait(); print(n, "rows ->", OUT)
+    p.wait(); print(n, "rows ->", a.rows)
 
 def train(a):
     rows = [json.loads(l) for l in open(OUT)]
@@ -92,6 +93,7 @@ def train(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["render", "train"]); ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--first", type=int, default=9000); ap.add_argument("--folds", type=int, default=5); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--out"); ap.add_argument("--shaped", action="store_true", help="render: random dots and variation per render")
+    ap.add_argument("--style-from", type=int, default=0); ap.add_argument("--style-step", type=int, default=1); ap.add_argument("--rows", default=OUT, help="render: file to append rows to")
     ap.add_argument("--train-on", choices=["rest", "all"], default="all", help="train: rows used for training (the test always reports rest and shaped apart)")
     ap.add_argument("--calib", choices=["val", "oof"], default="oof"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--pct", type=float, default=3)
     a = ap.parse_args(); render(a) if a.cmd == "render" else train(a)
