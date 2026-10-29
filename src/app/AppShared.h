@@ -5653,6 +5653,7 @@ void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = null
       Patch::Data data;          // nodes + cables only
       std::map<int, int> remap;  // NodeRecord::index -> live GraphNode index
       int framesWaited = 0;
+      std::optional<ImVec2> centre; // a paste: centre the layout here and leave the view alone
    };
 
 extern PendingAutoLayout gPendingAutoLayout;

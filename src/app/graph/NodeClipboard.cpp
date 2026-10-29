@@ -4,6 +4,7 @@
 #include <map>
 #include "app/AppShared.h"
 #include "core/Patch.h"
+#include "core/PatchLayout.h"
 
 namespace app
 {
@@ -108,6 +109,10 @@ NodePasteResult NodeClipboardPaste(const std::string& text, const ImVec2& at)
       res.message = T("Nothing to paste");
       return res;
    }
+
+   // Text made headless (the Sample studio's convert to patch) carries no `pos` lines: lay it out as a patch file
+   // would load (sources left, sinks right) so the nodes do not land stacked on one point.
+   const bool laidOut = PatchLayout::Apply(data);
 
    // Centre of the copied nodes, to land them on `at`.
    float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;
@@ -256,6 +261,16 @@ NodePasteResult NodeClipboardPaste(const std::string& text, const ImVec2& at)
    RebuildAudioTopology();
    gSuppressUndoCheckpoints = false;
    gPatchDirty = true;
+   // The estimate above only keeps them apart; once they have drawn, place them again by their real sizes, around
+   // the same point (the tick that lays out a patch loaded without positions).
+   if (laidOut && !remap.empty())
+   {
+      gPendingAutoLayout = PendingAutoLayout{};
+      gPendingAutoLayout.active = true;
+      gPendingAutoLayout.data = data;
+      gPendingAutoLayout.remap = remap;
+      gPendingAutoLayout.centre = at;
+   }
 
    res.ok = res.pasted > 0;
    res.message = res.ok ? ("Pasted " + std::to_string(res.pasted) + (res.pasted == 1 ? " node" : " nodes") +

@@ -1,11 +1,11 @@
 // Sample studio: the website's studio as a panel docked bottom or top, like the Timeline (SAMPLE-STUDIO-DESIGN.md).
-// A toolbar of icon chips over two areas: on the left the blob and four glass dots (tone, energy, space, mood), on
-// the right the take's waveform with its start and end handles and the transport's playhead. The settings inspector
-// (pitch, fine, speed, loop, reverse, ping-pong, fades, style, length) opens on the right like the Timeline's clip
-// inspector. The take plays on the global transport through StudioLoopPlayer; its play button switches audio to
-// Studio mode, which bypasses the canvas the way Timeline audio does.
+// A toolbar (generate, instrument, snap to scale, bars; play, loop, ping-pong, reverse; export, convert) over two
+// areas: on the left the blob, moving with the take; on the right the take's waveform with its start and end handles
+// and the transport's playhead. The settings inspector (pitch, fine, speed, fades, style, wild, key and scale) opens
+// on the right like the Timeline's clip inspector. The take plays on the global transport through StudioLoopPlayer;
+// its play button switches audio to Studio mode, which bypasses the canvas the way Timeline audio does.
 // The engine is a private Generate Samples node (never in the graph, never cooked): a take made here and one made
-// on the node are the same sound for the same recipe, role critic included. A dot move re-renders the take's own
+// on the node are the same sound for the same recipe, role critic included. Snap to scale re-renders the take's own
 // seed pinned, so the instrument never swaps under the hand. Session state only: nothing here is saved in a patch.
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesNode.h"
@@ -56,15 +56,6 @@ namespace
                         P::Kicks, P::Snares, P::Hats, P::Toms, P::Percussion, P::Fx, P::Foley };
    const int kBars[] = { 1, 2, 4, 8 };
 
-   // The dots, as on the website: home angles at the middle ring, pulled in = +1, pushed out = -1 (in blob radii).
-   constexpr float kNear = 1.08f, kFar = 2.4f, kMid = (kNear + kFar) * 0.5f;
-   const float kHomeDeg[4] = { 145.0f, 35.0f, -35.0f, -145.0f };
-   const char* const kDotTip[4] = { "Tone: pull in for brighter, push out for darker",
-                                    "Energy: pull in for more drive, push out for calmer",
-                                    "Space: pull in for wider and wetter, push out for drier",
-                                    "Mood: pull in for warmer, push out for darker" };
-   const tok::Rgba8 kDotCol[4] = { tok::pal::c_EBB42DFF, tok::pal::c_F97316FF, tok::pal::c_7890E6FF, tok::pal::c_8B5CF6FF };
-
    struct Take
    {
       SampleStyles::Recipe recipe; // as made: the seed it landed on
@@ -82,11 +73,8 @@ namespace
       int barsIdx = 1;
       float variation = 0.5f;
       bool followScale = false;
-      // Dots: position in blob radii from the blob centre (y down), and the value each one gives.
-      ImVec2 dot[4];
-      float dotV[4] = { 0, 0, 0, 0 };
-      int dragDot = -1;
-      // Playback shaping (the inspector), applied to what plays and what is exported.
+      // Playback shaping, applied to what plays and what is exported. Loop, ping-pong and reverse behave as on the
+      // Sampler: all off plays the take once, ping-pong bounces only while looping.
       int trimFrom = 0, trimTo = 0; // 16ths of the take
       float pitch = 0.0f, fine = 0.0f, speed = 1.0f, fadeInMs = 0.0f, fadeOutMs = 0.0f;
       bool loop = true, reverse = false, pingPong = false;
@@ -111,23 +99,13 @@ namespace
       {
          s.gen = std::make_unique<GenerateSamplesNode>();
          s.gen->followTransport = true; // the take is made at the transport's tempo, so it sits on the grid as made
-         for (int i = 0; i < 4; i++)
-         {
-            const float a = kHomeDeg[i] * 3.14159265f / 180.0f;
-            s.dot[i] = ImVec2(std::cos(a) * kMid, -std::sin(a) * kMid);
-         }
       }
       return s;
    }
 
    int Sixteenths(const Take& t) { return std::max(1, t.recipe.bars * 16); }
 
-   float DotValue(ImVec2 d)
-   {
-      const float r = std::sqrt(d.x * d.x + d.y * d.y);
-      float v = std::clamp((kMid - r) / ((kFar - kNear) * 0.5f), -1.0f, 1.0f);
-      return std::fabs(v) < 0.05f ? 0.0f : v;
-   }
+   bool BouncesNow() { return S().loop && S().pingPong; }
 
    // ---- the take as heard ----
 
@@ -197,7 +175,7 @@ namespace
          std::reverse(r.begin(), r.end());
       }
       double beats = (double)(s.trimTo - s.trimFrom) / 4.0 / std::max(0.05f, s.speed);
-      if (s.pingPong && !l.empty())
+      if (BouncesNow() && !l.empty())
       {
          l.insert(l.end(), l.rbegin(), l.rend());
          r.insert(r.end(), r.rbegin(), r.rend());
@@ -253,10 +231,7 @@ namespace
       g.bars = pinned ? s.take->recipe.bars : kBars[s.barsIdx];
       g.variation = s.variation;
       g.followScale = s.followScale;
-      g.tone = s.dotV[0];
-      g.energy = s.dotV[1];
-      g.space = s.dotV[2];
-      g.mood = s.dotV[3];
+      g.tone = g.energy = g.space = g.mood = 0.0f;
       if (pinned)
       {
          g.seed = (int)s.take->recipe.seed;
@@ -298,6 +273,7 @@ namespace
       }
       s.peakFor = nullptr;
       Rebuild();
+      AudioEngine::Instance().StudioLoop().Restart(); // a one-shot plays the new take from its start
    }
 
    // ---- out of the studio ----
@@ -456,7 +432,10 @@ namespace
    {
       const bool playing = Transport::Instance().IsPlaying();
       if (!playing)
+      {
          SetStudioAudio(true);
+         AudioEngine::Instance().StudioLoop().Restart();
+      }
       LaunchRequestTogglePlay();
    }
 
@@ -513,9 +492,8 @@ namespace
       bool tried = false;
       int uRes = -1, uT = -1, uE = -1, uBusy = -1, uB = -1, uA = -1, uS = -1, uL = -1, uTone = -1, uHarsh = -1, uSpace = -1,
           uMood = -1, uP = -1, uC = -1;
-      float t = 0.0f, busyK = 0.0f, energy = 0.0f, tone = 0.0f, harsh = 0.0f, space = 0.0f, mood = 0.0f;
+      float t = 0.0f, busyK = 0.0f, energy = 0.0f;
       float bands[16] = {};
-      float lp[4] = {};
    };
 
    Blob& B()
@@ -566,16 +544,12 @@ namespace
 
    ImVec4 Rgb(const tok::Rgba8& c) { return ImGui::ColorConvertU32ToFloat4(tok::U32(c)); }
 
-   // The blob in the middle of the field and the four glass dots around it. A dot dragged and let go re-renders the
-   // take pinned; double-click sends a dot home.
-   void DrawBlobField(ImVec2 mn, ImVec2 size)
+   // The blob, filling a square: it breathes with the take's bands at the playhead and quickens while a take is made.
+   void DrawBlob(ImVec2 mn, float side)
    {
       Studio& s = S();
       Blob& b = B();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const float side = std::min(size.x, size.y);
-      const ImVec2 c(mn.x + size.x * 0.5f, mn.y + size.y * 0.5f);
-      const float R = 0.31f * side; // one blob radius
 
       // Smoothing, as the website does it.
       float bandsNow[16];
@@ -587,124 +561,39 @@ namespace
          sum += b.bands[i];
       }
       b.energy += (sum / 16.0f - b.energy) * 0.2f;
-      const float* v = s.dotV;
-      b.tone += (v[0] - b.tone) * 0.06f;
-      b.space += (v[2] - b.space) * 0.06f;
-      b.mood += (v[3] - b.mood) * 0.05f;
-      b.harsh += (std::max(0.0f, v[0]) * 0.45f + std::max(0.0f, v[1]) * 0.3f - b.harsh) * 0.05f;
       b.busyK += ((s.busy ? 1.0f : 0.0f) - b.busyK) * 0.08f;
-      b.t += (0.016f + 0.03f * b.busyK) * (1.0f + 0.7f * std::max(0.0f, v[1]) - 0.4f * std::max(0.0f, -v[1]));
-      for (int i = 0; i < 4; i++)
-         b.lp[i] += (v[i] - b.lp[i]) * 0.08f;
+      b.t += 0.016f + 0.03f * b.busyK;
 
-      // The shader pass, into a square the size of the field's height.
       const ImVec2 fbs = ImGui::GetIO().DisplayFramebufferScale;
       const int px = std::max(8, (int)(side * fbs.x)), py = std::max(8, (int)(side * fbs.y));
-      if (b.prog != 0 && GLUtil::EnsureFbo(b.fbo, px, py))
+      if (b.prog == 0 || !GLUtil::EnsureFbo(b.fbo, px, py))
+         return;
+      const ImVec4 a = Rgb(tok::pal::c_F97316FF), sg = Rgb(tok::pal::c_7890E6FF);
+      const float zero[12] = {};
+      const GLboolean blendWas = glIsEnabled(GL_BLEND);
+      GLUtil::RunShaderPass(b.fbo, b.prog, [&]()
       {
-         const ImVec4 a = Rgb(tok::pal::c_F97316FF), sg = Rgb(tok::pal::c_7890E6FF);
-         float dotP[12], dotC[12];
-         for (int i = 0; i < 4; i++)
-         {
-            dotP[i * 3] = s.dot[i].x;
-            dotP[i * 3 + 1] = -s.dot[i].y;
-            dotP[i * 3 + 2] = b.lp[i];
-            const ImVec4 dc = Rgb(kDotCol[i]);
-            dotC[i * 3] = dc.x;
-            dotC[i * 3 + 1] = dc.y;
-            dotC[i * 3 + 2] = dc.z;
-         }
-         const GLboolean blendWas = glIsEnabled(GL_BLEND);
-         GLUtil::RunShaderPass(b.fbo, b.prog, [&]()
-         {
-            glDisable(GL_BLEND);
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glUniform2f(b.uRes, (float)px, (float)py);
-            glUniform1f(b.uT, b.t);
-            glUniform1f(b.uE, b.energy);
-            glUniform1f(b.uBusy, b.busyK);
-            glUniform1fv(b.uB, 16, b.bands);
-            glUniform3f(b.uA, a.x, a.y, a.z);
-            glUniform3f(b.uS, sg.x, sg.y, sg.z);
-            glUniform1f(b.uL, CategoryColors::IsThemeLight() ? 1.0f : 0.0f);
-            glUniform1f(b.uTone, b.tone);
-            glUniform1f(b.uHarsh, b.harsh);
-            glUniform1f(b.uSpace, b.space);
-            glUniform1f(b.uMood, b.mood);
-            glUniform3fv(b.uP, 4, dotP);
-            glUniform3fv(b.uC, 4, dotC);
-         });
-         if (blendWas)
-            glEnable(GL_BLEND);
-         const ImVec2 bmn(c.x - side * 0.5f, c.y - side * 0.5f);
-         dl->AddImage((ImTextureID)(intptr_t)b.fbo.tex, bmn, ImVec2(bmn.x + side, bmn.y + side), ImVec2(0, 1), ImVec2(1, 0));
-      }
-
-      // Dots: hit-test, drag, release.
-      const float dotR = std::max(7.0f, side * 0.035f);
-      const ImVec2 m = ImGui::GetIO().MousePos;
-      const auto screenOf = [&](int i) { return ImVec2(c.x + s.dot[i].x * R, c.y + s.dot[i].y * R); };
-      ImGui::SetCursorScreenPos(mn);
-      ImGui::InvisibleButton("##studioField", size);
-      const bool fieldHot = ImGui::IsItemHovered();
-      int hotDot = -1;
-      for (int i = 0; i < 4 && s.dragDot < 0; i++)
-      {
-         const ImVec2 p = screenOf(i);
-         if ((m.x - p.x) * (m.x - p.x) + (m.y - p.y) * (m.y - p.y) <= (dotR + 4.0f) * (dotR + 4.0f))
-            hotDot = i;
-      }
-      if (fieldHot && hotDot >= 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-      {
-         const float ang = kHomeDeg[hotDot] * 3.14159265f / 180.0f;
-         s.dot[hotDot] = ImVec2(std::cos(ang) * kMid, -std::sin(ang) * kMid);
-         s.dotV[hotDot] = 0.0f;
-         Render(true);
-      }
-      else if (ImGui::IsItemActivated() && hotDot >= 0)
-         s.dragDot = hotDot;
-      if (s.dragDot >= 0 && ImGui::IsItemActive())
-      {
-         // Kept inside the field.
-         const float x = std::clamp(m.x, mn.x + dotR, mn.x + size.x - dotR), y = std::clamp(m.y, mn.y + dotR, mn.y + size.y - dotR);
-         s.dot[s.dragDot] = ImVec2((x - c.x) / R, (y - c.y) / R);
-         s.dotV[s.dragDot] = DotValue(s.dot[s.dragDot]);
-      }
-      if (ImGui::IsItemDeactivated() && s.dragDot >= 0)
-      {
-         s.dragDot = -1;
-         Render(true);
-      }
-      if (hotDot >= 0 || s.dragDot >= 0)
-      {
-         ImGui::SetMouseCursor(s.dragDot >= 0 ? ImGuiMouseCursor_ResizeAll : ImGuiMouseCursor_Hand);
-         if (s.dragDot < 0 && fieldHot)
-            HelpTip(T(kDotTip[hotDot]));
-      }
-
-      const ImVec4 white = Rgb(tok::pal::c_FFFFFFFF);
-      for (int i = 0; i < 4; i++)
-      {
-         const ImVec2 p = screenOf(i);
-         const ImVec4 col = Rgb(kDotCol[i]);
-         const float on = std::max(0.0f, s.dotV[i]);
-         const float len = std::sqrt(s.dot[i].x * s.dot[i].x + s.dot[i].y * s.dot[i].y);
-         // Tether from the blob's edge.
-         if (len > 1.05f)
-         {
-            const ImVec2 e(c.x + s.dot[i].x / len * R, c.y + s.dot[i].y / len * R);
-            dl->AddLine(e, p, ImGui::GetColorU32(ImVec4(col.x, col.y, col.z, 0.25f + 0.6f * on)), 1.0f);
-         }
-         // Glass: a tinted disc, a soft rim and a highlight; brighter the further it is pulled in.
-         const bool hot = i == hotDot || i == s.dragDot;
-         const float rr = dotR * (hot ? 1.15f : 1.0f);
-         dl->AddCircleFilled(p, rr * 1.8f, ImGui::GetColorU32(ImVec4(col.x, col.y, col.z, 0.10f + 0.25f * on)), 32);
-         dl->AddCircleFilled(p, rr, ImGui::GetColorU32(ImVec4(col.x, col.y, col.z, 0.35f + 0.5f * on)), 32);
-         dl->AddCircle(p, rr, ImGui::GetColorU32(ImVec4(white.x, white.y, white.z, 0.55f)), 32, 1.2f);
-         dl->AddCircleFilled(ImVec2(p.x - rr * 0.32f, p.y - rr * 0.36f), rr * 0.32f,
-                             ImGui::GetColorU32(ImVec4(white.x, white.y, white.z, 0.55f)), 16);
-      }
+         glDisable(GL_BLEND);
+         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+         glClear(GL_COLOR_BUFFER_BIT);
+         glUniform2f(b.uRes, (float)px, (float)py);
+         glUniform1f(b.uT, b.t);
+         glUniform1f(b.uE, b.energy);
+         glUniform1f(b.uBusy, b.busyK);
+         glUniform1fv(b.uB, 16, b.bands);
+         glUniform3f(b.uA, a.x, a.y, a.z);
+         glUniform3f(b.uS, sg.x, sg.y, sg.z);
+         glUniform1f(b.uL, CategoryColors::IsThemeLight() ? 1.0f : 0.0f);
+         glUniform1f(b.uTone, 0.0f);
+         glUniform1f(b.uHarsh, 0.0f);
+         glUniform1f(b.uSpace, 0.0f);
+         glUniform1f(b.uMood, 0.0f);
+         glUniform3fv(b.uP, 4, zero);
+         glUniform3fv(b.uC, 4, zero);
+      });
+      if (blendWas)
+         glEnable(GL_BLEND);
+      dl->AddImage((ImTextureID)(intptr_t)b.fbo.tex, mn, ImVec2(mn.x + side, mn.y + side), ImVec2(0, 1), ImVec2(1, 0));
    }
 
    // ---- the waveform ----
@@ -806,7 +695,7 @@ namespace
       if (u >= 0.0f)
       {
          float k = u;
-         if (s.pingPong)
+         if (BouncesNow())
             k = k < 0.5f ? k * 2.0f : 2.0f - k * 2.0f;
          if (s.reverse)
             k = 1.0f - k;
@@ -863,25 +752,6 @@ namespace
       FieldWell::Slider("##studiospeed", &s.speed, 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
       edited();
 
-      SectionCard::Begin(T("Playback"));
-      const float half = std::floor((availW - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
-      if (ChipButton::Draw(L("Loop##studioloopchip"), s.loop, 24.0f, half))
-      {
-         s.loop = !s.loop;
-         AudioEngine::Instance().StudioLoop().SetLoop(s.loop);
-      }
-      FormParts::Inline();
-      if (ChipButton::Draw(L("Reverse##studiorev"), s.reverse, 24.0f, availW - half - ImGui::GetStyle().ItemSpacing.x))
-      {
-         s.reverse = !s.reverse;
-         s.dirty = true;
-      }
-      if (ChipButton::Draw(L("Ping-pong##studiopp"), s.pingPong, 24.0f, availW))
-      {
-         s.pingPong = !s.pingPong;
-         s.dirty = true;
-      }
-
       SectionCard::Begin(T("Fade"));
       SectionCard::RowLabel(T("In"));
       ImGui::SetNextItemWidth(fieldW);
@@ -909,16 +779,6 @@ namespace
             for (int i = 0; i < (int)styles.size(); i++)
                if (MenuParts::Choice(styles[(size_t)i].c_str(), i == s.style + 1))
                   s.style = i - 1;
-            MenuParts::EndCombo();
-         }
-         static const char* const bars[] = { "1 bar", "2 bars", "4 bars", "8 bars" };
-         SectionCard::RowLabel(T("Length"));
-         ImGui::SetNextItemWidth(fieldW);
-         if (MenuParts::BeginCombo("##studiobars", T(bars[s.barsIdx])))
-         {
-            for (int i = 0; i < 4; i++)
-               if (MenuParts::Choice(T(bars[i]), i == s.barsIdx))
-                  s.barsIdx = i;
             MenuParts::EndCombo();
          }
          SectionCard::RowLabel(T("Wild"));
@@ -960,6 +820,7 @@ namespace
    }
 
    // ---- the toolbar ----
+   // One height (tok::tile) for every item, one gap inside a group (space_1) and one between groups (space_3).
 
    void PushToolbarChip(bool on, bool green = false)
    {
@@ -967,11 +828,15 @@ namespace
    }
    void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
 
+   constexpr float kIconW = 30.0f;
+
+   float TextW(const char* label) { return ImGui::CalcTextSize(label, ImGui::FindRenderedTextEnd(label)).x + 2.0f * tok::space_3; }
+
    // An icon chip in the Timeline's toolbar grammar. Returns true when clicked.
    bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
       PushToolbarChip(on, green);
-      const bool clicked = ActionButton::Draw(id, ImVec2(30, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile));
       PopToolbarChip();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", tip);
@@ -981,43 +846,55 @@ namespace
       return clicked;
    }
 
-   // The part picker: the list fades and settles in over one motion step, and scrolls past nine rows.
-   void PartPicker()
+   bool TextChip(const char* label, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
-      Studio& s = S();
-      static std::vector<std::string> parts;
-      if (parts.empty())
-         for (P p : kParts)
-            parts.push_back(SampleStyles::PartName(p));
+      return ActionButton::Draw(label, ImVec2(TextW(label), tok::tile), kind);
+   }
+
+   // A dropdown chip: the value on the left, a chevron on the right, the list below. The list fades and settles in
+   // over one motion step and scrolls past nine rows. Returns true when the choice changed.
+   bool PickerChip(const char* id, const std::vector<std::string>& items, int& cur, float w, const char* tip)
+   {
+      static ImGuiID sOpenId = 0;
       static double sOpenedAt = -1.0;
-      if (DropdownField::Draw((parts[(size_t)s.part] + "##studioPart").c_str(), ImVec2(120.0f, tok::tile)))
+      const ImGuiID pid = ImGui::GetID(id);
+      if (ActionButton::Draw(id, ImVec2(w, tok::tile)))
       {
-         ImGui::OpenPopup("##studioPartList");
+         ImGui::OpenPopup(id);
+         sOpenId = pid;
          sOpenedAt = ImGui::GetTime();
       }
       if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Which part to make"));
-      const ImVec2 below(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + tok::space_1);
-      const float k = std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f);
+         HelpTip("%s", tip);
+      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 tc = ImGui::GetColorU32(ImGuiCol_Text);
+      const float cy = (bmin.y + bmax.y) * 0.5f;
+      const std::string& value = items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)];
+      dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), tc, value.c_str());
+      glyph::Draw(dl, ImVec2(bmax.x - tok::space_3 - tok::icon_sm * 0.5f, cy), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                  IconsInfinite::ChevronDown);
+
+      const float k = sOpenId == pid ? std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f) : 1.0f;
       const float e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
       const float rowH = ImGui::GetFrameHeight();
-      ImGui::SetNextWindowPos(ImVec2(below.x, below.y + (1.0f - e) * tok::space_2));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(160.0f, 0.0f), ImVec2(280.0f, rowH * 9.5f + tok::space_3 * 2.0f));
+      ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1 + (1.0f - e) * tok::space_2));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(160.0f, w), 0.0f), ImVec2(280.0f, rowH * 9.5f + tok::space_3 * 2.0f));
       const float savedAlpha = ImGui::GetStyle().Alpha;
       ImGui::GetStyle().Alpha = savedAlpha * e;
-      if (MenuParts::BeginPopup("##studioPartList"))
+      bool changed = false;
+      if (MenuParts::BeginPopup(id))
       {
-         for (int i = 0; i < (int)parts.size(); i++)
-            if (MenuParts::Choice(parts[(size_t)i].c_str(), i == s.part))
+         for (int i = 0; i < (int)items.size(); i++)
+            if (MenuParts::Choice(items[(size_t)i].c_str(), i == cur) && i != cur)
             {
-               const bool changed = i != s.part;
-               s.part = i;
-               if (changed && s.take && !s.busy)
-                  Render(false);
+               cur = i;
+               changed = true;
             }
          MenuParts::EndPopup();
       }
       ImGui::GetStyle().Alpha = savedAlpha;
+      return changed;
    }
 
    void DrawToolbar(float w)
@@ -1025,21 +902,27 @@ namespace
       Studio& s = S();
       const bool has = s.take.has_value();
       const float x0 = ImGui::GetCursorScreenPos().x;
+      const float in = tok::space_1, between = tok::space_3;
 
-      // Generate (cancel while making a take).
-      if (IconChip("##studioGen", IconsInfinite::Refresh, s.busy, s.busy ? T("Making a take: click to cancel") : T("Generate a new take"), true))
+      // Make: generate (again), instrument, snap to scale, bars.
+      if (TextChip(L("Generate##studioGen"), s.busy ? ActionButton::Kind::Go : ActionButton::Kind::Primary))
       {
          if (s.busy)
-         {
             s.gen->Cancel();
-            s.busy = false;
-         }
-         else
+         Render(false);
+      }
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", s.busy ? T("Making a take: click to start over") : T("Generate a new take"));
+      FormParts::Inline(0.0f, in);
+      {
+         static std::vector<std::string> parts;
+         if (parts.empty())
+            for (P p : kParts)
+               parts.push_back(SampleStyles::PartName(p));
+         if (PickerChip("##studioPart", parts, s.part, 128.0f, T("Instrument")) && s.take && !s.busy)
             Render(false);
       }
-      FormParts::Inline(0.0f, tok::space_1);
-      PartPicker();
-      FormParts::Inline(0.0f, tok::space_1);
+      FormParts::Inline(0.0f, in);
       if (IconChip("##studioScale", s.followScale ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, s.followScale,
                    s.followScale ? T("Snapped to the project's key and scale") : T("Snap to the project's key and scale")))
       {
@@ -1047,47 +930,62 @@ namespace
          if (has && !s.busy)
             Render(true);
       }
+      FormParts::Inline(0.0f, in);
+      {
+         static std::vector<std::string> bars;
+         if (bars.empty())
+            for (const char* b : { "1 bar", "2 bars", "4 bars", "8 bars" })
+               bars.push_back(T(b));
+         if (PickerChip("##studioBars", bars, s.barsIdx, 92.0f, T("Length")) && s.take && !s.busy)
+            Render(false);
+      }
 
-      // Transport: play the take on the global transport (hands audio to the studio), and loop.
-      FormParts::Inline(0.0f, tok::space_3);
+      // Hear: play on the transport (hands audio to the studio, pausing the canvas), then the Sampler's three toggles.
+      FormParts::Inline(0.0f, between);
       const bool playing = Transport::Instance().IsPlaying() && gAudioMode == AudioMode::Studio;
       ImGui::BeginDisabled(!has);
       if (IconChip("##studioPlay", playing ? IconsInfinite::PauseFill : IconsInfinite::PlayFill, playing,
-                   playing ? T("Pause") : T("Play the take on the transport (pauses the canvas audio)"), true))
+                   playing ? T("Stop") : T("Play the take (pauses the canvas audio)"), true))
          TogglePlay();
       ImGui::EndDisabled();
-      FormParts::Inline(0.0f, tok::space_1);
-      if (IconChip("##studioLoop", IconsInfinite::Loop, s.loop, s.loop ? T("Looping") : T("Loop")))
+      const auto toggle = [&](const char* label, bool& v, const char* tip)
       {
-         s.loop = !s.loop;
-         AudioEngine::Instance().StudioLoop().SetLoop(s.loop);
-      }
+         FormParts::Inline(0.0f, in);
+         if (AudioToggleButton(label, &v, TextW(label), tok::tile))
+         {
+            s.dirty = true;
+            AudioEngine::Instance().StudioLoop().SetLoop(s.loop);
+            AudioEngine::Instance().StudioLoop().Restart();
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", tip);
+      };
+      toggle(L("Loop##studioLoop"), s.loop, T("Loop the take; off plays it once"));
+      toggle(L("Ping-pong##studioPP"), s.pingPong, T("While looping, play forward then back"));
+      toggle(L("Reverse##studioRev"), s.reverse, T("Play the take backwards"));
 
-      // Pinned right: Studio audio (as the Timeline's audio chip), export, convert, settings.
-      const float chip = 30.0f, gap = tok::space_1;
-      const bool studioMode = gAudioMode == AudioMode::Studio;
-      const char* audioLabel = studioMode ? T("Studio Audio On") : T("Enable Studio Audio");
-      const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
-      const float rightW = audioW + tok::space_3 + 4.0f * chip + 3.0f * gap;
+      // Out, pinned right: export, convert to patch, convert to node, settings.
+      const char* exportL = L("Export##studioExport");
+      const char* patchL = L("Convert to patch##studioPatch");
+      const char* nodeL = L("Convert to node##studioNode");
+      const float rightW = TextW(exportL) + TextW(patchL) + TextW(nodeL) + kIconW + 3.0f * in;
       FormParts::Inline(0.0f, 0.0f);
-      ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + tok::space_3, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
-      if (ChipButton::Draw(audioLabel, studioMode, tok::tile))
-         SetStudioAudio(!studioMode);
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", studioMode ? T("The take is driving audio; the canvas is paused. Click to hand audio back to the canvas.")
-                                  : T("Hear the take on its own: pauses the canvas audio, as Timeline audio does"));
-      FormParts::Inline(0.0f, tok::space_3);
+      ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + between, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
       ImGui::BeginDisabled(!has || s.busy);
-      if (IconChip("##studioExport", IconsInfinite::Folder, false, T("Export the take as heard")))
+      if (TextChip(exportL))
          ImGui::OpenPopup("##studioExportMenu");
-      FormParts::Inline(0.0f, gap);
-      if (IconChip("##studioPatch", IconsInfinite::ModMatrix, false, T("Convert to patch: the graph that made the take, as a group on the canvas")))
+      FormParts::Inline(0.0f, in);
+      if (TextChip(patchL))
          ConvertToPatch();
-      FormParts::Inline(0.0f, gap);
-      if (IconChip("##studioNode", IconsInfinite::Plus, false, T("Convert to node: a sample node holding the take")))
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         HelpTip("%s", T("The graph that made the take, as a group on the canvas"));
+      FormParts::Inline(0.0f, in);
+      if (TextChip(nodeL))
          ImGui::OpenPopup("##studioNodeMenu");
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         HelpTip("%s", T("A sample node holding the take"));
       ImGui::EndDisabled();
-      FormParts::Inline(0.0f, gap);
+      FormParts::Inline(0.0f, in);
       if (IconChip("##studioSettings", IconsInfinite::Settings, s.settingsOpen, T("Sample settings")))
          s.settingsOpen = !s.settingsOpen;
 
@@ -1137,9 +1035,23 @@ namespace
          Render(false);
       }
       PollEngine();
+      // INFINITE_OPENPANELS=...,studiopatch: convert the first take to a patch, to review the layout.
+      static bool sDemoPatch = [] { const char* op = getenv("INFINITE_OPENPANELS"); return op != nullptr && std::strstr(op, "studiopatch") != nullptr; }();
+      if (sDemoPatch && s.take)
+      {
+         sDemoPatch = false;
+         ConvertToPatch();
+      }
       if (s.dirty && s.dragHandle < 0)
          Rebuild();
-      AudioEngine::Instance().StudioLoop().SetGain(gAudioMode == AudioMode::Studio ? 0.8f : 0.0f);
+      StudioLoopPlayer& player = AudioEngine::Instance().StudioLoop();
+      player.SetGain(gAudioMode == AudioMode::Studio ? 0.8f : 0.0f);
+      // Loop off: the take played once, so the transport stops (as a one-shot does in the Sampler).
+      if (!s.loop && player.Finished() && gAudioMode == AudioMode::Studio && Transport::Instance().IsPlaying())
+      {
+         player.Restart();
+         LaunchRequestTogglePlay();
+      }
 
       const float w = std::max(1.0f, ImGui::GetContentRegionAvail().x);
       DrawToolbar(w);
@@ -1163,9 +1075,8 @@ namespace
       const float h = std::max(40.0f, avail.y);
       const float gap = ImGui::GetStyle().ItemSpacing.x;
       const float settingsW = s.settingsOpen ? kSettingsW + gap : 0.0f;
-      const float fieldW = std::min(h * 1.6f, std::max(h, (avail.x - settingsW) * 0.4f));
-      DrawBlobField(origin, ImVec2(fieldW, h));
-      DrawWave(ImVec2(origin.x + fieldW + gap, origin.y), ImVec2(std::max(40.0f, avail.x - settingsW - fieldW - gap), h));
+      DrawBlob(origin, h);
+      DrawWave(ImVec2(origin.x + h + gap, origin.y), ImVec2(std::max(40.0f, avail.x - settingsW - h - gap), h));
       if (s.settingsOpen)
       {
          ImGui::SetCursorScreenPos(ImVec2(origin.x + avail.x - kSettingsW, origin.y));

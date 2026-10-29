@@ -73,3 +73,9 @@ The website studio stays the reference and keeps working as is. When the panel s
 - Convert to patch: the graph that made the take plus an Audio Out, pasted as one undo step and wrapped in a Group. Convert to node: Generate Samples (the recipe, keepSeed, trim) or Sampler, Slicer, Molder, Grain Molder, PaulStretch, Granular loaded with the take as heard.
 - Removed: takes list, all labels and status text.
 - Not yet: Windows / Linux runs, panels-sweep, credit tags in exports, pitch shift is a simple grain shifter (not formant-aware).
+
+## Round two 2026-10-29 (Naman's notes: more intuitive, symmetric toolbar)
+- Toolbar, one row at tile height: Generate (text, Primary; a click while making cancels and makes again), instrument dropdown, snap to scale (icon), bars dropdown (a change makes a new take), Play, then Loop / Ping-pong / Reverse as text toggles with the Sampler's grammar. Pinned right: Export, Convert to patch, Convert to node (text), Settings (icon).
+- Playback as the Sampler: all toggles off plays the take once from where play started, then the studio stops the transport; Loop repeats it locked to the grid; Ping-pong needs Loop; Reverse plays backwards either way.
+- The four dots are gone (another idea later); the blob stays and still reacts to the take.
+- Convert to patch: the headless graph has no positions, so the paste lays it out sources-left, sinks-right, then once the nodes have drawn it lays them out again by their measured sizes around the paste point (the patch-load auto-layout tick, without fitting the view). No stacked nodes.

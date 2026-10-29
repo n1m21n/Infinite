@@ -436,18 +436,36 @@ namespace app
       }
 
       const std::map<int, PatchLayout::Pos> pos = PatchLayout::Compute(p.data, &measured);
+      float dx = 0.0f, dy = 0.0f;
+      if (p.centre)
+      {
+         float minX = 1e30f, minY = 1e30f, maxX = -1e30f, maxY = -1e30f;
+         for (const auto& entry : pos)
+         {
+            auto ms = measured.find(entry.first);
+            const float w = ms != measured.end() ? ms->second.w : 0.0f, h = ms != measured.end() ? ms->second.h : 0.0f;
+            minX = std::min(minX, entry.second.x); maxX = std::max(maxX, entry.second.x + w);
+            minY = std::min(minY, entry.second.y); maxY = std::max(maxY, entry.second.y + h);
+         }
+         if (minX <= maxX)
+         {
+            dx = p.centre->x - (minX + maxX) * 0.5f;
+            dy = p.centre->y - (minY + maxY) * 0.5f;
+         }
+      }
       for (const auto& entry : pos)
       {
          auto m = p.remap.find(entry.first);
          GraphNode* gn = m != p.remap.end() ? FindNodeByIndex(m->second) : nullptr;
          if (gn == nullptr)
             continue;
-         gn->spawnX = gn->liveX = entry.second.x;
-         gn->spawnY = gn->liveY = entry.second.y;
-         ed::SetNodePosition(gn->NodeId(), ImVec2(entry.second.x, entry.second.y));
+         gn->spawnX = gn->liveX = entry.second.x + dx;
+         gn->spawnY = gn->liveY = entry.second.y + dy;
+         ed::SetNodePosition(gn->NodeId(), ImVec2(entry.second.x + dx, entry.second.y + dy));
       }
       ed::SetCurrentEditor(prevEditor);
-      gRequestFitView = true;
+      if (!p.centre)
+         gRequestFitView = true;
       p = PendingAutoLayout{};
    }
 
