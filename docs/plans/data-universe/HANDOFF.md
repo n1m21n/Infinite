@@ -628,3 +628,4 @@ Objective: softmax regression P(role | audio features), 2,158 audio-measured ins
 - Catch of swapped roles **73.7% +- 1.2** (bar >= 96%) — **MISS**
 - Top-1 role accuracy 70.0% +- 1.3 (baseline: biggest role share).
 Reading: roles that overlap in sound (piano / keys / mallets, synth / texture / other) cannot be told apart from 43 spectral features; swapping within them is not detectable. Next: add temporal/envelope features and merge indistinguishable roles into role groups, then re-run on the same splits.
+Second run, same splits: key range added as 3 features and piano/keys/mallets and synth/texture/other merged into two role groups (10 roles). FRR **4.6% +- 0.8** (bar 3%), catch **75.2% +- 1.5** (bar 96%), top-1 **73.2% +- 1.2**. Still a **MISS** on both. The audio features hold no more role information than this; the remaining lever is more audio per instrument (only 2,158 of 14,161 are measured), tied to item 1.

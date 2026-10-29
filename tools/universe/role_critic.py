@@ -24,7 +24,10 @@ import sound_clusters as sc
 ATLAS = os.path.expanduser("~/Infinite/training-data/atlas/instruments.jsonl")
 rows = [json.loads(l) for l in open(ATLAS)]; rows = [r for r in rows if r.get("audio") and r["audio"].get("bands")]
 F = np.array([sc.feat(r["audio"]) for r in rows]); cm = np.nan_to_num(np.nanmean(F, 0)); F = np.where(np.isnan(F), cm, F)
+K = np.array([r["keys"] if r.get("keys") else [0, 127] for r in rows], float); F = np.c_[F, K[:, 0], K[:, 1], K[:, 1] - K[:, 0]]
 Z = (F - F.mean(0)) / (F.std(0) + 1e-9)
+GROUP = {"piano": "keys", "keys": "keys", "mallets": "keys", "synth": "synth", "texture": "synth", "other": "synth"}
+for r in rows: r["family"] = GROUP.get(r["family"], r["family"])
 fams = sorted({r["family"] for r in rows if sum(x["family"] == r["family"] for x in rows) >= 24}); keep = [i for i, r in enumerate(rows) if r["family"] in fams]
 Z = Z[keep]; y = np.array([fams.index(rows[i]["family"]) for i in keep]); print(len(y), "voices;", len(fams), "roles:", fams)
 res = []
