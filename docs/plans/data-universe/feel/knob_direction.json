@@ -18,18 +18,18 @@
  "Wavetable": {
   "reliable": {
    "tau": 0.8,
-   "acc": 1.0,
-   "scored_moves": 3,
-   "reliable_cells_per_fold": 1.0,
-   "cells_with_data": 2.0
+   "acc": 0.75,
+   "scored_moves": 220,
+   "reliable_cells_per_fold": 18.2,
+   "cells_with_data": 116.8
   },
-  "pairs": 683,
-  "banks": 56,
-  "dominant_acc": 0.511,
-  "dominant_sd": 0.03,
-  "gated_acc": 0.523,
-  "gated_sd": 0.087,
-  "gated_moves_per_fold": 39
+  "pairs": 2492,
+  "banks": 204,
+  "dominant_acc": 0.559,
+  "dominant_sd": 0.011,
+  "gated_acc": 0.532,
+  "gated_sd": 0.041,
+  "gated_moves_per_fold": 174
  },
  "Oscillator": {
   "reliable": {
