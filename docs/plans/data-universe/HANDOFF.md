@@ -595,3 +595,6 @@ Corpus register by instrument family (first 120k files, range midpoint, p5/p50/p
 | Best knobs "engine unmeasured" | 2,156 | 15.2% |
 
 **Item 1 verdict: MISS.** Bar is unassigned < 5% (now 15.9%) and the measured column covering every audio node. Sources: steam 11,519, exs 2,413, nkc 229. Next step is a render-and-measure pass over the 12,003 unmeasured instruments (many are Steam library entries with no sample audio on this Mac, which has to be checked first, since an instrument with no audio cannot be measured here).
+
+### Item 4, per-part critic: status corrected
+`tools/universe/critic.py` is a per-part critic for the note side: parts drum / melody / bass / chord, each with hard validity rules, a plausibility floor set at the 1.5th percentile of held-out real music (B2 false rejects 1.38%, drums 2.90%), and mishap catch 98.0% over 11 corruption types (B3). It exists and is benchmarked. **What is still missing for item 4:** a critic for the *sound* side, per audio part (is this bass voice / pad voice / lead voice a good sound for its role). `feel_check` and `spectral_gates.py` (B8: held-out FRR 0.81%, catch 97.7%) check renders for damage, not for fit to a role. Verdict for item 4: cluster assignment bar met (93.8% / 93.9% over two seeds); per-part critic **partly in place (note side), sound-side role critic not built**.
