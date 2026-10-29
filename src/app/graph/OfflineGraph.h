@@ -50,6 +50,22 @@ public:
    // cooks every node. False when the tap is not an audio source.
    bool Prepare(double sampleRate);
 
+   // A note a voice received while RenderNotes ran: when it started and how
+   // long it held, in beats from bar 1, and which voice (patch index) took it.
+   struct CapturedNote
+   {
+      double startBeats = 0.0, lengthBeats = 0.0;
+      int pitch = 60;
+      float velocity = 0.0f;
+      int voice = -1;
+   };
+
+   // Notes only, instead of Render: steps the note sources for `beats` beats
+   // from bar 1 and records every note at each voice's note input. Voices,
+   // effects and the Drum Sequencer do not run, so a 4-bar take costs a few
+   // ms. A note still held at the end is cut there. Call after Prepare.
+   void RenderNotes(double beats, std::vector<CapturedNote>& out);
+
    // Renders `frames` stereo frames from bar 1. Returns false when `cancel`
    // turned true first (the output is then partial). `progress` gets 0..1.
    bool Render(int frames, std::vector<float>& left, std::vector<float>& right,
@@ -65,10 +81,13 @@ private:
    void Collect(INode* node, std::vector<INode*>& visiting);
    void Cook();
    void ApplyMotions(double beats);
+   void ProcessEntry(Entry& e, int n);
 
    std::vector<Owned> mNodes;
    std::vector<Entry> mOrder;
    std::vector<Motion> mMotions;
+   struct Wire;
+   std::vector<Wire> mWires; // every note cable, with the cursor its consumer reads
    std::vector<std::vector<float>> mBuffers; // two per output: L then R
    Patch::TransportRecord mTransportRec;
    Transport mClock;

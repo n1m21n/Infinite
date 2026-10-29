@@ -494,6 +494,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchShare.cpp
     src/app/graph/PatchIO.cpp
     src/app/graph/OfflineGraph.cpp
+    src/app/graph/NoteGen.cpp
     src/app/graph/RoleCritic.cpp
     src/app/graph/SampleStyles.cpp
     src/app/graph/UserStyle.cpp
@@ -543,6 +544,7 @@ set(COMMON_SOURCES
     src/app/selftest/PresetTests.cpp
     src/app/selftest/SynthAudit.cpp
     src/app/selftest/NoteAudit.cpp
+    src/app/selftest/NoteGenTest.cpp
     src/app/selftest/IoAudit.cpp
     src/app/selftest/GeoAudit.cpp
     src/app/selftest/CompAudit.cpp

@@ -834,6 +834,8 @@ namespace
       return 6;
    }
 
+   bool CriticJudgePitches(const std::vector<int>& pitches, int root, float& outScore);
+
    bool CriticJudgeMelody(const std::vector<std::pair<int, bool>>& seq, int root, int scaleId, int octave, float& outScore)
    {
       std::vector<int> pitches;
@@ -844,6 +846,11 @@ namespace
             while (n < 28) n += 12;
             pitches.push_back(n);
          }
+      return CriticJudgePitches(pitches, root, outScore);
+   }
+
+   bool CriticJudgePitches(const std::vector<int>& pitches, int root, float& outScore)
+   {
       if (pitches.size() < 6)
          return false;
       int lo = pitches[0], hi = pitches[0], maxLeap = 0, extremeLeaps = 0;
@@ -2564,7 +2571,9 @@ Compiled Compile(const Recipe& recipe)
          static const int kRoles[6][4] = { { kLong, kLong, kRolling, kMelodic }, { kTrap, kTrap, kTrap, kLong },
                                            { kLong, kWobble, kWobble, kRolling }, { kFunk, kFunk, kMelodic, kRolling },
                                            { kWobble, kRolling, kFunk, kMelodic }, { kAcid, kAcid, kAcid, kRolling } };
-         const int role = kRoles[kind][sp.Range(4)];
+         int role = kRoles[kind][sp.Range(4)];
+         if (recipe.bassRole >= 0)
+            role = std::clamp(recipe.bassRole, (int)kLong, (int)kAcid);
          // Progressions as scale degrees, one chord each: I-vi-IV-V, I-V-vi-IV, i-VII-VI-VII, i-iv-v-i, I-IV, i-VI ...
          static const int kProg[][4] = { { 0, 5, 3, 4 }, { 0, 4, 5, 3 }, { 0, 6, 5, 6 }, { 0, 3, 4, 0 },
                                          { 0, 0, 3, 4 }, { 0, 5, 0, 4 }, { 0, 3, 0, 3 }, { 0, 5, 6, 4 } };
@@ -3016,6 +3025,8 @@ Compiled Compile(const Recipe& recipe)
                play = kTopLine;
             if (kind == 4 && play == kHeld)
                play = kComp;
+            if (recipe.keysPlay >= 0)
+               play = std::clamp(recipe.keysPlay, (int)kHeld, (int)kTopLine);
             // Degrees per chord: I-V-vi-IV, I-vi-IV-V, ii-V-I-I, I-IV-V-IV, vi-IV-I-V, i-VII-VI-v, I-iii-IV-V, IV-V-I-vi.
             static const int kKeysProg[][4] = { { 0, 4, 5, 3 }, { 0, 5, 3, 4 }, { 1, 4, 0, 0 }, { 0, 3, 4, 3 },
                                                 { 5, 3, 0, 4 }, { 0, 6, 5, 4 }, { 0, 2, 3, 4 }, { 3, 4, 0, 5 } };
@@ -3043,6 +3054,8 @@ Compiled Compile(const Recipe& recipe)
             p["root"] = { 'i', std::to_string(root) };
             p["scale"] = { 'i', std::to_string(out.scale) };
             p["chordSize"] = { 'i', pi == 2 ? "4" : std::to_string(3 + sp.Range(2)) }; // the ii-V-I wants its sevenths
+            if (recipe.chordSize > 0)
+               p["chordSize"] = { 'i', std::to_string(std::clamp(recipe.chordSize, 2, 6)) };
             p["mode"] = { 'i', "1" };
             p["progSteps"] = { 'i', std::to_string(cells.size()) };
             for (size_t i = 0; i < cells.size(); i++)
@@ -3056,6 +3069,10 @@ Compiled Compile(const Recipe& recipe)
                a["rateMode"] = { 'i', "0" };
                a["octaves"] = { 'i', std::to_string(1 + sp.Range(2)) };
                a["mode"] = { 'i', std::to_string(kArpMode[sp.Range(8)]) };
+               if (recipe.arpOctaves > 0)
+                  a["octaves"] = { 'i', std::to_string(std::clamp(recipe.arpOctaves, 1, 4)) };
+               if (recipe.arpMode >= 0)
+                  a["mode"] = { 'i', std::to_string(recipe.arpMode) };
                notes = g.Add("Arpeggiator", sp.Range(1 << 30), a);
                g.Connect(ch, notes, true);
             }
@@ -3555,6 +3572,13 @@ Compiled Compile(const Recipe& recipe)
       UserStyle::NoteFeatures(phi);
    }
    return out;
+}
+
+bool JudgeMelody(const std::vector<int>& pitches, int root, int scale, float& score)
+{
+   (void)scale; // the corpus model is in pitch classes from the root; the scale is the caller's snap
+   score = 0.0f;
+   return CriticJudgePitches(pitches, root, score);
 }
 
 std::vector<std::string> PoolTypes()

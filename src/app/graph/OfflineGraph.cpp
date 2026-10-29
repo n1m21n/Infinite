@@ -102,6 +102,15 @@ struct OfflineGraph::Entry
    int firstOutput = 0; // buffer pair of output 0
 };
 
+struct OfflineGraph::Wire
+{
+   INode* owner = nullptr; // the consumer
+   AudioNode* consumer = nullptr;
+   int slot = 0;
+   NoteEventQueue* inbox = nullptr;
+   int cursor = 0;
+};
+
 OfflineGraph::OfflineGraph() = default;
 OfflineGraph::~OfflineGraph() = default;
 int OfflineGraph::NodeCount() const { return (int)mNodes.size(); }
@@ -248,8 +257,8 @@ bool OfflineGraph::Prepare(double sampleRate)
    // these queues. Cursor ids 0..n-1 per outbox, every consumer starting at
    // the tail, as AudioEngine::ApplyNoteWiringIfNew does for a fresh wire.
    std::unordered_map<NoteEventQueue*, int> consumers;
-   struct Wire { AudioNode* consumer; int slot; NoteEventQueue* inbox; int cursor; };
-   std::vector<Wire> wires;
+   std::vector<Wire>& wires = mWires;
+   wires.clear();
    for (Entry& e : mOrder)
       for (int slot = 0; slot < kMaxNoteSlots; slot++)
       {
@@ -263,7 +272,7 @@ bool OfflineGraph::Prepare(double sampleRate)
          int& count = consumers[inbox];
          if (count >= NoteEventQueue::kMaxConsumers)
             continue;
-         wires.push_back({ e.node, slot, inbox, count++ });
+         wires.push_back({ e.owner, e.node, slot, inbox, count++ });
       }
    for (const auto& [queue, count] : consumers)
    {
@@ -290,6 +299,41 @@ void OfflineGraph::ApplyMotions(double beats)
       snprintf(text, sizeof(text), "%g", v);
       Patch::LoadParams(n, { { m.key, text } });
    }
+}
+
+void OfflineGraph::ProcessEntry(Entry& e, int n)
+{
+   float* chans[kAudioMaxNodeInputs][2];
+   AudioBuffer views[kAudioMaxNodeInputs];
+   const AudioBuffer* ins[kAudioMaxNodeInputs];
+   for (int i = 0; i < e.numInputs; i++)
+   {
+      const int p = e.inputs[i];
+      if (p < 0)
+      {
+         ins[i] = nullptr;
+         continue;
+      }
+      chans[i][0] = mBuffers[(size_t)p * 2].data();
+      chans[i][1] = mBuffers[(size_t)p * 2 + 1].data();
+      views[i] = AudioBuffer{ chans[i], 2, n };
+      ins[i] = &views[i];
+   }
+   float* outChans[kAudioMaxNodeOutputs][2];
+   AudioBuffer outViews[kAudioMaxNodeOutputs];
+   AudioBuffer* outs[kAudioMaxNodeOutputs];
+   for (int o = 0; o < e.numOutputs; o++)
+   {
+      const int p = e.firstOutput + o;
+      outChans[o][0] = mBuffers[(size_t)p * 2].data();
+      outChans[o][1] = mBuffers[(size_t)p * 2 + 1].data();
+      std::fill(outChans[o][0], outChans[o][0] + n, 0.0f);
+      std::fill(outChans[o][1], outChans[o][1] + n, 0.0f);
+      outViews[o] = AudioBuffer{ outChans[o], 2, n };
+      outs[o] = &outViews[o];
+   }
+   e.node->ProcessBlockMulti(ins, e.numInputs, outs, e.numOutputs);
+   e.node->ApplyBlockGain(outs, e.numOutputs, n, mSampleRate);
 }
 
 bool OfflineGraph::Render(int frames, std::vector<float>& left, std::vector<float>& right,
@@ -332,39 +376,7 @@ bool OfflineGraph::Render(int frames, std::vector<float>& left, std::vector<floa
          Cook();
       }
       for (Entry& e : mOrder)
-      {
-         float* chans[kAudioMaxNodeInputs][2];
-         AudioBuffer views[kAudioMaxNodeInputs];
-         const AudioBuffer* ins[kAudioMaxNodeInputs];
-         for (int i = 0; i < e.numInputs; i++)
-         {
-            const int p = e.inputs[i];
-            if (p < 0)
-            {
-               ins[i] = nullptr;
-               continue;
-            }
-            chans[i][0] = mBuffers[(size_t)p * 2].data();
-            chans[i][1] = mBuffers[(size_t)p * 2 + 1].data();
-            views[i] = AudioBuffer{ chans[i], 2, n };
-            ins[i] = &views[i];
-         }
-         float* outChans[kAudioMaxNodeOutputs][2];
-         AudioBuffer outViews[kAudioMaxNodeOutputs];
-         AudioBuffer* outs[kAudioMaxNodeOutputs];
-         for (int o = 0; o < e.numOutputs; o++)
-         {
-            const int p = e.firstOutput + o;
-            outChans[o][0] = mBuffers[(size_t)p * 2].data();
-            outChans[o][1] = mBuffers[(size_t)p * 2 + 1].data();
-            std::fill(outChans[o][0], outChans[o][0] + n, 0.0f);
-            std::fill(outChans[o][1], outChans[o][1] + n, 0.0f);
-            outViews[o] = AudioBuffer{ outChans[o], 2, n };
-            outs[o] = &outViews[o];
-         }
-         e.node->ProcessBlockMulti(ins, e.numInputs, outs, e.numOutputs);
-         e.node->ApplyBlockGain(outs, e.numOutputs, n, mSampleRate);
-      }
+         ProcessEntry(e, n);
       const float* l = mBuffers[(size_t)tapEntry.firstOutput * 2].data();
       const float* r = mBuffers[(size_t)tapEntry.firstOutput * 2 + 1].data();
       std::copy(l, l + n, left.begin() + done);
@@ -375,6 +387,77 @@ bool OfflineGraph::Render(int frames, std::vector<float>& left, std::vector<floa
          progress->store((float)done / (float)frames, std::memory_order_relaxed);
    }
    return true;
+}
+
+void OfflineGraph::RenderNotes(double beats, std::vector<CapturedNote>& out)
+{
+   out.clear();
+   if (mOrder.empty() || beats <= 0.0)
+      return;
+   ScopedTransport clock(mClock);
+   const double beatsPerFrame = mClock.Tempo() / (60.0 * mSampleRate);
+   const int frames = (int)std::ceil(beats / beatsPerFrame);
+
+   // Only the voices' wires are read here: a note effect's own input is
+   // drained by the effect, which runs. Each voice's cursor is ours, since
+   // the voice never does.
+   std::vector<const Wire*> voices;
+   std::unordered_map<const INode*, int> indexOf;
+   for (const Owned& o : mNodes)
+      indexOf[o.node.get()] = o.index;
+   for (const Wire& w : mWires)
+      if (dynamic_cast<INoteSource*>(w.owner) == nullptr)
+         voices.push_back(&w);
+
+   std::unordered_map<int64_t, size_t> open; // (wire, voiceId) -> index in out
+   NoteEvent events[NoteEventQueue::kCapacity];
+   int done = 0;
+   while (done < frames)
+   {
+      const int n = std::min(kBlock, frames - done);
+      mClock.AdvanceAudioClock(n);
+      const double b0 = mClock.BlockStartBeats();
+      for (Entry& e : mOrder)
+         if (dynamic_cast<INoteSource*>(e.owner) != nullptr)
+            ProcessEntry(e, n);
+      for (size_t w = 0; w < voices.size(); w++)
+      {
+         const int count = voices[w]->inbox->Pop(voices[w]->cursor, events, NoteEventQueue::kCapacity);
+         for (int i = 0; i < count; i++)
+         {
+            const NoteEvent& ev = events[i];
+            if (ev.bendUpdate)
+               continue;
+            const double at = b0 + ev.frameOffset * beatsPerFrame;
+            const int64_t key = ((int64_t)w << 32) ^ (int64_t)(uint32_t)ev.voiceId;
+            auto it = open.find(key);
+            if (it != open.end())
+            {
+               // A note-off, or a note-on reusing a held id: either way the held note ends here.
+               CapturedNote& c = out[it->second];
+               c.lengthBeats = std::max(0.0, at - c.startBeats);
+               open.erase(it);
+            }
+            if (ev.isNoteOn && at < beats)
+            {
+               CapturedNote c;
+               c.startBeats = at;
+               c.pitch = ev.note;
+               c.velocity = ev.velocity;
+               auto idx = indexOf.find(voices[w]->owner);
+               c.voice = idx != indexOf.end() ? idx->second : -1;
+               open[key] = out.size();
+               out.push_back(c);
+            }
+         }
+      }
+      done += n;
+   }
+   for (const auto& [key, i] : open)
+      out[i].lengthBeats = std::max(0.0, beats - out[i].startBeats);
+   std::stable_sort(out.begin(), out.end(), [](const CapturedNote& a, const CapturedNote& b) {
+      return a.startBeats != b.startBeats ? a.startBeats < b.startBeats : a.pitch < b.pitch;
+   });
 }
 
 } // namespace app

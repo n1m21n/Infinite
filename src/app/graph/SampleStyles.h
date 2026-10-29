@@ -72,6 +72,14 @@ namespace SampleStyles
       //   space  dry, close .. wide     (envelope release, measured 89%; reverb and delay amount)
       //   mood   dark .. bright feeling (minor or major family scale, a little tempo and cutoff; a cue, not a guarantee)
       float tone = 0.0f, energy = 0.0f, space = 0.0f, mood = 0.0f;
+      // How a part is played, for the Piano Roll's Generate (docs/plans/piano-roll/README.md §12.3).
+      // Each < 0 means "the card picks": the draw is still made and then replaced, so the other
+      // parts keep their draws and every existing sample compiles unchanged.
+      int keysPlay = -1;   // Keys: 0 held chords, 1 comp, 2 arpeggio, 3 chords with a top line
+      int chordSize = -1;  // Keys: 2..6 notes per chord
+      int arpMode = -1;    // Keys arpeggio: an Arpeggiator mode
+      int arpOctaves = -1; // Keys arpeggio: 1..4
+      int bassRole = -1;   // Bass: 0 long, 1 rolling, 2 melodic, 3 funk, 4 wobble, 5 trap 808, 6 acid
    };
 
    struct Compiled
@@ -85,6 +93,11 @@ namespace SampleStyles
       std::string error;   // non-empty: unknown style
    };
    Compiled Compile(const Recipe& r);
+
+   // The melody critic Generate Samples runs on its motifs, on a line of MIDI
+   // notes: false when it fails the critic floor (too few notes, too wide,
+   // too leapy, or unlikely against the corpus), else `score` is 0..1.
+   bool JudgeMelody(const std::vector<int>& pitches, int root, int scale, float& score);
 
    // Every type a style can place as a synth, effect or note effect.
    std::vector<std::string> PoolTypes();
