@@ -288,3 +288,6 @@ Wavetable	b.warpRatio
 Wavetable	fmMode
 Wavetable	frequency
 Wavetable	glide
+Piano Roll	transpose
+Piano Roll	useGlobalScale
+Piano Roll	velocity

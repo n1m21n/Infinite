@@ -1,0 +1,33 @@
+infinite-patch 1
+# A Piano Roll node playing its linked MIDI lane (a one-bar looped clip, chance and swing off)
+# into a short synth. tools/determinism-check.py renders it twice and compares the bytes.
+node 1 Notes Piano Roll
+  id roll
+  uid 4242
+end
+node 2 Synths Wavetable
+  id voice
+  f a.ampAttack 1
+  f a.ampDecay 120
+  f a.ampSustain 0.2
+  f a.ampRelease 40
+end
+node 3 Utility Audio Out
+  id speakers
+end
+note voice 0 roll
+aud speakers 0 voice
+transport 120 4 4 0 0
+stream 2 0 1 0 0 1 0 Bass
+streamid 0 7
+cliptick 0 11 0 7680 0 0 0 0 0 1 0 0.4 0.6 0.9 Riff
+streamnote 0 4242 0
+clipmidi 0 11 9 0 1 0 3840 0 1 0
+clipnote 0 11 id=1 s=0 l=480 p=48
+clipnote 0 11 id=2 s=480 l=240 p=55 v=90
+clipnote 0 11 id=3 s=960 l=480 p=60
+clipnote 0 11 id=4 s=960 l=480 p=63 v=80
+clipnote 0 11 id=5 s=1680 l=240 p=58
+clipnote 0 11 id=6 s=1920 l=960 p=51 v=110
+clipnote 0 11 id=7 s=2880 l=480 p=55
+clipnote 0 11 id=8 s=3360 l=480 p=60 v=70

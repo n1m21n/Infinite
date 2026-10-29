@@ -1441,6 +1441,43 @@ bool RunPianoRollTest()
       StopTransport();
    }
 
+   // 5b. The node's own transpose, velocity and scale snap reach the audio half
+   // (the generic param sweep's bare node has no lane, so it cannot see them).
+   {
+      Transport& tr = Transport::Instance();
+      const int key = tr.Key(), scale = tr.Scale();
+      tr.SetKey(0);
+      tr.SetScale(0);
+      auto* pr = static_cast<PianoRollNode*>(PianoRollNode::Create());
+      pr->transpose = 1;
+      pr->velocity = 0.5f;
+      Rig rig;
+      rig.Init(pr);
+      pr->SetSchedule(schedule());
+      StartTransport(bpm);
+      while ((double)rig.pos < 5.75 * spb)
+         rig.Step();
+      pr->useGlobalScale = true;
+      while ((double)rig.pos < 8.0 * spb)
+         rig.Step();
+      std::vector<std::pair<int, float>> ons;
+      for (const Evt& e : rig.got)
+         if (e.e.isNoteOn && !e.e.bendUpdate)
+            ons.push_back({ e.e.note, e.e.velocity });
+      const float vel = 100.0f / 127.0f * 0.5f;
+      check(ons.size() == 4 && ons[0].first == 61 && ons[1].first == 65, "transpose moves the lane's notes");
+      bool velOk = !ons.empty();
+      for (const auto& o : ons)
+         velOk = velOk && std::fabs(o.second - vel) < 1e-4f;
+      check(velOk, "velocity scales the lane's notes");
+      check(ons.size() == 4 && ons[2].first != 61 && MusicTime::ScaleContainsPitchClass(0, ons[2].first % 12) && ons[3].first == 65,
+            "scale snap pulls a transposed note into the transport's key");
+      stopAndFlush(rig);
+      check(pairsOk(rig), "node params: every note-on has its off");
+      tr.SetKey(key);
+      tr.SetScale(scale);
+   }
+
    // 6. Save -> load -> save gives the same bytes, notes and expression included.
    {
       Model full = m;

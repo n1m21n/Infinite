@@ -7,6 +7,7 @@ frame is named), 2 = usage / the tool itself failed.
 
     python3 tools/determinism-check.py tests/headless/format/modulation.inf
     python3 tools/determinism-check.py patch.inf --times 0,0.5,1 --binary build/Infinite.app/Contents/MacOS/Infinite
+    python3 tools/determinism-check.py tests/headless/format/piano_roll.inf --audio-only --audio-seconds 4
 
 A patch listed in tools/determinism-by-design.txt (one patch path per line, `#` comments) is
 reported `nondeterministic_by_design` and passes: live input, plugins with their own clocks, and
@@ -107,6 +108,8 @@ def main():
     ap.add_argument("--in-process", action="store_true",
                     help="also render the patch twice inside ONE process (--frame --repeat 2, patch reloaded between "
                          "passes) and compare, to catch static state that two fresh processes hide")
+    ap.add_argument("--audio-only", action="store_true",
+                    help="skip the frames: for a sound-only patch with no Output node (the notes row)")
     ap.add_argument("--json", action="store_true", help="print the result as one JSON object")
     args = ap.parse_args()
 
@@ -119,7 +122,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as tmp:
         runs = []
-        for tag in ("a", "b"):
+        for tag in (() if args.audio_only else ("a", "b")):
             d = os.path.join(tmp, "f" + tag)
             code, status, files = frames(args.binary, args.patch, args.times, d, args.timeout)
             if code != 0:
@@ -135,7 +138,7 @@ def main():
                     t = args.times.split(",")[result["frames_compared"] - 1]
                     result["first_differing_node"] = first_differing_node(args.binary, args.patch, t, tmp, args.timeout)
 
-        if args.in_process:
+        if args.in_process and not args.audio_only:
             d = os.path.join(tmp, "inproc")
             code, status = run(args.binary, ["--frame", args.patch, args.times, d, "--repeat", "2", "--lenient"], args.timeout)
             if code != 0:
@@ -166,6 +169,9 @@ def main():
             same = sha(wavs[0]) == sha(wavs[1])
             result["audio"] = "identical" if same else "differs"
             result["deterministic"] = result["deterministic"] and same
+        elif args.audio_only:
+            result["audio"] = "failed" # nothing else was compared, so no render is not a pass
+            result["deterministic"] = False
 
     if by_design and not result["deterministic"]:
         result["deterministic"] = True # reported, not failed

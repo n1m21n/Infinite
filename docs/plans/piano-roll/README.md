@@ -499,25 +499,38 @@ The piano roll ships on the engine as it is. Each model gain (the chord_nn.py co
 | 1-3 Model, note ops, NoteSchedule, Piano Roll node (loops, chance, bend/pressure/timbre, thru) | done, `pianoroll-check` + `INFINITE_PIANOROLLTEST` (120/87 bpm) ALL OK | 3c55e136 |
 | 4 Save/load (`streamnote`/`clipmidi`/`clipnote`), PatchJson, byte-stable round trip | done | 1f210052 |
 | 5 `.mid` import (`Arrange::ImportSong`) + "Open in Piano Roll" on MIDI File | done; the swap itself is UI-only (not headless-tested) | b3651764 |
-| 6 NoteGen | **not started** | |
-| 7 Sweeps, determinism row, wasm parity, `gen-patch-skill --check` | **not run** | |
+| 6 NoteGen | done, `INFINITE_NOTEGENTEST` ALL OK: 8 types x 34 styles x 3 seeds = 816 takes, 0 empty, all in key and in 21..108, no overlaps, same seed same notes; melody critic 102/102; ~34 ms a take in a dev build | 2a10e490 |
+| 7 Sweeps, determinism row, parity, `gen-patch-skill --check` | done, see below | the commit after 2a10e490 |
 
-### Left for step 6 (NoteGen), with the findings so far
-- `OfflineGraph::RenderNotes(bars, std::vector<CapturedNote>&)`: after `Prepare`, process only entries whose owner is an
-  `INoteSource`; register one extra consumer (`NoteEventQueue::RegisterConsumer`, no device running) on every outbox that feeds a
-  non-note-source (a voice), pop it each block, pair on/off by `voiceId`, frame -> beats with `mClock.BlockStartBeats()` + offset.
-  Tag each note with the consumer's patch index, so the part split keeps one voice's notes.
-- Drums do not go through note cables: the Drum Sequencer is an audio source. Read its compiled params directly: `steps` (32),
-  `swing`, and `stepVel[lane][step]` (`lane<i>_...` keys). Lane order is `kKitFiles` (SampleStyles.cpp:74): kick, snare, closed hat,
-  open hat, clap, low tom, high tom, bell -> GM 36, 38, 42, 46, 39, 45, 50, 56. Synth-replaced lanes (`synthDrums`, volume 0) still
-  hold the full pattern in the sequencer, so the sequencer alone is the truth.
-- `src/app/graph/NoteGen.*`: `Generate(GenSpec) -> Take`: Recipe (part from type), `SampleStyles::Compile`, `Patch` parse,
-  `OfflineGraph::Build/Prepare`, `RenderNotes`, keep the type's voice, critic gate (up to 3 redraws), form, swing, gate, scale snap.
-- Recipe note fields (`chordSize`, `voicing`, `inversion`, `arpMode`, `arpRate`, `arpOctaves`, `bassRole`, `contour`,
-  `motifRepeat`, `density`, `rangeLo/Hi`, `numerals`) all default to "the card picks" so wasm parity stays green.
-- `INFINITE_NOTEGENTEST` as §12.6.
+### Step 6 (NoteGen): what landed
+- `OfflineGraph::RenderNotes`: processes only the note sources, reads each voice's own outbox cursor, pairs on/off by
+  (wire, voiceId), frame -> beats from the block clock; each note carries the voice's patch index. `Build` already keeps only
+  what feeds the tap, so a part's patch gives that part's voices.
+- `src/app/graph/NoteGen.*`: `Generate(GenSpec) -> Take`, types 1-8, form (AABA/ABAB/AAAB, B = seed + 1), critic gate (3 redraws,
+  seed + n x 7919, melody judged by `SampleStyles::JudgeMelody`), post pass (key snap, octave fold into the range or the piano's
+  21..108, density, gate, swing, locks, no overlap on one pitch). Drums read the Drum Sequencer's params straight from the
+  compiled patch (GM map as below). `Serialize`/`Parse` give the `type=chords style=... seed=...` line; unknown keys are ignored.
+- Recipe note fields added: `keysPlay`, `chordSize`, `arpMode`, `arpOctaves`, `bassRole`, all -1 = the card picks, applied after
+  the card's draws so no draw moves. Not added yet (no type of §12.2 needs them in Block A): `voicing`, `inversion`, `arpRate`,
+  `contour`, `motifRepeat`, `numerals`.
+- `INFINITE_NOTEGENSPEC="type=pads style=dub_techno seed=2"` (with `INFINITE_NOTEGENTEST=1`) prints one take's notes.
+- Findings: a Humanizer spreads a chord's starts by 20-120 ticks, so "chords stack" counts notes sounding at once; a card's Note
+  Echo climbs an octave a repeat (dub_techno pads reached 108+), hence the default 21..108 fold.
+- Deferred to Block B: the `gen`/`gentake` save lines (§12.6) go with takes; no separate RenderNotes-vs-audible-voice parity check
+  (RenderNotes reads the voice's own inbox cursor, so it sees exactly what the voice plays).
 
-### Left for step 7
-audio-node-sweep, audio-pipeline-sweep, determinism-check (add a Piano Roll row), `wasm/parity_dump.js`,
-`tools/gen-patch-skill.py --check`. Known cost for Block B: every arrange revision bump rebuilds the audio topology
-(`ArrangeAudioRebuildIfStale`), so note edits do too; skip MIDI-only changes there.
+### Step 7 results (dev build, arm64)
+- `audio-pipeline-sweep`: 19/19 pass. Its AUDIOPARAMSWEEPTEST had 10 new rows: 7 Generate Samples recipe params (`card`,
+  `followScale`, `tone`, `energy`, `space`, `mood`, `keepSeed`; missing on main too) and the Piano Roll's `transpose`, `velocity`,
+  `useGlobalScale` (the rig's bare node has no lane). All baselined in `audio-param-sweep-expected.txt`; the Piano Roll three are now
+  checked for real by `INFINITE_PIANOROLLTEST` 5b.
+- `audio-node-sweep`: teardown passes for every audio/note node (Piano Roll included), xruns 0. Its param half stays red on main's
+  drift: `known-blind-spots.txt` misses 169 rows the hygiene baseline has (Convolution Reverb, Generate Samples, ...). The Piano Roll
+  rows were added there too; reconciling the two lists is separate work.
+- Determinism: `tests/headless/format/piano_roll.inf` (a looped Piano Roll lane into a Wavetable) renders byte-identical audio
+  twice. `tools/determinism-check.py --audio-only` is new for sound-only patches; `run_gate.sh` row `determinism-notes`.
+- Parity: `wasm/parity_dump.js` could not run (no emcc on this Mac). Instead `SampleStyles::Compile`'s patch text for Keys and
+  Bass, all 34 styles at seed 1, is byte-identical before and after the Recipe fields (68/68).
+- `tools/gen-patch-skill.py --check`: up to date.
+- Known cost for Block B: every arrange revision bump rebuilds the audio topology (`ArrangeAudioRebuildIfStale`), so note edits do
+  too; skip MIDI-only changes there.
