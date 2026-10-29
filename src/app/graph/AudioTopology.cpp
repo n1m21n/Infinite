@@ -226,6 +226,14 @@ namespace app
              (gArrangeWavRender.active && gArrangeWavRender.timelineAudio);
    }
 
+   // Studio mode routes like Timeline (canvas bypassed) but schedules no clip; an arrangement render still does.
+   bool StudioOnlyRouting()
+   {
+      return gAudioMode == AudioMode::Studio &&
+             !(gOfflineRender.active && gOfflineRender.arrangeDriven && gOfflineRender.timelineAudio) &&
+             !(gArrangeWavRender.active && gArrangeWavRender.timelineAudio);
+   }
+
 
    // A take starts every node from its prepared state. Without this, a note-only node the
    // no-device pump (AudioEngine::PumpNoteNodesWithoutDevice, wall-clock driven) already ran keeps the
@@ -350,7 +358,10 @@ namespace app
       };
       std::vector<ScheduledTerminal> scheduled;
       std::vector<ClipWindow> clipWindows;
-      if (timelineRouting)
+      // Studio mode routes like Timeline (canvas bypassed) but schedules nothing: the take plays outside the graph.
+      // An arrangement render still schedules its clips whatever the mode.
+      const bool studioOnly = StudioOnlyRouting();
+      if (timelineRouting && !studioOnly)
       {
          // Straight off the model (WP5b): ticks convert to beats with no
          // tempo, so a tempo change does not touch the schedule at all. BPM
@@ -893,6 +904,7 @@ namespace app
       // whichever of the ~40 graph-edit call sites got here first.
       gArrangeAudioBuiltRevision = gArrange.revision;
       gArrangeAudioBuiltRouting = timelineRouting;
+      gArrangeAudioBuiltStudio = studioOnly;
       gArrangeAudioBuiltSessionGen = ArrangeSessionGeneration();
       gAudioTopologyRebuildCount++;
       ReapArrangeTerminalCompensation();
@@ -915,7 +927,8 @@ namespace app
          return false;
       if (gArrange.revision == gArrangeAudioBuiltRevision &&
           ArrangeSessionGeneration() == gArrangeAudioBuiltSessionGen &&
-          ArrangeTimelineRoutingActive() == gArrangeAudioBuiltRouting)
+          ArrangeTimelineRoutingActive() == gArrangeAudioBuiltRouting &&
+          StudioOnlyRouting() == gArrangeAudioBuiltStudio)
          return false;
       const unsigned long long before = gAudioTopologyRebuildCount;
       RebuildAudioTopology();

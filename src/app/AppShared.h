@@ -922,7 +922,9 @@ extern bool  gArrangeFocused;
    // arrangement panel to be open and the transport to be playing, which made
    // hiding the panel or hitting pause change what the topology contained -
    // a rebuild-driven mode leak rather than a routing rule.
-   enum class AudioMode { Canvas, Timeline, Session };
+   // Studio: the Sample studio's take alone (SampleStudioPanel.cpp). Canvas Audio Outs are bypassed as in Timeline,
+   // and no clip is scheduled, so the take is heard on its own.
+   enum class AudioMode { Canvas, Timeline, Session, Studio };
 
 extern AudioMode gAudioMode;
 
@@ -4946,6 +4948,7 @@ extern uint64_t gArrangeAudioBuiltRevision;
 extern uint64_t gArrangeAudioBuiltSessionGen;
 
 extern bool gArrangeAudioBuiltRouting;
+extern bool gArrangeAudioBuiltStudio;
 
 extern std::set<uint64_t> gArrangeRetriggerConflictClipIds;
 
@@ -4961,6 +4964,7 @@ void ArrangeCollectClipModBindings(const GraphNode& node,
                                       std::vector<std::pair<int, std::string>>& out);
 
 bool ArrangeTimelineRoutingActive();
+bool StudioOnlyRouting(); // AudioMode::Studio outside an arrangement render: canvas bypassed, no clip scheduled
 
 void ForceAudioRepare();
 
@@ -5715,7 +5719,8 @@ extern float gHistoryWidth;
 void DrawHistoryDocked(const char* id, const ImVec2& size);
 // Sample studio (Shift+W): generate, shape, trim and export a loop; docked right.
 extern bool gSampleStudioOpen;
-extern float gSampleStudioWidth;
+extern float gSampleStudioHeight;
+extern int gSampleStudioDock; // 0 = bottom, 3 = top (the Timeline's codes)
 void DrawSampleStudioDocked(const char* id, const ImVec2& size);
 
 extern Patch::Data gDragStartSnapshot;

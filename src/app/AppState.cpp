@@ -443,7 +443,8 @@ bool gHeadlessNeedProbe = false;
    bool  gHistoryOpen = false;
    float gHistoryWidth = 300.0f;
    bool  gSampleStudioOpen = false;
-   float gSampleStudioWidth = 360.0f;
+   float gSampleStudioHeight = 260.0f;
+   int   gSampleStudioDock = 0;
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top
@@ -1479,6 +1480,7 @@ bool gHeadlessNeedProbe = false;
    uint64_t gArrangeAudioBuiltSessionGen = 0;
 
    bool gArrangeAudioBuiltRouting = false;
+   bool gArrangeAudioBuiltStudio = false;
 
    // Clip ids whose Retrigger flag was suppressed at the last rebuild because
    // their source node is also used by a clip on another lane - one physical

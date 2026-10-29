@@ -403,12 +403,6 @@ void DrawSidePanels(FrameCtx& fc)
          DrawHistoryDocked("##historypanel_right", ImVec2(gHistoryWidth, graphHeight));
       }
 
-      // Right-docked Sample studio (View > Sample Studio or Shift+W)
-      if (gSampleStudioOpen)
-      {
-         DrawSampleStudioDocked("##samplestudio_right", ImVec2(gSampleStudioWidth, graphHeight));
-      }
-
       // ---- node browser / search panel ----
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)
@@ -702,6 +696,9 @@ void DrawSidePanels(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_bottom", ImVec2(0, gArrangePanelHeight));
       if (sessionBottom)
          DrawSessionPanelDocked("##sessionpanel_bottom", ImVec2(0, gSessionPanelHeight));
+      // Sample studio (View > Sample Studio or Shift+W), bottom or top like the Timeline.
+      if (gSampleStudioOpen && gSampleStudioDock != 3)
+         DrawSampleStudioDocked("##samplestudio_bottom", ImVec2(0, gSampleStudioHeight));
 
       ImGui::End();
 

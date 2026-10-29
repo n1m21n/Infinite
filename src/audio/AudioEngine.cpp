@@ -499,6 +499,7 @@ void AudioEngine::PumpMainThread()
    // retired (superseded by a newer Play(), or Stop()'s buffer once a new
    // one lands) rather than leaving it to leak.
    mPreviewPlayer.DrainRetired();
+   mStudioLoop.DrainRetired();
    PollTail();
    DrainRetired();
 }
@@ -1402,6 +1403,11 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    // bypass/the transport) across a topology swap, and even with nothing
    // patched to an Audio Out.
    mPreviewPlayer.ProcessBlock(buffer);
+   {
+      Transport& transport = Transport::Instance();
+      const double beatsPerSample = sampleRate > 0.0 ? std::max(1.0, (double)transport.Tempo()) / 60.0 / sampleRate : 0.0;
+      mStudioLoop.ProcessBlock(buffer, transport.IsPlaying(), transport.BlockStartBeats(), beatsPerSample);
+   }
    // The metronome sits after the graph for the same reason: it is not a node,
    // so it never reaches an Audio Out recording. BlockStartBeats() is the
    // block's first sample (Beats() has already advanced past it).

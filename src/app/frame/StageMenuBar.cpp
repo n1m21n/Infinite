@@ -641,6 +641,16 @@ void DrawMenuBar(FrameCtx& fc)
                      ? T("The Session's launched clips are driving audio. Click to hand it back to the canvas.")
                      : T("The Session's launched clips will drive audio once the engine is started."));
             }
+            else if (gAudioMode == AudioMode::Studio)
+            {
+               TopBarSameLine(4.0f);
+               if (ChipButton::Draw(L("Studio##studiobadge"), true, tok::tile, 0.0f, true))
+                  gAudioMode = AudioMode::Canvas;
+               if (ImGui::IsItemHovered())
+                  HelpTip(engineOn
+                     ? T("The Sample studio's take is driving audio. Click to hand it back to the canvas.")
+                     : T("The Sample studio's take will drive audio once the engine is started."));
+            }
          };
 
          // Left cluster ends here: menus, transport, audio. Tempo, meter, click and key sit centred in the

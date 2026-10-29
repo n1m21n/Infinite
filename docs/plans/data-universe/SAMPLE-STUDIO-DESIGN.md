@@ -61,3 +61,15 @@ The website studio stays the reference and keeps working as is. When the panel s
   node with the take's recipe and trim). Review shots: `INFINITE_OPENPANELS=studio,studiodemo`.
 - Not yet: top and bottom docks (right only), true drag to canvas (a button for now), credit tags in the WAV, opening the patch straight onto
   the canvas (saved to a file instead, so the open patch is never replaced), Windows / Linux runs, the panels-sweep.
+
+## Redesign 2026-10-29 (Naman's notes: no text, dock top/bottom, timeline grammar)
+- Dock: bottom (default) or top, like the Timeline and Scene docks; grip on the inner edge; right-click the toolbar to switch. Height saved in the panel layout (`panelStudioH`, `panelStudioDock`). The right dock is gone.
+- Toolbar, icons only (tooltips carry the words): Generate (Refresh; green while making, click cancels), part dropdown (fades and settles in over `motion_on`, scrolls past nine rows), snap to scale (NoteSnap, the note nodes' icon; follows the project key and scale), Play (on the global transport), Loop. Pinned right: Studio Audio chip, Export, Convert to patch, Convert to node, Settings.
+- Studio audio: `AudioMode::Studio`. Play switches to it; the canvas Audio Outs are bypassed exactly as Timeline audio does, and the top bar shows a Studio badge that hands audio back. The take plays through `StudioLoopPlayer` (in `AudioEngine`, after the topology, locked to the transport's beat position).
+- Left: the website's blob shader (ported, straight alpha) reacting to 16 bands of the take at the playhead, and four glass dots (tone, energy, space, mood). Drag a dot: the blob leans and tints toward it, letting go re-renders the take's own seed pinned. Double-click sends a dot home.
+- Right: the waveform on a 16th grid, start and end handles snapping to 16ths, the transport playhead (mapped through reverse and ping-pong).
+- Settings (the clip inspector's grammar): pitch (semitones), fine (cents), speed (0.25-4x), loop, reverse, ping-pong, fade in/out, and for the next take style, length, wild, key and scale.
+- Export: WAV 24, WAV 16, FLAC, MP3 to the Recordings folder (revealed), or WAV to a chosen path. The take as heard.
+- Convert to patch: the graph that made the take plus an Audio Out, pasted as one undo step and wrapped in a Group. Convert to node: Generate Samples (the recipe, keepSeed, trim) or Sampler, Slicer, Molder, Grain Molder, PaulStretch, Granular loaded with the take as heard.
+- Removed: takes list, all labels and status text.
+- Not yet: Windows / Linux runs, panels-sweep, credit tags in exports, pitch shift is a simple grain shifter (not formant-aware).

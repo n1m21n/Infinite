@@ -14,6 +14,7 @@
 #include "CompensationDelay.h"
 #include "Metronome.h"
 #include "SamplePreviewPlayer.h"
+#include "StudioLoopPlayer.h"
 #include "../core/BenchReport.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
@@ -546,6 +547,8 @@ public:
    // transport, and survives a topology rebuild mid-preview - see Process()
    // mixing it in after RunTopology.
    SamplePreviewPlayer& Preview() { return mPreviewPlayer; }
+   // The Sample studio's take on the transport (StudioLoopPlayer.h), mixed in right after the preview.
+   StudioLoopPlayer& StudioLoop() { return mStudioLoop; }
 
    // The metronome: mixed into the device output after the graph and the
    // preview, only while the transport plays. Main thread sets, audio thread
@@ -762,6 +765,7 @@ private:
    ClipPeakRing mClipPeaks;
 
    SamplePreviewPlayer mPreviewPlayer;
+   StudioLoopPlayer mStudioLoop;
 
    std::atomic<bool> mMetronomeOn { false };
    std::atomic<float> mMetronomeVolume { 0.5f };

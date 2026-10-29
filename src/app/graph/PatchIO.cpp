@@ -365,8 +365,10 @@ namespace app
             gHistoryWidth = std::max(220.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelStudioOpen")
             gSampleStudioOpen = (val != "0");
-         else if (key == "panelStudioW")
-            gSampleStudioWidth = std::max(300.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelStudioH")
+            gSampleStudioHeight = std::max(180.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelStudioDock")
+            gSampleStudioDock = (val == "3") ? 3 : 0;
       }
    }
 
@@ -402,7 +404,8 @@ namespace app
       file << "panelHistoryOpen=" << (gHistoryOpen ? 1 : 0) << "\n";
       file << "panelHistoryW=" << gHistoryWidth << "\n";
       file << "panelStudioOpen=" << (gSampleStudioOpen ? 1 : 0) << "\n";
-      file << "panelStudioW=" << gSampleStudioWidth << "\n";
+      file << "panelStudioH=" << gSampleStudioHeight << "\n";
+      file << "panelStudioDock=" << gSampleStudioDock << "\n";
    }
 
 
@@ -415,10 +418,10 @@ namespace app
       if (sTestRun)
          return;
       char buf[256];
-      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d|%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
-                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d|%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock, gSampleStudioDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
-                    gPerfPanelHeight, gHistoryWidth, gSampleStudioWidth);
+                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

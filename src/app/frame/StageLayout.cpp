@@ -266,6 +266,12 @@ void DrawLayout(FrameCtx& fc)
       if (perfTop     || perfBottom)     { topBottom += gPerfPanelHeight;     topBottomRows++; }
       if (arrangeTop  || arrangeBottom)  { topBottom += gArrangePanelHeight;  topBottomRows++; }
       if (sessionTop  || sessionBottom)  { topBottom += gSessionPanelHeight;  topBottomRows++; }
+      if (gSampleStudioOpen)
+      {
+         gSampleStudioHeight = std::clamp(gSampleStudioHeight, 180.0f, std::max(180.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gSampleStudioHeight;
+         topBottomRows++;
+      }
       // No ItemSpacing term: every docked panel is laid out flush (its
       // Draw*Docked zeroes the spacing around its own outer child, and the
       // SameLine chaining below passes an explicit 0 gap), so reserving a
@@ -289,6 +295,8 @@ void DrawLayout(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_top", ImVec2(0, gArrangePanelHeight));
       if (sessionTop)
          DrawSessionPanelDocked("##sessionpanel_top", ImVec2(0, gSessionPanelHeight));
+      if (gSampleStudioOpen && gSampleStudioDock == 3)
+         DrawSampleStudioDocked("##samplestudio_top", ImVec2(0, gSampleStudioHeight));
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
@@ -353,11 +361,6 @@ void DrawLayout(FrameCtx& fc)
       {
          gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));
          rightReserved += gHistoryWidth;
-      }
-      if (gSampleStudioOpen)
-      {
-         gSampleStudioWidth = std::min(gSampleStudioWidth, std::max(300.0f, ImGui::GetContentRegionAvail().x * 0.5f));
-         rightReserved += gSampleStudioWidth;
       }
       const float graphWidth = rightReserved > 0.0f
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
