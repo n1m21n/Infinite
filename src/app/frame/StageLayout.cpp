@@ -130,7 +130,8 @@ void DrawLayout(FrameCtx& fc)
 
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
-         gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys);
+         gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
+                           (gPianoRollOpen && gPianoRollClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -141,7 +142,8 @@ void DrawLayout(FrameCtx& fc)
             gArrangeClaimedKeys = false;
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
-         gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys);
+         gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys);
 
          if (!gPerfPanelOpen)
          {
@@ -272,6 +274,12 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gSampleStudioHeight;
          topBottomRows++;
       }
+      if (gPianoRollOpen)
+      {
+         gPianoRollHeight = std::clamp(gPianoRollHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gPianoRollHeight;
+         topBottomRows++;
+      }
       // No ItemSpacing term: every docked panel is laid out flush (its
       // Draw*Docked zeroes the spacing around its own outer child, and the
       // SameLine chaining below passes an explicit 0 gap), so reserving a
@@ -297,6 +305,8 @@ void DrawLayout(FrameCtx& fc)
          DrawSessionPanelDocked("##sessionpanel_top", ImVec2(0, gSessionPanelHeight));
       if (gSampleStudioOpen && gSampleStudioDock == 3)
          DrawSampleStudioDocked("##samplestudio_top", ImVec2(0, gSampleStudioHeight));
+      if (gPianoRollOpen && gPianoRollDock == 3)
+         DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
@@ -433,5 +443,7 @@ void DrawLayout(FrameCtx& fc)
                                (gSessionPanelOpen && gDropPos.x >= gSessionPanelRectMin.x && gDropPos.x < gSessionPanelRectMax.x &&
                                 gDropPos.y >= gSessionPanelRectMin.y && gDropPos.y < gSessionPanelRectMax.y) ||
                                (gSampleStudioOpen && gDropPos.x >= gSampleStudioRectMin.x && gDropPos.x < gSampleStudioRectMax.x &&
-                                gDropPos.y >= gSampleStudioRectMin.y && gDropPos.y < gSampleStudioRectMax.y);}
+                                gDropPos.y >= gSampleStudioRectMin.y && gDropPos.y < gSampleStudioRectMax.y) ||
+                               (gPianoRollOpen && gDropPos.x >= gPianoRollRectMin.x && gDropPos.x < gPianoRollRectMax.x &&
+                                gDropPos.y >= gPianoRollRectMin.y && gDropPos.y < gPianoRollRectMax.y);}
 }

@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE94A;
+   inline constexpr unsigned kLast = 0xE94E;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -80,4 +80,8 @@ namespace IconsInfinite
    inline constexpr const char* Settings = "\xee\xa5\x88"; // U+E948 settings
    inline constexpr const char* Session = "\xee\xa5\x89"; // U+E949 session
    inline constexpr const char* Waveform = "\xee\xa5\x8a"; // U+E94A waveform
+   inline constexpr const char* Audition = "\xee\xa5\x8b"; // U+E94B audition
+   inline constexpr const char* Erase = "\xee\xa5\x8c"; // U+E94C erase
+   inline constexpr const char* Fold = "\xee\xa5\x8d"; // U+E94D fold
+   inline constexpr const char* Follow = "\xee\xa5\x8e"; // U+E94E follow
 }

@@ -111,6 +111,8 @@ namespace
       c.velScale = std::clamp(c.velScale, 0.0f, 2.0f);
       if (!std::isfinite(c.swing)) c.swing = 0.0f;
       c.swing = std::clamp(c.swing, 0.0f, 1.0f);
+      if (!std::isfinite(c.chanceScale)) c.chanceScale = 1.0f;
+      c.chanceScale = std::clamp(c.chanceScale, 0.0f, 2.0f);
    }
 
    void NormalizeNotes(const Lane& l, Clip& c)
@@ -1917,7 +1919,7 @@ bool AddNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes, std::ve
       c->notes.push_back(std::move(n));
    }
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -1938,7 +1940,7 @@ bool EditNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes)
    }
    if (!changed) return false;
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -1953,7 +1955,7 @@ bool DeleteNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids)
                                  [&](const Note& n) { return kill.count(n.id) != 0; }),
                   c->notes.end());
    if (c->notes.size() == before) return false;
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -1990,7 +1992,7 @@ bool MoveNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tick
    }
    if (!changed) return false;
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -2025,7 +2027,7 @@ bool SplitNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tic
    if (rights.empty()) return false;
    for (Note& r : rights) c->notes.push_back(std::move(r));
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -2057,7 +2059,7 @@ bool JoinNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids)
                                  [&](const Note& n) { return kill.count(n.id) != 0; }),
                   c->notes.end());
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 
@@ -2094,7 +2096,7 @@ bool QuantizeNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, 
    }
    if (!changed) return false;
    ResolveNoteOverlaps(*c);
-   m.revision++;
+   m.NoteEdited();
    return true;
 }
 

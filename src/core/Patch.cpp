@@ -504,13 +504,24 @@ static void WriteBody(std::ostream& file, const Data& data)
       // window, then the notes. Own tags, so an older reader skips them.
       if (s.type == kStreamMidi)
       {
-         if (s.noteNodeUid != 0 || s.scaleSnap)
-            file << "streamnote " << i << " " << s.noteNodeUid << " " << (s.scaleSnap ? 1 : 0) << "\n";
+         if (s.noteNodeUid != 0 || s.scaleSnap || s.drumRows)
+         {
+            file << "streamnote " << i << " " << s.noteNodeUid << " " << (s.scaleSnap ? 1 : 0);
+            if (s.drumRows) file << " 1";
+            file << "\n";
+         }
          for (const ClipRecord& c : s.clips)
          {
             file << "clipmidi " << i << " " << c.id << " " << c.nextNoteId << " " << c.contentOffset << " "
                  << (c.midiLoop ? 1 : 0) << " " << c.loopStart << " " << c.loopLength << " " << c.transpose << " "
-                 << FloatToString(c.velScale) << " " << FloatToString(c.swing) << "\n";
+                 << FloatToString(c.velScale) << " " << FloatToString(c.swing);
+            if (c.chanceScale != 1.0f) file << " " << FloatToString(c.chanceScale);
+            file << "\n";
+            if (!c.genSpec.empty())
+               file << "gen " << i << " " << c.id << " " << c.genSpec << "\n";
+            for (const Arrange::Clip::GenTake& t : c.takes)
+               if (t.pin)
+                  file << "gentake " << i << " " << c.id << " pin=1 " << t.spec << "\n";
             for (const Arrange::Note& n : c.notes)
             {
                file << "clipnote " << i << " " << c.id << " id=" << n.id << " s=" << n.start << " l=" << n.length
@@ -1290,15 +1301,17 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       }
       else if (tag == "streamnote")
       {
-         int streamIdx = -1, snap = 0;
+         int streamIdx = -1, snap = 0, drums = 0;
          uint64_t uid = 0;
          if (in >> streamIdx >> uid >> snap && streamIdx >= 0 && streamIdx < (int)outData.streams.size())
          {
             outData.streams[streamIdx].noteNodeUid = uid;
             outData.streams[streamIdx].scaleSnap = snap != 0;
+            if (in >> drums)
+               outData.streams[streamIdx].drumRows = drums != 0;
          }
       }
-      else if (tag == "clipmidi" || tag == "clipnote")
+      else if (tag == "clipmidi" || tag == "clipnote" || tag == "gen" || tag == "gentake")
       {
          int streamIdx = -1;
          uint64_t clipId = 0;
@@ -1315,7 +1328,16 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                if (clips[k].id == clipId) { c = &clips[k]; sLastClip = k; break; }
          if (c == nullptr)
             continue;
-         if (tag == "clipmidi")
+         if (tag == "gen" || tag == "gentake")
+         {
+            std::string rest;
+            std::getline(in >> std::ws, rest);
+            if (tag == "gen")
+               c->genSpec = rest;
+            else if (rest.rfind("pin=1 ", 0) == 0)
+               c->takes.push_back({ rest.substr(6), true });
+         }
+         else if (tag == "clipmidi")
          {
             int loop = 0;
             if (in >> c->nextNoteId >> c->contentOffset >> loop >> c->loopStart >> c->loopLength >> c->transpose
@@ -1324,6 +1346,9 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             // Ranges are the model's business: Normalize clamps on apply.
             if (!std::isfinite(c->velScale)) c->velScale = 1.0f;
             if (!std::isfinite(c->swing)) c->swing = 0.0f;
+            float chanceScale = 1.0f;
+            if (in >> chanceScale && std::isfinite(chanceScale))
+               c->chanceScale = chanceScale;
          }
          else
          {

@@ -25,6 +25,19 @@ namespace FormParts
    constexpr float kSliderW = kControlW;   // sliders, dropdowns and inputs share one width in Settings
    constexpr float kRowH = 28.0f;
 
+   // A narrow side column (a panel's inspector) has no room for the Settings columns: inside a Narrow scope the
+   // label column shrinks and every control fills the rest of the row.
+   inline float gLabelW = kLabelW;
+   inline bool gFill = false;
+   struct Narrow
+   {
+      float savedW; bool savedFill;
+      explicit Narrow(float labelW = 92.0f) : savedW(gLabelW), savedFill(gFill) { gLabelW = labelW; gFill = true; }
+      ~Narrow() { gLabelW = savedW; gFill = savedFill; }
+   };
+   // The control width after Label(): the Settings column, or what is left of the row in a Narrow scope.
+   inline float ControlW() { return gFill ? std::max(1.0f, ImGui::GetContentRegionAvail().x) : kControlW; }
+
    // The hairline edge every surface carries (same value the Library wells use).
    inline ImU32 EdgeCol()
    {
@@ -57,7 +70,7 @@ namespace FormParts
       return k != nullptr ? std::string(label, k) : std::string(label);
    }
 
-   // Dimmed label in the left column; the control follows on the same line at kLabelW.
+   // Dimmed label in the left column; the control follows on the same line at the label column's width.
    inline void Label(const char* label)
    {
       const std::string v = Visible(label);
@@ -66,7 +79,7 @@ namespace FormParts
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.78f));
       ImGui::TextUnformatted(v.c_str());
       ImGui::PopStyleColor();
-      ImGui::SameLine(kLabelW);
+      ImGui::SameLine(gLabelW);
    }
 
    inline std::string Id(const char* label) { return std::string("##") + label; }
@@ -104,12 +117,13 @@ namespace FormParts
    {
       constexpr float kListMaxW = 280.0f;
       Label(label);
-      ImGui::SetNextItemWidth(kControlW);
+      const float controlW = ControlW();
+      ImGui::SetNextItemWidth(controlW);
       FieldWell::PushStyle(ImGui::GetID(Id(label).c_str()) ^ 0x9e3779b9u);
       MenuParts::PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       std::string shown = preview;
-      const float room = kControlW - 2.0f * tok::space_3;
+      const float room = controlW - 2.0f * tok::space_3;
       const bool cut = ImGui::CalcTextSize(preview).x > room;
       if (cut)
       {
@@ -122,7 +136,7 @@ namespace FormParts
          }
          shown += "...";
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(kControlW, listMinW), 0.0f), ImVec2(std::max(kListMaxW, listMinW), FLT_MAX));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(controlW, listMinW), 0.0f), ImVec2(std::max(kListMaxW, listMinW), FLT_MAX));
       const bool open = ImGui::BeginCombo(Id(label).c_str(), shown.c_str(), ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
       FieldWell::PopStyle();
@@ -190,14 +204,14 @@ namespace FormParts
    inline bool SliderFloat(const char* label, float* v, float lo, float hi, const char* fmt = "%.3f", ImGuiSliderFlags fl = 0)
    {
       Label(label);
-      ImGui::SetNextItemWidth(kSliderW);
+      ImGui::SetNextItemWidth(ControlW());
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
    inline bool SliderInt(const char* label, int* v, int lo, int hi, const char* fmt = "%d", ImGuiSliderFlags fl = 0)
    {
       Label(label);
-      ImGui::SetNextItemWidth(kSliderW);
+      ImGui::SetNextItemWidth(ControlW());
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 

@@ -73,5 +73,9 @@
  "history": 59719,
  "settings": 59720,
  "session": 59721,
- "waveform": 59722
+ "waveform": 59722,
+ "audition": 59723,
+ "erase": 59724,
+ "fold": 59725,
+ "follow": 59726
 }

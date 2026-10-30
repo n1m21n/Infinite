@@ -53,6 +53,8 @@ public:
    uint64_t scheduleKey = 0; // the publisher's change key for the current schedule
    // Main-thread readout of the playhead in timeline beats, -1 when stopped.
    double PlayheadBeats() const;
+   // Main thread: sounds a key now, transport or not (the panel's audition).
+   void Audition(int pitch, float velocity, bool on);
 
 private:
    void RetireSchedules();

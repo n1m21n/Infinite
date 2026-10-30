@@ -701,7 +701,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-344 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+346 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -1075,12 +1075,14 @@ R"AISKILL(| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
 | `Oscillator` | notes:note, fm_in:audio | out:audio | 22 | bypass |
 | `Partials` | notes:note | out:audio | 11 | bypass |
 | `PaulStretch` | record_in:audio | out:audio | 15 | bypass |
+| `Piano` | notes:note | out:audio | 10 | bypass |
 | `Sampler` | notes:note, record_in:audio | out:audio | 15 | bypass |
 | `Slicer` | notes:note, record_in:audio | out:audio | 13 | bypass |
 | `Spectral Synth` | image:image, note:note | out:audio | 33 | bypass |
-| `String` | notes:note | out:audio | 8 | bypass |
+| `String` | notes:note | out:audio | 12 | bypass |
 | `Wave Terrain` | texture:image, note:note | out:audio | 35 | bypass |
 | `Wavetable` | notes:note, fm_in:audio | out:audio | 73 | bypass |
+| `Wind` | notes:note | out:audio | 8 | bypass |
 
 ### Utility
 

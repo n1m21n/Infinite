@@ -376,6 +376,12 @@ namespace app
             gSampleStudioOpen = (val != "0");
          else if (key == "panelStudioH")
             gSampleStudioHeight = std::max(180.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelPianoRollOpen")
+            gPianoRollOpen = (val != "0");
+         else if (key == "panelPianoRollH")
+            gPianoRollHeight = std::max(240.0f, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelPianoRollDock")
+            gPianoRollDock = (val == "3") ? 3 : 0;
          else if (key == "panelStudioDock")
             gSampleStudioDock = (val == "3") ? 3 : 0;
       }
@@ -416,6 +422,9 @@ namespace app
       file << "panelStudioOpen=" << (gSampleStudioOpen ? 1 : 0) << "\n";
       file << "panelStudioH=" << gSampleStudioHeight << "\n";
       file << "panelStudioDock=" << gSampleStudioDock << "\n";
+      file << "panelPianoRollOpen=" << (gPianoRollOpen ? 1 : 0) << "\n";
+      file << "panelPianoRollH=" << gPianoRollHeight << "\n";
+      file << "panelPianoRollDock=" << gPianoRollDock << "\n";
    }
 
 
@@ -428,10 +437,11 @@ namespace app
       if (sTestRun)
          return;
       char buf[256];
-      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d|%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
-                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock, gSampleStudioDock,
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d%d|%d%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gPianoRollOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
+                    gSampleStudioDock, gPianoRollDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
-                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight);
+                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

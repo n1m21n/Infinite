@@ -5,6 +5,7 @@
 #include "app/AppShared.h"
 #include "core/ModShapes.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/StepCell.h"
 #include "audio/NoteTheory.h"
@@ -2050,6 +2051,9 @@ namespace app
          else
             AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, n->laneId == 0 ? "link a Piano Roll page" : "empty page");
          ImGui::Dummy(ImVec2(w, h));
+         // Double-click the preview: the panel, on this node's page.
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            PianoRollOpenPage(n->laneId);
       }
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f)); // the skeleton's gap under the visualizer
@@ -2070,6 +2074,8 @@ namespace app
          row.Skip();
          row.End();
       }
+      if (ChipButton::Draw("Open##pianoOpen", false, ChipButton::kHeight, gAudioBodyW))
+         PianoRollOpenPage(n->laneId);
 
       EndAudioBody();
    }

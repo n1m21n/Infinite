@@ -43,14 +43,14 @@ namespace
       const int freshIndex = fresh->index;
       const uint64_t freshUid = fresh->uid;
       const bool loop = mf->loop;
-      ArrangeEdit([&] {
-         const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneMidi);
-         for (Arrange::Lane& l : gArrange.lanes)
-            if (l.id == lane && !name.empty())
-               l.name = name;
-         Arrange::ImportSong(gArrange, lane, *song, 0, loop);
-         Arrange::LinkLane(gArrange, lane, freshUid);
-      });
+      // The patch checkpoint above covers the lane too: no second undo entry.
+      const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneMidi);
+      for (Arrange::Lane& l : gArrange.lanes)
+         if (l.id == lane && !name.empty())
+            l.name = name;
+      Arrange::ImportSong(gArrange, lane, *song, 0, loop);
+      Arrange::LinkLane(gArrange, lane, freshUid);
+      ArrangeCommitEdit();
       for (const Out& o : outs)
       {
          std::string err;
@@ -58,6 +58,7 @@ namespace
       }
       RemoveNodeByIndex(oldIndex);
       gPatchDirty = true;
+      PianoRollOpenPage(lane);
    }
 }
 

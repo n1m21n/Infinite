@@ -30,6 +30,15 @@ public:
       mLastTransport = -1.0;
    }
 
+   void PushAudition(int pitch, float velocity, bool on)
+   {
+      const uint32_t at = mAuditionWrite.load(std::memory_order_relaxed);
+      if (at - mAuditionRead.load(std::memory_order_acquire) >= kAuditionSlots)
+         return;
+      mAudition[at % kAuditionSlots] = AuditionEvent { (uint8_t)std::clamp(pitch, 0, 127), velocity, on };
+      mAuditionWrite.store(at + 1, std::memory_order_release);
+   }
+
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       mBlocks.fetch_add(1, std::memory_order_relaxed);
@@ -46,6 +55,8 @@ public:
             e.source = this;
             Emit(e);
          }
+
+      DrainAudition();
 
       const NoteSchedule* s = mSched.load(std::memory_order_acquire);
       const uint64_t gen = s ? s->gen : 0;
@@ -242,6 +253,30 @@ private:
       mHeldCount = 0;
    }
 
+   void DrainAudition()
+   {
+      const uint32_t end = mAuditionWrite.load(std::memory_order_acquire);
+      uint32_t at = mAuditionRead.load(std::memory_order_relaxed);
+      for (; at != end; at++)
+      {
+         const AuditionEvent a = mAudition[at % kAuditionSlots];
+         NoteEvent e;
+         e.note = a.pitch;
+         e.velocity = a.velocity;
+         e.isNoteOn = a.on;
+         e.source = this;
+         if (a.on)
+         {
+            e.voiceId = NextVoiceId();
+            mAuditionVoice[a.pitch] = e.voiceId;
+         }
+         else
+            e.voiceId = mAuditionVoice[a.pitch];
+         Emit(e);
+      }
+      mAuditionRead.store(at, std::memory_order_release);
+   }
+
    void Emit(const NoteEvent& e)
    {
       if (mOutCount < kMaxOut)
@@ -285,6 +320,19 @@ private:
    std::atomic<bool> mUseGlobalScale { false };
    std::atomic<bool> mThru { true };
    std::atomic<double> mPlayhead { -1.0 };
+
+   // The panel's audition, main thread to audio thread.
+   struct AuditionEvent
+   {
+      uint8_t pitch = 0;
+      float velocity = 0.0f;
+      bool on = false;
+   };
+   static constexpr uint32_t kAuditionSlots = 32;
+   AuditionEvent mAudition[kAuditionSlots];
+   std::atomic<uint32_t> mAuditionWrite { 0 };
+   std::atomic<uint32_t> mAuditionRead { 0 };
+   decltype(NoteEvent::voiceId) mAuditionVoice[128] = {};
 };
 
 PianoRollNode::PianoRollNode() = default;
@@ -326,6 +374,12 @@ void PianoRollNode::RetireSchedules()
    mSchedules.erase(std::remove_if(mSchedules.begin(), mSchedules.end() - 1,
                                    [&](const std::unique_ptr<NoteSchedule>& p) { return idle || p->gen < acked; }),
                     mSchedules.end() - 1);
+}
+
+void PianoRollNode::Audition(int pitch, float velocity, bool on)
+{
+   if (mAudioNode != nullptr)
+      mAudioNode->PushAudition(pitch, velocity, on);
 }
 
 double PianoRollNode::PlayheadBeats() const

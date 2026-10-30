@@ -93,13 +93,15 @@ class INode;
 //     name. Only written when the list is non-empty; a patch without it
 //     loads with nothing bypassed, i.e. exactly the behaviour that predates
 //     the field.
-//   streamnote <streamIndex> <noteNodeUid> <scaleSnap>
+//   streamnote <streamIndex> <noteNodeUid> <scaleSnap> [drumRows]
 //     MIDI lane (stream type 2): the Piano Roll node it is linked to. Only
 //     written for a MIDI stream with a link or scale snap on.
 //   clipmidi <streamIndex> <clipId> <nextNoteId> <contentOffset> <loop>
 //            <loopStart> <loopLength> <transpose> <velScale> <swing>
 //     A MIDI clip's content window and clip-wide note settings. Every MIDI
 //     clip gets one, so nextNoteId round-trips.
+//   gen <streamIndex> <clipId> <NoteGen::Serialize line>
+//   gentake <streamIndex> <clipId> pin=1 <NoteGen::Serialize line>  (pinned takes only)
 //   clipnote <streamIndex> <clipId> id=<n> s=<start> l=<length> p=<pitch> [v=] [r=]
 //        [c=] [m=1] [g=] [pan=] [bend=at:v,at:v...] [press=...] [timbre=...]
 //     One note, content ticks (docs/plans/piano-roll/README.md §5, §8).
@@ -442,6 +444,9 @@ namespace Patch
       int      transpose     = 0;
       float    velScale      = 1.0f;
       float    swing         = 0.0f;
+      float    chanceScale   = 1.0f;
+      std::string genSpec;
+      std::vector<Arrange::Clip::GenTake> takes;
    };
 
    // Session view row (Arrange::Scene), one `scene` line each, in order.
@@ -477,6 +482,7 @@ namespace Patch
       float rowHeight = 0.0f;   // 0 = default; new field, older patches load at the default height
       uint64_t noteNodeUid = 0; // MIDI only: the linked Piano Roll node (`streamnote`)
       bool  scaleSnap = false;  // MIDI only
+      bool  drumRows = false;   // MIDI only
       std::vector<ClipRecord> clips;
    };
 

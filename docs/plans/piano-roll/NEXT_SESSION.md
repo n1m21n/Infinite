@@ -68,3 +68,22 @@ panel in the app. Re-run `INFINITE_PIANOROLLTEST` and `INFINITE_NOTEGENTEST` aft
 Block C (`feature/piano-roll-c-integration`): MIDI tracks in the Timeline and columns in Session, per-note gain and pan,
 recording and retro capture, .mid export, ghost notes, select-by, generation types 9-12, Generate all parts, and Sample
 Studio's "Notes to Piano Roll".
+
+## State at last stop (2026-10-30)
+
+Block B steps 1-7 are committed on `feature/piano-roll-b-panel`. The dev build is OK and
+`INFINITE_PIANOROLLTEST` passes, including the step 7 cases (a note edit does not rebuild but reaches the
+node; undo and a clip move still rebuild) and the Generate save lines.
+
+Update 2026-10-30 (later): Generate is proved in the app. `INFINITE_PIANOROLL_GENSHOT="type=drums style=deep_house"` with
+`INFINITE_OPENPANELS=pianoroll` and `IMAGERESYNTH_SCREENSHOT` shoots it, checked for chords, drums, bass and arp in dark and
+Infinite Paper. The shots found and fixed three problems: the inspector overflowed (now `FormParts::Narrow`), the roll had
+about three rows at the default height (now 480 pt), and fresh takes landed off-view (rows now fit the notes until the user
+scrolls). PIANOROLLTEST, NOTEGENTEST, determinism, i18n, icon lint, contrast and the panel's ratchet row pass.
+Block B is merged into `main`.
+
+Still open: the owner's hands-on feedback, the panels, shortcuts and node-ui sweeps, and screenshots at 3 zoom levels.
+Main's ratchet already fails on SampleStudioPanel and SettingsWindow (not this branch).
+
+Differences from the spec to report: the card only covers GenSpec fields; the takes row sits above the
+ruler; `gentake` stores the full spec; other-page harmony is not in B.

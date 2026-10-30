@@ -1736,6 +1736,7 @@ namespace app
       }
 
       const uint64_t liveRevision = gArrange.revision;
+      const uint64_t liveMidiRevision = gArrange.midiRevision;
       const uint64_t liveNextId = gArrange.nextId;
       const Arrange::LoopRange liveLoop = gArrange.settings.loop;
       const ArrangeViewSettings liveView = ArrangeKeepViewSettings(gArrange);
@@ -1746,6 +1747,7 @@ namespace app
       // Restoring the snapshot is itself a change of what is on screen, and
       // revision must only climb (the audio rebuild keys on it).
       gArrange.revision = liveRevision + 1;
+      gArrange.midiRevision = liveMidiRevision;
 
       switch (d.mode)
       {

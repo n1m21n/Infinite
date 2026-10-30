@@ -5735,6 +5735,16 @@ void SampleStudioApply(const std::string& text);
 extern bool gSampleStudioClaimedKeys;
 // The Studio's screen rect last frame, so a file dropped on it isn't also dropped on the canvas.
 extern ImVec2 gSampleStudioRectMin, gSampleStudioRectMax;
+// Piano Roll (Shift+R, docs/plans/piano-roll/README.md §9): one page per MIDI lane, docked bottom or top.
+extern bool gPianoRollOpen;
+extern float gPianoRollHeight;
+extern int gPianoRollDock; // 0 = bottom, 3 = top (the Timeline's codes)
+void DrawPianoRollDocked(const char* id, const ImVec2& size);
+// Opens the panel on this MIDI lane's page.
+void PianoRollOpenPage(uint64_t laneId);
+// True while the pointer is over the panel: its keys beat the canvas's (the Timeline's rule).
+extern bool gPianoRollClaimedKeys;
+extern ImVec2 gPianoRollRectMin, gPianoRollRectMax;
 // This frame's trackpad pinch (Platform::PollTrackpadMagnificationDelta), read once per frame so the Timeline and
 // the Studio both see it; each acts on it only while the pointer is over it.
 double TrackpadPinchThisFrame();
