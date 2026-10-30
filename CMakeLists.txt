@@ -524,6 +524,8 @@ set(COMMON_SOURCES
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
+    src/app/panels/TerminalPanel.cpp
+    src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
@@ -639,6 +641,10 @@ set(COMMON_SOURCES
     src/arrange/MidiImport.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
+    src/core/InfiniteCli.cpp
+    src/app/graph/RpcTerminal.cpp
+    src/app/graph/RpcApp.cpp
+    src/app/graph/RpcTimeline.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/OscControl.cpp
@@ -1040,6 +1046,40 @@ endif()
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
+# Terminal (docs/plans/terminal/README.md). libvterm is vendored as plain source
+# behind src/core/term/VtEngine.h; see external/libvterm/VENDORED_COMMIT.txt.
+add_library(vterm_lib STATIC
+    external/libvterm/src/encoding.c
+    external/libvterm/src/keyboard.c
+    external/libvterm/src/mouse.c
+    external/libvterm/src/parser.c
+    external/libvterm/src/pen.c
+    external/libvterm/src/screen.c
+    external/libvterm/src/state.c
+    external/libvterm/src/unicode.c
+    external/libvterm/src/vterm.c
+)
+target_include_directories(vterm_lib PUBLIC external/libvterm/include)
+set_target_properties(vterm_lib PROPERTIES C_STANDARD 99 C_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(vterm_lib PRIVATE /utf-8 /wd4100 /wd4244 /wd4267)
+endif()
+
+set(TERMINAL_CORE_SOURCES src/core/term/VtEngine.cpp src/core/term/TermSession.cpp)
+if(WIN32)
+    list(APPEND TERMINAL_CORE_SOURCES src/core/term/PtyHostWin.cpp)
+else()
+    list(APPEND TERMINAL_CORE_SOURCES src/core/term/PtyHostPosix.cpp)
+endif()
+
+# Headless checks for the terminal core.
+find_package(Threads REQUIRED)
+add_executable(terminal-check src/core/term/TerminalCheck.cpp ${TERMINAL_CORE_SOURCES})
+target_link_libraries(terminal-check PRIVATE vterm_lib Threads::Threads)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(terminal-check PRIVATE util)
+endif()
+
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch3d-check PRIVATE src/core/sketch src/core)
 target_link_libraries(sketch3d-check PRIVATE sketch_deps lunasvg_lib)
@@ -1208,7 +1248,11 @@ target_include_directories(Infinite PRIVATE
     src/platform/ndi
 )
 
-target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib)
+target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
+target_sources(Infinite PRIVATE ${TERMINAL_CORE_SOURCES})
+if(UNIX AND NOT APPLE)
+    target_link_libraries(Infinite PRIVATE util)
+endif()
 
 if(WIN32)
     # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its
@@ -1381,6 +1425,8 @@ if(WIN32)
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
                 ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
@@ -1443,6 +1489,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
                 ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
@@ -1763,6 +1811,8 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES

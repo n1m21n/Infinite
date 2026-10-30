@@ -1201,6 +1201,27 @@ namespace app
       ArrangeSessionApplyMenuAction();
    }
 
+   // The Scene menu and the empty cell's Add Clip, for the terminal.
+   bool ArrangeSessionSceneAction(const std::string& action, int row)
+   {
+      if (row < 0 || (action != "insert" && row >= (int)gArrange.scenes.size()))
+         return false;
+      if (action == "insert")
+         InsertSceneAt(row);
+      else if (action == "duplicatescene")
+         DuplicateScene(row);
+      else
+         DeleteScene(row);
+      return true;
+   }
+
+   uint64_t ArrangeSessionAddSlotClip(uint64_t laneId, int row)
+   {
+      AddSlotClip(laneId, row);
+      const Arrange::Lane* lane = Arrange::FindLane(gArrange, laneId);
+      return lane != nullptr && row >= 0 && row < (int)lane->slots.size() ? lane->slots[(size_t)row].clip.id : 0;
+   }
+
    // Moves a slot (clip and launch settings) to another cell of a same-type track, replacing what is there;
    // `copy` leaves the original in place. False when the move cannot land.
    bool ArrangeSessionMoveSlot(uint64_t srcLaneId, int srcRow, uint64_t dstLaneId, int dstRow, bool copy)

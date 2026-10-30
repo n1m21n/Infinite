@@ -114,6 +114,7 @@ int DrawFloating(FrameCtx& fc)
             sDlg = nullptr;
          }
       }
+      DrawTerminalQuitWarning();
       if (gShowUnsavedChangesModal)
       {
          ImGui::OpenPopup(L("Unsaved Changes"));
@@ -414,11 +415,14 @@ int DrawFloating(FrameCtx& fc)
                   GLFWwindow* window = fc.window;
                   GuardUnsavedChanges([window]()
                   {
-                     std::string error;
-                     if (SelfUpdate::LaunchHelper(true, error))
-                        glfwSetWindowShouldClose(window, GLFW_TRUE);
-                     else
-                        Notices::Post(Notices::Level::Warning, "update", "Could not update", error);
+                     TerminalGuardQuit([window]()
+                     {
+                        std::string error;
+                        if (SelfUpdate::LaunchHelper(true, error))
+                           glfwSetWindowShouldClose(window, GLFW_TRUE);
+                        else
+                           Notices::Post(Notices::Level::Warning, "update", "Could not update", error);
+                     });
                   });
                }
                if (pick >= 0)

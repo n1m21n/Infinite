@@ -28,9 +28,15 @@ namespace RemoteControl
 
    // Starts the accept thread bound to 127.0.0.1:port. Writes a random auth
    // token to ~/Library/Application Support/Infinite/control_token (creating
-   // the directory if needed). Safe to call once at startup; no-op if a
-   // server is already running.
+   // the directory if needed). When the port is taken, as by a second running
+   // app, it takes the next free one and leaves the token file alone. Safe to
+   // call once at startup; no-op if a server is already running.
    void Start(int port);
+
+   // The port actually bound (0 = no server) and this app's token, for the
+   // sessions of its Terminal panel.
+   int Port();
+   const std::string& Token();
 
    // Runs `handler` for every request received since the last call, in
    // receipt order, on the calling (main) thread. Must be called every frame.

@@ -621,16 +621,19 @@ void DrawFramePump(FrameCtx& fc)
          const bool navPanel = navCtx.NavWindow != nullptr && navCtx.NavWindow->RootWindow != nullptr &&
                                std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0 &&
                                !(navCtx.NavWindow->RootWindow->Flags & ImGuiWindowFlags_NoNav);   // the panel rail is a NoNav strip, not a panel
-         const bool navOn = navPopup || navPanel;
+         const bool navOn = (navPopup || navPanel) && !gTerminalFocus;   // the shell gets Tab, arrows and Escape
          ImGuiIO& nio = ImGui::GetIO();
          if (navOn) nio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
          else nio.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
          gNavOwnsKeys = navOn && nio.NavVisible;
          // With no active node and no popup/panel owning the keys, Tab does nothing: it must not wander through params.
-         if (gKbOwnTab || (!navOn && !nio.WantTextInput))
+         if (gKbOwnTab || gTerminalFocus || (!navOn && !nio.WantTextInput))
             ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       }
       ImGui::NewFrame();
+      // The shell's keys are text to every canvas and panel shortcut. Set here: EndFrame overwrites WantTextInputNextFrame.
+      if (gTerminalFocus)
+         ImGui::GetIO().WantTextInput = true;
       // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          ImGui::GetCurrentContext()->NavCursorVisible = false;

@@ -1840,6 +1840,7 @@ void NoteHiddenParamAlias(int nodeIndex, int hiddenParam, int shownParam);
 extern std::map<int, int> gPinAlias;
 
 extern bool gParamRegisterOnly;
+extern int gParamProbeNode; // this node registers its controls next frame though its eye is closed
 
 extern std::vector<int> gPendingSelect;
 
@@ -5738,6 +5739,26 @@ extern ImVec2 gSampleStudioRectMin, gSampleStudioRectMax;
 // A Library sample released over the Studio; the panel loads it next frame.
 extern std::string gSampleStudioPendingDrop;
 // Piano Roll (Shift+R, docs/plans/piano-roll/README.md §9): one page per MIDI lane, docked bottom or top.
+extern bool gTerminalOpen;
+extern float gTerminalHeight;
+extern float gTerminalWidth;
+extern int gTerminalDock; // 0 bottom, 1 right, 2 left, 3 top
+extern float gTerminalFontSize;
+extern bool gTerminalFocus; // the terminal has the keyboard
+extern ImVec2 gTerminalRectMin, gTerminalRectMax;
+extern std::vector<std::string> gTerminalDropPending; // paths dropped on the panel, pasted as shell words
+void TerminalLoadFonts(float bakedPx);
+void DrawTerminalDocked(const char* id, const ImVec2& size);
+void TerminalPanelHidden();
+void TerminalToggleShortcut();
+int TerminalBusyCount();
+void TerminalGuardQuit(std::function<void()> action);
+void DrawTerminalQuitWarning();
+void TerminalShutdown();
+// The verbs behind the `infinite` command (graph/RpcTerminal.cpp, Terminal*Rpc in TerminalPanel.cpp).
+// True when the method was theirs; outError set means it failed.
+bool HandleTerminalRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
+bool HandleTerminalSessionRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
 extern bool gPianoRollOpen;
 extern float gPianoRollHeight;
 extern int gPianoRollDock; // 0 = bottom, 3 = top (the Timeline's codes)

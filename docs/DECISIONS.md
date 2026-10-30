@@ -4,6 +4,7 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-10-30 Owner: the Terminal is approved: a real terminal in the right rail, an `infinite` command with full parity (every panel, command and setting gets a verb), expert `code` tools for Field, Sketch, Sketch 3D, GLSL and formulas, and patch generation from the terminal. Coding agents are the user's own; none ships with Infinite. Plan: `docs/plans/terminal/README.md`.
 - 2026-10-30 Owner: the Generate Samples project is reopened; the 2026-10-30 close doc closed only the fix pass after the 2/10 review. Work list and order: `docs/plans/data-universe/PLAN-2026-10-30.md`.
 - 2026-10-30 Owner: acoustic instruments go to execution (research done, `docs/prior-art/physical-models-2026-10-29.md`): String gets a fitted body table, pick filter and bow controls; a new Piano node and a new Wind node (reed / jet / lip) are approved. STK's patent notice is accepted (as recorded in IMPROVEMENT-PLAN §9). Each instrument joins the generator only after it passes its family test.
 - 2026-10-30 Owner: the dots feature is abandoned. No more work wiring dots to learned models (IMPROVEMENT-PLAN §10 is dropped).

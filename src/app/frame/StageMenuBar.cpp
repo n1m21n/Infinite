@@ -47,6 +47,12 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
+   if (PanelRail::Item("##railTerminal", top + 8.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
+   {
+      gTerminalOpen = !gTerminalOpen;
+      gTerminalFocus = gTerminalOpen;
+   }
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -284,182 +290,210 @@ void DrawMenuBar(FrameCtx& fc)
 
             MenuParts::Separator();
 
-            if (MenuParts::SubMenu(L("Viewport panel")))
+            if (MenuParts::SubMenu(L("Panels")))
             {
-               MenuParts::Check(L("Show viewport panel"), &gViewportPanelOpen);
-               if (gViewportPanelOpen)
+               if (MenuParts::SubMenu(L("Viewport panel")))
                {
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle(); ViewportPanelDockCombo(); FieldWell::PopStyle();
-                  ImGui::SetNextItemWidth(150);
-                  if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
+                  MenuParts::Check(L("Show viewport panel"), &gViewportPanelOpen);
+                  if (gViewportPanelOpen)
                   {
-                     FieldWell::Slider(L("Width"), &gViewportPanelWidth,
-                                        kViewportPanelMinWidth, 900.0f, "%.0f px");
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle(); ViewportPanelDockCombo(); FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
+                     {
+                        FieldWell::Slider(L("Width"), &gViewportPanelWidth,
+                                           kViewportPanelMinWidth, 900.0f, "%.0f px");
+                     }
+                     else
+                     {
+                        FieldWell::Slider(L("Height"), &gViewportPanelHeight,
+                                           kViewportPanelMinHeight, 800.0f, "%.0f px");
+                     }
+                     MenuParts::Separator();
+                     if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
+                        gViewportPanelNodes.clear();
+                     if (MenuParts::Item(L("Close viewport panel")))
+                        gViewportPanelOpen = false;
                   }
-                  else
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Modulation matrix")))
+               {
+                  // Plain themed widgets, same as "Viewport panel" above - this
+                  // is menu chrome, not a node body, so it takes the app's own
+                  // checkbox/slider colours (ApplyTheme) rather than the P10
+                  // dark-contrast-budget style meant for controls inside a node.
+                  // The two styles side by side in one menu (one purple/clean,
+                  // one flat blue) is what read as inconsistent.
+                  MenuParts::Check(L("Show modulation matrix"), &gModMatrixOpen);
+                  if (gModMatrixOpen)
                   {
-                     FieldWell::Slider(L("Height"), &gViewportPanelHeight,
-                                        kViewportPanelMinHeight, 800.0f, "%.0f px");
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle(); ModMatrixDockCombo(); FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gModMatrixDock == 1 || gModMatrixDock == 2)
+                     {
+                        FieldWell::Slider(L("Width"), &gModMatrixWidth,
+                                           kModMatrixMinWidth, 900.0f, "%.0f px");
+                     }
+                     else
+                     {
+                        FieldWell::Slider(L("Height"), &gModMatrixHeight,
+                                           kModMatrixMinHeight, 800.0f, "%.0f px");
+                     }
                   }
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Performance Matrix")))
+               {
+                  // Same reasoning as "Modulation matrix" above: plain themed
+                  // widgets, not the node-body P10 style.
+                  MenuParts::Check(L("Show Performance Matrix"), &gPerfPanelOpen);
+                  if (gPerfPanelOpen)
+                  {
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle(); PerfPanelDockCombo(); FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
+                     {
+                        FieldWell::Slider(L("Width"), &gPerfPanelWidth,
+                                           kPerfPanelMinWidth, 900.0f, "%.0f px");
+                     }
+                     else
+                     {
+                        FieldWell::Slider(L("Height"), &gPerfPanelHeight,
+                                           kPerfPanelMinHeight, 800.0f, "%.0f px");
+                     }
+                     MenuParts::Check(L("Edit Mode"), &gPerfEditMode);
+                  }
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Arrangement Timeline")))
+               {
+                  MenuParts::Check(L("Show Arrangement Timeline"), &gArrangePanelOpen);
+                  if (gArrangePanelOpen)
+                  {
+                     // Bottom or top only - a timeline reads left-to-right, so a
+                     // side dock would fight the ruler's own horizontal axis.
+                     // Saved with the document (Settings.dockSide); not undoable.
+                     int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                     bool dockChanged = false;
+                     if (MenuParts::BeginCombo("##arrdock", T(kDockNames[dockSide])))
+                     {
+                        for (int i = 0; i < 2; ++i)
+                           if (MenuParts::Choice(L(kDockNames[i]), i == dockSide))
+                           {
+                              dockSide = i;
+                              dockChanged = true;
+                           }
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     if (dockChanged && dockSide != gArrange.settings.dockSide)
+                     {
+                        gArrange.settings.dockSide = dockSide;
+                        gArrange.revision++; // a model field like any other (WP5b)
+                        gPatchDirty = true;
+                     }
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &gArrangePanelHeight,
+                                        kArrangePanelMinHeight, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Session")))
+               {
+                  MenuParts::Check(L("Show Session"), &gSessionPanelOpen);
+                  if (gSessionPanelOpen)
+                  {
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+
+               // Sample Studio and Piano Roll dock at the bottom or the top, like the Timeline.
+               auto dockedPanelMenu = [](const char* name, const char* show, bool& open, int& dock, float& height, const char* dockId) {
+                  if (!MenuParts::SubMenu(name))
+                     return;
+                  MenuParts::Check(show, &open);
+                  if (open)
+                  {
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                     int side = dock == 3 ? 1 : 0;
+                     if (MenuParts::BeginCombo(dockId, T(kDockNames[side])))
+                     {
+                        for (int i = 0; i < 2; ++i)
+                           if (MenuParts::Choice(L(kDockNames[i]), i == side))
+                              dock = i == 1 ? 3 : 0;
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::Slider(L("Height"), &height, 200.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               };
+               dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
+               dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
+               if (MenuParts::SubMenu(L("Terminal")))
+               {
+                  MenuParts::Check(L("Show Terminal"), &gTerminalOpen);
+                  if (gTerminalOpen)
+                  {
+                     static const char* kTerminalDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+                     ImGui::SetNextItemWidth(150);
+                     FieldWell::PushStyle();
+                     if (MenuParts::BeginCombo("##terminaldock", T(kTerminalDocks[gTerminalDock])))
+                     {
+                        for (int i = 0; i < 4; ++i)
+                           if (MenuParts::Choice(L(kTerminalDocks[i]), i == gTerminalDock))
+                              gTerminalDock = i;
+                        MenuParts::EndCombo();
+                     }
+                     FieldWell::PopStyle();
+                     ImGui::SetNextItemWidth(150);
+                     if (gTerminalDock == 1 || gTerminalDock == 2)
+                        FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
+                     else
+                        FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+                  }
+                  ImGui::EndMenu();
+               }
+
+               if (MenuParts::SubMenu(L("Show Set")))
+               {
+                  MenuParts::Check(L("Show Set window"), &gShowSetOpen);
+                  if (MenuParts::Item(L("Next patch"), "PgDn", false, ShowSetSize() > 0))
+                     ShowSetStep(+1);
+                  if (MenuParts::Item(L("Previous patch"), "PgUp", false, ShowSetSize() > 0))
+                     ShowSetStep(-1);
                   MenuParts::Separator();
-                  if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
-                     gViewportPanelNodes.clear();
-                  if (MenuParts::Item(L("Close viewport panel")))
-                     gViewportPanelOpen = false;
-               }
-               ImGui::EndMenu();
-            }
-
-            if (MenuParts::SubMenu(L("Modulation matrix")))
-            {
-               // Plain themed widgets, same as "Viewport panel" above - this
-               // is menu chrome, not a node body, so it takes the app's own
-               // checkbox/slider colours (ApplyTheme) rather than the P10
-               // dark-contrast-budget style meant for controls inside a node.
-               // The two styles side by side in one menu (one purple/clean,
-               // one flat blue) is what read as inconsistent.
-               MenuParts::Check(L("Show modulation matrix"), &gModMatrixOpen);
-               if (gModMatrixOpen)
-               {
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle(); ModMatrixDockCombo(); FieldWell::PopStyle();
-                  ImGui::SetNextItemWidth(150);
-                  if (gModMatrixDock == 1 || gModMatrixDock == 2)
+                  if (MenuParts::Item(L("Show lock"), MODKEY "+Shift+L", gShowLock))
+                     ShowLockToggle();
+                  if (ShowPanicLatched())
                   {
-                     FieldWell::Slider(L("Width"), &gModMatrixWidth,
-                                        kModMatrixMinWidth, 900.0f, "%.0f px");
+                     if (MenuParts::Item(L("Resume after panic"), MODKEY "+.", true))
+                        ShowPanicToggle();
                   }
-                  else
-                  {
-                     FieldWell::Slider(L("Height"), &gModMatrixHeight,
-                                        kModMatrixMinHeight, 800.0f, "%.0f px");
-                  }
-               }
-               ImGui::EndMenu();
-            }
-
-            if (MenuParts::SubMenu(L("Performance Matrix")))
-            {
-               // Same reasoning as "Modulation matrix" above: plain themed
-               // widgets, not the node-body P10 style.
-               MenuParts::Check(L("Show Performance Matrix"), &gPerfPanelOpen);
-               if (gPerfPanelOpen)
-               {
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle(); PerfPanelDockCombo(); FieldWell::PopStyle();
-                  ImGui::SetNextItemWidth(150);
-                  if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
-                  {
-                     FieldWell::Slider(L("Width"), &gPerfPanelWidth,
-                                        kPerfPanelMinWidth, 900.0f, "%.0f px");
-                  }
-                  else
-                  {
-                     FieldWell::Slider(L("Height"), &gPerfPanelHeight,
-                                        kPerfPanelMinHeight, 800.0f, "%.0f px");
-                  }
-                  MenuParts::Check(L("Edit Mode"), &gPerfEditMode);
-               }
-               ImGui::EndMenu();
-            }
-
-            if (MenuParts::SubMenu(L("Arrangement Timeline")))
-            {
-               MenuParts::Check(L("Show Arrangement Timeline"), &gArrangePanelOpen);
-               if (gArrangePanelOpen)
-               {
-                  // Bottom or top only - a timeline reads left-to-right, so a
-                  // side dock would fight the ruler's own horizontal axis.
-                  // Saved with the document (Settings.dockSide); not undoable.
-                  int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle();
-                  static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
-                  bool dockChanged = false;
-                  if (MenuParts::BeginCombo("##arrdock", T(kDockNames[dockSide])))
-                  {
-                     for (int i = 0; i < 2; ++i)
-                        if (MenuParts::Choice(L(kDockNames[i]), i == dockSide))
-                        {
-                           dockSide = i;
-                           dockChanged = true;
-                        }
-                     MenuParts::EndCombo();
-                  }
-                  FieldWell::PopStyle();
-                  if (dockChanged && dockSide != gArrange.settings.dockSide)
-                  {
-                     gArrange.settings.dockSide = dockSide;
-                     gArrange.revision++; // a model field like any other (WP5b)
-                     gPatchDirty = true;
-                  }
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::Slider(L("Height"), &gArrangePanelHeight,
-                                     kArrangePanelMinHeight, 800.0f, "%.0f px");
-               }
-               ImGui::EndMenu();
-            }
-
-            if (MenuParts::SubMenu(L("Session")))
-            {
-               MenuParts::Check(L("Show Session"), &gSessionPanelOpen);
-               if (gSessionPanelOpen)
-               {
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, 800.0f, "%.0f px");
-               }
-               ImGui::EndMenu();
-            }
-
-            // Sample Studio and Piano Roll dock at the bottom or the top, like the Timeline.
-            auto dockedPanelMenu = [](const char* name, const char* show, bool& open, int& dock, float& height, const char* dockId) {
-               if (!MenuParts::SubMenu(name))
-                  return;
-               MenuParts::Check(show, &open);
-               if (open)
-               {
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle();
-                  static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
-                  int side = dock == 3 ? 1 : 0;
-                  if (MenuParts::BeginCombo(dockId, T(kDockNames[side])))
-                  {
-                     for (int i = 0; i < 2; ++i)
-                        if (MenuParts::Choice(L(kDockNames[i]), i == side))
-                           dock = i == 1 ? 3 : 0;
-                     MenuParts::EndCombo();
-                  }
-                  FieldWell::PopStyle();
-                  ImGui::SetNextItemWidth(150);
-                  FieldWell::Slider(L("Height"), &height, 200.0f, 800.0f, "%.0f px");
-               }
-               ImGui::EndMenu();
-            };
-            dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
-            dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
-
-            if (MenuParts::SubMenu(L("Show Set")))
-            {
-               MenuParts::Check(L("Show Set window"), &gShowSetOpen);
-               if (MenuParts::Item(L("Next patch"), "PgDn", false, ShowSetSize() > 0))
-                  ShowSetStep(+1);
-               if (MenuParts::Item(L("Previous patch"), "PgUp", false, ShowSetSize() > 0))
-                  ShowSetStep(-1);
-               MenuParts::Separator();
-               if (MenuParts::Item(L("Show lock"), MODKEY "+Shift+L", gShowLock))
-                  ShowLockToggle();
-               if (ShowPanicLatched())
-               {
-                  if (MenuParts::Item(L("Resume after panic"), MODKEY "+.", true))
+                  else if (MenuParts::Item(L("Panic"), MODKEY "+."))
                      ShowPanicToggle();
-               }
-               else if (MenuParts::Item(L("Panic"), MODKEY "+."))
-                  ShowPanicToggle();
-               if (MenuParts::Item(L("Pre-show check")))
-                  {
-                  gShowSetOpen = true;
-                  gShowCheckRequest = true;
+                  if (MenuParts::Item(L("Pre-show check")))
+                     {
+                     gShowSetOpen = true;
+                     gShowCheckRequest = true;
+                  }
+                  ImGui::EndMenu();
                }
                ImGui::EndMenu();
             }

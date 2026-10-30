@@ -839,7 +839,7 @@ void DrawNodeBodies(FrameCtx& fc)
          // the params body does around them. Gated on there being a binding at
          // all so the common collapsed node costs exactly what it did before.
          const bool registerOnlyParams = !isAudioBody && !isComment && !paramsOpen &&
-                                         (gn.IsParamDriven() || gHeadlessProbeAll);
+                                         (gn.IsParamDriven() || gHeadlessProbeAll || gn.index == gParamProbeNode);
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
          const bool savedSkipItems = paramsWindow->SkipItems;
          if (registerOnlyParams)

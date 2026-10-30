@@ -647,6 +647,7 @@ namespace app
          { I18N_KEY("Transport & Audio"), I18N_KEY("Play Notes"), "Z X C V / Q W E R", I18N_KEY("With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing") },
          { I18N_KEY("Transport & Audio"), I18N_KEY("Keyboard Octave"), "- / =", I18N_KEY("Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)") },
 
+         { I18N_KEY("Canvas & View"), I18N_KEY("Terminal"), "Ctrl+`", I18N_KEY("Open the Terminal, move the keyboard to it, or close it") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Ruler"), "Click / Shift+drag", I18N_KEY("The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Generate Range"), "Alt+drag", I18N_KEY("Drag on the ruler with Alt held to mark the range Generate fills") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },

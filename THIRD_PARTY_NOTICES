@@ -152,6 +152,20 @@ paths) and the nodes say so when it is missing. NDI is named only to identify
 compatibility with NDI products; Infinite is not a product of, or sponsored
 by, NDI. Get the runtime and NDI Tools from https://ndi.video/tools/.
 
+libvterm (all platforms)
+------------------------
+
+The Terminal panel's screen model (`external/libvterm/`, neovim/libvterm).
+Copyright (c) 2008 Paul Evans. MIT licence; full text in
+`external/libvterm/LICENSE`.
+
+Geist Mono (all platforms)
+--------------------------
+
+The Terminal panel's font (`external/fonts/GeistMono/`). Copyright 2024 The
+Geist Project Authors. Licensed under the SIL Open Font License 1.1; full text
+in `external/fonts/GeistMono/OFL.txt`.
+
 Noto Sans SC / Noto Sans JP (all platforms)
 -------------------------------------------
 

@@ -280,6 +280,12 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
+      if (gTerminalOpen && (gTerminalDock == 0 || gTerminalDock == 3))
+      {
+         gTerminalHeight = std::clamp(gTerminalHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
+         topBottom += gTerminalHeight;
+         topBottomRows++;
+      }
       // No ItemSpacing term: every docked panel is laid out flush (its
       // Draw*Docked zeroes the spacing around its own outer child, and the
       // SameLine chaining below passes an explicit 0 gap), so reserving a
@@ -307,6 +313,8 @@ void DrawLayout(FrameCtx& fc)
          DrawSampleStudioDocked("##samplestudio_top", ImVec2(0, gSampleStudioHeight));
       if (gPianoRollOpen && gPianoRollDock == 3)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
+      if (gTerminalOpen && gTerminalDock == 3)
+         DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
@@ -325,6 +333,13 @@ void DrawLayout(FrameCtx& fc)
       if (arrangeLeft)
       {
          DrawArrangePanelDocked("##arrangepanel_left", ImVec2(gArrangePanelWidth, graphHeight));
+         ImGui::SameLine(0.0f, 0.0f);
+      }
+      if (gTerminalOpen && (gTerminalDock == 1 || gTerminalDock == 2))
+         gTerminalWidth = std::clamp(gTerminalWidth, 280.0f, std::max(280.0f, ImGui::GetContentRegionAvail().x - 300.0f));
+      if (gTerminalOpen && gTerminalDock == 2)
+      {
+         DrawTerminalDocked("##terminal_left", ImVec2(gTerminalWidth, graphHeight));
          ImGui::SameLine(0.0f, 0.0f);
       }
 
@@ -367,6 +382,7 @@ void DrawLayout(FrameCtx& fc)
       if (matrixRight) rightReserved += gModMatrixWidth;
       if (perfRight) rightReserved += gPerfPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
+      if (gTerminalOpen && gTerminalDock == 1) rightReserved += gTerminalWidth;
       if (gHistoryOpen)
       {
          gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));
@@ -445,5 +461,14 @@ void DrawLayout(FrameCtx& fc)
                                (gSampleStudioOpen && gDropPos.x >= gSampleStudioRectMin.x && gDropPos.x < gSampleStudioRectMax.x &&
                                 gDropPos.y >= gSampleStudioRectMin.y && gDropPos.y < gSampleStudioRectMax.y) ||
                                (gPianoRollOpen && gDropPos.x >= gPianoRollRectMin.x && gDropPos.x < gPianoRollRectMax.x &&
-                                gDropPos.y >= gPianoRollRectMin.y && gDropPos.y < gPianoRollRectMax.y);}
+                                gDropPos.y >= gPianoRollRectMin.y && gDropPos.y < gPianoRollRectMax.y) ||
+                               (gTerminalOpen && gDropPos.x >= gTerminalRectMin.x && gDropPos.x < gTerminalRectMax.x &&
+                                gDropPos.y >= gTerminalRectMin.y && gDropPos.y < gTerminalRectMax.y);
+      // Files dropped on the Terminal become shell words at its prompt.
+      if (!gDroppedFiles.empty() && gTerminalOpen && gDropPos.x >= gTerminalRectMin.x && gDropPos.x < gTerminalRectMax.x &&
+          gDropPos.y >= gTerminalRectMin.y && gDropPos.y < gTerminalRectMax.y)
+      {
+         gTerminalDropPending = gDroppedFiles;
+         gDroppedFiles.clear();
+      }}
 }

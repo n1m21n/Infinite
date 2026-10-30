@@ -4,6 +4,9 @@
 #include "app/frame/FrameTests.h"
 #include "core/SelfUpdate.h"
 #include "core/CoverageFlush.h"
+#include "core/InfiniteCli.h"
+
+#include <cstring>
 
 namespace app
 {
@@ -29,6 +32,9 @@ int main(int argc, char** argv)
       argv = utf8Argv.data();
    }
 #endif
+   // The Terminal's `infinite` command: answers before any window or GPU work.
+   if (argc >= 2 && std::strcmp(argv[1], "--cli") == 0)
+      return InfiniteCli::Run(argc - 2, argv + 2);
    FrameCtx fc;
    {
       const int rc = InitApp(fc, argc, argv);
@@ -105,6 +111,8 @@ int main(int argc, char** argv)
       if (PredictiveRhythmStyle::HasLearnedData())
          PredictiveRhythmStyle::Save(AppPaths::AppSupportDir() + "/prediction");
    }
+   SetQuitStep("terminal");
+   TerminalShutdown();
    SetQuitStep("close output windows");
    CloseAllProjectorWindows();
    Platform::StopDisplayRefreshClock();

@@ -181,6 +181,15 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
          gSampleStudioOpen = !gSampleStudioOpen;
 
+      // Ctrl+` opens the Terminal, moves the keyboard to it, or closes it; physical Ctrl on every OS.
+#if defined(__APPLE__)
+      const bool terminalChord = io.KeySuper && !io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
+#else
+      const bool terminalChord = io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
+#endif
+      if (terminalChord && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+         TerminalToggleShortcut();
+
       // Shift+R: the docked Piano Roll
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_R, false))
          gPianoRollOpen = !gPianoRollOpen;

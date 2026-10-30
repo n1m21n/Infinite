@@ -192,6 +192,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
          }
       }
    }
+   TerminalLoadFonts(bakedPx);
 }
 
 int InitApp(FrameCtx& fc, int argc, char** argv)
@@ -350,6 +351,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          Platform::AppendLogLine("plugin crash: the last run ended inside " + crashed + "; it will not load in process again");
    }
 
+   if (getenv("INFINITE_TERMINALTEST") != nullptr)
+      gTerminalOpen = true;
    if (getenv("INFINITE_CRASHTEST") != nullptr)
    {
       SysInfo::CrashTest();
@@ -4236,6 +4239,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gHistoryOpen = o.find("history") != std::string::npos;
       gSampleStudioOpen = o.find("studio") != std::string::npos;
       gPianoRollOpen = o.find("pianoroll") != std::string::npos;
+      gTerminalOpen = o.find("terminal") != std::string::npos;
       // "historydemo": a few named edits so the History panel has rows for a review shot.
       if (o.find("historydemo") != std::string::npos)
          for (const char* l : {"Add Shape", "Move node", "Connect cable", "amount 0.20 \xE2\x86\x92 0.55", "Bypass"})

@@ -32,7 +32,9 @@ namespace app
       {
          return m == "delete_node" || m == "connect" || m == "disconnect" || m == "set_node_position" ||
                 m == "auto_wire_inputs" || m == "undo" || m == "redo" ||
-                m == "load_patch" || m == "load_patch_text" || m == "new_patch";
+                m == "load_patch" || m == "load_patch_text" || m == "new_patch" ||
+                m == "bind_mod" || m == "unbind_mod" || m == "set_expr" || m == "set_bypass" ||
+                m == "edit" || m == "spawn";
       };
       bool movesGraph = MovesTheGraph(method);
       if (method == "batch" && params.contains("calls") && params["calls"].is_array())
@@ -939,6 +941,9 @@ namespace app
             outResult["warning"] = "W_BLACK_FRAME: the frame is entirely black";
          return true;
       }
+
+      if (HandleTerminalRpc(method, params, outResult, outError))
+         return outError.empty();
 
       outError = "unknown method '" + method + "'";
       return false;

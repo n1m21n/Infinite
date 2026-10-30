@@ -3461,6 +3461,42 @@ namespace
    }
 }
 
+// The Fx menu, for the terminal: on the selected notes of the page shown, or all of the track's.
+bool PianoRollTransform(uint64_t laneId, const std::string& name)
+{
+   const Arrange::Lane* page = Arrange::FindLane(gArrange, laneId);
+   if (page == nullptr)
+      return false;
+   if (S().lane != laneId)
+   {
+      S().notes.clear();
+      S().clips.clear();
+   }
+   if (name == "legato")
+      TransformNotes(*page, Legato);
+   else if (name == "humanize")
+      TransformNotes(*page, Humanize);
+   else if (name == "reverse")
+      TransformNotes(*page, Reverse);
+   else if (name == "invert")
+      TransformNotes(*page, Invert);
+   else if (name == "double")
+      TransformNotes(*page, [](std::vector<Arrange::Note>& n) { Stretch(n, 0.5); });
+   else if (name == "half")
+      TransformNotes(*page, [](std::vector<Arrange::Note>& n) { Stretch(n, 2.0); });
+   else if (name == "strum")
+      TransformNotes(*page, Strum);
+   else if (name == "chop")
+      ChopToGrid(*page);
+   else if (name == "ramp")
+      TransformNotes(*page, VelocityRamp);
+   else if (name == "scale")
+      TransformNotes(*page, FitToScale);
+   else
+      return false;
+   return true;
+}
+
 void PianoRollOpenPage(uint64_t laneId)
 {
    gPianoRollOpen = true;
