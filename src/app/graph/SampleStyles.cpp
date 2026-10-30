@@ -4,6 +4,7 @@
 
 #include "app/graph/UserStyle.h"
 #include "audio/MusicTime.h"
+#include "core/FactoryPresets.h"
 #include "nodes/DrumSequencerNode.h"
 
 #include <algorithm>
@@ -150,6 +151,24 @@ namespace
    }
 
    using Params = std::map<std::string, std::pair<char, std::string>>; // key -> (tag, text)
+
+   // An instrument the physical-model nodes were voiced for: one of a type's factory presets by name, drawn from
+   // `names`, its tone moved a little so two takes differ. Added with seed 0, which leaves the preset as it is.
+   Params RealVoice(const char* type, std::initializer_list<const char*> names, Rng& r)
+   {
+      Params out;
+      const char* want = *(names.begin() + r.Range((int)names.size()));
+      const double nudge = r.Uniform(-0.08, 0.08);
+      if (const std::vector<FactoryPresets::Preset>* list = FactoryPresets::For(type))
+         for (const FactoryPresets::Preset& p : *list)
+            if (p.name == want)
+               for (const auto& [key, value] : p.values)
+               {
+                  const bool whole = key == "model" || key == "exciter" || key == "bodyType" || key == "instrument";
+                  out[key] = { whole ? 'i' : 'f', key == "tone" ? Num(std::clamp(std::stod(value) + nudge, 0.0, 1.0)) : value };
+               }
+      return out;
+   }
 
    // A patch under construction: scene.Graph's add/connect, writing .inf lines.
    struct Graph
@@ -1132,8 +1151,8 @@ namespace
    {
       static const int kStyles[][2] = { { 0, 0 }, { 2, 2 }, { 1, 4 }, { 4, 1 } }; // Bass; Lead; Keys, Sequence; Sequence, Keys
       std::vector<const BankRow*> pool;
-      // Diva rows (src 1) stay out for now: on the same 27 takes they made leads darker (centroid 689 -> 581 Hz, low
-      // share 0.13 -> 0.20) and synths lower (low 0.58 -> 0.65). Their cutoffs are fitted to the renders' average.
+      // Diva rows (src 1) stay out: measured again on 30 takes each (2026-10-30) they make leads lower (low share
+      // 0.10 -> 0.19) and synths darker (centroid 931 -> 741 Hz). Their cutoffs are fitted to the renders' average.
       for (const BankRow& v : kBankVoices)
          if (v.src == 0 && (v.style == kStyles[(int)role][0] || v.style == kStyles[(int)role][1]))
             pool.push_back(&v);
@@ -1585,6 +1604,18 @@ Compiled Compile(const Recipe& recipe)
       pluckGate = shapeRng.Uniform(25.0, 70.0);
       static const double kStab[] = { 0.5, 1.0, 1.0, 2.0 };
       pluckStab = kStab[shapeRng.Range(4)];
+      // Some takes are a real instrument: plucked and hammered strings, a bowed section. On its own stream.
+      Rng rv(std::string("real:chords:") + std::to_string(recipe.seed));
+      if (plucks && rv.Uniform() < 0.35)
+      {
+         shapedVoice = "String";
+         shapedEnv = RealVoice("String", { "Nylon Guitar", "Steel Guitar", "Concert Harp", "Violin Pizzicato", "Cello Pizzicato", "Struck Dulcimer" }, rv);
+      }
+      else if (pads && rv.Uniform() < 0.25)
+      {
+         shapedVoice = "String";
+         shapedEnv = RealVoice("String", { "Violin Bowed", "Cello Bowed" }, rv);
+      }
    }
 
    std::set<std::string> ban;
@@ -2492,7 +2523,7 @@ Compiled Compile(const Recipe& recipe)
       if (!picked.empty())
       {
          g.melodic = true;
-         const int sy = (pads || plucks) ? g.Add(shapedVoice, seed(), shapedEnv) : g.Add(picked, seed());
+         const int sy = (pads || plucks) ? g.Add(shapedVoice, shapedVoice == "String" ? (seed(), 0) : seed(), shapedEnv) : g.Add(picked, seed());
          g.melodic = false;
          g.Connect(notes, sy, true);
          if (wantChords)
@@ -3099,6 +3130,17 @@ Compiled Compile(const Recipe& recipe)
                kind = kByQuad[g.Quadrant()][vr.Range(3)];
             }
             double rate = sp.Uniform() < 0.5 ? 2.0 : 4.0, strum = sp.Uniform(4.0, 28.0);
+            // Most electric and felt pianos are the Piano node's own models. On its own stream: the draws stay put.
+            Rng rv(std::string("real:keys:") + std::to_string(recipe.seed));
+            Params real;
+            if (kind == 0 && rv.Uniform() < 0.75)
+               real = RealVoice("Piano", { "Mark I", "Suitcase", "Bell Tine", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed" }, rv);
+            else if (kind == 2 && rv.Uniform() < 0.75)
+               real = RealVoice("Piano", { "Grand", "Felt Piano", "Upright", "Dark Grand" }, rv);
+            auto keysVoice = [&]() {
+               const int s = sp.Range(1 << 30);
+               return real.empty() ? g.Add("Wavetable", s, k) : g.Add("Piano", 0, real);
+            };
             switch (kind)
             {
             case 0: // electric piano: tine table, bell-like top, long decay
@@ -3214,7 +3256,7 @@ Compiled Compile(const Recipe& recipe)
                g.Connect(ch, notes, true);
             }
             g.melodic = true;
-            const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            const int sy = keysVoice();
             g.melodic = false;
             g.Connect(notes, sy, true);
             synths.push_back(sy);
@@ -3247,7 +3289,7 @@ Compiled Compile(const Recipe& recipe)
                }
                const int lq = sequence(vel, note, lineRate, sp.Uniform(70.0, 95.0), 16);
                g.melodic = true;
-               const int ly = g.Add("Wavetable", sp.Range(1 << 30), k);
+               const int ly = keysVoice();
                g.melodic = false;
                g.Connect(lq, ly, true);
                synths.push_back(ly);
@@ -3265,6 +3307,12 @@ Compiled Compile(const Recipe& recipe)
             k = DesignVoice(kLeadVoice[std::clamp(kind, 0, 5)], sp);
             if (kind != 4 && bv.Uniform() < 0.5)
                k = BankVoice(BankRole::Lead, bv);
+            // A horn or reed in place of the stacks: a brass kind always leans to brass.
+            Rng rv(std::string("real:lead:") + std::to_string(recipe.seed));
+            Params real;
+            if (kind == 0 ? rv.Uniform() < 0.7 : kind != 4 && rv.Uniform() < 0.15)
+               real = kind == 0 ? RealVoice("Wind", { "Solo Trumpet", "Soft Horn" }, rv)
+                                : RealVoice("Wind", { "Tenor Sax", "Clarinet", "Breathy Flute", "Solo Trumpet" }, rv);
             if (kind == 4) // vowel: a sung stack on top of the supersaw
             {
                Engine(k, 'a', 47, sp.Uniform(0.0, 0.9), 3, sp.Uniform(10.0, 18.0), 0, 1.0);
@@ -3333,7 +3381,8 @@ Compiled Compile(const Recipe& recipe)
             const double leadGate = sp.Uniform(60.0, 100.0) * (recipe.energy > 0.35f ? 0.7 : 1.0);
             const int sq = sequence(vel, note, leadRate, leadGate, 16);
             g.melodic = true;
-            const int sy = g.Add("Wavetable", sp.Range(1 << 30), k);
+            const int leadSeed = sp.Range(1 << 30);
+            const int sy = real.empty() ? g.Add("Wavetable", leadSeed, k) : g.Add("Wind", 0, real);
             g.melodic = false;
             g.Connect(sq, sy, true);
             int end = sy;

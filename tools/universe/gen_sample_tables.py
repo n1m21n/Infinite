@@ -8,7 +8,7 @@ import json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT = os.path.join(ROOT, "src", "app", "graph", "GenerateSamplesTables.inc")
-FIXED = ["Drum Sequencer", "Note Sequencer", "Chorder", "Arpeggiator", "Mixer", "Reverb", "Limiter", "Dynamics"]
+FIXED = ["Drum Sequencer", "Note Sequencer", "Chorder", "Arpeggiator", "Mixer", "Reverb", "Limiter", "Dynamics", "Piano", "String", "Wind"]
 MOD_KEYS = ("cutoff", "position", "res", "mix", "detune", "drive", "warp", "size", "tone", "depth", "rate", "feedback")
 LANES = ["kick", "snare", "chat", "ohat", "clap", "tom", "htom", "bell"]
 
