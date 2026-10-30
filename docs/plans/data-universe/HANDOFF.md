@@ -912,7 +912,8 @@ and the bass sit 6 dB lower. No draw moves.
 
 - 40-250 Hz together: 51.4% vs the library's 52.5%. The low end now matches; the low mids are still at 0.7-0.8x.
 - New gap, now visible: the top end (2 kHz and up) is too loud, 10% of the power against ~1% in the library mixes and 3.7%
-  in DEAM. Hats and cymbals are the likely cause; it is the next balance step.
+  in DEAM. Not the hats: the hat lane and synth hats 4 dB lower in the full mix moved 6k+ only 4.7% -> 4.2% and 2-6 kHz
+  not at all, so that try was reverted. The source is still to find (per-channel mute renders of the full patch).
 - The 30 Hz master high-pass measures as intended: sub-40 Hz is 0.4%.
 - Gates: pads 102/102 identical, and the bass, kicks and synths parts are 102/102 identical too (`wasm_pad_dump.js`, new
   in `tools/universe/`, with `--cmp`). Full takes: 102 render, 0 clipped, 0 silent with redraws on. Pinned (no redraw),
