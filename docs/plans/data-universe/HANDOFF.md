@@ -1156,3 +1156,22 @@ The Piano node (49a9deba) shipped as a node. Family test (`own_sweeps.py run --n
   ratio is 6.26, no better than String or Wind against their families. Same limit as items 8-9: two render pitches against
   libraries at every pitch, and 400 random presets. Not chased further (owner: stop work that is not leading anywhere).
 - Item 12: no instrument passed its family test (String, Wind, Piano), so none was added to Generate Samples. Pads unchanged.
+
+## 2026-10-30 Plan item 13: overnight knob -> sound rounds (run on the MacBook Air): String MET, Wavetable MISS, Sampler not run; stopped by the owner
+
+`overnight_rounds.py` on the Air (summary `~/Infinite/training-data/models/overnight/20261030.jsonl` there). Median held-out R² of the
+characteristic means, head; bar 0.6:
+
+| Engine | base | round a | round b | round c | result |
+|---|---|---|---|---|---|
+| String | 0.846 (2,266 presets, 9 of 11 at bar) | 0.905 (+0.059) | 0.859 (-0.046) | 0.863 (+0.004) | MET at base; stop rule fired, rounds added nothing lasting |
+| Wavetable | 0.002 (5,490, 0 of 11) | 0.230 (+0.228, 7,490) | not scored | - | MISS |
+| Sampler | - | - | - | - | not run (240 presets) |
+
+- The first run at 04:57 scored nothing (head null for every round) and was rerun; only the second run is in the table.
+- Wavetable: the round-b sweep was under way when the overnight process ended at 09:26. The owner had chosen to stop after the
+  Wavetable round and before Sampler, as the rounds no longer pay off and nothing that ships reads this model. A watcher
+  (`~/stop_after_wt.sh` on the Air) stopped any Sampler step; the round-b rows that landed stay in `own_wavetable.jsonl` there.
+- Why Wavetable stays low: one knob move does not have one direction on Wavetable (item 14 measures how often a move disagrees
+  with itself), so more presets of the same kind do not lift R².
+- No cross-engine model was built.
