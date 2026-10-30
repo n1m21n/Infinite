@@ -8,6 +8,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -52,9 +53,6 @@ namespace app
       const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
       bool changed = false;
       const bool open = MenuParts::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
-                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
       if (open)
       {
          for (int i = 0; i < (int)list.size(); ++i)
@@ -1281,9 +1279,9 @@ namespace app
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
-            const char* audioLabel = timelineMode ? T("Timeline Audio On") : T("Enable Timeline Audio");
+            const char* audioLabel = T("Audio");
             const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
-            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW, panelOrigin.y);
+            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - 30.0f - tok::space_1 - audioBtnW, panelOrigin.y); // the inspector toggle holds the corner
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
             ImGui::SetCursorScreenPos(audioBtnPos);
             if (ChipButton::Draw(audioLabel, timelineMode, tok::tile))
@@ -1435,17 +1433,101 @@ namespace app
          ImGui::SameLine(0.0f, tok::space_4);
          {
             const int shownUnit = gArrange.settings.timeDisplay;
-            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "Bars" }, { "arrange.unit.time", "Time" } };
+            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "B" }, { "arrange.unit.time", "T" } };
             const ImVec2 up = ImGui::GetCursorScreenPos();
             const UiLayout::Rect ur{ up.x, up.y, 104.0f, tok::tile };
-            const int pickedUnit = PillGroup::Draw("arrangeunit", ur, kUnitSegs, 2, shownUnit);
+            const int pickedUnit = TimeRuler::UnitPills("arrangeunit", kUnitSegs, 2, shownUnit, T("Ruler: Bars or Time"));
             if (ImGui::IsMouseHoveringRect(ImVec2(ur.x, ur.y), ImVec2(ur.Right(), ur.Bottom())))
                HelpTip(ImGui::GetIO().MousePos.x < ur.CenterX() ? T("Switch display to Bars / Beats (BBT)")
                                                                  : T("Switch display to Time (Minutes:Seconds)"));
-            ImGui::SetCursorScreenPos(up);
-            ImGui::Dummy(ImVec2(ur.w, ur.h));
             if (pickedUnit >= 0)
                ArrangeSetTimeDisplay(pickedUnit);
+         }
+
+         // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
+         ImGui::SameLine(0.0f, tok::space_4);
+         const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
+         PushToolbarChip(toolNonDefault);
+         const float toolBtnW = 30.0f;
+         if (ActionButton::Draw("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
+         {
+            ImGui::OpenPopup("##arrangetoolpopup");
+         }
+         PopToolbarChip();
+
+         const char* toolTooltip = T("Tool: Select (A)");
+         switch (gArrangeTool)
+         {
+            case ArrangeTool::Select: toolTooltip = T("Tool: Select (A) - Click to choose tool"); break;
+            case ArrangeTool::Trim:   toolTooltip = T("Tool: Trim (T) - Click to choose tool"); break;
+            case ArrangeTool::Range:  toolTooltip = T("Tool: Range Selection (R) - Click to choose tool"); break;
+            case ArrangeTool::Blade:  toolTooltip = T("Tool: Blade / Cut (B) - Click to choose tool"); break;
+            case ArrangeTool::Zoom:   toolTooltip = T("Tool: Zoom (Z) - Click to choose tool"); break;
+            case ArrangeTool::Hand:   toolTooltip = T("Tool: Hand / Pan (H) - Click to choose tool"); break;
+            case ArrangeTool::Pencil: toolTooltip = T("Tool: Pencil / Draw (P) - Click to choose tool"); break;
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", toolTooltip);
+
+         // Draw current tool icon
+         {
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const float iconSize = tok::icon_md;
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const bool hovered = ImGui::IsItemHovered();
+            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            ImDrawList* tdl = ImGui::GetWindowDrawList();
+            switch (gArrangeTool)
+            {
+               case ArrangeTool::Select: glyph::DrawPointer(tdl, center, iconSize, icol, true); break;
+               case ArrangeTool::Trim:   glyph::DrawTrim(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Range:  glyph::DrawRange(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Blade:  glyph::DrawScissors(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Zoom:   glyph::DrawZoom(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Hand:   glyph::DrawHand(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Pencil: glyph::DrawPencil(tdl, center, iconSize, icol); break;
+            }
+         }
+
+         if (MenuParts::BeginPopup("##arrangetoolpopup"))
+         {
+            if (MenuParts::Item(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
+            {
+               gArrangeTool = ArrangeTool::Select;
+               gArrangeBladeOn = false;
+            }
+            if (MenuParts::Item(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
+            {
+               gArrangeTool = ArrangeTool::Range;
+               gArrangeBladeOn = false;
+            }
+            if (MenuParts::Item(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
+            {
+               gArrangeTool = ArrangeTool::Trim;
+               gArrangeBladeOn = false;
+            }
+            if (MenuParts::Item(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
+            {
+               gArrangeTool = ArrangeTool::Pencil;
+               gArrangeBladeOn = false;
+            }
+            if (MenuParts::Item(L("Cut"), "B", gArrangeTool == ArrangeTool::Blade))
+            {
+               gArrangeTool = ArrangeTool::Blade;
+               gArrangeBladeOn = true;
+            }
+            if (MenuParts::Item(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
+            {
+               gArrangeTool = ArrangeTool::Hand;
+               gArrangeBladeOn = false;
+            }
+            if (MenuParts::Item(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
+            {
+               gArrangeTool = ArrangeTool::Zoom;
+               gArrangeBladeOn = false;
+            }
+            MenuParts::EndPopup();
          }
 
          // Snap: the magnet toggles the grid off <-> the last division that
@@ -1454,7 +1536,7 @@ namespace app
          // the same musical grid at any zoom and any tempo. It covers clip
          // move/trim, marker drags, the ruler scrub, the loop drag and the
          // arrow-key nudge.
-         ImGui::SameLine(0.0f, tok::space_4);
+         ImGui::SameLine(0.0f, tok::space_1);
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
          PushToolbarChip(snapWasOn);
          if (ActionButton::Draw("##arrangesnapbtn", ImVec2(30, tok::tile)))
@@ -1532,95 +1614,6 @@ namespace app
             glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
-         // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
-         ImGui::SameLine(0.0f, tok::space_1);
-         const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
-         PushToolbarChip(toolNonDefault);
-         const float toolBtnW = 34.0f;
-         if (ActionButton::Draw("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
-         {
-            ImGui::OpenPopup("##arrangetoolpopup");
-         }
-         PopToolbarChip();
-
-         const char* toolTooltip = T("Tool: Select (A)");
-         switch (gArrangeTool)
-         {
-            case ArrangeTool::Select: toolTooltip = T("Tool: Select (A) - Click to choose tool"); break;
-            case ArrangeTool::Trim:   toolTooltip = T("Tool: Trim (T) - Click to choose tool"); break;
-            case ArrangeTool::Range:  toolTooltip = T("Tool: Range Selection (R) - Click to choose tool"); break;
-            case ArrangeTool::Blade:  toolTooltip = T("Tool: Blade / Cut (B) - Click to choose tool"); break;
-            case ArrangeTool::Zoom:   toolTooltip = T("Tool: Zoom (Z) - Click to choose tool"); break;
-            case ArrangeTool::Hand:   toolTooltip = T("Tool: Hand / Pan (H) - Click to choose tool"); break;
-            case ArrangeTool::Pencil: toolTooltip = T("Tool: Pencil / Draw (P) - Click to choose tool"); break;
-         }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", toolTooltip);
-
-         // Draw current tool icon + chevron
-         {
-            const ImVec2 bmin = ImGui::GetItemRectMin();
-            const ImVec2 bmax = ImGui::GetItemRectMax();
-            const float iconSize = tok::icon_md;
-            const ImVec2 center(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f);
-            const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
-            ImDrawList* tdl = ImGui::GetWindowDrawList();
-            switch (gArrangeTool)
-            {
-               case ArrangeTool::Select: glyph::DrawPointer(tdl, center, iconSize, icol, true); break;
-               case ArrangeTool::Trim:   glyph::DrawTrim(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Range:  glyph::DrawRange(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Blade:  glyph::DrawScissors(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Zoom:   glyph::DrawZoom(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Hand:   glyph::DrawHand(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Pencil: glyph::DrawPencil(tdl, center, iconSize, icol); break;
-            }
-            // Small chevron down on the right edge
-            const ImVec2 chevCenter(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f);
-            glyph::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
-         }
-
-         if (MenuParts::BeginPopup("##arrangetoolpopup"))
-         {
-            if (MenuParts::Item(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
-            {
-               gArrangeTool = ArrangeTool::Select;
-               gArrangeBladeOn = false;
-            }
-            if (MenuParts::Item(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
-            {
-               gArrangeTool = ArrangeTool::Trim;
-               gArrangeBladeOn = false;
-            }
-            if (MenuParts::Item(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
-            {
-               gArrangeTool = ArrangeTool::Range;
-               gArrangeBladeOn = false;
-            }
-            if (MenuParts::Item(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
-            {
-               gArrangeTool = ArrangeTool::Blade;
-               gArrangeBladeOn = true;
-            }
-            if (MenuParts::Item(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
-            {
-               gArrangeTool = ArrangeTool::Zoom;
-               gArrangeBladeOn = false;
-            }
-            if (MenuParts::Item(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
-            {
-               gArrangeTool = ArrangeTool::Hand;
-               gArrangeBladeOn = false;
-            }
-            if (MenuParts::Item(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
-            {
-               gArrangeTool = ArrangeTool::Pencil;
-               gArrangeBladeOn = false;
-            }
-            MenuParts::EndPopup();
-         }
-
          // Add Marker (M): drops one at the playhead, on the snap grid.
          ImGui::SameLine(0.0f, tok::space_1);
          PushToolbarChip(false);
@@ -1676,7 +1669,7 @@ namespace app
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
          // glyph for clip/track settings.
-         ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::SetCursorScreenPos(ImVec2(panelOrigin.x + panelSize.x - 30.0f, panelOrigin.y));
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
          PushToolbarChip(inspectorWasOpen);
          if (ActionButton::Draw("##clipsettingstoggle", ImVec2(30, tok::tile)))
@@ -1760,7 +1753,7 @@ namespace app
 
       const float kHeaderWidth = 175.0f; // Mix strip (S M pan gain / opacity), name box, drag handle
       const float kMarkerStripH = 14.0f; // marker flags (WP6), above the tick/label strip
-      const float kRulerHeight = 40.0f;  // marker strip + the 26 px tick/label strip
+      const float kRulerHeight = kMarkerStripH + TimeRuler::kHeight; // marker strip + the shared ruler
       const float kLaneHeight = 30.0f;  // default/group row height; a lane can be drag-resized off this via Lane::rowHeight
       const float kMinLaneHeight = kLaneHeight;  // can't shrink below the original size, only grow
       const float kMaxLaneHeight = 160.0f;
@@ -2002,13 +1995,6 @@ namespace app
          beatStep = st;
          if (ppb * st >= 10.0) break;
       }
-      double barStep = 1.0;
-      for (double st : kStepMultiples)
-      {
-         if (st < 1.0) continue;
-         barStep = st;
-         if (ppb * beatsPerBar * st >= 64.0) break;
-      }
 
       // The ruler: a marker strip on top, the tick/label strip under it.
       const float kTickStripTop = pinnedTopY + kMarkerStripH;
@@ -2020,8 +2006,6 @@ namespace app
       const ImU32 markerStripBg = 0;
       const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
       const ImU32 hairCol = ImGui::GetColorU32(ImGuiCol_Text, 0.08f);
-      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.85f);
-      const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
 
       // Header-column corner, level with the ruler (above the first track
       // row) - otherwise blank/unstyled, reading as a hole next to the
@@ -2034,91 +2018,15 @@ namespace app
       dl->AddLine(ImVec2(headerStartX, rulerPos.y + rulerSize.y), ImVec2(rulerPos.x + rulerSize.x, rulerPos.y + rulerSize.y),
                   hairCol, 1.0f);
 
-      // ---- ruler ticks and labels ----
-      // Primary label in the chosen unit; the other unit follows it, dimmer,
-      // only where it fits before the next label.
+      // ---- ruler ticks and labels: the same ruler as the Piano Roll and the Sample Studio ----
       {
-         const float rulerBottom = rulerPos.y + rulerSize.y;
-         UiType::Scope labelScope(UiType::Size::Caption, UiType::Weight::Medium);
-         const float labelY = kTickStripTop + 4.0f;
-         dl->PushClipRect(rulerPos, ImVec2(rulerPos.x + rulerSize.x, rulerBottom), true);
-         auto drawLabelPair = [&](float x, float nextX, const std::string& primary, const std::string& secondary)
-         {
-            dl->AddText(ImVec2(x + 3.0f, labelY), textCol, primary.c_str());
-            const float pw = ImGui::CalcTextSize(primary.c_str()).x;
-            const float sw = ImGui::CalcTextSize(secondary.c_str()).x;
-            if (x + 3.0f + pw + 6.0f + sw + 4.0f < nextX)
-               dl->AddText(ImVec2(x + 3.0f + pw + 6.0f, labelY), subTextCol, secondary.c_str());
-         };
-         if (!showTime)
-         {
-            // Minor ticks on every beatStep, skipping the bar lines.
-            const double firstMinor = std::floor(startBeat / beatStep) * beatStep;
-            for (double b = firstMinor; b <= endBeat + beatStep; b += beatStep)
-            {
-               if (b < 0.0) continue;
-               const double inBar = std::fmod(b, beatsPerBar);
-               if (inBar < 1e-6 || beatsPerBar - inBar < 1e-6) continue;
-               const float x = beatToX(b);
-               dl->AddLine(ImVec2(x, rulerBottom - 6.0f), ImVec2(x, rulerBottom), tickCol, 0.8f);
-            }
-            // Bars: every bar gets a mid tick, every barStep-th a label.
-            const double barPx = ppb * beatsPerBar;
-            const long long firstBar = std::max(0LL, (long long)std::floor(startBeat / beatsPerBar));
-            const long long lastBar = (long long)std::ceil(endBeat / beatsPerBar) + 1;
-            const long long labelEvery = std::max(1LL, (long long)barStep);
-            for (long long bar = firstBar; bar <= lastBar; bar++)
-            {
-               const float x = beatToX((double)bar * beatsPerBar);
-               const bool labelled = bar % labelEvery == 0;
-               if (!labelled && barPx < 4.0)
-                  continue;
-               dl->AddLine(ImVec2(x, rulerBottom - (labelled ? 12.0f : 8.0f)), ImVec2(x, rulerBottom), tickCol, labelled ? 1.2f : 1.0f);
-               if (labelled)
-               {
-                  const Arrange::Tick t = (Arrange::Tick)bar * barTicks;
-                  drawLabelPair(x, x + (float)(barPx * (double)labelEvery), std::to_string(bar),
-                                ArrangeFormatTickSeconds(t));
-               }
-            }
-         }
+         const TimeRuler::Axis axis { rulerPos.x, rulerPos.x + rulerSize.x, startBeat, ppb, beatsPerBar };
+         TimeRuler::Background(dl, axis, kTickStripTop);
+         if (showTime)
+            TimeRuler::DrawUnits(dl, axis, kTickStripTop, 60.0 / arrBpm, 0.1,
+                                 [](double sec, double step) { return ArrangeFormatSeconds(sec, step < 1.0); });
          else
-         {
-            // Round-second steps; the minor ticks subdivide a major.
-            static const double kSecSteps[] = { 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 3600.0 };
-            const double pxPerSec = (double)ppb * arrBpm / 60.0;
-            double majorSec = kSecSteps[0];
-            for (double st : kSecSteps)
-            {
-               majorSec = st;
-               if (pxPerSec * st >= 72.0) break;
-            }
-            static const int kSubdivs[] = { 10, 5, 4, 2, 1 };
-            double minorSec = majorSec;
-            for (int sd : kSubdivs)
-               if (pxPerSec * majorSec / sd >= 8.0) { minorSec = majorSec / sd; break; }
-            const double startSecV = startBeat * 60.0 / arrBpm;
-            const double endSecV = endBeat * 60.0 / arrBpm;
-            const long long firstIdx = std::max(0LL, (long long)std::floor(startSecV / minorSec));
-            const long long lastIdx = (long long)std::ceil(endSecV / minorSec) + 1;
-            const long long perMajor = std::max(1LL, (long long)std::llround(majorSec / minorSec));
-            for (long long k = firstIdx; k <= lastIdx; k++)
-            {
-               const double sec = (double)k * minorSec;
-               const float x = beatToX(sec * arrBpm / 60.0);
-               if (k % perMajor == 0)
-               {
-                  dl->AddLine(ImVec2(x, rulerBottom - 12.0f), ImVec2(x, rulerBottom), tickCol, 1.2f);
-                  drawLabelPair(x, x + (float)(pxPerSec * majorSec), ArrangeFormatSeconds(sec, majorSec < 1.0),
-                                ArrangeFormatBBT(Arrange::SecondsToTicks(sec, arrBpm)));
-               }
-               else
-               {
-                  dl->AddLine(ImVec2(x, rulerBottom - 6.0f), ImVec2(x, rulerBottom), tickCol, 0.8f);
-               }
-            }
-         }
-         dl->PopClipRect();
+            TimeRuler::DrawBars(dl, axis, kTickStripTop);
       }
 
       // ---- marker flags (WP6) ----
@@ -4467,33 +4375,9 @@ namespace app
          {
             const float bx0 = std::max(rulerStartX, tickToX(bl.start));
             const float bx1 = std::min(rulerStartX + rulerWidth, tickToX(bl.end));
-            const float bandBottom = fullTimelineBottom;
-            const ImU32 bandCol = gArrangeShiftDraggingLoop ? tok::U32(tok::pal::c_FACC152D) : tok::U32(tok::pal::c_FACC151E);
-            const ImU32 bandBorder = tok::U32(tok::pal::c_FACC15B4);
-            const bool isDraggingLeft = (gArrangeLoopDragMode == kArrangeLoopDragStart);
-            const bool isDraggingRight = (gArrangeLoopDragMode == kArrangeLoopDragEnd);
-            const bool isDraggingHeader = (gArrangeLoopDragMode == kArrangeLoopDragMove);
-
-            // From the tick strip down: the marker strip above stays clear.
-            dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, bandBottom), bandCol);
-
-            // Loop brace header bar in ruler
-            const ImU32 headerBarCol = isDraggingHeader ? tok::U32(tok::pal::c_FFEB3BFF) : tok::U32(tok::pal::c_FACC15E6);
-            dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, kTickStripTop + 4.0f), headerBarCol, 2.0f);
-
-            // Left boundary line & bracket handle [
-            const ImU32 leftCol = isDraggingLeft ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
-            const float leftStroke = isDraggingLeft ? 2.5f : 1.5f;
-            dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, bandBottom), leftCol, leftStroke);
-            dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, kTickStripTop + 8.0f), leftCol, 3.0f);
-            dl->AddLine(ImVec2(bx0, kTickStripTop + 8.0f), ImVec2(bx0 + 5.0f, kTickStripTop + 8.0f), leftCol, 2.0f);
-
-            // Right boundary line & bracket handle ]
-            const ImU32 rightCol = isDraggingRight ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
-            const float rightStroke = isDraggingRight ? 2.5f : 1.5f;
-            dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, bandBottom), rightCol, rightStroke);
-            dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, kTickStripTop + 8.0f), rightCol, 3.0f);
-            dl->AddLine(ImVec2(bx1 - 5.0f, kTickStripTop + 8.0f), ImVec2(bx1, kTickStripTop + 8.0f), rightCol, 2.0f);
+            TimeRuler::LoopBand(dl, bx0, bx1, kTickStripTop, fullTimelineBottom, gArrangeShiftDraggingLoop,
+                                gArrangeLoopDragMode == kArrangeLoopDragStart ? 1 : gArrangeLoopDragMode == kArrangeLoopDragEnd ? 2
+                                : gArrangeLoopDragMode == kArrangeLoopDragMove ? 3 : 0);
          }
       }
 
@@ -4506,22 +4390,13 @@ namespace app
          const double playBeats = std::max(0.0, tr.Beats());
          if (playBeats >= startBeat && playBeats <= endBeat)
          {
-            const float playheadX = beatToX(playBeats);
-            const ImU32 playheadCol = tok::U32(tok::pal::c_EF4444FF);
-            dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.25f);
-            const float triSize = 5.0f;
-            dl->AddTriangleFilled(ImVec2(playheadX - triSize, kTickStripTop), ImVec2(playheadX + triSize, kTickStripTop),
-                                  ImVec2(playheadX, kTickStripTop + triSize * 1.6f), playheadCol);
+            TimeRuler::Playhead(dl, beatToX(playBeats), kTickStripTop, lineBottom);
          }
          if (gArrangeScrubbing && gArrangeScrubTick >= startTick && gArrangeScrubTick <= endTick)
          {
             const float gx = tickToX(gArrangeScrubTick);
-            const ImU32 ghostCol = tok::U32(tok::pal::c_EF444478);
-            dl->AddLine(ImVec2(gx, kTickStripTop), ImVec2(gx, lineBottom), ghostCol, 1.5f);
-            const float triSize = 5.0f;
-            dl->AddTriangleFilled(ImVec2(gx - triSize, kTickStripTop), ImVec2(gx + triSize, kTickStripTop),
-                                  ImVec2(gx, kTickStripTop + triSize * 1.6f), ghostCol);
-            const std::string ghostLabel = ArrangeFormatBBT(gArrangeScrubTick) + "  |  " + ArrangeFormatTickSeconds(gArrangeScrubTick);
+            TimeRuler::Playhead(dl, gx, kTickStripTop, lineBottom, true);
+            const std::string ghostLabel = TimeRuler::BarLabel((double)gArrangeScrubTick / (double)Arrange::kPPQ, beatsPerBar) + "  |  " + ArrangeFormatTickSeconds(gArrangeScrubTick);
             const ImVec2 ts = ImGui::CalcTextSize(ghostLabel.c_str());
             float lx = gx + 6.0f;
             if (lx + ts.x + 6.0f > rulerStartX + rulerWidth)

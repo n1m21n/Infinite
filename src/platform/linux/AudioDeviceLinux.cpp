@@ -815,8 +815,10 @@ namespace Platform
    }
 
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
-                             uint64_t& readerCursor, int channelOffset, bool isMono)
+                             uint64_t& readerCursor, int channelOffset, bool isMono, int* outFrames)
    {
+      if (outFrames != nullptr)
+         *outFrames = 0;
       if (outChannels == nullptr || numFrames <= 0 || maxChannels <= 0)
          return 0;
       if (!AudioInputCaptureIsRunning() || gTap.ring.channels == 0)
@@ -850,6 +852,8 @@ namespace Platform
          if (maxChannels > 1)
             std::copy(outChannels[0], outChannels[0] + numFrames, outChannels[1]);
          readerCursor = cursor + n;
+         if (outFrames != nullptr)
+            *outFrames = n;
          return n > 0 ? 1 : 0;
       }
       else
@@ -870,6 +874,8 @@ namespace Platform
                outChannels[1][i] = 0.0f;
          }
          readerCursor = cursor + n;
+         if (outFrames != nullptr)
+            *outFrames = n;
          return (n > 0) ? (ch0 != ch1 ? 2 : 1) : 0;
       }
    }
