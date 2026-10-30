@@ -88,5 +88,4 @@ namespace IconsInfinite
    inline constexpr const char* Mute = "\xee\xa5\x90"; // U+E950 mute
    inline constexpr const char* PingPong = "\xee\xa5\x91"; // U+E951 ping-pong
    inline constexpr const char* Reverse = "\xee\xa5\x92"; // U+E952 reverse
-   inline constexpr const char* Slice = "\xee\xa5\x93"; // U+E953 slice
 }

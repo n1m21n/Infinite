@@ -2868,8 +2868,8 @@ namespace
       const float x0 = ImGui::GetCursorScreenPos().x;
       const float in = tok::space_1, between = tok::space_3;
       // The pickers give up width first, then the input picker goes (Settings still has it): the bar never scrolls.
-      const float roomy = std::clamp((w - 1040.0f) / 100.0f, 0.0f, 1.0f);
-      const bool showInput = w >= 1040.0f;
+      const float roomy = std::clamp((w - 1165.0f) / 100.0f, 0.0f, 1.0f);
+      const bool showInput = w >= 1165.0f;
 
       // Make: open a file, generate (again), instrument, snap to scale, bars.
       if (IconChip("##studioOpen", IconsInfinite::Folder, false, T("Open an audio file (or drop one on the Studio)")))
@@ -2927,8 +2927,8 @@ namespace
       }
       FormParts::Inline(0.0f, between);
       {
-         static const PillGroup::Segment kUnits[3] = { { "studio.unit.bars", "B" }, { "studio.unit.time", "T" }, { "studio.unit.samples", "S" } };
-         const int picked = TimeRuler::UnitPills("studiounit", kUnits, 3, s.ruler, T("Ruler: Bars, Time or Samples"));
+         static const PillGroup::Segment kUnits[3] = { { "studio.unit.bars", "Bars" }, { "studio.unit.time", "Time" }, { "studio.unit.samples", "Samples" } };
+         const int picked = TimeRuler::UnitPills("studiounit", kUnits, 3, s.ruler);
          if (picked >= 0)
             s.ruler = picked;
       }
@@ -2973,8 +2973,10 @@ namespace
       if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
          s.snapGrid = !s.snapGrid;
       FormParts::Inline(0.0f, between);
-      if (IconChip("##studioSlice", IconsInfinite::Slice, false, T("Slice: cut the sample by transients, grid or into equal parts")))
+      if (TextChip(L("Slice##studioSlice")))
          ImGui::OpenPopup("##studioSliceMenu");
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         HelpTip("%s", T("Cut the sample by transients, grid or into equal parts"));
       ImGui::EndDisabled();
       const auto toggle = [&](const char* id, const char* glyphStr, bool& v, const char* tip)
       {
