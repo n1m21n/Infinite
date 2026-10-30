@@ -1069,11 +1069,18 @@ Look     graph [p.inf]  explain [p.inf]  params <node>  selection  status  nodes
 Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disconnect <dst[:slot]>
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
-Patch    new  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
-Play     play  stop  rewind  seek <seconds>  tempo <bpm>  session scene <n>  session stop
+         select <node>...|all|none  copy  paste  duplicate  group  ungroup
+Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
+Play     play  stop  rewind  seek <seconds>  tempo <bpm>
+Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
+         session scene|launch|stop|add|insert|send|sceneset|slot ...
+         notes get|add|delete|move|quantize|transform <clip>  perf ...  studio get|set
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
 Code     code kinds|new|check|push|pull|watch|errors|docs|examples
 Generate patch recipes|new|check|layout|apply
+App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply
+         show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save
+         view fit|params on|off|clearcards|metronome [on|off]  quit
 Learn    context  guide
 Watch    watch
 Terminal term open|list|read|send|run
@@ -1364,9 +1371,114 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       if (verb == "undo" || verb == "redo")
          return call(verb);
 
+      if (verb == "select")
+      {
+         need(1, "select <node>... | select all | select none");
+         json nodes = json::array();
+         if (args[0] != "all" && args[0] != "none")
+            for (const std::string& node : args)
+               nodes.push_back(NodeRef(node));
+         return call("select", { { "all", args[0] == "all" }, { "nodes", nodes } });
+      }
+      if (verb == "copy" || verb == "paste" || verb == "duplicate" || verb == "group" || verb == "ungroup")
+         return call("edit", { { "action", verb } });
+
+      // The app itself
+      if (verb == "panel")
+      {
+         json params = json::object();
+         for (const std::string& word : args)
+         {
+            if (word == "open" || word == "close")
+               params["open"] = word == "open";
+            else if (word == "bottom" || word == "right" || word == "left" || word == "top")
+               params["dock"] = word;
+            else
+               params["name"] = word;
+         }
+         return call("panel", params);
+      }
+      if (verb == "settings")
+      {
+         if (!args.empty() && (args[0] == "apply" || args[0] == "devices"))
+            return call("settings", { { "action", args[0] } });
+         json params = json::object();
+         if (!args.empty())
+            params["key"] = args[0];
+         if (args.size() > 1)
+         {
+            params["value"] = json::parse(args[1], nullptr, false);
+            if (params["value"].is_discarded())
+               params["value"] = args[1];
+         }
+         return call("settings", params);
+      }
+      if (verb == "show")
+      {
+         json params = { { "action", args.empty() ? "list" : args[0] } };
+         if (args.size() > 1)
+         {
+            if (args[1] == "on" || args[1] == "off")
+               params["on"] = args[1] == "on";
+            else if (args[0] == "go" || args[0] == "remove")
+               params["index"] = atoi(args[1].c_str());
+            else
+               params["path"] = std::filesystem::absolute(AppPaths::FsPath(args[1])).u8string();
+         }
+         return call("show", params);
+      }
+      if (verb == "view")
+      {
+         need(1, "view fit | view params on|off | view clearcards | view metronome [on|off]");
+         if (args[0] == "fit")
+            return call("fit_view");
+         json params = { { "action", args[0] } };
+         if (args.size() > 1 && args[0] == "params")
+            params["show"] = args[1] == "on";
+         else if (args.size() > 1)
+            params["on"] = args[1] == "on";
+         return call("view", params);
+      }
+
+      if (verb == "timeline" || verb == "session" || verb == "notes" || verb == "perf" || verb == "studio")
+      {
+         // Words go through as they are; key=value words become fields.
+         const bool nouns = verb == "timeline" || verb == "session";
+         json params = json::object();
+         json fields = json::object();
+         json words = json::array();
+         size_t at = 0;
+         if (nouns && at < args.size())
+            params["noun"] = args[at++];
+         if (verb != "session" && at < args.size())
+            params["action"] = args[at++];
+         for (; at < args.size(); at++)
+         {
+            const size_t eq = args[at].find('=');
+            if (eq == std::string::npos || eq == 0)
+            {
+               words.push_back(args[at]);
+               continue;
+            }
+            json value = json::parse(args[at].substr(eq + 1), nullptr, false);
+            fields[args[at].substr(0, eq)] = value.is_discarded() ? json(args[at].substr(eq + 1)) : value;
+         }
+         params["args"] = words;
+         params["fields"] = fields;
+         return call(verb, params);
+      }
+
       // Patch
       if (verb == "new")
+      {
+         if (!args.empty())
+            return call("spawn", { { "what", args[0] } });
          return call("new_patch");
+      }
+      if (verb == "recent")
+         return call("recent");
+      if (verb == "quit")
+         return call("quit");
       if (verb == "open")
       {
          need(1, "open <file.inf>");
@@ -1402,15 +1514,6 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
          need(1, "tempo <bpm>");
          return transport("tempo", { { "bpm", atof(args[0].c_str()) } });
       }
-      if (verb == "session")
-      {
-         need(1, "session scene <n> | session stop");
-         if (args[0] == "stop")
-            return call("session", { { "action", "stop" } });
-         need(2, "session scene <n>");
-         return call("session", { { "action", "scene" }, { "scene", atoi(args[1].c_str()) } });
-      }
-
       // See and hear
       if (verb == "shot")
       {

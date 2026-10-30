@@ -643,6 +643,8 @@ set(COMMON_SOURCES
     src/core/RemoteControl.cpp
     src/core/InfiniteCli.cpp
     src/app/graph/RpcTerminal.cpp
+    src/app/graph/RpcApp.cpp
+    src/app/graph/RpcTimeline.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/OscControl.cpp

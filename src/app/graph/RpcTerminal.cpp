@@ -6,6 +6,9 @@
 
 namespace app
 {
+   bool HandleAppRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
+   bool HandleTimelineRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
+
    namespace
    {
       using json = nlohmann::json;
@@ -183,21 +186,7 @@ namespace app
          outResult = { { "errors", errors } };
          return true;
       }
-      if (method == "session")
-      {
-         const std::string action = params.value("action", std::string());
-         if (action == "scene")
-            ArrangeSessionLaunchScene(params.value("scene", 0));
-         else if (action == "stop")
-            ArrangeSessionStopAll();
-         else
-         {
-            outError = "unknown session action '" + action + "'";
-            return true;
-         }
-         outResult = json::object();
-         return true;
-      }
-      return HandleTerminalSessionRpc(method, params, outResult, outError);
+      return HandleTerminalSessionRpc(method, params, outResult, outError) ||
+             HandleAppRpc(method, params, outResult, outError) || HandleTimelineRpc(method, params, outResult, outError);
    }
 }
