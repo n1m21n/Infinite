@@ -35,6 +35,10 @@ body dropdown is only the resonance (guitar is 1.7 dB from box at body 0.5); the
    existing render tools (own_sweeps, click_measure, band_measure). Output: a ranked fix list, then fixes one by one.
 2. Real voices: Generate Samples now draws Piano (grand, Rhodes, Wurlitzer), String and Wind for keys, plucks, pads and leads, from their factory presets (`RealVoice`). The keys gate's high floor went to 0: piano spectra sit under the synth-fitted 0.001.
 
+3. OPEN BUG: Wind has never appeared in a lead take (0 of 204 in the web build). Piano and String do. The trace `kind / real.size()` in the leads branch showed real 0 on 4 takes, too few to tell chance from a fault: count it over a few hundred takes first.
+
+Web parity: 32 of 40 identical to desktop. The other 8 differ in length only, because the web's RoleCritic redraws and the native batch does not.
+
 ## Item 23, ship (needs the owner)
 Desktop deploy of what passed (`scripts/deploy_desktop.sh`, headless smoke with 0 fails). Before any push, reconcile `main`
 with `origin/main`.
