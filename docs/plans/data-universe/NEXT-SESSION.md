@@ -23,16 +23,17 @@ Read `docs/DECISIONS.md` and this file first.
 | 17 | 909 figures + MPC / SP-1200 swing in the Drums groove, MET, drum gate holds |
 | 20, 22 | MET |
 | 21 | Learner built; blocked on data (0 real takes). Rerun `learn_from_logs.py learn` after a few hundred owner takes |
-| 15, 16, 18, 19 | **Not started.** Deprioritised on 2026-10-30: the owner asked to stop work that is not leading anywhere substantial |
+| 15, 16, 18 | MET (HANDOFF): synths octave 3, clicks fitted to SubLab attacks, textures de-grumbled + birds/water/leaves |
+| 19 | Diva closed loop: not started |
+| Nodes | String / Piano / Wind: 8 / 8 / 9 factory presets; String pluck and strike levelled toward the bow. The String
+body dropdown is only the resonance (guitar is 1.7 dB from box at body 0.5); the presets carry the instrument |
 | 23 | Ship: only when the owner says |
 
-## If the owner picks the generator-sound items back up
-| Item | What | Pointers |
-|---|---|---|
-| 15 | Synths low end | Wavetable and Analog lines under the motif, then refit the synths spectral gate (`spectral_gates.py`) so octave 3 can pass. Bar: synths centroid and low share toward the library. |
-| 16 | Bass and kick click transients | SubLab transient samples in `~/Infinite/musical_datasets/6_sub_bass_and_kicks/sublab`. Bar: click measure against the library. |
-| 18 | Textures merged with foley | Bar: textures against the library. |
-| 19 | Diva closed loop | `vital_voice_bank.py --diva`. Diva rows are held out (`BankVoice` keeps `src == 0`) because they made leads and synths darker. Bar: no darker. |
+## Next
+1. DSP review of every synth and audio-effect node (owner asked 2026-10-30): per node, the algorithm against its
+   reference (Smith, Välimäki, Zölzer, Pirkle, Farnell), aliasing, denormals, level, parameter law; measured with the
+   existing render tools (own_sweeps, click_measure, band_measure). Output: a ranked fix list, then fixes one by one.
+2. Item 19, Diva closed loop: `vital_voice_bank.py --diva`; Diva rows held out (`BankVoice` keeps `src == 0`). Bar: no darker.
 
 ## Item 23, ship (needs the owner)
 Desktop deploy of what passed (`scripts/deploy_desktop.sh`, headless smoke with 0 fails). Before any push, reconcile `main`
