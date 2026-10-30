@@ -30,6 +30,7 @@ namespace app
             { "session", &gSessionPanelOpen, nullptr, false },
             { "samplestudio", &gSampleStudioOpen, &gSampleStudioDock, false },
             { "pianoroll", &gPianoRollOpen, &gPianoRollDock, false },
+            { "view3d", &gView3DOpen, &gView3DDock, false },
             { "terminal", &gTerminalOpen, &gTerminalDock, true },
             { "showset", &gShowSetOpen, nullptr, false },
             { "history", &gHistoryOpen, nullptr, false },

@@ -131,7 +131,7 @@ void DrawLayout(FrameCtx& fc)
          gArrangeClaimedKeys = inArrange;
          gSessionClaimedKeys = inSession;
          gArrangeFocused = inArrange || inSession || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                           (gPianoRollOpen && gPianoRollClaimedKeys);
+                           (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -143,7 +143,7 @@ void DrawLayout(FrameCtx& fc)
          if (!gSessionPanelOpen)
             gSessionClaimedKeys = false;
          gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
-                        (gPianoRollOpen && gPianoRollClaimedKeys);
+                        (gPianoRollOpen && gPianoRollClaimedKeys) || (gView3DOpen && gView3DClaimedKeys);
 
          if (!gPerfPanelOpen)
          {
@@ -274,6 +274,11 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gSampleStudioHeight;
          topBottomRows++;
       }
+      if (gView3DOpen)
+      {
+         gView3DHeight = std::clamp(gView3DHeight, 300.0f, std::max(300.0f, ImGui::GetContentRegionAvail().y * 0.8f));
+         topBottom += gView3DHeight;
+      }
       if (gPianoRollOpen)
       {
          gPianoRollHeight = std::clamp(gPianoRollHeight, 240.0f, std::max(240.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
@@ -313,6 +318,8 @@ void DrawLayout(FrameCtx& fc)
          DrawSampleStudioDocked("##samplestudio_top", ImVec2(0, gSampleStudioHeight));
       if (gPianoRollOpen && gPianoRollDock == 3)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
+      if (gView3DOpen && gView3DDock == 3)
+         DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
       if (gTerminalOpen && gTerminalDock == 3)
          DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       if (viewportLeft)

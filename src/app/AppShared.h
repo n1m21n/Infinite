@@ -5767,6 +5767,16 @@ void DrawPianoRollDocked(const char* id, const ImVec2& size);
 void PianoRollOpenPage(uint64_t laneId);
 // True while the pointer is over the panel: its keys beat the canvas's (the Timeline's rule).
 extern bool gPianoRollClaimedKeys;
+extern bool gView3DOpen;
+extern float gView3DHeight;
+extern int gView3DDock; // 0 = bottom, 3 = top
+extern bool gView3DClaimedKeys;
+extern ImVec2 gView3DRectMin, gView3DRectMax;
+void DrawView3DDocked(const char* id, const ImVec2& size);
+bool View3DCanAdd(const GraphNode& gn);
+bool View3DCanSetWorld(const GraphNode& gn);
+void View3DAddNode(GraphNode& gn);
+void View3DSetWorld(GraphNode& gn);
 extern ImVec2 gPianoRollRectMin, gPianoRollRectMax;
 // A Library .mid released over the Piano Roll; the panel imports it next frame.
 extern std::string gPianoRollPendingDrop;

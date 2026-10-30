@@ -94,6 +94,10 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
                g->on = !g->on;
+            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
+               View3DAddNode(*gn);
+            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
+               View3DSetWorld(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -149,6 +153,10 @@ void DrawPopupsA(FrameCtx& fc)
                gColor.label = "colour";
                gColor.justOpened = true;
             }
+            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
+               View3DAddNode(*gn);
+            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
+               View3DSetWorld(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -205,6 +213,10 @@ void DrawPopupsA(FrameCtx& fc)
                   RebuildAudioTopology();
                }
             }
+            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
+               View3DAddNode(*gn);
+            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
+               View3DSetWorld(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))

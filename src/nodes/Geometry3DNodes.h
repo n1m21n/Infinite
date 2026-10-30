@@ -252,6 +252,10 @@ public:
    virtual int GroupChildCount() const { return 0; }
    virtual IGeometrySource* GroupChild(int /*index*/) const { return nullptr; }
 
+   // Which of the render's lights reach this source, one bit per light. All of
+   // them by default; only the 3D View's placed sources narrow it.
+   virtual unsigned int LightMask() const { return ~0u; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
@@ -536,7 +540,9 @@ class Render3DNode : public INode
 public:
    static const int kSlots = 4;
    // Most sources one Render 3D draws once Group 3D containers are expanded.
-   static const int kMaxDraw = 64;
+   static const int kMaxDraw = 256;
+   // Lights the shader can take. The pins stop at kLightSlots; a Rig may use all of these.
+   static const int kMaxLights = 8;
 
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
@@ -578,6 +584,30 @@ public:
    // the flat bgColor clear while still using the HDRI for lighting and
    // reflections - useful when compositing the render over something else.
    bool envAsBackground = true;
+
+   // The 3D View's override of this render's view and lights (Scene3DNode owns
+   // it). A camera or light placed in a scene is the node's own result moved by
+   // the placement, so it arrives here already computed rather than as a node.
+   struct RigLight
+   {
+      float vec[3] = { 0, 1, 0 };
+      float color[3] = { 1, 1, 1 };
+      float intensity = 1.0f;
+      int type = 0;
+      float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
+   };
+   struct Rig
+   {
+      bool hasView = false;
+      Mat4 view;
+      float eye[3] = { 0, 0, 0 };
+      class CameraNode* lens = nullptr;  // projection comes from it; null = this node's fov
+      bool hasLights = false;
+      std::vector<RigLight> lights;
+      bool wireframe = false;
+      unsigned long long revision = 0;   // bumped by the owner on any change above
+   };
+   const Rig* rig = nullptr;
 
    const char* InputLabel(int slot) const override
    {
@@ -871,6 +901,7 @@ private:
       std::vector<size_t> instanceCount;
       std::vector<Mat4> instanceGroupMatrix;
       bool envConnected = false;
+      unsigned long long rigRevision = 0;
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
       float envIntensity = 1.0f;
@@ -879,6 +910,8 @@ private:
 
       bool operator==(const SceneSignature& o) const
       {
+         if (rigRevision != o.rigRevision)
+            return false;
          if (animated || o.animated || texturedMaterial || o.texturedMaterial)
             return false; // never treated as a cache hit
          if (own != o.own || hasCamera != o.hasCamera || camera != o.camera)
@@ -912,6 +945,10 @@ private:
    // World-space bounds of everything patched in, from the cached per-slot
    // object-space boxes pushed through each source's model matrix.
    bool SceneBounds(float outLo[3], float outHi[3]);
+public:
+   // World box of one source of the last draw, from the same bounds.
+   bool SourceBounds(const IGeometrySource* source, float outLo[3], float outHi[3]) const;
+private:
 
    // Resolve target: a plain texture, and what the rest of the graph reads.
    unsigned int mFbo = 0;

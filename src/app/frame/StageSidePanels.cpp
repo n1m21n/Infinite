@@ -711,6 +711,8 @@ void DrawSidePanels(FrameCtx& fc)
       // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
       if (gPianoRollOpen && gPianoRollDock != 3)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
+      if (gView3DOpen && gView3DDock != 3)
+         DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
       // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
       if (gTerminalOpen && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));

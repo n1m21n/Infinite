@@ -453,14 +453,15 @@ namespace
       "uniform sampler2D uSceneColor;\n"
       "uniform float uSceneMaxLod;\n"
       "uniform vec2 uScreenSize;\n"
-      "uniform vec3 uLightDir[3];\n"
-      "uniform vec3 uLightColor[3];\n"
-      "uniform float uLightIntensity[3];\n"
-      "uniform int uLightType[3];\n"
-      "uniform float uLightSpotAngle[3];\n"
-      "uniform float uLightSpotPenumbra[3];\n"
-      "uniform vec2 uLightArea[3];\n"
+      "uniform vec3 uLightDir[8];\n"
+      "uniform vec3 uLightColor[8];\n"
+      "uniform float uLightIntensity[8];\n"
+      "uniform int uLightType[8];\n"
+      "uniform float uLightSpotAngle[8];\n"
+      "uniform float uLightSpotPenumbra[8];\n"
+      "uniform vec2 uLightArea[8];\n"
       "uniform int uLightCount;\n"
+      "uniform int uLightMask;\n"
       "uniform vec3 uAmbient;\n"
       "uniform float uRim;\n"
       "uniform vec3 uCamPos;\n"
@@ -776,8 +777,9 @@ namespace
       "      tangent = tRot;\n"
       "   }\n"
       "\n"
-      "   for (int i = 0; i < 3; i++) {\n"
+      "   for (int i = 0; i < 8; i++) {\n"
       "      if (i >= uLightCount) break;\n"
+      "      if ((uLightMask & (1 << i)) == 0) continue;\n"
       "      if (uLightType[i] == 3) {\n"
       "         col += base * (1.0 - metal) * toLinear(uLightColor[i]) * uLightIntensity[i];\n"
       "         continue;\n"
@@ -1260,6 +1262,34 @@ static bool IsCloudSource(IGeometrySource* s)
    return s->GetGpuPoints() != nullptr || s->GetPointCloud() != nullptr;
 }
 
+bool Render3DNode::SourceBounds(const IGeometrySource* source, float outLo[3], float outHi[3]) const
+{
+   for (int i = 0; i < (int)mDraw.size() && i < (int)mGpu.size(); i++)
+   {
+      if (mDraw[i] != source || !mGpu[i].hasBounds)
+         continue;
+      const Mat4 model = IsCloudSource(mDraw[i]) ? Mat4::Identity() : mDraw[i]->GetModelMatrix();
+      for (int k = 0; k < 3; k++) { outLo[k] = 1e30f; outHi[k] = -1e30f; }
+      for (int corner = 0; corner < 8; corner++)
+      {
+         const float c[3] = {
+            (corner & 1) ? mGpu[i].hi[0] : mGpu[i].lo[0],
+            (corner & 2) ? mGpu[i].hi[1] : mGpu[i].lo[1],
+            (corner & 4) ? mGpu[i].hi[2] : mGpu[i].lo[2]
+         };
+         for (int k = 0; k < 3; k++)
+         {
+            const float w = model.m[k] * c[0] + model.m[4 + k] * c[1] +
+                            model.m[8 + k] * c[2] + model.m[12 + k];
+            outLo[k] = std::min(outLo[k], w);
+            outHi[k] = std::max(outHi[k], w);
+         }
+      }
+      return true;
+   }
+   return false;
+}
+
 bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 {
    outLo[0] = outLo[1] = outLo[2] = 1e30f;
@@ -1713,6 +1743,7 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       }
    }
 
+   sig.rigRevision = rig != nullptr ? rig->revision : 0;
    sig.envConnected = envInput.IsConnected();
    if (sig.envConnected)
    {
@@ -1840,6 +1871,13 @@ void Render3DNode::CookOnce(int frameId)
          ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
    }
+   if (rig != nullptr && rig->hasView)
+   {
+      view = rig->view;
+      eye[0] = rig->eye[0]; eye[1] = rig->eye[1]; eye[2] = rig->eye[2];
+      if (rig->lens != nullptr)
+         proj = rig->lens->ProjectionMatrix(aspect);
+   }
    if (mFaceOverride >= 0)
    {
       // One 90 degree face of the cube around the eye, in the GL cube map's
@@ -1891,15 +1929,41 @@ void Render3DNode::CookOnce(int frameId)
    const float camUp[3] = { view.m[1], view.m[5], view.m[9] };
 
    // Gather lights: patched Light nodes win, otherwise the built-in one.
-   float lightDirs[kLightSlots * 3] = { 0 };
-   float lightCols[kLightSlots * 3] = { 0 };
-   float lightPower[kLightSlots] = { 0 };
-   int lightTypes[kLightSlots] = { 0 };
-   float lightSpotAngle[kLightSlots] = { 45.0f, 45.0f, 45.0f };
-   float lightSpotPenumbra[kLightSlots] = { 0.2f, 0.2f, 0.2f };
-   float lightArea[kLightSlots * 2] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+   float lightDirs[kMaxLights * 3] = { 0 };
+   float lightCols[kMaxLights * 3] = { 0 };
+   float lightPower[kMaxLights] = { 0 };
+   int lightTypes[kMaxLights] = { 0 };
+   float lightSpotAngle[kMaxLights];
+   float lightSpotPenumbra[kMaxLights];
+   float lightArea[kMaxLights * 2];
+   for (int i = 0; i < kMaxLights; i++)
+   {
+      lightSpotAngle[i] = 45.0f;
+      lightSpotPenumbra[i] = 0.2f;
+      lightArea[i * 2] = lightArea[i * 2 + 1] = 1.0f;
+   }
    int lightCount = 0;
-   for (int i = 0; i < kLightSlots; i++)
+   if (rig != nullptr && rig->hasLights)
+   {
+      for (const RigLight& l : rig->lights)
+      {
+         if (lightCount >= kMaxLights)
+            break;
+         for (int k = 0; k < 3; k++)
+         {
+            lightDirs[lightCount * 3 + k] = l.vec[k];
+            lightCols[lightCount * 3 + k] = l.color[k];
+         }
+         lightPower[lightCount] = l.intensity;
+         lightTypes[lightCount] = l.type;
+         lightSpotAngle[lightCount] = l.spotAngle;
+         lightSpotPenumbra[lightCount] = l.spotPenumbra;
+         lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
+         lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
+         lightCount++;
+      }
+   }
+   for (int i = 0; i < kLightSlots && (rig == nullptr || !rig->hasLights); i++)
    {
       if (lights[i] == nullptr)
          continue;
@@ -2128,6 +2192,8 @@ void Render3DNode::CookOnce(int frameId)
 
    glEnable(GL_BLEND);
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+   if (rig != nullptr && rig->wireframe)
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
    mProgram = mProgramFull;
    mLastTriangles = 0;
@@ -2148,13 +2214,13 @@ void Render3DNode::CookOnce(int frameId)
       glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
       glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
       glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
-      glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
-      glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
-      glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
-      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
-      glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kLightSlots, lightArea);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kMaxLights, lightDirs);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kMaxLights, lightCols);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kMaxLights, lightPower);
+      glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kMaxLights, lightTypes);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kMaxLights, lightSpotAngle);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
+      glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kMaxLights, lightArea);
       glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
       glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
       glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
@@ -2453,6 +2519,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
+      glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
@@ -2864,6 +2931,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
+      glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
@@ -3127,6 +3195,8 @@ void Render3DNode::CookOnce(int frameId)
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);
    if (!prevCull) glDisable(GL_CULL_FACE);
+   if (rig != nullptr && rig->wireframe)
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
    if (!prevBlend) glDisable(GL_BLEND);
    if (prevScissor)
    {

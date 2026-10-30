@@ -524,6 +524,7 @@ set(COMMON_SOURCES
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
+    src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
@@ -763,6 +764,7 @@ set(COMMON_SOURCES
     src/nodes/LSystemNode.cpp
     src/nodes/GenerativeNodes.cpp
     src/nodes/GeometryOpNodes.cpp
+    src/nodes/Scene3DNode.cpp
     src/nodes/GeometryFeedbackNode.cpp
     src/nodes/FieldElementNode.cpp
     src/nodes/FieldPrimitiveNode.cpp

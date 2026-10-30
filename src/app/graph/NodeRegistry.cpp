@@ -5,6 +5,11 @@ namespace app
 {
    void RegisterNodes()
    {
+      Scene3DNode::ResolveUid = [](uint64_t uid) -> INode*
+      {
+         GraphNode* gn = FindNodeByUid(uid);
+         return gn != nullptr ? gn->node.get() : nullptr;
+      };
 #ifndef NDEBUG
       if (getenv("INFINITE_PREDBINDTEST") != nullptr)
          REGISTER_NODE(StubPredictorNode, Stub Predictor, "Modulators");
@@ -112,6 +117,7 @@ namespace app
       REGISTER_NODE(MergeByDistanceNode, Merge by Distance, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
       REGISTER_NODE(Group3DNode, Group 3D, "3D");
+      REGISTER_NODE(Scene3DNode, 3D View, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");

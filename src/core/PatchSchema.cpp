@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <map>
 #include <set>
+#include <sstream>
 
 namespace PatchSchema
 {
@@ -765,6 +766,38 @@ namespace PatchSchema
             errors.push_back(Make("E_NO_OUTPUT", "the patch has no Output node", 0, -1, "add a node 'Utility Output' and cable your image into it"));
          else if (terminals.empty())   // an audio-only patch (Audio Out / Spatial Mixer) is complete: it is measured, not rendered
             warnings.push_back(Make("W_NO_OUTPUT", "the patch has no Output node, so it cannot be rendered", 0, -1));
+      }
+      // A 3D View reads its sources by uid, so its scene text is its cables.
+      for (const Patch::NodeRecord& n : data.nodes)
+      {
+         if (n.typeName != "3D View")
+            continue;
+         for (const auto& param : n.params)
+         {
+            if (param.first != "s scene")
+               continue;
+            std::string text = param.second;
+            for (size_t at = text.find("\\n"); at != std::string::npos; at = text.find("\\n", at))
+               text.replace(at, 2, "\n");
+            std::istringstream lines(text);
+            std::string line, key;
+            while (std::getline(lines, line))
+            {
+               std::istringstream l(line);
+               uint64_t uid = 0;
+               int id = 0;
+               l >> key;
+               if (key == "item")
+                  l >> id >> uid;
+               else if (key == "world")
+                  l >> uid;
+               if (uid == 0)
+                  continue;
+               for (const Patch::NodeRecord& src : data.nodes)
+                  if (src.uid == uid)
+                     flowsTo.insert({ src.index, n.index });
+            }
+         }
       }
       std::multimap<int, int> flowsFrom;
       for (const auto& kv : flowsTo)
