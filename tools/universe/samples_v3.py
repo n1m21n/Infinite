@@ -48,8 +48,9 @@ def measure_file(src):
         elif len(x) < 2 * rate and len(x) > 0.2 * rate:
             pad = np.concatenate([x, np.zeros(int(2.05 * rate) - len(x))]); r["detail"] = det.measure(pad, rate, name_midi(src)[1] if nm and nm[1] else 60, hold=min(1.5, 0.6 * len(x) / rate))
         d = r.get("detail")
-        if d and d.get("f0"):
-            r["pitch_pc"] = int(round(12 * math.log2(d["f0"] / 440.0) + 69)) % 12
+        f0 = d and (d.get("f0_hs") or d.get("f0"))    # harmonic sum first (pitch_check.py), YIN where it had no answer
+        if f0 and math.isfinite(f0):
+            r["pitch_pc"] = int(round(12 * math.log2(f0 / 440.0) + 69)) % 12
     except Exception as e:  # keep the row, say why
         r["error"] = "%s: %s" % (type(e).__name__, str(e)[:80])
     return r

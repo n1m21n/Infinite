@@ -1022,3 +1022,32 @@ Family test (`string_families.py --set wind`, 400 presets at C3 and C4, ratio as
 - Same limit as String: renders at two pitches against libraries at every pitch, and 400 random presets over a narrow engine
   against Wavetable's huge space. Next: render the families' own pitches (STIM notes), a brighter breath (a reed-table slope
   per breath), and an onset noise burst; then rerun.
+
+## 2026-10-30 Plan item 11: pitch from audio, harmonic sum (`detail.hsum`, `pitch_check.py` -> `eval/pitch_check.json`): MET except mallets
+`detail.hsum`: subharmonic summation (Hermes 1988). The averaged amplitude spectrum goes onto a 10-cent log grid, taking the max over
+±30 cents so stretched piano partials still count. Score(f) = sum over 12 harmonics of 0.84^(h-1) A(h f), for f from 27 Hz to 2.1 kHz.
+`detail.measure` now also returns `f0_hs`; `samples_v3.py` takes its pitch class from `f0_hs` first and falls back to YIN.
+Test set: drive files named with exactly one note+octave (no loop/bpm/chord/arp in the name), grouped into 10 families by path,
+160 per family at seed 7 (1,600 files, 1,580 measurable). Pitch class only, because libraries disagree on which octave is C3.
+The rule (YIN, harmonic sum, or harmonic sum where the two disagree above a salience threshold) was chosen on split A; the
+report is on split B:
+
+| Family | n (B) | YIN | harmonic sum (shipped) | bar 90 |
+|---|---|---|---|---|
+| bass | 84 | 89.3 | 92.9 | PASS |
+| brass | 80 | 98.8 | 100.0 | PASS |
+| guitar | 76 | 96.1 | 96.1 | PASS |
+| mallet | 79 | 72.2 | 78.5 | MISS |
+| organ | 83 | 98.8 | 100.0 | PASS |
+| piano | 77 | 90.9 | **96.1** (33% in the old 6-file count) | PASS |
+| strings | 70 | 98.6 | 97.1 | PASS |
+| synth | 72 | 88.9 | 95.8 | PASS |
+| vocal | 80 | 100.0 | 100.0 | PASS |
+| wind | 79 | 98.7 | 100.0 | PASS |
+
+- Split A chose the plain harmonic sum (family mean 96.0% against YIN's 93.1%). A YIN fallback only lost accuracy.
+- Mallets miss. 14 of the 26 misses are one synthetic "Error Bell" pack named down to G0, and the rest are tubular bells,
+  glass xylophone and a vibraslap. These are inharmonic sounds with no single harmonic pitch. Without bells and slaps it is
+  84.2%, but on only 19 files, so this is a recorded miss and not a claim.
+- `frame_features` (loop/take features) has no f0, and one f0 means nothing for a loop, so the estimator lives in the
+  single-note path (`detail.py`).

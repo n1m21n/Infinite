@@ -5,7 +5,7 @@
 
 measure(seg, rate, midi, hold) takes ONE note window (mono samples, the note starts at 0 and is released at `hold` seconds) and gives
 
-  scalars (axis columns, G2)   f0 (Hz, YIN), tuning (cents against the played note), inharmonicity (cents), oddeven (dB odd - even
+  scalars (axis columns, G2)   f0 (Hz, YIN), f0_hs (Hz, harmonic sum; the better pitch, pitch_check.py), tuning (cents against the played note), inharmonicity (cents), oddeven (dB odd - even
                                power of the harmonic partials), partial_roughness (Sethares on the real partials), partial_decay
                                (dB/s, median of the 8 strongest), f1 / f2 (Hz, axis 21), glide (semitones/s, axis 22), space (dB,
                                axis 20), vibrato_rate / vibrato_depth (Hz, cents), tremolo_rate / tremolo_depth (Hz, dB),
@@ -102,6 +102,38 @@ def yin(x, rate, t0, t1, fmin=30.0, fmax=1500.0, thr=0.15, hop_s=0.01, W=2048):
         den = a_ - 2 * b_ + c_
         f0[i] = rate / (tau + (0.5 * (a_ - c_) / den if abs(den) > 1e-12 else 0.0))
     return (starts + L / 2) / rate, f0
+
+
+def hsum(x, rate, t0, t1, fmin=27.0, fmax=2100.0, H=12, w=0.84, tol_c=30.0):
+    """Subharmonic summation (Hermes 1988) on x between t0 and t1 seconds: the average amplitude spectrum moved onto a 10-cent
+    log grid (max over +-tol_c cents, so stretched piano partials still count), then score(f) = sum_h w^(h-1) A(h f) over the
+    candidates fmin..fmax. A sub-octave only collects every other harmonic at a weight w lower, so the true f wins where YIN can
+    lock onto a partial. Returns (f0 Hz, salience 0..1 = best score / score with every harmonic at full height), nan if silent."""
+    a, b = int(t0 * rate), min(int(t1 * rate), len(x))
+    seg = np.ascontiguousarray(x[a:b], np.float64); n = 16384
+    if len(seg) < n:
+        seg = np.concatenate([seg, np.zeros(n - len(seg))])
+    P = (np.abs(np.fft.rfft(_strided(seg, n, n // 2) * np.hanning(n), axis=1)) ** 2).mean(0)
+    if P.max() <= 1e-18:
+        return np.nan, 0.0
+    A = np.sqrt(P / P.max()); fr = np.fft.rfftfreq(n, 1 / rate)
+    top = min(8000.0, 0.45 * rate); g = fmin * 2 ** (np.arange(int(1200 * np.log2(top / fmin) / 10)) / 120)
+    lo = np.searchsorted(fr, g * 2 ** (-tol_c / 1200)); hi = np.searchsorted(fr, g * 2 ** (tol_c / 1200))
+    L = np.interp(g, fr, A)
+    for i in np.nonzero(hi > lo)[0]:
+        L[i] = max(L[i], A[lo[i]:hi[i]].max())
+    nc = int(1200 * np.log2(fmax / fmin) / 10) + 1; S = np.zeros(nc); full = sum(w ** h for h in range(H))
+    for h in range(1, H + 1):
+        k = int(round(120 * np.log2(h)))
+        m = min(nc, len(L) - k)
+        if m > 0:
+            S[:m] += w ** (h - 1) * L[k:k + m]
+    i = int(np.argmax(S))
+    if 0 < i < nc - 1:
+        den = S[i - 1] - 2 * S[i] + S[i + 1]; off = 0.5 * (S[i - 1] - S[i + 1]) / den if den < -1e-12 else 0.0
+    else:
+        off = 0.0
+    return float(fmin * 2 ** ((i + off) / 120)), float(S[i] / full)
 
 
 # ---- partials -------------------------------------------------------------------------------------------------------------
@@ -285,6 +317,7 @@ def measure(seg, rate, midi, hold=1.5, heavy=True):
         return None
     tt, f0s = yin(x, rate, 0.02, hold)
     d = modulation(x, rate, hold, tt, f0s, midi)
+    d["f0_hs"] = hsum(x, rate, 0.02, hold)[0]                              # harmonic sum: right more often than YIN per family (pitch_check.py)
     part, _ = partials(x, rate, hold)
     f0 = d["f0"] if np.isfinite(d["f0"]) else 440 * 2 ** ((midi - 69) / 12)
     d.update(harmonic_stats(part, f0))
@@ -366,6 +399,7 @@ def run_checks():
                and abs(g("tremolo", "tremolo_depth") - 2.2) < 0.8),
               ("formants: 700 / 1200 Hz read within 150 / 250 Hz", g("vowel", "f1") is not None and abs(g("vowel", "f1") - 700) < 150
                and g("vowel", "f2") is not None and abs(g("vowel", "f2") - 1200) < 250),
+              ("harmonic-sum f0: saw and square at 220 Hz within 1%", abs(g("saw", "f0_hs") - 220) < 2.2 and abs(g("square", "f0_hs") - 220) < 2.2),
               ("partials: saw gives 39 peaks, first at 220 Hz", len(R["saw"]["partials"]) >= 30 and abs(R["saw"]["partials"][0][0] - 220) < 3),
               ("partial decay: bell partials fall faster than the sustained sine", g("bell", "partial_decay") < g("sine", "partial_decay") - 3),
               ("noise share: noise >> sine (> 20 dB more)", g("noise", "noise_share") > g("sine", "noise_share") + 20),
