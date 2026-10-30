@@ -412,8 +412,32 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::EndMenu();
             }
 
-            MenuParts::Check(L("Sample Studio"), &gSampleStudioOpen);
-            MenuParts::Check(L("Piano Roll"), &gPianoRollOpen);
+            // Sample Studio and Piano Roll dock at the bottom or the top, like the Timeline.
+            auto dockedPanelMenu = [](const char* name, const char* show, bool& open, int& dock, float& height, const char* dockId) {
+               if (!MenuParts::SubMenu(name))
+                  return;
+               MenuParts::Check(show, &open);
+               if (open)
+               {
+                  ImGui::SetNextItemWidth(150);
+                  FieldWell::PushStyle();
+                  static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                  int side = dock == 3 ? 1 : 0;
+                  if (MenuParts::BeginCombo(dockId, T(kDockNames[side])))
+                  {
+                     for (int i = 0; i < 2; ++i)
+                        if (MenuParts::Choice(L(kDockNames[i]), i == side))
+                           dock = i == 1 ? 3 : 0;
+                     MenuParts::EndCombo();
+                  }
+                  FieldWell::PopStyle();
+                  ImGui::SetNextItemWidth(150);
+                  FieldWell::Slider(L("Height"), &height, 200.0f, 800.0f, "%.0f px");
+               }
+               ImGui::EndMenu();
+            };
+            dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
+            dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
 
             if (MenuParts::SubMenu(L("Show Set")))
             {

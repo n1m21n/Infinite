@@ -1637,7 +1637,7 @@ namespace
       if (!haveMidi)
          ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", haveMidi ? T("Record notes from your MIDI controller while the transport plays")
+         HelpTip("%s", haveMidi ? T("Record notes from your MIDI controller while the transport plays (R)")
                                 : T("Connect a MIDI controller to record"));
       FormParts::Inline(0.0f, gap);
       if (IconChip("##pianoSettings", IconsInfinite::Edit, s.settingsOpen || s.genOpen, T("Settings for the page, clip or note")))
@@ -2959,6 +2959,8 @@ namespace
          ArrangeSetLoopEdgeAtPlayhead(true);
       else if (noMods && key(ImGuiKey_O))
          ArrangeSetLoopEdgeAtPlayhead(false);
+      else if (noMods && key(ImGuiKey_R) && !Platform::MidiDeviceSummary().empty())
+         s.recording = !s.recording;
    }
 
    void DrawPage(Arrange::Lane& page)

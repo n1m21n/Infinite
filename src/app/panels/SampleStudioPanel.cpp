@@ -149,6 +149,9 @@ namespace
       uint16_t primary = 0;               // the one the inspector shows
       std::vector<Snapshot> undo, redo;
       std::string status;                 // a line under the toolbar when something failed
+      bool recording = false;             // capturing the audio input into recL/recR
+      uint64_t recCursor = 0;
+      std::vector<float> recL, recR;
       // View, in source frames.
       double viewStart = 0.0, viewLen = 1.0;
       float level = 1.0f; // vertical zoom
@@ -590,6 +593,84 @@ namespace
       ClampView();
       s.dirty = true;
       AudioEngine::Instance().StudioLoop().Restart();
+   }
+
+   // Audio in: record the system input into a new sample. Offered only while an input device exists.
+   bool HasAudioInput()
+   {
+      for (const Platform::AudioDeviceInfo& d : Platform::AudioListDevices())
+         if (d.isInput && d.inputChannels > 0)
+            return true;
+      return false;
+   }
+
+   void StopRecording(bool keep)
+   {
+      Studio& s = S();
+      if (!s.recording)
+         return;
+      s.recording = false;
+      Platform::AudioInputCaptureRemoveRef();
+      if (keep && s.recL.size() > 1024)
+      {
+         const double sr = AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate;
+         auto a = std::make_shared<SourceAudio>();
+         a->sr = sr;
+         a->l = std::move(s.recL);
+         a->r = std::move(s.recR);
+         const int n = (int)a->l.size();
+         std::vector<float> inter((size_t)n * 2);
+         for (int i = 0; i < n; i++)
+         {
+            inter[(size_t)i * 2] = a->l[(size_t)i];
+            inter[(size_t)i * 2 + 1] = a->r[(size_t)i];
+         }
+         const std::string path = AudioRecordings::GenerateFilePath("studio-rec");
+         const bool saved = AudioRecordings::WriteWav(path, inter.data(), n, sr, 2);
+         if (s.src)
+            PushUndo();
+         s.status = saved ? std::string(T("Recorded")) + " " + path : std::string(T("Recorded (not saved to disk)"));
+         SetSource(std::move(a), saved ? path : std::string(), std::nullopt, false);
+      }
+      s.recL.clear();
+      s.recR.clear();
+   }
+
+   void StartRecording()
+   {
+      Studio& s = S();
+      if (s.recording || !HasAudioInput())
+         return;
+      s.recL.clear();
+      s.recR.clear();
+      s.recCursor = 0;
+      s.recording = true;
+      Platform::AudioInputCaptureAddRef();
+      s.status = T("Recording from the audio input. Press I to stop");
+   }
+
+   // Per frame: pull what the device captured since last frame (the ring holds about a second).
+   void PollRecording()
+   {
+      Studio& s = S();
+      if (!s.recording)
+         return;
+      std::string err;
+      Platform::AudioInputCapturePump(err);
+      float bufL[4096], bufR[4096];
+      float* chans[2] = { bufL, bufR };
+      for (int guard = 0; guard < 64; guard++)
+      {
+         const int got = Platform::AudioInputCaptureRead(chans, 4096, 2, s.recCursor, 0, false);
+         if (got <= 0)
+            break;
+         s.recL.insert(s.recL.end(), bufL, bufL + got);
+         s.recR.insert(s.recR.end(), bufR, bufR + got);
+         if (got < 4096)
+            break;
+      }
+      if (s.recL.size() > (size_t)kRate * 600)
+         StopRecording(true); // ten minutes is plenty for one sample
    }
 
    bool LoadFile(const std::string& path)
@@ -1925,6 +2006,8 @@ namespace
          EditSelected([](SliceParams& p) { p.solo = !p.solo; });
       else if (ImGui::IsKeyPressed(ImGuiKey_R, false))
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
+      else if (ImGui::IsKeyPressed(ImGuiKey_I, false))
+         s.recording ? StopRecording(true) : StartRecording();
    }
 
    // The palette as small chips, the first "by position"; a click colours the selection. True when one was picked.
@@ -2733,6 +2816,13 @@ namespace
          if (!p.empty())
             LoadFile(p);
       }
+      if (HasAudioInput() || s.recording)
+      {
+         FormParts::Inline(0.0f, in);
+         if (IconChip("##studioRecord", s.recording ? IconsInfinite::RecordFill : IconsInfinite::Record, s.recording,
+                      s.recording ? T("Stop recording (I)") : T("Record the audio input into a new sample (I)")))
+            s.recording ? StopRecording(true) : StartRecording();
+      }
       FormParts::Inline(0.0f, in);
       if (TextChip(L("Generate##studioGen"), s.busy ? ActionButton::Kind::Go : ActionButton::Kind::Primary))
       {
@@ -2963,6 +3053,7 @@ namespace
       }
       TakeDrops();
       PollOnsets();
+      PollRecording();
       PumpRender();
       StudioLoopPlayer& player = AudioEngine::Instance().StudioLoop();
       player.SetGain(gAudioMode == AudioMode::Studio ? 0.8f : 0.0f);
@@ -2993,7 +3084,10 @@ namespace
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_1));
          if (MenuParts::Item(L("Close Sample Studio")))
+         {
+            StopRecording(false);
             gSampleStudioOpen = false;
+         }
          MenuParts::EndPopup();
       }
       if (!s.status.empty())
