@@ -17,9 +17,12 @@
 #include "nodes/OutputNode.h"
 #include "nodes/Scene3DNode.h"
 #include "nodes/SceneNodes.h"
+#include "Transport.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -54,14 +57,12 @@ namespace
 
    Shading sShading = Shading::Solid;
    bool sCameraView = false;
-   bool sSnap = false;
    bool sGrid = true;
    bool sOrtho = false;
    bool sAutoOrtho = false;        // an axis view went orthographic; orbiting gives it back
    bool sSideOpen = true;
    int sViewName = -1;             // 0..5 while looking straight down an axis
    int sGridAxis = 1;
-   float sSnapMove = 0.25f, sSnapRot = 15.0f, sSnapScale = 0.1f;
    int sTab = 0;                    // the settings tab
    int sLensUnit = 0;               // 0 millimeters, 1 field of view
    bool sLockCam = false;           // navigating in camera view moves the camera
@@ -69,18 +70,29 @@ namespace
    bool sLockUndo = false;
    bool sToolKey = false;           // Shift+Space was pressed; the next key picks the tool
    int sPadDrag = 0;                // 1 zoom, 2 pan, by dragging the toolpad
-   float sPassAlpha = 0.5f;
-   bool sSafe = false, sGuideThirds = false, sGuideCenter = false, sGuideGolden = false;
-   float sSafeTitle = 0.035f, sSafeAction = 0.05f;
    int sTool = 1;                  // 0 select, 1 move, 2 rotate, 3 scale
    int sHot = -1;                  // last frame's handle: 0-2 axes, 3 centre, 4-6 planes
    std::vector<int> sSel;
-   int sDuration = 15, sFps = 60;
+   std::vector<int> sLocal;        // local view: only these, empty when off
+   bool sOverlays = true;
+   bool sZoomArmed = false, sBoxZoom = false;   // Shift+B, then a box to zoom into
+   int sReduceTo = 0;              // a click inside a selection narrows it on release, not a drag
+   float sCamZoom = 1.0f;          // how close the camera frame is drawn
+   ImVec2 sCamPan(0, 0);
+   int sRename = 0;
+   bool sRenameFocus = false;
+   char sRenameBuf[96] = "";
+   char sSearch[64] = "";
+   uint64_t sSceneUid = 0;         // the 3D View node last selected on the canvas
+
+   // What the scene remembers. Points at the shown scene's own settings while the panel draws.
+   Scene3DNode::Settings sNoScene;
+   Scene3DNode::Settings* sSet = &sNoScene;
 
    float sTarget[3] = { 0, 0, 0 };
    float sDist = 6.0f, sAz = 0.7f, sEl = 0.4f;
 
-   bool sBoxOn = false, sTweak = false, sRightOk = false, sNavDrag = false, sOpenAdd = false, sOpenMenu = false;
+   bool sBoxOn = false, sTweak = false, sRightOk = false, sNavDrag = false, sOpenAdd = false, sOpenMenu = false, sOpenPivot = false, sOpenOrient = false;
    ImVec2 sPressAt;
 
    // Spawning moves gNodes, so anything that makes a node waits until the frame's
@@ -107,11 +119,12 @@ namespace
       char mode = 0;               // 'g', 'r', 's'
       int axis = -1;
       int plane = -1;              // moves in the plane facing this axis
-      bool local = false;
+      int orient = 0;              // 0 global, 1 local, 2 view
       bool gizmo = false;
       ImVec2 start;
       float pivot[3] = { 0, 0, 0 };
       std::vector<Item> before;
+      std::vector<float> centers;  // three per item, for individual origins
       std::string typed;
    } sOp;
 
@@ -138,20 +151,37 @@ namespace
       out[2] = a[0] * b[1] - a[1] * b[0];
    }
 
-   Scene3DNode* FindScene()
-   {
-      for (GraphNode& gn : gNodes)
-         if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
-            return s;
-      return nullptr;
-   }
-
    GraphNode* SceneGraphNode()
    {
+      if (GraphNode* chosen = sSceneUid != 0 ? FindNodeByUid(sSceneUid) : nullptr)
+         if (dynamic_cast<Scene3DNode*>(chosen->node.get()) != nullptr)
+            return chosen;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr)
             return &gn;
       return nullptr;
+   }
+
+   Scene3DNode* FindScene()
+   {
+      GraphNode* gn = SceneGraphNode();
+      return gn != nullptr ? dynamic_cast<Scene3DNode*>(gn->node.get()) : nullptr;
+   }
+
+   // With two 3D View nodes, the panel shows the one last selected on the canvas.
+   void FollowCanvasSelection()
+   {
+      if (gEditor == nullptr)
+         return;
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      for (GraphNode& gn : gNodes)
+         if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
+         {
+            sSceneUid = gn.uid;
+            break;
+         }
+      ed::SetCurrentEditor(prev);
    }
 
    // Panels draw outside the canvas, where no node editor is current.
@@ -166,8 +196,14 @@ namespace
 
    bool Selected(int id) { return std::find(sSel.begin(), sSel.end(), id) != sSel.end(); }
 
+   bool InLocal(int id) { return sLocal.empty() || std::find(sLocal.begin(), sLocal.end(), id) != sLocal.end(); }
+
+   bool Shown(const Item& it) { return it.visible && InLocal(it.id); }
+
    std::string ItemName(const Item& it)
    {
+      if (!it.name.empty())
+         return it.name;
       GraphNode* gn = FindNodeByUid(it.uid);
       return gn != nullptr ? gn->typeName + " " + std::to_string(gn->index) : std::string(T("source missing"));
    }
@@ -210,7 +246,9 @@ namespace
             fh = h * 0.92f;
             fw = fh * renderAspect;
          }
-         sCam.frameMn = ImVec2(mn.x + (w - fw) * 0.5f, mn.y + (h - fh) * 0.5f);
+         fw *= sCamZoom;
+         fh *= sCamZoom;
+         sCam.frameMn = ImVec2(mn.x + (w - fw) * 0.5f + sCamPan.x, mn.y + (h - fh) * 0.5f + sCamPan.y);
          sCam.frameMx = ImVec2(sCam.frameMn.x + fw, sCam.frameMn.y + fh);
          sCam.proj = lens->ProjectionMatrix(renderAspect);
          sCam.proj.m[0] *= fw / w;
@@ -219,6 +257,11 @@ namespace
          sCam.proj.m[9] *= fh / h;
          sCam.proj.m[12] *= fw / w;
          sCam.proj.m[13] *= fh / h;
+         for (int i = 0; i < 4; i++)
+         {
+            sCam.proj.m[i * 4 + 0] += 2.0f * sCamPan.x / w * sCam.proj.m[i * 4 + 3];
+            sCam.proj.m[i * 4 + 1] -= 2.0f * sCamPan.y / h * sCam.proj.m[i * 4 + 3];
+         }
          sCam.ortho = lens->projection != 0;
       }
       else
@@ -344,17 +387,96 @@ namespace
       return true;
    }
 
-   // The item's real middle, wherever its source put it.
-   void ItemCenter(Scene3DNode* scene, const Item& it, float out[3])
+   // Through a camera these move the frame; a locked camera moves with the view instead.
+   void Pan(float dx, float dy)
    {
-      float lo[3], hi[3];
-      if (scene->ItemPoint(it, out))
+      if (sCameraView && !sLockCam)
+      {
+         sCamPan.x += dx;
+         sCamPan.y += dy;
          return;
-      if (scene->ItemBounds(it.id, lo, hi))
+      }
+      LeaveCamera();
+      const float u = UnitAt(sTarget);
+      for (int k = 0; k < 3; k++)
+         sTarget[k] += -sCam.right[k] * dx * u + sCam.up[k] * dy * u;
+   }
+
+   void Zoom(float ratio, const ImVec2* mouse = nullptr)
+   {
+      if (sCameraView && !sLockCam)
+      {
+         sCamZoom = std::clamp(sCamZoom / ratio, 0.1f, 12.0f);
+         return;
+      }
+      LeaveCamera();
+      const float was = sDist;
+      sDist = std::clamp(sDist * ratio, 0.1f, 500.0f);
+      float o[3], d[3], h[3];
+      if (mouse == nullptr || !sSet->zoomToMouse)
+         return;
+      MouseRay(*mouse, o, d);
+      if (PlaneHit(sTarget, sCam.fwd, o, d, h))
          for (int k = 0; k < 3; k++)
-            out[k] = (lo[k] + hi[k]) * 0.5f;
-      else
-         std::copy(it.pos, it.pos + 3, out);
+            sTarget[k] = h[k] + (sTarget[k] - h[k]) * (sDist / was);
+   }
+
+   // The middle of the selection.
+   bool SelectionCenter(Scene3DNode* scene, float out[3])
+   {
+      out[0] = out[1] = out[2] = 0.0f;
+      int count = 0;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+         {
+            float c[3];
+            scene->ItemCenter(*it, c);
+            for (int k = 0; k < 3; k++)
+               out[k] += c[k];
+            count++;
+         }
+      for (int k = 0; k < 3 && count > 0; k++)
+         out[k] /= (float)count;
+      return count > 0;
+   }
+
+   // Where the gizmo stands and what rotates and scales around.
+   void PivotPoint(Scene3DNode* scene, float out[3])
+   {
+      SelectionCenter(scene, out);
+      if (sSet->pivot == 3)
+         std::copy(sSet->cursor, sSet->cursor + 3, out);
+      else if (sSet->pivot == 2 && !sSel.empty())
+         if (const Item* it = scene->FindItem(sSel.back()))
+            scene->ItemCenter(*it, out);
+   }
+
+   // A turn of the view. With a selection the view swings round it, so it stays where it was on screen.
+   void OrbitBy(Scene3DNode* scene, float dAz, float dEl)
+   {
+      Orbited();
+      float p[3];
+      const bool around = sSet->orbitSelection && SelectionCenter(scene, p);
+      float eye[3], local[3] = { 0, 0, 0 };
+      Mat4 v = OrbitView();
+      if (around)
+      {
+         EyeFromOrbit(eye);
+         for (int i = 0; i < 3; i++)
+            for (int k = 0; k < 3; k++)
+               local[i] += (p[k] - eye[k]) * v.m[k * 4 + i];
+      }
+      sAz += dAz;
+      sEl = std::clamp(sEl + dEl, -1.5697f, 1.5697f);
+      if (!around)
+         return;
+      v = OrbitView();
+      float next[3], at[3];
+      EyeFromOrbit(next);
+      for (int k = 0; k < 3; k++)
+         at[k] = p[k] - (local[0] * v.m[k * 4] + local[1] * v.m[k * 4 + 1] + local[2] * v.m[k * 4 + 2]);
+      for (int k = 0; k < 3; k++)
+         sTarget[k] += at[k] - next[k];
    }
 
    // The rotation part of an item, as rows.
@@ -391,20 +513,50 @@ namespace
             out[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j];
    }
 
+   // Axis a of an orientation: the world, the item's own, or the view's.
+   void OrientAxis(const Item& item, int orient, int a, float out[3])
+   {
+      out[0] = out[1] = out[2] = 0.0f;
+      if (orient == 1)
+      {
+         float r[3][3];
+         RotationOf(item.rot, r);
+         for (int k = 0; k < 3; k++)
+            out[k] = r[k][a];
+      }
+      else if (orient == 2)
+         for (int k = 0; k < 3; k++)
+            out[k] = a == 0 ? sCam.right[k] : a == 1 ? sCam.up[k] : -sCam.fwd[k];
+      else
+         out[a] = 1.0f;
+   }
+
    void OpAxis(const Item& first, float out[3])
    {
       out[0] = out[1] = out[2] = 0.0f;
-      if (sOp.axis < 0)
-         return;
-      if (!sOp.local)
+      if (sOp.axis >= 0)
+         OrientAxis(first, sOp.orient, sOp.axis, out);
+   }
+
+   // First press global, second the scene's orientation, third lets go.
+   void LockAxis(int a)
+   {
+      const bool same = sOp.axis == a && sOp.plane < 0;
+      sOp.plane = -1;
+      if (sOp.mode == 's')
       {
-         out[sOp.axis] = 1.0f;
+         sOp.axis = same ? -1 : a;
          return;
       }
-      float r[3][3];
-      RotationOf(first.rot, r);
-      for (int k = 0; k < 3; k++)
-         out[k] = r[k][sOp.axis];
+      if (!same)
+      {
+         sOp.axis = a;
+         sOp.orient = 0;
+      }
+      else if (sOp.orient == 0)
+         sOp.orient = sSet->orientation != 0 ? sSet->orientation : 1;
+      else
+         sOp.axis = -1;
    }
 
    float SnapTo(float v, float step) { return step > 0.0f ? std::round(v / step) * step : v; }
@@ -417,35 +569,34 @@ namespace
       sOp.plane = plane;
       sOp.gizmo = gizmo;
       sOp.start = mouse;
-      sOp.local = mode == 's';
+      sOp.orient = mode == 's' ? 1 : gizmo ? sSet->orientation : 0;
       for (int id : sSel)
          if (Item* it = scene->FindItem(id))
          {
             sOp.before.push_back(*it);
             float c[3];
-            ItemCenter(scene, *it, c);
-            for (int k = 0; k < 3; k++)
-               sOp.pivot[k] += c[k];
+            scene->ItemCenter(*it, c);
+            sOp.centers.insert(sOp.centers.end(), c, c + 3);
          }
       if (sOp.before.empty())
       {
          sOp.mode = 0;
          return;
       }
-      for (int k = 0; k < 3; k++)
-         sOp.pivot[k] /= (float)sOp.before.size();
+      PivotPoint(scene, sOp.pivot);
    }
 
    void ApplyOp(Scene3DNode* scene, ImVec2 mouse)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      const bool snap = sSnap != io.KeyCtrl;
+      const bool snap = sSet->snap != io.KeyCtrl;
       const float fine = io.KeyShift && sOp.plane < 0 ? 0.1f : 1.0f;
       const bool hasTyped = !sOp.typed.empty() && sOp.typed != "-";
       const float typed = hasTyped ? std::strtof(sOp.typed.c_str(), nullptr) : 0.0f;
       const ImVec2 d((mouse.x - sOp.start.x) * fine, (mouse.y - sOp.start.y) * fine);
       float axis[3];
-      OpAxis(sOp.before[0], axis);
+      const Item& first = sOp.before.back();
+      OpAxis(first, axis);
       ImVec2 c(0, 0);
       Project(sOp.pivot, c);
 
@@ -462,9 +613,9 @@ namespace
          if (sOp.axis >= 0)
          {
             float amount = hasTyped ? typed : (LineParam(sOp.pivot, axis, o1, d1) - LineParam(sOp.pivot, axis, o0, d0)) * fine;
-            if (sOp.local && snapStep)
+            if (sOp.orient != 0 && snapStep)
             {
-               amount = SnapTo(amount, sSnapMove);
+               amount = SnapTo(amount, sSet->snapMove);
                snapStep = false;
             }
             for (int k = 0; k < 3; k++)
@@ -478,12 +629,22 @@ namespace
             float n[3] = { sCam.fwd[0], sCam.fwd[1], sCam.fwd[2] };
             if (sOp.plane >= 0)
             {
-               n[0] = n[1] = n[2] = 0.0f;
-               n[sOp.plane] = 1.0f;
-               moved[sOp.plane] = false;
+               OrientAxis(first, sOp.orient, sOp.plane, n);
+               if (sOp.orient == 0)
+                  moved[sOp.plane] = false;
+               else
+                  snapStep = false;
             }
             float h0[3], h1[3];
-            if (PlaneHit(sOp.pivot, n, o0, d0, h0) && PlaneHit(sOp.pivot, n, o1, d1, h1))
+            if (hasTyped)
+            {
+               // A number needs a direction: X, or the plane's first axis.
+               float along[3];
+               OrientAxis(first, sOp.orient, sOp.plane >= 0 ? (sOp.plane + 1) % 3 : 0, along);
+               for (int k = 0; k < 3; k++)
+                  move[k] = along[k] * typed;
+            }
+            else if (PlaneHit(sOp.pivot, n, o0, d0, h0) && PlaneHit(sOp.pivot, n, o1, d1, h1))
                for (int k = 0; k < 3; k++)
                   move[k] = (h1[k] - h0[k]) * fine;
          }
@@ -504,7 +665,7 @@ namespace
          if (hasTyped)
             deg = typed;
          else if (snap)
-            deg = SnapTo(deg, sSnapRot);
+            deg = SnapTo(deg, sSet->snapRot);
          angle = deg * kPi / 180.0f;
       }
       else
@@ -529,24 +690,26 @@ namespace
          if (hasTyped)
             factor = typed;
          else if (snap)
-            factor = SnapTo(factor, sSnapScale);
+            factor = SnapTo(factor, sSet->snapScale);
          if (factor == 0.0f)
             factor = 0.001f;
       }
 
-      for (const Item& was : sOp.before)
+      for (size_t i = 0; i < sOp.before.size(); i++)
       {
+         const Item& was = sOp.before[i];
          Item* it = scene->FindItem(was.id);
          if (it == nullptr)
             continue;
-         float off[3] = { was.pos[0] - sOp.pivot[0], was.pos[1] - sOp.pivot[1], was.pos[2] - sOp.pivot[2] };
+         const float* pivot = sSet->pivot == 1 ? &sOp.centers[i * 3] : sOp.pivot;
+         float off[3] = { was.pos[0] - pivot[0], was.pos[1] - pivot[1], was.pos[2] - pivot[2] };
          if (sOp.mode == 'g')
          {
             for (int k = 0; k < 3; k++)
             {
                it->pos[k] = was.pos[k] + move[k];
                if (snapStep && moved[k])
-                  it->pos[k] = SnapTo(it->pos[k], sSnapMove);
+                  it->pos[k] = SnapTo(it->pos[k], sSet->snapMove);
             }
          }
          else if (sOp.mode == 'r')
@@ -557,7 +720,7 @@ namespace
             Mul(dr, r0, r1);
             EulerFrom(r1, it->rot);
             for (int k = 0; k < 3; k++)
-               it->pos[k] = sOp.pivot[k] + dr[k][0] * off[0] + dr[k][1] * off[1] + dr[k][2] * off[2];
+               it->pos[k] = pivot[k] + dr[k][0] * off[0] + dr[k][1] * off[1] + dr[k][2] * off[2];
          }
          else
          {
@@ -566,12 +729,12 @@ namespace
             RotationOf(was.rot, r);
             for (int k = 0; k < 3; k++)
             {
-               const float f = sOp.axis < 0 || sOp.axis == k ? factor : 1.0f;
+               const float f = (sOp.axis < 0 && sOp.plane < 0) || sOp.axis == k || (sOp.plane >= 0 && sOp.plane != k) ? factor : 1.0f;
                local[k] = (r[0][k] * off[0] + r[1][k] * off[1] + r[2][k] * off[2]) * f;
                it->scale[k] = was.scale[k] * f;
             }
             for (int k = 0; k < 3; k++)
-               it->pos[k] = sOp.pivot[k] + r[k][0] * local[0] + r[k][1] * local[1] + r[k][2] * local[2];
+               it->pos[k] = pivot[k] + r[k][0] * local[0] + r[k][1] * local[1] + r[k][2] * local[2];
          }
       }
       scene->Commit();
@@ -597,7 +760,7 @@ namespace
             *it = was;
          }
       scene->Commit();
-      PushUndoCheckpoint("Move in 3D View");
+      PushUndoCheckpoint(sOp.mode == 'g' ? "Move in 3D View" : sOp.mode == 'r' ? "Rotate in 3D View" : "Scale in 3D View");
       for (const Item& now : after)
          if (Item* it = scene->FindItem(now.id))
             *it = now;
@@ -629,6 +792,7 @@ namespace
       }
       if (!any)
          return;
+      LeaveCamera();
       float size = 0.0f;
       for (int k = 0; k < 3; k++)
       {
@@ -636,7 +800,6 @@ namespace
          size = std::max(size, hi[k] - lo[k]);
       }
       sDist = std::max(0.5f, size * 1.8f);
-      LeaveCamera();
    }
 
    void DeleteSelected(Scene3DNode* scene)
@@ -673,6 +836,97 @@ namespace
    }
 
    void StartRender(Scene3DNode* scene);
+   void RenderStill(Scene3DNode* scene);
+
+   void CursorToSelected(Scene3DNode* scene)
+   {
+      float c[3];
+      if (!SelectionCenter(scene, c))
+         return;
+      PushUndoCheckpoint("Move 3D cursor");
+      std::copy(c, c + 3, sSet->cursor);
+   }
+
+   void SelectionToCursor(Scene3DNode* scene)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Move to 3D cursor");
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+         {
+            float c[3];
+            scene->ItemCenter(*it, c);
+            for (int k = 0; k < 3; k++)
+               it->pos[k] += sSet->cursor[k] - c[k];
+         }
+      scene->Commit();
+   }
+
+   // Half a 60 fps frame: close enough to be the same key.
+   Scene3DNode::Key* KeyAt(Item& it, float t)
+   {
+      for (Scene3DNode::Key& k : it.keys)
+         if (std::abs(k.t - t) < 0.008f)
+            return &k;
+      return nullptr;
+   }
+
+   void InsertKeys(Scene3DNode* scene)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Insert key");
+      const float t = (float)Transport::Instance().Seconds();
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+         {
+            Scene3DNode::Key* key = KeyAt(*it, t);
+            if (key == nullptr)
+            {
+               Scene3DNode::Key fresh;
+               fresh.t = t;
+               auto at = std::find_if(it->keys.begin(), it->keys.end(), [&](const Scene3DNode::Key& k) { return k.t > t; });
+               key = &*it->keys.insert(at, fresh);
+            }
+            std::copy(it->pos, it->pos + 3, key->pos);
+            std::copy(it->rot, it->rot + 3, key->rot);
+            std::copy(it->scale, it->scale + 3, key->scale);
+         }
+      scene->Commit();
+   }
+
+   void RemoveKeysHere(Scene3DNode* scene)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Remove key");
+      const float t = (float)Transport::Instance().Seconds();
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+            if (Scene3DNode::Key* key = KeyAt(*it, t))
+               it->keys.erase(it->keys.begin() + (key - it->keys.data()));
+      scene->Commit();
+   }
+
+   void ToggleLocal(Scene3DNode* scene)
+   {
+      if (!sLocal.empty())
+         sLocal.clear();
+      else if (!sSel.empty())
+      {
+         sLocal = sSel;
+         FrameItems(scene, false);
+      }
+   }
+
+   void StartRename(const Item& it)
+   {
+      sSideOpen = true;
+      sRename = it.id;
+      sRenameFocus = true;
+      snprintf(sRenameBuf, sizeof(sRenameBuf), "%s", ItemName(it).c_str());
+   }
 
    void ToggleCamera(Scene3DNode* scene)
    {
@@ -717,15 +971,13 @@ namespace
          for (int a = 0; a < 3; a++)
             if (pressed(a == 0 ? ImGuiKey_X : a == 1 ? ImGuiKey_Y : ImGuiKey_Z))
             {
-               if (io.KeyShift && sOp.mode == 'g')
+               if (io.KeyShift && sOp.mode != 'r')
                {
                   sOp.plane = a;
                   sOp.axis = -1;
-                  continue;
                }
-               sOp.local = sOp.mode == 's' || (sOp.axis == a && !sOp.local);
-               sOp.axis = a;
-               sOp.plane = -1;
+               else
+                  LockAxis(a);
             }
          for (int i = 0; i < 10; i++)
             if (digit(i))
@@ -766,9 +1018,16 @@ namespace
          if (!sToolKey)
             return;
       }
+      if (sZoomArmed && pressed(ImGuiKey_Escape))
+         sZoomArmed = false;
       if (pressed(ImGuiKey_F12))
-         StartRender(scene);
-      if (io.KeyAlt && !command && (pressed(ImGuiKey_G) || pressed(ImGuiKey_R) || pressed(ImGuiKey_S)))
+      {
+         if (command)
+            StartRender(scene);
+         else
+            RenderStill(scene);
+      }
+      if (!sSel.empty() && io.KeyAlt && !command && (pressed(ImGuiKey_G) || pressed(ImGuiKey_R) || pressed(ImGuiKey_S)))
       {
          PushUndoCheckpoint("Clear transform");
          for (int id : sSel)
@@ -783,7 +1042,39 @@ namespace
       if (io.KeyShift && !command && pressed(ImGuiKey_Z))
          sShading = sShading == Shading::Wire ? Shading::Solid : Shading::Wire;
       if (io.KeyShift && !command && pressed(ImGuiKey_C))
+      {
+         if (sSet->cursor[0] != 0.0f || sSet->cursor[1] != 0.0f || sSet->cursor[2] != 0.0f)
+         {
+            PushUndoCheckpoint("Move 3D cursor");
+            std::fill(sSet->cursor, sSet->cursor + 3, 0.0f);
+         }
          FrameItems(scene, true);
+      }
+      if (io.KeyShift && !command && pressed(ImGuiKey_B))
+         sZoomArmed = true;
+      if (io.KeyShift && !command && pressed(ImGuiKey_Tab))
+      {
+         PushUndoCheckpoint("Snap in 3D View");
+         sSet->snap = !sSet->snap;
+      }
+      if (io.KeyShift && !command && pressed(ImGuiKey_H))
+      {
+         PushUndoCheckpoint("Hide in 3D View");
+         for (Item& it : scene->Items())
+            if (!Selected(it.id))
+               it.visible = false;
+         scene->Commit();
+      }
+      if (command && pressed(ImGuiKey_GraveAccent))
+         sOverlays = !sOverlays;
+      if (command && !io.KeyAlt && pressed(ImGuiKey_I))
+      {
+         std::vector<int> others;
+         for (const Item& it : scene->Items())
+            if (Shown(it) && !Selected(it.id))
+               others.push_back(it.id);
+         sSel.swap(others);
+      }
       if (command && !io.KeyAlt && digit(0))
          if (sSel.size() == 1)
             if (Item* it = scene->FindItem(sSel[0]))
@@ -809,8 +1100,26 @@ namespace
          else if (pressed(ImGuiKey_R)) BeginOp('r', scene, mouse);
          else if (pressed(ImGuiKey_S)) BeginOp('s', scene, mouse);
          else if (pressed(ImGuiKey_N)) sSideOpen = !sSideOpen;
-         else if (pressed(ImGuiKey_F) || pressed(ImGuiKey_Period) || pressed(ImGuiKey_KeypadDecimal)) FrameItems(scene, sSel.empty());
-         else if (pressed(ImGuiKey_Home)) FrameItems(scene, true);
+         else if (pressed(ImGuiKey_F) || pressed(ImGuiKey_KeypadDecimal)) FrameItems(scene, sSel.empty());
+         else if (pressed(ImGuiKey_Period)) sOpenPivot = true;
+         else if (pressed(ImGuiKey_Comma)) sOpenOrient = true;
+         else if (pressed(ImGuiKey_Slash) || pressed(ImGuiKey_KeypadDivide)) ToggleLocal(scene);
+         else if (pressed(ImGuiKey_I)) InsertKeys(scene);
+         else if (pressed(ImGuiKey_F2))
+         {
+            if (const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back()))
+               StartRename(*it);
+         }
+         else if (pressed(ImGuiKey_Home))
+         {
+            if (sCameraView && !sLockCam)
+            {
+               sCamZoom = 1.0f;
+               sCamPan = ImVec2(0, 0);
+            }
+            else
+               FrameItems(scene, true);
+         }
          else if (pressed(ImGuiKey_Z)) sShading = (Shading)(((int)sShading + 1) % 3);
          else if (digit(0)) ToggleCamera(scene);
          else if (digit(1)) ViewAxis(4);
@@ -822,41 +1131,29 @@ namespace
             sAutoOrtho = false;
          }
          else if (digit(9))
-         {
-            Orbited();
-            sAz += kPi;
-         }
+            OrbitBy(scene, kPi, 0.0f);
          else if (digit(2) || digit(8))
-         {
-            Orbited();
-            sEl = std::clamp(sEl + (digit(8) ? 0.2618f : -0.2618f), -1.5697f, 1.5697f);
-         }
+            OrbitBy(scene, 0.0f, digit(8) ? 0.2618f : -0.2618f);
          else if (digit(4) || digit(6))
-         {
-            Orbited();
-            sAz += digit(6) ? 0.2618f : -0.2618f;
-         }
+            OrbitBy(scene, digit(6) ? 0.2618f : -0.2618f, 0.0f);
          else if (pressed(ImGuiKey_A))
          {
             sSel.clear();
             for (const Item& it : scene->Items())
-               sSel.push_back(it.id);
+               if (Shown(it))
+                  sSel.push_back(it.id);
          }
          else if (pressed(ImGuiKey_H))
             HideSelected(scene);
          else if (pressed(ImGuiKey_X) || pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace))
             DeleteSelected(scene);
          else if (pressed(ImGuiKey_KeypadAdd) || pressed(ImGuiKey_Equal))
-         {
-            LeaveCamera();
-            sDist = std::max(0.1f, sDist * 0.85f);
-         }
+            Zoom(0.85f);
          else if (pressed(ImGuiKey_KeypadSubtract) || pressed(ImGuiKey_Minus))
-         {
-            LeaveCamera();
-            sDist = std::min(500.0f, sDist / 0.85f);
-         }
+            Zoom(1.0f / 0.85f);
       }
+      if (io.KeyAlt && !command && pressed(ImGuiKey_I))
+         RemoveKeysHere(scene);
       if (io.KeyAlt && pressed(ImGuiKey_A))
          sSel.clear();
       if (io.KeyAlt && pressed(ImGuiKey_H))
@@ -872,28 +1169,17 @@ namespace
          sOpenAdd = true;
    }
 
-   void HandleNavigation(bool hovered)
+   void HandleNavigation(Scene3DNode* scene, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
       const bool orbitDrag = ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f) ||
                              (io.KeyAlt && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) || sNavDrag;
-      auto pan = [&](float dx, float dy)
-      {
-         LeaveCamera();
-         const float u = UnitAt(sTarget);
-         for (int k = 0; k < 3; k++)
-            sTarget[k] += -sCam.right[k] * dx * u + sCam.up[k] * dy * u;
-      };
       if ((hovered || sNavDrag) && orbitDrag && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f))
       {
          if (io.KeyShift)
-            pan(io.MouseDelta.x, io.MouseDelta.y);
+            Pan(io.MouseDelta.x, io.MouseDelta.y);
          else
-         {
-            Orbited();
-            sAz += io.MouseDelta.x * 0.008f;
-            sEl = std::clamp(sEl + io.MouseDelta.y * 0.008f, -1.5697f, 1.5697f);
-         }
+            OrbitBy(scene, io.MouseDelta.x * 0.008f, io.MouseDelta.y * 0.008f);
       }
       if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
@@ -903,18 +1189,11 @@ namespace
          const bool zoom = !io.KeyShift;
 #endif
          if (zoom)
-         {
-            LeaveCamera();
-            sDist = std::clamp(sDist * std::pow(0.9f, io.MouseWheel), 0.1f, 500.0f);
-         }
+            Zoom(std::pow(0.9f, io.MouseWheel), &io.MousePos);
          else if (io.KeyShift)
-            pan(io.MouseWheelH * 12.0f, io.MouseWheel * 12.0f);
+            Pan(io.MouseWheelH * 12.0f, io.MouseWheel * 12.0f);
          else
-         {
-            Orbited();
-            sAz += io.MouseWheelH * 0.05f;
-            sEl = std::clamp(sEl + io.MouseWheel * 0.05f, -1.5697f, 1.5697f);
-         }
+            OrbitBy(scene, io.MouseWheelH * 0.05f, io.MouseWheel * 0.05f);
       }
       if (hovered && ImGui::IsMouseDown(ImGuiMouseButton_Right) && sOp.mode == 0)
       {
@@ -943,21 +1222,6 @@ namespace
                sTarget[k] += (sCam.fwd[k] * f + sCam.right[k] * r + sCam.up[k] * u) * speed;
          }
       }
-   }
-
-   void DrawBox(ImDrawList* dl, const float lo[3], const float hi[3], ImU32 col)
-   {
-      ImVec2 s[8];
-      for (int i = 0; i < 8; i++)
-      {
-         const float p[3] = { (i & 1) ? hi[0] : lo[0], (i & 2) ? hi[1] : lo[1], (i & 4) ? hi[2] : lo[2] };
-         if (!Project(p, s[i]))
-            return;
-      }
-      for (int i = 0; i < 8; i++)
-         for (int bit : { 1, 2, 4 })
-            if ((i & bit) == 0)
-               dl->AddLine(s[i], s[i | bit], col, 1.5f);
    }
 
    float SegDist(ImVec2 p, ImVec2 a, ImVec2 b)
@@ -992,6 +1256,39 @@ namespace
          dl->AddLine(s0, s1, col, thick);
    }
 
+   // Cut at the near plane like any line, so a box the eye stands in still draws.
+   void DrawBox(ImDrawList* dl, const float lo[3], const float hi[3], ImU32 col)
+   {
+      for (int i = 0; i < 8; i++)
+         for (int bit : { 1, 2, 4 })
+            if ((i & bit) == 0)
+            {
+               const int j = i | bit;
+               const float p[3] = { (i & 1) ? hi[0] : lo[0], (i & 2) ? hi[1] : lo[1], (i & 4) ? hi[2] : lo[2] };
+               const float q[3] = { (j & 1) ? hi[0] : lo[0], (j & 2) ? hi[1] : lo[1], (j & 4) ? hi[2] : lo[2] };
+               Line3D(dl, p, q, col, 1.5f);
+            }
+   }
+
+   // Blender's 3D cursor: a red and white ring with four ticks.
+   void DrawCursor(ImDrawList* dl)
+   {
+      ImVec2 s;
+      if (!Project(sSet->cursor, s))
+         return;
+      for (int i = 0; i < 8; i++)
+      {
+         const float a0 = (float)i / 8.0f * 2.0f * kPi, a1 = (float)(i + 1) / 8.0f * 2.0f * kPi;
+         dl->PathArcTo(s, 9.0f, a0, a1, 6);
+         dl->PathStroke(i % 2 == 0 ? Hex(0xFF3030) : Hex(0xFFFFFF), 0, 1.5f);
+      }
+      for (int i = 0; i < 4; i++)
+      {
+         const ImVec2 d(i == 0 ? 1.0f : i == 1 ? -1.0f : 0.0f, i == 2 ? 1.0f : i == 3 ? -1.0f : 0.0f);
+         dl->AddLine(ImVec2(s.x + d.x * 6.0f, s.y + d.y * 6.0f), ImVec2(s.x + d.x * 14.0f, s.y + d.y * 14.0f), Hex(0x000000, 0.8f), 1.0f);
+      }
+   }
+
    void TransformBy(const Mat4& t, const float p[3], float out[3])
    {
       for (int k = 0; k < 3; k++)
@@ -1009,7 +1306,8 @@ namespace
       const Mat4 world = Mat4::Inverse(view);
       const float aspect = (float)std::max(1, scene->GetOutputWidth()) / (float)std::max(1, scene->GetOutputHeight());
       const float depth = 1.0f;
-      const float h = depth * std::tan(lens->fov * 0.5f * kPi / 180.0f), w = h * aspect;
+      const bool ortho = lens->projection != 0;
+      const float h = ortho ? lens->orthoHeight : depth * std::tan(lens->fov * 0.5f * kPi / 180.0f), w = h * aspect;
       float c[4][3];
       const float xs[4] = { -w, w, w, -w }, ys[4] = { -h, -h, h, h };
       for (int i = 0; i < 4; i++)
@@ -1017,7 +1315,10 @@ namespace
          const float big = std::max(w, h) * 2.0f;
          const float p[3] = { xs[i] + lens->shiftX * big, ys[i] + lens->shiftY * big, -depth };
          TransformBy(world, p, c[i]);
-         Line3D(dl, eye, c[i], col);
+         const float flat[3] = { p[0], p[1], 0.0f };
+         float from[3];
+         TransformBy(world, flat, from);
+         Line3D(dl, ortho ? from : eye, c[i], col);
       }
       for (int i = 0; i < 4; i++)
          Line3D(dl, c[i], c[(i + 1) % 4], col, 1.5f);
@@ -1112,20 +1413,12 @@ namespace
       }
    }
 
-   // Axis directions the handles point along: the world, except scale, which is the item's own.
+   // Axis directions the handles point along: the orientation, except scale, which is the item's own.
    void HandleAxis(Scene3DNode* scene, int a, float out[3])
    {
-      out[0] = out[1] = out[2] = 0.0f;
-      out[a] = 1.0f;
-      if (sTool != 3 || sSel.empty())
-         return;
-      if (const Item* it = scene->FindItem(sSel[0]))
-      {
-         float r[3][3];
-         RotationOf(it->rot, r);
-         for (int k = 0; k < 3; k++)
-            out[k] = r[k][a];
-      }
+      static const Item kNone;
+      const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      OrientAxis(it != nullptr ? *it : kNone, sTool == 3 ? 1 : sSet->orientation, a, out);
    }
 
    // Draws the tool's handles at the selection and says which one the mouse is on.
@@ -1286,7 +1579,8 @@ namespace
       return hit;
    }
 
-   // Nearest item under the ray: geometry by its box, cameras and lights by their marker.
+   // Nearest item under the ray. Cameras and lights go by their marker and win, being
+   // small; geometry goes by its box, hit by the ray itself.
    int Pick(Scene3DNode* scene, ImVec2 mouse)
    {
       int best = 0;
@@ -1295,35 +1589,40 @@ namespace
       {
          float p[3];
          ImVec2 s;
-         if (scene->ItemPoint(it, p))
-         {
-            if (it.id == scene->activeCamera && sCameraView)
-               continue;
-            if (Project(p, s) && std::hypot(mouse.x - s.x, mouse.y - s.y) < 14.0f)
-               return it.id;
+         if (!Shown(it) || !scene->ItemPoint(it, p) || (it.id == scene->activeCamera && sCameraView))
             continue;
+         const float depth = (p[0] - sCam.eye[0]) * sCam.fwd[0] + (p[1] - sCam.eye[1]) * sCam.fwd[1] + (p[2] - sCam.eye[2]) * sCam.fwd[2];
+         if (Project(p, s) && std::hypot(mouse.x - s.x, mouse.y - s.y) < 14.0f && depth < bestDepth)
+         {
+            bestDepth = depth;
+            best = it.id;
          }
-         float lo[3], hi[3];
-         if (!it.visible || !scene->ItemBounds(it.id, lo, hi))
+      }
+      if (best != 0)
+         return best;
+      float o[3], d[3];
+      MouseRay(mouse, o, d);
+      for (const Item& it : scene->Items())
+      {
+         float p[3], lo[3], hi[3];
+         if (!Shown(it) || scene->ItemPoint(it, p) || !scene->ItemBounds(it.id, lo, hi))
             continue;
-         float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
-         bool front = true;
-         for (int i = 0; i < 8; i++)
+         float near = -1e30f, far = 1e30f;
+         for (int k = 0; k < 3 && near <= far; k++)
          {
-            const float c[3] = { (i & 1) ? hi[0] : lo[0], (i & 2) ? hi[1] : lo[1], (i & 4) ? hi[2] : lo[2] };
-            if (!Project(c, s))
+            if (std::abs(d[k]) < 1e-6f)
             {
-               front = false;
-               break;
+               if (o[k] < lo[k] || o[k] > hi[k])
+                  far = -1e30f;
+               continue;
             }
-            x0 = std::min(x0, s.x); y0 = std::min(y0, s.y);
-            x1 = std::max(x1, s.x); y1 = std::max(y1, s.y);
+            const float a = (lo[k] - o[k]) / d[k], b = (hi[k] - o[k]) / d[k];
+            near = std::max(near, std::min(a, b));
+            far = std::min(far, std::max(a, b));
          }
-         if (!front || mouse.x < x0 || mouse.x > x1 || mouse.y < y0 || mouse.y > y1)
+         if (near > far || far < 0.0f)
             continue;
-         const float mid[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
-         const float depth = (mid[0] - sCam.eye[0]) * sCam.fwd[0] + (mid[1] - sCam.eye[1]) * sCam.fwd[1] +
-                             (mid[2] - sCam.eye[2]) * sCam.fwd[2];
+         const float depth = std::max(near, 0.0f);
          if (depth < bestDepth)
          {
             bestDepth = depth;
@@ -1346,7 +1645,7 @@ namespace
          dl->AddText(ImVec2(mn.x + tok::space_3, y), Hex(0xFFFFFF, alpha), text.c_str());
          y += ImGui::GetTextLineHeightWithSpacing();
       };
-      line(view, 0.9f);
+      line(sLocal.empty() ? std::string(view) : std::string(view) + " " + T("(Local)"), 0.9f);
       if (sSel.size() == 1)
       {
          if (const Item* it = scene->FindItem(sSel[0]))
@@ -1396,22 +1695,23 @@ namespace
          dl->AddLine(ImVec2(a.x + w * fx, a.y), ImVec2(a.x + w * fx, b.y), guide);
          dl->AddLine(ImVec2(a.x, a.y + h * fy), ImVec2(b.x, a.y + h * fy), guide);
       };
-      if (sGuideThirds)
+      if (sSet->thirds)
       {
          cross(1.0f / 3.0f, 1.0f / 3.0f);
          cross(2.0f / 3.0f, 2.0f / 3.0f);
       }
-      if (sGuideGolden)
+      if (sSet->golden)
       {
          cross(0.382f, 0.382f);
          cross(0.618f, 0.618f);
       }
-      if (sGuideCenter)
+      if (sSet->center)
          cross(0.5f, 0.5f);
-      if (sSafe)
+      if (sSet->safe)
       {
-         dl->AddRect(ImVec2(a.x + w * sSafeAction, a.y + h * sSafeAction), ImVec2(b.x - w * sSafeAction, b.y - h * sSafeAction), guide);
-         const float m = sSafeAction + sSafeTitle;
+         const float act = sSet->safeAction;
+         dl->AddRect(ImVec2(a.x + w * act, a.y + h * act), ImVec2(b.x - w * act, b.y - h * act), guide);
+         const float m = act + sSet->safeTitle;
          dl->AddRect(ImVec2(a.x + w * m, a.y + h * m), ImVec2(b.x - w * m, b.y - h * m), guide);
       }
    }
@@ -1456,15 +1756,10 @@ namespace
             sPadDrag = 0;
          else if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
          {
-            LeaveCamera();
             if (sPadDrag == 1)
-               sDist = std::clamp(sDist * std::pow(1.01f, io.MouseDelta.y), 0.1f, 500.0f);
+               Zoom(std::pow(1.01f, io.MouseDelta.y));
             else
-            {
-               const float u = UnitAt(sTarget);
-               for (int k = 0; k < 3; k++)
-                  sTarget[k] += -sCam.right[k] * io.MouseDelta.x * u + sCam.up[k] * io.MouseDelta.y * u;
-            }
+               Pan(io.MouseDelta.x, io.MouseDelta.y);
          }
       }
    }
@@ -1488,7 +1783,8 @@ namespace
       view.proj = sCam.proj;
       std::copy(sCam.eye, sCam.eye + 3, view.eye);
       view.shading = sShading;
-      view.grid = sGrid;
+      view.grid = sGrid && sOverlays;
+      view.only = sLocal;
       view.gridAxis = sGridAxis;
       view.gridDist = sDist;
       const float dpi = io.DisplayFramebufferScale.y;
@@ -1497,7 +1793,6 @@ namespace
          dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
 
       const ImVec2 mouse = io.MousePos;
-      float center[3] = { 0, 0, 0 };
       int selCount = 0;
       bool cameraSelected = false;
       for (const Item& it : scene->Items())
@@ -1508,6 +1803,13 @@ namespace
          float p[3];
          const Kind kind = scene->ItemKind(it);
          const bool looking = sCameraView && it.id == scene->activeCamera;
+         if (sel)
+         {
+            selCount++;
+            cameraSelected = cameraSelected || looking;
+         }
+         if (!sOverlays || !InLocal(it.id))
+            continue;
          if (scene->ItemPoint(it, p))
          {
             if (kind == Kind::Camera && !looking)
@@ -1521,20 +1823,13 @@ namespace
             if (scene->ItemBounds(it.id, lo, hi))
                DrawBox(dl, lo, hi, col);
          }
-         if (sel)
-         {
-            float c[3];
-            ItemCenter(scene, it, c);
-            for (int k = 0; k < 3; k++)
-               center[k] += c[k];
-            selCount++;
-            cameraSelected = cameraSelected || looking;
-         }
       }
+      if (sOverlays)
+         DrawCursor(dl);
 
       if (sCameraView)
       {
-         const ImU32 shade = Hex(0x000000, sPassAlpha);
+         const ImU32 shade = Hex(0x000000, sSet->passAlpha);
          dl->AddRectFilled(mn, ImVec2(mx.x, sCam.frameMn.y), shade);
          dl->AddRectFilled(ImVec2(mn.x, sCam.frameMx.y), mx, shade);
          dl->AddRectFilled(ImVec2(mn.x, sCam.frameMn.y), ImVec2(sCam.frameMn.x, sCam.frameMx.y), shade);
@@ -1549,10 +1844,10 @@ namespace
       DrawToolpad(dl, scene, mn, mx, mouse, hovered && sOp.mode == 0, onPad);
       onNav = onNav || onPad;
       int hot = -1;
-      if (selCount > 0 && sOp.mode == 0 && !cameraSelected)
+      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays)
       {
-         for (int k = 0; k < 3; k++)
-            center[k] /= (float)selCount;
+         float center[3];
+         PivotPoint(scene, center);
          hot = DrawGizmo(dl, scene, center, mouse, canGrab && !onNav);
       }
       sHot = hot;
@@ -1563,7 +1858,7 @@ namespace
          if (sOp.axis >= 0)
          {
             float axis[3];
-            OpAxis(sOp.before[0], axis);
+            OpAxis(sOp.before.back(), axis);
             const float reach = sDist * 40.0f;
             const float a[3] = { sOp.pivot[0] - axis[0] * reach, sOp.pivot[1] - axis[1] * reach, sOp.pivot[2] - axis[2] * reach };
             const float b[3] = { sOp.pivot[0] + axis[0] * reach, sOp.pivot[1] + axis[1] * reach, sOp.pivot[2] + axis[2] * reach };
@@ -1579,7 +1874,7 @@ namespace
       HandleKeys(scene, mouse, hovered);
       if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
          sNavDrag = false;
-      HandleNavigation(hovered);
+      HandleNavigation(scene, hovered);
       if (sLockDirty)
       {
          sLockDirty = false;
@@ -1597,7 +1892,13 @@ namespace
 
       if (hovered && sOp.mode == 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
       {
-         if (onPad)
+         if (sZoomArmed)
+         {
+            sZoomArmed = false;
+            sBoxZoom = sBoxOn = true;
+            sPressAt = mouse;
+         }
+         else if (onPad)
          {
          }
          else if (navBall >= 0)
@@ -1618,17 +1919,33 @@ namespace
             sPressAt = mouse;
             if (id != 0)
             {
-               if (!io.KeyShift && !Selected(id))
-                  sSel.clear();
-               if (Selected(id) && io.KeyShift)
-                  sSel.erase(std::find(sSel.begin(), sSel.end(), id));
-               else if (!Selected(id))
-                  sSel.push_back(id);
+               if (!io.KeyShift)
+               {
+                  if (Selected(id))
+                     sReduceTo = id;
+                  else
+                     sSel = { id };
+               }
+               else
+               {
+                  // Shift: add, make active, and only a click on the active one takes it off.
+                  const bool wasActive = !sSel.empty() && sSel.back() == id;
+                  if (Selected(id))
+                     sSel.erase(std::find(sSel.begin(), sSel.end(), id));
+                  if (!wasActive)
+                     sSel.push_back(id);
+               }
                sTweak = sTool == 1 && !io.KeyShift;
             }
             else
                sBoxOn = true;
          }
+      }
+      if (sReduceTo != 0 && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         if (io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < 25.0f)
+            sSel = { sReduceTo };
+         sReduceTo = 0;
       }
       if (sTweak)
       {
@@ -1653,15 +1970,31 @@ namespace
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
          {
             sBoxOn = false;
-            if (!io.KeyShift)
+            const bool zoomBox = sBoxZoom;
+            sBoxZoom = false;
+            if (zoomBox)
+            {
+               float o[3], d[3], hit[3];
+               const ImVec2 mid((lo.x + hi.x) * 0.5f, (lo.y + hi.y) * 0.5f);
+               MouseRay(mid, o, d);
+               const float fill = std::max((hi.x - lo.x) / std::max(1.0f, mx.x - mn.x), (hi.y - lo.y) / std::max(1.0f, mx.y - mn.y));
+               const bool aimed = dragged && PlaneHit(sTarget, sCam.fwd, o, d, hit);
+               if (aimed)
+               {
+                  LeaveCamera();
+                  std::copy(hit, hit + 3, sTarget);
+                  sDist = std::clamp(sDist * fill, 0.1f, 500.0f);
+               }
+            }
+            else if (!io.KeyShift)
                sSel.clear();
-            if (dragged)
+            if (dragged && !zoomBox)
                for (const Item& it : scene->Items())
                {
                   float c[3];
-                  ItemCenter(scene, it, c);
+                  scene->ItemCenter(it, c);
                   ImVec2 s;
-                  if (it.visible && Project(c, s) && s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y && !Selected(it.id))
+                  if (Shown(it) && Project(c, s) && s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y && !Selected(it.id))
                      sSel.push_back(it.id);
                }
          }
@@ -1670,20 +2003,36 @@ namespace
       if (hovered && sRightOk && sOp.mode == 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
           io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Right] < 16.0f)
       {
-         const int id = Pick(scene, mouse);
-         if (id != 0 && !Selected(id))
-            sSel = { id };
-         sOpenMenu = true;
+         float o[3], d[3], hit[3];
+         MouseRay(mouse, o, d);
+         if (io.KeyShift)
+         {
+            if (PlaneHit(sSet->cursor, sCam.fwd, o, d, hit))
+            {
+               PushUndoCheckpoint("Move 3D cursor");
+               std::copy(hit, hit + 3, sSet->cursor);
+            }
+         }
+         else
+         {
+            const int id = Pick(scene, mouse);
+            if (id != 0 && !Selected(id))
+               sSel = { id };
+            sOpenMenu = true;
+         }
       }
 
       DrawOverlayText(dl, scene, mn);
       if (sOp.mode != 0)
       {
          char line[96];
-         snprintf(line, sizeof(line), "%s %s%s", sOp.mode == 'g' ? T("Move") : sOp.mode == 'r' ? T("Rotate") : T("Scale"),
+         const char* orient = sOp.axis < 0 && sOp.plane < 0 ? "" : sOp.orient == 1 ? T("Local ") : sOp.orient == 2 ? T("View ") : T("Global ");
+         snprintf(line, sizeof(line), "%s %s%s%s", sOp.mode == 'g' ? T("Move") : sOp.mode == 'r' ? T("Rotate") : T("Scale"), orient,
                   sOp.axis < 0 ? "" : sOp.axis == 0 ? "X " : sOp.axis == 1 ? "Y " : "Z ", sOp.typed.c_str());
          dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - 24), Hex(0xFFFFFF, 0.95f), line);
       }
+      else if (sZoomArmed)
+         dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - 24), Hex(0xFFFFFF, 0.95f), T("Drag a box to zoom into"));
       if (scene->Items().empty())
       {
          const char* hint = T("Shift+A to add a camera, a light or a node from the canvas");
@@ -1739,9 +2088,15 @@ namespace
          sAutoOrtho = false;
       }
       gap();
-      if (IconChip("##v3dsnap", IconsInfinite::Snap, sSnap, T("Snap (hold Ctrl to flip)"))) sSnap = !sSnap;
+      if (IconChip("##v3dsnap", IconsInfinite::Snap, sSet->snap, T("Snap (Shift+Tab, hold Ctrl to flip)")))
+      {
+         PushUndoCheckpoint("Snap in 3D View");
+         sSet->snap = !sSet->snap;
+      }
       next();
       if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
+      next();
+      if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
       ImGui::SameLine(startX + availW - kIconW);
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
    }
@@ -1896,35 +2251,89 @@ namespace
       SectionCard::Begin(T("Scene"));
       if (scene->Items().empty())
          ImGui::TextDisabled("%s", T("Empty. Shift+A adds to it."));
+      if (scene->Items().size() >= 6)
+      {
+         ImGui::SetNextItemWidth(availW);
+         FieldWell::InputTextWithHint("##v3dsearch", T("Search"), sSearch, sizeof(sSearch));
+      }
+      else
+         sSearch[0] = 0;
+      auto lower = [](std::string text)
+      {
+         std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         return text;
+      };
+      const std::string search = lower(sSearch);
+      const ImGuiIO& io = ImGui::GetIO();
       const float rowH = 24.0f;
       // Up to a third of the height, then it scrolls, so the settings below keep their room.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::clamp((int)(ImGui::GetContentRegionAvail().y * 0.34f / step), 2, 5));
+      const int shown = std::min(count, std::clamp((int)(ImGui::GetContentRegionAvail().y * 0.34f / step), 2, 8));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
       if (scrolls)
          availW -= ImGui::GetStyle().ScrollbarSize;
-      for (Item& it : scene->Items())
+      std::vector<Item>& items = scene->Items();
+      for (int row = 0; row < count; row++)
       {
+         Item& it = items[row];
+         if (!search.empty() && lower(ItemName(it)).find(search) == std::string::npos)
+            continue;
          ImGui::PushID(it.id);
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImGui::SetNextItemAllowOverlap();
          if (ImGui::Selectable("##row", Selected(it.id), ImGuiSelectableFlags_None, ImVec2(availW, rowH)))
          {
-            if (!ImGui::GetIO().KeyShift)
-               sSel.clear();
-            if (!Selected(it.id))
+            const bool toggle = io.KeyCtrl || io.KeySuper;
+            auto anchor = sSel.empty() ? items.end() : std::find_if(items.begin(), items.end(), [](const Item& x) { return x.id == sSel.back(); });
+            if (io.KeyShift && anchor != items.end())
+            {
+               // The whole run from the active row, which stays where the click landed.
+               const int from = (int)(anchor - items.begin());
+               for (int i = std::min(from, row); i <= std::max(from, row); i++)
+                  if (!Selected(items[i].id))
+                     sSel.push_back(items[i].id);
+               sSel.erase(std::find(sSel.begin(), sSel.end(), it.id));
                sSel.push_back(it.id);
+            }
+            else if (toggle && Selected(it.id))
+               sSel.erase(std::find(sSel.begin(), sSel.end(), it.id));
+            else if (toggle)
+               sSel.push_back(it.id);
+            else
+               sSel = { it.id };
          }
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            StartRename(it);
          const bool missing = scene->ItemKind(it) == Kind::Missing;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImU32 text = ImGui::GetColorU32(missing || !it.visible ? ImGuiCol_TextDisabled : ImGuiCol_Text);
          const float midY = p.y + rowH * 0.5f;
          glyph::Draw(dl, ImVec2(p.x + 12.0f, midY), tok::icon_sm, text, KindGlyph(scene, it));
          const std::string name = ItemName(it);
-         dl->AddText(ImVec2(p.x + 26.0f, midY - ImGui::GetTextLineHeight() * 0.5f), text, name.c_str());
+         if (sRename == it.id)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 24.0f, midY - ImGui::GetFrameHeight() * 0.5f));
+            ImGui::SetNextItemWidth(availW - 72.0f);
+            if (sRenameFocus)
+               ImGui::SetKeyboardFocusHere();
+            const bool enter = FieldWell::InputText("##rename", sRenameBuf, sizeof(sRenameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+            if (!sRenameFocus && (enter || ImGui::IsItemDeactivated()))
+            {
+               if (name != sRenameBuf)
+               {
+                  PushUndoCheckpoint("Rename in 3D View");
+                  it.name = sRenameBuf;
+                  scene->Commit();
+               }
+               sRename = 0;
+            }
+            sRenameFocus = false;
+         }
+         else
+            dl->AddText(ImVec2(p.x + 26.0f, midY - ImGui::GetTextLineHeight() * 0.5f), text, name.c_str());
          if (it.id == scene->activeCamera)
             glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_sm, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
          ImGui::SetCursorScreenPos(ImVec2(p.x + availW - 24.0f, p.y));
@@ -2201,9 +2610,22 @@ namespace
          return;
       if (OutputNode* out = View3DEnsureOutput())
       {
-         out->offlineDurationSeconds = sDuration;
-         out->offlineFps = sFps;
+         out->offlineDurationSeconds = (int)sSet->seconds;
+         out->offlineFps = (int)sSet->fps;
          StartOfflineRenderSession(out);
+      }
+   }
+
+   // One picture through the active camera, to the path on the Output node.
+   void RenderStill(Scene3DNode* scene)
+   {
+      if (gOfflineRender.active || scene->activeCamera == 0)
+         return;
+      if (OutputNode* out = View3DEnsureOutput())
+      {
+         if (out->exportImagePath.empty())
+            out->exportImagePath = AppPaths::DesktopDir() + "/infinite_render.png";
+         ExportImage(out, out->exportImagePath);
       }
    }
 
@@ -2253,14 +2675,14 @@ namespace
       Render3DNode& look = scene->Look();
       if (Card(T("Format")))
       {
-         int w = (int)look.width, h = (int)look.height;
+         int w = (int)scene->renderW, h = (int)scene->renderH;
          if (IntInputRow(T("Resolution X"), &w))
-            look.width = (float)std::clamp(w, 16, 8192);
+            scene->renderW = (float)std::clamp(w, 16, 8192);
          if (IntInputRow(T("Y"), &h))
-            look.height = (float)std::clamp(h, 16, 8192);
+            scene->renderH = (float)std::clamp(h, 16, 8192);
          static const int kRates[] = { 24, 25, 30, 48, 50, 60, 120 };
          char face[16];
-         snprintf(face, sizeof(face), "%d fps", sFps);
+         snprintf(face, sizeof(face), "%d fps", (int)sSet->fps);
          SectionCard::RowLabel(T("Frame rate"));
          ImGui::SetNextItemWidth(sFieldW);
          if (MenuParts::BeginCombo("##v3dfps", face))
@@ -2268,18 +2690,19 @@ namespace
             for (int rate : kRates)
             {
                snprintf(face, sizeof(face), "%d fps", rate);
-               if (MenuParts::Choice(face, rate == sFps))
-                  sFps = rate;
+               if (MenuParts::Choice(face, rate == (int)sSet->fps))
+                  sSet->fps = (float)rate;
             }
             MenuParts::EndCombo();
          }
       }
       if (Card(T("Frame Range")))
       {
-         IntInputRow(T("Seconds"), &sDuration);
-         sDuration = std::clamp(sDuration, 1, 3600);
+         int seconds = (int)sSet->seconds;
+         if (IntInputRow(T("Seconds"), &seconds))
+            sSet->seconds = (float)std::clamp(seconds, 1, 3600);
          SectionCard::RowLabel(T("Frames"));
-         ImGui::Text("%d", sDuration * sFps);
+         ImGui::Text("%d", (int)(sSet->seconds * sSet->fps));
       }
       if (Card(T("Output")))
       {
@@ -2301,26 +2724,65 @@ namespace
          ImGui::TextDisabled("%s", T("Add a camera to render."));
    }
 
-   void DrawViewTab()
+   const std::vector<std::string>& OrientationNames()
    {
+      static const std::vector<std::string> kNames = { T("Global"), T("Local"), T("View") };
+      return kNames;
+   }
+
+   const std::vector<std::string>& PivotNames()
+   {
+      static const std::vector<std::string> kNames = { T("Median Point"), T("Individual Origins"), T("Active Element"), T("3D Cursor") };
+      return kNames;
+   }
+
+   void DrawViewTab(Scene3DNode* scene, float availW)
+   {
+      Scene3DNode::Settings& set = *sSet;
+      if (Card(T("Transform")))
+      {
+         ComboRow(T("Orientation"), &set.orientation, OrientationNames());
+         ComboRow(T("Pivot"), &set.pivot, PivotNames());
+      }
       if (Card(T("Snap")))
       {
-         FloatRow(T("Move"), &sSnapMove, 0.01f, 5.0f, "%.2f");
-         FloatRow(T("Rotate"), &sSnapRot, 1.0f, 90.0f, "%.0f");
-         FloatRow(T("Scale"), &sSnapScale, 0.01f, 1.0f, "%.2f");
+         BoolRow(T("On"), &set.snap);
+         FloatRow(T("Move"), &set.snapMove, 0.01f, 5.0f, "%.2f");
+         FloatRow(T("Rotate"), &set.snapRot, 1.0f, 90.0f, "%.0f");
+         FloatRow(T("Scale"), &set.snapScale, 0.01f, 1.0f, "%.2f");
+      }
+      if (Card(T("3D Cursor")))
+      {
+         SectionCard::RowLabel(T("Location"));
+         ImGui::SetNextItemWidth(sFieldW);
+         FieldWell::PushStyle();
+         ImGui::DragFloat3("##v3dcursor", set.cursor, 0.01f, 0.0f, 0.0f, "%.2f");
+         FieldWell::PopStyle();
+         Undoable("Move 3D cursor");
+         ImGui::BeginDisabled(sSel.empty());
+         if (ActionButton::Draw(L("Cursor to Selected"), ImVec2(availW, 0)))
+            CursorToSelected(scene);
+         if (ActionButton::Draw(L("Selection to Cursor"), ImVec2(availW, 0)))
+            SelectionToCursor(scene);
+         ImGui::EndDisabled();
+      }
+      if (Card(T("Navigation")))
+      {
+         BoolRow(T("Zoom to mouse"), &set.zoomToMouse);
+         BoolRow(T("Orbit around selection"), &set.orbitSelection);
       }
       if (Card(T("Passepartout")))
-         FloatRow(T("Opacity"), &sPassAlpha, 0.0f, 1.0f, "%.2f");
-      if (Card(T("Safe Areas"), &sSafe))
+         FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");
+      if (Card(T("Safe Areas"), &set.safe))
       {
-         FloatRow(T("Title"), &sSafeTitle, 0.0f, 0.3f, "%.3f");
-         FloatRow(T("Action"), &sSafeAction, 0.0f, 0.3f, "%.3f");
+         FloatRow(T("Title"), &set.safeTitle, 0.0f, 0.3f, "%.3f");
+         FloatRow(T("Action"), &set.safeAction, 0.0f, 0.3f, "%.3f");
       }
       if (Card(T("Composition Guides")))
       {
-         BoolRow(T("Thirds"), &sGuideThirds);
-         BoolRow(T("Center"), &sGuideCenter);
-         BoolRow(T("Golden"), &sGuideGolden);
+         BoolRow(T("Thirds"), &set.thirds);
+         BoolRow(T("Center"), &set.center);
+         BoolRow(T("Golden"), &set.golden);
       }
    }
 
@@ -2379,7 +2841,7 @@ namespace
       else if (sTab == 2) DrawWorldTab(scene, availW);
       else if (sTab == 3) DrawObjectTab(scene, availW);
       else if (sTab == 4) DrawDataTab(scene, availW);
-      else DrawViewTab();
+      else DrawViewTab(scene, availW);
       SectionCard::EndWindow();
       ImGui::EndChild();
       ImGui::EndChild();
@@ -2430,6 +2892,30 @@ namespace
       if (sOpenMenu)
          ImGui::OpenPopup("##v3dcontext");
       sOpenAdd = sOpenMenu = false;
+      if (sOpenPivot)
+         ImGui::OpenPopup("##v3dpivot");
+      if (sOpenOrient)
+         ImGui::OpenPopup("##v3dorient");
+      sOpenPivot = sOpenOrient = false;
+      auto choose = [](const std::vector<std::string>& names, int* v, const char* undo)
+      {
+         for (int i = 0; i < (int)names.size(); i++)
+            if (MenuParts::Item(names[i].c_str(), nullptr, i == *v) && i != *v)
+            {
+               PushUndoCheckpoint(undo);
+               *v = i;
+            }
+      };
+      if (MenuParts::BeginPopup("##v3dpivot"))
+      {
+         choose(PivotNames(), &sSet->pivot, "Pivot in 3D View");
+         MenuParts::EndPopup();
+      }
+      if (MenuParts::BeginPopup("##v3dorient"))
+      {
+         choose(OrientationNames(), &sSet->orientation, "Orientation in 3D View");
+         MenuParts::EndPopup();
+      }
       if (MenuParts::BeginPopup("##v3daddmenu"))
       {
          DrawAddItems(scene);
@@ -2444,6 +2930,16 @@ namespace
          if (MenuParts::Item(T("Duplicate"), "Shift+D", false, any)) DuplicateSelected(scene, ImGui::GetIO().MousePos);
          if (MenuParts::Item(T("Hide"), "H", false, any)) HideSelected(scene);
          if (MenuParts::Item(T("Remove from scene"), "X", false, any)) DeleteSelected(scene);
+         if (MenuParts::Item(T("Rename"), "F2", false, sSel.size() == 1))
+            if (const Item* it = scene->FindItem(sSel.back()))
+               StartRename(*it);
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Insert key"), "I", false, any)) InsertKeys(scene);
+         if (MenuParts::Item(T("Remove key"), "Alt+I", false, any)) RemoveKeysHere(scene);
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Cursor to Selected"), nullptr, false, any)) CursorToSelected(scene);
+         if (MenuParts::Item(T("Selection to Cursor"), nullptr, false, any)) SelectionToCursor(scene);
+         MenuParts::Separator();
          if (sSel.size() == 1)
             if (MenuParts::Item(T("Go to node")))
                if (const Item* it = scene->FindItem(sSel[0]))
@@ -2564,7 +3060,9 @@ namespace
 
    void DrawPanel()
    {
+      FollowCanvasSelection();
       Scene3DNode* scene = FindScene();
+      sSet = scene != nullptr ? &scene->settings : &sNoScene;
       if (scene == nullptr)
       {
          gView3DClaimedKeys = false;
@@ -2576,6 +3074,9 @@ namespace
          if (scene->FindItem(id) != nullptr)
             live.push_back(id);
       sSel.swap(live);
+      sLocal.erase(std::remove_if(sLocal.begin(), sLocal.end(), [&](int id) { return scene->FindItem(id) == nullptr; }), sLocal.end());
+      static Scene3DNode::Settings sSeen;
+      std::memcpy(&sSeen, sSet, sizeof(sSeen));
 
       DrawHeader(scene);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -2589,6 +3090,9 @@ namespace
          DrawSide(scene, sideW);
       }
       DrawPopups(scene);
+      scene->holdKeys = sOp.mode != 0;
+      if (std::memcmp(&sSeen, sSet, sizeof(sSeen)) != 0)
+         scene->Commit();
       RunPending(scene);
    }
 }
@@ -2607,11 +3111,13 @@ void View3DShotState(int state)
    sTab = state % 10;
    sCameraView = state >= 10;
    sShading = Shading::Final;
-   sGuideThirds = sCameraView;
    sSideOpen = true;
    if (Scene3DNode* scene = FindScene())
+   {
+      scene->settings.thirds = sCameraView;
       if (const Item* cam = scene->FindItem(scene->activeCamera))
          sSel = { cam->id };
+   }
 }
 
 void View3DAddLight(int type)
