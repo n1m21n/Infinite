@@ -98,6 +98,7 @@ namespace
       bool inspectorHovered = false;
       bool settingsOpen = false; // the right-hand settings panel (the Edit icon)
       bool recording = false;    // MIDI record is armed
+      unsigned int recDevice = 0; // the MIDI source to record from; 0 = every input
       unsigned long long recCursor = 0;
       std::map<int, std::pair<Tick, int>> recHeld; // pitch -> (start tick, velocity) of the keys held down
       uint64_t copyClip = 0;     // where the copied notes came from, so a paste lands right after them
@@ -1494,7 +1495,7 @@ namespace
    void PollRecording(Arrange::Lane& page)
    {
       State& s = S();
-      if (!s.recording || Platform::MidiDeviceSummary().empty())
+      if (!s.recording || Platform::MidiListSources().empty())
       {
          s.recording = false;
          s.recHeld.clear();
@@ -1508,7 +1509,7 @@ namespace
          for (int i = 0; i < n; i++)
          {
             const Platform::MidiNoteMessage& m = msgs[i];
-            if (!Transport::Instance().IsPlaying())
+            if (!Transport::Instance().IsPlaying() || (s.recDevice != 0 && m.device != s.recDevice))
                continue;
             const int vel = std::clamp((int)std::lround(m.velocity01 * 127.0f), 1, 127);
             if (m.isNoteOn)
@@ -1625,11 +1626,41 @@ namespace
       if (Picker("##pianoGenType", types, (int)NoteGen::Type::Count, type, 128.0f, T("What Generate writes")))
          s.gen.type = (NoteGen::Type)type;
 
-      // Right-pinned: record, then the settings toggle.
-      const bool haveMidi = !Platform::MidiDeviceSummary().empty();
+      // Right-pinned: the MIDI input, record, then the settings toggle.
+      if (!Platform::MidiIsRunning())
+      {
+         std::string midiErr;
+         Platform::MidiStart(midiErr); // the controller list fills only once MIDI is listening
+      }
+      const std::vector<Platform::MidiSource> srcs = Platform::MidiListSources();
+      const bool haveMidi = !srcs.empty();
+      if (s.recDevice != 0 && !std::any_of(srcs.begin(), srcs.end(), [&](const Platform::MidiSource& m) { return m.id == s.recDevice; }))
+         s.recDevice = 0;
+      std::string devLabel = haveMidi ? T("All MIDI inputs") : T("No MIDI input");
+      for (const Platform::MidiSource& m : srcs)
+         if (m.id == s.recDevice)
+            devLabel = m.name;
       const float recW = TextW(T("Record"));
-      const float rightW = recW + gap + kIconW;
+      const float devW = 150.0f;
+      const float rightW = devW + gap + recW + gap + kIconW;
       FormParts::Inline(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - rightW));
+      {
+         ImVec2 bmin, bmax;
+         if (PickerFace("##pianoRecDevice", devLabel.c_str(), devW, T("Which MIDI controller Record listens to"), bmin, bmax))
+            ImGui::OpenPopup("##pianoRecDeviceMenu");
+         if (BeginPickerMenu("##pianoRecDeviceMenu", bmin, bmax, devW))
+         {
+            if (MenuParts::Item(T("All MIDI inputs"), nullptr, s.recDevice == 0))
+               s.recDevice = 0;
+            for (const Platform::MidiSource& m : srcs)
+               if (MenuParts::Item(m.name.c_str(), nullptr, s.recDevice == m.id))
+                  s.recDevice = m.id;
+            if (!haveMidi)
+               ImGui::TextDisabled("%s", T("Connect a MIDI controller"));
+            MenuParts::EndPopup();
+         }
+      }
+      FormParts::Inline(0.0f, gap);
       if (!haveMidi)
          ImGui::BeginDisabled();
       if (ActionButton::Draw(T("Record"), ImVec2(recW, tok::tile), s.recording ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
@@ -2959,7 +2990,7 @@ namespace
          ArrangeSetLoopEdgeAtPlayhead(true);
       else if (noMods && key(ImGuiKey_O))
          ArrangeSetLoopEdgeAtPlayhead(false);
-      else if (noMods && key(ImGuiKey_R) && !Platform::MidiDeviceSummary().empty())
+      else if (noMods && key(ImGuiKey_R) && !Platform::MidiListSources().empty())
          s.recording = !s.recording;
    }
 

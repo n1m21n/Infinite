@@ -421,6 +421,15 @@ namespace Platform
       return summary.empty() ? std::string("no inputs connected") : summary;
    }
 
+   std::vector<MidiSource> MidiListSources()
+   {
+      std::vector<MidiSource> out;
+      std::lock_guard<std::mutex> lock(gState.mutex);
+      for (size_t i = 0; i < gState.deviceNames.size() && i < gHandles.size(); i++)
+         out.push_back({ (MidiDeviceId)(i + 1), gState.deviceNames[i] });
+      return out;
+   }
+
    std::string MidiDeviceName(MidiDeviceId device)
    {
       if (device == 0 || device > gHandles.size())

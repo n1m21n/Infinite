@@ -629,6 +629,15 @@ namespace Platform
       return summary;
    }
 
+   std::vector<MidiSource> MidiListSources()
+   {
+      std::vector<MidiSource> out;
+      std::lock_guard<std::mutex> lock(gState.mutex);
+      for (const MidiDeviceId id : gState.deviceOrder)
+         out.push_back({ id, gState.deviceNames[id] });
+      return out;
+   }
+
    std::string MidiDeviceName(MidiDeviceId device)
    {
       std::lock_guard<std::mutex> lock(gState.mutex);

@@ -1121,6 +1121,14 @@ namespace Platform
    bool MidiIsRunning();
    std::string MidiDeviceSummary(); // comma-joined names of connected sources, for status text
    std::string MidiDeviceName(MidiDeviceId device); // "" if not currently connected
+   // Connected note sources, in a stable order, each with the id MidiNoteMessage.device carries. Empty when MIDI is not
+   // started or nothing is plugged in (MidiDeviceSummary's text is not a test for that: it reads "no inputs connected").
+   struct MidiSource
+   {
+      MidiDeviceId id = 0;
+      std::string name;
+   };
+   std::vector<MidiSource> MidiListSources();
 
    // Injects raw MIDI bytes (Note On, Note Off, CC, Clock) into the MIDI subsystem
    // for benchmarks and tests, identically to hardware MIDI arrival.
