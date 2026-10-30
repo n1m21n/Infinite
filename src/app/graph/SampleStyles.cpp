@@ -2580,9 +2580,9 @@ Compiled Compile(const Recipe& recipe)
       p["steps"] = { 'i', "16" };
       p["rateMode"] = { 'i', "0" };
       // The card's motif octave sits over its bass in the full mix; played alone as the synths part it would be the
-      // bass (owner's review, 2026-10-29: synths "not dark or muddy"), so it rises an octave or so. Octave 3 brightens more
-      // but turns a sine motif into a whistle the spectral gate rejects (4 of 34 takes failed), so 2.
-      const int motifOct = part == Part::Synths ? std::max(st.motifOctave, 2) : st.motifOctave;
+      // bass (owner's review, 2026-10-29: synths "not dark or muddy"), so it rises to octave 3: low share 0.22 -> 0.08, the
+      // library's median (item 15). The synths gate's low floor was refitted with it, as it held the old dark sound.
+      const int motifOct = part == Part::Synths ? std::max(st.motifOctave, 3) : st.motifOctave;
       for (int k = 0; k < 16; k++)
       {
          p["note" + std::to_string(k)] = { 'i', std::to_string(degreeNote(seq[k].first, motifOct)) };

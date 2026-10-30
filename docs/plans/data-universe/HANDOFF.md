@@ -1215,3 +1215,30 @@ a cycle, a change no listener hears. Every characteristic the stored move change
   filter type. The conditioned models already tried lost (HANDOFF, "Wavetable knob model that uses the other knobs"), and the
   item 13 sound model reached only 0.23 R². The bar stays a MISS. Reaching it needs a model per table / warp mode, or more
   data per region, not cleaner renders.
+
+## 2026-10-30 Plan item 15: synths low end (`SampleStyles.cpp` motif octave 3, synths gate row): MET
+
+Measured from the app's own spectrum dump (`INFINITE_GENSAMPLESPECTRUM`, 40 takes per part, same seeds) with
+`tools/universe/band_measure.py`: centroid and low share (< 215 Hz) from the 32 bands, the library's numbers from `features.jsonl`
+synth loops (2,041). The wasm `part_vs_library.py` gives the same library medians.
+
+| Synths part | centroid | low share | high share | gap to library (IQRs, centroid + low) |
+|---|---|---|---|---|
+| library median | 694 | 0.082 | 0.028 | 0 |
+| before (motif octave 2) | 715 | 0.222 | 0.053 | 0.40 |
+| **motif octave 3** | 870 | **0.082** | 0.063 | **0.22** |
+
+- The centroid had already reached the library; what was left was the low end. A solo motif at octave 2 has its fundamentals at
+  130-260 Hz, under the 215 Hz edge. At octave 3 the low share is the library's median exactly. "Wavetable + Analog lines under
+  the motif" was not needed and would have added low end, not removed it.
+- **The app's gate is not `spectral_gates.json`.** The app compiles an older 8-threshold table (`kPartSpectralGates` in
+  `GenerateSamplesCritic.inc`); the 10-check per-mishap gate in `spectral_gates.json` is fitted but `export_critic_inc.py` was
+  never rerun into the app (rerunning it now also rebuilds the melody, drum and bass critics from a fresh sample, so it was not
+  used). `tools/universe/app_gate_check.py` checks takes against the table the app actually compiles.
+- In that gate, octave 3 doubled synths rejects (6 -> 12 of 37) on one check: `minLow 0.005`, at least 0.5% below 215 Hz. A
+  quarter of real library synth loops have under 0.3%, so the floor held the old dark sound. Synths `minLow` is now 0.001:
+  clean rejects 7/37 (6 before), thin copies caught 37/37 (36 before), dropouts 10/37 (7 before). No other row changed.
+- Item 17's drums were rechecked against the app's gate: drums 0/40 before and after, as with the json gate.
+- `spectral_gates.json` (local and shippable) was refitted on the octave-3 renders: held-out FRR 0.80%, catch 95.2%, same as on
+  the octave-2 renders. The old file is kept in the session scratchpad only.
+- Pads gate row unchanged and pads renders unchanged, so pads stay identical.

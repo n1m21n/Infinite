@@ -499,7 +499,7 @@ namespace SampleCriticData
    };
    constexpr PartSpectralGate kPartSpectralGates[16] = {
       { 0.016f, 0.996f, 0.002f, 0.000f, 0.751f, 0.953f, 0.350f, 0.473f }, // full
-      { 0.005f, 1.000f, 0.000f, 0.000f, 0.608f, 1.935f, 1.000f, 0.729f }, // synths
+      { 0.001f, 1.000f, 0.000f, 0.000f, 0.608f, 1.935f, 1.000f, 0.729f }, // synths
       { 0.000f, 0.957f, 0.033f, 0.000f, 0.901f, 2.769f, 1.000f, 0.829f }, // pads
       { 0.000f, 0.914f, 0.066f, 0.000f, 0.865f, 3.659f, 0.740f, 0.832f }, // plucks
       { 0.001f, 0.954f, 0.031f, 0.001f, 0.770f, 3.943f, 0.559f, 0.815f }, // percussion
