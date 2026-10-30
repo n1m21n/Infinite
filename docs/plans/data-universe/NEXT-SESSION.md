@@ -35,7 +35,7 @@ body dropdown is only the resonance (guitar is 1.7 dB from box at body 0.5); the
    existing render tools (own_sweeps, click_measure, band_measure). Output: a ranked fix list, then fixes one by one.
 2. Real voices: Generate Samples now draws Piano (grand, Rhodes, Wurlitzer), String and Wind for keys, plucks, pads and leads, from their factory presets (`RealVoice`). The keys gate's high floor went to 0: piano spectra sit under the synth-fitted 0.001.
 
-3. OPEN BUG: Wind has never appeared in a lead take (0 of 204 in the web build). Piano and String do. The trace `kind / real.size()` in the leads branch showed real 0 on 4 takes, too few to tell chance from a fault: count it over a few hundred takes first.
+3. CLOSED 2026-10-30, not a bug: Wind leads. Counting Wind nodes in `gen_patch()` over all styles, part 10, on the committed wasm (same bytes as `website/gen`): 23 of 120 pinned (19%, as the weights predict: brass 0.18 x 0.7 + the other kinds x 0.15), 14 of 119 unpinned (the role critic redraws some). The earlier 0 of 204 was most likely counted on the wasm from before Wind was wired in. A lead patch looks like a full mix because every layer is built for every part (keeps the seed stream fixed, `SampleStyles.cpp` near "Every layer is built whatever the part"); only the lead reaches Audio Out (0 of 60 takes had another voice audible). The downloaded `.inf` still carries those unwired layers.
 
 Web parity: 32 of 40 identical to desktop. The other 8 differ in length only, because the web's RoleCritic redraws and the native batch does not.
 
