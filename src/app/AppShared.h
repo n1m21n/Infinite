@@ -5740,7 +5740,8 @@ extern std::string gSampleStudioPendingDrop;
 // Piano Roll (Shift+R, docs/plans/piano-roll/README.md §9): one page per MIDI lane, docked bottom or top.
 extern bool gTerminalOpen;
 extern float gTerminalHeight;
-extern int gTerminalDock; // 0 = bottom, 3 = top
+extern float gTerminalWidth;
+extern int gTerminalDock; // 0 bottom, 1 right, 2 left, 3 top
 extern float gTerminalFontSize;
 extern bool gTerminalFocus; // the terminal has the keyboard
 extern ImVec2 gTerminalRectMin, gTerminalRectMax;

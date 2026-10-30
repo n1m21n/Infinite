@@ -399,6 +399,13 @@ void DrawSidePanels(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_right", ImVec2(gArrangePanelWidth, graphHeight));
       }
 
+      // Right-docked terminal
+      if (gTerminalOpen && gTerminalDock == 1)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         DrawTerminalDocked("##terminal_right", ImVec2(gTerminalWidth, graphHeight));
+      }
+
       // Right-docked edit history (always right; Edit > History or Shift+U)
       if (gHistoryOpen)
       {
@@ -704,8 +711,8 @@ void DrawSidePanels(FrameCtx& fc)
       // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
       if (gPianoRollOpen && gPianoRollDock != 3)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
-      // Terminal (View > Terminal or Ctrl+`), bottom or top like the Timeline.
-      if (gTerminalOpen && gTerminalDock != 3)
+      // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
+      if (gTerminalOpen && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));
       if (!gTerminalOpen)
          TerminalPanelHidden();

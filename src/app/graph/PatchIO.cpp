@@ -387,7 +387,9 @@ namespace app
          else if (key == "panelTerminalH")
             gTerminalHeight = std::max(160.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelTerminalDock")
-            gTerminalDock = (val == "3") ? 3 : 0;
+            gTerminalDock = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "panelTerminalW")
+            gTerminalWidth = std::max(280.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelStudioDock")
             gSampleStudioDock = (val == "3") ? 3 : 0;
       }
@@ -434,6 +436,7 @@ namespace app
       file << "panelTerminalOpen=" << (gTerminalOpen ? 1 : 0) << "\n";
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";
+      file << "panelTerminalW=" << gTerminalWidth << "\n";
    }
 
 
@@ -446,11 +449,11 @@ namespace app
       if (sTestRun)
          return;
       char buf[256];
-      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d%d%d|%d%d%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d%d%d%d|%d%d%d%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
                     gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gSampleStudioOpen, gPianoRollOpen, gTerminalOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
                     gSampleStudioDock, gPianoRollDock, gTerminalDock,
                     gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
-                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight);
+                    gPerfPanelHeight, gHistoryWidth, gSampleStudioHeight, gPianoRollHeight, gTerminalHeight, gTerminalWidth);
       static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
       static std::string sSeen = buf;
       static double sSeenAt = 0.0;

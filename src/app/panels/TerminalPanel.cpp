@@ -32,6 +32,7 @@ namespace app
 namespace
 {
    constexpr float kMinHeight = 160.0f;
+   constexpr float kMinWidth = 280.0f;
    constexpr float kTabRowH = 26.0f;
    constexpr float kLineHeight = 1.3f;
    constexpr int kWheelLines = 3;
@@ -875,7 +876,9 @@ void TerminalLoadFonts(float bakedPx)
 void DrawTerminalDocked(const char* id, const ImVec2& size)
 {
    const float kGrip = PanelFrame::kGap;
-   const bool gripFirst = gTerminalDock != 3; // bottom: the grip sits on top
+   const int dock = gTerminalDock;
+   const bool vertical = dock == 1 || dock == 2;  // the grip is a column
+   const bool gripFirst = dock == 0 || dock == 1; // the canvas is above or to the left
    ImGui::BeginChild(id, size, false);
    gTerminalRectMin = ImGui::GetWindowPos();
    gTerminalRectMax = ImVec2(gTerminalRectMin.x + ImGui::GetWindowSize().x, gTerminalRectMin.y + ImGui::GetWindowSize().y);
@@ -885,25 +888,41 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    const ImVec2 inner = ImGui::GetContentRegionAvail();
    auto grip = [&]()
    {
-      ImGui::InvisibleButton("##terminalgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
-      DrawPanelSeam(false, gripFirst);
+      ImGui::InvisibleButton("##terminalgrip", vertical ? ImVec2(kGrip, std::max(1.0f, inner.y)) : ImVec2(std::max(1.0f, inner.x), kGrip));
+      DrawPanelSeam(vertical, gripFirst);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+         ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
       if (ImGui::IsItemActive())
       {
-         gTerminalHeight += gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y;
+         const ImVec2 d = ImGui::GetIO().MouseDelta;
+         switch (dock)
+         {
+            case 0: gTerminalHeight -= d.y; break;
+            case 1: gTerminalWidth -= d.x; break;
+            case 2: gTerminalWidth += d.x; break;
+            default: gTerminalHeight += d.y; break;
+         }
          gTerminalHeight = std::max(kMinHeight, gTerminalHeight);
+         gTerminalWidth = std::max(kMinWidth, gTerminalWidth);
       }
    };
    if (gripFirst)
+   {
       grip();
+      if (vertical)
+         ImGui::SameLine();
+   }
    const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-   const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+   const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), std::max(1.0f, inner.y))
+                                    : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
    PanelFrame::Insets in;
-   if (gripFirst)
-      in.t = 0.0f;
-   else
-      in.b = 0.0f;
+   switch (dock)  // the grip side needs no inset of its own
+   {
+      case 0: in.t = 0.0f; break;
+      case 1: in.l = 0.0f; break;
+      case 2: in.r = 0.0f; break;
+      default: in.b = 0.0f; break;
+   }
    PanelFrame::BeginCard("##terminalcontent", cardSize, in);
    const auto drawStart = std::chrono::steady_clock::now();
    DrawPanel();
@@ -913,7 +932,11 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    sDrawWorst = std::max(sDrawWorst, drawn);
    PanelFrame::EndCard();
    if (!gripFirst)
+   {
+      if (vertical)
+         ImGui::SameLine();
       grip();
+   }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
    ImGui::EndChild();

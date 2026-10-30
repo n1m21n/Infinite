@@ -444,7 +444,30 @@ void DrawMenuBar(FrameCtx& fc)
             };
             dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
             dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
-            dockedPanelMenu(L("Terminal"), L("Show Terminal"), gTerminalOpen, gTerminalDock, gTerminalHeight, "##terminaldock");
+            if (MenuParts::SubMenu(L("Terminal")))
+            {
+               MenuParts::Check(L("Show Terminal"), &gTerminalOpen);
+               if (gTerminalOpen)
+               {
+                  static const char* kTerminalDocks[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+                  ImGui::SetNextItemWidth(150);
+                  FieldWell::PushStyle();
+                  if (MenuParts::BeginCombo("##terminaldock", T(kTerminalDocks[gTerminalDock])))
+                  {
+                     for (int i = 0; i < 4; ++i)
+                        if (MenuParts::Choice(L(kTerminalDocks[i]), i == gTerminalDock))
+                           gTerminalDock = i;
+                     MenuParts::EndCombo();
+                  }
+                  FieldWell::PopStyle();
+                  ImGui::SetNextItemWidth(150);
+                  if (gTerminalDock == 1 || gTerminalDock == 2)
+                     FieldWell::Slider(L("Width"), &gTerminalWidth, 280.0f, 1400.0f, "%.0f px");
+                  else
+                     FieldWell::Slider(L("Height"), &gTerminalHeight, 160.0f, 800.0f, "%.0f px");
+               }
+               ImGui::EndMenu();
+            }
 
             if (MenuParts::SubMenu(L("Show Set")))
             {

@@ -450,6 +450,7 @@ bool gHeadlessNeedProbe = false;
    std::string gSampleStudioPendingDrop;
    bool  gTerminalOpen = false;
    float gTerminalHeight = 320.0f;
+   float gTerminalWidth = 560.0f;
    int   gTerminalDock = 0;
    float gTerminalFontSize = 13.0f;
    bool  gTerminalFocus = false;
