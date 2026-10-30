@@ -5,6 +5,8 @@
 namespace app
 {
    static std::string gOwnNodeClipboardText;
+extern int gView3DTestMenuNode;
+
 void DrawKeyboard(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -1029,6 +1031,11 @@ void DrawKeyboard(FrameCtx& fc)
          if (ed::ShowNodeContextMenu(&contextNodeId) && !gParamRightClickConsumedThisFrame)
          {
             gContextMenuNodeIndex = (int)contextNodeId.Get() / GraphNode::kStride;
+            ImGui::OpenPopup("##nodecontext");
+         }
+         if (gView3DTestMenuNode >= 0)
+         {
+            gContextMenuNodeIndex = gView3DTestMenuNode;
             ImGui::OpenPopup("##nodecontext");
          }
       }}

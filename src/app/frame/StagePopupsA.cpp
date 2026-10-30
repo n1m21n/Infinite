@@ -62,6 +62,9 @@ namespace
    }
 }
 
+// Self-test: opens the node menu on this node with Add to 3D View clicked.
+int gView3DTestMenuNode = -1;
+
 void DrawPopupsA(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -69,6 +72,16 @@ void DrawPopupsA(FrameCtx& fc)
    auto& searchBuf = fc.searchBuf;
    auto& searchJustOpened = fc.searchJustOpened;
    int pianoRollFrom = -1;
+   // Run after the menu: the first add spawns the 3D View node, which can move
+   // gNodes while gn is still in use.
+   int view3DAddFrom = -1, view3DWorldFrom = -1;
+   auto view3DItems = [&](const GraphNode& gn)
+   {
+      if (View3DCanAdd(gn) && (MenuParts::Item(L("Add to 3D View")) || gView3DTestMenuNode >= 0))
+         view3DAddFrom = gn.index;
+      else if (View3DCanSetWorld(gn) && MenuParts::Item(L("Use as 3D View world")))
+         view3DWorldFrom = gn.index;
+   };
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
       if (MenuParts::BeginPopup("##nodecontext"))
@@ -94,17 +107,7 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
                g->on = !g->on;
-            // The first add spawns the 3D View node, which can move gNodes: refetch gn.
-            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
-            {
-               View3DAddNode(*gn);
-               gn = FindNodeByIndex(gContextMenuNodeIndex);
-            }
-            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
-            {
-               View3DSetWorld(*gn);
-               gn = FindNodeByIndex(gContextMenuNodeIndex);
-            }
+            view3DItems(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -160,10 +163,7 @@ void DrawPopupsA(FrameCtx& fc)
                gColor.label = "colour";
                gColor.justOpened = true;
             }
-            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
-               View3DAddNode(*gn);
-            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
-               View3DSetWorld(*gn);
+            view3DItems(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -220,10 +220,7 @@ void DrawPopupsA(FrameCtx& fc)
                   RebuildAudioTopology();
                }
             }
-            if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
-               View3DAddNode(*gn);
-            else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
-               View3DSetWorld(*gn);
+            view3DItems(*gn);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -404,6 +401,10 @@ void DrawPopupsA(FrameCtx& fc)
       if (GraphNode* from = FindNodeByIndex(pianoRollFrom))
          if (auto* mf = dynamic_cast<MidiFileNode*>(from->node.get()))
             OpenInPianoRoll(from, mf);
+      if (GraphNode* from = FindNodeByIndex(view3DAddFrom))
+         View3DAddNode(*from);
+      if (GraphNode* from = FindNodeByIndex(view3DWorldFrom))
+         View3DSetWorld(*from);
 
       // Node "Help" popup, opened via the context menu above. A separate
       // OpenPopup call (rather than nesting it inside "##nodecontext") because

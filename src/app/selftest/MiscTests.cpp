@@ -3284,9 +3284,34 @@ bool RunPerfPanelSelfTest()
 }
 
 // Every first add spawns the 3D View node, which is what moves gNodes under the caller.
+extern int gView3DTestMenuNode;
+static bool sView3DTestOk = true;
+
+// The first add from the real node menu, at full node capacity so the spawn
+// moves gNodes under the open menu.
+void RunView3DMenuTest(int frameId)
+{
+   if (frameId == 7)
+   {
+      NewPatch();
+      const int cube = SpawnNode("Cube", "3D", 0.0f, 0.0f)->index;
+      gNodes.shrink_to_fit();
+      gView3DTestMenuNode = cube;
+      return;
+   }
+   gView3DTestMenuNode = -1;
+   int items = -1;
+   for (GraphNode& gn : gNodes)
+      if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
+         items = (int)s->Items().size();
+   const bool pass = items == 1;
+   printf("  [%s] the node menu's first add makes one item\n", pass ? "pass" : "FAIL");
+   printf("VIEW3DTEST %s\n", sView3DTestOk && pass ? "OK" : "FAIL");
+}
+
 void RunView3DTest()
 {
-   bool ok = true;
+   bool& ok = sView3DTestOk;
    auto Check = [&](const char* label, bool pass)
    {
       printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
@@ -3350,7 +3375,6 @@ void RunView3DTest()
 
    // The scene stays up: the frames after this one draw the panel with it.
    gView3DOpen = true;
-   printf("VIEW3DTEST %s\n", ok ? "OK" : "FAIL");
 }
 
 void RunClipboardTest()
