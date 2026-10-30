@@ -2,6 +2,7 @@
 
 #include "app/AppCommon.h"
 #include "app/graph/RoleCritic.h"
+#include "app/graph/SampleStyles.h"
 #include "app/graph/UserStyle.h"
 #include "core/MovementLog.h"
 #include "core/Transport.h"
@@ -393,6 +394,169 @@ namespace LearningLog
                     { "velocity_median", std::round(1e4 * Median(vel)) / 1e4 }, { "onset_grid16", Shares(grid) } };
       }
 
+      // Close doc 5.3: which note-bank picks does this player keep? tools/universe/learn_from_logs.py is the same fit and its
+      // tests. A pick's keep rate, shrunk toward the base rate, clipped to 0.5..2 and averaged to 1 inside its pool; the weights
+      // are written only when, on the last quarter of the sessions, they beat the old keep rate (mean and bootstrap 5th percentile).
+      struct LoggedTake
+      {
+         std::string session, part;
+         std::vector<std::string> picks;
+         std::string outcome;
+      };
+
+      void LoadPickWeights()
+      {
+         std::ifstream f(AppPaths::FsPath(gDir + "/profile/learned_weights.json"));
+         json j = json::parse(f, nullptr, false);
+         if (j.is_discarded() || !j.contains("weights"))
+         {
+            SampleStyles::SetPickWeights(nullptr);
+            return;
+         }
+         auto w = std::make_shared<std::map<std::string, double>>();
+         for (auto it = j["weights"].begin(); it != j["weights"].end(); ++it)
+            if (it.value().is_number())
+               (*w)[it.key()] = it.value().get<double>();
+         SampleStyles::SetPickWeights(w);
+      }
+
+      void FitPickWeights()
+      {
+         constexpr int kMinTrain = 200, kMinHeld = 60;
+         constexpr double kPrior = 20.0, kLo = 0.5, kHi = 2.0;
+         std::map<std::string, LoggedTake> takes;
+         std::vector<std::string> order, sessions;
+         std::error_code ec;
+         std::vector<fs::path> files;
+         for (const auto& e : fs::directory_iterator(AppPaths::FsPath(gDir + "/takes"), ec))
+            if (e.path().extension() == ".jsonl")
+               files.push_back(e.path());
+         std::sort(files.begin(), files.end());
+         for (const fs::path& file : files)
+         {
+            std::ifstream f(file);
+            std::string line;
+            while (std::getline(f, line))
+            {
+               const json j = json::parse(line, nullptr, false);
+               if (j.is_discarded() || !j.contains("id") || !j["id"].is_string())
+                  continue;
+               const std::string id = j["id"];
+               if (!takes.count(id))
+                  order.push_back(id);
+               LoggedTake& t = takes[id];
+               if (j.contains("session") && j["session"].is_string())
+                  t.session = j["session"];
+               if (j.contains("part") && j["part"].is_string())
+                  t.part = j["part"];
+               if (j.contains("picks") && j["picks"].is_array())
+                  for (const json& p : j["picks"])
+                     if (p.is_string())
+                        t.picks.push_back(p);
+               if (j.contains("outcome") && j["outcome"].is_string() && t.outcome != "kept")
+                  t.outcome = j["outcome"];
+            }
+         }
+         std::vector<const LoggedTake*> all;
+         for (const std::string& id : order)
+         {
+            const LoggedTake& t = takes[id];
+            if (t.outcome.empty() || t.part.empty())
+               continue;
+            all.push_back(&t);
+            if (std::find(sessions.begin(), sessions.end(), t.session) == sessions.end())
+               sessions.push_back(t.session);
+         }
+         if (sessions.size() < 2)
+            return;
+         const size_t firstHeld = sessions.size() - std::max<size_t>(1, sessions.size() / 4);
+         auto isHeld = [&](const LoggedTake* t) { return (size_t)(std::find(sessions.begin(), sessions.end(), t->session) - sessions.begin()) >= firstHeld; };
+         std::vector<const LoggedTake*> train, held;
+         for (const LoggedTake* t : all)
+            (isHeld(t) ? held : train).push_back(t);
+         if ((int)train.size() < kMinTrain || (int)held.size() < kMinHeld)
+            return;
+         auto keysOf = [](const LoggedTake& t) {
+            std::vector<std::string> k;
+            for (const std::string& p : t.picks)
+               if (p.rfind("prog:", 0) == 0 || p.rfind("line:", 0) == 0)
+                  k.push_back(t.part + "|" + p);
+            std::sort(k.begin(), k.end());
+            k.erase(std::unique(k.begin(), k.end()), k.end());
+            return k;
+         };
+         double base = 0.0;
+         std::map<std::string, std::pair<double, double>> counts; // key -> takes, kept
+         for (const LoggedTake* t : train)
+         {
+            const bool kept = t->outcome == "kept";
+            base += kept;
+            for (const std::string& k : keysOf(*t))
+            {
+               counts[k].first += 1.0;
+               counts[k].second += kept;
+            }
+         }
+         base /= (double)train.size();
+         std::map<std::string, double> w;
+         std::map<std::string, std::vector<std::string>> pools;
+         for (const auto& [k, c] : counts)
+         {
+            w[k] = std::clamp((c.second + kPrior * base) / (c.first + kPrior) / std::max(base, 1e-6), kLo, kHi);
+            pools[k.substr(0, k.find(':'))].push_back(k);
+         }
+         for (const auto& [pool, members] : pools)
+         {
+            double m = 0.0;
+            for (const std::string& k : members)
+               m += w[k];
+            m /= (double)members.size();
+            for (const std::string& k : members)
+               w[k] /= m;
+         }
+         std::vector<std::pair<double, double>> scored; // ratio, kept
+         for (const LoggedTake* t : held)
+         {
+            double r = 1.0;
+            for (const std::string& k : keysOf(*t))
+               if (const auto it = w.find(k); it != w.end())
+                  r *= it->second;
+            scored.push_back({ r, t->outcome == "kept" ? 1.0 : 0.0 });
+         }
+         auto lift = [](const std::vector<std::pair<double, double>>& v) {
+            double rs = 0.0, rk = 0.0, k = 0.0;
+            for (const auto& [r, kept] : v)
+            {
+               rs += r;
+               rk += r * kept;
+               k += kept;
+            }
+            return rk / std::max(rs, 1e-9) - k / (double)v.size();
+         };
+         std::mt19937 rng(7);
+         std::uniform_int_distribution<size_t> pick(0, scored.size() - 1);
+         std::vector<double> boots;
+         std::vector<std::pair<double, double>> sample(scored.size());
+         for (int b = 0; b < 400; b++)
+         {
+            for (auto& x : sample)
+               x = scored[pick(rng)];
+            boots.push_back(lift(sample));
+         }
+         std::sort(boots.begin(), boots.end());
+         if (lift(scored) <= 0.0 || boots[boots.size() / 20] <= 0.0)
+            return; // keep only if better: the weights already in place stay
+         const std::string tmp = gDir + "/profile/learned_weights.json.tmp";
+         {
+            std::ofstream f(AppPaths::FsPath(tmp), std::ios::trunc);
+            f << json({ { "weights", w } }).dump(1);
+            if (!f)
+               return;
+         }
+         fs::rename(AppPaths::FsPath(tmp), AppPaths::FsPath(gDir + "/profile/learned_weights.json"), ec);
+         LoadPickWeights();
+      }
+
       void StartProfileIfDue(double now)
       {
          if (now - gLastProfileCheck < kProfileCheckEvery || gProfileBusy.load())
@@ -411,6 +575,7 @@ namespace LearningLog
          gProfileBusy.store(true);
          gProfileThread = std::thread([] {
             RebuildProfile();
+            FitPickWeights();
             gProfileBusy.store(false);
          });
       }
@@ -485,6 +650,7 @@ namespace LearningLog
       {
          Prune();
          WriteSessionLine("start");
+         LoadPickWeights();
       }
    }
 
@@ -695,6 +861,7 @@ namespace LearningLog
          return;
       std::error_code ec;
       fs::remove_all(AppPaths::FsPath(gDir), ec);
+      SampleStyles::SetPickWeights(nullptr);
       gLastProfileCheck = Now(); // nothing to build from for a while
       if (gTestMode)
          return;

@@ -1,8 +1,7 @@
 # Generate Samples: sound-type rebuild
 
-Status: sections 1-7 drafted for sign-off. Nothing below is built yet. Numbers in the spec cards are
-**hypotheses from sound-design practice**; each one is checked against reference audio (section 8, step 2)
-before it goes into the generator.
+Status: built and shipped; the build logs below hold what happened. Sections 1-7 are the original plan, and the numbers in
+the spec cards were hypotheses from sound-design practice. Latest state: `docs/plans/data-universe/HANDOFF-2026-10-30.md`.
 
 ## 1. Goal
 Every part the node offers (synths, pads, plucks, percussion, drums, plus bass and FX/foley if approved)
@@ -168,7 +167,7 @@ Chord stabs and keys (piano, organ, e-piano, Rhodes), leads (solo melodies), arp
 What-if: if A cannot reach the fit/A-B gate for kicks, snares or foley, move those parts to B or C. If bass or FX is not approved, the scope drops to five parts and the metrics apply to those.
 
 ## 10. Benchmarking against the baseline
-Filled after the work: results tables linked to section 6 and section 7.
+Results live in `docs/plans/data-universe/CLOSE-2026-10-30.md` and the closed-loop table in `docs/plans/data-universe/HANDOFF-2026-10-30.md`.
 
 ## 11. Critique (initial)
 - Reference numbers are my own priors, so the quality of this plan depends on step 2 and not on this text.

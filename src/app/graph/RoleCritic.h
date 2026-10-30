@@ -18,6 +18,6 @@ namespace RoleCritic
    // P(role) for every role (RoleCriticData::kRoles values).
    std::vector<float> Probabilities(const std::vector<double>& features);
 
-   // True when the audio passes its declared part's cut-off, or the part is not judged. p (optional): P(declared role), or -1.
+   // True when the audio sounds like its declared part (its cut-off, at least 0.5), or the part is not judged. p (optional): P(declared role), or -1.
    bool Accept(const char* partName, const float* l, const float* r, int frames, double fs, float* p = nullptr);
 }

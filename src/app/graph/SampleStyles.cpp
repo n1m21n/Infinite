@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <atomic>
 #include <set>
 #include <sstream>
 
@@ -32,6 +33,10 @@ namespace
       explicit PickScope(std::vector<std::string>& v) { gPicks = &v; }
       ~PickScope() { gPicks = nullptr; }
    };
+   // The learned weights Compile leans on while it runs; null for a recipe that is not personal.
+   std::shared_ptr<const std::map<std::string, double>> gPickWeights;
+   thread_local const std::map<std::string, double>* gLean = nullptr;
+   thread_local const char* gLeanPart = "";
 
    struct GenStyle
    {
@@ -89,6 +94,7 @@ namespace
 #include "app/graph/GenerateSamplesGrooves909.inc"
 #include "app/graph/GenerateSamplesVoices.inc"
 #include "app/graph/GenerateSamplesNotes.inc"
+#include "app/graph/GenerateSamplesChords.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -1232,15 +1238,58 @@ namespace
       using namespace MusicTime;
       return !(scale == kMajor || scale == kLydian || scale == kMixolydian || scale == kMajorPentatonic);
    }
+   // One of the pool: uniform (the same draw as ever) with no learned weights.
+   int LeanedPick(const std::vector<int>& pool, const char* kind, Rng& r)
+   {
+      if (!gLean)
+         return pool[(size_t)r.Range((int)pool.size())];
+      std::vector<double> w(pool.size(), 1.0);
+      double sum = 0.0;
+      for (size_t i = 0; i < pool.size(); i++)
+      {
+         const auto it = gLean->find(std::string(gLeanPart) + "|" + kind + std::to_string(pool[i]));
+         if (it != gLean->end())
+            w[i] = it->second;
+         sum += w[i];
+      }
+      double u = r.Uniform() * sum;
+      for (size_t i = 0; i < pool.size(); i++)
+         if ((u -= w[i]) <= 0.0)
+            return pool[i];
+      return pool.back();
+   }
+   // A progression as real songs use them: common ones often, the rest now and then, leaning further with a taste profile.
    const int* BankProg(int scale, Rng& r)
    {
+      const int minor = MinorFamily(scale) ? 1 : 0;
+      std::vector<double> w;
       std::vector<int> pool;
-      for (int i = 0; i < (int)(sizeof(kNoteProgs) / sizeof(kNoteProgs[0])); i++)
-         if (kNoteProgs[i].minor == (MinorFamily(scale) ? 1 : 0))
-            pool.push_back(i);
-      const int i = pool[(size_t)r.Range((int)pool.size())];
-      NotePick("prog:" + std::to_string(i));
-      return kNoteProgs[i].d;
+      double sum = 0.0;
+      for (int i = 0; i < (int)(sizeof(kChordProgs) / sizeof(kChordProgs[0])); i++)
+      {
+         if (kChordProgs[i].minor != minor)
+            continue;
+         double lean = 1.0;
+         if (gLean)
+         {
+            const auto it = gLean->find(std::string(gLeanPart) + "|prog:" + std::to_string(i));
+            if (it != gLean->end())
+               lean = it->second;
+         }
+         pool.push_back(i);
+         w.push_back(kChordProgs[i].weight * lean);
+         sum += w.back();
+      }
+      double u = r.Uniform() * sum;
+      int pick = pool.back();
+      for (size_t i = 0; i < pool.size(); i++)
+         if ((u -= w[i]) <= 0.0)
+         {
+            pick = pool[i];
+            break;
+         }
+      NotePick("prog:" + std::to_string(pick));
+      return kChordProgs[pick].d;
    }
    // A bank line as 16 (degree, velocity 0..1) steps, velocity 0 a rest. The slight variation that makes one line many:
    // a note now and then steps to its neighbour degree, never the downbeat.
@@ -1250,7 +1299,7 @@ namespace
       for (int i = 0; i < (int)(sizeof(kNoteLines) / sizeof(kNoteLines[0])); i++)
          if (kNoteLines[i].minor == (MinorFamily(scale) ? 1 : 0) && kNoteLines[i].bass == (bass ? 1 : 0))
             pool.push_back(i);
-      const int li = pool[(size_t)r.Range((int)pool.size())];
+      const int li = LeanedPick(pool, "line:", r);
       NotePick("line:" + std::to_string(li));
       const NoteLine& l = kNoteLines[li];
       std::vector<std::pair<int, double>> out(16, { 0, 0.0 });
@@ -1351,10 +1400,18 @@ int Find(const std::string& id)
    return -1;
 }
 
+void SetPickWeights(std::shared_ptr<const std::map<std::string, double>> weights)
+{
+   std::atomic_store(&gPickWeights, std::move(weights));
+}
+
 Compiled Compile(const Recipe& recipe)
 {
    Compiled out;
    PickScope picks(out.picks);
+   const auto lean = recipe.personal ? std::atomic_load(&gPickWeights) : nullptr;
+   gLean = lean.get();
+   gLeanPart = PartName(recipe.part);
    const int si = Find(recipe.style);
    if (si < 0)
    {
@@ -2646,7 +2703,21 @@ Compiled Compile(const Recipe& recipe)
          static const Voice kMotifVoice[] = { Voice::SynthPluck, Voice::SynthPluck, Voice::SawStack, Voice::SquareLead, Voice::FmStack, Voice::Supersaw };
          g.melodic = true;
          const int mv = dv.Range(10); // 0-5 a designed voice, 6-9 a Vital preset's
-         const int sy = g.Add("Wavetable", seed(), mv < 6 ? DesignVoice(kMotifVoice[mv], dv) : BankVoice(mv < 8 ? BankRole::Synth : BankRole::Pluck, dv));
+         const int motifSeed = seed();
+         const Params k = mv < 6 ? DesignVoice(kMotifVoice[mv], dv) : BankVoice(mv < 8 ? BankRole::Synth : BankRole::Pluck, dv);
+         // The full mix's motif plays a real instrument, one a take (its own stream: no other draw moves).
+         Params real;
+         const char* realType = nullptr;
+         if (full)
+         {
+            Rng rv(std::string("real:full:") + std::to_string(recipe.seed));
+            const int which = rv.Range(3);
+            realType = which == 0 ? "Piano" : which == 1 ? "String" : "Wind";
+            real = which == 0 ? RealVoice("Piano", { "Grand", "Felt Piano", "Upright", "Mark I", "Suitcase", "Wurli 200A", "Soft Reed" }, rv)
+                 : which == 1 ? RealVoice("String", { "Nylon Guitar", "Steel Guitar", "Concert Harp", "Violin Pizzicato", "Struck Dulcimer" }, rv)
+                              : RealVoice("Wind", { "Tenor Sax", "Clarinet", "Breathy Flute", "Solo Trumpet", "Soft Horn" }, rv);
+         }
+         const int sy = real.empty() ? g.Add("Wavetable", motifSeed, k) : g.Add(realType, 0, real);
          g.melodic = false;
          g.Connect(mn, sy, true);
          synths.push_back(sy);
