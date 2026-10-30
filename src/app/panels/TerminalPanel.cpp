@@ -694,13 +694,16 @@ namespace
          ImGui::SetCursorScreenPos(ImVec2(x, start.y));
          ImGui::InvisibleButton("##tab", ImVec2(width, kTabRowH - 4.0f));
          const bool hovered = ImGui::IsItemHovered();
-         if (ImGui::IsItemClicked())
+         // The close mark is part of this button: a second button on top of it never gets the hover.
+         const ImVec2 closeMin(x + width - 20.0f, start.y + 3.0f), closeMax(closeMin.x + 16.0f, closeMin.y + 16.0f);
+         const bool overClose = hovered && ImGui::IsMouseHoveringRect(closeMin, closeMax);
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Middle) || (overClose && ImGui::IsItemClicked()))
+            closeIndex = i;
+         else if (ImGui::IsItemClicked())
          {
             sActive = i;
             gTerminalFocus = true;
          }
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Middle))
-            closeIndex = i;
          if (i == sActive || hovered)
             dl->AddRectFilled(ImVec2(x, start.y), ImVec2(x + width, start.y + kTabRowH - 4.0f),
                               ImGui::GetColorU32(ImGuiCol_FrameBg), tok::radius_field);
@@ -713,12 +716,8 @@ namespace
                      i == sActive ? textColor : dimColor, title.c_str());
          if (hovered || i == sActive)
          {
-            ImGui::SetCursorScreenPos(ImVec2(x + width - 20.0f, start.y + 3.0f));
-            ImGui::InvisibleButton("##close", ImVec2(16.0f, 16.0f));
-            if (ImGui::IsItemClicked())
-               closeIndex = i;
             const ImVec2 c(x + width - 12.0f, start.y + 11.0f);
-            const ImU32 mark = ImGui::IsItemHovered() ? textColor : dimColor;
+            const ImU32 mark = overClose ? textColor : dimColor;
             dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), mark, 1.25f);
             dl->AddLine(ImVec2(c.x + 3.5f, c.y - 3.5f), ImVec2(c.x - 3.5f, c.y + 3.5f), mark, 1.25f);
          }
