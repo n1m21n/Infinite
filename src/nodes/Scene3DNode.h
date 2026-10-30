@@ -61,6 +61,8 @@ public:
    uint64_t worldUid = 0;            // an Environment node, or any node with a picture
    bool worldColorOn = false;
    float worldColor[3] = { 0.04f, 0.04f, 0.06f };
+   float worldStrength = 1.0f;       // the colour lights the scene as well as filling it
+   int focusItem = 0;                // item id the camera stays focused on; 0 = the focus distance
 
    // INode
    unsigned int GetOutputTexture() override;
@@ -104,6 +106,7 @@ public:
 private:
    class Placed;
    void Parse();
+   const Item* FindConst(int id) const;
    void Serialize();
    void Sync(int frameId);
    void ApplyWorld(Render3DNode& render, bool show);

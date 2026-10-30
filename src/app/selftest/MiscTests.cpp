@@ -3285,6 +3285,9 @@ bool RunPerfPanelSelfTest()
 
 // Every first add spawns the 3D View node, which is what moves gNodes under the caller.
 extern int gView3DTestMenuNode;
+void View3DAddCamera();
+void View3DAddLight(int type);
+void View3DShotState(int state);
 static bool sView3DTestOk = true;
 
 // The first add from the real node menu, at full node capacity so the spawn
@@ -3380,8 +3383,70 @@ void RunView3DTest()
    Check("render finds or makes an Output", out != nullptr);
    Check("a second ask reuses it", View3DEnsureOutput() == out);
 
+   // The real add paths, and what each one has to change on screen.
+   const size_t before = Scene()->Items().size();
+   View3DAddCamera();
+   Check("the Add menu's camera lands in the scene", Scene() != nullptr && Scene()->Items().size() == before + 1);
+   View3DAddLight(4);
+   Check("the Add menu's light lands in the scene", Scene()->Items().size() == before + 2);
+   const Scene3DNode::Item spot = Scene()->Items().back();
+   float aim[3];
+   Check("a spot says where it points", Scene()->ItemKind(spot) == Scene3DNode::Kind::Light && Scene()->ItemLightAim(spot, aim));
+
+   auto Corner = [&](Scene3DNode::Shading shading, float rgba[4])
+   {
+      Scene3DNode* s = Scene();
+      const float eye[3] = { 3, 2, 5 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
+      Scene3DNode::View view;
+      view.view = Mat4::LookAt(eye, target, up);
+      view.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 2000.0f);
+      std::copy(eye, eye + 3, view.eye);
+      view.shading = shading;
+      view.grid = false;
+      const unsigned int tex = s->RenderView(32, 32, view);
+      std::vector<float> px(32 * 32 * 4);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+      std::copy(px.begin(), px.begin() + 4, rgba);
+   };
+   for (Scene3DNode::Shading shading : { Scene3DNode::Shading::Solid, Scene3DNode::Shading::Final })
+   {
+      float red[4], green[4], none[4], dim[4];
+      Scene()->worldUid = 0;
+      Scene()->worldColorOn = true;
+      Scene()->worldColor[0] = 0.8f; Scene()->worldColor[1] = 0.05f; Scene()->worldColor[2] = 0.05f;
+      Corner(shading, red);
+      Scene()->worldColor[0] = 0.05f; Scene()->worldColor[1] = 0.8f;
+      Corner(shading, green);
+      Scene()->worldStrength = 0.1f;
+      Corner(shading, dim);
+      Scene()->worldStrength = 1.0f;
+      Scene()->worldColorOn = false;
+      Corner(shading, none);
+      Check("the world colour reaches the picture", red[0] > red[1] && green[1] > green[0]);
+      Check("the world strength dims it", dim[1] < green[1]);
+      Check("no world is transparent", none[3] < 0.01f);
+   }
+   float wire[4];
+   Corner(Scene3DNode::Shading::Wire, wire);
+   Check("wire draws on nothing", wire[3] < 0.01f);
+
+   auto* lens = dynamic_cast<CameraNode*>(FindNodeByIndex(cam)->node.get());
+   const float straight = lens->ProjectionMatrix(1.5f).m[8];
+   lens->shiftX = 0.25f;
+   Check("lens shift slides the picture", lens->ProjectionMatrix(1.5f).m[8] != straight);
+   lens->shiftX = 0.0f;
+
    // The scene stays up: the frames after this one draw the panel with it.
+   Scene3DNode* shown = Scene();
+   shown->worldColorOn = true;
+   shown->worldColor[0] = 0.05f; shown->worldColor[1] = 0.12f; shown->worldColor[2] = 0.22f;
+   View3DAddNode(*FindNodeByIndex(sphere));
+   shown->Commit();
    gView3DOpen = true;
+   if (const char* state = getenv("INFINITE_VIEW3DSHOT"))
+      View3DShotState(atoi(state));
 }
 
 void RunClipboardTest()

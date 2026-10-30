@@ -608,6 +608,7 @@ public:
       bool hasLights = false;
       std::vector<RigLight> lights;
       bool wireframe = false;            // black outlines, no shading
+      float ambient[3] = { 0, 0, 0 };    // the world's light, added to the ambient
       unsigned long long revision = 0;   // bumped by the owner on any change above
    };
    const Rig* rig = nullptr;

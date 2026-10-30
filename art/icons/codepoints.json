@@ -97,5 +97,6 @@
  "view-camera": 59743,
  "view-ortho": 59744,
  "view-persp": 59745,
- "world": 59746
+ "world": 59746,
+ "lock": 59747
 }

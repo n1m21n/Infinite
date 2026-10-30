@@ -38,9 +38,19 @@ Mat4 CameraNode::ViewMatrix() const
 
 Mat4 CameraNode::ProjectionMatrix(float aspect) const
 {
+   // Shift slides the picture across the sensor; the wider side is the sensor's width.
+   const float sx = 2.0f * shiftX * std::max(1.0f, 1.0f / aspect), sy = 2.0f * shiftY * std::max(1.0f, aspect);
    if (projection == 1)
-      return Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane);
-   return Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   {
+      Mat4 m = Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane);
+      m.m[12] -= sx;
+      m.m[13] -= sy;
+      return m;
+   }
+   Mat4 m = Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   m.m[8] += sx;
+   m.m[9] += sy;
+   return m;
 }
 
 void LightNode::ComputeVector(float out[3]) const

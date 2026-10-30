@@ -2233,7 +2233,10 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
       glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kMaxLights, lightArea);
       glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
-      glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
+      const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
+                                    ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),
+                                    ambientColor[2] + (rig != nullptr ? rig->ambient[2] : 0.0f) };
+      glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, rigAmbient);
       glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
       glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);

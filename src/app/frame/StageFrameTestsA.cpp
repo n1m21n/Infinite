@@ -1989,7 +1989,7 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunClipboardTest();
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && frameId == 4)
          RunView3DTest();
-      if (getenv("INFINITE_VIEW3DTEST") != nullptr && (frameId == 7 || frameId == 8))
+      if (getenv("INFINITE_VIEW3DTEST") != nullptr && getenv("INFINITE_VIEW3DSHOT") == nullptr && (frameId == 7 || frameId == 8))
          RunView3DMenuTest(frameId);
 
       if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop

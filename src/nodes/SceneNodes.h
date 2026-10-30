@@ -36,9 +36,12 @@ public:
    float nearPlane = 0.05f;
    float farPlane = 100.0f;
    float orbitPerBeat = 0.0f; // free rotation, useful for turntables
+   float shiftX = 0.0f, shiftY = 0.0f;   // lens shift, in widths of the sensor
+   float sensorWidth = 36.0f;            // mm, what focal length is measured against
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("projection", projection); v.Float("fov", fov);
+      v.Float("shiftX", shiftX); v.Float("shiftY", shiftY); v.Float("sensorWidth", sensorWidth);
       v.Float("orthoHeight", orthoHeight); v.Float("distance", distance);
       v.Float("azimuth", azimuth); v.Float("elevation", elevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);

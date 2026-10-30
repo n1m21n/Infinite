@@ -128,6 +128,14 @@ Scene3DNode::Kind Scene3DNode::KindOf(const INode* node)
    return dynamic_cast<const IGeometrySource*>(node) != nullptr ? Kind::Geometry : Kind::Missing;
 }
 
+const Scene3DNode::Item* Scene3DNode::FindConst(int id) const
+{
+   for (const Item& it : mItems)
+      if (it.id == id)
+         return &it;
+   return nullptr;
+}
+
 bool Scene3DNode::ItemLightAim(const Item& item, float aim[3]) const
 {
    auto* light = dynamic_cast<LightNode*>(ResolveUid ? ResolveUid(item.uid) : nullptr);
@@ -189,7 +197,7 @@ void Scene3DNode::Serialize()
    o << "next " << mNextId << "\n";
    o << "camera " << activeCamera << "\n";
    o << "world " << worldUid << " " << (worldColorOn ? 1 : 0) << " " << worldColor[0] << " " << worldColor[1]
-     << " " << worldColor[2] << "\n";
+     << " " << worldColor[2] << " " << worldStrength << " " << focusItem << "\n";
    for (const Item& it : mItems)
    {
       o << "item " << it.id << " " << it.uid;
@@ -223,6 +231,11 @@ void Scene3DNode::Parse()
       {
          int on = 0;
          l >> worldUid >> on >> worldColor[0] >> worldColor[1] >> worldColor[2];
+         if (!(l >> worldStrength >> focusItem))
+         {
+            worldStrength = 1.0f;
+            focusItem = 0;
+         }
          worldColorOn = on != 0;
       }
       else if (key == "item")
@@ -433,7 +446,22 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
       stamp.insert(stamp.end(), l.aim, l.aim + 3);
    }
-   if (stamp != mRigStamp)
+   const bool worldLights = worldColorOn && mWorldNode == nullptr;
+   for (int k = 0; k < 3; k++)
+   {
+      mRig.ambient[k] = worldLights ? worldColor[k] * worldStrength : 0.0f;
+      stamp.push_back(mRig.ambient[k]);
+   }
+   // A focus object is measured along the camera, so it holds as either one moves.
+   if (const Item* target = focusItem != 0 ? FindConst(focusItem) : nullptr)
+   {
+      Mat4 view;
+      float eye[3];
+      if (CameraView(view, eye, nullptr))
+         mRender.focusDistance = std::max(0.05f, -(view.m[2] * target->pos[0] + view.m[6] * target->pos[1] +
+                                                  view.m[10] * target->pos[2] + view.m[14]));
+   }
+   stamp.push_back(mRender.focusDistance);
    {
       mRigStamp.swap(stamp);
       mRig.revision++;
@@ -460,7 +488,8 @@ void Scene3DNode::ApplyWorld(Render3DNode& render, bool show)
       render.envInput.Disconnect();
    render.envAsBackground = true;
    render.bgOpacity = (show && worldColorOn && mWorldNode == nullptr) ? 1.0f : 0.0f;
-   std::memcpy(render.bgColor, worldColor, sizeof(worldColor));
+   for (int k = 0; k < 3; k++)
+      render.bgColor[k] = worldColor[k] * worldStrength;
 }
 
 // A plain picture as the world: the render, over it, with its own alpha.
@@ -638,7 +667,7 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
                                look.shadowsEnabled ? 1.0f : 0.0f, (float)look.shadowQuality, look.shadowBias,
                                look.shadowSoftness, look.shadowStrength, look.envIntensity, look.ambientColor[0],
                                look.ambientColor[1], look.ambientColor[2], worldColor[0], worldColor[1], worldColor[2],
-                               worldColorOn ? 1.0f : 0.0f, (float)worldUid });
+                               worldColorOn ? 1.0f : 0.0f, (float)worldUid, worldStrength });
    if (stamp != mEditorStamp)
    {
       mEditorStamp.swap(stamp);
@@ -704,4 +733,8 @@ bool Scene3DNode::ItemBounds(int id, float lo[3], float hi[3])
    return any;
 }
 
-Scene3DNode::Scene3DNode() = default;
+Scene3DNode::Scene3DNode()
+{
+   mRender.width = 1920.0f;
+   mRender.height = 1080.0f;
+}
