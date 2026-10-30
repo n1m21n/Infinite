@@ -664,7 +664,7 @@ namespace
       dl->PopClipRect();
    }
 
-   void DrawGrid(ImDrawList* dl, const Areas& a)
+   void DrawGrid(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
       const int root = Transport::Instance().Key();
@@ -674,10 +674,13 @@ namespace
          if (y > a.rollB)
             break;
          const int p = s.rows[(size_t)r];
+         const bool snapping = page.scaleSnap && !page.drumRows;
          if ((p - root + 120) % 12 == 0)
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), AccentU32(0.12f));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), AccentU32(snapping ? 0.26f : 0.12f));
          else if (InScale(p))
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), Tint(0.045f));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), snapping ? AccentU32(0.13f) : Tint(0.045f));
+         else if (snapping) // notes cannot land here: a dark lane
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), IM_COL32(0, 0, 0, 70));
          dl->AddLine(ImVec2(a.x0, y), ImVec2(a.x1, y), Tint(p % 12 == 11 ? 0.16f : 0.04f));
       }
       Tick grid = ArrangeSnapGridTicks();
@@ -942,12 +945,10 @@ namespace
    void DrawGridChip()
    {
       State& s = S();
-      const std::string caption = std::string(GridLabel()) + "##pianoGrid";
-      if (DropdownField::Draw(caption.c_str(), ImVec2(64.0f, 0.0f)))
+      ImVec2 bmin, bmax;
+      if (PickerFace("##pianoGrid", GridLabel(), 72.0f, T("Grid, shared with the Timeline"), bmin, bmax))
          ImGui::OpenPopup("##pianoGridMenu");
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Grid, shared with the Timeline"));
-      if (!MenuParts::BeginPopup("##pianoGridMenu"))
+      if (!BeginPickerMenu("##pianoGridMenu", bmin, bmax, 72.0f))
          return;
       const Arrange::Settings& st = gArrange.settings;
       if (MenuParts::Item(L("Bar"), nullptr, st.snapDivision == 1))
@@ -3012,7 +3013,7 @@ namespace
       dl->PushClipRect(origin, ImVec2(a.x1, a.rollB), true);
       DrawRuler(dl, a);
       dl->PushClipRect(ImVec2(a.x0, a.rollY), ImVec2(a.x1, a.rollB), true);
-      DrawGrid(dl, a);
+      DrawGrid(dl, a, page);
       DrawClipsAndNotes(dl, a, page);
       if (s.drag == Drag::Marquee)
       {
