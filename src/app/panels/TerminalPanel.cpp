@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/RemoteControl.h"
 #include "core/term/TermSession.h"
@@ -644,6 +645,29 @@ namespace
       }
    }
 
+   // Right-click on the panel. A program that takes the mouse keeps the click over its cells; Shift gets the menu.
+   void DrawDockMenu(bool overCells, const term::Snapshot* snap)
+   {
+      const bool reported = overCells && snap != nullptr && snap->mouseMode != 0 && !ImGui::GetIO().KeyShift;
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !reported &&
+          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+         ImGui::OpenPopup("##terminalDockMenu");
+      if (!MenuParts::BeginPopup("##terminalDockMenu"))
+         return;
+      if (MenuParts::SubMenu(L("Dock Position")))
+      {
+         static const char* kDocks[] = { I18N_KEY("Terminal at Bottom"), I18N_KEY("Terminal at Right"), I18N_KEY("Terminal at Left"), I18N_KEY("Terminal at Top") };
+         for (int i = 0; i < 4; ++i)
+            if (MenuParts::Item(L(kDocks[i]), nullptr, gTerminalDock == i))
+               gTerminalDock = i;
+         ImGui::EndMenu();
+      }
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      if (MenuParts::Item(L("Close Terminal")))
+         gTerminalOpen = false;
+      MenuParts::EndPopup();
+   }
+
    void DrawTabRow(const term::Snapshot* active)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -858,6 +882,7 @@ namespace
       ImGui::InvisibleButton("##terminalcells", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
       if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
          gTerminalFocus = true;
+      DrawDockMenu(ImGui::IsItemHovered(), snap.get());
 
       if (gTerminalDropPending.size() > 0)
       {

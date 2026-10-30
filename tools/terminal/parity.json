@@ -36,6 +36,7 @@
   "frame/StageMenuBar.cpp:Nodes": "nodes",
   "frame/StageMenuBar.cpp:Open Recent": "recent",
   "frame/StageMenuBar.cpp:Open...": "open <p.inf>",
+  "frame/StageMenuBar.cpp:Panels": "panel",
   "frame/StageMenuBar.cpp:Panic": "show panic on",
   "frame/StageMenuBar.cpp:Paste": "paste",
   "frame/StageMenuBar.cpp:Performance Matrix": "panel perf",
@@ -301,6 +302,8 @@
   "panels/SettingsWindow.cpp:UI Scale": "settings uiScale",
   "panels/SettingsWindow.cpp:Vsync": "settings vsync",
   "panels/SettingsWindow.cpp:Zoom sensitivity": "settings zoomSensitivity",
+  "panels/TerminalPanel.cpp:Close Terminal": "panel terminal close",
+  "panels/TerminalPanel.cpp:Dock Position": "panel terminal <side>",
   "panels/ViewportPanel.cpp:Clear all cards": "view clearcards",
   "panels/ViewportPanel.cpp:Close panel": "panel viewport close"
  },
