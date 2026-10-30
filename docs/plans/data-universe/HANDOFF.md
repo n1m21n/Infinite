@@ -941,3 +941,18 @@ degree-bigram shares to the held-out 20%. Transformer retrained per split, 5 see
   not clearly better, so nothing ships (keep only if better).
 - The limit is data: 194 labelled progressions. The next real step for the note model is more chord data: derive
   progressions from POP909 / Lakh MIDI (chord estimation per beat), then retrain and rerun chord_nn.py and chord_sample.py.
+
+## 2026-10-30 Plan item 4: valence from DEAM audio (`deam_valence.py` -> `feel/deam_valence.json`): MISS, r 0.749
+All 1,802 DEAM songs measured: timbre, envelope, onsets and notes from `frame_features`, plus key mode, triad colour,
+chord change, tempo, beat and loudness or brightness over thirds. Held out by song, 10 splits.
+
+| Target | Ridge | Gradient boosting | Extra trees | Harmony and tempo only (best) |
+|---|---|---|---|---|
+| Valence | 0.704 | **0.749 ± 0.027** | 0.737 | 0.705 |
+| Arousal | 0.730 | **0.783 ± 0.024** | 0.769 | 0.737 |
+
+- Valence misses the 0.8 bar (0.749), well above the notes-only EMOPIA fit (0.547) and at the top of the literature range
+  for audio valence (about 0.6-0.7). Not re-scored with an easier bar.
+- Audio + notes is this fit: the note features (pitch content, mode, chord colour) are inside the 0.749. Notes alone (harmony
+  columns) give 0.705, so timbre and dynamics add about 0.04.
+- Use: the valence model can score the generator's own renders (machine mood check), since it reads only audio.

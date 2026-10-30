@@ -1,0 +1,87 @@
+{
+ "songs": 1802,
+ "bar": 0.8,
+ "split": "KFold by song, 10 splits",
+ "valence_all_ridge": {
+  "r": 0.704,
+  "sd": 0.021
+ },
+ "valence_all_gbr": {
+  "r": 0.749,
+  "sd": 0.027
+ },
+ "valence_all_extra": {
+  "r": 0.737,
+  "sd": 0.027
+ },
+ "valence_harmony_only_ridge": {
+  "r": 0.654,
+  "sd": 0.024
+ },
+ "valence_harmony_only_gbr": {
+  "r": 0.682,
+  "sd": 0.027
+ },
+ "valence_harmony_only_extra": {
+  "r": 0.705,
+  "sd": 0.026
+ },
+ "arousal_all_ridge": {
+  "r": 0.73,
+  "sd": 0.025
+ },
+ "arousal_all_gbr": {
+  "r": 0.783,
+  "sd": 0.024
+ },
+ "arousal_all_extra": {
+  "r": 0.769,
+  "sd": 0.033
+ },
+ "arousal_harmony_only_ridge": {
+  "r": 0.663,
+  "sd": 0.029
+ },
+ "arousal_harmony_only_gbr": {
+  "r": 0.731,
+  "sd": 0.039
+ },
+ "arousal_harmony_only_extra": {
+  "r": 0.737,
+  "sd": 0.03
+ },
+ "valence_best": {
+  "model": "valence_all_gbr",
+  "r": 0.749,
+  "sd": 0.027,
+  "met": false
+ },
+ "arousal_best": {
+  "model": "arousal_all_gbr",
+  "r": 0.783,
+  "sd": 0.024,
+  "met": false
+ },
+ "valence_corr_by_harmony_feature": {
+  "maj_r": -0.106,
+  "min_r": -0.157,
+  "mode": 0.031,
+  "key_clarity": -0.138,
+  "maj_triad": -0.03,
+  "min_triad": -0.078,
+  "dim_triad": 0.127,
+  "chord_change": 0.233,
+  "chroma_entropy": 0.415,
+  "tempo": 0.093,
+  "beat_strength": -0.013,
+  "pulse_clarity": 0.34,
+  "bright_0": 0.524,
+  "bright_1": 0.527,
+  "bright_2": 0.523,
+  "loud_0": 0.346,
+  "loud_1": 0.346,
+  "loud_2": 0.343,
+  "loud_slope": -0.01,
+  "width": 0.049
+ }
+}
