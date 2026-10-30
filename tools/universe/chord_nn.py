@@ -69,7 +69,7 @@ def evaluate(net, items):
     return t1 / n, cel / n, n
 
 
-def run(kind, sd):
+def run(kind, sd, return_net=False):
     rng = random.Random(sd); idx = list(range(len(ce.seqs))); rng.shuffle(idx); cut = int(.8 * len(idx))
     tr_all = [ce.seqs[i] for i in idx[:cut]]; te = [ce.seqs[i] for i in idx[cut:]]
     u = {}
@@ -97,7 +97,7 @@ def run(kind, sd):
                 break
     net.load_state_dict(best_state)
     t1, cel, n = evaluate(net, ts)
-    return t1, base, cel, n, ep + 1
+    return (t1, base, cel, n, ep + 1, net) if return_net else (t1, base, cel, n, ep + 1)
 
 
 def main():

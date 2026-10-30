@@ -1,0 +1,49 @@
+{
+ "real": {
+  "progressions": 194,
+  "entropy_bits": 7.031
+ },
+ "bank": {
+  "rows": 297,
+  "entropy_bits": 6.823,
+  "js_vs_test": 0.3286
+ },
+ "temps": {
+  "0.6": {
+   "entropy_bits": 6.661,
+   "x_real": 0.947,
+   "js_vs_test": 0.3589,
+   "js_sd": 0.0334,
+   "novel": 0.873
+  },
+  "0.8": {
+   "entropy_bits": 7.051,
+   "x_real": 1.003,
+   "js_vs_test": 0.3279,
+   "js_sd": 0.0219,
+   "novel": 0.923
+  },
+  "1.0": {
+   "entropy_bits": 7.254,
+   "x_real": 1.032,
+   "js_vs_test": 0.3177,
+   "js_sd": 0.0163,
+   "novel": 0.957
+  },
+  "1.2": {
+   "entropy_bits": 7.338,
+   "x_real": 1.044,
+   "js_vs_test": 0.3199,
+   "js_sd": 0.0154,
+   "novel": 0.98
+  },
+  "1.5": {
+   "entropy_bits": 7.411,
+   "x_real": 1.054,
+   "js_vs_test": 0.3254,
+   "js_sd": 0.0151,
+   "novel": 0.994
+  }
+ },
+ "floor_js_train_vs_test": 0.2957
+}

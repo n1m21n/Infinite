@@ -920,3 +920,24 @@ and the bass sit 6 dB lower. No draw moves.
   style 28 seed 9002 fails Master (silent or non-finite on the first draw); it failed the same way before this change and
   is still open.
 - The wasm build needs `EMSDK_PYTHON=/opt/homebrew/bin/python3.12` (emscripten refuses the system Python 3.9).
+
+## 2026-10-30 Plan item 3: sampling the chord transformer with a temperature (`chord_sample.py` -> `feel/chord_sample.json`)
+Correction to the plan: B5 in `benchmark.py` scores drum grooves (cluster entropy of drum families), not chords, so chord
+sampling cannot move it. Item 3 is measured in the bank's own terms instead: four chord roots as scale degrees. Variety =
+entropy of the progressions at the real set's size (bar 0.90 x real, the B5 rule). Realism = Jensen-Shannon distance of
+degree-bigram shares to the held-out 20%. Transformer retrained per split, 5 seeds, 2,000 samples per temperature.
+
+| Source | Variety (bits) | x real | JS to held-out (lower = more real) | New progressions |
+|---|---|---|---|---|
+| Real (194 progressions) | 7.03 | 1.00 | floor: train vs test 0.296 | |
+| Shipped bank (297, uniform draws) | 6.82 | **0.97** | 0.329 | |
+| Transformer T=0.6 | 6.66 | 0.95 | 0.359 ± 0.033 | 87% |
+| Transformer T=0.8 | 7.05 | 1.00 | 0.328 ± 0.022 | 92% |
+| Transformer T=1.0 | 7.25 | 1.03 | 0.318 ± 0.016 | 96% |
+| Transformer T=1.2 | 7.34 | 1.04 | 0.320 ± 0.015 | 98% |
+
+- Chord variety already passes with the shipped bank (0.97 x real). The variety MISS on record (0.72 x) is the drum B5.
+- The transformer at T=1.0 is as real as the bank (0.318 vs 0.329, inside one sd) and makes 96% new progressions, but it is
+  not clearly better, so nothing ships (keep only if better).
+- The limit is data: 194 labelled progressions. The next real step for the note model is more chord data: derive
+  progressions from POP909 / Lakh MIDI (chord estimation per beat), then retrain and rerun chord_nn.py and chord_sample.py.
