@@ -100,7 +100,14 @@ namespace
       bool recording = false;    // MIDI record is armed
       unsigned int recDevice = 0; // the MIDI source to record from; 0 = every input
       unsigned long long recCursor = 0;
-      std::map<int, std::pair<Tick, int>> recHeld; // pitch -> (start tick, velocity) of the keys held down
+      struct RecNote
+      {
+         uint64_t clip = 0;
+         uint32_t note = 0;
+         Tick start = 0; // timeline tick the key went down
+      };
+      std::map<int, RecNote> recHeld; // pitch -> the note written when its key went down, grown until it comes up
+      uint64_t recClip = 0;           // the one clip a take writes into, grown as the take runs
       uint64_t copyClip = 0;     // where the copied notes came from, so a paste lands right after them
       Tick pasteAt = 0, copySpan = 0;
       std::vector<uint64_t> copiedClips; // Ctrl+C on clips: Ctrl+V lays them right after themselves
@@ -1492,13 +1499,39 @@ namespace
 
    // MIDI record: while armed and the transport plays, keys played on a connected controller become notes. A note is
    // written when its key comes up, so a held key never half-writes.
+   // A held key's note: its length is the time since it went down. Written straight into the model (no undo step of its
+   // own; the undo step is the note's first write, which holds the model from before it).
+   void FinishHeld(int pitch, Tick now)
+   {
+      State& s = S();
+      auto it = s.recHeld.find(pitch);
+      if (it == s.recHeld.end())
+         return;
+      const State::RecNote h = it->second;
+      s.recHeld.erase(it);
+      const Arrange::Clip* c = Arrange::FindClip(gArrange, h.clip);
+      const Arrange::Note* n = c ? Arrange::FindNote(*c, h.note) : nullptr;
+      if (n == nullptr)
+         return;
+      Arrange::Note edited = *n;
+      edited.length = std::max<Tick>(1, now - h.start);
+      GrowClipTo(h.clip, edited.start + edited.length);
+      if (Arrange::EditNotes(gArrange, h.clip, { edited }))
+         ArrangeCommitEdit();
+   }
+
+   // Notes of a take go into ONE clip that grows with the take (a new clip per bar cut every note at the bar line). A key
+   // appears in the roll the moment it goes down, and its length follows until it comes up.
    void PollRecording(Arrange::Lane& page)
    {
       State& s = S();
       if (!s.recording || Platform::MidiListSources().empty())
       {
+         const Tick now = ArrangePlayTick();
+         while (!s.recHeld.empty())
+            FinishHeld(s.recHeld.begin()->first, now);
          s.recording = false;
-         s.recHeld.clear();
+         s.recClip = 0;
          s.recCursor = Platform::MidiNoteStreamPosition();
          return;
       }
@@ -1509,43 +1542,61 @@ namespace
          for (int i = 0; i < n; i++)
          {
             const Platform::MidiNoteMessage& m = msgs[i];
-            if (!Transport::Instance().IsPlaying() || (s.recDevice != 0 && m.device != s.recDevice))
+            if (s.recDevice != 0 && m.device != s.recDevice)
                continue;
-            const int vel = std::clamp((int)std::lround(m.velocity01 * 127.0f), 1, 127);
-            if (m.isNoteOn)
+            if (!m.isNoteOn)
             {
-               s.recHeld[m.note] = { ArrangePlayTick(), vel };
-               Sound(page, m.note, vel, 0.0);
+               FinishHeld(m.note, ArrangePlayTick());
                continue;
             }
-            auto held = s.recHeld.find(m.note);
-            if (held == s.recHeld.end())
+            if (!Transport::Instance().IsPlaying())
                continue;
-            const Tick start = held->second.first;
-            const int velocity = held->second.second;
-            s.recHeld.erase(held);
-            const Tick length = std::max<Tick>(1, ArrangePlayTick() - start);
+            const int vel = std::clamp((int)std::lround(m.velocity01 * 127.0f), 1, 127);
+            const Tick start = ArrangePlayTick();
+            Sound(page, m.note, vel, 0.0);
+            FinishHeld(m.note, start); // the same key again before it came up
             const uint64_t lane = page.id;
             ArrangeEdit([&] {
                Arrange::Lane* l = Arrange::FindLane(gArrange, lane);
                if (l == nullptr)
                   return;
-               Arrange::Clip* c = ClipAt(*l, start);
+               Arrange::Clip* c = s.recClip != 0 ? Arrange::FindClip(gArrange, s.recClip) : nullptr;
+               if (c != nullptr && start < c->start)
+                  c = nullptr; // the transport looped back before the take's clip
+               if (c == nullptr)
+                  c = ClipAt(*l, start);
                if (c == nullptr)
                   c = NewClipAt(*l, start);
                if (c == nullptr)
                   return;
+               s.recClip = c->id;
                Arrange::Note note;
                note.start = Arrange::MidiContentTick(*c, std::max<Tick>(0, start - c->start));
-               note.length = length;
+               note.length = s.lastLength;
                note.pitch = (decltype(note.pitch))m.note;
-               note.vel = (decltype(note.vel))velocity;
-               GrowClipTo(c->id, note.start + length);
-               Arrange::AddNotes(gArrange, c->id, { note }, nullptr);
+               note.vel = (decltype(note.vel))vel;
+               GrowClipTo(c->id, note.start + note.length);
+               std::vector<uint32_t> ids;
+               if (Arrange::AddNotes(gArrange, c->id, { note }, &ids) && !ids.empty())
+                  s.recHeld[m.note] = { c->id, ids[0], start };
             });
          }
          if (n < 64)
             break;
+      }
+      // Keys still down grow with the playhead.
+      const Tick now = ArrangePlayTick();
+      for (const auto& [pitch, h] : s.recHeld)
+      {
+         const Arrange::Clip* c = Arrange::FindClip(gArrange, h.clip);
+         const Arrange::Note* nt = c ? Arrange::FindNote(*c, h.note) : nullptr;
+         if (nt == nullptr || now <= h.start)
+            continue;
+         Arrange::Note edited = *nt;
+         edited.length = std::max<Tick>(1, now - h.start);
+         GrowClipTo(h.clip, edited.start + edited.length);
+         if (Arrange::EditNotes(gArrange, h.clip, { edited }))
+            ArrangeCommitEdit();
       }
    }
 

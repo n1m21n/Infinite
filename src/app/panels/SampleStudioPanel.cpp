@@ -633,6 +633,9 @@ namespace
          s.status = saved ? std::string(T("Recorded")) + " " + path : std::string(T("Recorded (not saved to disk)"));
          SetSource(std::move(a), saved ? path : std::string(), std::nullopt, false);
       }
+      else
+         s.status = s.recErr.empty() ? std::string(T("Nothing was recorded. Check the audio input and microphone permission"))
+                                     : s.recErr;
       s.recL.clear();
       s.recR.clear();
    }
@@ -648,6 +651,9 @@ namespace
       s.recErr.clear();
       s.recording = true;
       Platform::AudioInputCaptureAddRef();
+      // Nothing else sounds while the input is taken, and no take in flight lands on it.
+      if (gAudioMode == AudioMode::Studio && Transport::Instance().IsPlaying())
+         LaunchRequestTogglePlay();
       s.status = T("Recording from the audio input. Press I to stop");
    }
 
@@ -712,7 +718,7 @@ namespace
    {
       Studio& s = S();
       GenerateSamplesNode& g = *s.gen;
-      if (pinned && !s.take)
+      if (s.recording || (pinned && !s.take))
          return;
       g.part = (int)(pinned ? s.take->recipe.part : kParts[s.part]);
       g.bars = pinned ? s.take->recipe.bars : kBars[s.barsIdx];
@@ -743,6 +749,11 @@ namespace
       if (!s.busy || g.GetState() == GenerateSamplesNode::State::Generating)
          return;
       s.busy = false;
+      if (s.recording)
+      {
+         s.pendingDoc.reset(); // a take finished while the input is being recorded: it must not replace the recording
+         return;
+      }
       if (g.GetState() == GenerateSamplesNode::State::Failed || g.LoopL().empty())
       {
          s.pendingDoc.reset();
@@ -3099,7 +3110,7 @@ namespace
       PollRecording();
       PumpRender();
       StudioLoopPlayer& player = AudioEngine::Instance().StudioLoop();
-      player.SetGain(gAudioMode == AudioMode::Studio ? 0.8f : 0.0f);
+      player.SetGain(gAudioMode == AudioMode::Studio && !s.recording ? 0.8f : 0.0f);
       // Loop off: the edit played once, so the transport stops (as a one-shot does in the Sampler).
       if (!s.doc.wide.loop && player.Finished() && gAudioMode == AudioMode::Studio && Transport::Instance().IsPlaying())
       {
