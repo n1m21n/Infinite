@@ -445,6 +445,6 @@ namespace app
       // that leads here (see _glfwInputWindowCloseRequest) - undo that so
       // the app stays open until we know whether it's safe to close.
       glfwSetWindowShouldClose(window, GLFW_FALSE);
-      GuardUnsavedChanges([window]() { glfwSetWindowShouldClose(window, GLFW_TRUE); });
+      GuardUnsavedChanges([window]() { TerminalGuardQuit([window]() { glfwSetWindowShouldClose(window, GLFW_TRUE); }); });
    }
 }

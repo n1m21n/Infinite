@@ -30,6 +30,8 @@ public:
     virtual void Resize(int cols, int rows) = 0;
     // false: ask politely (hang up). true: force, and Read returns 0 from now on.
     virtual void Kill(bool force) = 0;
+    // True while a program other than the shell has the terminal.
+    virtual bool Busy() = 0;
     // Waits for the child, which must be gone or killed. -1 = unknown.
     virtual int ExitCode() = 0;
 };

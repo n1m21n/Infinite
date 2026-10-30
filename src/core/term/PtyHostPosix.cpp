@@ -161,6 +161,13 @@ public:
         }
     }
 
+    bool Busy() override {
+        const pid_t pid = pid_.load();
+        if (pid <= 0 || reaped_.load()) return false;
+        const pid_t foreground = tcgetpgrp(master_);
+        return foreground > 0 && foreground != pid;
+    }
+
     int ExitCode() override {
         Reap(true);
         return exitCode_.load();

@@ -47,6 +47,12 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
+   if (PanelRail::Item("##railTerminal", top + 8.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+                       T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
+   {
+      gTerminalOpen = !gTerminalOpen;
+      gTerminalFocus = gTerminalOpen;
+   }
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
    if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
@@ -438,6 +444,7 @@ void DrawMenuBar(FrameCtx& fc)
             };
             dockedPanelMenu(L("Sample Studio"), L("Show Sample Studio"), gSampleStudioOpen, gSampleStudioDock, gSampleStudioHeight, "##studiodock");
             dockedPanelMenu(L("Piano Roll"), L("Show Piano Roll"), gPianoRollOpen, gPianoRollDock, gPianoRollHeight, "##rolldock");
+            dockedPanelMenu(L("Terminal"), L("Show Terminal"), gTerminalOpen, gTerminalDock, gTerminalHeight, "##terminaldock");
 
             if (MenuParts::SubMenu(L("Show Set")))
             {

@@ -704,6 +704,11 @@ void DrawSidePanels(FrameCtx& fc)
       // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
       if (gPianoRollOpen && gPianoRollDock != 3)
          DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
+      // Terminal (View > Terminal or Ctrl+`), bottom or top like the Timeline.
+      if (gTerminalOpen && gTerminalDock != 3)
+         DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));
+      if (!gTerminalOpen)
+         TerminalPanelHidden();
 
       ImGui::End();
 

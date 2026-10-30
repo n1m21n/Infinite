@@ -109,7 +109,7 @@ reachable from one `infinite` command, and expert help for every place people wr
 | Element | Behaviour |
 |---|---|
 | Rail tile | New `Terminal` glyph (`>_` in a square), built with `tools/design/build_glyphs.py`. Small status dot: running, finished, failed, needs attention |
-| Dock | Bottom by default, moves to all four sides like the other panels |
+| Dock | Bottom by default, moves to the top; same View menu control as the Piano Roll |
 | Tabs | One per session, named after the running program. `+` opens a new one. Split panes are out of this version; tmux covers them |
 | Start folder | The open patch's folder, or home when the patch is unsaved |
 | Keys | With focus, all keys go to the shell, including Tab, Esc and arrows. Cmd+C copies a selection (Ctrl+Shift+C on Windows and Linux), Cmd+V pastes, Cmd+Q still quits |

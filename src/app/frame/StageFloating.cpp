@@ -114,6 +114,7 @@ int DrawFloating(FrameCtx& fc)
             sDlg = nullptr;
          }
       }
+      DrawTerminalQuitWarning();
       if (gShowUnsavedChangesModal)
       {
          ImGui::OpenPopup(L("Unsaved Changes"));

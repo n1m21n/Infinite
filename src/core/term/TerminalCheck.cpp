@@ -174,8 +174,8 @@ static void CheckSession() {
     }
     {  // The sync query is answered, and held output shows only after release.
         auto s = TermSession::Start(Sh(
-            "stty raw -echo; printf '\\033[?2026$p'; dd bs=1 count=11 2>/dev/null | od -c | grep -q 2026 && "
-            "printf 'query-ok'; printf '\\033[?2026h'; printf 'held'; sleep 0.05; printf '\\033[?2026l'; sleep 5"));
+            "stty raw -echo; printf '\\033[?2026$p'; r=$(dd bs=1 count=11 2>/dev/null); "
+            "case \"$r\" in *2026*2*y) printf 'query-ok';; esac; printf '\\033[?2026h'; printf 'held'; sleep 0.05; printf '\\033[?2026l'; sleep 5"));
         CHECK(WaitFor([&] { return Screen(s->Latest()).find("held") != std::string::npos; }, 3000));
         CHECK(Screen(s->Latest()).find("query-ok") != std::string::npos);
     }

@@ -105,6 +105,8 @@ int main(int argc, char** argv)
       if (PredictiveRhythmStyle::HasLearnedData())
          PredictiveRhythmStyle::Save(AppPaths::AppSupportDir() + "/prediction");
    }
+   SetQuitStep("terminal");
+   TerminalShutdown();
    SetQuitStep("close output windows");
    CloseAllProjectorWindows();
    Platform::StopDisplayRefreshClock();

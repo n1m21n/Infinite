@@ -33,6 +33,7 @@ struct Snapshot {
     std::string title;
     std::string cwd;
     bool commandRunning = false;
+    bool busy = false;  // a program is running in the foreground
     int lastExit = -1;
     uint32_t bells = 0;
     uint32_t notices = 0;
@@ -56,6 +57,9 @@ public:
     // Returns at once; the shell starts on the session's own thread.
     static std::shared_ptr<TermSession> Start(const Options& options);
     ~TermSession();
+
+    // Current even while hidden; safe from any thread.
+    bool Busy() const;
 
     // Ends the shell in the background. Never blocks.
     void Stop();

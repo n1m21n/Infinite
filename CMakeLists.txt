@@ -524,6 +524,8 @@ set(COMMON_SOURCES
     src/app/panels/PatchOpenerCheck.cpp
     src/app/panels/HistoryPanel.cpp
     src/app/panels/PianoRollPanel.cpp
+    src/app/panels/TerminalPanel.cpp
+    src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
@@ -1242,7 +1244,11 @@ target_include_directories(Infinite PRIVATE
     src/platform/ndi
 )
 
-target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib)
+target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
+target_sources(Infinite PRIVATE ${TERMINAL_CORE_SOURCES})
+if(UNIX AND NOT APPLE)
+    target_link_libraries(Infinite PRIVATE util)
+endif()
 
 if(WIN32)
     # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its
@@ -1415,6 +1421,8 @@ if(WIN32)
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
                 ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
@@ -1477,6 +1485,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
                 ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
@@ -1797,6 +1807,8 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/GeistMono/GeistMono-Bold.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES

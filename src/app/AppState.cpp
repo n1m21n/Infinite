@@ -448,6 +448,13 @@ bool gHeadlessNeedProbe = false;
    bool  gSampleStudioClaimedKeys = false;
    ImVec2 gSampleStudioRectMin(0.0f, 0.0f), gSampleStudioRectMax(0.0f, 0.0f);
    std::string gSampleStudioPendingDrop;
+   bool  gTerminalOpen = false;
+   float gTerminalHeight = 320.0f;
+   int   gTerminalDock = 0;
+   float gTerminalFontSize = 13.0f;
+   bool  gTerminalFocus = false;
+   ImVec2 gTerminalRectMin, gTerminalRectMax;
+   std::vector<std::string> gTerminalDropPending;
    bool  gPianoRollOpen = false;
    float gPianoRollHeight = 480.0f;
    int   gPianoRollDock = 3; // top, like the Timeline's second row

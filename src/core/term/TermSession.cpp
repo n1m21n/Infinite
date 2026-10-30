@@ -52,6 +52,7 @@ struct TermSession::Impl : std::enable_shared_from_this<TermSession::Impl> {
     mutable std::mutex publishLock;
     std::shared_ptr<const Snapshot> latest;
     std::atomic<bool> visible{true};
+    std::atomic<bool> busy{false};
 
     std::mutex copyLock;
     std::string copied;
@@ -209,6 +210,7 @@ struct TermSession::Impl : std::enable_shared_from_this<TermSession::Impl> {
         s.title = engine->Title();
         s.cwd = engine->Cwd();
         s.commandRunning = engine->CommandRunning();
+        s.busy = busy.load();
         s.lastExit = engine->LastExit();
         s.bells = engine->BellCount();
         s.notices = engine->NoticeCount();
@@ -254,6 +256,12 @@ struct TermSession::Impl : std::enable_shared_from_this<TermSession::Impl> {
         Clock::time_point nextPublish = Clock::now();
         size_t fedThisTick = 0;
         bool stopping = false;
+        Clock::time_point nextBusyCheck = Clock::now();
+        const auto after250 = [&](Clock::time_point t) {
+            if (t < nextBusyCheck) return false;
+            nextBusyCheck = t + std::chrono::milliseconds(250);
+            return true;
+        };
 
         while (!stopping) {
             const Clock::time_point now = Clock::now();
@@ -293,11 +301,17 @@ struct TermSession::Impl : std::enable_shared_from_this<TermSession::Impl> {
             }
             if (finished && !exited) {
                 exited = true;
+                busy.store(false);
                 exitCode = pty ? pty->ExitCode() : -1;
                 held = false;
                 const std::string message = "\r\n[Shell ended. Press Enter to start a new one]\r\n";
                 engine->Feed(message.data(), message.size());
                 needPublish = true;
+            }
+
+            if (started && !exited && after250(now)) {
+                const bool nowBusy = pty->Busy();
+                if (nowBusy != busy.exchange(nowBusy)) needPublish = true;
             }
 
             // Text that scrolled in keeps a scrolled-back view on the same lines.
@@ -359,6 +373,8 @@ void TermSession::Stop() {
     impl_->wake.notify_one();
     impl_->ringSpace.notify_all();
 }
+
+bool TermSession::Busy() const { return impl_->busy.load(); }
 
 std::shared_ptr<const Snapshot> TermSession::Latest() const {
     std::lock_guard<std::mutex> guard(impl_->publishLock);
