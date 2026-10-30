@@ -8,4 +8,6 @@
 namespace UndoDescribe
 {
    std::string Change(const Patch::Data& before, const Patch::Data& after);
+   // The same for a timeline-only step: names the panel and the edit ("Piano Roll: Move 3 notes", "Timeline: Split clip").
+   std::string ChangeArrange(const Arrange::Model& before, const Arrange::Model& after);
 }

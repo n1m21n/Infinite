@@ -873,12 +873,18 @@ namespace app
       if (e.label.empty())
       {
          if (e.arrangeOnly)
-            return "Edit timeline";
+         {
+            // Pushed before its change (PushArrangeUndo): name it against the entry above, or the live model.
+            if (i == 0)
+               return UndoDescribe::ChangeArrange(e.arrange, gArrange);
+            const UndoEntry& above = gUndoStack[gUndoStack.size() - i];
+            return above.arrangeOnly ? UndoDescribe::ChangeArrange(e.arrange, above.arrange) : std::string("Timeline: Edit");
+         }
          // The top entry's "after" is the live graph, which keeps changing: derive but do not cache it.
          const bool top = (i == 0);
          const std::string derived =
             top ? UndoDescribe::Change(e.patch, BuildPatchData())
-                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Edit timeline")
+                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Timeline: Edit")
                                                                  : UndoDescribe::Change(e.patch, gUndoStack[gUndoStack.size() - i].patch));
          if (!top)
             e.label = derived;
@@ -1444,6 +1450,7 @@ namespace app
       UndoEntry e;
       e.arrangeOnly = true;
       e.arrange = before;
+      e.label = UndoDescribe::ChangeArrange(before, gArrange);
       gUndoStack.push_back(std::move(e));
       if (gUndoStack.size() > kMaxUndoDepth)
          gUndoStack.pop_front();

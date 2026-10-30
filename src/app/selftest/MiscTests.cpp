@@ -1,4 +1,5 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
+#include "core/UndoDescribe.h"
 #include "core/Extensions.h"
 #include "core/tracking/HandTracker.h"
 #include "nodes/HandTrackNode.h"
@@ -2381,6 +2382,30 @@ void RunHistoryTest()
    Check("jump back landed on the right state", gNodes.size() == 2 && FindNodeByIndex(shapeIdx) != nullptr && !FindNodeByIndex(shapeIdx)->node->bypassed);
    Check("redo entries keep their names", RedoLabelAt(0) == "Bypass" && RedoLabelAt(1).find("Delete") == 0);
    Check("undo entry names survive the jump", UndoLabelAt(0).rfind(paramLabel + " ", 0) == 0);
+
+   // Timeline and Piano Roll steps name the panel and the edit.
+   {
+      Arrange::Model m0;
+      Arrange::Lane lane;
+      lane.id = 1;
+      lane.type = Arrange::kLaneMidi;
+      Arrange::Clip c;
+      c.id = 2;
+      c.length = 960;
+      lane.clips.push_back(c);
+      m0.lanes.push_back(lane);
+      Arrange::Model m1 = m0;
+      Arrange::Note n;
+      n.id = 1;
+      m1.lanes[0].clips[0].notes.push_back(n);
+      Arrange::Model m2 = m1;
+      m2.lanes[0].clips[0].notes[0].vel = 40;
+      Arrange::Model m3 = m2;
+      m3.lanes[0].clips[0].start = 480;
+      Check("a note added is named", UndoDescribe::ChangeArrange(m0, m1) == "Piano Roll: Add 1 note");
+      Check("a velocity edit is named", UndoDescribe::ChangeArrange(m1, m2) == "Piano Roll: Velocity of note");
+      Check("a clip move is named", UndoDescribe::ChangeArrange(m2, m3) == "Piano Roll: Move 1 clip");
+   }
 
    // Jump forward one: the bypass is back.
    JumpInHistory(0, 1);
