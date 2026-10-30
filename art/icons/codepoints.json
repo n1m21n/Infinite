@@ -82,5 +82,6 @@
  "mute": 59728,
  "ping-pong": 59729,
  "reverse": 59730,
- "slice": 59731
+ "slice": 59731,
+ "terminal": 59732
 }

@@ -1040,6 +1040,40 @@ endif()
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
+# Terminal (docs/plans/terminal/README.md). libvterm is vendored as plain source
+# behind src/core/term/VtEngine.h; see external/libvterm/VENDORED_COMMIT.txt.
+add_library(vterm_lib STATIC
+    external/libvterm/src/encoding.c
+    external/libvterm/src/keyboard.c
+    external/libvterm/src/mouse.c
+    external/libvterm/src/parser.c
+    external/libvterm/src/pen.c
+    external/libvterm/src/screen.c
+    external/libvterm/src/state.c
+    external/libvterm/src/unicode.c
+    external/libvterm/src/vterm.c
+)
+target_include_directories(vterm_lib PUBLIC external/libvterm/include)
+set_target_properties(vterm_lib PROPERTIES C_STANDARD 99 C_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(vterm_lib PRIVATE /utf-8 /wd4100 /wd4244 /wd4267)
+endif()
+
+set(TERMINAL_CORE_SOURCES src/core/term/VtEngine.cpp src/core/term/TermSession.cpp)
+if(WIN32)
+    list(APPEND TERMINAL_CORE_SOURCES src/core/term/PtyHostWin.cpp)
+else()
+    list(APPEND TERMINAL_CORE_SOURCES src/core/term/PtyHostPosix.cpp)
+endif()
+
+# Headless checks for the terminal core.
+find_package(Threads REQUIRED)
+add_executable(terminal-check src/core/term/TerminalCheck.cpp ${TERMINAL_CORE_SOURCES})
+target_link_libraries(terminal-check PRIVATE vterm_lib Threads::Threads)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(terminal-check PRIVATE util)
+endif()
+
 add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch3d-check PRIVATE src/core/sketch src/core)
 target_link_libraries(sketch3d-check PRIVATE sketch_deps lunasvg_lib)
