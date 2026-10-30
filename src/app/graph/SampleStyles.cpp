@@ -82,6 +82,7 @@ namespace
 #include "app/graph/GenerateSamplesTables.inc"
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/GenerateSamplesGrooves.inc"
+#include "app/graph/GenerateSamplesGrooves909.inc"
 #include "app/graph/GenerateSamplesVoices.inc"
 #include "app/graph/GenerateSamplesNotes.inc"
 
@@ -1828,7 +1829,7 @@ Compiled Compile(const Recipe& recipe)
    // Groove MIDI drummers share, put together from the genres whose drummers play the card's family: breaks and
    // drum & bass take funk and hip-hop breaks at their own tempo, as jungle does; four-on-the-floor families keep the
    // kick and backbeat and take the hats and ghosts; bass music is half-time. Its own stream: only this part moves.
-   std::string bank[4];
+   std::string bank[4], clap909;
    if (part == Part::Drums && hasDrums)
    {
       Rng gb(std::string("groove-bank:") + std::to_string(recipe.seed));
@@ -1887,12 +1888,27 @@ Compiled Compile(const Recipe& recipe)
                   snare[(size_t)i] = 'o';
          }
          bank[0] = kick, bank[1] = snare, bank[2] = h0.h, bank[3] = h0.o;
+         // Four-on-the-floor takes the hats, open hat and clap of a 909 pattern on about half its takes (item 17):
+         // drawn after the Groove MIDI draws, so the other half is unchanged.
+         if (four && gb.Uniform() < 0.5)
+         {
+            std::vector<const Groove909*> nine;
+            for (const Groove909& x : kGroove909)
+               if (x.four)
+                  nine.push_back(&x);
+            const Groove909& g = *nine[(size_t)gb.Range((int)nine.size())];
+            bank[2] = g.h, bank[3] = g.o;
+            if (std::string(g.c).find('x') != std::string::npos)
+               clap909 = g.c;
+         }
          if (bank[3].find_first_not_of('.') == std::string::npos)
             bank[3].clear();
          for (int i = 0; i < 4; i++)
             lanes[i] = bank[i].c_str();
          if (!four)
             lanes[4] = ""; // the skeleton's snare is the backbeat; a card clap on top doubles it
+         else if (!clap909.empty())
+            lanes[4] = clap909.c_str();
       }
    }
 
@@ -1937,7 +1953,24 @@ Compiled Compile(const Recipe& recipe)
    bool is808Kick = false;
    if (hasDrums)
    {
-      Params force = F({ { "swing", st.swing }, { "volume", 0.9 } });
+      // A swung card plays a real machine's swing (MPC 3000 / SP 1200 16ths, item 17): one within 0.12 of the card's,
+      // else the nearest. Its own stream.
+      float swing = st.swing;
+      if (st.swing > 0.02f)
+      {
+         std::vector<float> near;
+         float best = kSwing909[0];
+         for (float v : kSwing909)
+         {
+            if (std::abs(v - st.swing) <= 0.12f)
+               near.push_back(v);
+            if (std::abs(v - st.swing) < std::abs(best - st.swing))
+               best = v;
+         }
+         Rng sr(std::string("swing909:") + std::to_string(recipe.seed));
+         swing = near.empty() ? best : near[(size_t)sr.Range((int)near.size())];
+      }
+      Params force = F({ { "swing", swing }, { "volume", 0.9 } });
       force["steps"] = { 'i', "32" };
       force["rate"] = { 'i', "12" };
       force["run"] = { 'b', "1" };

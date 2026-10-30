@@ -1175,3 +1175,21 @@ characteristic means, head; bar 0.6:
 - Why Wavetable stays low: one knob move does not have one direction on Wavetable (item 14 measures how often a move disagrees
   with itself), so more presets of the same kind do not lift R².
 - No cross-engine model was built.
+
+## 2026-10-30 Plan item 17: 909 patterns and MPC / SP-1200 swing in the Drums groove (`tools/universe/groove_909.py` -> `GenerateSamplesGrooves909.inc`): MET
+
+- **Bank.** `groove_909.py` reads the Drumazon 2 pattern library (`.dr2seq`, straight 1/16 only; triplets skipped). A 32-step
+  pattern gives both halves. A figure needs a kick and a hat (fills and intros are left out). The result is 274 unique 16-step
+  figures, 157 of them four-on-the-floor. Lanes: kick, snare, closed hat (ride when the pattern has no closed hat), open hat, clap.
+  The 909's accent is not kept.
+- **Swing.** The ten 16th swings named in Ableton's MPC 3000 and SP 1200 swing grooves, converted to DrumSequencer units
+  (odd 16ths late by `swing * 0.5` steps, so p% is `4p/100 - 2`): 0.16 to 0.96.
+- **In the generator** (`SampleStyles.cpp`, Drums groove): on a four-on-the-floor card, half the takes take their closed and
+  open hat lanes, and the clap when the figure has one, from a 909 figure. Kick and snare stay with the card's own groove. A
+  swung card (swing > 0.02) plays a machine swing within 0.12 of its own, else the nearest; straight cards stay straight. Both
+  draws use their own random streams, so nothing else in a take moves.
+- **Gate holds.** Shipped spectral gate on 40 clean takes per part, same seeds, before vs after: drums 0/40 -> 0/40, kicks,
+  snares, hats, toms, percussion 0 -> 0, full 1/40 -> 1/40. 23 of 40 drum takes, 8 hats takes and 15 full mixes changed.
+  Seven synths / pads / plucks takes and two snares takes moved by at most 0.6% in one band with RMS unchanged to 4 digits:
+  render noise, not this change.
+- `groove_bank.py`'s inc is unchanged; the 909 bank sits beside it.
