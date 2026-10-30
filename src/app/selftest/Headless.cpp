@@ -648,8 +648,8 @@ static void PrimeOfflineStart(int& frameId, double startSeconds)
 static const char* CodeKeyOf(const Patch::NodeRecord& rec)
 {
    for (const auto& kv : rec.params)
-      if (kv.first == "s code" || kv.first == "s formula")
-         return kv.first == "s code" ? "s code" : "s formula";
+      if (kv.first == "s code" || kv.first == "s formula" || kv.first == "s stImage")
+         return kv.first == "s code" ? "s code" : kv.first == "s formula" ? "s formula" : "s stImage";
    return nullptr;
 }
 
@@ -658,13 +658,19 @@ static Headless::Issue CodeCompileIssue(const Patch::NodeRecord* rec, int node, 
 {
    const char* key = rec != nullptr ? CodeKeyOf(*rec) : nullptr;
    const bool formula = key != nullptr ? std::string(key) == "s formula" : (type == "Formula" || type == "Equation");
+   const bool sketch = type == "Sketch" || type == "Sketch 3D";
+   const bool glsl = type == "Shadertoy";
    Headless::Issue is;
-   is.code = formula ? "E_FORMULA_COMPILE" : "E_FIELD_COMPILE";
+   is.code = glsl ? "E_GLSL_COMPILE" : sketch ? "E_SKETCH_COMPILE" : formula ? "E_FORMULA_COMPILE" : "E_FIELD_COMPILE";
    is.node = node;
-   is.message = type + " node " + std::to_string(node) + (formula ? ": its formula does not compile: " : ": its Field code does not compile: ") +
+   is.message = type + " node " + std::to_string(node) +
+                (glsl ? ": its shader does not compile: " : sketch ? ": its script does not compile: " :
+                 formula ? ": its formula does not compile: " : ": its Field code does not compile: ") +
                 NodeIssues::FirstLine(error);
-   is.hint = formula ? "fix the node's `s formula` line; a formula that does not compile never reaches the output"
-                     : "fix the kernel on the node's `s code` line; a Field node whose code does not compile produces nothing";
+   is.hint = glsl ? "fix the pass named in the error; the line number counts from the top of that pass, and `code docs glsl` lists what the preamble defines"
+             : sketch ? "fix the script on the node's `s code` line; the last working picture stays until it compiles, and `code docs sketch` lists the API"
+             : formula ? "fix the node's `s formula` line; a formula that does not compile never reaches the output"
+                       : "fix the kernel on the node's `s code` line; a Field node whose code does not compile produces nothing";
    if (rec != nullptr)
    {
       is.line = rec->line;
@@ -689,6 +695,10 @@ static void CheckFieldCode(const Patch::Data& data, std::vector<Headless::Issue>
          continue;
       Patch::LoadParams(node.get(), rec.params);
       ReloadDerivedState(node.get());
+      if (auto* sketch = dynamic_cast<SketchNode*>(node.get()))
+         sketch->Apply();
+      else if (auto* sketch3d = dynamic_cast<Sketch3DNode*>(node.get()))
+         sketch3d->Apply();
       const std::string err = node->CodeError();
       if (!err.empty())
          errors.push_back(CodeCompileIssue(&rec, rec.index, rec.typeName, err));

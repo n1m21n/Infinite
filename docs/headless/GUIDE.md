@@ -141,6 +141,36 @@ The **last line printed** is always one JSON object with these fields: `ok`, `mo
 | 5 | Rendering failed |
 | 6 | Timeout. Raise `--timeout` |
 
+## 4.5 The `infinite` command
+
+Inside Infinite's Terminal panel, `infinite` is on the PATH. A verb goes to the running app, or to the
+headless flags above when you give it a `.inf` file. `infinite` alone lists every verb; `infinite context`
+prints the open patch, the selection and any code errors in one answer.
+
+| Group | Verbs |
+|---|---|
+| Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
+| Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `mod`, `expr`, `bypass`, `batch`, `undo`, `redo` |
+| Patch | `new`, `open`, `save`, `validate`, `canonicalize`, `apply` |
+| Play | `play`, `stop`, `rewind`, `seek`, `tempo`, `session scene`, `session stop` |
+| See and hear | `shot`, `frame`, `render`, `audio` |
+| Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
+| Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |
+| Learn | `context`, `guide` |
+| Watch | `watch` prints a JSON line for each change |
+| Terminal | `term list`, `read`, `send`, `run` |
+
+A `<node>` is an index, `selected`, or a title or type only one node has. Exit codes match 4.4, plus 7: no
+running app answered. Each terminal is tied to its own app, so two running apps do not cross.
+
+`code check` runs the real compiler and answers `{ok, errors: [{code, message, line, col, hint}]}`, with
+`E_FIELD_COMPILE`, `E_SKETCH_COMPILE`, `E_GLSL_COMPILE` or `E_FORMULA_COMPILE`. Add `--look` for one frame and
+its `frame_stats`. `code watch file --node n` pushes every save that compiles; a broken save reports its error
+and the node keeps its last good code.
+
+`patch check file.inf` runs loads, reachable, picture and sound in order and stops at the first failure. Add
+`--want moving-picture,sound` to fail a still picture, or a silent or clipping patch.
+
 ## 5. The patch file format
 
 A patch is a line-based text file. The first line is `infinite-patch 1`. Blank lines and lines starting with `#` are ignored.

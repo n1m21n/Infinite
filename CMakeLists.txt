@@ -641,6 +641,8 @@ set(COMMON_SOURCES
     src/arrange/MidiImport.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
+    src/core/InfiniteCli.cpp
+    src/app/graph/RpcTerminal.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/OscControl.cpp

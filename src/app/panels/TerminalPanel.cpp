@@ -7,8 +7,10 @@
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "core/RemoteControl.h"
 #include "core/term/TermSession.h"
 #include "imgui_internal.h"
+#include "platform/AppPaths.h"
 #include "platform/Platform.h"
 
 #include <algorithm>
@@ -17,6 +19,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <string>
@@ -39,6 +43,7 @@ namespace
 
    struct Tab
    {
+      int id = 0;
       std::shared_ptr<term::TermSession> session;
       int cols = 0, rows = 0;
       uint32_t seenBells = 0;
@@ -52,6 +57,7 @@ namespace
    };
 
    std::vector<std::unique_ptr<Tab>> sTabs;
+   int sNextTabId = 1;
    int sActive = 0;
    bool sSelecting = false;
    bool sSearchOpen = false;
@@ -78,6 +84,56 @@ namespace
       return tok::U32(*kColors[index], false);
    }
 
+   // Writes the `infinite` shim, once per app run, and returns its folder. One folder per binary,
+   // so two builds running side by side each reach their own.
+   std::string ShimDir()
+   {
+      static const std::string dir = []
+      {
+         const std::string exe = Platform::ExecutablePath();
+         if (exe.empty())
+            return std::string();
+         char name[32];
+         snprintf(name, sizeof(name), "%016llx", (unsigned long long)std::hash<std::string>{}(exe));
+         const std::string out = AppPaths::AppSupportDir() + "/term-bin/" + name;
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(out), ec);
+#if defined(_WIN32)
+         std::string front = exe;
+         const size_t dot = front.find_last_of('.');
+         if (dot != std::string::npos)
+            front = front.substr(0, dot) + ".com";
+         std::ofstream(AppPaths::FsPath(out + "/infinite.cmd"), std::ios::binary) << "@\"" << front << "\" --cli %*\r\n";
+#else
+         const std::string shim = out + "/infinite";
+         std::ofstream(AppPaths::FsPath(shim), std::ios::binary) << "#!/bin/sh\nexec \"" << exe << "\" --cli \"$@\"\n";
+         std::filesystem::permissions(AppPaths::FsPath(shim), std::filesystem::perms::owner_all, ec);
+#endif
+         return out;
+      }();
+      return dir;
+   }
+
+   // What the `infinite` command needs: itself first on the PATH, and this app's server.
+   void AddCommandEnv(term::PtySpawn& spawn)
+   {
+      if (const std::string dir = ShimDir(); !dir.empty())
+      {
+#if defined(_WIN32)
+         const char separator = ';';
+#else
+         const char separator = ':';
+#endif
+         const char* path = getenv("PATH");
+         spawn.env.push_back({ "PATH", path != nullptr && path[0] != '\0' ? dir + separator + path : dir });
+      }
+      if (RemoteControl::Port() > 0)
+      {
+         spawn.env.push_back({ "INFINITE_CONTROL_PORT", std::to_string(RemoteControl::Port()) });
+         spawn.env.push_back({ "INFINITE_CONTROL_TOKEN", RemoteControl::Token() });
+      }
+   }
+
    std::unique_ptr<Tab> NewTab(int cols, int rows)
    {
       term::TermSession::Options o;
@@ -98,11 +154,14 @@ namespace
       };
       if (const char* lang = getenv("LANG"); lang == nullptr || lang[0] == '\0')
          o.spawn.env.push_back({ "LANG", "en_US.UTF-8" });
+      AddCommandEnv(o.spawn);
       for (int i = 0; i < 16; ++i)
          o.palette[i] = Ansi(i);
       o.foreground = tok::U32(tok::terminal_fg, false);
       o.background = tok::U32(tok::terminal_bg, false);
       auto tab = std::make_unique<Tab>();
+      tab->id = sNextTabId++;
+      o.spawn.env.push_back({ "INFINITE_TERM_TAB", std::to_string(tab->id) });
       tab->cols = o.spawn.cols;
       tab->rows = o.spawn.rows;
       tab->session = term::TermSession::Start(o);
@@ -948,6 +1007,72 @@ void TerminalPanelHidden()
    gTerminalFocus = false;
    for (const auto& tab : sTabs)
       tab->session->SetVisible(false);
+}
+
+bool HandleTerminalSessionRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError)
+{
+   using json = nlohmann::json;
+   if (method != "term_list" && method != "term_read" && method != "term_send")
+      return false;
+
+   if (method == "term_list")
+   {
+      json tabs = json::array();
+      for (size_t i = 0; i < sTabs.size(); i++)
+      {
+         const auto snap = sTabs[i]->session->Latest();
+         tabs.push_back({ { "tab", sTabs[i]->id }, { "active", (int)i == sActive },
+                          { "title", snap ? snap->title : std::string() }, { "cwd", snap ? snap->cwd : std::string() },
+                          { "busy", sTabs[i]->session->Busy() } });
+      }
+      outResult = { { "tabs", tabs }, { "open", gTerminalOpen } };
+      return true;
+   }
+
+   Tab* tab = nullptr;
+   const int wanted = params.value("tab", 0);
+   for (size_t i = 0; i < sTabs.size(); i++)
+      if (wanted > 0 ? sTabs[i]->id == wanted : (int)i == sActive)
+         tab = sTabs[i].get();
+   if (tab == nullptr)
+   {
+      outError = wanted > 0 ? "no terminal tab " + std::to_string(wanted) : "no terminal is open";
+      return true;
+   }
+
+   if (method == "term_send")
+   {
+      tab->session->SendBytes(params.value("text", std::string()));
+      outResult = { { "tab", tab->id } };
+      return true;
+   }
+
+   // A snapshot is built only for what is on screen, so a read of a background tab asks for one and
+   // the caller polls; the panel's next frame turns it off again.
+   tab->session->SetVisible(true);
+   const auto snap = tab->session->Latest();
+   std::string text;
+   if (snap != nullptr)
+      for (int row = 0; row < snap->rows; row++)
+      {
+         std::string line;
+         for (int col = 0; col < snap->cols; col++)
+         {
+            const term::Cell& cell = snap->cells[(size_t)(row * snap->cols + col)];
+            if (cell.width == 0)
+               continue;
+            const ImWchar wide[2] = { cell.ch != 0 ? (ImWchar)cell.ch : (ImWchar)' ', 0 };
+            char utf8[8];
+            ImTextStrToUtf8(utf8, sizeof utf8, wide, wide + 1);
+            line += utf8;
+         }
+         line.erase(line.find_last_not_of(' ') + 1);
+         text += line + "\n";
+      }
+   text.erase(text.find_last_not_of('\n') + 1);
+   outResult = { { "tab", tab->id }, { "text", text }, { "exitCode", snap ? snap->lastExit : -1 },
+                 { "running", snap && snap->commandRunning }, { "busy", tab->session->Busy() } };
+   return true;
 }
 
 void TerminalToggleShortcut()

@@ -32,6 +32,7 @@ namespace RemoteControl
 
       std::string gToken;
       bool gStarted = false;
+      int gPort = 0;
 
       std::string SettingsDir()
       {
@@ -61,9 +62,7 @@ namespace RemoteControl
       }
 
       // Handles one client connection to completion (reads/replies until the
-      // socket closes or a fatal error). Runs on the accept thread - a single
-      // client (the MCP server) is the expected case, so connections are
-      // handled sequentially rather than one thread per client.
+      // socket closes or a fatal error).
       void ServeConnection(int fd, const Handler* handlerHolder)
       {
          (void)handlerHolder;
@@ -125,37 +124,46 @@ namespace RemoteControl
          NetCompat::NetClose(fd);
       }
 
-      void AcceptLoop(int port)
+      // Binds the requested port, or the next free one, so a second running app gets a server of its own.
+      int BindListener(int port, int& boundPort)
       {
-         int listenFd = socket(AF_INET, SOCK_STREAM, 0);
-         if (listenFd < 0)
-            return;
-
-         int yes = 1;
-         NetCompat::NetSetSockOpt(listenFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-
-         sockaddr_in addr{};
-         addr.sin_family = AF_INET;
-         addr.sin_port = htons(static_cast<uint16_t>(port));
-         addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // loopback only - never 0.0.0.0
-
-         if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+         const int tries = port == 0 ? 1 : 10;
+         for (int i = 0; i < tries; i++)
          {
-            NetCompat::NetClose(listenFd);
-            return;
-         }
-         if (listen(listenFd, 4) != 0)
-         {
-            NetCompat::NetClose(listenFd);
-            return;
-         }
+            int listenFd = socket(AF_INET, SOCK_STREAM, 0);
+            if (listenFd < 0)
+               return -1;
 
+            int yes = 1;
+            NetCompat::NetSetSockOpt(listenFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(static_cast<uint16_t>(port + i));
+            addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // loopback only - never 0.0.0.0
+
+            if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0 && listen(listenFd, 4) == 0)
+            {
+               socklen_t size = sizeof(addr);
+               getsockname(listenFd, reinterpret_cast<sockaddr*>(&addr), &size);
+               boundPort = ntohs(addr.sin_port);
+               return listenFd;
+            }
+            NetCompat::NetClose(listenFd);
+         }
+         return -1;
+      }
+
+      void AcceptLoop(int listenFd)
+      {
          for (;;)
          {
             int clientFd = accept(listenFd, nullptr, nullptr);
             if (clientFd < 0)
                continue;
-            ServeConnection(clientFd, nullptr);
+            // Each client gets its own thread: the MCP server holds its connection
+            // open, and a terminal's `infinite` must not wait behind it.
+            std::thread(ServeConnection, clientFd, nullptr).detach();
          }
       }
    }
@@ -167,9 +175,27 @@ namespace RemoteControl
       gStarted = true;
 
       gToken = GenerateToken();
-      WriteTokenFile(gToken);
+      int boundPort = 0;
+      const int listenFd = BindListener(port, boundPort);
+      if (listenFd < 0)
+         return;
+      gPort = boundPort;
+      // The token file belongs to the app on the requested port: a second app must not lock
+      // out the MCP client of the first. Its own terminals get the token through the environment.
+      if (boundPort == port || port == 0)
+         WriteTokenFile(gToken);
 
-      std::thread(AcceptLoop, port).detach();
+      std::thread(AcceptLoop, listenFd).detach();
+   }
+
+   int Port()
+   {
+      return gPort;
+   }
+
+   const std::string& Token()
+   {
+      return gToken;
    }
 
    void DrainPending(const Handler& handler)

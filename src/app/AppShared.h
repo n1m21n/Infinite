@@ -5754,6 +5754,10 @@ int TerminalBusyCount();
 void TerminalGuardQuit(std::function<void()> action);
 void DrawTerminalQuitWarning();
 void TerminalShutdown();
+// The verbs behind the `infinite` command (graph/RpcTerminal.cpp, Terminal*Rpc in TerminalPanel.cpp).
+// True when the method was theirs; outError set means it failed.
+bool HandleTerminalRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
+bool HandleTerminalSessionRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
 extern bool gPianoRollOpen;
 extern float gPianoRollHeight;
 extern int gPianoRollDock; // 0 = bottom, 3 = top (the Timeline's codes)

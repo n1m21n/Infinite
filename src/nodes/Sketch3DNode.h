@@ -57,6 +57,7 @@ public:
    // Compiles `code`. On failure the last working program (and mesh) stay.
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   std::string CodeError() const override { return mLastError; }
    const std::string& Notice() const { return mNotice; }
    Field::ParamTable& GetParamTable() { return mParamTable; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
