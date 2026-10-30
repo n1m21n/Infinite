@@ -1,0 +1,917 @@
+{
+ "Arpeggiator": {
+  "rows": 432,
+  "pairs": 360,
+  "held_out_acc": 0.949,
+  "scored": 468,
+  "knobs": {
+   "mode": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 0.83,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "octaves": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 22.216
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 14.901
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "rateMode": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 0.91,
+      "median_per_turn": -20.208
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 0.98,
+      "median_per_turn": -33.402
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 0.84,
+      "median_per_turn": -0.033
+     },
+     {
+      "measure": "grid",
+      "dir": "up",
+      "agree": 0.94,
+      "median_per_turn": 43.212
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -2.309
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 0.96,
+      "median_per_turn": -1.76
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.001
+     }
+    ]
+   },
+   "rateSeconds": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -2.856
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -8.439
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 0.9,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 0.89,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 0.9,
+      "median_per_turn": -0.001
+     }
+    ]
+   },
+   "gatePercent": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.445
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 0.86,
+      "median_per_turn": -0.003
+     }
+    ]
+   }
+  }
+ },
+ "Gate": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 0.947,
+  "scored": 245,
+  "knobs": {
+   "holdMs": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 1.296
+     },
+     {
+      "measure": "register",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 1.499
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 0.83,
+      "median_per_turn": 0.009
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -1.003
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 0.96,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.75
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 0.96,
+      "median_per_turn": 0.089
+     }
+    ]
+   }
+  }
+ },
+ "Glide": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 0.893,
+  "scored": 187,
+  "knobs": {
+   "glideMs": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 0.88,
+      "median_per_turn": 8.681
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 0.9,
+      "median_per_turn": 0.335
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 0.94,
+      "median_per_turn": 0.512
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -4.93
+     }
+    ]
+   }
+  }
+ },
+ "Humanizer": {
+  "rows": 216,
+  "pairs": 144,
+  "held_out_acc": 0.955,
+  "scored": 67,
+  "knobs": {
+   "timingMs": {
+    "pairs": 72,
+    "moves": []
+   },
+   "velocityPct": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 0.91,
+      "median_per_turn": 0.778
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 0.98,
+      "median_per_turn": 3.357
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ },
+ "Note Echo": {
+  "rows": 504,
+  "pairs": 432,
+  "held_out_acc": 0.934,
+  "scored": 361,
+  "knobs": {
+   "rateMode": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "up",
+      "agree": 0.89,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.156
+     }
+    ]
+   },
+   "rateSeconds": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "repeats": {
+    "pairs": 72,
+    "moves": []
+   },
+   "decay": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.95,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 0.91,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 0.95,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.001
+     },
+     {
+      "measure": "grid",
+      "dir": "up",
+      "agree": 0.88,
+      "median_per_turn": 0.673
+     },
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.002
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 0.95,
+      "median_per_turn": 0.009
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 0.93,
+      "median_per_turn": 0.062
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 0.8,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "transposePerRepeat": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 0.88,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "muteDry": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 0.8,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -76.322
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 0.88,
+      "median_per_turn": -0.602
+     }
+    ]
+   }
+  }
+ },
+ "Note Filter": {
+  "rows": 432,
+  "pairs": 360,
+  "held_out_acc": 0.998,
+  "scored": 404,
+  "knobs": {
+   "scale": {
+    "pairs": 72,
+    "moves": []
+   },
+   "root": {
+    "pairs": 72,
+    "moves": []
+   },
+   "rangeLow": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "down",
+      "agree": 0.96,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "rangeHigh": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "chance": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ },
+ "Note Stack": {
+  "rows": 648,
+  "pairs": 576,
+  "held_out_acc": null,
+  "scored": 0,
+  "knobs": {
+   "semi0": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi1": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi2": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi3": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi4": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi5": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi6": {
+    "pairs": 72,
+    "moves": []
+   },
+   "semi7": {
+    "pairs": 72,
+    "moves": []
+   }
+  }
+ },
+ "Note Strum": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 0.966,
+  "scored": 59,
+  "knobs": {
+   "strumMs": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 0.91,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ },
+ "Note Transpose": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 0.958,
+  "scored": 190,
+  "knobs": {
+   "semitones": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 0.92,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.95,
+      "median_per_turn": 62.834
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 3.085
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -0.342
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 0.93,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "down",
+      "agree": 0.89,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.267
+     }
+    ]
+   }
+  }
+ },
+ "Pitch Bend": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 1.0,
+  "scored": 48,
+  "knobs": {
+   "bendSemitones": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 4.747
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 0.86,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.005
+     }
+    ]
+   }
+  }
+ },
+ "Quantizer": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 0.878,
+  "scored": 115,
+  "knobs": {
+   "div": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 0.89,
+      "median_per_turn": 2.237
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "grid",
+      "dir": "up",
+      "agree": 0.82,
+      "median_per_turn": 21.53
+     },
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -0.982
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 0.83,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ },
+ "Velocity Curve": {
+  "rows": 144,
+  "pairs": 72,
+  "held_out_acc": 1.0,
+  "scored": 52,
+  "knobs": {
+   "curve": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -14.536
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "duty",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ }
+}
