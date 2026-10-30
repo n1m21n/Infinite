@@ -986,3 +986,39 @@ heavy 6.88 / 4.03, noise 0.4 6.86 / 4.25, cello body with heavy pressure and noi
 - What limits the ratio is outside these knobs: renders are at C3 only while library samples are at every pitch, and the
   string's own spectrum and decay (loop loss, excitation) put it away from the recordings. Next: rerun on all STIM notes, and
   fit the loop loss (tone vs frequency) from the same recordings, before more body work.
+
+## 2026-10-30 Plan item 9: Wind node (clarinet, sax, flute, brass): shipped, family bar MISS
+New node `Wind` (Synths; `src/nodes/WindNode.*`): bore delay line closed by a reed (clarinet), a reed at 0.4 of a conical bore
+(sax), an air jet with a cubic jet table (flute) or a lip resonator (brass, constant Q 25, DC gain 3, tuned 2.5-3.5% under the
+note); bell loss, breath noise, 5.5 Hz vibrato, a 40 ms tongue overshoot of the pressure at note-on; 8 voices; controls
+instrument, breath, tone, noise, vibrato, attack, release, volume. Constants trimmed with `wind_proto.py` (numba twin of the
+C++ tick, no rebuild per try) and checked in the real node with `wind_tune.py` (held note every 5 semitones, YIN):
+
+| Instrument | Range | Speaks | Pitch (median, breath 0.5 / 1) | RMS | Peak |
+|---|---|---|---|---|---|
+| clarinet | 50-86 | every note from breath 0.1 | +1 / +1 c | -9 / -8 dB | 0.77 |
+| sax | 49-81 | every note from breath 0 (one 2-octave jump at 54, breath 1) | +2 / 0 c | -10 / -9 dB | 0.84 |
+| flute | 60-96 | every note from breath 0.1 | 0 / 0 c | -8.5 / -8 dB | 0.63 |
+| brass | 40-82 | every note from breath 0 | +12 / +8 c (low notes up to +50 c at breath 0: lip pull) | -15 / -13 dB | 0.9 |
+
+Fixes on the way: the flute's jet table was clipped flat (pressure 1.3-1.8 into x(x^2-1)) and it overblew to the octave until
+the loop was two periods; the sax needs pressure just above its threshold (0.6) and the reed further down the bore; the brass lip
+resonator's DC gain grew as 1/w^2, so low notes saturated open and stayed silent. Param sweep: all 8 params pass (release
+through `SweepPostAlter`: the sweep's first held note arrives before the inbox consumer registers, so the release waits for a
+sounding voice). Teardown sweep: Wind passes (the run then stalls after Convolution Reverb, unrelated).
+
+Family test (`string_families.py --set wind`, 400 presets at C3 and C4, ratio as for String; lower is closer):
+
+| Family | samples | Wind | Wind before tongue + gains | Wavetable | Analog | String |
+|---|---|---|---|---|---|---|
+| clarinet | 122 | 5.95 | 5.97 | **5.08** | 5.97 | 7.32 |
+| sax | 253 | 5.69 | 6.13 | **5.23** | 6.36 | 7.34 |
+| flute | 565 | 5.02 | 5.22 | **4.13** | 4.39 | 6.60 |
+| brass | 2271 | 6.61 | 7.12 | **5.94** | 6.84 | 8.96 |
+
+- MISS: no family passes, and Wavetable lands closer on all four. Per-axis gap from each library sample to its nearest Wind
+  render (median z): attack -0.6 to -1.2 (the recordings peak sooner), loudness +0.6 to +1.2, density +0.2 to +0.9,
+  brightness +0.3 to +0.5. The tongue overshoot and +3 dB moved every family by 0.0-0.5.
+- Same limit as String: renders at two pitches against libraries at every pitch, and 400 random presets over a narrow engine
+  against Wavetable's huge space. Next: render the families' own pitches (STIM notes), a brighter breath (a reed-table slope
+  per breath), and an onset noise burst; then rerun.

@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 """Step 7: String vs the library's acoustic sounds. Per family (names only): distance of each library sample to the nearest String render
-on the 11 shared axes (sound_space.AX, z-scored on the pooled rows), against the family's own inner distance (nearest other sample of
+(or Wind with --set wind) on the 11 shared axes (sound_space.AX, z-scored on the pooled rows), against the family's own inner distance (nearest other sample of
 the same family). Ratio < 1 means the String node already lands inside the family; > 1 means the family has regions the node misses.
-    string_families.py [--node String]"""
+    string_families.py [--node String] [--set strings|wind]"""
 import argparse, os, re, sys
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import sound_space as ss  # noqa: E402
 
 FAM = {"guitar": r"guitar|gtr", "harp": r"harp", "pluck": r"pluck", "violin": r"violin|vln", "cello": r"cello|vcl", "piano": r"piano|pno|keys"}
+WIND = {"clarinet": r"clarinet|clar\b", "sax": r"sax", "flute": r"flute|piccolo|fife", "brass": r"brass|trumpet|trombone|horn|tuba|cornet|flugel"}
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--node", default="String"); ap.add_argument("--n", type=int, default=0, help="subsample renders to n (equal-size comparison)"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--node", default="String"); ap.add_argument("--n", type=int, default=0, help="subsample renders to n (equal-size comparison)")
+    ap.add_argument("--set", default="strings", choices=["strings", "wind"]); a = ap.parse_args()
     S, _, _ = ss.own_matrix(os.path.join(ss.AUDIO, "own_%s.jsonl" % a.node.lower()))
     X, N = ss.sample_matrix(None, 200000)
     ok = np.isfinite(S).all(1); S = S[ok]
     if a.n and len(S) > a.n: S = S[np.random.default_rng(0).choice(len(S), a.n, replace=False)]
     print('%s: %d renders' % (a.node, len(S)))
     z = ss.prep(X, S); Sz, Xz = z(S), z(X)
-    print("| family | samples | nearest String render (median z) | inner distance (median z) | ratio | share within inner |\n|---|---|---|---|---|---|")
-    for fam, pat in FAM.items():
+    print("| family | samples | nearest render (median z) | inner distance (median z) | ratio | share within inner |\n|---|---|---|---|---|---|")
+    for fam, pat in (WIND if a.set == "wind" else FAM).items():
         idx = [i for i, n in enumerate(N) if re.search(pat, n.lower())]
         if len(idx) < 20: print("| %s | %d | too few | | | |" % (fam, len(idx))); continue
         F = Xz[idx]; d = ss.nn_dist(F, Sz)

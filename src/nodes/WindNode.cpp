@@ -43,13 +43,15 @@ namespace
       float gain;
    };
    constexpr InstrumentSpec kSpecs[WindNode::kInstrumentCount] = {
-      { 0.60f, 0.40f, 0.5f, 0.6f },     // clarinet
-      { 0.68f, 0.22f, 1.0f, 0.45f },    // sax: speaks from p ~0.6
-      { 0.88f, 0.32f, 1.9965f, 0.8f },  // flute: the jet table clips above ~1.3
-      { 0.40f, 0.45f, 2.0f, 2.2f },     // brass
+      { 0.60f, 0.40f, 0.5f, 0.85f },    // clarinet
+      { 0.68f, 0.22f, 1.0f, 0.6f },     // sax: speaks from p ~0.6
+      { 0.88f, 0.32f, 1.9965f, 1.3f },  // flute: the jet table clips above ~1.3
+      { 0.40f, 0.45f, 2.0f, 1.9f },     // brass
    };
    constexpr float kSaxReedPos = 0.4f;   // reed's share of the conical bore
    constexpr float kJetRatio = 0.32f;    // flute: jet delay over the bore delay
+   constexpr float kTongueAmount = 0.4f; // onset overshoot of the breath pressure
+   constexpr double kTongueMs = 40.0;    // its decay time constant
    // Brass lip resonator: a constant Q (so its bandwidth follows the note) and
    // a fixed DC gain, so the valve neither saturates open on low notes nor
    // stays shut on high ones; tuned a little under the note, since the lip
@@ -89,6 +91,7 @@ namespace
       // Brass lip: two-pole resonator at the note's frequency.
       float lipA1 = 0.0f, lipA2 = 0.0f, lipG = 0.0f, lipY1 = 0.0f, lipY2 = 0.0f;
       float level = 0.0f; // decaying peak of the output, to free the voice
+      float tongue = 0.0f; // onset pressure overshoot, 1 at note-on, decays
 
       void Clear()
       {
@@ -131,6 +134,7 @@ public:
       mDc.SetSampleRate(mSampleRate);
       mHighpass.SetHighpass(60.0, 0.707, mSampleRate);
       mLoopDcR = (float)std::exp(-2.0 * M_PI * 20.0 / mSampleRate);
+      mTongueDecay = (float)std::exp(-1.0 / (kTongueMs * 0.001 * mSampleRate));
       Reset();
    }
 
@@ -235,7 +239,11 @@ public:
             }
             v.chunkLeft--;
             v.env = v.held ? std::min(1.0f, v.env + attackStep) : std::max(0.0f, v.env - releaseStep);
-            float p = v.env * (spec.pressureMin + spec.pressureRange * breath) * (0.7f + 0.3f * v.velocity);
+            // The tongue's release puts a short pressure overshoot on the
+            // onset, which is where a played note's attack is heard.
+            v.tongue *= mTongueDecay;
+            float p = v.env * (spec.pressureMin + spec.pressureRange * breath) * (0.7f + 0.3f * v.velocity)
+                      * (1.0f + kTongueAmount * v.tongue);
             p += p * (0.2f * noiseAmt * mNoise.Next() + vibMod);
             const float out = Tick(v, inst, p, pole) * spec.gain;
             v.level = std::max(std::fabs(out), v.level * 0.9995f);
@@ -433,6 +441,7 @@ private:
       v.age = mNextAge++;
       v.chunkLeft = 0;
       v.level = std::max(v.level, 1e-3f);
+      v.tongue = 1.0f;
    }
 
    double mSampleRate = 44100.0;
@@ -443,6 +452,7 @@ private:
    DspMath::WhiteNoise mNoise;
    double mVibPhase = 0.0;
    float mLoopDcR = 0.997f;
+   float mTongueDecay = 0.9995f;
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;
