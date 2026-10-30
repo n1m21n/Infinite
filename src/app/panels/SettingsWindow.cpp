@@ -52,7 +52,8 @@ namespace app
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
       // First tab level with the first card; a little air between tabs.
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, tok::space_2));
+      const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
       for (int i = 0; i < kTabCount; i++)
       {
          const bool sel = (i == sTab);
@@ -74,12 +75,13 @@ namespace app
          dl->AddText(ImVec2(p.x + tok::space_4, p.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = oldItemSpacing;
       ImGui::EndChild();
-      ImGui::SameLine();
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, 0.0f));
+      FormParts::Inline();
+      const ImVec2 oldWindowPadding = ImGui::GetStyle().WindowPadding;
+      ImGui::GetStyle().WindowPadding = ImVec2(tok::space_4, 0.0f);
       ImGui::BeginChild("##SettingsBody", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().WindowPadding = oldWindowPadding;
       SectionCard::BeginWindow();
       {
          // 1. Appearance Tab
@@ -138,7 +140,7 @@ namespace app
                }
                FormParts::EndCombo();
             }
-            ImGui::SameLine();
+            FormParts::Inline();
             // Fingerprint swatch for the currently-selected preset, so the
             // tab reads at a glance even before opening the dropdown.
             {

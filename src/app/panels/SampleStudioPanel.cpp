@@ -2019,7 +2019,7 @@ namespace
       for (int c = -1; c < kPaletteSize; c++)
       {
          if ((c + 1) % perRow != 0)
-            ImGui::SameLine(0.0f, 3.0f);
+            FormParts::Inline(0.0f, 3.0f);
          else if (c > -1 && rowLabels)
             SectionCard::RowLabel("");
          ImGui::PushID(c);
@@ -2476,10 +2476,10 @@ namespace
          SectionCard::RowLabel(T("Play"));
          if (AudioToggleButton(L("Mute##sliceMute"), &m, fieldW / 3.0f - 3.0f, 0.0f))
             t.Changed(true);
-         ImGui::SameLine(0.0f, 3.0f);
+         FormParts::Inline(0.0f, 3.0f);
          if (AudioToggleButton(L("Solo##sliceSolo"), &so, fieldW / 3.0f - 3.0f, 0.0f))
             t.Changed(true);
-         ImGui::SameLine(0.0f, 3.0f);
+         FormParts::Inline(0.0f, 3.0f);
          bool rv = e.reverse;
          if (AudioToggleButton(L("Rev##sliceRev"), &rv, fieldW / 3.0f, 0.0f))
             t.Changed(true);
