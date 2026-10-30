@@ -5,7 +5,7 @@ const fs = require('fs'), path = require('path');
 
 const factory = require(path.resolve(process.argv[2]));
 const site = path.resolve(process.argv[3]);
-const PER = 28; // takes per part: 15 parts x 28 + the 89 rendered mixes is over 500 samples
+const PER = parseInt(process.argv[4] || process.env.PER || '8', 10); // takes per part: default 8 (15 parts x 8 = 120 recipes per round)
 const PARTS = { synths: 1, keys: 9, leads: 10, pads: 2, plucks: 3, textures: 11, bass: 6, drums: 5, kicks: 12, snares: 13, hats: 14, toms: 15, percussion: 4, fx: 7, foley: 8 };
 const KEYLESS = new Set(['drums', 'percussion', 'kicks', 'snares', 'hats', 'toms', 'fx', 'foley']);
 const SHORT = new Set(['kicks', 'snares', 'hats', 'toms']);
@@ -13,12 +13,13 @@ factory().then(M => {
   const nStyles = M._gen_style_count(), nScales = M._gen_scale_count();
   const dataPath = path.join(site, 'data.json'), data = JSON.parse(fs.readFileSync(dataPath));
   data.samples = data.samples.filter(x => !x.id.startsWith('lib-'));
+  const batch = parseInt(process.argv[5] || process.env.BATCH || Math.floor(Date.now() / (1000 * 3600 * 6)), 10);
   let made = 0;
   Object.keys(PARTS).forEach((name, pi) => {
     for (let n = 0; n < PER; n++) {
       const bars0 = nm => SHORT.has(nm) ? 1 : 2;
-      const style = (pi * 7 + n * 11) % nStyles, seed = 1000 + pi * 37 + n * 101;
-      const scale = KEYLESS.has(name) ? -1 : (pi * 3 + n * 5) % nScales;
+      const style = (pi * 7 + n * 11 + batch * 3) % nStyles, seed = 1000 + (batch % 1000) * 997 + pi * 37 + n * 101;
+      const scale = KEYLESS.has(name) ? -1 : (pi * 3 + n * 5 + batch * 2) % nScales;
       let frames = M._gen_run(style, PARTS[name], seed, bars0(name), -1, scale);
       if (!frames) { console.log('FAIL', name, n); continue; }
       const pcm = new Float32Array(M.HEAPF32.buffer, M._gen_pcm(), frames * 2);

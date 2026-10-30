@@ -23,11 +23,11 @@ run the infinite samples bot from the patch-universe checkout. sound only; every
 1. engine & generation:
    the closed-loop sample generator engine uses the role critic (redraws below P 0.5 up to 2 times, keeping the best heard take), real instrument models (piano, rhodes, wurlitzer, strings, winds), and weighted real-song chord progressions.
    if generator logic or styles changed in src/app/graph/SampleStyles.cpp, GenerateSamplesNode.cpp, RoleCritic.cpp, or wasm/gen_main.cpp, rebuild the wasm first (source ~/emsdk/emsdk_env.sh && cmake --build build-wasm -j2) and copy infinite_gen_wasm.{js,wasm,data} to website/gen/.
-   generate library: cd build-wasm && node ../tools/web_gen_library.js infinite_gen_wasm.js ../website/samples
-   (writes recipes rendered on play/download in browser, about 28 per category keeping 500+ samples total; older audio-* files stay). then python3 tools/web_library_names.py.
+   generate library: cd build-wasm && node ../tools/web_gen_library.js infinite_gen_wasm.js ../website/samples 8
+   (writes recipes rendered on play/download in browser, about 8 per category for ~120 recipes per round; older audio-* files stay). then python3 tools/web_library_names.py.
    music styles in tools/catalog/styles_music.json are the only source of variety; never write or edit .inf files by hand.
 2. read the log: report made count, failed takes and the reason (role critic under P 0.5, spectral gate, loudness, silence). a style failing twice in a row is reported as "needs a style fix" and not retried.
-3. publish & git: if the total (recipes + audio-* items) is at least 500 and every category has 25 or more, run python3 tools/website/gen_seo.py and python3 tools/website/gen_og_cards.py, check git status shows only samples, website/gen and og files, run the pre-push checks, commit in small steps with a clean smallcase message and no attribution lines, rebase on origin/main if needed, and push to origin/main. otherwise stop and report.
+3. publish & git: if the total (recipes + audio-* items) is at least 200 and every category has 7 or more, run python3 tools/website/gen_seo.py and python3 tools/website/gen_og_cards.py, check git status shows only samples, website/gen and og files, run the pre-push checks, commit in small steps with a clean smallcase message and no attribution lines, rebase on origin/main if needed, and push to origin/main. otherwise stop and report.
 ```
 
 ## Where an LLM is worth it
