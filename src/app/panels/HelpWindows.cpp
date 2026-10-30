@@ -644,7 +644,7 @@ namespace app
          { I18N_KEY("Transport & Audio"), I18N_KEY("Keyboard Octave"), "- / =", I18N_KEY("Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)") },
 
          { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "Esc / D / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), while the pointer is over the Piano Roll. The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Duplicate Notes"), MODKEY "+D / Shift+D", I18N_KEY("Lay the selected notes or clips again right after themselves") },

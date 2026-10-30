@@ -45,12 +45,13 @@ namespace FormParts
    }
 
    // Round colour dot (same shape as the Clip Settings swatches); a click opens a picker. True when edited.
-   inline bool ColorDot(const char* id, float* rgb, float d = 15.0f)
+   inline bool ColorDot(const char* id, float* rgb, float d = 15.0f, float rowH = 0.0f)
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const bool click = ImGui::InvisibleButton(id, ImVec2(d, d));
+      const float h = std::max(d, rowH); // rowH: centre the dot on a form row
+      const bool click = ImGui::InvisibleButton(id, ImVec2(d, h));
       const bool hov = ImGui::IsItemHovered();
-      const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
+      const ImVec2 c(p.x + d * 0.5f, p.y + h * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), 48);   // 48 segments: the auto count facets a 9 px circle
       if (click)

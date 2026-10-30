@@ -14,6 +14,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/ToolCursor.h"
 #include "arrange/ArrangeModel.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
@@ -111,6 +112,11 @@ namespace
       uint32_t humanizeSeed = 1;
       std::vector<Arrange::Note> clipboard; // starts relative to the first note
       bool openFunctions = false;
+      int menuKind = 0;          // right-click target: 0 empty roll, 1 clip, 2 note
+      Tick menuTick = 0;
+      int menuPitch = 60;
+      bool menuCompact = false;  // NoteField draws a menu row, not an inspector row
+      int quantIdx = 0;          // kQuant entry: 0 follows the grid
       NoteGen::GenSpec gen = [] {
          NoteGen::GenSpec g;
          g.seed = std::random_device {}() & 0xFFFFu;
@@ -237,15 +243,14 @@ namespace
       return 0;
    }
 
-   // The clip's own colour, or the page's, or the palette by page.
+   // The clip's own colour, else one of its own by identity: every clip reads as a different clip, whatever its page.
    ImVec4 ClipColor(const Arrange::Clip& c, const Arrange::Lane& page)
    {
       if (c.colorR + c.colorG + c.colorB > 0.0f)
          return ImVec4(c.colorR, c.colorG, c.colorB, 1.0f);
-      if (page.colorR + page.colorG + page.colorB > 0.0f)
-         return ImVec4(page.colorR, page.colorG, page.colorB, 1.0f);
+      float hue = std::fmod((float)(c.id % 4096) * 0.61803399f + (float)PageIndex(page) * 0.083f, 1.0f);
       float r, g, b;
-      ImGui::ColorConvertHSVtoRGB((float)(PageIndex(page) % kPaletteSize) / (float)kPaletteSize, 0.55f, 0.88f, r, g, b);
+      ImGui::ColorConvertHSVtoRGB(hue, 0.55f, 0.88f, r, g, b);
       return ImVec4(r, g, b, 1.0f);
    }
 
@@ -826,12 +831,12 @@ namespace
    {
       switch (t)
       {
-      case Tool::Draw: return T("Tool: Draw (D) - click to choose a tool");
+      case Tool::Draw: return T("Tool: Draw (P) - click to choose a tool");
       case Tool::Erase: return T("Tool: Erase (E) - click to choose a tool");
       case Tool::Blade: return T("Tool: Cut (B) - click to choose a tool");
       case Tool::Mute: return T("Tool: Mute (0) - click to choose a tool");
       case Tool::Hand: return T("Tool: Hand (H) - click to choose a tool");
-      default: return T("Tool: Select (Esc) - click to choose a tool");
+      default: return T("Tool: Select (A) - click to choose a tool");
       }
    }
 
@@ -855,9 +860,9 @@ namespace
       ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
       if (!MenuParts::BeginPopup("##pianoToolMenu"))
          return;
-      if (MenuParts::Item(L("Select"), "Esc", s.tool == Tool::Select))
+      if (MenuParts::Item(L("Select"), "A", s.tool == Tool::Select))
          s.tool = Tool::Select;
-      if (MenuParts::Item(L("Draw"), "D", s.tool == Tool::Draw))
+      if (MenuParts::Item(L("Draw"), "P", s.tool == Tool::Draw))
          s.tool = Tool::Draw;
       if (MenuParts::Item(L("Erase"), "E", s.tool == Tool::Erase))
          s.tool = Tool::Erase;
@@ -1011,10 +1016,33 @@ namespace
       });
    }
 
+   // Quantise targets, the usual divisions plus whole bars. Entry 0 follows the roll's grid.
+   struct QuantChoice
+   {
+      const char* label;
+      int num, den; // a fraction of a bar
+   };
+   const QuantChoice kQuant[] = { { I18N_KEY("Follow grid"), 0, 1 }, { I18N_KEY("2 Bars"), 2, 1 }, { I18N_KEY("Bar"), 1, 1 },
+                                  { "1/2", 1, 2 },  { "1/4", 1, 4 },  { "1/8", 1, 8 },   { "1/16", 1, 16 },
+                                  { "1/32", 1, 32 }, { "1/8T", 1, 12 }, { "1/16T", 1, 24 } };
+   constexpr int kQuantCount = (int)(sizeof(kQuant) / sizeof(kQuant[0]));
+
+   Tick QuantGrid()
+   {
+      const QuantChoice& q = kQuant[std::clamp(S().quantIdx, 0, kQuantCount - 1)];
+      return q.num == 0 ? GridOrBeatSixteenth() : (Tick)((int64_t)Arrange::kTicksPerBar * q.num / q.den);
+   }
+
+   const char* QuantLabel()
+   {
+      const QuantChoice& q = kQuant[std::clamp(S().quantIdx, 0, kQuantCount - 1)];
+      return q.num == 0 ? T("Grid") : T(q.label);
+   }
+
    void Quantize(const Arrange::Lane& page)
    {
       State& s = S();
-      s.quant.grid = GridOrBeatSixteenth();
+      s.quant.grid = QuantGrid();
       const auto targets = TargetNotes(page);
       ArrangeEdit([&] {
          for (const auto& [clip, ids] : targets)
@@ -1158,30 +1186,11 @@ namespace
 
    void DeleteSelection();
    void DuplicateSelection();
+   void DrawContextMenu(Arrange::Lane& page);
 
-   void DrawFunctionItems(const Arrange::Lane& page, bool noteItems)
+   // The transforms, for the Fx dropdown and the menus' Fx submenu.
+   void DrawFunctionItems(const Arrange::Lane& page)
    {
-      State& s = S();
-      if (noteItems && !s.notes.empty())
-      {
-         if (MenuParts::Item(L("Settings")))
-         {
-            s.settingsOpen = true;
-            s.genOpen = false;
-         }
-         if (MenuParts::Item(L("Duplicate"), "Shift+D"))
-            DuplicateSelection();
-         if (MenuParts::Item(L("Mute"), "0"))
-            TransformNotes(page, [](std::vector<Arrange::Note>& notes) {
-               for (Arrange::Note& n : notes)
-                  n.mute = !n.mute;
-            });
-         if (MenuParts::Item(L("Delete"), "Del"))
-            DeleteSelection();
-         MenuParts::Separator();
-      }
-      if (MenuParts::Item(L("Quantise"), "Q"))
-         Quantize(page);
       if (MenuParts::Item(L("Legato")))
          TransformNotes(page, Legato);
       if (MenuParts::Item(L("Humanize")))
@@ -1202,6 +1211,23 @@ namespace
          TransformNotes(page, VelocityRamp);
       if (MenuParts::Item(L("Fit to Scale")))
          TransformNotes(page, FitToScale);
+   }
+
+   // The divisions as menu rows. `apply`: choosing one also quantises the target now.
+   void DrawQuantItems(const Arrange::Lane& page, bool apply)
+   {
+      State& s = S();
+      for (int i = 0; i < kQuantCount; i++)
+      {
+         if (i == 3)
+            MenuParts::Separator();
+         if (MenuParts::Item(T(kQuant[i].label), nullptr, s.quantIdx == i))
+         {
+            s.quantIdx = i;
+            if (apply)
+               Quantize(page);
+         }
+      }
    }
 
    // Notes laid past a clip's end would neither show nor play: grow the clip (up to its neighbour) to hold them.
@@ -1570,10 +1596,27 @@ namespace
          s.genOpen = false;
       }
       FormParts::Inline(0.0f, gap);
-      if (TextChip(T("Fx")))
-         s.openFunctions = true;
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Functions: legato, humanize, reverse, strum and more. Also on right-click"));
+      {
+         ImVec2 bmin, bmax;
+         if (PickerFace("##pianoQuantGrid", QuantLabel(), 72.0f, T("What Quantise snaps to: the grid, bars or a division"), bmin, bmax))
+            ImGui::OpenPopup("##pianoQuantMenu");
+         if (BeginPickerMenu("##pianoQuantMenu", bmin, bmax, 72.0f))
+         {
+            DrawQuantItems(page, false);
+            MenuParts::EndPopup();
+         }
+      }
+      FormParts::Inline(0.0f, gap);
+      {
+         ImVec2 bmin, bmax;
+         if (PickerFace("##pianoFxMenuFace", T("Fx"), 64.0f, T("Functions: legato, humanize, reverse, strum and more"), bmin, bmax))
+            ImGui::OpenPopup("##pianoFxMenu");
+         if (BeginPickerMenu("##pianoFxMenu", bmin, bmax, 150.0f))
+         {
+            DrawFunctionItems(page);
+            MenuParts::EndPopup();
+         }
+      }
       FormParts::Inline(0.0f, gapGroup);
       if (TextChip(T("Generate"), false, ActionButton::Kind::Primary))
          Generate(page);
@@ -2146,6 +2189,8 @@ namespace
          StopSound(page);
       if (s.drag == Drag::None && hovered && m.y >= a.rollY && m.x >= a.x0 && s.tool == Tool::Hand)
          ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+      else if (hovered && s.drag == Drag::None && m.y >= a.rollY && m.x >= a.x0 && s.tool != Tool::Select)
+         ToolCursor::Badge(ToolGlyph(s.tool));
       if (s.drag == Drag::None && hovered && m.y >= a.rollY && m.x >= a.x0 && s.tool == Tool::Select)
       {
          NoteHit hit;
@@ -2173,7 +2218,17 @@ namespace
          any = true;
       }
       float v = first;
-      const bool changed = FormParts::SliderFloat(label, &v, lo, hi, mixed ? T("mixed") : fmt, flags);
+      bool changed;
+      if (s.menuCompact)
+      {
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(label);
+         FormParts::Inline(84.0f);
+         ImGui::SetNextItemWidth(112.0f);
+         changed = FieldWell::Slider((std::string("##m") + label).c_str(), &v, lo, hi, mixed ? T("mixed") : fmt, flags);
+      }
+      else
+         changed = FormParts::SliderFloat(label, &v, lo, hi, mixed ? T("mixed") : fmt, flags);
       if (ImGui::IsItemActivated())
       {
          ArrangeGestureBegin();
@@ -2259,8 +2314,8 @@ namespace
       State& s = S();
       SectionCard::Begin(T("Functions"));
       FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, "%.0f ticks");
-      FormParts::SliderFloat(T("Humanize time"), &s.humanizeTime, 0.0f, 120.0f, "%.0f ticks");
-      FormParts::SliderFloat(T("Humanize velocity"), &s.humanizeVel, 0.0f, 40.0f, "%.0f");
+      FormParts::SliderFloat(T("Time spread"), &s.humanizeTime, 0.0f, 120.0f, "%.0f ticks");
+      FormParts::SliderFloat(T("Vel spread"), &s.humanizeVel, 0.0f, 40.0f, "%.0f");
    }
 
    void DrawNoteInspector(Arrange::Lane& page)
@@ -2340,7 +2395,7 @@ namespace
       FormParts::Label(T("Colour"));
       ImVec4 shown = ClipColor(*c0, page);
       float rgb[3] = { shown.x, shown.y, shown.z };
-      if (FormParts::ColorDot("##clipColour", rgb))
+      if (FormParts::ColorDot("##clipColour", rgb, 15.0f, FormParts::kRowH))
       {
          if (!gArrangeGestureOpen)
             ArrangeGestureBegin();
@@ -2420,7 +2475,7 @@ namespace
       const ImVec4 shown = page.colorR + page.colorG + page.colorB > 0.0f ? ImVec4(page.colorR, page.colorG, page.colorB, 1.0f)
                                                                          : ClipColor(Arrange::Clip {}, page);
       float rgb[3] = { shown.x, shown.y, shown.z };
-      if (FormParts::ColorDot("##pageColour", rgb))
+      if (FormParts::ColorDot("##pageColour", rgb, 15.0f, FormParts::kRowH))
       {
          page.colorR = rgb[0];
          page.colorG = rgb[1];
@@ -2767,8 +2822,10 @@ namespace
             s.rangeStart = s.rangeEnd = 0;
          }
       }
-      else if (noMods && key(ImGuiKey_D))
+      else if (noMods && key(ImGuiKey_P))
          s.tool = Tool::Draw;
+      else if (noMods && key(ImGuiKey_A))
+         s.tool = Tool::Select;
       else if (noMods && key(ImGuiKey_E))
          s.tool = Tool::Erase;
       else if (noMods && key(ImGuiKey_B))
@@ -2984,20 +3041,38 @@ namespace
       HandlePointer(page, a, hovered, mouse);
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && mouse.y >= a.rollY && mouse.x >= a.x0)
       {
-         NoteHit hit; // the note under the pointer is what the menu acts on
-         if (HitNote(page, a, mouse, hit) && s.notes.count({ hit.clip, hit.note.id }) == 0)
-            s.notes = { { hit.clip, hit.note.id } };
-         s.openFunctions = true;
+         State& ms = S();
+         NoteHit hit; // what is under the pointer decides the menu
+         const Tick at = (Tick)std::max(0.0, a.XTick(mouse.x));
+         if (HitNote(page, a, mouse, hit))
+         {
+            if (ms.notes.count({ hit.clip, hit.note.id }) == 0)
+               ms.notes = { { hit.clip, hit.note.id } };
+            ms.menuKind = 2;
+         }
+         else if (Arrange::Clip* c = ClipAt(page, at))
+         {
+            ms.notes.clear();
+            ms.clips = { c->id };
+            ms.menuKind = 1;
+         }
+         else
+         {
+            ms.menuKind = 0;
+            ms.menuTick = at;
+            ms.menuPitch = SnapPitch(page, ms.rows[(size_t)RowAtY(a, mouse.y)]);
+         }
+         ms.openFunctions = true;
       }
       if (s.openFunctions)
       {
          s.openFunctions = false;
          ImGui::OpenPopup("##pianoFx");
       }
-      ImGui::SetNextWindowSizeConstraints(ImVec2(150.0f, 0.0f), ImVec2(220.0f, 10000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 0.0f), ImVec2(280.0f, 10000.0f));
       if (MenuParts::BeginPopup("##pianoFx"))
       {
-         DrawFunctionItems(page, true);
+         DrawContextMenu(page);
          MenuParts::EndPopup();
       }
       PollRecording(page);
@@ -3046,6 +3121,81 @@ namespace
       }
       else
          s.inspectorHovered = false;
+   }
+
+   // Right-click menu: an empty stretch adds, a clip acts on its notes, a note on itself.
+   void DrawContextMenu(Arrange::Lane& page)
+   {
+      State& s = S();
+      if (s.menuKind == 0)
+      {
+         if (MenuParts::Item(L("Add Note")))
+         {
+            s.paintClip = 0;
+            ArrangeEdit([&] { PaintNote(page, s.menuTick, s.menuPitch); });
+            if (s.paintClip != 0)
+            {
+               s.notes = { { s.paintClip, s.paintNote } };
+               s.clips.clear();
+            }
+         }
+         if (MenuParts::Item(L("Add Clip")))
+            ArrangeEdit([&] { NewClipAt(page, s.menuTick); });
+         return;
+      }
+      if (MenuParts::Item(L("Settings")))
+      {
+         s.settingsOpen = true;
+         s.genOpen = false;
+      }
+      if (MenuParts::Item(L("Duplicate"), "Shift+D"))
+         DuplicateSelection();
+      if (MenuParts::Item(L("Mute"), "0"))
+      {
+         if (s.menuKind == 2)
+            TransformNotes(page, [](std::vector<Arrange::Note>& notes) {
+               for (Arrange::Note& n : notes)
+                  n.mute = !n.mute;
+            });
+         else
+            ArrangeEdit([&] {
+               for (uint64_t id : s.clips)
+                  if (Arrange::Clip* c = Arrange::FindClip(gArrange, id))
+                     c->enabled = !c->enabled;
+               gArrange.revision++;
+            });
+      }
+      if (MenuParts::Item(L("Delete"), "Del"))
+         DeleteSelection();
+      if (s.menuKind == 2 && !s.notes.empty())
+      {
+         MenuParts::Separator();
+         using Note = Arrange::Note;
+         s.menuCompact = true;
+         NoteField(page, T("Velocity"), 1.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.vel; },
+                   [](Note& n, float v) { n.vel = (uint8_t)std::lround(v); });
+         NoteField(page, T("Release"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.relVel; },
+                   [](Note& n, float v) { n.relVel = (uint8_t)std::lround(v); });
+         NoteField(page, T("Chance"), 0.0f, 1.0f, "%.2f", [](const Note& n) { return n.chance; }, [](Note& n, float v) { n.chance = v; });
+         NoteField(page, T("Bend"), -12.0f, 12.0f, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
+                   [&](Note& n, float v) { SetExprAtStart(n.bend, v); });
+         NoteField(page, T("Pressure"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.pressure); },
+                   [&](Note& n, float v) { SetExprAtStart(n.pressure, v); });
+         NoteField(page, T("Timbre"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.timbre); },
+                   [&](Note& n, float v) { SetExprAtStart(n.timbre, v); });
+         s.menuCompact = false;
+      }
+      MenuParts::Separator();
+      if (MenuParts::SubMenu(L("Quantise")))
+      {
+         DrawQuantItems(page, true);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(L("Fx")))
+      {
+         DrawFunctionItems(page);
+         ImGui::EndMenu();
+      }
    }
 
    void DrawPanel()

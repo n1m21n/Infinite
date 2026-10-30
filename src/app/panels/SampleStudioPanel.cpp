@@ -17,6 +17,7 @@
 #include "app/graph/SampleStyles.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/ToolCursor.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/DialogParts.h"
@@ -1718,6 +1719,9 @@ namespace
             PlayFrom(mf); // a click above the wave: play from there
          else if (s.tool == 1)
             Split(GridFrame(mf)); // the scissors
+         else if (s.tool == 2)
+         {
+         } // the hand pans: nothing to select
          else if (!s.doc.Empty())
          {
             const int i = s.doc.IndexAt((int64_t)mf);
@@ -1896,10 +1900,12 @@ namespace
          DeleteSelected();
       else if (ImGui::IsKeyPressed(ImGuiKey_J, false))
          JoinSelected();
-      else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_A, false))
          s.tool = 0;
-      else if (ImGui::IsKeyPressed(ImGuiKey_C, false))
+      else if (ImGui::IsKeyPressed(ImGuiKey_B, false))
          s.tool = s.tool == 1 ? 0 : 1;
+      else if (ImGui::IsKeyPressed(ImGuiKey_H, false))
+         s.tool = s.tool == 2 ? 0 : 2;
       else if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
          io.KeyShift ? ViewAll() : ZoomToSelection();
       else if (ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd))
@@ -2267,6 +2273,22 @@ namespace
          const float x = g.XOf((double)GridFrame(g.FrameAt(ImGui::GetIO().MousePos.x)));
          for (float y = g.mn.y; y < g.mx.y; y += 6.0f)
             dl->AddLine(ImVec2(x, y), ImVec2(x, std::min(g.mx.y, y + 3.0f)), ImGui::GetColorU32(ImGuiCol_Text), 1.0f);
+      }
+
+      // The hand: drag the wave to pan; the pointer shows the active tool.
+      if (ImGui::IsMouseHoveringRect(g.mn, g.mx))
+      {
+         if (s.tool == 2)
+         {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) && g.mx.x > g.mn.x)
+            {
+               s.viewStart -= (double)ImGui::GetIO().MouseDelta.x / (double)(g.mx.x - g.mn.x) * s.viewLen;
+               ClampView();
+            }
+         }
+         else if (s.tool == 1)
+            ToolCursor::Badge(IconsInfinite::Scissors);
       }
 
       // Playhead: the transport's place in the edit as heard, mapped back onto the source.
@@ -2796,9 +2818,34 @@ namespace
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", T("Cut the sample by transients, grid or into equal parts"));
       FormParts::Inline(0.0f, in);
-      if (IconChip("##studioSplit", IconsInfinite::Scissors, s.tool == 1,
-                   s.tool == 1 ? T("Scissors: click the wave to cut there (Esc or C: back to select)") : T("Scissors: click to cut (C); double-click above the wave cuts with any tool")))
-         s.tool = s.tool == 1 ? 0 : 1;
+      {
+         // The tool dropdown, the same as the Timeline's and the Piano Roll's.
+         const bool nonDefault = s.tool != 0;
+         ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(34.0f, tok::tile));
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
+         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+         const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+         const char* tg = s.tool == 1 ? IconsInfinite::Scissors : s.tool == 2 ? IconsInfinite::Hand : IconsInfinite::Pointer;
+         ImDrawList* tdl = ImGui::GetWindowDrawList();
+         glyph::Draw(tdl, ImVec2(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, tg);
+         glyph::DrawChevronDown(tdl, ImVec2(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f), 8.0f, col, 1.3f);
+         if (clicked)
+            ImGui::OpenPopup("##studioToolMenu");
+         ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
+         if (MenuParts::BeginPopup("##studioToolMenu"))
+         {
+            if (MenuParts::Item(L("Select"), "A", s.tool == 0))
+               s.tool = 0;
+            if (MenuParts::Item(L("Cut"), "B", s.tool == 1))
+               s.tool = 1;
+            if (MenuParts::Item(L("Hand"), "H", s.tool == 2))
+               s.tool = 2;
+            MenuParts::EndPopup();
+         }
+      }
       FormParts::Inline(0.0f, in);
       if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
          s.snapGrid = !s.snapGrid;

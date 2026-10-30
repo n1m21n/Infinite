@@ -2,6 +2,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/ToolCursor.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -1065,6 +1066,18 @@ namespace app
       if (overPanel && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
       {
          gArrangeClaimedKeys = true;
+         gSessionClaimedKeys = false;
+      }
+      if (overPanel && !gArrangeHandDragging && gArrangeTool != ArrangeTool::Select && ImGui::IsWindowHovered())
+      {
+         static const char* const kGlyph[] = { nullptr, IconsInfinite::Trim, IconsInfinite::Range, IconsInfinite::Scissors,
+                                               IconsInfinite::Zoom, IconsInfinite::Hand, IconsInfinite::Pencil };
+         ToolCursor::Badge(kGlyph[(int)gArrangeTool]);
+      }
+      // One owner at a time: the panel under the pointer (Sample Studio, Piano Roll) takes the keys from the Timeline.
+      if ((gSampleStudioOpen && gSampleStudioClaimedKeys) || (gPianoRollOpen && gPianoRollClaimedKeys))
+      {
+         gArrangeClaimedKeys = false;
          gSessionClaimedKeys = false;
       }
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
