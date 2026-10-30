@@ -43,7 +43,7 @@ namespace
    constexpr double kTreble = 8.0;       // above C5, both again: contact well under a period
    constexpr double kStringZ = 4.0;      // string impedance, kg/s
    constexpr double kStrikePos = 0.125;  // hammer at 1/8 of the string
-   constexpr double kOutGain = 0.35;
+   constexpr double kOutGain = 0.7;
    constexpr double kTilt = 0.45; // dB per key: long bass strings put out far more velocity
 
    // Soundboard: a dense modal bank (DenseBody.h). A ribbed spruce plate has a
@@ -57,7 +57,11 @@ namespace
       s.rollHz = 1000.0f; s.rollDbPerOct = 4.0f; s.lowCutHz = 60.0f; s.stereo = 0.7f; s.seed = 88;
       return s;
    }
-   constexpr float kBoardGain = 0.72f; // body-1 level against dry
+   // A board's response is a smooth mean (its characteristic admittance) with
+   // the modes on top. Low down a mode is ~2 Hz wide and ~27 Hz from the next,
+   // so modes alone miss most sustained partials: the direct share is that mean.
+   constexpr float kBoardDirect = 0.65f;
+   constexpr float kBoardGain = 0.45f; // the modes' level against dry
 
    // Phase delays in samples at w radians per sample: the first-order allpass
    // (a + z^-1) / (1 + a z^-1) and the one-pole lowpass (1 - a) / (1 - a z^-1).
@@ -370,7 +374,7 @@ public:
          float ch[2];
          for (int c = 0; c < 2; c++)
          {
-            const float o = (1.0f - body) * dry + body * kBoardGain * board[c];
+            const float o = (1.0f - body * (1.0f - kBoardDirect)) * dry + body * kBoardGain * board[c];
             mDcOut[c] = DspMath::FlushDenormal(o - mDcIn[c] + mDcR * mDcOut[c]);
             mDcIn[c] = o;
             ch[c] = mDcOut[c] * volume;
