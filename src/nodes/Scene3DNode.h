@@ -65,6 +65,7 @@ public:
       bool zoomToMouse = true;
       bool orbitSelection = true;
       int shadowItem = 0;           // the light that casts; 0 = the first one
+      float fStop = 0.0f;           // 0 leaves the look's own aperture
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.

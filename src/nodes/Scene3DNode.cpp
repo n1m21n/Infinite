@@ -40,7 +40,7 @@ namespace
       f(s.snapMove); f(s.snapRot); f(s.snapScale); f(s.passAlpha);
       f(s.safe); f(s.thirds); f(s.center); f(s.golden); f(s.safeTitle); f(s.safeAction);
       f(s.orientation); f(s.pivot); f(s.cursor[0]); f(s.cursor[1]); f(s.cursor[2]);
-      f(s.zoomToMouse); f(s.orbitSelection); f(s.shadowItem);
+      f(s.zoomToMouse); f(s.orbitSelection); f(s.shadowItem); f(s.fStop);
    }
 
    void Normalize(float v[3])
@@ -691,6 +691,18 @@ void Scene3DNode::Sync(int frameId)
          ItemCenter(*target, c);
          mRender.focusDistance = std::max(0.05f, -(view.m[2] * c[0] + view.m[6] * c[1] + view.m[10] * c[2] + view.m[14]));
       }
+   }
+   // A real f-stop: the thin lens's blur circle as a share of the sensor height,
+   // in the units dofAperture counts (24 px across a 1080 frame).
+   Mat4 lensView;
+   float lensEye[3];
+   CameraNode* lens = nullptr;
+   if (settings.fStop > 0.0f && CameraView(lensView, lensEye, &lens) && lens != nullptr)
+   {
+      const float aspect = std::max(1.0f, std::max(1.0f, renderW) / std::max(1.0f, renderH));
+      const float mm = lens->sensorWidth / (2.0f * std::tan(lens->fov * 0.5f * 3.14159265f / 180.0f) * aspect);
+      const float focusMm = std::max(mRender.focusDistance * 1000.0f, mm * 1.01f);
+      mRender.dofAperture = mm * mm / (settings.fStop * (focusMm - mm)) / (lens->sensorWidth / aspect) * 45.0f;
    }
    stamp.push_back(mRender.focusDistance);
    stamp.insert(stamp.end(), marks.begin(), marks.end());

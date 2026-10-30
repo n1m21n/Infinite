@@ -2144,6 +2144,7 @@ namespace
       FieldWell::PushStyle();
       const bool changed = FieldWell::InputInt(FormParts::Id(label).c_str(), v);
       FieldWell::PopStyle();
+      Undoable("Edit in 3D View");
       return changed;
    }
 
@@ -2354,7 +2355,31 @@ namespace
          ImGui::EndChild();
    }
 
-   void DrawLightCard(LightNode* light)
+   void PointAtCursor(Scene3DNode* scene, Item* item, float availW)
+   {
+      if (!ActionButton::Draw(L("Point at 3D Cursor"), ImVec2(availW, 0)))
+         return;
+      PushUndoCheckpoint("Aim in 3D View");
+      scene->AimAt(*item, sSet->cursor);
+      scene->Commit();
+   }
+
+   // The light that casts: the one chosen, else the first that can.
+   const Item* ShadowCaster(Scene3DNode* scene)
+   {
+      if (const Item* chosen = scene->FindItem(sSet->shadowItem))
+         return chosen;
+      for (const Item& it : scene->Items())
+      {
+         GraphNode* gn = FindNodeByUid(it.uid);
+         auto* light = gn != nullptr ? dynamic_cast<LightNode*>(gn->node.get()) : nullptr;
+         if (light != nullptr && light->type != 1 && light->type != 3)
+            return &it;
+      }
+      return nullptr;
+   }
+
+   void DrawLightCard(Scene3DNode* scene, Item* item, LightNode* light, float availW)
    {
       if (!Card(T("Light")))
          return;
@@ -2365,8 +2390,6 @@ namespace
       ComboRow(T("Type"), &light->type, names, "Light type");
       ColorRow(T("Colour"), light->color, "Light colour");
       FloatRow(T("Strength"), &light->intensity, 0.0f, 20.0f, "%.2f");
-      if (light->type == 1 || light->type == 4 || light->type == 5)
-         FloatRow(T("Falloff"), &light->falloff, 0.0f, 3.0f, "%.2f");
       if (light->type == 4)
       {
          FloatRow(T("Cone"), &light->spotAngle, 1.0f, 89.0f, "%.1f");
@@ -2376,6 +2399,13 @@ namespace
       {
          FloatRow(T("Width"), &light->areaWidth, 0.05f, 20.0f, "%.2f");
          FloatRow(T("Height"), &light->areaHeight, 0.05f, 20.0f, "%.2f");
+      }
+      if (light->type != 1 && light->type != 3)
+      {
+         bool casts = ShadowCaster(scene) == item;
+         if (BoolRow(T("Casts shadow"), &casts, "Shadow light"))
+            sSet->shadowItem = casts ? item->id : 0;
+         PointAtCursor(scene, item, availW);
       }
    }
 
@@ -2410,8 +2440,7 @@ namespace
 
    float RenderAspect(Scene3DNode* scene)
    {
-      Render3DNode& look = scene->Look();
-      return std::max(1.0f, look.width) / std::max(1.0f, look.height);
+      return std::max(1.0f, scene->renderW) / std::max(1.0f, scene->renderH);
    }
 
    float FocalFromFov(float fov, float sensor, float aspect)
@@ -2422,6 +2451,22 @@ namespace
    float FovFromFocal(float mm, float sensor, float aspect)
    {
       return 2.0f * std::atan(sensor / (2.0f * mm * std::max(1.0f, aspect))) * 180.0f / kPi;
+   }
+
+   // Blender's focal length holds when the frame or sensor changes; only the view angle moves.
+   template <typename Change>
+   void KeepingLenses(Scene3DNode* scene, Change&& change)
+   {
+      std::vector<std::pair<CameraNode*, float>> lenses;
+      for (const Item& it : scene->Items())
+      {
+         GraphNode* gn = FindNodeByUid(it.uid);
+         if (auto* cam = gn != nullptr ? dynamic_cast<CameraNode*>(gn->node.get()) : nullptr)
+            lenses.push_back({ cam, FocalFromFov(cam->fov, cam->sensorWidth, RenderAspect(scene)) });
+      }
+      change();
+      for (auto& lens : lenses)
+         lens.first->fov = FovFromFocal(lens.second, lens.first->sensorWidth, RenderAspect(scene));
    }
 
    void DrawCameraCards(Scene3DNode* scene, Item* item, CameraNode* cam, float availW)
@@ -2458,7 +2503,13 @@ namespace
       }
       if (Card(T("Camera")))
       {
-         FloatRow(T("Sensor"), &cam->sensorWidth, 1.0f, 100.0f, "%.0f mm");
+         float sensor = cam->sensorWidth;
+         if (FloatRow(T("Sensor"), &sensor, 1.0f, 100.0f, "%.0f mm"))
+         {
+            const float mm = FocalFromFov(cam->fov, cam->sensorWidth, RenderAspect(scene));
+            cam->sensorWidth = sensor;
+            cam->fov = FovFromFocal(mm, sensor, RenderAspect(scene));
+         }
          if (scene->activeCamera != item->id)
          {
             if (ActionButton::Draw(L("Render through this camera"), ImVec2(availW, 0)))
@@ -2470,13 +2521,18 @@ namespace
          }
          else if (ActionButton::Draw(L("Move camera to view"), ImVec2(availW, 0)))
             CameraToView(scene);
+         PointAtCursor(scene, item, availW);
       }
       Render3DNode& look = scene->Look();
-      bool dof = look.dofAperture > 0.0f;
+      Scene3DNode::Settings& set = *sSet;
+      bool dof = set.fStop > 0.0f || look.dofAperture > 0.0f;
       const bool was = dof;
       const bool open = Card(T("Depth of Field"), &dof);
       if (dof != was)
-         look.dofAperture = dof ? 1.0f : 0.0f;
+      {
+         set.fStop = dof ? 2.8f : 0.0f;
+         look.dofAperture = 0.0f;
+      }
       if (open)
       {
          ImGui::BeginDisabled(!dof);
@@ -2499,9 +2555,9 @@ namespace
          ImGui::BeginDisabled(scene->focusItem != 0);
          FloatRow(T("Distance"), &look.focusDistance, 0.05f, 100.0f, "%.2f");
          ImGui::EndDisabled();
-         float stop = 2.8f / std::max(0.01f, look.dofAperture);
+         float stop = set.fStop > 0.0f ? set.fStop : 2.8f;
          if (FloatRow(T("F-Stop"), &stop, 0.7f, 128.0f, "%.1f"))
-            look.dofAperture = 2.8f / stop;
+            set.fStop = stop;
          ImGui::EndDisabled();
       }
    }
@@ -2531,6 +2587,28 @@ namespace
          field(T("Scale"), item->scale, 0.01f);
          FieldWell::PopStyle();
       }
+      if (Card(T("Visibility")))
+         if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
+            scene->Commit();
+      if (Card(T("Animation")))
+      {
+         Transport& transport = Transport::Instance();
+         float at = (float)transport.Seconds();
+         if (FloatRow(T("Time"), &at, 0.0f, std::max(1.0f, sSet->seconds), "%.2f s"))
+            transport.Seek(at);
+         SectionCard::RowLabel(T("Keys"));
+         ImGui::Text("%d", (int)item->keys.size());
+         if (ActionButton::Draw(L("Insert Key"), ImVec2(availW, 0)))
+            InsertKeys(scene);
+         ImGui::BeginDisabled(item->keys.empty());
+         if (ActionButton::Draw(L("Clear Keys"), ImVec2(availW, 0)))
+         {
+            PushUndoCheckpoint("Clear keys");
+            item->keys.clear();
+            scene->Commit();
+         }
+         ImGui::EndDisabled();
+      }
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry)
          DrawLitBy(scene, item);
@@ -2547,7 +2625,7 @@ namespace
       GraphNode* gn = item != nullptr ? FindNodeByUid(item->uid) : nullptr;
       INode* node = gn != nullptr ? gn->node.get() : nullptr;
       if (auto* light = dynamic_cast<LightNode*>(node))
-         DrawLightCard(light);
+         DrawLightCard(scene, item, light, availW);
       else if (auto* cam = dynamic_cast<CameraNode*>(node))
          DrawCameraCards(scene, item, cam, availW);
       else
@@ -2650,7 +2728,7 @@ namespace
          FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
          FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
          ImGui::EndDisabled();
-         ImGui::TextDisabled("%s", T("Cast by the first sun or directional light."));
+         ImGui::TextDisabled("%s", T("Cast by one light, any but a point. Pick it in the light's settings."));
       }
       if (Card(T("Ambient Occlusion")))
       {
@@ -2663,6 +2741,8 @@ namespace
          FloatRow(T("Threshold"), &look.bloomThreshold, 0.5f, 8.0f, "%.2f");
          FloatRow(T("Radius"), &look.bloomRadius, 0.0f, 1.0f, "%.2f");
       }
+      if (Card(T("Film")))
+         BoolRow(T("Transparent"), &sSet->transparent);
       if (Card(T("Color Management")))
       {
          ComboRow(T("View"), &look.tonemap, Render3DNode::TonemapNames());
@@ -2677,24 +2757,17 @@ namespace
       {
          int w = (int)scene->renderW, h = (int)scene->renderH;
          if (IntInputRow(T("Resolution X"), &w))
-            scene->renderW = (float)std::clamp(w, 16, 8192);
+            KeepingLenses(scene, [&] { scene->renderW = (float)std::clamp(w, 16, 8192); });
          if (IntInputRow(T("Y"), &h))
-            scene->renderH = (float)std::clamp(h, 16, 8192);
-         static const int kRates[] = { 24, 25, 30, 48, 50, 60, 120 };
-         char face[16];
-         snprintf(face, sizeof(face), "%d fps", (int)sSet->fps);
-         SectionCard::RowLabel(T("Frame rate"));
-         ImGui::SetNextItemWidth(sFieldW);
-         if (MenuParts::BeginCombo("##v3dfps", face))
-         {
-            for (int rate : kRates)
-            {
-               snprintf(face, sizeof(face), "%d fps", rate);
-               if (MenuParts::Choice(face, rate == (int)sSet->fps))
-                  sSet->fps = (float)rate;
-            }
-            MenuParts::EndCombo();
-         }
+            KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, 16, 8192); });
+         FloatRow(T("Resolution %"), &sSet->percent, 1.0f, 200.0f, "%.0f%%");
+         SectionCard::RowLabel(T("Final size"));
+         ImGui::Text("%d x %d", (int)(scene->renderW * sSet->percent / 100.0f), (int)(scene->renderH * sSet->percent / 100.0f));
+         static const std::vector<int> kRates = { 24, 25, 30, 48, 50, 60, 120 };
+         static const std::vector<std::string> kRateNames = { "24 fps", "25 fps", "30 fps", "48 fps", "50 fps", "60 fps", "120 fps" };
+         int rate = (int)(std::find(kRates.begin(), kRates.end(), (int)sSet->fps) - kRates.begin());
+         if (ComboRow(T("Frame rate"), &rate, kRateNames))
+            sSet->fps = (float)kRates[rate];
       }
       if (Card(T("Frame Range")))
       {
@@ -2706,17 +2779,21 @@ namespace
       }
       if (Card(T("Output")))
       {
-         SectionCard::RowLabel(T("Color depth"));
+         static const std::vector<std::string> kDepths = { "8", "16" };
          int depth = look.floatOutput ? 1 : 0;
-         ImGui::SetNextItemWidth(sFieldW);
-         if (MenuParts::BeginCombo("##v3ddepth", depth == 1 ? "16" : "8"))
+         if (ComboRow(T("Color depth"), &depth, kDepths))
+            look.floatOutput = depth == 1;
+         ComboRow(T("Pass"), &look.renderPass, Render3DNode::RenderPassNames());
+         ComboRow(T("Projection"), &look.projection, Render3DNode::ProjectionNames());
+         if (look.projection == 4)
          {
-            if (MenuParts::Choice("8", depth == 0)) look.floatOutput = false;
-            if (MenuParts::Choice("16", depth == 1)) look.floatOutput = true;
-            MenuParts::EndCombo();
+            FloatRow(T("Dome angle"), &look.domeAngle, 90.0f, 360.0f, "%.0f");
+            FloatRow(T("Dome tilt"), &look.domeTilt, 0.0f, 90.0f, "%.0f");
          }
       }
       ImGui::BeginDisabled(gOfflineRender.active || scene->activeCamera == 0);
+      if (ActionButton::Draw(L("Render Image"), ImVec2(availW, 0)))
+         RenderStill(scene);
       if (ActionButton::Draw(L("Render Animation"), ImVec2(availW, 0), ActionButton::Kind::Primary))
          StartRender(scene);
       ImGui::EndDisabled();
