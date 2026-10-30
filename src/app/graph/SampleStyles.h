@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -99,6 +101,9 @@ namespace SampleStyles
       std::string error;   // non-empty: unknown style
    };
    Compiled Compile(const Recipe& r);
+   // This machine's learned weights, "part|prog:3" -> weight (LearningLog). They lean a personal recipe's draws from the
+   // note bank; null, or a recipe that is not personal, draws uniformly as always. Any thread.
+   void SetPickWeights(std::shared_ptr<const std::map<std::string, double>> weights);
 
    // The part of a compiled graph that feeds `tap`: its nodes and wires, renumbered from 1, `newTap` its new index. A
    // style compiles every part of the arrangement (drums, chords, bass) and a take taps one, so the rest would only be
