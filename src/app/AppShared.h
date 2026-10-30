@@ -3653,6 +3653,7 @@ void DrawMetallicBody(GraphNode& gn, MetallicNode* n);
 void DrawFMBody(GraphNode& gn, FMNode* n);
 void DrawPartialsBody(GraphNode& gn, PartialsNode* n);
 void DrawStringBody(GraphNode& gn, StringNode* n);
+void DrawWindBody(GraphNode& gn, WindNode* n);
 
 void DrawWaveTerrainBody(GraphNode& gn, WaveTerrainNode* n);
 
