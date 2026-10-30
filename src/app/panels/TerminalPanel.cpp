@@ -12,6 +12,7 @@
 #include "platform/Platform.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -63,6 +64,7 @@ namespace
    ImFont* sFontBold = nullptr;
    bool sShowQuitWarning = false;
    std::function<void()> sQuitAction;
+   double sDrawSeconds = 0.0, sDrawFrames = 0.0, sDrawWorst = 0.0;  // self-test only
 
    ImU32 Ansi(int index)
    {
@@ -708,10 +710,21 @@ namespace
    }
 
    // INFINITE_TERMINALTEST: a real shell in the real panel. Echoes a marker with a resized grid, then exits 0 or 1.
+   // INFINITE_TERMINALTEST=flood goes on to run `yes` for a minute and reports the panel's frame cost.
    void RunSelfTest(Tab& tab, const term::Snapshot* snap)
    {
       static double sStart = ImGui::GetTime();
       static bool sSent = false;
+      static double sFloodStart = 0.0;
+      if (sFloodStart > 0.0)
+      {
+         if (ImGui::GetTime() - sFloodStart < 60.0)
+            return;
+         const double frames = std::max(1.0, sDrawFrames);
+         std::printf("[TerminalTest] flood frames=%.0f panel avg=%.3f ms worst=%.3f ms\n", frames, sDrawSeconds * 1000.0 / frames, sDrawWorst * 1000.0);
+         std::fflush(stdout);
+         std::_Exit(sDrawSeconds * 1000.0 / frames <= 1.0 ? 0 : 1);
+      }
       if (snap == nullptr)
          return;
       if (!sSent)
@@ -728,6 +741,13 @@ namespace
       {
          std::printf("[TerminalTest] %s cols=%d rows=%d\n", pass ? "PASS" : "FAIL", snap->cols, snap->rows);
          std::fflush(stdout);
+         if (pass && std::strcmp(std::getenv("INFINITE_TERMINALTEST"), "flood") == 0)
+         {
+            tab.session->SendBytes("yes\n");
+            sFloodStart = ImGui::GetTime();
+            sDrawSeconds = sDrawFrames = sDrawWorst = 0.0;
+            return;
+         }
          std::_Exit(pass ? 0 : 1);
       }
    }
@@ -885,7 +905,12 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    else
       in.b = 0.0f;
    PanelFrame::BeginCard("##terminalcontent", cardSize, in);
+   const auto drawStart = std::chrono::steady_clock::now();
    DrawPanel();
+   const double drawn = std::chrono::duration<double>(std::chrono::steady_clock::now() - drawStart).count();
+   sDrawSeconds += drawn;
+   sDrawFrames += 1.0;
+   sDrawWorst = std::max(sDrawWorst, drawn);
    PanelFrame::EndCard();
    if (!gripFirst)
       grip();
