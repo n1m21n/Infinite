@@ -1,5 +1,14 @@
 [
  {
+  "slug": "linux-daw-modular-audio-and-generative-visuals",
+  "title": "Linux DAW workflows: modular audio, VST3 hosting and live visuals",
+  "description": "Explore modular music production on Linux with Infinite: a Linux DAW to route synthesiser graphs, host Linux VST3 plugins, and patch audio into live visuals.",
+  "date": "2026-10-30",
+  "updated": "2026-10-30",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/linux-daw-modular-audio-and-generative-visuals.html"
+ },
+ {
   "slug": "generative-visuals-live-performance",
   "title": "Generative visuals in live performance: audio, nodes and GPU",
   "description": "Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.",

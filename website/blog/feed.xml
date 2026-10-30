@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Tue, 27 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Linux DAW workflows: modular audio, VST3 hosting and live visuals</title><link>https://infinitedevices.org/blog/linux-daw-modular-audio-and-generative-visuals.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/linux-daw-modular-audio-and-generative-visuals.html</guid>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Explore modular music production on Linux with Infinite: a Linux DAW to route synthesiser graphs, host Linux VST3 plugins, and patch audio into live visuals.</description></item>
   <item><title>Generative visuals in live performance: audio, nodes and GPU</title><link>https://infinitedevices.org/blog/generative-visuals-live-performance.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/generative-visuals-live-performance.html</guid>
     <pubDate>Tue, 27 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Build robust generative visuals for live performance with audio FFT analysis, GPU shaders, procedural geometry, and stable feedback loops in Infinite.</description></item>
   <item><title>Open source VJ software: real-time visual performance in Infinite</title><link>https://infinitedevices.org/blog/open-source-vj-software.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/open-source-vj-software.html</guid>
