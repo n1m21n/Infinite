@@ -1193,3 +1193,25 @@ characteristic means, head; bar 0.6:
   Seven synths / pads / plucks takes and two snares takes moved by at most 0.6% in one band with RMS unchanged to 4 digits:
   render noise, not this change.
 - `groove_bank.py`'s inc is unchanged; the 909 bank sits beside it.
+
+## 2026-10-30 Plan item 14: Wavetable knob direction, repeat test (`tools/universe/wavetable_repeat.py` -> `feel/wavetable_repeat.json`): MISS stands (79.3%), and render noise is ruled out
+
+The question: is 90% out of reach because a Wavetable move disagrees with itself from render to render? 100 one-knob pairs from
+`own_wavetable.jsonl` (seed 0, phase knobs left out) rendered again at C3 with both oscillators' start phase turned by 0.37 of
+a cycle, a change no listener hears. Every characteristic the stored move changes clearly (>= 0.3 spread) must move the same way.
+
+| | |
+|---|---|
+| clear axis moves | 143 |
+| flip direction | 8 (**5.6%**) |
+| still clear after the turn | 90.2% |
+| a take vs its own re-render, median change | 0.003 spread (3.4% of axes reach 0.3) |
+
+- Renders agree with themselves: the ceiling from repeat noise is about 94%, above the 90% bar. The guess in NEXT-SESSION
+  (about 20% disagreement, so 90% unreachable) is wrong.
+- The flips sit on knobs whose effect depends on other settings: a.table 1/3, a.warpMode 1/4, b.ampDecay 1/5, b.filterType 1/7,
+  b.unison 1/10, b.resonance 1/13, b.table 1/20, a.pan 1/1.
+- So the 79.3% is the model's limit: one direction per knob, while on Wavetable a move's direction depends on the table, warp and
+  filter type. The conditioned models already tried lost (HANDOFF, "Wavetable knob model that uses the other knobs"), and the
+  item 13 sound model reached only 0.23 R². The bar stays a MISS. Reaching it needs a model per table / warp mode, or more
+  data per region, not cleaner renders.

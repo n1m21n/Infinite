@@ -1,0 +1,212 @@
+{
+ "pairs": 100,
+ "rendered": 100,
+ "clear_axis_moves": 143,
+ "flips": 8,
+ "disagreement": 0.056,
+ "still_clear": 0.902,
+ "self_change_median_spread": 0.003,
+ "self_change_over_eff": 0.034,
+ "per_knob": {
+  "a.ampAttack": {
+   "clear": 1,
+   "flip": 0.0
+  },
+  "a.ampDecay": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.ampRelease": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.ampSustain": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.detune": {
+   "clear": 4,
+   "flip": 0.0
+  },
+  "a.filterAmount": {
+   "clear": 2,
+   "flip": 0.0
+  },
+  "a.filterAttack": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.filterDecay": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.filterRelease": {
+   "clear": 7,
+   "flip": 0.0
+  },
+  "a.filterSustain": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.filterType": {
+   "clear": 4,
+   "flip": 0.0
+  },
+  "a.fine": {
+   "clear": 1,
+   "flip": 0.0
+  },
+  "a.pan": {
+   "clear": 1,
+   "flip": 1.0
+  },
+  "a.pitchAmount": {
+   "clear": 10,
+   "flip": 0.0
+  },
+  "a.pitchAttack": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.pitchDecay": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.pitchRelease": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.pitchSustain": {
+   "clear": 2,
+   "flip": 0.0
+  },
+  "a.position": {
+   "clear": 1,
+   "flip": 0.0
+  },
+  "a.resonance": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.stereoWidth": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.table": {
+   "clear": 3,
+   "flip": 0.333
+  },
+  "a.unison": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.warpAmount": {
+   "clear": 0,
+   "flip": null
+  },
+  "a.warpMode": {
+   "clear": 4,
+   "flip": 0.25
+  },
+  "a.warpRatio": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.ampAttack": {
+   "clear": 1,
+   "flip": 0.0
+  },
+  "b.ampDecay": {
+   "clear": 5,
+   "flip": 0.2
+  },
+  "b.ampRelease": {
+   "clear": 5,
+   "flip": 0.0
+  },
+  "b.ampSustain": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.detune": {
+   "clear": 5,
+   "flip": 0.0
+  },
+  "b.filterAmount": {
+   "clear": 6,
+   "flip": 0.0
+  },
+  "b.filterDecay": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.filterRelease": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.filterSustain": {
+   "clear": 2,
+   "flip": 0.0
+  },
+  "b.filterType": {
+   "clear": 7,
+   "flip": 0.143
+  },
+  "b.pan": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.pitchAmount": {
+   "clear": 5,
+   "flip": 0.0
+  },
+  "b.pitchAttack": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.pitchDecay": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.pitchRelease": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.pitchSustain": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.resonance": {
+   "clear": 13,
+   "flip": 0.077
+  },
+  "b.stereoWidth": {
+   "clear": 0,
+   "flip": null
+  },
+  "b.table": {
+   "clear": 20,
+   "flip": 0.05
+  },
+  "b.unison": {
+   "clear": 10,
+   "flip": 0.1
+  },
+  "b.warpAmount": {
+   "clear": 10,
+   "flip": 0.0
+  },
+  "fmDepth": {
+   "clear": 0,
+   "flip": null
+  },
+  "fmMode": {
+   "clear": 0,
+   "flip": null
+  },
+  "mix": {
+   "clear": 14,
+   "flip": 0.0
+  }
+ }
+}
