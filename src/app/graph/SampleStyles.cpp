@@ -2139,9 +2139,9 @@ Compiled Compile(const Recipe& recipe)
          g.Connect(sq, sy, true);
          force["lane0_volume"] = { 'f', "0" };
          synthDrums.push_back({ 0, sy, -3.0f + fullLowDb });
-         if (dr.Uniform() < 0.45) // a 5-15 ms noise click on the front
+         if (dr.Uniform() < 0.45) // a 2-5 ms noise click on the front, 0.5-2.2 kHz: SubLab's attacks (item 16, click_measure.py)
          {
-            const int ck = noiseVoice(2, dr.Uniform(3000.0, 8000.0), 0.1, dr.Uniform(5.0, 15.0), 0.8);
+            const int ck = noiseVoice(2, dr.Uniform(500.0, 2200.0), 0.1, dr.Uniform(2.0, 5.0), 0.8);
             g.Connect(sq, ck, true);
             synthDrums.push_back({ 0, ck, -13.0f });
          }
@@ -2897,6 +2897,7 @@ Compiled Compile(const Recipe& recipe)
          }
          // The click: a separate short, high layer on each note's start (a sine pitched down from four octaves up in a
          // few ms, high-passed), as bass and kick designers layer their transients. It is what lets a bass cut through.
+         // High-pass and decay sit SubLab's attack samples (item 16): 1-5 ms, centroid ~470 Hz, not the 2 kHz it had.
          if (sp.Uniform() < (kind == 1 ? 0.35 : kind == 0 ? 0.5 : 0.6))
          {
             Params c;
@@ -2907,8 +2908,8 @@ Compiled Compile(const Recipe& recipe)
             Engine(c, 'a', 0, sp.Uniform() < 0.5 ? kSine : 0.333, 1, 0.0, 1, 1.0);
             c["a.pitchAmount"] = { 'f', num(sp.Uniform(30.0, 44.0)) };
             c["a.pitchDecay"] = { 'f', num(sp.Uniform(2.0, 6.0)) };
-            EngineFilter(c, 'a', 4, sp.Uniform(1200.0, 3000.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0); // HP12
-            EngineAmp(c, 'a', 0.0, sp.Uniform(6.0, 14.0), 0.0, 6.0);
+            EngineFilter(c, 'a', 4, sp.Uniform(250.0, 700.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0); // HP12
+            EngineAmp(c, 'a', 0.0, sp.Uniform(3.0, 8.0), 0.0, 6.0);
             const int ck = g.Add("Wavetable", sp.Range(1 << 30), c);
             g.Connect(sq, ck, true);
             chans.push_back({ ck, (float)sp.Uniform(-12.0, -7.0) });

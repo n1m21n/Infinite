@@ -1242,3 +1242,15 @@ synth loops (2,041). The wasm `part_vs_library.py` gives the same library median
 - `spectral_gates.json` (local and shippable) was refitted on the octave-3 renders: held-out FRR 0.80%, catch 95.2%, same as on
   the octave-2 renders. The old file is kept in the session scratchpad only.
 - Pads gate row unchanged and pads renders unchanged, so pads stay identical.
+
+## Item 16: bass and kick click transients (2026-10-30), MET
+Reference: SubLab's 77 plain attack samples (its "kick attack" files are whole kick bodies, 169 ms, left out). Measured by
+`click_measure.py` (peak to -40 dB, centroid over 40 ms): 1-5 ms, centroid 235 / 473 / 2242 Hz (10th / median / 90th).
+Our layers rendered alone (`click_render.py`, C1):
+| layer | before | after |
+|---|---|---|
+| bass click (Wavetable, HP12) | HP 1.2-3 kHz, decay 6-14 ms: 3.5 ms, centroid 2080 Hz | HP 250-700 Hz, decay 3-8 ms: 4 ms, centroid 595 Hz |
+| kick noise click (Analog BP) | 3-8 kHz, 5-15 ms: 9 ms, centroid 5040 Hz | 0.5-2.2 kHz, 2-5 ms: 2 ms, centroid 1280 Hz |
+Both now sit inside SubLab's 10th-90th band on length and centroid. App gate (40 takes): rejects per part unchanged; bass
+whole-mix centroid and low share unchanged (the click is 7-13 dB under the body). The SubLab WAVs are not shipped; only
+ranges were fitted.
