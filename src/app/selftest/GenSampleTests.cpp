@@ -22,6 +22,7 @@
 #include "app/graph/LearningLog.h"
 #include "app/graph/OfflineGraph.h"
 #include "audio/AudioFileWriter.h"
+#include "app/graph/RoleCritic.h"
 #include "app/graph/SampleStyles.h"
 #include "app/graph/UserStyle.h"
 #include "core/AudioSummary.h"
@@ -116,8 +117,12 @@ bool RunGenSampleBatch(const std::string& dir)
             rec.style = SampleStyles::At(i).id;
             rec.part = (SampleStyles::Part)pi;
             rec.bars = 2;
-            bool ok = false;
-            for (int attempt = 0; attempt <= 3 && !ok; attempt++)
+            // The node's rule: redraw what the critic does not settle on, keep the best heard.
+            bool ok = false, settled = false;
+            float bestP = -1.0f;
+            uint32_t landed = seed;
+            SampleStyles::Compiled kept;
+            for (int attempt = 0; attempt <= 2 && !settled; attempt++)
             {
                rec.seed = seed + (uint32_t)attempt * 7919u;
                const SampleStyles::Compiled c = SampleStyles::Compile(rec);
@@ -136,6 +141,11 @@ bool RunGenSampleBatch(const std::string& dir)
                   continue;
                if (!GenerateSamplesNode::Master((int)rec.part, left.data() + pre, right.data() + pre, frames, l, r))
                   continue;
+               float heard = -1.0f;
+               settled = RoleCritic::Accept(SampleStyles::PartName(rec.part), l.data(), r.data(), frames, kRate, &heard);
+               if (!settled && heard <= bestP)
+                  continue;
+               bestP = heard;
                std::vector<float> inter((size_t)frames * 2);
                for (int f = 0; f < frames; f++)
                {
@@ -145,10 +155,17 @@ bool RunGenSampleBatch(const std::string& dir)
                const std::string name = rec.style + "-" + SampleStyles::PartName(rec.part) + "-" + std::to_string(seed);
                if (!AudioRecordings::WriteWav(dir + "/" + name + ".wav", inter.data(), frames, kRate, 2))
                   continue;
-               fprintf(index, "%s{\"file\":\"%s\",\"style\":\"%s\",\"part\":\"%s\",\"seed\":%u,\"root\":%d,\"scale\":\"%s\",\"bpm\":%.2f,\"label\":\"%s\"}\n",
-                       made > 0 ? "," : "", name.c_str(), rec.style.c_str(), SampleStyles::PartName(rec.part), rec.seed, c.root,
-                       MusicTime::ScaleTable(c.scale).name, c.bpm, GenerateSamplesNode::Label(rec, c.root, c.scale).c_str());
+               landed = rec.seed;
+               kept = c;
                ok = true;
+            }
+            if (ok)
+            {
+               rec.seed = landed;
+               const std::string name = rec.style + "-" + SampleStyles::PartName(rec.part) + "-" + std::to_string(seed);
+               fprintf(index, "%s{\"file\":\"%s\",\"style\":\"%s\",\"part\":\"%s\",\"seed\":%u,\"root\":%d,\"scale\":\"%s\",\"bpm\":%.2f,\"label\":\"%s\"}\n",
+                       made > 0 ? "," : "", name.c_str(), rec.style.c_str(), SampleStyles::PartName(rec.part), rec.seed, kept.root,
+                       MusicTime::ScaleTable(kept.scale).name, kept.bpm, GenerateSamplesNode::Label(rec, kept.root, kept.scale).c_str());
             }
             made += ok ? 1 : 0;
             failed += ok ? 0 : 1;
@@ -313,6 +330,75 @@ bool RunGenSampleDrums(const std::string& file, int takes)
    return made > 0;
 }
 
+// The closed loop on real takes: renders a take costs, and the role critic's score before and after it.
+bool RunGenSampleLoop(int takes)
+{
+   struct Out { bool ok = false, settled = false; float p = -1.0f; };
+   auto run = [](SampleStyles::Recipe rec) {
+      Out o;
+      const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+      const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
+      const int pre = bar * GenerateSamplesNode::PrerollBars(rec.bars);
+      const int frames = bar * rec.bars;
+      Patch::Data data;
+      std::string err;
+      OfflineGraph g;
+      if (!c.error.empty() || !Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+         return o;
+      for (const OfflineGraph::Motion& m : c.motions)
+         g.AddMotion(m);
+      std::vector<float> left, right, l, r;
+      if (!g.Prepare(kRate) || !g.Render(pre + frames, left, right))
+         return o;
+      if (!GenerateSamplesNode::Master((int)rec.part, left.data() + pre, right.data() + pre, frames, l, r, false))
+         return o;
+      o.ok = true;
+      o.settled = RoleCritic::Accept(SampleStyles::PartName(rec.part), l.data(), r.data(), frames, kRate, &o.p);
+      return o;
+   };
+   for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
+   {
+      int n = 0, renders = 0, judged = 0;
+      double before = 0.0, after = 0.0;
+      for (int i = 0; i < takes; i++)
+      {
+         SampleStyles::Recipe rec;
+         const uint32_t seed = 5000u + (uint32_t)i * 37u + (uint32_t)pi * 100003u;
+         rec.style = SampleStyles::At((int)((seed * 2654435761u >> 8) % (uint32_t)SampleStyles::Count())).id;
+         rec.part = (SampleStyles::Part)pi;
+         rec.bars = 2;
+         float first = -1.0f, best = -1.0f;
+         bool any = false;
+         for (int attempt = 0; attempt < 3; attempt++)
+         {
+            rec.seed = seed + (uint32_t)attempt * 7919u;
+            const Out o = run(rec);
+            renders++;
+            if (attempt == 0)
+               first = o.p;
+            any = any || o.ok;
+            best = std::max(best, o.p);
+            if (o.settled)
+            {
+               best = o.p;
+               break;
+            }
+         }
+         n += any;
+         if (first >= 0.0f && best >= 0.0f)
+         {
+            judged++;
+            before += first;
+            after += best;
+         }
+      }
+      printf("GENLOOP %-10s n %d renders %.2f P %.3f -> %.3f\n", SampleStyles::PartName((SampleStyles::Part)pi), n, (double)renders / takes, judged ? before / judged : 0.0,
+             judged ? after / judged : 0.0);
+      fflush(stdout);
+   }
+   return true;
+}
+
 bool RunGenSampleSpectrum(const std::string& file, int takes)
 {
    FILE* out = fopen(file.c_str(), "w");
@@ -407,6 +493,54 @@ bool RunGenSampleTest()
    const std::string only = arg == "1" || arg == "full" ? "" : arg;
    const uint32_t seeds = arg == "1" ? 1u : 3u;
    auto runs = [&](const char* section) { return only.empty() || only == section; };
+   if (runs("picks"))
+   {
+      // A full mix's motif plays a real instrument (a card with no motif has none to play), and a taste profile leans a personal take's progressions, nobody else's.
+      int real = 0;
+      for (uint32_t s = 1; s <= 12; s++)
+      {
+         SampleStyles::Recipe rec;
+         rec.style = SampleStyles::At((int)(s % (uint32_t)SampleStyles::Count())).id;
+         rec.seed = s;
+         const std::string patch = SampleStyles::Compile(rec).patch;
+         real += patch.find("Piano") != std::string::npos || patch.find("String") != std::string::npos || patch.find("Wind") != std::string::npos;
+      }
+      auto picked = [](bool personal, const std::string& pick) {
+         int n = 0;
+         for (uint32_t s = 1; s <= 200; s++)
+         {
+            SampleStyles::Recipe rec;
+            rec.part = SampleStyles::Part::Keys;
+            rec.seed = s;
+            rec.personal = personal;
+            const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+            n += (int)std::count(c.picks.begin(), c.picks.end(), pick);
+         }
+         return n;
+      };
+      SampleStyles::SetPickWeights(nullptr);
+      std::string pick;
+      {
+         SampleStyles::Recipe rec;
+         rec.part = SampleStyles::Part::Keys;
+         rec.seed = 1;
+         for (const std::string& p : SampleStyles::Compile(rec).picks)
+            if (p.rfind("prog:", 0) == 0)
+               pick = p;
+      }
+      const int plain = picked(false, pick), base = picked(true, pick);
+      auto lean = std::make_shared<std::map<std::string, double>>();
+      (*lean)["keys|" + pick] = 8.0;
+      SampleStyles::SetPickWeights(lean);
+      const int leaned = picked(true, pick), other = picked(false, pick);
+      SampleStyles::SetPickWeights(nullptr);
+      printf("GENSAMPLE picks real %d/12 %s plain %d personal %d leaned %d other %d\n", real, pick.c_str(), plain, base, leaned, other);
+      if (real < 8 || pick.empty() || leaned <= base || other != plain)
+      {
+         printf("GENSAMPLE picks FAIL\n");
+         return false;
+      }
+   }
    if (const char* dump = getenv("INFINITE_GENSAMPLEPATCH")) // "<style>:<part>:<seed>": print the compiled patch and stop
    {
       SampleStyles::Recipe rec;
