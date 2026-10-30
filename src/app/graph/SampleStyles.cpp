@@ -1427,6 +1427,10 @@ Compiled Compile(const Recipe& recipe)
    const int root = out.root;
    const Part part = recipe.part;
    const bool full = part == Part::Full;
+   // Each of kick and bass alone matches the library's loops of its part, but summed in the full mix they put 39% of
+   // the power at 40-80 Hz against 19% in the library's electronic full mixes, and the loudness match then turns the
+   // mids down to 0.34x (mix_bands.py). In the full mix only, both sit lower; no draw moves.
+   const float fullLowDb = full ? -6.0f : 0.0f;
    // Every layer is built whatever the part, so the random stream stays the
    // same and a part is that layer of the seed's full mix; a layer the part
    // leaves out goes no further than the mixer (the offline graph renders
@@ -1932,7 +1936,7 @@ Compiled Compile(const Recipe& recipe)
       {
          const std::string lane = "lane" + std::to_string(i);
          force[lane + "_path"] = { 's', DrumSequencerNode::KitDir() + "/" + kKitFiles[i] + ".wav" };
-         force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : part == Part::Percussion && i == 5 ? 0.6 : 0.85) };
+         force[lane + "_volume"] = { 'f', Num(i == 2 ? 0.55 : part == Part::Percussion && i == 5 ? 0.6 : i == 0 ? 0.85 * std::pow(10.0, fullLowDb / 20.0) : 0.85) };
          const std::string pat = lanes[i];
          const std::string cardPat = i == 2 && !hatLane.empty() ? std::string(cardHats) : pat;
          const bool ghostLane = i == 1 || i == 2 || i == 3 || i == 4;
@@ -2073,7 +2077,7 @@ Compiled Compile(const Recipe& recipe)
          const int sy = g.Add("Wavetable", dr.Range(1 << 30), k);
          g.Connect(sq, sy, true);
          force["lane0_volume"] = { 'f', "0" };
-         synthDrums.push_back({ 0, sy, -3.0f });
+         synthDrums.push_back({ 0, sy, -3.0f + fullLowDb });
          if (dr.Uniform() < 0.45) // a 5-15 ms noise click on the front
          {
             const int ck = noiseVoice(2, dr.Uniform(3000.0, 8000.0), 0.1, dr.Uniform(5.0, 15.0), 0.8);
@@ -2354,7 +2358,7 @@ Compiled Compile(const Recipe& recipe)
          if (full)
          {
             synths.push_back(sy);
-            chans.push_back({ end, -4.0f });
+            chans.push_back({ end, -4.0f + fullLowDb });
          }
       }
    }

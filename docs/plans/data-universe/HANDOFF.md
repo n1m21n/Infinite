@@ -887,3 +887,35 @@ Same held-out splits as chord_eval2 (test 20% never seen), 5 seeds.
   lead; cross-entropy is clearly lower, so its probabilities are better calibrated, which matters for item 3 (sampling with temperature for variety).
 - Only next chord is scored here. Key, register, density per role and B5 variety need the generator to sample from the
   transformer (item 3) before it can replace the n-gram.
+
+## 2026-10-30 Plan item 1: whole-mix balance at rest (`mix_bands.py`)
+The dots are gone, so every take renders at mood and energy 0; the mood quadrant check (`mood_check.py`) no longer applies.
+What was left of item 1 is the balance of the whole mix. `tools/universe/mix_bands.py` renders all 34 styles x 2 seeds
+(Full part) and measures power share per band against two references: 150 DEAM songs (mostly rock, pop, classical) and
+212 electronic full mixes from the sample library (pack song starters, construction-kit demos, music-kit full loops,
+measured from the audio on the WD Black drive; cached at `~/Infinite/training-data/eval/lib_fullmix_bands.json`).
+
+Each part alone matched its library loops before the change (`part_vs_library.py`: kicks low share 0.993 vs 0.986, bass
+0.927 vs 0.935). The fault was the sum: kick and bass together held 42% of the full mix at 40-80 Hz, and the loudness match
+pushed the mids down. Fix (`SampleStyles.cpp`, `fullLowDb`): in the Full part only, the kick (sample lane and synth kick)
+and the bass sit 6 dB lower. No draw moves.
+
+| Band | Before | -4 dB | **-6 dB (shipped)** | Library full mixes | DEAM |
+|---|---|---|---|---|---|
+| sub < 40 | 0.6% | 0.5% | 0.4% | 0.2% | 0.2% |
+| 40-80 | 41.9% | 31.8% | **26.4%** | 21.6% | 7.8% |
+| 80-250 | 26.7% | 26.2% | 25.0% | 30.9% | 33.0% |
+| 250-500 | 6.4% | 7.4% | 7.9% | 10.2% | 15.4% |
+| 500-2k | 4.3% | 5.8% | 6.7% | 9.5% | 20.4% |
+| 2k-6k | 2.5% | 4.4% | 5.5% | 0.8% | 3.3% |
+| 6k+ | 1.9% | 3.4% | 4.7% | 0.0% | 0.4% |
+
+- 40-250 Hz together: 51.4% vs the library's 52.5%. The low end now matches; the low mids are still at 0.7-0.8x.
+- New gap, now visible: the top end (2 kHz and up) is too loud, 10% of the power against ~1% in the library mixes and 3.7%
+  in DEAM. Hats and cymbals are the likely cause; it is the next balance step.
+- The 30 Hz master high-pass measures as intended: sub-40 Hz is 0.4%.
+- Gates: pads 102/102 identical, and the bass, kicks and synths parts are 102/102 identical too (`wasm_pad_dump.js`, new
+  in `tools/universe/`, with `--cmp`). Full takes: 102 render, 0 clipped, 0 silent with redraws on. Pinned (no redraw),
+  style 28 seed 9002 fails Master (silent or non-finite on the first draw); it failed the same way before this change and
+  is still open.
+- The wasm build needs `EMSDK_PYTHON=/opt/homebrew/bin/python3.12` (emscripten refuses the system Python 3.9).
