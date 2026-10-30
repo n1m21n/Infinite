@@ -16,7 +16,7 @@ class AudioPianoNode;
 // fitted so the partials stretch sharp like a stiff string (Van Duyne & Smith
 // 1994; Rauhala & Valimaki 2006) and a Thiran allpass for the fraction of a
 // sample, so the treble keeps its sustain. Detuned unisons give the beating
-// and two-stage decay; a soundboard of resonators colours the sum. Dampers
+// and two-stage decay; a dense modal soundboard (DenseBody.h) colours the sum, wide in stereo. Dampers
 // stop a note on note-off, except in the top octave and a half, which has
 // none. Note-driven, 16 voices.
 class PianoNode : public INode, public IAudioSource

@@ -44,3 +44,8 @@ Not fixing: EQ shelf residual, rate-dependent releases, Transient Shaper max boo
 
 ## Order
 3, 4, 5, 6, 8 are small and independent: one commit each. Then 1 (biggest audible win), 2, 7, 9.
+
+## Done
+| # | Result |
+|---|---|
+| 1 | `src/audio/dsp/DenseBody.h`, used by String (96-200 modes per type) and Piano (224). String body types against box, rms dB of spectrum difference at body 0.5: 1.7-4.1 before, 5.9-8.3 after. Stereo with centred bass, left/right never anti-phase. STRINGTEST and factory presets pass |

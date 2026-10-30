@@ -11,6 +11,7 @@
 #include "audio/DspMath.h"
 #include "audio/NoteEventQueue.h"
 #include "audio/ParamMailbox.h"
+#include "audio/dsp/DenseBody.h"
 
 namespace
 {
@@ -58,19 +59,16 @@ namespace
       return 0.5 * (lo + hi);
    }
 
-   // The body: a bank of constant-peak bandpass modes, one table per body
-   // type. Box is the low air and plate modes of a small acoustic box
-   // (Helmholtz resonance, then plate modes). Guitar is fitted from 101
-   // notes of a classical guitar (string_body_fit.py: the dB average of every
-   // note's spectrum keeps what the notes share, the body; r 0.68 with that
-   // curve, box 0.42). Harp from 43 concert-harp notes (r 0.80), violin and
-   // cello from 21 and 19 section pizzicato notes (r 0.86, 0.75; box about 0).
-   struct BodyMode
-   {
-      float hz, q, gain;
-   };
-   constexpr int kBodyModeCount = 10;
-   constexpr BodyMode kBodyModes[StringNode::kBodyTypeCount][kBodyModeCount] = {
+   // The body: a dense bank of modes (DenseBody.h), one design per body type.
+   // Its spectral envelope is a fitted curve per type: box is the low air and
+   // plate modes of a small acoustic box (Helmholtz resonance, then plate
+   // modes). Guitar is fitted from 101 notes of a classical guitar
+   // (string_body_fit.py: the dB average of every note's spectrum keeps what
+   // the notes share, the body; r 0.68 with that curve, box 0.42). Harp from
+   // 43 concert-harp notes (r 0.80), violin and cello from 21 and 19 section
+   // pizzicato notes (r 0.86, 0.75; box about 0).
+   constexpr int kBodyCurveCount = 10;
+   constexpr DenseBody::Mode kBodyCurve[StringNode::kBodyTypeCount][kBodyCurveCount] = {
       {
          { 98.0f, 14.0f, 1.00f },  { 204.0f, 22.0f, 0.85f }, { 283.0f, 26.0f, 0.60f }, { 399.0f, 28.0f, 0.55f },
          { 552.0f, 30.0f, 0.42f }, { 728.0f, 30.0f, 0.35f }, { 1020.0f, 26.0f, 0.30f }, { 1430.0f, 22.0f, 0.26f },
@@ -97,10 +95,58 @@ namespace
          { 1810.2f, 2.0f, 0.31f }, { 2215.8f, 2.0f, 0.36f },
       },
    };
-   // Makes the body path roughly as loud as the dry string on a plucked note;
-   // per table, so every body type sits at the box's level (mean power over
-   // 80 Hz - 5 kHz).
-   constexpr float kBodyGain[StringNode::kBodyTypeCount] = { 5.5f, 5.5f * 0.917f, 5.5f * 0.336f, 5.5f * 0.536f, 5.5f * 0.281f };
+   // Signature modes (Fletcher & Rossing ch. 9-10; Woodhouse 2014): the guitar's
+   // air mode A0 and top-plate T(1,1) pair, the violin's A0 and B1-/B1+ corpus
+   // pair, the cello's the same an octave and a half down; the harp's
+   // soundboard and box peaks from its fit; the box's Helmholtz and first plate
+   // mode.
+   constexpr DenseBody::Mode kSigBox[] = { { 98.0f, 14.0f, 1.0f }, { 204.0f, 22.0f, 0.7f } };
+   constexpr DenseBody::Mode kSigGuitar[] = { { 99.0f, 18.0f, 1.0f }, { 199.0f, 32.0f, 0.75f }, { 392.0f, 30.0f, 0.4f } };
+   constexpr DenseBody::Mode kSigHarp[] = { { 158.0f, 18.0f, 0.6f }, { 211.0f, 24.0f, 1.0f }, { 325.0f, 24.0f, 0.8f } };
+   constexpr DenseBody::Mode kSigViolin[] = { { 281.0f, 15.0f, 0.8f }, { 445.0f, 35.0f, 1.0f }, { 535.0f, 35.0f, 0.9f } };
+   constexpr DenseBody::Mode kSigCello[] = { { 105.0f, 14.0f, 0.7f }, { 199.0f, 30.0f, 1.0f }, { 320.0f, 25.0f, 0.7f } };
+
+   // Per type: loss factor (eta 0.04 a short box thud .. 0.012 the harp's long
+   // soundboard ring), mode density and range, the violin family's bridge hill
+   // (violin ~2.5 kHz, cello lower; Jansson 1997), the top roll-off and low cut.
+   DenseBody::Spec BodySpec(int type)
+   {
+      DenseBody::Spec s;
+      s.envelope = kBodyCurve[type];
+      s.envelopeCount = kBodyCurveCount;
+      s.seed = 101 + (uint32_t)type;
+      switch (type)
+      {
+         case 0: // box
+            s.signature = kSigBox; s.signatureCount = 2;
+            s.loHz = 90.0f; s.hiHz = 6000.0f; s.modes = 96; s.eta = 0.04f; s.rollHz = 3500.0f; s.stereo = 0.4f;
+            break;
+         case 1: // guitar
+            s.signature = kSigGuitar; s.signatureCount = 3;
+            s.loHz = 80.0f; s.hiHz = 6000.0f; s.modes = 160; s.eta = 0.025f; s.rollHz = 3000.0f; s.stereo = 0.5f;
+            break;
+         case 2: // harp
+            s.signature = kSigHarp; s.signatureCount = 3;
+            s.loHz = 80.0f; s.hiHz = 5000.0f; s.modes = 160; s.eta = 0.012f; s.rollHz = 1500.0f; s.stereo = 0.6f;
+            break;
+         case 3: // violin
+            s.signature = kSigViolin; s.signatureCount = 3;
+            s.loHz = 200.0f; s.hiHz = 9000.0f; s.modes = 200; s.density = 0.6f; s.eta = 0.03f;
+            s.hillHz = 2500.0f; s.hillDb = 9.0f; s.hillOct = 0.6f; s.rollHz = 4500.0f; s.rollDbPerOct = 12.0f;
+            s.lowCutHz = 240.0f; s.stereo = 0.5f;
+            break;
+         default: // cello
+            s.signature = kSigCello; s.signatureCount = 3;
+            s.loHz = 65.0f; s.hiHz = 7000.0f; s.modes = 200; s.density = 0.6f; s.eta = 0.025f;
+            s.hillHz = 1400.0f; s.hillDb = 6.0f; s.hillOct = 0.7f; s.rollHz = 3000.0f; s.rollDbPerOct = 12.0f;
+            s.lowCutHz = 70.0f; s.stereo = 0.5f;
+            break;
+      }
+      return s;
+   }
+   // Makes the body path roughly as loud as the dry string on a plucked note,
+   // per type (measured: rms of a body-1 pluck against the dry one).
+   constexpr float kBodyGain[StringNode::kBodyTypeCount] = { 0.43f, 0.45f, 0.33f, 0.44f, 0.41f };
 
    struct StringVoice
    {
@@ -181,6 +227,7 @@ public:
       mBodyTypeSet = -1;
       SetBodyType(mBodyType.load(std::memory_order_relaxed));
       mDc.SetSampleRate(mSampleRate);
+      mDcR.SetSampleRate(mSampleRate);
       Reset();
    }
 
@@ -188,9 +235,9 @@ public:
    {
       for (auto& v : mVoices)
          v.active = false;
-      for (auto& bq : mBody)
-         bq.Reset();
+      mBody.Reset();
       mDc.Reset();
+      mDcR.Reset();
       mNextAge = 1;
    }
 
@@ -220,15 +267,14 @@ public:
       mBodyType.store(std::clamp(n.bodyType, 0, (int)StringNode::kBodyTypeCount - 1), std::memory_order_relaxed);
    }
 
-   // Audio thread: retune the body bank when the type changes. The filters
+   // Audio thread: redesign the body bank when the type changes. The modes
    // keep their state, so a switch while ringing does not click to silence.
    void SetBodyType(int type)
    {
       if (type == mBodyTypeSet)
          return;
       mBodyTypeSet = type;
-      for (int m = 0; m < kBodyModeCount; m++)
-         mBody[m].SetBandpass(std::min((double)kBodyModes[type][m].hz, 0.45 * mSampleRate), kBodyModes[type][m].q, mSampleRate);
+      mBody.Design(BodySpec(type), mSampleRate);
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -242,7 +288,6 @@ public:
             std::fill_n(output.channels[ch], output.numFrames, 0.0f);
 
       SetBodyType(mBodyType.load(std::memory_order_relaxed));
-      const BodyMode* modes = kBodyModes[mBodyTypeSet];
       const float bodyGain = kBodyGain[mBodyTypeSet];
 
       NoteEvent evts[64];
@@ -284,22 +329,20 @@ public:
             dry += Render(v, bowStep, bowLift);
          }
 
-         float wet = 0.0f;
-         for (int m = 0; m < kBodyModeCount; m++)
-            wet += modes[m].gain * mBody[m].Process(dry);
-         float y = dry + (wet * bodyGain - dry) * body;
-         y = mDc.Process(y) * volume;
-         if (!std::isfinite(y))
+         float wetL = 0.0f, wetR = 0.0f;
+         mBody.Process(dry, wetL, wetR);
+         float y = mDc.Process(dry + (wetL * bodyGain - dry) * body) * volume;
+         float yR = mDcR.Process(dry + (wetR * bodyGain - dry) * body) * volume;
+         if (!std::isfinite(y) || !std::isfinite(yR))
          {
-            y = 0.0f;
-            for (auto& bq : mBody)
-               bq.Reset();
+            y = yR = 0.0f;
+            mBody.Reset();
             mDc.Reset();
+            mDcR.Reset();
          }
-         y = std::clamp(y, -4.0f, 4.0f);
-         outL[i] = y;
+         outL[i] = std::clamp(y, -4.0f, 4.0f);
          if (outR)
-            outR[i] = y;
+            outR[i] = std::clamp(yR, -4.0f, 4.0f);
       }
       while (nextEvt < numEvts)
          HandleEvent(evts[nextEvt++]);
@@ -540,8 +583,8 @@ private:
    double mSampleRate = 44100.0;
    StringVoice mVoices[kMaxVoices];
    uint64_t mNextAge = 1;
-   DspMath::Biquad mBody[kBodyModeCount];
-   DspMath::DcBlocker mDc;
+   DenseBody::Bank mBody;
+   DspMath::DcBlocker mDc, mDcR;
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;

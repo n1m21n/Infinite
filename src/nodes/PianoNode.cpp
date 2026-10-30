@@ -11,6 +11,7 @@
 #include "audio/DspMath.h"
 #include "audio/NoteEventQueue.h"
 #include "audio/ParamMailbox.h"
+#include "audio/dsp/DenseBody.h"
 
 namespace
 {
@@ -45,10 +46,18 @@ namespace
    constexpr double kOutGain = 0.35;
    constexpr double kTilt = 0.45; // dB per key: long bass strings put out far more velocity
 
-   // Soundboard: fixed resonators, the low ones broad.
-   constexpr int kBodyModes = 12;
-   constexpr double kBodyF[kBodyModes] = { 95, 140, 210, 290, 380, 520, 700, 950, 1300, 1800, 2600, 3500 };
-   constexpr double kBodyQ[kBodyModes] = { 4, 4, 5, 5, 6, 6, 6, 7, 7, 8, 8, 8 };
+   // Soundboard: a dense modal bank (DenseBody.h). A ribbed spruce plate has a
+   // nearly constant modal density and a loss factor around 0.02 (Suzuki 1986;
+   // Ege, Boutillon & Rebillat 2013), so T60 falls as 1/f. No signature modes:
+   // a board has no air mode to be known by.
+   DenseBody::Spec BoardSpec()
+   {
+      DenseBody::Spec s;
+      s.loHz = 45.0f; s.hiHz = 6000.0f; s.modes = 224; s.density = 0.0f; s.eta = 0.02f;
+      s.rollHz = 1000.0f; s.rollDbPerOct = 4.0f; s.lowCutHz = 60.0f; s.stereo = 0.7f; s.seed = 88;
+      return s;
+   }
+   constexpr float kBoardGain = 0.72f; // body-1 level against dry
 
    // Phase delays in samples at w radians per sample: the first-order allpass
    // (a + z^-1) / (1 + a z^-1) and the one-pole lowpass (1 - a) / (1 - a z^-1).
@@ -195,14 +204,7 @@ public:
       mSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
       mMailbox.PrepareToPlay(mSampleRate);
       mDcR = (float)std::exp(-2.0 * M_PI * 20.0 / mSampleRate);
-      for (int j = 0; j < kBodyModes; j++)
-      {
-         const double w = 2.0 * M_PI * std::min(kBodyF[j], 0.45 * mSampleRate) / mSampleRate;
-         const double r = std::exp(-w / (2.0 * kBodyQ[j]));
-         mBodyA1[j] = (float)(-2.0 * r * std::cos(w));
-         mBodyA2[j] = (float)(r * r);
-         mBodyG[j] = (float)((1.0 - r * r) * 0.5);   // with zeros at DC and Nyquist: unit gain at the mode at any frequency
-      }
+      mBoard.Design(BoardSpec(), mSampleRate);
       Reset();
    }
 
@@ -210,10 +212,8 @@ public:
    {
       for (auto& v : mVoices)
          v.active = false;
-      std::fill_n(mBodyY1, kBodyModes, 0.0f);
-      std::fill_n(mBodyY2, kBodyModes, 0.0f);
-      mDcIn = mDcOut = 0.0f;
-      mBodyX1 = mBodyX2 = 0.0f;
+      mBoard.Reset();
+      mDcIn[0] = mDcIn[1] = mDcOut[0] = mDcOut[1] = 0.0f;
       mNextAge = 1;
    }
 
@@ -365,29 +365,24 @@ public:
             dry += out;
          }
 
-         float bo = 0.0f;
-         for (int j = 0; j < kBodyModes; j++)
+         float board[2];
+         mBoard.Process(dry, board[0], board[1]);
+         float ch[2];
+         for (int c = 0; c < 2; c++)
          {
-            const float yb = DspMath::FlushDenormal(mBodyG[j] * (dry - mBodyX2) - mBodyA1[j] * mBodyY1[j] - mBodyA2[j] * mBodyY2[j]);
-            mBodyY2[j] = mBodyY1[j];
-            mBodyY1[j] = yb;
-            bo += yb;
+            const float o = (1.0f - body) * dry + body * kBoardGain * board[c];
+            mDcOut[c] = DspMath::FlushDenormal(o - mDcIn[c] + mDcR * mDcOut[c]);
+            mDcIn[c] = o;
+            ch[c] = mDcOut[c] * volume;
          }
-         mBodyX2 = mBodyX1;
-         mBodyX1 = dry;
-         const float o = (1.0f - body) * dry + body * 4.0f * bo;
-         mDcOut = DspMath::FlushDenormal(o - mDcIn + mDcR * mDcOut);
-         mDcIn = o;
-         float y = mDcOut * volume;
-         if (!std::isfinite(y))
+         if (!std::isfinite(ch[0]) || !std::isfinite(ch[1]))
          {
-            y = 0.0f;
+            ch[0] = ch[1] = 0.0f;
             Reset();
          }
-         y = std::clamp(y, -4.0f, 4.0f);
-         outL[i] = y;
+         outL[i] = std::clamp(ch[0], -4.0f, 4.0f);
          if (outR)
-            outR[i] = y;
+            outR[i] = std::clamp(ch[1], -4.0f, 4.0f);
       }
       while (nextEvt < numEvts)
          HandleEvent(evts[nextEvt++]);
@@ -555,10 +550,8 @@ private:
    PianoVoice mVoices[kMaxVoices];
    uint64_t mNextAge = 1;
    int mFitCursor = 0;
-   float mBodyA1[kBodyModes] = {}, mBodyA2[kBodyModes] = {}, mBodyG[kBodyModes] = {};
-   float mBodyY1[kBodyModes] = {}, mBodyY2[kBodyModes] = {};
-   float mDcR = 0.997f, mDcIn = 0.0f, mDcOut = 0.0f;
-   float mBodyX1 = 0.0f, mBodyX2 = 0.0f;
+   float mDcR = 0.997f, mDcIn[2] = {}, mDcOut[2] = {};
+   DenseBody::Bank mBoard;
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;
