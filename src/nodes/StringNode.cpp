@@ -530,7 +530,10 @@ private:
          v.pulseLen = std::max(2, (int)std::lround(sr * (0.004 - 0.003 * (double)v.velocity)));
       else
          v.pulseLen = 0;
-      v.pulseAmp = v.pulseLen > 0 ? 2.0f * 3.0f * v.velocity / (float)v.pulseLen : 0.0f;
+      // One pulse peaked ~18 dB under a sustained bow, so switching exciters jumped in level: strike x4, pluck x2 for
+      // a hard pick up to x4 for a soft one (a longer pulse peaks lower), keeping a hard full-velocity pluck under 1.
+      const float pulseGain = v.exciter == StringNode::kStrike ? 4.0f : 2.0f + 2.0f * (1.0f - mHardness.load(std::memory_order_relaxed));
+      v.pulseAmp = v.pulseLen > 0 ? pulseGain * 2.0f * 3.0f * v.velocity / (float)v.pulseLen : 0.0f;
       v.bowSpeed = 0.07f * (0.4f + 0.6f * v.velocity);
    }
 

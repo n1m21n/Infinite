@@ -18,6 +18,9 @@ namespace FactoryPresets
       //   Analog      wave 0 saw 1 square 2 triangle 3 sine; filterType 0 off 1 ladder 2 lp12 3 lp24 8 bp12
       //   Oscillator  waveform 0 sine 1 triangle 2 saw 3 square; filterType 0 off 1 lp12 2 lp24 7 bp12
       //   Wavetable   table = index into Wavetable::TableName; warpMode 5 sync; filterType as Oscillator
+      //   String      exciter 0 pluck 1 bow 2 strike; bodyType 0 box 1 guitar 2 harp 3 violin 4 cello. The body type
+      //               is only the resonance: the exciter, position, decay and hardness make the instrument.
+      //   Wind        instrument 0 clarinet 1 sax 2 flute 3 brass
       //   Metallic    material 0 steel 1 bell bronze 2 gong 3 cast iron; filterType 0 lp12 1 lp24 2 hp12 3 bp 4 off
       //   Delay       rateDiv = MusicTime::RateDivision (3 half, 6 quarter, 7 dotted quarter, 9 eighth,
       //               10 dotted eighth, 11 eighth triplet, 12 sixteenth)
@@ -51,6 +54,34 @@ namespace FactoryPresets
          { "Wavetable", "Marimba", "a.table=16 a.ampAttack=1 a.ampDecay=450 a.ampSustain=0 a.ampRelease=450" },
          { "Wavetable", "Tine Keys", "a.table=17 a.position=0.3 a.unison=2 a.detune=6 a.ampAttack=1 a.ampDecay=1200 a.ampSustain=0.15 a.ampRelease=500" },
          { "Wavetable", "Sync Sweep Lead", "a.table=13 a.position=0.6 a.warpMode=5 a.warpAmount=0.4 a.warpRatio=2 a.unison=2 a.detune=10 a.filterType=2 a.cutoff=8000" },
+         // Plucked near the bridge rings bright; a harpist plucks near the middle (round); a bow sits close to the
+         // bridge (sul tasto is further). Harp strings ring on undamped, so its release is long.
+         { "String", "Nylon Guitar", "exciter=0 bodyType=1 body=0.85 position=0.18 hardness=0.45 tone=0.4 decay=4 stiffness=0.02 release=220" },
+         { "String", "Steel Guitar", "exciter=0 bodyType=1 body=0.75 position=0.11 hardness=0.9 tone=0.7 decay=6 stiffness=0.08 release=260" },
+         { "String", "Concert Harp", "exciter=0 bodyType=2 body=0.9 position=0.45 hardness=0.3 tone=0.35 decay=7 release=1500" },
+         { "String", "Violin Bowed", "exciter=1 bodyType=3 body=0.9 position=0.1 pressure=0.55 noise=0.15 tone=0.6 decay=8 release=120" },
+         { "String", "Violin Pizzicato", "exciter=0 bodyType=3 body=0.95 position=0.25 hardness=0.4 tone=0.4 decay=0.6 release=80" },
+         { "String", "Cello Bowed", "exciter=1 bodyType=4 body=0.9 position=0.11 pressure=0.6 noise=0.12 tone=0.5 decay=10 release=220" },
+         { "String", "Cello Pizzicato", "exciter=0 bodyType=4 body=0.95 position=0.22 hardness=0.35 tone=0.35 decay=1.2 release=120" },
+         { "String", "Struck Dulcimer", "exciter=2 bodyType=0 body=0.7 position=0.12 hardness=0.8 stiffness=0.2 tone=0.65 decay=5 release=400" },
+         // Grand: the node's defaults. Upright: more inharmonic, wider unison, less sustain. Felt: soft hammers, dark.
+         { "Piano", "Grand", "hardness=0.5 tone=0.5 decay=0.5 detune=0.3 stiffness=0.5 body=0.5 release=250" },
+         { "Piano", "Bright Grand", "hardness=0.8 tone=0.7 decay=0.55 detune=0.25 stiffness=0.5 body=0.65 release=250" },
+         { "Piano", "Upright", "hardness=0.6 tone=0.45 decay=0.4 detune=0.5 stiffness=0.85 body=0.7 release=200" },
+         { "Piano", "Felt Piano", "hardness=0.15 tone=0.25 decay=0.45 detune=0.3 stiffness=0.4 body=0.8 release=400 volume=0.9" },
+         { "Piano", "Honky-Tonk", "hardness=0.7 tone=0.6 decay=0.45 detune=0.9 stiffness=0.7 body=0.6 release=220" },
+         { "Piano", "Dark Grand", "hardness=0.3 tone=0.35 decay=0.6 detune=0.25 stiffness=0.5 body=0.6 release=300" },
+         { "Piano", "Muted", "hardness=0.5 tone=0.4 decay=0.15 detune=0.3 stiffness=0.5 body=0.6 release=80" },
+         { "Piano", "Bare Strings", "hardness=0.6 tone=0.6 decay=0.5 detune=0.35 stiffness=0.5 body=0 release=250" },
+         { "Wind", "Clarinet", "instrument=0 breath=0.6 tone=0.45 noise=0.12 vibrato=0 attack=30 release=80" },
+         { "Wind", "Tenor Sax", "instrument=1 breath=0.7 tone=0.6 noise=0.2 vibrato=0.25 attack=25 release=90" },
+         { "Wind", "Breathy Flute", "instrument=2 breath=0.5 tone=0.55 noise=0.35 vibrato=0.3 attack=60 release=120" },
+         { "Wind", "Solo Trumpet", "instrument=3 breath=0.75 tone=0.7 noise=0.08 vibrato=0.15 attack=20 release=80" },
+         { "Wind", "Soft Horn", "instrument=3 breath=0.45 tone=0.3 noise=0.05 vibrato=0.1 attack=70 release=160" },
+         { "Wind", "Dark Clarinet", "instrument=0 breath=0.45 tone=0.25 noise=0.08 vibrato=0 attack=40 release=100" },
+         { "Wind", "Overblown Sax", "instrument=1 breath=0.92 tone=0.75 noise=0.3 vibrato=0.2 attack=15 release=80" },
+         { "Wind", "Pan Flute", "instrument=2 breath=0.45 tone=0.4 noise=0.5 vibrato=0 attack=90 release=150" },
+         { "Wind", "Brass Swell", "instrument=3 breath=0.65 tone=0.5 noise=0.06 vibrato=0.1 attack=400 release=300" },
          { "Wavetable", "Formant Drone", "mix=0.35 a.table=3 a.position=0.5 a.unison=4 a.detune=18 a.stereoWidth=1 a.ampAttack=1500 a.ampRelease=2500 b.on=1 b.table=9 b.octave=0 b.ampAttack=1500 b.ampRelease=2500" },
 
          { "Metallic", "Steel Bar", "material=0 decay=2.2 stiffness=0.25" },
