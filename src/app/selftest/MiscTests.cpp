@@ -3329,8 +3329,15 @@ void RunView3DTest()
    {
       Scene3DNode* s = Scene();
       const float eye[3] = { 3, 2, 5 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
-      return s != nullptr && s->RenderView(64, 64, Mat4::LookAt(eye, target, up), eye, 45.0f,
-                                           Scene3DNode::Shading::Final, false) != 0;
+      if (s == nullptr)
+         return false;
+      Scene3DNode::View view;
+      view.view = Mat4::LookAt(eye, target, up);
+      view.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 2000.0f);
+      std::copy(eye, eye + 3, view.eye);
+      view.shading = Scene3DNode::Shading::Final;
+      view.grid = false;
+      return s->RenderView(64, 64, view) != 0;
    };
 
    NewPatch();

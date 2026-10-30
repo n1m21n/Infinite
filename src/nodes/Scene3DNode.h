@@ -74,15 +74,31 @@ public:
    // the output so looking around never touches the picture, and only exists
    // once the panel asks.
    enum class Shading { Wire, Solid, Final };
-   unsigned int RenderView(int w, int h, const Mat4& view, const float eye[3],
-                           float fov, Shading shading, bool throughCamera);
+   struct View
+   {
+      Mat4 view, proj;
+      float eye[3] = { 0, 0, 0 };
+      Shading shading = Shading::Solid;
+      bool grid = true;
+      int gridAxis = 1;       // the axis the grid plane faces
+      float gridDist = 6.0f;  // how far the view stands back, which picks the grid's scale
+   };
+   unsigned int RenderView(int w, int h, const View& v);
    // The active camera's view as the output sees it.
    bool CameraView(Mat4& view, float eye[3], CameraNode** lens) const;
+   // Any camera item's view.
+   bool ItemCamera(const Item& item, Mat4& view, float eye[3], CameraNode** lens) const;
+   // The placement that makes a camera item see `view`.
+   void AlignToView(Item& item, const Mat4& view) const;
+   // Render 3D's look settings, shared by the output and the Final view.
+   Render3DNode& Look() { return mRender; }
 
    // World box of an item as last drawn in the editor.
    bool ItemBounds(int id, float lo[3], float hi[3]);
    // Position of a camera or light item, for its marker.
    bool ItemPoint(const Item& item, float out[3]) const;
+   // Where a light item shines, as a unit vector.
+   bool ItemLightAim(const Item& item, float aim[3]) const;
    size_t ClippedDraws() const { return mClipped; }
 
 private:
@@ -90,8 +106,9 @@ private:
    void Parse();
    void Serialize();
    void Sync(int frameId);
-   void ApplyWorld(Render3DNode& render, bool final);
+   void ApplyWorld(Render3DNode& render, bool show);
    unsigned int Composite(unsigned int sceneTex, int w, int h, unsigned int backdrop, GLUtil::Fbo& out);
+   unsigned int GridPass(unsigned int sceneTex, int w, int h, const View& v);
 
    std::vector<Item> mItems;
    int mNextId = 1;
@@ -108,8 +125,9 @@ private:
    Render3DNode::Rig mRig, mEditorRig;
    std::vector<float> mRigStamp, mEditorStamp;
    INode* mWorldNode = nullptr;
-   GLUtil::Fbo mOutFbo, mEditorFbo;
+   GLUtil::Fbo mOutFbo, mEditorFbo, mGridFbo;
    unsigned int mCompositeProgram = 0;
+   unsigned int mGridProgram = 0;
    unsigned int mOutTex = 0;
    unsigned long long mRevision = 0;
    unsigned long long mBuiltRevision = 0;

@@ -83,5 +83,19 @@
  "ping-pong": 59729,
  "reverse": 59730,
  "slice": 59731,
- "terminal": 59732
+ "terminal": 59732,
+ "light-area": 59733,
+ "light-point": 59734,
+ "light-spot": 59735,
+ "light-sun": 59736,
+ "shade-render": 59737,
+ "shade-solid": 59738,
+ "shade-wire": 59739,
+ "tool-move": 59740,
+ "tool-rotate": 59741,
+ "tool-scale": 59742,
+ "view-camera": 59743,
+ "view-ortho": 59744,
+ "view-persp": 59745,
+ "world": 59746
 }

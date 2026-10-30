@@ -595,6 +595,7 @@ public:
       float intensity = 1.0f;
       int type = 0;
       float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
+      float aim[3] = { 0, -1, 0 };       // where a spot or area light points
    };
    struct Rig
    {
@@ -602,9 +603,11 @@ public:
       Mat4 view;
       float eye[3] = { 0, 0, 0 };
       class CameraNode* lens = nullptr;  // projection comes from it; null = this node's fov
+      bool hasProj = false;              // an exact projection, ahead of lens and fov
+      Mat4 proj;
       bool hasLights = false;
       std::vector<RigLight> lights;
-      bool wireframe = false;
+      bool wireframe = false;            // black outlines, no shading
       unsigned long long revision = 0;   // bumped by the owner on any change above
    };
    const Rig* rig = nullptr;

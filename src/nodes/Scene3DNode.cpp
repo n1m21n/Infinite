@@ -101,8 +101,11 @@ Scene3DNode::~Scene3DNode()
 {
    GLUtil::DestroyFbo(mOutFbo);
    GLUtil::DestroyFbo(mEditorFbo);
+   GLUtil::DestroyFbo(mGridFbo);
    if (mCompositeProgram != 0)
       glDeleteProgram(mCompositeProgram);
+   if (mGridProgram != 0)
+      glDeleteProgram(mGridProgram);
 }
 
 Mat4 Scene3DNode::Placement(const Item& it)
@@ -123,6 +126,21 @@ Scene3DNode::Kind Scene3DNode::KindOf(const INode* node)
    if (dynamic_cast<const LightNode*>(node) != nullptr)
       return Kind::Light;
    return dynamic_cast<const IGeometrySource*>(node) != nullptr ? Kind::Geometry : Kind::Missing;
+}
+
+bool Scene3DNode::ItemLightAim(const Item& item, float aim[3]) const
+{
+   auto* light = dynamic_cast<LightNode*>(ResolveUid ? ResolveUid(item.uid) : nullptr);
+   if (light == nullptr)
+      return false;
+   float own[3];
+   light->ComputeVector(own);
+   const float back[3] = { -own[0], -own[1], -own[2] };
+   TransformDir(Placement(item), back, aim);
+   const float len = std::max(1e-4f, std::sqrt(aim[0] * aim[0] + aim[1] * aim[1] + aim[2] * aim[2]));
+   for (int k = 0; k < 3; k++)
+      aim[k] /= len;
+   return true;
 }
 
 Scene3DNode::Kind Scene3DNode::ItemKind(const Item& item) const
@@ -236,6 +254,18 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("bloom", mRender.bloom);
    v.Float("ao", mRender.aoStrength);
    v.Int("supersample", mRender.supersample);
+   v.Int("tonemap", mRender.tonemap);
+   v.Float("bloomThreshold", mRender.bloomThreshold);
+   v.Float("bloomRadius", mRender.bloomRadius);
+   v.Float("aoRadius", mRender.aoRadius);
+   v.Int("shadowQuality", mRender.shadowQuality);
+   v.Float("shadowBias", mRender.shadowBias);
+   v.Float("shadowSoftness", mRender.shadowSoftness);
+   v.Float("shadowStrength", mRender.shadowStrength);
+   v.Float("dofAperture", mRender.dofAperture);
+   v.Float("focusDistance", mRender.focusDistance);
+   v.Color("ambient", mRender.ambientColor);
+   v.Float("envIntensity", mRender.envIntensity);
    v.Text("scene", mText);
 }
 
@@ -260,25 +290,46 @@ bool Scene3DNode::ItemPoint(const Item& item, float out[3]) const
    return true;
 }
 
+bool Scene3DNode::ItemCamera(const Item& item, Mat4& view, float eye[3], CameraNode** lens) const
+{
+   auto* cam = dynamic_cast<CameraNode*>(ResolveUid ? ResolveUid(item.uid) : nullptr);
+   if (cam == nullptr)
+      return false;
+   const Mat4 place = Placement(item);
+   float own[3];
+   cam->ComputeEye(own);
+   TransformPoint(place, own, eye);
+   view = Mat4::Multiply(cam->ViewMatrix(), Mat4::Inverse(place));
+   if (lens != nullptr)
+      *lens = cam;
+   return true;
+}
+
 bool Scene3DNode::CameraView(Mat4& view, float eye[3], CameraNode** lens) const
 {
    for (const Item& it : mItems)
-   {
-      if (it.id != activeCamera)
-         continue;
-      auto* cam = dynamic_cast<CameraNode*>(ResolveUid ? ResolveUid(it.uid) : nullptr);
-      if (cam == nullptr)
-         return false;
-      const Mat4 place = Placement(it);
-      float own[3];
-      cam->ComputeEye(own);
-      TransformPoint(place, own, eye);
-      view = Mat4::Multiply(cam->ViewMatrix(), Mat4::Inverse(place));
-      if (lens != nullptr)
-         *lens = cam;
-      return true;
-   }
+      if (it.id == activeCamera)
+         return ItemCamera(it, view, eye, lens);
    return false;
+}
+
+// view = camera * inverse(place), so place = inverse(view) * camera. Both are
+// rigid, so the result splits cleanly back into a position and three angles.
+void Scene3DNode::AlignToView(Item& item, const Mat4& view) const
+{
+   auto* cam = dynamic_cast<CameraNode*>(ResolveUid ? ResolveUid(item.uid) : nullptr);
+   if (cam == nullptr)
+      return;
+   const Mat4 place = Mat4::Multiply(Mat4::Inverse(view), cam->ViewMatrix());
+   const float d = 180.0f / 3.14159265f;
+   for (int k = 0; k < 3; k++)
+   {
+      item.pos[k] = place.m[12 + k];
+      item.scale[k] = 1.0f;
+   }
+   item.rot[1] = std::asin(std::clamp(-place.m[2], -1.0f, 1.0f)) * d;
+   item.rot[0] = std::atan2(place.m[6], place.m[10]) * d;
+   item.rot[2] = std::atan2(place.m[1], place.m[0]) * d;
 }
 
 void Scene3DNode::Sync(int frameId)
@@ -309,6 +360,11 @@ void Scene3DNode::Sync(int frameId)
          TransformPoint(place, own, l.vec);
       else
          TransformDir(place, own, l.vec);
+      const float back[3] = { -own[0], -own[1], -own[2] };
+      TransformDir(place, back, l.aim);
+      const float aimLen = std::max(1e-4f, std::sqrt(l.aim[0] * l.aim[0] + l.aim[1] * l.aim[1] + l.aim[2] * l.aim[2]));
+      for (float& a : l.aim)
+         a /= aimLen;
       std::memcpy(l.color, light->color, sizeof(l.color));
       l.intensity = light->intensity;
       l.type = light->type;
@@ -375,6 +431,7 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back((float)l.type);
       stamp.push_back(l.spotAngle); stamp.push_back(l.spotPenumbra);
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
+      stamp.insert(stamp.end(), l.aim, l.aim + 3);
    }
    if (stamp != mRigStamp)
    {
@@ -391,10 +448,10 @@ void Scene3DNode::Sync(int frameId)
       mWorldNode->CookIfNeeded(frameId);
 }
 
-void Scene3DNode::ApplyWorld(Render3DNode& render, bool final)
+void Scene3DNode::ApplyWorld(Render3DNode& render, bool show)
 {
    auto* env = dynamic_cast<EnvironmentNode*>(mWorldNode);
-   if (env != nullptr && final)
+   if (env != nullptr && show)
    {
       if (render.envInput.Resolved() != env)
          render.envInput.Connect(env);
@@ -402,7 +459,7 @@ void Scene3DNode::ApplyWorld(Render3DNode& render, bool final)
    else if (render.envInput.IsConnected())
       render.envInput.Disconnect();
    render.envAsBackground = true;
-   render.bgOpacity = (final && worldColorOn) ? 1.0f : 0.0f;
+   render.bgOpacity = (show && worldColorOn && mWorldNode == nullptr) ? 1.0f : 0.0f;
    std::memcpy(render.bgColor, worldColor, sizeof(worldColor));
 }
 
@@ -463,8 +520,88 @@ unsigned int Scene3DNode::GetOutputTexture()
    return mOutTex;
 }
 
-unsigned int Scene3DNode::RenderView(int w, int h, const Mat4& view, const float eye[3],
-                                     float fov, Shading shading, bool throughCamera)
+// The floor, drawn after the scene against its depth: endless, always fine at
+// any zoom, fading into the distance, and hidden by whatever stands in front.
+// Colours are Blender's theme defaults.
+unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const View& v)
+{
+   if (mGridProgram == 0)
+      mGridProgram = GLUtil::CompileProgram(
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uScene;\n"
+         "uniform sampler2D uDepth;\n"
+         "uniform mat4 uInv;\n"
+         "uniform mat4 uViewProj;\n"
+         "uniform vec3 uEye;\n"
+         "uniform int uAxis;\n"
+         "uniform int uDraw;\n"
+         "uniform float uDist;\n"
+         "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.545, 0.863, 0.0), vec3(0.157, 0.565, 1.0));\n"
+         "float lines(vec2 uv, float s) {\n"
+         "   vec2 c = uv / s;\n"
+         "   vec2 g = abs(fract(c - 0.5) - 0.5) / max(fwidth(c), vec2(1e-5));\n"
+         "   return 1.0 - min(min(g.x, g.y), 1.0);\n"
+         "}\n"
+         "void main() {\n"
+         "   vec4 s = texture(uScene, vUv);\n"
+         "   vec3 rgb = s.rgb;\n"
+         "   float a = s.a;\n"
+         "   if (uDraw == 1) {\n"
+         "      vec4 n = uInv * vec4(vUv * 2.0 - 1.0, -1.0, 1.0);\n"
+         "      vec4 f = uInv * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);\n"
+         "      vec3 o = n.xyz / n.w;\n"
+         "      vec3 d = f.xyz / f.w - o;\n"
+         "      float t = abs(d[uAxis]) > 1e-6 ? -o[uAxis] / d[uAxis] : -1.0;\n"
+         "      vec3 p = o + d * max(t, 0.0);\n"
+         "      int ua = (uAxis + 1) % 3, ub = (uAxis + 2) % 3;\n"
+         "      vec2 uv = vec2(p[ua], p[ub]);\n"
+         "      vec4 clip = uViewProj * vec4(p, 1.0);\n"
+         "      float pd = clip.z / clip.w * 0.5 + 0.5;\n"
+         "      float graze = abs(normalize(d)[uAxis]);\n"
+         "      float range = uDist * 14.0 + 12.0;\n"
+         "      float fade = (1.0 - smoothstep(range * 0.35, range, length(p - uEye))) * smoothstep(0.0, 0.06, graze);\n"
+         "      if (t > 0.0 && t <= 1.0 && pd <= texture(uDepth, vUv).r + 1e-6 && fade > 0.0) {\n"
+         "         float level = log(max(uDist, 1e-3) * 0.25) / log(10.0);\n"
+         "         float scale = pow(10.0, floor(level));\n"
+         "         float step01 = fract(level);\n"
+         "         float grid = max(lines(uv, scale) * 0.4 * (1.0 - step01), lines(uv, scale * 10.0) * 0.75);\n"
+         "         vec3 col = vec3(0.329);\n"
+         "         float ax = 1.0 - min(abs(uv.x) / max(fwidth(uv.x), 1e-5), 1.0);\n"
+         "         float bx = 1.0 - min(abs(uv.y) / max(fwidth(uv.y), 1e-5), 1.0);\n"
+         "         if (ax > 0.0) { col = kAxis[ub]; grid = max(grid, ax); }\n"
+         "         if (bx > 0.0) { col = kAxis[ua]; grid = max(grid, bx); }\n"
+         "         float g = grid * fade;\n"
+         "         rgb = mix(rgb, col, g);\n"
+         "         a = a + g * (1.0 - a);\n"
+         "      }\n"
+         "   }\n"
+         "   fragColor = a > 1e-4 ? vec4(rgb / a, a) : vec4(0.0);\n"
+         "}\n");
+   if (mGridProgram == 0 || !GLUtil::EnsureFbo(mGridFbo, w, h))
+      return sceneTex;
+   const Mat4 viewProj = Mat4::Multiply(v.proj, v.view);
+   const Mat4 inv = Mat4::Inverse(viewProj);
+   GLUtil::RunShaderPass(mGridFbo, mGridProgram, [&]
+   {
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mEditor->DepthTexture());
+      glUniform1i(glGetUniformLocation(mGridProgram, "uDepth"), 1);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, sceneTex);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uScene"), 0);
+      glUniformMatrix4fv(glGetUniformLocation(mGridProgram, "uInv"), 1, GL_FALSE, inv.m);
+      glUniformMatrix4fv(glGetUniformLocation(mGridProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniform3fv(glGetUniformLocation(mGridProgram, "uEye"), 1, v.eye);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uAxis"), v.gridAxis);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uDraw"), v.grid && mEditor->DepthValid() ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mGridProgram, "uDist"), v.gridDist);
+   });
+   return mGridFbo.tex;
+}
+
+unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
 {
    // Always afresh: a node may have been deleted since the output cooked this frame.
    // The cook already ran this frame, so the sources it asks for are no-ops.
@@ -473,27 +610,35 @@ unsigned int Scene3DNode::RenderView(int w, int h, const Mat4& view, const float
    if (!mEditor)
    {
       mEditor = std::make_unique<Render3DNode>();
-      mEditor->hdr = true;
       mEditor->samples = 2;
+      mEditor->RequestDepth();
    }
    Render3DNode& e = *mEditor;
    e.geometry[0] = mRoot.get();
    e.width = (float)w;
    e.height = (float)h;
-   e.fov = fov;
-   const bool final = shading == Shading::Final;
+   const bool final = v.shading == Shading::Final;
+   const bool wire = v.shading == Shading::Wire;
    mEditorRig = final ? mRig : Render3DNode::Rig();
    mEditorRig.hasView = true;
-   mEditorRig.view = view;
-   mEditorRig.eye[0] = eye[0]; mEditorRig.eye[1] = eye[1]; mEditorRig.eye[2] = eye[2];
-   mEditorRig.lens = throughCamera ? mRig.lens : nullptr;
-   mEditorRig.wireframe = shading == Shading::Wire;
+   mEditorRig.view = v.view;
+   mEditorRig.eye[0] = v.eye[0]; mEditorRig.eye[1] = v.eye[1]; mEditorRig.eye[2] = v.eye[2];
+   mEditorRig.lens = nullptr;
+   mEditorRig.hasProj = true;
+   mEditorRig.proj = v.proj;
+   mEditorRig.wireframe = wire;
 
-   std::vector<float> stamp(view.m, view.m + 16);
-   stamp.push_back(fov);
-   stamp.push_back((float)shading);
-   stamp.push_back(throughCamera ? 1.0f : 0.0f);
+   std::vector<float> stamp(v.view.m, v.view.m + 16);
+   stamp.insert(stamp.end(), v.proj.m, v.proj.m + 16);
+   stamp.push_back((float)v.shading);
    stamp.insert(stamp.end(), mRigStamp.begin(), mRigStamp.end());
+   const Render3DNode& look = mRender;
+   stamp.insert(stamp.end(), { look.exposure, (float)look.tonemap, look.bloom, look.bloomThreshold, look.bloomRadius,
+                               look.aoStrength, look.aoRadius, look.dofAperture, look.focusDistance,
+                               look.shadowsEnabled ? 1.0f : 0.0f, (float)look.shadowQuality, look.shadowBias,
+                               look.shadowSoftness, look.shadowStrength, look.envIntensity, look.ambientColor[0],
+                               look.ambientColor[1], look.ambientColor[2], worldColor[0], worldColor[1], worldColor[2],
+                               worldColorOn ? 1.0f : 0.0f, (float)worldUid });
    if (stamp != mEditorStamp)
    {
       mEditorStamp.swap(stamp);
@@ -501,18 +646,37 @@ unsigned int Scene3DNode::RenderView(int w, int h, const Mat4& view, const float
    }
    mEditorRig.revision = mEditorRevision;
    e.rig = &mEditorRig;
-   e.shadowsEnabled = final && mRender.shadowsEnabled;
+
+   // HDR's finish reads one depth sample per pixel and would cut thin lines to dots.
+   e.hdr = !wire;
+   e.depthTest = !wire;
+   e.backfaceCull = !wire;
+   e.tonemap = mRender.tonemap;
    e.exposure = final ? mRender.exposure : 1.0f;
+   e.ambientColor[0] = mRender.ambientColor[0];
+   e.ambientColor[1] = mRender.ambientColor[1];
+   e.ambientColor[2] = mRender.ambientColor[2];
+   e.envIntensity = mRender.envIntensity;
+   e.shadowsEnabled = final && mRender.shadowsEnabled;
+   e.shadowQuality = mRender.shadowQuality;
+   e.shadowBias = mRender.shadowBias;
+   e.shadowSoftness = mRender.shadowSoftness;
+   e.shadowStrength = mRender.shadowStrength;
    e.bloom = final ? mRender.bloom : 0.0f;
+   e.bloomThreshold = mRender.bloomThreshold;
+   e.bloomRadius = mRender.bloomRadius;
    e.aoStrength = final ? mRender.aoStrength : 0.0f;
-   ApplyWorld(e, final);
+   e.aoRadius = mRender.aoRadius;
+   e.dofAperture = final ? mRender.dofAperture : 0.0f;
+   e.focusDistance = mRender.focusDistance;
+   ApplyWorld(e, !wire);
    e.CookIfNeeded(++mEditorFrame);
 
    unsigned int tex = e.GetOutputTexture();
-   if (final && mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr &&
+   if (!wire && mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr &&
        mWorldNode->GetOutputTexture() != 0)
       tex = Composite(tex, e.GetOutputWidth(), e.GetOutputHeight(), mWorldNode->GetOutputTexture(), mEditorFbo);
-   return tex;
+   return tex != 0 ? GridPass(tex, e.GetOutputWidth(), e.GetOutputHeight(), v) : 0;
 }
 
 bool Scene3DNode::ItemBounds(int id, float lo[3], float hi[3])

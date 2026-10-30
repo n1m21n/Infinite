@@ -454,6 +454,8 @@ namespace
       "uniform float uSceneMaxLod;\n"
       "uniform vec2 uScreenSize;\n"
       "uniform vec3 uLightDir[8];\n"
+      "uniform vec3 uLightAim[8];\n"
+      "uniform int uWire;\n"
       "uniform vec3 uLightColor[8];\n"
       "uniform float uLightIntensity[8];\n"
       "uniform int uLightType[8];\n"
@@ -791,7 +793,7 @@ namespace
       "         // rectangle nearest the mirror ray (the representative-point method), so a bigger panel\n"
       "         // gives a broader, softer highlight; one-sided, no light leaves the back.\n"
       "         vec3 lp = uLightDir[i];\n"
-      "         vec3 fwd = normalize(-lp);\n"
+      "         vec3 fwd = uLightAim[i];\n"
       "         vec3 rgt = cross(vec3(0.0, 1.0, 0.0), fwd);\n"
       "         rgt = (dot(rgt, rgt) < 1e-4) ? vec3(1.0, 0.0, 0.0) : normalize(rgt);\n"
       "         vec3 upv = cross(fwd, rgt);\n"
@@ -813,7 +815,7 @@ namespace
       "         lightDir = toLight / max(dist, 1e-4);\n"
       "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
       "         if (uLightType[i] == 4) {\n"
-      "            vec3 spotDir = normalize(-uLightDir[i]);\n"
+      "            vec3 spotDir = uLightAim[i];\n"
       "            float cosCur = dot(-lightDir, spotDir);\n"
       "            float cosOuter = cos(radians(uLightSpotAngle[i]));\n"
       "            float cosInner = cos(radians(uLightSpotAngle[i] * (1.0 - uLightSpotPenumbra[i])));\n"
@@ -918,7 +920,7 @@ namespace
       "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
-      "   fragColor = vec4(col, alpha);\n"
+      "   fragColor = uWire == 1 ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(col, alpha);\n"
       "}\n";
 }
 
@@ -1875,7 +1877,9 @@ void Render3DNode::CookOnce(int frameId)
    {
       view = rig->view;
       eye[0] = rig->eye[0]; eye[1] = rig->eye[1]; eye[2] = rig->eye[2];
-      if (rig->lens != nullptr)
+      if (rig->hasProj)
+         proj = rig->proj;
+      else if (rig->lens != nullptr)
          proj = rig->lens->ProjectionMatrix(aspect);
    }
    if (mFaceOverride >= 0)
@@ -1930,6 +1934,7 @@ void Render3DNode::CookOnce(int frameId)
 
    // Gather lights: patched Light nodes win, otherwise the built-in one.
    float lightDirs[kMaxLights * 3] = { 0 };
+   float lightAims[kMaxLights * 3] = { 0 };
    float lightCols[kMaxLights * 3] = { 0 };
    float lightPower[kMaxLights] = { 0 };
    int lightTypes[kMaxLights] = { 0 };
@@ -1952,6 +1957,7 @@ void Render3DNode::CookOnce(int frameId)
          for (int k = 0; k < 3; k++)
          {
             lightDirs[lightCount * 3 + k] = l.vec[k];
+            lightAims[lightCount * 3 + k] = l.aim[k];
             lightCols[lightCount * 3 + k] = l.color[k];
          }
          lightPower[lightCount] = l.intensity;
@@ -1972,6 +1978,9 @@ void Render3DNode::CookOnce(int frameId)
       lightDirs[lightCount * 3 + 0] = vec[0];
       lightDirs[lightCount * 3 + 1] = vec[1];
       lightDirs[lightCount * 3 + 2] = vec[2];
+      const float vecLen = std::max(1e-4f, std::sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]));
+      for (int k = 0; k < 3; k++)
+         lightAims[lightCount * 3 + k] = -vec[k] / vecLen;   // a node's own spot or area faces the origin
       lightCols[lightCount * 3 + 0] = lights[i]->color[0];
       lightCols[lightCount * 3 + 1] = lights[i]->color[1];
       lightCols[lightCount * 3 + 2] = lights[i]->color[2];
@@ -2215,6 +2224,8 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
       glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
       glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kMaxLights, lightDirs);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightAim"), kMaxLights, lightAims);
+      glUniform1i(glGetUniformLocation(mProgram, "uWire"), rig != nullptr && rig->wireframe ? 1 : 0);
       glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kMaxLights, lightCols);
       glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kMaxLights, lightPower);
       glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kMaxLights, lightTypes);

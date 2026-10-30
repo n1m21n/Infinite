@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE954;
+   inline constexpr unsigned kLast = 0xE962;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -89,4 +89,18 @@ namespace IconsInfinite
    inline constexpr const char* PingPong = "\xee\xa5\x91"; // U+E951 ping-pong
    inline constexpr const char* Reverse = "\xee\xa5\x92"; // U+E952 reverse
    inline constexpr const char* Terminal = "\xee\xa5\x94"; // U+E954 terminal
+   inline constexpr const char* LightArea = "\xee\xa5\x95"; // U+E955 light-area
+   inline constexpr const char* LightPoint = "\xee\xa5\x96"; // U+E956 light-point
+   inline constexpr const char* LightSpot = "\xee\xa5\x97"; // U+E957 light-spot
+   inline constexpr const char* LightSun = "\xee\xa5\x98"; // U+E958 light-sun
+   inline constexpr const char* ShadeRender = "\xee\xa5\x99"; // U+E959 shade-render
+   inline constexpr const char* ShadeSolid = "\xee\xa5\x9a"; // U+E95A shade-solid
+   inline constexpr const char* ShadeWire = "\xee\xa5\x9b"; // U+E95B shade-wire
+   inline constexpr const char* ToolMove = "\xee\xa5\x9c"; // U+E95C tool-move
+   inline constexpr const char* ToolRotate = "\xee\xa5\x9d"; // U+E95D tool-rotate
+   inline constexpr const char* ToolScale = "\xee\xa5\x9e"; // U+E95E tool-scale
+   inline constexpr const char* ViewCamera = "\xee\xa5\x9f"; // U+E95F view-camera
+   inline constexpr const char* ViewOrtho = "\xee\xa5\xa0"; // U+E960 view-ortho
+   inline constexpr const char* ViewPersp = "\xee\xa5\xa1"; // U+E961 view-persp
+   inline constexpr const char* World = "\xee\xa5\xa2"; // U+E962 world
 }
