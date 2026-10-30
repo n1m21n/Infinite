@@ -1802,6 +1802,73 @@ void FrameTest_NEWSYNTHTEST(int frameId, GLFWwindow* window)
    }
 }
 
+// A file dropped on a panel lands in that panel: a WAV in the Sample Studio from the Library hand-over and from
+// the OS queue (the OS path must also beat a take still rendering), a .mid in the Piano Roll as notes.
+void FrameTest_PANELDROPTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_PANELDROPTEST") == nullptr)
+      return;
+   static bool ok = true;
+   static std::string wavA, wavB, mid;
+   static size_t notesBefore = 0;
+   auto check = [&](bool good, const char* what) {
+      ok = ok && good;
+      printf("paneldrop %-56s %s\n", what, good ? "ok" : "FAIL");
+   };
+   auto noteCount = [] {
+      size_t n = 0;
+      for (const Arrange::Lane& l : gArrange.lanes)
+         for (const Arrange::Clip& c : l.clips)
+            n += c.notes.size();
+      return n;
+   };
+   if (frameId == 3)
+   {
+      NewPatch();
+      std::error_code ec;
+      const auto dir = std::filesystem::temp_directory_path(ec);
+      wavA = (dir / "infinite_paneldrop_a.wav").string();
+      wavB = (dir / "infinite_paneldrop_b.wav").string();
+      mid = (dir / "infinite_paneldrop.mid").string();
+      std::vector<float> zeros(4800, 0.0f);
+      check(AudioRecordings::WriteWav(wavA, zeros.data(), (int)zeros.size(), 48000.0) &&
+               AudioRecordings::WriteWav(wavB, zeros.data(), (int)zeros.size(), 48000.0), "the test WAVs are written");
+      // Format 0, 480 ppq: C4 for one beat.
+      static const uint8_t kMid[] = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0, 'M', 'T', 'r', 'k', 0, 0, 0, 13,
+                                      0, 0x90, 60, 100, 0x83, 0x60, 0x80, 60, 0, 0, 0xFF, 0x2F, 0 };
+      std::ofstream(mid, std::ios::binary).write((const char*)kMid, sizeof kMid);
+      PianoRollOpenPage(Arrange::AddLane(gArrange, Arrange::kLaneMidi));
+      gSampleStudioOpen = true;
+      gPianoRollOpen = true;
+   }
+   if (frameId == 6)
+   {
+      gSampleStudioPendingDrop = wavA;
+      notesBefore = noteCount();
+   }
+   if (frameId == 8)
+   {
+      check(SampleStudioSerialize().find(wavA) != std::string::npos, "a Library sample dropped on the Studio is loaded");
+      gDropPos = ImVec2((gSampleStudioRectMin.x + gSampleStudioRectMax.x) * 0.5f, (gSampleStudioRectMin.y + gSampleStudioRectMax.y) * 0.5f);
+      gDroppedFiles.push_back(wavB);
+   }
+   if (frameId == 10)
+   {
+      check(SampleStudioSerialize().find(wavB) != std::string::npos, "a Finder sample dropped on the Studio is loaded");
+      check(gDroppedFiles.empty(), "the Studio took it, the canvas did not");
+      gDropPos = ImVec2((gPianoRollRectMin.x + gPianoRollRectMax.x) * 0.5f, (gPianoRollRectMin.y + gPianoRollRectMax.y) * 0.5f);
+      gDroppedFiles.push_back(mid);
+   }
+   if (frameId == 12)
+   {
+      check(noteCount() == notesBefore + 1, "a .mid dropped on the Piano Roll becomes its notes");
+      check(gDroppedFiles.empty(), "the Piano Roll took it, the canvas did not");
+      printf("PANELDROPTEST %s\n", ok ? "OK" : "FAIL");
+      glfwSetWindowShouldClose(window, 1);
+   }
+}
+
+
 // v0.6 2.2: one audio file dropped on the canvas plays through an Audio Out with nothing else to do,
 // and a pick from the "load into instead" list replaces that pair instead of adding to it.
 void FrameTest_DROPSOUNDTEST(int frameId, GLFWwindow* window)

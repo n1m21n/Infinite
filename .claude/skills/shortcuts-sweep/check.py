@@ -53,6 +53,8 @@ def norm_key(tok):
 LOCAL_KEYS = {
     "Escape": "dismisses a popup/modal/inline edit - not a global binding",
     "Enter":  "commits an inline text edit - not a global binding",
+    "KeypadAdd": "the keypad twin of = in zoom handlers",
+    "KeypadSubtract": "the keypad twin of - in zoom handlers",
     "KeypadEnter": "Enter's keypad twin - opens a hovered comment's inline edit, not a global binding",
     "Minus":  "zoom-out within the canvas zoom handler, paired with the scroll gesture",
 }

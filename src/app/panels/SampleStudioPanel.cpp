@@ -17,6 +17,7 @@
 #include "app/graph/SampleStyles.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/components/ToolCursor.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -149,6 +150,7 @@ namespace
       uint16_t primary = 0;               // the one the inspector shows
       std::vector<Snapshot> undo, redo;
       std::string status;                 // a line under the toolbar when something failed
+      bool dropTake = false;              // a file landed while a take was rendering: the take must not replace it
       bool recording = false;             // capturing the audio input into recL/recR
       uint64_t recCursor = 0;
       std::vector<float> recL, recR;
@@ -157,6 +159,8 @@ namespace
       double viewStart = 0.0, viewLen = 1.0;
       float level = 1.0f; // vertical zoom
       int ruler = 0;      // 0 bars, 1 seconds, 2 samples
+      double headFrame = -1.0;  // the playhead placed on the ruler while stopped, -1 none
+      double scrubFrame = -1.0; // where a ruler drag will land
       bool snapGrid = true;
       bool settingsOpen = true;
       // Engine.
@@ -596,14 +600,24 @@ namespace
       AudioEngine::Instance().StudioLoop().Restart();
    }
 
-   // Audio in: record the system input into a new sample. Offered only while an input device exists.
-   bool HasAudioInput()
+   // Audio in: record the chosen input into a new sample. Offered only while an input device exists.
+   // Listed about once a second: the device query is not free and this runs every frame.
+   const std::vector<Platform::AudioDeviceInfo>& AudioInputs()
    {
-      for (const Platform::AudioDeviceInfo& d : Platform::AudioListDevices())
-         if (d.isInput && d.inputChannels > 0)
-            return true;
-      return false;
+      static std::vector<Platform::AudioDeviceInfo> sInputs;
+      static double sListedAt = -10.0;
+      if (ImGui::GetTime() - sListedAt > 1.0)
+      {
+         sListedAt = ImGui::GetTime();
+         sInputs.clear();
+         for (const Platform::AudioDeviceInfo& d : Platform::AudioListDevices())
+            if (d.isInput && d.inputChannels > 0)
+               sInputs.push_back(d);
+      }
+      return sInputs;
    }
+
+   bool HasAudioInput() { return !AudioInputs().empty(); }
 
    void StopRecording(bool keep)
    {
@@ -651,10 +665,17 @@ namespace
       s.recErr.clear();
       s.recording = true;
       Platform::AudioInputCaptureAddRef();
+      // The device rate is the recording's rate, so the engine has to be open before the first block.
+      if (AudioEngine::Instance().SampleRate() <= 0.0)
+      {
+         gAudioStartError.clear();
+         if (!StartAudioEngine(gAudioStartError))
+            fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+      }
       // Nothing else sounds while the input is taken, and no take in flight lands on it.
-      if (gAudioMode == AudioMode::Studio && Transport::Instance().IsPlaying())
+      if (Transport::Instance().IsPlaying())
          LaunchRequestTogglePlay();
-      s.status = T("Recording from the audio input. Press I to stop");
+      s.status = T("Recording from the audio input. Press R to stop");
    }
 
    // Per frame: pull what the device captured since last frame (the ring holds about a second).
@@ -670,7 +691,9 @@ namespace
       float* chans[2] = { bufL, bufR };
       for (int guard = 0; guard < 64; guard++)
       {
-         const int got = Platform::AudioInputCaptureRead(chans, 4096, 2, s.recCursor, 0, false);
+         // The call returns a channel count: only outFrames says how much audio came back.
+         int got = 0;
+         Platform::AudioInputCaptureRead(chans, 4096, 2, s.recCursor, 0, false, &got);
          if (got <= 0)
             break;
          s.recL.insert(s.recL.end(), bufL, bufL + got);
@@ -701,6 +724,7 @@ namespace
       if (S().src)
          PushUndo();
       S().status.clear();
+      S().dropTake = S().busy;
       SetSource(std::move(a), path, std::nullopt, false);
       return true;
    }
@@ -749,9 +773,10 @@ namespace
       if (!s.busy || g.GetState() == GenerateSamplesNode::State::Generating)
          return;
       s.busy = false;
-      if (s.recording)
+      if (s.recording || s.dropTake)
       {
-         s.pendingDoc.reset(); // a take finished while the input is being recorded: it must not replace the recording
+         s.dropTake = false;
+         s.pendingDoc.reset(); // a take finished under a recording or a dropped file: it must not replace them
          return;
       }
       if (g.GetState() == GenerateSamplesNode::State::Failed || g.LoopL().empty())
@@ -1238,6 +1263,8 @@ namespace
    // Play the edit from a source frame (its place in the render as heard).
    void PlayFrom(double frame)
    {
+      if (S().recording)
+         return;
       Studio& s = S();
       if (!s.heard || s.heard->laidFrames <= 0 || s.heardDoc.Empty())
          return;
@@ -1254,7 +1281,14 @@ namespace
 
    void TogglePlay()
    {
+      if (S().recording)
+         return; // the input has the room
       const bool playing = Transport::Instance().IsPlaying();
+      if (!playing && S().headFrame >= 0.0)
+      {
+         PlayFrom(S().headFrame);
+         return;
+      }
       if (!playing)
       {
          SetStudioAudio(true);
@@ -1266,6 +1300,8 @@ namespace
    // One slice through its chain, on the preview voice (no transport needed).
    void Audition(int i)
    {
+      if (S().recording)
+         return;
       Studio& s = S();
       if (!s.src || i < 0 || i >= s.doc.Count())
          return;
@@ -1384,74 +1420,39 @@ namespace
       float XOf(double f) const { return XOfW(W(f)); }
    };
 
-   // Ruler step: the smallest of 1-2-5 x 10^n units that leaves at least `minPx` between ticks.
-   double NiceStep(double unitsPerPx, double minPx)
-   {
-      const double want = unitsPerPx * minPx;
-      double step = std::pow(10.0, std::floor(std::log10(std::max(1e-9, want))));
-      for (double m : { 1.0, 2.0, 5.0, 10.0 })
-         if (step * m >= want)
-            return step * m;
-      return step * 10.0;
-   }
+   int64_t GridFrame(double f, bool flip);
 
+   // The ruler the Timeline and the Piano Roll have: click or drag places the playhead; it lands on
+   // release, and a playing edit carries on from there.
    void DrawRuler(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const WaveGeom& g)
    {
       Studio& s = S();
       ImGui::SetCursorScreenPos(mn);
       ImGui::InvisibleButton("##studioRuler", ImVec2(mx.x - mn.x, mx.y - mn.y));
-      if (ImGui::IsItemClicked())
-         s.ruler = (s.ruler + 1) % 3;
+      const double fpb = FramesPerBeat();
+      const TimeRuler::Axis axis { mn.x, mx.x, g.w0 / fpb, (mx.x - mn.x) / std::max(1e-9, (g.w1 - g.w0) / fpb), 4.0 };
       if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Click: bars, seconds or samples"));
-      const ImU32 tick = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.6f), txt = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      const double fpp = (g.w1 - g.w0) / std::max(1.0f, mx.x - mn.x);
-      const double v0 = g.w0, v1 = g.w1;
-      const auto label = [&](double f, const char* text)
+         HelpTip("%s", T("Click or drag to place the playhead"));
+      if (ImGui::IsItemActive() && Frames() > 0)
+         s.scrubFrame = std::clamp((double)GridFrame(axis.Beat(ImGui::GetIO().MousePos.x) * fpb, false), 0.0, (double)Frames());
+      else if (s.scrubFrame >= 0.0)
       {
-         const float x = g.XOfW(f);
-         dl->AddLine(ImVec2(x, mx.y - 5.0f), ImVec2(x, mx.y), tick);
-         dl->AddText(ImVec2(x + 2.0f, mn.y), txt, text);
-      };
-      char buf[48];
+         s.headFrame = s.scrubFrame;
+         s.scrubFrame = -1.0;
+         if (Transport::Instance().IsPlaying() && gAudioMode == AudioMode::Studio)
+            PlayFrom(s.headFrame);
+      }
+      TimeRuler::Background(dl, axis, mn.y);
       if (s.ruler == 0)
-      {
-         // Bars and beats of the sample's tempo; finer steps as the zoom allows.
-         const double fpb = FramesPerBeat();
-         double stepBeats = 4.0;
-         while (stepBeats / 4.0 * fpb / fpp > 70.0 && stepBeats > 0.25)
-            stepBeats /= 2.0;
-         while (stepBeats * fpb / fpp < 50.0)
-            stepBeats *= 2.0;
-         for (double b = std::floor(v0 / fpb / stepBeats) * stepBeats; b * fpb <= v1; b += stepBeats)
-         {
-            const int bar = (int)std::floor(b / 4.0 + 1e-9);
-            const double inBar = b - bar * 4.0;
-            if (std::fabs(inBar) < 1e-6)
-               snprintf(buf, sizeof(buf), "%d", bar + 1);
-            else
-               snprintf(buf, sizeof(buf), "%d.%g", bar + 1, inBar + 1.0);
-            label(b * fpb, buf);
-         }
-      }
+         TimeRuler::DrawBars(dl, axis, mn.y);
       else if (s.ruler == 1)
-      {
-         const double step = NiceStep(fpp / Sr(), 60.0);
-         for (double t = std::floor(v0 / Sr() / step) * step; t * Sr() <= v1; t += step)
-         {
-            snprintf(buf, sizeof(buf), step < 0.01 ? "%.4fs" : step < 1.0 ? "%.2fs" : "%.0fs", t);
-            label(t * Sr(), buf);
-         }
-      }
+         TimeRuler::DrawUnits(dl, axis, mn.y, fpb / Sr(), 0.0001, [](double sec, double step) { return ArrangeFormatSeconds(sec, step < 1.0); });
       else
-      {
-         const double step = std::max(1.0, NiceStep(fpp, 70.0));
-         for (double f = std::floor(v0 / step) * step; f <= v1; f += step)
-         {
+         TimeRuler::DrawUnits(dl, axis, mn.y, fpb, 1.0, [](double f, double) {
+            char buf[32];
             snprintf(buf, sizeof(buf), "%.0f", f);
-            label(f, buf);
-         }
-      }
+            return std::string(buf);
+         });
    }
 
    void DrawOverview(ImDrawList* dl, ImVec2 mn, ImVec2 mx)
@@ -2001,6 +2002,8 @@ namespace
          s.tool = s.tool == 1 ? 0 : 1;
       else if (ImGui::IsKeyPressed(ImGuiKey_H, false))
          s.tool = s.tool == 2 ? 0 : 2;
+      else if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+         ViewAll();
       else if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
          io.KeyShift ? ViewAll() : ZoomToSelection();
       else if (ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd))
@@ -2018,9 +2021,9 @@ namespace
          EditSelected([](SliceParams& p) { p.mute = !p.mute; });
       else if (ImGui::IsKeyPressed(ImGuiKey_S, false))
          EditSelected([](SliceParams& p) { p.solo = !p.solo; });
-      else if (ImGui::IsKeyPressed(ImGuiKey_R, false))
+      else if (ImGui::IsKeyPressed(ImGuiKey_V, false))
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
-      else if (ImGui::IsKeyPressed(ImGuiKey_I, false))
+      else if (ImGui::IsKeyPressed(ImGuiKey_R, false))
          s.recording ? StopRecording(true) : StartRecording();
    }
 
@@ -2083,7 +2086,7 @@ namespace
          EditSelected([](SliceParams& p) { p.mute = !p.mute; });
       if (MenuParts::Item(T("Solo"), "S", false, any))
          EditSelected([](SliceParams& p) { p.solo = !p.solo; });
-      if (MenuParts::Item(T("Reverse"), "R", false, any))
+      if (MenuParts::Item(T("Reverse"), "V", false, any))
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
       if (MenuParts::SubMenu(T("Colour"), any))
       {
@@ -2425,6 +2428,7 @@ namespace
       }
 
       // Playhead: the transport's place in the edit as heard, mapped back onto the source.
+      float headX = -1.0f;
       const float u = AudioEngine::Instance().StudioLoop().Phase();
       if (u >= 0.0f && s.heard && s.heard->laidFrames > 0)
       {
@@ -2433,13 +2437,20 @@ namespace
             k = k < 0.5 ? k * 2.0 : 2.0 - k * 2.0;
          if (s.doc.wide.reverse)
             k = 1.0 - k;
-         const float x = g.XOfW((double)s.doc.StartFrame() + k * (double)s.heard->laidFrames);
-         dl->AddLine(ImVec2(x, g.mn.y), ImVec2(x, g.mx.y), ImGui::GetColorU32(ImGuiCol_Text), 1.0f);
+         headX = g.XOfW((double)s.doc.StartFrame() + k * (double)s.heard->laidFrames);
       }
+      else if (s.headFrame >= 0.0)
+         headX = g.XOfW(s.headFrame);
       if (s.job || s.onsetJob || s.busy)
          dl->AddRectFilled(ImVec2(g.mn.x, g.mx.y - 2.0f), ImVec2(g.mn.x + w * (s.busy ? std::clamp(s.gen->Progress(), 0.0f, 1.0f) : 1.0f), g.mx.y),
                            AccentU32(s.busy ? 1.0f : 0.4f));
       dl->PopClipRect();
+      // Over the ruler too, so it sits on the same mark in all three panels.
+      const float rulerTop = mn.y + kOverviewH + 1.0f;
+      if (headX >= g.mn.x && headX <= g.mx.x)
+         TimeRuler::Playhead(dl, headX, rulerTop, g.mx.y);
+      if (s.scrubFrame >= 0.0)
+         TimeRuler::Playhead(dl, g.XOfW(s.scrubFrame), rulerTop, g.mx.y, true);
    }
 
    // ---- the inspector ----
@@ -2780,8 +2791,6 @@ namespace
       const float cy = (bmin.y + bmax.y) * 0.5f;
       const std::string& value = items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)];
       dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), tc, value.c_str());
-      glyph::Draw(dl, ImVec2(bmax.x - tok::space_3 - tok::icon_sm * 0.5f, cy), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                  IconsInfinite::ChevronDown);
 
       const float k = sOpenId == pid ? std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f) : 1.0f;
       const float e = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k);
@@ -2866,18 +2875,128 @@ namespace
          if (!p.empty())
             LoadFile(p);
       }
+      FormParts::Inline(0.0f, between);
+      // The transport: play, back, record and its input, in the Timeline's and the Piano Roll's place.
+      const bool playing = Transport::Instance().IsPlaying() && gAudioMode == AudioMode::Studio;
+      ImGui::BeginDisabled(!has);
+      if (IconChip("##studioPlay", playing ? IconsInfinite::PauseFill : IconsInfinite::PlayFill, playing,
+                   playing ? T("Stop") : T("Play the edit (pauses the canvas audio)"), true))
+         TogglePlay();
+      ImGui::EndDisabled();
+      FormParts::Inline(0.0f, in);
+      if (IconChip("##studioRewind", IconsInfinite::Rewind, false, T("Return to Start (Enter)")))
+      {
+         s.headFrame = -1.0;
+         if (playing)
+            AudioEngine::Instance().StudioLoop().Restart();
+      }
+      FormParts::Inline(0.0f, in);
       {
          const bool haveIn = HasAudioInput();
-         FormParts::Inline(0.0f, in);
          if (!haveIn && !s.recording)
             ImGui::BeginDisabled();
          if (IconChip("##studioRecord", s.recording ? IconsInfinite::RecordFill : IconsInfinite::Record, s.recording,
-                      s.recording ? T("Stop recording (I)") : haveIn ? T("Record the audio input into a new sample (I)") : T("Connect an audio input to record")))
+                      s.recording ? T("Stop recording (R)") : haveIn ? T("Record the audio input into a new sample (R)") : T("Connect an audio input to record")))
             s.recording ? StopRecording(true) : StartRecording();
          if (!haveIn && !s.recording)
             ImGui::EndDisabled();
+         // Which input Record takes, shared with Settings and the Audio In node.
+         if (haveIn)
+         {
+            const std::vector<Platform::AudioDeviceInfo>& inputs = AudioInputs();
+            std::vector<std::string> names { T("System default") };
+            int cur = 0;
+            for (const Platform::AudioDeviceInfo& d : inputs)
+            {
+               names.push_back(d.name);
+               if (d.deviceId == gAudioInputDeviceId)
+                  cur = (int)names.size() - 1;
+            }
+            FormParts::Inline(0.0f, in);
+            ImGui::BeginDisabled(s.recording);
+            if (PickerChip("##studioInput", names, cur, 132.0f, T("Audio input to record from")))
+            {
+               gAudioInputDeviceId = cur > 0 ? inputs[(size_t)cur - 1].deviceId : 0;
+               Platform::AudioInputCaptureSetDevice(gAudioInputDeviceId);
+            }
+            ImGui::EndDisabled();
+         }
+      }
+      FormParts::Inline(0.0f, between);
+      {
+         static const PillGroup::Segment kUnits[3] = { { "studio.unit.bars", "Bars" }, { "studio.unit.time", "Time" }, { "studio.unit.samples", "Samples" } };
+         const int picked = TimeRuler::UnitPills("studiounit", kUnits, 3, s.ruler);
+         if (picked >= 0)
+            s.ruler = picked;
+      }
+      FormParts::Inline(0.0f, between);
+      ImGui::BeginDisabled(!has);
+      {
+         // The tool dropdown, the same as the Timeline's and the Piano Roll's.
+         const bool nonDefault = s.tool != 0;
+         ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(tok::tile, tok::tile));
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
+         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+         const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
+         const char* tg = s.tool == 1 ? IconsInfinite::Scissors : s.tool == 2 ? IconsInfinite::Hand : IconsInfinite::Pointer;
+         ImDrawList* tdl = ImGui::GetWindowDrawList();
+         glyph::Draw(tdl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, tg);
+         if (clicked)
+            ImGui::OpenPopup("##studioToolMenu");
+         ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
+         if (MenuParts::BeginPopup("##studioToolMenu"))
+         {
+            if (MenuParts::Item(L("Select"), "A", s.tool == 0))
+               s.tool = 0;
+            if (MenuParts::Item(L("Cut"), "B", s.tool == 1))
+               s.tool = 1;
+            if (MenuParts::Item(L("Hand"), "H", s.tool == 2))
+               s.tool = 2;
+            MenuParts::Separator();
+            const double mid = s.viewStart + s.viewLen * 0.5;
+            if (MenuParts::Item(L("Zoom In"), "="))
+               ZoomAround(mid, 0.8);
+            if (MenuParts::Item(L("Zoom Out"), "-"))
+               ZoomAround(mid, 1.25);
+            if (MenuParts::Item(L("Fit"), "F"))
+               ViewAll();
+            MenuParts::EndPopup();
+         }
       }
       FormParts::Inline(0.0f, in);
+      if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
+         s.snapGrid = !s.snapGrid;
+      FormParts::Inline(0.0f, between);
+      if (TextChip(L("Slice##studioSlice")))
+         ImGui::OpenPopup("##studioSliceMenu");
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         HelpTip("%s", T("Cut the sample by transients, grid or into equal parts"));
+      ImGui::EndDisabled();
+      const auto toggle = [&](const char* label, bool& v, const char* tip)
+      {
+         FormParts::Inline(0.0f, in);
+         const bool before = v;
+         if (AudioToggleButton(label, &v, TextW(label), tok::tile))
+         {
+            const bool after = v;
+            v = before;
+            PushUndo();
+            v = after;
+            s.dirty = true;
+            AudioEngine::Instance().StudioLoop().SetLoop(s.doc.wide.loop);
+            AudioEngine::Instance().StudioLoop().Restart();
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", tip);
+      };
+      toggle(L("Loop##studioLoop"), s.doc.wide.loop, T("Loop the edit; off plays it once"));
+      toggle(L("Ping-pong##studioPP"), s.doc.wide.pingPong, T("While looping, play forward then back"));
+      toggle(L("Reverse##studioRev"), s.doc.wide.reverse, T("Play the whole edit backwards"));
+
+      FormParts::Inline(0.0f, between);
       if (TextChip(L("Generate##studioGen"), s.busy ? ActionButton::Kind::Go : ActionButton::Kind::Primary))
       {
          if (s.busy)
@@ -2908,86 +3027,7 @@ namespace
          PickerChip("##studioBars", bars, s.barsIdx, 92.0f, T("Length (for the next Generate)"));
       }
 
-      // Hear: play on the transport (hands audio to the studio, pausing the canvas), then the Sampler's three toggles.
-      FormParts::Inline(0.0f, between);
-      const bool playing = Transport::Instance().IsPlaying() && gAudioMode == AudioMode::Studio;
-      ImGui::BeginDisabled(!has);
-      if (IconChip("##studioPlay", playing ? IconsInfinite::PauseFill : IconsInfinite::PlayFill, playing,
-                   playing ? T("Stop") : T("Play the edit (pauses the canvas audio)"), true))
-         TogglePlay();
-      ImGui::EndDisabled();
-      const auto toggle = [&](const char* label, bool& v, const char* tip)
-      {
-         FormParts::Inline(0.0f, in);
-         const bool before = v;
-         if (AudioToggleButton(label, &v, TextW(label), tok::tile))
-         {
-            const bool after = v;
-            v = before;
-            PushUndo();
-            v = after;
-            s.dirty = true;
-            AudioEngine::Instance().StudioLoop().SetLoop(s.doc.wide.loop);
-            AudioEngine::Instance().StudioLoop().Restart();
-         }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", tip);
-      };
-      toggle(L("Loop##studioLoop"), s.doc.wide.loop, T("Loop the edit; off plays it once"));
-      toggle(L("Ping-pong##studioPP"), s.doc.wide.pingPong, T("While looping, play forward then back"));
-      toggle(L("Reverse##studioRev"), s.doc.wide.reverse, T("Play the whole edit backwards"));
 
-      // Slice: the auto-slicers, split, grid snap, zoom.
-      FormParts::Inline(0.0f, between);
-      ImGui::BeginDisabled(!has);
-      if (TextChip(L("Slice##studioSlice")))
-         ImGui::OpenPopup("##studioSliceMenu");
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Cut the sample by transients, grid or into equal parts"));
-      FormParts::Inline(0.0f, in);
-      {
-         // The tool dropdown, the same as the Timeline's and the Piano Roll's.
-         const bool nonDefault = s.tool != 0;
-         ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-         const bool clicked = ActionButton::Draw("##studioToolPicker", ImVec2(34.0f, tok::tile));
-         ActionButton::Scoped() = ActionButton::Kind::Plain;
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool"));
-         const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-         const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
-         const char* tg = s.tool == 1 ? IconsInfinite::Scissors : s.tool == 2 ? IconsInfinite::Hand : IconsInfinite::Pointer;
-         ImDrawList* tdl = ImGui::GetWindowDrawList();
-         glyph::Draw(tdl, ImVec2(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, tg);
-         glyph::DrawChevronDown(tdl, ImVec2(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f), 8.0f, col, 1.3f);
-         if (clicked)
-            ImGui::OpenPopup("##studioToolMenu");
-         ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
-         if (MenuParts::BeginPopup("##studioToolMenu"))
-         {
-            if (MenuParts::Item(L("Select"), "A", s.tool == 0))
-               s.tool = 0;
-            if (MenuParts::Item(L("Cut"), "B", s.tool == 1))
-               s.tool = 1;
-            if (MenuParts::Item(L("Hand"), "H", s.tool == 2))
-               s.tool = 2;
-            MenuParts::Separator();
-            const double mid = s.viewStart + s.viewLen * 0.5;
-            if (MenuParts::Item(L("Zoom In"), "="))
-               ZoomAround(mid, 0.8);
-            if (MenuParts::Item(L("Zoom Out"), "-"))
-               ZoomAround(mid, 1.25);
-            if (MenuParts::Item(L("Fit"), "Shift+Z"))
-               ViewAll();
-            MenuParts::EndPopup();
-         }
-      }
-      FormParts::Inline(0.0f, in);
-      if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
-         s.snapGrid = !s.snapGrid;
-      ImGui::EndDisabled();
-      FormParts::Inline(0.0f, in);
-      if (IconChip("##studioSettings", IconsInfinite::Edit, s.settingsOpen, T("Sample and slice settings")))
-         s.settingsOpen = !s.settingsOpen;
       DrawSliceMenu();
       DrawReplaceConfirm();
 
@@ -2998,7 +3038,7 @@ namespace
       const bool studioMode = gAudioMode == AudioMode::Studio;
       const char* audioL = studioMode ? T("Sample Audio On") : T("Enable Sample Audio");
       const float audioW = ImGui::CalcTextSize(audioL).x + 2.0f * tok::space_2;
-      const float rightW = TextW(exportL) + TextW(convertL) + audioW + 2.0f * in;
+      const float rightW = TextW(exportL) + TextW(convertL) + audioW + kIconW + 3.0f * in;
       FormParts::Inline(0.0f, 0.0f);
       ImGui::SetCursorScreenPos(ImVec2(std::max(ImGui::GetCursorScreenPos().x + between, x0 + w - rightW), ImGui::GetCursorScreenPos().y));
       ImGui::BeginDisabled(!has || s.busy);
@@ -3017,6 +3057,9 @@ namespace
          HelpTip("%s", !gAudioStartError.empty() && AudioEngine::Instance().SampleRate() <= 0.0
                           ? gAudioStartError.c_str()
                           : T("Sample Audio: you hear the Studio's edit; the canvas, Session and Timeline stay silent"));
+      FormParts::Inline(0.0f, in);
+      if (IconChip("##studioSettings", IconsInfinite::Edit, s.settingsOpen, T("Sample and slice settings")))
+         s.settingsOpen = !s.settingsOpen;
 
       if (MenuParts::BeginPopup("##studioExportMenu"))
       {
@@ -3062,13 +3105,26 @@ namespace
    // A file dropped anywhere on the Studio opens in it (the canvas leaves drops inside this rect alone).
    void TakeDrops()
    {
+      // A sample dragged from the Library (StagePopupsA hands it over on release).
+      if (!gSampleStudioPendingDrop.empty())
+      {
+         const std::string path = std::move(gSampleStudioPendingDrop);
+         gSampleStudioPendingDrop.clear();
+         if (S().recording)
+            S().status = T("Stop recording first");
+         else
+            LoadFile(path);
+      }
       if (gDroppedFiles.empty() || gDropPos.x < gSampleStudioRectMin.x || gDropPos.x >= gSampleStudioRectMax.x ||
           gDropPos.y < gSampleStudioRectMin.y || gDropPos.y >= gSampleStudioRectMax.y)
          return;
       for (const std::string& p : gDroppedFiles)
          if (IsAudioPath(p))
          {
-            LoadFile(p);
+            if (S().recording)
+               S().status = T("Stop recording first");
+            else
+               LoadFile(p);
             break;
          }
       gDroppedFiles.clear();

@@ -625,9 +625,12 @@ namespace Platform
    // `channelOffset`: 0-indexed channel to read (0 = input 1, 1 = input 2, etc.)
    // `isMono`: when true, copies channelOffset to both outChannels[0] and outChannels[1] (center mono).
    //           when false, reads stereo pair (channelOffset and channelOffset + 1).
+   // `outFrames`: when set, receives how many real frames were read (the rest
+   // were zero-filled). A recorder must use this, not the return value.
    // Audio-thread safe: lock-free, no allocation.
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels,
-                             uint64_t& readerCursor, int channelOffset = 0, bool isMono = false);
+                             uint64_t& readerCursor, int channelOffset = 0, bool isMono = false,
+                             int* outFrames = nullptr);
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
 
    // ---- audio plugin hosting -----------------------------------------------
