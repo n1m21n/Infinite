@@ -3348,7 +3348,8 @@ void RunView3DTest()
    Check("render finds or makes an Output", out != nullptr);
    Check("a second ask reuses it", View3DEnsureOutput() == out);
 
-   NewPatch();
+   // The scene stays up: the frames after this one draw the panel with it.
+   gView3DOpen = true;
    printf("VIEW3DTEST %s\n", ok ? "OK" : "FAIL");
 }
 
