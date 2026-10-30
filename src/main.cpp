@@ -91,7 +91,8 @@ int main(int argc, char** argv)
    // watchdog's _Exit, and anything not yet saved by then is lost. They are
    // only ever changed on this thread, so the audio engine can still be running.
    SetQuitStep("save prediction profiles");
-   if (gHeadlessJob.mode == Headless::Mode::None) // headless renders never write the learned profiles
+   // Headless renders never write the learned profiles; nor does a run with learning off or after Forget me.
+   if (gHeadlessJob.mode == Headless::Mode::None && LearningLog::MaySaveProfiles())
    {
       if (ColorStats::Engine::Instance().HasLearnedData())
          ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");

@@ -2,6 +2,8 @@
 
 #include "app/AppCommon.h"
 #include "app/graph/RoleCritic.h"
+#include "app/graph/UserStyle.h"
+#include "core/MovementLog.h"
 #include "core/Transport.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
@@ -47,6 +49,12 @@ namespace LearningLog
 
       bool gEnabled = true;
       bool gStarted = false;
+      bool gTestMode = false; // INFINITE_LEARNING_DIR: never touch the player's own folders
+      bool gForgotten = false;
+      // The derived profiles a starter seeds and Forget me deletes (AppSupportDir()/prediction).
+      const char* const kProfileFiles[] = { "notes_style.bin",    "rhythm_style.bin",  "velocity_profile.bin",
+                                            "quantize_profile.bin", "tempo_profile.txt", "color_stats.bin",
+                                            "generate_taste.txt", "generate_taste_vec.txt", "generate_seen.txt" };
       std::string gDir; // empty: off for this run
       std::string gSession;
       double gTestClock = -1.0;
@@ -448,7 +456,7 @@ namespace LearningLog
       return total;
    }
 
-   void Start()
+   void Start(const std::string& starterDir)
    {
       if (gStarted)
          return;
@@ -458,6 +466,7 @@ namespace LearningLog
       {
          gDir = dir;
          gEnabled = true;
+         gTestMode = true;
       }
       else
       {
@@ -465,6 +474,8 @@ namespace LearningLog
             if (std::strncmp(*env, "INFINITE_", 9) == 0)
                return; // a self-test or headless job: never the player's folder
          gDir = AppPaths::AppSupportDir() + "/learning";
+         if (!starterDir.empty())
+            SeedStarter(starterDir, AppPaths::AppSupportDir() + "/prediction", AppPaths::AppSupportDir() + "/Infinite.starter-profile");
       }
       std::random_device rd;
       char tail[8];
@@ -646,8 +657,32 @@ namespace LearningLog
          StartProfileIfDue(now);
    }
 
+   bool MaySaveProfiles() { return gEnabled && !gForgotten; }
+
+   bool SeedStarter(const std::string& starterDir, const std::string& predictionDir, const std::string& marker)
+   {
+      std::error_code ec;
+      if (starterDir.empty() || fs::exists(AppPaths::FsPath(marker), ec) || !fs::is_directory(AppPaths::FsPath(starterDir), ec))
+         return false;
+      for (const char* f : kProfileFiles)
+         if (fs::exists(AppPaths::FsPath(predictionDir + "/" + f), ec))
+            return false; // this machine has learned already; it keeps its own
+      fs::create_directories(AppPaths::FsPath(predictionDir), ec);
+      int copied = 0;
+      for (const char* f : kProfileFiles)
+      {
+         const fs::path src = AppPaths::FsPath(starterDir + "/" + f);
+         if (fs::exists(src, ec) && fs::copy_file(src, AppPaths::FsPath(predictionDir + "/" + f), ec))
+            copied++;
+      }
+      std::ofstream m(AppPaths::FsPath(marker), std::ios::trunc);
+      m << "starter profile seeded " << IsoNow() << " (" << copied << " files)\n";
+      return copied > 0;
+   }
+
    void ForgetMe()
    {
+      gForgotten = true;
       gPending.clear();
       gLastTake.clear();
       gMidiLines.clear();
@@ -658,6 +693,16 @@ namespace LearningLog
       std::error_code ec;
       fs::remove_all(AppPaths::FsPath(gDir), ec);
       gLastProfileCheck = Now(); // nothing to build from for a while
+      if (gTestMode)
+         return;
+      const std::string pred = AppPaths::AppSupportDir() + "/prediction";
+      for (const char* f : kProfileFiles)
+         fs::remove(AppPaths::FsPath(pred + "/" + f), ec);
+      const std::string moves = MovementLog::GetLogDirectory();
+      if (!moves.empty())
+         for (const auto& e : fs::directory_iterator(AppPaths::FsPath(moves), ec))
+            fs::remove(e.path(), ec); // the open session file goes too where the platform allows it
+      UserStyle::ResetTaste();
    }
 
    bool RebuildProfile()

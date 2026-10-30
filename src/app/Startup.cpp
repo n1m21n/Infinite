@@ -1485,7 +1485,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    });
    MovementLog::Start();
    if (gHeadlessJob.mode == Headless::Mode::None)
-      LearningLog::Start();
+      LearningLog::Start(BundledResourcePath("starter-profile"));
    // Headless jobs neither read nor write the learned profiles: a render must not depend on (or change)
    // the user's accumulated data, or the same patch renders differently run to run.
    if (gHeadlessJob.mode == Headless::Mode::None)

@@ -810,8 +810,29 @@ bool RunLearningLogTest()
    check(!p.is_discarded() && p["harmony"].value("notes", 0) == 7 && p["harmony"]["chord_size"][2].get<double>() > 0.0,
          "profile: notes counted, one three-note chord");
    check(!p.is_discarded() && p["melody"].value("step", 0.0) >= 0.5, "profile: C D E G is mostly steps");
+   // Starter profile: seeds an empty prediction folder once, never over learned files, never after its marker.
+   {
+      const fs::path st = dir.parent_path() / "infinite_starter_test";
+      fs::remove_all(st, ec);
+      fs::create_directories(st / "starter", ec);
+      std::ofstream(st / "starter" / "notes_style.bin") << "x";
+      std::ofstream(st / "starter" / "generate_taste.txt") << "0 1 2 3\n";
+      const std::string s = (st / "starter").string(), pr = (st / "pred").string(), mk = (st / "marker").string();
+      check(LearningLog::SeedStarter(s, pr, mk) && fs::exists(st / "pred" / "notes_style.bin") && fs::exists(st / "marker"),
+            "starter seeds an empty folder and writes its marker");
+      fs::remove_all(st / "pred", ec);
+      check(!LearningLog::SeedStarter(s, pr, mk) && !fs::exists(st / "pred"), "starter: never again once the marker exists");
+      fs::remove(st / "marker", ec);
+      fs::create_directories(st / "pred", ec);
+      std::ofstream(st / "pred" / "rhythm_style.bin") << "mine";
+      check(!LearningLog::SeedStarter(s, pr, mk) && !fs::exists(st / "pred" / "notes_style.bin"),
+            "starter: never over a folder that has learned");
+      fs::remove_all(st, ec);
+   }
+   check(LearningLog::MaySaveProfiles(), "profiles may save before Forget me");
    LearningLog::ForgetMe();
    check(!fs::exists(dir), "Forget me deletes the folder");
+   check(!LearningLog::MaySaveProfiles(), "no profile saves after Forget me");
    LearningLog::Stop();
    fs::remove_all(dir, ec);
    printf("LEARNINGTEST %s (%d failures)\n", fails == 0 ? "PASS" : "FAIL", fails);

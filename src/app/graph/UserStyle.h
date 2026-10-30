@@ -64,6 +64,7 @@ namespace UserStyle
    void NoteSaved(int part, int card, int seed); // a saved patch reopened: that loop was kept, counted once
    void SettleTaste();                    // main thread, each frame: a loop left alone lands
    int DrawCard(int part, double u, int cardCount); // by what has landed for this part
+   void ResetTaste();                     // Forget me: the in-memory taste starts over (the files are deleted by the caller)
 
    // 16-dimensional contextual preference model over musical features phi(x) in [-1, 1].
    // Every landed/skipped sample updates the user's feature weights across all styles.

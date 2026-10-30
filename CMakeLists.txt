@@ -878,6 +878,8 @@ set(SYPHON_SOURCES
 # Interface translation (docs/plans/i18n): <code>.tsv tables and the CJK font subsets, copied
 # into every platform's Resources/ layout below. Globbed so a new language is one new file.
 file(GLOB INFINITE_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang/*.tsv")
+# Starter profile (PLAN-2026-10-30 item 22): seeded into a fresh install's prediction folder once.
+file(GLOB INFINITE_STARTER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/starter-profile/*")
 file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Noto/*-Subset.otf")
 
 set(APPLE_SOURCES
@@ -1377,6 +1379,9 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/starter-profile"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/starter-profile"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
@@ -1436,6 +1441,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/starter-profile"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/starter-profile"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
@@ -1750,8 +1758,9 @@ if(APPLE)
     set(INFINITE_ICON_FONT_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf")
-    target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES})
+    target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES} ${INFINITE_STARTER_FILES})
     set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
+    set_source_files_properties(${INFINITE_STARTER_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/starter-profile")
     set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
     set_source_files_properties(${INFINITE_ICON_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/icons")
 

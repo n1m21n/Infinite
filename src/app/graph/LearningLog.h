@@ -20,7 +20,9 @@
 // a test folder and turns it on. Main thread only, except the profile rebuild, which runs on its own thread.
 namespace LearningLog
 {
-   void Start(); // after MovementLog::Start
+   // After MovementLog::Start and before the prediction profiles load. `starterDir`: the bundled starter profile
+   // (resources/starter-profile), seeded into a fresh install's prediction folder once.
+   void Start(const std::string& starterDir = std::string());
    void Stop();  // ends the session line, flushes, joins the profile thread
 
    bool Enabled(); // the setting (saved with the workspace settings)
@@ -41,8 +43,16 @@ namespace LearningLog
    // Once per frame: reads played notes, settles takes nobody acted on, flushes, starts the profile rebuild when due.
    void Frame(double now);
 
-   // Deletes the learning folder (the session goes on, writing into a fresh one).
+   // Deletes the learning folder, the derived prediction profiles and the movement logs, and forgets the in-memory
+   // taste (the session goes on, writing into a fresh learning folder). A test folder: only that folder.
    void ForgetMe();
+   // False after Forget me or with learning off: the prediction profiles are not saved (or they would come back).
+   bool MaySaveProfiles();
+
+   // Copies the starter profile into `predictionDir` when that folder has none of its files and `marker` does not
+   // exist, then writes `marker` (it lives outside learning/, so Forget me does not bring the starter back). True
+   // when it copied.
+   bool SeedStarter(const std::string& starterDir, const std::string& predictionDir, const std::string& marker);
 
    // Builds profile/user_profile.json from the logs now, on this thread. False with nothing to build from.
    bool RebuildProfile();

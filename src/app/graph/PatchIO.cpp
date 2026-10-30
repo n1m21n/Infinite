@@ -704,7 +704,7 @@ namespace app
    // shutdown-path pairing as PollColorStatsAutosave above.
    void PollPredictionProfilesAutosave(double now)
    {
-      if (gHeadlessJob.mode != Headless::Mode::None)
+      if (gHeadlessJob.mode != Headless::Mode::None || !LearningLog::MaySaveProfiles())
          return;
       static double sLastSave = 0.0;
       if (sLastSave > 0.0 && now - sLastSave < (double)gAutosaveSeconds)

@@ -1,0 +1,38 @@
+{
+ "built": "2026-10-30",
+ "source": "owner's prediction profiles (features only)",
+ "files": {
+  "notes_style.bin": {
+   "bytes": 3240,
+   "sha1": "37211d437d2d"
+  },
+  "rhythm_style.bin": {
+   "bytes": 1724,
+   "sha1": "42d9714fc54d"
+  },
+  "velocity_profile.bin": {
+   "bytes": 16004,
+   "sha1": "aa32dcb48928"
+  },
+  "quantize_profile.bin": {
+   "bytes": 2704,
+   "sha1": "bf3af7c544cb"
+  },
+  "tempo_profile.txt": {
+   "bytes": 1960,
+   "sha1": "448fea1f673c"
+  },
+  "color_stats.bin": {
+   "bytes": 830,
+   "sha1": "21bc8391a540"
+  },
+  "generate_taste.txt": {
+   "bytes": 5376,
+   "sha1": "a82009b0c7d0"
+  },
+  "generate_taste_vec.txt": {
+   "bytes": 282,
+   "sha1": "825f74695446"
+  }
+ }
+}
