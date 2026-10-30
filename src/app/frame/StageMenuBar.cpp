@@ -51,6 +51,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railStudio", groupTop + 7.0f * step, IconsInfinite::Waveform, nullptr, gSampleStudioOpen,
                        T("Sample studio - generate and shape a loop (Shift+W)")))
       gSampleStudioOpen = !gSampleStudioOpen;
+   if (PanelRail::Item("##railPianoRoll", groupTop + 8.0f * step, IconsInfinite::FamilyNotes, nullptr, gPianoRollOpen,
+                       T("Piano roll - edit and generate notes (Shift+R)")))
+      gPianoRollOpen = !gPianoRollOpen;
    PanelRail::End();
 }
 
@@ -410,6 +413,7 @@ void DrawMenuBar(FrameCtx& fc)
             }
 
             MenuParts::Check(L("Sample Studio"), &gSampleStudioOpen);
+            MenuParts::Check(L("Piano Roll"), &gPianoRollOpen);
 
             if (MenuParts::SubMenu(L("Show Set")))
             {

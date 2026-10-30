@@ -181,6 +181,10 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_W, false))
          gSampleStudioOpen = !gSampleStudioOpen;
 
+      // Shift+R: the docked Piano Roll
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_R, false))
+         gPianoRollOpen = !gPianoRollOpen;
+
       // Shift+Y: fit view to content, replacing the old menu-only entry
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_Y, false))
          gRequestFitView = true;
@@ -333,7 +337,8 @@ void DrawKeyboard(FrameCtx& fc)
          gArrangeClaimedKeys = false;
       if (!gSessionPanelOpen)
          gSessionClaimedKeys = false;
-      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys);
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys);
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||

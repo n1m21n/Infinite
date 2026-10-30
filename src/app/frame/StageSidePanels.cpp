@@ -701,6 +701,9 @@ void DrawSidePanels(FrameCtx& fc)
       // Sample studio (View > Sample Studio or Shift+W), bottom or top like the Timeline.
       if (gSampleStudioOpen && gSampleStudioDock != 3)
          DrawSampleStudioDocked("##samplestudio_bottom", ImVec2(0, gSampleStudioHeight));
+      // Piano Roll (View > Piano Roll or Shift+R), bottom or top like the Timeline.
+      if (gPianoRollOpen && gPianoRollDock != 3)
+         DrawPianoRollDocked("##pianoroll_bottom", ImVec2(0, gPianoRollHeight));
 
       ImGui::End();
 

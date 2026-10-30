@@ -1067,7 +1067,8 @@ namespace app
          gArrangeClaimedKeys = true;
          gSessionClaimedKeys = false;
       }
-      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys);
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||
+                        (gPianoRollOpen && gPianoRollClaimedKeys);
 
       Transport& tr = Transport::Instance();
 
