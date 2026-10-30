@@ -152,6 +152,7 @@ namespace
       bool recording = false;             // capturing the audio input into recL/recR
       uint64_t recCursor = 0;
       std::vector<float> recL, recR;
+      std::string recErr;                 // why the input is not delivering (permission, device)
       // View, in source frames.
       double viewStart = 0.0, viewLen = 1.0;
       float level = 1.0f; // vertical zoom
@@ -644,6 +645,7 @@ namespace
       s.recL.clear();
       s.recR.clear();
       s.recCursor = 0;
+      s.recErr.clear();
       s.recording = true;
       Platform::AudioInputCaptureAddRef();
       s.status = T("Recording from the audio input. Press I to stop");
@@ -657,6 +659,7 @@ namespace
          return;
       std::string err;
       Platform::AudioInputCapturePump(err);
+      s.recErr = err;
       float bufL[4096], bufR[4096];
       float* chans[2] = { bufL, bufR };
       for (int guard = 0; guard < 64; guard++)
@@ -2095,6 +2098,42 @@ namespace
       Studio& s = S();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 mx(mn.x + size.x, mn.y + size.y);
+      if (s.recording)
+      {
+         // The take so far, drawn live: one min/max column per pixel across everything captured.
+         ImGui::SetCursorScreenPos(mn);
+         ImGui::InvisibleButton("##studioWave", size);
+         gSampleStudioClaimedKeys = ImGui::IsItemHovered() && !ImGui::GetIO().WantTextInput;
+         FieldWell::Draw(dl, mn, mx, false, false);
+         const float mid = (mn.y + mx.y) * 0.5f, amp = (mx.y - mn.y) * 0.45f;
+         const size_t n = s.recL.size();
+         const int cols = std::max(1, (int)size.x);
+         const ImU32 col = tok::U32(tok::action_record, CategoryColors::IsThemeLight());
+         float peak = 0.0f;
+         for (int x = 0; x < cols && n > 0; x++)
+         {
+            const size_t a = n * (size_t)x / (size_t)cols, b = std::max(a + 1, n * (size_t)(x + 1) / (size_t)cols);
+            float lo = 0.0f, hi = 0.0f;
+            for (size_t i = a; i < b && i < n; i += std::max<size_t>(1, (b - a) / 64))
+            {
+               lo = std::min(lo, s.recL[i]);
+               hi = std::max(hi, s.recL[i]);
+            }
+            peak = std::max(peak, std::max(hi, -lo));
+            dl->AddLine(ImVec2(mn.x + (float)x + 0.5f, mid - hi * amp), ImVec2(mn.x + (float)x + 0.5f, mid - lo * amp + 1.0f), col);
+         }
+         dl->AddLine(ImVec2(mn.x, mid), ImVec2(mx.x, mid), ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.25f));
+         const double secs = (double)n / (AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : kRate);
+         char buf[160];
+         if (!s.recErr.empty())
+            snprintf(buf, sizeof buf, "%s", s.recErr.c_str());
+         else if (!Platform::AudioInputCaptureIsRunning())
+            snprintf(buf, sizeof buf, "%s", T("Waiting for the audio input (allow the microphone if macOS asks)"));
+         else
+            snprintf(buf, sizeof buf, "%s %d:%04.1f", T("Recording"), (int)secs / 60, std::fmod(secs, 60.0));
+         dl->AddText(ImVec2(mn.x + 12.0f, mn.y + 8.0f), ImGui::GetColorU32(ImGuiCol_Text), buf);
+         return;
+      }
       if (!s.src)
       {
          ImGui::SetCursorScreenPos(mn);
