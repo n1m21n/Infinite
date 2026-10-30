@@ -230,7 +230,7 @@ namespace PatchExplain
       }
       for (const Patch::StreamRecord& s : data.streams)
       {
-         const char* lane = s.type == Patch::kStreamAudio ? "audio" : "video";
+         const char* lane = s.type == Patch::kStreamAudio ? "audio" : s.type == Patch::kStreamMidi ? "MIDI" : "video";
          for (const Patch::ClipRecord& c : s.clips)
          {
             std::string t = c.sessionScene >= 0
@@ -241,10 +241,14 @@ namespace PatchExplain
                                     Num((float)c.startTick / 960.0f + 1.0f) + ", " +
                                     Num((float)c.lengthTick / 960.0f) + " beats";
             std::string src = "unassigned";
+            // A MIDI clip plays through the Piano Roll node its lane links to.
+            const uint64_t srcUid = s.type == Patch::kStreamMidi ? s.noteNodeUid : c.srcUid;
             for (const Patch::NodeRecord& n : data.nodes)
-               if (c.srcUid != 0 && n.uid == c.srcUid)
+               if (srcUid != 0 && n.uid == srcUid)
                   src = label(n.index);
             t += ", source " + src;
+            if (s.type == Patch::kStreamMidi)
+               t += ", " + std::to_string(c.notes.size()) + " notes" + (c.midiLoop ? ", looped" : "");
             if (c.srcOutput != 0)
                t += " out " + std::to_string(c.srcOutput);
             if (c.gainDb != 0.0f)

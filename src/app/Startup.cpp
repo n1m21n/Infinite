@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/graph/LearningLog.h"
 #include "platform/PluginCrashGuard.h"
+#include "app/graph/NoteGen.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
@@ -580,6 +581,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunRestartTest() ? 0 : 1;
    if (getenv("INFINITE_CHORDPROGTEST") != nullptr)
       return RunChordProgTest() ? 0 : 1;
+   if (getenv("INFINITE_PIANOROLLTEST") != nullptr)
+      return RunPianoRollTest() ? 0 : 1;
+   if (getenv("INFINITE_NOTEGENTEST") != nullptr)
+   {
+      RegisterNodes(); // the note graphs spawn real nodes; no GL involved
+      return NoteGen::RunSelfTest() ? 0 : 1;
+   }
 
    if (getenv("INFINITE_MPETEST") != nullptr)
       return RunMpeFixture() ? 0 : 1;

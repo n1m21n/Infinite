@@ -465,6 +465,9 @@ Generate Samples|variation|a recipe param, read only by generate's offline rende
 Generate Samples|bars|a recipe param, read only by generate's offline render (GENSAMPLETEST)
 Generate Samples|followTransport|a recipe param, read only by generate's offline render (GENSAMPLETEST)
 Generate Samples|part|a recipe param, read only by generate's offline render (GENSAMPLETEST parts)
+Piano Roll|transpose|it shapes the linked lane's notes, and the bare rig's node has no lane, so nothing plays; INFINITE_PIANOROLLTEST 5b checks it reaches the audio half
+Piano Roll|velocity|it shapes the linked lane's notes, and the bare rig's node has no lane, so nothing plays; INFINITE_PIANOROLLTEST 5b checks it reaches the audio half
+Piano Roll|useGlobalScale|it shapes the linked lane's notes, and the bare rig's node has no lane, so nothing plays; INFINITE_PIANOROLLTEST 5b checks it reaches the audio half
 Generate Samples|generated|not a control: saved state that the patch held a generated loop
 Generate Samples|genVersion|not a control: the generator version that made the saved loop
 Generate Samples|card|a recipe param, read only by generate's offline render (CurrentRecipe picks the style from it); GENSAMPLETEST covers the render

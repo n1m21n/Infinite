@@ -168,8 +168,10 @@ void DrawSidePanels(FrameCtx& fc)
       // box (via ed::GetNodePosition/GetNodeSize, both canvas-space here
       // just like the param picker's mp above) and a click assigns it as the
       // clip's source.
-      if (gArrangeAssigningClipId != 0 && Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId) == nullptr)
-         gArrangeAssigningClipId = 0;
+      // A MIDI clip has no source node to assign (its lane links a Piano Roll node).
+      if (gArrangeAssigningClipId != 0)
+         if (const Arrange::Lane* al = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId); al == nullptr || al->type == Arrange::kLaneMidi)
+            gArrangeAssigningClipId = 0;
       if (gArrangeAssigningClipId != 0)
       {
          const Arrange::Lane* assignLane = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId);

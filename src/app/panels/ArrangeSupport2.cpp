@@ -1015,7 +1015,7 @@ namespace app
             break;
          }
       }
-      if (laneIdx < 0)
+      if (laneIdx < 0 || gArrange.lanes[laneIdx].type == Arrange::kLaneMidi)
          return;
 
       const bool isAudioKind = (kind == Arrange::ImportMediaKind::Audio);

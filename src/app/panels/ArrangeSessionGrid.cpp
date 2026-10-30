@@ -249,7 +249,7 @@ namespace app
          Arrange::ImportMediaKind kind;
          *consumed = false;
          const Arrange::Lane* lane = Arrange::FindLane(gArrange, laneId);
-         if (lane == nullptr || !ArrangeMediaKindForPath(path, kind))
+         if (lane == nullptr || lane->type == Arrange::kLaneMidi || !ArrangeMediaKindForPath(path, kind))
             return;
          const bool audioKind = kind == Arrange::ImportMediaKind::Audio;
          if (audioKind != (lane->type == Arrange::kLaneAudio))

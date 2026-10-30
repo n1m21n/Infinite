@@ -1,5 +1,6 @@
 // Audio chain collection, topology rebuild, engine start and recovery (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "arrange/NoteSchedule.h"
 
 namespace app
 {
@@ -325,10 +326,54 @@ namespace app
       RebuildAudioTopology();
    }
 
+   // Hands every Piano Roll node the flattened notes of the MIDI lane linked
+   // to it (docs/plans/piano-roll/README.md §7). A node is rebuilt only when
+   // its lane, the arrangement revision or the Session launch state moved, so
+   // a quiet frame costs one pass over the nodes. Called once a frame and at
+   // every topology rebuild, which is how a headless render gets its notes.
+   void ArrangeNoteSchedulesPublish()
+   {
+      const Arrange::Model& m = ArrangePlaybackModel();
+      for (GraphNode& gn : gNodes)
+      {
+         auto* pr = dynamic_cast<PianoRollNode*>(gn.node.get());
+         if (!pr)
+            continue;
+         const Arrange::Lane* lane = nullptr;
+         for (const Arrange::Lane& l : m.lanes)
+            if (l.type == Arrange::kLaneMidi && l.noteNodeUid == gn.uid)
+            {
+               lane = &l;
+               break;
+            }
+         uint64_t key = 0;
+         if (lane)
+         {
+            key = (m.revision * 0x9E3779B97F4A7C15ull) ^ (ArrangeSessionGeneration() << 32) ^ lane->id ^
+                  (uint64_t)(uintptr_t)&m;
+            key |= 1; // never 0, which means "no lane"
+         }
+         if (key == pr->scheduleKey)
+            continue;
+         pr->scheduleKey = key;
+         pr->laneId = lane ? lane->id : 0;
+         pr->laneName = lane ? lane->name : std::string();
+         if (!lane)
+         {
+            pr->SetSchedule(nullptr);
+            continue;
+         }
+         auto s = std::make_unique<Arrange::NoteSchedule>();
+         Arrange::BuildNoteSchedule(*lane, *s);
+         pr->SetSchedule(std::move(s));
+      }
+   }
+
    void RebuildAudioTopology()
    {
       if (gDeferAudioRebuild || gAudioPanicked)
          return;
+      ArrangeNoteSchedulesPublish();
       ScopedPerfTimer perfTimer("RebuildAudioTopology");
       std::vector<AudioTopologyEntry> order;
       std::set<INode*> visited;
@@ -1109,6 +1154,8 @@ namespace app
    {
       for (const Arrange::Lane& l : gArrange.lanes)
       {
+         if (l.type == Arrange::kLaneMidi)
+            continue;
          const bool isVideo = l.type == Arrange::kLaneVideo;
          if (isVideo ? !wantVideo : !wantAudio)
             continue;

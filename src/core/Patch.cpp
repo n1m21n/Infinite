@@ -500,6 +500,40 @@ static void WriteBody(std::ostream& file, const Data& data)
             file << "sessionslot " << i << " " << c.id << " " << c.sessionScene << " " << c.followAction << " "
                  << c.followBars << " " << (c.slotLoop ? 1 : 0) << " " << c.slotLoopTicks << " "
                  << c.slotQuantize << " " << c.slotLaunchMode << "\n";
+      // MIDI lanes (docs/plans/piano-roll/README.md §5): link, clip content
+      // window, then the notes. Own tags, so an older reader skips them.
+      if (s.type == kStreamMidi)
+      {
+         if (s.noteNodeUid != 0 || s.scaleSnap)
+            file << "streamnote " << i << " " << s.noteNodeUid << " " << (s.scaleSnap ? 1 : 0) << "\n";
+         for (const ClipRecord& c : s.clips)
+         {
+            file << "clipmidi " << i << " " << c.id << " " << c.nextNoteId << " " << c.contentOffset << " "
+                 << (c.midiLoop ? 1 : 0) << " " << c.loopStart << " " << c.loopLength << " " << c.transpose << " "
+                 << FloatToString(c.velScale) << " " << FloatToString(c.swing) << "\n";
+            for (const Arrange::Note& n : c.notes)
+            {
+               file << "clipnote " << i << " " << c.id << " id=" << n.id << " s=" << n.start << " l=" << n.length
+                    << " p=" << (int)n.pitch;
+               if (n.vel != 100) file << " v=" << (int)n.vel;
+               if (n.relVel != 64) file << " r=" << (int)n.relVel;
+               if (n.chance != 1.0f) file << " c=" << FloatToString(n.chance);
+               if (n.mute) file << " m=1";
+               if (n.gainDb != 0.0f) file << " g=" << FloatToString(n.gainDb);
+               if (n.pan != 0.0f) file << " pan=" << FloatToString(n.pan);
+               const char* names[3] = { "bend", "press", "timbre" };
+               const std::vector<Arrange::ExprPoint>* curves[3] = { &n.bend, &n.pressure, &n.timbre };
+               for (int k = 0; k < 3; k++)
+                  if (!curves[k]->empty())
+                  {
+                     file << " " << names[k] << "=";
+                     for (size_t q = 0; q < curves[k]->size(); q++)
+                        file << (q ? "," : "") << (*curves[k])[q].at << ":" << FloatToString((*curves[k])[q].v);
+                  }
+               file << "\n";
+            }
+         }
+      }
    }
    for (const MarkerRecord& mk : data.markers)
       file << "marker " << mk.id << " " << mk.posTick << " " << mk.color << " " << EscapeLine(mk.name) << "\n";
@@ -1038,7 +1072,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          if (!raw.empty() && raw[0] == ' ')
             raw.erase(0, 1);
          s.name = UnescapeLine(raw);
-         if (s.type != kStreamVideo && s.type != kStreamAudio) s.type = kStreamVideo;
+         if (s.type != kStreamVideo && s.type != kStreamAudio && s.type != kStreamMidi) s.type = kStreamVideo;
          if (s.blendMode < 0 || s.blendMode > 34) s.blendMode = 0;
          if (!std::isfinite(s.opacity)) s.opacity = 1.0f;
          s.opacity = std::clamp(s.opacity, 0.0f, 1.0f);
@@ -1252,6 +1286,93 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                   c.speed = speed;
                   c.reverse = reverse != 0;
                }
+         }
+      }
+      else if (tag == "streamnote")
+      {
+         int streamIdx = -1, snap = 0;
+         uint64_t uid = 0;
+         if (in >> streamIdx >> uid >> snap && streamIdx >= 0 && streamIdx < (int)outData.streams.size())
+         {
+            outData.streams[streamIdx].noteNodeUid = uid;
+            outData.streams[streamIdx].scaleSnap = snap != 0;
+         }
+      }
+      else if (tag == "clipmidi" || tag == "clipnote")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         if (!(in >> streamIdx >> clipId) || streamIdx < 0 || streamIdx >= (int)outData.streams.size() || clipId == 0)
+            continue;
+         // Notes arrive in long runs for one clip: remember the last match.
+         static thread_local size_t sLastClip = 0;
+         std::vector<ClipRecord>& clips = outData.streams[streamIdx].clips;
+         ClipRecord* c = nullptr;
+         if (sLastClip < clips.size() && clips[sLastClip].id == clipId)
+            c = &clips[sLastClip];
+         else
+            for (size_t k = 0; k < clips.size(); k++)
+               if (clips[k].id == clipId) { c = &clips[k]; sLastClip = k; break; }
+         if (c == nullptr)
+            continue;
+         if (tag == "clipmidi")
+         {
+            int loop = 0;
+            if (in >> c->nextNoteId >> c->contentOffset >> loop >> c->loopStart >> c->loopLength >> c->transpose
+                   >> c->velScale >> c->swing)
+               c->midiLoop = loop != 0;
+            // Ranges are the model's business: Normalize clamps on apply.
+            if (!std::isfinite(c->velScale)) c->velScale = 1.0f;
+            if (!std::isfinite(c->swing)) c->swing = 0.0f;
+         }
+         else
+         {
+            // Named fields (Patch.h): anything missing keeps the Note default.
+            Arrange::Note n;
+            std::string field;
+            auto curve = [](const std::string& text, std::vector<Arrange::ExprPoint>& out) {
+               out.clear();
+               std::istringstream cs(text);
+               std::string pair;
+               while (std::getline(cs, pair, ',') && out.size() < 4096)
+               {
+                  const size_t colon = pair.find(':');
+                  if (colon == std::string::npos)
+                     continue;
+                  Arrange::ExprPoint p;
+                  p.at = std::strtoll(pair.c_str(), nullptr, 10);
+                  p.v = std::strtof(pair.c_str() + colon + 1, nullptr);
+                  if (std::isfinite(p.v))
+                     out.push_back(p);
+               }
+            };
+            while (in >> field)
+            {
+               const size_t eq = field.find('=');
+               if (eq == std::string::npos)
+                  continue;
+               const std::string key = field.substr(0, eq);
+               const std::string val = field.substr(eq + 1);
+               const char* v = val.c_str();
+               if (key == "id") n.id = (uint32_t)std::strtoul(v, nullptr, 10);
+               else if (key == "s") n.start = std::strtoll(v, nullptr, 10);
+               else if (key == "l") n.length = std::strtoll(v, nullptr, 10);
+               else if (key == "p") n.pitch = (uint8_t)std::clamp((int)std::strtol(v, nullptr, 10), 0, 127);
+               else if (key == "v") n.vel = (uint8_t)std::clamp((int)std::strtol(v, nullptr, 10), 1, 127);
+               else if (key == "r") n.relVel = (uint8_t)std::clamp((int)std::strtol(v, nullptr, 10), 0, 127);
+               else if (key == "c") n.chance = std::strtof(v, nullptr);
+               else if (key == "m") n.mute = std::strtol(v, nullptr, 10) != 0;
+               else if (key == "g") n.gainDb = std::strtof(v, nullptr);
+               else if (key == "pan") n.pan = std::strtof(v, nullptr);
+               else if (key == "bend") curve(val, n.bend);
+               else if (key == "press") curve(val, n.pressure);
+               else if (key == "timbre") curve(val, n.timbre);
+            }
+            if (!std::isfinite(n.chance)) n.chance = 1.0f;
+            if (!std::isfinite(n.gainDb)) n.gainDb = 0.0f;
+            if (!std::isfinite(n.pan)) n.pan = 0.0f;
+            if (c->notes.size() < (size_t)Arrange::kMaxNotesPerLane)
+               c->notes.push_back(std::move(n));
          }
       }
       else if (tag == "sessionslot")

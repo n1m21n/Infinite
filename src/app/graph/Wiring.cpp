@@ -39,6 +39,15 @@ namespace app
          r.speed = c.speed;
          r.reverse = c.reverse;
          r.bypassedModParams = c.bypassedModParams;
+         r.notes = c.notes;
+         r.nextNoteId = c.nextNoteId;
+         r.contentOffset = c.contentOffset;
+         r.midiLoop = c.midiLoop;
+         r.loopStart = c.loopStart;
+         r.loopLength = c.loopLength;
+         r.transpose = c.transpose;
+         r.velScale = c.velScale;
+         r.swing = c.swing;
          return r;
       }
 
@@ -83,6 +92,15 @@ namespace app
          clip.speed = c.speed;
          clip.reverse = c.reverse;
          clip.bypassedModParams = c.bypassedModParams;
+         clip.notes = c.notes;
+         clip.nextNoteId = c.nextNoteId;
+         clip.contentOffset = c.contentOffset;
+         clip.midiLoop = c.midiLoop;
+         clip.loopStart = c.loopStart;
+         clip.loopLength = c.loopLength;
+         clip.transpose = c.transpose;
+         clip.velScale = c.velScale;
+         clip.swing = c.swing;
          return clip;
       }
    }
@@ -112,6 +130,8 @@ namespace app
          s.colorG = lane.colorG;
          s.colorB = lane.colorB;
          s.rowHeight = lane.rowHeight;
+         s.noteNodeUid = lane.noteNodeUid;
+         s.scaleSnap = lane.scaleSnap;
          for (const Arrange::Clip& c : lane.clips)
             s.clips.push_back(ArrangeClipToRecord(c));
          // Session slots ride in the same list, flagged by sessionScene.
@@ -206,7 +226,11 @@ namespace app
       {
          Arrange::Lane lane;
          lane.id = s.id;
-         lane.type = (s.type == Patch::kStreamAudio) ? Arrange::kLaneAudio : Arrange::kLaneVideo;
+         lane.type = (s.type == Patch::kStreamAudio)  ? Arrange::kLaneAudio
+                     : (s.type == Patch::kStreamMidi) ? Arrange::kLaneMidi
+                                                      : Arrange::kLaneVideo;
+         lane.noteNodeUid = s.noteNodeUid;
+         lane.scaleSnap = s.scaleSnap;
          lane.blendMode = 0; // legacy lane-wide mode migrates onto each clip below
          lane.opacity = s.opacity;
          lane.gainDb = s.gainDb;

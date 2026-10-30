@@ -71,6 +71,7 @@ STEPS=(
   "sweep-panels|I|P2|yes|no|panels sweep|bash $SW/panels-sweep/driver.sh --skip-build"
   "render-goldens|E|P2|yes|no|image and audio goldens in tests/render|python3 tools/render-check.py --binary \"\$BIN\""
   "determinism|E|P2|yes|no|two runs identical on the video patch (by-design list excepted)|python3 tools/determinism-check.py tests/headless/patch_video.inf --binary \"\$BIN\""
+  "determinism-notes|D|P2|yes|no|two runs identical on a Piano Roll lane into a synth (audio only)|python3 tools/determinism-check.py tests/headless/format/piano_roll.inf --audio-only --audio-seconds 4 --binary \"\$BIN\""
   "headless-smoke|C|P2|yes|no|headless CLI contract: exit codes, JSON, files|bash scripts/headless_smoke.sh \"\$BIN\""
   "selfupdate|K|P2|yes|no|in-place update on a throwaway copy|bash scripts/selfupdate_swap_test.sh \"\$APP\""
   "scoreboard|G|P2|info|no|scoreboard gate over the QUALITY rows of this run's logs (missing metrics are normal in a partial run)|python3 tools/quality/quality.py check \"\$OUT\"/logs/*.log"

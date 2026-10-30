@@ -83,8 +83,62 @@ namespace Arrange
       return std::max<Tick>(1, (Tick)llround(seconds * (effBpm / 60.0) * (double)kPPQ));
    }
 
-   enum LaneType { kLaneVideo = 0, kLaneAudio = 1 };
+   // kLaneMidi: a Piano Roll page (docs/plans/piano-roll/README.md). Its
+   // clips hold notes instead of pointing at a source's output; the lane's
+   // noteNodeUid names the Piano Roll node that plays them.
+   enum LaneType { kLaneVideo = 0, kLaneAudio = 1, kLaneMidi = 2 };
    enum Edge { kEdgeStart = 0, kEdgeEnd = 1 };
+
+   // --- MIDI notes (piano-roll README §5) --------------------------------
+   // A note's start is in the clip's CONTENT ticks, not timeline ticks: the
+   // clip shows content [contentOffset, contentOffset + length) (looped by
+   // midiLoop), so a trim or split moves contentOffset and never rewrites a
+   // note - the same non-destructive rule audio clips follow with
+   // sourceOffsetSeconds. Notes are sorted by (start, pitch) and two notes on
+   // one pitch never overlap (the later one cuts the earlier, as every DAW).
+   constexpr int kMaxNotesPerLane = 16384;
+
+   struct ExprPoint
+   {
+      Tick  at = 0;     // ticks from the note's own start, 0..note length
+      float v  = 0.0f;  // bend: semitones; pressure, timbre: 0..1
+      bool operator==(const ExprPoint& o) const { return at == o.at && v == o.v; }
+   };
+
+   struct Note
+   {
+      uint32_t id     = 0;      // unique within its clip, never reused (Clip::nextNoteId)
+      Tick     start  = 0;      // content ticks, >= 0
+      Tick     length = kPPQ / 4; // > 0
+      uint8_t  pitch  = 60;     // 0..127
+      uint8_t  vel    = 100;    // 1..127
+      uint8_t  relVel = 64;     // release velocity, 0..127
+      float    chance = 1.0f;   // 0..1, rolled per play
+      bool     mute   = false;
+      // Per-note gain and pan wait for voice support (README §4.4, Block C):
+      // stored and saved, not yet sent to the voices.
+      float    gainDb = 0.0f;   // -60..12
+      float    pan    = 0.0f;   // -1..1
+      std::vector<ExprPoint> bend, pressure, timbre; // sorted by `at`
+      Tick End() const { return start + length; }
+      bool operator==(const Note& o) const
+      {
+         return id == o.id && start == o.start && length == o.length && pitch == o.pitch && vel == o.vel &&
+                relVel == o.relVel && chance == o.chance && mute == o.mute && gainDb == o.gainDb && pan == o.pan &&
+                bend == o.bend && pressure == o.pressure && timbre == o.timbre;
+      }
+   };
+
+   // Note-grid quantize (README §4.3). grid in ticks; strength 0..1 pulls each
+   // start that fraction of the way to the grid; swing 0..1 delays every
+   // second grid line by up to half a grid; ends also quantizes note ends.
+   struct QuantizeSpec
+   {
+      Tick  grid = kPPQ / 4;
+      float strength = 1.0f;
+      float swing = 0.0f;
+      bool  ends = false;
+   };
    // SetEnabled's third argument.
    enum EnableMode { kDisable = 0, kEnable = 1, kToggle = 2 };
 
@@ -197,8 +251,42 @@ namespace Arrange
             bypassedModParams.erase(it);
       }
 
+      // --- MIDI lanes only (piano-roll README §5) ----------------------
+      std::vector<Note> notes;  // sorted by (start, pitch)
+      uint32_t nextNoteId = 1;  // persisted, as Model::nextId
+      Tick     contentOffset = 0; // content tick at the clip's left edge
+      bool     midiLoop   = false;
+      Tick     loopStart  = 0;  // content ticks
+      Tick     loopLength = 0;  // > 0 while midiLoop
+      int      transpose  = 0;  // semitones, -48..48, applied at play
+      float    velScale   = 1.0f; // 0..2, applied at play
+      float    swing      = 0.0f; // 0..1 of an 1/16, applied at play
+
+      // Every MIDI-only field, for the undo comparator.
+      bool MidiEqual(const Clip& o) const
+      {
+         return notes == o.notes && nextNoteId == o.nextNoteId && contentOffset == o.contentOffset &&
+                midiLoop == o.midiLoop && loopStart == o.loopStart && loopLength == o.loopLength &&
+                transpose == o.transpose && velScale == o.velScale && swing == o.swing;
+      }
+
       Tick End() const { return start + length; }
    };
+
+   // Content tick that `t` ticks past the clip's left edge plays, through the
+   // clip's loop. A looping clip runs from contentOffset into the loop and
+   // then repeats [loopStart, loopStart + loopLength).
+   inline Tick MidiContentTick(const Clip& c, Tick t)
+   {
+      Tick q = c.contentOffset + t;
+      if (c.midiLoop && c.loopLength > 0)
+      {
+         const Tick loopEnd = c.loopStart + c.loopLength;
+         if (q >= loopEnd)
+            q = c.loopStart + (q - loopEnd) % c.loopLength;
+      }
+      return q;
+   }
 
    inline constexpr float kClipSpeedMin = 0.1f;
    inline constexpr float kClipSpeedMax = 8.0f;
@@ -274,6 +362,10 @@ namespace Arrange
       float    rowHeight = 0.0f;  // 0 = default row height; drag-resized via the row's bottom border
       std::vector<Clip> clips;    // always sorted by start, never overlapping
       std::vector<SessionSlot> slots; // session view, index = scene row
+      // MIDI lanes only: the Piano Roll node (GraphNode::uid) that plays this
+      // page, 0 = unlinked. Scale snap for note edits on this page.
+      uint64_t noteNodeUid = 0;
+      bool     scaleSnap   = false;
    };
 
    // A track group: a named, colored container for lanes AND other track
@@ -556,6 +648,33 @@ namespace Arrange
    // playhead that has just passed a marker still jump to the one before it.
    const Marker* PrevMarker(const Model& m, Tick t, Tick tolerance = 0);
    const Marker* NextMarker(const Model& m, Tick t, Tick tolerance = 0);
+
+   // --- notes (MIDI lanes; clipId may be a Timeline clip or a session slot)
+   // Each returns true if it changed the clip and bumps `revision` once.
+   // Ids on the incoming notes are ignored and fresh ones assigned (returned
+   // through outIds in order). Refused past kMaxNotesPerLane.
+   bool AddNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes, std::vector<uint32_t>* outIds = nullptr);
+   // Replaces each note with the same id; ids that do not exist are skipped.
+   bool EditNotes(Model& m, uint64_t clipId, const std::vector<Note>& notes);
+   bool DeleteNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids);
+   // Moves by ticks and semitones, keeping the block's shape. scaleMask (bit
+   // n = pitch class n, C = 0, key already applied; 0 = no snap) snaps each
+   // moved pitch to the nearest scale note, up first on a tie. The block
+   // stops at content tick 0 and at pitches 0 and 127 as one piece.
+   bool MoveNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tick dTick, int dPitch,
+                  uint16_t scaleMask = 0);
+   // Cuts every listed note that strictly contains content tick `at`.
+   bool SplitNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, Tick at);
+   // Joins each run of listed notes on one pitch into one note spanning the
+   // run; the first note of a run keeps its id and settings.
+   bool JoinNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids);
+   bool QuantizeNotes(Model& m, uint64_t clipId, const std::vector<uint32_t>& ids, const QuantizeSpec& q);
+   // Links a MIDI lane to a Piano Roll node (0 unlinks). A node links to at
+   // most one lane: linking it here unlinks it anywhere else.
+   bool LinkLane(Model& m, uint64_t laneId, uint64_t nodeUid);
+   const Note* FindNote(const Clip& c, uint32_t noteId);
+   // Notes on a lane across its Timeline clips and session slots.
+   int LaneNoteCount(const Lane& l);
 
    // Re-sorts, clamps and dissolves singleton groups. Called at the end of
    // every op and after deserialization; safe to call on anything.

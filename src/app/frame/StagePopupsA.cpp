@@ -3,15 +3,71 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 #include "core/FactoryPresets.h"
+#include "arrange/MidiImport.h"
 
 namespace app
 {
+namespace
+{
+   // MIDI File -> Piano Roll (docs/plans/piano-roll/README.md §10): the file
+   // becomes a MIDI page linked to a fresh Piano Roll node in the old node's
+   // place, with the node's note cables moved over. The file node goes.
+   void OpenInPianoRoll(GraphNode* gn, MidiFileNode* mf)
+   {
+      const MidiFile::Song* song = mf->GetSong();
+      if (song == nullptr || song->events.empty())
+         return;
+      const int oldIndex = gn->index;
+      INode* oldNode = gn->node.get();
+      const ImVec2 pos = ed::GetNodePosition(gn->NodeId());
+      struct Out { int dst, slot; };
+      std::vector<Out> outs;
+      for (const auto& other : gNodes)
+         for (int slot = 0; slot < kMaxNoteSlots; slot++)
+         {
+            NoteCable* cable = other.node->NoteInputSlot(slot);
+            if (cable && cable->IsConnected() && cable->GetSource() == oldNode)
+               outs.push_back({ other.index, slot });
+         }
+      std::string name = mf->path.substr(mf->path.find_last_of("/\\") + 1);
+      name = name.substr(0, name.find_last_of('.'));
+
+      PushUndoCheckpoint("Open in Piano Roll");
+      GraphNode* fresh = SpawnNode("Piano Roll", "Notes", pos.x, pos.y);
+      auto* pr = fresh ? dynamic_cast<PianoRollNode*>(fresh->node.get()) : nullptr;
+      if (pr == nullptr)
+         return;
+      pr->transpose = mf->transpose;
+      pr->velocity = mf->velocity;
+      pr->useGlobalScale = mf->useGlobalScale;
+      const int freshIndex = fresh->index;
+      const uint64_t freshUid = fresh->uid;
+      const bool loop = mf->loop;
+      ArrangeEdit([&] {
+         const uint64_t lane = Arrange::AddLane(gArrange, Arrange::kLaneMidi);
+         for (Arrange::Lane& l : gArrange.lanes)
+            if (l.id == lane && !name.empty())
+               l.name = name;
+         Arrange::ImportSong(gArrange, lane, *song, 0, loop);
+         Arrange::LinkLane(gArrange, lane, freshUid);
+      });
+      for (const Out& o : outs)
+      {
+         std::string err;
+         ConnectNodes(freshIndex, 0, o.dst, o.slot, err);
+      }
+      RemoveNodeByIndex(oldIndex);
+      gPatchDirty = true;
+   }
+}
+
 void DrawPopupsA(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
    auto& window = fc.window;
    auto& searchBuf = fc.searchBuf;
    auto& searchJustOpened = fc.searchJustOpened;
+   int pianoRollFrom = -1;
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
       if (MenuParts::BeginPopup("##nodecontext"))
@@ -173,6 +229,9 @@ void DrawPopupsA(FrameCtx& fc)
             }
 
             // View & Panel Actions
+            if (auto* mf = dynamic_cast<MidiFileNode*>(gn->node.get()))
+               if (mf->GetSong() != nullptr && MenuParts::Item(L("Open in Piano Roll")))
+                  pianoRollFrom = gn->index; // swapped after the menu is drawn: gn dies with it
             if (!IsAudioBodyNode(gn->node.get()))
             {
                if (gn->showParams)
@@ -322,6 +381,9 @@ void DrawPopupsA(FrameCtx& fc)
          }
          MenuParts::EndPopup();
       }
+      if (GraphNode* from = FindNodeByIndex(pianoRollFrom))
+         if (auto* mf = dynamic_cast<MidiFileNode*>(from->node.get()))
+            OpenInPianoRoll(from, mf);
 
       // Node "Help" popup, opened via the context menu above. A separate
       // OpenPopup call (rather than nesting it inside "##nodecontext") because

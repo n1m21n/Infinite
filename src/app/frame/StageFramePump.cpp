@@ -402,6 +402,7 @@ void DrawFramePump(FrameCtx& fc)
       // boundary. One topology now covers the whole arrangement, and clip
       // boundaries never rebuild.
       ArrangeSessionTick();
+      ArrangeNoteSchedulesPublish();
       ArrangeAudioRebuildIfStale();
 
       // Update-checker worker handoff - once a frame, main thread only.

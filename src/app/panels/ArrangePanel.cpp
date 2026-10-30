@@ -1794,7 +1794,9 @@ namespace app
                else
                {
                   const int li = Arrange::LaneIndex(gArrange, slot.id);
-                  if (li >= 0)
+                  // MIDI lanes live in the Piano Roll panel; the Timeline
+                  // gives them no row (zero height is skipped everywhere).
+                  if (li >= 0 && gArrange.lanes[(size_t)li].type != Arrange::kLaneMidi)
                   {
                      const float rowH = laneEffectiveHeight(gArrange.lanes[(size_t)li]);
                      arrangeLaneRelTop[(size_t)li] = y;
