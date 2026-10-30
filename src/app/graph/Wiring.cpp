@@ -48,6 +48,9 @@ namespace app
          r.transpose = c.transpose;
          r.velScale = c.velScale;
          r.swing = c.swing;
+         r.chanceScale = c.chanceScale;
+         r.genSpec = c.genSpec;
+         r.takes = c.takes;
          return r;
       }
 
@@ -101,6 +104,9 @@ namespace app
          clip.transpose = c.transpose;
          clip.velScale = c.velScale;
          clip.swing = c.swing;
+         clip.chanceScale = c.chanceScale;
+         clip.genSpec = c.genSpec;
+         clip.takes = c.takes;
          return clip;
       }
    }
@@ -132,6 +138,7 @@ namespace app
          s.rowHeight = lane.rowHeight;
          s.noteNodeUid = lane.noteNodeUid;
          s.scaleSnap = lane.scaleSnap;
+         s.drumRows = lane.drumRows;
          for (const Arrange::Clip& c : lane.clips)
             s.clips.push_back(ArrangeClipToRecord(c));
          // Session slots ride in the same list, flagged by sessionScene.
@@ -231,6 +238,7 @@ namespace app
                                                       : Arrange::kLaneVideo;
          lane.noteNodeUid = s.noteNodeUid;
          lane.scaleSnap = s.scaleSnap;
+         lane.drumRows = s.drumRows;
          lane.blendMode = 0; // legacy lane-wide mode migrates onto each clip below
          lane.opacity = s.opacity;
          lane.gainDb = s.gainDb;

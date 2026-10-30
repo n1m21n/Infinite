@@ -69,7 +69,7 @@ void BuildNoteSchedule(const Lane& lane, NoteSchedule& out)
             s.pitch = (uint8_t)std::clamp((int)n.pitch + c.transpose, 0, 127);
             s.vel = (uint8_t)std::clamp((int)std::lround((double)n.vel * (double)c.velScale), 1, 127);
             s.relVel = n.relVel;
-            s.chance = n.chance;
+            s.chance = std::clamp(n.chance * c.chanceScale, 0.0f, 1.0f);
             s.key = Key(c.id, n.id, pass);
             const std::vector<ExprPoint>* curves[3] = { &n.bend, &n.pressure, &n.timbre };
             for (int k = 0; k < 3; k++)

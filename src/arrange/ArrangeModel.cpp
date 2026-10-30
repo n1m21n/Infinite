@@ -111,6 +111,8 @@ namespace
       c.velScale = std::clamp(c.velScale, 0.0f, 2.0f);
       if (!std::isfinite(c.swing)) c.swing = 0.0f;
       c.swing = std::clamp(c.swing, 0.0f, 1.0f);
+      if (!std::isfinite(c.chanceScale)) c.chanceScale = 1.0f;
+      c.chanceScale = std::clamp(c.chanceScale, 0.0f, 2.0f);
    }
 
    void NormalizeNotes(const Lane& l, Clip& c)

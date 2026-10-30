@@ -2,6 +2,8 @@
 // MIDI lane. A page edits the lane's clips and notes through the Arrange note ops; the linked Piano Roll node plays
 // them. Edits are timeline undo entries; page add and delete touch a node too, so they are patch undo steps.
 #include "app/AppShared.h"
+#include "app/graph/NoteGen.h"
+#include "app/graph/SampleStyles.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -21,6 +23,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <random>
 #include <set>
@@ -110,6 +113,13 @@ namespace
       uint32_t humanizeSeed = 1;
       std::vector<Arrange::Note> clipboard; // starts relative to the first note
       bool openQuantize = false, openFunctions = false;
+      NoteGen::GenSpec gen = [] {
+         NoteGen::GenSpec g;
+         g.seed = std::random_device {}() & 0xFFFFu;
+         return g;
+      }();
+      bool genOpen = false, seedLock = false;
+      std::string genError;
       Arrange::Lane fieldBase;   // the page as an inspector drag found it
       float fieldFrom = 0.0f;    // the field's value there
       Tool tool = Tool::Select;
@@ -291,13 +301,16 @@ namespace
       s.rows.clear();
       s.rowOf.fill(-1);
       std::array<bool, 128> used {};
-      if (s.fold && !page.scaleSnap)
+      if (page.drumRows || (s.fold && !page.scaleSnap))
          for (const Arrange::Clip& c : page.clips)
             for (const Arrange::Note& n : c.notes)
                used[n.pitch] = true;
+      if (page.drumRows && !s.fold) // an empty row to draw into
+         for (int p : { 36, 38, 39, 42, 45, 46, 50, 56 })
+            used[(size_t)p] = true;
       for (int p = 127; p >= 0; p--)
       {
-         if (s.fold && !(page.scaleSnap ? InScale(p) : used[(size_t)p]))
+         if (page.drumRows ? !used[(size_t)p] : (s.fold && !(page.scaleSnap ? InScale(p) : used[(size_t)p])))
             continue;
          s.rowOf[(size_t)p] = (int)s.rows.size();
          s.rows.push_back(p);
@@ -709,7 +722,26 @@ namespace
       }
    }
 
-   void DrawKeys(ImDrawList* dl, const Areas& a)
+   const char* DrumName(int pitch)
+   {
+      switch (pitch)
+      {
+      case 35: case 36: return T("Kick");
+      case 37: return T("Rim");
+      case 38: case 40: return T("Snare");
+      case 39: return T("Clap");
+      case 42: return T("C Hat");
+      case 44: return T("P Hat");
+      case 46: return T("O Hat");
+      case 41: case 43: case 45: case 47: case 48: case 50: return T("Tom");
+      case 49: case 57: return T("Crash");
+      case 51: case 59: return T("Ride");
+      case 56: return T("Bell");
+      default: return nullptr;
+      }
+   }
+
+   void DrawKeys(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
       const float kx0 = a.x0 - kKeysW, kx1 = a.x0 - 1.0f;
@@ -720,6 +752,16 @@ namespace
          if (y > a.rollB)
             break;
          const int p = s.rows[(size_t)r];
+         if (page.drumRows)
+         {
+            dl->AddRectFilled(ImVec2(kx0, y), ImVec2(kx1, y1 - 1.0f), Tint(0.1f));
+            if (s.keyH >= 9.0f)
+            {
+               const char* name = DrumName(p);
+               dl->AddText(ImVec2(kx0 + 3.0f, y + (s.keyH - ImGui::GetFontSize()) * 0.5f), Tint(0.8f), name != nullptr ? name : PitchName(p).c_str());
+            }
+            continue;
+         }
          const bool black = IsBlackKey(p);
          dl->AddRectFilled(ImVec2(kx0, y), ImVec2(black ? kx0 + (kx1 - kx0) * 0.62f : kx1, y1 - 1.0f), Tint(black ? 0.42f : 0.1f));
          if (p % 12 == 0 && s.keyH >= 9.0f)
@@ -760,6 +802,9 @@ namespace
       }
    }
 
+   // Drum rows draw every note as the same short hit.
+   float DrumHitW() { return std::max(6.0f, (float)(S().pxPerTick * (double)(Arrange::kPPQ / 4))); }
+
    void DrawClipsAndNotes(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
    {
       const State& s = S();
@@ -778,7 +823,8 @@ namespace
             const int row = s.rowOf[(size_t)std::clamp((int)pl.note->pitch + c.transpose, 0, 127)];
             if (row < 0)
                return;
-            const float y = a.RowY((float)row), x0 = a.TickX((double)pl.start), x1 = std::max(x0 + 2.0f, a.TickX((double)pl.end));
+            const float y = a.RowY((float)row), x0 = a.TickX((double)pl.start);
+            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + 2.0f, a.TickX((double)pl.end));
             if (x1 < a.x0 || x0 > a.x1 || y + s.keyH < a.rollY || y > a.rollB)
                return;
             const bool sel = s.notes.count({ c.id, pl.note->id }) != 0;
@@ -868,6 +914,8 @@ namespace
 
    Arrange::Clip* ClipAt(Arrange::Lane& page, Tick t);
    Arrange::Clip* NewClipAt(Arrange::Lane& page, Tick tick);
+   void Generate(Arrange::Lane& page);
+   void DrawTakes(Arrange::Lane& page);
 
    // The notes an edit works on: the selection, or with none every note of the clips being edited.
    std::map<uint64_t, std::vector<uint32_t>> TargetNotes(const Arrange::Lane& page)
@@ -1357,6 +1405,19 @@ namespace
          s.follow = !s.follow;
       FormParts::Inline(0.0f, tok::space_3);
       DrawQuantizeChips(page);
+      FormParts::Inline(0.0f, tok::space_3);
+      if (ActionButton::Draw(T("Generate"), ImVec2(0.0f, tok::tile), ActionButton::Kind::Primary))
+         Generate(page);
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Generate notes in the page's key (G). A ruler selection sets the range; selected notes regenerate in place"));
+      FormParts::Inline(0.0f, tok::space_1);
+      const char* types[(int)NoteGen::Type::Count] = { T("Chords"), T("Chord Rhythm"), T("Pads"), T("Strum"), T("Arpeggio"), T("Bass"), T("Melody"), T("Drums") };
+      int type = (int)s.gen.type;
+      if (FormParts::BareCombo("##pianoGenType", &type, types, (int)NoteGen::Type::Count, 104.0f))
+         s.gen.type = (NoteGen::Type)type;
+      FormParts::Inline(0.0f, tok::space_1);
+      if (IconChip("##pianoGenSettings", IconsInfinite::Settings, s.genOpen, T("Generate settings")))
+         s.genOpen = !s.genOpen;
       const float zoomW = 3.0f * kIconW + 2.0f * tok::space_1;
       ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - zoomW));
       if (IconChip("##pianoZoomOut", IconsInfinite::Zoom, false, T("Zoom out (-)")))
@@ -1395,7 +1456,8 @@ namespace
             const int row = s.rowOf[(size_t)std::clamp((int)pl.note->pitch + c.transpose, 0, 127)];
             if (row < 0 || m.y < a.RowY((float)row) || m.y >= a.RowY((float)row + 1.0f))
                return;
-            const float x0 = a.TickX((double)pl.start), x1 = std::max(x0 + 2.0f, a.TickX((double)pl.end));
+            const float x0 = a.TickX((double)pl.start);
+            const float x1 = page.drumRows ? x0 + DrumHitW() : std::max(x0 + 2.0f, a.TickX((double)pl.end));
             if (m.x < x0 || m.x > x1)
                return;
             hit.clip = c.id;
@@ -1403,7 +1465,7 @@ namespace
             hit.start = pl.start;
             hit.end = pl.end;
             const float margin = std::min(5.0f, (x1 - x0) * 0.3f);
-            hit.edge = m.x > x1 - margin ? 1 : m.x < x0 + margin ? -1 : 0;
+            hit.edge = page.drumRows ? 0 : m.x > x1 - margin ? 1 : m.x < x0 + margin ? -1 : 0;
             found = true;
          });
       }
@@ -2273,6 +2335,7 @@ namespace
       intField(T("Transpose"), -48, 48, [](Clip& c) -> int& { return c.transpose; });
       ClipField(T("Velocity"), 0.0f, 2.0f, "%.2f", [](Clip& c) -> float& { return c.velScale; });
       ClipField(T("Swing"), 0.0f, 1.0f, "%.2f", [](Clip& c) -> float& { return c.swing; });
+      ClipField(T("Chance"), 0.0f, 2.0f, "%.2f", [](Clip& c) -> float& { return c.chanceScale; });
       SectionCard::Begin(T("Loop"));
       bool loop = c0->midiLoop;
       if (FormParts::Switch(T("Loop"), &loop))
@@ -2331,9 +2394,98 @@ namespace
             gArrange.revision++;
          });
       }
+      bool drums = page.drumRows;
+      if (FormParts::Switch(T("Drum rows"), &drums))
+      {
+         const uint64_t lane = page.id;
+         ArrangeEdit([&] {
+            Arrange::FindLane(gArrange, lane)->drumRows = drums;
+            gArrange.revision++;
+         });
+      }
       FormParts::Switch(T("Audition"), &s.audition);
       SectionCard::RowLabel(T("Grid"));
       DrawGridChip();
+   }
+
+   // Sliders for the settings that default to the style card: the left end is "the card's own value".
+   void StyleSlider(const char* label, float* v, float lo, float hi)
+   {
+      const float step = (hi - lo) * 0.05f;
+      float shown = *v < 0.0f ? lo - step : *v;
+      if (FormParts::SliderFloat(label, &shown, lo - step, hi, *v < 0.0f ? T("style") : "%.2f"))
+         *v = shown < lo ? -1.0f : shown;
+   }
+
+   void StyleSliderInt(const char* label, int* v, int lo, int hi)
+   {
+      int shown = *v < 0 ? lo - 1 : *v;
+      if (FormParts::SliderInt(label, &shown, lo - 1, hi, *v < 0 ? T("style") : "%d"))
+         *v = shown < lo ? -1 : shown;
+   }
+
+   void DrawGenerateCard()
+   {
+      State& s = S();
+      NoteGen::GenSpec& g = s.gen;
+      SectionCard::Begin(T("Generate"));
+      const int styleNow = SampleStyles::Find(g.style);
+      if (FormParts::BeginCombo(T("Style"), styleNow >= 0 ? SampleStyles::At(styleNow).name : g.style.c_str()))
+      {
+         const char* family = nullptr;
+         for (int i = 0; i < SampleStyles::Count(); i++)
+         {
+            const SampleStyles::Style st = SampleStyles::At(i);
+            if (family == nullptr || std::strcmp(family, st.family) != 0)
+               ImGui::TextDisabled("%s", st.family);
+            family = st.family;
+            if (MenuParts::Choice(st.name, i == styleNow))
+               g.style = st.id;
+         }
+         FormParts::EndCombo();
+      }
+      const int barChoices[4] = { 1, 2, 4, 8 };
+      int barsAt = 0;
+      for (int i = 0; i < 4; i++)
+         if (barChoices[i] == g.bars)
+            barsAt = i;
+      if (FormParts::Combo(T("Bars"), &barsAt, "1\0" "2\0" "4\0" "8\0"))
+         g.bars = barChoices[barsAt];
+      int form = (int)g.form;
+      if (FormParts::Combo(T("Form"), &form, "None\0" "AABA\0" "ABAB\0" "AAAB\0"))
+         g.form = (NoteGen::Form)form;
+      SectionCard::RowLabel(T("Seed"));
+      int seed = (int)g.seed;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (FieldWell::InputInt("##pianoGenSeed", &seed))
+         g.seed = (uint32_t)std::max(0, seed);
+      FormParts::Switch(T("Lock seed"), &s.seedLock);
+      FormParts::SliderFloat(T("Creativity"), &g.creativity, 0.0f, 1.0f, "%.2f");
+      FormParts::SliderFloat(T("Energy"), &g.energy, -1.0f, 1.0f, "%.2f");
+      FormParts::SliderFloat(T("Mood"), &g.mood, -1.0f, 1.0f, "%.2f");
+      StyleSlider(T("Density"), &g.density, 0.0f, 1.0f);
+      StyleSlider(T("Swing"), &g.swing, 0.0f, 0.75f);
+      StyleSlider(T("Gate"), &g.gate, 0.1f, 1.0f);
+      StyleSliderInt(T("Low Note"), &g.rangeLo, 21, 108);
+      StyleSliderInt(T("High Note"), &g.rangeHi, 21, 108);
+      if (g.type == NoteGen::Type::Chords || g.type == NoteGen::Type::Comp || g.type == NoteGen::Type::Pads || g.type == NoteGen::Type::Strum)
+         StyleSliderInt(T("Chord Size"), &g.chordSize, 2, 6);
+      if (g.type == NoteGen::Type::Arp)
+      {
+         StyleSliderInt(T("Arp Mode"), &g.arpMode, 0, 14);
+         StyleSliderInt(T("Octaves"), &g.arpOctaves, 1, 4);
+      }
+      if (g.type == NoteGen::Type::Bass)
+      {
+         int role = g.bassRole + 1;
+         if (FormParts::Combo(T("Role"), &role, "Style\0" "Long\0" "Rolling\0" "Melodic\0" "Funk\0" "Wobble\0" "Trap 808\0" "Acid\0"))
+            g.bassRole = role - 1;
+      }
+      FormParts::Switch(T("Personal"), &g.personal);
+      FormParts::Switch(T("Lock rhythm"), &g.lockRhythm);
+      FormParts::Switch(T("Lock pitch"), &g.lockPitch);
+      if (!s.genError.empty())
+         ImGui::TextWrapped("%s", s.genError.c_str());
    }
 
    void DrawInspector(Arrange::Lane& page, ImVec2 size)
@@ -2341,7 +2493,9 @@ namespace
       State& s = S();
       ImGui::BeginChild("##pianoInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
       SectionCard::BeginWindow();
-      if (!s.notes.empty())
+      if (s.genOpen)
+         DrawGenerateCard();
+      else if (!s.notes.empty())
          DrawNoteInspector(page);
       else if (!s.clips.empty())
          DrawClipInspector(page);
@@ -2350,6 +2504,244 @@ namespace
       SectionCard::EndWindow();
       s.inspectorHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
       ImGui::EndChild();
+   }
+
+   // The clip a take lands on and whose takes show: the one selected, or the one under the playhead.
+   Arrange::Clip* TakesClip(Arrange::Lane& page)
+   {
+      const State& s = S();
+      if (s.clips.size() == 1)
+         return Arrange::FindClip(gArrange, *s.clips.begin());
+      return ClipAt(page, ArrangePlayTick());
+   }
+
+   int BarsFor(Tick span)
+   {
+      for (int bars : { 1, 2, 4 })
+         if (span <= bars * Arrange::kTicksPerBar)
+            return bars;
+      return 8;
+   }
+
+   NoteGen::GenSpec SpecNow()
+   {
+      NoteGen::GenSpec spec = S().gen;
+      Transport& tr = Transport::Instance();
+      spec.key = tr.Key();
+      spec.scale = tr.Scale();
+      return spec;
+   }
+
+   // Writes a take over a clip's notes, or into a new clip when `clip` is 0. Runs one undo step.
+   void WriteTake(Arrange::Lane& page, uint64_t clip, Tick at, Tick span, NoteGen::GenSpec spec, bool addTake)
+   {
+      State& s = S();
+      std::vector<uint32_t> old;
+      int notesAfter = Arrange::LaneNoteCount(page);
+      if (const Arrange::Clip* c = clip != 0 ? Arrange::FindClip(gArrange, clip) : nullptr)
+         for (const Arrange::Note& n : c->notes)
+         {
+            old.push_back(n.id);
+            notesAfter--;
+            if (spec.lockRhythm || spec.lockPitch)
+            {
+               spec.source.push_back(n);
+               spec.source.back().start -= c->contentOffset;
+            }
+         }
+      const NoteGen::Take take = NoteGen::Generate(spec);
+      s.genError = take.error;
+      if (!take.error.empty())
+         return;
+      if (notesAfter + (int)take.notes.size() > Arrange::kMaxNotesPerLane)
+      {
+         s.genError = T("This page is full");
+         return;
+      }
+      spec.lockRhythm = spec.lockPitch = false; // locks are one edit's post-pass, not part of the recipe
+      const std::string recipe = NoteGen::Serialize(spec);
+      const bool drums = spec.type == NoteGen::Type::Drums;
+      const uint64_t laneId = page.id;
+      ArrangeEdit([&] {
+         uint64_t id = clip;
+         if (id == 0)
+         {
+            Arrange::Clip fresh;
+            fresh.start = at;
+            fresh.length = span;
+            if (!Arrange::PlaceOverwrite(gArrange, laneId, fresh, &id) || id == 0)
+               return;
+         }
+         else if (const Arrange::Clip* c = Arrange::FindClip(gArrange, id); c != nullptr && take.length > c->length)
+            Arrange::TrimEdge(gArrange, id, Arrange::kEdgeEnd, c->start + take.length);
+         Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+         if (c == nullptr)
+            return;
+         std::vector<Arrange::Note> notes = take.notes;
+         for (Arrange::Note& n : notes)
+            n.start += c->contentOffset;
+         Arrange::DeleteNotes(gArrange, id, old);
+         Arrange::AddNotes(gArrange, id, notes, nullptr);
+         c = Arrange::FindClip(gArrange, id);
+         c->genSpec = recipe;
+         if (addTake)
+         {
+            c->takes.push_back({ recipe, false });
+            if (c->takes.size() > 6)
+            {
+               const auto drop = std::find_if(c->takes.begin(), c->takes.end(), [](const Arrange::Clip::GenTake& t) { return !t.pin; });
+               if (drop != c->takes.end())
+                  c->takes.erase(drop);
+            }
+         }
+         if (drums)
+            Arrange::FindLane(gArrange, laneId)->drumRows = true;
+         gArrange.revision++;
+         s.clips = { id };
+         s.notes.clear();
+      });
+   }
+
+   // Replaces the notes `ids` of one clip with what a take holds in [lo, hi) (content ticks), keeping the
+   // bar grid. The caller holds the undo step.
+   void RegenerateRange(uint64_t clip, const std::vector<uint32_t>& ids, Tick lo, Tick hi, NoteGen::GenSpec spec)
+   {
+      State& s = S();
+      const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+      if (c == nullptr)
+         return;
+      const Tick from = Arrange::GridFloor(lo, Arrange::kTicksPerBar);
+      spec.bars = BarsFor(hi - from);
+      spec.form = NoteGen::Form::None;
+      if (spec.lockRhythm || spec.lockPitch)
+         for (uint32_t id : ids)
+            if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+            {
+               spec.source.push_back(*n);
+               spec.source.back().start -= from;
+            }
+      const NoteGen::Take take = NoteGen::Generate(spec);
+      s.genError = take.error;
+      if (!take.error.empty())
+         return;
+      std::vector<Arrange::Note> notes;
+      for (Arrange::Note n : take.notes)
+      {
+         n.start += from;
+         if (n.start < lo || n.start >= hi)
+            continue;
+         n.length = std::min(n.length, hi - n.start);
+         notes.push_back(n);
+      }
+      Arrange::DeleteNotes(gArrange, clip, ids);
+      std::vector<uint32_t> added;
+      Arrange::AddNotes(gArrange, clip, notes, &added);
+      for (uint32_t id : added)
+         s.notes.insert({ clip, id });
+   }
+
+   // G: selected notes regenerate in place; a ruler range fills or replaces that range; otherwise a new
+   // take on the clip here, or a new clip at the playhead.
+   void Generate(Arrange::Lane& page)
+   {
+      State& s = S();
+      if (!s.seedLock)
+         s.gen.seed++;
+      NoteGen::GenSpec spec = SpecNow();
+      const auto sel = SelectionByClip();
+      if (!sel.empty())
+      {
+         s.notes.clear();
+         ArrangeEdit([&] {
+            for (const auto& [clip, ids] : sel)
+            {
+               const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+               if (c == nullptr)
+                  continue;
+               Tick lo = Arrange::kMaxTick, hi = 0;
+               for (uint32_t id : ids)
+                  if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+                  {
+                     lo = std::min(lo, n->start);
+                     hi = std::max(hi, n->End());
+                  }
+               if (hi > lo)
+                  RegenerateRange(clip, ids, lo, hi, spec);
+            }
+         });
+         return;
+      }
+      if (s.rangeEnd > s.rangeStart)
+      {
+         for (const Arrange::Clip& c : page.clips)
+            if (c.start < s.rangeEnd && c.End() > s.rangeStart)
+            {
+               const Tick from = std::max(s.rangeStart, c.start), to = std::min(s.rangeEnd, c.End());
+               const Tick lo = Arrange::MidiContentTick(c, from - c.start), hi = lo + (to - from);
+               std::vector<uint32_t> ids;
+               for (const Arrange::Note& n : c.notes)
+                  if (n.start >= lo && n.start < hi)
+                     ids.push_back(n.id);
+               const uint64_t clip = c.id;
+               ArrangeEdit([&] { RegenerateRange(clip, ids, lo, hi, spec); });
+               return;
+            }
+         spec.bars = BarsFor(s.rangeEnd - s.rangeStart);
+         spec.form = NoteGen::Form::None;
+         WriteTake(page, 0, s.rangeStart, s.rangeEnd - s.rangeStart, spec, true);
+         return;
+      }
+      if (const Arrange::Clip* c = TakesClip(page))
+      {
+         WriteTake(page, c->id, 0, 0, spec, true);
+         return;
+      }
+      // A new clip stops at the next one, which it must not overwrite.
+      const Tick at = Arrange::GridFloor(ArrangePlayTick(), Arrange::kTicksPerBar);
+      Tick span = spec.bars * Arrange::kTicksPerBar * (spec.form == NoteGen::Form::None ? 1 : 4);
+      for (const Arrange::Clip& c : page.clips)
+         if (c.start > at)
+            span = std::min(span, c.start - at);
+      WriteTake(page, 0, at, span, spec, true);
+   }
+
+   // Takes of the clip here: click recalls, right-click keeps through a save.
+   void DrawTakes(Arrange::Lane& page)
+   {
+      State& s = S();
+      Arrange::Clip* c = TakesClip(page);
+      if (c == nullptr || c->takes.empty())
+         return;
+      const uint64_t clip = c->id;
+      int recall = -1, pin = -1;
+      ImGui::TextDisabled("%s", T("Takes"));
+      for (size_t i = 0; i < c->takes.size(); i++)
+      {
+         FormParts::Inline(0.0f, tok::space_1);
+         char label[32];
+         std::snprintf(label, sizeof label, "%s%d##pianoTake%d", c->takes[i].pin ? "* " : "", (int)i + 1, (int)i);
+         if (ChipButton::Draw(label, c->takes[i].spec == c->genSpec, tok::tile * 0.8f, kIconW))
+            recall = (int)i;
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            pin = (int)i;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Click to recall this take. Right-click to keep it when the patch is saved"));
+      }
+      if (recall >= 0)
+      {
+         NoteGen::GenSpec spec;
+         if (NoteGen::Parse(c->takes[(size_t)recall].spec, spec))
+         {
+            s.gen = spec;
+            WriteTake(page, clip, 0, 0, spec, false);
+         }
+      }
+      if (pin >= 0)
+         ArrangeEdit([&] {
+            Arrange::Clip* edited = Arrange::FindClip(gArrange, clip);
+            edited->takes[(size_t)pin].pin = !edited->takes[(size_t)pin].pin;
+            gArrange.revision++;
+         });
    }
 
    // The panel's keys, while the pointer is over it (the Timeline's rule; the canvas's are off then).
@@ -2456,6 +2848,8 @@ namespace
       }
       else if (cmd && !shift && key(ImGuiKey_G))
          ArrangeEdit([&] { Arrange::Group(gArrange, clipIds()); });
+      else if (noMods && key(ImGuiKey_G))
+         Generate(page);
       else if (noMods && key(ImGuiKey_Q))
          Quantize(page);
       else if (!cmd && shift && key(ImGuiKey_Q))
@@ -2507,6 +2901,7 @@ namespace
          const ImVec2 room = ImGui::GetContentRegionAvail();
          DrawToolbar(page, room.x - kKeysW, room.y - toolbarH - kRulerH - kStripH);
       }
+      DrawTakes(page);
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       Areas a;
@@ -2593,7 +2988,7 @@ namespace
          dl->AddRect(p0, p1, AccentU32(0.8f));
       }
       dl->PopClipRect();
-      DrawKeys(dl, a);
+      DrawKeys(dl, a, page);
       dl->PushClipRect(ImVec2(a.x0, a.stripY), ImVec2(a.x1, a.rollY), true);
       DrawClipStrip(dl, a, page);
       dl->PopClipRect();

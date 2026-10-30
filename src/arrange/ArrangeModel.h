@@ -261,13 +261,25 @@ namespace Arrange
       int      transpose  = 0;  // semitones, -48..48, applied at play
       float    velScale   = 1.0f; // 0..2, applied at play
       float    swing      = 0.0f; // 0..1 of an 1/16, applied at play
+      float    chanceScale = 1.0f; // 0..2, multiplies every note's chance at play
+      // Generate (piano-roll README §12.4): the recipe of the notes in the
+      // clip and the last takes. Takes are recipes, not note copies.
+      struct GenTake
+      {
+         std::string spec; // NoteGen::Serialize
+         bool pin = false; // kept on save; the rest drop
+         bool operator==(const GenTake& o) const { return spec == o.spec && pin == o.pin; }
+      };
+      std::string genSpec;
+      std::vector<GenTake> takes;
 
       // Every MIDI-only field, for the undo comparator.
       bool MidiEqual(const Clip& o) const
       {
          return notes == o.notes && nextNoteId == o.nextNoteId && contentOffset == o.contentOffset &&
                 midiLoop == o.midiLoop && loopStart == o.loopStart && loopLength == o.loopLength &&
-                transpose == o.transpose && velScale == o.velScale && swing == o.swing;
+                transpose == o.transpose && velScale == o.velScale && swing == o.swing && chanceScale == o.chanceScale &&
+                genSpec == o.genSpec && takes == o.takes;
       }
 
       Tick End() const { return start + length; }
@@ -366,6 +378,7 @@ namespace Arrange
       // page, 0 = unlinked. Scale snap for note edits on this page.
       uint64_t noteNodeUid = 0;
       bool     scaleSnap   = false;
+      bool     drumRows    = false; // named drum rows instead of keys
    };
 
    // A track group: a named, colored container for lanes AND other track

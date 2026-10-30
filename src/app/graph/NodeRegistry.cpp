@@ -484,7 +484,7 @@ namespace app
          if (la.id != lb.id || la.type != lb.type || la.blendMode != lb.blendMode || la.opacity != lb.opacity ||
              la.gainDb != lb.gainDb || la.pan != lb.pan || la.enabled != lb.enabled || la.groupId != lb.groupId ||
              la.mute != lb.mute || la.solo != lb.solo || la.rowHeight != lb.rowHeight ||
-             la.name != lb.name || la.noteNodeUid != lb.noteNodeUid || la.scaleSnap != lb.scaleSnap ||
+             la.name != lb.name || la.noteNodeUid != lb.noteNodeUid || la.scaleSnap != lb.scaleSnap || la.drumRows != lb.drumRows ||
              la.clips.size() != lb.clips.size())
             return false;
          for (size_t k = 0; k < la.clips.size(); k++)
