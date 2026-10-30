@@ -1635,7 +1635,10 @@ namespace
          const uint64_t lane = page.id;
          page = s.base;
          page.id = lane;
-         gArrange.revision++;
+         if (s.drag == Drag::MoveClips || s.drag == Drag::TrimStart || s.drag == Drag::TrimEnd)
+            gArrange.revision++;
+         else
+            gArrange.NoteEdited();
       };
       switch (s.drag)
       {
@@ -2067,7 +2070,7 @@ namespace
       if (s.tool == Tool::Draw) // a ramp, from the press to the pointer
       {
          page = s.base;
-         gArrange.revision++;
+         gArrange.NoteEdited();
          const float x0 = std::min(s.exprFrom.x, m.x), x1 = std::max(s.exprFrom.x, m.x);
          const float v0 = valueAt(m.x >= s.exprFrom.x ? s.exprFrom.y : m.y), v1 = valueAt(m.x >= s.exprFrom.x ? m.y : s.exprFrom.y);
          EditLaneNotes(page, a, [&](Arrange::Note& n, float x, Tick) {
@@ -2166,7 +2169,7 @@ namespace
       if (changed)
       {
          page = s.fieldBase;
-         gArrange.revision++;
+         gArrange.NoteEdited();
          const bool typed = ImGui::GetIO().WantTextInput;
          for (const auto& [clip, ids] : SelectionByClip())
          {

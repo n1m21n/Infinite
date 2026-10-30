@@ -468,8 +468,13 @@ namespace Arrange
       Settings                settings;
       uint64_t            nextId  = 1; // persisted; never recomputed as max+1
       uint64_t            revision = 0; // bumped by every op that changed data
+      uint64_t            midiRevision = 0; // how many of those bumps only moved notes
 
       uint64_t NewId() { return nextId++; }
+      // Notes reach the audio through the Piano Roll's schedule, not through
+      // the routing, so a note edit needs no topology rebuild.
+      void NoteEdited() { revision++; midiRevision++; }
+      uint64_t StructuralRevision() const { return revision - midiRevision; }
    };
 
    // Where a clip lives right now. Indices are only valid until the next edit.

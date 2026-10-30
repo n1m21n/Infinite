@@ -1488,6 +1488,7 @@ namespace app
       // anything keyed on it (the audio rebuild, WP5b) sees
       // an undo as the change it is instead of a revision it already built.
       gArrange.revision = current.revision + 1;
+      gArrange.midiRevision = current.midiRevision;
       // Where the panel docks, the display unit and the snap grid are view
       // choices, not edits - undo leaves them (WP5, WP6).
       ArrangeRestoreViewSettings(gArrange, ArrangeKeepViewSettings(current));

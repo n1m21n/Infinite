@@ -947,7 +947,7 @@ namespace app
       // The topology just published describes this revision and this
       // routing, so ArrangeAudioRebuildIfStale stays quiet until one moves -
       // whichever of the ~40 graph-edit call sites got here first.
-      gArrangeAudioBuiltRevision = gArrange.revision;
+      gArrangeAudioBuiltRevision = gArrange.StructuralRevision();
       gArrangeAudioBuiltRouting = timelineRouting;
       gArrangeAudioBuiltStudio = studioOnly;
       gArrangeAudioBuiltSessionGen = ArrangeSessionGeneration();
@@ -959,8 +959,10 @@ namespace app
    // The main loop's once-a-frame audio trigger (WP5b). gArrange.revision is
    // the one change signal for the arrangement: every model op and every
    // direct field edit bumps it, so there is no per-site dirty flag to forget
-   // and nothing to hash. The only other input the schedule has is the
-   // routing (mode, or an arrangement-driven offline render), OR'd in here.
+   // and nothing to hash. A note edit is left out (StructuralRevision): it
+   // moves no routing and reaches its node through ArrangeNoteSchedulesPublish,
+   // which runs just before this. The only other input the schedule has is
+   // the routing (mode, or an arrangement-driven offline render), OR'd in here.
    // Graph changes are not polled: every one of them already calls
    // RebuildAudioTopology directly, which records both values above.
    // Tempo is deliberately absent - see gArrangeAudioBuiltRevision.
@@ -970,7 +972,7 @@ namespace app
    {
       if (gOfflineRender.active)
          return false;
-      if (gArrange.revision == gArrangeAudioBuiltRevision &&
+      if (gArrange.StructuralRevision() == gArrangeAudioBuiltRevision &&
           ArrangeSessionGeneration() == gArrangeAudioBuiltSessionGen &&
           ArrangeTimelineRoutingActive() == gArrangeAudioBuiltRouting &&
           StudioOnlyRouting() == gArrangeAudioBuiltStudio)

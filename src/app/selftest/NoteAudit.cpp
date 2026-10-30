@@ -1511,6 +1511,79 @@ bool RunPianoRollTest()
       check(t1.find("\nclipnote ") != std::string::npos && t1.find("streamnote") != std::string::npos, "the file has the note lines");
    }
 
+   // Generate's lines: a clip keeps its recipe, its pinned takes and its
+   // chance scale, a page its drum rows.
+   {
+      Model full;
+      const uint64_t page = AddLane(full, kLaneMidi);
+      Clip c;
+      c.length = 4 * kPPQ;
+      uint64_t id = 0;
+      PlaceOverwrite(full, page, c, &id);
+      Clip* made = FindClipOrSlot(full, id);
+      made->chanceScale = 0.5f;
+      made->genSpec = "type=pads style=dub_techno seed=2";
+      made->takes.push_back({ "type=pads style=dub_techno seed=3", true });
+      FindLane(full, page)->drumRows = true;
+      Patch::Data d1;
+      ArrangeModelToPatchData(full, d1);
+      std::string t1, err;
+      Patch::WriteText(d1, t1);
+      Patch::Data d2;
+      Patch::ReadText(t1, d2, err);
+      Model back;
+      PatchDataToArrangeModel(d2, back, nullptr);
+      const Clip* bc = FindClipOrSlot(back, id);
+      check(bc && bc->chanceScale == 0.5f && bc->genSpec == made->genSpec && bc->takes.size() == 1 &&
+               bc->takes[0].spec == made->takes[0].spec && bc->takes[0].pin && FindLane(back, page)->drumRows,
+            "the recipe, a pinned take, the chance scale and drum rows come back");
+   }
+
+   // A note edit reaches a Piano Roll node without a topology rebuild; a clip
+   // move and an undo still rebuild.
+   {
+      const Model keep = gArrange;
+      GraphNode gn;
+      gn.uid = 991;
+      auto node = std::make_unique<PianoRollNode>();
+      PianoRollNode* pr = node.get();
+      gn.node = std::move(node);
+      gNodes.push_back(std::move(gn));
+      gArrange = Model();
+      gArrange.revision = keep.revision + 1;
+      const uint64_t page = AddLane(gArrange, kLaneMidi);
+      LinkLane(gArrange, page, 991);
+      Clip c;
+      c.length = 4 * kPPQ;
+      uint64_t id = 0;
+      PlaceOverwrite(gArrange, page, c, &id);
+      ArrangeNoteSchedulesPublish();
+      ArrangeAudioRebuildIfStale();
+      const unsigned long long built = gAudioTopologyRebuildCount;
+      const uint64_t keyBefore = pr->scheduleKey;
+
+      const Model before = gArrange;
+      check(AddNotes(gArrange, id, { N(0, 480, 60) }), "the note goes in");
+      ArrangeNoteSchedulesPublish();
+      check(!ArrangeAudioRebuildIfStale() && gAudioTopologyRebuildCount == built, "a note edit does not rebuild");
+      check(pr->scheduleKey != keyBefore, "a note edit still reaches the node");
+
+      PushArrangeUndoSnapshot(before);
+      Undo();
+      ArrangeAudioRebuildIfStale();
+      check(gAudioTopologyRebuildCount > built, "undoing a note edit rebuilds");
+
+      const unsigned long long afterUndo = gAudioTopologyRebuildCount;
+      MoveClips(gArrange, { id }, 8 * kPPQ, 0);
+      ArrangeAudioRebuildIfStale();
+      check(gAudioTopologyRebuildCount > afterUndo, "a clip move still rebuilds");
+
+      gNodes.pop_back();
+      gArrange = keep;
+      gArrange.revision += 3;
+      RebuildAudioTopology();
+   }
+
    printf("PIANOROLLTEST %s\n", ok ? "ALL OK" : "FAILED");
    return ok;
 }
