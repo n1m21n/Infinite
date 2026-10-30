@@ -79,5 +79,8 @@
  "fold": 59725,
  "follow": 59726,
  "piano": 59727,
- "mute": 59728
+ "mute": 59728,
+ "ping-pong": 59729,
+ "reverse": 59730,
+ "slice": 59731
 }

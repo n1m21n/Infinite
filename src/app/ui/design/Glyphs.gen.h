@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE950;
+   inline constexpr unsigned kLast = 0xE953;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -86,4 +86,7 @@ namespace IconsInfinite
    inline constexpr const char* Follow = "\xee\xa5\x8e"; // U+E94E follow
    inline constexpr const char* Piano = "\xee\xa5\x8f"; // U+E94F piano
    inline constexpr const char* Mute = "\xee\xa5\x90"; // U+E950 mute
+   inline constexpr const char* PingPong = "\xee\xa5\x91"; // U+E951 ping-pong
+   inline constexpr const char* Reverse = "\xee\xa5\x92"; // U+E952 reverse
+   inline constexpr const char* Slice = "\xee\xa5\x93"; // U+E953 slice
 }

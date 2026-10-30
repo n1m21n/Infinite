@@ -1638,8 +1638,8 @@ namespace
 
       FormParts::Inline(0.0f, gapGroup);
       {
-         static const PillGroup::Segment kUnits[2] = { { "piano.unit.bars", "Bars" }, { "piano.unit.time", "Time" } };
-         const int picked = TimeRuler::UnitPills("pianounit", kUnits, 2, gArrange.settings.timeDisplay);
+         static const PillGroup::Segment kUnits[2] = { { "piano.unit.bars", "B" }, { "piano.unit.time", "T" } };
+         const int picked = TimeRuler::UnitPills("pianounit", kUnits, 2, gArrange.settings.timeDisplay, T("Ruler: Bars or Time"));
          if (picked >= 0)
             ArrangeSetTimeDisplay(picked);
       }

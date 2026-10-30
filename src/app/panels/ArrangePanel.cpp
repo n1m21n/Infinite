@@ -1279,7 +1279,7 @@ namespace app
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
-            const char* audioLabel = timelineMode ? T("Timeline Audio On") : T("Enable Timeline Audio");
+            const char* audioLabel = T("Audio");
             const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
             const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - 30.0f - tok::space_1 - audioBtnW, panelOrigin.y); // the inspector toggle holds the corner
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
@@ -1433,10 +1433,10 @@ namespace app
          ImGui::SameLine(0.0f, tok::space_4);
          {
             const int shownUnit = gArrange.settings.timeDisplay;
-            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "Bars" }, { "arrange.unit.time", "Time" } };
+            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "B" }, { "arrange.unit.time", "T" } };
             const ImVec2 up = ImGui::GetCursorScreenPos();
             const UiLayout::Rect ur{ up.x, up.y, 104.0f, tok::tile };
-            const int pickedUnit = TimeRuler::UnitPills("arrangeunit", kUnitSegs, 2, shownUnit);
+            const int pickedUnit = TimeRuler::UnitPills("arrangeunit", kUnitSegs, 2, shownUnit, T("Ruler: Bars or Time"));
             if (ImGui::IsMouseHoveringRect(ImVec2(ur.x, ur.y), ImVec2(ur.Right(), ur.Bottom())))
                HelpTip(ImGui::GetIO().MousePos.x < ur.CenterX() ? T("Switch display to Bars / Beats (BBT)")
                                                                  : T("Switch display to Time (Minutes:Seconds)"));
