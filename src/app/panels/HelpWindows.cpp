@@ -643,6 +643,23 @@ namespace app
          { I18N_KEY("Transport & Audio"), I18N_KEY("Play Notes"), "Z X C V / Q W E R", I18N_KEY("With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing") },
          { I18N_KEY("Transport & Audio"), I18N_KEY("Keyboard Octave"), "- / =", I18N_KEY("Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)") },
 
+         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "Esc / D / E / B", I18N_KEY("Select, Draw, Erase and Blade, while the pointer is over the Piano Roll. Every key in this section needs the pointer there") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes; paste at the playhead") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Duplicate Notes"), MODKEY "+D", I18N_KEY("Lay the selection again right after itself") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Delete Notes"), "Delete / Backspace", I18N_KEY("Delete the selected notes or clips") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Split / Join Notes"), MODKEY "+E / " MODKEY "+J", I18N_KEY("Cut the selected notes at the playhead; join runs on one pitch into one note") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Select All Notes"), MODKEY "+A", I18N_KEY("Select every note of the clips being edited") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Group / Ungroup Clips"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group the selected clips or dissolve their groups") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Generate"), "G", I18N_KEY("Open Generate for this page; with a ruler selection it fills that range") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Quantize"), "Q / Shift+Q", I18N_KEY("Quantize the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Transpose Notes"), "Up / Down", I18N_KEY("One semitone, or one scale degree with scale snap on; hold Shift for an octave") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Nudge Notes / Step Playhead"), "Left / Right", I18N_KEY("Move the selected notes one grid step; with nothing selected, step the playhead") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Zoom Piano Roll"), "= / - / F / Z", I18N_KEY("Zoom in, zoom out, fit the page, zoom to the selection") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Previous / Next Page"), "[ / ]", I18N_KEY("Switch to the neighbouring page") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Loop"), MODKEY "+L / I / O", I18N_KEY("Loop the ruler selection or the selected notes; set the loop start or end at the playhead") },
          // Arrangement Timeline - these fire only while the timeline panel
          // owns the keyboard (click inside it) and no text field is active;
          // the canvas's own Cmd+C/V/D/G and Delete stand down meanwhile.

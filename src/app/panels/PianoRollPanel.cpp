@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <random>
 #include <set>
 #include <string>
 #include <utility>
@@ -102,6 +103,13 @@ namespace
       float exprH = 72.0f;
       bool exprDrag = false;
       ImVec2 exprFrom {};
+      bool inspectorHovered = false;
+      Arrange::QuantizeSpec quant;
+      float strumTicks = 40.0f;
+      float humanizeTime = 15.0f, humanizeVel = 8.0f;
+      uint32_t humanizeSeed = 1;
+      std::vector<Arrange::Note> clipboard; // starts relative to the first note
+      bool openQuantize = false, openFunctions = false;
       Arrange::Lane fieldBase;   // the page as an inspector drag found it
       float fieldFrom = 0.0f;    // the field's value there
       Tool tool = Tool::Select;
@@ -854,6 +862,452 @@ namespace
       MenuParts::EndPopup();
    }
 
+   Arrange::Clip* ClipAt(Arrange::Lane& page, Tick t);
+   Arrange::Clip* NewClipAt(Arrange::Lane& page, Tick tick);
+
+   // The notes an edit works on: the selection, or with none every note of the clips being edited.
+   std::map<uint64_t, std::vector<uint32_t>> TargetNotes(const Arrange::Lane& page)
+   {
+      const State& s = S();
+      if (!s.notes.empty())
+         return SelectionByClip();
+      std::map<uint64_t, std::vector<uint32_t>> out;
+      for (const Arrange::Clip& c : page.clips)
+         if (s.clips.empty() || s.clips.count(c.id) != 0)
+            for (const Arrange::Note& n : c.notes)
+               out[c.id].push_back(n.id);
+      return out;
+   }
+
+   // One undo step that hands every target clip's notes to `fn` and writes back what it leaves in the vector.
+   template <class Fn>
+   void TransformNotes(const Arrange::Lane& page, Fn&& fn)
+   {
+      const auto targets = TargetNotes(page);
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : targets)
+         {
+            const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+            if (c == nullptr)
+               continue;
+            std::vector<Arrange::Note> notes;
+            for (uint32_t id : ids)
+               if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+                  notes.push_back(*n);
+            std::sort(notes.begin(), notes.end(), [](const Arrange::Note& x, const Arrange::Note& y) { return x.start < y.start; });
+            fn(notes);
+            Arrange::EditNotes(gArrange, clip, notes);
+         }
+      });
+   }
+
+   void Quantize(const Arrange::Lane& page)
+   {
+      State& s = S();
+      s.quant.grid = GridOrBeatSixteenth();
+      const auto targets = TargetNotes(page);
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : targets)
+            Arrange::QuantizeNotes(gArrange, clip, ids, s.quant);
+      });
+   }
+
+   void Legato(std::vector<Arrange::Note>& notes)
+   {
+      for (size_t i = 0; i + 1 < notes.size(); i++)
+      {
+         size_t next = i + 1;
+         while (next < notes.size() && notes[next].start == notes[i].start)
+            next++;
+         if (next < notes.size())
+            notes[i].length = notes[next].start - notes[i].start;
+      }
+   }
+
+   void Humanize(std::vector<Arrange::Note>& notes)
+   {
+      State& s = S();
+      std::mt19937 rng(s.humanizeSeed++);
+      std::uniform_real_distribution<float> unit(-1.0f, 1.0f);
+      for (Arrange::Note& n : notes)
+      {
+         n.start = std::max<Tick>(0, n.start + (Tick)std::lround(unit(rng) * s.humanizeTime));
+         n.vel = (uint8_t)std::clamp((int)n.vel + (int)std::lround(unit(rng) * s.humanizeVel), 1, 127);
+      }
+   }
+
+   void Reverse(std::vector<Arrange::Note>& notes)
+   {
+      if (notes.empty())
+         return;
+      Tick lo = notes[0].start, hi = 0;
+      for (const Arrange::Note& n : notes)
+      {
+         lo = std::min(lo, n.start);
+         hi = std::max(hi, n.End());
+      }
+      for (Arrange::Note& n : notes)
+         n.start = lo + hi - n.End();
+   }
+
+   void Invert(std::vector<Arrange::Note>& notes)
+   {
+      int lo = 127, hi = 0;
+      for (const Arrange::Note& n : notes)
+      {
+         lo = std::min(lo, (int)n.pitch);
+         hi = std::max(hi, (int)n.pitch);
+      }
+      for (Arrange::Note& n : notes)
+         n.pitch = (uint8_t)(lo + hi - n.pitch);
+   }
+
+   void Stretch(std::vector<Arrange::Note>& notes, double factor)
+   {
+      if (notes.empty())
+         return;
+      const Tick from = notes[0].start;
+      for (Arrange::Note& n : notes)
+      {
+         n.start = from + (Tick)std::llround((double)(n.start - from) * factor);
+         n.length = std::max<Tick>(1, (Tick)std::llround((double)n.length * factor));
+      }
+   }
+
+   void Strum(std::vector<Arrange::Note>& notes)
+   {
+      const State& s = S();
+      for (size_t i = 0; i < notes.size();)
+      {
+         size_t end = i;
+         while (end < notes.size() && notes[end].start == notes[i].start)
+            end++;
+         std::sort(notes.begin() + (long)i, notes.begin() + (long)end,
+                   [](const Arrange::Note& x, const Arrange::Note& y) { return x.pitch < y.pitch; });
+         const Tick at = notes[i].start;
+         for (size_t k = i; k < end; k++)
+         {
+            const Tick d = (Tick)std::lround((float)(k - i) * s.strumTicks);
+            notes[k].start = at + d;
+            notes[k].length = std::max<Tick>(1, notes[k].length - d);
+         }
+         i = end;
+      }
+   }
+
+   void VelocityRamp(std::vector<Arrange::Note>& notes)
+   {
+      if (notes.size() < 2)
+         return;
+      const float from = notes.front().vel, to = notes.back().vel;
+      const float span = (float)(notes.back().start - notes.front().start);
+      for (Arrange::Note& n : notes)
+         n.vel = (uint8_t)std::clamp((int)std::lround(from + (to - from) * (span > 0.0f ? (float)(n.start - notes.front().start) / span : 0.0f)), 1, 127);
+   }
+
+   void FitToScale(std::vector<Arrange::Note>& notes)
+   {
+      Transport& tr = Transport::Instance();
+      for (Arrange::Note& n : notes)
+         n.pitch = (uint8_t)std::clamp(MusicTime::SnapToScale(n.pitch, tr.Key(), tr.Scale(), MusicTime::kSnapNearest), 0, 127);
+   }
+
+   // Cuts the target notes along the grid.
+   void ChopToGrid(const Arrange::Lane& page)
+   {
+      const Tick grid = GridOrBeatSixteenth();
+      const auto targets = TargetNotes(page);
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : targets)
+         {
+            const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+            if (c == nullptr)
+               continue;
+            Tick lo = Arrange::kMaxTick, hi = 0;
+            for (uint32_t id : ids)
+               if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+               {
+                  lo = std::min(lo, n->start);
+                  hi = std::max(hi, n->End());
+               }
+            // New pieces get new ids: cut only the listed notes and the pieces cut from them.
+            std::vector<uint32_t> sorted = ids;
+            std::sort(sorted.begin(), sorted.end());
+            const uint32_t firstNew = c->nextNoteId;
+            for (Tick t = Arrange::GridCeil(lo + 1, grid); t < hi; t += grid)
+            {
+               std::vector<uint32_t> cut;
+               for (const Arrange::Note& n : Arrange::FindClip(gArrange, clip)->notes)
+                  if (n.id >= firstNew || std::binary_search(sorted.begin(), sorted.end(), n.id))
+                     cut.push_back(n.id);
+               Arrange::SplitNotes(gArrange, clip, cut, t);
+            }
+         }
+      });
+   }
+
+   void DrawFunctionItems(const Arrange::Lane& page)
+   {
+      State& s = S();
+      if (MenuParts::Item(L("Legato")))
+         TransformNotes(page, Legato);
+      if (MenuParts::Item(L("Humanize")))
+         TransformNotes(page, Humanize);
+      if (MenuParts::Item(L("Reverse")))
+         TransformNotes(page, Reverse);
+      if (MenuParts::Item(L("Invert")))
+         TransformNotes(page, Invert);
+      if (MenuParts::Item(L("Double Speed")))
+         TransformNotes(page, [](std::vector<Arrange::Note>& n) { Stretch(n, 0.5); });
+      if (MenuParts::Item(L("Half Speed")))
+         TransformNotes(page, [](std::vector<Arrange::Note>& n) { Stretch(n, 2.0); });
+      if (MenuParts::Item(L("Strum")))
+         TransformNotes(page, Strum);
+      if (MenuParts::Item(L("Chop to Grid")))
+         ChopToGrid(page);
+      if (MenuParts::Item(L("Velocity Ramp")))
+         TransformNotes(page, VelocityRamp);
+      if (MenuParts::Item(L("Fit to Scale")))
+         TransformNotes(page, FitToScale);
+      MenuParts::Separator();
+      FormParts::SliderFloat(T("Strum"), &s.strumTicks, 0.0f, 240.0f, "%.0f ticks");
+      FormParts::SliderFloat(T("Time"), &s.humanizeTime, 0.0f, 120.0f, "%.0f ticks");
+      FormParts::SliderFloat(T("Velocity"), &s.humanizeVel, 0.0f, 40.0f, "%.0f");
+   }
+
+   void DrawQuantizeChips(const Arrange::Lane& page)
+   {
+      State& s = S();
+      if (ChipButton::Draw("Q##pianoQ", false, tok::tile, kIconW))
+         Quantize(page);
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Quantize to the grid (Q). Right-click or Shift+Q for strength, swing and ends"));
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || s.openQuantize)
+         ImGui::OpenPopup("##pianoQuantize");
+      s.openQuantize = false;
+      if (MenuParts::BeginPopup("##pianoQuantize"))
+      {
+         FormParts::SliderFloat(T("Strength"), &s.quant.strength, 0.0f, 1.0f, "%.2f");
+         FormParts::SliderFloat(T("Swing"), &s.quant.swing, 0.0f, 1.0f, "%.2f");
+         FormParts::Switch(T("Ends"), &s.quant.ends);
+         if (MenuParts::Item(L("Quantize")))
+            Quantize(page);
+         MenuParts::EndPopup();
+      }
+      FormParts::Inline(0.0f, tok::space_1);
+      if (ChipButton::Draw("fx##pianoFx", false, tok::tile, kIconW) || s.openFunctions)
+         ImGui::OpenPopup("##pianoFunctions");
+      s.openFunctions = false;
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Note functions"));
+      if (MenuParts::BeginPopup("##pianoFunctions"))
+      {
+         DrawFunctionItems(page);
+         MenuParts::EndPopup();
+      }
+   }
+
+   void CopyNotes()
+   {
+      State& s = S();
+      s.clipboard.clear();
+      Tick first = Arrange::kMaxTick;
+      for (const auto& [clip, ids] : SelectionByClip())
+         if (const Arrange::Clip* c = Arrange::FindClip(gArrange, clip))
+            for (uint32_t id : ids)
+               if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+               {
+                  s.clipboard.push_back(*n);
+                  first = std::min(first, n->start);
+               }
+      for (Arrange::Note& n : s.clipboard)
+         n.start -= first;
+   }
+
+   void DeleteSelection()
+   {
+      State& s = S();
+      const auto sel = SelectionByClip();
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : sel)
+            Arrange::DeleteNotes(gArrange, clip, ids);
+      });
+      s.notes.clear();
+   }
+
+   void PasteNotes(Arrange::Lane& page, Tick at)
+   {
+      State& s = S();
+      if (s.clipboard.empty())
+         return;
+      ArrangeEdit([&] {
+         Arrange::Clip* c = ClipAt(page, at);
+         if (c == nullptr)
+            c = NewClipAt(page, at);
+         if (c == nullptr)
+            return;
+         const Tick to = Arrange::MidiContentTick(*c, at - c->start);
+         std::vector<Arrange::Note> notes = s.clipboard;
+         for (Arrange::Note& n : notes)
+            n.start += to;
+         std::vector<uint32_t> ids;
+         const uint64_t id = c->id;
+         Arrange::AddNotes(gArrange, id, notes, &ids);
+         s.notes.clear();
+         for (uint32_t note : ids)
+            s.notes.insert({ id, note });
+      });
+   }
+
+   // Cmd+D: the selection again, right after itself.
+   void DuplicateSelection()
+   {
+      State& s = S();
+      std::map<uint64_t, std::vector<Arrange::Note>> copies;
+      for (const auto& [clip, ids] : SelectionByClip())
+         if (const Arrange::Clip* c = Arrange::FindClip(gArrange, clip))
+         {
+            Tick lo = Arrange::kMaxTick, hi = 0;
+            for (uint32_t id : ids)
+               if (const Arrange::Note* n = Arrange::FindNote(*c, id))
+               {
+                  copies[clip].push_back(*n);
+                  lo = std::min(lo, n->start);
+                  hi = std::max(hi, n->End());
+               }
+            for (Arrange::Note& n : copies[clip])
+               n.start += hi - lo;
+         }
+      ArrangeEdit([&] {
+         s.notes.clear();
+         for (const auto& [clip, notes] : copies)
+         {
+            std::vector<uint32_t> ids;
+            Arrange::AddNotes(gArrange, clip, notes, &ids);
+            for (uint32_t id : ids)
+               s.notes.insert({ clip, id });
+         }
+      });
+   }
+
+   void NudgePitch(const Arrange::Lane& page, int steps, bool octave)
+   {
+      const auto sel = SelectionByClip();
+      const uint16_t mask = ScaleMask(page);
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : sel)
+         {
+            if (octave)
+            {
+               Arrange::MoveNotes(gArrange, clip, ids, 0, steps * 12);
+               continue;
+            }
+            if (mask == 0)
+            {
+               Arrange::MoveNotes(gArrange, clip, ids, 0, steps);
+               continue;
+            }
+            // One scale degree: walk each note on to the next key of the scale.
+            const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+            std::vector<Arrange::Note> edits;
+            for (uint32_t id : ids)
+               if (const Arrange::Note* found = Arrange::FindNote(*c, id))
+               {
+                  Arrange::Note n = *found;
+                  int p = n.pitch + steps;
+                  while (p >= 0 && p <= 127 && (mask & (1u << (p % 12))) == 0)
+                     p += steps;
+                  if (p >= 0 && p <= 127)
+                     n.pitch = (uint8_t)p;
+                  edits.push_back(n);
+               }
+            Arrange::EditNotes(gArrange, clip, edits);
+         }
+      });
+   }
+
+   void NudgeTime(int steps)
+   {
+      const auto sel = SelectionByClip();
+      const Tick d = steps * GridOrBeatSixteenth();
+      ArrangeEdit([&] {
+         for (const auto& [clip, ids] : sel)
+            Arrange::MoveNotes(gArrange, clip, ids, d, 0);
+      });
+   }
+
+   void SelectAll(const Arrange::Lane& page)
+   {
+      State& s = S();
+      s.notes.clear();
+      for (const Arrange::Clip& c : page.clips)
+         if (s.clips.empty() || s.clips.count(c.id) != 0)
+            for (const Arrange::Note& n : c.notes)
+               s.notes.insert({ c.id, n.id });
+   }
+
+   void JumpPage(const Arrange::Lane& page, int dir)
+   {
+      const std::vector<Arrange::Lane*> pages = Pages();
+      const int n = (int)pages.size();
+      for (int i = 0; i < n; i++)
+         if (pages[(size_t)i]->id == page.id)
+         {
+            S().lane = pages[(size_t)((i + dir + n) % n)]->id;
+            return;
+         }
+   }
+
+   // Zooms to the selected notes, or the selected clips.
+   void ZoomToSelection(const Arrange::Lane& page, float rollW)
+   {
+      State& s = S();
+      Tick lo = Arrange::kMaxTick, hi = 0;
+      for (const Arrange::Clip& c : page.clips)
+      {
+         if (s.notes.empty() && s.clips.count(c.id) != 0)
+         {
+            lo = std::min(lo, c.start);
+            hi = std::max(hi, c.start + c.length);
+         }
+         ForEachPlaced(c, [&](const Placed& pl) {
+            if (!pl.repeat && s.notes.count({ c.id, pl.note->id }) != 0)
+            {
+               lo = std::min(lo, pl.start);
+               hi = std::max(hi, pl.end);
+            }
+         });
+      }
+      if (hi <= lo)
+         return;
+      s.pxPerTick = std::clamp((double)rollW * 0.9 / (double)(hi - lo), kMinPxPerTick, kMaxPxPerTick);
+      s.viewTick = std::max(0.0, (double)lo - (double)rollW * 0.05 / s.pxPerTick);
+   }
+
+   void SetLoopFromSelection(const Arrange::Lane& page)
+   {
+      State& s = S();
+      Tick lo = s.rangeStart, hi = s.rangeEnd;
+      if (hi <= lo)
+      {
+         lo = Arrange::kMaxTick;
+         hi = 0;
+         for (const Arrange::Clip& c : page.clips)
+            ForEachPlaced(c, [&](const Placed& pl) {
+               if (!pl.repeat && s.notes.count({ c.id, pl.note->id }) != 0)
+               {
+                  lo = std::min(lo, pl.start);
+                  hi = std::max(hi, pl.end);
+               }
+            });
+      }
+      const Arrange::LoopRange& loop = gArrange.settings.loop;
+      if (hi > lo)
+         ArrangeSetLoop(true, lo, hi);
+      else
+         ArrangeSetLoop(!loop.enabled, loop.start, loop.end);
+   }
+
    void DrawToolbar(Arrange::Lane& page, float rollW, float rollH)
    {
       State& s = S();
@@ -897,6 +1351,8 @@ namespace
       FormParts::Inline(0.0f, tok::space_1);
       if (IconChip("##pianoFollow", IconsInfinite::Follow, s.follow, T("Follow the playhead")))
          s.follow = !s.follow;
+      FormParts::Inline(0.0f, tok::space_3);
+      DrawQuantizeChips(page);
       const float zoomW = 3.0f * kIconW + 2.0f * tok::space_1;
       ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - zoomW));
       if (IconChip("##pianoZoomOut", IconsInfinite::Zoom, false, T("Zoom out (-)")))
@@ -1589,8 +2045,6 @@ namespace
       ImGui::SetCursorScreenPos(ImVec2(left, y0));
       ImGui::InvisibleButton("##exprLane", ImVec2(width, s.exprH));
       const ImVec2 m = ImGui::GetIO().MousePos;
-      if (ImGui::IsItemHovered())
-         gPianoRollClaimedKeys = true;
       if (ImGui::IsItemActivated())
       {
          ArrangeGestureBegin();
@@ -1890,7 +2344,154 @@ namespace
       else
          DrawPageInspector(page);
       SectionCard::EndWindow();
+      s.inspectorHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
       ImGui::EndChild();
+   }
+
+   // The panel's keys, while the pointer is over it (the Timeline's rule; the canvas's are off then).
+   void HandleKeys(Arrange::Lane& page, const Areas& a, float rollW, float rollH)
+   {
+      State& s = S();
+      const ImGuiIO& io = ImGui::GetIO();
+      if (!gPianoRollClaimedKeys || s.inspectorHovered || io.WantTextInput || s.drag != Drag::None || s.exprDrag || gArrangeGestureOpen)
+         return;
+      const bool cmd = io.KeyCtrl || io.KeySuper, shift = io.KeyShift;
+      const bool noMods = !cmd && !shift && !io.KeyAlt;
+      const bool any = !s.notes.empty();
+      const auto key = [](ImGuiKey k, bool repeat = false) { return ImGui::IsKeyPressed(k, repeat); };
+      const auto clipIds = [&] { return std::vector<uint64_t>(s.clips.begin(), s.clips.end()); };
+      if (noMods && key(ImGuiKey_Escape))
+      {
+         if (s.tool != Tool::Select)
+            s.tool = Tool::Select;
+         else
+         {
+            s.notes.clear();
+            s.clips.clear();
+            s.rangeStart = s.rangeEnd = 0;
+         }
+      }
+      else if (noMods && key(ImGuiKey_D))
+         s.tool = Tool::Draw;
+      else if (noMods && key(ImGuiKey_E))
+         s.tool = Tool::Erase;
+      else if (noMods && key(ImGuiKey_B))
+         s.tool = Tool::Blade;
+      else if (noMods && (key(ImGuiKey_0) || key(ImGuiKey_Keypad0)))
+      {
+         if (any)
+            TransformNotes(page, [](std::vector<Arrange::Note>& notes) {
+               for (Arrange::Note& n : notes)
+                  n.mute = !n.mute;
+            });
+         else if (!s.clips.empty())
+            ArrangeEdit([&] { Arrange::SetEnabled(gArrange, clipIds(), Arrange::kToggle); });
+      }
+      else if (cmd && !shift && key(ImGuiKey_C) && any)
+         CopyNotes();
+      else if (cmd && !shift && key(ImGuiKey_X) && any)
+      {
+         CopyNotes();
+         DeleteSelection();
+      }
+      else if (cmd && !shift && key(ImGuiKey_V))
+         PasteNotes(page, ArrangePlayTick());
+      else if (cmd && !shift && key(ImGuiKey_D))
+      {
+         if (any)
+            DuplicateSelection();
+         else if (!s.clips.empty())
+            ArrangeEdit([&] { Arrange::DuplicateBlock(gArrange, clipIds()); });
+      }
+      else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
+      {
+         if (any)
+            DeleteSelection();
+         else if (!s.clips.empty())
+         {
+            ArrangeEdit([&] { Arrange::Delete(gArrange, clipIds()); });
+            s.clips.clear();
+         }
+      }
+      else if (cmd && !shift && key(ImGuiKey_E))
+      {
+         const Tick at = ArrangePlayTick();
+         if (any)
+            ArrangeEdit([&] {
+               for (const auto& [clip, ids] : SelectionByClip())
+                  if (const Arrange::Clip* c = Arrange::FindClip(gArrange, clip))
+                     if (at >= c->start && at < c->start + c->length)
+                        Arrange::SplitNotes(gArrange, clip, ids, Arrange::MidiContentTick(*c, at - c->start));
+            });
+         else
+            ArrangeEdit([&] {
+               for (uint64_t id : s.clips)
+                  Arrange::Split(gArrange, id, at);
+            });
+      }
+      else if (cmd && !shift && key(ImGuiKey_J) && any)
+         ArrangeEdit([&] {
+            for (const auto& [clip, ids] : SelectionByClip())
+               Arrange::JoinNotes(gArrange, clip, ids);
+         });
+      else if (cmd && !shift && key(ImGuiKey_A))
+         SelectAll(page);
+      else if (cmd && !shift && key(ImGuiKey_R))
+      {
+         s.renameLane = page.id;
+         std::snprintf(s.renameBuf, sizeof s.renameBuf, "%s", page.name.c_str());
+         s.renameFocus = true;
+      }
+      else if (cmd && shift && key(ImGuiKey_G))
+      {
+         std::vector<uint64_t> groups;
+         for (const Arrange::Clip& c : page.clips)
+            if (s.clips.count(c.id) != 0 && c.groupId != 0)
+               groups.push_back(c.groupId);
+         ArrangeEdit([&] { Arrange::Ungroup(gArrange, groups); });
+      }
+      else if (cmd && !shift && key(ImGuiKey_G))
+         ArrangeEdit([&] { Arrange::Group(gArrange, clipIds()); });
+      else if (noMods && key(ImGuiKey_Q))
+         Quantize(page);
+      else if (!cmd && shift && key(ImGuiKey_Q))
+         s.openQuantize = true;
+      else if (any && key(ImGuiKey_UpArrow, true))
+         NudgePitch(page, 1, shift);
+      else if (any && key(ImGuiKey_DownArrow, true))
+         NudgePitch(page, -1, shift);
+      else if (noMods && key(ImGuiKey_LeftArrow, true))
+      {
+         if (any)
+            NudgeTime(-1);
+         else
+            ArrangeSeekTick(std::max<Tick>(0, ArrangePlayTick() - ArrangeNudgeStepTicks()));
+      }
+      else if (noMods && key(ImGuiKey_RightArrow, true))
+      {
+         if (any)
+            NudgeTime(1);
+         else
+            ArrangeSeekTick(ArrangePlayTick() + ArrangeNudgeStepTicks());
+      }
+      else if (noMods && key(ImGuiKey_Equal, true))
+         ZoomX(1.25, (a.x0 + a.x1) * 0.5f, a.x0);
+      else if (noMods && key(ImGuiKey_Minus, true))
+         ZoomX(1.0 / 1.25, (a.x0 + a.x1) * 0.5f, a.x0);
+      else if (noMods && key(ImGuiKey_F))
+         FitView(page, rollW, rollH);
+      else if (noMods && key(ImGuiKey_Z))
+         ZoomToSelection(page, rollW);
+      else if (noMods && key(ImGuiKey_LeftBracket))
+         JumpPage(page, -1);
+      else if (noMods && key(ImGuiKey_RightBracket))
+         JumpPage(page, 1);
+      else if (cmd && !shift && key(ImGuiKey_L))
+         SetLoopFromSelection(page);
+      else if (noMods && key(ImGuiKey_I))
+         ArrangeSetLoopEdgeAtPlayhead(true);
+      else if (noMods && key(ImGuiKey_O))
+         ArrangeSetLoopEdgeAtPlayhead(false);
    }
 
    void DrawPage(Arrange::Lane& page)
@@ -1935,8 +2536,6 @@ namespace
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelX);
       const bool hovered = ImGui::IsItemHovered();
-      if (hovered)
-         gPianoRollClaimedKeys = true;
       const ImGuiIO& io = ImGui::GetIO();
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
       if (hovered)
@@ -1964,6 +2563,9 @@ namespace
       }
       ClampView(a.rollB - a.rollY);
       HandlePointer(page, a, hovered, mouse);
+      if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && mouse.y >= a.rollY && mouse.x >= a.x0)
+         s.openFunctions = true;
+      HandleKeys(page, a, a.x1 - a.x0, a.rollB - a.rollY);
 
       // Follow: the view pages along while playing.
       const Tick play = ArrangePlayTick();
@@ -2008,6 +2610,7 @@ namespace
 
    void DrawPanel()
    {
+      gPianoRollClaimedKeys = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !ImGui::GetIO().WantTextInput;
       FollowCanvasSelection();
       DrawTabs();
       DrawLinkChip();
