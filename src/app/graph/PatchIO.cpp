@@ -1,6 +1,8 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/graph/LearningLog.h"
 #include "core/MediaCollect.h"
+#include "core/MovementLog.h"
 #include "core/Notices.h"
 #include "platform/AppPaths.h"
 
@@ -324,6 +326,12 @@ namespace app
             gGridSnap = std::strtof(val.c_str(), nullptr);
          else if (key == "zoomSensitivity")
             gZoomSensitivity = std::strtof(val.c_str(), nullptr);
+         else if (key == "learnFromPlaying")
+         {
+            LearningLog::SetEnabled(val != "0");
+            if (val == "0")
+               MovementLog::SetEnabled(false); // the one switch stops every writer, the movement log included
+         }
          else if (key == "minimapEnabled")
             gMinimapEnabled = (val != "0");
          else if (key == "minimapCorner")
@@ -385,6 +393,7 @@ namespace app
       file << "gridSnap=" << gGridSnap << "\n";
       file << "zoomSensitivity=" << gZoomSensitivity << "\n";
       file << "minimapEnabled=" << (gMinimapEnabled ? 1 : 0) << "\n";
+      file << "learnFromPlaying=" << (LearningLog::Enabled() ? 1 : 0) << "\n";
       file << "minimapCorner=" << gMinimapCorner << "\n";
       file << "minimapSize=" << gMinimapSize << "\n";
       file << "minimapOpacity=" << gMinimapOpacity << "\n";
@@ -798,6 +807,7 @@ namespace app
       gPatchDirty = false;
       gPatchStatus = "Saved";
       NotePatchFileStamp(path); // our own write is not an outside change
+      LearningLog::PatchSaved(path);
       Patch::NoteRecent(path);
       // Whatever the autosave was covering is now safely on disk under the
       // user's own file - see §3: leaving it around would offer to recover

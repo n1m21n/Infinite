@@ -1051,3 +1051,54 @@ report is on split B:
   84.2%, but on only 19 files, so this is a recorded miss and not a claim.
 - `frame_features` (loop/take features) has no f0, and one f0 means nothing for a loop, so the estimator lives in the
   single-note path (`detail.py`).
+
+## 2026-10-30 Plan item 20: local learning log (`src/app/graph/LearningLog.*`, `INFINITE_LEARNINGTEST`): MET, two deviations
+Close doc §5.1 and §5.2 are now app code. Everything goes under `AppSupportDir()/learning/`:
+
+| File | Written when |
+|---|---|
+| `sessions.jsonl` | app start and end, and when the switch changes: session id, time, app version, learning on/off |
+| `takes/YYYYMMDD.jsonl` | every Generate Samples take, once it has an outcome. Fields: part, style, landed seed, attempt, dots, bpm, key, follow flags |
+| `audio/YYYYMMDD.jsonl` | a take is kept: its RoleCritic frame features (132 numbers), never the audio |
+| `midi/YYYYMMDD.jsonl` | notes played in from any MIDI device: on/off, velocity, beat, tempo, key, scale, playing; flushed every 10 s |
+| `patches/<hash>.inf` + `index.jsonl` | a user save: patch text stored once per FNV-1a hash, one index line per save |
+| `profile/user_profile.json` | rebuilt on a background thread when older than 20 h, checked every 10 min |
+
+Outcomes:
+- **kept**: the node's "keep as file" export, or a take leaving the Sample studio (export, slices, to patch, to node, to Samplers). Kept after a take settled still counts, as its own line.
+- **rerolled**: a new take from the same node.
+- **edited**: the node's settings moved off the take within 30 s.
+- **deleted**: the node was deleted.
+- **ignored**: nothing happened for 45 s.
+
+Not counted as new takes: a reopened patch re-rendering its saved take, and a take carried from the studio to the canvas.
+
+The profile has these blocks:
+- taste: keep rate per part, style and part|style, trust n/(n+20)
+- sound: per-part median of the kept features
+- harmony: pitch-class, key, scale and chord-size shares
+- melody: step/leap/repeat shares, range, velocity, 16th onset grid
+
+Settings > Learning has:
+- "Learn from my playing" (saved as `learnFromPlaying`). Off drops pending takes, stops every writer and the movement log, and leaves existing files.
+- "Open learning folder", with the folder size.
+- A two-click "Forget me" that deletes the folder.
+
+Raw logs share a 500 MB cap, oldest first; `profile/` is never dropped. Logging is off in headless jobs and whenever any
+`INFINITE_*` variable is set. `INFINITE_LEARNING_DIR` points it at a test folder and turns it on.
+
+`INFINITE_LEARNINGTEST` PASS, 11 checks:
+- five takes with one of each outcome
+- nothing written while off
+- a patch saved twice stored once
+- profile counts takes, kept synths and features
+- a C major triad read as one 3-note chord, C D E G as steps
+- Forget me removes the folder
+
+Deviations and limits:
+- MIDI goes to plain JSONL, not the movement log's compressed writer: no MovementLog record type was added. A day of playing is a few MB.
+- Audio features are the role critic's 132 frame features, not the "32 bands + centroid, crest, onsets" in the close doc, because they are already in the app and are what the critic refit (item 21) reads.
+- The movement log stays in its own folder; it was not moved under `learning/`.
+- The voice source (Vital / designed / bank line) is not known where a take lands, so taste has no voice-source block yet.
+- The MIDI reader itself is not exercised by the test (no device); its profile side is.
+- Nothing reads the profile yet (item 21).

@@ -19,6 +19,7 @@
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/GenerateSamplesNode.h"
+#include "app/graph/LearningLog.h"
 #include "app/graph/OfflineGraph.h"
 #include "audio/AudioFileWriter.h"
 #include "app/graph/SampleStyles.h"
@@ -27,6 +28,7 @@
 #include "audio/NoteModel.h"
 #include "platform/AppPaths.h"
 #include "audio/MusicTime.h"
+#include "json.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -34,6 +36,7 @@
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
+#include <map>
 #include <set>
 #include <thread>
 
@@ -693,6 +696,125 @@ bool RunGenSampleTest()
       fails++;
    }
    printf("GENSAMPLETEST %s (%d failures)\n", fails == 0 ? "PASS" : "FAIL", fails);
+   return fails == 0;
+}
+}
+
+// INFINITE_LEARNINGTEST: the local learning log (LearningLog) in a temp folder, on a test clock. Five takes get the
+// five outcomes (rerolled, edited, kept, deleted, ignored); the off switch writes nothing; a patch saved twice is
+// stored once; the profile counts them; Forget me deletes the folder.
+
+namespace app
+{
+bool RunLearningLogTest()
+{
+   namespace fs = std::filesystem;
+   int fails = 0;
+   auto check = [&](bool ok, const char* what) {
+      printf("  %s %s\n", ok ? "ok  " : "FAIL", what);
+      fails += ok ? 0 : 1;
+   };
+   const fs::path dir = fs::temp_directory_path() / "infinite_learningtest";
+   std::error_code ec;
+   fs::remove_all(dir, ec);
+#if defined(_WIN32)
+   _putenv_s("INFINITE_LEARNING_DIR", dir.string().c_str());
+#else
+   setenv("INFINITE_LEARNING_DIR", dir.string().c_str(), 1);
+#endif
+   LearningLog::SetClockForTest(0.0);
+   LearningLog::Start();
+   check(LearningLog::Active(), "on with INFINITE_LEARNING_DIR");
+   SampleStyles::Recipe r;
+   r.part = SampleStyles::Part::Synths;
+   int a = 0, b = 0;
+   LearningLog::TakeMade(&a, r, 0, 120.0f, 0, 0);
+   LearningLog::SetClockForTest(1.0);
+   LearningLog::TakeMade(&a, r, 1, 120.0f, 0, 0); // the first: rerolled
+   LearningLog::SetClockForTest(5.0);
+   LearningLog::TakeEdited(&a);
+   LearningLog::SetClockForTest(50.0);
+   LearningLog::Frame(0.0); // the second: edited (45 s on, a knob moved within 30 s)
+   LearningLog::TakeMade(&b, r, 0, 120.0f, 0, 0);
+   std::vector<float> l(48000), rr(48000);
+   for (int i = 0; i < 48000; i++)
+      l[i] = rr[i] = 0.3f * std::sin(6.283185307179586 * 220.0 * i / 48000.0) * (float)((i % 12000) < 6000);
+   LearningLog::TakeKept(&b, "export", l.data(), rr.data(), 48000, 48000.0); // the third: kept
+   LearningLog::SetClockForTest(60.0);
+   LearningLog::TakeMade(&a, r, 0, 120.0f, 0, 0);
+   LearningLog::TakeDeleted(&a); // the fourth: deleted
+   LearningLog::SetClockForTest(61.0);
+   LearningLog::TakeMade(&b, r, 0, 120.0f, 0, 0);
+   LearningLog::SetClockForTest(120.0);
+   LearningLog::Frame(0.0); // the fifth: ignored
+   LearningLog::SetEnabled(false);
+   LearningLog::TakeMade(&a, r, 0, 120.0f, 0, 0);
+   LearningLog::TakeKept(&a, "export", l.data(), rr.data(), 48000, 48000.0);
+   LearningLog::SetEnabled(true);
+
+   const fs::path patch = dir / "p.inf";
+   {
+      std::ofstream f(patch);
+      f << "infinite-patch 1\n";
+   }
+   LearningLog::PatchSaved(patch.string());
+   LearningLog::PatchSaved(patch.string());
+   int infs = 0, index = 0;
+   for (const auto& e : fs::directory_iterator(dir / "patches", ec))
+      infs += e.path().extension() == ".inf";
+   {
+      std::ifstream f(dir / "patches" / "index.jsonl");
+      std::string line;
+      while (std::getline(f, line))
+         index++;
+   }
+   check(infs == 1 && index == 2, "a patch saved twice: one file, two index lines");
+
+   std::map<std::string, int> outcomes;
+   int takeLines = 0;
+   for (const auto& e : fs::directory_iterator(dir / "takes", ec))
+   {
+      std::ifstream f(e.path());
+      std::string line;
+      while (std::getline(f, line))
+      {
+         takeLines++;
+         outcomes[nlohmann::json::parse(line).value("outcome", "")]++;
+      }
+   }
+   printf("  take lines %d: kept %d rerolled %d edited %d deleted %d ignored %d\n", takeLines, outcomes["kept"],
+          outcomes["rerolled"], outcomes["edited"], outcomes["deleted"], outcomes["ignored"]);
+   check(takeLines == 5 && outcomes["kept"] == 1 && outcomes["rerolled"] == 1 && outcomes["edited"] == 1 &&
+            outcomes["deleted"] == 1 && outcomes["ignored"] == 1,
+         "five takes, one of each outcome; nothing while off");
+
+   // Played notes (the MIDI reader needs a device, so its lines are written here): a C major triad, then C D E G.
+   {
+      fs::create_directories(dir / "midi", ec);
+      std::ofstream f(dir / "midi" / "20261030.jsonl");
+      const int notes[7] = { 60, 64, 67, 60, 62, 64, 67 };
+      const double ts[7] = { 0.0, 0.01, 0.02, 1.0, 1.25, 1.5, 1.75 };
+      for (int i = 0; i < 7; i++)
+         f << nlohmann::json{ { "session", "s" }, { "t", ts[i] }, { "beat", ts[i] * 2.0 }, { "key", 0 }, { "scale", 0 },
+                              { "dev", 1 }, { "ch", 0 }, { "note", notes[i] }, { "vel", 0.8 }, { "on", true } }
+                 .dump()
+           << "\n";
+   }
+   check(LearningLog::RebuildProfile(), "profile built");
+   nlohmann::json p = nlohmann::json::parse(std::ifstream(dir / "profile" / "user_profile.json"), nullptr, false);
+   check(!p.is_discarded() && p["taste"].value("takes", 0) == 5, "profile: five takes");
+   check(!p.is_discarded() && p["taste"]["part"]["synths"].value("kept", 0) == 1, "profile: synths kept once");
+   check(!p.is_discarded() && p["sound"]["synths"].value("n", 0) == 1 && p["sound"]["synths"]["median"].size() > 20,
+         "profile: kept audio features for synths");
+
+   check(!p.is_discarded() && p["harmony"].value("notes", 0) == 7 && p["harmony"]["chord_size"][2].get<double>() > 0.0,
+         "profile: notes counted, one three-note chord");
+   check(!p.is_discarded() && p["melody"].value("step", 0.0) >= 0.5, "profile: C D E G is mostly steps");
+   LearningLog::ForgetMe();
+   check(!fs::exists(dir), "Forget me deletes the folder");
+   LearningLog::Stop();
+   fs::remove_all(dir, ec);
+   printf("LEARNINGTEST %s (%d failures)\n", fails == 0 ? "PASS" : "FAIL", fails);
    return fails == 0;
 }
 }

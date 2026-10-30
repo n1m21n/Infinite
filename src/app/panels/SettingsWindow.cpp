@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -788,6 +789,49 @@ namespace app
                   }
                }
                FormParts::EndCombo();
+            }
+
+            ImGui::Spacing();
+            FormParts::Section(T("Learning"));
+            {
+               // Local only: what you keep and play, so the generator learns your taste (LearningLog). Off stops every
+               // writer, the movement log included; Forget me deletes the folder.
+               bool learn = LearningLog::Enabled();
+               if (FormParts::Switch(L("Learn from my playing"), &learn))
+               {
+                  LearningLog::SetEnabled(learn);
+                  MovementLog::SetEnabled(learn);
+                  SaveWorkspaceSettings();
+               }
+               ImGui::TextDisabled("%s", T("Kept takes, notes you play and saved patches stay on this computer."));
+               if (FormParts::Button(L("Open learning folder")))
+               {
+                  const std::string dir = LearningLog::Dir();
+                  if (!dir.empty())
+                     Platform::RevealInFileManager(dir);
+               }
+               ImGui::SameLine();
+               static double sLearnSizedAt = -10.0; // walking the folder every frame would cost; once a second
+               static float sLearnMB = 0.0f;
+               if (ImGui::GetTime() - sLearnSizedAt > 1.0)
+               {
+                  sLearnMB = (float)LearningLog::FolderBytes() / (1024.0f * 1024.0f);
+                  sLearnSizedAt = ImGui::GetTime();
+               }
+               ImGui::Text(T("(%.1f MB used)"), sLearnMB);
+               // Two clicks: the first arms it for four seconds.
+               static double sForgetArmed = -1.0;
+               const bool armed = sForgetArmed >= 0.0 && ImGui::GetTime() - sForgetArmed < 4.0;
+               if (FormParts::Button(armed ? L("Click again to delete everything learned") : L("Forget me")))
+               {
+                  if (armed)
+                  {
+                     LearningLog::ForgetMe();
+                     sForgetArmed = -1.0;
+                  }
+                  else
+                     sForgetArmed = ImGui::GetTime();
+               }
             }
 
             ImGui::Spacing();

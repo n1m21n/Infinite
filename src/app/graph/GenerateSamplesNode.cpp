@@ -1,5 +1,6 @@
 // Generate Samples. See GenerateSamplesNode.h.
 #include "app/graph/GenerateSamplesNode.h"
+#include "app/graph/LearningLog.h"
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/UserStyle.h"
 
@@ -66,7 +67,10 @@ GenerateSamplesNode::GenerateSamplesNode()
    loop = true;
 }
 
-GenerateSamplesNode::~GenerateSamplesNode() = default;
+GenerateSamplesNode::~GenerateSamplesNode()
+{
+   LearningLog::TakeDeleted(this);
+}
 
 SampleStyles::Recipe GenerateSamplesNode::CurrentRecipe() const
 {
@@ -223,6 +227,10 @@ void GenerateSamplesNode::Finish()
    mJob.reset();
    mMade = made;
    mMadeAttempt = attempt;
+   // Not a new take: a reopened patch rendering its saved take again, or a take brought over from the Sample studio
+   // (kept there already).
+   if (!mRestoreRange && !keepSeed)
+      LearningLog::TakeMade(this, made, attempt, madeBpm, madeRoot, madeScale);
    FinishBuffer(buf, MadeLabel(), "", "generated");
    if (mRestoreRange)
    {
@@ -303,6 +311,7 @@ bool GenerateSamplesNode::ExportWav(const std::string& path) const
    if (mLoopL.empty() || path.empty())
       return false;
    UserStyle::NoteKept(); // a loop worth taking away landed
+   LearningLog::TakeKept(this, "export", mLoopL.data(), mLoopR.data(), (int)mLoopL.size(), kRate);
    std::vector<float> inter(mLoopL.size() * 2);
    for (size_t i = 0; i < mLoopL.size(); i++)
    {
@@ -317,6 +326,8 @@ void GenerateSamplesNode::CookIfNeeded(int frameId)
    SamplerNode::CookIfNeeded(frameId);
    UserStyle::SettleTaste();
    Poll();
+   if (mHasSample && !mJob && GetState() == State::Stale)
+      LearningLog::TakeEdited(this);
    // A kept file reloaded from a patch: it is the sample, made from the saved recipe.
    if (!mHasSample && !mJob && !mFilePath.empty())
    {

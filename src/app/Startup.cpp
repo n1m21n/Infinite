@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/graph/LearningLog.h"
 #include "platform/PluginCrashGuard.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/Glyphs.gen.h"
@@ -11,6 +12,7 @@ namespace app
 bool RunAliasTest(); // selftest/AliasTests.cpp
 bool RunOversampleTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
+bool RunLearningLogTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleTest(); // selftest/GenSampleTests.cpp
 bool RunGenSampleBatch(const std::string& dir);
 bool RunGenSampleDiversity(const std::string& dir, int takes);
@@ -638,6 +640,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       RegisterNodes();
       return RunGenSampleTest() ? 0 : 1;
    }
+   // The local learning log: outcomes, off switch, patches, profile, Forget me (selftest/GenSampleTests.cpp).
+   if (getenv("INFINITE_LEARNINGTEST") != nullptr)
+      return RunLearningLogTest() ? 0 : 1;
    if (const char* dir = getenv("INFINITE_GENSAMPLEBATCH"))
    {
       RegisterNodes();
@@ -1479,6 +1484,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return std::string();
    });
    MovementLog::Start();
+   if (gHeadlessJob.mode == Headless::Mode::None)
+      LearningLog::Start();
    // Headless jobs neither read nor write the learned profiles: a render must not depend on (or change)
    // the user's accumulated data, or the same patch renders differently run to run.
    if (gHeadlessJob.mode == Headless::Mode::None)

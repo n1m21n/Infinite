@@ -1,4 +1,5 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "app/graph/LearningLog.h"
 #include "app/frame/FrameCtx.h"
 #include "app/frame/FrameTests.h"
 #include "core/SelfUpdate.h"
@@ -115,6 +116,7 @@ int main(int argc, char** argv)
    SelfUpdate::Shutdown();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    SetQuitStep("movement log");
+   LearningLog::Stop();
    MovementLog::Stop();
    SetQuitStep("delete nodes");
    gNodes.clear();

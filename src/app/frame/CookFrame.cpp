@@ -1,4 +1,5 @@
 // Per-frame modulation + palette application (runtime code that sat among the fixtures in main.cpp).
+#include "app/graph/LearningLog.h"
 #include "app/AppShared.h"
 #include "audio/VoiceMod.h"
 
@@ -740,5 +741,6 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // Wall clock, not the transport: the transport freezes while paused, which
    // would stamp every hand move made with playback stopped at one instant.
    MovementLog::Capture(ImGui::GetTime(), isNormalFrame);
+   LearningLog::Frame(ImGui::GetTime());
 }
 }

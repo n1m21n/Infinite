@@ -12,6 +12,7 @@
 // on the node are the same sound for the same recipe. Snap to scale re-renders the take's own seed pinned.
 #include "app/AppShared.h"
 #include "app/graph/GenerateSamplesNode.h"
+#include "app/graph/LearningLog.h"
 #include "app/graph/NodeClipboard.h"
 #include "app/graph/SampleStyles.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -889,6 +890,15 @@ namespace
       return true;
    }
 
+   // A generated take leaving the studio (written, sliced, made a node or a patch) is a kept take (LearningLog).
+   void NoteKept(const char* how)
+   {
+      Studio& s = S();
+      if (s.take && s.gen && s.gen->HasLoopToExport())
+         LearningLog::TakeKept(s.gen.get(), how, s.gen->LoopL().data(), s.gen->LoopR().data(), (int)s.gen->LoopL().size(),
+                               GenerateSamplesNode::kLoopRate);
+   }
+
    // The edit as heard, rendered now (not the cached result, which may be a step behind). "" on failure.
    std::string WriteEdit(std::string path, const char* ext, AudioFileWriter::Format fmt, int bits, SliceRenderResult* outRes = nullptr)
    {
@@ -903,6 +913,7 @@ namespace
          path = AudioRecordings::GenerateFilePath(SourceName(), ext);
       if (!WriteAudio(path, res.l, res.r, fmt, bits))
          return std::string();
+      NoteKept("export");
       if (outRes != nullptr)
          *outRes = std::move(res);
       return path;
@@ -947,7 +958,10 @@ namespace
          return;
       const std::vector<std::string> paths = WriteSlices(folder);
       if (!paths.empty())
+      {
+         NoteKept("slices");
          Platform::RevealInFileManager(paths.front());
+      }
    }
 
    // The slice starts in the written file, 0..1, for the Slicer.
@@ -1097,6 +1111,7 @@ namespace
          }
       gSuppressUndoCheckpoints = false;
       gPatchDirty = true;
+      NoteKept("patch");
    }
 
    // A node that plays the edit: Generate Samples keeps the recipe (it re-renders the same take between the start
@@ -1138,6 +1153,7 @@ namespace
             n->followScale = s.followScale;
             n->keepSeed = true;
             n->Generate();
+            NoteKept("node");
             const double total = (double)std::max<int64_t>(1, Frames());
             n->start = (float)((double)s.doc.StartFrame() / total);
             n->end = (float)((double)s.doc.endFrame / total);
@@ -1189,6 +1205,7 @@ namespace
       }
       gSuppressUndoCheckpoints = false;
       gPatchDirty = true;
+      NoteKept("samplers");
    }
 
    // Play: the edit on the transport, with audio handed to the studio the way Timeline audio takes it from the canvas.

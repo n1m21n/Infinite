@@ -40,6 +40,9 @@ PHRASES = [("chord", "Oscillator", [(0.0, m, 0.8, 1.0) for m in (60, 64, 67)] + 
 SYNTH = ["  i waveform 0", "  f ampAttack 2", "  f ampDecay 120", "  f ampSustain 0.3", "  f ampRelease 20", "  f volume 0.8"]
 
 
+GENERATORS = {"Chorder"}  # make their own notes: no input pin, so the phrase only sets the tempo they run against
+
+
 def out_path(fx):
     return os.path.join(fxs.OUT_DIR, "notefx_%s.jsonl" % fx.lower().replace(" ", "_"))
 
@@ -50,7 +53,7 @@ def patch(fx, tags, rec, part):
         tg = tags.get(k, "f")
         L.append("  %s %s %s" % (tg, k, int(float(v)) if tg in ("i", "b") else repr(float(v))))
     L += ["end", "node 3 Synths Oscillator", "  id syn"] + SYNTH + ["end", "node 4 Utility Audio Out", "  id out", "end",
-          "note nfx 0 keys", "note syn 0 nfx", "aud out 0 syn"]
+          "note syn 0 nfx", "aud out 0 syn"] + ([] if fx in GENERATORS else ["note nfx 0 keys"])
     return "\n".join(L) + "\n"
 
 
