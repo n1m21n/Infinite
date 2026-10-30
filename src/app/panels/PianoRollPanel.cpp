@@ -593,12 +593,16 @@ namespace
    {
       State& s = S();
       uint64_t uid = 0;
+      // The panel draws outside the canvas, where no editor is current.
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<PianoRollNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
             uid = gn.uid;
             break;
          }
+      ed::SetCurrentEditor(prevEditor);
       if (uid == s.lastSelectedNode)
          return;
       s.lastSelectedNode = uid;
