@@ -12,8 +12,8 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Button | 4 | 5 | 6 | 6 | 18 | · | 2 | 48 | 5 | · | 22 | · | · | **116** |
 | Toggle (bypass/eye/viewport/scale) | · | 4 | · | · | · | · | 5 | · | · | · | · | · | 1 | **10** |
 | Checkbox | · | 2 | · | · | · | · | 1 | 141 | · | · | · | · | · | **144** |
-| Dropdown | 1 | · | 1 | 2 | 3 | 2 | · | 179 | 1 | · | 2 | 16 | · | **207** |
-| Knob | · | 7 | 2 | · | 2 | · | 4 | 377 | · | · | · | · | · | **392** |
+| Dropdown | 1 | · | 1 | 2 | 3 | 2 | · | 180 | 1 | · | 2 | 16 | · | **208** |
+| Knob | · | 7 | 2 | · | 2 | · | 4 | 378 | · | · | · | · | · | **393** |
 | Slider / fader / drag | · | 14 | 2 | · | 3 | · | 2 | 750 | 3 | 1 | 1 | 9 | · | **785** |
 | Text / number field | 1 | 4 | 2 | · | 17 | · | 6 | 14 | · | 3 | 11 | 2 | · | **60** |
 | Colour swatch / picker | · | 1 | · | · | 3 | · | 1 | 48 | · | 1 | · | · | · | **54** |

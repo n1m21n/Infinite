@@ -119,6 +119,9 @@ namespace
          return g;
       }();
       bool genOpen = false, seedLock = false;
+      bool refitRows = false;    // a take was written: bring its pitches into view next frame
+      bool autoFit = false;      // the rows were fitted and not scrolled since: refit when the roll's height changes
+      float fitH = 0.0f;         // the roll height of the last fit
       std::string genError;
       Arrange::Lane fieldBase;   // the page as an inspector drag found it
       float fieldFrom = 0.0f;    // the field's value there
@@ -322,20 +325,37 @@ namespace
       }
    }
 
-   void FitView(const Arrange::Lane& page, float rollW, float rollH)
+   // Rows sized and scrolled so the page's whole pitch span shows, with a row of air above and below. Rows only
+   // shrink from 12 pt, except drum rows, which stay tall enough for their names.
+   void FitRows(const Arrange::Lane& page, float rollH)
    {
       State& s = S();
-      Tick t0 = Arrange::kMaxTick, t1 = 0;
       int lo = 127, hi = 0;
       for (const Arrange::Clip& c : page.clips)
-      {
-         t0 = std::min(t0, c.start);
-         t1 = std::max(t1, c.start + c.length);
          for (const Arrange::Note& n : c.notes)
          {
             lo = std::min(lo, (int)n.pitch);
             hi = std::max(hi, (int)n.pitch);
          }
+      if (hi < lo)
+         lo = hi = 60;
+      const int span = std::abs(std::max(0, s.rowOf[(size_t)lo]) - std::max(0, s.rowOf[(size_t)hi])) + 3;
+      const float floor = page.drumRows ? 18.0f : kMinKeyH;
+      s.keyH = std::clamp(std::min(page.drumRows ? 22.0f : 12.0f, rollH / (float)span), floor, kMaxKeyH);
+      const int mid = std::max(0, s.rowOf[(size_t)((lo + hi) / 2)]);
+      s.topRow = (float)mid - rollH / s.keyH * 0.5f;
+      s.fitH = rollH;
+      s.autoFit = true;
+   }
+
+   void FitView(const Arrange::Lane& page, float rollW, float rollH)
+   {
+      State& s = S();
+      Tick t0 = Arrange::kMaxTick, t1 = 0;
+      for (const Arrange::Clip& c : page.clips)
+      {
+         t0 = std::min(t0, c.start);
+         t1 = std::max(t1, c.start + c.length);
       }
       if (t1 <= t0)
       {
@@ -344,10 +364,7 @@ namespace
       }
       s.pxPerTick = std::clamp((double)rollW * 0.95 / (double)(t1 - t0), kMinPxPerTick, kMaxPxPerTick);
       s.viewTick = (double)t0;
-      if (hi < lo)
-         lo = hi = 60;
-      const int mid = std::max(0, s.rowOf[(size_t)((lo + hi) / 2)]);
-      s.topRow = (float)mid - rollH / s.keyH * 0.5f;
+      FitRows(page, rollH);
    }
 
    void ZoomX(double factor, float anchorX, float rollX)
@@ -567,7 +584,7 @@ namespace
       else
          face = T("Link a Piano Roll node");
       const float w = 190.0f;
-      ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - w));
+      FormParts::Inline(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - w));
       const std::string caption = face.substr(0, face.find("##")) + "##pageLink";
       if (DropdownField::Draw(caption.c_str(), ImVec2(w, 0.0f)))
          ImGui::OpenPopup("##pageLinkMenu");
@@ -1419,7 +1436,7 @@ namespace
       if (IconChip("##pianoGenSettings", IconsInfinite::Settings, s.genOpen, T("Generate settings")))
          s.genOpen = !s.genOpen;
       const float zoomW = 3.0f * kIconW + 2.0f * tok::space_1;
-      ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - zoomW));
+      FormParts::Inline(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - zoomW));
       if (IconChip("##pianoZoomOut", IconsInfinite::Zoom, false, T("Zoom out (-)")))
          ZoomX(1.0 / 1.25, ImGui::GetWindowPos().x + rollW * 0.5f, ImGui::GetWindowPos().x);
       FormParts::Inline(0.0f, tok::space_1);
@@ -2289,7 +2306,7 @@ namespace
       SectionCard::Begin(s.clips.size() == 1 ? T("Clip") : T("Clips"));
       if (s.clips.size() == 1)
       {
-         SectionCard::RowLabel(T("Name"));
+         FormParts::Label(T("Name"));
          ImGui::SetNextItemWidth(-1.0f);
          const bool changed = FieldWell::InputText("##clipName", &c0->name);
          if (ImGui::IsItemActivated())
@@ -2299,7 +2316,7 @@ namespace
          if (ImGui::IsItemDeactivated())
             ArrangeGestureEnd();
       }
-      SectionCard::RowLabel(T("Colour"));
+      FormParts::Label(T("Colour"));
       ImVec4 shown = ClipColor(*c0, page);
       float rgb[3] = { shown.x, shown.y, shown.z };
       if (FormParts::ColorDot("##clipColour", rgb))
@@ -2377,7 +2394,7 @@ namespace
    {
       State& s = S();
       SectionCard::Begin(T("Page"));
-      SectionCard::RowLabel(T("Colour"));
+      FormParts::Label(T("Colour"));
       const ImVec4 shown = page.colorR + page.colorG + page.colorB > 0.0f ? ImVec4(page.colorR, page.colorG, page.colorB, 1.0f)
                                                                          : ClipColor(Arrange::Clip {}, page);
       float rgb[3] = { shown.x, shown.y, shown.z };
@@ -2407,7 +2424,7 @@ namespace
          });
       }
       FormParts::Switch(T("Audition"), &s.audition);
-      SectionCard::RowLabel(T("Grid"));
+      FormParts::Label(T("Grid"));
       DrawGridChip();
    }
 
@@ -2457,7 +2474,7 @@ namespace
       int form = (int)g.form;
       if (FormParts::Combo(T("Form"), &form, "None\0" "AABA\0" "ABAB\0" "AAAB\0"))
          g.form = (NoteGen::Form)form;
-      SectionCard::RowLabel(T("Seed"));
+      FormParts::Label(T("Seed"));
       int seed = (int)g.seed;
       ImGui::SetNextItemWidth(-1.0f);
       if (FieldWell::InputInt("##pianoGenSeed", &seed))
@@ -2496,6 +2513,7 @@ namespace
       State& s = S();
       ImGui::BeginChild("##pianoInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
       SectionCard::BeginWindow();
+      const FormParts::Narrow narrow;
       if (s.genOpen)
          DrawGenerateCard();
       else if (!s.notes.empty())
@@ -2599,6 +2617,7 @@ namespace
          }
          if (drums)
             Arrange::FindLane(gArrange, laneId)->drumRows = true;
+         s.refitRows = true;
          gArrange.revision++;
          s.clips = { id };
          s.notes.clear();
@@ -2928,6 +2947,9 @@ namespace
          s.rangeStart = s.rangeEnd = 0;
          FitView(page, a.x1 - a.x0, a.rollB - a.rollY);
       }
+      else if ((s.refitRows || (s.autoFit && std::abs(a.rollB - a.rollY - s.fitH) > 0.5f)) && s.drag == Drag::None)
+         FitRows(page, a.rollB - a.rollY);
+      s.refitRows = false;
       PruneSelection(page);
 
       // Scroll and zoom anywhere over the page. Read every frame: the pinch must not pile up while the pointer is away.
@@ -2943,6 +2965,8 @@ namespace
       if (hovered)
       {
          const float wheelY = io.MouseWheel, wheelX = io.MouseWheelH;
+         if (pinch != 0.0 || wheelY != 0.0f || wheelX != 0.0f)
+            s.autoFit = false;
          if (pinch != 0.0)
          {
             if (io.KeyAlt)
@@ -3018,6 +3042,22 @@ namespace
       DrawLinkChip();
       DrawDockMenu();
       Arrange::Lane* page = Page();
+      // Review shots (INFINITE_PIANOROLL_GENSHOT="type=pads style=dub_techno"): opens the
+      // Generate card and writes three takes on the first page, once.
+      static bool sGenShotDone = false;
+      if (const char* shot = getenv("INFINITE_PIANOROLL_GENSHOT"); shot != nullptr && !sGenShotDone)
+      {
+         if (page == nullptr && !Pages().empty())
+            page = Pages().front(), S().lane = page->id;
+         if (page != nullptr)
+         {
+            sGenShotDone = true;
+            NoteGen::Parse(shot, S().gen);
+            S().genOpen = true;
+            for (int i = 0; i < 3; ++i)
+               Generate(*page);
+         }
+      }
       if (page != nullptr)
       {
          DrawPage(*page);

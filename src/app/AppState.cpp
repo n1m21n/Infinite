@@ -448,7 +448,7 @@ bool gHeadlessNeedProbe = false;
    bool  gSampleStudioClaimedKeys = false;
    ImVec2 gSampleStudioRectMin(0.0f, 0.0f), gSampleStudioRectMax(0.0f, 0.0f);
    bool  gPianoRollOpen = false;
-   float gPianoRollHeight = 340.0f;
+   float gPianoRollHeight = 480.0f;
    int   gPianoRollDock = 0;
    bool  gPianoRollClaimedKeys = false;
    ImVec2 gPianoRollRectMin(0.0f, 0.0f), gPianoRollRectMax(0.0f, 0.0f);
