@@ -50,6 +50,9 @@ namespace app
       }
       const float navW = 200.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+      // First tab level with the first card; a little air between tabs.
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, tok::space_2));
       for (int i = 0; i < kTabCount; i++)
       {
          const bool sel = (i == sTab);
@@ -71,6 +74,7 @@ namespace app
          dl->AddText(ImVec2(p.x + tok::space_4, p.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
+      ImGui::PopStyleVar();
       ImGui::EndChild();
       ImGui::SameLine();
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, 0.0f));
