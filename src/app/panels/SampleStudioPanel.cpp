@@ -990,90 +990,6 @@ namespace
       return f;
    }
 
-   // The part of a compiled graph that feeds `tap`: its nodes and wires, renumbered from 1. The style compiles every
-   // part of the arrangement (drums, chords, bass) and the take taps one, so the rest would only be noise on the canvas.
-   std::string UpstreamOf(const std::string& patch, int tap, int& newTap)
-   {
-      std::map<int, std::string> blocks; // node -> its "node ... end" lines
-      std::vector<std::array<int, 3>> wires; // dst, slot, src
-      std::vector<std::string> wireLines;
-      std::istringstream in(patch);
-      std::string line;
-      int cur = -1;
-      while (std::getline(in, line))
-      {
-         if (cur >= 0)
-         {
-            blocks[cur] += line + "\n";
-            if (line == "end")
-               cur = -1;
-         }
-         else if (line.rfind("node ", 0) == 0)
-         {
-            cur = atoi(line.c_str() + 5);
-            blocks[cur] = line + "\n";
-         }
-         else if (line.rfind("aud ", 0) == 0 || line.rfind("note ", 0) == 0)
-         {
-            int d = 0, sl = 0, sr = 0;
-            if (sscanf(line.c_str() + line.find(' ') + 1, "%d %d %d", &d, &sl, &sr) == 3)
-            {
-               wires.push_back({ d, sl, sr });
-               wireLines.push_back(line.substr(0, line.find(' ')));
-            }
-         }
-      }
-      // A compressor keyed from the drums (sidechain ducking) would drag the whole kit in through its key, so it is
-      // spliced out: whatever reads it reads its main input instead.
-      std::map<int, int> mainIn; // ducker -> its main input
-      for (const auto& [k, b] : blocks)
-         if (b.find(" sidechainExternal ") != std::string::npos)
-         {
-            int slot = INT_MAX;
-            for (const auto& w : wires)
-               if (w[0] == k && wireLines[&w - wires.data()] == "aud" && w[1] < slot)
-               {
-                  slot = w[1];
-                  mainIn[k] = w[2];
-               }
-         }
-      auto through = [&](int n)
-      {
-         for (int hops = 0; mainIn.count(n) && hops < 64; hops++)
-            n = mainIn[n];
-         return n;
-      };
-      tap = through(tap);
-      std::set<int> keep = { tap };
-      for (bool grew = true; grew;)
-      {
-         grew = false;
-         for (const auto& w : wires)
-            if (keep.count(w[0]) && !mainIn.count(w[2]) && keep.insert(w[2]).second)
-               grew = true;
-            else if (keep.count(w[0]) && mainIn.count(w[2]) && keep.insert(through(w[2])).second)
-               grew = true;
-      }
-      for (auto& w : wires)
-         w[2] = through(w[2]);
-      std::map<int, int> to;
-      for (int k : keep)
-         to[k] = (int)to.size() + 1;
-      std::string out;
-      for (int k : keep)
-      {
-         const std::string& b = blocks[k];
-         const size_t sp = b.find(' ', 5);
-         out += "node " + std::to_string(to[k]) + b.substr(sp);
-      }
-      for (size_t i = 0; i < wires.size(); i++)
-         if (keep.count(wires[i][0]) && keep.count(wires[i][2]))
-            out += wireLines[i] + " " + std::to_string(to[wires[i][0]]) + " " + std::to_string(wires[i][1]) + " " +
-                   std::to_string(to[wires[i][2]]) + "\n";
-      newTap = to[tap];
-      return out;
-   }
-
    // The chain that made the take (only what feeds its tap), with an Audio Out on it, pasted onto the canvas inside
    // a Group.
    void ConvertToPatch()
@@ -1085,7 +1001,7 @@ namespace
       if (!c.error.empty())
          return;
       int tap = 0;
-      const std::string chain = UpstreamOf(c.patch, c.tap, tap);
+      const std::string chain = SampleStyles::UpstreamOf(c.patch, c.tap, tap);
       int out = 0; // nodes are renumbered 1..n
       for (size_t at = 0; (at = chain.find("node ", at)) != std::string::npos; at += 5)
          if (at == 0 || chain[at - 1] == '\n')

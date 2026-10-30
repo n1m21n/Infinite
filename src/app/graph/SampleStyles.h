@@ -97,6 +97,11 @@ namespace SampleStyles
    };
    Compiled Compile(const Recipe& r);
 
+   // The part of a compiled graph that feeds `tap`: its nodes and wires, renumbered from 1, `newTap` its new index. A
+   // style compiles every part of the arrangement (drums, chords, bass) and a take taps one, so the rest would only be
+   // noise on a canvas. A ducker keyed from the drums is spliced out (it would drag the kit in through its key).
+   std::string UpstreamOf(const std::string& patch, int tap, int& newTap);
+
    // The melody critic Generate Samples runs on its motifs, on a line of MIDI
    // notes: false when it fails the critic floor (too few notes, too wide,
    // too leapy, or unlikely against the corpus), else `score` is 0..1.

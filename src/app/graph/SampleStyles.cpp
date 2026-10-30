@@ -8,12 +8,15 @@
 #include "nodes/DrumSequencerNode.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <map>
 #include <set>
+#include <sstream>
 
 namespace
 {
@@ -3905,6 +3908,88 @@ Compiled Probe(const std::string& type)
    out.bpm = 120.0f;
    g.lines.insert(g.lines.begin() + 2, "transport 120 4 4 0 0");
    out.patch = g.Text();
+   return out;
+}
+
+std::string UpstreamOf(const std::string& patch, int tap, int& newTap)
+{
+   std::map<int, std::string> blocks; // node -> its "node ... end" lines
+   std::vector<std::array<int, 3>> wires; // dst, slot, src
+   std::vector<std::string> wireLines;
+   std::istringstream in(patch);
+   std::string line;
+   int cur = -1;
+   while (std::getline(in, line))
+   {
+      if (cur >= 0)
+      {
+         blocks[cur] += line + "\n";
+         if (line == "end")
+            cur = -1;
+      }
+      else if (line.rfind("node ", 0) == 0)
+      {
+         cur = atoi(line.c_str() + 5);
+         blocks[cur] = line + "\n";
+      }
+      else if (line.rfind("aud ", 0) == 0 || line.rfind("note ", 0) == 0)
+      {
+         int d = 0, sl = 0, sr = 0;
+         if (sscanf(line.c_str() + line.find(' ') + 1, "%d %d %d", &d, &sl, &sr) == 3)
+         {
+            wires.push_back({ d, sl, sr });
+            wireLines.push_back(line.substr(0, line.find(' ')));
+         }
+      }
+   }
+   // A compressor keyed from the drums (sidechain ducking) would drag the whole kit in through its key, so it is
+   // spliced out: whatever reads it reads its main input instead.
+   std::map<int, int> mainIn; // ducker -> its main input
+   for (const auto& [k, b] : blocks)
+      if (b.find(" sidechainExternal ") != std::string::npos)
+      {
+         int slot = INT_MAX;
+         for (const auto& w : wires)
+            if (w[0] == k && wireLines[&w - wires.data()] == "aud" && w[1] < slot)
+            {
+               slot = w[1];
+               mainIn[k] = w[2];
+            }
+      }
+   auto through = [&](int n)
+   {
+      for (int hops = 0; mainIn.count(n) && hops < 64; hops++)
+         n = mainIn[n];
+      return n;
+   };
+   tap = through(tap);
+   std::set<int> keep = { tap };
+   for (bool grew = true; grew;)
+   {
+      grew = false;
+      for (const auto& w : wires)
+         if (keep.count(w[0]) && !mainIn.count(w[2]) && keep.insert(w[2]).second)
+            grew = true;
+         else if (keep.count(w[0]) && mainIn.count(w[2]) && keep.insert(through(w[2])).second)
+            grew = true;
+   }
+   for (auto& w : wires)
+      w[2] = through(w[2]);
+   std::map<int, int> to;
+   for (int k : keep)
+      to[k] = (int)to.size() + 1;
+   std::string out;
+   for (int k : keep)
+   {
+      const std::string& b = blocks[k];
+      const size_t sp = b.find(' ', 5);
+      out += "node " + std::to_string(to[k]) + b.substr(sp);
+   }
+   for (size_t i = 0; i < wires.size(); i++)
+      if (keep.count(wires[i][0]) && keep.count(wires[i][2]))
+         out += wireLines[i] + " " + std::to_string(to[wires[i][0]]) + " " + std::to_string(wires[i][1]) + " " +
+                std::to_string(to[wires[i][2]]) + "\n";
+   newTap = to[tap];
    return out;
 }
 }

@@ -81,13 +81,18 @@ namespace
 
 namespace
 {
-   // The compiled graph ends at a tap; a download needs credit and an Audio Out so it opens playing.
+   // The compiled graph ends at a tap; a download needs credit and an Audio Out so it opens playing. Only the chain
+   // that feeds the tap goes in (the style builds every part; a lead take would open with an unwired kit and chords).
    std::string OpenablePatch(const SampleStyles::Compiled& c)
    {
+      const size_t body = c.patch.find("\nnode ");
+      int tap = 0;
+      const std::string chain = SampleStyles::UpstreamOf(c.patch, c.tap, tap);
       int last = 0;
-      for (size_t at = c.patch.find("\nnode "); at != std::string::npos; at = c.patch.find("\nnode ", at + 1))
-         last = std::max(last, atoi(c.patch.c_str() + at + 6));
-      std::string out = c.patch;
+      for (size_t at = 0; (at = chain.find("node ", at)) != std::string::npos; at += 5)
+         if (at == 0 || chain[at - 1] == '\n')
+            last++;
+      std::string out = (body == std::string::npos ? c.patch : c.patch.substr(0, body + 1)) + chain;
       // The browser keeps the kit at /kit; on a desktop the same files live in the app's drumkits/infinite-basic folder,
       // which the drum sequencer finds again from any such path when the patch opens.
       for (size_t at = out.find("/kit/"); at != std::string::npos; at = out.find("/kit/", at + 1))
@@ -95,7 +100,7 @@ namespace
       const size_t nl = out.find("\n", out.find("\ntransport") == std::string::npos ? 0 : out.find("\ntransport") + 1);
       out.insert(nl == std::string::npos ? out.size() : nl + 1,
                  "# Made with the free sample generator in Infinite, by Naman Soni (n1m21n): https://infinitedevices.org/samples/\n# Free for commercial use if credited: Sample from Infinite by Naman Soni (n1m21n), infinitedevices.org.\n");
-      out += "node " + std::to_string(last + 1) + " Utility Audio Out\nend\naud " + std::to_string(last + 1) + " 0 " + std::to_string(c.tap) + "\n";
+      out += "node " + std::to_string(last + 1) + " Utility Audio Out\nend\naud " + std::to_string(last + 1) + " 0 " + std::to_string(tap) + "\n";
       return out;
    }
 }
