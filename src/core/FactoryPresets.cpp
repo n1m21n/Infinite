@@ -15,6 +15,7 @@ namespace FactoryPresets
       struct Row { const char* type; const char* name; const char* values; };
 
       // "key=value key=value". Enum values are the saved ints:
+      //   Piano       model 0 grand 1 rhodes 2 wurlitzer
       //   Analog      wave 0 saw 1 square 2 triangle 3 sine; filterType 0 off 1 ladder 2 lp12 3 lp24 8 bp12
       //   Oscillator  waveform 0 sine 1 triangle 2 saw 3 square; filterType 0 off 1 lp12 2 lp24 7 bp12
       //   Wavetable   table = index into Wavetable::TableName; warpMode 5 sync; filterType as Oscillator
@@ -73,6 +74,14 @@ namespace FactoryPresets
          { "Piano", "Dark Grand", "hardness=0.3 tone=0.35 decay=0.6 detune=0.25 stiffness=0.5 body=0.6 release=300" },
          { "Piano", "Muted", "hardness=0.5 tone=0.4 decay=0.15 detune=0.3 stiffness=0.5 body=0.6 release=80" },
          { "Piano", "Bare Strings", "hardness=0.6 tone=0.6 decay=0.5 detune=0.35 stiffness=0.5 body=0 release=250" },
+         { "Piano", "Mark I", "model=1 hardness=0.5 tone=0.5 decay=0.5 detune=0.3 stiffness=0.4 body=0.4 release=120" },
+         { "Piano", "Suitcase", "model=1 hardness=0.5 tone=0.55 decay=0.5 detune=0.3 stiffness=0.45 body=0.8 release=120 tremolo=0.6" },
+         { "Piano", "Bell Tine", "model=1 hardness=0.8 tone=0.3 decay=0.6 detune=0.15 stiffness=0.9 body=0.2 release=200" },
+         { "Piano", "Barking Tine", "model=1 hardness=0.65 tone=0.85 decay=0.45 detune=0.35 stiffness=0.35 body=0.7 release=100" },
+         { "Piano", "Wurli 200A", "model=2 hardness=0.5 tone=0.5 decay=0.5 detune=0.2 stiffness=0.4 body=0.7 release=90" },
+         { "Piano", "Wurli Vibrato", "model=2 hardness=0.5 tone=0.5 decay=0.5 detune=0.2 stiffness=0.4 body=0.8 release=90 tremolo=0.7" },
+         { "Piano", "Wurli Bark", "model=2 hardness=0.75 tone=0.85 decay=0.4 detune=0.25 stiffness=0.6 body=0.85 release=80" },
+         { "Piano", "Soft Reed", "model=2 hardness=0.2 tone=0.25 decay=0.6 detune=0.15 stiffness=0.2 body=0.5 release=140" },
          { "Wind", "Clarinet", "instrument=0 breath=0.6 tone=0.45 noise=0.12 vibrato=0 attack=30 release=80" },
          { "Wind", "Tenor Sax", "instrument=1 breath=0.7 tone=0.6 noise=0.2 vibrato=0.25 attack=25 release=90" },
          { "Wind", "Breathy Flute", "instrument=2 breath=0.5 tone=0.55 noise=0.35 vibrato=0.3 attack=60 release=120" },
