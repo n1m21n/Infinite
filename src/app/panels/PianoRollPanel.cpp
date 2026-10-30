@@ -11,6 +11,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "arrange/ArrangeModel.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
@@ -34,6 +35,7 @@ namespace
    constexpr float kMinHeight = 240.0f;
    constexpr float kIconW = 30.0f;
    constexpr float kKeysW = 44.0f, kRulerH = 18.0f, kStripH = 24.0f;
+   constexpr float kInspectorW = 268.0f, kSplitH = 6.0f, kMinExprH = 40.0f, kMaxExprH = 240.0f;
    constexpr float kMinKeyH = 5.0f, kMaxKeyH = 32.0f;
    constexpr double kMinPxPerTick = 0.002, kMaxPxPerTick = 2.0;
    constexpr int kPaletteSize = 12;
@@ -46,6 +48,16 @@ namespace
       const Arrange::Note* note = nullptr;
       Tick start = 0, end = 0;
       bool repeat = false;
+   };
+
+   enum class Expr
+   {
+      Velocity,
+      Release,
+      Chance,
+      Pitch,
+      Pressure,
+      Timbre
    };
 
    enum class Tool
@@ -86,6 +98,12 @@ namespace
       bool follow = false;
       bool fold = false;
       bool audition = true;
+      Expr expr = Expr::Velocity;
+      float exprH = 72.0f;
+      bool exprDrag = false;
+      ImVec2 exprFrom {};
+      Arrange::Lane fieldBase;   // the page as an inspector drag found it
+      float fieldFrom = 0.0f;    // the field's value there
       Tool tool = Tool::Select;
       Drag drag = Drag::None;
       Arrange::Lane base;        // the page as the drag found it; every drag step re-runs from here
@@ -1405,6 +1423,476 @@ namespace
       }
    }
 
+   bool IsCurve(Expr e) { return e == Expr::Pitch || e == Expr::Pressure || e == Expr::Timbre; }
+
+   std::vector<Arrange::ExprPoint>* Curve(Arrange::Note& n, Expr e)
+   {
+      return e == Expr::Pitch ? &n.bend : e == Expr::Pressure ? &n.pressure : &n.timbre;
+   }
+
+   // 0..1 up the lane. Bend spans an octave each way.
+   float LaneValue(float v, Expr e) { return e == Expr::Pitch ? v / 24.0f + 0.5f : v; }
+   float ModelValue(float t, Expr e) { return e == Expr::Pitch ? (t - 0.5f) * 24.0f : t; }
+
+   float BarValue(const Arrange::Note& n, Expr e)
+   {
+      return e == Expr::Velocity ? (float)n.vel / 127.0f : e == Expr::Release ? (float)n.relVel / 127.0f : n.chance;
+   }
+
+   void SetBarValue(Arrange::Note& n, Expr e, float t)
+   {
+      if (e == Expr::Velocity)
+         n.vel = (uint8_t)std::clamp((int)std::lround(t * 127.0f), 1, 127);
+      else if (e == Expr::Release)
+         n.relVel = (uint8_t)std::clamp((int)std::lround(t * 127.0f), 0, 127);
+      else
+         n.chance = std::clamp(t, 0.0f, 1.0f);
+   }
+
+   // Calls fn(clip, note copy, x of the note) for the notes the lane may touch: the selection, or with none every
+   // note of the clips being edited. Edits fn makes are written back.
+   template <class Fn>
+   void EditLaneNotes(const Arrange::Lane& page, const Areas& a, Fn&& fn)
+   {
+      const State& s = S();
+      for (const Arrange::Clip& c : page.clips)
+      {
+         if (!s.clips.empty() && s.clips.count(c.id) == 0)
+            continue;
+         std::vector<Arrange::Note> edits;
+         ForEachPlaced(c, [&](const Placed& pl) {
+            if (pl.repeat || (!s.notes.empty() && s.notes.count({ c.id, pl.note->id }) == 0))
+               return;
+            Arrange::Note n = *pl.note;
+            if (fn(n, a.TickX((double)pl.start), pl.start))
+               edits.push_back(n);
+         });
+         if (!edits.empty())
+            Arrange::EditNotes(gArrange, c.id, edits);
+      }
+   }
+
+   void DrawExpressionMarks(ImDrawList* dl, const Areas& a, const Arrange::Lane& page, float y0, float y1)
+   {
+      const State& s = S();
+      const auto yOf = [&](float t) { return y1 - 2.0f - std::clamp(t, 0.0f, 1.0f) * (y1 - y0 - 4.0f); };
+      if (s.expr == Expr::Pitch)
+         dl->AddLine(ImVec2(a.x0, yOf(0.5f)), ImVec2(a.x1, yOf(0.5f)), Tint(0.14f));
+      for (const Arrange::Clip& c : page.clips)
+      {
+         const ImVec4 col = ClipColor(c, page);
+         const bool editing = s.clips.empty() || s.clips.count(c.id) != 0;
+         ForEachPlaced(c, [&](const Placed& pl) {
+            const float x = a.TickX((double)pl.start);
+            const bool sel = s.notes.count({ c.id, pl.note->id }) != 0;
+            const float alpha = !editing ? 0.25f : pl.repeat ? 0.35f : 1.0f;
+            if (a.TickX((double)pl.end) < a.x0 || x > a.x1)
+               return;
+            if (!IsCurve(s.expr))
+            {
+               const float y = yOf(BarValue(*pl.note, s.expr));
+               dl->AddLine(ImVec2(x, y1), ImVec2(x, y), WithAlpha(col, 0.7f * alpha), 1.5f);
+               dl->AddCircleFilled(ImVec2(x, y), 3.0f, sel ? Tint(1.0f) : WithAlpha(col, alpha));
+               return;
+            }
+            Arrange::Note n = *pl.note;
+            const std::vector<Arrange::ExprPoint>& pts = *Curve(n, s.expr);
+            const ImU32 line = sel ? Tint(1.0f) : WithAlpha(col, alpha);
+            if (pts.empty())
+            {
+               const float y = yOf(LaneValue(0.0f, s.expr));
+               dl->AddLine(ImVec2(x, y), ImVec2(a.TickX((double)pl.end), y), WithAlpha(col, 0.3f * alpha));
+               return;
+            }
+            ImVec2 last(x, yOf(LaneValue(pts[0].v, s.expr)));
+            for (const Arrange::ExprPoint& q : pts)
+            {
+               const ImVec2 p(a.TickX((double)(pl.start + q.at)), yOf(LaneValue(q.v, s.expr)));
+               dl->AddLine(last, p, line, 1.5f);
+               last = p;
+            }
+            dl->AddLine(last, ImVec2(a.TickX((double)pl.end), last.y), line, 1.5f);
+         });
+      }
+   }
+
+   void StepExpression(Arrange::Lane& page, const Areas& a, ImVec2 m, float y0, float y1)
+   {
+      State& s = S();
+      const ImGuiIO& io = ImGui::GetIO();
+      const auto valueAt = [&](float y) { return std::clamp((y1 - 2.0f - y) / (y1 - y0 - 4.0f), 0.0f, 1.0f); };
+      if (IsCurve(s.expr))
+      {
+         const Tick tick = (Tick)std::max(0.0, a.XTick(m.x));
+         EditLaneNotes(page, a, [&](Arrange::Note& n, float, Tick at) {
+            if (tick < at || tick >= at + n.length)
+               return false;
+            std::vector<Arrange::ExprPoint>& pts = *Curve(n, s.expr);
+            if (io.KeyAlt)
+            {
+               pts.clear();
+               return true;
+            }
+            const Tick local = tick - at, near = std::max<Tick>(1, n.length / 64);
+            pts.erase(std::remove_if(pts.begin(), pts.end(), [&](const Arrange::ExprPoint& q) { return std::llabs(q.at - local) <= near; }),
+                      pts.end());
+            pts.insert(std::lower_bound(pts.begin(), pts.end(), local, [](const Arrange::ExprPoint& q, Tick t) { return q.at < t; }),
+                       Arrange::ExprPoint { local, ModelValue(valueAt(m.y), s.expr) });
+            return true;
+         });
+         return;
+      }
+      if (s.tool == Tool::Draw) // a ramp, from the press to the pointer
+      {
+         page = s.base;
+         gArrange.revision++;
+         const float x0 = std::min(s.exprFrom.x, m.x), x1 = std::max(s.exprFrom.x, m.x);
+         const float v0 = valueAt(m.x >= s.exprFrom.x ? s.exprFrom.y : m.y), v1 = valueAt(m.x >= s.exprFrom.x ? m.y : s.exprFrom.y);
+         EditLaneNotes(page, a, [&](Arrange::Note& n, float x, Tick) {
+            if (x < x0 || x > x1)
+               return false;
+            SetBarValue(n, s.expr, v0 + (v1 - v0) * (x1 > x0 ? (x - x0) / (x1 - x0) : 0.0f));
+            return true;
+         });
+         return;
+      }
+      EditLaneNotes(page, a, [&](Arrange::Note& n, float x, Tick) {
+         if (std::fabs(x - m.x) > 4.0f)
+            return false;
+         SetBarValue(n, s.expr, valueAt(m.y));
+         return true;
+      });
+   }
+
+   void DrawExpression(Arrange::Lane& page, const Areas& a, float top)
+   {
+      State& s = S();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const float left = a.x0 - kKeysW, width = a.x1 - left;
+      ImGui::SetCursorScreenPos(ImVec2(left, top));
+      ImGui::InvisibleButton("##exprSplit", ImVec2(width, kSplitH));
+      if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+      if (ImGui::IsItemActive())
+         s.exprH = std::clamp(s.exprH - ImGui::GetIO().MouseDelta.y, kMinExprH, kMaxExprH);
+      static const char* const kNames[] = { "Velocity", "Release", "Chance", "Pitch", "Pressure", "Timbre" };
+      ImGui::SetCursorScreenPos(ImVec2(left, top + kSplitH));
+      for (int i = 0; i < 6; i++)
+      {
+         const std::string label = std::string(T(kNames[i])) + "##expr" + std::to_string(i);
+         if (ChipButton::Draw(label.c_str(), (int)s.expr == i, tok::tile))
+            s.expr = (Expr)i;
+         if (i < 5)
+            FormParts::Inline(0.0f, tok::space_1);
+      }
+      const float y0 = top + kSplitH + tok::tile + tok::space_1, y1 = y0 + s.exprH;
+      ImGui::SetCursorScreenPos(ImVec2(left, y0));
+      ImGui::InvisibleButton("##exprLane", ImVec2(width, s.exprH));
+      const ImVec2 m = ImGui::GetIO().MousePos;
+      if (ImGui::IsItemHovered())
+         gPianoRollClaimedKeys = true;
+      if (ImGui::IsItemActivated())
+      {
+         ArrangeGestureBegin();
+         s.exprDrag = true;
+         s.exprFrom = m;
+         s.base = page;
+      }
+      if (s.exprDrag)
+      {
+         if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            StepExpression(page, a, m, y0, y1);
+         else
+         {
+            s.exprDrag = false;
+            s.base = Arrange::Lane {};
+            ArrangeGestureEnd();
+         }
+      }
+      dl->PushClipRect(ImVec2(a.x0, y0), ImVec2(a.x1, y1), true);
+      dl->AddRectFilled(ImVec2(a.x0, y0), ImVec2(a.x1, y1), Tint(0.04f));
+      DrawExpressionMarks(dl, a, page, y0, y1);
+      if (s.exprDrag && s.tool == Tool::Draw && !IsCurve(s.expr))
+         dl->AddLine(s.exprFrom, m, AccentU32(0.9f), 1.5f);
+      dl->PopClipRect();
+   }
+
+   // One value over the selected notes. A drag moves every note by the same amount; a typed value sets them all.
+   template <class Get, class Set>
+   void NoteField(Arrange::Lane& page, const char* label, float lo, float hi, const char* fmt, Get get, Set set, ImGuiSliderFlags flags = 0)
+   {
+      State& s = S();
+      bool any = false, mixed = false;
+      float first = 0.0f;
+      for (const auto& [clip, id] : s.notes)
+      {
+         const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+         const Arrange::Note* n = c != nullptr ? Arrange::FindNote(*c, id) : nullptr;
+         if (n == nullptr)
+            continue;
+         const float v = get(*n);
+         mixed = mixed || (any && v != first);
+         first = any ? first : v;
+         any = true;
+      }
+      float v = first;
+      const bool changed = FormParts::SliderFloat(label, &v, lo, hi, mixed ? T("mixed") : fmt, flags);
+      if (ImGui::IsItemActivated())
+      {
+         ArrangeGestureBegin();
+         s.fieldBase = page;
+         s.fieldFrom = first;
+      }
+      if (changed)
+      {
+         page = s.fieldBase;
+         gArrange.revision++;
+         const bool typed = ImGui::GetIO().WantTextInput;
+         for (const auto& [clip, ids] : SelectionByClip())
+         {
+            const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+            if (c == nullptr)
+               continue;
+            std::vector<Arrange::Note> edits;
+            for (uint32_t id : ids)
+               if (const Arrange::Note* found = Arrange::FindNote(*c, id))
+               {
+                  Arrange::Note n = *found;
+                  set(n, std::clamp(typed ? v : get(n) + v - s.fieldFrom, lo, hi));
+                  edits.push_back(n);
+               }
+            Arrange::EditNotes(gArrange, clip, edits);
+         }
+      }
+      if (ImGui::IsItemDeactivated())
+      {
+         s.fieldBase = Arrange::Lane {};
+         ArrangeGestureEnd();
+      }
+   }
+
+   // A clip field, the same value on every selected clip.
+   template <class Field>
+   void ClipField(const char* label, float lo, float hi, const char* fmt, Field field)
+   {
+      const State& s = S();
+      Arrange::Clip* c0 = Arrange::FindClip(gArrange, *s.clips.begin());
+      if (c0 == nullptr)
+         return;
+      float v = field(*c0);
+      const bool changed = FormParts::SliderFloat(label, &v, lo, hi, fmt);
+      if (ImGui::IsItemActivated())
+         ArrangeGestureBegin();
+      if (changed)
+      {
+         for (uint64_t id : s.clips)
+            if (Arrange::Clip* c = Arrange::FindClip(gArrange, id))
+               field(*c) = v;
+         gArrange.revision++;
+      }
+      if (ImGui::IsItemDeactivated())
+         ArrangeGestureEnd();
+   }
+
+   float ExprAtStart(const std::vector<Arrange::ExprPoint>& pts) { return pts.empty() ? 0.0f : pts[0].v; }
+
+   void SetExprAtStart(std::vector<Arrange::ExprPoint>& pts, float v)
+   {
+      if (!pts.empty() && pts[0].at == 0)
+         pts[0].v = v;
+      else
+         pts.insert(pts.begin(), Arrange::ExprPoint { 0, v });
+   }
+
+   void DrawNoteInspector(Arrange::Lane& page)
+   {
+      State& s = S();
+      using Note = Arrange::Note;
+      SectionCard::Begin(s.notes.size() == 1 ? T("Note") : T("Notes"));
+      const auto beats = [](Tick t) { return (float)t / (float)Arrange::kPPQ; };
+      const auto ticks = [](float b) { return (Tick)std::lround(b * (float)Arrange::kPPQ); };
+      NoteField(page, T("Pitch"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.pitch; },
+                [](Note& n, float v) { n.pitch = (uint8_t)std::lround(v); });
+      NoteField(page, T("Start"), 0.0f, 256.0f, "%.3f", [&](const Note& n) { return beats(n.start); },
+                [&](Note& n, float v) { n.start = ticks(v); }, ImGuiSliderFlags_Logarithmic);
+      NoteField(page, T("Length"), 0.015f, 64.0f, "%.3f", [&](const Note& n) { return beats(n.length); },
+                [&](Note& n, float v) { n.length = std::max<Tick>(1, ticks(v)); }, ImGuiSliderFlags_Logarithmic);
+      NoteField(page, T("Velocity"), 1.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.vel; },
+                [](Note& n, float v) { n.vel = (uint8_t)std::lround(v); });
+      NoteField(page, T("Release"), 0.0f, 127.0f, "%.0f", [](const Note& n) { return (float)n.relVel; },
+                [](Note& n, float v) { n.relVel = (uint8_t)std::lround(v); });
+      NoteField(page, T("Chance"), 0.0f, 1.0f, "%.2f", [](const Note& n) { return n.chance; }, [](Note& n, float v) { n.chance = v; });
+      bool allMuted = true;
+      for (const auto& [clip, id] : s.notes)
+      {
+         const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+         const Arrange::Note* n = c != nullptr ? Arrange::FindNote(*c, id) : nullptr;
+         allMuted = allMuted && n != nullptr && n->mute;
+      }
+      bool mute = allMuted;
+      if (FormParts::Switch(T("Mute"), &mute))
+         ArrangeEdit([&] {
+            for (const auto& [clip, ids] : SelectionByClip())
+            {
+               const Arrange::Clip* c = Arrange::FindClip(gArrange, clip);
+               if (c == nullptr)
+                  continue;
+               std::vector<Note> edits;
+               for (uint32_t id : ids)
+                  if (const Note* found = Arrange::FindNote(*c, id))
+                  {
+                     edits.push_back(*found);
+                     edits.back().mute = mute;
+                  }
+               Arrange::EditNotes(gArrange, clip, edits);
+            }
+         });
+      SectionCard::Begin(T("Expression at start"));
+      NoteField(page, T("Bend"), -12.0f, 12.0f, "%.2f st", [&](const Note& n) { return ExprAtStart(n.bend); },
+                [&](Note& n, float v) { SetExprAtStart(n.bend, v); });
+      NoteField(page, T("Pressure"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.pressure); },
+                [&](Note& n, float v) { SetExprAtStart(n.pressure, v); });
+      NoteField(page, T("Timbre"), 0.0f, 1.0f, "%.2f", [&](const Note& n) { return ExprAtStart(n.timbre); },
+                [&](Note& n, float v) { SetExprAtStart(n.timbre, v); });
+   }
+
+   void DrawClipInspector(Arrange::Lane& page)
+   {
+      State& s = S();
+      using Clip = Arrange::Clip;
+      Clip* c0 = Arrange::FindClip(gArrange, *s.clips.begin());
+      if (c0 == nullptr)
+         return;
+      SectionCard::Begin(s.clips.size() == 1 ? T("Clip") : T("Clips"));
+      if (s.clips.size() == 1)
+      {
+         SectionCard::RowLabel(T("Name"));
+         ImGui::SetNextItemWidth(-1.0f);
+         const bool changed = FieldWell::InputText("##clipName", &c0->name);
+         if (ImGui::IsItemActivated())
+            ArrangeGestureBegin();
+         if (changed)
+            gArrange.revision++;
+         if (ImGui::IsItemDeactivated())
+            ArrangeGestureEnd();
+      }
+      SectionCard::RowLabel(T("Colour"));
+      ImVec4 shown = ClipColor(*c0, page);
+      float rgb[3] = { shown.x, shown.y, shown.z };
+      if (FormParts::ColorDot("##clipColour", rgb))
+      {
+         if (!gArrangeGestureOpen)
+            ArrangeGestureBegin();
+         for (uint64_t id : s.clips)
+            if (Clip* c = Arrange::FindClip(gArrange, id))
+            {
+               c->colorR = rgb[0];
+               c->colorG = rgb[1];
+               c->colorB = rgb[2];
+            }
+         gArrange.revision++;
+      }
+      else if (gArrangeGestureOpen && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && s.drag == Drag::None && !s.exprDrag &&
+               !ImGui::IsAnyItemActive())
+         ArrangeGestureEnd();
+      SectionCard::Begin(T("Play"));
+      ClipField(T("Gain"), -60.0f, 12.0f, "%.1f dB", [](Clip& c) -> float& { return c.gainDb; });
+      const auto intField = [&](const char* label, int lo, int hi, auto field) {
+         int v = (int)field(*c0);
+         const bool changed = FormParts::SliderInt(label, &v, lo, hi);
+         if (ImGui::IsItemActivated())
+            ArrangeGestureBegin();
+         if (changed)
+         {
+            for (uint64_t id : s.clips)
+               if (Clip* c = Arrange::FindClip(gArrange, id))
+                  field(*c) = v;
+            gArrange.revision++;
+         }
+         if (ImGui::IsItemDeactivated())
+            ArrangeGestureEnd();
+      };
+      intField(T("Transpose"), -48, 48, [](Clip& c) -> int& { return c.transpose; });
+      ClipField(T("Velocity"), 0.0f, 2.0f, "%.2f", [](Clip& c) -> float& { return c.velScale; });
+      ClipField(T("Swing"), 0.0f, 1.0f, "%.2f", [](Clip& c) -> float& { return c.swing; });
+      SectionCard::Begin(T("Loop"));
+      bool loop = c0->midiLoop;
+      if (FormParts::Switch(T("Loop"), &loop))
+         ArrangeEdit([&] {
+            for (uint64_t id : s.clips)
+               if (Clip* c = Arrange::FindClip(gArrange, id))
+               {
+                  c->midiLoop = loop;
+                  if (loop && c->loopLength <= 0)
+                  {
+                     c->loopStart = c->contentOffset;
+                     c->loopLength = c->length;
+                  }
+               }
+            gArrange.revision++;
+         });
+      if (loop)
+      {
+         float beats = (float)c0->loopLength / (float)Arrange::kPPQ;
+         const bool changed = FormParts::SliderFloat(T("Length"), &beats, 0.25f, 64.0f, "%.2f beats", ImGuiSliderFlags_Logarithmic);
+         if (ImGui::IsItemActivated())
+            ArrangeGestureBegin();
+         if (changed)
+         {
+            for (uint64_t id : s.clips)
+               if (Clip* c = Arrange::FindClip(gArrange, id))
+                  c->loopLength = std::max<Tick>(1, (Tick)std::lround(beats * (float)Arrange::kPPQ));
+            gArrange.revision++;
+         }
+         if (ImGui::IsItemDeactivated())
+            ArrangeGestureEnd();
+      }
+   }
+
+   void DrawPageInspector(Arrange::Lane& page)
+   {
+      State& s = S();
+      SectionCard::Begin(T("Page"));
+      SectionCard::RowLabel(T("Colour"));
+      const ImVec4 shown = page.colorR + page.colorG + page.colorB > 0.0f ? ImVec4(page.colorR, page.colorG, page.colorB, 1.0f)
+                                                                         : ClipColor(Arrange::Clip {}, page);
+      float rgb[3] = { shown.x, shown.y, shown.z };
+      if (FormParts::ColorDot("##pageColour", rgb))
+      {
+         page.colorR = rgb[0];
+         page.colorG = rgb[1];
+         page.colorB = rgb[2];
+         ArrangeCommitEdit();
+      }
+      bool snap = page.scaleSnap;
+      if (FormParts::Switch(T("Scale snap"), &snap))
+      {
+         const uint64_t lane = page.id;
+         ArrangeEdit([&] {
+            Arrange::FindLane(gArrange, lane)->scaleSnap = snap;
+            gArrange.revision++;
+         });
+      }
+      FormParts::Switch(T("Audition"), &s.audition);
+      SectionCard::RowLabel(T("Grid"));
+      DrawGridChip();
+   }
+
+   void DrawInspector(Arrange::Lane& page, ImVec2 size)
+   {
+      State& s = S();
+      ImGui::BeginChild("##pianoInspector", size, ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+      SectionCard::BeginWindow();
+      if (!s.notes.empty())
+         DrawNoteInspector(page);
+      else if (!s.clips.empty())
+         DrawClipInspector(page);
+      else
+         DrawPageInspector(page);
+      SectionCard::EndWindow();
+      ImGui::EndChild();
+   }
+
    void DrawPage(Arrange::Lane& page)
    {
       State& s = S();
@@ -1417,12 +1905,14 @@ namespace
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       Areas a;
+      const float inspectorW = std::min(kInspectorW, avail.x * 0.4f);
+      const float exprRoom = kSplitH + tok::tile + tok::space_1 + s.exprH;
       a.x0 = origin.x + kKeysW;
-      a.x1 = origin.x + avail.x;
+      a.x1 = origin.x + avail.x - inspectorW - tok::space_2;
       a.rulerY = origin.y;
       a.stripY = a.rulerY + kRulerH;
       a.rollY = a.stripY + kStripH;
-      a.rollB = origin.y + avail.y;
+      a.rollB = origin.y + avail.y - exprRoom;
       if (a.rollB - a.rollY < 8.0f || a.x1 - a.x0 < 8.0f)
          return;
       if (s.drag == Drag::None) // rows stay put under a drag: fold would pull them out from under the pointer
@@ -1441,7 +1931,7 @@ namespace
       const double pinch = TrackpadPinchThisFrame();
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y));
-      ImGui::InvisibleButton("##pianoRoll", ImVec2(avail.x, avail.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+      ImGui::InvisibleButton("##pianoRoll", ImVec2(a.x1 - origin.x, a.rollB - origin.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
       ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelX);
       const bool hovered = ImGui::IsItemHovered();
@@ -1484,7 +1974,7 @@ namespace
             s.viewTick = (double)play;
       }
 
-      dl->PushClipRect(ImVec2(origin.x, origin.y), ImVec2(a.x1, a.rollB), true);
+      dl->PushClipRect(origin, ImVec2(a.x1, a.rollB), true);
       DrawRuler(dl, a);
       dl->PushClipRect(ImVec2(a.x0, a.rollY), ImVec2(a.x1, a.rollB), true);
       DrawGrid(dl, a);
@@ -1511,6 +2001,9 @@ namespace
          dl->AddText(ImVec2((a.x0 + a.x1 - ts.x) * 0.5f, (a.rollY + a.rollB - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
       }
       dl->PopClipRect();
+      DrawExpression(page, a, a.rollB);
+      ImGui::SetCursorScreenPos(ImVec2(a.x1 + tok::space_2, origin.y));
+      DrawInspector(page, ImVec2(inspectorW, avail.y));
    }
 
    void DrawPanel()
