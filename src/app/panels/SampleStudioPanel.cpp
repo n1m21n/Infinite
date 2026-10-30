@@ -2770,7 +2770,7 @@ namespace
       return ActionButton::Draw(label, ImVec2(TextW(label), tok::tile), kind);
    }
 
-   // A dropdown chip: the value on the left, a chevron on the right, the list below. The list fades and settles in
+   // A dropdown chip: the value, clipped to the chip, and the list below. The list fades and settles in
    // over one motion step and scrolls past nine rows. Returns true when the choice changed.
    bool PickerChip(const char* id, const std::vector<std::string>& items, int& cur, float w, const char* tip)
    {
@@ -2789,7 +2789,7 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 tc = ImGui::GetColorU32(ImGuiCol_Text);
       const float cy = (bmin.y + bmax.y) * 0.5f;
-      const std::string& value = items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)];
+      const std::string value = app::TruncateWithEllipsis(items[(size_t)std::clamp(cur, 0, (int)items.size() - 1)], w - 2.0f * tok::space_3);
       dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), tc, value.c_str());
 
       const float k = sOpenId == pid ? std::clamp((float)((ImGui::GetTime() - sOpenedAt) * 1000.0 / tok::motion_on), 0.0f, 1.0f) : 1.0f;
@@ -2867,6 +2867,9 @@ namespace
       const bool has = s.src != nullptr;
       const float x0 = ImGui::GetCursorScreenPos().x;
       const float in = tok::space_1, between = tok::space_3;
+      // The pickers give up width first, then the input picker goes (Settings still has it): the bar never scrolls.
+      const float roomy = std::clamp((w - 1040.0f) / 100.0f, 0.0f, 1.0f);
+      const bool showInput = w >= 1040.0f;
 
       // Make: open a file, generate (again), instrument, snap to scale, bars.
       if (IconChip("##studioOpen", IconsInfinite::Folder, false, T("Open an audio file (or drop one on the Studio)")))
@@ -2901,7 +2904,7 @@ namespace
          if (!haveIn && !s.recording)
             ImGui::EndDisabled();
          // Which input Record takes, shared with Settings and the Audio In node.
-         if (haveIn)
+         if (haveIn && showInput)
          {
             const std::vector<Platform::AudioDeviceInfo>& inputs = AudioInputs();
             std::vector<std::string> names { T("System default") };
@@ -2914,7 +2917,7 @@ namespace
             }
             FormParts::Inline(0.0f, in);
             ImGui::BeginDisabled(s.recording);
-            if (PickerChip("##studioInput", names, cur, 132.0f, T("Audio input to record from")))
+            if (PickerChip("##studioInput", names, cur, 72.0f + 60.0f * roomy, T("Audio input to record from")))
             {
                gAudioInputDeviceId = cur > 0 ? inputs[(size_t)cur - 1].deviceId : 0;
                Platform::AudioInputCaptureSetDevice(gAudioInputDeviceId);
@@ -2924,8 +2927,8 @@ namespace
       }
       FormParts::Inline(0.0f, between);
       {
-         static const PillGroup::Segment kUnits[3] = { { "studio.unit.bars", "Bars" }, { "studio.unit.time", "Time" }, { "studio.unit.samples", "Samples" } };
-         const int picked = TimeRuler::UnitPills("studiounit", kUnits, 3, s.ruler);
+         static const PillGroup::Segment kUnits[3] = { { "studio.unit.bars", "B" }, { "studio.unit.time", "T" }, { "studio.unit.samples", "S" } };
+         const int picked = TimeRuler::UnitPills("studiounit", kUnits, 3, s.ruler, T("Ruler: Bars, Time or Samples"));
          if (picked >= 0)
             s.ruler = picked;
       }
@@ -2970,31 +2973,24 @@ namespace
       if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
          s.snapGrid = !s.snapGrid;
       FormParts::Inline(0.0f, between);
-      if (TextChip(L("Slice##studioSlice")))
+      if (IconChip("##studioSlice", IconsInfinite::Slice, false, T("Slice: cut the sample by transients, grid or into equal parts")))
          ImGui::OpenPopup("##studioSliceMenu");
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Cut the sample by transients, grid or into equal parts"));
       ImGui::EndDisabled();
-      const auto toggle = [&](const char* label, bool& v, const char* tip)
+      const auto toggle = [&](const char* id, const char* glyphStr, bool& v, const char* tip)
       {
          FormParts::Inline(0.0f, in);
-         const bool before = v;
-         if (AudioToggleButton(label, &v, TextW(label), tok::tile))
+         if (IconChip(id, glyphStr, v, tip))
          {
-            const bool after = v;
-            v = before;
             PushUndo();
-            v = after;
+            v = !v;
             s.dirty = true;
             AudioEngine::Instance().StudioLoop().SetLoop(s.doc.wide.loop);
             AudioEngine::Instance().StudioLoop().Restart();
          }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", tip);
       };
-      toggle(L("Loop##studioLoop"), s.doc.wide.loop, T("Loop the edit; off plays it once"));
-      toggle(L("Ping-pong##studioPP"), s.doc.wide.pingPong, T("While looping, play forward then back"));
-      toggle(L("Reverse##studioRev"), s.doc.wide.reverse, T("Play the whole edit backwards"));
+      toggle("##studioLoop", IconsInfinite::Loop, s.doc.wide.loop, T("Loop: on repeats the edit, off plays it once"));
+      toggle("##studioPP", IconsInfinite::PingPong, s.doc.wide.pingPong, T("Ping-pong: while looping, play forward then back"));
+      toggle("##studioRev", IconsInfinite::Reverse, s.doc.wide.reverse, T("Reverse: play the whole edit backwards"));
 
       FormParts::Inline(0.0f, between);
       if (TextChip(L("Generate##studioGen"), s.busy ? ActionButton::Kind::Go : ActionButton::Kind::Primary))
@@ -3012,7 +3008,7 @@ namespace
             for (P p : kParts)
                parts.push_back(SampleStyles::PartName(p));
          // Only Generate makes a take: the pickers set what the next one will be.
-         PickerChip("##studioPart", parts, s.part, 128.0f, T("Instrument (for the next Generate)"));
+         PickerChip("##studioPart", parts, s.part, 72.0f + 40.0f * roomy, T("Instrument (for the next Generate)"));
       }
       FormParts::Inline(0.0f, in);
       if (IconChip("##studioScale", s.followScale ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, s.followScale,
@@ -3024,7 +3020,7 @@ namespace
          if (bars.empty())
             for (const char* b : { "1 bar", "2 bars", "4 bars", "8 bars" })
                bars.push_back(T(b));
-         PickerChip("##studioBars", bars, s.barsIdx, 92.0f, T("Length (for the next Generate)"));
+         PickerChip("##studioBars", bars, s.barsIdx, 66.0f, T("Length (for the next Generate)"));
       }
 
 
@@ -3036,7 +3032,7 @@ namespace
       const char* convertL = L("Convert##studioConvert");
       // Sample Audio: the twin of Session's and the Timeline's chip.
       const bool studioMode = gAudioMode == AudioMode::Studio;
-      const char* audioL = studioMode ? T("Sample Audio On") : T("Enable Sample Audio");
+      const char* audioL = T("Audio");
       const float audioW = ImGui::CalcTextSize(audioL).x + 2.0f * tok::space_2;
       const float rightW = TextW(exportL) + TextW(convertL) + audioW + kIconW + 3.0f * in;
       FormParts::Inline(0.0f, 0.0f);

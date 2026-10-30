@@ -165,7 +165,7 @@ namespace MenuParts
    {
       PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
-      const bool open = ImGui::BeginCombo(id, preview, flags);
+      const bool open = ImGui::BeginCombo(id, preview, flags | ImGuiComboFlags_NoArrowButton); // field well + value, never a chevron
       ImGui::PopStyleVar(2);
       if (open)
          BeginContent();

@@ -130,14 +130,16 @@ namespace TimeRuler
       edge(bx1, -5.0f, drag == 2);
    }
 
-   // The Bars | Time toggle the three toolbars share. Returns the picked index, or -1.
-   inline int UnitPills(const char* id, const PillGroup::Segment* segs, int count, int selected)
+   // The B | T | S unit toggle the three toolbars share. Returns the picked index, or -1.
+   inline int UnitPills(const char* id, const PillGroup::Segment* segs, int count, int selected, const char* tip)
    {
       const ImVec2 at = ImGui::GetCursorScreenPos();
-      const UiLayout::Rect r{ at.x, at.y, count > 2 ? 186.0f : 104.0f, tok::tile }; // "Samples" needs the room
+      const UiLayout::Rect r{ at.x, at.y, count * 28.0f + 4.0f, tok::tile };
       const int picked = PillGroup::Draw(id, r, segs, count, selected);
       ImGui::SetCursorScreenPos(at);
       ImGui::Dummy(ImVec2(r.w, r.h));
+      if (ImGui::IsItemHovered())
+         app::HelpTip("%s", tip);
       return picked;
    }
 }
