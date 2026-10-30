@@ -12,6 +12,20 @@ Phrase -> Keyboard -> node -> sine Oscillator, read back from the audio. Turning
 | rateSeconds | onsets down (1.00, -2.86), span down (1.00, -8.44), poly down (0.90, +0.00), ioi_cv down (1.00, +0.00), level down (0.89, +0.00), vel_sd down (0.90, -0.00) |
 | gatePercent | duty up (1.00, +0.45), cents down (0.86, -0.00) |
 
+## Chorder: held-out 0.934 on 649 moves
+
+| Knob | Moves (up/down, agree, median change per full turn) |
+|---|---|
+| scale | poly down (1.00, -0.29) |
+| root | onsets up (1.00, -3.61), register up (0.85, +1.44), grid down (1.00, -1.17), level down (0.80, -0.33) |
+| chordSize | poly up (1.00, +2.79), duty up (1.00, +0.00), cents up (1.00, +7.61) |
+| strumMs | onsets up (0.86, +13.54), register up (1.00, -0.53), poly down (0.80, -0.69), vel_sd down (1.00, -1.46), duty up (1.00, +0.00), cents down (1.00, -3.83) |
+| humanizeTimingMs | onsets up (1.00, -1.47), register up (1.00, -0.01), span up (0.80, +0.00) |
+| humanizeVelocity | register down (1.00, -0.06), span down (1.00, +0.00), poly down (1.00, -0.59), level up (1.00, +2.21), vel_sd up (0.88, +2.29) |
+| upperHarmonics | register up (1.00, +1.16), span up (0.86, +1.48), poly up (1.00, +0.72), duty down (1.00, +0.00), cents up (1.00, -2.15) |
+| mode | poly down (1.00, -0.08), duty up (1.00, +0.00), cents up (1.00, +0.95) |
+| progSteps | duty up (1.00, +0.00) |
+
 ## Gate: held-out 0.947 on 245 moves
 
 | Knob | Moves (up/down, agree, median change per full turn) |
@@ -52,18 +66,18 @@ Phrase -> Keyboard -> node -> sine Oscillator, read back from the audio. Turning
 | rangeHigh | onsets up (1.00, +0.00), register up (1.00, +0.00), span up (1.00, +0.00), poly up (1.00, +0.00), ioi_cv up (1.00, +0.00), grid up (1.00, +0.00), level up (1.00, +0.00), duty up (1.00, +0.00) |
 | chance | onsets up (1.00, +0.00), span up (1.00, +0.00), ioi_cv up (1.00, +0.00), grid down (1.00, +0.00), vel_sd up (1.00, +0.00), duty up (1.00, +0.00) |
 
-## Note Stack: held-out None on 0 moves
+## Note Stack: held-out 0.942 on 447 moves
 
 | Knob | Moves (up/down, agree, median change per full turn) |
 |---|---|
-| semi0 | nothing reliable |
-| semi1 | nothing reliable |
-| semi2 | nothing reliable |
-| semi3 | nothing reliable |
-| semi4 | nothing reliable |
-| semi5 | nothing reliable |
-| semi6 | nothing reliable |
-| semi7 | nothing reliable |
+| semi0 | register up (0.96, +6.08), poly up (1.00, +0.00) |
+| semi1 | register up (0.98, +6.11), poly up (1.00, +0.20), cents down (0.94, -2.43) |
+| semi2 | register up (1.00, +5.37), cents down (0.89, -0.24) |
+| semi3 | register up (0.93, +5.92) |
+| semi4 | register up (0.94, +6.01), poly up (0.80, +0.00), ioi_cv down (0.83, +0.00) |
+| semi5 | register up (0.93, +5.49), span down (0.80, +0.00), poly up (0.94, +0.00), cents down (0.93, -0.58) |
+| semi6 | register up (1.00, +3.59), poly up (0.93, +0.00) |
+| semi7 | register up (1.00, +5.85) |
 
 ## Note Strum: held-out 0.966 on 59 moves
 

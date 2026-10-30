@@ -656,40 +656,156 @@
  "Note Stack": {
   "rows": 648,
   "pairs": 576,
-  "held_out_acc": null,
-  "scored": 0,
+  "held_out_acc": 0.942,
+  "scored": 447,
   "knobs": {
    "semi0": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.96,
+      "median_per_turn": 6.081
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
    },
    "semi1": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.98,
+      "median_per_turn": 6.114
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.205
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 0.94,
+      "median_per_turn": -2.433
+     }
+    ]
    },
    "semi2": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 5.365
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 0.89,
+      "median_per_turn": -0.241
+     }
+    ]
    },
    "semi3": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.93,
+      "median_per_turn": 5.915
+     }
+    ]
    },
    "semi4": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.94,
+      "median_per_turn": 6.009
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 0.8,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "ioi_cv",
+      "dir": "down",
+      "agree": 0.83,
+      "median_per_turn": 0.0
+     }
+    ]
    },
    "semi5": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.93,
+      "median_per_turn": 5.49
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 0.8,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 0.94,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 0.93,
+      "median_per_turn": -0.584
+     }
+    ]
    },
    "semi6": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 3.588
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 0.93,
+      "median_per_turn": 0.0
+     }
+    ]
    },
    "semi7": {
     "pairs": 72,
-    "moves": []
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 5.854
+     }
+    ]
    }
   }
  },
@@ -907,6 +1023,245 @@
      {
       "measure": "duty",
       "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     }
+    ]
+   }
+  }
+ },
+ "Chorder": {
+  "rows": 720,
+  "pairs": 648,
+  "held_out_acc": 0.934,
+  "scored": 649,
+  "knobs": {
+   "scale": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.295
+     }
+    ]
+   },
+   "root": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -3.612
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 0.85,
+      "median_per_turn": 1.435
+     },
+     {
+      "measure": "grid",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -1.171
+     },
+     {
+      "measure": "level",
+      "dir": "down",
+      "agree": 0.8,
+      "median_per_turn": -0.327
+     }
+    ]
+   },
+   "chordSize": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 2.789
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 7.607
+     }
+    ]
+   },
+   "strumMs": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 0.86,
+      "median_per_turn": 13.541
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -0.534
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 0.8,
+      "median_per_turn": -0.695
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -1.458
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -3.835
+     }
+    ]
+   },
+   "humanizeTimingMs": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "onsets",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -1.469
+     },
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -0.007
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 0.8,
+      "median_per_turn": 0.0
+     }
+    ]
+   },
+   "humanizeVelocity": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.059
+     },
+     {
+      "measure": "span",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.593
+     },
+     {
+      "measure": "level",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 2.207
+     },
+     {
+      "measure": "vel_sd",
+      "dir": "up",
+      "agree": 0.88,
+      "median_per_turn": 2.287
+     }
+    ]
+   },
+   "upperHarmonics": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "register",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 1.161
+     },
+     {
+      "measure": "span",
+      "dir": "up",
+      "agree": 0.86,
+      "median_per_turn": 1.475
+     },
+     {
+      "measure": "poly",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.725
+     },
+     {
+      "measure": "duty",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": -2.155
+     }
+    ]
+   },
+   "mode": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "poly",
+      "dir": "down",
+      "agree": 1.0,
+      "median_per_turn": -0.082
+     },
+     {
+      "measure": "duty",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.0
+     },
+     {
+      "measure": "cents",
+      "dir": "up",
+      "agree": 1.0,
+      "median_per_turn": 0.952
+     }
+    ]
+   },
+   "progSteps": {
+    "pairs": 72,
+    "moves": [
+     {
+      "measure": "duty",
+      "dir": "up",
       "agree": 1.0,
       "median_per_turn": 0.0
      }

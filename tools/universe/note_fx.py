@@ -26,9 +26,12 @@ SR = fxs.SR
 MAP = os.path.join(os.path.dirname(os.path.dirname(HERE)), "docs/plans/data-universe/feel/note_fx_map")
 FEATS = ["onsets", "register", "span", "poly", "ioi_cv", "grid", "level", "vel_sd", "duty", "cents"]
 FX = ["Arpeggiator", "Gate", "Glide", "Humanizer", "Note Echo", "Note Filter", "Note Stack", "Note Strum", "Note Transpose",
-      "Pitch Bend", "Quantizer", "Velocity Curve"]
+      "Pitch Bend", "Quantizer", "Velocity Curve", "Chorder"]
 # note-node knobs left at their default: the global scale is app state, not the node's
 fxs.FX_FIXED.setdefault("useGlobalScale", 0)
+# Note Stack's semiN only reaches the output when enabledN is on (NoteStackNode::SweepPrerequisitesFor); off by default
+for _i in range(8):
+    fxs.FX_FIXED.setdefault("enabled%d" % _i, 1)
 # (name, "Oscillator", notes as (start s, midi, velocity 0-1, length s)), all inside fxs.PLAY seconds; pitches >= 55 so
 # neighbouring semitones stay apart in an 85 ms window
 PHRASES = [("chord", "Oscillator", [(0.0, m, 0.8, 1.0) for m in (60, 64, 67)] + [(1.2, m, 0.8, 1.0) for m in (65, 69, 72)]),

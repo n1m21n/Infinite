@@ -1119,3 +1119,21 @@ Deviations and limits:
 - **Fixture (`selftest`).** 24 sessions of 20 takes. With a hidden preference (line 3 kept 55%, others 20%) the gate passes (held keep 0.208, estimate 0.261, p5 lift 0.019) and line 3 tops the weights. With no preference it refuses (p5 lift -0.009). With 40 takes it says "not enough data".
 - **The real log.** 0 takes so far: the log started today and only self-tests have run. Verdict "not enough data" (needs 200 training takes and 60 held out). This item stays open until the owner has generated a few hundred takes.
 - **Not done.** Nothing in the app reads `learned_weights.json` yet; the draws in `BankLine`/`BankProg`/voice choice stay uniform. The spectral gate refit and the role critic refit (≤ 3% false rejects on kept takes) need about 200 kept takes with features; the learner only counts them. Wiring the weights in is a small change once a real log passes the gate.
+
+## 2026-10-30 Plan items 5-6: what each effect knob does (`fx_sweeps.py`, `note_fx.py` -> `feel/fx_map.*`, `feel/note_fx_map.*`): 20 of 27 MET
+
+Per effect: 12 banks, each one base (every knob drawn in its range) and one move of each knob; the source is a fixed set of parts
+(audio effects) or six phrases through Keyboard -> node -> sine (note effects), read back from the audio. A (knob, measure) cell is
+reliable when >= 80% of its training moves agree; held out by part / phrase. Bar 90%.
+
+| Kind | MET | MISS |
+|---|---|---|
+| Audio (14) | Chorus .957, Delay .937, Drive .920, Dynamics .975, Flanger .948, Limiter .993, Phaser .974, Saturator .964, Stereo .914 (35 moves) | Audio Filter .693, Bitcrush .897, EQ .873, Reverb .861, Transient Shaper .851 |
+| Note (13) | Arpeggiator .949, Chorder .934, Gate .947, Humanizer .955 (67), Note Echo .934, Note Filter .998, Note Stack .942, Note Strum .966 (59), Note Transpose .958, Pitch Bend 1.0 (48), Velocity Curve 1.0 (52) | Glide .893, Quantizer .878 |
+
+- **Note Stack had 0 test pairs**: its `semiN` knobs only reach the output when `enabledN` is on (the node says so in
+  `SweepPrerequisitesFor`), and the sweep left all eight voices at their default, off. Every move changed nothing. `note_fx.py` now
+  fixes `enabled0-7` on; rerun 648 rows, **.942 on 447 moves**. The voices-off rows are kept as `notefx_note_stack.voices-off.jsonl`.
+- **Chorder** rendered 0 before (it has no note input, so the phrase only sets the tempo); the `GENERATORS` rule fixed it: 720 rows, **.934**.
+- **Arpeggiator** printed no per-bank lines because its 432 rows (12 banks x 6 phrases x 6 designs) were already on disk: the rerun skipped them all. Nothing missing.
+- The misses are near the bar except Audio Filter (.693 on only 75 moves): its type knob changes what cutoff and resonance do, so one direction per knob is the wrong model, the same reading as Wavetable (item 14).
