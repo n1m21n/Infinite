@@ -810,6 +810,7 @@ set(COMMON_SOURCES
     src/nodes/PartialsNode.cpp
     src/nodes/StringNode.cpp
     src/nodes/WindNode.cpp
+    src/nodes/PianoNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
     src/nodes/LooperNode.cpp

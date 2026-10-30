@@ -641,6 +641,8 @@ namespace app
          DrawStringBody(gn, n);
       else if (auto* n = dynamic_cast<WindNode*>(gn.node.get()))
          DrawWindBody(gn, n);
+      else if (auto* n = dynamic_cast<PianoNode*>(gn.node.get()))
+         DrawPianoBody(gn, n);
       else if (auto* n = dynamic_cast<AudioPluginNode*>(gn.node.get()))
          DrawPluginBody(gn, n);
       else if (auto* n = dynamic_cast<GenerateSamplesNode*>(gn.node.get()))

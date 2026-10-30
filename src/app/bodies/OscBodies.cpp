@@ -2201,6 +2201,63 @@ namespace app
    }
 
 
+   // Three unison strings from the bridge pin (left) and the hammer under
+   // them at an eighth of their length, lifted while a note is sounding.
+   void DrawPianoDiagram(PianoNode* n, float h)
+   {
+      const float w = gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      AudioViz::Fill(dl, origin, br);
+      const float pad = 10.0f;
+      const float x0 = origin.x + pad, x1 = br.x - pad;
+      const ImU32 line = ScopeMidLineCol();
+      const ImU32 trace = IsThemeLight() ? tok::U32(tok::pal::c_008CD2F0) : tok::U32(tok::pal::c_32F0FFF0);
+      const float spread = 3.0f + 3.0f * n->detune;
+      const float y0 = origin.y + h * 0.35f;
+      for (int k = -1; k <= 1; k++)
+         dl->AddLine(ImVec2(x0, y0 + k * spread), ImVec2(x1, y0 + k * spread), trace, 1.2f);
+      dl->AddLine(ImVec2(x0, y0 - 2.0f * spread), ImVec2(x0, y0 + 2.0f * spread), line, 2.0f);
+      const float hx = x0 + (x1 - x0) * 0.125f;
+      const float lift = n->ActiveVoices() > 0 ? 2.0f : 6.0f;
+      const float hw = 4.0f + 3.0f * n->hardness;
+      dl->AddRectFilled(ImVec2(hx - hw, y0 + spread + lift), ImVec2(hx + hw, br.y - 3.0f), trace, 2.0f);
+      AudioViz::Border(dl, origin, br);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawPianoBody(GraphNode& gn, PianoNode* n)
+   {
+      const int voices = n->ActiveVoices();
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawPianoDiagram(n, 28.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      // 2 x 4: the hammer and the strings' sound, then their tuning, the
+      // soundboard, the dampers and the level.
+      {
+         AudioKnobRow row(4);
+         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
+         row.Knob("decay", &n->decay, 0.0f, 1.0f, "%.2f");
+         row.Knob("detune", &n->detune, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f");
+         row.Knob("body", &n->body, 0.0f, 1.0f, "%.2f");
+         row.Knob("release", &n->release, 10.0f, 2000.0f, "%.0f ms", kKnobSmall, false, false,
+                  AudioWidgetStyle::KnobSkewRelease400);
+         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      EndAudioBody();
+   }
+
+
    void DrawWaveTerrainScope(WaveTerrainNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
