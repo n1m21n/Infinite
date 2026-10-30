@@ -1,6 +1,7 @@
 #include "InfiniteCli.h"
 
 #include "AISkillContent.h"
+#include "core/NodeFactory.h"
 #include "Patch.h"
 #include "PatchLayout.h"
 #include "TermDocs.h"
@@ -42,6 +43,11 @@
 namespace app
 {
    std::string BundledResourcePath(const char* relPath);
+}
+
+namespace app
+{
+   void RegisterNodes();
 }
 
 namespace InfiniteCli
@@ -264,7 +270,7 @@ namespace
          return true;
       }
 
-      json Call(const std::string& method, const json& params = json::object())
+      json Call(const std::string& method, const json& params = json::object(), int attempt = 0)
       {
          if (!Connect())
             Fail("no running Infinite answered. Open the app, or give a patch file for the headless route", kExitNoApp);
@@ -284,7 +290,15 @@ namespace
          const json reply = json::parse(mBuffer.substr(0, newline));
          mBuffer.erase(0, newline + 1);
          if (reply.contains("error"))
-            Fail(reply["error"].value("message", std::string("the app refused the call")));
+         {
+            const std::string message = reply["error"].value("message", std::string("the app refused the call"));
+            if (attempt < 10 && message.find("retry on the next frame") != std::string::npos)
+            {
+               std::this_thread::sleep_for(std::chrono::milliseconds(50));
+               return Call(method, params, attempt + 1);
+            }
+            Fail(message);
+         }
          return reply.value("result", json::object());
       }
 
@@ -609,7 +623,8 @@ namespace
    // The language of a live node, by its type.
    const Language& LiveLanguage(int index)
    {
-      for (const json& n : gLive.Call("list_nodes")["nodes"])
+      const json nodes = gLive.Call("list_nodes")["nodes"];
+      for (const json& n : nodes)
          if (n.value("index", -1) == index)
          {
             if (const Language* l = LanguageByType(n.value("type", std::string())))
@@ -753,7 +768,7 @@ namespace
             const std::string key = "s " + (passKey.empty() ? std::string(l.key) : passKey);
             if (!params.contains(key))
                Fail("node " + std::to_string(index) + " has no " + key);
-            code = params[key].get<std::string>();
+            code = Unescape(params[key].get<std::string>());
             extension = l.extension;
          }
          if (file.empty())
@@ -1061,7 +1076,7 @@ Code     code kinds|new|check|push|pull|watch|errors|docs|examples
 Generate patch recipes|new|check|layout|apply
 Learn    context  guide
 Watch    watch
-Terminal term list|read|send|run
+Terminal term open|list|read|send|run
 
 <node> is an index, `selected`, or a title or type that only one node has.
 )";
@@ -1111,7 +1126,7 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
    int TermVerb(Args args)
    {
       if (args.empty())
-         Fail("usage: infinite term list|read|send|run", kExitUsage);
+         Fail("usage: infinite term open|list|read|send|run", kExitUsage);
       const std::string verb = args[0];
       args.erase(args.begin());
       std::string tabText, timeoutText = "60";
@@ -1120,6 +1135,11 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       json params = json::object();
       if (!tabText.empty())
          params["tab"] = atoi(tabText.c_str());
+      if (verb == "open")
+      {
+         Print(gLive.Call("term_open"));
+         return 0;
+      }
       if (verb == "list")
       {
          Print(gLive.Call("term_list"));
@@ -1199,7 +1219,8 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       int slot = 0;
       SplitPin(args[0], nodeText, slot, 0);
       const int dst = NodeRef(nodeText);
-      for (const json& link : gLive.Call("get_graph")["links"])
+      const json links = gLive.Call("get_graph")["links"];
+      for (const json& link : links)
          if (link.value("dstIndex", -1) == dst && link.value("dstSlot", -1) == slot)
          {
             Print(gLive.Call("disconnect", { { "linkId", link.value("id", -1) } }));
@@ -1256,11 +1277,18 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       if (verb == "status")
          return call("status");
       if (verb == "nodes")
-         return PassThrough({ "--describe" });
+      {
+         app::RegisterNodes();
+         json table = json::object();
+         for (const std::string& category : NodeFactory::Instance().GetCategories())
+            table[category] = NodeFactory::Instance().GetNodesInCategory(category);
+         Print(table);
+         return 0;
+      }
       if (verb == "describe")
       {
          need(1, "describe <type>");
-         return PassThrough({ "--describe", args[0], "--json" });
+         return PassThrough({ "--describe", args[0] });
       }
 
       // Edit

@@ -1,6 +1,7 @@
 // The RPC verbs the `infinite` command adds to the existing set (Rpc.cpp): what the human is
 // pointing at, the transport, modulation by control name, bypass, and the code errors of the
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
+#include <algorithm>
 #include "app/AppShared.h"
 
 namespace app
@@ -12,22 +13,27 @@ namespace app
       // The modulatable index of a control, by the key `describe` and the patch format use.
       int ParamIndexOfKey(const GraphNode& gn, const std::string& key, std::string& outError)
       {
-         auto it = gParamJoin.find(gn.typeName);
-         if (it == gParamJoin.end() || !it->second.done)
+         // Controls a script declares are saved as p.<name>, so both spellings work.
+         int param = ParamIndexOfKeyOnNode(gn, key);
+         if (param < 0)
+            param = ParamIndexOfKeyOnNode(gn, "p." + key);
+         if (param >= 0)
          {
-            outError = gn.typeName + " has not been drawn yet, so its controls are not known; retry on the next frame";
+            gParamProbeNode = -1;
+            return param;
+         }
+         // A closed node has no controls until something asks. The client retries on this text.
+         const std::vector<ParamRef>& drawn = Modulation::Instance().FrameParams();
+         const bool registered = std::any_of(drawn.begin(), drawn.end(), [&](const ParamRef& r) { return r.nodeIndex == gn.index; });
+         if (!registered)
+         {
+            gParamProbeNode = gn.index;
+            outError = gn.typeName + " has no controls yet; retry on the next frame";
             return -1;
          }
-         auto k = it->second.paramOfKey.find(key);
-         if (k == it->second.paramOfKey.end())
-         {
-            std::string keys;
-            for (const auto& kv : it->second.paramOfKey)
-               keys += (keys.empty() ? "" : ", ") + kv.first;
-            outError = "'" + key + "' is not a modulatable control of " + gn.typeName + " (it has: " + keys + ")";
-            return -1;
-         }
-         return k->second;
+         gParamProbeNode = -1;
+         outError = "'" + key + "' is not a modulatable control of " + gn.typeName + "; `infinite params " + std::to_string(gn.index) + "` lists its keys";
+         return param;
       }
 
       json CodeIssue(const GraphNode& gn, const std::string& message)
@@ -44,9 +50,13 @@ namespace app
    {
       if (method == "selection")
       {
+         // Requests run between frames, when no editor is current.
+         ed::EditorContext* previous = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
          const int count = ed::GetSelectedObjectCount();
          std::vector<ed::NodeId> ids((size_t)std::max(1, count));
          const int got = ed::GetSelectedNodes(ids.data(), count);
+         ed::SetCurrentEditor(previous);
          json nodes = json::array();
          for (int i = 0; i < got; i++)
             if (GraphNode* gn = FindNodeByIndex((int)ids[(size_t)i].Get() / GraphNode::kStride))

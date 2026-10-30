@@ -1840,6 +1840,7 @@ void NoteHiddenParamAlias(int nodeIndex, int hiddenParam, int shownParam);
 extern std::map<int, int> gPinAlias;
 
 extern bool gParamRegisterOnly;
+extern int gParamProbeNode; // this node registers its controls next frame though its eye is closed
 
 extern std::vector<int> gPendingSelect;
 

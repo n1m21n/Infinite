@@ -1012,8 +1012,16 @@ void TerminalPanelHidden()
 bool HandleTerminalSessionRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError)
 {
    using json = nlohmann::json;
-   if (method != "term_list" && method != "term_read" && method != "term_send")
+   if (method != "term_open" && method != "term_list" && method != "term_read" && method != "term_send")
       return false;
+
+   if (method == "term_open")
+   {
+      gTerminalOpen = true;
+      gTerminalFocus = true;
+      outResult = { { "open", true } };
+      return true;
+   }
 
    if (method == "term_list")
    {
