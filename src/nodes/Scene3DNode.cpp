@@ -199,7 +199,7 @@ Scene3DNode::Kind Scene3DNode::ItemKind(const Item& item) const
 
 Scene3DNode::Item* Scene3DNode::FindItem(int id)
 {
-   for (Item& it : mItems)
+   for (Item& it : Items())
       if (it.id == id)
          return &it;
    return nullptr;

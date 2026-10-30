@@ -189,7 +189,7 @@ void DrawKeyboard(FrameCtx& fc)
 #else
       const bool terminalChord = io.KeyCtrl && !io.KeyShift && !io.KeyAlt;
 #endif
-      if (terminalChord && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
+      if (terminalChord && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_GraveAccent, false))
          TerminalToggleShortcut();
 
       // Shift+R: the docked Piano Roll

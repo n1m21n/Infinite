@@ -2097,7 +2097,8 @@ namespace
       if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
       next();
       if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
-      ImGui::SameLine(startX + availW - kIconW);
+      ActionButton::RowNext();
+      ImGui::SetCursorPosX(startX + availW - kIconW);
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
    }
 
@@ -2432,7 +2433,7 @@ namespace
                item->unlit.push_back(other.uid);
             scene->Commit();
          }
-         ImGui::SameLine();
+         ActionButton::RowNext();
          ImGui::TextUnformatted(ItemName(other).c_str());
          ImGui::PopID();
       }
@@ -2908,7 +2909,7 @@ namespace
          if (kTabs[i].show && IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, kTabs[i].tip))
             sTab = i;
       ImGui::EndGroup();
-      ImGui::SameLine();
+      ActionButton::RowNext();
       ImGui::BeginChild("##v3dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
       SectionCard::BeginWindow();
       availW = ImGui::GetContentRegionAvail().x;
@@ -3163,7 +3164,7 @@ namespace
       DrawViewport(scene, ImVec2(viewW, std::max(80.0f, avail.y)));
       if (sSideOpen)
       {
-         ImGui::SameLine();
+         ActionButton::RowNext();
          DrawSide(scene, sideW);
       }
       DrawPopups(scene);

@@ -1,4 +1,5 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
+#include "Transport.h"
 #include "core/UndoDescribe.h"
 #include "core/Extensions.h"
 #include "core/tracking/HandTracker.h"
@@ -3437,6 +3438,61 @@ void RunView3DTest()
    lens->shiftX = 0.25f;
    Check("lens shift slides the picture", lens->ProjectionMatrix(1.5f).m[8] != straight);
    lens->shiftX = 0.0f;
+
+   // The composing facts the panel leans on.
+   static int sCookFrame = 1000000;
+   const int camItem = Scene()->Items()[Scene()->Items().size() - 2].id;
+   Scene3DNode::Item& moved = Scene()->Items().back();
+   const int movedId = moved.id;
+   const float target[3] = { 2.0f, -1.0f, 0.5f };
+   float aimed[3], from[3];
+   const bool aims = Scene()->AimAt(moved, target) && Scene()->ItemLightAim(moved, aimed) && Scene()->ItemPoint(moved, from);
+   const float to[3] = { target[0] - from[0], target[1] - from[1], target[2] - from[2] };
+   const float reach = std::sqrt(to[0] * to[0] + to[1] * to[1] + to[2] * to[2]);
+   Check("a light aims at a point", aims && (aimed[0] * to[0] + aimed[1] * to[1] + aimed[2] * to[2]) / reach > 0.99f);
+
+   Scene3DNode::Key a, b;
+   a.t = 0.0f;
+   b.t = 2.0f;
+   b.pos[0] = 2.0f;
+   a.scale[0] = a.scale[1] = a.scale[2] = b.scale[0] = b.scale[1] = b.scale[2] = 1.0f;
+   moved.keys = { a, b };
+   Scene()->Commit();
+   Transport::Instance().Seek(1.0);
+   Scene()->CookIfNeeded(++sCookFrame);
+   Check("keys carry a placement between them", Scene()->FindItem(movedId)->pos[0] > 0.1f && Scene()->FindItem(movedId)->pos[0] < 1.9f);
+   Transport::Instance().Seek(0.0);
+
+   Scene()->activeCamera = camItem;
+   Scene()->settings.fStop = 2.8f;
+   Scene()->Commit();
+   Scene()->CookIfNeeded(++sCookFrame);
+   const float wide = Scene()->Look().dofAperture;
+   Scene()->settings.fStop = 5.6f;
+   Scene()->Commit();
+   Scene()->CookIfNeeded(++sCookFrame);
+   Check("a higher f-stop blurs less", wide > 0.0f && std::abs(Scene()->Look().dofAperture * 2.0f - wide) < wide * 0.01f);
+
+   Scene()->settings.pivot = 3;
+   Scene()->settings.cursor[1] = 2.0f;
+   Scene()->FindItem(movedId)->name = "hero";
+   Scene()->FindItem(movedId)->render = false;
+   Scene()->Commit();
+   PushUndoCheckpoint("View 3D test");
+   Scene()->settings.fStop = 9.0f;
+   Scene()->settings.pivot = 0;
+   Scene()->FindItem(movedId)->name = "other";
+   Scene()->FindItem(movedId)->keys.clear();
+   Scene()->Commit();
+   Undo();
+   const Scene3DNode::Item* back = Scene() != nullptr ? Scene()->FindItem(movedId) : nullptr;
+   Check("settings, names and keys survive a reload", back != nullptr && back->name == "hero" && !back->render && back->keys.size() == 2
+      && Scene()->settings.fStop == 5.6f && Scene()->settings.pivot == 3 && Scene()->settings.cursor[1] == 2.0f);
+   Scene()->settings = Scene3DNode::Settings();
+   Scene()->activeCamera = 0;
+   Scene()->Look().dofAperture = 0.0f;
+   Scene()->FindItem(movedId)->keys.clear();
+   Scene()->Commit();
 
    // The scene stays up: the frames after this one draw the panel with it.
    Scene3DNode* shown = Scene();
