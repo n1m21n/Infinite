@@ -22,7 +22,7 @@ static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
    const float step = tok::tile + tok::space_3;
-   const float top = (tok::bar_h - tok::tile) * 0.5f;
+   const float top = (tok::bar_h - tok::tile) * 0.5f + step; // Library starts level with the Viewport tile
    if (PanelRail::Item("##railLibrary", top, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
                        T("Library - search modules, samples, media and plugins")))
       gNodePanelOpen = !gNodePanelOpen;
@@ -48,12 +48,12 @@ static void DrawPanelRail()
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
    const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
-   if (PanelRail::Item("##railHistory", bottom, IconsInfinite::History, nullptr, gHistoryOpen,
-                       T("Edit history - jump back to any earlier edit")))
-      gHistoryOpen = !gHistoryOpen;
-   if (PanelRail::Item("##railSettings", bottom - step, IconsInfinite::Settings, nullptr, gSettingsOpen,
+   if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
       gSettingsOpen = !gSettingsOpen;
+   if (PanelRail::Item("##railHistory", bottom - step, IconsInfinite::History, nullptr, gHistoryOpen,
+                       T("Edit history - jump back to any earlier edit")))
+      gHistoryOpen = !gHistoryOpen;
    PanelRail::End();
 }
 

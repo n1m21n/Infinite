@@ -1068,12 +1068,10 @@ namespace app
          gArrangeClaimedKeys = true;
          gSessionClaimedKeys = false;
       }
-      if (overPanel && !gArrangeHandDragging && gArrangeTool != ArrangeTool::Select && ImGui::IsWindowHovered())
-      {
-         static const char* const kGlyph[] = { nullptr, IconsInfinite::Trim, IconsInfinite::Range, IconsInfinite::Scissors,
-                                               IconsInfinite::Zoom, IconsInfinite::Hand, IconsInfinite::Pencil };
-         ToolCursor::Badge(kGlyph[(int)gArrangeTool]);
-      }
+      // Blade, Pencil and Zoom draw their own pointer below; Trim and Range get the shared one.
+      if (overPanel && ImGui::IsWindowHovered() && !gArrangeBladeOn &&
+          (gArrangeTool == ArrangeTool::Trim || gArrangeTool == ArrangeTool::Range))
+         ToolCursor::Badge(gArrangeTool == ArrangeTool::Trim ? IconsInfinite::Trim : IconsInfinite::Range);
       // One owner at a time: the panel under the pointer (Sample Studio, Piano Roll) takes the keys from the Timeline.
       if ((gSampleStudioOpen && gSampleStudioClaimedKeys) || (gPianoRollOpen && gPianoRollClaimedKeys))
       {

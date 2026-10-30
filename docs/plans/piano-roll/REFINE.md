@@ -27,6 +27,9 @@ Fill in the owner-feedback section (§1) after a hands-on session, and turn each
 
 Status: built; panels-sweep 8/8, PIANOROLLTEST and NOTEGENTEST pass, determinism check identical, i18n lint clean. Ratchet: no piano-roll file over its allowance (SampleStudio and Settings were already over). node-ui-sweep: 4 drag fixtures fail with the roll closed (unconfirmed against main). Not driven by the owner. Note settings (Expression at start) were kept.
 
+Second round (same day): every clip has its own colour (changeable in clip settings); right-click menus for blank / clip / note (the Fx list shows only what fits a lone note); the Quantise chip opens the grid dropdown (bars and the usual divisions) and choosing one quantises; Fx is one dropdown; tool keys and pointers are the same in the Timeline, Sample Studio and Piano Roll (A select, P draw, E erase, B cut, 0 mute, H hand, Z zoom; the tool's glyph replaces the arrow); Sample Studio has the tool dropdown with the roll's Zoom In / Out / Fit; rail: Library level with Viewport, Edit history above Settings in the bottom corner.
+Not done from it: note colour tint (needs a model field).
+
 ---
 
 ## 1. Owner feedback (fill in while testing)
@@ -94,9 +97,9 @@ Add `INFINITE_THEME="Infinite Paper"` for the light theme.
 | S4 | §12.3: harmony from another page's chords | Not in B | Block C, with types 9-12 |
 | S5 | §4.1: Consolidate | Not in the panel | moved to Block C |
 | S6 | §4.1: drag a clip onto another page's tab to move it to that lane | Check: not found in a code search | Add or move it to Block C |
-| S7 | §9: the empty-page text "Draw a clip, drop a .mid, or record" | Check in the app | Add if missing (without "record" until Block C) |
+| S7 | §9: the empty-page text "Draw a clip, drop a .mid, or record" | Present | done |
 | S8 | §4.5: fold shows only keys in use **or** only scale keys | The fold chip says "Fold to the keys in use" | decided: not added; scale snap now colours the lanes, which covers the need |
-| S9 | §11 decision 4: Sample Studio's scissors should move from `C` to `B` | Not done | left alone: Sample Studio is outside this round; do it with its own help-table row |
+| S9 | §11 decision 4: Sample Studio's scissors should move from `C` to `B` | Done: Cut is B, Select A, Hand H | done |
 
 ---
 

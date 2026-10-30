@@ -2280,7 +2280,7 @@ namespace
       {
          if (s.tool == 2)
          {
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ToolCursor::Badge(IconsInfinite::Hand);
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) && g.mx.x > g.mn.x)
             {
                s.viewStart -= (double)ImGui::GetIO().MouseDelta.x / (double)(g.mx.x - g.mn.x) * s.viewLen;
@@ -2621,23 +2621,6 @@ namespace
       return clicked;
    }
 
-   // A magnifier with a plus or a minus, drawn on the last item (the glyph font has one zoom icon, no zoom out).
-   void DrawMagnifier(bool plus)
-   {
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      const ImVec2 c((bmin.x + bmax.x) * 0.5f - 1.5f, (bmin.y + bmax.y) * 0.5f - 1.5f);
-      const float r = tok::icon_md * 0.3f;
-      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddCircle(c, r, col, 0, 1.5f);
-      const float d = r * 0.7071f;
-      dl->AddLine(ImVec2(c.x + d, c.y + d), ImVec2(c.x + d + r * 0.75f, c.y + d + r * 0.75f), col, 2.0f);
-      const float a = r * 0.5f;
-      dl->AddLine(ImVec2(c.x - a, c.y), ImVec2(c.x + a, c.y), col, 1.5f);
-      if (plus)
-         dl->AddLine(ImVec2(c.x, c.y - a), ImVec2(c.x, c.y + a), col, 1.5f);
-   }
-
    bool TextChip(const char* label, ActionButton::Kind kind = ActionButton::Kind::Plain)
    {
       return ActionButton::Draw(label, ImVec2(TextW(label), tok::tile), kind);
@@ -2843,21 +2826,20 @@ namespace
                s.tool = 1;
             if (MenuParts::Item(L("Hand"), "H", s.tool == 2))
                s.tool = 2;
+            MenuParts::Separator();
+            const double mid = s.viewStart + s.viewLen * 0.5;
+            if (MenuParts::Item(L("Zoom In"), "="))
+               ZoomAround(mid, 0.8);
+            if (MenuParts::Item(L("Zoom Out"), "-"))
+               ZoomAround(mid, 1.25);
+            if (MenuParts::Item(L("Fit"), "Shift+Z"))
+               ViewAll();
             MenuParts::EndPopup();
          }
       }
       FormParts::Inline(0.0f, in);
       if (IconChip("##studioSnap", IconsInfinite::Snap, s.snapGrid, s.snapGrid ? T("Markers snap to 16ths (Shift while dragging: free)") : T("Snap markers to 16ths")))
          s.snapGrid = !s.snapGrid;
-      FormParts::Inline(0.0f, in);
-      const double viewMid = s.viewStart + s.viewLen * 0.5;
-      if (IconChip("##studioZoomIn", nullptr, false, T("Zoom in (pinch, Cmd+wheel or =; Z: to the selection)")))
-         ZoomAround(viewMid, 0.6);
-      DrawMagnifier(true);
-      FormParts::Inline(0.0f, in);
-      if (IconChip("##studioZoomOut", nullptr, false, T("Zoom out (pinch, Cmd+wheel or -; Shift+Z: all)")))
-         ZoomAround(viewMid, 1.0 / 0.6);
-      DrawMagnifier(false);
       ImGui::EndDisabled();
       FormParts::Inline(0.0f, in);
       if (IconChip("##studioSettings", IconsInfinite::Edit, s.settingsOpen, T("Sample and slice settings")))

@@ -1189,25 +1189,27 @@ namespace
    void DrawContextMenu(Arrange::Lane& page);
 
    // The transforms, for the Fx dropdown and the menus' Fx submenu.
+   // A lone note only gets the ones that mean something for it; the rest relate notes to each other.
    void DrawFunctionItems(const Arrange::Lane& page)
    {
-      if (MenuParts::Item(L("Legato")))
+      const bool one = S().notes.size() == 1;
+      if (!one && MenuParts::Item(L("Legato")))
          TransformNotes(page, Legato);
       if (MenuParts::Item(L("Humanize")))
          TransformNotes(page, Humanize);
-      if (MenuParts::Item(L("Reverse")))
+      if (!one && MenuParts::Item(L("Reverse")))
          TransformNotes(page, Reverse);
-      if (MenuParts::Item(L("Invert")))
+      if (!one && MenuParts::Item(L("Invert")))
          TransformNotes(page, Invert);
       if (MenuParts::Item(L("Double Speed")))
          TransformNotes(page, [](std::vector<Arrange::Note>& n) { Stretch(n, 0.5); });
       if (MenuParts::Item(L("Half Speed")))
          TransformNotes(page, [](std::vector<Arrange::Note>& n) { Stretch(n, 2.0); });
-      if (MenuParts::Item(L("Strum")))
+      if (!one && MenuParts::Item(L("Strum")))
          TransformNotes(page, Strum);
       if (MenuParts::Item(L("Chop to Grid")))
          ChopToGrid(page);
-      if (MenuParts::Item(L("Velocity Ramp")))
+      if (!one && MenuParts::Item(L("Velocity Ramp")))
          TransformNotes(page, VelocityRamp);
       if (MenuParts::Item(L("Fit to Scale")))
          TransformNotes(page, FitToScale);
@@ -1586,23 +1588,18 @@ namespace
       if (IconChip("##pianoFollow", IconsInfinite::Follow, s.follow, T("Follow the playhead")))
          s.follow = !s.follow;
       FormParts::Inline(0.0f, gapGroup);
-      if (TextChip(T("Quantise")))
-         Quantize(page);
-      if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Quantise the selection, or the clip being edited (Q). Right-click or Shift+Q for its settings"));
-      if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-      {
-         s.settingsOpen = true;
-         s.genOpen = false;
-      }
-      FormParts::Inline(0.0f, gap);
       {
          ImVec2 bmin, bmax;
-         if (PickerFace("##pianoQuantGrid", QuantLabel(), 72.0f, T("What Quantise snaps to: the grid, bars or a division"), bmin, bmax))
+         if (PickerFace("##pianoQuantGrid", T("Quantise"), 96.0f, T("Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings"), bmin, bmax))
             ImGui::OpenPopup("##pianoQuantMenu");
-         if (BeginPickerMenu("##pianoQuantMenu", bmin, bmax, 72.0f))
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
-            DrawQuantItems(page, false);
+            s.settingsOpen = true;
+            s.genOpen = false;
+         }
+         if (BeginPickerMenu("##pianoQuantMenu", bmin, bmax, 96.0f))
+         {
+            DrawQuantItems(page, true);
             MenuParts::EndPopup();
          }
       }
@@ -2187,9 +2184,7 @@ namespace
       }
       if (s.soundingUntil > 0.0 && ImGui::GetTime() > s.soundingUntil)
          StopSound(page);
-      if (s.drag == Drag::None && hovered && m.y >= a.rollY && m.x >= a.x0 && s.tool == Tool::Hand)
-         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-      else if (hovered && s.drag == Drag::None && m.y >= a.rollY && m.x >= a.x0 && s.tool != Tool::Select)
+      if (hovered && m.y >= a.rollY && m.x >= a.x0 && s.tool != Tool::Select)
          ToolCursor::Badge(ToolGlyph(s.tool));
       if (s.drag == Drag::None && hovered && m.y >= a.rollY && m.x >= a.x0 && s.tool == Tool::Select)
       {
