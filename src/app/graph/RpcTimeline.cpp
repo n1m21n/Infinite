@@ -4,6 +4,7 @@
 // Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
 #include "app/AppShared.h"
+#include "core/FactoryPresets.h"
 
 namespace app
 {
@@ -93,6 +94,7 @@ namespace app
       bool SetClipFields(Arrange::Clip& c, const json& f)
       {
          Assign(f, "name", c.name);
+         Assign(f, "output", c.srcOutput);
          Assign(f, "enabled", c.enabled);
          Assign(f, "gainDb", c.gainDb);
          Assign(f, "pan", c.pan);
@@ -499,6 +501,24 @@ namespace app
             ArrangeEdit([&] { Arrange::AddNotes(gArrange, clip, notes, &made); });
             outResult = { { "ids", made } };
          }
+         else if (action == "set")
+         {
+            std::vector<Arrange::Note> edited;
+            for (Arrange::Note n : c->notes)
+               if (std::find(ids.begin(), ids.end(), n.id) != ids.end())
+               {
+                  Assign(fields, "mute", n.mute);
+                  Assign(fields, "chance", n.chance);
+                  if (fields.contains("vel"))
+                     n.vel = (uint8_t)std::clamp(fields["vel"].get<int>(), 1, 127);
+                  if (fields.contains("pitch"))
+                     n.pitch = (uint8_t)std::clamp(fields["pitch"].get<int>(), 0, 127);
+                  if (fields.contains("length"))
+                     n.length = BeatsToTicks(fields["length"].get<double>());
+                  edited.push_back(n);
+               }
+            ArrangeEdit([&] { Arrange::EditNotes(gArrange, clip, edited); });
+         }
          else if (action == "delete")
             ArrangeEdit([&] { Arrange::DeleteNotes(gArrange, clip, ids); });
          else if (action == "move")
@@ -513,7 +533,7 @@ namespace app
             ArrangeEdit([&] { Arrange::QuantizeNotes(gArrange, clip, ids, spec); });
          }
          else
-            outError = "notes get|add|delete|move|quantize|transform";
+            outError = "notes get|add|set|delete|move|quantize|transform";
       }
 
       void Perf(const std::string& action, const Words& args, const json& fields, json& outResult, std::string& outError)
@@ -618,6 +638,13 @@ namespace app
                Assign(fields, "x", r->cellX);
                Assign(fields, "y", r->cellY);
                Assign(fields, "page", r->page);
+               if (fields.contains("color"))
+               {
+                  const uint32_t rgb = fields["color"].get<uint32_t>();
+                  r->colorR = ((rgb >> 16) & 0xFF) / 255.0f;
+                  r->colorG = ((rgb >> 8) & 0xFF) / 255.0f;
+                  r->colorB = (rgb & 0xFF) / 255.0f;
+               }
             }
          }
          else if (action == "edit")
@@ -675,11 +702,103 @@ namespace app
          if (outError.empty() && outResult.is_null())
             outResult = json::object();
       }
+
+      // What a node's right-click menu does.
+      void NodeMenu(const std::string& action, GraphNode& gn, const Words& args, json& outResult, std::string& outError)
+      {
+         const bool on = args.empty() || args[0] != "off";
+         if (action == "rename" && !args.empty())
+         {
+            auto* group = dynamic_cast<GroupNode*>(gn.node.get());
+            if (group == nullptr)
+            {
+               outError = "only groups have a name of their own";
+               return;
+            }
+            PushUndoCheckpoint();
+            group->label = args[0];
+            gPatchDirty = true;
+         }
+         else if (action == "params")
+            gn.showParams = on;
+         else if (action == "viewport")
+            gn.showMiniViewport = on;
+         else if (action == "panel" && CanShowInViewportPanel(gn))
+         {
+            if (std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), gn.index) == gViewportPanelNodes.end())
+               gViewportPanelNodes.push_back(gn.index);
+            gViewportPanelOpen = true;
+         }
+         else if (action == "window" && CanShowInViewportPanel(gn))
+         {
+            ProjectorWindow* projector = FindProjectorWindow(gn.index);
+            const std::string what = args.empty() ? std::string("open") : args[0];
+            if (what == "close")
+               CloseProjectorWindowFor(gn.index);
+            else if (projector == nullptr)
+               OpenProjectorWindow(glfwGetCurrentContext(), gn);
+            else if (what == "fullscreen")
+               ToggleProjectorFullscreen(*projector);
+            else if (what == "display" && args.size() > 1)
+               MoveProjectorToMonitor(*projector, atoi(args[1].c_str()));
+         }
+         else if (action == "timeline" || action == "session")
+         {
+            const int lane = args.empty() ? -1 : args[0] == "audio" ? (int)Arrange::kLaneAudio : (int)Arrange::kLaneVideo;
+            const uint64_t made = action == "timeline" ? AddNodeToArrangeTimeline(gn.index, lane) : AddNodeToArrangeSession(gn.index, lane);
+            if (made == 0)
+               outError = gn.typeName + " makes neither picture nor sound";
+            outResult = { { "clip", made } };
+         }
+         else if (action == "pianoroll" && !args.empty())
+         {
+            PianoRollOpenPage(strtoull(args[0].c_str(), nullptr, 10));
+            gPianoRollOpen = true;
+         }
+         else if (action == "preset" && !args.empty())
+         {
+            const auto* presets = FactoryPresets::For(gn.typeName);
+            int index = -1;
+            for (int i = 0; presets != nullptr && i < (int)presets->size(); i++)
+               if ((*presets)[(size_t)i].name == args[0])
+                  index = i;
+            if (index < 0)
+            {
+               outError = "no preset '" + args[0] + "' on " + gn.typeName;
+               return;
+            }
+            PushUndoCheckpoint("Preset");
+            FactoryPresets::Apply(gn.node.get(), gn.typeName, index);
+            gPatchDirty = true;
+         }
+         else
+            outError = "node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|display <n>], timeline|session [video|audio], preset <name>";
+      }
+
+      void Library(const std::string& action, const Words& args, json& outResult, std::string& outError)
+      {
+         SampleScanner& scanner = !args.empty() && args[0] == "media" ? gMediaScanner : gSampleScanner;
+         const std::string folder = args.size() > 1 ? args[1] : std::string();
+         if (action == "add" && !folder.empty())
+         {
+            scanner.AddFolder(folder);
+            scanner.StartScan(folder);
+         }
+         else if (action == "remove" && !folder.empty())
+            scanner.RemoveFolder(folder);
+         else if (action == "refresh")
+            scanner.StartScan(folder);
+         else if (action.empty() || action == "list")
+            outResult = { { "samples", gSampleScanner.Folders() }, { "media", gMediaScanner.Folders() } };
+         else
+            outError = "library list | add|remove samples|media <folder> | refresh samples|media [folder]";
+      }
    }
 
    bool HandleTimelineRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError)
    {
-      if (method != "timeline" && method != "session" && method != "notes" && method != "perf" && method != "studio")
+      if (method != "timeline" && method != "session" && method != "notes" && method != "perf" && method != "studio" &&
+          method != "node" && method != "library" && method != "mod_curve" && method != "launch_quantize")
          return false;
       const std::string noun = params.value("noun", std::string());
       const std::string action = params.value("action", std::string());
@@ -703,6 +822,40 @@ namespace app
             Notes(action, args, fields, outResult, outError);
          else if (method == "perf")
             Perf(action, args, fields, outResult, outError);
+         else if (method == "library")
+            Library(action, args, outResult, outError);
+         else if (method == "launch_quantize")
+         {
+            const std::string what = params.value("what", std::string("launch"));
+            if (what == "launch")
+               Transport::Instance().SetLaunchQuantize(params.value("value", 0));
+            else if (what == "quantize")
+               ShowSetQuantize() = params.value("value", 0);
+            else
+               ShowSetFadeMs() = std::clamp(params.value("value", 0.0f), 0.0f, 8000.0f);
+            gPatchDirty = true;
+         }
+         else if (method == "node" || method == "mod_curve")
+         {
+            GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+            if (gn == nullptr)
+               outError = "unknown node index";
+            else if (method == "node")
+               NodeMenu(action, *gn, args, outResult, outError);
+            else
+            {
+               const int param = std::max(ParamIndexOfKeyOnNode(*gn, params.value("key", std::string())),
+                                          ParamIndexOfKeyOnNode(*gn, "p." + params.value("key", std::string())));
+               if (param < 0)
+                  outError = "'" + params.value("key", std::string()) + "' is not a modulatable control of " + gn->typeName;
+               else
+               {
+                  PushUndoCheckpoint();
+                  Modulation::Instance().SetCurve(gn->index, param, std::clamp(params.value("curve", 0.0f), -1.0f, 1.0f));
+                  gPatchDirty = true;
+               }
+            }
+         }
          else if (action == "set")
             SampleStudioApply(fields.value("text", std::string()));
          else

@@ -159,6 +159,7 @@ namespace app
             Toggle("autosave", &gAutosaveEnabled, SaveGeneralSettings),
             Number("autosaveSeconds", &gAutosaveSeconds, 15, 300, SaveGeneralSettings),
             Number("targetFps", &gTargetFps, 0, 120, SaveGeneralSettings),
+            Number("outputMode", &gAudioOutputMode, 0, 3, SaveAudioSettings),
             Flag("vsync", [] { return gVsync; },
                  [](bool on)
                  {
@@ -536,6 +537,65 @@ namespace app
          {
             ApplyAudioSettings();
             outResult = { { "error", gAudioStartError } };
+            return true;
+         }
+         if (action == "updates")
+         {
+            UpdateCheck::Start();
+            gShowUpdateCheckModal = true;
+            outResult = json::object();
+            return true;
+         }
+         if (action == "reset")
+         {
+            CategoryColors::ResetAllAppearanceBoth();
+            ApplyTheme();
+            outResult = json::object();
+            return true;
+         }
+         if (action == "logs")
+         {
+            Platform::RevealLogs();
+            outResult = json::object();
+            return true;
+         }
+         if (action == "gpu")
+         {
+            if (params.contains("value"))
+               Platform::SetGpuPreference(std::clamp(params.value("value", 0), 0, 2));
+            outResult = { { "gpu", Platform::GpuPreference() } };
+            return true;
+         }
+         if (action == "global")
+         {
+            std::vector<ExprGlobals::Global>& globals = ExprGlobals::All();
+            const std::string name = params.value("name", std::string());
+            const auto found = std::find_if(globals.begin(), globals.end(), [&](const ExprGlobals::Global& g) { return g.name == name; });
+            if (!name.empty())
+            {
+               PushUndoCheckpoint();
+               if (!params.contains("expr"))
+               {
+                  if (found != globals.end())
+                     globals.erase(found);
+               }
+               else if (found != globals.end())
+                  found->expr = params.value("expr", std::string());
+               else
+                  globals.push_back({ name, params.value("expr", std::string()), 0.0f, std::string() });
+               gPatchDirty = true;
+               SaveDefaultExprGlobals();
+            }
+            json all = json::object();
+            for (const ExprGlobals::Global& g : globals)
+               all[g.name] = g.expr;
+            outResult = { { "globals", all } };
+            return true;
+         }
+         if (action == "extension")
+         {
+            Extensions::InstallFileAsync(params.value("path", std::string()));
+            outResult = json::object();
             return true;
          }
          if (action == "devices")

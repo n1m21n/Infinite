@@ -152,7 +152,12 @@ prints the open patch, the selection and any code errors in one answer.
 | Look | `graph`, `explain`, `params`, `selection`, `status`, `nodes`, `describe` |
 | Edit | `add`, `remove`, `connect`, `disconnect`, `set`, `mod`, `expr`, `bypass`, `batch`, `undo`, `redo` |
 | Patch | `new`, `open`, `save`, `validate`, `canonicalize`, `apply` |
-| Play | `play`, `stop`, `rewind`, `seek`, `tempo`, `session scene`, `session stop` |
+| Play | `play`, `stop`, `rewind`, `seek`, `tempo` |
+| Timeline | `timeline` prints it all; `timeline track`, `clip`, `marker`, `group`, `loop`, `snap`, `render`. Times are in beats; `key=value` words set fields |
+| Session | `session scene`, `launch`, `launchrow`, `stop`, `add`, `insert`, `duplicatescene`, `deletescene`, `send`, `sceneset`, `slot`, `place`, `duplicate`, `clear`, `copy`, `paste`, `cut`, `quantize` |
+| Notes | `notes get`, `add <clip> beat:pitch[:length[:velocity]]`, `set`, `delete`, `move`, `quantize`, `transform <track> <name>` |
+| Performance Matrix | `perf get`, `add <kind> [label]`, `remove`, `assign`, `clear`, `unmidi`, `set`, `edit`, `page add|go|rename|delete|duplicate` |
+| Nodes and files | `node <node> rename|params|viewport|panel|window|timeline|session|preset`, `library`, `mod curve`, `studio get|set` |
 | See and hear | `shot`, `frame`, `render`, `audio` |
 | Code | `code kinds`, `new`, `check`, `push`, `pull`, `watch`, `errors`, `docs`, `examples` |
 | Generate | `patch recipes`, `new`, `check`, `layout`, `apply` |

@@ -5,7 +5,7 @@ Status: approved by the owner 2026-10-30. Block A built, Blocks B and C built in
 Checked on macOS (2026-10-30): `scripts/terminal_cli_smoke.py` passes; live verbs, `term run` with exit codes, `infinite` inside the panel, and two apps on one machine (second takes the next port) were run against a dev app.
 
 Open:
-- B3 parity: timeline, Piano Roll, Sample Studio, settings and show next/prev/go have no verbs yet; `session` has scene and stop only. Groups, `patch apply --merge` and the view verb are also missing, so the parity script is not written.
+- `patch apply --merge` is not built. Parity is held by `tools/terminal/parity.py` (run in `scripts/headless_smoke.sh`): 457 clickable actions, each with a verb or a stated reason in `tools/terminal/parity.json`. Verbs were each run against the app on macOS, except render output and `node rename`.
 - Shell integration startup files are not written; `term run` sends its own exit marker, and on PowerShell it does not work yet.
 - C5/C6 agent bench not run.
 - Start-up of the shim is 130-200 ms, over the 50 ms target: the command is the whole app binary.

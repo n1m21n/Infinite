@@ -1067,19 +1067,21 @@ namespace
 
 Look     graph [p.inf]  explain [p.inf]  params <node>  selection  status  nodes  describe <type>
 Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disconnect <dst[:slot]>
-         set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>
+         set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
          select <node>...|all|none  copy  paste  duplicate  group  ungroup
 Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
          session scene|launch|stop|add|insert|send|sceneset|slot ...
-         notes get|add|delete|move|quantize|transform <clip>  perf ...  studio get|set
+         notes get|add|set|delete|move|quantize|transform <clip>  perf ...  studio get|set
+Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|display <n>], timeline|session [video|audio], preset <name>
+         library list|add|remove|refresh samples|media [folder]
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
 Code     code kinds|new|check|push|pull|watch|errors|docs|examples
 Generate patch recipes|new|check|layout|apply
-App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply
-         show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save
+App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
+         show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save|fade <ms>|quantize <n>|launch <n>
          view fit|params on|off|clearcards|metronome [on|off]  quit
 Learn    context  guide
 Watch    watch
@@ -1329,6 +1331,11 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
             need(3, "mod clear <dst> <key>");
             return call("unbind_mod", { { "index", NodeRef(args[1]) }, { "key", args[2] } });
          }
+         if (!args.empty() && args[0] == "curve")
+         {
+            need(4, "mod curve <dst> <key> <-1..1>");
+            return call("mod_curve", { { "index", NodeRef(args[1]) }, { "key", args[2] }, { "curve", atof(args[3].c_str()) } });
+         }
          need(3, "mod <src[:output]> <dst> <key> [lo hi]");
          std::string src;
          int output = 0;
@@ -1400,8 +1407,24 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "settings")
       {
-         if (!args.empty() && (args[0] == "apply" || args[0] == "devices"))
+         if (!args.empty() && (args[0] == "apply" || args[0] == "devices" || args[0] == "updates" || args[0] == "reset" || args[0] == "logs"))
             return call("settings", { { "action", args[0] } });
+         if (!args.empty() && args[0] == "gpu")
+            return call("settings", args.size() > 1 ? json{ { "action", "gpu" }, { "value", atoi(args[1].c_str()) } } : json{ { "action", "gpu" } });
+         if (!args.empty() && args[0] == "extension")
+         {
+            need(2, "settings extension <file>");
+            return call("settings", { { "action", "extension" }, { "path", std::filesystem::absolute(AppPaths::FsPath(args[1])).u8string() } });
+         }
+         if (!args.empty() && args[0] == "global")
+         {
+            json params = { { "action", "global" } };
+            if (args.size() > 1)
+               params["name"] = args[1];
+            if (args.size() > 2)
+               params["expr"] = args[2];
+            return call("settings", params);
+         }
          json params = json::object();
          if (!args.empty())
             params["key"] = args[0];
@@ -1415,6 +1438,8 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "show")
       {
+         if (args.size() > 1 && (args[0] == "launch" || args[0] == "quantize" || args[0] == "fade"))
+            return call("launch_quantize", { { "what", args[0] }, { "value", atof(args[1].c_str()) } });
          json params = { { "action", args.empty() ? "list" : args[0] } };
          if (args.size() > 1)
          {
@@ -1440,6 +1465,20 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
          return call("view", params);
       }
 
+      if (verb == "node" && args.size() >= 2)
+      {
+         json rest = json::array();
+         for (size_t i = 2; i < args.size(); i++)
+            rest.push_back(args[i]);
+         return call("node", { { "index", NodeRef(args[0]) }, { "action", args[1] }, { "args", rest } });
+      }
+      if (verb == "library")
+      {
+         json rest = json::array();
+         for (size_t i = 1; i < args.size(); i++)
+            rest.push_back(args[i]);
+         return call("library", { { "action", args.empty() ? std::string() : args[0] }, { "args", rest } });
+      }
       if (verb == "timeline" || verb == "session" || verb == "notes" || verb == "perf" || verb == "studio")
       {
          // Words go through as they are; key=value words become fields.
