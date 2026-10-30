@@ -14,8 +14,10 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/TimeRuler.h"
 #include "app/ui/design/components/ToolCursor.h"
 #include "arrange/ArrangeModel.h"
+#include "audio/MidiFile.h"
 #include "audio/MusicTime.h"
 #include "core/Transport.h"
 #include "nodes/PianoRollNode.h"
@@ -78,6 +80,8 @@ namespace
       TrimStart,
       TrimEnd,
       Range,
+      Scrub,     // the ruler: a ghost playhead, landing on release
+      LoopCarve, // Shift+drag on the ruler
       LoopStart,
       LoopEnd,
       Keys,
@@ -87,6 +91,7 @@ namespace
    struct State
    {
       uint64_t lane = 0;         // the page on show
+      std::string dropMessage;   // why the last dropped file did not land
       uint64_t viewedLane = 0;   // the page the view was last fitted to
       double pxPerTick = 0.06;
       double viewTick = 0.0;     // tick at the roll's left edge
@@ -559,49 +564,22 @@ namespace
       float RowY(float row) const { return rollY + (row - S().topRow) * S().keyH; }
    };
 
+   TimeRuler::Axis RulerAxis(const Areas& a)
+   {
+      return { a.x0, a.x1, a.XTick(a.x0) / (double)Arrange::kPPQ, (double)Arrange::kPPQ * S().pxPerTick, 4.0 };
+   }
+
    void DrawRuler(ImDrawList* dl, const Areas& a)
    {
-      const float y0 = a.rulerY, y1 = y0 + kRulerH;
-      dl->AddRectFilled(ImVec2(a.x0, y0), ImVec2(a.x1, y1), Tint(0.04f));
-      const Arrange::LoopRange& loop = gArrange.settings.loop;
-      if (loop.end > loop.start)
-         dl->AddRectFilled(ImVec2(a.TickX((double)loop.start), y0), ImVec2(a.TickX((double)loop.end), y1),
-                           loop.enabled ? AccentU32(0.35f) : Tint(0.08f));
+      const TimeRuler::Axis axis = RulerAxis(a);
+      TimeRuler::Background(dl, axis, a.rulerY);
       if (S().rangeEnd > S().rangeStart)
-         dl->AddRectFilled(ImVec2(a.TickX((double)S().rangeStart), y0), ImVec2(a.TickX((double)S().rangeEnd), y1), Tint(0.22f));
-      // The Sample Studio's ruler: bar numbers, and with zoom the beats ("1.3") and their halves.
-      const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_TextDisabled), textCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      const double beatPx = (double)Arrange::kPPQ * S().pxPerTick;
-      double step = 4.0; // beats between labels
-      while (step > 0.25 && step * 0.5 * beatPx >= 50.0)
-         step *= 0.5;
-      while (step * beatPx < 50.0 && step < 64.0)
-         step *= 2.0;
-      const double stepTicks = step * (double)Arrange::kPPQ;
-      const double firstTick = std::max(0.0, std::floor(a.XTick(a.x0) / stepTicks) * stepTicks);
-      const float fontY = y0 + (kRulerH - ImGui::GetFontSize()) * 0.5f;
-      for (double t = firstTick;; t += stepTicks)
-      {
-         const float x = a.TickX(t);
-         if (x > a.x1)
-            break;
-         const bool bar = std::fmod(t, (double)Arrange::kTicksPerBar) < 0.5;
-         dl->AddLine(ImVec2(x, y1 - (bar ? 6.0f : 4.0f)), ImVec2(x, y1), tickCol);
-         const double beats = t / (double)Arrange::kPPQ;
-         const int barNo = (int)std::floor(beats / 4.0) + 1;
-         char label[24];
-         if (bar)
-            std::snprintf(label, sizeof label, "%d", barNo);
-         else
-         {
-            const double inBar = beats - (double)(barNo - 1) * 4.0;
-            if (std::fabs(inBar - std::round(inBar)) < 1e-6)
-               std::snprintf(label, sizeof label, "%d.%d", barNo, (int)std::round(inBar) + 1);
-            else
-               std::snprintf(label, sizeof label, "%d.%.2g", barNo, inBar + 1.0);
-         }
-         dl->AddText(ImVec2(x + 3.0f, fontY), textCol, label);
-      }
+         dl->AddRectFilled(ImVec2(a.TickX((double)S().rangeStart), a.rulerY), ImVec2(a.TickX((double)S().rangeEnd), a.rulerY + kRulerH), Tint(0.22f));
+      if (gArrange.settings.timeDisplay == 1)
+         TimeRuler::DrawUnits(dl, axis, a.rulerY, 60.0 / std::max(1.0, (double)Transport::Instance().Tempo()), 0.1,
+                              [](double sec, double step) { return ArrangeFormatSeconds(sec, step < 1.0); });
+      else
+         TimeRuler::DrawBars(dl, axis, a.rulerY);
    }
 
    void DrawClipStrip(ImDrawList* dl, const Areas& a, const Arrange::Lane& page)
@@ -755,10 +733,10 @@ namespace
       }
    }
 
-   bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip)
+   bool IconChip(const char* id, const char* glyphStr, bool on, const char* tip, bool green = false)
    {
       ActionButton::Scoped() = on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile));
+      const bool clicked = ActionButton::Draw(id, ImVec2(kIconW, tok::tile), green ? ActionButton::Kind::Go : ActionButton::Kind::Plain);
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (ImGui::IsItemHovered())
          HelpTip("%s", tip);
@@ -778,7 +756,7 @@ namespace
       return clicked;
    }
 
-   // A dropdown face in the Sample Studio's grammar: the value on the left, a chevron on the right.
+   // A dropdown face in the Sample Studio's grammar: the value in a field well.
    bool PickerFace(const char* id, const char* value, float w, const char* tip, ImVec2& bmin, ImVec2& bmax)
    {
       const bool clicked = ActionButton::Draw(id, ImVec2(w, tok::tile));
@@ -788,11 +766,9 @@ namespace
       bmax = ImGui::GetItemRectMax();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float cy = (bmin.y + bmax.y) * 0.5f;
-      dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_3 - tok::icon_sm, bmax.y), true);
+      dl->PushClipRect(bmin, ImVec2(bmax.x - tok::space_2, bmax.y), true);
       dl->AddText(ImVec2(bmin.x + tok::space_3, cy - ImGui::GetFontSize() * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), value);
       dl->PopClipRect();
-      glyph::Draw(dl, ImVec2(bmax.x - tok::space_3 - tok::icon_sm * 0.5f, cy), tok::icon_sm, ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                  IconsInfinite::ChevronDown);
       return clicked;
    }
 
@@ -854,15 +830,14 @@ namespace
       State& s = S();
       const bool nonDefault = s.tool != Tool::Select;
       ActionButton::Scoped() = nonDefault ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
-      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(34.0f, tok::tile));
+      const bool clicked = ActionButton::Draw("##pianoToolPicker", ImVec2(kIconW, tok::tile));
       ActionButton::Scoped() = ActionButton::Kind::Plain;
       if (ImGui::IsItemHovered())
          HelpTip("%s", ToolTip(s.tool));
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       const ImU32 col = nonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : ImGui::GetColorU32(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      glyph::Draw(dl, ImVec2(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, ToolGlyph(s.tool));
-      glyph::DrawChevronDown(dl, ImVec2(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f), 8.0f, col, 1.3f);
+      glyph::Draw(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tok::icon_md, col, ToolGlyph(s.tool));
       if (clicked)
          ImGui::OpenPopup("##pianoToolMenu");
       ImGui::SetNextWindowPos(ImVec2(bmin.x, bmax.y + tok::space_1));
@@ -1602,15 +1577,75 @@ namespace
 
    // One row, laid out like the Sample Studio's: the left group, then a right-pinned group. Gaps are space_1 between
    // icons of one kind and space_3 between kinds.
+   // Record and the MIDI input it listens to.
+   void DrawRecordControls()
+   {
+      State& s = S();
+      if (!Platform::MidiIsRunning())
+      {
+         std::string midiErr;
+         Platform::MidiStart(midiErr); // the controller list fills only once MIDI is listening
+      }
+      const std::vector<Platform::MidiSource> srcs = Platform::MidiListSources();
+      const bool haveMidi = !srcs.empty();
+      if (s.recDevice != 0 && !std::any_of(srcs.begin(), srcs.end(), [&](const Platform::MidiSource& m) { return m.id == s.recDevice; }))
+         s.recDevice = 0;
+      std::string devLabel = haveMidi ? T("All MIDI inputs") : T("No MIDI input");
+      for (const Platform::MidiSource& m : srcs)
+         if (m.id == s.recDevice)
+            devLabel = m.name;
+      if (!haveMidi)
+         ImGui::BeginDisabled();
+      if (IconChip("##pianoRecord", s.recording ? IconsInfinite::RecordFill : IconsInfinite::Record, s.recording,
+                   haveMidi ? T("Record notes from your MIDI controller while the transport plays (R)") : T("Connect a MIDI controller to record")))
+         s.recording = !s.recording;
+      if (!haveMidi)
+         ImGui::EndDisabled();
+      FormParts::Inline(0.0f, tok::space_1);
+      const float devW = 132.0f;
+      ImVec2 bmin, bmax;
+      if (PickerFace("##pianoRecDevice", devLabel.c_str(), devW, T("Which MIDI controller Record listens to"), bmin, bmax))
+         ImGui::OpenPopup("##pianoRecDeviceMenu");
+      if (BeginPickerMenu("##pianoRecDeviceMenu", bmin, bmax, devW))
+      {
+         if (MenuParts::Item(T("All MIDI inputs"), nullptr, s.recDevice == 0))
+            s.recDevice = 0;
+         for (const Platform::MidiSource& m : srcs)
+            if (MenuParts::Item(m.name.c_str(), nullptr, s.recDevice == m.id))
+               s.recDevice = m.id;
+         if (!haveMidi)
+            ImGui::TextDisabled("%s", T("Connect a MIDI controller"));
+         MenuParts::EndPopup();
+      }
+   }
+
    void DrawToolbar(Arrange::Lane& page, float rollW, float rollH)
    {
       State& s = S();
       const float gap = tok::space_1, gapGroup = tok::space_3;
       DrawPagePicker();
+
+      // The transport, in the Timeline's and the Sample Studio's place: play, back, record, its input.
+      FormParts::Inline(0.0f, gapGroup);
+      const bool playing = Transport::Instance().IsPlaying();
+      if (IconChip("##pianoPlay", playing ? IconsInfinite::PauseFill : IconsInfinite::PlayFill, playing, playing ? T("Pause (Space)") : T("Play (Space)"), true))
+         LaunchRequestTogglePlay();
+      FormParts::Inline(0.0f, gap);
+      if (IconChip("##pianoRewind", IconsInfinite::Rewind, false, T("Return to Start (Enter)")))
+         LaunchRequestRewind();
+      FormParts::Inline(0.0f, gap);
+      DrawRecordControls();
+
+      FormParts::Inline(0.0f, gapGroup);
+      {
+         static const PillGroup::Segment kUnits[2] = { { "piano.unit.bars", "Bars" }, { "piano.unit.time", "Time" } };
+         const int picked = TimeRuler::UnitPills("pianounit", kUnits, 2, gArrange.settings.timeDisplay);
+         if (picked >= 0)
+            ArrangeSetTimeDisplay(picked);
+      }
+
       FormParts::Inline(0.0f, gapGroup);
       DrawToolPicker(page, rollW, rollH);
-      FormParts::Inline(0.0f, gapGroup);
-      DrawGridChip();
       FormParts::Inline(0.0f, gap);
       const Arrange::Settings& st = gArrange.settings;
       if (IconChip("##pianoSnap", IconsInfinite::Snap, st.snapDivision != 0, T("Snap to the grid")))
@@ -1619,6 +1654,8 @@ namespace
             s.lastDivision = st.snapDivision;
          ArrangeSetSnap(st.snapDivision != 0 ? 0 : s.lastDivision, st.snapTriplet);
       }
+      FormParts::Inline(0.0f, gap);
+      DrawGridChip();
       FormParts::Inline(0.0f, gap);
       if (IconChip("##pianoScale", page.scaleSnap ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, page.scaleSnap,
                    T("Snap drawn and moved notes to the scale")))
@@ -1670,58 +1707,15 @@ namespace
       if (TextChip(T("Generate"), false, ActionButton::Kind::Primary))
          Generate(page);
       if (ImGui::IsItemHovered())
-         HelpTip("%s", T("Generate notes in the page's key (G). A ruler selection sets the range; selected notes regenerate in place"));
+         HelpTip("%s", T("Generate notes in the page's key (G). Alt+drag the ruler sets the range; selected notes regenerate in place"));
       FormParts::Inline(0.0f, gap);
       const char* types[(int)NoteGen::Type::Count] = { T("Chords"), T("Chord Rhythm"), T("Pads"), T("Strum"), T("Arpeggio"), T("Bass"), T("Melody"), T("Drums") };
       int type = (int)s.gen.type;
       if (Picker("##pianoGenType", types, (int)NoteGen::Type::Count, type, 128.0f, T("What Generate writes")))
          s.gen.type = (NoteGen::Type)type;
 
-      // Right-pinned: the MIDI input, record, then the settings toggle.
-      if (!Platform::MidiIsRunning())
-      {
-         std::string midiErr;
-         Platform::MidiStart(midiErr); // the controller list fills only once MIDI is listening
-      }
-      const std::vector<Platform::MidiSource> srcs = Platform::MidiListSources();
-      const bool haveMidi = !srcs.empty();
-      if (s.recDevice != 0 && !std::any_of(srcs.begin(), srcs.end(), [&](const Platform::MidiSource& m) { return m.id == s.recDevice; }))
-         s.recDevice = 0;
-      std::string devLabel = haveMidi ? T("All MIDI inputs") : T("No MIDI input");
-      for (const Platform::MidiSource& m : srcs)
-         if (m.id == s.recDevice)
-            devLabel = m.name;
-      const float recW = TextW(T("Record"));
-      const float devW = 150.0f;
-      const float rightW = devW + gap + recW + gap + kIconW;
-      FormParts::Inline(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - rightW));
-      {
-         ImVec2 bmin, bmax;
-         if (PickerFace("##pianoRecDevice", devLabel.c_str(), devW, T("Which MIDI controller Record listens to"), bmin, bmax))
-            ImGui::OpenPopup("##pianoRecDeviceMenu");
-         if (BeginPickerMenu("##pianoRecDeviceMenu", bmin, bmax, devW))
-         {
-            if (MenuParts::Item(T("All MIDI inputs"), nullptr, s.recDevice == 0))
-               s.recDevice = 0;
-            for (const Platform::MidiSource& m : srcs)
-               if (MenuParts::Item(m.name.c_str(), nullptr, s.recDevice == m.id))
-                  s.recDevice = m.id;
-            if (!haveMidi)
-               ImGui::TextDisabled("%s", T("Connect a MIDI controller"));
-            MenuParts::EndPopup();
-         }
-      }
-      FormParts::Inline(0.0f, gap);
-      if (!haveMidi)
-         ImGui::BeginDisabled();
-      if (ActionButton::Draw(T("Record"), ImVec2(recW, tok::tile), s.recording ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
-         s.recording = !s.recording;
-      if (!haveMidi)
-         ImGui::EndDisabled();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", haveMidi ? T("Record notes from your MIDI controller while the transport plays (R)")
-                                : T("Connect a MIDI controller to record"));
-      FormParts::Inline(0.0f, gap);
+      // Right-pinned, as in the other two: the settings toggle.
+      FormParts::Inline(std::max(ImGui::GetCursorPosX() + gap, ImGui::GetContentRegionMax().x - kIconW));
       if (IconChip("##pianoSettings", IconsInfinite::Edit, s.settingsOpen || s.genOpen, T("Settings for the page, clip or note")))
       {
          const bool open = s.settingsOpen || s.genOpen;
@@ -1805,6 +1799,116 @@ namespace
       if (!Arrange::PlaceOverwrite(gArrange, page.id, c, &id) || id == 0)
          return nullptr;
       return Arrange::FindClip(gArrange, id);
+   }
+
+   // A .mid dropped on the roll: its notes on the file's own beat grid, in the clip under the
+   // drop, or in a new clip that lands where it overwrites nothing.
+   void ImportMidiFile(Arrange::Lane& page, const std::string& path, Tick tick)
+   {
+      State& s = S();
+      MidiFile::Song song;
+      std::string err;
+      if (!MidiFile::Load(path, song, err))
+      {
+         s.dropMessage = std::string(T("Could not open")) + " " + path + (err.empty() ? "" : ": " + err);
+         return;
+      }
+      std::vector<Arrange::Note> notes;
+      std::map<uint32_t, std::vector<std::pair<Tick, uint8_t>>> held; // track, channel, pitch -> open note-ons
+      const auto toTick = [](double beat) { return (Tick)std::llround(beat * Arrange::kPPQ); };
+      const auto close = [&](uint8_t pitch, const std::pair<Tick, uint8_t>& on, Tick end)
+      {
+         Arrange::Note n;
+         n.start = on.first;
+         n.length = std::max<Tick>(1, end - on.first);
+         n.pitch = pitch;
+         n.vel = std::max<uint8_t>(1, on.second);
+         notes.push_back(n);
+      };
+      for (const MidiFile::Event& e : song.events)
+      {
+         const uint32_t key = (uint32_t)e.track << 16 | (uint32_t)e.channel << 8 | e.note;
+         std::vector<std::pair<Tick, uint8_t>>& open = held[key];
+         if (e.on)
+            open.push_back({ toTick(e.beat), e.velocity });
+         else if (!open.empty())
+         {
+            close(e.note, open.front(), toTick(e.beat));
+            open.erase(open.begin());
+         }
+      }
+      const Tick songEnd = toTick(song.lengthBeats);
+      for (const auto& [key, open] : held) // a note the file never ended runs to the end
+         for (const auto& on : open)
+            close((uint8_t)(key & 0x7f), on, songEnd);
+      if (notes.empty())
+      {
+         s.dropMessage = T("That MIDI file has no notes");
+         return;
+      }
+      Tick end = 0;
+      for (const Arrange::Note& n : notes)
+         end = std::max(end, n.start + n.length);
+      ArrangeEdit([&] {
+         tick = std::max<Tick>(0, tick);
+         Arrange::Clip* c = ClipAt(page, tick);
+         Tick to = c != nullptr ? Arrange::MidiContentTick(*c, tick - c->start) : 0;
+         if (c == nullptr)
+         {
+            const Tick length = Arrange::GridCeil(end, Arrange::kTicksPerBar);
+            Tick at = Arrange::GridFloor(tick, Arrange::kTicksPerBar);
+            Tick last = 0;
+            bool clash = false;
+            for (const Arrange::Clip& other : page.clips)
+            {
+               last = std::max(last, other.start + other.length);
+               clash = clash || (other.start < at + length && other.start + other.length > at);
+            }
+            if (clash)
+               at = Arrange::GridCeil(last, Arrange::kTicksPerBar);
+            Arrange::Clip fresh;
+            fresh.start = at;
+            fresh.length = length;
+            uint64_t id = 0;
+            if (!Arrange::PlaceOverwrite(gArrange, page.id, fresh, &id) || id == 0)
+               return;
+            c = Arrange::FindClip(gArrange, id);
+         }
+         if (c == nullptr)
+            return;
+         for (Arrange::Note& n : notes)
+            n.start += to;
+         const uint64_t id = c->id;
+         GrowClipTo(id, to + end);
+         std::vector<uint32_t> ids;
+         Arrange::AddNotes(gArrange, id, notes, &ids);
+         s.notes.clear();
+         for (uint32_t note : ids)
+            s.notes.insert({ id, note });
+      });
+      s.dropMessage.clear();
+   }
+
+   // A .mid from the Library or the Finder. Nothing else lands here, and no drop outlives its frame.
+   void TakeDrops(Arrange::Lane& page, const Areas& a)
+   {
+      if (!gPianoRollPendingDrop.empty())
+      {
+         const std::string path = std::move(gPianoRollPendingDrop);
+         gPianoRollPendingDrop.clear();
+         ImportMidiFile(page, path, (Tick)a.XTick(ImGui::GetMousePos().x));
+      }
+      if (gDroppedFiles.empty() || gDropPos.x < gPianoRollRectMin.x || gDropPos.x >= gPianoRollRectMax.x ||
+          gDropPos.y < gPianoRollRectMin.y || gDropPos.y >= gPianoRollRectMax.y)
+         return;
+      static const std::vector<std::string> kMidi = { "mid", "midi" };
+      for (const std::string& p : gDroppedFiles)
+         if (HasExtension(p, kMidi))
+         {
+            ImportMidiFile(page, p, (Tick)a.XTick(gDropPos.x));
+            break;
+         }
+      gDroppedFiles.clear();
    }
 
    // Draws one note under the pointer and makes it the run's current note.
@@ -2081,6 +2185,12 @@ namespace
          s.rangeStart = std::min(s.dragTick, SnapTick(tick));
          s.rangeEnd = std::max(s.dragTick, SnapTick(tick));
          break;
+      case Drag::Scrub:
+         ArrangeScrubUpdate(SnapTick(tick));
+         break;
+      case Drag::LoopCarve:
+         ArrangeSetLoop(gArrange.settings.loop.enabled, std::min(s.dragTick, SnapTick(tick)), std::max(s.dragTick, SnapTick(tick)));
+         break;
       case Drag::LoopStart:
       case Drag::LoopEnd:
       {
@@ -2128,10 +2238,17 @@ namespace
       else if (s.drag == Drag::Range)
       {
          if (std::fabs(m.x - s.dragFrom.x) < 3.0f)
-         {
             s.rangeStart = s.rangeEnd = 0;
-            ArrangeSeekTick(SnapTick((Tick)std::max(0.0, a.XTick(m.x))));
-         }
+      }
+      else if (s.drag == Drag::Scrub)
+      {
+         s.rangeStart = s.rangeEnd = 0;
+         ArrangeScrubEnd();
+      }
+      else if (s.drag == Drag::LoopCarve)
+      {
+         const Arrange::LoopRange& loop = gArrange.settings.loop;
+         ArrangeSetLoop(loop.end - loop.start > Arrange::kPPQ / 16, loop.start, loop.end);
       }
       else if (s.drag != Drag::None && s.drag != Drag::Pan)
       {
@@ -2219,15 +2336,19 @@ namespace
       State& s = S();
       const Tick tick = (Tick)std::max(0.0, a.XTick(m.x));
       const Arrange::LoopRange& loop = gArrange.settings.loop;
-      if (loop.end > loop.start && std::fabs(m.x - a.TickX((double)loop.start)) < 5.0f)
+      const ImGuiIO& io = ImGui::GetIO();
+      if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.start)) <= TimeRuler::kEdgeHit)
          BeginDrag(Drag::LoopStart, page, m, tick, 0, loop.start);
-      else if (loop.end > loop.start && std::fabs(m.x - a.TickX((double)loop.end)) < 5.0f)
+      else if (loop.enabled && std::fabs(m.x - a.TickX((double)loop.end)) <= TimeRuler::kEdgeHit)
          BeginDrag(Drag::LoopEnd, page, m, tick, 0, loop.end);
       else
       {
-         s.drag = Drag::Range;
+         // The Timeline's ruler: drag places the playhead, Shift+drag carves the loop.
+         s.drag = io.KeyShift ? Drag::LoopCarve : io.KeyAlt ? Drag::Range : Drag::Scrub;
          s.dragFrom = m;
          s.dragTick = SnapTick(tick);
+         if (s.drag == Drag::Scrub)
+            ArrangeScrubBegin(s.dragTick);
       }
    }
 
@@ -3155,6 +3276,7 @@ namespace
          MenuParts::EndPopup();
       }
       PollRecording(page);
+      TakeDrops(page, a);
       HandleKeys(page, a, a.x1 - a.x0, a.rollB - a.rollY);
 
       // Follow: the view pages along while playing.
@@ -3183,14 +3305,26 @@ namespace
       dl->PushClipRect(ImVec2(a.x0, a.stripY), ImVec2(a.x1, a.rollY), true);
       DrawClipStrip(dl, a, page);
       dl->PopClipRect();
+      const Arrange::LoopRange& loop = gArrange.settings.loop;
+      if (loop.enabled && loop.end > loop.start)
+         TimeRuler::LoopBand(dl, a.TickX((double)loop.start), a.TickX((double)loop.end), a.rulerY, a.rollB, s.drag == Drag::LoopCarve,
+                             s.drag == Drag::LoopStart ? 1 : s.drag == Drag::LoopEnd ? 2 : 0);
       const float px = a.TickX((double)play);
       if (px >= a.x0 && px <= a.x1)
-         dl->AddLine(ImVec2(px, a.rulerY), ImVec2(px, a.rollB), AccentU32(1.0f), 1.5f);
+         TimeRuler::Playhead(dl, px, a.rulerY, a.rollB);
+      if (gArrangeScrubbing && s.drag == Drag::Scrub)
+         TimeRuler::Playhead(dl, a.TickX((double)gArrangeScrubTick), a.rulerY, a.rollB, true);
       if (page.clips.empty())
       {
          const char* text = T("Draw a clip, drop a .mid, or record");
          const ImVec2 ts = ImGui::CalcTextSize(text);
          dl->AddText(ImVec2((a.x0 + a.x1 - ts.x) * 0.5f, (a.rollY + a.rollB - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
+      }
+      if (!s.dropMessage.empty())
+      {
+         dl->AddText(ImVec2(a.x0 + tok::space_3, a.rollY + tok::space_2), ImGui::GetColorU32(ImGuiCol_Text), s.dropMessage.c_str());
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            s.dropMessage.clear();
       }
       dl->PopClipRect();
       if (inspectorW > 0.0f)
@@ -3316,6 +3450,7 @@ namespace
          DrawPage(*page);
          return;
       }
+      gPianoRollPendingDrop.clear();
       DrawPagePicker();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const char* text = T("Add a page to start writing notes");

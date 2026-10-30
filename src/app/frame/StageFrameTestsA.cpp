@@ -1938,6 +1938,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // v0.6 2.2: a dropped audio file is wired to an Audio Out at once.
       FrameTest_DROPSOUNDTEST(frameId, window);
 
+      // A file dropped on the Sample Studio or the Piano Roll lands there, not on the canvas.
+      FrameTest_PANELDROPTEST(frameId, window);
+
       // Cmd/Ctrl+F find on a 400-node patch.
       FrameTest_FINDTEST(frameId, window);
 

@@ -852,7 +852,20 @@ void DrawPopupsA(FrameCtx& fc)
             const bool overArrangePanelForDrop = gArrangePanelOpen &&
                mp.x >= gArrangePanelRectMin.x && mp.x < gArrangePanelRectMax.x &&
                mp.y >= gArrangePanelRectMin.y && mp.y < gArrangePanelRectMax.y;
-            if (overArrangePanelForDrop &&
+            const bool overStudioForDrop = gSampleStudioOpen &&
+               mp.x >= gSampleStudioRectMin.x && mp.x < gSampleStudioRectMax.x &&
+               mp.y >= gSampleStudioRectMin.y && mp.y < gSampleStudioRectMax.y;
+            const bool overPianoRollForDrop = gPianoRollOpen &&
+               mp.x >= gPianoRollRectMin.x && mp.x < gPianoRollRectMax.x &&
+               mp.y >= gPianoRollRectMin.y && mp.y < gPianoRollRectMax.y;
+            const bool fileDrag = (gSampleDragKind == LibraryDragKind::Sample || gSampleDragKind == LibraryDragKind::Media) &&
+                                  !gSampleDragPath.empty();
+            if (fileDrag && (overStudioForDrop || overPianoRollForDrop))
+            {
+               // These two panels load a file straight in; each takes only its own kind.
+               (overStudioForDrop ? gSampleStudioPendingDrop : gPianoRollPendingDrop) = gSampleDragPath;
+            }
+            else if (overArrangePanelForDrop &&
                 (gSampleDragKind == LibraryDragKind::Sample || gSampleDragKind == LibraryDragKind::Media) &&
                 !gSampleDragPath.empty())
             {
