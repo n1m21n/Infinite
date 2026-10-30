@@ -628,6 +628,7 @@ namespace app
          { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample studio: generate, shape and export a loop") },
+         { I18N_KEY("Canvas & View"), I18N_KEY("Record Audio In"), "I", I18N_KEY("With the pointer over the Sample Studio waveform: start or stop recording the audio input into a new sample (only when an input device is connected)") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
@@ -645,6 +646,7 @@ namespace app
 
          { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
+         { I18N_KEY("Piano Roll"), I18N_KEY("Record MIDI"), "R", I18N_KEY("Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
          { I18N_KEY("Piano Roll"), I18N_KEY("Duplicate Notes"), MODKEY "+D / Shift+D", I18N_KEY("Lay the selected notes or clips again right after themselves") },
