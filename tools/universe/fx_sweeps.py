@@ -92,23 +92,25 @@ def patch(fx, tags, rec, part):
     return "\n".join(L) + "\n"
 
 
-def notes_files(d, part):
+def notes_files(d, part, node="syn"):
     _, _, notes = part
-    types = {"n%d" % i: {"node": "syn", "pitch": m, "velocity_from": "v", "length_from": "len"} for i, (_, m, _, _) in enumerate(notes)}
+    types = {"n%d" % i: {"node": node, "pitch": m, "velocity_from": "v", "length_from": "len"} for i, (_, m, _, _) in enumerate(notes)}
     evs = [{"t": osw.LEAD + t, "type": "n%d" % i, "v": v, "len": ln} for i, (t, _, v, ln) in enumerate(notes)]
     ep, mp_ = os.path.join(d, "events.json"), os.path.join(d, "map.json")
     json.dump(evs, open(ep, "w")); json.dump(types, open(mp_, "w"))
     return ep, mp_
 
 
-def render(binp, fx, tags, recs, part, tmp, timeout=300):
-    """One Infinite process per part renders every recipe (--batch). A wav path or None per recipe."""
-    ep, mp_ = notes_files(tmp, part)
+def render(binp, fx, tags, recs, part, tmp, timeout=300, make=None, node="syn"):
+    """One Infinite process per part renders every recipe (--batch). A wav path or None per recipe. note_fx.py passes its own
+    patch maker and sends the notes to the Keyboard instead of the synth."""
+    make = make or patch
+    ep, mp_ = notes_files(tmp, part, node)
     dur = osw.LEAD + PLAY + TAIL
     jobs = []
     for k, rec in enumerate(recs):
         inf, js, wav = (os.path.join(tmp, "%s%d.%s" % (n, k, e)) for n, e in (("p", "inf"), ("s", "json"), ("o", "wav")))
-        open(inf, "w").write(patch(fx, tags, rec, part)); jobs.append((inf, js, wav))
+        open(inf, "w").write(make(fx, tags, rec, part)); jobs.append((inf, js, wav))
     res, todo = [None] * len(jobs), list(range(len(jobs)))
     while todo:
         lst = os.path.join(tmp, "batch.txt")
@@ -203,16 +205,16 @@ def cmd_run(a):
         print("  bank %d: %d renders, %d s" % (bank, made, time.time() - t0), flush=True)
 
 
-def score(fx, tau=0.8, eff=0.5, need=6):
+def score(fx, tau=0.8, eff=0.5, need=6, feats=None, parts=None, path=None):
     """Pairs within a bank and part that differ in one knob. A (knob, measure) cell is reliable when >= tau of its training pairs
     with a clear change (|change| >= eff sd of that measure) moved it the same way per unit of knob. Held out by part: train on
     seven parts, test on the eighth, so a mapping holds for a sound it never saw."""
-    path = fx_out(fx)
+    feats, parts, path = feats or FEATS, parts or PARTS, path or fx_out(fx)
     if not os.path.exists(path):
         return None
     rows = [json.loads(ln) for ln in open(path)]
     keys = rows[0]["keys"]
-    M = np.array([[r["m"][k] for k in FEATS] for r in rows]); sd = M.std(0) + 1e-9
+    M = np.array([[r["m"][k] for k in feats] for r in rows]); sd = M.std(0) + 1e-9
     by = {}
     for r, m in zip(rows, M):
         by.setdefault((r["bank"], r["part"]), {})[r["design"]] = (np.array(r["knobs"]), m)
@@ -228,7 +230,7 @@ def score(fx, tau=0.8, eff=0.5, need=6):
             if dk != 0:
                 P.append((part, j, dk, (m - m0) / sd))
     hit = tot = 0; per = {}
-    for held in [p[0] for p in PARTS]:
+    for held in [p[0] for p in parts]:
         tr = [p for p in P if p[0] != held]; te = [p for p in P if p[0] == held]
         for j in range(len(keys)):
             s = np.array([np.sign(p[2]) * np.sign(p[3]) * (np.abs(p[3]) >= eff) for p in tr if p[1] == j])
@@ -250,9 +252,9 @@ def score(fx, tau=0.8, eff=0.5, need=6):
         s = np.array([np.sign(p[2]) * np.sign(p[3]) * (np.abs(p[3]) >= eff) for p in ps]); n = (s != 0).sum(0); up = (s > 0).sum(0)
         slope = np.median(np.array([p[3] / p[2] for p in ps]), 0) * sd  # in the measure's own units per full knob turn
         cells = []
-        for a in range(len(FEATS)):
+        for a in range(len(feats)):
             if n[a] >= need and max(up[a], n[a] - up[a]) >= tau * n[a]:
-                cells.append({"measure": FEATS[a], "dir": "up" if up[a] * 2 >= n[a] else "down", "agree": round(max(up[a], n[a] - up[a]) / n[a], 2),
+                cells.append({"measure": feats[a], "dir": "up" if up[a] * 2 >= n[a] else "down", "agree": round(max(up[a], n[a] - up[a]) / n[a], 2),
                               "median_per_turn": round(float(slope[a]), 3)})
         per[k] = {"pairs": len(ps), "moves": cells}
     return {"rows": len(rows), "pairs": len(P), "held_out_acc": round(hit / tot, 3) if tot else None, "scored": tot, "knobs": per}
