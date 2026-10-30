@@ -956,3 +956,33 @@ chord change, tempo, beat and loudness or brightness over thirds. Held out by so
 - Audio + notes is this fit: the note features (pitch content, mode, chord colour) are inside the 0.749. Notes alone (harmony
   columns) give 0.705, so timbre and dynamics add about 0.04.
 - Use: the valence model can score the generator's own renders (machine mood check), since it reads only audio.
+
+## 2026-10-30 Plan items 7 and 8: String body tables, pick and bow controls: MISS (shipped as options, defaults unchanged)
+Item 7: `string_body_fit.py` fits a body table (10 modes: frequency, Q, gain) from one instrument's recorded single notes
+(dB average of the first second of every note, smoothed to 1/6 octave, tilt removed, peaks taken greedily). Fits against each
+body curve: guitar r 0.68 (GarageBand classical guitar, 101 notes; box table 0.42), harp 0.80 (43 notes), violin 0.86 and
+cello 0.75 (section pizzicato, 21 and 19 notes; box about 0). New String dropdown `body type`: box (default), guitar, harp,
+violin, cello; each table loudness-matched to the box. Item 8: `hardness` (pick pulse 0.3 ms at 1, default, up to 3 ms),
+`pressure` (bow friction slope 3.5 at 0.5, default; x2.8 steeper at 0, /2.8 at 1) and `noise` (rosin noise in the bow speed, 0
+default). Old presets render unchanged: `own_sweeps.py check --node String`, worst mel r 0.99986 (gate 0.999).
+
+Family test (`string_body_test.py`, `string_families.py`'s ratio: median distance from each library sample to the nearest
+render over the family's own spacing; lower is closer; 400 base presets, C3):
+
+| Family | box (today) | guitar | harp | violin | cello | pluck: box | pluck: harp |
+|---|---|---|---|---|---|---|---|
+| guitar | 7.15 | 7.09 | 6.77 | **6.72** | 6.69 | 7.91 | 7.55 |
+| harp | 5.56 | 5.59 | 5.28 | **5.22** | 5.38 | 6.17 | 5.88 |
+| violin | 7.12 | 7.04 | 6.73 | **6.68** | 6.84 | 8.49 | 8.38 |
+| cello | 4.47 | 4.59 | 4.12 | **4.05** | 4.29 | 7.11 | 6.68 |
+| piano | 7.17 | 7.19 | 6.64 | **6.57** | 6.74 | 7.86 | 7.26 |
+
+Bowed (300 presets, every one bowed): box 7.02 / 4.12 (violin / cello), violin body 6.77 / 3.98, light pressure 6.85 / 4.04,
+heavy 6.88 / 4.03, noise 0.4 6.86 / 4.25, cello body with heavy pressure and noise 7.25 / 4.73.
+
+- The bar (guitar well under 4) is missed by far. A fitted body lowers every family by 0.1-0.5 (5-8%), and the guitar table does
+  not even help the guitar most, so the body is not what keeps String from the guitar family. Bow pressure and noise move the
+  ratio by under 0.15. Kept as options because each is a little better and the defaults are today's sound exactly.
+- What limits the ratio is outside these knobs: renders are at C3 only while library samples are at every pitch, and the
+  string's own spectrum and decay (loop loss, excitation) put it away from the recordings. Next: rerun on all STIM notes, and
+  fit the loop loss (tone vs frequency) from the same recordings, before more body work.

@@ -29,6 +29,19 @@ public:
       kExciterCount
    };
    static const std::vector<std::string>& ExciterNames();
+   // The body's mode table: box is the original small acoustic box; the
+   // others are fitted from one instrument's recorded notes
+   // (tools/universe/string_body_fit.py).
+   enum BodyType
+   {
+      kBodyBox = 0,
+      kBodyGuitar,
+      kBodyHarp,
+      kBodyViolin,
+      kBodyCello,
+      kBodyTypeCount
+   };
+   static const std::vector<std::string>& BodyTypeNames();
 
    static INode* Create() { return new StringNode(); }
    StringNode();
@@ -64,7 +77,11 @@ public:
    float decay = 3.0f;      // 0.05..20 s, the fundamental's T60 while held
    float stiffness = 0.0f;  // 0..1, upper partials stretch sharp (piano, metal)
    float body = 0.5f;       // 0..1, dry string -> through the body's modes
+   int bodyType = kBodyBox;
    float release = 150.0f;  // ms, the damper's T60 after note-off
+   float hardness = 1.0f;   // 0..1, pick: soft (3 ms pulse, dull) -> hard (0.3 ms, bright)
+   float pressure = 0.5f;   // 0..1, bow force: light (slips, airy) -> heavy (sticks, gritty)
+   float noise = 0.0f;      // 0..1, bow hair: rosin noise in the bow's speed
    float volume = 0.8f;
 
    NoteCable noteInput;

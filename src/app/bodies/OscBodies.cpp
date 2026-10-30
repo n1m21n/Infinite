@@ -2088,21 +2088,110 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawStringDiagram(n, 28.0f);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      // 3 x 3: selectors stacked in the left column (exciter, body type), the
+      // string's knobs beside the exciter, the body's beside its type.
       {
-         AudioKnobRow row(4);
+         AudioKnobRow row(3);
          row.Dropdown("exciter##stringExciter", StringNode::ExciterNames(), n->exciter, [n](int i) {
             PushUndoCheckpoint();
             n->exciter = i;
          });
          row.Knob("position", &n->position, 0.02f, 0.5f, "%.2f");
-         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
          row.Knob("stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f");
          row.End();
       }
       {
-         AudioKnobRow row(4);
-         row.Knob("decay", &n->decay, 0.05f, 20.0f, "%.2f s");
+         AudioKnobRow row(3);
+         row.Dropdown("body type##stringBodyType", StringNode::BodyTypeNames(), n->bodyType, [n](int i) {
+            PushUndoCheckpoint();
+            n->bodyType = i;
+         });
          row.Knob("body", &n->body, 0.0f, 1.0f, "%.2f");
+         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("decay", &n->decay, 0.05f, 20.0f, "%.2f s");
+         row.Knob("release", &n->release, 1.0f, 5000.0f, "%.0f ms", kKnobSmall, false, false,
+                  AudioWidgetStyle::KnobSkewRelease400);
+         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         // The exciter's own: the pick's hardness, the bow's force and noise.
+         AudioKnobRow row(3);
+         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         row.Knob("pressure", &n->pressure, 0.0f, 1.0f, "%.2f");
+         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      EndAudioBody();
+   }
+
+
+   // The bore from mouthpiece (left) to bell (right): straight for the
+   // clarinet and flute, a cone for the sax, a flare at the end for brass.
+   void DrawWindDiagram(WindNode* n, float h)
+   {
+      const float w = gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      AudioViz::Fill(dl, origin, br);
+      const float pad = 10.0f;
+      const float midY = origin.y + h * 0.5f;
+      const float x0 = origin.x + pad, x1 = br.x - pad;
+      const ImU32 line = ScopeMidLineCol();
+      const ImU32 trace = IsThemeLight() ? tok::U32(tok::pal::c_008CD2F0) : tok::U32(tok::pal::c_32F0FFF0);
+      const float r0 = 2.5f, rMax = h * 0.5f - 3.0f;
+      ImVec2 top[17], bot[17];
+      for (int k = 0; k <= 16; k++)
+      {
+         const float t = (float)k / 16.0f;
+         float r = r0;
+         if (n->instrument == WindNode::kSax)
+            r = r0 + (rMax * 0.7f - r0) * t;
+         else if (n->instrument == WindNode::kBrass)
+            r = r0 + (rMax - r0) * std::pow(t, 6.0f);
+         else if (n->instrument == WindNode::kClarinet)
+            r = t > 0.85f ? r0 + (rMax * 0.5f - r0) * (t - 0.85f) / 0.15f : r0;
+         const float x = x0 + (x1 - x0) * t;
+         top[k] = ImVec2(x, midY - r);
+         bot[k] = ImVec2(x, midY + r);
+      }
+      dl->AddPolyline(top, 17, trace, 0, 1.5f);
+      dl->AddPolyline(bot, 17, trace, 0, 1.5f);
+      dl->AddLine(ImVec2(x0, midY - r0 - 3.0f), ImVec2(x0, midY + r0 + 3.0f), line, 2.0f);
+      AudioViz::Border(dl, origin, br);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawWindBody(GraphNode& gn, WindNode* n)
+   {
+      const int voices = n->ActiveVoices();
+      char stat[64];
+      snprintf(stat, sizeof(stat), "%d voice%s", voices, voices == 1 ? "" : "s");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawWindDiagram(n, 28.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      // 2 x 4: the instrument in the left column, then how it is blown;
+      // the breath's shape in time and the level below.
+      {
+         AudioKnobRow row(4);
+         row.Dropdown("instrument##windInstrument", WindNode::InstrumentNames(), n->instrument, [n](int i) {
+            PushUndoCheckpoint();
+            n->instrument = i;
+         });
+         row.Knob("breath", &n->breath, 0.0f, 1.0f, "%.2f");
+         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
+         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("vibrato", &n->vibrato, 0.0f, 1.0f, "%.2f");
+         row.Knob("attack", &n->attack, 1.0f, 2000.0f, "%.0f ms");
          row.Knob("release", &n->release, 1.0f, 5000.0f, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);

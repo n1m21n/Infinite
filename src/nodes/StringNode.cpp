@@ -22,6 +22,8 @@ namespace
       kParamStiffness,
       kParamBody,
       kParamVolume,
+      kParamPressure,
+      kParamNoise,
    };
 
    // One loop per voice, long enough for 16 Hz at 192 kHz.
@@ -56,20 +58,49 @@ namespace
       return 0.5 * (lo + hi);
    }
 
-   // A fixed body: the low air and plate modes of a small acoustic box
-   // (Helmholtz resonance, then plate modes), each a constant-peak bandpass.
+   // The body: a bank of constant-peak bandpass modes, one table per body
+   // type. Box is the low air and plate modes of a small acoustic box
+   // (Helmholtz resonance, then plate modes). Guitar is fitted from 101
+   // notes of a classical guitar (string_body_fit.py: the dB average of every
+   // note's spectrum keeps what the notes share, the body; r 0.68 with that
+   // curve, box 0.42). Harp from 43 concert-harp notes (r 0.80), violin and
+   // cello from 21 and 19 section pizzicato notes (r 0.86, 0.75; box about 0).
    struct BodyMode
    {
       float hz, q, gain;
    };
-   constexpr BodyMode kBodyModes[] = {
-      { 98.0f, 14.0f, 1.00f },  { 204.0f, 22.0f, 0.85f }, { 283.0f, 26.0f, 0.60f }, { 399.0f, 28.0f, 0.55f },
-      { 552.0f, 30.0f, 0.42f }, { 728.0f, 30.0f, 0.35f }, { 1020.0f, 26.0f, 0.30f }, { 1430.0f, 22.0f, 0.26f },
-      { 2200.0f, 14.0f, 0.22f }, { 3300.0f, 8.0f, 0.18f },
+   constexpr int kBodyModeCount = 10;
+   constexpr BodyMode kBodyModes[StringNode::kBodyTypeCount][kBodyModeCount] = {
+      {
+         { 98.0f, 14.0f, 1.00f },  { 204.0f, 22.0f, 0.85f }, { 283.0f, 26.0f, 0.60f }, { 399.0f, 28.0f, 0.55f },
+         { 552.0f, 30.0f, 0.42f }, { 728.0f, 30.0f, 0.35f }, { 1020.0f, 26.0f, 0.30f }, { 1430.0f, 22.0f, 0.26f },
+         { 2200.0f, 14.0f, 0.22f }, { 3300.0f, 8.0f, 0.18f },
+      },
+      {
+         { 99.3f, 13.9f, 1.00f },  { 167.1f, 2.0f, 0.11f },  { 198.7f, 7.7f, 0.47f },  { 254.0f, 2.2f, 0.13f },
+         { 391.7f, 7.5f, 0.17f },  { 493.5f, 4.3f, 0.11f },  { 772.2f, 6.9f, 0.10f },  { 1261.6f, 2.0f, 0.10f },
+         { 1544.3f, 2.0f, 0.10f }, { 3368.2f, 2.0f, 0.15f },
+      },
+      {
+         { 157.7f, 7.5f, 0.57f },  { 210.5f, 7.7f, 1.00f },  { 265.2f, 5.7f, 0.64f },  { 324.7f, 5.8f, 0.90f },
+         { 397.4f, 6.8f, 0.62f },  { 493.5f, 6.2f, 0.61f },  { 604.1f, 2.0f, 0.23f },  { 728.8f, 2.0f, 0.48f },
+         { 1173.8f, 2.0f, 0.33f }, { 1566.8f, 2.0f, 0.23f },
+      },
+      {
+         { 195.8f, 2.0f, 0.07f },  { 232.9f, 4.4f, 0.21f },  { 281.0f, 7.7f, 1.00f },  { 334.2f, 4.6f, 0.28f },
+         { 421.0f, 4.6f, 0.55f },  { 530.5f, 6.2f, 0.39f },  { 630.8f, 3.1f, 0.12f },  { 905.1f, 2.0f, 0.23f },
+         { 1478.9f, 2.0f, 0.11f }, { 1917.8f, 2.0f, 0.09f },
+      },
+      {
+         { 167.1f, 3.8f, 0.41f },  { 198.7f, 4.8f, 1.00f },  { 239.7f, 2.0f, 0.28f },  { 320.0f, 2.7f, 0.86f },
+         { 433.4f, 3.8f, 0.49f },  { 668.3f, 2.0f, 0.33f },  { 1001.4f, 2.0f, 0.47f },  { 1522.2f, 2.0f, 0.29f },
+         { 1810.2f, 2.0f, 0.31f }, { 2215.8f, 2.0f, 0.36f },
+      },
    };
-   constexpr int kBodyModeCount = (int)(sizeof(kBodyModes) / sizeof(kBodyModes[0]));
-   // Makes the body path roughly as loud as the dry string on a plucked note.
-   constexpr float kBodyGain = 5.5f;
+   // Makes the body path roughly as loud as the dry string on a plucked note;
+   // per table, so every body type sits at the box's level (mean power over
+   // 80 Hz - 5 kHz).
+   constexpr float kBodyGain[StringNode::kBodyTypeCount] = { 5.5f, 5.5f * 0.917f, 5.5f * 0.336f, 5.5f * 0.536f, 5.5f * 0.281f };
 
    struct StringVoice
    {
@@ -131,6 +162,12 @@ const std::vector<std::string>& StringNode::ExciterNames()
    return kNames;
 }
 
+const std::vector<std::string>& StringNode::BodyTypeNames()
+{
+   static const std::vector<std::string> kNames = { "box", "guitar", "harp", "violin", "cello" };
+   return kNames;
+}
+
 // ------------------------------------------------------------- audio thread
 class AudioStringNode : public AudioNode
 {
@@ -141,8 +178,8 @@ public:
    {
       mSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
       mMailbox.PrepareToPlay(mSampleRate);
-      for (int m = 0; m < kBodyModeCount; m++)
-         mBody[m].SetBandpass(std::min((double)kBodyModes[m].hz, 0.45 * mSampleRate), kBodyModes[m].q, mSampleRate);
+      mBodyTypeSet = -1;
+      SetBodyType(mBodyType.load(std::memory_order_relaxed));
       mDc.SetSampleRate(mSampleRate);
       Reset();
    }
@@ -175,8 +212,23 @@ public:
       mMailbox.Push(kParamStiffness, n.stiffness);
       mMailbox.Push(kParamBody, n.body);
       mMailbox.Push(kParamVolume, n.volume);
+      mMailbox.Push(kParamPressure, n.pressure);
+      mMailbox.Push(kParamNoise, n.noise);
+      mHardness.store(std::clamp(n.hardness, 0.0f, 1.0f), std::memory_order_relaxed);
       mRelease.store(n.release, std::memory_order_relaxed);
       mExciter.store(std::clamp(n.exciter, 0, (int)StringNode::kExciterCount - 1), std::memory_order_relaxed);
+      mBodyType.store(std::clamp(n.bodyType, 0, (int)StringNode::kBodyTypeCount - 1), std::memory_order_relaxed);
+   }
+
+   // Audio thread: retune the body bank when the type changes. The filters
+   // keep their state, so a switch while ringing does not click to silence.
+   void SetBodyType(int type)
+   {
+      if (type == mBodyTypeSet)
+         return;
+      mBodyTypeSet = type;
+      for (int m = 0; m < kBodyModeCount; m++)
+         mBody[m].SetBandpass(std::min((double)kBodyModes[type][m].hz, 0.45 * mSampleRate), kBodyModes[type][m].q, mSampleRate);
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -188,6 +240,10 @@ public:
       for (int ch = 2; ch < output.numChannels; ch++)
          if (output.channels[ch])
             std::fill_n(output.channels[ch], output.numFrames, 0.0f);
+
+      SetBodyType(mBodyType.load(std::memory_order_relaxed));
+      const BodyMode* modes = kBodyModes[mBodyTypeSet];
+      const float bodyGain = kBodyGain[mBodyTypeSet];
 
       NoteEvent evts[64];
       const int numEvts = mNoteInbox ? mNoteInbox->Pop(mNoteCursor, evts, 64) : 0;
@@ -209,6 +265,10 @@ public:
          const float stiffness = std::clamp(mMailbox.SmoothedValue(kParamStiffness), 0.0f, 1.0f);
          const float body = std::clamp(mMailbox.SmoothedValue(kParamBody), 0.0f, 1.0f);
          const float volume = mMailbox.SmoothedValue(kParamVolume);
+         // Bow force sets the friction curve's slope: 3.5 at 0.5 (Smith's
+         // value), x2.8 steeper at 0 (slips sooner), /2.8 at 1 (sticks longer).
+         mBowSlope = 3.5f * std::exp2(1.5f * (1.0f - 2.0f * std::clamp(mMailbox.SmoothedValue(kParamPressure), 0.0f, 1.0f)));
+         mBowNoise = std::clamp(mMailbox.SmoothedValue(kParamNoise), 0.0f, 1.0f);
 
          float dry = 0.0f;
          for (auto& v : mVoices)
@@ -226,8 +286,8 @@ public:
 
          float wet = 0.0f;
          for (int m = 0; m < kBodyModeCount; m++)
-            wet += kBodyModes[m].gain * mBody[m].Process(dry);
-         float y = dry + (wet * kBodyGain - dry) * body;
+            wet += modes[m].gain * mBody[m].Process(dry);
+         float y = dry + (wet * bodyGain - dry) * body;
          y = mDc.Process(y) * volume;
          if (!std::isfinite(y))
          {
@@ -367,9 +427,16 @@ private:
             // Smith's friction junction: the bow sticks while the string
             // moves with it and slips once they part (reflection falls off
             // as the fourth power of the velocity difference).
+            // Rosin noise jitters the bow's speed (up to +-50%).
+            float speed = v.bowSpeed * v.bowEnv;
+            if (mBowNoise > 0.0f)
+            {
+               mRng = mRng * 1664525u + 1013904223u;
+               speed *= 1.0f + mBowNoise * ((float)(mRng >> 8) * (1.0f / 8388608.0f) - 1.0f) * 0.5f;
+            }
             const float vs = *left - *right;
-            const float dv = v.bowSpeed * v.bowEnv - vs;
-            const float r = std::min(1.0f, std::pow(std::fabs(dv * 3.5f) + 0.75f, -4.0f));
+            const float dv = speed - vs;
+            const float r = std::min(1.0f, std::pow(std::fabs(dv * mBowSlope) + 0.75f, -4.0f));
             const float d = r * dv * v.bowEnv;
             *left += d;
             *right -= d;
@@ -441,7 +508,8 @@ private:
       v.chunkLeft = 0;
       v.level = std::max(v.level, 1e-3f);
 
-      // A pluck is a sharp pulse; a strike is a felt hammer, longer and
+      // A pluck is a sharp pulse (a soft pick or a finger widens it up to
+      // 10x, which dulls the top); a strike is a felt hammer, longer and
       // softer the gentler the hit. Both put the same total velocity in.
       const double sr = mSampleRate;
       if (!same)
@@ -457,7 +525,7 @@ private:
       }
       v.pulsePos = 0;
       if (v.exciter == StringNode::kPluck)
-         v.pulseLen = std::max(2, (int)std::lround(sr * 0.0003));
+         v.pulseLen = std::max(2, (int)std::lround(sr * 0.0003 * std::pow(10.0, 1.0 - (double)mHardness.load(std::memory_order_relaxed))));
       else if (v.exciter == StringNode::kStrike)
          v.pulseLen = std::max(2, (int)std::lround(sr * (0.004 - 0.003 * (double)v.velocity)));
       else
@@ -478,6 +546,11 @@ private:
 
    std::atomic<float> mRelease{ 150.0f };
    std::atomic<int> mExciter{ StringNode::kPluck };
+   std::atomic<int> mBodyType{ StringNode::kBodyBox };
+   std::atomic<float> mHardness{ 1.0f };
+   float mBowSlope = 3.5f, mBowNoise = 0.0f; // this sample's bow force and noise (audio thread)
+   uint32_t mRng = 0x2545F491u;
+   int mBodyTypeSet = -1; // the table the body bank is tuned to (audio thread)
    std::atomic<float> mClipPitch{ 0.0f };
    std::atomic<int> mActiveVoiceCount{ 0 };
 };
@@ -516,6 +589,10 @@ void StringNode::VisitParams(ParamVisitor& v)
    v.Float("decay", decay);
    v.Float("stiffness", stiffness);
    v.Float("body", body);
+   v.Int("bodyType", bodyType);
    v.Float("release", release);
+   v.Float("hardness", hardness);
+   v.Float("pressure", pressure);
+   v.Float("noise", noise);
    v.Float("volume", volume);
 }
