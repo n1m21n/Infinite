@@ -795,6 +795,7 @@ namespace
 
    // INFINITE_TERMINALTEST: a real shell in the real panel. Echoes a marker with a resized grid, then exits 0 or 1.
    // INFINITE_TERMINALTEST=flood goes on to run `yes` for a minute and reports the panel's frame cost.
+   // INFINITE_TERMINALTEST=keys goes on to press "/" with the shell focused: no canvas shortcut may fire.
    void RunSelfTest(Tab& tab, const term::Snapshot* snap)
    {
       static double sStart = ImGui::GetTime();
@@ -808,6 +809,28 @@ namespace
          std::printf("[TerminalTest] flood frames=%.0f panel avg=%.3f ms worst=%.3f ms\n", frames, sDrawSeconds * 1000.0 / frames, sDrawWorst * 1000.0);
          std::fflush(stdout);
          std::_Exit(sDrawSeconds * 1000.0 / frames <= 1.0 ? 0 : 1);
+      }
+      static int sKeyFrame = 0;
+      if (sKeyFrame > 0)
+      {
+         gTerminalFocus = true;
+         ImGuiIO& io = ImGui::GetIO();
+         io.AddFocusEvent(true);
+         if (++sKeyFrame == 5)
+         {
+            io.AddKeyEvent(ImGuiKey_Slash, true);
+            io.AddInputCharacter('/');
+         }
+         if (sKeyFrame == 7)
+            io.AddKeyEvent(ImGuiKey_Slash, false);
+         if (sKeyFrame == 15)
+         {
+            const bool spawned = std::any_of(gNodes.begin(), gNodes.end(), [](const GraphNode& gn) { return gn.typeName == "Comment"; });
+            std::printf("[TerminalTest] slash %s\n", spawned ? "FAIL spawned a comment" : "PASS");
+            std::fflush(stdout);
+            std::_Exit(spawned ? 1 : 0);
+         }
+         return;
       }
       if (snap == nullptr)
          return;
@@ -825,6 +848,11 @@ namespace
       {
          std::printf("[TerminalTest] %s cols=%d rows=%d\n", pass ? "PASS" : "FAIL", snap->cols, snap->rows);
          std::fflush(stdout);
+         if (pass && std::strcmp(std::getenv("INFINITE_TERMINALTEST"), "keys") == 0)
+         {
+            sKeyFrame = 1;
+            return;
+         }
          if (pass && std::strcmp(std::getenv("INFINITE_TERMINALTEST"), "flood") == 0)
          {
             tab.session->SendBytes("yes\n");
@@ -922,10 +950,7 @@ namespace
       if (sSelfTest)
          RunSelfTest(*tab, snap.get());
       if (gTerminalFocus && !sSearchActive)
-      {
-         ImGui::GetCurrentContext()->WantTextInputNextFrame = 1;
          HandleKeyboard(*tab, snap.get());
-      }
    }
 }
 

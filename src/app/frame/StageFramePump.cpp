@@ -631,6 +631,9 @@ void DrawFramePump(FrameCtx& fc)
             ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       }
       ImGui::NewFrame();
+      // The shell's keys are text to every canvas and panel shortcut. Set here: EndFrame overwrites WantTextInputNextFrame.
+      if (gTerminalFocus)
+         ImGui::GetIO().WantTextInput = true;
       // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          ImGui::GetCurrentContext()->NavCursorVisible = false;
