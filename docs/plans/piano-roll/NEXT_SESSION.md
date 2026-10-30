@@ -71,16 +71,14 @@ Studio's "Notes to Piano Roll".
 
 ## State at last stop (2026-10-30)
 
-Block B steps 1-6 are committed on `feature/piano-roll-b-panel`. Step 7 (note edits skip the topology
-rebuild) is committed but NOT verified: it passed syntax checks only, and the dev build was still
-running when the session ended.
+Block B steps 1-7 are committed on `feature/piano-roll-b-panel`. The dev build is OK and
+`INFINITE_PIANOROLLTEST` passes, including the step 7 cases (a note edit does not rebuild but reaches the
+node; undo and a clip move still rebuild) and the Generate save lines.
 
 Left to do, in order:
 
-1. `scripts/ibuild.py build --mode dev`, then run `INFINITE_PIANOROLLTEST=1`. The new test block calls
-   `Undo()` headless, which may not work there. If it crashes, restore the snapshot directly instead.
-2. Screenshot Generate (card, takes, drum rows). Nothing has proved it works in the app yet.
-3. Run the rest of the checks listed above: sweeps, light/dark at 3 zooms, NOTEGENTEST, determinism,
+1. Screenshot Generate (card, takes, drum rows). Nothing has proved it works in the app yet.
+2. Run the rest of the checks listed above: sweeps, light/dark at 3 zooms, NOTEGENTEST, determinism,
    gen-patch-skill, inventory ratchet, i18n, node help coverage.
 
 Differences from the spec to report: the card only covers GenSpec fields; the takes row sits above the
