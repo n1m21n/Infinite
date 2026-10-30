@@ -175,6 +175,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Electro Cybernetic Sync Lead Synth](https://infinitedevices.org/library/electro-cybernetic-sync-lead-synth.html): Sharp hard-sync machine lead synthesizer with metallic harmonic bite, glide articulation, and punchy stereo width. (file: https://infinitedevices.org/assets/templates/electro-cybernetic-sync-lead-synth.inf)
 - [Future Garage Ghost Reverb FX](https://infinitedevices.org/library/future-garage-ghost-reverb-fx.html): Subterranean cavernous ghost reverb with pitch-drift detune diffusion, vinyl warmth saturation, and high-frequency dampening. (file: https://infinitedevices.org/assets/templates/future-garage-ghost-reverb-fx.inf)
 - [Future Garage Pitch Drift Delay FX](https://infinitedevices.org/library/future-garage-pitch-drift-delay-fx.html): Syncopated stereo tape delay with flutter modulation, resonant low-shelf filtering, and warm analog cross-feedback. (file: https://infinitedevices.org/assets/templates/future-garage-pitch-drift-delay-fx.inf)
+- [Detroit Techno Soul Chord Synth](https://infinitedevices.org/library/detroit-techno-soul-chord-synth.html): Soulful Detroit techno chord synthesizer with detuned sawtooth triads, warm analog filter resonance, and velocity-sensitive exponential decay envelope. (file: https://infinitedevices.org/assets/templates/detroit-techno-soul-chord-synth.inf)
+- [Detroit Techno Machine Lead Synth](https://infinitedevices.org/library/detroit-techno-machine-lead-synth.html): Piercing Belleville machine lead synthesizer with hard frequency modulation bite, resonant high-pass bite, and syncopated harmonic bite. (file: https://infinitedevices.org/assets/templates/detroit-techno-machine-lead-synth.inf)
+- [UK Garage Sub Drive Saturator FX](https://infinitedevices.org/library/uk-garage-sub-drive-saturator-fx.html): Heavy 2-step bass overdrive and saturation processor with asymmetrical diode clipping, low-end punch preservation, and tape warmth harmonics. (file: https://infinitedevices.org/assets/templates/uk-garage-sub-drive-saturator-fx.inf)
+- [UK Garage Chopped Vocal Delay FX](https://infinitedevices.org/library/uk-garage-chopped-vocal-delay-fx.html): Syncopated ping-pong dub delay with rhythmic 3/16 dotted divisions, resonant high-cut damping, and subtle pitch-drift tape modulation. (file: https://infinitedevices.org/assets/templates/uk-garage-chopped-vocal-delay-fx.inf)
 
 ## Library: Community
 
@@ -535,7 +539,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 62 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 64 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -552,4 +556,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 47 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 49 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
