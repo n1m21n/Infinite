@@ -1137,3 +1137,22 @@ reliable when >= 80% of its training moves agree; held out by part / phrase. Bar
 - **Chorder** rendered 0 before (it has no note input, so the phrase only sets the tempo); the `GENERATORS` rule fixed it: 720 rows, **.934**.
 - **Arpeggiator** printed no per-bank lines because its 432 rows (12 banks x 6 phrases x 6 designs) were already on disk: the rerun skipped them all. Nothing missing.
 - The misses are near the bar except Audio Filter (.693 on only 75 moves): its type knob changes what cutoff and resonance do, so one direction per knob is the wrong model, the same reading as Wavetable (item 14).
+
+## 2026-10-30 Plan items 10 and 12: Piano node family test MISS; nothing added to Generate Samples
+
+The Piano node (49a9deba) shipped as a node. Family test (`own_sweeps.py run --node Piano --count 400 --notes C3,C4`, then
+`string_families.py --node Piano`; ratio as for String, lower is closer, bar well under 4):
+
+| Family | samples | nearest render (median z) | inner distance | ratio |
+|---|---|---|---|---|
+| piano | 3173 | 1.95 | 0.31 | 6.26 |
+| guitar | 3180 | 2.40 | 0.35 | 6.93 |
+| harp | 876 | 2.31 | 0.42 | 5.54 |
+| pluck | 759 | 2.51 | 0.47 | 5.30 |
+| cello | 363 | 2.29 | 0.42 | 5.50 |
+| violin | 678 | 2.94 | 0.34 | 8.61 |
+
+- MISS. Piano is its own nearest family (1.95, the lowest of the six), so the node sounds like a piano to the measure, but the
+  ratio is 6.26, no better than String or Wind against their families. Same limit as items 8-9: two render pitches against
+  libraries at every pitch, and 400 random presets. Not chased further (owner: stop work that is not leading anywhere).
+- Item 12: no instrument passed its family test (String, Wind, Piano), so none was added to Generate Samples. Pads unchanged.
