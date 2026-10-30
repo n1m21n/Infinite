@@ -4,7 +4,7 @@
 #include "app/AppShared.h"
 #include "app/panels/TerminalDraw.h"
 #include "app/ui/design/TokenColors.h"
-#include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -1178,25 +1178,25 @@ void DrawTerminalQuitWarning()
       ImGui::OpenPopup("##terminalquit");
       sShowQuitWarning = false;
    }
-   if (!ImGui::BeginPopupModal("##terminalquit", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
+   if (!DialogParts::Begin("##terminalquit"))
       return;
-   ImGui::TextUnformatted(T("A program is still running in the terminal."));
-   ImGui::TextDisabled("%s", T("Quitting ends it."));
-   ImGui::Spacing();
-   if (ActionButton::Draw(L("Quit Anyway")))
+   DialogParts::Title(T("Program still running"));
+   DialogParts::Message(T("A program is still running in the terminal."));
+   DialogParts::Message(T("Quitting ends it."));
+   const int pick = DialogParts::Buttons({ L("Quit Anyway"), L("Keep Working") });
+   if (pick == 0)
    {
       ImGui::CloseCurrentPopup();
       if (sQuitAction)
          sQuitAction();
       sQuitAction = nullptr;
    }
-   ImGui::SameLine();
-   if (ActionButton::Draw(L("Keep Working")) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+   else if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
    {
       ImGui::CloseCurrentPopup();
       sQuitAction = nullptr;
    }
-   ImGui::EndPopup();
+   DialogParts::End();
 }
 
 void TerminalShutdown()
