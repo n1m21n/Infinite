@@ -488,6 +488,6 @@ bool Accept(const char* partName, const float* l, const float* r, int frames, do
    const float pr = Probabilities(Measure(l, r, frames, fs))[role];
    if (p)
       *p = pr;
-   return pr >= RoleCriticData::kCut[role];
+   return pr >= std::max(RoleCriticData::kCut[role], 0.5f); // better than a coin toss, or it is redrawn
 }
 }

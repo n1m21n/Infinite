@@ -24,7 +24,7 @@
 namespace
 {
    constexpr double kRate = 48000.0;
-   constexpr int kMaxRedraws = 3;
+   constexpr int kMaxRedraws = 2;
    constexpr double kTargetLufs = -14.0;
    constexpr double kCeilingDb = -1.0;  // true peak
    constexpr double kSilentLufs = -50.0;
@@ -40,6 +40,12 @@ struct GenerateSamplesNode::Job
    SampleStyles::Recipe recipe; // as asked; attempts move only the seed
    int attempt = 0;
    bool pinned = false; // one attempt, lenient gate
+   // The attempt the critic liked most so far, kept if none settles.
+   float bestP = -1.0f;
+   int bestAttempt = -1, bestBar = 0, bestRoot = 0, bestScale = 0;
+   float bestBpm = 0.0f;
+   std::vector<float> bestL, bestR;
+   std::vector<std::string> bestPicks;
    int barFrames = 0;
    int prerollBars = 0;
    std::unique_ptr<app::OfflineGraph> graph;
@@ -199,19 +205,42 @@ void GenerateSamplesNode::Finish()
       return;
    }
    const int from = job.barFrames * job.prerollBars;
-   const int frames = job.barFrames * job.recipe.bars;
-   if (!Master((int)job.recipe.part, job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR, job.pinned))
+   int frames = job.barFrames * job.recipe.bars;
+   const bool mastered = Master((int)job.recipe.part, job.left.data() + from, job.right.data() + from, frames, mLoopL, mLoopR, job.pinned);
+   // The role critic: a take that does not sound enough like the part asked for is redrawn, and the best one heard is kept.
+   float heard = -1.0f;
+   const bool settled = mastered && (job.pinned || RoleCritic::Accept(SampleStyles::PartName(job.recipe.part), mLoopL.data(), mLoopR.data(), frames, kRate, &heard));
+   if (mastered && !settled && heard > job.bestP)
    {
-      if (!job.pinned && job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
-         return;
-      mJob.reset();
-      mFailed = true;
-      return;
+      job.bestP = heard;
+      job.bestAttempt = job.attempt;
+      job.bestBar = job.barFrames;
+      job.bestL = mLoopL;
+      job.bestR = mLoopR;
+      job.bestBpm = madeBpm;
+      job.bestRoot = madeRoot;
+      job.bestScale = madeScale;
+      job.bestPicks = madePicks;
    }
-   // The role critic: a part that does not sound like the part asked for is redrawn (the last attempt is kept).
-   if (!job.pinned && job.attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(job.recipe.part), mLoopL.data(), mLoopR.data(), frames, kRate) &&
-       StartAttempt(job.attempt + 1))
+   if (!settled && !job.pinned && job.attempt < kMaxRedraws && StartAttempt(job.attempt + 1))
       return;
+   if (!settled)
+   {
+      if (job.bestAttempt < 0)
+      {
+         mJob.reset();
+         mFailed = true;
+         return;
+      }
+      job.attempt = job.bestAttempt;
+      frames = job.bestBar * job.recipe.bars;
+      mLoopL = std::move(job.bestL);
+      mLoopR = std::move(job.bestR);
+      madeBpm = job.bestBpm;
+      madeRoot = job.bestRoot;
+      madeScale = job.bestScale;
+      madePicks = std::move(job.bestPicks);
+   }
    auto* buf = new Platform::SampleBuffer();
    buf->channels = 2;
    buf->numFrames = frames;

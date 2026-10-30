@@ -1,5 +1,5 @@
 // infinite_gen_wasm entry: one call renders a Generate Samples loop the way GenerateSamplesNode does.
-// The redraw rule (seed + attempt * 7919, up to 3) and Master() mirror src/app/graph/GenerateSamplesNode.cpp; the parity test keeps them honest.
+// The redraw rule (seed + attempt * 7919, up to 2, best kept) and Master() mirror src/app/graph/GenerateSamplesNode.cpp; the parity test keeps them honest.
 #include "app/graph/GenerateSamplesNode.h"  // PrerollBars
 #include "app/graph/GenerateSamplesCritic.inc"
 #include "app/graph/OfflineGraph.h"
@@ -25,7 +25,7 @@ void RegisterGenNodes();
 namespace
 {
    constexpr double kRate = 48000.0;
-   constexpr int kMaxRedraws = 3;
+   constexpr int kMaxRedraws = 2;
    constexpr double kTargetLufs = -14.0;
    constexpr double kCeilingDb = -1.0;
    constexpr double kSilentLufs = -50.0;
@@ -160,6 +160,8 @@ extern "C"
       rec.variation = gVariation;
       rec.bpm = gBpmSet;
       gPcm.clear();
+      float bestP = -1.0f;
+      int bestFrames = 0;
       for (int attempt = 0; attempt <= (gPinned ? 0 : kMaxRedraws); attempt++)
       {
          SampleStyles::Recipe r = rec;
@@ -184,9 +186,13 @@ extern "C"
             continue;
          if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr, gPinned))
             continue;
-         // The role critic: a part that does not sound like the part asked for is redrawn (the last attempt is kept).
-         if (!gPinned && attempt < kMaxRedraws && !RoleCritic::Accept(SampleStyles::PartName(r.part), l.data(), rr.data(), frames, kRate))
+         // The role critic: a take that does not sound enough like the part asked for is redrawn, and the best one heard is kept.
+         float heard = -1.0f;
+         const bool settled = gPinned || RoleCritic::Accept(SampleStyles::PartName(r.part), l.data(), rr.data(), frames, kRate, &heard);
+         if (!settled && heard <= bestP)
             continue;
+         bestP = heard;
+         bestFrames = frames;
          gPcm.resize((size_t)frames * 2);
          for (int f = 0; f < frames; f++)
          {
@@ -197,9 +203,10 @@ extern "C"
          gPatch = OpenablePatch(c);
          gBpm = c.bpm;
          gAttempt = attempt;
-         return frames;
+         if (settled)
+            break;
       }
-      return 0;
+      return bestFrames;
    }
 
    EMSCRIPTEN_KEEPALIVE const float* gen_pcm() { return gPcm.data(); }
