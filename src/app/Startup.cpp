@@ -1351,8 +1351,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       try { scanner.LoadFromDisk(); }
       catch (const std::exception&) {}
    };
-   loadIndex(gSampleScanner);
-   loadIndex(gMediaScanner);
+   // A headless job never shows the Samples or Media panel, and the sample
+   // index alone can be tens of MB of JSON (most of a --validate's launch).
+   // The plugin index stays: it is small and a patch's plugins resolve through it.
+   if (!HeadlessJobActive())
+   {
+      loadIndex(gSampleScanner);
+      loadIndex(gMediaScanner);
+   }
    // Never a scan at launch, for the same reason the two above aren't:
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
