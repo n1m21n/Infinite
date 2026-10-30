@@ -1985,6 +1985,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunHistoryTest();
       if (getenv("INFINITE_CLIPBOARDTEST") != nullptr && frameId == 4)
          RunClipboardTest();
+      if (getenv("INFINITE_VIEW3DTEST") != nullptr && frameId == 4)
+         RunView3DTest();
 
       if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop
          RunPatchWatchTest();

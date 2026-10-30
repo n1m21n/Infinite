@@ -94,10 +94,17 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
                g->on = !g->on;
+            // The first add spawns the 3D View node, which can move gNodes: refetch gn.
             if (View3DCanAdd(*gn) && MenuParts::Item(L("Add to 3D View")))
+            {
                View3DAddNode(*gn);
+               gn = FindNodeByIndex(gContextMenuNodeIndex);
+            }
             else if (View3DCanSetWorld(*gn) && MenuParts::Item(L("Use as 3D View world")))
+            {
                View3DSetWorld(*gn);
+               gn = FindNodeByIndex(gContextMenuNodeIndex);
+            }
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))

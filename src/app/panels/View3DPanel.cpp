@@ -97,6 +97,16 @@ namespace
       return nullptr;
    }
 
+   // Panels draw outside the canvas, where no node editor is current.
+   ImVec2 NodePos(const GraphNode& gn)
+   {
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      const ImVec2 at = ed::GetNodePosition(gn.NodeId());
+      ed::SetCurrentEditor(prev);
+      return at;
+   }
+
    bool Selected(int id) { return std::find(sSel.begin(), sSel.end(), id) != sSel.end(); }
 
    std::string ItemName(const Item& it)
@@ -834,6 +844,25 @@ namespace
          ImGui::NewLine();
    }
 
+   OutputNode* EnsureOutputImpl()
+   {
+      GraphNode* self = SceneGraphNode();
+      if (self == nullptr)
+         return nullptr;
+      for (GraphNode& gn : gNodes)
+         if (auto* o = dynamic_cast<OutputNode*>(gn.node.get()))
+            if (o->Input().GetSource() == self->node.get())
+               return o;
+      const int selfIndex = self->index;
+      const ImVec2 at = NodePos(*self);
+      GraphNode* spawned = SpawnNode("Output", "Utility", at.x + 320.0f, at.y);
+      std::string error;
+      if (spawned == nullptr)
+         return nullptr;
+      auto* out = dynamic_cast<OutputNode*>(spawned->node.get());
+      return ConnectNodes(selfIndex, 0, spawned->index, 0, error) ? out : nullptr;
+   }
+
    void DrawRenderBox(Scene3DNode* scene)
    {
       ImGui::TextDisabled("%s", T("Render"));
@@ -850,22 +879,7 @@ namespace
       ImGui::BeginDisabled(gOfflineRender.active || scene->activeCamera == 0);
       if (ActionButton::Draw(L("Render camera view"), ImVec2(-1, 0), ActionButton::Kind::Primary))
       {
-         GraphNode* self = SceneGraphNode();
-         OutputNode* out = nullptr;
-         if (self != nullptr)
-            for (GraphNode& gn : gNodes)
-               if (auto* o = dynamic_cast<OutputNode*>(gn.node.get()))
-                  if (o->Input().GetSource() == self->node.get())
-                     out = o;
-         if (out == nullptr && self != nullptr)
-         {
-            const int selfIndex = self->index;
-            const ImVec2 at = ed::GetNodePosition(self->NodeId());
-            GraphNode* spawned = SpawnNode("Output", "Output", at.x + 320.0f, at.y);
-            std::string error;
-            if (spawned != nullptr && ConnectNodes(selfIndex, 0, spawned->index, 0, error))
-               out = dynamic_cast<OutputNode*>(spawned->node.get());
-         }
+         OutputNode* out = View3DEnsureOutput();
          if (out != nullptr)
          {
             out->offlineDurationSeconds = sDuration;
@@ -1034,6 +1048,8 @@ namespace
    }
 }
 
+OutputNode* View3DEnsureOutput() { return EnsureOutputImpl(); }
+
 bool View3DCanAdd(const GraphNode& gn)
 {
    if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr)
@@ -1064,7 +1080,7 @@ namespace
    {
       if (Scene3DNode* s = FindScene())
          return s;
-      const ImVec2 at = ed::GetNodePosition(near.NodeId());
+      const ImVec2 at = NodePos(near);
       GraphNode* made = SpawnNode("3D View", "3D", at.x + 340.0f, at.y);
       return made != nullptr ? dynamic_cast<Scene3DNode*>(made->node.get()) : nullptr;
    }

@@ -3283,6 +3283,75 @@ bool RunPerfPanelSelfTest()
    return true;
 }
 
+// Every first add spawns the 3D View node, which is what moves gNodes under the caller.
+void RunView3DTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   auto Scene = []() -> Scene3DNode*
+   {
+      for (GraphNode& gn : gNodes)
+         if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
+            return s;
+      return nullptr;
+   };
+   auto Draw = [&]()
+   {
+      Scene3DNode* s = Scene();
+      const float eye[3] = { 3, 2, 5 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
+      return s != nullptr && s->RenderView(64, 64, Mat4::LookAt(eye, target, up), eye, 45.0f,
+                                           Scene3DNode::Shading::Final, false) != 0;
+   };
+
+   NewPatch();
+   gNodes.shrink_to_fit();
+   const int cube = SpawnNode("Cube", "3D", 0.0f, 0.0f)->index;
+   const int sphere = SpawnNode("Sphere", "3D", 0.0f, 200.0f)->index;
+   const int cam = SpawnNode("Camera", "3D", 0.0f, 400.0f)->index;
+   const int light = SpawnNode("Light", "3D", 0.0f, 600.0f)->index;
+   const int render = SpawnNode("Render 3D", "3D", 300.0f, 0.0f)->index;
+   std::string error;
+   ConnectNodes(sphere, 0, render, 0, error);
+   ConnectNodes(cam, 0, render, Render3DNode::kSlots, error);
+   ConnectNodes(light, 0, render, Render3DNode::kSlots + 1, error);
+   gNodes.shrink_to_fit();
+
+   GraphNode* gn = FindNodeByIndex(cube);
+   Check("a cube can be added", gn != nullptr && View3DCanAdd(*gn));
+   View3DAddNode(*gn);
+   Check("the first add makes the node", Scene() != nullptr);
+   Check("one item after one add", Scene() != nullptr && Scene()->Items().size() == 1);
+   Check("the scene node is not addable", !View3DCanAdd(*FindNodeByIndex(cube + 5)));
+
+   View3DAddNode(*FindNodeByIndex(render));
+   Check("a Render 3D brings its set", Scene()->Items().size() == 4);
+   Check("its camera becomes the active one", Scene()->activeCamera != 0);
+   Check("the scene draws", Draw());
+
+   View3DAddNode(*FindNodeByIndex(cube));
+   Check("the same node can be added twice", Scene()->Items().size() == 5);
+
+   Undo();
+   Check("undo takes the second add back", Scene() != nullptr && Scene()->Items().size() == 4);
+   Check("the scene draws after undo", Draw());
+
+   RemoveNodeByIndex(cube);
+   Check("a deleted source stays listed", Scene()->Items().size() == 4);
+   Check("the scene draws with a source missing", Draw());
+
+   OutputNode* out = View3DEnsureOutput();
+   Check("render finds or makes an Output", out != nullptr);
+   Check("a second ask reuses it", View3DEnsureOutput() == out);
+
+   NewPatch();
+   printf("VIEW3DTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 void RunClipboardTest()
 {
    bool ok = true;

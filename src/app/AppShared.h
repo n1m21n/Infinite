@@ -5774,6 +5774,7 @@ extern bool gView3DClaimedKeys;
 extern ImVec2 gView3DRectMin, gView3DRectMax;
 void DrawView3DDocked(const char* id, const ImVec2& size);
 bool View3DCanAdd(const GraphNode& gn);
+OutputNode* View3DEnsureOutput();
 bool View3DCanSetWorld(const GraphNode& gn);
 void View3DAddNode(GraphNode& gn);
 void View3DSetWorld(GraphNode& gn);
@@ -6371,6 +6372,7 @@ void RunRpcBatchTest();
 void RunOscControlTest();
 void RunHistoryTest();
 void RunClipboardTest();
+void RunView3DTest();
 
 void RunPatchWatchTest();
 
