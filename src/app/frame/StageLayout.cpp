@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -340,7 +341,7 @@ void DrawLayout(FrameCtx& fc)
       if (gTerminalOpen && gTerminalDock == 2)
       {
          DrawTerminalDocked("##terminal_left", ImVec2(gTerminalWidth, graphHeight));
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
       }
 
       // Cleared here rather than at the top of the frame: a top/left-docked

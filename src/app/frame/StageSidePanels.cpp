@@ -402,7 +402,7 @@ void DrawSidePanels(FrameCtx& fc)
       // Right-docked terminal
       if (gTerminalOpen && gTerminalDock == 1)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
          DrawTerminalDocked("##terminal_right", ImVec2(gTerminalWidth, graphHeight));
       }
 
