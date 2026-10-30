@@ -3378,23 +3378,26 @@ Compiled Compile(const Recipe& recipe)
             synths.push_back(tx);
             return tx;
          };
+         // Owner's review, 2026-10-29: textures "mostly sound like grumbly bass" (low share 0.113 vs the library's pad
+         // loops 0.042), so the beds sit an octave up and the rumble became an ocean (item 18).
          if (kind == 0) // drone: dark, wide, slow
-            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 300.0, 1200.0, sp.Uniform(0.1, 0.35), 0), 0.0f });
+            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 450.0, 1600.0, sp.Uniform(0.1, 0.35), 1), 0.0f });
          else if (kind == 1) // vowel bed: a held, breathy formant
             chans.push_back({ bed(sp.Range(2) ? 46 : 43, 1, 1500.0, 4500.0, 0.0, 0), 0.0f });
          else if (kind == 2) // shimmer: high, bright, glassy
             chans.push_back({ bed(sp.Range(2) ? 62 : 63, 1, 3000.0, 8000.0, 0.0, 1), 0.0f });
-         else if (kind == 3) // rumble: a low sine under dark noise
+         else if (kind == 3) // ocean: low-passed noise whose cutoff swells and falls once or twice a loop, like waves
          {
-            chans.push_back({ bed(10, 1, 200.0, 500.0, 0.0, -1), 0.0f });
-            Params n = F({ { "volume", 0.6 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1500.0 },
-                           { "decay", 200.0 }, { "sustain", 1.0 }, { "release", 2000.0 }, { "cutoff", sp.Uniform(120.0, 320.0) }, { "voices", 1.0 }, { "keyTrack", 0.0 } });
-            n["filterType"] = { 'i', "1" };
+            Params n = F({ { "volume", 0.8 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1500.0 },
+                           { "decay", 200.0 }, { "sustain", 1.0 }, { "release", 2000.0 }, { "cutoff", 900.0 }, { "resonance", 0.0 },
+                           { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            n["filterType"] = { 'i', "2" };
             const int nv = g.Add("Analog", sp.Range(1 << 30), n);
             std::vector<double> vel(16, 0.0);
             vel[0] = 1.0;
-            g.Connect(sequence(vel, std::vector<int>(16, 36), loopBeats, 100.0, 1), nv, true);
-            chans.push_back({ nv, -3.0f });
+            g.Connect(sequence(vel, std::vector<int>(16, 60), loopBeats, 100.0, 1), nv, true);
+            sweep(nv, "cutoff", sp.Uniform(250.0, 450.0), sp.Uniform(1800.0, 3500.0), cyc, sp.Uniform(0.0, 1.0));
+            chans.push_back({ nv, -2.0f });
          }
          else if (kind == 4) // wind: noise through a band-pass that wanders
          {
@@ -3432,7 +3435,7 @@ Compiled Compile(const Recipe& recipe)
             g.Connect(sequence(vel, note, 0.5, 25.0, 16), gr, true);
             sweep(gr, "a.position", 0.0, 1.0, cyc, sp.Uniform(0.0, 1.0));
             chans.push_back({ gr, 0.0f });
-            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 250.0, 900.0, 0.1, 0), -9.0f });
+            chans.push_back({ bed(sp.Range(2) ? 56 : 59, 2, 400.0, 1400.0, 0.1, 1), -9.0f });
             specialWet = sp.Uniform(0.45, 0.7);
          }
       }
