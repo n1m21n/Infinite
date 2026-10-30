@@ -3353,7 +3353,8 @@ Compiled Compile(const Recipe& recipe)
       else if (texPart)
       {
          // Sound with no pulse: it holds, drifts and breathes across the loop.
-         const int kind = sp.Range(6);
+         // Kinds 6-8 are nature foley merged into textures (owner, 2026-10-30: birds, water, leaves, wind; wind is kind 4).
+         const int kind = sp.Range(9);
          const double cyc = sp.Uniform() < 0.5 ? (double)loopBeats : loopBeats / 2.0; // a whole number of cycles per loop, so it loops
          specialWet = sp.Uniform(0.3, 0.6);
          specialDecay = sp.Uniform(3.0, 6.0);
@@ -3414,6 +3415,80 @@ Compiled Compile(const Recipe& recipe)
             g.Connect(nv, af, false);
             sweep(af, "freq", sp.Uniform(250.0, 500.0), sp.Uniform(1800.0, 4000.0), cyc, sp.Uniform(0.0, 1.0));
             chans.push_back({ af, 0.0f });
+         }
+         else if (kind >= 6) // nature: events in phrases (Farnell, Designing Sound) over a quiet bed of moving air
+         {
+            // A bed of low-passed noise whose cutoff drifts, under every nature kind.
+            Params n = F({ { "volume", 0.7 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 1500.0 },
+                           { "decay", 200.0 }, { "sustain", 1.0 }, { "release", 2000.0 }, { "cutoff", 1200.0 }, { "resonance", 0.0 },
+                           { "voices", 1.0 }, { "keyTrack", 0.0 } });
+            n["filterType"] = { 'i', "2" };
+            const int air = g.Add("Analog", sp.Range(1 << 30), n);
+            std::vector<double> held(16, 0.0);
+            held[0] = 1.0;
+            g.Connect(sequence(held, std::vector<int>(16, 60), loopBeats, 100.0, 1), air, true);
+            sweep(air, "cutoff", sp.Uniform(500.0, 900.0), sp.Uniform(1800.0, 3200.0), cyc, sp.Uniform(0.0, 1.0));
+            chans.push_back({ air, kind == 7 ? -6.0f : -12.0f });
+            // Phrases: two to five events close together, then a gap.
+            std::vector<double> vel(16, 0.0);
+            std::vector<int> note(16, 96);
+            for (int b = sp.Range(3); b < 16; b += 4 + sp.Range(5))
+               for (int j = 0; j < 2 + sp.Range(4) && b + j < 16; j++)
+                  vel[(size_t)(b + j)] = sp.Uniform(0.4, 1.0);
+            vel[(size_t)sp.Range(4)] = 0.9;
+            if (kind == 6) // birds: sine chirps, 2-5 kHz, a fast glide up or down in each
+            {
+               for (int i = 0; i < 16; i++)
+                  note[(size_t)i] = 96 + sp.Range(10);
+               Params k;
+               wt(k, 0, 0.0, 0, 18000, 0.0);
+               k["a.pitchAmount"] = { 'f', num(sp.Uniform() < 0.5 ? sp.Uniform(-14.0, -5.0) : sp.Uniform(5.0, 14.0)) };
+               k["a.pitchDecay"] = { 'f', num(sp.Uniform(20.0, 70.0)) };
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(30.0, 90.0)) };
+               k["a.ampSustain"] = { 'f', "0" };
+               k["a.ampRelease"] = { 'f', "20" };
+               const int bird = g.Add("Wavetable", sp.Range(1 << 30), k);
+               const int src = sequence(vel, note, 0.25, 30.0, 16);
+               const int bh = g.Add("Humanizer", sp.Range(1 << 30), F({ { "timingMs", sp.Uniform(10.0, 35.0) }, { "velocityPct", 30.0 } }));
+               g.Connect(src, bh, true);
+               g.Connect(bh, bird, true);
+               chans.push_back({ bird, -6.0f });
+            }
+            else if (kind == 7) // water: bubbles, sines that rise as they form (Minnaert), dense over the stream's hiss
+            {
+               for (int i = 0; i < 16; i++)
+                  if (vel[(size_t)i] == 0.0 && sp.Uniform() < 0.5)
+                     vel[(size_t)i] = sp.Uniform(0.2, 0.6);
+               for (int i = 0; i < 16; i++)
+                  note[(size_t)i] = 79 + sp.Range(20);
+               Params k;
+               wt(k, 0, 0.0, 0, 18000, 0.0);
+               k["a.pitchAmount"] = { 'f', num(sp.Uniform(-18.0, -6.0)) };
+               k["a.pitchDecay"] = { 'f', num(sp.Uniform(10.0, 40.0)) };
+               k["a.ampDecay"] = { 'f', num(sp.Uniform(20.0, 70.0)) };
+               k["a.ampSustain"] = { 'f', "0" };
+               k["a.ampRelease"] = { 'f', "20" };
+               const int drop = g.Add("Wavetable", sp.Range(1 << 30), k);
+               const int src = sequence(vel, note, 0.125, 30.0, 16);
+               const int wh = g.Add("Humanizer", sp.Range(1 << 30), F({ { "timingMs", sp.Uniform(15.0, 40.0) }, { "velocityPct", 40.0 } }));
+               g.Connect(src, wh, true);
+               g.Connect(wh, drop, true);
+               chans.push_back({ drop, -8.0f });
+            }
+            else // leaves: short band-passed noise crackles in gusts, 2.5-7 kHz
+            {
+               Params nn = F({ { "volume", 0.8 }, { "osc1Vol", 0.0 }, { "osc2Vol", 0.0 }, { "sub", 0.0 }, { "noise", 1.0 }, { "attack", 0.0 },
+                               { "decay", sp.Uniform(15.0, 60.0) }, { "sustain", 0.0 }, { "release", 20.0 }, { "cutoff", sp.Uniform(2500.0, 7000.0) },
+                               { "resonance", 0.15 }, { "voices", 4.0 }, { "keyTrack", 0.0 } });
+               nn["filterType"] = { 'i', "8" };
+               const int leaf = g.Add("Analog", sp.Range(1 << 30), nn);
+               const int src = sequence(vel, note, 0.125, 30.0, 16);
+               const int lh = g.Add("Humanizer", sp.Range(1 << 30), F({ { "timingMs", sp.Uniform(10.0, 35.0) }, { "velocityPct", 30.0 } }));
+               g.Connect(src, lh, true);
+               g.Connect(lh, leaf, true);
+               chans.push_back({ leaf, -4.0f });
+            }
+            specialWet = sp.Uniform(0.2, 0.45);
          }
          else // grain: scattered glassy specks over a quiet bed
          {

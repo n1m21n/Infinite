@@ -1254,3 +1254,17 @@ Our layers rendered alone (`click_render.py`, C1):
 Both now sit inside SubLab's 10th-90th band on length and centroid. App gate (40 takes): rejects per part unchanged; bass
 whole-mix centroid and low share unchanged (the click is 7-13 dB under the body). The SubLab WAVs are not shipped; only
 ranges were fitted.
+
+## Item 18: textures merged with nature foley (2026-10-30), MET
+Owner's review: textures "mostly sound like grumbly bass"; foley should join them with birds, water, leaves, wind (owner
+approved 2026-10-30). The library has no textures part, so the bar is the pad loops (n=1419, the nearest held sound).
+| | centroid | low share (<215 Hz) | gate rejects |
+|---|---|---|---|
+| library pad loops | 655 | 0.042 | |
+| textures before | 646 | 0.113 | 1/40 |
+| beds an octave up, rumble -> ocean swell | 821 | 0.039 | 1/40 |
+| + birds, water, leaves (kinds 6-8) | 1063 | 0.067 | 1/60 |
+Kinds now: drone, vowel, shimmer, ocean, wind, grain, birds (sine chirps 2-5 kHz with a glide), water (rising-pitch
+bubbles, Minnaert, over stream hiss), leaves (band-passed noise crackles in gusts). Each nature kind sits on a quiet bed of
+drifting low-passed air and is placed in phrases through a Humanizer. The Foley part keeps its household sounds (steps,
+knocks, drips, ticks, typing).
