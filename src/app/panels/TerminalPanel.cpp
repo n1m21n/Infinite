@@ -83,7 +83,7 @@ namespace
          &tok::terminal_ansi8, &tok::terminal_ansi9, &tok::terminal_ansi10, &tok::terminal_ansi11,
          &tok::terminal_ansi12, &tok::terminal_ansi13, &tok::terminal_ansi14, &tok::terminal_ansi15,
       };
-      return tok::U32(*kColors[index], false);
+      return tok::U32(*kColors[index], CategoryColors::IsThemeLight());
    }
 
    // Writes the `infinite` shim, once per app run, and returns its folder. One folder per binary,
@@ -156,11 +156,12 @@ namespace
       };
       if (const char* lang = getenv("LANG"); lang == nullptr || lang[0] == '\0')
          o.spawn.env.push_back({ "LANG", "en_US.UTF-8" });
+      o.spawn.env.push_back({ "COLORFGBG", CategoryColors::IsThemeLight() ? "0;15" : "15;0" });
       AddCommandEnv(o.spawn);
       for (int i = 0; i < 16; ++i)
          o.palette[i] = Ansi(i);
-      o.foreground = tok::U32(tok::terminal_fg, false);
-      o.background = tok::U32(tok::terminal_bg, false);
+      o.foreground = tok::U32(tok::terminal_fg, CategoryColors::IsThemeLight());
+      o.background = tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight());
       auto tab = std::make_unique<Tab>();
       tab->id = sNextTabId++;
       o.spawn.env.push_back({ "INFINITE_TERM_TAB", std::to_string(tab->id) });
@@ -249,17 +250,17 @@ namespace
 
    ImU32 CellFg(const term::Cell& c)
    {
-      return (c.flags & term::kCellDefaultFg) ? tok::U32(tok::terminal_fg, false) : (ImU32)c.fg;
+      return (c.flags & term::kCellDefaultFg) ? tok::U32(tok::terminal_fg, CategoryColors::IsThemeLight()) : (ImU32)c.fg;
    }
    ImU32 CellBg(const term::Cell& c)
    {
-      return (c.flags & term::kCellDefaultBg) ? tok::U32(tok::terminal_bg, false) : (ImU32)c.bg;
+      return (c.flags & term::kCellDefaultBg) ? tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()) : (ImU32)c.bg;
    }
 
    void DrawCells(ImDrawList* dl, const term::Snapshot& snap, ImVec2 origin, float cw, float ch, float px,
                   const Tab& tab)
    {
-      const ImU32 defaultBg = tok::U32(tok::terminal_bg, false);
+      const ImU32 defaultBg = tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight());
       // Selection and search are drawn with the backgrounds, under the text.
       const auto selected = [&](int64_t line, int col)
       {
@@ -307,9 +308,9 @@ namespace
                const term::Cell& c = cells[col];
                bg = (c.flags & term::kCellReverse) ? CellFg(c) : CellBg(c);
                if (selected(line, col))
-                  bg = tok::U32(tok::terminal_selection, false);
+                  bg = tok::U32(tok::terminal_selection, CategoryColors::IsThemeLight());
                else if (!matched.empty() && matched[(size_t)row * (size_t)snap.cols + (size_t)col])
-                  bg = tok::U32(tok::terminal_match, false);
+                  bg = tok::U32(tok::terminal_match, CategoryColors::IsThemeLight());
             }
             if (col == snap.cols || bg != runColor)
             {
@@ -387,7 +388,7 @@ namespace
       if (blinkOff)
          return;
       const float x = origin.x + (float)snap.cursorCol * cw, y = origin.y + (float)snap.cursorRow * ch;
-      const ImU32 color = tok::U32(tok::terminal_cursor, false);
+      const ImU32 color = tok::U32(tok::terminal_cursor, CategoryColors::IsThemeLight());
       if (!focused)
          dl->AddRect(ImVec2(x, y), ImVec2(x + cw, y + ch), color);
       else if (snap.cursorShape == term::CursorShape::Bar)
@@ -405,7 +406,7 @@ namespace
             ImTextStrToUtf8(utf8, sizeof utf8, wide, wide + 1);
             const float px = ImGui::GetFontSize();
             dl->AddText((c.flags & term::kCellBold) ? sFontBold : sFont, px, ImVec2(x, y + std::floor((ch - px) * 0.5f)),
-                        tok::U32(tok::terminal_bg, false), utf8);
+                        tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()), utf8);
          }
       }
    }
@@ -864,8 +865,23 @@ namespace
       }
    }
 
+   // Default-coloured cells follow the theme at draw time; this is for what programs print from now on.
+   void FollowTheme()
+   {
+      static bool sLight = CategoryColors::IsThemeLight();
+      if (sLight == CategoryColors::IsThemeLight())
+         return;
+      sLight = !sLight;
+      uint32_t palette[16];
+      for (int i = 0; i < 16; ++i)
+         palette[i] = Ansi(i);
+      for (const auto& tab : sTabs)
+         tab->session->SetColors(palette, tok::U32(tok::terminal_fg, sLight), tok::U32(tok::terminal_bg, sLight));
+   }
+
    void DrawPanel()
    {
+      FollowTheme();
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));
@@ -906,7 +922,7 @@ namespace
       }
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), tok::U32(tok::terminal_bg, false), tok::radius_field);
+      dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), tok::U32(tok::terminal_bg, CategoryColors::IsThemeLight()), tok::radius_field);
       ImGui::InvisibleButton("##terminalcells", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
       if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
          gTerminalFocus = true;
@@ -941,7 +957,7 @@ namespace
          const float h = std::max(24.0f, avail.y * (float)snap->rows / total);
          const float y = (avail.y - h) * (1.0f - (float)snap->scrollOffset / (float)snap->scrollbackSize);
          dl->AddRectFilled(ImVec2(origin.x + avail.x - 4.0f, origin.y + y), ImVec2(origin.x + avail.x - 1.0f, origin.y + y + h),
-                           tok::U32(tok::terminal_ansi8, false), 1.5f);
+                           tok::U32(tok::terminal_ansi8, CategoryColors::IsThemeLight()), 1.5f);
       }
       dl->PopClipRect();
 

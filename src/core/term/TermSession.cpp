@@ -20,11 +20,12 @@ constexpr auto kHangupGrace = std::chrono::milliseconds(300);
 constexpr size_t kMaxSearchHits = 5000;
 
 struct Input {
-    enum Kind { Key, Paste, Bytes, MouseMove, MouseButton, Resize, ScrollBy, ScrollLine, ScrollEnd, Search, Copy } kind;
+    enum Kind { Colors, Key, Paste, Bytes, MouseMove, MouseButton, Resize, ScrollBy, ScrollLine, ScrollEnd, Search, Copy } kind;
     int a = 0, b = 0, c = 0;
     uint32_t cp = 0;
     int64_t lineA = 0, lineB = 0;
     std::string text;
+    std::vector<uint32_t> colors;  // 16 palette, foreground, background
 };
 
 }  // namespace
@@ -169,6 +170,7 @@ struct TermSession::Impl : std::enable_shared_from_this<TermSession::Impl> {
                     needPublish = true;
                 }
                 break;
+            case Input::Colors: engine->SetColors(in.colors.data(), in.colors[16], in.colors[17]); break;
             case Input::ScrollBy: ApplyScroll(scrollOffset + in.a); break;
             case Input::ScrollLine: ApplyScroll((int)(engine->TopLine() - in.lineA)); break;
             case Input::ScrollEnd: ApplyScroll(0); break;
@@ -444,6 +446,14 @@ void TermSession::ScrollToLine(int64_t line) {
 }
 
 void TermSession::ScrollToBottom() { impl_->Queue(Input{Input::ScrollEnd}); }
+
+void TermSession::SetColors(const uint32_t* palette, uint32_t foreground, uint32_t background) {
+    Input in{Input::Colors};
+    in.colors.assign(palette, palette + 16);
+    in.colors.push_back(foreground);
+    in.colors.push_back(background);
+    impl_->Queue(std::move(in));
+}
 
 void TermSession::Search(std::string query) {
     Input in{Input::Search};

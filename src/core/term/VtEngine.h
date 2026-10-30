@@ -62,6 +62,8 @@ public:
 
     void Feed(const char* data, size_t size);
     void Resize(int cols, int rows);
+    // Colours for what comes next; cells already drawn keep theirs, except default ones, which the view resolves.
+    void SetColors(const uint32_t* palette, uint32_t foreground, uint32_t background);
 
     // key is a VTermKey; 0 sends codepoint instead. mod: bit 1 shift, 2 alt, 4 ctrl.
     void Key(int key, uint32_t codepoint, int mod);
