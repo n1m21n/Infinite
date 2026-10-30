@@ -33,12 +33,53 @@ namespace app
          return;
       }
 
+      // Vertical section list on the left, the selected section's cards in a scrolling pane on the right.
+      static int sTab = 0;
+      static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
+                                           I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
+                                           I18N_KEY("Expression Globals"), I18N_KEY("Extensions") };
+      constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
+      // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
+      static bool sTabPicked = false;
+      if (!sTabPicked)
+      {
+         sTabPicked = true;
+         const char* o = getenv("INFINITE_OPENPANELS");
+         if (o && strstr(o, "settingsgeneral"))
+            sTab = 3;
+      }
+      const float navW = 200.0f;
+      ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+      for (int i = 0; i < kTabCount; i++)
+      {
+         const bool sel = (i == sTab);
+         const float h = ImGui::GetFrameHeight();
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const float w = ImGui::GetContentRegionAvail().x;
+         ImGui::PushID(i);
+         if (ImGui::InvisibleButton("##tab", ImVec2(w, h)))
+            sTab = i;
+         ImGui::PopID();
+         const bool hov = ImGui::IsItemHovered();
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         if (sel || hov)
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 0.14f : 0.08f)),
+                              tok::radius_tile);
+         const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
+         const ImVec2 ts = ImGui::CalcTextSize(label);
+         dl->AddText(ImVec2(p.x + tok::space_4, p.y + (h - ts.y) * 0.5f),
+                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
+      }
+      ImGui::EndChild();
+      ImGui::SameLine();
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, 0.0f));
+      ImGui::BeginChild("##SettingsBody", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::PopStyleVar();
       SectionCard::BeginWindow();
-      FormParts::PushTabStyle();
-      if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None))
       {
          // 1. Appearance Tab
-         if (ImGui::BeginTabItem(L("Appearance"), nullptr, 0))
+         if (sTab == 0)
          {
             const bool isLight = CategoryColors::IsThemeLight();
             ImGui::Spacing();
@@ -299,11 +340,10 @@ namespace app
             }
 
             SectionCard::End();
-            ImGui::EndTabItem();
          }
 
          // 2. Canvas & Workspace Tab
-         if (ImGui::BeginTabItem(L("Canvas & Workspace"), nullptr, 0))
+         if (sTab == 1)
          {
             ImGui::Spacing();
             FormParts::Section(T("Grid & Canvas"));
@@ -385,11 +425,10 @@ namespace app
             }
 
             SectionCard::End();
-            ImGui::EndTabItem();
          }
 
          // 3. Audio Tab
-         if (ImGui::BeginTabItem(L("Audio"), nullptr, 0))
+         if (sTab == 2)
          {
             ImGui::Spacing();
             FormParts::Section(T("Audio Devices & Format"));
@@ -662,16 +701,10 @@ namespace app
             }
 
             SectionCard::End();
-            ImGui::EndTabItem();
          }
 
          // 4. General & Performance Tab
-         // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens this tab first (design review shots).
-         static const bool sGeneralFirst = [] { const char* o = getenv("INFINITE_OPENPANELS"); return o && strstr(o, "settingsgeneral"); }();
-         static bool sGeneralPicked = false;
-         const ImGuiTabItemFlags generalFlags = (sGeneralFirst && !sGeneralPicked) ? ImGuiTabItemFlags_SetSelected : 0;
-         sGeneralPicked = true;
-         if (ImGui::BeginTabItem(L("General & Performance"), nullptr, generalFlags))
+         if (sTab == 3)
          {
             ImGui::Spacing();
             FormParts::Section(T("Autosave"));
@@ -880,11 +913,10 @@ namespace app
             }
 
             SectionCard::End();
-            ImGui::EndTabItem();
          }
 
          // 5. Field Language Reference Tab
-         if (ImGui::BeginTabItem(L("Field Language"), nullptr, 0))
+         if (sTab == 4)
          {
             static char sFilterBuf[64] = "";
             static int sSelectedSection = 0;
@@ -1201,11 +1233,10 @@ namespace app
             // i18n-skip-end
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
-            ImGui::EndTabItem();
          }
 
          // 6. Expression Globals Tab
-         if (ImGui::BeginTabItem(L("Expression Globals"), nullptr, 0))
+         if (sTab == 5)
          {
             ImGui::Spacing();
             FormParts::PushReferenceStyle();
@@ -1413,11 +1444,10 @@ namespace app
 
             FormParts::PopReferenceStyle();
             SectionCard::End();
-            ImGui::EndTabItem();
          }
 
          // 7. Extensions Tab: optional packs (docs/plans/extensions/README.md)
-         if (ImGui::BeginTabItem(L("Extensions")))
+         if (sTab == 6)
          {
             // Ask the catalog again whenever the tab opens, at most every 5 minutes, so a pack published while
             // Infinite is running shows up without a restart.
@@ -1561,14 +1591,12 @@ namespace app
             }
             SectionCard::End();
 
-            ImGui::EndTabItem();
          }
 
-         ImGui::EndTabBar();
-         FormParts::PopTabStyle();
       }
 
       SectionCard::EndWindow();
+      ImGui::EndChild();
       FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
