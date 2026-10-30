@@ -2816,12 +2816,16 @@ namespace
          if (!p.empty())
             LoadFile(p);
       }
-      if (HasAudioInput() || s.recording)
       {
+         const bool haveIn = HasAudioInput();
          FormParts::Inline(0.0f, in);
+         if (!haveIn && !s.recording)
+            ImGui::BeginDisabled();
          if (IconChip("##studioRecord", s.recording ? IconsInfinite::RecordFill : IconsInfinite::Record, s.recording,
-                      s.recording ? T("Stop recording (I)") : T("Record the audio input into a new sample (I)")))
+                      s.recording ? T("Stop recording (I)") : haveIn ? T("Record the audio input into a new sample (I)") : T("Connect an audio input to record")))
             s.recording ? StopRecording(true) : StartRecording();
+         if (!haveIn && !s.recording)
+            ImGui::EndDisabled();
       }
       FormParts::Inline(0.0f, in);
       if (TextChip(L("Generate##studioGen"), s.busy ? ActionButton::Kind::Go : ActionButton::Kind::Primary))
