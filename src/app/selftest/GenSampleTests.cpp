@@ -104,13 +104,13 @@ bool RunGenSampleBatch(const std::string& dir)
    int made = 0, failed = 0;
    // INFINITE_GENSAMPLEPARITY=1: only what the wasm parity test compares (tools/web_gen_parity.py).
    const bool parity = getenv("INFINITE_GENSAMPLEPARITY") != nullptr;
-   static const int kParityStyles[5] = { 0, 7, 14, 21, 28 }, kParityParts[6] = { 0, 1, 2, 3, 5, 6 };
+   static const int kParityStyles[5] = { 0, 7, 14, 21, 28 }, kParityParts[8] = { 0, 1, 2, 3, 5, 6, 9, 10 };
    for (int i = 0; i < SampleStyles::Count(); i++)
       for (int pi = 0; pi < (int)SampleStyles::Part::Count; pi++)
          for (uint32_t seed = 1; seed <= (parity ? 1u : 3u); seed++)
          {
             if (parity && (std::find(kParityStyles, kParityStyles + 5, i) == kParityStyles + 5 ||
-                           std::find(kParityParts, kParityParts + 6, pi) == kParityParts + 6))
+                           std::find(kParityParts, kParityParts + 8, pi) == kParityParts + 8))
                continue;
             SampleStyles::Recipe rec;
             rec.style = SampleStyles::At(i).id;

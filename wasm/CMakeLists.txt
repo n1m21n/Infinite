@@ -36,11 +36,15 @@ set(SRC
     ${R}/src/nodes/NoteNodes.cpp
     ${R}/src/nodes/OscillatorNode.cpp
     ${R}/src/nodes/PartialsNode.cpp
+    ${R}/src/nodes/PianoNode.cpp
+    ${R}/src/nodes/StringNode.cpp
+    ${R}/src/nodes/WindNode.cpp
     ${R}/src/nodes/SamplerNode.cpp
     ${R}/src/nodes/ImageSpectralSynthNode.cpp
     ${R}/src/nodes/AudioNodes.cpp
     ${R}/src/core/Patch.cpp
     ${R}/src/core/NodeFactory.cpp
+    ${R}/src/core/FactoryPresets.cpp
     ${R}/src/core/AudioSummary.cpp
     ${R}/src/core/Transport.cpp
     ${R}/src/core/AudioDecodeCache.cpp

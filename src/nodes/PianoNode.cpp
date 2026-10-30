@@ -12,6 +12,7 @@
 #include "audio/NoteEventQueue.h"
 #include "audio/ParamMailbox.h"
 #include "audio/dsp/DenseBody.h"
+#include "audio/dsp/ElectricPiano.h"
 
 namespace
 {
@@ -19,6 +20,7 @@ namespace
    {
       kParamBody = 0,
       kParamVolume,
+      kParamTremolo,
    };
 
    // One string's loop, long enough for A0 at 192 kHz.
@@ -209,6 +211,7 @@ public:
       mMailbox.PrepareToPlay(mSampleRate);
       mDcR = (float)std::exp(-2.0 * M_PI * 20.0 / mSampleRate);
       mBoard.Design(BoardSpec(), mSampleRate);
+      mElectric.Prepare(mSampleRate);
       Reset();
    }
 
@@ -217,6 +220,7 @@ public:
       for (auto& v : mVoices)
          v.active = false;
       mBoard.Reset();
+      mElectric.Reset();
       mDcIn[0] = mDcIn[1] = mDcOut[0] = mDcOut[1] = 0.0f;
       mNextAge = 1;
    }
@@ -240,6 +244,8 @@ public:
    {
       mMailbox.Push(kParamBody, n.body);
       mMailbox.Push(kParamVolume, n.volume);
+      mMailbox.Push(kParamTremolo, n.tremolo);
+      mModel.store(n.model, std::memory_order_relaxed);
       mHardness.store(n.hardness, std::memory_order_relaxed);
       mTone.store(n.tone, std::memory_order_relaxed);
       mDecay.store(n.decay, std::memory_order_relaxed);
@@ -257,6 +263,21 @@ public:
       for (int ch = 2; ch < output.numChannels; ch++)
          if (output.channels[ch])
             std::fill_n(output.channels[ch], output.numFrames, 0.0f);
+
+      // The model is chosen between notes: a switch stops what is ringing.
+      const int model = mModel.load(std::memory_order_relaxed);
+      if (model != mPlayingModel)
+      {
+         mPlayingModel = model;
+         Reset();
+         if (model != PianoNode::kGrand)
+            mElectric.SetModel(model);
+      }
+      if (model != PianoNode::kGrand)
+      {
+         ProcessElectric(outL, outR, output.numFrames);
+         return;
+      }
 
       bool any = false;
       for (const auto& v : mVoices)
@@ -398,6 +419,58 @@ public:
    }
 
 private:
+   void ProcessElectric(float* outL, float* outR, int numFrames)
+   {
+      ElectricPiano::Knobs k;
+      k.hardness = mHardness.load(std::memory_order_relaxed);
+      k.tone = mTone.load(std::memory_order_relaxed);
+      k.decay = mDecay.load(std::memory_order_relaxed);
+      k.detune = mDetune.load(std::memory_order_relaxed);
+      k.bell = mStiffness.load(std::memory_order_relaxed);
+      k.release = mRelease.load(std::memory_order_relaxed);
+      k.clipSemis = mClipPitch.load(std::memory_order_relaxed);
+      mElectric.SetKnobs(k);
+      if (mReleaseAll.exchange(false, std::memory_order_relaxed))
+         mElectric.ReleaseAll();
+      if (mRestrikeAll.exchange(false, std::memory_order_relaxed))
+         mElectric.RestrikeAll();
+
+      NoteEvent evts[64];
+      const int numEvts = mNoteInbox ? mNoteInbox->Pop(mNoteCursor, evts, 64) : 0;
+      int nextEvt = 0;
+      auto handle = [&](const NoteEvent& e) {
+         if (e.bendUpdate)
+            mElectric.Bend(e.voiceId, e.bendSemitones);
+         else if (e.isNoteOn && e.velocity > 0.0f)
+            mElectric.NoteOn(e.note, e.velocity, e.voiceId, e.bendSemitones);
+         else
+            mElectric.NoteOff(e.note, e.voiceId);
+      };
+      for (int i = 0; i < numFrames; i++)
+      {
+         while (nextEvt < numEvts && evts[nextEvt].frameOffset <= i)
+            handle(evts[nextEvt++]);
+         const float body = std::clamp(mMailbox.SmoothedValue(kParamBody), 0.0f, 1.0f);
+         const float volume = mMailbox.SmoothedValue(kParamVolume);
+         const float tremolo = std::clamp(mMailbox.SmoothedValue(kParamTremolo), 0.0f, 1.0f);
+         float l, r;
+         mElectric.Tick(body, tremolo, l, r);
+         l *= volume;
+         r *= volume;
+         if (!std::isfinite(l) || !std::isfinite(r))
+         {
+            l = r = 0.0f;
+            mElectric.Reset();
+         }
+         outL[i] = std::clamp(l, -4.0f, 4.0f);
+         if (outR)
+            outR[i] = std::clamp(r, -4.0f, 4.0f);
+      }
+      while (nextEvt < numEvts)
+         handle(evts[nextEvt++]);
+      mActiveVoiceCount.store(mElectric.ActiveVoices(), std::memory_order_relaxed);
+   }
+
    double NoteHz(const PianoVoice& v) const
    {
       const double clip = mClipPitch.load(std::memory_order_relaxed);
@@ -556,6 +629,8 @@ private:
    int mFitCursor = 0;
    float mDcR = 0.997f, mDcIn[2] = {}, mDcOut[2] = {};
    DenseBody::Bank mBoard;
+   ElectricPiano::Engine mElectric;
+   int mPlayingModel = PianoNode::kGrand;
 
    ParamMailbox mMailbox;
    NoteEventQueue* mNoteInbox = nullptr;
@@ -567,6 +642,7 @@ private:
    std::atomic<float> mDetune{ 0.3f };
    std::atomic<float> mStiffness{ 0.5f };
    std::atomic<float> mRelease{ 250.0f };
+   std::atomic<int> mModel{ PianoNode::kGrand };
    std::atomic<float> mClipPitch{ 0.0f };
    std::atomic<int> mActiveVoiceCount{ 0 };
    std::atomic<bool> mReleaseAll{ false };
@@ -609,8 +685,15 @@ void PianoNode::SweepPostAlter(const std::string& paramName, int& /*frameId*/)
       mAudioNode->RestrikeAll();
 }
 
+const std::vector<std::string>& PianoNode::ModelNames()
+{
+   static const std::vector<std::string> kNames = { "grand", "rhodes", "wurlitzer" };
+   return kNames;
+}
+
 void PianoNode::VisitParams(ParamVisitor& v)
 {
+   v.Int("model", model);
    v.Float("hardness", hardness);
    v.Float("tone", tone);
    v.Float("decay", decay);
@@ -618,5 +701,6 @@ void PianoNode::VisitParams(ParamVisitor& v)
    v.Float("stiffness", stiffness);
    v.Float("body", body);
    v.Float("release", release);
+   v.Float("tremolo", tremolo);
    v.Float("volume", volume);
 }

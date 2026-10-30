@@ -24,7 +24,7 @@ Read `docs/DECISIONS.md` and this file first.
 | 20, 22 | MET |
 | 21 | Learner built; blocked on data (0 real takes). Rerun `learn_from_logs.py learn` after a few hundred owner takes |
 | 15, 16, 18 | MET (HANDOFF): synths octave 3, clicks fitted to SubLab attacks, textures de-grumbled + birds/water/leaves |
-| 19 | Diva closed loop: not started |
+| 19 | Diva closed loop: bar MISSED, rows stay held out. On 30 takes each: leads low share 0.10 -> 0.19, synths centroid 931 -> 741 Hz |
 | Nodes | String / Piano / Wind: 8 / 8 / 9 factory presets; String pluck and strike levelled toward the bow. The String
 body dropdown is only the resonance (guitar is 1.7 dB from box at body 0.5); the presets carry the instrument |
 | 23 | Ship: only when the owner says |
@@ -33,7 +33,11 @@ body dropdown is only the resonance (guitar is 1.7 dB from box at body 0.5); the
 1. DSP review of every synth and audio-effect node (owner asked 2026-10-30): per node, the algorithm against its
    reference (Smith, Välimäki, Zölzer, Pirkle, Farnell), aliasing, denormals, level, parameter law; measured with the
    existing render tools (own_sweeps, click_measure, band_measure). Output: a ranked fix list, then fixes one by one.
-2. Item 19, Diva closed loop: `vital_voice_bank.py --diva`; Diva rows held out (`BankVoice` keeps `src == 0`). Bar: no darker.
+2. Real voices: Generate Samples now draws Piano (grand, Rhodes, Wurlitzer), String and Wind for keys, plucks, pads and leads, from their factory presets (`RealVoice`). The keys gate's high floor went to 0: piano spectra sit under the synth-fitted 0.001.
+
+3. OPEN BUG: Wind has never appeared in a lead take (0 of 204 in the web build). Piano and String do. The trace `kind / real.size()` in the leads branch showed real 0 on 4 takes, too few to tell chance from a fault: count it over a few hundred takes first.
+
+Web parity: 32 of 40 identical to desktop. The other 8 differ in length only, because the web's RoleCritic redraws and the native batch does not.
 
 ## Item 23, ship (needs the owner)
 Desktop deploy of what passed (`scripts/deploy_desktop.sh`, headless smoke with 0 fails). Before any push, reconcile `main`

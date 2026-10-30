@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Website generator parity: the wasm build must match the desktop render.
 
-5 styles x 6 parts at seed 1: same length, integrated LUFS within 0.5 dB, correlation > 0.99.
+5 styles x 8 parts at seed 1: same length, integrated LUFS within 0.5 dB, correlation > 0.99.
   INFINITE_GENSAMPLEPARITY=1 INFINITE_GENSAMPLEBATCH=<native_dir> build/Infinite.app/Contents/MacOS/Infinite
   node wasm/parity_dump.js build-wasm/infinite_gen_wasm.js <wasm_dir>
   python3 tools/web_gen_parity.py <native_dir> <wasm_dir>

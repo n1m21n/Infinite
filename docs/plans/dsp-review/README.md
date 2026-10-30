@@ -52,4 +52,16 @@ Not fixing: EQ shelf residual, rate-dependent releases, Transient Shaper max boo
 
 Piano family score after #1: 7.72 (was 6.26), a miss on that metric. Same loudness as before now, so the rise is real but small: fullness gap 0.13 -> 0.26 sd, attack 0.30 -> 0.51 sd (still inside the library's quartiles). Brightness and warmth moved closer. The largest gap, before and after, is loudness (2.4 sd), which is not timbre. Piano presets remain close: nearest other preset 1.7-4.8 dB, because all eight share one board.
 
-Open: board size per preset (grand / upright), and electric pianos: tine + tone bar modes, pickup nonlinearity (Falaize & Hélie 2017), Wurlitzer reed.
+Open: board size per preset (grand / upright).
+
+## Electric pianos in the Piano node (2026-10-30)
+`src/audio/dsp/ElectricPiano.h`: `model` = grand / rhodes / wurlitzer, 8 new presets. Four tip modes struck by a Hunt-Crossley hammer, read through the pickup's nonlinear field law, a preamp and a speaker.
+
+| Part | Source | Measured or voiced |
+|---|---|---|
+| Rhodes pickup field, velocity bark | Falaize & Hélie 2017 | form from the paper, distance by knob |
+| Rhodes Q per pitch, inharmonic overtones die fast, centring shifts to 2nd partial | Shear 2011 | measured there |
+| Wurlitzer reed, dominant first mode, tip displacement, electrostatic pickup | Pfeifle 2017; Pfeifle & Münster 2017 | measured there; pickup law is a soft curve of that shape |
+| Preamp high-pass, tube amp, speaker curves, Wurlitzer Q | GroupDIY 200A notes | voiced, not measured |
+
+C4 at velocity 100, direct out, rms over 0.5 s: Rhodes -15.9, Wurlitzer -15.4, grand -18.6. Soft to hard at C4: Rhodes H2 -21 to -1 dB, Wurlitzer -36 to -12 dB. Only the owner's ear can sign off the sound.

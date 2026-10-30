@@ -1,10 +1,10 @@
-// Renders the parity set through the wasm build: 5 styles x 6 parts at seed 1 -> <dir>/<style>-<part>-1.wav (float32 stereo).
+// Renders the parity set through the wasm build: 5 styles x 8 parts at seed 1 -> <dir>/<style>-<part>-1.wav (float32 stereo).
 // usage: node parity_dump.js <infinite_gen_wasm.js> <outdir>
 const fs = require('fs');
 const factory = require(require('path').resolve(process.argv[2]));
 const out = process.argv[3];
-const STYLES = [0, 7, 14, 21, 28], PARTS = [0, 1, 2, 3, 5, 6];
-const PART_NAMES = { 0: 'all', 1: 'synths', 2: 'pads', 3: 'plucks', 5: 'drums', 6: 'bass' };
+const STYLES = [0, 7, 14, 21, 28], PARTS = [0, 1, 2, 3, 5, 6, 9, 10];
+const PART_NAMES = { 0: 'all', 1: 'synths', 2: 'pads', 3: 'plucks', 5: 'drums', 6: 'bass', 9: 'keys', 10: 'leads' };
 factory().then(M => {
   fs.mkdirSync(out, { recursive: true });
   for (const s of STYLES) for (const p of PARTS) {

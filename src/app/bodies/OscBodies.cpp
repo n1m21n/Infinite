@@ -2235,20 +2235,32 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawPianoDiagram(n, 28.0f);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      // 2 x 4: the hammer and the strings' sound, then their tuning, the
-      // soundboard, the dampers and the level.
+      // 2 x 4 under the model: the hammer and the strings' sound, then their
+      // tuning, the soundboard, the dampers and the level. An electric reads
+      // the same knobs as its pickup, fork and speaker.
+      const bool electric = n->model != PianoNode::kGrand;
       {
-         AudioKnobRow row(4);
-         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
-         row.Knob("tone", &n->tone, 0.0f, 1.0f, "%.2f");
-         row.Knob("decay", &n->decay, 0.0f, 1.0f, "%.2f");
-         row.Knob("detune", &n->detune, 0.0f, 1.0f, "%.2f");
+         AudioKnobRow row(electric ? 2 : 1);
+         row.Dropdown("model##pianoModel", PianoNode::ModelNames(), n->model, [n](int i) {
+            PushUndoCheckpoint();
+            n->model = i;
+         });
+         if (electric)
+            row.Knob("tremolo", &n->tremolo, 0.0f, 1.0f, "%.2f");
          row.End();
       }
       {
          AudioKnobRow row(4);
-         row.Knob("stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f");
-         row.Knob("body", &n->body, 0.0f, 1.0f, "%.2f");
+         row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         row.Knob(electric ? "pickup" : "tone", &n->tone, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "tone");
+         row.Knob("decay", &n->decay, 0.0f, 1.0f, "%.2f");
+         row.Knob(electric ? "fork" : "detune", &n->detune, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "detune");
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob(electric ? "bell" : "stiffness", &n->stiffness, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "stiffness");
+         row.Knob(electric ? "speaker" : "body", &n->body, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "body");
          row.Knob("release", &n->release, 10.0f, 2000.0f, "%.0f ms", kKnobSmall, false, false,
                   AudioWidgetStyle::KnobSkewRelease400);
          row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);

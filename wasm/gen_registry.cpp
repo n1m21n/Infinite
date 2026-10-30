@@ -13,8 +13,11 @@
 #include "nodes/NoteNodes.h"
 #include "nodes/OscillatorNode.h"
 #include "nodes/PartialsNode.h"
+#include "nodes/PianoNode.h"
 #include "nodes/SamplerNode.h"
+#include "nodes/StringNode.h"
 #include "nodes/WavetableNode.h"
+#include "nodes/WindNode.h"
 
 void RegisterGenNodes()
 {
@@ -23,6 +26,9 @@ void RegisterGenNodes()
    REGISTER_NODE(AnalogNode, Analog, "Synths");
    REGISTER_NODE(FMNode, FM, "Synths");
    REGISTER_NODE(PartialsNode, Partials, "Synths");
+   REGISTER_NODE(StringNode, String, "Synths");
+   REGISTER_NODE(PianoNode, Piano, "Synths");
+   REGISTER_NODE(WindNode, Wind, "Synths");
    REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
    REGISTER_NODE(MetallicNode, Metallic, "Synths");
    REGISTER_NODE(SamplerNode, Sampler, "Synths");
