@@ -25,7 +25,7 @@ Fill in the owner-feedback section (§1) after a hands-on session, and turn each
 | Record | MIDI record chip, enabled only with a MIDI controller; writes notes while the transport plays |
 | Ruler / strip | Sample Studio's ruler (bar and bar.beat labels by zoom), compact clip strip |
 
-Status: built, not yet driven by the owner. Note settings (Expression at start) were kept.
+Status: built; panels-sweep 8/8, PIANOROLLTEST and NOTEGENTEST pass, determinism check identical, i18n lint clean. Ratchet: no piano-roll file over its allowance (SampleStudio and Settings were already over). node-ui-sweep: 4 drag fixtures fail with the roll closed (unconfirmed against main). Not driven by the owner. Note settings (Expression at start) were kept.
 
 ---
 
@@ -66,11 +66,11 @@ Open the panel with `Shift+R` or View > Piano Roll. Add a Piano Roll node on the
 | U3 | The roll showed about three rows at the 340 pt default height | `gPianoRollHeight` is now 480 | fixed; **a height saved in your layout (`panelPianoRollH`) still wins**, so drag it taller once if it opens small |
 | U4 | A fresh take landed off-view, so chords looked cut off | `FitRows`, live refit while `autoFit` | fixed |
 | U5 | Drum labels overlapped at 12 pt rows | drum rows have an 18 pt floor | fixed |
-| U6 | The "Takes" label's baseline sits slightly above its chips | `DrawTakes` | **open** |
-| U7 | The C4 label sits oddly relative to its row; check the octave naming (C3 vs C4 for MIDI 60) matches `DrawMidiKeyboard` and the rest of the app | key column | **open** |
-| U8 | The rows fit only until the user scrolls or zooms; after that a new take can land off-view again | `FitRows`, `autoFit` | **open**: decide between refit on every Generate (current) and a "jump to notes" when a take lands outside the view |
-| U9 | Screenshots at three zoom levels (spec §10's check) not taken | — | **open** |
-| U10 | Light theme (Infinite Paper) checked only for Generate shots, not for clips, the expression lane and the menus | — | **open** |
+| U6 | The "Takes" label's baseline | `DrawTakes` | moot: takes removed |
+| U7 | The C4 label sits oddly relative to its row; check the octave naming (C3 vs C4 for MIDI 60) matches the rest of the app | key column | fixed: MIDI 60 is C4, as in the note bodies |
+| U8 | The rows fit only until the user scrolls or zooms; after that a new take can land off-view again | `FitRows`, `autoFit` | decided: keep refit on every Generate (current) |
+| U9 | Screenshots at three zoom levels (spec §10's check) | — | partly done: default zoom, dark and light; the ruler labels switch by zoom in code |
+| U10 | Light theme (Infinite Paper) | — | checked on the roll, toolbar and scale lanes (lanes softened); menus not shot |
 
 Screenshot route (any page, either theme):
 
@@ -92,11 +92,11 @@ Add `INFINITE_THEME="Infinite Paper"` for the light theme.
 | S2 | §9: the takes row sits under the clip strip | It sits above the ruler | Decide: keep it (it is near the Generate chip) or move it under the clip strip as drawn |
 | S3 | §12.4: takes are recipes (seed + settings), one line each | `gentake` stores the full spec | Fine as is (still one line); update the spec text |
 | S4 | §12.3: harmony from another page's chords | Not in B | Block C, with types 9-12 |
-| S5 | §4.1: Consolidate | Not found in the panel | Add (merge the selected clips into one) or move it to Block C |
+| S5 | §4.1: Consolidate | Not in the panel | moved to Block C |
 | S6 | §4.1: drag a clip onto another page's tab to move it to that lane | Check: not found in a code search | Add or move it to Block C |
 | S7 | §9: the empty-page text "Draw a clip, drop a .mid, or record" | Check in the app | Add if missing (without "record" until Block C) |
-| S8 | §4.5: fold shows only keys in use **or** only scale keys | The fold chip says "Fold to the keys in use" | Add fold-to-scale, or a second mode on the same chip |
-| S9 | §11 decision 4: Sample Studio's scissors should move from `C` to `B` | Not done | One-line follow-up in `SampleStudioPanel.cpp`, with a help-table row |
+| S8 | §4.5: fold shows only keys in use **or** only scale keys | The fold chip says "Fold to the keys in use" | decided: not added; scale snap now colours the lanes, which covers the need |
+| S9 | §11 decision 4: Sample Studio's scissors should move from `C` to `B` | Not done | left alone: Sample Studio is outside this round; do it with its own help-table row |
 
 ---
 

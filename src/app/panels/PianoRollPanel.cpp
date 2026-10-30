@@ -270,7 +270,7 @@ namespace
    std::string PitchName(int pitch)
    {
       static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-      return std::string(kNames[pitch % 12]) + std::to_string(pitch / 12 - 2);
+      return std::string(kNames[pitch % 12]) + std::to_string(pitch / 12 - 1);
    }
 
    // Every note of the clip as it plays in its box, the schedule's walk.
@@ -668,6 +668,8 @@ namespace
    {
       const State& s = S();
       const int root = Transport::Instance().Key();
+      const ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+      const bool lightTheme = (bg.x + bg.y + bg.z) > 1.5f;
       for (int r = (int)s.topRow; r < (int)s.rows.size(); r++)
       {
          const float y = a.RowY((float)r);
@@ -680,7 +682,7 @@ namespace
          else if (InScale(p))
             dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), snapping ? AccentU32(0.13f) : Tint(0.045f));
          else if (snapping) // notes cannot land here: a dark lane
-            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), IM_COL32(0, 0, 0, 70));
+            dl->AddRectFilled(ImVec2(a.x0, y), ImVec2(a.x1, y + s.keyH), IM_COL32(0, 0, 0, lightTheme ? 22 : 70));
          dl->AddLine(ImVec2(a.x0, y), ImVec2(a.x1, y), Tint(p % 12 == 11 ? 0.16f : 0.04f));
       }
       Tick grid = ArrangeSnapGridTicks();
