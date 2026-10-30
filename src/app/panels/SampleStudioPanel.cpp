@@ -77,7 +77,7 @@ namespace
    }
 
    using P = SampleStyles::Part;
-   const P kParts[] = { P::Synths, P::Keys, P::Leads, P::Pads, P::Plucks, P::Textures, P::Bass, P::Drums,
+   const P kParts[] = { P::Synths, P::Keys, P::Piano, P::Leads, P::Strings, P::Winds, P::Pads, P::Plucks, P::Textures, P::Bass, P::Drums,
                         P::Kicks, P::Snares, P::Hats, P::Toms, P::Percussion, P::Fx, P::Foley };
    const int kBars[] = { 1, 2, 4, 8 };
 

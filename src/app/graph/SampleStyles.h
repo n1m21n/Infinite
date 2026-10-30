@@ -46,6 +46,9 @@ namespace SampleStyles
       Snares,     // snare and clap
       Hats,       // closed and open hats
       Toms,       // toms and bell
+      Strings,    // the String node: bowed chords held long, or plucked ones arpeggiated
+      Winds,      // the Wind node: a single line on a clarinet, sax, flute or brass voice
+      Piano,      // the Piano node: chords on a grand, upright or felt piano, or an electric (tine, reed)
       Count
    };
    const char* PartName(Part p); // lowercase: "all", "synths", ...

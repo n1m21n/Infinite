@@ -1330,7 +1330,7 @@ namespace SampleStyles
 {
 const char* PartName(Part p)
 {
-   static const char* const kNames[] = { "all", "synths", "pads", "plucks", "percussion", "drums", "bass", "fx", "foley", "keys", "leads", "textures", "kicks", "snares", "hats", "toms" };
+   static const char* const kNames[] = { "all", "synths", "pads", "plucks", "percussion", "drums", "bass", "fx", "foley", "keys", "leads", "textures", "kicks", "snares", "hats", "toms", "strings", "winds", "piano" };
    const int i = (int)p;
    return i >= 0 && i < (int)Part::Count ? kNames[i] : kNames[0];
 }
@@ -1486,7 +1486,10 @@ Compiled Compile(const Recipe& recipe)
    // same and a part is that layer of the seed's full mix; a layer the part
    // leaves out goes no further than the mixer (the offline graph renders
    // only what reaches the tap). The drums still feed the sidechains.
-   const bool pads = part == Part::Pads, plucks = part == Part::Plucks;
+   // Strings ride the pads path (bowed) or the plucks path (plucked), on the String node; the choice has its own stream.
+   const bool stringsPart = part == Part::Strings;
+   const bool bowed = stringsPart && Rng(std::string("strings:") + std::to_string(recipe.seed)).Uniform() < 0.5;
+   const bool pads = part == Part::Pads || bowed, plucks = part == Part::Plucks || (stringsPart && !bowed);
    const bool wantBass = full || part == Part::Synths;
    bool wantChords = full || pads || plucks;
    const bool wantMotif = wantBass;
@@ -1609,7 +1612,13 @@ Compiled Compile(const Recipe& recipe)
       pluckStab = kStab[shapeRng.Range(4)];
       // Some takes are a real instrument: plucked and hammered strings, a bowed section. On its own stream.
       Rng rv(std::string("real:chords:") + std::to_string(recipe.seed));
-      if (plucks && rv.Uniform() < 0.35)
+      if (stringsPart)
+      {
+         shapedVoice = "String";
+         shapedEnv = bowed ? RealVoice("String", { "Violin Bowed", "Cello Bowed" }, rv)
+                           : RealVoice("String", { "Nylon Guitar", "Steel Guitar", "Concert Harp", "Violin Pizzicato", "Cello Pizzicato", "Struck Dulcimer" }, rv);
+      }
+      else if (plucks && rv.Uniform() < 0.35)
       {
          shapedVoice = "String";
          shapedEnv = RealVoice("String", { "Nylon Guitar", "Steel Guitar", "Concert Harp", "Violin Pizzicato", "Cello Pizzicato", "Struck Dulcimer" }, rv);
@@ -2658,7 +2667,7 @@ Compiled Compile(const Recipe& recipe)
    // each take picks a kit (an instrument or a kind of sound), then draws the
    // kit's ranges and a rhythm. Nothing here moves the other parts' draws.
    const bool bassPart = part == Part::Bass, fxPart = part == Part::Fx, foleyPart = part == Part::Foley;
-   const bool keysPart = part == Part::Keys, leadPart = part == Part::Leads, texPart = part == Part::Textures;
+   const bool keysPart = part == Part::Keys || part == Part::Piano, leadPart = part == Part::Leads || part == Part::Winds, texPart = part == Part::Textures;
    const bool ownSpace = fxPart || foleyPart || keysPart || leadPart || texPart; // sets its own reverb
    double specialWet = 0.2, specialDecay = 1.6;
    if (bassPart || fxPart || foleyPart || keysPart || leadPart || texPart)
@@ -3136,7 +3145,15 @@ Compiled Compile(const Recipe& recipe)
             // Most electric and felt pianos are the Piano node's own models. On its own stream: the draws stay put.
             Rng rv(std::string("real:keys:") + std::to_string(recipe.seed));
             Params real;
-            if (kind == 0 && rv.Uniform() < 0.75)
+            // The piano part always plays the Piano node: half acoustic, half electric (its own stream as well).
+            if (part == Part::Piano)
+            {
+               Rng pr(std::string("piano:") + std::to_string(recipe.seed));
+               kind = pr.Uniform() < 0.5 ? 2 : 0;
+               real = kind == 0 ? RealVoice("Piano", { "Mark I", "Suitcase", "Bell Tine", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed" }, pr)
+                                : RealVoice("Piano", { "Grand", "Bright Grand", "Upright", "Felt Piano", "Honky-Tonk", "Dark Grand", "Muted" }, pr);
+            }
+            else if (kind == 0 && rv.Uniform() < 0.75)
                real = RealVoice("Piano", { "Mark I", "Suitcase", "Bell Tine", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed" }, rv);
             else if (kind == 2 && rv.Uniform() < 0.75)
                real = RealVoice("Piano", { "Grand", "Felt Piano", "Upright", "Dark Grand" }, rv);
@@ -3313,7 +3330,11 @@ Compiled Compile(const Recipe& recipe)
             // A horn or reed in place of the stacks: a brass kind always leans to brass.
             Rng rv(std::string("real:lead:") + std::to_string(recipe.seed));
             Params real;
-            if (kind == 0 ? rv.Uniform() < 0.7 : kind != 4 && rv.Uniform() < 0.15)
+            // The winds part always plays one, from the whole set.
+            if (part == Part::Winds)
+               real = kind == 0 ? RealVoice("Wind", { "Solo Trumpet", "Soft Horn", "Brass Swell" }, rv)
+                                : RealVoice("Wind", { "Clarinet", "Dark Clarinet", "Tenor Sax", "Overblown Sax", "Breathy Flute", "Pan Flute" }, rv);
+            else if (kind == 0 ? rv.Uniform() < 0.7 : kind != 4 && rv.Uniform() < 0.15)
                real = kind == 0 ? RealVoice("Wind", { "Solo Trumpet", "Soft Horn" }, rv)
                                 : RealVoice("Wind", { "Tenor Sax", "Clarinet", "Breathy Flute", "Solo Trumpet" }, rv);
             if (kind == 4) // vowel: a sung stack on top of the supersaw

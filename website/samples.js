@@ -5,7 +5,7 @@
   var gens = [], genEl = document.getElementById('smp-gen'), genBtn = document.getElementById('smp-gen-btn');
   function byId(id) { return items.concat(gens).filter(function (x) { return x.id === id; })[0]; }
   // Filters: what a sample is (the Generate Samples node's parts; a whole mix is only under "all") and its key.
-  var PARTS = ['synths', 'keys', 'leads', 'pads', 'plucks', 'textures', 'bass', 'drums', 'kicks', 'snares', 'hats', 'toms', 'percussion', 'fx'];
+  var PARTS = ['synths', 'keys', 'piano', 'leads', 'strings', 'winds', 'pads', 'plucks', 'textures', 'bass', 'drums', 'kicks', 'snares', 'hats', 'toms', 'percussion', 'fx'];
   var filt = { part: '', scale: '', key: '' };
   var NOTES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
   function noteOf(x) { return x.key ? String(x.key).split(' ')[0] : ''; }
@@ -67,7 +67,7 @@
   // The generator is the desktop engine compiled to wasm, run in a worker; it loads on the first press.
   var worker = null, info = null, jobs = {}, jobId = 0, serial = 0, busy = false;
   var SCALES = ['major', 'natural minor', 'harmonic minor', 'melodic minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian', 'major pentatonic', 'minor pentatonic', 'blues', 'whole tone', 'chromatic'];
-  var PART_INDEX = { '': 0, synths: 1, pads: 2, plucks: 3, percussion: 4, drums: 5, bass: 6, fx: 7, foley: 8, keys: 9, leads: 10, textures: 11, kicks: 12, snares: 13, hats: 14, toms: 15 };
+  var PART_INDEX = { '': 0, synths: 1, pads: 2, plucks: 3, percussion: 4, drums: 5, bass: 6, fx: 7, foley: 8, keys: 9, leads: 10, textures: 11, kicks: 12, snares: 13, hats: 14, toms: 15, strings: 16, winds: 17, piano: 18 };
   function ask(msg) {
     if (!worker) {
       worker = new Worker('../gen/gen-worker.js?v=9');

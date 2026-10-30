@@ -497,7 +497,7 @@ namespace SampleCriticData
    {
       float minLow, maxLow, minMid, minHigh, maxHigh, minCrest, maxSilence, maxWhistle;
    };
-   constexpr PartSpectralGate kPartSpectralGates[16] = {
+   constexpr PartSpectralGate kPartSpectralGates[19] = {
       { 0.016f, 0.996f, 0.002f, 0.000f, 0.751f, 0.953f, 0.350f, 0.473f }, // full
       { 0.001f, 1.000f, 0.000f, 0.000f, 0.608f, 1.935f, 1.000f, 0.729f }, // synths
       { 0.000f, 0.957f, 0.033f, 0.000f, 0.901f, 2.769f, 1.000f, 0.829f }, // pads
@@ -514,6 +514,11 @@ namespace SampleCriticData
       { 0.000f, 0.823f, 0.011f, 0.004f, 0.964f, 7.489f, 0.943f, 0.667f }, // snares
       { 0.000f, 0.352f, 0.002f, 0.346f, 0.998f, 8.265f, 0.737f, 0.571f }, // hats
       { 0.327f, 0.997f, 0.002f, 0.000f, 0.350f, 1.937f, 0.877f, 0.405f }, // toms
+      // Not fitted yet (nor piano below): strings take the looser of pads and plucks (they play one or the other), winds take leads.
+      { 0.000f, 0.957f, 0.033f, 0.000f, 0.901f, 2.769f, 1.000f, 0.832f }, // strings
+      { 0.000f, 0.955f, 0.034f, 0.000f, 0.538f, 2.152f, 0.350f, 0.688f }, // winds
+      // piano: keys, with room for a grand's low end.
+      { 0.000f, 0.750f, 0.200f, 0.000f, 0.395f, 3.170f, 0.474f, 0.616f }, // piano
    };
 
    // Same checks, same order as tools/universe/spectral_gates.py verify(); gates fitted on real renders.
@@ -532,7 +537,7 @@ namespace SampleCriticData
       }
       if (tot <= 1e-12)
          return false;
-      const PartSpectralGate& g = kPartSpectralGates[(partIdx >= 0 && partIdx < 16) ? partIdx : 0];
+      const PartSpectralGate& g = kPartSpectralGates[(partIdx >= 0 && partIdx < 19) ? partIdx : 0];
       low /= tot;
       mid /= tot;
       high /= tot;

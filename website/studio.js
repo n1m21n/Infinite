@@ -2,7 +2,7 @@
 // sample shifts (tempo, scale, hats, filters, tails, space), re-rendered by the real engine in a worker.
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var PARTS = [['', 'full mix', 0], ['synths', 'synths', 1], ['keys', 'keys', 9], ['leads', 'leads', 10], ['pads', 'pads', 2], ['plucks', 'plucks', 3],
+  var PARTS = [['', 'full mix', 0], ['synths', 'synths', 1], ['keys', 'keys', 9], ['piano', 'piano', 18], ['leads', 'leads', 10], ['strings', 'strings', 16], ['winds', 'winds', 17], ['pads', 'pads', 2], ['plucks', 'plucks', 3],
     ['bass', 'bass', 6], ['textures', 'textures', 11], ['drums', 'drums', 5], ['kicks', 'kicks', 12], ['snares', 'snares', 13], ['hats', 'hats', 14],
     ['toms', 'toms', 15], ['percussion', 'percussion', 4], ['fx', 'fx', 7], ['foley', 'foley', 8]];
   var KEYLESS = { 4: 1, 5: 1, 7: 1, 8: 1, 12: 1, 13: 1, 14: 1, 15: 1 };

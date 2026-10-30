@@ -497,7 +497,7 @@ namespace app
 
       // The parts, melodic then rhythmic then effects; "all" stays in the engine but is not offered.
       using P = SampleStyles::Part;
-      static const P kParts[] = { P::Synths, P::Keys, P::Leads, P::Pads, P::Plucks, P::Textures, P::Bass, P::Drums,
+      static const P kParts[] = { P::Synths, P::Keys, P::Piano, P::Leads, P::Strings, P::Winds, P::Pads, P::Plucks, P::Textures, P::Bass, P::Drums,
                                   P::Kicks, P::Snares, P::Hats, P::Toms, P::Percussion, P::Fx, P::Foley };
       static std::vector<std::string> partNames;
       if (partNames.empty())
