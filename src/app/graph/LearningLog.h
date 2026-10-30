@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "app/graph/SampleStyles.h"
 
@@ -32,7 +33,9 @@ namespace LearningLog
    uint64_t FolderBytes();
 
    // Generate Samples. `owner` is the node the take landed in; a new take from the same owner settles the last one.
-   void TakeMade(const void* owner, const SampleStyles::Recipe& r, int attempt, float bpm, int root, int scale);
+   // `picks`: Compiled::picks, what the take drew from the note and voice banks (the learner weighs those).
+   void TakeMade(const void* owner, const SampleStyles::Recipe& r, int attempt, float bpm, int root, int scale,
+                 const std::vector<std::string>* picks = nullptr);
    void TakeEdited(const void* owner);  // the node's settings moved off the take (counts within 30 s of it)
    void TakeDeleted(const void* owner); // the node went away
    // A take worth taking away (exported, sliced, made a node or patch): the outcome plus its audio features.

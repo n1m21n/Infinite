@@ -82,6 +82,9 @@ namespace SampleStyles
       int root = 0;
       int scale = 0;
       std::vector<app::OfflineGraph::Motion> motions;
+      // What the take drew, in order: "prog:<i>" and "line:<i>" (note bank rows), "voice:vital:<role>:<row>" and
+      // "voice:designed:<voice>". A part whose voice is replaced lists both; the later one plays. For local learning.
+      std::vector<std::string> picks;
       std::string error;   // non-empty: unknown style
    };
    Compiled Compile(const Recipe& r);

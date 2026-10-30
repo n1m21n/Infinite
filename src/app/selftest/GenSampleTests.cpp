@@ -800,6 +800,22 @@ bool RunLearningLogTest()
                  .dump()
            << "\n";
    }
+   {
+      // The compiler names what it drew, so the learner can weigh bank lines and voices.
+      int voices = 0, lines = 0;
+      for (uint32_t sd = 1; sd <= 8; sd++)
+      {
+         SampleStyles::Recipe rr;
+         rr.part = SampleStyles::Part::Synths;
+         rr.seed = sd;
+         for (const std::string& k : SampleStyles::Compile(rr).picks)
+         {
+            voices += k.rfind("voice:", 0) == 0;
+            lines += k.rfind("line:", 0) == 0 || k.rfind("prog:", 0) == 0;
+         }
+      }
+      check(voices >= 8 && lines >= 1, "compiler lists its voice and bank picks");
+   }
    check(LearningLog::RebuildProfile(), "profile built");
    nlohmann::json p = nlohmann::json::parse(std::ifstream(dir / "profile" / "user_profile.json"), nullptr, false);
    check(!p.is_discarded() && p["taste"].value("takes", 0) == 5, "profile: five takes");

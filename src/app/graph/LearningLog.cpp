@@ -504,7 +504,8 @@ namespace LearningLog
       gStarted = false;
    }
 
-   void TakeMade(const void* owner, const SampleStyles::Recipe& r, int attempt, float bpm, int root, int scale)
+   void TakeMade(const void* owner, const SampleStyles::Recipe& r, int attempt, float bpm, int root, int scale,
+                 const std::vector<std::string>* picks)
    {
       if (!Writing() || !owner)
          return;
@@ -523,6 +524,8 @@ namespace LearningLog
                  { "root", root }, { "scale", scale }, { "follow_bpm", r.bpm > 0.0f }, { "follow_key", r.key >= 0 },
                  { "tone", r.tone }, { "energy", r.energy }, { "space", r.space }, { "mood", r.mood },
                  { "version", INFINITE_VERSION_STRING } };
+      if (picks && !picks->empty())
+         p.line["picks"] = *picks;
       gLastTake[owner] = p.id;
       gPending[owner] = std::move(p);
    }

@@ -169,6 +169,7 @@ bool GenerateSamplesNode::StartAttempt(int attempt)
    madeBpm = c.bpm;
    madeRoot = c.root;
    madeScale = c.scale;
+   madePicks = c.picks;
 
    // A pre-roll of one drum pattern (2 bars; 1 for a 1-bar loop) renders
    // first and is dropped: the loop then starts with the reverb and release
@@ -230,7 +231,7 @@ void GenerateSamplesNode::Finish()
    // Not a new take: a reopened patch rendering its saved take again, or a take brought over from the Sample studio
    // (kept there already).
    if (!mRestoreRange && !keepSeed)
-      LearningLog::TakeMade(this, made, attempt, madeBpm, madeRoot, madeScale);
+      LearningLog::TakeMade(this, made, attempt, madeBpm, madeRoot, madeScale, &madePicks);
    FinishBuffer(buf, MadeLabel(), "", "generated");
    if (mRestoreRange)
    {

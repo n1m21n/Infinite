@@ -84,6 +84,7 @@ public:
    float madeBpm = 0.0f;
    int madeRoot = 0;
    int madeScale = 0;
+   std::vector<std::string> madePicks; // what the compiler chose (bank lines, voices), for the learning log
    // "synths 1204, a natural minor": what the sample is, for its
    // name and a kept file's.
    std::string MadeLabel() const;

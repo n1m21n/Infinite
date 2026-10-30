@@ -16,6 +16,19 @@
 
 namespace
 {
+   // Compile's picks list while it runs (Compile is reentrant per thread, never nested).
+   thread_local std::vector<std::string>* gPicks = nullptr;
+   void NotePick(std::string what)
+   {
+      if (gPicks)
+         gPicks->push_back(std::move(what));
+   }
+   struct PickScope
+   {
+      explicit PickScope(std::vector<std::string>& v) { gPicks = &v; }
+      ~PickScope() { gPicks = nullptr; }
+   };
+
    struct GenStyle
    {
       const char* id;
@@ -1033,6 +1046,7 @@ namespace
    // A whole voice: both engines, the A/B balance (equal power), one filter and one amp shape on both.
    Params DesignVoice(Voice v, Rng& r)
    {
+      NotePick("voice:designed:" + std::to_string((int)v));
       Params k;
       k["volume"] = { 'f', "0.9" };
       k["frequency"] = { 'f', "440" };
@@ -1116,6 +1130,8 @@ namespace
          if (v.src == 0 && (v.style == kStyles[(int)role][0] || v.style == kStyles[(int)role][1]))
             pool.push_back(&v);
       const BankRow& v = *pool[(size_t)r.Range((int)pool.size())];
+      static const char* const kRoleNames[] = { "bass", "lead", "synth", "pluck" };
+      NotePick(std::string("voice:vital:") + kRoleNames[(int)role] + ":" + std::to_string(&v - kBankVoices));
       const bool bass = role == BankRole::Bass, pluck = role == BankRole::Pluck;
       const BankOsc* o[2] = { &v.a, &v.b };
       if (!v.a.on || (v.b.on && v.b.level > v.a.level))
@@ -1192,7 +1208,9 @@ namespace
       for (int i = 0; i < (int)(sizeof(kNoteProgs) / sizeof(kNoteProgs[0])); i++)
          if (kNoteProgs[i].minor == (MinorFamily(scale) ? 1 : 0))
             pool.push_back(i);
-      return kNoteProgs[pool[(size_t)r.Range((int)pool.size())]].d;
+      const int i = pool[(size_t)r.Range((int)pool.size())];
+      NotePick("prog:" + std::to_string(i));
+      return kNoteProgs[i].d;
    }
    // A bank line as 16 (degree, velocity 0..1) steps, velocity 0 a rest. The slight variation that makes one line many:
    // a note now and then steps to its neighbour degree, never the downbeat.
@@ -1202,7 +1220,9 @@ namespace
       for (int i = 0; i < (int)(sizeof(kNoteLines) / sizeof(kNoteLines[0])); i++)
          if (kNoteLines[i].minor == (MinorFamily(scale) ? 1 : 0) && kNoteLines[i].bass == (bass ? 1 : 0))
             pool.push_back(i);
-      const NoteLine& l = kNoteLines[pool[(size_t)r.Range((int)pool.size())]];
+      const int li = pool[(size_t)r.Range((int)pool.size())];
+      NotePick("line:" + std::to_string(li));
+      const NoteLine& l = kNoteLines[li];
       std::vector<std::pair<int, double>> out(16, { 0, 0.0 });
       for (int i = 0; i < 16; i++)
          if (l.d[i] != '.')
@@ -1304,6 +1324,7 @@ int Find(const std::string& id)
 Compiled Compile(const Recipe& recipe)
 {
    Compiled out;
+   PickScope picks(out.picks);
    const int si = Find(recipe.style);
    if (si < 0)
    {
