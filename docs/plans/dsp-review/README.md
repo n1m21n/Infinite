@@ -49,3 +49,7 @@ Not fixing: EQ shelf residual, rate-dependent releases, Transient Shaper max boo
 | # | Result |
 |---|---|
 | 1 | `src/audio/dsp/DenseBody.h`, used by String (96-200 modes per type) and Piano (224). String body types against box, rms dB of spectrum difference at body 0.5: 1.7-4.1 before, 5.9-8.3 after. Stereo with centred bass, left/right never anti-phase. STRINGTEST and factory presets pass |
+
+Piano family score after #1: 7.72 (was 6.26), a miss on that metric. Same loudness as before now, so the rise is real but small: fullness gap 0.13 -> 0.26 sd, attack 0.30 -> 0.51 sd (still inside the library's quartiles). Brightness and warmth moved closer. The largest gap, before and after, is loudness (2.4 sd), which is not timbre. Piano presets remain close: nearest other preset 1.7-4.8 dB, because all eight share one board.
+
+Open: board size per preset (grand / upright), and electric pianos: tine + tone bar modes, pickup nonlinearity (Falaize & Hélie 2017), Wurlitzer reed.
