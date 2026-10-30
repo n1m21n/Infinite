@@ -77,5 +77,7 @@
  "audition": 59723,
  "erase": 59724,
  "fold": 59725,
- "follow": 59726
+ "follow": 59726,
+ "piano": 59727,
+ "mute": 59728
 }

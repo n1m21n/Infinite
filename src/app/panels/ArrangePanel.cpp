@@ -2,6 +2,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/ToolCursor.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -1065,6 +1066,16 @@ namespace app
       if (overPanel && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
       {
          gArrangeClaimedKeys = true;
+         gSessionClaimedKeys = false;
+      }
+      // Blade, Pencil and Zoom draw their own pointer below; Trim and Range get the shared one.
+      if (overPanel && ImGui::IsWindowHovered() && !gArrangeBladeOn &&
+          (gArrangeTool == ArrangeTool::Trim || gArrangeTool == ArrangeTool::Range))
+         ToolCursor::Badge(gArrangeTool == ArrangeTool::Trim ? IconsInfinite::Trim : IconsInfinite::Range);
+      // One owner at a time: the panel under the pointer (Sample Studio, Piano Roll) takes the keys from the Timeline.
+      if ((gSampleStudioOpen && gSampleStudioClaimedKeys) || (gPianoRollOpen && gPianoRollClaimedKeys))
+      {
+         gArrangeClaimedKeys = false;
          gSessionClaimedKeys = false;
       }
       gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys || (gSampleStudioOpen && gSampleStudioClaimedKeys) ||

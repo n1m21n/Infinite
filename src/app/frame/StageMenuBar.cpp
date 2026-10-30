@@ -16,44 +16,44 @@
 
 namespace app
 {
-// The rail of panel toggles down the right edge. Settings sits on the top bar's centre line; Library and
-// the panels follow below a hairline, one tile apart.
+// The rail of panel toggles down the right edge. Library leads on the top bar's centre line and the panels follow,
+// one tile apart; Edit history sits in the bottom corner with Settings just above it.
 static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
-   const float first = (tok::bar_h - tok::tile) * 0.5f;
    const float step = tok::tile + tok::space_3;
-   if (PanelRail::Item("##railSettings", first, IconsInfinite::Settings, nullptr, gSettingsOpen,
-                       T("Settings")))
-      gSettingsOpen = !gSettingsOpen;
-   const float groupTop = tok::bar_h + tok::space_2;
-   if (PanelRail::Item("##railLibrary", groupTop, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
+   const float top = (tok::bar_h - tok::tile) * 0.5f + step; // Library starts level with the Viewport tile
+   if (PanelRail::Item("##railLibrary", top, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
                        T("Library - search modules, samples, media and plugins")))
       gNodePanelOpen = !gNodePanelOpen;
-   if (PanelRail::Item("##railViewport", groupTop + step, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
+   if (PanelRail::Item("##railViewport", top + step, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
                        T("Viewport panel")))
       gViewportPanelOpen = !gViewportPanelOpen;
-   if (PanelRail::Item("##railModMatrix", groupTop + 2.0f * step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
+   if (PanelRail::Item("##railModMatrix", top + 2.0f * step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
                        T("Modulation matrix")))
       gModMatrixOpen = !gModMatrixOpen;
-   if (PanelRail::Item("##railPerf", groupTop + 3.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
+   if (PanelRail::Item("##railPerf", top + 3.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
                        T("Performance mode")))
       gPerfPanelOpen = !gPerfPanelOpen;
-   if (PanelRail::Item("##railArrange", groupTop + 4.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
+   if (PanelRail::Item("##railArrange", top + 4.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
                        T("Arrangement timeline")))
       gArrangePanelOpen = !gArrangePanelOpen;
-   if (PanelRail::Item("##railSession", groupTop + 5.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
+   if (PanelRail::Item("##railSession", top + 5.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
                        T("Session - launch clips by scene")))
       gSessionPanelOpen = !gSessionPanelOpen;
-   if (PanelRail::Item("##railHistory", groupTop + 6.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
-                       T("Edit history - jump back to any earlier edit")))
-      gHistoryOpen = !gHistoryOpen;
-   if (PanelRail::Item("##railStudio", groupTop + 7.0f * step, IconsInfinite::Waveform, nullptr, gSampleStudioOpen,
+   if (PanelRail::Item("##railStudio", top + 6.0f * step, IconsInfinite::Waveform, nullptr, gSampleStudioOpen,
                        T("Sample studio - generate and shape a loop (Shift+W)")))
       gSampleStudioOpen = !gSampleStudioOpen;
-   if (PanelRail::Item("##railPianoRoll", groupTop + 8.0f * step, IconsInfinite::FamilyNotes, nullptr, gPianoRollOpen,
+   if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
+   const float bottom = ImGui::GetWindowHeight() - tok::tile - tok::space_2;
+   if (PanelRail::Item("##railSettings", bottom, IconsInfinite::Settings, nullptr, gSettingsOpen,
+                       T("Settings")))
+      gSettingsOpen = !gSettingsOpen;
+   if (PanelRail::Item("##railHistory", bottom - step, IconsInfinite::History, nullptr, gHistoryOpen,
+                       T("Edit history - jump back to any earlier edit")))
+      gHistoryOpen = !gHistoryOpen;
    PanelRail::End();
 }
 
