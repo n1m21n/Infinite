@@ -10,6 +10,7 @@
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
+#include "Transport.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -29,6 +30,46 @@ namespace
    }
    // Directional, sun and ambient lights hold a direction, the others a position.
    bool LightIsPositioned(int type) { return type == 1 || type == 4 || type == 5; }
+
+   // Every saved setting in one order, so writing and reading cannot drift.
+   // New ones go at the end: a line from an older patch just stops early.
+   template <typename F>
+   void SettingFields(Scene3DNode::Settings& s, F&& f)
+   {
+      f(s.fps); f(s.seconds); f(s.percent); f(s.transparent); f(s.snap);
+      f(s.snapMove); f(s.snapRot); f(s.snapScale); f(s.passAlpha);
+      f(s.safe); f(s.thirds); f(s.center); f(s.golden); f(s.safeTitle); f(s.safeAction);
+      f(s.orientation); f(s.pivot); f(s.cursor[0]); f(s.cursor[1]); f(s.cursor[2]);
+      f(s.zoomToMouse); f(s.orbitSelection); f(s.shadowItem);
+   }
+
+   void Normalize(float v[3])
+   {
+      const float len = std::max(1e-6f, std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]));
+      for (int k = 0; k < 3; k++)
+         v[k] /= len;
+   }
+   void Cross(const float a[3], const float b[3], float out[3])
+   {
+      out[0] = a[1] * b[2] - a[2] * b[1];
+      out[1] = a[2] * b[0] - a[0] * b[2];
+      out[2] = a[0] * b[1] - a[1] * b[0];
+   }
+   // Columns right, up, back of a frame looking along `forward`.
+   void LookBasis(const float forward[3], const float upHint[3], float basis[3][3])
+   {
+      for (int k = 0; k < 3; k++)
+         basis[2][k] = -forward[k];
+      Normalize(basis[2]);
+      Cross(upHint, basis[2], basis[0]);
+      if (basis[0][0] * basis[0][0] + basis[0][1] * basis[0][1] + basis[0][2] * basis[0][2] < 1e-8f)
+      {
+         const float other[3] = { 0, 0, 1 };
+         Cross(other, basis[2], basis[0]);
+      }
+      Normalize(basis[0]);
+      Cross(basis[2], basis[0], basis[1]);
+   }
 }
 
 // One item as Render 3D sees it: the source's own result with the placement
@@ -180,6 +221,10 @@ void Scene3DNode::RemoveItem(int id)
                 mItems.end());
    if (activeCamera == id)
       activeCamera = 0;
+   if (focusItem == id)
+      focusItem = 0;
+   if (settings.shadowItem == id)
+      settings.shadowItem = 0;
    mPlaced.erase(id);
    Commit();
 }
@@ -198,6 +243,9 @@ void Scene3DNode::Serialize()
    o << "camera " << activeCamera << "\n";
    o << "world " << worldUid << " " << (worldColorOn ? 1 : 0) << " " << worldColor[0] << " " << worldColor[1]
      << " " << worldColor[2] << " " << worldStrength << " " << focusItem << "\n";
+   o << "settings";
+   SettingFields(settings, [&](auto& v) { o << " " << +v; });
+   o << "\n";
    for (const Item& it : mItems)
    {
       o << "item " << it.id << " " << it.uid;
@@ -207,6 +255,18 @@ void Scene3DNode::Serialize()
       o << " " << (it.visible ? 1 : 0);
       for (uint64_t u : it.unlit) o << " " << u;
       o << "\n";
+      if (!it.name.empty())
+         o << "label " << it.id << " " << it.name << "\n";
+      if (!it.render)
+         o << "itemx " << it.id << " 0\n";
+      for (const Key& k : it.keys)
+      {
+         o << "key " << it.id << " " << k.t;
+         for (float v : k.pos) o << " " << v;
+         for (float v : k.rot) o << " " << v;
+         for (float v : k.scale) o << " " << v;
+         o << "\n";
+      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -216,6 +276,8 @@ void Scene3DNode::Parse()
 {
    mParsedText = mText;
    mItems.clear();
+   settings = Settings();
+   mKeyTime = -1.0;
    std::istringstream in(mText);
    std::string line;
    while (std::getline(in, line))
@@ -254,13 +316,49 @@ void Scene3DNode::Parse()
          mNextId = std::max(mNextId, it.id + 1);
          mItems.push_back(std::move(it));
       }
+      else if (key == "settings")
+         SettingFields(settings, [&](auto& v)
+         {
+            float x = 0;
+            if (l >> x)
+               v = (std::decay_t<decltype(v)>)x;
+         });
+      else if (key == "label" || key == "itemx" || key == "key")
+      {
+         int id = 0;
+         l >> id;
+         Item* it = FindItem(id);
+         if (it == nullptr)
+            continue;
+         if (key == "label")
+         {
+            l >> std::ws;
+            std::getline(l, it->name);
+         }
+         else if (key == "itemx")
+         {
+            int on = 1;
+            l >> on;
+            it->render = on != 0;
+         }
+         else
+         {
+            Key k;
+            l >> k.t;
+            for (float& v : k.pos) l >> v;
+            for (float& v : k.rot) l >> v;
+            for (float& v : k.scale) l >> v;
+            if (l)
+               it->keys.push_back(k);
+         }
+      }
    }
 }
 
 void Scene3DNode::VisitParams(ParamVisitor& v)
 {
-   v.Float("width", mRender.width);
-   v.Float("height", mRender.height);
+   v.Float("width", renderW);
+   v.Float("height", renderH);
    v.Int("samples", mRender.samples);
    v.Bool("shadows", mRender.shadowsEnabled);
    v.Float("exposure", mRender.exposure);
@@ -279,6 +377,11 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("focusDistance", mRender.focusDistance);
    v.Color("ambient", mRender.ambientColor);
    v.Float("envIntensity", mRender.envIntensity);
+   v.Bool("floatOutput", mRender.floatOutput);
+   v.Int("renderPass", mRender.renderPass);
+   v.Int("projection", mRender.projection);
+   v.Float("domeAngle", mRender.domeAngle);
+   v.Float("domeTilt", mRender.domeTilt);
    v.Text("scene", mText);
 }
 
@@ -301,6 +404,20 @@ bool Scene3DNode::ItemPoint(const Item& item, float out[3]) const
       return false;
    TransformPoint(Placement(item), p, out);
    return true;
+}
+
+void Scene3DNode::ItemCenter(const Item& item, float out[3])
+{
+   if (ItemPoint(item, out))
+      return;
+   float lo[3], hi[3];
+   if (ItemBounds(item.id, lo, hi))
+   {
+      for (int k = 0; k < 3; k++)
+         out[k] = (lo[k] + hi[k]) * 0.5f;
+      return;
+   }
+   std::memcpy(out, item.pos, sizeof(item.pos));
 }
 
 bool Scene3DNode::ItemCamera(const Item& item, Mat4& view, float eye[3], CameraNode** lens) const
@@ -345,6 +462,87 @@ void Scene3DNode::AlignToView(Item& item, const Mat4& view) const
    item.rot[2] = std::atan2(place.m[1], place.m[0]) * d;
 }
 
+bool Scene3DNode::AimAt(Item& item, const float target[3]) const
+{
+   INode* node = ResolveUid ? ResolveUid(item.uid) : nullptr;
+   float own[3], forward[3], up[3] = { 0, 1, 0 };
+   if (auto* cam = dynamic_cast<CameraNode*>(node))
+   {
+      cam->ComputeEye(own);
+      const Mat4 v = cam->ViewMatrix();
+      forward[0] = -v.m[2]; forward[1] = -v.m[6]; forward[2] = -v.m[10];
+      up[0] = v.m[1]; up[1] = v.m[5]; up[2] = v.m[9];
+   }
+   else if (auto* light = dynamic_cast<LightNode*>(node))
+   {
+      light->ComputeVector(own);
+      for (int k = 0; k < 3; k++)
+         forward[k] = -own[k];
+      if (!LightIsPositioned(light->type))
+         for (float& v : own)
+            v *= light->distance;
+   }
+   else
+      return false;
+
+   float point[3];
+   TransformPoint(Placement(item), own, point);
+   float wanted[3] = { target[0] - point[0], target[1] - point[1], target[2] - point[2] };
+   if (wanted[0] * wanted[0] + wanted[1] * wanted[1] + wanted[2] * wanted[2] < 1e-8f)
+      return false;
+
+   const float worldUp[3] = { 0, 1, 0 };
+   float from[3][3], to[3][3], r[3][3];
+   LookBasis(forward, up, from);
+   LookBasis(wanted, worldUp, to);
+   for (int row = 0; row < 3; row++)
+      for (int col = 0; col < 3; col++)
+         r[row][col] = to[0][row] * from[0][col] + to[1][row] * from[1][col] + to[2][row] * from[2][col];
+
+   const float d = 180.0f / 3.14159265f;
+   item.rot[1] = std::asin(std::clamp(-r[2][0], -1.0f, 1.0f)) * d;
+   item.rot[0] = std::atan2(r[2][1], r[2][2]) * d;
+   item.rot[2] = std::atan2(r[1][0], r[0][0]) * d;
+
+   // The point stays put; the turn must not swing it about the node's origin.
+   Item turned = item;
+   std::memset(turned.pos, 0, sizeof(turned.pos));
+   float swung[3];
+   TransformPoint(Placement(turned), own, swung);
+   for (int k = 0; k < 3; k++)
+      item.pos[k] = point[k] - swung[k];
+   return true;
+}
+
+// Keyed items follow the transport, smoothly between keys and held past the
+// ends, the same way live and in a render since both read the same clock.
+void Scene3DNode::ApplyKeys()
+{
+   const double now = Transport::Instance().Seconds();
+   if (holdKeys || now == mKeyTime)
+      return;
+   mKeyTime = now;
+   const float t = (float)now;
+   for (Item& it : mItems)
+   {
+      if (it.keys.empty())
+         continue;
+      size_t next = 0;
+      while (next < it.keys.size() && it.keys[next].t <= t)
+         next++;
+      const Key& a = it.keys[next == 0 ? 0 : next - 1];
+      const Key& b = it.keys[std::min(next, it.keys.size() - 1)];
+      float f = b.t > a.t ? std::clamp((t - a.t) / (b.t - a.t), 0.0f, 1.0f) : 0.0f;
+      f = f * f * (3.0f - 2.0f * f);
+      for (int k = 0; k < 3; k++)
+      {
+         it.pos[k] = a.pos[k] + (b.pos[k] - a.pos[k]) * f;
+         it.rot[k] = a.rot[k] + (b.rot[k] - a.rot[k]) * f;
+         it.scale[k] = a.scale[k] + (b.scale[k] - a.scale[k]) * f;
+      }
+   }
+}
+
 void Scene3DNode::Sync(int frameId)
 {
    if (mSyncedFrame == frameId)
@@ -352,14 +550,40 @@ void Scene3DNode::Sync(int frameId)
    mSyncedFrame = frameId;
    if (mText != mParsedText)
       Parse();
+   ApplyKeys();
    if (!mRoot)
+   {
       mRoot = std::make_unique<Root>();
+      mOutRoot = std::make_unique<Root>();
+      mLocalRoot = std::make_unique<Root>();
+   }
+
+   // A deleted world node reads as no world, in the same breath as its uid.
+   mWorldNode = (worldUid != 0 && ResolveUid) ? ResolveUid(worldUid) : nullptr;
+   if (mWorldNode != nullptr && mWorldNode->bypassed)
+      mWorldNode = nullptr;
+   if (mWorldNode != nullptr)
+      mWorldNode->CookIfNeeded(frameId);
+
+   mRender.width = std::max(16.0f, std::round(renderW * settings.percent * 0.01f));
+   mRender.height = std::max(16.0f, std::round(renderH * settings.percent * 0.01f));
+
+   // The renderer shadows from its first light, so the chosen one goes first.
+   std::vector<const Item*> lightItems;
+   for (const Item& it : mItems)
+      if (it.id == settings.shadowItem)
+         lightItems.push_back(&it);
+   for (const Item& it : mItems)
+      if (it.id != settings.shadowItem)
+         lightItems.push_back(&it);
 
    // The lights first: each item's mask is by their order.
    std::vector<uint64_t> lightOrder;
+   std::vector<float> marks;
    mRig.lights.clear();
-   for (const Item& it : mItems)
+   for (const Item* item : lightItems)
    {
+      const Item& it = *item;
       auto* light = dynamic_cast<LightNode*>(ResolveUid ? ResolveUid(it.uid) : nullptr);
       if (light == nullptr || light->bypassed || !it.visible ||
           (int)mRig.lights.size() >= Render3DNode::kMaxLights)
@@ -387,10 +611,12 @@ void Scene3DNode::Sync(int frameId)
       l.areaH = light->areaHeight;
       mRig.lights.push_back(l);
       lightOrder.push_back(it.uid);
+      marks.push_back(it.render ? 1.0f : 0.0f);
    }
    mRig.hasLights = !mRig.lights.empty();
 
    mRoot->draws.clear();
+   mOutRoot->draws.clear();
    for (const Item& it : mItems)
    {
       INode* node = ResolveUid ? ResolveUid(it.uid) : nullptr;
@@ -415,8 +641,11 @@ void Scene3DNode::Sync(int frameId)
          placed = std::make_unique<Placed>();
       placed->Update(source, Placement(it), mask);
       mRoot->draws.push_back(placed.get());
+      if (it.render)
+         mOutRoot->draws.push_back(placed.get());
+      marks.push_back((float)(mask & 0xffffu));
    }
-   mRender.geometry[0] = mRoot.get();
+   mRender.geometry[0] = mOutRoot.get();
    mRender.camera = nullptr;
    mClipped = 0;
    const size_t want = [&] { size_t n = 0; for (IGeometrySource* s : mRoot->draws) n += std::max(1, s->GroupChildCount()); return n; }();
@@ -456,27 +685,39 @@ void Scene3DNode::Sync(int frameId)
    if (const Item* target = focusItem != 0 ? FindConst(focusItem) : nullptr)
    {
       Mat4 view;
-      float eye[3];
+      float eye[3], c[3];
       if (CameraView(view, eye, nullptr))
-         mRender.focusDistance = std::max(0.05f, -(view.m[2] * target->pos[0] + view.m[6] * target->pos[1] +
-                                                  view.m[10] * target->pos[2] + view.m[14]));
+      {
+         ItemCenter(*target, c);
+         mRender.focusDistance = std::max(0.05f, -(view.m[2] * c[0] + view.m[6] * c[1] + view.m[10] * c[2] + view.m[14]));
+      }
    }
    stamp.push_back(mRender.focusDistance);
+   stamp.insert(stamp.end(), marks.begin(), marks.end());
+   for (int shift = 0; shift < 64; shift += 16)
+      stamp.push_back((float)((worldUid >> shift) & 0xffffu));
+   if (stamp != mRigStamp)
    {
       mRigStamp.swap(stamp);
       mRig.revision++;
    }
-   mRender.rig = &mRig;
 
-   // A deleted world node reads as no world, in the same breath as its uid.
-   mWorldNode = (worldUid != 0 && ResolveUid) ? ResolveUid(worldUid) : nullptr;
-   if (mWorldNode != nullptr && mWorldNode->bypassed)
-      mWorldNode = nullptr;
-   if (mWorldNode != nullptr)
-      mWorldNode->CookIfNeeded(frameId);
+   // What the picture sees: the same rig, less the lights kept out of renders.
+   mOutRig = mRig;
+   size_t lightIndex = 0;
+   for (const Item* item : lightItems)
+   {
+      auto* light = dynamic_cast<LightNode*>(ResolveUid ? ResolveUid(item->uid) : nullptr);
+      if (light == nullptr || light->bypassed || !item->visible || lightIndex >= mOutRig.lights.size())
+         continue;
+      if (!item->render)
+         mOutRig.lights[lightIndex].intensity = 0.0f;
+      lightIndex++;
+   }
+   mRender.rig = &mOutRig;
 }
 
-void Scene3DNode::ApplyWorld(Render3DNode& render, bool show)
+void Scene3DNode::ApplyWorld(Render3DNode& render, bool show, bool background)
 {
    auto* env = dynamic_cast<EnvironmentNode*>(mWorldNode);
    if (env != nullptr && show)
@@ -486,8 +727,8 @@ void Scene3DNode::ApplyWorld(Render3DNode& render, bool show)
    }
    else if (render.envInput.IsConnected())
       render.envInput.Disconnect();
-   render.envAsBackground = true;
-   render.bgOpacity = (show && worldColorOn && mWorldNode == nullptr) ? 1.0f : 0.0f;
+   render.envAsBackground = background;
+   render.bgOpacity = (show && background && worldColorOn && mWorldNode == nullptr) ? 1.0f : 0.0f;
    for (int k = 0; k < 3; k++)
       render.bgColor[k] = worldColor[k] * worldStrength;
 }
@@ -527,11 +768,12 @@ void Scene3DNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
    Sync(frameId);
-   ApplyWorld(mRender, true);
+   ApplyWorld(mRender, true, !settings.transparent);
    mRender.CookIfNeeded(frameId);
 
    unsigned int backdrop = 0;
-   if (mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr)
+   if (mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr && !settings.transparent &&
+       mRender.renderPass == 0)
       backdrop = mWorldNode->GetOutputTexture();
    mOutTex = mRender.GetOutputTexture();
    if (backdrop != 0)
@@ -643,7 +885,19 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
       mEditor->RequestDepth();
    }
    Render3DNode& e = *mEditor;
-   e.geometry[0] = mRoot.get();
+   Root* root = mRoot.get();
+   if (!v.only.empty())
+   {
+      root = mLocalRoot.get();
+      root->draws.clear();
+      for (int id : v.only)
+      {
+         auto found = mPlaced.find(id);
+         if (found != mPlaced.end())
+            root->draws.push_back(found->second.get());
+      }
+   }
+   e.geometry[0] = root;
    e.width = (float)w;
    e.height = (float)h;
    const bool final = v.shading == Shading::Final;
@@ -667,7 +921,8 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
                                look.shadowsEnabled ? 1.0f : 0.0f, (float)look.shadowQuality, look.shadowBias,
                                look.shadowSoftness, look.shadowStrength, look.envIntensity, look.ambientColor[0],
                                look.ambientColor[1], look.ambientColor[2], worldColor[0], worldColor[1], worldColor[2],
-                               worldColorOn ? 1.0f : 0.0f, (float)worldUid, worldStrength });
+                               worldColorOn ? 1.0f : 0.0f, worldStrength, (float)look.renderPass,
+                               settings.transparent ? 1.0f : 0.0f });
    if (stamp != mEditorStamp)
    {
       mEditorStamp.swap(stamp);
@@ -698,12 +953,13 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
    e.aoRadius = mRender.aoRadius;
    e.dofAperture = final ? mRender.dofAperture : 0.0f;
    e.focusDistance = mRender.focusDistance;
-   ApplyWorld(e, !wire);
+   e.renderPass = final ? mRender.renderPass : 0;
+   ApplyWorld(e, !wire, !settings.transparent);
    e.CookIfNeeded(++mEditorFrame);
 
    unsigned int tex = e.GetOutputTexture();
-   if (!wire && mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr &&
-       mWorldNode->GetOutputTexture() != 0)
+   if (!wire && !settings.transparent && e.renderPass == 0 && mWorldNode != nullptr &&
+       dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr && mWorldNode->GetOutputTexture() != 0)
       tex = Composite(tex, e.GetOutputWidth(), e.GetOutputHeight(), mWorldNode->GetOutputTexture(), mEditorFbo);
    return tex != 0 ? GridPass(tex, e.GetOutputWidth(), e.GetOutputHeight(), v) : 0;
 }
@@ -711,13 +967,14 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
 bool Scene3DNode::ItemBounds(int id, float lo[3], float hi[3])
 {
    auto found = mPlaced.find(id);
-   if (found == mPlaced.end() || !mEditor)
+   if (found == mPlaced.end())
       return false;
+   Render3DNode& measure = mEditor ? *mEditor : mRender;
    bool any = false;
    std::function<void(Placed&)> walk = [&](Placed& p)
    {
       float a[3], b[3];
-      if (mEditor->SourceBounds(&p, a, b))
+      if (measure.SourceBounds(&p, a, b))
       {
          for (int k = 0; k < 3; k++)
          {
