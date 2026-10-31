@@ -574,7 +574,7 @@ void DrawLinks(FrameCtx& fc)
       // timeline has its own Shift+A (select all clips) while it owns the
       // keyboard, same as its sibling shortcuts below.
       const bool doSelectAll = gRequestSelectAll ||
-         (!typing && !gArrangeFocused && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false));
+         (!typing && !gPerfMatrixFocused && !gArrangeFocused && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_A, false));
       gRequestSelectAll = false;
       if (doSelectAll)
       {

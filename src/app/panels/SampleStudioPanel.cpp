@@ -1967,6 +1967,7 @@ namespace
       // Keys, while the pointer is over the waveform (the canvas's are off then: gSampleStudioClaimedKeys).
       if (!hovered || io.WantTextInput)
          return;
+      auto Bare = [&io](ImGuiKey k) { return !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(k, false); };
       if (cmd && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
          Undo();
       else if (cmd && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
@@ -1992,17 +1993,18 @@ namespace
       }
       else if (cmd)
          return;
+      // The single-letter keys fire bare only: Shift+S is the Session panel's, not Solo.
       else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
          DeleteSelected();
-      else if (ImGui::IsKeyPressed(ImGuiKey_J, false))
+      else if (Bare(ImGuiKey_J))
          JoinSelected();
-      else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_A, false))
+      else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || Bare(ImGuiKey_A))
          s.tool = 0;
-      else if (ImGui::IsKeyPressed(ImGuiKey_B, false))
+      else if (Bare(ImGuiKey_B))
          s.tool = s.tool == 1 ? 0 : 1;
-      else if (ImGui::IsKeyPressed(ImGuiKey_H, false))
+      else if (Bare(ImGuiKey_H))
          s.tool = s.tool == 2 ? 0 : 2;
-      else if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+      else if (Bare(ImGuiKey_F))
          ViewAll();
       else if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
          io.KeyShift ? ViewAll() : ZoomToSelection();
@@ -2015,15 +2017,15 @@ namespace
          io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio / 1.05f); }) : SelectStep(-1);
       else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
          io.KeyShift ? EditSelected([](SliceParams& p) { p.lengthRatio = Mould(p.lengthRatio * 1.05f); }) : SelectStep(1);
-      else if (ImGui::IsKeyPressed(ImGuiKey_Q, false))
+      else if (Bare(ImGuiKey_Q))
          Audition(s.sel.empty() ? s.doc.IndexAt((int64_t)mf) : s.doc.IndexOfId(s.primary));
-      else if (ImGui::IsKeyPressed(ImGuiKey_M, false))
+      else if (Bare(ImGuiKey_M))
          EditSelected([](SliceParams& p) { p.mute = !p.mute; });
-      else if (ImGui::IsKeyPressed(ImGuiKey_S, false))
+      else if (Bare(ImGuiKey_S))
          EditSelected([](SliceParams& p) { p.solo = !p.solo; });
-      else if (ImGui::IsKeyPressed(ImGuiKey_V, false))
+      else if (Bare(ImGuiKey_V))
          EditSelected([](SliceParams& p) { p.reverse = !p.reverse; });
-      else if (ImGui::IsKeyPressed(ImGuiKey_R, false))
+      else if (Bare(ImGuiKey_R))
          s.recording ? StopRecording(true) : StartRecording();
    }
 
