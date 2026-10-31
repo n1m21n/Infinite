@@ -2,7 +2,7 @@
 
 The final stage of a 3D patch: arrange node outputs in one scene, look through a camera, render it.
 Infinite's 3D stays abstract, procedural and generative. This is not an editor: no modelling, sculpting,
-UVs or rigging. The canvas is the source. The Add menu (Shift+A or +) only spawns real Camera and Light nodes.
+UVs or rigging. The canvas is the source. The Add menu (Shift+A or +) brings nodes from the canvas and spawns real Camera, Light and HDRI nodes or a new scene.
 Blender is the reference for the panel's grammar, keys and settings names.
 
 It composes, it does not modify: geometry, materials, particles and physics stay in the node chain, and the
@@ -32,6 +32,8 @@ It only improves what comes after adding: composing, camera, lights, render and 
 | Per-object lighting | "Lit by": each item picks which scene lights reach it. Up to 8 lights. |
 | Add a Render 3D | Brings its geometry, lights, camera and environment. Its lights light only what it brought. |
 | Panel closed | The editor render costs nothing. The node still renders if an Output is wired. |
+| Scenes | Each scene is its own 3D View node. New scene is in the Add menu; with two or more, the outliner has a picker. |
+| Reassign | Object tab Source, or right-click Source: same kind only, placement kept. A missing item can take any node. |
 | Limit | 256 objects; past that the panel says how many were left out. |
 
 ## Panel
@@ -40,9 +42,9 @@ It only improves what comes after adding: composing, camera, lights, render and 
 |---|---|
 | Render | Sampling, Shadows, Ambient Occlusion, Bloom, Film, Color Management |
 | Output | Format (default 1920x1080, resolution %), Frame Range, colour depth, pass, projection, Render Image, Render Animation |
-| World | Surface (None, Background, Environment texture), Strength, HDRI, Ambient, Reflections |
-| Object | Transform, Visibility, Animation (keys), Lit by |
-| Data | Camera: lens, shift, clip, sensor, depth of field (real f-stop). Light: its node's settings, shadow caster. Both: point at 3D cursor |
+| World | Surface (None, Background, Environment texture), Strength, Load HDRI, Ambient, Reflections |
+| Object | Source, Transform, Visibility, Animation (keys), Lit by |
+| Data | Opens when a camera or light is picked. Camera: view (distance, orbit, elevation, roll, target), lens, shift, clip, sensor, depth of field (real f-stop). Light: its node's settings (type, colour, strength, orbit, elevation, distance), shadow caster. Both: point at 3D cursor |
 | Viewport | Transform, Snap, 3D Cursor, Navigation, Passepartout, Safe Areas, Composition Guides |
 
 The outliner renames (double-click or F2), searches from six items, and takes Ctrl and Shift clicks.
@@ -72,9 +74,9 @@ Blender's keymap.
 | N | Sidebar |
 | H, Shift+H, Alt+H | Hide, hide the rest, show all |
 | A, Alt+A, Ctrl+I, Shift+D, X or Delete | Select all, none, invert, duplicate, remove from scene |
-| Shift+A | Add a camera or light |
+| Shift+A | Add from the canvas, a camera, a light, an HDRI or a new scene |
 | F12, Ctrl+F12 | Render image, render animation |
-| Two-finger, Shift+scroll, pinch | Orbit, pan, zoom (middle drag or Alt+left also orbit) |
+| Two-finger, Shift+scroll, pinch or Ctrl/Cmd+scroll | Orbit, pan, zoom at the pointer (middle drag or Alt+left also orbit) |
 | Hold right + WASD QE | Fly |
 | Shift+3 (anywhere) | Open the panel |
 
