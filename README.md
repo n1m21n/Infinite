@@ -118,6 +118,8 @@ A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Ro
 
 <img src="docs/screenshots/v1/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
 
+<img src="docs/screenshots/v1/performance.png" alt="The Performance panel in Perform mode: knobs, faders and number boxes for the showcase patch" width="100%">
+
 The Mod Matrix (Shift + M) lists every modulation in the patch in one table: source, destination, range, curve and invert, with each source's live signal. The Performance panel (Shift + P) is a surface for playing a patch: pages of knobs, faders, XY pads, toggles, triggers, radio selectors and step gates, each assigned to any parameter, with MIDI learn and a response curve per control. Edit mode lays it out; Perform mode plays it.
 
 ### Terminal and the `infinite` command
@@ -166,7 +168,7 @@ That is the one idea underneath the language: a **kernel**, run once per element
 Any element, pixel or sample kernel can declare **dynamic pins** in its code, adding real, cable-wireable, save-safe inputs and outputs without touching C++. Finished devices (kernel, params and presets) save and share as portable `.field` files. The full reference is in the [Field Language Manual](Field_Language_Manual.pdf).
 
 <p align="center">
-  <img src="website/assets/field_pixel_editor.png" alt="Field Pixel editor" width="550">
+  <img src="docs/screenshots/v1/field-editor.png" alt="The Field Pixel editor beside its node" width="100%">
 </p>
 
 
