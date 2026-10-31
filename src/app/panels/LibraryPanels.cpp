@@ -789,18 +789,10 @@ namespace app
    }
 
 
-   // The Plugins mode of the docked node-browser panel. Same shape as
-   // DrawLibrarySearchPanel above, minus the folder machinery: Audio Unit
-   // discovery is a registry query, not a directory walk, so there is nothing
-   // to add a folder to and the whole mode reduces to one Rescan button. Like
-   // the other modes, the list shown at launch comes off disk - a scan only
-   // ever happens when the user asks for one.
-   void DrawPluginSearchPanel()
+   // Rescan, search folders and what the last scan could not load. Shared by the Plugins mode of the browser and by
+   // Settings, where the folders start open because managing them is why you are there.
+   void DrawPluginScanControls(bool foldersOpen)
    {
-      gPluginScanner.PollResults();
-
-      ImGui::PushID("##plugins");
-
       const bool scanning = gPluginScanner.IsScanning();
       if (scanning)
          ImGui::BeginDisabled();
@@ -837,7 +829,7 @@ namespace app
       }
 #endif
 
-      if (ImGui::TreeNodeEx(L("VST3 search folders"), ImGuiTreeNodeFlags_None))
+      if (ImGui::TreeNodeEx(L("VST3 search folders"), foldersOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
       {
          // Snapshot rather than iterate gPluginScanner.Folders() directly:
          // RemoveFolder() below erases from that same live vector, which
@@ -908,6 +900,78 @@ namespace app
 #else
       ImGui::TextDisabled("%s", T("VST3 support is not compiled into this build."));
 #endif
+   }
+
+   static const std::vector<std::string>& PluginSortNames()
+   {
+      static const std::vector<std::string> kNames = { "Name", "Format", "Manufacturer", "Favourites" };
+      return kNames;
+   }
+
+   // Empty under !INFINITE_ENABLE_VST3: that hides the type control rather than
+   // showing a dropdown with one real option (AU), the index only holds AU entries.
+   static const std::vector<std::string>& PluginTypeNames()
+   {
+#if INFINITE_ENABLE_VST3
+      return PluginTypeFilterNames();
+#else
+      static const std::vector<std::string> kNone;
+      return kNone;
+#endif
+   }
+
+   // The list of scanned plugins in Settings: its own search and sort, so the browser's filter stays put.
+   void DrawPluginManagerList()
+   {
+      static BrowserFilterState sFilter;
+      static std::vector<const PluginScanner::Entry*> sShown;
+      static uint64_t sIndexVersion = 0;
+      const bool changed = DrawBrowserFilterStrip(sFilter, T("search plugins..."), PluginSortNames(), PluginTypeNames());
+      if (changed || sIndexVersion != gPluginScanner.IndexVersion())
+      {
+         std::string q = sFilter.query;
+         std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+         sShown = FilterAndSortPluginEntries(gPluginScanner.Index(), q, sFilter);
+         sIndexVersion = gPluginScanner.IndexVersion();
+      }
+      char count[64];
+      snprintf(count, sizeof(count), T("%d of %d plugins"), (int)sShown.size(), (int)gPluginScanner.Index().size());
+      ImGui::TextDisabled("%s", count);
+      LibraryParts::BeginWell("##pluginmanagerlist", 320.0f);
+      if (sShown.empty())
+      {
+         if (gPluginScanner.Index().empty())
+            EmptyState::DrawInWindow(T("No plugins indexed"), T("Hit Rescan plugins"));
+         else
+            EmptyState::DrawInWindow(T("No plugins found"), T("Try clearing the search or filter"));
+      }
+      ImGuiListClipper clipper;
+      clipper.Begin((int)sShown.size());
+      while (clipper.Step())
+         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+         {
+            const PluginScanner::Entry& entry = *sShown[i];
+            std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) + "] " + entry.name;
+            if (!entry.manufacturer.empty())
+               label += "  -  " + entry.manufacturer;
+            ImGui::TextUnformatted(label.c_str());
+         }
+      LibraryParts::EndWell();
+   }
+
+   // The Plugins mode of the docked node-browser panel. Same shape as
+   // DrawLibrarySearchPanel above, minus the folder machinery: Audio Unit
+   // discovery is a registry query, not a directory walk, so there is nothing
+   // to add a folder to and the whole mode reduces to one Rescan button. Like
+   // the other modes, the list shown at launch comes off disk - a scan only
+   // ever happens when the user asks for one.
+   void DrawPluginSearchPanel()
+   {
+      gPluginScanner.PollResults();
+
+      ImGui::PushID("##plugins");
+
+      DrawPluginScanControls(false);
 
       // Its own BrowserFilterState, like the Samples and Media modes each
       // have, so switching tabs and back keeps this mode's in-progress
@@ -964,17 +1028,8 @@ namespace app
          }
       }
 
-      static const std::vector<std::string> kPluginSortNames = { "Name", "Format", "Manufacturer", "Favourites" };
-      // Empty typeNames under !INFINITE_ENABLE_VST3 hides the type control
-      // rather than showing a dropdown with one real option (AU) - the
-      // index only ever holds AU entries in that build anyway.
-#if INFINITE_ENABLE_VST3
-      const std::vector<std::string>& pluginTypeNames = PluginTypeFilterNames();
-#else
-      static const std::vector<std::string> pluginTypeNames;
-#endif
       const bool filterChanged =
-         DrawBrowserFilterStrip(gPluginFilter, T("search plugins..."), kPluginSortNames, pluginTypeNames);
+         DrawBrowserFilterStrip(gPluginFilter, T("search plugins..."), PluginSortNames(), PluginTypeNames());
       if (filterChanged)
          SaveBrowserFilterPrefs();
 

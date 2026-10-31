@@ -11,6 +11,9 @@
 
 namespace app
 {
+   void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
+   void DrawPluginManagerList();
+
    void DrawSettingsWindow(bool* open)
    {
       // No SetNextWindowPos meant this took ImGui's default cascade position
@@ -37,7 +40,7 @@ namespace app
       static int sTab = 0;
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
-                                           I18N_KEY("Expression Globals"), I18N_KEY("Extensions") };
+                                           I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -47,6 +50,8 @@ namespace app
          const char* o = getenv("INFINITE_OPENPANELS");
          if (o && strstr(o, "settingsgeneral"))
             sTab = 3;
+         if (o && strstr(o, "settingsplugins"))
+            sTab = 7;
       }
       const float navW = 200.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
@@ -1597,6 +1602,19 @@ namespace app
             }
             SectionCard::End();
 
+         }
+
+         // 8. Plugins Tab
+         if (sTab == 7)
+         {
+            // The browser polls only while its Plugins mode shows.
+            gPluginScanner.PollResults();
+            ImGui::Spacing();
+            FormParts::Section(T("Plugins"));
+            DrawPluginScanControls(true);
+            FormParts::Section(T("Scanned plugins"));
+            DrawPluginManagerList();
+            SectionCard::End();
          }
 
       }
