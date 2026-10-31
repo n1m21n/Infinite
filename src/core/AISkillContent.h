@@ -617,6 +617,8 @@ the result back as JSON. Never guess a node's name, keys, slots or ranges: ask t
 7. **Fix** - change the patch, go back to step 4. Change one thing at a time.
 8. **Render** - `Infinite --render patch.inf out.mp4 [--start S] [--duration S] [--fps N]`.
 
+A full showcase or template-library patch (two bands, arrangement, Session scenes, media folder) follows the same loop plus extra checks: see `showcase.md` next to this file (repo only).
+
 ## Reading the result
 
 The last line of stdout is one JSON object: `ok`, `mode`, `frames`, `fps`, `size`, `audio`,
@@ -703,19 +705,20 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-346 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+347 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
+| `3D View` | none | out:image | 26 | bypass |
 | `Array` | geo:geometry | out:geometry | 72 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
 | `Bevel` | geo:geometry | out:geometry | 72 | bypass |
-| `Camera` | none | out:camera | 13 | bypass |
+| `Camera` | none | out:camera | 16 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
 | `Cloth` | geo:geometry | out:geometry | 38 | bypass |
 | `Cone` | texture:image | out:geometry | 51 | bypass |
@@ -757,11 +760,11 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
-| `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
+)AISKILL"
+R"AISKILL(| `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Points` | geo:geometry | out:geometry | 22 | bypass |
-)AISKILL"
-R"AISKILL(| `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
+| `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
 | `Mirror` | geo:geometry | out:geometry | 72 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Model 3D` | texture:image | out:geometry | 28 | bypass |
@@ -958,11 +961,11 @@ R"AISKILL(| `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
 | `MSEG` | trig:modulator | out:modulator | 8 | bypass |
 | `Math` | input:modulator, input_2:modulator | out:modulator | 6 |  |
 | `Mod Curve` | in:modulator | out:modulator | 3 | bypass |
-| `Mod Depth` | in:modulator | out:modulator | 2 | bypass |
+)AISKILL"
+R"AISKILL(| `Mod Depth` | in:modulator | out:modulator | 2 | bypass |
 | `Note Expression` | none | out:modulator | 3 | bypass |
 | `Note to CV` | notes:note | out:modulator | 3 | bypass |
-)AISKILL"
-R"AISKILL(| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
+| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
 | `Palette` | ref:image | out:palette | 14 | bypass |
 | `Path` | curve:geometry, geo:geometry | x:modulator, y:modulator, z:modulator, t:modulator | 14 |  |
 | `Pattern` | none | out:modulator | 24 | bypass |
