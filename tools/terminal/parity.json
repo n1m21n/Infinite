@@ -365,6 +365,12 @@
   "panels/SettingsWindow.cpp:Open learning folder": "opens Finder; the folder path is in the log",
   "panels/SettingsWindow.cpp:Pixel Shader: Radial Glow SDF (Field Pixel Node)": "reference page; `code docs field` prints it",
   "panels/SettingsWindow.cpp:Retention cap": "housekeeping limit of the movement log; default holds",
+  "frame/StagePopupsA.cpp:Add to 3D View": "composes a node into the 3D View panel's scene; no terminal verb yet (open item after v1)",
+  "panels/SettingsWindow.cpp:10. Canonical Recipes": "reference page; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:7. Branching, Loops & Control Flow": "reference page; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:8. Field Synth, Effect & Notes (sample domain)": "reference page; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:9. Field Graph (graph domain)": "reference page; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Install All AI Skills": "`infinite context` and `guide` give an agent the same text",
   "panels/SettingsWindow.cpp:free": "label inside a size readout"
  }
 }
