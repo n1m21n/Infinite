@@ -63,7 +63,11 @@ namespace app
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
       }
-      const float navW = 200.0f;
+      // As wide as the longest section name in the current language, with the label inset on both sides.
+      float navW = 0.0f;
+      for (const char* tab : kTabs)
+         navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
+      navW += tok::space_4 * 2.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
       // First tab level with the first card; a little air between tabs.
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
