@@ -1,6 +1,6 @@
 # Maintainer: Naman Soni <contact@infinitedevices.org>
 pkgname=infinite-bin
-pkgver=0.6.6
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="Free, open-source real-time modular audiovisual workstation for visuals, music and code"
 arch=('x86_64')
