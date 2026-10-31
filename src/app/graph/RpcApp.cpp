@@ -303,15 +303,17 @@ namespace app
    {
       // "ui": synthetic ImGui input for scripted documentation shots (tools/manual/ui_shots_offscreen.py), so menus,
       // right-click menus and dropdowns can be opened in an off-screen run. x, y are window points.
-      // actions: move {x,y}; click {x,y,button 0|1|2, double}; key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
+      // actions: move {x,y}; click {x,y,button 0|1|2, double}; down / up {x,y,button} (a drag is down, move, up); key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
       // shift, ctrl, alt, super}. ImGui trickles the queued events, so a down and up land on separate frames.
       if (method == "ui")
       {
          ImGuiIO& io = ImGui::GetIO();
          const std::string action = params.value("action", std::string());
-         if (action == "move" || action == "click")
+         if (action == "move" || action == "click" || action == "down" || action == "up")
             io.AddMousePosEvent(params.value("x", 0.0f), params.value("y", 0.0f));
-         if (action == "click")
+         if (action == "down" || action == "up")
+            io.AddMouseButtonEvent(std::clamp(params.value("button", 0), 0, 2), action == "down");
+         else if (action == "click")
          {
             const int button = std::clamp(params.value("button", 0), 0, 2);
             for (int n = params.value("double", false) ? 2 : 1; n > 0; --n)
@@ -352,7 +354,7 @@ namespace app
                if (params.value(name, false))
                   io.AddKeyEvent(m, false);
          }
-         else if (action != "move")
+         else if (action != "move" && action != "down" && action != "up")
          {
             outError = "unknown ui action '" + action + "'";
             return true;
