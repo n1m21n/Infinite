@@ -951,12 +951,20 @@ namespace app
                ImGui::SetScrollY(ImGui::GetScrollMaxY()); // pin to the bottom
             }
 
-            if (noBindings)
-               EmptyState::DrawInWindow(T("No active modulations"), T("Patch a modulator, type a formula, or record a gesture to see it here."));
+            // Drawn once the table has ended: text from inside a cell belongs to that cell and is clipped away.
+            ImDrawList* tableDl = ImGui::GetWindowDrawList();
+            const ImVec2 tableMin = ImGui::GetWindowPos();
+            const ImVec2 tableMax(tableMin.x + ImGui::GetWindowWidth(), tableMin.y + ImGui::GetWindowHeight());
             ImGui::EndTable();
-            ImGui::PopStyleColor(3);
-            ImGui::PopStyleVar();
+            if (noBindings)
+            {
+               tableDl->PushClipRect(tableMin, tableMax, false);
+               EmptyState::DrawTo(tableDl, tableMin, tableMax, T("No active modulations"), T("Patch a modulator, type a formula, or record a gesture to see it here."));
+               tableDl->PopClipRect();
+            }
          }
+         ImGui::PopStyleColor(3);
+         ImGui::PopStyleVar();
       }
 
       // Right-click anywhere on the panel - empty space, the table, or a
