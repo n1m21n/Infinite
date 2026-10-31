@@ -3541,13 +3541,6 @@ bool View3DCanAdd(const GraphNode& gn)
           dynamic_cast<EnvironmentNode*>(gn.node.get()) != nullptr;
 }
 
-bool View3DCanSetWorld(const GraphNode& gn)
-{
-   INode* n = gn.node.get();
-   return dynamic_cast<Scene3DNode*>(n) == nullptr && dynamic_cast<IGeometrySource*>(n) == nullptr &&
-          n->GetOutputWidth() > 0;
-}
-
 namespace
 {
    uint64_t UidOf(const INode* node)

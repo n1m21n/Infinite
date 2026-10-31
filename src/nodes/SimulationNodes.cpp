@@ -1326,11 +1326,14 @@ void ParticleSystemNode::CookIfNeeded(int frameId)
    // The textures are sized to a tier (next power of two, at least 1024), so
    // dragging or modulating max particles only changes the active count; the
    // run restarts only when the cap outgrows the textures or falls under a
-   // quarter of them.
+   // quarter of them. The smallest tier always fits: a cap under 256 used to
+   // fail the quarter test against 1024 and restart the run every cook, so
+   // no particle ever lived.
    int wantAlloc = 1024;
    while (wantAlloc < wantCap && wantAlloc < kGpuMaxParticles)
       wantAlloc *= 2;
-   const bool capFits = mGpuActive && mGpuAlloc > 0 && wantCap <= mGpuAlloc && wantCap * 4 >= mGpuAlloc;
+   const bool capFits = mGpuActive && mGpuAlloc > 0 && wantCap <= mGpuAlloc &&
+                        (mGpuAlloc == wantAlloc || wantCap * 4 >= mGpuAlloc);
    if (wantGpu && capFits && wantCap != mGpuCap)
    {
       const bool shrank = wantCap < mGpuCap;
