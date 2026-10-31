@@ -317,25 +317,6 @@ namespace app
       const ImVec2 panelSize = ImGui::GetContentRegionAvail();
 
       GestureRecorder& rec = GestureRecorder::Instance();
-      if (mod.Links().empty() && mod.Expressions().empty() && rec.Playbacks().empty())
-      {
-         // Empty state: centred in the card, one size, weight carries the title.
-         const char* head = T("No active modulations.");
-         const char* hint = T("Patch a modulator, type a formula, or record a gesture to see it here.");
-         const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         const float lineH = ImGui::GetTextLineHeight();
-         const float y0 = std::max(0.0f, (panelSize.y - lineH * 2.0f - tok::space_1) * 0.5f);
-         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y0);
-         auto centred = [&](const char* t, float a)
-         {
-            ImGui::SetCursorPosX(std::max(0.0f, (panelSize.x - ImGui::CalcTextSize(t).x) * 0.5f) + ImGui::GetCursorPosX());
-            ImGui::TextColored(ImVec4(dim.x, dim.y, dim.z, a), "%s", t);
-         };
-         { UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold); centred(head, 0.7f); }
-         ImGui::Dummy(ImVec2(0, tok::space_1));
-         centred(hint, 0.45f);
-      }
-      else
       {
          // Inner grid lines only - no BordersOuterH/V. This is a docked
          // panel, not a floating dialog: DrawModMatrixDocked's own comment
@@ -971,7 +952,7 @@ namespace app
             }
 
             if (noBindings)
-               EmptyState::DrawInWindow(T("No modulation yet"), T("Drag from a modulator's output onto a parameter pin"));
+               EmptyState::DrawInWindow(T("No active modulations"), T("Patch a modulator, type a formula, or record a gesture to see it here."));
             ImGui::EndTable();
             ImGui::PopStyleColor(3);
             ImGui::PopStyleVar();

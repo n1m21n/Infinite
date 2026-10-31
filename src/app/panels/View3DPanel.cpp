@@ -172,6 +172,10 @@ namespace
    }
 
    // With two 3D View nodes, the panel shows the one last selected on the canvas.
+   // "Assign Node...": the next node clicked on the canvas becomes this item's source.
+   int sPickItem = -1;
+   uint64_t sPickedUid = 0;
+
    void FollowCanvasSelection()
    {
       if (gEditor == nullptr)
@@ -180,7 +184,17 @@ namespace
       ed::SetCurrentEditor(gEditor);
       // Only a new selection moves it, so the panel's own scene picker holds while a node stays selected.
       static uint64_t sFollowed = 0;
-      uint64_t selected = 0;
+      static uint64_t sLastNode = 0;
+      uint64_t selected = 0, anyNode = 0;
+      for (GraphNode& gn : gNodes)
+         if (ed::IsNodeSelected(gn.NodeId()))
+         {
+            anyNode = gn.uid;
+            break;
+         }
+      if (anyNode != 0 && anyNode != sLastNode && sPickItem >= 0)
+         sPickedUid = anyNode;
+      sLastNode = anyNode;
       for (GraphNode& gn : gNodes)
          if (dynamic_cast<Scene3DNode*>(gn.node.get()) != nullptr && ed::IsNodeSelected(gn.NodeId()))
          {
@@ -2050,9 +2064,12 @@ namespace
          dl->AddText(ImVec2(mn.x + tok::space_3, mx.y - 24), Hex(0xFFFFFF, 0.95f), T("Drag a box to zoom into"));
       if (scene->Items().empty())
       {
-         const char* hint = T("Shift+A to add a camera, a light or a node from the canvas");
-         const ImVec2 ts = ImGui::CalcTextSize(hint);
-         dl->AddText(ImVec2((mn.x + mx.x - ts.x) * 0.5f, mx.y - ts.y - tok::space_5), Hex(0xFFFFFF, 0.55f), hint);
+         const char* head = T("Nothing in the 3D View yet");
+         const char* hint = T("Shift+A adds a camera, a light or a node from the canvas");
+         const ImVec2 hs = ImGui::CalcTextSize(head), ts = ImGui::CalcTextSize(hint);
+         const float midY = (mn.y + mx.y) * 0.5f;
+         dl->AddText(ImVec2((mn.x + mx.x - hs.x) * 0.5f, midY - hs.y - tok::space_1), Hex(0xFFFFFF, 0.8f), head);
+         dl->AddText(ImVec2((mn.x + mx.x - ts.x) * 0.5f, midY + tok::space_1), Hex(0xFFFFFF, 0.55f), hint);
       }
       dl->PopClipRect();
    }
@@ -2349,13 +2366,8 @@ namespace
       }
       if (scene->Items().empty())
          ImGui::TextDisabled("%s", T("Empty. Shift+A adds to it."));
-      if (scene->Items().size() >= 6)
-      {
-         ImGui::SetNextItemWidth(availW);
-         FieldWell::InputTextWithHint("##v3dsearch", T("Search"), sSearch, sizeof(sSearch));
-      }
-      else
-         sSearch[0] = 0;
+      ImGui::SetNextItemWidth(availW);
+      FieldWell::InputTextWithHint("##v3dsearch", T("Search"), sSearch, sizeof(sSearch));
       auto lower = [](std::string text)
       {
          std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)std::tolower(c); });
@@ -2471,7 +2483,7 @@ namespace
       for (GraphNode& gn : gNodes)
       {
          const Kind k = Scene3DNode::KindOf(gn.node.get());
-         if (k != Kind::Missing && (kind == Kind::Missing || k == kind))
+         if (k != Kind::Missing && (kind == Kind::Missing || k == kind) && gn.node.get() != scene)
             nodes.push_back(&gn);
       }
       return nodes;
@@ -2728,8 +2740,14 @@ namespace
             for (GraphNode* gn : nodes)
                if (MenuParts::Choice(title(*gn).c_str(), gn == current) && gn != current)
                   SetSource(scene, *item, gn->uid);
+            if (nodes.empty())
+               ImGui::TextDisabled("%s", T("No fitting nodes in this patch"));
             MenuParts::EndCombo();
          }
+         const bool picking = sPickItem == item->id;
+         if (ActionButton::Draw(picking ? T("Click a node on the canvas...") : current != nullptr ? T("Assign Different Node...") : T("Assign Node..."),
+                                ImVec2(-1.0f, 0.0f), picking ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+            sPickItem = picking ? -1 : item->id;
       }
       if (Card(T("Transform")))
       {
@@ -3442,6 +3460,18 @@ namespace
    {
       FollowCanvasSelection();
       Scene3DNode* scene = FindScene();
+      if (scene == nullptr)
+      {
+         // The first scene is there from the start, so the toolbar and settings always show.
+         if (GraphNode* made = SpawnNode("3D View", "3D", 0.0f, 0.0f))
+            if ((scene = dynamic_cast<Scene3DNode*>(made->node.get())) != nullptr)
+            {
+               scene->panelOnly = true;
+               scene->Commit();
+               made->hiddenFromCanvas = true;
+               sSceneUid = made->uid;
+            }
+      }
       sSet = scene != nullptr ? &scene->settings : &sNoScene;
       if (scene == nullptr)
       {
@@ -3454,6 +3484,20 @@ namespace
          if (scene->FindItem(id) != nullptr)
             live.push_back(id);
       sSel.swap(live);
+      if (scene->FindItem(sPickItem) == nullptr)
+         sPickItem = -1;
+      if (sPickedUid != 0 && sPickItem >= 0)
+      {
+         Item* item = scene->FindItem(sPickItem);
+         for (GraphNode* gn : SourceChoices(scene, *item))
+            if (gn->uid == sPickedUid)
+            {
+               SetSource(scene, *item, gn->uid);
+               sPickItem = -1;
+               break;
+            }
+      }
+      sPickedUid = 0;
       sLocal.erase(std::remove_if(sLocal.begin(), sLocal.end(), [&](int id) { return scene->FindItem(id) == nullptr; }), sLocal.end());
       static Scene3DNode::Settings sSeen;
       std::memcpy(&sSeen, sSet, sizeof(sSeen));

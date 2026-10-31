@@ -7,6 +7,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/DropdownField.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -1624,6 +1625,7 @@ namespace
       State& s = S();
       const float gap = tok::space_1, gapGroup = tok::space_3;
       DrawPagePicker();
+      ImGui::BeginDisabled(page.id == 0); // no page yet: the tools show, the picker stays live
 
       // The transport, in the Timeline's and the Sample Studio's place: play, back, record, its input.
       FormParts::Inline(0.0f, gapGroup);
@@ -1722,6 +1724,7 @@ namespace
          s.settingsOpen = !open;
          s.genOpen = false;
       }
+      ImGui::EndDisabled();
    }
 
    struct NoteHit
@@ -3451,13 +3454,10 @@ namespace
          return;
       }
       gPianoRollPendingDrop.clear();
-      DrawPagePicker();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
-      const char* text = T("Add a page to start writing notes");
-      const ImVec2 ts = ImGui::CalcTextSize(text);
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      ImGui::GetWindowDrawList()->AddText(ImVec2(p.x + (avail.x - ts.x) * 0.5f, p.y + (avail.y - ts.y) * 0.5f),
-                                          ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
+      static Arrange::Lane sNoPage;
+      const ImVec2 room = ImGui::GetContentRegionAvail();
+      DrawToolbar(sNoPage, room.x - kKeysW, room.y);
+      EmptyState::DrawInWindow(T("No pages yet"), T("Choose New Page in the page list to start writing notes."));
    }
 }
 
