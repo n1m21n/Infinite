@@ -714,6 +714,30 @@ int DrawTestsB(FrameCtx& fc)
          }
       }
 
+      // INFINITE_SHOT_REQUEST=<file>: a scripted run (docs/showcase/shoot.sh) writes an output path into
+      // <file>; the next frame saves the backbuffer there and deletes <file>, and the app keeps running.
+      // Works off-screen and with the screen locked, unlike a window capture.
+      static const char* sShotRequest = getenv("INFINITE_SHOT_REQUEST");
+      if (sShotRequest != nullptr && frameId % 10 == 0)
+      {
+         if (FILE* f = fopen(sShotRequest, "r"))
+         {
+            char out[1024] = "";
+            const bool got = fgets(out, sizeof(out), f) != nullptr;
+            fclose(f);
+            out[strcspn(out, "\r\n")] = 0;
+            if (got && out[0] != 0)
+            {
+               std::vector<unsigned char> px(fbW * fbH * 4);
+               glReadPixels(0, 0, fbW, fbH, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+               stbi_flip_vertically_on_write(1);
+               const bool ok = stbi_write_png(out, fbW, fbH, 4, px.data(), fbW * 4) != 0;
+               printf("%s %s (%dx%d)\n", ok ? "wrote" : "FAILED to write", out, fbW, fbH);
+            }
+            std::remove(sShotRequest);
+         }
+      }
+
       if (Bench::Tail().active)
       {
          PollTailFences();
