@@ -75,6 +75,7 @@ public:
     void SendMouseMove(int row, int col, int mod);
     void SendMouseButton(int button, bool pressed, int mod);
     void Resize(int cols, int rows);
+    void SetColors(const uint32_t* palette, uint32_t foreground, uint32_t background);  // for the theme
     void ScrollBy(int lines);  // positive = back in history
     void ScrollToLine(int64_t line);
     void ScrollToBottom();

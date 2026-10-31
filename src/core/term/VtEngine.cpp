@@ -1,6 +1,7 @@
 #include "VtEngine.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 extern "C" {
@@ -46,6 +47,15 @@ struct VtEngine::Impl {
     std::string titleBuffer;
     std::string oscBuffer;
     int oscCommand = -1;
+    uint32_t foreground = 0, background = 0;
+
+    // OSC 10 and 11 with "?": how a program finds out the terminal is light or dark.
+    void ReplyColor(int command, uint32_t c) {
+        char reply[64];
+        const int r = c & 0xFF, g = (c >> 8) & 0xFF, b = (c >> 16) & 0xFF;
+        const int n = std::snprintf(reply, sizeof reply, "\033]%d;rgb:%02x%02x/%02x%02x/%02x%02x\033\\", command, r, r, g, g, b, b);
+        if (output) output(reply, (size_t)n);
+    }
 
     Cell Convert(const VTermScreenCell& in) const {
         Cell out;
@@ -73,7 +83,9 @@ struct VtEngine::Impl {
     }
 
     void HandleOsc() {
-        if (oscCommand == 7) {
+        if ((oscCommand == 10 || oscCommand == 11) && oscBuffer == "?") {
+            ReplyColor(oscCommand, oscCommand == 10 ? foreground : background);
+        } else if (oscCommand == 7) {
             // file://host/path
             std::string path = oscBuffer;
             if (path.rfind("file://", 0) == 0) {
@@ -197,7 +209,7 @@ struct VtEngine::Impl {
     }
     static int OnOsc(int command, VTermStringFragment frag, void* user) {
         Impl* impl = static_cast<Impl*>(user);
-        if (command != 7 && command != 9 && command != 133) return 0;
+        if (command != 7 && command != 9 && command != 10 && command != 11 && command != 133) return 0;
         if (frag.initial) {
             impl->oscCommand = command;
             impl->oscBuffer.clear();
@@ -246,14 +258,21 @@ VtEngine::VtEngine(const Options& options) : impl_(std::make_unique<Impl>()) {
 
     VTermState* state = vterm_obtain_state(impl_->vt);
     vterm_state_set_bold_highbright(state, 0);
-    const VTermColor fg = ToVterm(options.foreground), bg = ToVterm(options.background);
+    SetColors(options.palette, options.foreground, options.background);
+    vterm_screen_reset(impl_->screen, 1);
+}
+
+void VtEngine::SetColors(const uint32_t* palette, uint32_t foreground, uint32_t background) {
+    impl_->foreground = foreground;
+    impl_->background = background;
+    VTermState* state = vterm_obtain_state(impl_->vt);
+    const VTermColor fg = ToVterm(foreground), bg = ToVterm(background);
     vterm_state_set_default_colors(state, &fg, &bg);
     for (int i = 0; i < 16; ++i)
-        if (options.palette[i]) {
-            const VTermColor c = ToVterm(options.palette[i]);
+        if (palette[i]) {
+            const VTermColor c = ToVterm(palette[i]);
             vterm_state_set_palette_color(state, i, &c);
         }
-    vterm_screen_reset(impl_->screen, 1);
 }
 
 VtEngine::~VtEngine() {

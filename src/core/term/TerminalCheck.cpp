@@ -126,6 +126,25 @@ static void CheckSyncFilter() {
     CHECK(sink.out == want);
 }
 
+static void CheckColorQuery() {
+    std::string out;
+    VtEngine::Options o = Small();
+    o.foreground = PackRgb(36, 40, 50);
+    o.background = PackRgb(250, 251, 253);
+    o.output = [&](const char* d, size_t n) { out.append(d, n); };
+    VtEngine e(o);
+    Feed(e, "\033]11;?\033\\");
+    CHECK(out == "\033]11;rgb:fafa/fbfb/fdfd\033\\");
+    out.clear();
+    Feed(e, "\033]10;?\007");
+    CHECK(out == "\033]10;rgb:2424/2828/3232\033\\");
+    out.clear();
+    const uint32_t palette[16] = {};
+    e.SetColors(palette, PackRgb(1, 2, 3), PackRgb(14, 15, 19));
+    Feed(e, "\033]11;?\033\\");
+    CHECK(out == "\033]11;rgb:0e0e/0f0f/1313\033\\");
+}
+
 static bool WaitFor(const std::function<bool()>& ok, int ms) {
     const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
     while (std::chrono::steady_clock::now() < end) {
@@ -202,6 +221,7 @@ int main() {
     CheckScrollback();
     CheckResize();
     CheckSyncFilter();
+    CheckColorQuery();
 #if !defined(_WIN32)
     CheckSession();
 #endif
