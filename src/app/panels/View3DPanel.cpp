@@ -62,10 +62,10 @@ namespace
    bool sOrtho = false;
    bool sAutoOrtho = false;        // an axis view went orthographic; orbiting gives it back
    bool sSideOpen = true;
-   bool sOutlinerOpen = true;
    int sViewName = -1;             // 0..5 while looking straight down an axis
    int sGridAxis = 1;
-   int sTab = 0;                    // the settings tab
+   constexpr int kSceneTab = 6;
+   int sTab = kSceneTab;            // the settings tab
    int sLensUnit = 0;               // 0 millimeters, 1 field of view
    bool sLockCam = false;           // navigating in camera view moves the camera
    bool sLockDirty = false;
@@ -2372,10 +2372,10 @@ namespace
       const std::string search = lower(sSearch);
       const ImGuiIO& io = ImGui::GetIO();
       const float rowH = 24.0f;
-      // Up to a third of the height, then it scrolls, so the settings below keep their room.
+      // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::clamp((int)(roomH * 0.34f / step), 2, 8));
+      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f) / step)));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
@@ -3106,57 +3106,41 @@ namespace
                       ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
       }
 
-      // One rail for every icon: each card starts level with its first icon, at the same x.
-      const auto sceneChip = [&]
-      {
-         if (IconChip("##v3dscenes", IconsInfinite::Arrange, sOutlinerOpen, T("Scene list")))
-            sOutlinerOpen = !sOutlinerOpen;
-      };
-      if (sOutlinerOpen)
-      {
-         const float roomH = ImGui::GetContentRegionAvail().y;
-         sceneChip();
-         ActionButton::RowNext();
-         BeginCardColumn("##v3dscenelist", ImGuiChildFlags_AutoResizeY);
-         DrawOutliner(scene, ImGui::GetContentRegionAvail().x, roomH);
-         EndCardColumn();
-      }
-
-      // The tab strip, Blender's order: what renders, where it goes, the world, then the selection.
+      // The tab strip, Blender's order after the scene list: what renders, where it goes, the world, then the selection.
       Item* item = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
       const char* dataGlyph = item != nullptr ? KindGlyph(scene, *item) : IconsInfinite::ViewCamera;
       const Kind kind = item != nullptr ? scene->ItemKind(*item) : Kind::Missing;
       const bool hasData = kind == Kind::Camera || kind == Kind::Light;
-      // Picking a camera or a light opens its settings, the likeliest reason to pick it.
+      // Picking a camera or a light opens its settings, the likeliest reason to pick it, unless the list is open.
       static int sPicked = 0;
       if ((item != nullptr ? item->id : 0) != sPicked)
       {
          sPicked = item != nullptr ? item->id : 0;
-         if (hasData)
+         if (hasData && sTab != kSceneTab)
             sTab = 4;
       }
       if (sTab == 4 && !hasData)
          sTab = item != nullptr ? 3 : 0;
       ImGui::BeginGroup();
-      if (!sOutlinerOpen)
-         sceneChip();
-      const struct { const char* id; const char* icon; const char* tip; bool show; } kTabs[6] = {
-         { "##t0", IconsInfinite::ShadeRender, T("Render"), true },
-         { "##t1", IconsInfinite::Folder, T("Output"), true },
-         { "##t2", IconsInfinite::World, T("World"), true },
-         { "##t3", IconsInfinite::Cube, T("Object"), item != nullptr },
-         { "##t4", dataGlyph, kind == Kind::Light ? T("Light") : T("Camera"), hasData },
-         { "##t5", IconsInfinite::Settings, T("Viewport"), true },
+      const struct { int tab; const char* id; const char* icon; const char* tip; bool show; } kTabs[7] = {
+         { kSceneTab, "##t6", IconsInfinite::Arrange, T("Scene"), true },
+         { 0, "##t0", IconsInfinite::ShadeRender, T("Render"), true },
+         { 1, "##t1", IconsInfinite::Folder, T("Output"), true },
+         { 2, "##t2", IconsInfinite::World, T("World"), true },
+         { 3, "##t3", IconsInfinite::Cube, T("Object"), item != nullptr },
+         { 4, "##t4", dataGlyph, kind == Kind::Light ? T("Light") : T("Camera"), hasData },
+         { 5, "##t5", IconsInfinite::Settings, T("Viewport"), true },
       };
-      for (int i = 0; i < 6; i++)
-         if (kTabs[i].show && IconChip(kTabs[i].id, kTabs[i].icon, sTab == i, kTabs[i].tip))
-            sTab = i;
+      for (const auto& tab : kTabs)
+         if (tab.show && IconChip(tab.id, tab.icon, sTab == tab.tab, tab.tip))
+            sTab = tab.tab;
       ImGui::EndGroup();
       ActionButton::RowNext();
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
       availW = ImGui::GetContentRegionAvail().x;
       sFieldW = std::max(70.0f, availW - kFieldLabelW);
-      if (sTab == 0) DrawRenderTab(scene);
+      if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
+      else if (sTab == 0) DrawRenderTab(scene);
       else if (sTab == 1) DrawOutputTab(scene, availW);
       else if (sTab == 2) DrawWorldTab(scene, availW);
       else if (sTab == 3) DrawObjectTab(scene, availW);
