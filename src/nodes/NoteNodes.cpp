@@ -362,14 +362,6 @@ public:
       const unsigned int deviceFilter = mDevice.load(std::memory_order_relaxed);
       for (int i = 0; i < n; i++)
       {
-         // Learn takes the next key pressed on any input, before the filters.
-         if (msgs[i].isNoteOn && mLearn.load(std::memory_order_relaxed))
-         {
-            mLearnedChannel.store(msgs[i].channel, std::memory_order_relaxed);
-            mLearnedDevice.store((unsigned int)msgs[i].device, std::memory_order_relaxed);
-            mLearn.store(false, std::memory_order_release);
-            mLearnDone.store(true, std::memory_order_release);
-         }
          if (deviceFilter != 0 && (unsigned int)msgs[i].device != deviceFilter)
             continue;
          if (channelFilter >= 0 && msgs[i].channel != channelFilter)
@@ -476,22 +468,6 @@ public:
       mMpeRange.store(std::clamp(n.mpeBendRange, 1.0f, 96.0f), std::memory_order_relaxed);
    }
 
-   // Main thread: arm Learn, then poll for the key it caught.
-   void ArmLearn()
-   {
-      mLearnDone.store(false, std::memory_order_relaxed);
-      mLearn.store(true, std::memory_order_release);
-   }
-   void CancelLearn() { mLearn.store(false, std::memory_order_relaxed); }
-   bool TakeLearned(unsigned int& device, int& channel)
-   {
-      if (!mLearnDone.exchange(false, std::memory_order_acquire))
-         return false;
-      device = mLearnedDevice.load(std::memory_order_relaxed);
-      channel = mLearnedChannel.load(std::memory_order_relaxed);
-      return true;
-   }
-
    uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
    int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
 
@@ -539,10 +515,6 @@ private:
    std::atomic<int> mLastNote { -1 };
    std::atomic<int> mChannel { -1 };
    std::atomic<unsigned int> mDevice { 0 };   // 0 = every input
-   std::atomic<bool> mLearn { false };
-   std::atomic<bool> mLearnDone { false };
-   std::atomic<unsigned int> mLearnedDevice { 0 };
-   std::atomic<int> mLearnedChannel { 0 };
    std::atomic<int> mTranspose { 0 };
    std::atomic<float> mVelocityScale { 1.0f };
    std::atomic<bool> mUseGlobalScale { false };
@@ -573,16 +545,31 @@ bool MidiNotesNode::DeviceMissing() const
 void MidiNotesNode::BeginLearn()
 {
    mLearning = true;
-   if (!mAudioNode)
-      mAudioNode = std::make_unique<AudioMidiNotesNode>();
-   mAudioNode->ArmLearn();
+   // Own cursor on the note stream, read from the main thread: Learn must not
+   // depend on the audio thread running this node (an unpatched one may not).
+   mLearnCursor = Platform::MidiNoteStreamPosition();
 }
 
 void MidiNotesNode::CancelLearn()
 {
    mLearning = false;
-   if (mAudioNode)
-      mAudioNode->CancelLearn();
+}
+
+void MidiNotesNode::PollLearn()
+{
+   if (!mLearning)
+      return;
+   Platform::MidiNoteMessage msgs[64];
+   const int n = Platform::MidiReadNotesSince(mLearnCursor, msgs, 64);
+   for (int i = 0; i < n; i++)
+   {
+      if (!msgs[i].isNoteOn)
+         continue;
+      deviceName = Platform::MidiDeviceName(msgs[i].device);
+      channel = msgs[i].channel;
+      mLearning = false;
+      return;
+   }
 }
 
 bool MidiNotesNode::StartListening()
@@ -598,17 +585,7 @@ void MidiNotesNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMidiNotesNode>();
-   if (mLearning)
-   {
-      unsigned int dev = 0;
-      int ch = 0;
-      if (mAudioNode->TakeLearned(dev, ch))
-      {
-         deviceName = Platform::MidiDeviceName((Platform::MidiDeviceId)dev);
-         channel = ch;
-         mLearning = false;
-      }
-   }
+   PollLearn();
    mAudioNode->PushParams(*this);
    // The MIDI backends only keep the note-pressure / note-slide virtual
    // controllers while some node wants MPE, so ordinary CC learn is untouched.

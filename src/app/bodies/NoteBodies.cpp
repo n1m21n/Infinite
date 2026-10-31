@@ -408,6 +408,7 @@ namespace app
       bool held[128];
       n->HeldKeys(held);
       const int count = n->HeldCount();
+      n->PollLearn();
 
       char stat[80];
       if (!Platform::MidiIsRunning())

@@ -91,6 +91,7 @@ public:
    void BeginLearn();
    void CancelLearn();
    bool IsLearning() const { return mLearning; }
+   void PollLearn();   // main thread, once per frame while learning
    int transpose = 0;            // semitones applied to every incoming note
    float velocityScale = 1.0f;   // 0..2, applied before the note leaves this node
    bool useGlobalScale = false;  // snap incoming notes to Transport's key/scale
@@ -108,6 +109,7 @@ private:
    int mLastCookFrame = -1;
    bool mMpeRegistered = false; // counted in Platform::MidiMpeEnabledCount
    bool mLearning = false;
+   unsigned long long mLearnCursor = 0;
 };
 
 // A note source that needs no hardware at all: an on-screen piano you click
