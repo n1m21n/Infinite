@@ -25,54 +25,99 @@ Always the newest release. All files, checksums and release notes are on the [Re
 
 ## What's new in v1.0
 
-v1.0 is the biggest release so far: about 600 commits since v0.6.6. The node canvas is still the centre; around it, Infinite now has the panels a full studio needs. Every panel docks to the edge of the window and opens from the rail or a key.
+v1.0 is the first release that is not a beta: 667 commits since v0.6.6, five new node types (Piano, Wind, Piano Roll, Generate Samples, 3D View), and these additions:
 
-### 3D View
+- **3D View** panel to compose 3D nodes into one scene and render it.
+- **Terminal** panel and the `infinite` command, for you and for coding agents.
+- **Sample Studio** for cutting, editing and generating samples.
+- **Piano Roll** panel for MIDI lanes on the Timeline.
+- **Template library** with 15 one-idea Starters and a full-piece Showcase.
+- Refined Session, Timeline, Mod Matrix and Performance panels (they arrived in 0.6.6).
+
+Full notes: [Releases](https://github.com/n1m21n/Infinite/releases/latest).
+
+---
+
+## A tour of the studio
+
+One window, one node canvas in the middle, and panels that dock to its edges. Each panel opens from the rail or a key (the full list is under [Manuals and shortcuts](#manuals-and-shortcuts)).
+
+### The node canvas
+
+![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
+
+Everything is a node, and every cable carries one kind of thing: pictures, 3D geometry, audio, notes or control signals. Patch left to right, right-click to add, and anything with a dot beside it can be modulated. Infinite has **347 node types**; the [Node library](#node-library) lists them by domain, and the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) documents each one.
+
+### Pictures and video
+
+![Four frames from the Showcase patch: a 3D scene of instanced cubes, rings and particles over a blurred sky](docs/screenshots/v1/showcase-frames.png)
+
+A GPU texture pipeline (GLSL, OpenGL 3.2 Core): images, video and camera, Syphon, Spout and NDI sources, shapes, noise and Field Pixel shaders, 32 blend modes, blur, bloom, glitch, halftone, curves, LUTs, reaction-diffusion, feedback loops and on-device background removal. The frames above are four seconds of the bundled Showcase patch, rendered headless.
+
+### 3D
 
 <img src="docs/screenshots/v1/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
 
-The final stage of a 3D patch. Right-click a 3D node and add it to the 3D View, then arrange node outputs in one scene, look through a camera and render a still or an animation for a chosen frame range. Cameras and lights are the existing Camera and Light nodes, the world is a colour, an HDRI or any image node (transparent until you set one), and each object picks which lights reach it. The panel follows Blender's keymap and setting names, with real f-stop depth of field, ambient occlusion, bloom, composition guides and safe areas. Arranging never writes back to the node: geometry, materials and simulation stay in the node chain. It composes; it does not model. Open it with Shift + 3.
+Procedural meshes, imports (USD, OBJ, PLY, STL, glTF), booleans, Voronoi and Delaunay, instancing on points, particles, PBD cloth and soft bodies, metaballs, and PBR rendering (Cook-Torrance GGX, ACES, 32-bit HDRI). The **3D View** panel (Shift + 3) is where a 3D patch ends: right-click a 3D node, add it to the view, arrange the objects, look through a camera and render a still or an animation (seconds and frame rate). The world is a colour or an HDRI, each object picks which lights reach it, and the panel follows Blender's keymap and setting names, with depth of field, ambient occlusion, bloom, composition guides and safe areas. It composes; it does not model, so geometry, materials and simulation stay in the node chain.
 
-### Terminal and the `infinite` command
+### Sound
 
-<img src="docs/screenshots/v1/terminal.png" alt="The Terminal panel running the infinite command" width="100%">
+![Piano, Analog, Granular and Generate Samples nodes](docs/screenshots/v1/gallery-sound.png)
 
-A real terminal inside Infinite (Ctrl + \`), docked on any side, running your own shell and your own tools, coding agents included. No agent ships with Infinite. Inside it, the `infinite` command drives the open patch: look (`graph`, `params`, `selection`), edit (`add`, `connect`, `set`, `mod`, `expr`, `undo`), play (`play`, `tempo`, `session launch`, `timeline`), see and hear (`shot`, `frame`, `render`, `audio`), and open any panel or setting. `infinite code new | check | watch | docs | examples` writes and checks Field, Sketch, Sketch 3D, GLSL and formula code against the real compilers, and `infinite patch new | check | layout | apply` generates whole patches. With no app running, every verb that takes a `.inf` file runs headless. Type `infinite context` for a short brief of the open patch, or `infinite guide` for the full reference.
+A sample-accurate, pull-based audio graph on the same BPM transport as the pictures. Synths and physical models (Analog, FM, Wavetable, Metallic, String, **Piano**, **Wind**, Granular, PaulStretch, Molder, Sampler, Slicer, 8-track Drum Sequencer, Looper), a full effects rack, AU and VST3 plugin hosting with native windows and modulatable parameters, and **Generate Samples**, a player whose sample is made rather than loaded: pick a part (drums, bass, pads, plucks, leads and more, 18 in all), press generate, and a loop of 1, 2, 4 or 8 bars is rendered from Infinite's own instruments. It saves as a recipe, not as audio.
+
+### Notes and control
+
+![LFO, Audio Analyze, Arpeggiator and Note Sequencer nodes](docs/screenshots/v1/gallery-control.png)
+
+Note sequencers, arpeggiator, chorder, quantizer and MIDI in and out on one side; LFOs, envelopes, random, pattern CV, audio analysis (8-band FFT, onsets), image analysis and camera tracking on the other. Any source can drive any parameter: a shader control, a 3D transform, a synth knob or a hosted plugin's parameter.
 
 ### Sample Studio
 
 <img src="docs/screenshots/v1/sample-studio.png" alt="Sample Studio slicing a waveform" width="100%">
 
-A self-contained sample editor (Shift + W). Open a file, drop one in, record from the audio input, or generate a take. Zoom the waveform, cut it into slices by transients, grid or equal parts, and give each slice its own gain, pan, pitch, fine tune, stretch, fades, shape, colour, mute and solo. Editing never touches the canvas. When it sounds right, Convert puts it on the canvas as a node that plays it, or as the patch that made it; Export writes the whole edit or each slice to WAV, FLAC or MP3. Studio work is saved in the patch.
-
-### Session clips and the Timeline (from 0.6.6, refined)
-
-| Session | Timeline |
-|---|---|
-| <img src="docs/screenshots/v1/session-clips.png" alt="Session view with scenes of clips" width="100%"> | <img src="docs/screenshots/v1/timeline.png" alt="Timeline arrangement with audio and video tracks" width="100%"> |
-| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Session Audio plays only the launched clips. Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
+A self-contained sample editor (Shift + W). Open a file, drop one in, record from the audio input, or generate a take. Zoom the waveform, cut it into slices by transients, grid or equal parts, and give each slice its own gain, pan, pitch, fine tune, stretch, fades, shape, colour, mute and solo. Editing never touches the canvas. When it sounds right, Convert puts it on the canvas as a node that plays it (a generated take can also come back as the patch that made it); Export writes the whole edit or each slice to WAV, FLAC or MP3. Studio work is saved in the patch.
 
 ### Piano Roll
 
 <img src="docs/screenshots/v1/piano-roll.png" alt="Piano Roll with notes in a scale" width="100%">
 
-A note editor (Shift + R) for MIDI lanes on the Timeline, played by the new Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key.
+A note editor (Shift + R) for MIDI lanes on the Timeline, played by the Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key.
 
-### Mod Matrix and Performance (from 0.6.6)
+### Session and Timeline
+
+| Session | Timeline |
+|---|---|
+| <img src="docs/screenshots/v1/session-clips.png" alt="Session view with scenes of clips" width="100%"> | <img src="docs/screenshots/v1/timeline.png" alt="Timeline arrangement with audio and video tracks" width="100%"> |
+| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
+
+### Mod Matrix and Performance
 
 <img src="docs/screenshots/v1/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
 
 The Mod Matrix (Shift + M) lists every modulation in the patch in one table: source, destination, range, curve and invert, with each source's live signal. The Performance panel (Shift + P) is a surface for playing a patch: pages of knobs, faders, XY pads, toggles, triggers, radio selectors and step gates, each assigned to any parameter, with MIDI learn and a response curve per control. Edit mode lays it out; Perform mode plays it.
 
-### New nodes and instruments
+### Template library
 
-- **Piano**: a physically modelled piano (felt hammers, stiff-string waveguides, unisons, dampers, soundboard) with Grand, Rhodes and Wurlitzer models.
-- **Wind**: a waveguide wind instrument: clarinet, sax, flute and brass.
-- **String**: fitted body types (guitar, harp, violin, cello), pick hardness, and bow pressure and noise.
-- **Generate Samples**: a sample player whose sample is made, not loaded. Pick a part (drums, bass, synths, pads, plucks, leads, percussion, textures), press generate, and it renders a 1 to 8 bar loop from Infinite's own instruments. It saves as a recipe, not as audio.
-- **Piano Roll**: plays a MIDI lane from the Piano Roll.
-- **3D View**: the scene node behind the 3D View panel; wire it to an Output to render it.
-- **Settings > Plugins**: scan controls and the list of scanned plugins in one place.
+Start from a working patch instead of an empty canvas. 15 **Starters** each teach one idea in 3 to 6 nodes with Comment notes beside them (first sound, first image, music to image, notes, synths, effects, 3D, modulators, Field and more), and the **Showcase** is a full piece that plays on its own: sound, picture, arrangement, Session scenes and a Performance page, with its media bundled. Open the Templates window from the menu; the Showcase is listed first.
+
+### Terminal and the `infinite` command
+
+<img src="docs/screenshots/v1/terminal.png" alt="The Terminal panel running the infinite command" width="100%">
+
+A real terminal inside Infinite (Ctrl + \`), docked on any side, running your own shell and your own tools, coding agents included. No agent ships with Infinite. Inside it, the `infinite` command drives the open patch:
+
+```bash
+infinite graph                      # look: the nodes and cables of the open patch
+infinite add Analog                 # edit: add, connect, set, mod, expr, undo
+infinite connect 1 2                # wire node 1 into node 2
+infinite mod 3 2 volume             # modulate node 2's volume from node 3
+infinite play                       # play: also tempo, seek, session, timeline
+infinite shot selected node.png     # see and hear: shot, frame, render, audio
+infinite code docs field            # code: new, check, watch, docs, examples for Field, Sketch, GLSL, formulas
+```
+
+With no app running, every verb that takes a `.inf` file runs headless. `infinite context` prints a short brief of the open patch and `infinite guide` the full reference.
 
 ### AI skill files
 
@@ -86,22 +131,9 @@ New to Infinite? Watch the full walkthrough on YouTube: **[Infinite video walkth
 
 ---
 
-## Highlights
-
-- **Two engines in lockstep**: a GPU texture pipeline (GLSL, OpenGL 3.2 Core) runs with a sample-accurate, pull-based audio graph on one BPM transport.
-- **Modulate anything from anything**: shader parameters, 3D transforms, synth controls and hosted plugin parameters, driven by LFOs, CV sequencers, audio FFT analysis or video analysis.
-- **Synthesis and physical modelling**: Wavetable, Metallic modal resonator, String, Piano, Wind, granular engine, PaulStretch, multi-sample player and an 8-track drum machine.
-- **AU and VST3 plugin hosting**: Audio Unit (macOS) and VST3 (macOS, Windows, Linux) with native plugin windows and modulatable parameters.
-- **Procedural 3D and physics**: meshes, 3D splines, point scattering, single-draw-call instancing (Instance on Points), PBD cloth and soft bodies, particle systems, and PBR rendering (Cook-Torrance GGX, ACES tonemapping, 32-bit HDRI).
-- **2D shaders and generative effects**: 32 blend modes, a live GLSL editor, video and camera playback, Syphon (macOS) and Spout (Windows) zero-copy video, NDI video in and out (needs the Free NDI runtime), reaction-diffusion, and on-device ML background removal.
-
----
-
 ## Node library
 
-Infinite has **300+ node types**:
-
-![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
+Infinite has **347 node types**:
 
 | Domain | Key nodes |
 |---|---|
@@ -152,6 +184,12 @@ Any element, pixel or sample kernel can declare **dynamic pins** in its code, ad
 ## Headless and agents
 
 Infinite also runs with no window: pictures, video and sound straight from a `.inf` text file on the command line, the same engine the `infinite` command uses. See the [Headless User Guide](docs/headless/Infinite_Headless_User_Guide.pdf) ([Markdown](docs/headless/GUIDE.md)).
+
+```bash
+Infinite --validate hello.inf                                   # check a patch
+Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png  # pictures at chosen seconds
+Infinite --render hello.inf hello.mp4 --duration 4 --fps 30     # video with sound
+```
 
 For AI coding assistants there is an MCP server, [`tools/npm/infinite-engine`](tools/npm/infinite-engine) (npm: `infinite-engine`), and a Claude plugin described in [`tools/mcp/README.md`](tools/mcp/README.md).
 
