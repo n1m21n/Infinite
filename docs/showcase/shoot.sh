@@ -3,7 +3,7 @@
 # Usage: docs/showcase/shoot.sh [shot ...]   (no arguments = all nine shots)
 #   APP=/path/to/Infinite.app/Contents/MacOS/Infinite   the dev app to drive (default below)
 # Writes docs/screenshots/v1/<shot>.png, each window-only, 2x Retina, under 1.5 MB.
-# Runs one Infinite instance on port 7790 and quits it at the end; never captures the full screen.
+# Runs one off-screen Infinite instance on port 7790 and quits it at the end; the app saves its own frames.
 set -e
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 SHOW=$REPO/docs/showcase
@@ -20,26 +20,10 @@ while ! python3 "$REPO/scripts/ibuild.py" status 2>/dev/null | grep -q 'build lo
    echo "a build is running; waiting"; sleep 30
 done
 
-# 2. Window-id helper: largest layer-0 window of a pid (CoreGraphics).
-cat > "$TMP/winid.swift" <<'EOF'
-import CoreGraphics
-let pid = Int32(CommandLine.arguments[1])!
-let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as! [[String: Any]]
-var best: (Int, Double) = (0, 0)
-for w in list {
-  guard let p = w[kCGWindowOwnerPID as String] as? Int32, p == pid else { continue }
-  guard let layer = w[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
-  let b = w[kCGWindowBounds as String] as! [String: Any]
-  let area = (b["Width"] as! Double) * (b["Height"] as! Double)
-  if area > best.1 { best = (w[kCGWindowNumber as String] as! Int, area) }
-}
-print(best.0)
-EOF
-swiftc -O "$TMP/winid.swift" -o "$TMP/winid"
-
 # 3. Launch. Keep a copy of the shared control token: other sessions may overwrite it.
 [ -f "$TOKFILE" ] && cp "$TOKFILE" "$TMP/token.bak"
 INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 INFINITE_HIDE_TELEMETRY=1 \
+   IMAGERESYNTH_SCREENSHOT="$TMP/unused.png" INFINITE_SCREENSHOT_FRAME=999999999 INFINITE_SHOT_REQUEST="$TMP/req" \
    "$APP" "$PATCH" > "$TMP/app.log" 2>&1 &
 PID=$!
 sleep 15
@@ -48,7 +32,7 @@ c() { INFINITE_CONTROL_PORT=7790 INFINITE_CONTROL_TOKEN=$(cat "$TMP/tok") "$APP"
 cleanup() {
    c quit >/dev/null 2>&1 || true; sleep 2; kill "$PID" 2>/dev/null || true
    [ -f "$TMP/token.bak" ] && cp "$TMP/token.bak" "$TOKFILE"
-   rm -rf "$TMP"
+   cp "$TMP/app.log" /private/tmp/claude-501/-Users-namansoni-Infinite-repo/4f14c8bb-2830-4e26-b493-469197e65438/scratchpad/app.log 2>/dev/null; rm -rf "$TMP"
 }
 trap cleanup EXIT
 
@@ -71,10 +55,14 @@ c session scene 1 >/dev/null   # starts the audio engine and plays scene "Groove
 
 closeall() { for p in samplestudio pianoroll modmatrix perf view3d timeline session terminal; do c panel $p close >/dev/null 2>&1 || true; done; c view params off >/dev/null; }
 
-# keep <name>: window-only capture, shrunk with sips in 160 px steps until under 1.5 MB.
+# keep <name>: the app saves its own backbuffer (INFINITE_SHOT_REQUEST), so this works off-screen and with the
+# screen locked; then shrink with sips in 160 px steps until under 1.5 MB.
 keep() {
-   screencapture -o -x -l "$("$TMP/winid" "$PID")" "$TMP/$1.png"
-   cp "$TMP/$1.png" "$OUT/$1.png"; w=2880
+   rm -f "$TMP/$1.png"; echo "$TMP/$1.png" > "$TMP/req"
+   n=0; while [ -f "$TMP/req" ] && [ $n -lt 60 ]; do sleep 0.5; n=$((n+1)); done
+   [ -f "$TMP/$1.png" ] || { echo "$1: no frame saved"; return; }
+   w=$(sips -g pixelWidth "$TMP/$1.png" | tail -1 | awk '{print $2}')
+   cp "$TMP/$1.png" "$OUT/$1.png"
    while [ "$(stat -f %z "$OUT/$1.png")" -gt 1500000 ] && [ $w -gt 1600 ]; do
       w=$((w-160)); sips -Z $w "$TMP/$1.png" --out "$OUT/$1.png" >/dev/null
    done
