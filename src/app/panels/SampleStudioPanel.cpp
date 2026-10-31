@@ -3160,6 +3160,17 @@ namespace
          SelectOnly(3);
          s.dirty = true;
       }
+      // INFINITE_OPENPANELS=...,studioend: pull the end marker in to 60% and show the whole take, to review the wave
+      // past the end marker (it used to draw as a solid block there).
+      static bool sDemoEnd = [] { const char* op = getenv("INFINITE_OPENPANELS"); return op != nullptr && std::strstr(op, "studioend") != nullptr; }();
+      if (sDemoEnd && s.src && !s.busy && !sDemoSlices)
+      {
+         sDemoEnd = false;
+         const int64_t a = s.doc.slices.back().start + 1;
+         s.doc.endFrame = std::max(a, s.doc.StartFrame() + (int64_t)((double)(Frames() - s.doc.StartFrame()) * 0.6));
+         ViewAll();
+         s.dirty = true;
+      }
       // INFINITE_OPENPANELS=...,studiopatch: convert the first take to a patch, to review the layout.
       static bool sDemoPatch = [] { const char* op = getenv("INFINITE_OPENPANELS"); return op != nullptr && std::strstr(op, "studiopatch") != nullptr; }();
       if (sDemoPatch && s.take)
