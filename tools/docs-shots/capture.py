@@ -36,7 +36,7 @@ SCENES = {
 
 def run_app(app, env_extra, out, timeout=120):
     env = dict(os.environ, INFINITE_NO_SINGLE_INSTANCE="1", INFINITE_NO_UPDATE_CHECK="1", INFINITE_NOSPLASH="1",
-               IMAGERESYNTH_SCREENSHOT=out, INFINITE_SCREENSHOT_FRAME="40")
+               INFINITE_HIDE_TELEMETRY="1", IMAGERESYNTH_SCREENSHOT=out, INFINITE_SCREENSHOT_FRAME="40")
     env.update(env_extra)
     if os.path.exists(out):
         os.remove(out)
