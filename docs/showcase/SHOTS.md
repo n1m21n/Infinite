@@ -36,14 +36,16 @@ Checks:
 1. Wait until `python3 scripts/ibuild.py status` prints `build lock: free`.
 2. Launch the app on the patch:
    ```
-   INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 \
+   INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 INFINITE_HIDE_TELEMETRY=1 \
+     IMAGERESYNTH_SCREENSHOT="$TMP/unused.png" INFINITE_SCREENSHOT_FRAME=999999999 INFINITE_SHOT_REQUEST="$TMP/req" \
      "$APP" docs/showcase/infinite-v1-showcase.inf &
    ```
+   `IMAGERESYNTH_SCREENSHOT` with an unreachable frame number keeps the window off-screen, and `INFINITE_HIDE_TELEMETRY` hides the fps/cpu readout.
 3. Copy `~/Library/Application Support/Infinite/control_token` right after launch, and drive the app with `INFINITE_CONTROL_PORT=7790 INFINITE_CONTROL_TOKEN=<copy> "$APP" --cli ...`. Other running sessions can overwrite the shared token file. Restore the old file when you finish.
 4. Run `--cli studio set "text=..."` with the take's absolute path. The Studio does not resolve the relative `src path=media/studio-take.wav` on load (see the gaps below).
 5. Run `--cli session scene 1`. This starts the audio engine and plays scene "Groove".
-6. Capture only the app window: `screencapture -o -x -l <window id>`. The window id is the largest layer-0 CoreGraphics window of the app's pid (a small Swift helper, built by the script).
-7. Shrink with `sips -Z` in 160 px steps from 2880 until the file is under 1.5 MB.
+6. Capture: write an output path into the `INFINITE_SHOT_REQUEST` file. The app saves its own backbuffer there (3200x2000 for the 1600x1000 pt window) and deletes the request file. There is no window capture, so it works off-screen and with the screen locked, and the title bar is never in the shot.
+7. Shrink with `sips -Z` in 160 px steps until the file is under 1.5 MB.
 
 Before every shot, all panels are closed and `view params off` is set.
 
