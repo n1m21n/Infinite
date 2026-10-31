@@ -39,7 +39,7 @@ swiftc -O "$TMP/winid.swift" -o "$TMP/winid"
 
 # 3. Launch. Keep a copy of the shared control token: other sessions may overwrite it.
 [ -f "$TOKFILE" ] && cp "$TOKFILE" "$TMP/token.bak"
-INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 \
+INFINITE_NO_SINGLE_INSTANCE=1 INFINITE_CONTROL_PORT=7790 INFINITE_NOSPLASH=1 INFINITE_NO_UPDATE_CHECK=1 INFINITE_HIDE_TELEMETRY=1 \
    "$APP" "$PATCH" > "$TMP/app.log" 2>&1 &
 PID=$!
 sleep 15

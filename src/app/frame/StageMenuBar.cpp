@@ -1137,7 +1137,9 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
          // On a narrow window the readouts are dropped rather than drawn over the centred group.
-         if (cursorX - telemetryW >= centreEndX + minGap)
+         // INFINITE_HIDE_TELEMETRY drops them for screenshot and manual runs, where a live frame rate is noise.
+         static const bool sHideTelemetry = getenv("INFINITE_HIDE_TELEMETRY") != nullptr;
+         if (!sHideTelemetry && cursorX - telemetryW >= centreEndX + minGap)
          {
             ImGui::SameLine(cursorX - telemetryW);
             TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
