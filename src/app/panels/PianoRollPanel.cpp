@@ -1672,6 +1672,16 @@ namespace
       FormParts::Inline(0.0f, gap);
       DrawGridChip();
       FormParts::Inline(0.0f, gap);
+      // The same loop region as the Timeline's toggle; arming it fits the region to the selection (Cmd+L) when there is one.
+      if (IconChip("##pianoLoop", IconsInfinite::Loop, st.loop.enabled,
+                   st.loop.enabled ? T("Loop Region: Enabled") : T("Toggle Loop Region (Shift+drag on ruler)")))
+      {
+         if (st.loop.enabled)
+            ArrangeSetLoop(false, st.loop.start, st.loop.end);
+         else
+            SetLoopFromSelection(page);
+      }
+      FormParts::Inline(0.0f, gap);
       if (IconChip("##pianoScale", page.scaleSnap ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap, page.scaleSnap,
                    T("Snap drawn and moved notes to the scale")))
       {
