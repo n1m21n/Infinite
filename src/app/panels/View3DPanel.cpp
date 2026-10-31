@@ -613,7 +613,7 @@ namespace
    void ApplyOp(Scene3DNode* scene, ImVec2 mouse)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      const bool snap = sSet->snap != io.KeyCtrl;
+      const bool snap = sSet->snap != (io.KeyCtrl || io.KeySuper);   // Cmd or Ctrl on macOS, Ctrl elsewhere
       const float fine = io.KeyShift && sOp.plane < 0 ? 0.1f : 1.0f;
       const bool hasTyped = !sOp.typed.empty() && sOp.typed != "-";
       const float typed = hasTyped ? std::strtof(sOp.typed.c_str(), nullptr) : 0.0f;
