@@ -1660,3 +1660,587 @@ Power saving (integrated GPU)	节能（集成 GPU）
 High performance (discrete GPU)	高性能（独立 GPU）
 Graphics processor	图形处理器
 For computers with more than one GPU. Takes effect the next time Infinite starts.	适用于有多个 GPU 的电脑。下次启动 Infinite 时生效。
+%d objects over the limit	%d 个对象超出上限
+%d of %d plugins	%d / %d 个插件
+%d selected	已选 %d 个
+(Local)	（局部）
+1 bar	1 小节
+1/16	1/16
+1/4	1/4
+1/8	1/8
+3D Cursor	3D 游标
+3D View	3D View
+3D View - arrange node outputs and render a camera (Shift+3)	3D View——排列节点输出并渲染相机（Shift+3）
+3D View Panel	3D View 面板
+A Sampler on the canvas holding this slice as you hear it	画布上的一个 Sampler，装着你听到的这个切片
+A program is still running in the terminal.	终端里仍有程序在运行。
+A sample holds at most 64 slices	一个采样最多容纳 64 个切片
+A sample player that makes its own loop: a music style, a part (all, synths, pads, plucks, percussion, drums), a seed and a length render 1-8 bars on a background thread, loudness-matched, saved as a recipe and rendered again on reopen, or kept as a wav.	自己生成循环的采样播放器：选择音乐风格、声部（all、synths、pads、plucks、percussion、drums）、种子和长度，在后台线程渲染 1-8 小节，响度匹配，保存为配方并在重新打开时再次渲染，或保留为 wav。
+Active Element	活动元素
+Add	添加
+Add a camera from this view (0)	从此视角添加相机（0）
+Add a camera to render.	添加一台相机用于渲染。
+Add a node, a camera, a light, an HDRI or a new scene (Shift+A)	添加节点、相机、灯光、HDRI 或新场景（Shift+A）
+Add to 3D View	添加到 3D View
+All MIDI inputs	所有 MIDI 输入
+Ambient	环境光
+Ambient Occlusion	环境光遮蔽
+Arp Mode	琶音模式
+Arpeggio	琶音
+Assign Piano Roll	指定 Piano Roll
+Assign another Piano Roll	指定另一个 Piano Roll
+At most	最多
+Audio input to record from	用于录音的音频输入
+Audition	试听
+Back Orthographic	后 正交
+Background colour	背景颜色
+Bar	小节
+Bars	小节数
+Bass	贝斯
+Bell	铃
+Bend	弯音
+Bias	偏移
+Bloom	辉光
+Bottom Orthographic	底 正交
+By grid	按网格
+By position	按位置
+By transients	按瞬态
+C Hat	闭镲
+Camera	相机
+Camera Orthographic	相机 正交
+Camera Perspective	相机 透视
+Camera view (0)	相机视图（0）
+Camera view (Numpad 0 or 0)	相机视图（小键盘 0 或 0）
+Cast by one light, any but a point. Pick it in the light's settings.	由一盏灯投射，点光源除外。请在该灯的设置中选择。
+Casts shadow	投射阴影
+Center	居中
+Chance	概率
+Choke	互斥
+Choose New Page in the page list to start writing notes.	在页面列表中选择“新建页面”即可开始写音符。
+Chop to Grid	按网格切分
+Chord Rhythm	和弦节奏
+Chord Size	和弦大小
+Chords	和弦
+Clap	拍手
+Clear slices	清除切片
+Click a node on the canvas...	点击画布上的一个节点...
+Click again to delete everything learned	再次点击将删除所有已学习内容
+Click or drag to place the playhead	点击或拖动以放置播放头
+Click: play from here; double-click: a new slice here	单击：从此处播放；双击：在此处新建切片
+Clip end	片段结束
+Clip start	片段开始
+Clips	片段
+Close Piano Roll	关闭 Piano Roll
+Close Sample Studio	关闭 Sample Studio
+Close Terminal	关闭终端
+Color	颜色
+Color Management	色彩管理
+Color depth	色深
+Composition Guides	构图参考线
+Cone	锥角
+Connect a MIDI controller	请连接 MIDI 控制器
+Connect a MIDI controller to record	连接 MIDI 控制器以录制
+Connect an audio input to record	连接音频输入以录音
+Convert	转换
+Convert to node	转换为节点
+Copy / Cut / Paste Notes	复制 / 剪切 / 粘贴音符
+Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original	复制或剪切所选音符，或复制所选片段；粘贴会把它们紧接在原件之后
+Copy scene	复制场景
+Could not open	无法打开
+Crash	碎音镲
+Creativity	创意度
+Cursor to Selected	游标到选中项
+Cut the sample by transients, grid or into equal parts	按瞬态、网格或等分切分采样
+Cut the selected notes at the playhead; join runs on one pitch into one note	在播放头处切开所选音符；把同一音高上的连续音符合并为一个
+Decay	衰减
+Delete Notes	删除音符
+Delete scene	删除场景
+Delete the selected notes or clips	删除所选音符或片段
+Density	密度
+Depth of Field	景深
+Distance	距离
+Dome angle	穹顶角度
+Dome tilt	穹顶倾斜
+Double Speed	二倍速
+Drag a box to zoom into	拖出方框进行放大
+Drag on the ruler with Alt held to mark the range Generate fills	按住 Alt 在标尺上拖动，标记“生成”要填充的范围
+Drag to move the view; double-click to see it all	拖动以移动视图；双击查看全部
+Drag: fade length; Shift-drag up or down (or on the curve): its shape	拖动：淡变长度；按住 Shift 上下拖动（或在曲线上拖动）：曲线形状
+Drag: move the cut; double-click: remove it	拖动：移动切点；双击：删除切点
+Draw	绘制
+Draw a clip, drop a .mid, or record	绘制片段、拖入 .mid 或录制
+Drum rows	鼓行
+Drums	鼓
+Duplicate Notes	复制一份音符
+Duplicate scene	复制一份场景
+Each slice to a folder...	每个切片导出到文件夹...
+Edit the whole sample instead of the selected slices	编辑整个采样，而不是所选切片
+Elevation	仰角
+Empty. Shift+A adds to it.	空。按 Shift+A 添加内容。
+Ends	尾部
+Energy	能量
+Environment texture	环境纹理
+Equal	等分
+Erase	擦除
+Export	导出
+Export slices to	切片导出到
+Exposure	曝光
+Expression at start	起始表情
+F-Stop	光圈值
+FLAC	FLAC
+Field of view	视野
+Fill	填充
+Film	胶片
+Final size	最终尺寸
+Find in terminal	在终端中查找
+Fine	微调
+Fit	适配
+Fit Page	适配页面
+Fit to 16ths	对齐到 16 分音符
+Fit to Scale	适配到音阶
+Focal length	焦距
+Focus on	聚焦于
+Fold to the keys in use	折叠到用到的琴键
+Follow grid	跟随网格
+Follow the playhead	跟随播放头
+Forget me	忘记我
+Form	曲式
+Frame	框显
+Frame Range	帧范围
+Frame all	全部框显
+Frame rate	帧率
+Frames	帧
+From canvas	来自画布
+Front Orthographic	前 正交
+Functions	功能
+Functions: legato, humanize, reverse, strum and more	功能：连奏、人性化、反转、扫弦等
+Fx	Fx
+Gain	增益
+Generate	生成
+Generate Range	生成范围
+Generate a new take	生成新版本
+Generate a take, open a file, or drop a sample here	生成一个版本、打开文件，或把采样拖到这里
+Generate notes in the page's key (G). Alt+drag the ruler sets the range; selected notes regenerate in place	按页面的调生成音符（G）。按住 Alt 拖动标尺设置范围；所选音符会原地重新生成
+Global	全局
+Global 	全局 
+Go to node	转到节点
+Golden	黄金分割
+Grid	网格
+Grid, shared with the Timeline	网格，与时间线共用
+Group the selected clips or dissolve their groups	编组所选片段，或解散其编组
+HDRI...	HDRI...
+Half Speed	半速
+Hear notes as you touch them	触碰音符时试听
+Hide (H)	隐藏（H）
+High Note	最高音
+Humanize	人性化
+In	入点
+Individual Origins	各自原点
+Instrument (for the next Generate)	乐器（用于下一次生成）
+Join	合并
+Keep Working	继续工作
+Kept takes, notes you play and saved patches stay on this computer.	保留的版本、你演奏的音符和保存的补丁都只留在这台电脑上。
+Key	调
+Kick	底鼓
+Lay the selected notes or clips again right after themselves	把所选音符或片段紧接在其自身之后再放一份
+Learn from my playing	从我的演奏中学习
+Learning	学习
+Left Orthographic	左 正交
+Legato	连奏
+Length (for the next Generate)	长度（用于下一次生成）
+Lens	镜头
+Lens unit	镜头单位
+Level	电平
+Light	灯光
+Lit by	照明来源
+Load HDRI...	载入 HDRI...
+Local	局部
+Local 	局部 
+Location	位置
+Lock camera to view	锁定相机到视图
+Lock pitch	锁定音高
+Lock rhythm	锁定节奏
+Lock seed	锁定种子
+Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead	循环标尺上 Alt+拖动的范围或所选音符；在播放头处设置循环起点或终点
+Loop: on repeats the edit, off plays it once	循环：开启时重复编辑结果，关闭时只播放一次
+Low Note	最低音
+MP3	MP3
+Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and 31 more), a seed and a length of 1, 2, 4 or 8 bars, and press generate: a private patch built from that style - drums, bass, chords, a motif, each through its own synths and effects - renders a seamless loop on a background thread while the canvas keeps running. part picks the whole mix (all) or one layer of it from the same seed: synths (bass and the motif line), pads (the chords held on a slow-swelling voice), plucks (the chords arpeggiated on a short plucked voice), percussion (clap, toms, bell) or drums (kick, snare, hats). variation is how far each node strays from its defaults; the dice picks a new seed. follow transport makes the loop at the patch tempo, key and scale, card's own at the style's. The status line names what was made, its tempo, key and scale. Every loop comes out at -14 LUFS under a -1 dB true-peak ceiling; a seed that renders silent or broken is redrawn up to three times before the node says so. Changing a setting marks the sample stale until you generate again. The patch saves the recipe, not the audio, and renders it again when reopened; keep as file writes the loop to a wav, and from then on it is saved as that file. Playback is the sample player's: drag the waveform edges for start and end, pitch, gain and loop below it, and connect notes to play it from a keyboard.	生成采样，而不是载入采样。选择一种音乐风格（deep house、dub techno、lofi beats 及另外 31 种）、一个种子和 1、2、4 或 8 小节的长度，然后按 generate：一个按该风格搭建的私有补丁——鼓、贝斯、和弦和一个动机，各自经过自己的合成器和效果——会在后台线程渲染出一个无缝循环，同时画布照常运行。part 从同一个种子中选择整个混音（all）或其中一层：synths（贝斯和动机旋律）、pads（用缓慢渐强的音色持续的和弦）、plucks（用短促拨弦音色琶音的和弦）、percussion（拍手、通鼓、铃）或 drums（底鼓、军鼓、镲）。variation 决定每个节点偏离默认值的程度；骰子会选一个新种子。follow transport 按补丁的速度、调和音阶生成循环，card's own 则按风格自身的设置。状态行会显示生成了什么，以及它的速度、调和音阶。每个循环都以 -14 LUFS 输出，真峰值上限为 -1 dB；渲染出静音或损坏结果的种子最多会重抽三次，之后节点才会报告。更改任何设置都会把采样标记为过期，直到你重新生成。补丁保存的是配方而不是音频，重新打开时会再次渲染；keep as file 会把循环写入 wav，此后它就作为该文件保存。播放方式与采样播放器相同：拖动波形边缘设置起点和终点，下方是 pitch、gain 和 loop，连接音符即可用键盘演奏。
+Making a take: click to start over	正在生成版本：点击重新开始
+Markers snap to 16ths (Shift while dragging: free)	标记吸附到 16 分音符（拖动时按住 Shift：自由）
+Median Point	中点
+Melody	旋律
+Mood	情绪
+Move	移动
+Move camera to view	移动相机到视图
+Move the selected notes one grid step; with nothing selected, step the playhead	将所选音符移动一个网格步长；未选中时移动播放头
+Move tool (Shift+Space, G). G moves at once	移动工具（Shift+Space，G）。G 直接移动
+Mute Notes	静音音符
+Mute the selected notes, or the selected clips, or bring them back	静音所选音符或片段，或恢复它们
+Navigation	导航
+New Page	新建页面
+New scene	新建场景
+No MIDI input	无 MIDI 输入
+No active modulations	没有活动的调制
+No fitting nodes in this patch	此补丁中没有合适的节点
+No page	无页面
+No pages yet	还没有页面
+Node	节点
+None, transparent	无，透明
+Normalise	标准化
+Note	音符
+Notes	音符
+Nothing in the 3D View yet	3D View 中还没有内容
+Nothing was recorded. Check the audio input and microphone permission	什么也没录到。请检查音频输入和麦克风权限
+Nudge Notes / Step Playhead	微移音符 / 步进播放头
+O Hat	开镲
+Object	物体
+Octaves	八度
+One semitone, or one scale degree with scale snap on; hold Shift for an octave	一个半音；开启音阶吸附时为一个音阶级；按住 Shift 为一个八度
+Only for a generated take	仅适用于生成的版本
+Open Generate for this page; with an Alt+drag range on the ruler it fills that range	为此页面打开“生成”；若标尺上有 Alt+拖动的范围，则填充该范围
+Open an audio file (or drop one on the Studio)	打开音频文件（或拖到 Studio 上）
+Open in Piano Roll	在 Piano Roll 中打开
+Open learning folder	打开学习文件夹
+Orbit	环绕
+Orbit around selection	围绕选中项环绕
+Orientation	坐标系
+Out	出点
+Overlays (Ctrl+`)	叠加层（Ctrl+`）
+P Hat	踩镲
+Pads	铺底
+Page	页面
+Pages: switch, add, rename or delete one ([ and ])	页面：切换、添加、重命名或删除（[ 和 ]）
+Pan	声像
+Pan: drag	平移：拖动
+Panels	面板
+Pass	通道
+Passepartout	遮框
+Paste after	粘贴到后面
+Paste scene	粘贴场景
+Patch	补丁
+Personal	个人
+Perspective or orthographic (5)	透视或正交（5）
+Physically modelled grand, Rhodes and Wurlitzer: hammers on stretched strings and a soundboard, or on a tine or reed read by its pickup through an amp; hardness, tone, decay and stiffness shape it.	物理建模的三角钢琴、Rhodes 和 Wurlitzer：琴槌敲击拉伸的琴弦和音板，或敲击由拾音器经放大器拾取的音叉或簧片；hardness、tone、decay 和 stiffness 塑造音色。
+Physically modelled piano. model picks a grand, a Rhodes or a Wurlitzer. On the electrics the hammer hits a steel tine or reed and the pickup makes the sound: play harder and it barks, pickup moves the bar closer, fork mistunes the tone bar (beating for sustain), bell is the short metallic overtones of the attack, speaker blends from the direct out into the amp, and tremolo is the Wurlitzer's vibrato or a Suitcase's stereo pan. On the grand, every note is a felt hammer striking one to three unison strings that stretch their upper partials sharp, as a real piano's do, on a soundboard. The harder you play the shorter the hammer touches the string and the brighter it gets. hardness is the felt (soft and round to hard and bright), tone how fast the upper partials die against the fundamental, decay how long a held note sings, detune how far apart the unison strings are (the slow beating and the two-stage decay of a real piano), stiffness how far the partials stretch (0 is perfectly harmonic), body blends from the bare strings into the soundboard, and release is how fast the dampers stop a note after note-off; the top octave and a half has no dampers and rings on. 16 voices, note-driven.	物理建模钢琴。model 选择三角钢琴、Rhodes 或 Wurlitzer。电钢琴上，琴槌敲击钢制音叉或簧片，由拾音器发声：弹得越重声音越粗糙；pickup 让拾音器靠得更近，fork 让音棒失谐（为延音带来拍频），bell 是起音时短促的金属泛音，speaker 从直出过渡到放大器，tremolo 是 Wurlitzer 的颤音或 Suitcase 的立体声声像摆动。三角钢琴上，每个音符都是一个毡槌敲击一到三根齐奏弦，这些弦的高次分音像真钢琴一样向上拉伸，并共鸣于音板。弹得越重，琴槌接触琴弦的时间越短，声音越亮。hardness 是毡头（从柔软圆润到坚硬明亮），tone 是高次分音相对基音衰减的速度，decay 是按住的音符鸣响多久，detune 是齐奏弦之间的偏离程度（真钢琴缓慢的拍频和两段式衰减），stiffness 是分音拉伸的程度（0 为完全谐和），body 从裸弦过渡到音板，release 是 note-off 后制音器止住音符的速度；最高的一个半八度没有制音器，会持续鸣响。16 复音，由音符驱动。
+Physically modelled string: every note is a waveguide string tuned exactly to its pitch, on a shared wooden body. exciter plucks it, bows it (the bow keeps it sounding while the note is held) or strikes it with a felt hammer that gets brighter the harder you hit. position is where along the string it is excited, measured from the bridge (a quarter of the way in silences every 4th harmonic, as on a real string). tone sets how bright it stays as it rings, decay how long the note rings while held, stiffness stretches the upper partials sharp like a piano or a metal string, body blends from the bare string into the body's resonances (body type picks whose: a small box, or a guitar, harp, violin or cello body measured from recordings), and release is how fast the damper stops it after note-off. hardness is the pick (soft and dull to hard and bright); pressure is how hard the bow presses (light slips and sounds airy, heavy sticks and grits) and noise adds rosin noise to the bow. 8 voices, note-driven.	物理建模琴弦：每个音符都是一根精确调到其音高的波导弦，共用一个木质琴身。exciter 选择拨弦、拉弓（按住音符时弓会让它持续发声）或用毡槌敲击（敲得越重越亮）。position 是激励点在弦上的位置，从琴码量起（在四分之一处会让每第 4 个谐波消失，与真实琴弦一样）。tone 设置鸣响时保持多亮，decay 设置按住时音符鸣响多久，stiffness 像钢琴或金属弦那样把高次分音向上拉伸，body 从裸弦过渡到琴身共鸣（body type 选择哪种琴身：小木箱，或根据录音测得的吉他、竖琴、小提琴或大提琴琴身），release 是 note-off 后制音器止住它的速度。hardness 是拨片（从柔软暗淡到坚硬明亮）；pressure 是弓压（轻则打滑、声音带气声，重则咬弦、发粗），noise 为弓加入松香噪声。8 复音，由音符驱动。
+Physically modelled wind instrument: every note is a bore blown by a clarinet reed, a sax reed on a conical bore, a flute's air jet or brass lips. breath is how hard you blow (soft and dark up to loud and bright; blow too softly and a reed will not speak), tone is how bright the bell lets it be, noise is the air in the breath, vibrato a 5.5 Hz swell in the breath, and attack and release how fast the breath comes and goes. 8 voices, note-driven.	物理建模管乐器：每个音符都是一根被吹响的管体，激励可以是单簧管簧片、锥形管上的萨克斯簧片、长笛的气流或铜管的唇。breath 是吹气力度（从轻柔暗淡到响亮明亮；吹得太轻时簧片不会发声），tone 是喇叭口放出的明亮程度，noise 是气息中的气流声，vibrato 是气息中 5.5 Hz 的起伏，attack 和 release 是气息来去的速度。8 复音，由音符驱动。
+Physically modelled wind: clarinet, sax, flute or brass, blown by the note; breath, tone, noise and vibrato shape it.	物理建模管乐：单簧管、萨克斯、长笛或铜管，由音符吹响；breath、tone、noise 和 vibrato 塑造音色。
+Piano Roll	Piano Roll
+Piano Roll Panel	Piano Roll 面板
+Piano Roll Tools	Piano Roll 工具
+Piano Roll at Bottom	Piano Roll 在底部
+Piano Roll at Top	Piano Roll 在顶部
+Piano Roll node	Piano Roll 节点
+Piano roll - edit and generate notes (Shift+R)	Piano Roll——编辑和生成音符（Shift+R）
+Picture	图片
+Ping-pong: while looping, play forward then back	乒乓：循环时先正向再反向播放
+Pitch	音高
+Pivot	轴心点
+Play slice	播放切片
+Play the edit (pauses the canvas audio)	播放编辑结果（暂停画布音频）
+Plays the notes of the Piano Roll page linked to it - a MIDI lane in the Timeline, laid out in clips you draw, cut and loop like any other clip. It follows the transport, plays each clip as drawn (loops unrolled, chance rolled fresh on every play), and sends pitch bend, pressure and timbre curves along with the notes. transpose and vel act on everything the page plays; the notes input passes through and merges in (switch thru off to drop it). The Global Scale button snaps every played note to the project key and scale. A copy of the node starts unlinked, so one page never drives two nodes.	播放与其关联的 Piano Roll 页面中的音符——时间线中的一条 MIDI 轨道，由你像其他片段一样绘制、剪切和循环的片段组成。它跟随走带，按绘制原样播放每个片段（循环展开，chance 每次播放重新掷骰），并随音符一起发送弯音、压力和音色曲线。transpose 和 vel 作用于页面播放的所有内容；notes 输入会直通并合并进来（关闭 thru 可丢弃它）。Global Scale 按钮把每个播放的音符吸附到项目的调和音阶。节点的副本开始时不关联，因此一个页面永远不会驱动两个节点。
+Point at 3D Cursor	指向 3D 游标
+Pressure	压力
+Previous / Next Page	上一页 / 下一页
+Program still running	程序仍在运行
+Projection	投影
+Properties (N)	属性（N）
+Put the edit on the canvas: the patch that made it, or a node that plays it	把编辑结果放到画布上：生成它的补丁，或播放它的节点
+Put this scene on the canvas	把此场景放到画布上
+Quality	质量
+Quantise	量化
+Quantise clip	量化片段
+Quantise page	量化页面
+Quantise selection	量化所选
+Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings	量化所选内容或片段：选择网格、小节或某个分割（Q 重复上一次）。右键或 Shift+Q 打开其设置
+Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings	把所选内容或正在编辑的片段量化到网格；Shift+Q 在设置中打开强度、摇摆和尾部
+Quit Anyway	仍然退出
+Quitting ends it.	退出会终止它。
+Radius	半径
+Record MIDI	录制 MIDI
+Record notes from your MIDI controller while the transport plays (R)	在走带播放时录制来自 MIDI 控制器的音符（R）
+Record the audio input into a new sample (R)	把音频输入录制为新采样（R）
+Recorded	已录制
+Recorded (not saved to disk)	已录制（未保存到磁盘）
+Recording	正在录制
+Recording from the audio input. Press R to stop	正在从音频输入录音。按 R 停止
+Reflections	反射
+Release	释放
+Remove from scene	从场景中移除
+Rename the page	重命名页面
+Render Animation	渲染动画
+Render Image	渲染图像
+Render through this camera	通过此相机渲染
+Rendered: your lights, world and render settings (Z cycles)	渲染：你的灯光、世界和渲染设置（Z 循环切换）
+Replace	替换
+Replace the slices?	替换切片？
+Resolution %	分辨率 %
+Resolution X	分辨率 X
+Rev	反向
+Reveal File	显示文件
+Reverse Slice	反转切片
+Reverse: play the whole edit backwards	反转：倒放整个编辑结果
+Ride	叮叮镲
+Right Orthographic	右 正交
+Right-click any 3D node and choose Add to 3D View.	右键点击任意 3D 节点并选择“添加到 3D View”。
+Rim	鼓边
+Role	角色
+Roll	滚转
+Rotate	旋转
+Rotate tool (Shift+Space, R). R rotates at once	旋转工具（Shift+Space，R）。R 直接旋转
+Rotation	旋转
+Ruler	标尺
+Safe Areas	安全区域
+Sample	采样
+Sample Audio: you hear the Studio's edit; the canvas, Session and Timeline stay silent	采样音频：你听到的是 Studio 的编辑结果；画布、会话和时间线保持静音
+Sample Studio	Sample Studio
+Sample Studio Record	Sample Studio 录音
+Sample Studio at Bottom	Sample Studio 在底部
+Sample Studio at Top	Sample Studio 在顶部
+Sample and slice settings	采样和切片设置
+Sample studio - generate and shape a loop (Shift+W)	Sample Studio——生成并塑造循环（Shift+W）
+Samples per frame when rendering out.	渲染输出时每帧的采样数。
+Sampling	采样
+Saving image...	正在保存图像...
+Scale	缩放
+Scale snap	音阶吸附
+Scale tool (Shift+Space, S). S scales at once	缩放工具（Shift+Space，S）。S 直接缩放
+Scanned plugins	已扫描的插件
+Scene	场景
+Search	搜索
+Seconds	秒
+Seed	种子
+Select (Shift+Space, W)	选择（Shift+Space，W）
+Select All Notes	全选音符
+Select a camera or a light.	请选择一台相机或一盏灯。
+Select every note of the clips being edited	选择正在编辑的片段中的所有音符
+Select one object.	请选择一个物体。
+Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	选择、绘制、擦除、剪切、静音和抓手（拖动平移），与时间线和 Sample Studio 使用相同的按键，指针需位于 Piano Roll 上方（Esc 也会回到选择）。工具下拉菜单中包含这些工具和缩放。本节所有按键都需要指针位于那里
+Selection to Cursor	选中项到游标
+Sensor	传感器
+Set the gain so the edit peaks at -0.3 dB	设置增益，使编辑结果峰值为 -0.3 dB
+Settings for the page, clip or note	页面、片段或音符的设置
+Shadows	阴影
+Shape	形状
+Shift X	偏移 X
+Shift Y	偏移 Y
+Shift+A adds a camera, a light or a node from the canvas	Shift+A 添加相机、灯光或画布中的节点
+Show (Alt+H shows everything)	显示（Alt+H 显示全部）
+Show 3D View	显示 3D View
+Show Piano Roll	显示 Piano Roll
+Show Sample Studio	显示 Sample Studio
+Show Terminal	显示终端
+Show in renders	在渲染中显示
+Show or hide the docked Piano Roll	显示或隐藏停靠的 Piano Roll
+Slice	切片
+Slice colour	切片颜色
+Slices you placed by hand will be replaced.	你手动放置的切片将被替换。
+Snap	吸附
+Snap (Shift+Tab, hold Ctrl to flip)	吸附（Shift+Tab，按住 Ctrl 临时反转）
+Snap drawn and moved notes to the scale	将绘制和移动的音符吸附到音阶
+Snap markers to 16ths	标记吸附到 16 分音符
+Snap the next Generate to the project's key and scale	让下一次生成吸附到项目的调和音阶
+Snap to the grid	吸附到网格
+Snare	军鼓
+Softness	柔和度
+Solid: a neutral light, to see the shapes	实体：中性光照，用于查看形状
+Split / Join Notes	拆分 / 合并音符
+Split here	在此拆分
+Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)	在走带播放时开始或停止录制来自 MIDI 控制器的音符（仅在连接了 MIDI 设备时）
+Stop recording (R)	停止录制（R）
+Stop recording first	请先停止录制
+Strength	强度
+Stretch	拉伸
+Strum	扫弦
+Studio	Studio
+Surface	表面
+Swing	摇摆
+Switch to the neighbouring page	切换到相邻页面
+Target X	目标 X
+Target Y	目标 Y
+Target Z	目标 Z
+Terminal	终端
+Terminal - a real shell, for you and your coding agents (Ctrl+`)	终端——真正的 shell，供你和你的编程智能体使用（Ctrl+`）
+Terminal at Bottom	终端在底部
+Terminal at Left	终端在左侧
+Terminal at Right	终端在右侧
+Terminal at Top	终端在顶部
+That MIDI file has no notes	该 MIDI 文件中没有音符
+The Sample studio's take is driving audio. Click to hand it back to the canvas.	Sample Studio 的版本正在驱动音频。点击把音频交还给画布。
+The Sample studio's take will drive audio once the engine is started.	音频引擎启动后，Sample Studio 的版本将驱动音频。
+The graph that made the take, as a group on the canvas	生成该版本的图，以编组形式放到画布上
+The next Generate snaps to the project's key and scale	下一次生成会吸附到项目的调和音阶
+The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop	在时间线和 Piano Roll 中相同，在 Sample Studio 上单击或拖动：单击或拖动会在松开时放置播放头；Shift+拖动划出循环；拖动循环边缘可移动它；右键删除循环
+The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices	切片保持其跨度：长度让它播放得更慢（在切片末尾截断）或更快（之后为静音，或用填充）。Off：不拉伸；repitch：音高随之改变；beats 和 tonal：音高不变。在波形上按 Shift+左/右 塑造所选切片
+The terminal font is missing from this install.	此安装中缺少终端字体。
+Then click a Piano Roll node on the canvas: this page plays through it	然后点击画布上的一个 Piano Roll 节点：此页面将通过它播放
+Thirds	三分法
+This page is full	此页面已满
+Threshold	阈值
+Timbre	音色
+Time	时间
+Time spread	时间离散
+Title	标题
+Tom	通鼓
+Tool: Cut (B) - click to choose a tool	工具：剪切（B）——点击选择工具
+Tool: Draw (P) - click to choose a tool	工具：绘制（P）——点击选择工具
+Tool: Erase (E) - click to choose a tool	工具：擦除（E）——点击选择工具
+Tool: Hand (H) - click to choose a tool	工具：抓手（H）——点击选择工具
+Tool: Mute (0) - click to choose a tool	工具：静音（0）——点击选择工具
+Tool: Select (A) - click to choose a tool	工具：选择（A）——点击选择工具
+Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool	工具：选择（A）、剪切（B）、抓手（H）——点击选择工具。在波形上方双击可用任意工具切分
+Top Orthographic	顶 正交
+Transform	变换
+Transient	瞬态
+Transparent	透明
+Transpose	移调
+Transpose Notes	移调音符
+Triplet	三连音
+Unlink	取消关联
+User Orthographic	用户 正交
+User Perspective	用户 透视
+Vel spread	力度离散
+Velocity	力度
+Velocity Ramp	力度渐变
+View	视图
+View 	视图 
+Viewport	视口
+Visibility	可见性
+WAV, 16-bit	WAV，16 位
+WAV, 24-bit	WAV，24 位
+WAV, choose where...	WAV，选择保存位置...
+Waiting for the audio input (allow the microphone if macOS asks)	正在等待音频输入（如果 macOS 询问，请允许使用麦克风）
+What Generate writes	“生成”写入的内容
+Which MIDI controller Record listens to	“录制”监听的 MIDI 控制器
+Whole sample	整个采样
+Wireframe (Shift+Z)	线框（Shift+Z）
+World	世界
+Y	Y
+Zoom In	放大
+Zoom Out	缩小
+Zoom Piano Roll	缩放 Piano Roll
+Zoom Sample Studio	缩放 Sample Studio
+Zoom in, zoom out, fit the page, zoom to the selection	放大、缩小、适配页面、缩放到所选
+Zoom in, zoom out, fit the sample, zoom to the selection	放大、缩小、适配采样、缩放到所选
+Zoom out	缩小
+Zoom to mouse	以鼠标为中心缩放
+Zoom to selection	缩放到所选
+Zoom: drag	缩放：拖动
+mixed	混合
+slices	个切片
+source missing	源缺失
+style	风格
+A 2D fluid simulation that carries the input picture along as dye, so it smears, swirls and folds. Patch a motion image (Optical Flow) into force to push it, and a picture into obstacles: bright areas are solid. The stirrer (Orbit, Pulse, Spin) moves it with nothing patched. Resolution divides the simulation size; Reset clears it.	二维流体模拟，把输入图片当作染料带着走，使其涂抹、旋转和折叠。把运动图像（Optical Flow）接到 force 来推动它，把图片接到 obstacles：亮的区域是实体。搅拌器（Orbit、Pulse、Spin）在没有任何连接时也会让它流动。Resolution 按比例缩小模拟尺寸；Reset 将其清空。
+A brickwall limiter: nothing passes above threshold. In gain drives the signal into it, release sets how fast it lets go, out gain sets the final level, and the meter shows the gain reduction. Always fully wet.	砖墙限制器：任何信号都不会超过 threshold。In gain 把信号推入限制器，release 设置释放速度，out gain 设置最终电平，表头显示增益衰减量。始终为全湿。
+A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus.	Infinite 内的真正 shell，供你和你的编程智能体使用。从右侧栏的 >_ 图块或用 Ctrl+` 打开，Ctrl+` 同时会让它获得焦点；已获得焦点时则关闭它。
+AI skills	AI 技能
+Add a node, a camera, a light, an HDRI or a new scene	添加节点、相机、灯光、HDRI 或新场景
+Add to the View	添加到视图
+Audition Slice	试听切片
+Axis Views	轴向视图
+Camera View	相机视图
+Clear Transform	清除变换
+Clear the screen	清屏
+Copy / Cut / Paste Controls	复制 / 剪切 / 粘贴控件
+Copy / Cut / Paste Slices	复制 / 剪切 / 粘贴切片
+Copy / Paste	复制 / 粘贴
+Copy / Paste / Duplicate Scene	复制 / 粘贴 / 复制一份场景
+Copy or cut the selected slices, or paste them	复制或剪切所选切片，或粘贴切片
+Copy the selected text, or paste into the shell	复制所选文本，或粘贴到 shell
+Copy the whole scene, paste it as a new scene, or duplicate it	复制整个场景、粘贴为新场景，或复制一份
+Cut a slice at the pointer (on the grid); join the selected slices	在指针处切出一个切片（按网格）；合并所选切片
+Cycle the shading; Shift+Z switches wireframe	循环切换着色方式；Shift+Z 切换线框
+Delete Controls	删除控件
+Delete Slices	删除切片
+Delete the selected controls; Esc clears the selection	删除所选控件；Esc 清除选择
+Delete the selected slices	删除所选切片
+Deletes the faces marked by an upstream Select op, or all faces with selection-only off. With 'keep selected instead' it keeps the selection and deletes the rest. After an Instance on Points it drops whole instances instead of faces.	删除上游 Select 操作标记的面；关闭 selection-only 时删除所有面。开启 'keep selected instead' 时保留所选部分并删除其余部分。在 Instance on Points 之后，它会删除整个实例而不是面。
+Duplicate Controls	复制一份控件
+Duplicate the selected controls	复制一份所选控件
+Duplicate the selected items	复制一份所选项
+F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan	F（或小键盘 .）框显所选内容，未选中时框显全部；Home 框显全部，或重置相机视图的缩放和平移
+Find in Terminal	在终端中查找
+Fly	飞行
+Fog, smoke or a cloud drawn over a picture, from drifting noise that the wind moves. Fed by a Render 3D node it sits in that scene: it uses the render's camera and solid objects hide the haze behind them. Steps sets quality while you work; render steps is used when rendering offline.	绘制在图片上的雾、烟或云，由随风飘移的噪声生成。由 Render 3D 节点输入时，它会置于该场景中：使用渲染的相机，实体物体会遮挡其后的雾气。Steps 设置工作时的质量；离线渲染时使用 render steps。
+Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps	前、右、顶；按住 {mod} 为后、左、底。5 切换正交，9 转到反面，2 / 4 / 6 / 8 按步环绕
+Group / Ungroup	编组 / 取消编组
+Group the selected items, or dissolve the group	编组所选项，或解散编组
+Headless engine	无界面引擎
+Hide / Show	隐藏 / 显示
+Hide the selection, hide everything else, show everything	隐藏所选、隐藏其他全部、显示全部
+Hold the right button to look around and walk; Shift goes faster	按住右键环顾和行走；按 Shift 加速
+In edit mode, with the panel clicked: copy or cut the selected controls, or paste them	在编辑模式下点击面板后：复制或剪切所选控件，或粘贴控件
+In the Terminal, infinite guide and infinite code docs <language> print the same references.	在终端中，infinite guide 和 infinite code docs <language> 会输出同样的参考资料。
+Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless.	在终端面板内，infinite 已在 PATH 中并与本应用通信。在面板外，请用 --cli 运行应用的可执行文件。若使用 .inf 文件而不是运行中的应用，同样的命令可以无界面运行。
+Install All AI Skills	安装全部 AI 技能
+Invert Selection	反选
+It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top.	它从当前补丁所在的文件夹启动。获得焦点时，所有按键都会发送给 shell。把节点、文件或采样拖进来即可输入其 id 或路径。右键点击面板可将其停靠在底部、右侧、左侧或顶部。
+Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide.	Linux 需要虚拟显示：xvfb-run -a Infinite ...  完整指南随附为 Headless User Guide。
+Local View	局部视图
+Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view	通过场景相机观看。{mod}+0 把所选相机设为场景相机；{mod}+Alt+0 把相机移到当前视角
+Move / Rotate / Scale	移动 / 旋转 / 缩放
+Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels	直接移动、旋转或缩放所选内容。X / Y / Z 锁定轴向（Shift 锁定平面），数字键输入数值；单击或 Enter 确认，Esc 或右键取消
+Mute / Solo Slice	静音 / 独奏切片
+Mute or solo the selected slices	静音或独奏所选切片
+New / Close Tab	新建 / 关闭标签页
+Open Terminal	打开终端
+Open a new terminal tab, or close this one	打开新的终端标签页，或关闭当前标签页
+Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system	在右侧栏打开终端、把键盘焦点移过去，或关闭它。所有系统上都是物理 Ctrl 键
+Open the pivot point or the transform orientation menu	打开轴心点或变换坐标系菜单
+Overlays	叠加层
+Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.	3D 几何/渲染管线的一部分——几何和点云节点经由相机和灯光输入 Render 3D。右键点击 3D 节点并选择“添加到 3D View”，即可在 3D View 中排列它。
+Patch authoring: write, check and render .inf patches.	补丁编写：编写、检查和渲染 .inf 补丁。
+Pivot / Orientation	轴心点 / 坐标系
+Play the selected slice, or the one under the pointer	播放所选切片，或指针下的切片
+Preview Views	预览视图
+Previous / Next Slice	上一个 / 下一个切片
+Put the 3D cursor back at the centre and frame everything	把 3D 游标放回中心并框显全部
+Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version.	任何 AI 助手都能读取的参考文件，让它写出有效的补丁、Field 内核和 '=' 表达式，而不是靠猜。选择一个文件夹：Claude Code 使用 ~/.claude/skills/（或项目的 .claude/skills/）；其他助手请把文件添加到项目或对话中。更新 Infinite 后请重新安装，使文件与此版本一致。
+Rename Item	重命名项
+Rename the selected item	重命名所选项
+Render a still from the scene camera, or render the camera for its set duration	从场景相机渲染一张静帧，或按设定时长渲染相机
+Reset 3D Cursor	重置 3D 游标
+Reset the position, rotation or scale of the selection	重置所选内容的位置、旋转或缩放
+Reverse the selected slices	反转所选切片
+Scroll Back	向上滚动
+Scroll the terminal's history a page at a time	按页滚动终端历史
+Search the terminal's text	搜索终端文本
+Select All / None	全选 / 全不选
+Select All Clips	全选片段
+Select All Controls	全选控件
+Select All Slices	全选切片
+Select every clip on the timeline	选择时间线上的所有片段
+Select every control on the page	选择页面上的所有控件
+Select every shown item that is not selected	选择所有未选中的可见项
+Select every shown item, or nothing	选择所有可见项，或全不选
+Select every slice	选择所有切片
+Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices	选择相邻切片；按住 Shift 时拉伸（右）或压缩（左）所选切片
+Select, Blade and Hand (drag to pan); Esc also returns to Select	选择、刀片和抓手（拖动平移）；Esc 也会回到选择
+Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select	选择、铅笔、修剪、范围、缩放和抓手；再次按工具的键或按 Esc 回到选择
+Shading	着色
+Show only the selection (Keypad / too); press again to show everything	仅显示所选内容（小键盘 / 亦可）；再按一次显示全部
+Show or hide the 3D View. Every other key in this section needs the pointer over the view	显示或隐藏 3D View。本节其他按键都需要指针位于视图上方
+Show or hide the overlays (over the 3D View this key does not open the Terminal)	显示或隐藏叠加层（在 3D View 上方时此键不会打开终端）
+Show or hide the side panel	显示或隐藏侧面板
+Sidebar	侧边栏
+Split / Join Slices	拆分 / 合并切片
+Start or stop recording the chosen audio input into a new sample	开始或停止把所选音频输入录制为新采样
+Studio Tools	Studio 工具
+Take the selected items out of the view; the nodes stay on the canvas	把所选项移出视图；节点仍留在画布上
+Terminal panel	终端面板
+The Field Language and Expression Globals pages each have an Install AI Skill button for their own file.	Field 语言和表达式全局变量页面各有一个“安装 AI 技能”按钮，用于安装各自的文件。
+The final stage of a 3D patch. Right-click any 3D node and choose Add to 3D View to bring its output in, then arrange it in the 3D View panel (Shift+3): G move, R rotate, S scale, X Y Z to lock an axis, hold {mod} to snap. Arranging never changes the node, and whatever the node animates keeps playing through the placement: build and change things on the canvas, compose them here. Transparent until you set a world in its World tab. Keys are Blender's, including the 3D cursor (Shift+right-click), pivot (period), orientation (comma), local view (/) and keyframes (I). F12 renders a picture and {mod}+F12 the animation, through an Output node.	3D 补丁的最后一环。右键点击任意 3D 节点并选择“添加到 3D View”即可引入它的输出，然后在 3D View 面板（Shift+3）中排列：G 移动，R 旋转，S 缩放，X Y Z 锁定轴向，按住 {mod} 吸附。排列永远不会改变节点，节点的动画会透过摆放继续播放：在画布上搭建和修改，在这里构图。在“世界”标签页中设置世界之前是透明的。按键沿用 Blender，包括 3D 游标（Shift+右键）、轴心点（句号）、坐标系（逗号）、局部视图（/）和关键帧（I）。F12 渲染一张图片，{mod}+F12 渲染动画，均通过 Output 节点输出。
+The infinite command	infinite 命令
+The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors).	同一个可执行文件无需窗口即可从 .inf 补丁渲染图片、视频和声音。输出是确定性的：同一个补丁总会得到相同的帧和采样。最后输出的一行是一个 JSON 对象（ok、files、warnings、errors）。
+Then W, G, R or S picks the Select, Move, Rotate or Scale tool	然后按 W、G、R 或 S 选择选择、移动、旋转或缩放工具
+Timeline Tools	时间线工具
+Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform	切换停靠的 Sample Studio。本节其他按键都需要指针位于其波形上方
+Tools	工具
+Turn snapping on or off; hold {mod} while moving to flip it	开启或关闭吸附；移动时按住 {mod} 临时反转
+Undo / Redo Studio Edit	撤销 / 重做 Studio 编辑
+Undo or redo the Studio's own edits; the patch's undo is not touched	撤销或重做 Studio 自身的编辑；不影响补丁的撤销
+With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom	指针位于 3D 预览（节点、视口卡片、Render 3D）上方时：前、右、顶或默认视图。按住 {mod} 为后、左、底
+Zoom 3D View	缩放 3D View
+Zoom in or out; Shift+B drags a box to zoom into	放大或缩小；Shift+B 拖出方框进行放大
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	单独输入 infinite 会列出所有命令。infinite context 一次性输出当前补丁、所选内容和代码错误。

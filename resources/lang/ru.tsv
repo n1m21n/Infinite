@@ -1660,3 +1660,587 @@ Power saving (integrated GPU)	Энергосбережение (встроенн
 High performance (discrete GPU)	Высокая производительность (дискретный GPU)
 Graphics processor	Графический процессор
 For computers with more than one GPU. Takes effect the next time Infinite starts.	Для компьютеров с несколькими GPU. Применяется при следующем запуске Infinite.
+%d objects over the limit	Объектов сверх лимита: %d
+%d of %d plugins	%d из %d плагинов
+%d selected	Выбрано: %d
+(Local)	(Локально)
+1 bar	1 такт
+1/16	1/16
+1/4	1/4
+1/8	1/8
+3D Cursor	3D-курсор
+3D View	3D View
+3D View - arrange node outputs and render a camera (Shift+3)	3D View — расстановка выходов узлов и рендер камеры (Shift+3)
+3D View Panel	Панель 3D View
+A Sampler on the canvas holding this slice as you hear it	Sampler на холсте с этим слайсом в том виде, в каком вы его слышите
+A program is still running in the terminal.	В терминале ещё работает программа.
+A sample holds at most 64 slices	В сэмпле может быть не больше 64 слайсов
+A sample player that makes its own loop: a music style, a part (all, synths, pads, plucks, percussion, drums), a seed and a length render 1-8 bars on a background thread, loudness-matched, saved as a recipe and rendered again on reopen, or kept as a wav.	Сэмпл-плеер, который сам создаёт луп: стиль музыки, партия (all, synths, pads, plucks, percussion, drums), сид и длина дают 1-8 тактов, рендер в фоновом потоке с выравниванием громкости; сохраняется как рецепт и рендерится заново при открытии или остаётся wav-файлом.
+Active Element	Активный элемент
+Add	Добавить
+Add a camera from this view (0)	Добавить камеру из этого вида (0)
+Add a camera to render.	Добавьте камеру для рендера.
+Add a node, a camera, a light, an HDRI or a new scene (Shift+A)	Добавить узел, камеру, свет, HDRI или новую сцену (Shift+A)
+Add to 3D View	Добавить в 3D View
+All MIDI inputs	Все MIDI-входы
+Ambient	Окружение
+Ambient Occlusion	Ambient occlusion
+Arp Mode	Режим арпеджио
+Arpeggio	Арпеджио
+Assign Piano Roll	Назначить Piano Roll
+Assign another Piano Roll	Назначить другой Piano Roll
+At most	Не больше
+Audio input to record from	Аудиовход для записи
+Audition	Прослушать
+Back Orthographic	Сзади, ортографический
+Background colour	Цвет фона
+Bar	Такт
+Bars	Такты
+Bass	Бас
+Bell	Колокольчик
+Bend	Бенд
+Bias	Смещение
+Bloom	Свечение
+Bottom Orthographic	Снизу, ортографический
+By grid	По сетке
+By position	По позиции
+By transients	По транзиентам
+C Hat	Хэт закр.
+Camera	Камера
+Camera Orthographic	Камера, ортографический
+Camera Perspective	Камера, перспектива
+Camera view (0)	Вид из камеры (0)
+Camera view (Numpad 0 or 0)	Вид из камеры (Numpad 0 или 0)
+Cast by one light, any but a point. Pick it in the light's settings.	Отбрасывается одним источником света, любым, кроме точечного. Выберите его в настройках источника.
+Casts shadow	Отбрасывает тень
+Center	Центр
+Chance	Вероятность
+Choke	Заглушение
+Choose New Page in the page list to start writing notes.	Выберите «Новая страница» в списке страниц, чтобы начать писать ноты.
+Chop to Grid	Нарезать по сетке
+Chord Rhythm	Ритм аккордов
+Chord Size	Размер аккорда
+Chords	Аккорды
+Clap	Хлопок
+Clear slices	Очистить слайсы
+Click a node on the canvas...	Щёлкните по узлу на холсте...
+Click again to delete everything learned	Нажмите ещё раз, чтобы удалить всё выученное
+Click or drag to place the playhead	Щёлкните или перетащите, чтобы поставить курсор воспроизведения
+Click: play from here; double-click: a new slice here	Щелчок: играть отсюда; двойной щелчок: новый слайс здесь
+Clip end	Конец клипа
+Clip start	Начало клипа
+Clips	Клипы
+Close Piano Roll	Закрыть Piano Roll
+Close Sample Studio	Закрыть Sample Studio
+Close Terminal	Закрыть терминал
+Color	Цвет
+Color Management	Управление цветом
+Color depth	Глубина цвета
+Composition Guides	Направляющие композиции
+Cone	Конус
+Connect a MIDI controller	Подключите MIDI-контроллер
+Connect a MIDI controller to record	Подключите MIDI-контроллер для записи
+Connect an audio input to record	Подключите аудиовход для записи
+Convert	Преобразовать
+Convert to node	Преобразовать в узел
+Copy / Cut / Paste Notes	Копировать / вырезать / вставить ноты
+Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original	Копирует или вырезает выбранные ноты либо копирует выбранные клипы; вставка кладёт их сразу после оригинала
+Copy scene	Копировать сцену
+Could not open	Не удалось открыть
+Crash	Крэш
+Creativity	Креативность
+Cursor to Selected	Курсор к выделению
+Cut the sample by transients, grid or into equal parts	Нарезать сэмпл по транзиентам, по сетке или на равные части
+Cut the selected notes at the playhead; join runs on one pitch into one note	Разрезает выбранные ноты по курсору воспроизведения; сливает ноты одной высоты, идущие подряд, в одну
+Decay	Затухание
+Delete Notes	Удалить ноты
+Delete scene	Удалить сцену
+Delete the selected notes or clips	Удалить выбранные ноты или клипы
+Density	Плотность
+Depth of Field	Глубина резкости
+Distance	Расстояние
+Dome angle	Угол купола
+Dome tilt	Наклон купола
+Double Speed	Двойная скорость
+Drag a box to zoom into	Обведите рамкой область для приближения
+Drag on the ruler with Alt held to mark the range Generate fills	Перетащите по линейке с зажатым Alt, чтобы отметить диапазон, который заполнит Генерация
+Drag to move the view; double-click to see it all	Перетаскивание сдвигает вид; двойной щелчок показывает всё
+Drag: fade length; Shift-drag up or down (or on the curve): its shape	Перетаскивание: длина фейда; Shift+перетаскивание вверх или вниз (или по кривой): её форма
+Drag: move the cut; double-click: remove it	Перетаскивание: сдвинуть разрез; двойной щелчок: удалить его
+Draw	Рисование
+Draw a clip, drop a .mid, or record	Нарисуйте клип, перетащите .mid или запишите
+Drum rows	Строки ударных
+Drums	Ударные
+Duplicate Notes	Дублировать ноты
+Duplicate scene	Дублировать сцену
+Each slice to a folder...	Каждый слайс в папку...
+Edit the whole sample instead of the selected slices	Редактировать весь сэмпл вместо выбранных слайсов
+Elevation	Высота
+Empty. Shift+A adds to it.	Пусто. Shift+A добавляет объекты.
+Ends	Концы
+Energy	Энергия
+Environment texture	Текстура окружения
+Equal	Равные части
+Erase	Ластик
+Export	Экспорт
+Export slices to	Экспорт слайсов в
+Exposure	Экспозиция
+Expression at start	Выразительность в начале
+F-Stop	Диафрагма
+FLAC	FLAC
+Field of view	Поле зрения
+Fill	Заполнение
+Film	Плёнка
+Final size	Итоговый размер
+Find in terminal	Найти в терминале
+Fine	Точно
+Fit	Вписать
+Fit Page	Вписать страницу
+Fit to 16ths	Подогнать к 1/16
+Fit to Scale	Подогнать к ладу
+Focal length	Фокусное расстояние
+Focus on	Фокус на
+Fold to the keys in use	Свернуть до используемых клавиш
+Follow grid	Следовать сетке
+Follow the playhead	Следовать за курсором воспроизведения
+Forget me	Забыть меня
+Form	Форма
+Frame	Показать в кадре
+Frame Range	Диапазон кадров
+Frame all	Показать всё в кадре
+Frame rate	Частота кадров
+Frames	Кадры
+From canvas	С холста
+Front Orthographic	Спереди, ортографический
+Functions	Функции
+Functions: legato, humanize, reverse, strum and more	Функции: легато, хьюманизация, реверс, страм и другое
+Fx	Fx
+Gain	Усиление
+Generate	Сгенерировать
+Generate Range	Диапазон генерации
+Generate a new take	Сгенерировать новый дубль
+Generate a take, open a file, or drop a sample here	Сгенерируйте дубль, откройте файл или перетащите сюда сэмпл
+Generate notes in the page's key (G). Alt+drag the ruler sets the range; selected notes regenerate in place	Генерирует ноты в тональности страницы (G). Alt+перетаскивание по линейке задаёт диапазон; выбранные ноты генерируются заново на месте
+Global	Глобально
+Global 	Глобально 
+Go to node	Перейти к узлу
+Golden	Золотое сечение
+Grid	Сетка
+Grid, shared with the Timeline	Сетка, общая с таймлайном
+Group the selected clips or dissolve their groups	Сгруппировать выбранные клипы или распустить их группы
+HDRI...	HDRI...
+Half Speed	Половинная скорость
+Hear notes as you touch them	Слышать ноты при касании
+Hide (H)	Скрыть (H)
+High Note	Верхняя нота
+Humanize	Хьюманизация
+In	Вход
+Individual Origins	Отдельные начала координат
+Instrument (for the next Generate)	Инструмент (для следующей генерации)
+Join	Склеить
+Keep Working	Продолжить работу
+Kept takes, notes you play and saved patches stay on this computer.	Сохранённые дубли, сыгранные вами ноты и сохранённые патчи остаются на этом компьютере.
+Key	Тональность
+Kick	Бочка
+Lay the selected notes or clips again right after themselves	Положить выбранные ноты или клипы ещё раз сразу после них самих
+Learn from my playing	Учиться на моей игре
+Learning	Обучение
+Left Orthographic	Слева, ортографический
+Legato	Легато
+Length (for the next Generate)	Длина (для следующей генерации)
+Lens	Объектив
+Lens unit	Единицы объектива
+Level	Уровень
+Light	Свет
+Lit by	Освещается
+Load HDRI...	Загрузить HDRI...
+Local	Локально
+Local 	Локально 
+Location	Положение
+Lock camera to view	Привязать камеру к виду
+Lock pitch	Зафиксировать высоту
+Lock rhythm	Зафиксировать ритм
+Lock seed	Зафиксировать сид
+Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead	Зацикливает диапазон линейки, отмеченный Alt+перетаскиванием, или выбранные ноты; ставит начало или конец цикла по курсору воспроизведения
+Loop: on repeats the edit, off plays it once	Цикл: вкл. повторяет правку, выкл. играет её один раз
+Low Note	Нижняя нота
+MP3	MP3
+Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and 31 more), a seed and a length of 1, 2, 4 or 8 bars, and press generate: a private patch built from that style - drums, bass, chords, a motif, each through its own synths and effects - renders a seamless loop on a background thread while the canvas keeps running. part picks the whole mix (all) or one layer of it from the same seed: synths (bass and the motif line), pads (the chords held on a slow-swelling voice), plucks (the chords arpeggiated on a short plucked voice), percussion (clap, toms, bell) or drums (kick, snare, hats). variation is how far each node strays from its defaults; the dice picks a new seed. follow transport makes the loop at the patch tempo, key and scale, card's own at the style's. The status line names what was made, its tempo, key and scale. Every loop comes out at -14 LUFS under a -1 dB true-peak ceiling; a seed that renders silent or broken is redrawn up to three times before the node says so. Changing a setting marks the sample stale until you generate again. The patch saves the recipe, not the audio, and renders it again when reopened; keep as file writes the loop to a wav, and from then on it is saved as that file. Playback is the sample player's: drag the waveform edges for start and end, pitch, gain and loop below it, and connect notes to play it from a keyboard.	Создаёт сэмпл вместо загрузки. Выберите стиль музыки (deep house, dub techno, lofi beats и ещё 31), сид и длину 1, 2, 4 или 8 тактов и нажмите generate: закрытый патч, собранный из этого стиля, — ударные, бас, аккорды, мотив, каждый через свои синтезаторы и эффекты — рендерит бесшовный луп в фоновом потоке, пока холст продолжает работать. part выбирает весь микс (all) или один его слой из того же сида: synths (бас и линия мотива), pads (аккорды, протянутые на медленно нарастающем голосе), plucks (аккорды арпеджио на коротком щипковом голосе), percussion (хлопок, томы, колокольчик) или drums (бочка, малый барабан, хэты). variation — насколько каждый узел отклоняется от своих значений по умолчанию; кубик выбирает новый сид. follow transport делает луп в темпе, тональности и ладу патча, card's own — в собственных настройках стиля. Строка состояния сообщает, что получилось, с темпом, тональностью и ладом. Каждый луп выходит на -14 LUFS под потолком true peak -1 dB; сид, который рендерится в тишину или с ошибкой, перебрасывается до трёх раз, прежде чем узел сообщит об этом. Изменение любой настройки помечает сэмпл как устаревший, пока вы не сгенерируете заново. Патч сохраняет рецепт, а не аудио, и рендерит его заново при открытии; keep as file записывает луп в wav, и с этого момента он сохраняется как этот файл. Воспроизведение — как у сэмпл-плеера: перетаскивайте края волны для начала и конца, под ней pitch, gain и loop; подключите ноты, чтобы играть с клавиатуры.
+Making a take: click to start over	Создаётся дубль: нажмите, чтобы начать заново
+Markers snap to 16ths (Shift while dragging: free)	Маркеры привязываются к 1/16 (Shift при перетаскивании: свободно)
+Median Point	Медианная точка
+Melody	Мелодия
+Mood	Настроение
+Move	Переместить
+Move camera to view	Переместить камеру к виду
+Move the selected notes one grid step; with nothing selected, step the playhead	Сдвигает выбранные ноты на шаг сетки; если ничего не выбрано, сдвигает курсор воспроизведения
+Move tool (Shift+Space, G). G moves at once	Инструмент перемещения (Shift+Space, G). G перемещает сразу
+Mute Notes	Заглушить ноты
+Mute the selected notes, or the selected clips, or bring them back	Заглушить выбранные ноты или клипы либо вернуть их
+Navigation	Навигация
+New Page	Новая страница
+New scene	Новая сцена
+No MIDI input	Нет MIDI-входа
+No active modulations	Нет активных модуляций
+No fitting nodes in this patch	В этом патче нет подходящих узлов
+No page	Нет страницы
+No pages yet	Страниц пока нет
+Node	Узел
+None, transparent	Нет, прозрачный
+Normalise	Нормализовать
+Note	Нота
+Notes	Ноты
+Nothing in the 3D View yet	В 3D View пока ничего нет
+Nothing was recorded. Check the audio input and microphone permission	Ничего не записано. Проверьте аудиовход и разрешение на микрофон
+Nudge Notes / Step Playhead	Сдвиг нот / шаг курсора
+O Hat	Хэт откр.
+Object	Объект
+Octaves	Октавы
+One semitone, or one scale degree with scale snap on; hold Shift for an octave	На полутон или, при привязке к ладу, на ступень лада; с Shift — на октаву
+Only for a generated take	Только для сгенерированного дубля
+Open Generate for this page; with an Alt+drag range on the ruler it fills that range	Открывает Генерацию для этой страницы; если на линейке есть диапазон Alt+перетаскивания, заполняет его
+Open an audio file (or drop one on the Studio)	Открыть аудиофайл (или перетащить его на Studio)
+Open in Piano Roll	Открыть в Piano Roll
+Open learning folder	Открыть папку обучения
+Orbit	Орбита
+Orbit around selection	Вращение вокруг выделения
+Orientation	Ориентация
+Out	Выход
+Overlays (Ctrl+`)	Оверлеи (Ctrl+`)
+P Hat	Хэт пед.
+Pads	Пэды
+Page	Страница
+Pages: switch, add, rename or delete one ([ and ])	Страницы: переключить, добавить, переименовать или удалить ([ и ])
+Pan	Панорама
+Pan: drag	Сдвиг: перетаскивание
+Panels	Панели
+Pass	Проход
+Passepartout	Паспарту
+Paste after	Вставить после
+Paste scene	Вставить сцену
+Patch	Патч
+Personal	Личное
+Perspective or orthographic (5)	Перспектива или ортографический (5)
+Physically modelled grand, Rhodes and Wurlitzer: hammers on stretched strings and a soundboard, or on a tine or reed read by its pickup through an amp; hardness, tone, decay and stiffness shape it.	Физически смоделированные рояль, Rhodes и Wurlitzer: молоточки по натянутым струнам и деке или по камертонному стержню или язычку, звук которого снимает звукосниматель через усилитель; hardness, tone, decay и stiffness формируют звук.
+Physically modelled piano. model picks a grand, a Rhodes or a Wurlitzer. On the electrics the hammer hits a steel tine or reed and the pickup makes the sound: play harder and it barks, pickup moves the bar closer, fork mistunes the tone bar (beating for sustain), bell is the short metallic overtones of the attack, speaker blends from the direct out into the amp, and tremolo is the Wurlitzer's vibrato or a Suitcase's stereo pan. On the grand, every note is a felt hammer striking one to three unison strings that stretch their upper partials sharp, as a real piano's do, on a soundboard. The harder you play the shorter the hammer touches the string and the brighter it gets. hardness is the felt (soft and round to hard and bright), tone how fast the upper partials die against the fundamental, decay how long a held note sings, detune how far apart the unison strings are (the slow beating and the two-stage decay of a real piano), stiffness how far the partials stretch (0 is perfectly harmonic), body blends from the bare strings into the soundboard, and release is how fast the dampers stop a note after note-off; the top octave and a half has no dampers and rings on. 16 voices, note-driven.	Физически смоделированное фортепиано. model выбирает рояль, Rhodes или Wurlitzer. В электрических молоточек бьёт по стальному стержню или язычку, а звук создаёт звукосниматель: сыграйте сильнее — и он рычит; pickup приближает звукосниматель, fork расстраивает тон-бар (биения для сустейна), bell — короткие металлические обертоны атаки, speaker смешивает прямой выход с усилителем, а tremolo — вибрато Wurlitzer или стереопанорамирование Suitcase. В рояле каждая нота — фетровый молоточек, ударяющий по одной-трём унисонным струнам, чьи верхние парциалы, как у настоящего фортепиано, растянуты вверх, на деке. Чем сильнее вы играете, тем короче молоточек касается струны и тем ярче звук. hardness — фетр (от мягкого и круглого до жёсткого и яркого), tone — как быстро верхние парциалы затухают относительно основного тона, decay — как долго звучит удерживаемая нота, detune — насколько расходятся унисонные струны (медленные биения и двухступенчатое затухание настоящего фортепиано), stiffness — насколько растянуты парциалы (0 — идеально гармонично), body смешивает голые струны с декой, а release — как быстро демпферы глушат ноту после note-off; верхние полторы октавы не имеют демпферов и продолжают звучать. 16 голосов, управляется нотами.
+Physically modelled string: every note is a waveguide string tuned exactly to its pitch, on a shared wooden body. exciter plucks it, bows it (the bow keeps it sounding while the note is held) or strikes it with a felt hammer that gets brighter the harder you hit. position is where along the string it is excited, measured from the bridge (a quarter of the way in silences every 4th harmonic, as on a real string). tone sets how bright it stays as it rings, decay how long the note rings while held, stiffness stretches the upper partials sharp like a piano or a metal string, body blends from the bare string into the body's resonances (body type picks whose: a small box, or a guitar, harp, violin or cello body measured from recordings), and release is how fast the damper stops it after note-off. hardness is the pick (soft and dull to hard and bright); pressure is how hard the bow presses (light slips and sounds airy, heavy sticks and grits) and noise adds rosin noise to the bow. 8 voices, note-driven.	Физически смоделированная струна: каждая нота — волноводная струна, настроенная точно на свою высоту, на общем деревянном корпусе. exciter щиплет её, ведёт по ней смычком (смычок поддерживает звук, пока нота удерживается) или бьёт фетровым молоточком, который звучит ярче, чем сильнее удар. position — место возбуждения струны, отсчитанное от подставки (на четверти длины пропадает каждая 4-я гармоника, как на настоящей струне). tone задаёт, насколько яркой она остаётся при звучании, decay — как долго звучит нота, пока удерживается, stiffness растягивает верхние парциалы вверх, как у фортепиано или металлической струны, body смешивает голую струну с резонансами корпуса (body type выбирает чьими: маленького ящика или корпуса гитары, арфы, скрипки или виолончели, измеренного по записям), а release — как быстро демпфер глушит её после note-off. hardness — медиатор (от мягкого и глухого до жёсткого и яркого); pressure — сила нажима смычка (лёгкий проскальзывает и звучит воздушно, тяжёлый цепляется и хрипит), а noise добавляет к смычку шум канифоли. 8 голосов, управляется нотами.
+Physically modelled wind instrument: every note is a bore blown by a clarinet reed, a sax reed on a conical bore, a flute's air jet or brass lips. breath is how hard you blow (soft and dark up to loud and bright; blow too softly and a reed will not speak), tone is how bright the bell lets it be, noise is the air in the breath, vibrato a 5.5 Hz swell in the breath, and attack and release how fast the breath comes and goes. 8 voices, note-driven.	Физически смоделированный духовой инструмент: каждая нота — канал, в который дуют через трость кларнета, трость саксофона на коническом канале, воздушную струю флейты или губы медного духового. breath — сила дыхания (от тихого и тёмного до громкого и яркого; если дуть слишком слабо, трость не зазвучит), tone — насколько ярко звук выпускает раструб, noise — воздух в дыхании, vibrato — колебание дыхания на 5.5 Hz, а attack и release — как быстро дыхание появляется и уходит. 8 голосов, управляется нотами.
+Physically modelled wind: clarinet, sax, flute or brass, blown by the note; breath, tone, noise and vibrato shape it.	Физически смоделированные духовые: кларнет, саксофон, флейта или медь, в которые дует нота; breath, tone, noise и vibrato формируют звук.
+Piano Roll	Piano Roll
+Piano Roll Panel	Панель Piano Roll
+Piano Roll Tools	Инструменты Piano Roll
+Piano Roll at Bottom	Piano Roll снизу
+Piano Roll at Top	Piano Roll сверху
+Piano Roll node	Узел Piano Roll
+Piano roll - edit and generate notes (Shift+R)	Piano Roll — редактирование и генерация нот (Shift+R)
+Picture	Изображение
+Ping-pong: while looping, play forward then back	Пинг-понг: в цикле играть вперёд, затем назад
+Pitch	Высота
+Pivot	Опорная точка
+Play slice	Играть слайс
+Play the edit (pauses the canvas audio)	Воспроизвести правку (ставит аудио холста на паузу)
+Plays the notes of the Piano Roll page linked to it - a MIDI lane in the Timeline, laid out in clips you draw, cut and loop like any other clip. It follows the transport, plays each clip as drawn (loops unrolled, chance rolled fresh on every play), and sends pitch bend, pressure and timbre curves along with the notes. transpose and vel act on everything the page plays; the notes input passes through and merges in (switch thru off to drop it). The Global Scale button snaps every played note to the project key and scale. A copy of the node starts unlinked, so one page never drives two nodes.	Играет ноты связанной с ним страницы Piano Roll — MIDI-дорожки в таймлайне, разложенной на клипы, которые вы рисуете, режете и зацикливаете, как любые другие клипы. Следует за транспортом, играет каждый клип как нарисован (циклы развёрнуты, chance разыгрывается заново при каждом проигрывании) и отправляет вместе с нотами кривые питч-бенда, давления и тембра. transpose и vel действуют на всё, что играет страница; вход notes проходит насквозь и подмешивается (выключите thru, чтобы отбросить его). Кнопка Global Scale привязывает каждую сыгранную ноту к тональности и ладу проекта. Копия узла создаётся несвязанной, так что одна страница никогда не управляет двумя узлами.
+Point at 3D Cursor	Направить на 3D-курсор
+Pressure	Давление
+Previous / Next Page	Предыдущая / следующая страница
+Program still running	Программа ещё работает
+Projection	Проекция
+Properties (N)	Свойства (N)
+Put the edit on the canvas: the patch that made it, or a node that plays it	Поместить правку на холст: патч, который её создал, или узел, который её играет
+Put this scene on the canvas	Поместить эту сцену на холст
+Quality	Качество
+Quantise	Квантовать
+Quantise clip	Квантовать клип
+Quantise page	Квантовать страницу
+Quantise selection	Квантовать выделение
+Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings	Квантовать выделение или клип: выберите сетку, такты или деление (Q повторяет последнее). Правый щелчок или Shift+Q — настройки
+Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings	Квантует выделение или редактируемые клипы по сетке; Shift+Q открывает в настройках силу, свинг и концы
+Quit Anyway	Всё равно выйти
+Quitting ends it.	Выход завершит её.
+Radius	Радиус
+Record MIDI	Запись MIDI
+Record notes from your MIDI controller while the transport plays (R)	Записывать ноты с MIDI-контроллера, пока играет транспорт (R)
+Record the audio input into a new sample (R)	Записать аудиовход в новый сэмпл (R)
+Recorded	Записано
+Recorded (not saved to disk)	Записано (не сохранено на диск)
+Recording	Запись
+Recording from the audio input. Press R to stop	Идёт запись с аудиовхода. Нажмите R, чтобы остановить
+Reflections	Отражения
+Release	Release
+Remove from scene	Убрать из сцены
+Rename the page	Переименовать страницу
+Render Animation	Рендер анимации
+Render Image	Рендер изображения
+Render through this camera	Рендерить через эту камеру
+Rendered: your lights, world and render settings (Z cycles)	Рендер: ваш свет, мир и настройки рендера (Z переключает)
+Replace	Заменить
+Replace the slices?	Заменить слайсы?
+Resolution %	Разрешение %
+Resolution X	Разрешение X
+Rev	Рев.
+Reveal File	Показать файл
+Reverse Slice	Реверс слайса
+Reverse: play the whole edit backwards	Реверс: проиграть всю правку задом наперёд
+Ride	Райд
+Right Orthographic	Справа, ортографический
+Right-click any 3D node and choose Add to 3D View.	Щёлкните правой кнопкой по любому 3D-узлу и выберите «Добавить в 3D View».
+Rim	Римшот
+Role	Роль
+Roll	Крен
+Rotate	Повернуть
+Rotate tool (Shift+Space, R). R rotates at once	Инструмент вращения (Shift+Space, R). R вращает сразу
+Rotation	Вращение
+Ruler	Линейка
+Safe Areas	Безопасные зоны
+Sample	Сэмпл
+Sample Audio: you hear the Studio's edit; the canvas, Session and Timeline stay silent	Аудио сэмпла: вы слышите правку Studio; холст, сессия и таймлайн молчат
+Sample Studio	Sample Studio
+Sample Studio Record	Запись Sample Studio
+Sample Studio at Bottom	Sample Studio снизу
+Sample Studio at Top	Sample Studio сверху
+Sample and slice settings	Настройки сэмпла и слайсов
+Sample studio - generate and shape a loop (Shift+W)	Sample Studio — генерация и обработка лупа (Shift+W)
+Samples per frame when rendering out.	Сэмплов на кадр при рендере.
+Sampling	Сэмплирование
+Saving image...	Сохранение изображения...
+Scale	Масштаб
+Scale snap	Привязка к ладу
+Scale tool (Shift+Space, S). S scales at once	Инструмент масштаба (Shift+Space, S). S масштабирует сразу
+Scanned plugins	Найденные плагины
+Scene	Сцена
+Search	Поиск
+Seconds	Секунды
+Seed	Сид
+Select (Shift+Space, W)	Выделение (Shift+Space, W)
+Select All Notes	Выбрать все ноты
+Select a camera or a light.	Выберите камеру или источник света.
+Select every note of the clips being edited	Выбрать все ноты редактируемых клипов
+Select one object.	Выберите один объект.
+Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	Выбор, Рисование, Ластик, Разрез, Заглушение и Рука (перетаскивание для сдвига) — те же клавиши, что в таймлайне и Sample Studio, когда указатель над Piano Roll (Esc тоже возвращает к Выбору). Они собраны в выпадающем списке инструментов вместе с масштабом. Все клавиши этого раздела требуют, чтобы указатель был там
+Selection to Cursor	Выделение к курсору
+Sensor	Сенсор
+Set the gain so the edit peaks at -0.3 dB	Задать усиление так, чтобы пик правки был -0.3 dB
+Settings for the page, clip or note	Настройки страницы, клипа или ноты
+Shadows	Тени
+Shape	Форма
+Shift X	Сдвиг X
+Shift Y	Сдвиг Y
+Shift+A adds a camera, a light or a node from the canvas	Shift+A добавляет камеру, свет или узел с холста
+Show (Alt+H shows everything)	Показать (Alt+H показывает всё)
+Show 3D View	Показать 3D View
+Show Piano Roll	Показать Piano Roll
+Show Sample Studio	Показать Sample Studio
+Show Terminal	Показать терминал
+Show in renders	Показывать в рендерах
+Show or hide the docked Piano Roll	Показать или скрыть закреплённый Piano Roll
+Slice	Слайс
+Slice colour	Цвет слайса
+Slices you placed by hand will be replaced.	Слайсы, расставленные вручную, будут заменены.
+Snap	Привязка
+Snap (Shift+Tab, hold Ctrl to flip)	Привязка (Shift+Tab, удерживайте Ctrl для инверсии)
+Snap drawn and moved notes to the scale	Привязывать нарисованные и перемещённые ноты к ладу
+Snap markers to 16ths	Привязать маркеры к 1/16
+Snap the next Generate to the project's key and scale	Привязать следующую генерацию к тональности и ладу проекта
+Snap to the grid	Привязка к сетке
+Snare	Малый
+Softness	Мягкость
+Solid: a neutral light, to see the shapes	Сплошной: нейтральный свет, чтобы видеть формы
+Split / Join Notes	Разделить / склеить ноты
+Split here	Разделить здесь
+Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)	Начать или остановить запись нот с MIDI-контроллера, пока играет транспорт (только при подключённом MIDI-устройстве)
+Stop recording (R)	Остановить запись (R)
+Stop recording first	Сначала остановите запись
+Strength	Сила
+Stretch	Растяжение
+Strum	Страм
+Studio	Studio
+Surface	Поверхность
+Swing	Свинг
+Switch to the neighbouring page	Переключиться на соседнюю страницу
+Target X	Цель X
+Target Y	Цель Y
+Target Z	Цель Z
+Terminal	Терминал
+Terminal - a real shell, for you and your coding agents (Ctrl+`)	Терминал — настоящая оболочка для вас и ваших агентов-программистов (Ctrl+`)
+Terminal at Bottom	Терминал снизу
+Terminal at Left	Терминал слева
+Terminal at Right	Терминал справа
+Terminal at Top	Терминал сверху
+That MIDI file has no notes	В этом MIDI-файле нет нот
+The Sample studio's take is driving audio. Click to hand it back to the canvas.	Аудио сейчас ведёт дубль Sample Studio. Нажмите, чтобы вернуть его холсту.
+The Sample studio's take will drive audio once the engine is started.	Дубль Sample Studio будет вести аудио, как только запустится движок.
+The graph that made the take, as a group on the canvas	Граф, создавший дубль, в виде группы на холсте
+The next Generate snaps to the project's key and scale	Следующая генерация привязывается к тональности и ладу проекта
+The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop	То же в таймлайне и Piano Roll, а в Sample Studio — щелчок или перетаскивание: курсор воспроизведения встаёт, когда вы отпускаете кнопку; Shift+перетаскивание задаёт цикл; перетаскивание края цикла сдвигает его; правый щелчок убирает цикл
+The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices	Слайс сохраняет свою протяжённость: Длина играет его медленнее (обрезая по концу слайса) или быстрее (затем тишина или Заполнение). Off: без растяжения; repitch: меняет и высоту; beats и tonal: та же высота. Shift+Влево/Вправо на волне формирует выбранные слайсы
+The terminal font is missing from this install.	В этой установке нет шрифта терминала.
+Then click a Piano Roll node on the canvas: this page plays through it	Затем щёлкните по узлу Piano Roll на холсте: эта страница будет играть через него
+Thirds	Трети
+This page is full	Эта страница заполнена
+Threshold	Порог
+Timbre	Тембр
+Time	Время
+Time spread	Разброс по времени
+Title	Заголовок
+Tom	Том
+Tool: Cut (B) - click to choose a tool	Инструмент: Разрез (B) — щёлкните, чтобы выбрать инструмент
+Tool: Draw (P) - click to choose a tool	Инструмент: Рисование (P) — щёлкните, чтобы выбрать инструмент
+Tool: Erase (E) - click to choose a tool	Инструмент: Ластик (E) — щёлкните, чтобы выбрать инструмент
+Tool: Hand (H) - click to choose a tool	Инструмент: Рука (H) — щёлкните, чтобы выбрать инструмент
+Tool: Mute (0) - click to choose a tool	Инструмент: Заглушение (0) — щёлкните, чтобы выбрать инструмент
+Tool: Select (A) - click to choose a tool	Инструмент: Выбор (A) — щёлкните, чтобы выбрать инструмент
+Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool	Инструмент: Выбор (A), Разрез (B), Рука (H) — щёлкните, чтобы выбрать инструмент. Двойной щелчок над волной режет любым инструментом
+Top Orthographic	Сверху, ортографический
+Transform	Трансформация
+Transient	Транзиент
+Transparent	Прозрачный
+Transpose	Транспонировать
+Transpose Notes	Транспонировать ноты
+Triplet	Триоль
+Unlink	Отвязать
+User Orthographic	Пользовательский, ортографический
+User Perspective	Пользовательский, перспектива
+Vel spread	Разброс велосити
+Velocity	Велосити
+Velocity Ramp	Рампа велосити
+View	Вид
+View 	Вид 
+Viewport	Вьюпорт
+Visibility	Видимость
+WAV, 16-bit	WAV, 16 бит
+WAV, 24-bit	WAV, 24 бит
+WAV, choose where...	WAV, выбрать место...
+Waiting for the audio input (allow the microphone if macOS asks)	Ожидание аудиовхода (разрешите микрофон, если macOS спросит)
+What Generate writes	Что пишет Генерация
+Which MIDI controller Record listens to	Какой MIDI-контроллер слушает Запись
+Whole sample	Весь сэмпл
+Wireframe (Shift+Z)	Каркас (Shift+Z)
+World	Мир
+Y	Y
+Zoom In	Приблизить
+Zoom Out	Отдалить
+Zoom Piano Roll	Масштаб Piano Roll
+Zoom Sample Studio	Масштаб Sample Studio
+Zoom in, zoom out, fit the page, zoom to the selection	Приблизить, отдалить, вписать страницу, масштаб по выделению
+Zoom in, zoom out, fit the sample, zoom to the selection	Приблизить, отдалить, вписать сэмпл, масштаб по выделению
+Zoom out	Отдалить
+Zoom to mouse	Масштаб к указателю
+Zoom to selection	Масштаб по выделению
+Zoom: drag	Масштаб: перетаскивание
+mixed	разные
+slices	слайсов
+source missing	нет источника
+style	стиль
+A 2D fluid simulation that carries the input picture along as dye, so it smears, swirls and folds. Patch a motion image (Optical Flow) into force to push it, and a picture into obstacles: bright areas are solid. The stirrer (Orbit, Pulse, Spin) moves it with nothing patched. Resolution divides the simulation size; Reset clears it.	2D-симуляция жидкости, которая несёт входное изображение как краску, так что оно размазывается, закручивается и складывается. Подайте изображение движения (Optical Flow) на force, чтобы толкать его, а картинку — на obstacles: светлые области твёрдые. Мешалка (Orbit, Pulse, Spin) двигает его, даже когда ничего не подключено. Resolution делит размер симуляции; Reset очищает её.
+A brickwall limiter: nothing passes above threshold. In gain drives the signal into it, release sets how fast it lets go, out gain sets the final level, and the meter shows the gain reduction. Always fully wet.	Лимитер brickwall: выше threshold ничего не проходит. In gain загоняет в него сигнал, release задаёт, как быстро он отпускает, out gain задаёт итоговый уровень, а индикатор показывает подавление усиления. Всегда полностью wet.
+A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus.	Настоящая оболочка внутри Infinite для вас и ваших агентов-программистов. Открывается плиткой >_ на правой панели или по Ctrl+`, который также передаёт ей фокус, а если фокус уже у неё, закрывает её.
+AI skills	Навыки ИИ
+Add a node, a camera, a light, an HDRI or a new scene	Добавить узел, камеру, свет, HDRI или новую сцену
+Add to the View	Добавить в вид
+Audition Slice	Прослушать слайс
+Axis Views	Виды по осям
+Camera View	Вид из камеры
+Clear Transform	Сбросить трансформацию
+Clear the screen	Очистить экран
+Copy / Cut / Paste Controls	Копировать / вырезать / вставить элементы управления
+Copy / Cut / Paste Slices	Копировать / вырезать / вставить слайсы
+Copy / Paste	Копировать / вставить
+Copy / Paste / Duplicate Scene	Копировать / вставить / дублировать сцену
+Copy or cut the selected slices, or paste them	Копировать или вырезать выбранные слайсы либо вставить их
+Copy the selected text, or paste into the shell	Копировать выделенный текст или вставить в оболочку
+Copy the whole scene, paste it as a new scene, or duplicate it	Скопировать всю сцену, вставить её как новую сцену или дублировать
+Cut a slice at the pointer (on the grid); join the selected slices	Разрезать слайс по указателю (по сетке); склеить выбранные слайсы
+Cycle the shading; Shift+Z switches wireframe	Переключать режим затенения; Shift+Z включает каркас
+Delete Controls	Удалить элементы управления
+Delete Slices	Удалить слайсы
+Delete the selected controls; Esc clears the selection	Удалить выбранные элементы управления; Esc снимает выделение
+Delete the selected slices	Удалить выбранные слайсы
+Deletes the faces marked by an upstream Select op, or all faces with selection-only off. With 'keep selected instead' it keeps the selection and deletes the rest. After an Instance on Points it drops whole instances instead of faces.	Удаляет грани, отмеченные операцией Select выше по цепочке, или все грани, если selection-only выключен. С 'keep selected instead' сохраняет выделение и удаляет остальное. После Instance on Points удаляет целые экземпляры вместо граней.
+Duplicate Controls	Дублировать элементы управления
+Duplicate the selected controls	Дублировать выбранные элементы управления
+Duplicate the selected items	Дублировать выбранные элементы
+F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan	F (или . на цифровой клавиатуре) показывает в кадре выделение, а без выделения — всё; Home показывает всё или сбрасывает масштаб и сдвиг вида из камеры
+Find in Terminal	Найти в терминале
+Fly	Полёт
+Fog, smoke or a cloud drawn over a picture, from drifting noise that the wind moves. Fed by a Render 3D node it sits in that scene: it uses the render's camera and solid objects hide the haze behind them. Steps sets quality while you work; render steps is used when rendering offline.	Туман, дым или облако поверх изображения из дрейфующего шума, который гонит ветер. При подаче от узла Render 3D он находится в этой сцене: использует камеру рендера, а твёрдые объекты скрывают дымку за собой. Steps задаёт качество во время работы; render steps используется при офлайн-рендере.
+Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps	Спереди, справа, сверху; удерживайте {mod} для вида сзади, слева, снизу. 5 переключает ортографию, 9 поворачивает на противоположную сторону, 2 / 4 / 6 / 8 вращают по шагам
+Group / Ungroup	Сгруппировать / разгруппировать
+Group the selected items, or dissolve the group	Сгруппировать выбранные элементы или распустить группу
+Headless engine	Движок без интерфейса
+Hide / Show	Скрыть / показать
+Hide the selection, hide everything else, show everything	Скрыть выделение, скрыть всё остальное, показать всё
+Hold the right button to look around and walk; Shift goes faster	Удерживайте правую кнопку, чтобы осматриваться и ходить; Shift — быстрее
+In edit mode, with the panel clicked: copy or cut the selected controls, or paste them	В режиме редактирования, после щелчка по панели: копировать или вырезать выбранные элементы управления либо вставить их
+In the Terminal, infinite guide and infinite code docs <language> print the same references.	В терминале infinite guide и infinite code docs <language> выводят те же справочники.
+Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless.	Внутри панели терминала infinite есть в PATH и общается с этим приложением. Вне её запускайте исполняемый файл приложения с --cli. С файлом .inf вместо запущенного приложения те же команды работают без интерфейса.
+Install All AI Skills	Установить все навыки ИИ
+Invert Selection	Инвертировать выделение
+It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top.	Запускается в папке открытого патча. Когда у него фокус, все клавиши идут в оболочку. Перетащите сюда узел, файл или сэмпл, чтобы вписать его id или путь. Щёлкните правой кнопкой по панели, чтобы закрепить её снизу, справа, слева или сверху.
+Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide.	Linux нужен виртуальный дисплей: xvfb-run -a Infinite ...  Полное руководство поставляется как Headless User Guide.
+Local View	Локальный вид
+Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view	Смотреть через камеру сцены. {mod}+0 делает выбранную камеру камерой сцены; {mod}+Alt+0 перемещает камеру к текущему виду
+Move / Rotate / Scale	Переместить / повернуть / масштабировать
+Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels	Сразу переместить, повернуть или масштабировать выделение. X / Y / Z фиксируют ось (Shift — плоскость), цифры вводят величину; щелчок или Enter подтверждает, Esc или правый щелчок отменяет
+Mute / Solo Slice	Заглушить / соло слайса
+Mute or solo the selected slices	Заглушить выбранные слайсы или включить для них соло
+New / Close Tab	Новая / закрыть вкладку
+Open Terminal	Открыть терминал
+Open a new terminal tab, or close this one	Открыть новую вкладку терминала или закрыть эту
+Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system	Открыть терминал на правой панели, передать ему клавиатуру или закрыть его. Физическая клавиша Ctrl на любой системе
+Open the pivot point or the transform orientation menu	Открыть меню опорной точки или ориентации трансформации
+Overlays	Оверлеи
+Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.	Часть конвейера 3D-геометрии и рендера: узлы геометрии и облаков точек подаются в Render 3D через камеру и источники света. Щёлкните правой кнопкой по 3D-узлу и выберите «Добавить в 3D View», чтобы расставить его в 3D View.
+Patch authoring: write, check and render .inf patches.	Создание патчей: написание, проверка и рендер патчей .inf.
+Pivot / Orientation	Опорная точка / ориентация
+Play the selected slice, or the one under the pointer	Играть выбранный слайс или слайс под указателем
+Preview Views	Виды предпросмотра
+Previous / Next Slice	Предыдущий / следующий слайс
+Put the 3D cursor back at the centre and frame everything	Вернуть 3D-курсор в центр и показать всё в кадре
+Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version.	Справочные файлы, которые может прочитать любой ИИ-ассистент, чтобы писать корректные патчи, ядра Field и выражения '=', а не угадывать. Выберите папку: для Claude Code — ~/.claude/skills/ (или .claude/skills/ проекта); для других ассистентов добавьте файл в проект или в чат. После обновления Infinite установите заново, чтобы файлы соответствовали этой версии.
+Rename Item	Переименовать элемент
+Rename the selected item	Переименовать выбранный элемент
+Render a still from the scene camera, or render the camera for its set duration	Отрендерить кадр с камеры сцены или отрендерить камеру на заданную длительность
+Reset 3D Cursor	Сбросить 3D-курсор
+Reset the position, rotation or scale of the selection	Сбросить положение, вращение или масштаб выделения
+Reverse the selected slices	Реверс выбранных слайсов
+Scroll Back	Прокрутка назад
+Scroll the terminal's history a page at a time	Прокручивать историю терминала по страницам
+Search the terminal's text	Поиск по тексту терминала
+Select All / None	Выбрать всё / ничего
+Select All Clips	Выбрать все клипы
+Select All Controls	Выбрать все элементы управления
+Select All Slices	Выбрать все слайсы
+Select every clip on the timeline	Выбрать все клипы в таймлайне
+Select every control on the page	Выбрать все элементы управления на странице
+Select every shown item that is not selected	Выбрать все показанные элементы, которые не выбраны
+Select every shown item, or nothing	Выбрать все показанные элементы или ничего
+Select every slice	Выбрать все слайсы
+Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices	Выбрать соседний слайс; с Shift растянуть (Вправо) или сжать (Влево) выбранные слайсы
+Select, Blade and Hand (drag to pan); Esc also returns to Select	Выбор, Лезвие и Рука (перетаскивание для сдвига); Esc тоже возвращает к Выбору
+Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select	Выбор, Карандаш, Подрезка, Диапазон, Масштаб и Рука; нажмите клавишу инструмента ещё раз или Esc, чтобы вернуться к Выбору
+Shading	Затенение
+Show only the selection (Keypad / too); press again to show everything	Показать только выделение (также / на цифровой клавиатуре); нажмите ещё раз, чтобы показать всё
+Show or hide the 3D View. Every other key in this section needs the pointer over the view	Показать или скрыть 3D View. Все остальные клавиши этого раздела требуют, чтобы указатель был над видом
+Show or hide the overlays (over the 3D View this key does not open the Terminal)	Показать или скрыть оверлеи (над 3D View эта клавиша не открывает терминал)
+Show or hide the side panel	Показать или скрыть боковую панель
+Sidebar	Боковая панель
+Split / Join Slices	Разделить / склеить слайсы
+Start or stop recording the chosen audio input into a new sample	Начать или остановить запись выбранного аудиовхода в новый сэмпл
+Studio Tools	Инструменты Studio
+Take the selected items out of the view; the nodes stay on the canvas	Убрать выбранные элементы из вида; узлы остаются на холсте
+Terminal panel	Панель терминала
+The Field Language and Expression Globals pages each have an Install AI Skill button for their own file.	На страницах «Язык Field» и «Глобальные выражений» есть своя кнопка «Установить навык ИИ» для своего файла.
+The final stage of a 3D patch. Right-click any 3D node and choose Add to 3D View to bring its output in, then arrange it in the 3D View panel (Shift+3): G move, R rotate, S scale, X Y Z to lock an axis, hold {mod} to snap. Arranging never changes the node, and whatever the node animates keeps playing through the placement: build and change things on the canvas, compose them here. Transparent until you set a world in its World tab. Keys are Blender's, including the 3D cursor (Shift+right-click), pivot (period), orientation (comma), local view (/) and keyframes (I). F12 renders a picture and {mod}+F12 the animation, through an Output node.	Последняя ступень 3D-патча. Щёлкните правой кнопкой по любому 3D-узлу и выберите «Добавить в 3D View», чтобы подать его выход, затем расставьте его в панели 3D View (Shift+3): G — перемещение, R — вращение, S — масштаб, X Y Z — фиксация оси, удерживайте {mod} для привязки. Расстановка никогда не меняет узел, а всё, что узел анимирует, продолжает играть сквозь размещение: стройте и меняйте на холсте, компонуйте здесь. Прозрачен, пока вы не зададите мир на его вкладке «Мир». Клавиши как в Blender, включая 3D-курсор (Shift+правый щелчок), опорную точку (точка), ориентацию (запятая), локальный вид (/) и ключевые кадры (I). F12 рендерит изображение, а {mod}+F12 — анимацию, через узел Output.
+The infinite command	Команда infinite
+The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors).	Тот же исполняемый файл рендерит изображения, видео и звук из патча .inf без окна. Вывод детерминирован: один и тот же патч даёт одни и те же кадры и сэмплы. Последняя выведенная строка — один объект JSON (ok, files, warnings, errors).
+Then W, G, R or S picks the Select, Move, Rotate or Scale tool	Затем W, G, R или S выбирают инструмент Выбор, Перемещение, Вращение или Масштаб
+Timeline Tools	Инструменты таймлайна
+Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform	Показать или скрыть закреплённый Sample Studio. Все остальные клавиши этого раздела требуют, чтобы указатель был над его волной
+Tools	Инструменты
+Turn snapping on or off; hold {mod} while moving to flip it	Включить или выключить привязку; удерживайте {mod} при перемещении, чтобы инвертировать её
+Undo / Redo Studio Edit	Отменить / повторить правку Studio
+Undo or redo the Studio's own edits; the patch's undo is not touched	Отменить или повторить собственные правки Studio; отмена в патче не затрагивается
+With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom	Когда указатель над 3D-превью (узел, карточка вьюпорта, Render 3D): спереди, справа, сверху или вид по умолчанию. Удерживайте {mod} для вида сзади, слева, снизу
+Zoom 3D View	Масштаб 3D View
+Zoom in or out; Shift+B drags a box to zoom into	Приблизить или отдалить; Shift+B — рамка для приближения
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite без аргументов перечисляет все команды. infinite context выводит открытый патч, выделение и ошибки кода в одном ответе.

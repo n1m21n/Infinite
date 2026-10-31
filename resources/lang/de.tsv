@@ -1660,3 +1660,587 @@ Power saving (integrated GPU)	Energiesparend (integrierte GPU)
 High performance (discrete GPU)	Hohe Leistung (dedizierte GPU)
 Graphics processor	Grafikprozessor
 For computers with more than one GPU. Takes effect the next time Infinite starts.	Für Computer mit mehr als einer GPU. Gilt beim nächsten Start von Infinite.
+%d objects over the limit	%d Objekte über dem Limit
+%d of %d plugins	%d von %d Plugins
+%d selected	%d ausgewählt
+(Local)	(Lokal)
+1 bar	1 Takt
+1/16	1/16
+1/4	1/4
+1/8	1/8
+3D Cursor	3D-Cursor
+3D View	3D View
+3D View - arrange node outputs and render a camera (Shift+3)	3D View - Node-Ausgaben anordnen und eine Kamera rendern (Shift+3)
+3D View Panel	3D-View-Panel
+A Sampler on the canvas holding this slice as you hear it	Ein Sampler auf dem Canvas, der diesen Slice so enthält, wie du ihn hörst
+A program is still running in the terminal.	Im Terminal läuft noch ein Programm.
+A sample holds at most 64 slices	Ein Sample enthält höchstens 64 Slices
+A sample player that makes its own loop: a music style, a part (all, synths, pads, plucks, percussion, drums), a seed and a length render 1-8 bars on a background thread, loudness-matched, saved as a recipe and rendered again on reopen, or kept as a wav.	Ein Sample-Player, der seinen eigenen Loop erzeugt: Musikstil, Part (all, synths, pads, plucks, percussion, drums), Seed und Länge rendern 1-8 Takte in einem Hintergrund-Thread, lautheitsangeglichen, als Rezept gespeichert und beim erneuten Öffnen neu gerendert oder als WAV behalten.
+Active Element	Aktives Element
+Add	Hinzufügen
+Add a camera from this view (0)	Kamera aus dieser Ansicht hinzufügen (0)
+Add a camera to render.	Füge eine Kamera zum Rendern hinzu.
+Add a node, a camera, a light, an HDRI or a new scene (Shift+A)	Node, Kamera, Licht, HDRI oder neue Szene hinzufügen (Shift+A)
+Add to 3D View	Zu 3D View hinzufügen
+All MIDI inputs	Alle MIDI-Eingänge
+Ambient	Umgebung
+Ambient Occlusion	Ambient Occlusion
+Arp Mode	Arp-Modus
+Arpeggio	Arpeggio
+Assign Piano Roll	Piano Roll zuweisen
+Assign another Piano Roll	Weitere Piano Roll zuweisen
+At most	Höchstens
+Audio input to record from	Audioeingang für die Aufnahme
+Audition	Vorhören
+Back Orthographic	Hinten orthografisch
+Background colour	Hintergrundfarbe
+Bar	Takt
+Bars	Takte
+Bass	Bass
+Bell	Bell
+Bend	Bend
+Bias	Bias
+Bloom	Bloom
+Bottom Orthographic	Unten orthografisch
+By grid	Nach Raster
+By position	Nach Position
+By transients	Nach Transienten
+C Hat	C Hat
+Camera	Kamera
+Camera Orthographic	Kamera orthografisch
+Camera Perspective	Kamera perspektivisch
+Camera view (0)	Kameraansicht (0)
+Camera view (Numpad 0 or 0)	Kameraansicht (Numpad 0 oder 0)
+Cast by one light, any but a point. Pick it in the light's settings.	Wird von einem Licht geworfen, jedem außer einem Punktlicht. Wähle es in den Einstellungen des Lichts.
+Casts shadow	Wirft Schatten
+Center	Mitte
+Chance	Wahrscheinlichkeit
+Choke	Choke
+Choose New Page in the page list to start writing notes.	Wähle in der Seitenliste „Neue Seite“, um Noten zu schreiben.
+Chop to Grid	Auf Raster schneiden
+Chord Rhythm	Akkordrhythmus
+Chord Size	Akkordgröße
+Chords	Akkorde
+Clap	Clap
+Clear slices	Slices löschen
+Click a node on the canvas...	Klicke auf einen Node im Canvas...
+Click again to delete everything learned	Erneut klicken, um alles Gelernte zu löschen
+Click or drag to place the playhead	Klicken oder ziehen, um den Abspielkopf zu setzen
+Click: play from here; double-click: a new slice here	Klick: ab hier abspielen; Doppelklick: neuer Slice hier
+Clip end	Clip-Ende
+Clip start	Clip-Start
+Clips	Clips
+Close Piano Roll	Piano Roll schließen
+Close Sample Studio	Sample Studio schließen
+Close Terminal	Terminal schließen
+Color	Farbe
+Color Management	Farbmanagement
+Color depth	Farbtiefe
+Composition Guides	Kompositionshilfen
+Cone	Kegel
+Connect a MIDI controller	Schließe einen MIDI-Controller an
+Connect a MIDI controller to record	Schließe zum Aufnehmen einen MIDI-Controller an
+Connect an audio input to record	Schließe zum Aufnehmen einen Audioeingang an
+Convert	Umwandeln
+Convert to node	In Node umwandeln
+Copy / Cut / Paste Notes	Noten kopieren / ausschneiden / einfügen
+Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original	Ausgewählte Noten kopieren oder ausschneiden oder ausgewählte Clips kopieren; Einfügen legt sie direkt hinter das Original
+Copy scene	Szene kopieren
+Could not open	Konnte nicht öffnen
+Crash	Crash
+Creativity	Kreativität
+Cursor to Selected	Cursor zur Auswahl
+Cut the sample by transients, grid or into equal parts	Sample nach Transienten, Raster oder in gleiche Teile schneiden
+Cut the selected notes at the playhead; join runs on one pitch into one note	Ausgewählte Noten am Abspielkopf teilen; Folgen auf einer Tonhöhe zu einer Note verbinden
+Decay	Decay
+Delete Notes	Noten löschen
+Delete scene	Szene löschen
+Delete the selected notes or clips	Ausgewählte Noten oder Clips löschen
+Density	Dichte
+Depth of Field	Schärfentiefe
+Distance	Entfernung
+Dome angle	Kuppelwinkel
+Dome tilt	Kuppelneigung
+Double Speed	Doppelte Geschwindigkeit
+Drag a box to zoom into	Rahmen ziehen zum Hineinzoomen
+Drag on the ruler with Alt held to mark the range Generate fills	Mit gedrückter Alt-Taste auf dem Lineal ziehen, um den Bereich zu markieren, den Generieren füllt
+Drag to move the view; double-click to see it all	Ziehen verschiebt die Ansicht; Doppelklick zeigt alles
+Drag: fade length; Shift-drag up or down (or on the curve): its shape	Ziehen: Fade-Länge; Shift-Ziehen nach oben oder unten (oder auf der Kurve): ihre Form
+Drag: move the cut; double-click: remove it	Ziehen: Schnitt verschieben; Doppelklick: entfernen
+Draw	Zeichnen
+Draw a clip, drop a .mid, or record	Clip zeichnen, .mid ablegen oder aufnehmen
+Drum rows	Drum-Reihen
+Drums	Drums
+Duplicate Notes	Noten duplizieren
+Duplicate scene	Szene duplizieren
+Each slice to a folder...	Jeden Slice in einen Ordner...
+Edit the whole sample instead of the selected slices	Ganzes Sample statt der ausgewählten Slices bearbeiten
+Elevation	Höhenwinkel
+Empty. Shift+A adds to it.	Leer. Shift+A fügt etwas hinzu.
+Ends	Enden
+Energy	Energie
+Environment texture	Umgebungstextur
+Equal	Gleich
+Erase	Radieren
+Export	Exportieren
+Export slices to	Slices exportieren nach
+Exposure	Belichtung
+Expression at start	Ausdruck am Anfang
+F-Stop	Blende
+FLAC	FLAC
+Field of view	Sichtfeld
+Fill	Füllen
+Film	Film
+Final size	Endgröße
+Find in terminal	Im Terminal suchen
+Fine	Fein
+Fit	Einpassen
+Fit Page	Seite einpassen
+Fit to 16ths	Auf 16tel einpassen
+Fit to Scale	An Skala anpassen
+Focal length	Brennweite
+Focus on	Fokus auf
+Fold to the keys in use	Auf verwendete Tasten falten
+Follow grid	Raster folgen
+Follow the playhead	Abspielkopf folgen
+Forget me	Vergiss mich
+Form	Form
+Frame	Einrahmen
+Frame Range	Frame-Bereich
+Frame all	Alles einrahmen
+Frame rate	Framerate
+Frames	Frames
+From canvas	Vom Canvas
+Front Orthographic	Vorne orthografisch
+Functions	Funktionen
+Functions: legato, humanize, reverse, strum and more	Funktionen: Legato, Humanize, Umkehren, Strum und mehr
+Fx	Fx
+Gain	Gain
+Generate	Generieren
+Generate Range	Bereich generieren
+Generate a new take	Neuen Take generieren
+Generate a take, open a file, or drop a sample here	Take generieren, Datei öffnen oder Sample hier ablegen
+Generate notes in the page's key (G). Alt+drag the ruler sets the range; selected notes regenerate in place	Noten in der Tonart der Seite generieren (G). Alt+Ziehen auf dem Lineal setzt den Bereich; ausgewählte Noten werden an Ort und Stelle neu generiert
+Global	Global
+Global 	Global 
+Go to node	Zum Node
+Golden	Goldener Schnitt
+Grid	Raster
+Grid, shared with the Timeline	Raster, gemeinsam mit der Timeline
+Group the selected clips or dissolve their groups	Ausgewählte Clips gruppieren oder ihre Gruppen auflösen
+HDRI...	HDRI...
+Half Speed	Halbe Geschwindigkeit
+Hear notes as you touch them	Noten beim Antippen hören
+Hide (H)	Ausblenden (H)
+High Note	Höchste Note
+Humanize	Humanize
+In	In
+Individual Origins	Einzelne Ursprünge
+Instrument (for the next Generate)	Instrument (für das nächste Generieren)
+Join	Verbinden
+Keep Working	Weiterarbeiten
+Kept takes, notes you play and saved patches stay on this computer.	Behaltene Takes, gespielte Noten und gespeicherte Patches bleiben auf diesem Computer.
+Key	Tonart
+Kick	Kick
+Lay the selected notes or clips again right after themselves	Ausgewählte Noten oder Clips direkt hinter sich erneut einfügen
+Learn from my playing	Aus meinem Spiel lernen
+Learning	Lernen
+Left Orthographic	Links orthografisch
+Legato	Legato
+Length (for the next Generate)	Länge (für das nächste Generieren)
+Lens	Objektiv
+Lens unit	Objektiveinheit
+Level	Pegel
+Light	Licht
+Lit by	Beleuchtet von
+Load HDRI...	HDRI laden...
+Local	Lokal
+Local 	Lokal 
+Location	Position
+Lock camera to view	Kamera an Ansicht koppeln
+Lock pitch	Tonhöhe sperren
+Lock rhythm	Rhythmus sperren
+Lock seed	Seed sperren
+Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead	Alt+Zieh-Bereich des Lineals oder ausgewählte Noten loopen; Loop-Start oder -Ende am Abspielkopf setzen
+Loop: on repeats the edit, off plays it once	Loop: an wiederholt die Bearbeitung, aus spielt sie einmal
+Low Note	Tiefste Note
+MP3	MP3
+Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and 31 more), a seed and a length of 1, 2, 4 or 8 bars, and press generate: a private patch built from that style - drums, bass, chords, a motif, each through its own synths and effects - renders a seamless loop on a background thread while the canvas keeps running. part picks the whole mix (all) or one layer of it from the same seed: synths (bass and the motif line), pads (the chords held on a slow-swelling voice), plucks (the chords arpeggiated on a short plucked voice), percussion (clap, toms, bell) or drums (kick, snare, hats). variation is how far each node strays from its defaults; the dice picks a new seed. follow transport makes the loop at the patch tempo, key and scale, card's own at the style's. The status line names what was made, its tempo, key and scale. Every loop comes out at -14 LUFS under a -1 dB true-peak ceiling; a seed that renders silent or broken is redrawn up to three times before the node says so. Changing a setting marks the sample stale until you generate again. The patch saves the recipe, not the audio, and renders it again when reopened; keep as file writes the loop to a wav, and from then on it is saved as that file. Playback is the sample player's: drag the waveform edges for start and end, pitch, gain and loop below it, and connect notes to play it from a keyboard.	Erzeugt ein Sample, statt eines zu laden. Wähle einen Musikstil (deep house, dub techno, lofi beats und 31 weitere), einen Seed und eine Länge von 1, 2, 4 oder 8 Takten und drücke generate: Ein privater Patch aus diesem Stil - Drums, Bass, Akkorde, ein Motiv, jeweils durch eigene Synths und Effekte - rendert einen nahtlosen Loop in einem Hintergrund-Thread, während der Canvas weiterläuft. part wählt den ganzen Mix (all) oder eine Ebene daraus aus demselben Seed: synths (Bass und die Motivlinie), pads (die Akkorde, gehalten auf einer langsam anschwellenden Stimme), plucks (die Akkorde arpeggiert auf einer kurzen gezupften Stimme), percussion (Clap, Toms, Bell) oder drums (Kick, Snare, Hats). variation bestimmt, wie weit jeder Node von seinen Standardwerten abweicht; der Würfel wählt einen neuen Seed. follow transport erzeugt den Loop in Tempo, Tonart und Skala des Patches, card's own in denen des Stils. Die Statuszeile nennt, was erzeugt wurde, samt Tempo, Tonart und Skala. Jeder Loop kommt mit -14 LUFS unter einer True-Peak-Grenze von -1 dB heraus; ein Seed, der stumm oder fehlerhaft rendert, wird bis zu dreimal neu gezogen, bevor der Node es meldet. Eine geänderte Einstellung markiert das Sample als veraltet, bis du erneut generierst. Der Patch speichert das Rezept, nicht das Audio, und rendert es beim erneuten Öffnen neu; keep as file schreibt den Loop in eine WAV, und ab dann wird er als diese Datei gespeichert. Die Wiedergabe ist die des Sample-Players: Ziehe die Ränder der Wellenform für Start und Ende, darunter pitch, gain und loop, und verbinde Noten, um ihn über eine Tastatur zu spielen.
+Making a take: click to start over	Take wird erstellt: Klicken, um neu zu beginnen
+Markers snap to 16ths (Shift while dragging: free)	Marker rasten auf 16tel ein (Shift beim Ziehen: frei)
+Median Point	Medianpunkt
+Melody	Melodie
+Mood	Stimmung
+Move	Verschieben
+Move camera to view	Kamera zur Ansicht bewegen
+Move the selected notes one grid step; with nothing selected, step the playhead	Ausgewählte Noten um einen Rasterschritt verschieben; ohne Auswahl den Abspielkopf bewegen
+Move tool (Shift+Space, G). G moves at once	Verschiebe-Werkzeug (Shift+Space, G). G verschiebt sofort
+Mute Notes	Noten stummschalten
+Mute the selected notes, or the selected clips, or bring them back	Ausgewählte Noten oder Clips stummschalten oder zurückholen
+Navigation	Navigation
+New Page	Neue Seite
+New scene	Neue Szene
+No MIDI input	Kein MIDI-Eingang
+No active modulations	Keine aktiven Modulationen
+No fitting nodes in this patch	Keine passenden Nodes in diesem Patch
+No page	Keine Seite
+No pages yet	Noch keine Seiten
+Node	Node
+None, transparent	Keine, transparent
+Normalise	Normalisieren
+Note	Note
+Notes	Noten
+Nothing in the 3D View yet	Noch nichts in der 3D View
+Nothing was recorded. Check the audio input and microphone permission	Nichts aufgenommen. Prüfe den Audioeingang und die Mikrofonberechtigung
+Nudge Notes / Step Playhead	Noten verschieben / Abspielkopf bewegen
+O Hat	O Hat
+Object	Objekt
+Octaves	Oktaven
+One semitone, or one scale degree with scale snap on; hold Shift for an octave	Ein Halbton oder, mit Skalen-Einrasten, eine Skalenstufe; Shift halten für eine Oktave
+Only for a generated take	Nur für einen generierten Take
+Open Generate for this page; with an Alt+drag range on the ruler it fills that range	Generieren für diese Seite öffnen; mit einem Alt+Zieh-Bereich auf dem Lineal füllt es diesen Bereich
+Open an audio file (or drop one on the Studio)	Audiodatei öffnen (oder eine auf das Studio ziehen)
+Open in Piano Roll	In Piano Roll öffnen
+Open learning folder	Lernordner öffnen
+Orbit	Orbit
+Orbit around selection	Um Auswahl kreisen
+Orientation	Ausrichtung
+Out	Out
+Overlays (Ctrl+`)	Overlays (Ctrl+`)
+P Hat	P Hat
+Pads	Pads
+Page	Seite
+Pages: switch, add, rename or delete one ([ and ])	Seiten: wechseln, hinzufügen, umbenennen oder löschen ([ und ])
+Pan	Pan
+Pan: drag	Schwenken: ziehen
+Panels	Panels
+Pass	Pass
+Passepartout	Passepartout
+Paste after	Danach einfügen
+Paste scene	Szene einfügen
+Patch	Patch
+Personal	Persönlich
+Perspective or orthographic (5)	Perspektivisch oder orthografisch (5)
+Physically modelled grand, Rhodes and Wurlitzer: hammers on stretched strings and a soundboard, or on a tine or reed read by its pickup through an amp; hardness, tone, decay and stiffness shape it.	Physikalisch modellierter Flügel, Rhodes und Wurlitzer: Hämmer auf gestreckten Saiten und einem Resonanzboden oder auf einer Zinke bzw. Zunge, abgenommen von einem Tonabnehmer durch einen Verstärker; hardness, tone, decay und stiffness formen den Klang.
+Physically modelled piano. model picks a grand, a Rhodes or a Wurlitzer. On the electrics the hammer hits a steel tine or reed and the pickup makes the sound: play harder and it barks, pickup moves the bar closer, fork mistunes the tone bar (beating for sustain), bell is the short metallic overtones of the attack, speaker blends from the direct out into the amp, and tremolo is the Wurlitzer's vibrato or a Suitcase's stereo pan. On the grand, every note is a felt hammer striking one to three unison strings that stretch their upper partials sharp, as a real piano's do, on a soundboard. The harder you play the shorter the hammer touches the string and the brighter it gets. hardness is the felt (soft and round to hard and bright), tone how fast the upper partials die against the fundamental, decay how long a held note sings, detune how far apart the unison strings are (the slow beating and the two-stage decay of a real piano), stiffness how far the partials stretch (0 is perfectly harmonic), body blends from the bare strings into the soundboard, and release is how fast the dampers stop a note after note-off; the top octave and a half has no dampers and rings on. 16 voices, note-driven.	Physikalisch modelliertes Klavier. model wählt einen Flügel, ein Rhodes oder ein Wurlitzer. Bei den E-Pianos trifft der Hammer eine Stahlzinke oder -zunge, und der Tonabnehmer erzeugt den Klang: Spiel härter, und es knurrt; pickup rückt den Tonabnehmer näher heran, fork verstimmt den Tonstab (Schwebung für das Sustain), bell sind die kurzen metallischen Obertöne des Anschlags, speaker blendet vom Direktausgang in den Verstärker über, und tremolo ist das Vibrato des Wurlitzer oder das Stereo-Panning eines Suitcase. Beim Flügel ist jede Note ein Filzhammer, der eine bis drei Unisono-Saiten anschlägt, deren obere Teiltöne wie bei einem echten Klavier nach oben gestreckt sind, auf einem Resonanzboden. Je härter du spielst, desto kürzer berührt der Hammer die Saite und desto heller wird es. hardness ist der Filz (weich und rund bis hart und hell), tone, wie schnell die oberen Teiltöne gegenüber dem Grundton verklingen, decay, wie lange eine gehaltene Note klingt, detune, wie weit die Unisono-Saiten auseinanderliegen (die langsame Schwebung und das zweistufige Ausklingen eines echten Klaviers), stiffness, wie weit die Teiltöne gestreckt sind (0 ist perfekt harmonisch), body blendet von den bloßen Saiten in den Resonanzboden über, und release ist, wie schnell die Dämpfer eine Note nach dem Note-off stoppen; die obersten anderthalb Oktaven haben keine Dämpfer und klingen weiter. 16 Stimmen, notengesteuert.
+Physically modelled string: every note is a waveguide string tuned exactly to its pitch, on a shared wooden body. exciter plucks it, bows it (the bow keeps it sounding while the note is held) or strikes it with a felt hammer that gets brighter the harder you hit. position is where along the string it is excited, measured from the bridge (a quarter of the way in silences every 4th harmonic, as on a real string). tone sets how bright it stays as it rings, decay how long the note rings while held, stiffness stretches the upper partials sharp like a piano or a metal string, body blends from the bare string into the body's resonances (body type picks whose: a small box, or a guitar, harp, violin or cello body measured from recordings), and release is how fast the damper stops it after note-off. hardness is the pick (soft and dull to hard and bright); pressure is how hard the bow presses (light slips and sounds airy, heavy sticks and grits) and noise adds rosin noise to the bow. 8 voices, note-driven.	Physikalisch modellierte Saite: Jede Note ist eine Waveguide-Saite, exakt auf ihre Tonhöhe gestimmt, auf einem gemeinsamen Holzkorpus. exciter zupft sie, streicht sie (der Bogen hält sie am Klingen, solange die Note gehalten wird) oder schlägt sie mit einem Filzhammer an, der heller wird, je härter du anschlägst. position ist die Stelle der Saite, an der sie angeregt wird, gemessen vom Steg (bei einem Viertel verstummt jede 4. Harmonische, wie bei einer echten Saite). tone bestimmt, wie hell sie beim Ausklingen bleibt, decay, wie lange die Note klingt, solange sie gehalten wird, stiffness streckt die oberen Teiltöne nach oben wie bei einem Klavier oder einer Metallsaite, body blendet von der bloßen Saite in die Resonanzen des Korpus über (body type wählt, welcher: eine kleine Box oder ein Gitarren-, Harfen-, Violin- oder Cellokorpus, aus Aufnahmen vermessen), und release ist, wie schnell der Dämpfer sie nach dem Note-off stoppt. hardness ist das Plektrum (weich und dumpf bis hart und hell); pressure ist, wie stark der Bogen drückt (leicht rutscht er und klingt luftig, schwer haftet er und kratzt), und noise fügt dem Bogen Kolophoniumrauschen hinzu. 8 Stimmen, notengesteuert.
+Physically modelled wind instrument: every note is a bore blown by a clarinet reed, a sax reed on a conical bore, a flute's air jet or brass lips. breath is how hard you blow (soft and dark up to loud and bright; blow too softly and a reed will not speak), tone is how bright the bell lets it be, noise is the air in the breath, vibrato a 5.5 Hz swell in the breath, and attack and release how fast the breath comes and goes. 8 voices, note-driven.	Physikalisch modelliertes Blasinstrument: Jede Note ist eine Röhre, angeblasen von einem Klarinettenblatt, einem Saxofonblatt an einer konischen Röhre, dem Luftstrahl einer Flöte oder Blechbläserlippen. breath ist, wie stark du bläst (leise und dunkel bis laut und hell; bläst du zu schwach, spricht ein Blatt nicht an), tone, wie hell der Schalltrichter es klingen lässt, noise ist die Luft im Atem, vibrato ein 5.5-Hz-Anschwellen des Atems, und attack und release, wie schnell der Atem kommt und geht. 8 Stimmen, notengesteuert.
+Physically modelled wind: clarinet, sax, flute or brass, blown by the note; breath, tone, noise and vibrato shape it.	Physikalisch modelliertes Blasinstrument: Klarinette, Saxofon, Flöte oder Blech, angeblasen von der Note; breath, tone, noise und vibrato formen den Klang.
+Piano Roll	Piano Roll
+Piano Roll Panel	Piano-Roll-Panel
+Piano Roll Tools	Piano-Roll-Werkzeuge
+Piano Roll at Bottom	Piano Roll unten
+Piano Roll at Top	Piano Roll oben
+Piano Roll node	Piano-Roll-Node
+Piano roll - edit and generate notes (Shift+R)	Piano Roll - Noten bearbeiten und generieren (Shift+R)
+Picture	Bild
+Ping-pong: while looping, play forward then back	Ping-Pong: beim Loopen vorwärts und dann rückwärts spielen
+Pitch	Tonhöhe
+Pivot	Pivot
+Play slice	Slice abspielen
+Play the edit (pauses the canvas audio)	Bearbeitung abspielen (pausiert das Canvas-Audio)
+Plays the notes of the Piano Roll page linked to it - a MIDI lane in the Timeline, laid out in clips you draw, cut and loop like any other clip. It follows the transport, plays each clip as drawn (loops unrolled, chance rolled fresh on every play), and sends pitch bend, pressure and timbre curves along with the notes. transpose and vel act on everything the page plays; the notes input passes through and merges in (switch thru off to drop it). The Global Scale button snaps every played note to the project key and scale. A copy of the node starts unlinked, so one page never drives two nodes.	Spielt die Noten der verknüpften Piano-Roll-Seite - eine MIDI-Spur in der Timeline, aufgeteilt in Clips, die du wie jeden anderen Clip zeichnest, schneidest und loopst. Er folgt dem Transport, spielt jeden Clip wie gezeichnet (Loops ausgerollt, chance bei jedem Abspielen neu gewürfelt) und sendet Pitch-Bend-, Druck- und Timbre-Kurven zusammen mit den Noten. transpose und vel wirken auf alles, was die Seite spielt; der Eingang notes wird durchgereicht und eingemischt (thru ausschalten, um ihn zu verwerfen). Die Schaltfläche Global Scale rastet jede gespielte Note auf Tonart und Skala des Projekts ein. Eine Kopie des Nodes beginnt unverknüpft, damit eine Seite nie zwei Nodes steuert.
+Point at 3D Cursor	Auf 3D-Cursor ausrichten
+Pressure	Druck
+Previous / Next Page	Vorherige / nächste Seite
+Program still running	Programm läuft noch
+Projection	Projektion
+Properties (N)	Eigenschaften (N)
+Put the edit on the canvas: the patch that made it, or a node that plays it	Bearbeitung auf den Canvas legen: den Patch, der sie erzeugt hat, oder einen Node, der sie abspielt
+Put this scene on the canvas	Diese Szene auf den Canvas legen
+Quality	Qualität
+Quantise	Quantisieren
+Quantise clip	Clip quantisieren
+Quantise page	Seite quantisieren
+Quantise selection	Auswahl quantisieren
+Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings	Auswahl oder Clip quantisieren: Raster, Takte oder eine Teilung wählen (Q wiederholt die letzte). Rechtsklick oder Shift+Q für die Einstellungen
+Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings	Auswahl oder die bearbeiteten Clips aufs Raster quantisieren; Shift+Q öffnet Stärke, Swing und Enden in den Einstellungen
+Quit Anyway	Trotzdem beenden
+Quitting ends it.	Beenden bricht es ab.
+Radius	Radius
+Record MIDI	MIDI aufnehmen
+Record notes from your MIDI controller while the transport plays (R)	Noten vom MIDI-Controller aufnehmen, während der Transport läuft (R)
+Record the audio input into a new sample (R)	Audioeingang in ein neues Sample aufnehmen (R)
+Recorded	Aufgenommen
+Recorded (not saved to disk)	Aufgenommen (nicht auf Festplatte gespeichert)
+Recording	Aufnahme
+Recording from the audio input. Press R to stop	Aufnahme vom Audioeingang. Drücke R zum Stoppen
+Reflections	Reflexionen
+Release	Release
+Remove from scene	Aus Szene entfernen
+Rename the page	Seite umbenennen
+Render Animation	Animation rendern
+Render Image	Bild rendern
+Render through this camera	Durch diese Kamera rendern
+Rendered: your lights, world and render settings (Z cycles)	Gerendert: deine Lichter, Welt und Render-Einstellungen (Z wechselt)
+Replace	Ersetzen
+Replace the slices?	Slices ersetzen?
+Resolution %	Auflösung %
+Resolution X	Auflösung X
+Rev	Rev
+Reveal File	Datei zeigen
+Reverse Slice	Slice umkehren
+Reverse: play the whole edit backwards	Rückwärts: die ganze Bearbeitung rückwärts abspielen
+Ride	Ride
+Right Orthographic	Rechts orthografisch
+Right-click any 3D node and choose Add to 3D View.	Rechtsklicke auf einen beliebigen 3D-Node und wähle Zu 3D View hinzufügen.
+Rim	Rim
+Role	Rolle
+Roll	Rollen
+Rotate	Drehen
+Rotate tool (Shift+Space, R). R rotates at once	Dreh-Werkzeug (Shift+Space, R). R dreht sofort
+Rotation	Drehung
+Ruler	Lineal
+Safe Areas	Sichere Bereiche
+Sample	Sample
+Sample Audio: you hear the Studio's edit; the canvas, Session and Timeline stay silent	Sample-Audio: Du hörst die Bearbeitung des Studios; Canvas, Session und Timeline bleiben stumm
+Sample Studio	Sample Studio
+Sample Studio Record	Sample-Studio-Aufnahme
+Sample Studio at Bottom	Sample Studio unten
+Sample Studio at Top	Sample Studio oben
+Sample and slice settings	Sample- und Slice-Einstellungen
+Sample studio - generate and shape a loop (Shift+W)	Sample Studio - einen Loop generieren und formen (Shift+W)
+Samples per frame when rendering out.	Samples pro Frame beim Rendern.
+Sampling	Sampling
+Saving image...	Bild wird gespeichert...
+Scale	Skalieren
+Scale snap	Skalen-Einrasten
+Scale tool (Shift+Space, S). S scales at once	Skalier-Werkzeug (Shift+Space, S). S skaliert sofort
+Scanned plugins	Gescannte Plugins
+Scene	Szene
+Search	Suchen
+Seconds	Sekunden
+Seed	Seed
+Select (Shift+Space, W)	Auswählen (Shift+Space, W)
+Select All Notes	Alle Noten auswählen
+Select a camera or a light.	Wähle eine Kamera oder ein Licht.
+Select every note of the clips being edited	Alle Noten der bearbeiteten Clips auswählen
+Select one object.	Wähle ein Objekt.
+Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	Auswählen, Zeichnen, Radieren, Schneiden, Stumm und Hand (ziehen zum Schwenken), dieselben Tasten wie in Timeline und Sample Studio, solange der Zeiger über der Piano Roll ist (Esc kehrt auch zu Auswählen zurück). Das Werkzeug-Dropdown enthält sie zusammen mit dem Zoom. Jede Taste in diesem Abschnitt braucht den Zeiger dort
+Selection to Cursor	Auswahl zum Cursor
+Sensor	Sensor
+Set the gain so the edit peaks at -0.3 dB	Gain so einstellen, dass die Bearbeitung bei -0.3 dB ihren Spitzenwert erreicht
+Settings for the page, clip or note	Einstellungen für Seite, Clip oder Note
+Shadows	Schatten
+Shape	Form
+Shift X	Verschiebung X
+Shift Y	Verschiebung Y
+Shift+A adds a camera, a light or a node from the canvas	Shift+A fügt eine Kamera, ein Licht oder einen Node vom Canvas hinzu
+Show (Alt+H shows everything)	Einblenden (Alt+H zeigt alles)
+Show 3D View	3D View anzeigen
+Show Piano Roll	Piano Roll anzeigen
+Show Sample Studio	Sample Studio anzeigen
+Show Terminal	Terminal anzeigen
+Show in renders	In Renderings zeigen
+Show or hide the docked Piano Roll	Angedockte Piano Roll ein- oder ausblenden
+Slice	Slice
+Slice colour	Slice-Farbe
+Slices you placed by hand will be replaced.	Von Hand gesetzte Slices werden ersetzt.
+Snap	Einrasten
+Snap (Shift+Tab, hold Ctrl to flip)	Einrasten (Shift+Tab, Ctrl halten zum Umkehren)
+Snap drawn and moved notes to the scale	Gezeichnete und verschobene Noten auf die Skala einrasten
+Snap markers to 16ths	Marker auf 16tel einrasten
+Snap the next Generate to the project's key and scale	Nächstes Generieren auf Tonart und Skala des Projekts einrasten
+Snap to the grid	Am Raster einrasten
+Snare	Snare
+Softness	Weichheit
+Solid: a neutral light, to see the shapes	Solid: ein neutrales Licht, um die Formen zu sehen
+Split / Join Notes	Noten teilen / verbinden
+Split here	Hier teilen
+Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)	Aufnahme von Noten vom MIDI-Controller starten oder stoppen, während der Transport läuft (nur wenn ein MIDI-Gerät angeschlossen ist)
+Stop recording (R)	Aufnahme stoppen (R)
+Stop recording first	Erst die Aufnahme stoppen
+Strength	Stärke
+Stretch	Dehnen
+Strum	Strum
+Studio	Studio
+Surface	Oberfläche
+Swing	Swing
+Switch to the neighbouring page	Zur benachbarten Seite wechseln
+Target X	Ziel X
+Target Y	Ziel Y
+Target Z	Ziel Z
+Terminal	Terminal
+Terminal - a real shell, for you and your coding agents (Ctrl+`)	Terminal - eine echte Shell, für dich und deine Coding-Agents (Ctrl+`)
+Terminal at Bottom	Terminal unten
+Terminal at Left	Terminal links
+Terminal at Right	Terminal rechts
+Terminal at Top	Terminal oben
+That MIDI file has no notes	Diese MIDI-Datei enthält keine Noten
+The Sample studio's take is driving audio. Click to hand it back to the canvas.	Der Take des Sample Studios steuert das Audio. Klicken, um es an den Canvas zurückzugeben.
+The Sample studio's take will drive audio once the engine is started.	Der Take des Sample Studios steuert das Audio, sobald die Engine gestartet ist.
+The graph that made the take, as a group on the canvas	Der Graph, der den Take erzeugt hat, als Gruppe auf dem Canvas
+The next Generate snaps to the project's key and scale	Das nächste Generieren rastet auf Tonart und Skala des Projekts ein
+The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop	Gleiches in Timeline und Piano Roll, dazu Klicken oder Ziehen im Sample Studio: Klicken oder Ziehen setzt den Abspielkopf beim Loslassen; Shift+Ziehen zieht den Loop auf; Ziehen an einer Loop-Kante verschiebt sie; Rechtsklick entfernt den Loop
+The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices	Der Slice behält seine Spanne: Länge spielt ihn langsamer (am Slice-Ende abgeschnitten) oder schneller (dann Stille oder Füllen). Off: keine Dehnung; repitch: verschiebt auch die Tonhöhe; beats und tonal: gleiche Tonhöhe. Shift+Links/Rechts auf der Wellenform formt die ausgewählten Slices
+The terminal font is missing from this install.	Die Terminal-Schrift fehlt in dieser Installation.
+Then click a Piano Roll node on the canvas: this page plays through it	Klicke dann auf einen Piano-Roll-Node im Canvas: Diese Seite spielt über ihn
+Thirds	Drittel
+This page is full	Diese Seite ist voll
+Threshold	Schwelle
+Timbre	Klangfarbe
+Time	Zeit
+Time spread	Zeitstreuung
+Title	Titel
+Tom	Tom
+Tool: Cut (B) - click to choose a tool	Werkzeug: Schneiden (B) - klicken, um ein Werkzeug zu wählen
+Tool: Draw (P) - click to choose a tool	Werkzeug: Zeichnen (P) - klicken, um ein Werkzeug zu wählen
+Tool: Erase (E) - click to choose a tool	Werkzeug: Radieren (E) - klicken, um ein Werkzeug zu wählen
+Tool: Hand (H) - click to choose a tool	Werkzeug: Hand (H) - klicken, um ein Werkzeug zu wählen
+Tool: Mute (0) - click to choose a tool	Werkzeug: Stumm (0) - klicken, um ein Werkzeug zu wählen
+Tool: Select (A) - click to choose a tool	Werkzeug: Auswählen (A) - klicken, um ein Werkzeug zu wählen
+Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool	Werkzeug: Auswählen (A), Schneiden (B), Hand (H) - klicken, um ein Werkzeug zu wählen. Doppelklick über der Wellenform schneidet mit jedem Werkzeug
+Top Orthographic	Oben orthografisch
+Transform	Transformieren
+Transient	Transiente
+Transparent	Transparent
+Transpose	Transponieren
+Transpose Notes	Noten transponieren
+Triplet	Triole
+Unlink	Trennen
+User Orthographic	Benutzer orthografisch
+User Perspective	Benutzer perspektivisch
+Vel spread	Velocity-Streuung
+Velocity	Velocity
+Velocity Ramp	Velocity-Rampe
+View	Ansicht
+View 	Ansicht 
+Viewport	Viewport
+Visibility	Sichtbarkeit
+WAV, 16-bit	WAV, 16 Bit
+WAV, 24-bit	WAV, 24 Bit
+WAV, choose where...	WAV, Speicherort wählen...
+Waiting for the audio input (allow the microphone if macOS asks)	Warte auf den Audioeingang (erlaube das Mikrofon, falls macOS fragt)
+What Generate writes	Was Generieren schreibt
+Which MIDI controller Record listens to	Welchem MIDI-Controller die Aufnahme zuhört
+Whole sample	Ganzes Sample
+Wireframe (Shift+Z)	Drahtgitter (Shift+Z)
+World	Welt
+Y	Y
+Zoom In	Vergrößern
+Zoom Out	Verkleinern
+Zoom Piano Roll	Piano Roll zoomen
+Zoom Sample Studio	Sample Studio zoomen
+Zoom in, zoom out, fit the page, zoom to the selection	Vergrößern, verkleinern, Seite einpassen, auf Auswahl zoomen
+Zoom in, zoom out, fit the sample, zoom to the selection	Vergrößern, verkleinern, Sample einpassen, auf Auswahl zoomen
+Zoom out	Herauszoomen
+Zoom to mouse	Zur Maus zoomen
+Zoom to selection	Auf Auswahl zoomen
+Zoom: drag	Zoomen: ziehen
+mixed	gemischt
+slices	Slices
+source missing	Quelle fehlt
+style	Stil
+A 2D fluid simulation that carries the input picture along as dye, so it smears, swirls and folds. Patch a motion image (Optical Flow) into force to push it, and a picture into obstacles: bright areas are solid. The stirrer (Orbit, Pulse, Spin) moves it with nothing patched. Resolution divides the simulation size; Reset clears it.	Eine 2D-Fluidsimulation, die das Eingangsbild als Farbstoff mitträgt, sodass es verschmiert, wirbelt und sich faltet. Patche ein Bewegungsbild (Optical Flow) in force, um es zu schieben, und ein Bild in obstacles: Helle Bereiche sind fest. Der Rührer (Orbit, Pulse, Spin) bewegt es, auch wenn nichts gepatcht ist. Resolution teilt die Simulationsgröße; Reset leert sie.
+A brickwall limiter: nothing passes above threshold. In gain drives the signal into it, release sets how fast it lets go, out gain sets the final level, and the meter shows the gain reduction. Always fully wet.	Ein Brickwall-Limiter: Nichts geht über threshold hinaus. In gain treibt das Signal hinein, release legt fest, wie schnell er loslässt, out gain setzt den Endpegel, und die Anzeige zeigt die Gain-Reduktion. Immer voll wet.
+A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus.	Eine echte Shell in Infinite, für dich und deine Coding-Agents. Öffne sie über die Kachel >_ in der rechten Leiste oder mit Ctrl+`, das ihr auch den Fokus gibt und sie schließt, wenn sie den Fokus schon hat.
+AI skills	KI-Skills
+Add a node, a camera, a light, an HDRI or a new scene	Node, Kamera, Licht, HDRI oder neue Szene hinzufügen
+Add to the View	Zur Ansicht hinzufügen
+Audition Slice	Slice vorhören
+Axis Views	Achsenansichten
+Camera View	Kameraansicht
+Clear Transform	Transformation zurücksetzen
+Clear the screen	Bildschirm leeren
+Copy / Cut / Paste Controls	Bedienelemente kopieren / ausschneiden / einfügen
+Copy / Cut / Paste Slices	Slices kopieren / ausschneiden / einfügen
+Copy / Paste	Kopieren / Einfügen
+Copy / Paste / Duplicate Scene	Szene kopieren / einfügen / duplizieren
+Copy or cut the selected slices, or paste them	Ausgewählte Slices kopieren oder ausschneiden oder einfügen
+Copy the selected text, or paste into the shell	Ausgewählten Text kopieren oder in die Shell einfügen
+Copy the whole scene, paste it as a new scene, or duplicate it	Ganze Szene kopieren, als neue Szene einfügen oder duplizieren
+Cut a slice at the pointer (on the grid); join the selected slices	Slice am Zeiger schneiden (auf dem Raster); ausgewählte Slices verbinden
+Cycle the shading; Shift+Z switches wireframe	Schattierung durchschalten; Shift+Z schaltet auf Drahtgitter
+Delete Controls	Bedienelemente löschen
+Delete Slices	Slices löschen
+Delete the selected controls; Esc clears the selection	Ausgewählte Bedienelemente löschen; Esc hebt die Auswahl auf
+Delete the selected slices	Ausgewählte Slices löschen
+Deletes the faces marked by an upstream Select op, or all faces with selection-only off. With 'keep selected instead' it keeps the selection and deletes the rest. After an Instance on Points it drops whole instances instead of faces.	Löscht die von einer vorgeschalteten Select-Operation markierten Flächen oder, mit selection-only aus, alle Flächen. Mit 'keep selected instead' behält es die Auswahl und löscht den Rest. Nach einem Instance on Points entfernt es ganze Instanzen statt Flächen.
+Duplicate Controls	Bedienelemente duplizieren
+Duplicate the selected controls	Ausgewählte Bedienelemente duplizieren
+Duplicate the selected items	Ausgewählte Elemente duplizieren
+F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan	F (oder Ziffernblock .) rahmt die Auswahl ein, ohne Auswahl alles; Pos1 rahmt alles ein oder setzt Zoom und Verschiebung der Kameraansicht zurück
+Find in Terminal	Im Terminal suchen
+Fly	Fliegen
+Fog, smoke or a cloud drawn over a picture, from drifting noise that the wind moves. Fed by a Render 3D node it sits in that scene: it uses the render's camera and solid objects hide the haze behind them. Steps sets quality while you work; render steps is used when rendering offline.	Nebel, Rauch oder eine Wolke über einem Bild, aus treibendem Rauschen, das der Wind bewegt. Von einem Render-3D-Node gespeist, sitzt es in dieser Szene: Es nutzt die Kamera des Renderings, und feste Objekte verdecken den Dunst dahinter. Steps legt die Qualität beim Arbeiten fest; render steps gilt beim Offline-Rendern.
+Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps	Vorne, rechts, oben; {mod} halten für hinten, links, unten. 5 schaltet orthografisch um, 9 dreht zur Gegenseite, 2 / 4 / 6 / 8 kreisen in Schritten
+Group / Ungroup	Gruppieren / Gruppierung aufheben
+Group the selected items, or dissolve the group	Ausgewählte Elemente gruppieren oder die Gruppe auflösen
+Headless engine	Headless-Engine
+Hide / Show	Ausblenden / Einblenden
+Hide the selection, hide everything else, show everything	Auswahl ausblenden, alles andere ausblenden, alles einblenden
+Hold the right button to look around and walk; Shift goes faster	Rechte Maustaste halten, um dich umzusehen und zu gehen; Shift ist schneller
+In edit mode, with the panel clicked: copy or cut the selected controls, or paste them	Im Bearbeitungsmodus, nach Klick ins Panel: ausgewählte Bedienelemente kopieren oder ausschneiden oder einfügen
+In the Terminal, infinite guide and infinite code docs <language> print the same references.	Im Terminal geben infinite guide und infinite code docs <language> dieselben Referenzen aus.
+Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless.	Im Terminal-Panel liegt infinite im PATH und spricht mit dieser App. Außerhalb davon starte die ausführbare Datei der App mit --cli. Mit einer .inf-Datei statt einer laufenden App funktionieren dieselben Verben headless.
+Install All AI Skills	Alle KI-Skills installieren
+Invert Selection	Auswahl umkehren
+It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top.	Es startet im Ordner des geöffneten Patches. Mit Fokus geht jede Taste an die Shell. Ziehe einen Node, eine Datei oder ein Sample hinein, um seine ID oder seinen Pfad einzutippen. Rechtsklicke auf das Panel, um es unten, rechts, links oder oben anzudocken.
+Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide.	Linux braucht ein virtuelles Display: xvfb-run -a Infinite ...  Die vollständige Anleitung liegt als Headless User Guide bei.
+Local View	Lokale Ansicht
+Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view	Durch die Szenenkamera schauen. {mod}+0 macht die ausgewählte Kamera zur Szenenkamera; {mod}+Alt+0 bewegt die Kamera zur aktuellen Ansicht
+Move / Rotate / Scale	Verschieben / Drehen / Skalieren
+Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels	Auswahl sofort verschieben, drehen oder skalieren. X / Y / Z sperrt eine Achse (Shift für eine Ebene), Ziffern geben einen Betrag ein; Klick oder Enter bestätigt, Esc oder Rechtsklick bricht ab
+Mute / Solo Slice	Slice stumm / solo
+Mute or solo the selected slices	Ausgewählte Slices stummschalten oder solo schalten
+New / Close Tab	Neuer Tab / Tab schließen
+Open Terminal	Terminal öffnen
+Open a new terminal tab, or close this one	Neuen Terminal-Tab öffnen oder diesen schließen
+Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system	Terminal in der rechten Leiste öffnen, die Tastatur dorthin lenken oder schließen. Auf jedem System die physische Ctrl-Taste
+Open the pivot point or the transform orientation menu	Menü für Pivot-Punkt oder Transformationsausrichtung öffnen
+Overlays	Overlays
+Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.	Teil der 3D-Geometrie-/Render-Pipeline - Geometrie- und Punktwolken-Nodes speisen Render 3D über eine Kamera und Lichter. Rechtsklicke auf einen 3D-Node und wähle Zu 3D View hinzufügen, um ihn in der 3D View anzuordnen.
+Patch authoring: write, check and render .inf patches.	Patch-Erstellung: .inf-Patches schreiben, prüfen und rendern.
+Pivot / Orientation	Pivot / Ausrichtung
+Play the selected slice, or the one under the pointer	Ausgewählten Slice abspielen oder den unter dem Zeiger
+Preview Views	Vorschauansichten
+Previous / Next Slice	Vorheriger / nächster Slice
+Put the 3D cursor back at the centre and frame everything	3D-Cursor zurück in die Mitte setzen und alles einrahmen
+Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version.	Referenzdateien, die jeder KI-Assistent lesen kann, damit er gültige Patches, Field-Kernels und '='-Ausdrücke schreibt, statt zu raten. Wähle einen Ordner: Für Claude Code nimm ~/.claude/skills/ (oder .claude/skills/ eines Projekts); für andere Assistenten füge die Datei dem Projekt oder dem Chat hinzu. Nach einem Update von Infinite neu installieren, damit die Dateien zu dieser Version passen.
+Rename Item	Element umbenennen
+Rename the selected item	Ausgewähltes Element umbenennen
+Render a still from the scene camera, or render the camera for its set duration	Standbild aus der Szenenkamera rendern oder die Kamera für ihre eingestellte Dauer rendern
+Reset 3D Cursor	3D-Cursor zurücksetzen
+Reset the position, rotation or scale of the selection	Position, Drehung oder Skalierung der Auswahl zurücksetzen
+Reverse the selected slices	Ausgewählte Slices umkehren
+Scroll Back	Zurückscrollen
+Scroll the terminal's history a page at a time	Verlauf des Terminals seitenweise scrollen
+Search the terminal's text	Text des Terminals durchsuchen
+Select All / None	Alles / nichts auswählen
+Select All Clips	Alle Clips auswählen
+Select All Controls	Alle Bedienelemente auswählen
+Select All Slices	Alle Slices auswählen
+Select every clip on the timeline	Jeden Clip in der Timeline auswählen
+Select every control on the page	Jedes Bedienelement der Seite auswählen
+Select every shown item that is not selected	Jedes angezeigte, nicht ausgewählte Element auswählen
+Select every shown item, or nothing	Jedes angezeigte Element auswählen oder nichts
+Select every slice	Jeden Slice auswählen
+Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices	Benachbarten Slice auswählen; mit Shift die ausgewählten Slices dehnen (Rechts) oder stauchen (Links)
+Select, Blade and Hand (drag to pan); Esc also returns to Select	Auswählen, Klinge und Hand (ziehen zum Schwenken); Esc kehrt auch zu Auswählen zurück
+Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select	Auswählen, Stift, Trimmen, Bereich, Zoom und Hand; die Taste eines Werkzeugs erneut drücken oder Esc, um zu Auswählen zurückzukehren
+Shading	Schattierung
+Show only the selection (Keypad / too); press again to show everything	Nur die Auswahl zeigen (auch Ziffernblock /); erneut drücken, um alles zu zeigen
+Show or hide the 3D View. Every other key in this section needs the pointer over the view	3D View ein- oder ausblenden. Jede andere Taste in diesem Abschnitt braucht den Zeiger über der Ansicht
+Show or hide the overlays (over the 3D View this key does not open the Terminal)	Overlays ein- oder ausblenden (über der 3D View öffnet diese Taste nicht das Terminal)
+Show or hide the side panel	Seitenleiste ein- oder ausblenden
+Sidebar	Seitenleiste
+Split / Join Slices	Slices teilen / verbinden
+Start or stop recording the chosen audio input into a new sample	Aufnahme des gewählten Audioeingangs in ein neues Sample starten oder stoppen
+Studio Tools	Studio-Werkzeuge
+Take the selected items out of the view; the nodes stay on the canvas	Ausgewählte Elemente aus der Ansicht nehmen; die Nodes bleiben auf dem Canvas
+Terminal panel	Terminal-Panel
+The Field Language and Expression Globals pages each have an Install AI Skill button for their own file.	Die Seiten Field-Sprache und Ausdrucks-Globals haben je eine Schaltfläche KI-Skill installieren für ihre eigene Datei.
+The final stage of a 3D patch. Right-click any 3D node and choose Add to 3D View to bring its output in, then arrange it in the 3D View panel (Shift+3): G move, R rotate, S scale, X Y Z to lock an axis, hold {mod} to snap. Arranging never changes the node, and whatever the node animates keeps playing through the placement: build and change things on the canvas, compose them here. Transparent until you set a world in its World tab. Keys are Blender's, including the 3D cursor (Shift+right-click), pivot (period), orientation (comma), local view (/) and keyframes (I). F12 renders a picture and {mod}+F12 the animation, through an Output node.	Die letzte Stufe eines 3D-Patches. Rechtsklicke auf einen beliebigen 3D-Node und wähle Zu 3D View hinzufügen, um seine Ausgabe hereinzuholen, und ordne sie dann im 3D-View-Panel an (Shift+3): G verschieben, R drehen, S skalieren, X Y Z sperrt eine Achse, {mod} halten rastet ein. Das Anordnen ändert nie den Node, und was der Node animiert, läuft durch die Platzierung weiter: Baue und ändere Dinge auf dem Canvas, komponiere sie hier. Transparent, bis du im Tab Welt eine Welt festlegst. Die Tasten sind die von Blender, einschließlich 3D-Cursor (Shift+Rechtsklick), Pivot (Punkt), Ausrichtung (Komma), lokaler Ansicht (/) und Keyframes (I). F12 rendert ein Bild und {mod}+F12 die Animation, über einen Output-Node.
+The infinite command	Der Befehl infinite
+The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors).	Dieselbe ausführbare Datei rendert Bilder, Video und Ton aus einem .inf-Patch ohne Fenster. Die Ausgabe ist deterministisch: Derselbe Patch ergibt dieselben Frames und Samples. Die zuletzt ausgegebene Zeile ist ein JSON-Objekt (ok, files, warnings, errors).
+Then W, G, R or S picks the Select, Move, Rotate or Scale tool	Dann wählt W, G, R oder S das Werkzeug Auswählen, Verschieben, Drehen oder Skalieren
+Timeline Tools	Timeline-Werkzeuge
+Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform	Angedocktes Sample Studio umschalten. Jede andere Taste in diesem Abschnitt braucht den Zeiger über seiner Wellenform
+Tools	Werkzeuge
+Turn snapping on or off; hold {mod} while moving to flip it	Einrasten ein- oder ausschalten; {mod} beim Verschieben halten, um es umzukehren
+Undo / Redo Studio Edit	Studio-Bearbeitung rückgängig / wiederholen
+Undo or redo the Studio's own edits; the patch's undo is not touched	Eigene Bearbeitungen des Studios rückgängig machen oder wiederholen; das Rückgängig des Patches bleibt unberührt
+With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom	Mit dem Zeiger über einer 3D-Vorschau (Node, Viewport-Karte, Render 3D): vorne, rechts, oben oder die Standardansicht. {mod} halten für hinten, links, unten
+Zoom 3D View	3D View zoomen
+Zoom in or out; Shift+B drags a box to zoom into	Hinein- oder herauszoomen; Shift+B zieht einen Rahmen zum Hineinzoomen
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite allein listet jedes Verb auf. infinite context gibt den geöffneten Patch, die Auswahl und Code-Fehler in einer Antwort aus.

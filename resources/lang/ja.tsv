@@ -1660,3 +1660,587 @@ Power saving (integrated GPU)	省電力（内蔵GPU）
 High performance (discrete GPU)	高パフォーマンス（外付けGPU）
 Graphics processor	グラフィックプロセッサ
 For computers with more than one GPU. Takes effect the next time Infinite starts.	GPUが複数あるコンピュータ向け。次回Infinite起動時に反映されます。
+%d objects over the limit	%d 個のオブジェクトが上限を超えています
+%d of %d plugins	%d / %d 個のプラグイン
+%d selected	%d 個選択中
+(Local)	（ローカル）
+1 bar	1 小節
+1/16	1/16
+1/4	1/4
+1/8	1/8
+3D Cursor	3D カーソル
+3D View	3D View
+3D View - arrange node outputs and render a camera (Shift+3)	3D View - ノードの出力を配置してカメラをレンダリング（Shift+3）
+3D View Panel	3D View パネル
+A Sampler on the canvas holding this slice as you hear it	聴こえているとおりのこのスライスを持つ、キャンバス上の Sampler
+A program is still running in the terminal.	ターミナルでまだプログラムが実行中です。
+A sample holds at most 64 slices	1 つのサンプルに入るスライスは最大 64 個です
+A sample player that makes its own loop: a music style, a part (all, synths, pads, plucks, percussion, drums), a seed and a length render 1-8 bars on a background thread, loudness-matched, saved as a recipe and rendered again on reopen, or kept as a wav.	自分でループを作るサンプルプレーヤー：音楽スタイル、パート（all、synths、pads、plucks、percussion、drums）、シード、長さから 1〜8 小節をバックグラウンドスレッドでレンダリングし、ラウドネスを揃えてレシピとして保存し、開き直すと再レンダリングします。wav として残すこともできます。
+Active Element	アクティブ要素
+Add	追加
+Add a camera from this view (0)	このビューからカメラを追加（0）
+Add a camera to render.	レンダリング用のカメラを追加してください。
+Add a node, a camera, a light, an HDRI or a new scene (Shift+A)	ノード、カメラ、ライト、HDRI、新しいシーンを追加（Shift+A）
+Add to 3D View	3D View に追加
+All MIDI inputs	すべての MIDI 入力
+Ambient	アンビエント
+Ambient Occlusion	アンビエントオクルージョン
+Arp Mode	アルペジオモード
+Arpeggio	アルペジオ
+Assign Piano Roll	Piano Roll を割り当て
+Assign another Piano Roll	別の Piano Roll を割り当て
+At most	最大
+Audio input to record from	録音するオーディオ入力
+Audition	試聴
+Back Orthographic	後・平行投影
+Background colour	背景色
+Bar	小節
+Bars	小節数
+Bass	ベース
+Bell	ベル
+Bend	ベンド
+Bias	バイアス
+Bloom	ブルーム
+Bottom Orthographic	下・平行投影
+By grid	グリッドで
+By position	位置で
+By transients	トランジェントで
+C Hat	Cハット
+Camera	カメラ
+Camera Orthographic	カメラ・平行投影
+Camera Perspective	カメラ・透視投影
+Camera view (0)	カメラビュー（0）
+Camera view (Numpad 0 or 0)	カメラビュー（テンキー 0 または 0）
+Cast by one light, any but a point. Pick it in the light's settings.	ポイント以外のいずれか 1 つのライトが落とします。ライトの設定で選択してください。
+Casts shadow	影を落とす
+Center	中央
+Chance	確率
+Choke	チョーク
+Choose New Page in the page list to start writing notes.	ページリストで「新規ページ」を選ぶとノートを書き始められます。
+Chop to Grid	グリッドで分割
+Chord Rhythm	コードリズム
+Chord Size	コードの構成音数
+Chords	コード
+Clap	クラップ
+Clear slices	スライスをクリア
+Click a node on the canvas...	キャンバス上のノードをクリック...
+Click again to delete everything learned	もう一度クリックすると学習内容をすべて削除します
+Click or drag to place the playhead	クリックまたはドラッグで再生ヘッドを配置
+Click: play from here; double-click: a new slice here	クリック：ここから再生、ダブルクリック：ここに新しいスライス
+Clip end	クリップの終了
+Clip start	クリップの開始
+Clips	クリップ
+Close Piano Roll	Piano Roll を閉じる
+Close Sample Studio	Sample Studio を閉じる
+Close Terminal	ターミナルを閉じる
+Color	カラー
+Color Management	カラーマネジメント
+Color depth	色深度
+Composition Guides	構図ガイド
+Cone	円錐角
+Connect a MIDI controller	MIDI コントローラーを接続してください
+Connect a MIDI controller to record	録音するには MIDI コントローラーを接続してください
+Connect an audio input to record	録音するにはオーディオ入力を接続してください
+Convert	変換
+Convert to node	ノードに変換
+Copy / Cut / Paste Notes	ノートのコピー / カット / ペースト
+Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original	選択したノートをコピーまたはカット、または選択したクリップをコピー。ペーストすると元の直後に配置されます
+Copy scene	シーンをコピー
+Could not open	開けませんでした
+Crash	クラッシュ
+Creativity	創造性
+Cursor to Selected	カーソルを選択物へ
+Cut the sample by transients, grid or into equal parts	サンプルをトランジェント、グリッド、または等分で分割
+Cut the selected notes at the playhead; join runs on one pitch into one note	選択したノートを再生ヘッドで分割。同じピッチの連続を 1 つのノートに結合
+Decay	ディケイ
+Delete Notes	ノートを削除
+Delete scene	シーンを削除
+Delete the selected notes or clips	選択したノートまたはクリップを削除
+Density	密度
+Depth of Field	被写界深度
+Distance	距離
+Dome angle	ドームの角度
+Dome tilt	ドームの傾き
+Double Speed	2 倍速
+Drag a box to zoom into	ドラッグした範囲にズーム
+Drag on the ruler with Alt held to mark the range Generate fills	Alt を押しながらルーラーをドラッグして、生成で埋める範囲を指定
+Drag to move the view; double-click to see it all	ドラッグでビューを移動、ダブルクリックで全体表示
+Drag: fade length; Shift-drag up or down (or on the curve): its shape	ドラッグ：フェードの長さ、Shift+上下ドラッグ（またはカーブ上）：その形
+Drag: move the cut; double-click: remove it	ドラッグ：カット位置を移動、ダブルクリック：削除
+Draw	描画
+Draw a clip, drop a .mid, or record	クリップを描く、.mid をドロップ、または録音
+Drum rows	ドラムの行
+Drums	ドラム
+Duplicate Notes	ノートを複製
+Duplicate scene	シーンを複製
+Each slice to a folder...	各スライスをフォルダーへ...
+Edit the whole sample instead of the selected slices	選択したスライスではなくサンプル全体を編集
+Elevation	仰角
+Empty. Shift+A adds to it.	空です。Shift+A で追加できます。
+Ends	ノートの終わり
+Energy	エネルギー
+Environment texture	環境テクスチャ
+Equal	等分
+Erase	消去
+Export	書き出し
+Export slices to	スライスの書き出し先
+Exposure	露出
+Expression at start	開始時のエクスプレッション
+F-Stop	F値
+FLAC	FLAC
+Field of view	視野角
+Fill	フィル
+Film	フィルム
+Final size	最終サイズ
+Find in terminal	ターミナル内を検索
+Fine	微調整
+Fit	フィット
+Fit Page	ページに合わせる
+Fit to 16ths	16 分に合わせる
+Fit to Scale	スケールに合わせる
+Focal length	焦点距離
+Focus on	フォーカス対象
+Fold to the keys in use	使用中の鍵盤に折りたたむ
+Follow grid	グリッドに従う
+Follow the playhead	再生ヘッドに追従
+Forget me	私を忘れる
+Form	曲構成
+Frame	フレーム表示
+Frame Range	フレーム範囲
+Frame all	すべてをフレーム表示
+Frame rate	フレームレート
+Frames	フレーム数
+From canvas	キャンバスから
+Front Orthographic	前・平行投影
+Functions	機能
+Functions: legato, humanize, reverse, strum and more	機能：レガート、ヒューマナイズ、反転、ストラムなど
+Fx	Fx
+Gain	ゲイン
+Generate	生成
+Generate Range	生成範囲
+Generate a new take	新しいテイクを生成
+Generate a take, open a file, or drop a sample here	テイクを生成、ファイルを開く、またはここにサンプルをドロップ
+Generate notes in the page's key (G). Alt+drag the ruler sets the range; selected notes regenerate in place	ページのキーでノートを生成（G）。Alt+ルーラーのドラッグで範囲を設定、選択したノートはその場で再生成されます
+Global	グローバル
+Global 	グローバル 
+Go to node	ノードへ移動
+Golden	黄金比
+Grid	グリッド
+Grid, shared with the Timeline	グリッド（タイムラインと共通）
+Group the selected clips or dissolve their groups	選択したクリップをグループ化、またはグループを解除
+HDRI...	HDRI...
+Half Speed	半速
+Hear notes as you touch them	触れたノートを鳴らす
+Hide (H)	隠す（H）
+High Note	最高音
+Humanize	ヒューマナイズ
+In	イン
+Individual Origins	個々の原点
+Instrument (for the next Generate)	楽器（次の生成用）
+Join	結合
+Keep Working	作業を続ける
+Kept takes, notes you play and saved patches stay on this computer.	残したテイク、演奏したノート、保存したパッチはこのコンピューターに保存されます。
+Key	キー
+Kick	キック
+Lay the selected notes or clips again right after themselves	選択したノートまたはクリップを、それ自身の直後にもう一度配置
+Learn from my playing	演奏から学習
+Learning	学習
+Left Orthographic	左・平行投影
+Legato	レガート
+Length (for the next Generate)	長さ（次の生成用）
+Lens	レンズ
+Lens unit	レンズ単位
+Level	レベル
+Light	ライト
+Lit by	照らすライト
+Load HDRI...	HDRI を読み込む...
+Local	ローカル
+Local 	ローカル 
+Location	位置
+Lock camera to view	カメラをビューにロック
+Lock pitch	ピッチをロック
+Lock rhythm	リズムをロック
+Lock seed	シードをロック
+Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead	Alt+ドラッグしたルーラー範囲または選択したノートをループ。再生ヘッド位置にループの開始または終了を設定
+Loop: on repeats the edit, off plays it once	ループ：オンで編集結果を繰り返し、オフで 1 回だけ再生
+Low Note	最低音
+MP3	MP3
+Makes a sample instead of loading one. Pick a music style (deep house, dub techno, lofi beats and 31 more), a seed and a length of 1, 2, 4 or 8 bars, and press generate: a private patch built from that style - drums, bass, chords, a motif, each through its own synths and effects - renders a seamless loop on a background thread while the canvas keeps running. part picks the whole mix (all) or one layer of it from the same seed: synths (bass and the motif line), pads (the chords held on a slow-swelling voice), plucks (the chords arpeggiated on a short plucked voice), percussion (clap, toms, bell) or drums (kick, snare, hats). variation is how far each node strays from its defaults; the dice picks a new seed. follow transport makes the loop at the patch tempo, key and scale, card's own at the style's. The status line names what was made, its tempo, key and scale. Every loop comes out at -14 LUFS under a -1 dB true-peak ceiling; a seed that renders silent or broken is redrawn up to three times before the node says so. Changing a setting marks the sample stale until you generate again. The patch saves the recipe, not the audio, and renders it again when reopened; keep as file writes the loop to a wav, and from then on it is saved as that file. Playback is the sample player's: drag the waveform edges for start and end, pitch, gain and loop below it, and connect notes to play it from a keyboard.	サンプルを読み込む代わりに作ります。音楽スタイル（deep house、dub techno、lofi beats ほか 31 種類）、シード、1・2・4・8 小節の長さを選んで generate を押すと、そのスタイルから組み立てた専用パッチ（ドラム、ベース、コード、モチーフ。それぞれ専用のシンセとエフェクトを通ります）が、キャンバスを動かしたままバックグラウンドスレッドでシームレスなループをレンダリングします。part は同じシードからミックス全体（all）か 1 つのレイヤーを選びます：synths（ベースとモチーフのライン）、pads（ゆっくり膨らむ音色で伸ばすコード）、plucks（短く弾く音色でアルペジオするコード）、percussion（クラップ、タム、ベル）、drums（キック、スネア、ハット）。variation は各ノードがデフォルト値からどれだけ外れるかを決め、サイコロで新しいシードを選びます。follow transport はパッチのテンポ、キー、スケールでループを作り、card's own はスタイル独自の設定で作ります。ステータス行には作られた内容とテンポ、キー、スケールが表示されます。どのループも -14 LUFS、トゥルーピーク上限 -1 dB で出力され、無音や壊れた結果になったシードは最大 3 回引き直してから、ノードがその旨を表示します。設定を変えると、もう一度生成するまでサンプルは古い状態として表示されます。パッチにはオーディオではなくレシピが保存され、開き直すと再レンダリングされます。keep as file はループを wav に書き出し、以後はそのファイルとして保存されます。再生はサンプルプレーヤーと同じです：波形の端をドラッグして開始と終了を決め、その下に pitch、gain、loop があり、ノートを接続すれば鍵盤で演奏できます。
+Making a take: click to start over	テイクを作成中：クリックでやり直し
+Markers snap to 16ths (Shift while dragging: free)	マーカーは 16 分にスナップ（ドラッグ中に Shift：自由）
+Median Point	中点
+Melody	メロディ
+Mood	ムード
+Move	移動
+Move camera to view	カメラをビューへ移動
+Move the selected notes one grid step; with nothing selected, step the playhead	選択したノートを 1 グリッド分移動。何も選択していなければ再生ヘッドを移動
+Move tool (Shift+Space, G). G moves at once	移動ツール（Shift+Space、G）。G ですぐに移動
+Mute Notes	ノートをミュート
+Mute the selected notes, or the selected clips, or bring them back	選択したノートまたはクリップをミュート、または元に戻す
+Navigation	ナビゲーション
+New Page	新規ページ
+New scene	新規シーン
+No MIDI input	MIDI 入力なし
+No active modulations	アクティブなモジュレーションはありません
+No fitting nodes in this patch	このパッチに該当するノードはありません
+No page	ページなし
+No pages yet	まだページがありません
+Node	ノード
+None, transparent	なし（透明）
+Normalise	ノーマライズ
+Note	ノート
+Notes	ノート
+Nothing in the 3D View yet	3D View にはまだ何もありません
+Nothing was recorded. Check the audio input and microphone permission	何も録音されませんでした。オーディオ入力とマイクの許可を確認してください
+Nudge Notes / Step Playhead	ノートを移動 / 再生ヘッドをステップ
+O Hat	Oハット
+Object	オブジェクト
+Octaves	オクターブ
+One semitone, or one scale degree with scale snap on; hold Shift for an octave	半音 1 つ、スケールスナップがオンならスケールの 1 度。Shift を押すと 1 オクターブ
+Only for a generated take	生成したテイクのみ
+Open Generate for this page; with an Alt+drag range on the ruler it fills that range	このページの生成を開きます。ルーラーに Alt+ドラッグの範囲があればその範囲を埋めます
+Open an audio file (or drop one on the Studio)	オーディオファイルを開く（または Studio にドロップ）
+Open in Piano Roll	Piano Roll で開く
+Open learning folder	学習フォルダーを開く
+Orbit	オービット
+Orbit around selection	選択物を中心にオービット
+Orientation	座標系
+Out	アウト
+Overlays (Ctrl+`)	オーバーレイ（Ctrl+`）
+P Hat	Pハット
+Pads	パッド
+Page	ページ
+Pages: switch, add, rename or delete one ([ and ])	ページ：切り替え、追加、名前変更、削除（[ と ]）
+Pan	パン
+Pan: drag	パン：ドラッグ
+Panels	パネル
+Pass	パス
+Passepartout	パスパルトゥー
+Paste after	後ろにペースト
+Paste scene	シーンをペースト
+Patch	パッチ
+Personal	パーソナル
+Perspective or orthographic (5)	透視投影または平行投影（5）
+Physically modelled grand, Rhodes and Wurlitzer: hammers on stretched strings and a soundboard, or on a tine or reed read by its pickup through an amp; hardness, tone, decay and stiffness shape it.	物理モデリングのグランド、Rhodes、Wurlitzer：張られた弦と響板を叩くハンマー、またはアンプを通したピックアップで拾うタインやリードを叩くハンマー。hardness、tone、decay、stiffness で音を作ります。
+Physically modelled piano. model picks a grand, a Rhodes or a Wurlitzer. On the electrics the hammer hits a steel tine or reed and the pickup makes the sound: play harder and it barks, pickup moves the bar closer, fork mistunes the tone bar (beating for sustain), bell is the short metallic overtones of the attack, speaker blends from the direct out into the amp, and tremolo is the Wurlitzer's vibrato or a Suitcase's stereo pan. On the grand, every note is a felt hammer striking one to three unison strings that stretch their upper partials sharp, as a real piano's do, on a soundboard. The harder you play the shorter the hammer touches the string and the brighter it gets. hardness is the felt (soft and round to hard and bright), tone how fast the upper partials die against the fundamental, decay how long a held note sings, detune how far apart the unison strings are (the slow beating and the two-stage decay of a real piano), stiffness how far the partials stretch (0 is perfectly harmonic), body blends from the bare strings into the soundboard, and release is how fast the dampers stop a note after note-off; the top octave and a half has no dampers and rings on. 16 voices, note-driven.	物理モデリングピアノ。model でグランド、Rhodes、Wurlitzer を選びます。エレクトリックではハンマーが鋼のタインやリードを叩き、ピックアップが音を作ります：強く弾くと唸り、pickup はピックアップを近づけ、fork はトーンバーをデチューンし（サステインにうなりを加える）、bell はアタックの短い金属的な倍音、speaker はダイレクト出力からアンプへブレンドし、tremolo は Wurlitzer のビブラートや Suitcase のステレオパンです。グランドでは、各ノートはフェルトのハンマーが 1〜3 本のユニゾン弦を叩く音で、弦の高次部分音は本物のピアノと同じく高めに伸び、響板の上で鳴ります。強く弾くほどハンマーが弦に触れる時間が短くなり、明るくなります。hardness はフェルト（柔らかく丸い音から硬く明るい音まで）、tone は基音に対して高次部分音が減衰する速さ、decay は押さえたノートが鳴り続ける長さ、detune はユニゾン弦のずれ（本物のピアノのゆっくりしたうなりと 2 段階の減衰）、stiffness は部分音の伸び（0 で完全に倍音的）、body は裸の弦から響板へのブレンド、release はノートオフ後にダンパーが音を止める速さです。最上部の 1 オクターブ半にはダンパーがなく鳴り続けます。16 ボイス、ノート駆動。
+Physically modelled string: every note is a waveguide string tuned exactly to its pitch, on a shared wooden body. exciter plucks it, bows it (the bow keeps it sounding while the note is held) or strikes it with a felt hammer that gets brighter the harder you hit. position is where along the string it is excited, measured from the bridge (a quarter of the way in silences every 4th harmonic, as on a real string). tone sets how bright it stays as it rings, decay how long the note rings while held, stiffness stretches the upper partials sharp like a piano or a metal string, body blends from the bare string into the body's resonances (body type picks whose: a small box, or a guitar, harp, violin or cello body measured from recordings), and release is how fast the damper stops it after note-off. hardness is the pick (soft and dull to hard and bright); pressure is how hard the bow presses (light slips and sounds airy, heavy sticks and grits) and noise adds rosin noise to the bow. 8 voices, note-driven.	物理モデリングの弦：各ノートはピッチに正確に調律された導波管の弦で、共通の木製ボディに載っています。exciter は弦をはじく、弓で弾く（ノートを押さえている間は弓が鳴らし続けます）、またはフェルトのハンマーで叩く（強く叩くほど明るくなります）を選びます。position は弦を励振する位置で、ブリッジから測ります（4 分の 1 の位置では、本物の弦と同じく 4 番目ごとの倍音が消えます）。tone は鳴っている間の明るさ、decay は押さえている間ノートが鳴る長さ、stiffness はピアノや金属弦のように高次部分音を高めに伸ばし、body は裸の弦からボディの共鳴へブレンドし（body type でボディを選択：小さな箱、または録音から測定したギター、ハープ、バイオリン、チェロのボディ）、release はノートオフ後にダンパーが止める速さです。hardness はピック（柔らかく鈍い音から硬く明るい音まで）、pressure は弓の圧力（軽いと滑って息っぽく、重いと食いついてざらつく）、noise は弓に松脂のノイズを加えます。8 ボイス、ノート駆動。
+Physically modelled wind instrument: every note is a bore blown by a clarinet reed, a sax reed on a conical bore, a flute's air jet or brass lips. breath is how hard you blow (soft and dark up to loud and bright; blow too softly and a reed will not speak), tone is how bright the bell lets it be, noise is the air in the breath, vibrato a 5.5 Hz swell in the breath, and attack and release how fast the breath comes and goes. 8 voices, note-driven.	物理モデリングの管楽器：各ノートは、クラリネットのリード、円錐管に付けたサックスのリード、フルートのエアジェット、または金管の唇で吹かれる管です。breath は吹く強さ（弱く暗い音から強く明るい音まで。弱すぎるとリードは鳴りません）、tone はベルが通す明るさ、noise は息に混じる空気、vibrato は息の 5.5 Hz の揺れ、attack と release は息の立ち上がりと消える速さです。8 ボイス、ノート駆動。
+Physically modelled wind: clarinet, sax, flute or brass, blown by the note; breath, tone, noise and vibrato shape it.	物理モデリングの管楽器：クラリネット、サックス、フルート、金管をノートで吹きます。breath、tone、noise、vibrato で音を作ります。
+Piano Roll	Piano Roll
+Piano Roll Panel	Piano Roll パネル
+Piano Roll Tools	Piano Roll ツール
+Piano Roll at Bottom	Piano Roll を下に
+Piano Roll at Top	Piano Roll を上に
+Piano Roll node	Piano Roll ノード
+Piano roll - edit and generate notes (Shift+R)	Piano Roll - ノートを編集・生成（Shift+R）
+Picture	画像
+Ping-pong: while looping, play forward then back	ピンポン：ループ中に順方向、次に逆方向で再生
+Pitch	ピッチ
+Pivot	ピボット
+Play slice	スライスを再生
+Play the edit (pauses the canvas audio)	編集結果を再生（キャンバスのオーディオは一時停止）
+Plays the notes of the Piano Roll page linked to it - a MIDI lane in the Timeline, laid out in clips you draw, cut and loop like any other clip. It follows the transport, plays each clip as drawn (loops unrolled, chance rolled fresh on every play), and sends pitch bend, pressure and timbre curves along with the notes. transpose and vel act on everything the page plays; the notes input passes through and merges in (switch thru off to drop it). The Global Scale button snaps every played note to the project key and scale. A copy of the node starts unlinked, so one page never drives two nodes.	リンクされた Piano Roll ページのノートを再生します。ページはタイムライン上の MIDI レーンで、ほかのクリップと同じように描き、カットし、ループできるクリップで構成されます。トランスポートに追従し、各クリップを描いたとおりに再生し（ループは展開され、chance は再生のたびに振り直されます）、ノートと一緒にピッチベンド、プレッシャー、音色のカーブを送ります。transpose と vel はページが再生するすべてに作用し、notes 入力はそのまま通過して合流します（thru をオフにすると破棄）。Global Scale ボタンは再生するすべてのノートをプロジェクトのキーとスケールにスナップします。ノードを複製するとリンクなしで始まるため、1 つのページが 2 つのノードを駆動することはありません。
+Point at 3D Cursor	3D カーソルに向ける
+Pressure	プレッシャー
+Previous / Next Page	前 / 次のページ
+Program still running	プログラムが実行中
+Projection	投影
+Properties (N)	プロパティ（N）
+Put the edit on the canvas: the patch that made it, or a node that plays it	編集結果をキャンバスに配置：それを作ったパッチ、またはそれを再生するノード
+Put this scene on the canvas	このシーンをキャンバスに配置
+Quality	品質
+Quantise	クオンタイズ
+Quantise clip	クリップをクオンタイズ
+Quantise page	ページをクオンタイズ
+Quantise selection	選択範囲をクオンタイズ
+Quantise the selection or clip: pick the grid, bars or a division (Q repeats the last). Right-click or Shift+Q for its settings	選択範囲またはクリップをクオンタイズ：グリッド、小節、または分割を選択（Q で前回を繰り返し）。右クリックまたは Shift+Q で設定
+Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings	選択範囲または編集中のクリップをグリッドにクオンタイズ。Shift+Q で設定の強さ、スイング、ノートの終わりを開きます
+Quit Anyway	それでも終了
+Quitting ends it.	終了すると停止します。
+Radius	半径
+Record MIDI	MIDI を録音
+Record notes from your MIDI controller while the transport plays (R)	トランスポート再生中に MIDI コントローラーからノートを録音（R）
+Record the audio input into a new sample (R)	オーディオ入力を新しいサンプルに録音（R）
+Recorded	録音しました
+Recorded (not saved to disk)	録音しました（ディスクには未保存）
+Recording	録音中
+Recording from the audio input. Press R to stop	オーディオ入力から録音中。R で停止
+Reflections	反射
+Release	リリース
+Remove from scene	シーンから削除
+Rename the page	ページの名前を変更
+Render Animation	アニメーションをレンダリング
+Render Image	画像をレンダリング
+Render through this camera	このカメラでレンダリング
+Rendered: your lights, world and render settings (Z cycles)	レンダー：ライト、ワールド、レンダー設定を反映（Z で切り替え）
+Replace	置き換え
+Replace the slices?	スライスを置き換えますか？
+Resolution %	解像度 %
+Resolution X	解像度 X
+Rev	逆再生
+Reveal File	ファイルを表示
+Reverse Slice	スライスを反転
+Reverse: play the whole edit backwards	反転：編集結果全体を逆再生
+Ride	ライド
+Right Orthographic	右・平行投影
+Right-click any 3D node and choose Add to 3D View.	任意の 3D ノードを右クリックして「3D View に追加」を選んでください。
+Rim	リム
+Role	役割
+Roll	ロール
+Rotate	回転
+Rotate tool (Shift+Space, R). R rotates at once	回転ツール（Shift+Space、R）。R ですぐに回転
+Rotation	回転
+Ruler	ルーラー
+Safe Areas	セーフエリア
+Sample	サンプル
+Sample Audio: you hear the Studio's edit; the canvas, Session and Timeline stay silent	サンプルオーディオ：Studio の編集結果が聴こえます。キャンバス、セッション、タイムラインは無音になります
+Sample Studio	Sample Studio
+Sample Studio Record	Sample Studio 録音
+Sample Studio at Bottom	Sample Studio を下に
+Sample Studio at Top	Sample Studio を上に
+Sample and slice settings	サンプルとスライスの設定
+Sample studio - generate and shape a loop (Shift+W)	Sample Studio - ループを生成・加工（Shift+W）
+Samples per frame when rendering out.	書き出し時の 1 フレームあたりのサンプル数。
+Sampling	サンプリング
+Saving image...	画像を保存中...
+Scale	スケール
+Scale snap	スケールスナップ
+Scale tool (Shift+Space, S). S scales at once	スケールツール（Shift+Space、S）。S ですぐに拡大縮小
+Scanned plugins	スキャン済みプラグイン
+Scene	シーン
+Search	検索
+Seconds	秒
+Seed	シード
+Select (Shift+Space, W)	選択（Shift+Space、W）
+Select All Notes	すべてのノートを選択
+Select a camera or a light.	カメラまたはライトを選択してください。
+Select every note of the clips being edited	編集中のクリップのノートをすべて選択
+Select one object.	オブジェクトを 1 つ選択してください。
+Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there	選択、描画、消去、カット、ミュート、手のひら（ドラッグでパン）。タイムラインや Sample Studio と同じキーで、ポインターが Piano Roll 上にあるときに使えます（Esc でも選択に戻ります）。ツールのドロップダウンにはズームと一緒にまとめられています。このセクションのキーはすべてポインターがそこにある必要があります
+Selection to Cursor	選択物をカーソルへ
+Sensor	センサー
+Set the gain so the edit peaks at -0.3 dB	編集結果のピークが -0.3 dB になるようにゲインを設定
+Settings for the page, clip or note	ページ、クリップ、ノートの設定
+Shadows	影
+Shape	シェイプ
+Shift X	シフト X
+Shift Y	シフト Y
+Shift+A adds a camera, a light or a node from the canvas	Shift+A でカメラ、ライト、キャンバスのノードを追加
+Show (Alt+H shows everything)	表示（Alt+H ですべて表示）
+Show 3D View	3D View を表示
+Show Piano Roll	Piano Roll を表示
+Show Sample Studio	Sample Studio を表示
+Show Terminal	ターミナルを表示
+Show in renders	レンダーに表示
+Show or hide the docked Piano Roll	ドッキングした Piano Roll の表示・非表示を切り替え
+Slice	スライス
+Slice colour	スライスの色
+Slices you placed by hand will be replaced.	手動で配置したスライスは置き換えられます。
+Snap	スナップ
+Snap (Shift+Tab, hold Ctrl to flip)	スナップ（Shift+Tab、Ctrl を押している間は反転）
+Snap drawn and moved notes to the scale	描画・移動したノートをスケールにスナップ
+Snap markers to 16ths	マーカーを 16 分にスナップ
+Snap the next Generate to the project's key and scale	次の生成をプロジェクトのキーとスケールにスナップ
+Snap to the grid	グリッドにスナップ
+Snare	スネア
+Softness	柔らかさ
+Solid: a neutral light, to see the shapes	ソリッド：形を見るためのニュートラルなライト
+Split / Join Notes	ノートを分割 / 結合
+Split here	ここで分割
+Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)	トランスポート再生中に MIDI コントローラーからのノート録音を開始・停止（MIDI デバイス接続時のみ）
+Stop recording (R)	録音を停止（R）
+Stop recording first	先に録音を停止してください
+Strength	強さ
+Stretch	ストレッチ
+Strum	ストラム
+Studio	Studio
+Surface	サーフェス
+Swing	スイング
+Switch to the neighbouring page	隣のページに切り替え
+Target X	ターゲット X
+Target Y	ターゲット Y
+Target Z	ターゲット Z
+Terminal	ターミナル
+Terminal - a real shell, for you and your coding agents (Ctrl+`)	ターミナル - あなたとコーディングエージェントのための本物のシェル（Ctrl+`）
+Terminal at Bottom	ターミナルを下に
+Terminal at Left	ターミナルを左に
+Terminal at Right	ターミナルを右に
+Terminal at Top	ターミナルを上に
+That MIDI file has no notes	その MIDI ファイルにはノートがありません
+The Sample studio's take is driving audio. Click to hand it back to the canvas.	Sample Studio のテイクがオーディオを鳴らしています。クリックでキャンバスに戻します。
+The Sample studio's take will drive audio once the engine is started.	エンジンが起動すると、Sample Studio のテイクがオーディオを鳴らします。
+The graph that made the take, as a group on the canvas	テイクを作ったグラフを、キャンバス上のグループとして
+The next Generate snaps to the project's key and scale	次の生成はプロジェクトのキーとスケールにスナップします
+The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop	タイムラインと Piano Roll でも同じで、Sample Studio ではクリックまたはドラッグ：離したときにクリックまたはドラッグした位置へ再生ヘッドを置きます。Shift+ドラッグでループを作成、ループの端をドラッグで移動、右クリックでループを解除
+The slice keeps its span: Length plays it slower (cut at the slice's end) or faster (then silence, or Fill). Off: no stretch; repitch: moves the pitch too; beats and tonal: same pitch. Shift+Left/Right on the wave moulds the selected slices	スライスは長さを保ちます：長さを変えると遅く（スライスの終わりでカット）または速く（その後は無音、またはフィル）再生します。Off：ストレッチなし、repitch：ピッチも変わる、beats と tonal：ピッチはそのまま。波形上で Shift+左/右 を押すと選択したスライスを整形します
+The terminal font is missing from this install.	このインストールにはターミナル用フォントがありません。
+Then click a Piano Roll node on the canvas: this page plays through it	次にキャンバス上の Piano Roll ノードをクリック：このページがそのノードで再生されます
+Thirds	三分割
+This page is full	このページはいっぱいです
+Threshold	しきい値
+Timbre	音色
+Time	時間
+Time spread	タイミングのばらつき
+Title	タイトル
+Tom	タム
+Tool: Cut (B) - click to choose a tool	ツール：カット（B） - クリックでツールを選択
+Tool: Draw (P) - click to choose a tool	ツール：描画（P） - クリックでツールを選択
+Tool: Erase (E) - click to choose a tool	ツール：消去（E） - クリックでツールを選択
+Tool: Hand (H) - click to choose a tool	ツール：手のひら（H） - クリックでツールを選択
+Tool: Mute (0) - click to choose a tool	ツール：ミュート（0） - クリックでツールを選択
+Tool: Select (A) - click to choose a tool	ツール：選択（A） - クリックでツールを選択
+Tool: Select (A), Cut (B), Hand (H) - click to choose a tool. Double-click above the wave cuts with any tool	ツール：選択（A）、カット（B）、手のひら（H） - クリックでツールを選択。波形の上をダブルクリックするとどのツールでもカットできます
+Top Orthographic	上・平行投影
+Transform	トランスフォーム
+Transient	トランジェント
+Transparent	透明
+Transpose	トランスポーズ
+Transpose Notes	ノートをトランスポーズ
+Triplet	3 連符
+Unlink	リンク解除
+User Orthographic	ユーザー・平行投影
+User Perspective	ユーザー・透視投影
+Vel spread	ベロシティのばらつき
+Velocity	ベロシティ
+Velocity Ramp	ベロシティランプ
+View	ビュー
+View 	ビュー 
+Viewport	ビューポート
+Visibility	可視性
+WAV, 16-bit	WAV、16 ビット
+WAV, 24-bit	WAV、24 ビット
+WAV, choose where...	WAV、保存先を選択...
+Waiting for the audio input (allow the microphone if macOS asks)	オーディオ入力を待っています（macOS に尋ねられたらマイクを許可してください）
+What Generate writes	生成で書き込む内容
+Which MIDI controller Record listens to	録音が受け付ける MIDI コントローラー
+Whole sample	サンプル全体
+Wireframe (Shift+Z)	ワイヤーフレーム（Shift+Z）
+World	ワールド
+Y	Y
+Zoom In	ズームイン
+Zoom Out	ズームアウト
+Zoom Piano Roll	Piano Roll をズーム
+Zoom Sample Studio	Sample Studio をズーム
+Zoom in, zoom out, fit the page, zoom to the selection	ズームイン、ズームアウト、ページに合わせる、選択範囲にズーム
+Zoom in, zoom out, fit the sample, zoom to the selection	ズームイン、ズームアウト、サンプルに合わせる、選択範囲にズーム
+Zoom out	ズームアウト
+Zoom to mouse	マウス位置にズーム
+Zoom to selection	選択範囲にズーム
+Zoom: drag	ズーム：ドラッグ
+mixed	混在
+slices	スライス
+source missing	ソースがありません
+style	スタイル
+A 2D fluid simulation that carries the input picture along as dye, so it smears, swirls and folds. Patch a motion image (Optical Flow) into force to push it, and a picture into obstacles: bright areas are solid. The stirrer (Orbit, Pulse, Spin) moves it with nothing patched. Resolution divides the simulation size; Reset clears it.	入力画像を染料として運ぶ 2D 流体シミュレーションで、画像がにじみ、渦巻き、折り重なります。動きの画像（Optical Flow）を force につなぐと押し流し、画像を obstacles につなぐと明るい部分が固体になります。何もつながっていなくても、攪拌器（Orbit、Pulse、Spin）が動かします。Resolution はシミュレーションサイズを分割し、Reset でクリアします。
+A brickwall limiter: nothing passes above threshold. In gain drives the signal into it, release sets how fast it lets go, out gain sets the final level, and the meter shows the gain reduction. Always fully wet.	ブリックウォールリミッター：threshold を超える信号は通しません。In gain で信号を押し込み、release で解放の速さを、out gain で最終レベルを設定し、メーターにゲインリダクションが表示されます。常にフルウェットです。
+A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus.	Infinite の中にある本物のシェルで、あなたとコーディングエージェントのためのものです。右レールの >_ タイルか Ctrl+` で開きます。Ctrl+` はフォーカスも移し、すでにフォーカスがあれば閉じます。
+AI skills	AI スキル
+Add a node, a camera, a light, an HDRI or a new scene	ノード、カメラ、ライト、HDRI、新しいシーンを追加
+Add to the View	ビューに追加
+Audition Slice	スライスを試聴
+Axis Views	軸ビュー
+Camera View	カメラビュー
+Clear Transform	トランスフォームをクリア
+Clear the screen	画面をクリア
+Copy / Cut / Paste Controls	コントロールのコピー / カット / ペースト
+Copy / Cut / Paste Slices	スライスのコピー / カット / ペースト
+Copy / Paste	コピー / ペースト
+Copy / Paste / Duplicate Scene	シーンのコピー / ペースト / 複製
+Copy or cut the selected slices, or paste them	選択したスライスをコピーまたはカット、またはペースト
+Copy the selected text, or paste into the shell	選択したテキストをコピー、またはシェルにペースト
+Copy the whole scene, paste it as a new scene, or duplicate it	シーン全体をコピー、新しいシーンとしてペースト、または複製
+Cut a slice at the pointer (on the grid); join the selected slices	ポインター位置でスライスを分割（グリッド上）。選択したスライスを結合
+Cycle the shading; Shift+Z switches wireframe	シェーディングを切り替え。Shift+Z でワイヤーフレームに切り替え
+Delete Controls	コントロールを削除
+Delete Slices	スライスを削除
+Delete the selected controls; Esc clears the selection	選択したコントロールを削除。Esc で選択を解除
+Delete the selected slices	選択したスライスを削除
+Deletes the faces marked by an upstream Select op, or all faces with selection-only off. With 'keep selected instead' it keeps the selection and deletes the rest. After an Instance on Points it drops whole instances instead of faces.	上流の Select 操作でマークされた面を削除します。selection-only がオフならすべての面を削除します。'keep selected instead' がオンなら選択を残して残りを削除します。Instance on Points の後では面ではなくインスタンスごと削除します。
+Duplicate Controls	コントロールを複製
+Duplicate the selected controls	選択したコントロールを複製
+Duplicate the selected items	選択した項目を複製
+F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan	F（またはテンキーの .）で選択範囲をフレーム表示、何も選択していなければすべて。Home ですべてをフレーム表示、またはカメラビューのズームとパンをリセット
+Find in Terminal	ターミナル内を検索
+Fly	フライ
+Fog, smoke or a cloud drawn over a picture, from drifting noise that the wind moves. Fed by a Render 3D node it sits in that scene: it uses the render's camera and solid objects hide the haze behind them. Steps sets quality while you work; render steps is used when rendering offline.	風で流れるノイズから作る、画像に重ねて描く霧、煙、雲。Render 3D ノードから入力するとそのシーンの中に置かれ、レンダーのカメラを使い、固体オブジェクトが背後のもやを隠します。Steps は作業中の品質を、render steps はオフラインレンダリング時の品質を決めます。
+Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps	前、右、上。{mod} を押すと後、左、下。5 で平行投影を切り替え、9 で反対側に回し、2 / 4 / 6 / 8 で段階的にオービット
+Group / Ungroup	グループ化 / グループ解除
+Group the selected items, or dissolve the group	選択した項目をグループ化、またはグループを解除
+Headless engine	ヘッドレスエンジン
+Hide / Show	隠す / 表示
+Hide the selection, hide everything else, show everything	選択物を隠す、それ以外を隠す、すべて表示
+Hold the right button to look around and walk; Shift goes faster	右ボタンを押したまま見回して歩きます。Shift で速く
+In edit mode, with the panel clicked: copy or cut the selected controls, or paste them	編集モードでパネルをクリックした状態：選択したコントロールをコピーまたはカット、またはペースト
+In the Terminal, infinite guide and infinite code docs <language> print the same references.	ターミナルでは、infinite guide と infinite code docs <language> で同じリファレンスを表示できます。
+Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless.	ターミナルパネル内では infinite が PATH に入っていて、このアプリと通信します。パネル外では、アプリの実行ファイルを --cli 付きで実行してください。実行中のアプリの代わりに .inf ファイルを使えば、同じコマンドがヘッドレスで動きます。
+Install All AI Skills	すべての AI スキルをインストール
+Invert Selection	選択を反転
+It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top.	開いているパッチのフォルダーで起動します。フォーカスがあると、すべてのキーがシェルに送られます。ノード、ファイル、サンプルをドラッグすると、その ID やパスが入力されます。パネルを右クリックすると、下、右、左、上にドッキングできます。
+Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide.	Linux には仮想ディスプレイが必要です：xvfb-run -a Infinite ...  詳しいガイドは Headless User Guide として同梱されています。
+Local View	ローカルビュー
+Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view	シーンカメラから見ます。{mod}+0 で選択したカメラをシーンカメラに、{mod}+Alt+0 でカメラを現在のビューに移動
+Move / Rotate / Scale	移動 / 回転 / スケール
+Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels	選択物をすぐに移動、回転、拡大縮小します。X / Y / Z で軸を固定（Shift で平面）、数字で量を入力。クリックか Enter で確定、Esc か右クリックでキャンセル
+Mute / Solo Slice	スライスをミュート / ソロ
+Mute or solo the selected slices	選択したスライスをミュートまたはソロ
+New / Close Tab	新規タブ / タブを閉じる
+Open Terminal	ターミナルを開く
+Open a new terminal tab, or close this one	新しいターミナルタブを開く、またはこのタブを閉じる
+Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system	右レールでターミナルを開く、キーボード入力を移す、または閉じる。どのシステムでも物理的な Ctrl キー
+Open the pivot point or the transform orientation menu	ピボットポイントまたはトランスフォーム座標系のメニューを開く
+Overlays	オーバーレイ
+Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights. Right-click a 3D node and choose Add to 3D View to arrange it in the 3D View.	3D ジオメトリ/レンダーパイプラインの一部です。ジオメトリやポイントクラウドのノードは、カメラとライトを経由して Render 3D に入力されます。3D ノードを右クリックして「3D View に追加」を選ぶと、3D View で配置できます。
+Patch authoring: write, check and render .inf patches.	パッチ作成：.inf パッチの作成、チェック、レンダリング。
+Pivot / Orientation	ピボット / 座標系
+Play the selected slice, or the one under the pointer	選択したスライス、またはポインターの下のスライスを再生
+Preview Views	プレビュービュー
+Previous / Next Slice	前 / 次のスライス
+Put the 3D cursor back at the centre and frame everything	3D カーソルを中央に戻してすべてをフレーム表示
+Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version.	どの AI アシスタントでも読めるリファレンスファイルで、推測ではなく正しいパッチ、Field カーネル、'=' 式を書けるようにします。フォルダーを選んでください：Claude Code なら ~/.claude/skills/（またはプロジェクトの .claude/skills/）、ほかのアシスタントならファイルをプロジェクトかチャットに追加します。Infinite を更新したら、ファイルがこのバージョンと一致するよう再インストールしてください。
+Rename Item	項目の名前を変更
+Rename the selected item	選択した項目の名前を変更
+Render a still from the scene camera, or render the camera for its set duration	シーンカメラから静止画をレンダリング、またはカメラを設定した長さでレンダリング
+Reset 3D Cursor	3D カーソルをリセット
+Reset the position, rotation or scale of the selection	選択物の位置、回転、スケールをリセット
+Reverse the selected slices	選択したスライスを反転
+Scroll Back	スクロールバック
+Scroll the terminal's history a page at a time	ターミナルの履歴を 1 ページずつスクロール
+Search the terminal's text	ターミナルのテキストを検索
+Select All / None	すべて選択 / 選択解除
+Select All Clips	すべてのクリップを選択
+Select All Controls	すべてのコントロールを選択
+Select All Slices	すべてのスライスを選択
+Select every clip on the timeline	タイムライン上のすべてのクリップを選択
+Select every control on the page	ページ上のすべてのコントロールを選択
+Select every shown item that is not selected	表示中で未選択の項目をすべて選択
+Select every shown item, or nothing	表示中の項目をすべて選択、または選択解除
+Select every slice	すべてのスライスを選択
+Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices	隣のスライスを選択。Shift を押すと選択したスライスを伸ばす（右）または縮める（左）
+Select, Blade and Hand (drag to pan); Esc also returns to Select	選択、ブレード、手のひら（ドラッグでパン）。Esc でも選択に戻ります
+Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select	選択、鉛筆、トリム、範囲、ズーム、手のひら。ツールのキーをもう一度押すか Esc で選択に戻ります
+Shading	シェーディング
+Show only the selection (Keypad / too); press again to show everything	選択物だけを表示（テンキーの / でも可）。もう一度押すとすべて表示
+Show or hide the 3D View. Every other key in this section needs the pointer over the view	3D View の表示・非表示を切り替え。このセクションのほかのキーはすべてポインターがビュー上にある必要があります
+Show or hide the overlays (over the 3D View this key does not open the Terminal)	オーバーレイの表示・非表示を切り替え（3D View 上ではこのキーでターミナルは開きません）
+Show or hide the side panel	サイドパネルの表示・非表示を切り替え
+Sidebar	サイドバー
+Split / Join Slices	スライスを分割 / 結合
+Start or stop recording the chosen audio input into a new sample	選んだオーディオ入力の新しいサンプルへの録音を開始・停止
+Studio Tools	Studio ツール
+Take the selected items out of the view; the nodes stay on the canvas	選択した項目をビューから外します。ノードはキャンバスに残ります
+Terminal panel	ターミナルパネル
+The Field Language and Expression Globals pages each have an Install AI Skill button for their own file.	Field 言語と式のグローバルのページには、それぞれのファイル用の「AIスキルをインストール」ボタンがあります。
+The final stage of a 3D patch. Right-click any 3D node and choose Add to 3D View to bring its output in, then arrange it in the 3D View panel (Shift+3): G move, R rotate, S scale, X Y Z to lock an axis, hold {mod} to snap. Arranging never changes the node, and whatever the node animates keeps playing through the placement: build and change things on the canvas, compose them here. Transparent until you set a world in its World tab. Keys are Blender's, including the 3D cursor (Shift+right-click), pivot (period), orientation (comma), local view (/) and keyframes (I). F12 renders a picture and {mod}+F12 the animation, through an Output node.	3D パッチの最終段です。任意の 3D ノードを右クリックして「3D View に追加」を選ぶと出力が取り込まれ、3D View パネル（Shift+3）で配置できます：G で移動、R で回転、S で拡大縮小、X Y Z で軸を固定、{mod} を押したままでスナップ。配置してもノード自体は変わらず、ノードのアニメーションは配置を通してそのまま再生されます：キャンバスで作って変更し、ここで構図を決めます。ワールドタブでワールドを設定するまでは透明です。キー操作は Blender と同じで、3D カーソル（Shift+右クリック）、ピボット（ピリオド）、座標系（カンマ）、ローカルビュー（/）、キーフレーム（I）も使えます。F12 で画像を、{mod}+F12 でアニメーションを Output ノード経由でレンダリングします。
+The infinite command	infinite コマンド
+The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors).	同じ実行ファイルで、ウィンドウなしに .inf パッチから画像、動画、音声をレンダリングできます。出力は決定的で、同じパッチからは同じフレームとサンプルが得られます。最後に表示される行は 1 つの JSON オブジェクト（ok、files、warnings、errors）です。
+Then W, G, R or S picks the Select, Move, Rotate or Scale tool	続けて W、G、R、S で選択、移動、回転、スケールのツールを選びます
+Timeline Tools	タイムラインツール
+Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform	ドッキングした Sample Studio を切り替え。このセクションのほかのキーはすべてポインターが波形上にある必要があります
+Tools	ツール
+Turn snapping on or off; hold {mod} while moving to flip it	スナップのオン・オフを切り替え。移動中に {mod} を押すと反転
+Undo / Redo Studio Edit	Studio の編集を元に戻す / やり直し
+Undo or redo the Studio's own edits; the patch's undo is not touched	Studio 自身の編集を元に戻す・やり直します。パッチの取り消し履歴には影響しません
+With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom	ポインターが 3D プレビュー（ノード、ビューポートカード、Render 3D）上にあるとき：前、右、上、またはデフォルトビュー。{mod} を押すと後、左、下
+Zoom 3D View	3D View をズーム
+Zoom in or out; Shift+B drags a box to zoom into	ズームイン・アウト。Shift+B でドラッグした範囲にズーム
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite だけを実行するとすべてのコマンドを一覧表示します。infinite context は開いているパッチ、選択、コードエラーを 1 回でまとめて表示します。
