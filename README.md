@@ -362,7 +362,7 @@ Contributions, bug reports and node ideas are welcome.
 
 ## Prior art and acknowledgements
 
-The tools and papers Infinite builds on are named in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and the people who contributed are credited in [CONTRIBUTING.md](CONTRIBUTING.md#community-and-contributors).
+The tools and papers Infinite builds on are named in [ACKNOWLEDGEMENTS.md](docs/ACKNOWLEDGEMENTS.md), and the people who contributed are credited in [CONTRIBUTING.md](CONTRIBUTING.md#community-and-contributors).
 
 ---
 

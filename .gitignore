@@ -48,3 +48,9 @@ node_modules/
 # API credentials
 tools/spread/*_config.json
 tools/spread/*client_secrets.json
+
+# Tool outputs that land in the repo root
+test-output/
+collect_check.md
+glyph-sheet.png
+.media_scratch_*

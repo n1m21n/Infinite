@@ -16,6 +16,6 @@ What Field adds is putting these together: **one kernel syntax whose domain (gra
 
 **How it is built.** Infinite is developed by n1m21n with extensive AI coding assistance from Anthropic's Claude. AI-assisted commits carry a `Co-Authored-By` trailer in the git history.
 
-**Third-party libraries** are vendored under `external/` and `third_party/`, each with its own licence (Dear ImGui, imgui-node-editor, miniaudio, dr_libs, stb, nlohmann/json, tinyfiledialogs and others). The Steinberg VST3 SDK is covered under [License](#license) below, and libraries that carry extra distribution obligations (FFmpeg, x264, Signalsmith Stretch) are documented in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+**Third-party libraries** are vendored under `external/` and `third_party/`, each with its own licence (Dear ImGui, imgui-node-editor, miniaudio, dr_libs, stb, nlohmann/json, tinyfiledialogs and others). The Steinberg VST3 SDK is covered under [License](#license) below, and libraries that carry extra distribution obligations (FFmpeg, x264, Signalsmith Stretch) are documented in [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES).
 
-People whose work or ideas shaped Infinite are credited in [CONTRIBUTING.md](CONTRIBUTING.md#community-and-contributors).
+People whose work or ideas shaped Infinite are credited in [CONTRIBUTING.md](../CONTRIBUTING.md#community-and-contributors).
