@@ -2229,12 +2229,15 @@ namespace
       const double fpp = s.viewLen / w;
       const ImU32 waveCol = ImGui::GetColorU32(ImGuiCol_Text, 0.78f), mutedCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.35f);
       const bool anySolo = s.doc.AnySolo();
-      // The source frame drawn at `f`: a reversed slice shows back to front.
+      // The source frame drawn at `f`: a reversed slice shows back to front. Outside the slices (before the start
+      // marker, past the end one) the source shows as it is.
       const auto Mirror = [&](int64_t f)
       {
          const int i = s.doc.IndexAt(f);
          const Slice& sl = s.doc.slices[(size_t)i];
-         return sl.p.reverse ? std::clamp<int64_t>(sl.start + s.doc.EndOf(i) - 1 - f, sl.start, s.doc.EndOf(i) - 1) : f;
+         if (!sl.p.reverse || f < sl.start || f >= s.doc.EndOf(i))
+            return f;
+         return std::clamp<int64_t>(sl.start + s.doc.EndOf(i) - 1 - f, sl.start, s.doc.EndOf(i) - 1);
       };
       const auto audible = [&](int64_t f)
       {
@@ -2278,7 +2281,12 @@ namespace
             }
             else
             {
-               const int64_t ma = Mirror(a), mb = Mirror(std::min(std::max(a + 1, b), s.doc.EndOf(s.doc.IndexAt(a))) - 1);
+               // A column stops at its slice's end so a reversed slice does not mirror its neighbour. Past the end
+               // marker there is no slice to stop at: clamping there made every column span back to the marker,
+               // and the wave turned into a solid block.
+               const int ia = s.doc.IndexAt(a);
+               const int64_t stop = a < s.doc.EndOf(ia) ? s.doc.EndOf(ia) : n;
+               const int64_t ma = Mirror(a), mb = Mirror(std::min(std::max(a + 1, b), stop) - 1);
                RangeMinMax(std::min(ma, mb), std::max(ma, mb) + 1, lo, hi);
                // The slice's gain and fades show at once, before the render lands.
                lo *= k;
