@@ -59,6 +59,9 @@ namespace app
             sTab = 5;
          if (o && strstr(o, "settingsterminal"))
             sTab = 8;
+         // "settingstab=N": any tab by index, so the manuals can shoot every page.
+         if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
+            sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
       }
       const float navW = 200.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
