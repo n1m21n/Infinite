@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <functional>
 #include "app/AppShared.h"
+#include "imgui.h"
 #include "app/graph/LearningLog.h"
 
 namespace app
@@ -300,6 +301,65 @@ namespace app
 
    bool HandleAppRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError)
    {
+      // "ui": synthetic ImGui input for scripted documentation shots (tools/manual/ui_shots_offscreen.py), so menus,
+      // right-click menus and dropdowns can be opened in an off-screen run. x, y are window points.
+      // actions: move {x,y}; click {x,y,button 0|1|2, double}; key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
+      // shift, ctrl, alt, super}. ImGui trickles the queued events, so a down and up land on separate frames.
+      if (method == "ui")
+      {
+         ImGuiIO& io = ImGui::GetIO();
+         const std::string action = params.value("action", std::string());
+         if (action == "move" || action == "click")
+            io.AddMousePosEvent(params.value("x", 0.0f), params.value("y", 0.0f));
+         if (action == "click")
+         {
+            const int button = std::clamp(params.value("button", 0), 0, 2);
+            for (int n = params.value("double", false) ? 2 : 1; n > 0; --n)
+            {
+               io.AddMouseButtonEvent(button, true);
+               io.AddMouseButtonEvent(button, false);
+            }
+         }
+         else if (action == "key")
+         {
+            const std::string k = params.value("key", std::string());
+            ImGuiKey key = ImGuiKey_None;
+            static const std::pair<const char*, ImGuiKey> kNamed[] = {
+               { "escape", ImGuiKey_Escape }, { "enter", ImGuiKey_Enter }, { "tab", ImGuiKey_Tab },
+               { "up", ImGuiKey_UpArrow },     { "down", ImGuiKey_DownArrow }, { "left", ImGuiKey_LeftArrow },
+               { "right", ImGuiKey_RightArrow }, { "space", ImGuiKey_Space }, { "slash", ImGuiKey_Slash },
+            };
+            for (const auto& [name, v] : kNamed)
+               if (k == name)
+                  key = v;
+            if (k.size() == 1 && k[0] >= 'a' && k[0] <= 'z')
+               key = (ImGuiKey)(ImGuiKey_A + (k[0] - 'a'));
+            if (k.size() == 1 && k[0] >= '0' && k[0] <= '9')
+               key = (ImGuiKey)(ImGuiKey_0 + (k[0] - '0'));
+            if (key == ImGuiKey_None)
+            {
+               outError = "unknown key '" + k + "'";
+               return true;
+            }
+            const std::pair<const char*, ImGuiKey> mods[] = {
+               { "shift", ImGuiMod_Shift }, { "ctrl", ImGuiMod_Ctrl }, { "alt", ImGuiMod_Alt }, { "super", ImGuiMod_Super } };
+            for (const auto& [name, m] : mods)
+               if (params.value(name, false))
+                  io.AddKeyEvent(m, true);
+            io.AddKeyEvent(key, true);
+            io.AddKeyEvent(key, false);
+            for (const auto& [name, m] : mods)
+               if (params.value(name, false))
+                  io.AddKeyEvent(m, false);
+         }
+         else if (action != "move")
+         {
+            outError = "unknown ui action '" + action + "'";
+            return true;
+         }
+         outResult = json::object();
+         return true;
+      }
       if (method == "panel")
       {
          const std::string name = params.value("name", std::string());
