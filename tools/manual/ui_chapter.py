@@ -142,13 +142,13 @@ def html_chapter(P):
                   "<p>Build your own control surface from knobs, faders, pads and switches, then play it live. It opens in <b>Edit Mode</b>; "
                   "switch off Edit Mode (the button then reads <b>Perform</b>) to lock the layout and play it. Drag the splitter up for more room.</p>",
                   row((fig("panel_perf", "The Performance panel docked at the right, in Edit Mode, with the showcase page.", box=(1180, 40, 1600, 1000)), 1),
-                      (fig("perf_controls_edit", "Edit Mode with all ten control types placed on Page 1.", box=(10, 335, 440, 705)), 2)),
+                      (fig("perf_edit", "Edit Mode: knobs, faders, number boxes and a slider on the Showcase page.", box=(1190, 60, 1555, 440)), 2)),
                   table(["Toolbar", "What it does"], [
                       ("Edit Mode / Perform", "Edit Mode lets you add, move, resize and rename controls. Perform locks the layout so a stray drag cannot move anything."),
                       ("+ Add Control", "Opens the control list below and places the chosen control on the next free cell."),
-                      ("Page 1, +", "Pages group controls into screens. The + button adds a page."),
+                      ("Page tabs, +", "Pages group controls into screens (here one page, Showcase). The + button adds a page."),
                   ]),
-                  row((fig("perf_add_control_menu", "+ Add Control menu: ten control types, with their grid size in brackets.", box=(10, 335, 440, 610)), 1),
+                  row((fig("perf_add_control", "+ Add Control menu: ten control types, with their grid size in brackets.", box=(1190, 60, 1580, 440)), 1),
                       (table(["Control", "Use it for"], [
                           ("Knob (1x1)", "Any single parameter."),
                           ("Vertical Fader (1x2)", "Levels and mixes."),
@@ -161,58 +161,58 @@ def html_chapter(P):
                           ("Bipolar Pan Knob (1x1)", "Centre-detent knob for pan or detune."),
                           ("Step Gate Ribbon (3x1)", "Eight on/off steps for a gate pattern."),
                       ]), 1)),
-                  row((fig("perf_control_menu", "Right-click a control: Rename, Type, Assign Parameter, MIDI CC Learn, Color Tint.", box=(10, 335, 440, 610)), 1),
-                      (fig("perf_performance_mode", "The same page in Perform mode: the toolbar collapses to a Perform tab.", box=(10, 335, 440, 705)), 1)),
-                  table(["Right-click item", "What it does"], [
+                  row((fig("perf_control_menu2", "Right-click a control: Rename, Type, Assign Parameter, Clear Destination, MIDI CC Learn, Color Tint.", box=(1190, 60, 1555, 440)), 1),
+                      (fig("perf_perform", "The same page in Perform mode: the toolbar shrinks to Perform and the page tabs.", box=(1190, 60, 1555, 440)), 1),
+                      (table(["Right-click item", "What it does"], [
                       ("Rename", "Change the label shown on the control."),
                       ("Type", "Swap the control for another type without losing its assignment."),
-                      ("Assign Parameter...", "Bind the control to a node parameter, then move the control to move the parameter."),
+                      ("Assign Parameter...", "Bind the control to a node parameter, then move the control to move the parameter. The current target is shown greyed below it."),
+                      ("Clear Destination", "Unbinds the control."),
                       ("MIDI CC Learn", "Move a knob on your MIDI controller to bind it to this control."),
                       ("Color Tint", "Colour-code the control so groups are easy to find on stage."),
-                  ])))
+                  ]), 2))))
 
     b.append(page("<h2>Arrangement panel</h2>",
                   "<p>The timeline. It sequences clips of nodes over time so a patch becomes a piece with a start and an end. "
                   "Each icon in the toolbar is explained below; hover any of them in the app for its tooltip.</p>",
                   fig("panel_timeline", "The Timeline docked at the bottom: monitor, tracks, clips and markers.", box=(0, 760, 1600, 1000)),
-                  fig("arr_empty", "Toolbar, track list and ruler of an empty arrangement.", box=(10, 300, 700, 745)),
-                  fig("arr_empty", "Right end of the toolbar: Render and Enable Timeline Audio.", box=(1000, 305, 1350, 345), width="60%"),
+                  fig("tl_overview", "The Timeline made tall: toolbar, monitor, track list, markers (Intro, Groove), ruler, clips and the Inspector.", box=(0, 60, 1550, 270)),
+                  fig("tl_overview", "Right end of the toolbar: Render, Audio and the Inspector pencil.", box=(1380, 62, 1548, 96), width="28%"),
                   table(["Toolbar item", "What it does"], [
                       ("Viewport monitor", "Shows or hides the preview of the timeline output at the left of the panel. Right-click for its dock position."),
                       ("Play / Pause (Space)", "Plays the timeline from the playhead."),
                       ("Return to Start (Enter)", "Jumps the playhead to the beginning."),
                       ("Bars / Time", "Switches the ruler between bars and beats and minutes and seconds."),
+                      ("Tool (arrow)", "Selects the editing tool. See the dropdown below."),
                       ("Snap (magnet)", "Clip edges snap to the grid when on."),
                       ("1/4 (grid division)", "How fine the snap grid is. See the dropdown below."),
                       ("Loop", "Turns the loop region on or off. Shift-drag on the ruler to set the region."),
-                      ("Tool dropdown", "Selects the editing tool. See below."),
                       ("Flag (M)", "Drops a marker at the playhead."),
                       ("Row height", "Resets any resized tracks back to the default height."),
-                      ("Pencil", "Opens the Clip / Track Inspector."),
-                      ("Render", "Renders the timeline to a video file."),
-                      ("Enable Timeline Audio", "Lets the timeline drive audio as well as picture. It reads Timeline Audio On when active."),
+                      ("Render", "Renders the timeline to a video file (or a WAV when it holds only audio)."),
+                      ("Audio", "Lets the timeline drive audio as well as picture."),
+                      ("Pencil", "Opens or closes the Inspector."),
                   ]),
-                  row((fig("arr_tool_dropdown", "Tool dropdown: Select (A), Trim (T), Range Selection (R), Blade (B), Zoom (Z), Hand (H), Pencil (P).", box=(330, 300, 700, 560)), 1),
-                      (fig("arr_grid_dropdown", "Snap grid dropdown: Off, 1 bar, 1/2, 1/4, 1/8, 1/16 and triplets.", box=(250, 300, 600, 600)), 1))))
+                  row((fig("tl_tool_dropdown", "Tool dropdown: Select (A), Range Selection (R), Trim (T), Pencil / Draw Clip (P), Cut (B), Hand (H), Zoom (Z).", box=(230, 60, 620, 270)), 1),
+                      (fig("tl_grid_dropdown", "Snap grid dropdown: Off, 1 bar, 1/2, 1/4, 1/8, 1/16, each with a triplet (T).", box=(230, 60, 620, 330)), 1))))
 
     b.append(page("<h2>Tracks, clips and the inspector</h2>",
                   "<h3>Adding tracks</h3><p>Click <b>+ Add Track</b> and choose Video Track or Audio Track. Audio tracks also carry <b>S</b> (solo), <b>M</b> (mute), a pan knob and a level knob; "
                   "video tracks carry an opacity slider.</p>",
-                  fig("arr_add_track_menu", "+ Add Track offers Video Track and Audio Track.", box=(330, 350, 900, 520), width="75%"),
-                  "<h3>Adding a clip</h3><p>Right-click an empty spot on a track and choose <b>Add Clip</b>. It appears at that position, snapped to the grid. "
-                  "A clip with no node yet is shown hatched and reads <i>Unassigned</i>.</p>",
-                  fig("arr_tracks_clip_menu", "Right-click a lane: Add Clip at the clicked bar and beat.", box=(330, 350, 900, 520), width="75%"),
+                  fig("tl_add_track_menu", "+ Add Track offers Video Track and Audio Track.", box=(340, 140, 700, 310), width="60%"),
+                  "<h3>Adding a clip</h3><p>Right-click an empty spot on a track and choose <b>Add Clip</b>. The menu shows the bar and beat it will land on, snapped to the grid. "
+                  "A clip with no node yet is shown hatched.</p>",
+                  fig("tl_lane_menu", "Right-click a lane: Add Clip at the clicked bar and beat.", box=(340, 140, 900, 270), width="70%"),
                   "<h3>Assigning a clip to a node</h3><p>Three ways: right-click a node on the canvas and choose <b>Add to Timeline</b> (creates an assigned clip at the playhead), "
                   "choose <b>Assign Node...</b> in the clip's right-click menu, or use <b>Assign Different Node...</b> in the inspector. "
-                  "An assigned clip takes the node's name and colour, and the viewport monitor shows its output as the playhead crosses it.",
-                  fig("arr_clip_assigned", "A clip assigned to render 3d; the viewport monitor on the left shows its live output.", box=(10, 305, 1000, 745))))
+                  "An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.",
+                  fig("tl_clip_selected", "The Stage clip selected (outlined); the monitor on the left shows the timeline output.", box=(0, 60, 1290, 560), width="72%")))
 
     b.append(page("<h3>Right-clicking a clip</h3>",
-                  row((fig("arr_clip_menu_assigned", "An assigned clip.", box=(580, 420, 900, 750)), 1),
-                      (fig("arr_clip_menu_unassigned", "An unassigned clip.", box=(850, 390, 1250, 580)), 1),
+                  row((fig("tl_clip_menu", "The clip menu.", box=(500, 130, 1000, 520)), 1),
                       (table(["Item", "What it does"], [
                           ("Rename (Cmd+R)", "Names the clip."),
-                          ("Active", "Tick to play the clip; untick to mute it without deleting."),
+                          ("Active", "Tick to play the clip; untick to mute it without deleting (it turns hatched)."),
                           ("Fade In / Fade Out", "Fade length in milliseconds."),
                           ("Opacity", "Clip brightness against what is beneath it."),
                           ("Compositing", "Blend mode used to combine this clip with lower tracks."),
@@ -222,30 +222,29 @@ def html_chapter(P):
                           ("Group (Cmd+G) / Ungroup (Cmd+Shift+G)", "Treat several clips as one block you can move together."),
                           ("Delete (Backspace)", "Removes the clip."),
                       ]), 1)),
-                  "<h3>The Clip / Track Inspector</h3><p>The pencil icon opens a side panel for whatever is selected. Select a clip and it shows the clip; select a track and it shows the track.</p>",
-                  row((fig("arr_inspector_clip_1", "Video Clip, top: name, Active, Timing &amp; Position, Compositing.", box=(1100, 345, 1345, 745)), 1),
-                      (fig("arr_inspector_clip_3", "Video Clip, bottom: Speed, Reverse, Color Tint, Source Node, Modulations.", box=(1100, 345, 1345, 745)), 1),
-                      (fig("arr_inspector_track", "Video Track: name, Active, opacity, tint, Duplicate, Delete.", box=(1100, 345, 1345, 745)), 1)),
-                  table(["Inspector field", "What it does"], [
+                  "<h3>The Inspector</h3><p>The pencil icon opens a side panel for whatever is selected. Select a clip and it shows the clip; select a track and it shows the track.</p>",
+                  row((fig("tl_clip_selected", "Video Clip: name, Active, Timing & Position, Compositing & Video, Color Tint, Source Node.", box=(1290, 100, 1545, 860)), 1),
+                      (fig("tl_track_selected", "Video Track: name, Active, opacity, Track Tint, Duplicate, Delete.", box=(1290, 100, 1545, 520)), 1),
+                      (table(["Inspector field", "What it does"], [
                       ("Name / Active", "Rename and enable or disable the clip or track."),
                       ("Start / Length", "Exact position and duration in bars.beats.ticks. Type a value for sample-accurate placement."),
                       ("Fade In / Fade Out", "Edge fades in milliseconds."),
-                      ("Blend / Opacity / Bright / Contrast", "How the clip composites over tracks beneath it."),
-                      ("Speed / Reverse", "Plays the clip faster, slower or backwards."),
-                      ("Color Tint", "The ten swatches colour the clip block."),
+                      ("Blend / Opacity / Bright / Contrast / Sat", "How the clip composites over tracks beneath it."),
+                      ("Color Tint", "The swatches colour the clip block."),
                       ("Source Node", "The node and node type the clip plays."),
-                      ("Modulations", "The modulation routes feeding that node, listed as parameter &lt;- source."),
                       ("Assign Different Node... / Clear Source", "Swap the node or make the clip unassigned again."),
-                  ])))
+                  ]), 3))))
 
     b.append(page("<h3>Selecting several clips and grouping</h3>",
                   "<p>To move or colour several clips at once, press <b>R</b> for the Range Selection tool and drag a box over them, then press <b>A</b> to return to Select. "
                   "Clips grouped with Group (Cmd+G) move as one.</p>",
-                  fig("arr_range_select", "Range Selection: all three clips selected by one drag.", box=(330, 350, 1340, 480)),
                   "<h3>Grouping tracks</h3><p>Right-click a track name. <b>Convert to Group</b> wraps the track in a collapsible folder so a whole stack of tracks can be folded away. "
                   "The same menu adds and renames tracks, deletes them, and offers <b>Render Track</b> to export just that track.</p>",
-                  row((fig("arr_track_menu", "Track menu.", box=(330, 350, 700, 580)), 1),
-                      (fig("arr_track_group", "After Convert to Group: Group 2 (1) holds Video 3.", box=(330, 350, 1340, 520)), 2))))
+                  row((fig("tl_track_menu", "Track menu.", box=(340, 130, 640, 330)), 1),
+                      (fig("tl_track_group", "After Convert to Group: Group 2 (1) holds Stage.", box=(340, 100, 1290, 260)), 2)),
+                  "<h3>Rendering</h3><p><b>Render</b> opens the Render Timeline popup: the span (whole arrangement, loop, markers or a custom range), the video size and rate, "
+                  "and the output name, folder and format.</p>",
+                  fig("tl_render", "Render Timeline popup.", box=(1250, 70, 1600, 520), width="45%")))
 
     b.append(page("<h2>History panel</h2>",
                   "<p>Every edit you make is listed, newest at the top. Click any line to jump the patch back (or forward) to that moment; edits after it are kept until you make a new change.</p>",
