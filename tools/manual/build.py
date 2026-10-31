@@ -89,23 +89,26 @@ def sharp(path, dw, dh):
     return out
 
 
-def shot_html(name, cls="shot", max_w=150, max_h=470):
+def shot_html(name, cls="shot", max_w=150, max_h=300):
     imgs = shots.find(name)
     if not imgs:
         return ""
     parts = []
-    for tid, path, w, h in imgs[:3]:
-        k = min(1.0, max_w / (w / 2), max_h / (h / 2)) * 0.5
+    imgs = imgs[:3]
+    mw = max_w if len(imgs) == 1 else max_w * 0.6  # several shots sit side by side, so a card never outgrows a page
+    for tid, path, w, h in imgs:
+        k = min(1.0, mw / (w / 2), max_h / (h / 2)) * 0.5
         dw, dh = round(w * k), round(h * k)
         parts.append(f'<img src="file://{sharp(path, dw, dh)}" width="{dw}" height="{dh}" alt="{esc(tid)}">')
-    return f'<div class="{cls}">{"".join(parts)}</div>'
+    row = ' style="flex-direction:row;align-items:flex-start"' if len(imgs) > 1 else ""
+    return f'<div class="{cls}"{row}>{"".join(parts)}</div>'
 
 
 def card_html(name, tag, desc, tryit, chain):
     chips = '<span class="arrow">&rarr;</span>'.join(f'<span class="chip">{esc(c)}</span>' for c in chain)
-    return (f'<div class="card"><div class="txt"><div class="top"><h2>{esc(name)}</h2><span class="tag">{esc(tag)}</span></div>'
+    return (f'<div style="break-inside:avoid;page-break-inside:avoid"><div class="card"><div class="txt"><div class="top"><h2>{esc(name)}</h2><span class="tag">{esc(tag)}</span></div>'
             f'<p>{esc(desc)}</p><div class="try"><b>Try it</b>{esc(tryit)}'
-            f'<div class="chain">{chips}</div></div></div>{shot_html(name)}</div>')
+            f'<div class="chain">{chips}</div></div></div>{shot_html(name)}</div></div>')
 
 
 def chapter_html(ch):
