@@ -127,12 +127,13 @@ P += vec2(1, 0)      # vec2 into vec3 — ERROR, no implicit fill
 | Arithmetic | `+ - * / % ^` (`^` is right-associative power: `2^3 == 8`) |
 | Compound assign | `+= -= *= /=` |
 | Compare / logic | `== != < <= > >= && \|\| !` |
-| Trig | `sin cos tan asin acos atan atan2` |
-| Math utilities | `abs floor ceil fract clamp lerp` (`lerp(a, b, t)`) |
-| Advanced math | `smoothstep pow sqrt exp log min max` |
+| Trig | `sin cos tan atan2` (there is no asin, acos or atan) |
+| Math utilities | `abs sign floor ceil round fract mod fmod clamp lerp mix` (`lerp(a, b, t)`) |
+| Advanced math | `step smoothstep pow sqrt exp log min max`, `if(cond, a, b)` (evaluates both sides) |
 | Phase shaping | `bend pinch mirror skew formant` take `(phase, amount)` and return a new 0..1 phase: `out = sin(skew(phase, 0.6) * 6.283185)` |
-| Vector math | `length normalize dot cross reflect` |
-| Randomness | `rand(t, seed)`, `noise(t, seed)` — pure, deterministic functions of time and seed, not stateful |
+| Vector math | `length distance normalize dot cross` (there is no reflect) |
+| Randomness | `rand`, `noise`, `sh` as `f()`, `f(speed)`, `f(min, max)` or `f(min, max, speed, seed)` — deterministic in time and seed, not stateful. In a sample kernel `rand()` takes no arguments and exists only in Field Notes |
+| Sample domain | `delay(x, samples)` (integer literal length), `tick(division)` (1 on a beat division, e.g. `1/16`), `deg(degree)` (note of a scale degree in the project key); Field Notes adds the statement `note(pitch, vel, len)` (len in beats, 0 follows the input note) and the names `noteNum`, `beat`. Sample kernels have a smaller function set: abs floor ceil clamp lerp min max pow sqrt exp log sin cos tan if |
 
 ## Domain transfer operators
 
@@ -511,11 +512,12 @@ Comparisons and logic yield `1` or `0` and compose directly with arithmetic —
 
 | Function | Notes |
 |---|---|
-| `sin cos tan` | radians |
+| `sin cos tan atan2` | radians |
 | `abs sign sqrt exp log pow` | standard |
-| `floor ceil round mod` | `mod(a, b)` is floating-point modulo |
+| `floor ceil round fract mod fmod` | `mod(a, b)` / `fmod(a, b)` are floating-point modulo |
 | `min max clamp lerp mix` | `lerp(a, b, t)` / `mix(a, b, t)` — linear interpolation |
 | `step(edge, x)` | 0 below `edge`, 1 at/above it |
+| `length normalize distance dot cross` | vector math on `vec2`/`vec3`/`vec4` |
 | `smoothstep(e0, e1, x)` | smooth Hermite ramp from `e0` to `e1` |
 | `bend pinch mirror skew formant` `(phase, amount)` | phase shaping: take a 0..1 phase (wrapped) and return a new one, so `sin(bend(p, 0.5) * 2 * pi)` reshapes a sine. `bend`, `pinch`, `skew` take -1..1, `mirror` 0..1, `formant` a ratio 1..64; amount 0 (ratio 1) leaves the phase alone |
 | `if(cond, a, b)` | evaluates **both** branches (no short-circuit) and returns one — fine since the language has no side effects |
