@@ -28,7 +28,9 @@ void DrawKeyboard(FrameCtx& fc)
       // it, so annotating a patch is one keystroke and then typing. Not gated on
       // Shift, so "?" does not leave a stray comment behind, and not on a
       // modifier, so Cmd-/ stays free for a binding later.
-      const bool doAddComment = gRequestAddComment || (!typing && gCommentEdit.target == nullptr && !cmdOrCtrl && !io.KeyShift &&
+      // !gArrangeFocused: "/" is the 3D View's local view while the pointer is there, and no
+      // docked panel that owns the keys should drop a comment on the canvas behind it.
+      const bool doAddComment = gRequestAddComment || (!typing && !gArrangeFocused && gCommentEdit.target == nullptr && !cmdOrCtrl && !io.KeyShift &&
                                                       ImGui::IsKeyPressed(ImGuiKey_Slash, false));
       gRequestAddComment = false;
       if (doAddComment)
@@ -248,7 +250,8 @@ void DrawKeyboard(FrameCtx& fc)
       // context menu's identical carve-out), so they must not count toward
       // "is anything showing?" either, or a canvas of audio nodes would make
       // the first press a no-op.
-      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_H, false))
+      // Not over the 3D View: Shift+H there hides the unselected items (View3DPanel HandleKeys).
+      if (!typing && shiftOnly && !(gView3DOpen && gView3DClaimedKeys) && ImGui::IsKeyPressed(ImGuiKey_H, false))
       {
          std::vector<GraphNode*> targets;
          const int count = ed::GetSelectedObjectCount();
@@ -305,7 +308,8 @@ void DrawKeyboard(FrameCtx& fc)
       // click on a node can't silently take the node with it. Shift+X is the
       // broader "delete what's selected", handled by the Delete/Backspace
       // block below.
-      if (!typing && !cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ShowLockBlocks())
+      // !gArrangeFocused like Delete below: X is the 3D View's remove key while the pointer is there.
+      if (!typing && !gArrangeFocused && !cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ShowLockBlocks())
       {
          const int count = ed::GetSelectedObjectCount();
          if (count > 0)

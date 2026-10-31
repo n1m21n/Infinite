@@ -28,6 +28,8 @@ KEY_ALIASES = {
     "left": "LeftArrow", "right": "RightArrow", "up": "UpArrow", "down": "DownArrow",
     "home": "Home", "end": "End", "pagedown": "PageDown", "pageup": "PageUp",
     "=": "Equal", "-": "Minus", ".": "Period",
+    "`": "GraveAccent", "period": "Period", "comma": "Comma", "f2": "F2", "f12": "F12",
+    "[": "LeftBracket", "]": "RightBracket",
 }
 
 def norm_key(tok):
@@ -57,6 +59,8 @@ LOCAL_KEYS = {
     "KeypadSubtract": "the keypad twin of - in zoom handlers",
     "KeypadEnter": "Enter's keypad twin - opens a hovered comment's inline edit, not a global binding",
     "Minus":  "zoom-out within the canvas zoom handler, paired with the scroll gesture",
+    "KeypadDecimal": "the keypad twin of F (frame) in the 3D View, and the decimal point while typing an amount",
+    "KeypadDivide": "the keypad twin of / (local view) in the 3D View",
 }
 
 # Lines that mention Super without Ctrl and are known-correct. Matched by
@@ -67,6 +71,9 @@ SUPER_ALLOW = [
     # only ever runs on the host it was written for.
     "key(ImGuiMod_Super, true); key(ImGuiKey_C, true);",
     "key(ImGuiKey_V, false); key(ImGuiMod_Super, false);",
+    # The Terminal sends physical Ctrl to the shell. ImGui swaps Cmd and Ctrl on macOS, so
+    # physical Ctrl reads as KeySuper there; the #else branch reads KeyCtrl on Windows/Linux.
+    "const bool physicalCtrl = io.KeySuper;  // ImGui swaps Cmd and Ctrl on macOS",
 ]
 
 
@@ -103,7 +110,9 @@ def main():
 
     # ---- 2. the real handlers ----------------------------------------------
     handlers = {}     # ImGuiKey suffix -> [line numbers]
-    for m in re.finditer(r"IsKey(?:Pressed|Down)\(ImGuiKey_([A-Za-z0-9]+)", src):
+    # Panels wrap the call in a local lambda (pressed / key / repeated, e.g. View3DPanel,
+    # PianoRollPanel, TerminalPanel, ArrangeSessionGrid); those count as handlers too.
+    for m in re.finditer(r"(?:IsKey(?:Pressed|Down)|\bpressed|\bkey|\brepeated)\(ImGuiKey_([A-Za-z0-9]+)", src):
         k = m.group(1)
         line = src.count("\n", 0, m.start()) + 1
         handlers.setdefault(k, []).append(line)
