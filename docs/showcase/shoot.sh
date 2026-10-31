@@ -79,6 +79,7 @@ for s in $SHOTS; do
    timeline)      c session stop >/dev/null; c play >/dev/null; c seek 2 >/dev/null
                   c panel timeline open top >/dev/null; sleep 3 ;;
    piano-roll)    c panel pianoroll open top >/dev/null; sleep 3 ;;
+   performance)   c session scene 2 >/dev/null; c panel perf open bottom >/dev/null; c view fit >/dev/null; sleep 4 ;;
    hero-panels)   c session scene 2 >/dev/null
                   c panel pianoroll open top >/dev/null; c panel modmatrix open left >/dev/null
                   c panel perf open right >/dev/null; c panel view3d open bottom >/dev/null
