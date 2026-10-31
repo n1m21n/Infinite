@@ -1,5 +1,5 @@
 {
- "app": "/Users/namansoni/Infinite/worktrees/main/build/Infinite.app",
+ "app": "/Users/namansoni/Infinite/infinte-base/build-dev/Infinite.app",
  "shots": {
   "dialog/about": {
    "category": "-",
@@ -12,6 +12,54 @@
    "state": "-",
    "theme": "dark",
    "width": 4238
+  },
+  "dialog/recover": {
+   "category": "-",
+   "framed": "docs/shots/framed/dialog_recover.png",
+   "height": 2384,
+   "kind": "dialog",
+   "name": "Autosave recovery dialog",
+   "pdf": "docs/shots/framed/dialog_recover.pdf.jpg",
+   "raw": "docs/shots/raw/dialog_recover.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "dialog/unsaved": {
+   "category": "-",
+   "framed": "docs/shots/framed/dialog_unsaved.png",
+   "height": 2384,
+   "kind": "dialog",
+   "name": "Unsaved changes dialog",
+   "pdf": "docs/shots/framed/dialog_unsaved.pdf.jpg",
+   "raw": "docs/shots/raw/dialog_unsaved.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "node/3D/3D View/c": {
+   "category": "3D",
+   "framed": "docs/shots/framed/node_3D_3D_View_c.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "3D View",
+   "pdf": "docs/shots/framed/node_3D_3D_View_c.pdf.jpg",
+   "raw": "docs/shots/raw/3D__3D_View__c.png",
+   "state": "c",
+   "theme": "dark",
+   "width": 1437
+  },
+  "node/3D/3D View/o": {
+   "category": "3D",
+   "framed": "docs/shots/framed/node_3D_3D_View_o.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "3D View",
+   "pdf": "docs/shots/framed/node_3D_3D_View_o.pdf.jpg",
+   "raw": "docs/shots/raw/3D__3D_View__o.png",
+   "state": "o",
+   "theme": "dark",
+   "width": 1437
   },
   "node/3D/Array/c": {
    "category": "3D",
@@ -743,7 +791,7 @@
    "raw": "docs/shots/raw/3D__Field_Primitive__d.png",
    "state": "d",
    "theme": "dark",
-   "width": 835
+   "width": 837
   },
   "node/3D/Field Primitive/o": {
    "category": "3D",
@@ -755,7 +803,7 @@
    "raw": "docs/shots/raw/3D__Field_Primitive__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 835
+   "width": 837
   },
   "node/3D/Gear 3D/c": {
    "category": "3D",
@@ -779,7 +827,7 @@
    "raw": "docs/shots/raw/3D__Gear_3D__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 857
+   "width": 859
   },
   "node/3D/Geometry/c": {
    "category": "3D",
@@ -808,7 +856,7 @@
   "node/3D/Group 3D/c": {
    "category": "3D",
    "framed": "docs/shots/framed/node_3D_Group_3D_c.png",
-   "height": 1955,
+   "height": 1957,
    "kind": "node",
    "name": "Group 3D",
    "pdf": "docs/shots/framed/node_3D_Group_3D_c.pdf.jpg",
@@ -820,7 +868,7 @@
   "node/3D/Group 3D/o": {
    "category": "3D",
    "framed": "docs/shots/framed/node_3D_Group_3D_o.png",
-   "height": 1955,
+   "height": 1957,
    "kind": "node",
    "name": "Group 3D",
    "pdf": "docs/shots/framed/node_3D_Group_3D_o.pdf.jpg",
@@ -875,7 +923,7 @@
    "raw": "docs/shots/raw/3D__Helix__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 857
+   "width": 859
   },
   "node/3D/Icosphere/c": {
    "category": "3D",
@@ -1249,6 +1297,18 @@
    "theme": "dark",
    "width": 1327
   },
+  "node/3D/Metaballs/d": {
+   "category": "3D",
+   "framed": "docs/shots/framed/node_3D_Metaballs_d.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Metaballs",
+   "pdf": "docs/shots/framed/node_3D_Metaballs_d.pdf.jpg",
+   "raw": "docs/shots/raw/3D__Metaballs__d.png",
+   "state": "d",
+   "theme": "dark",
+   "width": 859
+  },
   "node/3D/Metaballs/o": {
    "category": "3D",
    "framed": "docs/shots/framed/node_3D_Metaballs_o.png",
@@ -1259,7 +1319,7 @@
    "raw": "docs/shots/raw/3D__Metaballs__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 857
+   "width": 859
   },
   "node/3D/Mirror/c": {
    "category": "3D",
@@ -1393,6 +1453,18 @@
    "theme": "dark",
    "width": 1327
   },
+  "node/3D/Ocean/d": {
+   "category": "3D",
+   "framed": "docs/shots/framed/node_3D_Ocean_d.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Ocean",
+   "pdf": "docs/shots/framed/node_3D_Ocean_d.pdf.jpg",
+   "raw": "docs/shots/raw/3D__Ocean__d.png",
+   "state": "d",
+   "theme": "dark",
+   "width": 789
+  },
   "node/3D/Ocean/o": {
    "category": "3D",
    "framed": "docs/shots/framed/node_3D_Ocean_o.png",
@@ -1440,6 +1512,18 @@
    "state": "c",
    "theme": "dark",
    "width": 2159
+  },
+  "node/3D/Particle System/d": {
+   "category": "3D",
+   "framed": "docs/shots/framed/node_3D_Particle_System_d.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Particle System",
+   "pdf": "docs/shots/framed/node_3D_Particle_System_d.pdf.jpg",
+   "raw": "docs/shots/raw/3D__Particle_System__d.png",
+   "state": "d",
+   "theme": "dark",
+   "width": 779
   },
   "node/3D/Particle System/o": {
    "category": "3D",
@@ -1607,7 +1691,7 @@
    "raw": "docs/shots/raw/3D__Render_3D__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1459
+   "width": 1460
   },
   "node/3D/Render 3D/o": {
    "category": "3D",
@@ -1739,7 +1823,7 @@
    "raw": "docs/shots/raw/3D__Screw__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 965
+   "width": 967
   },
   "node/3D/Select/c": {
    "category": "3D",
@@ -1775,7 +1859,7 @@
    "raw": "docs/shots/raw/3D__Set_Vertex_Color__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1391
+   "width": 1393
   },
   "node/3D/Set Vertex Color/o": {
    "category": "3D",
@@ -1991,7 +2075,7 @@
    "raw": "docs/shots/raw/3D__Sweep__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 965
+   "width": 967
   },
   "node/3D/Switcher 3D/c": {
    "category": "3D",
@@ -2087,7 +2171,7 @@
    "raw": "docs/shots/raw/3D__Torus_Knot__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 857
+   "width": 859
   },
   "node/3D/Torus/c": {
    "category": "3D",
@@ -2410,6 +2494,18 @@
    "pdf": "docs/shots/framed/node_AudioEffects_Convolution_Reverb_c.pdf.jpg",
    "raw": "docs/shots/raw/AudioEffects__Convolution_Reverb__c.png",
    "state": "c",
+   "theme": "dark",
+   "width": 1903
+  },
+  "node/AudioEffects/Convolution Reverb/d": {
+   "category": "AudioEffects",
+   "framed": "docs/shots/framed/node_AudioEffects_Convolution_Reverb_d.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Convolution Reverb",
+   "pdf": "docs/shots/framed/node_AudioEffects_Convolution_Reverb_d.pdf.jpg",
+   "raw": "docs/shots/raw/AudioEffects__Convolution_Reverb__d.png",
+   "state": "d",
    "theme": "dark",
    "width": 1903
   },
@@ -4187,7 +4283,7 @@
    "raw": "docs/shots/raw/Effects__crop__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 965
+   "width": 967
   },
   "node/Effects/diffuseglow/c": {
    "category": "Effects",
@@ -4355,7 +4451,7 @@
    "raw": "docs/shots/raw/Effects__glitch__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 965
+   "width": 967
   },
   "node/Effects/halftone/c": {
    "category": "Effects",
@@ -4619,7 +4715,7 @@
    "raw": "docs/shots/raw/Effects__ripple__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 965
+   "width": 967
   },
   "node/Effects/symmetry/c": {
    "category": "Effects",
@@ -4931,7 +5027,7 @@
    "raw": "docs/shots/raw/Macros__Macro_XY__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1155
+   "width": 1157
   },
   "node/Modulators/Audio Analyze/c": {
    "category": "Modulators",
@@ -4991,7 +5087,7 @@
    "raw": "docs/shots/raw/Modulators__Audio_to_CV__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1445
+   "width": 1447
   },
   "node/Modulators/Audio to CV/o": {
    "category": "Modulators",
@@ -5003,7 +5099,7 @@
    "raw": "docs/shots/raw/Modulators__Audio_to_CV__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1445
+   "width": 1447
   },
   "node/Modulators/CV Recorder/c": {
    "category": "Modulators",
@@ -5099,7 +5195,7 @@
    "raw": "docs/shots/raw/Modulators__Constant__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1711
+   "width": 1713
   },
   "node/Modulators/Envelope/c": {
    "category": "Modulators",
@@ -5363,7 +5459,7 @@
    "raw": "docs/shots/raw/Modulators__MSEG__d.png",
    "state": "d",
    "theme": "dark",
-   "width": 901
+   "width": 902
   },
   "node/Modulators/MSEG/o": {
    "category": "Modulators",
@@ -5375,7 +5471,7 @@
    "raw": "docs/shots/raw/Modulators__MSEG__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 901
+   "width": 902
   },
   "node/Modulators/Math/c": {
    "category": "Modulators",
@@ -5399,7 +5495,7 @@
    "raw": "docs/shots/raw/Modulators__Math__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1115
+   "width": 1117
   },
   "node/Modulators/Mod Curve/c": {
    "category": "Modulators",
@@ -5687,7 +5783,7 @@
    "raw": "docs/shots/raw/Modulators__Range_to_Range__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1115
+   "width": 1117
   },
   "node/Modulators/Smoothing/c": {
    "category": "Modulators",
@@ -5819,7 +5915,7 @@
    "raw": "docs/shots/raw/Notes__Bouncing_Balls__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1587
+   "width": 1589
   },
   "node/Notes/Bouncing Balls/d": {
    "category": "Notes",
@@ -5831,7 +5927,7 @@
    "raw": "docs/shots/raw/Notes__Bouncing_Balls__d.png",
    "state": "d",
    "theme": "dark",
-   "width": 1587
+   "width": 1589
   },
   "node/Notes/Bouncing Balls/o": {
    "category": "Notes",
@@ -5843,7 +5939,7 @@
    "raw": "docs/shots/raw/Notes__Bouncing_Balls__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1587
+   "width": 1589
   },
   "node/Notes/Chorder/c": {
    "category": "Notes",
@@ -6289,6 +6385,30 @@
    "theme": "dark",
    "width": 1927
   },
+  "node/Notes/Piano Roll/c": {
+   "category": "Notes",
+   "framed": "docs/shots/framed/node_Notes_Piano_Roll_c.png",
+   "height": 1957,
+   "kind": "node",
+   "name": "Piano Roll",
+   "pdf": "docs/shots/framed/node_Notes_Piano_Roll_c.pdf.jpg",
+   "raw": "docs/shots/raw/Notes__Piano_Roll__c.png",
+   "state": "c",
+   "theme": "dark",
+   "width": 2261
+  },
+  "node/Notes/Piano Roll/o": {
+   "category": "Notes",
+   "framed": "docs/shots/framed/node_Notes_Piano_Roll_o.png",
+   "height": 1957,
+   "kind": "node",
+   "name": "Piano Roll",
+   "pdf": "docs/shots/framed/node_Notes_Piano_Roll_o.pdf.jpg",
+   "raw": "docs/shots/raw/Notes__Piano_Roll__o.png",
+   "state": "o",
+   "theme": "dark",
+   "width": 2261
+  },
   "node/Notes/Pitch Bend/c": {
    "category": "Notes",
    "framed": "docs/shots/framed/node_Notes_Pitch_Bend_c.png",
@@ -6419,7 +6539,7 @@
    "raw": "docs/shots/raw/Prediction__Moves__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1893
+   "width": 1895
   },
   "node/Prediction/Moves/d": {
    "category": "Prediction",
@@ -6496,7 +6616,7 @@
   "node/Prediction/Predictive Notes/c": {
    "category": "Prediction",
    "framed": "docs/shots/framed/node_Prediction_Predictive_Notes_c.png",
-   "height": 2259,
+   "height": 2256,
    "kind": "node",
    "name": "Predictive Notes",
    "pdf": "docs/shots/framed/node_Prediction_Predictive_Notes_c.pdf.jpg",
@@ -6508,7 +6628,7 @@
   "node/Prediction/Predictive Notes/o": {
    "category": "Prediction",
    "framed": "docs/shots/framed/node_Prediction_Predictive_Notes_o.png",
-   "height": 2259,
+   "height": 2256,
    "kind": "node",
    "name": "Predictive Notes",
    "pdf": "docs/shots/framed/node_Prediction_Predictive_Notes_o.pdf.jpg",
@@ -6551,7 +6671,7 @@
    "raw": "docs/shots/raw/Prediction__Predictive_Rhythm__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1745
+   "width": 1747
   },
   "node/Prediction/Predictive Rhythm/o": {
    "category": "Prediction",
@@ -6563,7 +6683,7 @@
    "raw": "docs/shots/raw/Prediction__Predictive_Rhythm__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1745
+   "width": 1747
   },
   "node/Prediction/Predictive Velocity/c": {
    "category": "Prediction",
@@ -6827,7 +6947,7 @@
    "raw": "docs/shots/raw/Source__FieldPixel__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1017
+   "width": 1019
   },
   "node/Source/Formula/c": {
    "category": "Source",
@@ -7621,6 +7741,30 @@
    "theme": "dark",
    "width": 967
   },
+  "node/Synths/Generate Samples/c": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Generate_Samples_c.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Generate Samples",
+   "pdf": "docs/shots/framed/node_Synths_Generate_Samples_c.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Generate_Samples__c.png",
+   "state": "c",
+   "theme": "dark",
+   "width": 1699
+  },
+  "node/Synths/Generate Samples/o": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Generate_Samples_o.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "Generate Samples",
+   "pdf": "docs/shots/framed/node_Synths_Generate_Samples_o.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Generate_Samples__o.png",
+   "state": "o",
+   "theme": "dark",
+   "width": 1699
+  },
   "node/Synths/Grain Molder/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Grain_Molder_c.png",
@@ -7631,7 +7775,7 @@
    "raw": "docs/shots/raw/Synths__Grain_Molder__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1913
+   "width": 1915
   },
   "node/Synths/Grain Molder/o": {
    "category": "Synths",
@@ -7643,7 +7787,7 @@
    "raw": "docs/shots/raw/Synths__Grain_Molder__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1913
+   "width": 1915
   },
   "node/Synths/Granular/c": {
    "category": "Synths",
@@ -7702,6 +7846,18 @@
    "pdf": "docs/shots/framed/node_Synths_MPC_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__MPC__c.png",
    "state": "c",
+   "theme": "dark",
+   "width": 1211
+  },
+  "node/Synths/MPC/d": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_MPC_d.png",
+   "height": 1951,
+   "kind": "node",
+   "name": "MPC",
+   "pdf": "docs/shots/framed/node_Synths_MPC_d.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__MPC__d.png",
+   "state": "d",
    "theme": "dark",
    "width": 1211
   },
@@ -7792,7 +7948,7 @@
   "node/Synths/Partials/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Partials_c.png",
-   "height": 1955,
+   "height": 1957,
    "kind": "node",
    "name": "Partials",
    "pdf": "docs/shots/framed/node_Synths_Partials_c.pdf.jpg",
@@ -7804,7 +7960,7 @@
   "node/Synths/Partials/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_Partials_o.png",
-   "height": 1955,
+   "height": 1957,
    "kind": "node",
    "name": "Partials",
    "pdf": "docs/shots/framed/node_Synths_Partials_o.pdf.jpg",
@@ -7836,6 +7992,30 @@
    "state": "o",
    "theme": "dark",
    "width": 1893
+  },
+  "node/Synths/Piano/c": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Piano_c.png",
+   "height": 1953,
+   "kind": "node",
+   "name": "Piano",
+   "pdf": "docs/shots/framed/node_Synths_Piano_c.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Piano__c.png",
+   "state": "c",
+   "theme": "dark",
+   "width": 2045
+  },
+  "node/Synths/Piano/o": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Piano_o.png",
+   "height": 1953,
+   "kind": "node",
+   "name": "Piano",
+   "pdf": "docs/shots/framed/node_Synths_Piano_o.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Piano__o.png",
+   "state": "o",
+   "theme": "dark",
+   "width": 2045
   },
   "node/Synths/Sampler/c": {
    "category": "Synths",
@@ -7912,26 +8092,26 @@
   "node/Synths/String/c": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_String_c.png",
-   "height": 2259,
+   "height": 1951,
    "kind": "node",
    "name": "String",
    "pdf": "docs/shots/framed/node_Synths_String_c.pdf.jpg",
    "raw": "docs/shots/raw/Synths__String__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 3449
+   "width": 1741
   },
   "node/Synths/String/o": {
    "category": "Synths",
    "framed": "docs/shots/framed/node_Synths_String_o.png",
-   "height": 2259,
+   "height": 1951,
    "kind": "node",
    "name": "String",
    "pdf": "docs/shots/framed/node_Synths_String_o.pdf.jpg",
    "raw": "docs/shots/raw/Synths__String__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 3449
+   "width": 1741
   },
   "node/Synths/Wave Terrain/c": {
    "category": "Synths",
@@ -7980,6 +8160,30 @@
    "state": "o",
    "theme": "dark",
    "width": 1579
+  },
+  "node/Synths/Wind/c": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Wind_c.png",
+   "height": 2259,
+   "kind": "node",
+   "name": "Wind",
+   "pdf": "docs/shots/framed/node_Synths_Wind_c.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Wind__c.png",
+   "state": "c",
+   "theme": "dark",
+   "width": 3449
+  },
+  "node/Synths/Wind/o": {
+   "category": "Synths",
+   "framed": "docs/shots/framed/node_Synths_Wind_o.png",
+   "height": 2259,
+   "kind": "node",
+   "name": "Wind",
+   "pdf": "docs/shots/framed/node_Synths_Wind_o.pdf.jpg",
+   "raw": "docs/shots/raw/Synths__Wind__o.png",
+   "state": "o",
+   "theme": "dark",
+   "width": 3449
   },
   "node/Utility/Audio In/c": {
    "category": "Utility",
@@ -8063,7 +8267,7 @@
    "raw": "docs/shots/raw/Utility__Blend_Audio__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1859
+   "width": 1860
   },
   "node/Utility/Blend Audio/o": {
    "category": "Utility",
@@ -8075,7 +8279,7 @@
    "raw": "docs/shots/raw/Utility__Blend_Audio__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1859
+   "width": 1860
   },
   "node/Utility/Field Graph/c": {
    "category": "Utility",
@@ -8111,7 +8315,7 @@
    "raw": "docs/shots/raw/Utility__Gain__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1859
+   "width": 1860
   },
   "node/Utility/Gain/o": {
    "category": "Utility",
@@ -8123,7 +8327,7 @@
    "raw": "docs/shots/raw/Utility__Gain__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 1859
+   "width": 1860
   },
   "node/Utility/MIDI Out/c": {
    "category": "Utility",
@@ -8272,26 +8476,26 @@
   "node/Utility/Output/c": {
    "category": "Utility",
    "framed": "docs/shots/framed/node_Utility_Output_c.png",
-   "height": 1951,
+   "height": 1957,
    "kind": "node",
    "name": "Output",
    "pdf": "docs/shots/framed/node_Utility_Output_c.pdf.jpg",
    "raw": "docs/shots/raw/Utility__Output__c.png",
    "state": "c",
    "theme": "dark",
-   "width": 1475
+   "width": 1483
   },
   "node/Utility/Output/o": {
    "category": "Utility",
    "framed": "docs/shots/framed/node_Utility_Output_o.png",
-   "height": 1951,
+   "height": 1953,
    "kind": "node",
    "name": "Output",
    "pdf": "docs/shots/framed/node_Utility_Output_o.pdf.jpg",
    "raw": "docs/shots/raw/Utility__Output__o.png",
    "state": "o",
    "theme": "dark",
-   "width": 721
+   "width": 723
   },
   "node/Utility/Projection/c": {
    "category": "Utility",
@@ -8413,6 +8617,42 @@
    "theme": "dark",
    "width": 1151
   },
+  "panel/arrange": {
+   "category": "-",
+   "framed": "docs/shots/framed/panel_arrange.png",
+   "height": 2384,
+   "kind": "panel",
+   "name": "Arrange panel",
+   "pdf": "docs/shots/framed/panel_arrange.pdf.jpg",
+   "raw": "docs/shots/raw/panel_arrange.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "panel/history": {
+   "category": "-",
+   "framed": "docs/shots/framed/panel_history.png",
+   "height": 2384,
+   "kind": "panel",
+   "name": "History panel",
+   "pdf": "docs/shots/framed/panel_history.pdf.jpg",
+   "raw": "docs/shots/raw/panel_history.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "panel/library": {
+   "category": "-",
+   "framed": "docs/shots/framed/panel_library.png",
+   "height": 2384,
+   "kind": "panel",
+   "name": "Node library",
+   "pdf": "docs/shots/framed/panel_library.pdf.jpg",
+   "raw": "docs/shots/raw/panel_library.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
   "panel/modmatrix": {
    "category": "-",
    "framed": "docs/shots/framed/panel_modmatrix.png",
@@ -8421,6 +8661,30 @@
    "name": "Modulation matrix",
    "pdf": "docs/shots/framed/panel_modmatrix.pdf.jpg",
    "raw": "docs/shots/raw/panel_modmatrix.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "panel/perf": {
+   "category": "-",
+   "framed": "docs/shots/framed/panel_perf.png",
+   "height": 2384,
+   "kind": "panel",
+   "name": "Performance panel",
+   "pdf": "docs/shots/framed/panel_perf.pdf.jpg",
+   "raw": "docs/shots/raw/panel_perf.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "panel/viewport": {
+   "category": "-",
+   "framed": "docs/shots/framed/panel_viewport.png",
+   "height": 2384,
+   "kind": "panel",
+   "name": "Viewport panel",
+   "pdf": "docs/shots/framed/panel_viewport.pdf.jpg",
+   "raw": "docs/shots/raw/panel_viewport.png",
    "state": "-",
    "theme": "dark",
    "width": 4238
@@ -8448,7 +8712,43 @@
    "state": "-",
    "theme": "light",
    "width": 4238
+  },
+  "window/help": {
+   "category": "-",
+   "framed": "docs/shots/framed/window_help.png",
+   "height": 2384,
+   "kind": "window",
+   "name": "Help window",
+   "pdf": "docs/shots/framed/window_help.pdf.jpg",
+   "raw": "docs/shots/raw/window_help.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "window/settings": {
+   "category": "-",
+   "framed": "docs/shots/framed/window_settings.png",
+   "height": 2384,
+   "kind": "window",
+   "name": "Settings window",
+   "pdf": "docs/shots/framed/window_settings.pdf.jpg",
+   "raw": "docs/shots/raw/window_settings.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
+  },
+  "window/shortcuts": {
+   "category": "-",
+   "framed": "docs/shots/framed/window_shortcuts.png",
+   "height": 2384,
+   "kind": "window",
+   "name": "Shortcuts window",
+   "pdf": "docs/shots/framed/window_shortcuts.pdf.jpg",
+   "raw": "docs/shots/raw/window_shortcuts.png",
+   "state": "-",
+   "theme": "dark",
+   "width": 4238
   }
  },
- "version": "0.6.5"
+ "version": "0.6.6"
 }
