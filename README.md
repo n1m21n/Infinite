@@ -11,140 +11,211 @@
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20GPLv3-green)](LICENSE)
 [<img src="https://trendshift.io/api/badge/trendshift/repositories/187223/daily?language=C%2B%2B" alt="n1m21n%2FInfinite | Trendshift" width="250" height="55"/>](https://trendshift.io/repositories/187223?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-187223)
 
-**Infinite is a free, open-source audiovisual workstation made by Naman Soni (n1m21n).** A unified node-based audiovisual modular workstation for **macOS**, **Windows**, and **Linux**. Real-time GPU image/video compositing, procedural 3D geometry and physics, and a full modular synthesizer rack with native AU and VST3 plugin hosting — all interconnected through a universal modulation graph. Most nodes do one fixed thing; **Field**, Infinite's embedded programming language, lets you write what a node does instead.
+**Infinite is a Free, open-source audiovisual workstation made by Naman Soni (n1m21n).** Visuals, music and code live on one node canvas, on **macOS**, **Windows** and **Linux**. GPU image and video compositing, procedural 3D geometry and physics, and a modular synth rack with AU and VST3 plugin hosting all patch into each other through one modulation graph. Most nodes do one fixed thing; **Field**, Infinite's own programming language, lets you write what a node does instead.
 
-![Infinite Screenshot](website/assets/screenshot.png)
+![Infinite v1.0 with several panels open around the node canvas](docs/screenshots/v1/hero-panels.png)
 
 ## Download
 
 [![macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite.dmg) [![Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-x64.zip) [![Windows ARM64](https://img.shields.io/badge/Download-Windows%20ARM64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-ARM64.zip) [![Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-x86_64.AppImage)
 
-Always the newest release. All files, checksums and release notes are on the [Releases page](https://github.com/n1m21n/Infinite/releases/latest).
+Always the newest release. All files, checksums and release notes are on the [Releases page](https://github.com/n1m21n/Infinite/releases/latest). First-launch steps for each platform are under [Installation](#installation).
 
 ---
 
-## Video Tutorial
+## What's new in v1.0 (beta)
 
-> **New to Infinite?** Watch the full walkthrough and workflow tutorial on YouTube:  
-> 🔗 **[Infinite Video Walkthrough & Tutorial](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)**
+v1.0 is the biggest release so far: about 600 commits since v0.6.6. The node canvas is still the centre; around it, Infinite now has the panels a full studio needs. Every panel docks to the edge of the window and opens from the rail or a key.
+
+### 3D View
+
+<img src="docs/screenshots/v1/3d-view.png" alt="3D View composing node outputs into one scene" width="100%">
+
+The final stage of a 3D patch. Right-click a 3D node and add it to the 3D View, then arrange node outputs in one scene, look through a camera and render a still or an animation for a chosen frame range. Cameras and lights are the existing Camera and Light nodes, the world is a colour, an HDRI or any image node (transparent until you set one), and each object picks which lights reach it. The panel follows Blender's keymap and setting names, with real f-stop depth of field, ambient occlusion, bloom, composition guides and safe areas. Arranging never writes back to the node: geometry, materials and simulation stay in the node chain. It composes; it does not model. Open it with Shift + 3.
+
+### Terminal and the `infinite` command
+
+<img src="docs/screenshots/v1/terminal.png" alt="The Terminal panel running the infinite command" width="100%">
+
+A real terminal inside Infinite (Ctrl + \`), docked on any side, running your own shell and your own tools, coding agents included. No agent ships with Infinite. Inside it, the `infinite` command drives the open patch: look (`graph`, `params`, `selection`), edit (`add`, `connect`, `set`, `mod`, `expr`, `undo`), play (`play`, `tempo`, `session launch`, `timeline`), see and hear (`shot`, `frame`, `render`, `audio`), and open any panel or setting. `infinite code new | check | watch | docs | examples` writes and checks Field, Sketch, Sketch 3D, GLSL and formula code against the real compilers, and `infinite patch new | check | layout | apply` generates whole patches. With no app running, every verb that takes a `.inf` file runs headless. Type `infinite context` for a short brief of the open patch, or `infinite guide` for the full reference.
+
+### Sample Studio
+
+<img src="docs/screenshots/v1/sample-studio.png" alt="Sample Studio slicing a waveform" width="100%">
+
+A self-contained sample editor (Shift + W). Open a file, drop one in, record from the audio input, or generate a take. Zoom the waveform, cut it into slices by transients, grid or equal parts, and give each slice its own gain, pan, pitch, fine tune, stretch, fades, shape, colour, mute and solo. Editing never touches the canvas. When it sounds right, Convert puts it on the canvas as a node that plays it, or as the patch that made it; Export writes the whole edit or each slice to WAV, FLAC or MP3. Studio work is saved in the patch.
+
+### Session clips and the Timeline
+
+| Session | Timeline |
+|---|---|
+| <img src="docs/screenshots/v1/session-clips.png" alt="Session view with scenes of clips" width="100%"> | <img src="docs/screenshots/v1/timeline.png" alt="Timeline arrangement with audio and video tracks" width="100%"> |
+| A clip launcher for live sets (Shift + S): audio and video clips in scenes, launch quantize (1 bar by default), Trigger and Gate launch modes, follow actions and "Then Play Next Scene". Session Audio plays only the launched clips. Record writes your performance into the Timeline, and Render Take renders that span, audio and video, to a folder. | The arrangement (Shift + T): clips on tracks against the same BPM transport, a blade tool, track groups, markers, loop and snap, drag-and-drop media import, live waveforms and video thumbnails, and a render queue. |
+
+### Piano Roll
+
+<img src="docs/screenshots/v1/piano-roll.png" alt="Piano Roll with notes in a scale" width="100%">
+
+A note editor (Shift + R) for MIDI lanes on the Timeline, played by the new Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key.
+
+### Mod Matrix and Performance
+
+<img src="docs/screenshots/v1/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
+
+The Mod Matrix (Shift + M) lists every modulation in the patch in one table: source, destination, range, curve and invert, with each source's live signal. The Performance panel (Shift + P) is a surface for playing a patch: pages of knobs, faders, XY pads, toggles, triggers, radio selectors and step gates, each assigned to any parameter, with MIDI learn and a response curve per control. Edit mode lays it out; Perform mode plays it.
+
+### New nodes and instruments
+
+- **Piano**: a physically modelled piano (felt hammers, stiff-string waveguides, unisons, dampers, soundboard) with Grand, Rhodes and Wurlitzer models.
+- **Wind**: a waveguide wind instrument: clarinet, sax, flute and brass.
+- **String**: fitted body types (guitar, harp, violin, cello), pick hardness, and bow pressure and noise.
+- **Generate Samples**: a sample player whose sample is made, not loaded. Pick a part (drums, bass, synths, pads, plucks, leads, percussion, textures), press generate, and it renders a 1 to 8 bar loop from Infinite's own instruments. It saves as a recipe, not as audio.
+- **Piano Roll**: plays a MIDI lane from the Piano Roll.
+- **3D View**: the scene node behind the 3D View panel; wire it to an Output to render it.
+- **Settings > Plugins**: scan controls and the list of scanned plugins in one place.
+
+### AI skill files
+
+Infinite ships reference files you can hand to any AI assistant, or drop into `~/.claude/skills/`, so it writes correct patches and code first time. Settings > Terminal installs all three at once (**Install All AI Skills**) or the patch authoring file alone; the Field Language and Expression Globals pages each have an **Install AI Skill** button for their own file. In the Terminal, `infinite guide` and `infinite code docs <language>` print the same references.
+
+---
+
+## Video tutorial
+
+New to Infinite? Watch the full walkthrough on YouTube: **[Infinite video walkthrough and tutorial](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)**.
 
 ---
 
 ## Highlights
 
-- **Arrangement Timeline**: A full clip-based arrangement editor alongside the node canvas — tick-accurate scheduling off the same BPM transport, blade tool, track groups, marquee multi-select, drag-and-drop media import, live waveform/video-thumbnail rendering, and a render/export queue.
-- **Dual Synchronized DAG Engine**: High-throughput GPU texture pipeline (GLSL / OpenGL 3.2 Core) running in lockstep with a sample-accurate, pull-based audio graph tied to a global BPM transport.
-- **Universal Cross-Domain Modulation**: Modulate any shader parameter, 3D transform, audio synth control, or hosted plugin slider via LFOs, CV sequencers, live audio FFT spectrum analysis, or video analysis.
-- **Audio Synthesis & Physical Modeling**: Wavetable oscillator, modal metallic physical resonator, real-time granular engine, PaulStretch spectral stretcher, multi-sample player, and 8-track drum machine.
-- **AU & VST3 Plugin Hosting**: Host third-party **Audio Unit** (macOS) and **VST3** (macOS, Windows, Linux) plugins with native GUI windows and automatable/modulatable parameter controls.
-- **Procedural 3D & Physics Solvers**: Meshes, 3D splines, point scattering, single-draw-call GPU instancing (`Instance on Points`), PBD cloth/soft-body physics, particle systems, and PBR rendering (Cook-Torrance GGX + ACES tonemapping + 32-bit HDRI).
-- **2D Shaders & Generative FX**: 32 blend modes, live GLSL editor, video & camera playback, Syphon (macOS) / Spout (Windows) zero-copy video I/O, NDI video in/out over the network (needs the free NDI runtime), reaction-diffusion, and on-device ML subject background removal.
+- **Two engines in lockstep**: a GPU texture pipeline (GLSL, OpenGL 3.2 Core) runs with a sample-accurate, pull-based audio graph on one BPM transport.
+- **Modulate anything from anything**: shader parameters, 3D transforms, synth controls and hosted plugin parameters, driven by LFOs, CV sequencers, audio FFT analysis or video analysis.
+- **Synthesis and physical modelling**: Wavetable, Metallic modal resonator, String, Piano, Wind, granular engine, PaulStretch, multi-sample player and an 8-track drum machine.
+- **AU and VST3 plugin hosting**: Audio Unit (macOS) and VST3 (macOS, Windows, Linux) with native plugin windows and modulatable parameters.
+- **Procedural 3D and physics**: meshes, 3D splines, point scattering, single-draw-call instancing (Instance on Points), PBD cloth and soft bodies, particle systems, and PBR rendering (Cook-Torrance GGX, ACES tonemapping, 32-bit HDRI).
+- **2D shaders and generative effects**: 32 blend modes, a live GLSL editor, video and camera playback, Syphon (macOS) and Spout (Windows) zero-copy video, NDI video in and out (needs the Free NDI runtime), reaction-diffusion, and on-device ML background removal.
 
 ---
 
-## Node Library Overview
+## Node library
 
-Infinite features **300+ modular node types**:
+Infinite has **300+ node types**:
 
-| Domain | Key Nodes |
+![The Infinite node canvas](docs/screenshots/v1/node-graph.png)
+
+| Domain | Key nodes |
 |---|---|
-| **2D & Video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise & Gradient Ramps |
-| **2D FX & Grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Dither, Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
-| **Compositing & Masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
-| **3D Geometry & FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Sketch 3D (JavaScript-built meshes), Mesh Deconstruction, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Taubin Smooth, Array, Instancing, Metaballs |
-| **3D Scene & Render** | Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES Tonemapping, Multisampled Antialiasing |
-| **Synths & Sound** | Wavetable synth, Metallic modal resonator, Granular synth, PaulStretch, Molder / Grain Molder (spectral resynthesis), Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, 16-pad MPC sampler (polyphonic, per-pad mode / tempo-quantised sync / volume / pitch / pan / speed / fine tune / fades, all modulatable), Looper (record / overdub, tempo-synced, latency-compensated, Sampler-style playback controls), Multi-waveform Oscillator |
-| **Field Language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Graph — see [below](#field-write-what-a-node-does) |
-| **Notes & MIDI** | Live MIDI input/clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock), Field Notes (a Field script that plays notes) |
-| **Audio FX & Plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch & Frequency Shifters, Chorus, Phaser, Formant |
-| **Modulators & Analysis** | LFO, Random, Pattern CV, Envelope Follower, Math, XY Pad, Audio Analyze (8-band FFT / onset), Image Analyze (luminance / motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
-| **Output & I/O** | Spatial Mixer (3D headphone mix with head tracking), PNG snapshot, H.264/MOV video recording with synchronized audio, Syphon Out / Spout Out, NDI Out |
-
-The full catalogue, including every node's pins and parameters, is in the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf).
-
-Infinite also renders headless, with no window: pictures, video and sound straight from a `.inf` text file on the command line. See the [Headless User Guide](docs/headless/Infinite_Headless_User_Guide.pdf) ([Markdown](docs/headless/GUIDE.md)).
-
-![Infinite Modular Node Graph](docs/nodegraph.png)
+| **2D and video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, NDI In, Paint/Draw canvas, GLSL Formula editor, Sketch (JavaScript-drawn images, with SVG animation), Shapes (SDF), Noise and Gradient Ramps |
+| **2D FX and grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Dither, Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
+| **Compositing and masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
+| **3D geometry and FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Sketch 3D (JavaScript-built meshes), Mesh Deconstruction, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Taubin Smooth, Array, Instancing, Metaballs, Point Trails |
+| **3D scene and render** | 3D View, Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES tonemapping, multisampled antialiasing |
+| **Synths and sound** | Wavetable, Metallic modal resonator, String, Piano, Wind, Generate Samples, Granular, PaulStretch, Molder / Grain Molder (spectral resynthesis), Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, 16-pad MPC sampler, Looper (record and overdub, tempo-synced, latency-compensated), multi-waveform Oscillator |
+| **Field language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Notes, Field Graph (see [below](#field-write-what-a-node-does)) |
+| **Notes and MIDI** | Piano Roll, live MIDI input and clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer, MIDI File player, MIDI Out (hardware and virtual ports, CC and clock) |
+| **Audio FX and plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch and Frequency Shifters, Chorus, Phaser, Formant |
+| **Modulators and analysis** | LFO, Random, Pattern CV, Envelope Follower, Math, XY Pad, Audio Analyze (8-band FFT, onset), Image Analyze (luminance, motion), Hand / Face / Pose Track (camera to modulators, via the Tracking pack) |
+| **Output and I/O** | Spatial Mixer (3D headphone mix with head tracking), PNG snapshot, H.264/MOV recording with synchronised audio, Syphon Out / Spout Out, NDI Out |
 
 ---
 
 ## Field: write what a node does
 
-Every other node in Infinite does one fixed thing — a Blur node blurs, a Delay node delays. **Field** nodes are different: you write a short kernel, and Field figures out where it runs from what the code touches.
+Every other node in Infinite does one fixed thing: a Blur node blurs, a Delay node delays. **Field** nodes are different. You write a short kernel, and Field works out where it runs from what the code touches.
 
 ```
-col = vec3(uv.x, uv.y, 0.5)              // once per pixel, on the GPU — a shader
-P.y += sin(P.x * 4.0 + t) * 0.2          // once per point in a mesh — a geometry deformer
-out = in * gain                          // once per audio sample — a DSP effect
+col = vec3(uv.x, uv.y, 0.5)              // once per pixel, on the GPU: a shader
+P.y += sin(P.x * 4.0 + t) * 0.2          // once per point in a mesh: a geometry deformer
+out = in * gain                          // once per audio sample: a DSP effect
 ```
 
-That's the one idea underneath the whole language: a **kernel**, run once per element of a **domain**, forever. You never declare where it runs — the domain (and therefore the backend it compiles to) is inferred. Field currently spans five domains and seven node types:
+That is the one idea underneath the language: a **kernel**, run once per element of a **domain**, forever. You never declare where it runs; the domain, and so the backend it compiles to, is inferred.
 
 | Node | Domain | What it does |
 |---|---|---|
-| **Field Modifier** | element | Per-vertex kernel over existing geometry — modifies `P`, `N`, `uv`, `Cd` and custom attributes |
-| **Field Primitive** | element | Generates procedural point geometry from scratch (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot) |
+| **Field Modifier** | element | Per-vertex kernel over existing geometry: modifies `P`, `N`, `uv`, `Cd` and custom attributes |
+| **Field Primitive** | element | Generates point geometry from scratch (Circle, Spiral, Grid Lattice, Fibonacci Sphere, Helix, Torus Knot) |
 | **Field Effect** | sample | Per-sample audio DSP kernel; `in`/`out`, `state` for per-voice memory, `param` for knobs |
-| **Field Synth** | sample | Polyphonic note-driven synth voice using the same sample compiler, with `freq`/`gate` in place of an audio input |
+| **Field Synth** | sample | Polyphonic note-driven synth voice on the same sample compiler, with `freq`/`gate` in place of an audio input |
 | **Field Pixel** | pixel | Per-pixel kernel compiled straight to GLSL; `state` cells with `[wrap]` support feedback and stencils |
 | **Field Notes** | sample | Per-sample note kernel: `note(pitch, vel, len)` sends notes out, and `tick(div)`, `deg(d)`, `rand()` and `beat` read the transport |
-| **Field Graph** | graph | Runs once at edit time — `emit()`/`connect()`/`set()`/`place()` declaratively mount and wire real Infinite nodes into a bundle ("Instrument Mode" collapses it to one box; "Unpack to Canvas" expands it back out) |
+| **Field Graph** | graph | Runs once at edit time: `emit()`/`connect()`/`set()`/`place()` mount and wire real Infinite nodes into a bundle ("Instrument Mode" collapses it to one box; "Unpack to Canvas" expands it again) |
 
-Any element/pixel/sample kernel can also declare **dynamic pins** right in its code, adding real, cable-wireable, save/load-safe I/O to the node without touching C++. Finished devices — kernel plus params plus presets — save, load, export and import as portable `.field` files, so a Field patch is shareable like an audio plugin preset. The full language reference — syntax, domain-transfer operators, reserved words, and the complete node/format reference — is in the [Field Language Manual](Field_Language_Manual.pdf).
+Any element, pixel or sample kernel can declare **dynamic pins** in its code, adding real, cable-wireable, save-safe inputs and outputs without touching C++. Finished devices (kernel, params and presets) save and share as portable `.field` files. The full reference is in the [Field Language Manual](Field_Language_Manual.pdf).
 
 <p align="center">
-  <img src="website/assets/field_pixel_editor.png" alt="Field Pixel Editor" width="550">
+  <img src="website/assets/field_pixel_editor.png" alt="Field Pixel editor" width="550">
 </p>
 
 ---
 
-## Model Context Protocol (MCP) Server
+## Headless and agents
 
-Infinite includes a native Model Context Protocol (MCP) stdio server implementation located in [`tools/npm/infinite-engine`](tools/npm/infinite-engine) (Node.js / npm: `infinite-engine`) and [`tools/mcp/infinite_mcp.py`](tools/mcp/infinite_mcp.py) (Python), allowing AI coding assistants and autonomous agents (Claude Desktop, Cursor, Windsurf, Claude Code) to compose audio, render visuals, and inspect node graphs headlessly.
+Infinite also runs with no window: pictures, video and sound straight from a `.inf` text file on the command line, the same engine the `infinite` command uses. See the [Headless User Guide](docs/headless/Infinite_Headless_User_Guide.pdf) ([Markdown](docs/headless/GUIDE.md)).
 
-### One-Command Setup
+For AI coding assistants there is an MCP server, [`tools/npm/infinite-engine`](tools/npm/infinite-engine) (npm: `infinite-engine`), and a Claude plugin described in [`tools/mcp/README.md`](tools/mcp/README.md).
 
 ```bash
-# Automatically configure Claude Desktop, Cursor, and Windsurf:
+# Add Infinite to Claude Desktop, Cursor and Windsurf:
 npx -y infinite-engine init
 
-# Or via Smithery registry:
+# Or through the Smithery registry:
 npx -y @smithery/cli install infinite-engine --client claude
 npx -y @smithery/cli install infinite-engine --client cursor
 ```
 
-### Implemented MCP Tools
-
-The server implements nine native MCP tools adhering to the Model Context Protocol specification:
-
-| MCP Tool | Description |
+| MCP tool | What it does |
 |---|---|
-| `infinite_synthesize_field_synth` | Synthesise WAV audio from an inline Field DSP kernel |
-| `infinite_synthesize_field_notes` | Generate algorithmic MIDI sequences and Euclidean rhythms into audio |
-| `infinite_process_field_effect` | Process audio through an inline Field per-sample DSP filter or wavefolder kernel |
-| `infinite_render_video` | Render 60fps MP4 video with synchronized audio from GLSL or JavaScript sketches |
-| `infinite_render_frame` | Render a still PNG frame from a shader, sketch, or `.inf` patch file |
-| `infinite_validate_patch` | Validate a `.inf` patch file and return structural diagnostics and syntax checks |
-| `infinite_sketch_3d` | Generate procedural 3D meshes from a JavaScript sketch |
-| `infinite_field_primitive` | Generate parametric 3D point surfaces from Field UV equations |
-| `infinite_field_modifier` | Deform, normalise, and shade a 3D mesh via Field vertex modifiers |
+| `infinite_synthesize_field_synth` | Renders WAV audio from an inline Field Synth kernel |
+| `infinite_synthesize_field_notes` | Renders algorithmic note sequences and Euclidean rhythms from a Field Notes kernel |
+| `infinite_process_field_effect` | Processes audio through an inline Field Effect kernel |
+| `infinite_render_field_pixel` | Renders a Field Pixel shader to a PNG |
+| `infinite_render_field_primitive` | Renders parametric surfaces from Field Primitive equations |
+| `infinite_render_field_modifier` | Deforms a mesh with an inline Field Modifier kernel |
+| `infinite_render_sketch3d` | Renders JavaScript-built 3D geometry to a PNG |
+| `infinite_validate_patch` | Checks a `.inf` patch against the engine |
+| `infinite_render_video` | Renders an MP4 from a `.inf` patch |
 
-For full tool schemas, architecture details, and custom prompts, see [`tools/npm/infinite-engine/README.md`](tools/npm/infinite-engine/README.md) and [`AGENT.md`](AGENT.md).
+Tool schemas and prompts: [`tools/npm/infinite-engine/README.md`](tools/npm/infinite-engine/README.md) and [`AGENT.md`](AGENT.md).
 
 ---
 
-## Installation & Quick Start
+## Manuals and shortcuts
 
-### Pre-built App (macOS, Windows & Linux)
-Download the latest build for your platform from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows, or `Infinite-x86_64.AppImage` for Linux.
+| Manual | What it covers |
+|---|---|
+| [Node Reference Manual](Infinite_Node_Reference_Manual.pdf) | Every node, with its pins and parameters |
+| [Field Language Manual](Field_Language_Manual.pdf) | Syntax, domains, domain-transfer operators, reserved words, the node and file format reference |
+| [Headless User Guide](docs/headless/Infinite_Headless_User_Guide.pdf) | Rendering and checking patches from the command line |
 
-**macOS** (Infinite is not notarized by Apple, so the first launch needs one extra step)
+Every keyboard shortcut is listed in the app under **All shortcuts...** in the menu. The panels:
+
+| Key | Panel |
+|---|---|
+| Shift + T | Timeline |
+| Shift + S | Session |
+| Shift + R | Piano Roll |
+| Shift + W | Sample Studio |
+| Shift + M | Mod Matrix |
+| Shift + P | Performance |
+| Shift + 3 | 3D View |
+| Shift + U | History |
+| Ctrl + \` | Terminal |
+
+---
+
+## Installation
+
+### Pre-built app (macOS, Windows and Linux)
+Download the latest build from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows, or `Infinite-x86_64.AppImage` for Linux.
+
+**macOS** (Infinite is not notarised by Apple, so the first launch needs one extra step)
 
 With Homebrew: `brew install --cask n1m21n/tap/infinite` (the first-launch step below still applies).
 
 1. Open the DMG and drag `Infinite.app` to Applications.
 2. Double-click `Fix & Open Infinite.command` in the DMG and press `y`. It clears the download flag on Infinite only, then opens it.
-   - Or do it by hand: try to open Infinite once, then **System Settings → Privacy & Security → Open Anyway** (macOS 15 and later), or right-click `Infinite.app` → **Open** (older macOS).
+   - Or by hand: try to open Infinite once, then **System Settings > Privacy & Security > Open Anyway** (macOS 15 and later), or right-click `Infinite.app` > **Open** (older macOS).
    - Or in Terminal: `xattr -dr com.apple.quarantine /Applications/Infinite.app`
 
 **Windows**
@@ -153,11 +224,11 @@ With Homebrew: `brew install --cask n1m21n/tap/infinite` (the first-launch step 
 
 **Linux**
 1. `chmod +x Infinite-x86_64.AppImage`
-2. Run `./Infinite-x86_64.AppImage`. It bundles the static AppImage runtime, so no `libfuse2` install is needed. If it's running in a container or on a system with no `/dev/fuse`, use `./Infinite-x86_64.AppImage --appimage-extract-and-run` instead.
+2. Run `./Infinite-x86_64.AppImage`. It bundles the static AppImage runtime, so no `libfuse2` install is needed. In a container or on a system with no `/dev/fuse`, use `./Infinite-x86_64.AppImage --appimage-extract-and-run` instead.
 
 ---
 
-## Build from Source
+## Build from source
 
 ### macOS
 Requirements: **CMake 3.16+** and **Xcode Command Line Tools**.
@@ -170,7 +241,7 @@ cmake --build build -j8
 open build/Infinite.app
 ```
 
-*To create a standalone DMG installer, run `./package.sh`.*
+*To make a standalone DMG installer, run `./package.sh`.*
 
 ### Windows
 Requirements: **CMake 3.16+** and **Visual Studio 2022/2026** (MSVC v143+, Desktop development with C++).
@@ -183,20 +254,20 @@ cmake --build build --config Release
 .\build\Release\Infinite.exe
 ```
 
-*To create a packaged portable folder, run `powershell -ExecutionPolicy Bypass -File package.ps1`.*
+*To make a packaged portable folder, run `powershell -ExecutionPolicy Bypass -File package.ps1`.*
 
 ### Linux
-Requirements: **CMake 3.16+**, a C++20 compiler (Clang or GCC), Ninja, and the dev packages in `tools/linux/deps-apt.sh` (X11/GLFW/ALSA/fontconfig headers etc.). x86_64, glibc ≥ 2.35 (Ubuntu 22.04+ or equivalent) if you want the result to match the published AppImage's floor.
+Requirements: **CMake 3.16+**, a C++20 compiler (Clang or GCC), Ninja, and the dev packages in `tools/linux/deps-apt.sh` (X11, GLFW, ALSA and fontconfig headers). x86_64, glibc 2.35 or newer (Ubuntu 22.04+ or equivalent) to match the published AppImage's floor.
 
 ```bash
 git clone https://github.com/n1m21n/Infinite.git
 cd Infinite
-tools/linux/deps-apt.sh   # installs build + runtime deps via apt
-tools/linux/build.sh      # configures + builds build-linux/Infinite
+tools/linux/deps-apt.sh   # installs build and runtime deps via apt
+tools/linux/build.sh      # configures and builds build-linux/Infinite
 ./build-linux/Infinite
 ```
 
-*To package a portable AppImage, run `tools/linux/package-appimage.sh build-linux artifacts-linux`.* A containerized dev environment (no local dep install needed) is available via `tools/linux/local.sh build` — see that script for details.
+*To package a portable AppImage, run `tools/linux/package-appimage.sh build-linux artifacts-linux`.* A containerised dev environment (no local dep install needed) is available through `tools/linux/local.sh build`; see that script for details.
 
 ---
 
@@ -204,9 +275,11 @@ tools/linux/build.sh      # configures + builds build-linux/Infinite
 
 ```
 src/
-├── core/         # INode DAG engine, ImageCable, Transport, Modulation, GLUtil, Mesh
-├── nodes/        # 160+ Node implementations (2D, 3D, Audio, Synth, Notes, Modulation)
-├── audio/        # Audio engine, DSP kernels, Wavetable core, Plugin hosting (AU/VST3)
+├── core/         # INode DAG engine, ImageCable, Transport, Modulation, GLUtil, Mesh, terminal core
+├── nodes/        # Node implementations (2D, 3D, Audio, Synth, Notes, Modulation)
+├── audio/        # Audio engine, DSP kernels, Wavetable core, plugin hosting (AU/VST3), slice rendering
+├── arrange/      # Timeline, Session and Piano Roll model and scheduling
+├── app/          # Canvas, panels, node bodies, patch I/O, headless and RPC
 └── platform/     # OS layer: macOS (CoreAudio/AU/AVFoundation) | Windows (WASAPI/WinMM/Media Foundation/GDI+) | Linux (ALSA/GLFW/X11/VST3)
 ```
 
@@ -214,42 +287,41 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/CODE_STANDARDS.md](docs/CODE_ST
 
 ---
 
-## Linux-specific known limits
+## Linux known limits
 
-The Linux build has the same node graph and file format as macOS/Windows, with these platform gaps:
+The Linux build has the same node graph and file format as macOS and Windows, with these platform gaps:
 
-- No Syphon/Spout equivalent — no zero-copy video I/O with other apps.
-- No Audio Unit (AU) hosting — VST3 only (same as Windows).
+- No Syphon/Spout equivalent, so no zero-copy video I/O with other apps.
+- No Audio Unit (AU) hosting: VST3 only (same as Windows).
 - No LV2 plugin hosting.
-- No complex-script text shaping (no HarfBuzz) — Latin-script text renders correctly, but right-to-left and complex scripts (Arabic, Devanagari, etc.) may not.
+- No complex-script text shaping (no HarfBuzz): Latin-script text renders correctly, but right-to-left and complex scripts (Arabic, Devanagari and others) may not.
 - VST3 plugin editor windows need X11 or XWayland; a pure-Wayland session without XWayland cannot show plugin GUIs.
-- x86_64 only — no arm64 build is published.
+- x86_64 only: no arm64 build is published.
 
 ---
 
 ## Contributing
 
-Contributions, bug reports, and node ideas are welcome!
-- Join the discussion and share creations in our [Discord Community](https://discord.gg/GMeQTyJqkH).
+Contributions, bug reports and node ideas are welcome.
+- Join the discussion and share creations in the [Discord community](https://discord.gg/GMeQTyJqkH).
 - File bugs or feature requests in [GitHub Issues](https://github.com/n1m21n/Infinite/issues).
-- Submit Pull Requests with clean-room MIT-compatible code following [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md). See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Submit pull requests with clean-room, MIT-compatible code following [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## Prior Art & Acknowledgements
+## Prior art and acknowledgements
 
 The tools and papers Infinite builds on are named in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and the people who contributed are credited in [CONTRIBUTING.md](CONTRIBUTING.md#community-and-contributors).
 
 ---
 
-## Cite & credit
+## Cite and credit
 
 If you write about, review or build on Infinite, please credit it as: *Infinite, by Naman Soni (n1m21n), https://infinitedevices.org*. GitHub's "Cite this repository" button uses [CITATION.cff](CITATION.cff).
 
 ---
 
-## License
+## Licence
 
-Infinite's source code is licensed under the [MIT License](LICENSE).  
+Infinite's source code is licensed under the [MIT License](LICENSE).
 Default builds include VST3 plugin hosting linking the [Steinberg VST3 SDK](https://github.com/steinbergmedia/vst3sdk) (GPLv3). Build with `-DINFINITE_ENABLE_VST3=OFF` for a pure MIT binary.
-
