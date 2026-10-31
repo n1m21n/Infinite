@@ -1317,8 +1317,8 @@
    [
     "MIDI Notes",
     "NOTES · OUT",
-    "The note source, reads live MIDI input and turns it into note events for the rest of the chain, with a channel selector, a transpose knob, a velocity scale, and an option to snap incoming notes to the global key/scale.",
-    "set channel to a single MIDI device's channel so you can layer two controllers into different chains without them colliding.",
+    "The note source, reads live MIDI input and turns it into note events for the rest of the chain, with a channel selector, a transpose knob, a velocity scale, and an option to snap incoming notes to the global key/scale. An input device dropdown picks which controller it listens to (or all of them), and Learn sets the device and channel from the next key you play.",
+    "press Learn and play a key on each of two controllers, one Midi Notes per controller, to layer them into different chains without them colliding.",
     [
      "MIDI Notes",
      "Note Transpose",
