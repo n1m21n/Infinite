@@ -450,13 +450,55 @@ namespace app
       BeginAudioSection("input");
       if (!Platform::MidiIsRunning())
       {
-         if (ActionButton::Draw("MIDI Learn", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Start MIDI", ImVec2(kPreviewSize, 0)))
             n->StartListening();
          ImGui::TextDisabled("click to start listening for a connected controller");
       }
       else
       {
-         ImGui::TextUnformatted(Platform::MidiDeviceSummary().c_str());
+         // Device: every input by default, or one connected controller by name.
+         const auto sources = Platform::MidiListSources();
+         std::vector<std::string> options { "All MIDI inputs" };
+         int currentIdx = 0;
+         for (const auto& src : sources)
+         {
+            if (src.name == n->deviceName)
+               currentIdx = (int)options.size();
+            options.push_back(src.name);
+         }
+         std::string caption = n->deviceName.empty() ? options[0] : n->deviceName;
+         if (n->DeviceMissing())
+            caption += " (not connected)";
+         PushDropdownStyle();
+         if (NodeDropdownField((caption + "##midiDevice").c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
+         {
+            gDropdown.options = options;
+            gDropdown.categories.assign(options.size(), "");
+            gDropdown.onSelect = [n, options](int idx) {
+               if (idx < 0 || idx >= (int)options.size())
+                  return;
+               PushUndoCheckpoint();
+               n->deviceName = idx == 0 ? std::string() : options[idx];
+            };
+            gDropdown.current = currentIdx;
+            gDropdown.justOpened = true;
+            gDropdown.focusSearch = false;
+         }
+         PopDropdownStyle();
+         const bool learning = n->IsLearning();
+         if (ActionButton::Draw(learning ? "Play a key..." : "Learn", ImVec2(kPreviewSize, 0),
+                                learning ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
+         {
+            if (learning)
+               n->CancelLearn();
+            else
+            {
+               PushUndoCheckpoint();
+               n->BeginLearn();
+            }
+         }
+         if (n->DeviceMissing())
+            ImGui::TextDisabled("device not connected - listening to all inputs");
       }
       ImGui::TextDisabled("%s", n->channel < 0 ? "channel: omni (-1)" : "channel: filtered");
       EndAudioSection();

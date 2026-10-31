@@ -359,8 +359,19 @@ public:
       Platform::MidiNoteMessage msgs[64];
       const int n = Platform::MidiReadNotesSince(mCursor, msgs, 64);
 
+      const unsigned int deviceFilter = mDevice.load(std::memory_order_relaxed);
       for (int i = 0; i < n; i++)
       {
+         // Learn takes the next key pressed on any input, before the filters.
+         if (msgs[i].isNoteOn && mLearn.load(std::memory_order_relaxed))
+         {
+            mLearnedChannel.store(msgs[i].channel, std::memory_order_relaxed);
+            mLearnedDevice.store((unsigned int)msgs[i].device, std::memory_order_relaxed);
+            mLearn.store(false, std::memory_order_release);
+            mLearnDone.store(true, std::memory_order_release);
+         }
+         if (deviceFilter != 0 && (unsigned int)msgs[i].device != deviceFilter)
+            continue;
          if (channelFilter >= 0 && msgs[i].channel != channelFilter)
             continue;
          int note = msgs[i].note + transpose;
@@ -457,11 +468,28 @@ public:
    void PushParams(const MidiNotesNode& n)
    {
       mChannel.store(n.channel, std::memory_order_relaxed);
+      mDevice.store(n.ResolvedDevice(), std::memory_order_relaxed);
       mTranspose.store(n.transpose, std::memory_order_relaxed);
       mVelocityScale.store(n.velocityScale, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       mMpe.store(n.mpe, std::memory_order_relaxed);
       mMpeRange.store(std::clamp(n.mpeBendRange, 1.0f, 96.0f), std::memory_order_relaxed);
+   }
+
+   // Main thread: arm Learn, then poll for the key it caught.
+   void ArmLearn()
+   {
+      mLearnDone.store(false, std::memory_order_relaxed);
+      mLearn.store(true, std::memory_order_release);
+   }
+   void CancelLearn() { mLearn.store(false, std::memory_order_relaxed); }
+   bool TakeLearned(unsigned int& device, int& channel)
+   {
+      if (!mLearnDone.exchange(false, std::memory_order_acquire))
+         return false;
+      device = mLearnedDevice.load(std::memory_order_relaxed);
+      channel = mLearnedChannel.load(std::memory_order_relaxed);
+      return true;
    }
 
    uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
@@ -510,6 +538,11 @@ private:
    std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
    std::atomic<int> mLastNote { -1 };
    std::atomic<int> mChannel { -1 };
+   std::atomic<unsigned int> mDevice { 0 };   // 0 = every input
+   std::atomic<bool> mLearn { false };
+   std::atomic<bool> mLearnDone { false };
+   std::atomic<unsigned int> mLearnedDevice { 0 };
+   std::atomic<int> mLearnedChannel { 0 };
    std::atomic<int> mTranspose { 0 };
    std::atomic<float> mVelocityScale { 1.0f };
    std::atomic<bool> mUseGlobalScale { false };
@@ -520,6 +553,36 @@ MidiNotesNode::~MidiNotesNode()
 {
    if (mMpeRegistered)
       Platform::MidiMpeEnabledCount().fetch_sub(1, std::memory_order_relaxed);
+}
+
+unsigned int MidiNotesNode::ResolvedDevice() const
+{
+   if (deviceName.empty())
+      return 0;
+   for (const auto& src : Platform::MidiListSources())
+      if (src.name == deviceName)
+         return (unsigned int)src.id;
+   return 0;   // unplugged: fall back to every input, the body says so
+}
+
+bool MidiNotesNode::DeviceMissing() const
+{
+   return !deviceName.empty() && ResolvedDevice() == 0;
+}
+
+void MidiNotesNode::BeginLearn()
+{
+   mLearning = true;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioMidiNotesNode>();
+   mAudioNode->ArmLearn();
+}
+
+void MidiNotesNode::CancelLearn()
+{
+   mLearning = false;
+   if (mAudioNode)
+      mAudioNode->CancelLearn();
 }
 
 bool MidiNotesNode::StartListening()
@@ -535,6 +598,17 @@ void MidiNotesNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMidiNotesNode>();
+   if (mLearning)
+   {
+      unsigned int dev = 0;
+      int ch = 0;
+      if (mAudioNode->TakeLearned(dev, ch))
+      {
+         deviceName = Platform::MidiDeviceName((Platform::MidiDeviceId)dev);
+         channel = ch;
+         mLearning = false;
+      }
+   }
    mAudioNode->PushParams(*this);
    // The MIDI backends only keep the note-pressure / note-slide virtual
    // controllers while some node wants MPE, so ordinary CC learn is untouched.
@@ -548,6 +622,7 @@ void MidiNotesNode::CookIfNeeded(int frameId)
 void MidiNotesNode::VisitParams(ParamVisitor& v)
 {
    v.Int("channel", channel);
+   v.Text("device", deviceName);
    v.Int("transpose", transpose);
    v.Float("velocityScale", velocityScale);
    v.Bool("useGlobalScale", useGlobalScale);

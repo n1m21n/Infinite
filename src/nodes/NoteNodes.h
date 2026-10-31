@@ -77,6 +77,16 @@ public:
    bool StartListening();
 
    int channel = -1;             // -1 = omni, else 0-15
+   // Input device by name ("" = every input). Ids change per session, names
+   // do not, so the name is what saves. An unplugged device falls back to
+   // every input (DeviceMissing tells the body to say so).
+   std::string deviceName;
+   unsigned int ResolvedDevice() const;
+   bool DeviceMissing() const;
+   // Learn: the next key played on any input sets device and channel.
+   void BeginLearn();
+   void CancelLearn();
+   bool IsLearning() const { return mLearning; }
    int transpose = 0;            // semitones applied to every incoming note
    float velocityScale = 1.0f;   // 0..2, applied before the note leaves this node
    bool useGlobalScale = false;  // snap incoming notes to Transport's key/scale
@@ -93,6 +103,7 @@ private:
    std::unique_ptr<AudioMidiNotesNode> mAudioNode;
    int mLastCookFrame = -1;
    bool mMpeRegistered = false; // counted in Platform::MidiMpeEnabledCount
+   bool mLearning = false;
 };
 
 // A note source that needs no hardware at all: an on-screen piano you click
