@@ -36,9 +36,8 @@ namespace EmptyState
       return y;
    }
 
-   inline void Draw(const ImVec2& min, const ImVec2& max, const char* message, const char* hint = nullptr)
+   inline void DrawTo(ImDrawList* dl, const ImVec2& min, const ImVec2& max, const char* message, const char* hint = nullptr)
    {
-      ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       const float cx = (min.x + max.x) * 0.5f;
       const float maxW = std::max(40.0f, max.x - min.x - 2.0f * tok::space_3);
@@ -52,6 +51,11 @@ namespace EmptyState
          UiType::Scope cap(UiType::Size::Caption);
          DrawWrapped(dl, cx, y, maxW, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.7f), hint);
       }
+   }
+
+   inline void Draw(const ImVec2& min, const ImVec2& max, const char* message, const char* hint = nullptr)
+   {
+      DrawTo(ImGui::GetWindowDrawList(), min, max, message, hint);
    }
 
    // The node-body variant: one centred Caption-size line (previews and scopes are small, so no Body weight).
