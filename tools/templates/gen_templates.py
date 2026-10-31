@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generates assets/templates/*.inf, then lays each out with tools/patch-layout.py.
     python3 tools/templates/gen_templates.py
-Edit the T(...) entries below, rerun, commit the .inf files. Each template is small, runs on its own
-and explains itself with Comment nodes (one header per band, one note per node group)."""
-import os, subprocess, sys
+Edit the T(...) entries below, rerun, commit the .inf files. Two tiers in the Templates window:
+  Starters  3-6 nodes, one idea each, explained with Comment nodes (one header per band, one note per node group).
+  Showcase  full patches with media, copied from docs/showcase/ (see SHOWCASE) with their Comment notes added."""
+import os, shutil, subprocess, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "assets", "templates")
 
@@ -18,11 +19,6 @@ class T:
         s.slug, s.title, s.blurb, s.nodes, s.wires, s.notes, s.bands, s.extra = slug, title, blurb, nodes, wires, notes, bands, extra
         T.all.append(s)
     def text(s):
-        if any(n[0]=="speakers" for n in s.nodes) and not any(n[0]=="out" for n in s.nodes):
-            last = s.wires[-1].split()[-1]
-            s.nodes = s.nodes + [("ana","Modulators","Audio Analyze",[]), ("pic","Source","Shape",["c fillColor 1 0.45 0.3","f size 0.2"]), OUTN]
-            s.wires = s.wires + [f"aud ana 0 {last}", "cable out 0 pic", "mod pic sizeX ana 0 0 1 0.5 0.12 0.4", "mod pic sizeY ana 0 0 1 0.5 0.12 0.4"]
-            s.notes = s.notes + [("pic","A small picture that follows the sound, so you can see it as well as hear it.")]
         out = ["infinite-patch 1", f"# {s.title}: {s.blurb}"]
         i = 1
         for nid, cat, typ, params in s.nodes:
@@ -60,13 +56,11 @@ T("first-image", "First image", "a shape on a colour wash",
 
 T("first-music-image", "Moves with the music", "the shape grows with the sound",
   [("notes","Notes","Random Note Generator",[]), ("synth","Synths","Analog",["f volume 0.5"]), SPK,
-   ("hear","Modulators","Audio Analyze",[]), src_shape("shape"),
-   ("glow","Effects","bloom",[]), OUTN],
-  ["note synth 0 notes", "aud speakers 0 synth", "aud hear 0 synth", "cable glow 0 shape", "cable out 0 glow",
+   ("hear","Modulators","Audio Analyze",[]), src_shape("shape"), OUTN],
+  ["note synth 0 notes", "aud speakers 0 synth", "aud hear 0 synth", "cable out 0 shape",
    "mod shape sizeX hear 0 0 1 0.5 0.12 0.4", "mod shape sizeY hear 0 0 1 0.5 0.12 0.4"],
   [("hear","Audio Analyze listens to the sound and turns it into moving numbers (level, low, mid, high). Try a different output as the source."),
    ("shape","The orange dots on Size X and Size Y means it is driven by the music. Change its Depth to make it move more or less."),
-   ("glow","Bloom adds a glow to bright parts. Try raising Intensity."),
    ("synth","This synth is the sound that the picture follows.")],
   {"Picture": "A picture that moves with the music.", "Sound": "The sound. Notes, synth, speakers."})
 
@@ -79,16 +73,12 @@ T("source", "Source", "pictures from nothing",
    ("mix","Blend puts two pictures together.")],
   {"Picture": "Sources make a picture out of nothing. Add any Source node and wire it to Output."})
 
-T("compositing", "Compositing", "layers, trails and feedback",
-  [src_shape("shape",["f size 0.18","f posX 0.3"]), ("tr","Compositing","Trails",[]), ("lay","Compositing","Layer Stack",[]),
-   ("bg","Source","Ramp",["c stopColor0 0.05 0.1 0.35","c stopColor1 0.55 0.2 0.6"]), OUTN],
-  ["cable tr 0 shape", "cable lay 0 bg", "cable lay 1 tr", "cable out 0 lay",
-   "mod shape posY lfo 0 0 0.3 0.5", "mod shape posX lfo2 0 0 0.3 0.5"],
+T("compositing", "Compositing", "trails behind a moving shape",
+  [src_shape("shape",["f size 0.18"]), ("lfo","Modulators","LFO",["f rateBeats 5"]), ("tr","Compositing","Trails",[]), OUTN],
+  ["cable tr 0 shape", "cable out 0 tr", "mod shape posX lfo 0 0 0.3 0.5"],
   [("tr","Trails leaves a fading copy of what came before. Try Decay: higher is longer trails."),
-   ("lay","Layer Stack puts pictures on top of each other. Its inputs go bottom to top."),
-   ("bg","This colour wash is the bottom layer.")],
-  {"Picture": "Compositing combines and reshapes pictures: stack them, fade them, trail them."},
-  extra=["node 90 Modulators LFO\n  id lfo\n  f rateBeats 5\nend", "node 91 Modulators LFO\n  id lfo2\n  f rateBeats 3\nend"])
+   ("lfo","The LFO swings the shape left and right, so the trail has something to follow.")],
+  {"Picture": "Compositing combines and reshapes pictures: stack them, fade them, trail them."})
 
 T("effects", "Effects", "change a picture",
   [("noise","Source","Noise",[]), ("kal","Effects","kaleidoscope",[]), ("glow","Effects","bloom",[]), ("cr","Compositing","Color Ramp",[]), OUTN],
@@ -155,20 +145,47 @@ T("prediction", "Prediction", "notes that keep going on their own",
   {"Sound": "Green nodes learn from what you play and carry on in your style."})
 
 T("utility", "Utility", "mix and meter sound",
-  [("a","Notes","Random Note Generator",[]), ("b","Notes","Random Note Generator",["i rangeLow 36","i rangeHigh 48"]),
-   ("s1","Synths","Analog",["f volume 0.4"]), ("s2","Synths","Analog",["f volume 0.4"]), ("mixer","Utility","Mixer",[]),
-   ("meter","Utility","Audio Meter",[]), SPK],
-  ["note s1 0 a", "note s2 0 b", "aud mixer in_1 s1", "aud mixer in_2 s2", "aud meter 0 mixer", "aud speakers 0 meter"],
+  [("a","Notes","Random Note Generator",[]), ("s1","Synths","Analog",["f volume 0.4"]), ("s2","Synths","Analog",["f volume 0.4"]),
+   ("mixer","Utility","Mixer",[]), ("meter","Utility","Audio Meter",[]), SPK],
+  ["note s1 0 a", "note s2 0 a", "aud mixer in_1 s1", "aud mixer in_2 s2", "aud meter 0 mixer", "aud speakers 0 meter"],
   [("mixer","The Mixer blends several sounds. Each channel has a volume, a pan and mute/solo."),
-   ("meter","The Meter shows how loud the sound is. It passes sound through unchanged."),
-   ("b","The second voice plays lower notes.")],
+   ("meter","The Meter shows how loud the sound is. It passes sound through unchanged.")],
   {"Sound": "Utility nodes route and check things: mixers, meters, outputs."})
 
 T("field", "Field", "write a picture as a formula",
-  [("pix","Source","FieldPixel",["s code col = vec3(0.5 + 0.5 * sin(uv.x * 10.0 + t), 0.5 + 0.5 * sin(uv.y * 10.0 - t), 0.6);"]), OUTN],
-  ["cable out 0 pix"],
-  [("pix","Field draws each pixel from a formula. uv is the position, t is time. Double-click to open the editor and change the 10.0 values.")],
+  [("pix","Source","FieldPixel",["s code col = vec3(0.5 + 0.5 * sin(uv.x * 10.0 + t), 0.5 + 0.5 * sin(uv.y * 10.0 - t), 0.6);"]), ("glow","Effects","bloom",[]), OUTN],
+  ["cable glow 0 pix", "cable out 0 glow"],
+  [("pix","Field draws each pixel from a formula. uv is the position, t is time. Double-click to open the editor and change the 10.0 values."),
+   ("glow","Field output is a picture like any other, so effects work on it.")],
   {"Picture": "Field lets you write your own picture, sound or shape in a few lines."})
+
+# ---------------- showcase ----------------
+# Full patches that live in docs/showcase/ (the README shots come from them). The generator copies the patch and its
+# media/ folder into assets/templates/ (the loader resolves relative media against the patch's own folder, so the
+# folder travels with the template) and adds the Comment notes: `notes` is (x, y, width, text), header first.
+SHOWCASE = [
+    dict(slug="infinite-v1-showcase", title="Infinite v1 showcase", blurb="drums, pads, 3D and a Perf page, all playing",
+         src="docs/showcase/infinite-v1-showcase.inf", media="docs/showcase/media", last_node="node 35 Utility Output",
+         notes=[(0, -330, 420, "Infinite v1 showcase, Sound band. A drum sequencer, three piano rolls, a pad, a bass and a sampler, mixed into a limiter and the speakers. Press play, or launch a scene in the Session panel."),
+                (1260, -330, 340, "The three Piano Rolls play the pad, the bass and the sampler. Open one to edit the notes."),
+                (3220, -330, 380, "Audio to CV listens to the sound; the LFOs and Random move things too. Open the Mod Matrix panel to see every live wire."),
+                (4800, -330, 420, "Picture band. A Field aurora, an Icosphere bent by a Field Modifier, a 3D scene with instances and particles, then bloom and vignette into Output."),
+                (5900, -330, 340, "World, Camera and two Lights frame the 3D scene. The 3D View shows it from the camera.")]),
+]
+
+def showcase_text(sc):
+    text = open(os.path.join(ROOT, sc["src"])).read()
+    for bad in ("/Users/", "C:\\Users", "/home/"):
+        assert bad not in text, f"{sc['slug']}: personal path {bad!r}"
+    first = text.index(sc["last_node"])
+    end = text.index("\nend\n", first) + len("\nend\n")
+    nid = max(int(m.split()[1]) for m in text.splitlines() if m.startswith("node ")) + 1
+    add = ""
+    for x, y, w, body in sc["notes"]:
+        h = max(110, 60 + 22 * (len(body) // (w // 9) + 1))
+        add += f"node {nid} Compositing Comment\n  pos {x} {y}\n  s text {body}\n  f width {w}\n  f height {h}\nend\n"
+        nid += 1
+    return text[:end] + add + text[end:]
 
 def main():
     os.makedirs(OUT, exist_ok=True)
@@ -176,10 +193,19 @@ def main():
         p = os.path.join(OUT, t.slug + ".inf")
         open(p, "w").write(t.text())
         subprocess.check_call([sys.executable, os.path.join(ROOT, "tools", "patch-layout.py"), p])
-    first = {"first-sound", "first-image", "first-music-image"}
+        n = sum(1 for l in t.text().splitlines() if l.startswith("node ") and " Compositing Comment" not in l)
+        assert 3 <= n <= 6, f"{t.slug}: a starter has 3-6 nodes besides comments, this has {n}"
+    for sc in SHOWCASE:
+        open(os.path.join(OUT, sc["slug"] + ".inf"), "w").write(showcase_text(sc))
+        dest = os.path.join(OUT, "media")
+        os.makedirs(dest, exist_ok=True)
+        for name in sorted(os.listdir(os.path.join(ROOT, sc["media"]))):
+            shutil.copy2(os.path.join(ROOT, sc["media"], name), os.path.join(dest, name))
     with open(os.path.join(OUT, "index.txt"), "w") as f:
         f.write("# slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.\n")
         for t in T.all:
-            f.write(f"{t.slug}|{'First patches' if t.slug in first else 'By node family'}|{t.title}|{t.blurb}\n")
-    print(len(T.all), "templates")
+            f.write(f"{t.slug}|Starters|{t.title}|{t.blurb}\n")
+        for sc in SHOWCASE:
+            f.write(f"{sc['slug']}|Showcase|{sc['title']}|{sc['blurb']}\n")
+    print(len(T.all), "starters,", len(SHOWCASE), "showcase")
 main()

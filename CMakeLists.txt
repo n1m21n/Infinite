@@ -19,12 +19,12 @@ project(Infinite LANGUAGES C CXX)
 # "am I current" comparison. Bump this (and INFINITE_VERSION_RC below it,
 # kept in sync by hand) when cutting a release; nothing else should hardcode
 # a version string.
-set(INFINITE_VERSION "0.6.6")
+set(INFINITE_VERSION "1.0.0")
 # VERSIONINFO (src/platform/win/Infinite.rc.in) wants four dot/comma-separated
 # numeric components but INFINITE_VERSION is three; kept as an explicit
 # second value rather than derived, so bump both together when cutting a
 # release.
-set(INFINITE_VERSION_RC "0,6,6,0")
+set(INFINITE_VERSION_RC "1,0,0,0")
 string(REPLACE "," "." INFINITE_VERSION_RC_STR "${INFINITE_VERSION_RC}")
 
 if(APPLE)
@@ -1839,7 +1839,10 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/08-bell.wav")
     file(GLOB INFINITE_TEMPLATE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/*.inf" "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/index.txt")
     file(GLOB INFINITE_TEMPLATE_THUMBS "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/thumbs/*.png")
-    target_sources(Infinite PRIVATE ${INFINITE_TEMPLATE_FILES} ${INFINITE_TEMPLATE_THUMBS})
+    # Showcase templates carry a media/ folder next to the .inf; the loader resolves relative media against the patch's folder.
+    file(GLOB INFINITE_TEMPLATE_MEDIA "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/media/*")
+    target_sources(Infinite PRIVATE ${INFINITE_TEMPLATE_FILES} ${INFINITE_TEMPLATE_THUMBS} ${INFINITE_TEMPLATE_MEDIA})
+    set_source_files_properties(${INFINITE_TEMPLATE_MEDIA} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/media")
     set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
     set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})

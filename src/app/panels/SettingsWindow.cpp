@@ -63,7 +63,11 @@ namespace app
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
       }
-      const float navW = 200.0f;
+      // As wide as the longest section name in the current language, with the label inset on both sides.
+      float navW = 0.0f;
+      for (const char* tab : kTabs)
+         navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
+      navW += tok::space_3 * 2.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
       // First tab level with the first card; a little air between tabs.
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
@@ -87,7 +91,7 @@ namespace app
                               tok::radius_tile);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p.x + tok::space_4, p.y + (h - ts.y) * 0.5f),
+         dl->AddText(ImVec2(p.x + tok::space_3, p.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
@@ -1732,7 +1736,7 @@ namespace app
                if (!folder.empty())
                   sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
             }
-            ImGui::SameLine();
+            ActionButton::RowNext();
             ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));

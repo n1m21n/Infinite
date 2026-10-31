@@ -125,6 +125,7 @@ with zoom and pan.
 | audio or note into a pin that is neither | `Audio/note signals only connect to a matching audio/note pin` |
 | a cable that would close an audio loop | `Cannot connect: this would create an audio feedback loop` |
 | a cable that would close a note loop | `Cannot connect: this would create a note feedback loop` |
+| a geometry cable that would close a loop | `Cannot connect: this would loop geometry - close it through Feedback 3D's loop pin` |
 | a non-audio source into Audio Analyze | `Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer` |
 
 ### Render 3D
