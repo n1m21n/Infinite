@@ -1505,6 +1505,18 @@ bool RunMpeFixture()
    feed({ 0x84, 70, 0 });
    run();
 
+   // Learn: the next note-on on any input becomes the node's channel; the
+   // device id comes with it (its name is what saves).
+   node.BeginLearn();
+   node.CookIfNeeded(frame++);
+   check(node.IsLearning(), "Learn waits for a key");
+   feed({ 0x95, 52, 90 });
+   run();
+   node.CookIfNeeded(frame++);
+   check(!node.IsLearning() && node.channel == 5, "Learn takes the channel of the next key played");
+   feed({ 0x85, 52, 0 });
+   run();
+
    // Pressure and slide exist only while an MPE node listens.
    const Platform::MidiDeviceId dev2 = 5151;
    auto feed2 = [&](std::initializer_list<unsigned char> bytes) {
