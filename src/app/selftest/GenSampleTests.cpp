@@ -820,7 +820,7 @@ bool RunGenSampleTest()
    if (runs("styles"))
       printf("GENSAMPLETEST slowest 2-bar generate %.1f ms (budget 500)\n", worst);
 #ifdef NDEBUG
-   const bool timed = true;
+   const bool timed = getenv("CI") == nullptr; // a shared runner's wall clock says nothing about this code
 #else
    const bool timed = false; // -O0 DSP runs 10-50x slower: only an optimised build's time means anything
 #endif
@@ -829,7 +829,10 @@ bool RunGenSampleTest()
       printf("GENSAMPLETEST FAIL: over twice the budget\n");
       fails++;
    }
-   printf("GENSAMPLETEST %s (%d failures)\n", fails == 0 ? "PASS" : "FAIL", fails);
+   if (fails == 0)
+      printf("GENSAMPLETEST PASS\n");
+   else
+      printf("GENSAMPLETEST FAIL (%d failures)\n", fails);
    return fails == 0;
 }
 }
