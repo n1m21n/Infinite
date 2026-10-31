@@ -108,7 +108,7 @@ jobs:
 
   macos:
     name: macOS (arm64)
-    runs-on: macos-14
+    runs-on: macos-15
     if: inputs.only == '' || inputs.only == 'all' || inputs.only == 'macos'
     steps:
       - uses: actions/checkout@v4
