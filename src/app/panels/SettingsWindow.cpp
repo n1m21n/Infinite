@@ -735,6 +735,26 @@ namespace app
             }
 
             SectionCard::End();
+
+            FormParts::Section(T("MIDI Inputs"));
+            ImGui::TextWrapped("%s", T("Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play."));
+            if (!Platform::MidiIsRunning())
+            {
+               if (FormParts::Button(L("Start MIDI")))
+               {
+                  std::string midiError;
+                  Platform::MidiStart(midiError);
+               }
+            }
+            else
+            {
+               const auto midiSources = Platform::MidiListSources();
+               if (midiSources.empty())
+                  ImGui::TextDisabled("%s", T("No MIDI inputs connected"));
+               for (const auto& src : midiSources)
+                  ImGui::TextUnformatted(src.name.c_str());
+            }
+            SectionCard::End();
          }
 
          // 4. General & Performance Tab
