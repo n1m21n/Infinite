@@ -741,8 +741,16 @@ void Scene3DNode::ApplyWorld(Render3DNode& render, bool show, bool background)
       render.envInput.Disconnect();
    render.envAsBackground = background;
    render.bgOpacity = (show && background && worldColorOn && mWorldNode == nullptr) ? 1.0f : 0.0f;
+   // A world colour is what surfaces reflect and what lights them from all sides; with none set
+   // they keep the default sky.
+   const bool colorWorld = show && worldColorOn && mWorldNode == nullptr;
    for (int k = 0; k < 3; k++)
+   {
       render.bgColor[k] = worldColor[k] * worldStrength;
+      render.envSky[k] = colorWorld ? render.bgColor[k] : Render3DNode::kEnvSky[k];
+      render.envHorizon[k] = colorWorld ? render.bgColor[k] : Render3DNode::kEnvHorizon[k];
+      render.envGround[k] = colorWorld ? render.bgColor[k] : Render3DNode::kEnvGround[k];
+   }
 }
 
 // A plain picture as the world: the render, over it, with its own alpha.

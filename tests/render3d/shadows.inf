@@ -1,0 +1,75 @@
+infinite-patch 1
+# shadows: contact at the base of everything, no float, no acne on curves, thin pole keeps its shadow
+node 1 3D Plane
+  pos 0 0
+  uid 1001
+  c color 0.7 0.7 0.72
+  f roughness 0.7
+  f metallic 0
+  f specular 0.25
+end
+node 2 3D Cube
+  pos 0 430
+  uid 1002
+  c color 0.7 0.7 0.75
+end
+node 3 3D Sphere
+  pos 0 860
+  uid 1003
+  i detail 48
+  c color 0.7 0.7 0.75
+end
+node 4 3D Cylinder
+  pos 0 1290
+  uid 1004
+  c color 0.7 0.7 0.75
+end
+node 5 3D Cube
+  pos 0 1720
+  uid 1005
+  c color 0.7 0.7 0.75
+end
+node 6 3D Torus
+  pos 0 2150
+  uid 1006
+  i detail 48
+  i sides 24
+  c color 0.7 0.7 0.75
+end
+node 7 3D Camera
+  pos 0 2580
+  uid 1007
+  f azimuth 90
+  f elevation 30
+  f distance 13
+  f fov 30
+  f targetX 0
+  f targetY 0.5
+  f targetZ 0.4
+end
+node 8 3D Light
+  pos 0 3010
+  uid 1008
+  i type 0
+  f azimuth 30
+  f elevation 38
+  f intensity 2.6
+  c color 1 1 1
+end
+node 9 3D 3D View
+  id view
+  pos 0 3440
+  f width 1280
+  f height 720
+  i samples 4
+  b shadows 1
+  i shadowQuality 2
+  c ambient 0.05 0.06 0.08
+  f shadowSoftness 1.0
+  s scene next 9\ncamera 7\nworld 0 1 0.012 0.016 0.035 1 0\nsettings 30 2 100 0 0 0.25 15 0.1 0.5 0 0 0 0 0.035 0.05 0 0 0 0 0 1 1 8 0.0\nitem 1 1001 0 0 0 -90 0 0 14 14 14 1\nlabel 1 Floor\nitem 2 1002 -2.2 0.5 0 0 25 0 1.0 1.0 1.0 1\nlabel 2 Block\nitem 3 1003 0 0.6 0.6 0 0 0 1.2 1.2 1.2 1\nlabel 3 Ball\nitem 4 1004 1.8 1.0 0.2 0 0 0 0.08 2.0 0.08 1\nlabel 4 Pole\nitem 5 1005 -0.8 0.06 2.2 0 0 0 1.4 0.04 1.0 1\nlabel 5 Hover plate\nitem 6 1006 2.6 0.5 1.8 90 0 0 1.0 1.0 1.0 1\nlabel 6 Ring\nitem 7 1007 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 7 Camera\nitem 8 1008 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 8 Key
+end
+node 10 Utility Output
+  id out
+  pos 460 0
+end
+cable out 0 view

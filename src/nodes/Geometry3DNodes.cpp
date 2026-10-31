@@ -523,8 +523,9 @@ namespace
       "   proj = proj * 0.5 + 0.5;\n"
       "   if (proj.z > 1.0 || proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0)\n"
       "      return 1.0;\n"
-      "   float slope = 1.0 - max(dot(normal, lightDir), 0.0);\n"
-      "   float bias = uShadowBias * (1.0 + slope * 4.0);\n"
+      // How far depth moves across one texel grows with the tangent of the light's angle to the surface.
+      "   float cosL = clamp(dot(normal, lightDir), 0.05, 1.0);\n"
+      "   float bias = uShadowBias * (1.0 + min(sqrt(1.0 - cosL * cosL) / cosL, 10.0));\n"
       "   float lit = 0.0;\n"
       "   for (int x = -1; x <= 1; x++) {\n"
       "      for (int y = -1; y <= 1; y++) {\n"
@@ -543,6 +544,14 @@ namespace
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
       R3D_TONEMAP_GLSL
+      "\n"
+      "vec3 toneDisplay(vec3 c) {\n"
+      "   if (uTonemap == 1) return acesFilm(c);\n"
+      "   if (uTonemap == 2) return c / (c + vec3(1.0));\n"
+      "   if (uTonemap == 3) return agxTone(c);\n"
+      "   if (uTonemap == 4) return neutralTone(c);\n"
+      "   return c;\n"
+      "}\n"
       "\n"
       "float ditherOffset() {\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
@@ -769,6 +778,7 @@ namespace
       "   vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));\n"
       "   vec3 f0 = mix(dielectricF0, base, metal);\n"
       "   vec3 col = vec3(0.0);\n"
+      "   vec3 glassSpec = vec3(0.0);\n"
       "\n"
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(n, vWorldPos, mapUv, tangent, bitangent);\n"
@@ -788,6 +798,7 @@ namespace
       "      }\n"
       "      vec3 lightDir;\n"
       "      float attenuation = 1.0;\n"
+      "      vec3 shadeDir = vec3(0.0);\n"
       "      if (uLightType[i] == 5) {\n"
       "         // Rectangle light facing the origin. The direction used for shading is the point of the\n"
       "         // rectangle nearest the mirror ray (the representative-point method), so a bigger panel\n"
@@ -800,15 +811,20 @@ namespace
       "         vec2 half2 = 0.5 * uLightArea[i];\n"
       "         vec3 refl = reflect(-viewDir, n);\n"
       "         float rf = dot(refl, fwd);\n"
-      "         float tHit = (rf < -1e-4) ? dot(lp - vWorldPos, fwd) / rf : 0.0;\n"
+      // rf never reaches 0, so the nearest point slides as the mirror ray turns away from the panel
+      // instead of jumping back under the surface, which drew a hard line across a floor.
+      "         float tHit = dot(lp - vWorldPos, fwd) / min(rf, -0.05);\n"
       "         vec3 hit = vWorldPos + refl * max(tHit, 0.0);\n"
       "         vec3 rel = hit - lp;\n"
       "         vec3 nearP = lp + rgt * clamp(dot(rel, rgt), -half2.x, half2.x) + upv * clamp(dot(rel, upv), -half2.y, half2.y);\n"
-      "         vec3 toLight = nearP - vWorldPos;\n"
-      "         float dist = length(toLight);\n"
-      "         lightDir = toLight / max(dist, 1e-4);\n"
+      "         lightDir = normalize(nearP - vWorldPos);\n"
+      // The highlight comes from that point; the diffuse comes from the panel as a whole. Shading
+      // it from the moving point printed the rectangle's clamp lines across floors and spheres.
+      "         vec3 toCentre = lp - vWorldPos;\n"
+      "         float dist = length(toCentre);\n"
+      "         shadeDir = toCentre / max(dist, 1e-4);\n"
       "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
-      "         attenuation *= clamp(dot(-lightDir, fwd) * 4.0, 0.0, 1.0);\n"
+      "         attenuation *= clamp(dot(-shadeDir, fwd) * 4.0, 0.0, 1.0);\n"
       "      } else if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
       "         float dist = length(toLight);\n"
@@ -826,12 +842,13 @@ namespace
       "         lightDir = normalize(uLightDir[i]);\n"
       "      }\n"
       "      vec3 halfway = normalize(lightDir + viewDir);\n"
+      "      if (uLightType[i] != 5) shadeDir = lightDir;\n"
       "      float nDotL;\n"
       "      if (uLightType[i] == 2) {\n"
       "         const float wrap = 0.35;\n"
       "         nDotL = max((dot(n, lightDir) + wrap) / (1.0 + wrap), 0.0);\n"
       "      } else {\n"
-      "         nDotL = max(dot(n, lightDir), 0.0);\n"
+      "         nDotL = max(dot(n, shadeDir), 0.0);\n"
       "      }\n"
       "      float sssWrap = uSubsurfaceRadius * 2.0;\n"
       "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
@@ -874,8 +891,9 @@ namespace
       "\n"
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * (1.0 - cc * 0.5);\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      "      float shadow = (i == 0) ? shadowFactor(n, lightDir) : 1.0;\n"
+      "      float shadow = (i == 0) ? shadowFactor(n, shadeDir) : 1.0;\n"
       "      col += (kD * base / 3.14159265 + specular + vec3(clearcoatSpec) + sheenSpec) * radiance * nDotL * shadow;\n"
+      "      if (uTransmission > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow;\n"
       "   }\n"
       "\n"
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
@@ -888,15 +906,12 @@ namespace
       "   }\n"
       "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
       "   col += reflection * fAmbient * ao;\n"
+      "   glassSpec += reflection * fAmbient * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
       "   col += emiss;\n"
       "\n"
-      "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   else if (uTonemap == 3) col = agxTone(col);\n"
-      "   else if (uTonemap == 4) col = neutralTone(col);\n"
+      "   col = toneDisplay(col * uExposure);\n"
       "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
       "   if (uTransmission > 0.0) {\n"
@@ -918,7 +933,10 @@ namespace
       "      } else {\n"
       "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
       "      }\n"
-      "      col = mix(col, refracted, uTransmission);\n"
+      // The surface still reflects: light reflected at the rim does not pass through, and the
+      // highlights go on top of what is seen through it, added as light rather than as display values.
+      "      col = mix(col, refracted * (vec3(1.0) - fAmbient), uTransmission);\n"
+      "      col = toSrgb(toLinear(col) + toneDisplay(glassSpec * uExposure) * uTransmission);\n"
       "   }\n"
       "   fragColor = uWire == 1 ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(col, alpha);\n"
       "}\n";
@@ -2011,6 +2029,7 @@ void Render3DNode::CookOnce(int frameId)
    // sampled by it. Only the first light casts, and only when it has a
    // direction: a point light would need a depth cube map and six passes.
    bool shadowsActive = false;
+   float shadowBiasDepth = shadowBias;
    if (shadowsEnabled && lightTypes[0] != 1 && EnsureShadowShader())
    {
       const int wantSize = kShadowSizes[std::max(0, std::min(shadowQuality, 2))];
@@ -2049,6 +2068,12 @@ void Render3DNode::CookOnce(int frameId)
          const Mat4 lightProj = Mat4::Orthographic(radius * 1.2f, 1.0f,
                                                    0.05f, radius * 5.0f);
          mLightViewProj = Mat4::Multiply(lightProj, lightView);
+         // The bias is a distance in the scene, at least the size of the filtered shadow texels.
+         // The depth map spans the whole scene, so a bias in depth units grew with the floor and
+         // lifted shadows off whatever cast them.
+         const float shadowTexelWorld = 2.4f * radius / (float)mShadowSize;
+         shadowBiasDepth = (shadowBias + 2.5f * shadowTexelWorld * std::max(1.0f, shadowSoftness)) /
+                           (radius * 5.0f - 0.05f);
 
          GLint prevFboShadow = 0, prevViewportShadow[4];
          glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFboShadow);
@@ -2063,10 +2088,9 @@ void Render3DNode::CookOnce(int frameId)
          glEnable(GL_DEPTH_TEST);
          glDepthFunc(GL_LESS);
          glDepthMask(GL_TRUE);
-         // Front faces culled so the depth written is the back of each object.
-         // Peter-panning is easier to bias away than the acne you get otherwise.
-         glEnable(GL_CULL_FACE);
-         glCullFace(GL_FRONT);
+         // Both sides are written: a flat plate has no back to cast from, and the side facing the
+         // light is what keeps a shadow attached where an object meets the ground.
+         glDisable(GL_CULL_FACE);
 
          glUseProgram(mShadowProgram);
          glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
@@ -2097,6 +2121,7 @@ void Render3DNode::CookOnce(int frameId)
          }
 
          glBindVertexArray(0);
+         glEnable(GL_CULL_FACE);
          glCullFace(GL_BACK);
          glBindFramebuffer(GL_FRAMEBUFFER, prevFboShadow);
          glViewport(prevViewportShadow[0], prevViewportShadow[1],
@@ -2248,7 +2273,7 @@ void Render3DNode::CookOnce(int frameId)
       glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
       glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
-      glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBiasDepth);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
                   lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);

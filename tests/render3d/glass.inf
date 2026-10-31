@@ -1,0 +1,128 @@
+infinite-patch 1
+# glass: objects behind bend and stay visible, rough glass blurs, dispersion splits colour at the rim
+node 1 3D Plane
+  pos 0 0
+  uid 1001
+  c color 0.55 0.55 0.58
+  f roughness 0.7
+  f metallic 0
+  f specular 0.25
+end
+node 2 3D Cube
+  pos 0 430
+  uid 1002
+  c color 0.9 0.2 0.15
+end
+node 3 3D Cube
+  pos 0 860
+  uid 1003
+  c color 0.95 0.75 0.15
+end
+node 4 3D Cube
+  pos 0 1290
+  uid 1004
+  c color 0.2 0.7 0.3
+end
+node 5 3D Cube
+  pos 0 1720
+  uid 1005
+  c color 0.2 0.4 0.9
+end
+node 6 3D Cube
+  pos 0 2150
+  uid 1006
+  c color 0.7 0.25 0.8
+end
+node 7 3D Sphere
+  pos 0 2580
+  uid 1007
+  i detail 48
+  f transmission 1.0
+  f roughness 0.05
+  f metallic 0
+  c color 1 1 1
+end
+node 8 3D Sphere
+  pos 0 3010
+  uid 1008
+  i detail 48
+  f transmission 1.0
+  f roughness 0.05
+  f metallic 0
+  c color 1 1 1
+  f ior 1.33
+end
+node 9 3D Sphere
+  pos 0 3440
+  uid 1009
+  i detail 48
+  f transmission 1.0
+  f roughness 0.05
+  f metallic 0
+  c color 1 1 1
+  f transmissionRoughness 0.35
+end
+node 10 3D Sphere
+  pos 0 3870
+  uid 1010
+  i detail 48
+  f transmission 1.0
+  f roughness 0.05
+  f metallic 0
+  c color 1 1 1
+  f dispersion 1.0
+end
+node 11 3D Camera
+  pos 0 4300
+  uid 1011
+  f azimuth 90
+  f elevation 12
+  f distance 10
+  f fov 30
+  f targetX 0
+  f targetY 0.6
+  f targetZ 0
+end
+node 12 3D Light
+  pos 0 4730
+  uid 1012
+  i type 0
+  f azimuth 60
+  f elevation 50
+  f intensity 2.5
+  c color 1 0.96 0.9
+end
+node 13 3D Light
+  pos 0 5160
+  uid 1013
+  i type 0
+  f azimuth -140
+  f elevation 25
+  f intensity 1.25
+  c color 0.8 0.88 1
+end
+node 14 3D Light
+  pos 0 5590
+  uid 1014
+  i type 0
+  f azimuth -50
+  f elevation 15
+  f intensity 0.375
+  c color 1 1 1
+end
+node 15 3D 3D View
+  id view
+  pos 0 6020
+  f width 1280
+  f height 720
+  i samples 4
+  b shadows 1
+  i shadowQuality 2
+  c ambient 0.05 0.06 0.08
+  s scene next 15\ncamera 11\nworld 0 1 0.012 0.016 0.035 1 0\nsettings 30 2 100 0 0 0.25 15 0.1 0.5 0 0 0 0 0.035 0.05 0 0 0 0 0 1 1 12 0.0\nitem 1 1001 0 0 0 -90 0 0 30 30 30 1\nlabel 1 Floor\nitem 2 1002 -3.0 0.6 -2.0 0 0 0 0.5 1.2 0.5 1\nlabel 2 Back 0\nitem 3 1003 -1.5 0.6 -2.0 0 0 0 0.5 1.2 0.5 1\nlabel 3 Back 1\nitem 4 1004 0.0 0.6 -2.0 0 0 0 0.5 1.2 0.5 1\nlabel 4 Back 2\nitem 5 1005 1.5 0.6 -2.0 0 0 0 0.5 1.2 0.5 1\nlabel 5 Back 3\nitem 6 1006 3.0 0.6 -2.0 0 0 0 0.5 1.2 0.5 1\nlabel 6 Back 4\nitem 7 1007 -2.4 0.6 0.6 0 0 0 1.2 1.2 1.2 1\nlabel 7 Glass 0\nitem 8 1008 -0.7999999999999998 0.6 0.6 0 0 0 1.2 1.2 1.2 1\nlabel 8 Glass 1\nitem 9 1009 0.8000000000000003 0.6 0.6 0 0 0 1.2 1.2 1.2 1\nlabel 9 Glass 2\nitem 10 1010 2.400000000000001 0.6 0.6 0 0 0 1.2 1.2 1.2 1\nlabel 10 Glass 3\nitem 11 1011 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 11 Camera\nitem 12 1012 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 12 Key\nitem 13 1013 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 13 Rim\nitem 14 1014 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 14 Fill
+end
+node 16 Utility Output
+  id out
+  pos 460 0
+end
+cable out 0 view

@@ -1,0 +1,92 @@
+infinite-patch 1
+# image world: stays behind the scene; balls reflect the default sky (known limit), never black
+node 1 Source Noise
+  pos 0 0
+  uid 1001
+end
+node 2 3D Plane
+  pos 0 410
+  uid 1002
+  c color 0.2 0.2 0.22
+  f roughness 0.7
+  f metallic 0
+  f specular 0.25
+end
+node 3 3D Sphere
+  pos 0 840
+  uid 1003
+  i detail 48
+  f metallic 1
+  f roughness 0.02
+  c color 0.95 0.95 0.95
+end
+node 4 3D Sphere
+  pos 0 1270
+  uid 1004
+  i detail 48
+  f metallic 1
+  f roughness 0.15
+  c color 0.95 0.95 0.95
+end
+node 5 3D Sphere
+  pos 0 1700
+  uid 1005
+  i detail 48
+  f metallic 1
+  f roughness 0.4
+  c color 0.95 0.95 0.95
+end
+node 6 3D Camera
+  pos 0 2130
+  uid 1006
+  f azimuth 90
+  f elevation 18
+  f distance 10
+  f fov 30
+  f targetX 0
+  f targetY 0.5
+  f targetZ 0
+end
+node 7 3D Light
+  pos 0 2560
+  uid 1007
+  i type 0
+  f azimuth 60
+  f elevation 50
+  f intensity 2.0
+  c color 1 0.96 0.9
+end
+node 8 3D Light
+  pos 0 2990
+  uid 1008
+  i type 0
+  f azimuth -140
+  f elevation 25
+  f intensity 1.0
+  c color 0.8 0.88 1
+end
+node 9 3D Light
+  pos 0 3420
+  uid 1009
+  i type 0
+  f azimuth -50
+  f elevation 15
+  f intensity 0.3
+  c color 1 1 1
+end
+node 10 3D 3D View
+  id view
+  pos 0 3850
+  f width 1280
+  f height 720
+  i samples 4
+  b shadows 1
+  i shadowQuality 2
+  c ambient 0.05 0.06 0.08
+  s scene next 9\ncamera 5\nworld 1001 0 0.012 0.016 0.035 1 0\nsettings 30 2 100 0 0 0.25 15 0.1 0.5 0 0 0 0 0.035 0.05 0 0 0 0 0 1 1 6 0.0\nitem 1 1002 0 0 0 -90 0 0 30 30 30 1\nlabel 1 Floor\nitem 2 1003 -1.8 0.7 0 0 0 0 1.4 1.4 1.4 1\nlabel 2 Metal 0.02\nitem 3 1004 0.0 0.7 0 0 0 0 1.4 1.4 1.4 1\nlabel 3 Metal 0.15\nitem 4 1005 1.8 0.7 0 0 0 0 1.4 1.4 1.4 1\nlabel 4 Metal 0.4\nitem 5 1006 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 5 Camera\nitem 6 1007 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 6 Key\nitem 7 1008 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 7 Rim\nitem 8 1009 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 8 Fill
+end
+node 11 Utility Output
+  id out
+  pos 460 0
+end
+cable out 0 view

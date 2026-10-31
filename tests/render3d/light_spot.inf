@@ -1,0 +1,66 @@
+infinite-patch 1
+# spot: round cone, soft penumbra edge, shadow lands inside the cone
+node 1 3D Plane
+  pos 0 0
+  uid 1001
+  c color 0.6 0.6 0.62
+  f roughness 0.7
+  f metallic 0
+  f specular 0.25
+end
+node 2 3D Plane
+  pos 0 430
+  uid 1002
+  c color 0.6 0.6 0.62
+  f roughness 0.8
+end
+node 3 3D Sphere
+  pos 0 860
+  uid 1003
+  i detail 48
+  c color 0.75 0.75 0.78
+end
+node 4 3D Cube
+  pos 0 1290
+  uid 1004
+  c color 0.75 0.75 0.78
+end
+node 5 3D Camera
+  pos 0 1720
+  uid 1005
+  f azimuth 90
+  f elevation 16
+  f distance 10
+  f fov 34
+  f targetX 0
+  f targetY 1.0
+  f targetZ 0
+end
+node 6 3D Light
+  pos 0 2150
+  uid 1006
+  i type 4
+  f azimuth 70
+  f elevation 55
+  f intensity 4.0
+  c color 1 1 1
+  f distance 5
+  f spotAngle 38
+  f spotPenumbra 0.3
+end
+node 7 3D 3D View
+  id view
+  pos 0 2580
+  f width 1280
+  f height 720
+  i samples 4
+  b shadows 1
+  i shadowQuality 2
+  c ambient 0.05 0.06 0.08
+  s scene next 7\ncamera 5\nworld 0 1 0.012 0.016 0.035 1 0\nsettings 30 2 100 0 0 0.25 15 0.1 0.5 0 0 0 0 0.035 0.05 0 0 0 0 0 1 1 6 0.0\nitem 1 1001 0 0 0 -90 0 0 60 60 60 1\nlabel 1 Floor\nitem 2 1002 0 3 -3 0 0 0 60 60 60 1\nlabel 2 Back wall\nitem 3 1003 -1.2 0.5 0 0 0 0 1.0 1.0 1.0 1\nlabel 3 Ball\nitem 4 1004 1.2 0.5 0 0 30 0 1.0 1.0 1.0 1\nlabel 4 Block\nitem 5 1005 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 5 Camera\nitem 6 1006 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 6 Spot
+end
+node 8 Utility Output
+  id out
+  pos 460 0
+end
+cable out 0 view

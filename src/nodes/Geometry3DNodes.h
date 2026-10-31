@@ -673,9 +673,12 @@ public:
    // Procedural surround, sampled for both reflections and ambient. Not an
    // HDRI: a three-stop vertical gradient, which is enough to stop metal
    // reading as flat grey.
-   float envSky[3] = { 0.42f, 0.53f, 0.75f };
-   float envHorizon[3] = { 0.55f, 0.56f, 0.60f };
-   float envGround[3] = { 0.16f, 0.14f, 0.13f };
+   static constexpr float kEnvSky[3] = { 0.42f, 0.53f, 0.75f };
+   static constexpr float kEnvHorizon[3] = { 0.55f, 0.56f, 0.60f };
+   static constexpr float kEnvGround[3] = { 0.16f, 0.14f, 0.13f };
+   float envSky[3] = { kEnvSky[0], kEnvSky[1], kEnvSky[2] };
+   float envHorizon[3] = { kEnvHorizon[0], kEnvHorizon[1], kEnvHorizon[2] };
+   float envGround[3] = { kEnvGround[0], kEnvGround[1], kEnvGround[2] };
    float envIntensity = 1.0f;
 
    float bgColor[3] = { 0.04f, 0.04f, 0.06f };

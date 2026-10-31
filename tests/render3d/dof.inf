@@ -1,0 +1,141 @@
+infinite-patch 1
+# dof: middle ball sharp, blur grows both ways, no sharp halo where near blur crosses the sharp ball
+node 1 3D Plane
+  pos 0 0
+  uid 1001
+  c color 0.25 0.25 0.28
+  f roughness 0.7
+  f metallic 0
+  f specular 0.25
+end
+node 2 3D Sphere
+  pos 0 430
+  uid 1002
+  i detail 48
+  c color 0.8 0.35 0.25
+end
+node 3 3D Sphere
+  pos 0 860
+  uid 1003
+  i detail 48
+  c color 0.8 0.39999999999999997 0.25
+end
+node 4 3D Sphere
+  pos 0 1290
+  uid 1004
+  i detail 48
+  c color 0.8 0.44999999999999996 0.25
+end
+node 5 3D Sphere
+  pos 0 1720
+  uid 1005
+  i detail 48
+  c color 0.8 0.5 0.25
+end
+node 6 3D Sphere
+  pos 0 2150
+  uid 1006
+  i detail 48
+  c color 0.8 0.55 0.25
+end
+node 7 3D Sphere
+  pos 0 2580
+  uid 1007
+  i detail 48
+  c color 0.8 0.6 0.25
+end
+node 8 3D Sphere
+  pos 0 3010
+  uid 1008
+  i detail 48
+  c color 0.8 0.65 0.25
+end
+node 9 3D Sphere
+  pos 0 3440
+  uid 1009
+  i detail 16
+  f emission 20
+  c emissionColor 1 0.8 0.5
+end
+node 10 3D Sphere
+  pos 0 3870
+  uid 1010
+  i detail 16
+  f emission 20
+  c emissionColor 1 0.8 0.5
+end
+node 11 3D Sphere
+  pos 0 4300
+  uid 1011
+  i detail 16
+  f emission 20
+  c emissionColor 1 0.8 0.5
+end
+node 12 3D Sphere
+  pos 0 4730
+  uid 1012
+  i detail 16
+  f emission 20
+  c emissionColor 1 0.8 0.5
+end
+node 13 3D Sphere
+  pos 0 5160
+  uid 1013
+  i detail 16
+  f emission 20
+  c emissionColor 1 0.8 0.5
+end
+node 14 3D Camera
+  pos 0 5590
+  uid 1014
+  f azimuth 90
+  f elevation 8
+  f distance 4.5
+  f fov 24
+  f targetX 0
+  f targetY 0.25
+  f targetZ 0
+end
+node 15 3D Light
+  pos 0 6020
+  uid 1015
+  i type 0
+  f azimuth 60
+  f elevation 50
+  f intensity 2.5
+  c color 1 0.96 0.9
+end
+node 16 3D Light
+  pos 0 6450
+  uid 1016
+  i type 0
+  f azimuth -140
+  f elevation 25
+  f intensity 1.25
+  c color 0.8 0.88 1
+end
+node 17 3D Light
+  pos 0 6880
+  uid 1017
+  i type 0
+  f azimuth -50
+  f elevation 15
+  f intensity 0.375
+  c color 1 1 1
+end
+node 18 3D 3D View
+  id view
+  pos 0 7310
+  f width 1280
+  f height 720
+  i samples 4
+  b shadows 1
+  i shadowQuality 1
+  c ambient 0.05 0.06 0.08
+  s scene next 18\ncamera 14\nworld 0 1 0.012 0.016 0.035 1 5\nsettings 30 2 100 0 0 0.25 15 0.1 0.5 0 0 0 0 0.035 0.05 0 0 0 0 0 1 1 15 1.4\nitem 1 1001 0 0 0 -90 0 0 30 30 30 1\nlabel 1 Floor\nitem 2 1002 0.7 0.18 1.8 0 0 0 0.36 0.36 0.36 1\nlabel 2 Ball 0\nitem 3 1003 0.45999999999999996 0.18 1.2000000000000002 0 0 0 0.36 0.36 0.36 1\nlabel 3 Ball 1\nitem 4 1004 0.21999999999999997 0.18 0.6000000000000001 0 0 0 0.36 0.36 0.36 1\nlabel 4 Ball 2\nitem 5 1005 -0.020000000000000018 0.18 2.220446049250313e-16 0 0 0 0.36 0.36 0.36 1\nlabel 5 Ball 3\nitem 6 1006 -0.26 0.18 -0.5999999999999999 0 0 0 0.36 0.36 0.36 1\nlabel 6 Ball 4\nitem 7 1007 -0.5 0.18 -1.2 0 0 0 0.36 0.36 0.36 1\nlabel 7 Ball 5\nitem 8 1008 -0.74 0.18 -1.7999999999999996 0 0 0 0.36 0.36 0.36 1\nlabel 8 Ball 6\nitem 9 1009 -1.2 0.5 -3 0 0 0 0.04 0.04 0.04 1\nlabel 9 Spark 0\nitem 10 1010 -0.6 0.8 -3 0 0 0 0.04 0.04 0.04 1\nlabel 10 Spark 1\nitem 11 1011 0.0 0.5 -3 0 0 0 0.04 0.04 0.04 1\nlabel 11 Spark 2\nitem 12 1012 0.5999999999999999 0.8 -3 0 0 0 0.04 0.04 0.04 1\nlabel 12 Spark 3\nitem 13 1013 1.2 0.5 -3 0 0 0 0.04 0.04 0.04 1\nlabel 13 Spark 4\nitem 14 1014 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 14 Camera\nitem 15 1015 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 15 Key\nitem 16 1016 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 16 Rim\nitem 17 1017 0 0 0 0 0 0 1.0 1.0 1.0 1\nlabel 17 Fill
+end
+node 19 Utility Output
+  id out
+  pos 460 0
+end
+cable out 0 view

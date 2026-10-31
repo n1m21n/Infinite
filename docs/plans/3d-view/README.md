@@ -84,6 +84,10 @@ Blender's keymap.
   Freestyle, frame start and step, render region (Ctrl+B), background images. Movie format and path stay in
   the render session; a still goes to the Output node's image path, with no save dialog.
 - Light falloff is not shown: the renderer ignores it.
+- An image world sits behind the scene and is not reflected; a colour or Environment world is.
+- One shadow map covers the whole scene, so a very large floor costs resolution: faint banding on faces at
+  about 60 units across. Spot and area shadows are parallel, not cast from the light's position.
+- `python3 tools/render3d-lab.py` renders one scene per render feature (`tests/render3d/`) onto a board.
 - Render is Infinite's own GL renderer. EEVEE is part of Blender and cannot be embedded. A bridge that
   hands the scene to an installed Blender is the only cheap route to real EEVEE and Cycles, and is not built.
 - Alpha reaches the file only in formats that carry it.
