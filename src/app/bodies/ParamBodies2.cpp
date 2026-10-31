@@ -938,7 +938,9 @@ namespace app
          }
          else
          {
+            PushTextWrapWidth(kPreviewSize);
             ImGui::TextDisabled("vars: r, g, b, a, lum, sat, hue, delta, t");
+            PopTextWrapWidth();
          }
       }
 

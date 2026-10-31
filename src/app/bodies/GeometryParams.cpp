@@ -894,6 +894,7 @@ namespace app
 
    void DrawPointTrailsParams(PointTrailsNode* n)
    {
+      PushTextWrapWidth(kPreviewSize);
       ImGui::TextDisabled("%zu tails, %d points tracked", n->TrailCount(), n->TrackedPoints());
       if (n->input != nullptr && n->TrailCount() == 0)
          ImGui::TextDisabled("no trails yet: the points are not moving");
@@ -901,6 +902,7 @@ namespace app
          ImGui::TextDisabled("outputs only the tails: patch the source into Render 3D too");
       if (n->ReadsBackFromGpu())
          ImGui::TextDisabled("GPU points: first %d read back per sample", n->TrackedPoints());
+      PopTextWrapWidth();
       ModSliderInt("length", &n->length, 2, 240);
       ModSliderInt("sample every", &n->sampleEvery, 1, 10);
       ModSlider("width", &n->width, 0.0005f, 0.2f, "%.4f");

@@ -1857,7 +1857,11 @@ namespace app
       PopTextWrapWidth();
 
       if (n->IsBound())
+      {
+         PushTextWrapWidth(kPreviewSize);
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
+         PopTextWrapWidth();
+      }
       ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       ModSlider("low", &n->low, 0.0f, 1.0f);
@@ -1889,12 +1893,18 @@ namespace app
       PopTextWrapWidth();
 
       if (n->IsBound())
+      {
+         PushTextWrapWidth(kPreviewSize);
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
+         PopTextWrapWidth();
+      }
       ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)
       {
+         PushTextWrapWidth(kPreviewSize);
          ImGui::TextDisabled("value = note number / 127, held until the next key");
+         PopTextWrapWidth();
       }
       else
       {

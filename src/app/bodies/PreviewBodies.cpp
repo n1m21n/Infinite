@@ -570,7 +570,11 @@ namespace app
          if (n->IsPlayingBack())
             ImGui::TextColored(tok::V4(tok::palf::v_500_950_600_1000), "playhead %.1f", n->PlayheadBeats());
          if (n->RecordingCapped())
+         {
+            PushTextWrapWidth(kPreviewSize);
             ImGui::TextDisabled("recording capped - further strokes won't be recorded");
+            PopTextWrapWidth();
+         }
       }
       ModCheckbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
