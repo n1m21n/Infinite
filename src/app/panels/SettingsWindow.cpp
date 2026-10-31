@@ -1732,7 +1732,7 @@ namespace app
                if (!folder.empty())
                   sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
             }
-            ImGui::SameLine();
+            ActionButton::RowNext();
             ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
