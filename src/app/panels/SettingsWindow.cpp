@@ -67,7 +67,7 @@ namespace app
       float navW = 0.0f;
       for (const char* tab : kTabs)
          navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
-      navW += tok::space_4 * 2.0f;
+      navW += tok::space_3 * 2.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
       // First tab level with the first card; a little air between tabs.
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
@@ -91,7 +91,7 @@ namespace app
                               tok::radius_tile);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p.x + tok::space_4, p.y + (h - ts.y) * 0.5f),
+         dl->AddText(ImVec2(p.x + tok::space_3, p.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
