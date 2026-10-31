@@ -138,7 +138,7 @@ namespace ElectricPiano
          v.bend = bend;
          v.age = mNextAge++;
          Retune(v);
-         v.pickup = Pickup(v, v.y);
+         v.yPrev = v.y;
          Strike(v);
       }
 
@@ -274,7 +274,7 @@ namespace ElectricPiano
          uint64_t age = 0;
          int chunkLeft = 0;
          Mode modes[kModes];
-         double y = 0.0, pickup = 0.0;
+         double y = 0.0, yPrev = 0.0; // yPrev: tip position one sample ago, for the pickup's difference
          // Hammer.
          bool contact = false, struck = true;
          double yh = 0.0, vh = 0.0, k = 0.0, lambda = 0.0, mass = 1.5;
@@ -420,10 +420,12 @@ namespace ElectricPiano
                y += m.shape * m.im;
             }
             v.y = y;
+            // Both flux values use the pickup's current geometry: differencing against a value taken under the old
+            // `pickup` knob setting put a step of (new - old) flux into every sample where the knob moved, a click.
             const double p = Pickup(v, y);
             // dF/dt, in per-octave-free units: 1 mm at 261.6 Hz through unit slope is 1.
-            const float out = (float)((p - v.pickup) * mOs / (2.0 * M_PI * 261.6));
-            v.pickup = p;
+            const float out = (float)((p - Pickup(v, v.yPrev)) * mOs / (2.0 * M_PI * 261.6));
+            v.yPrev = y;
             v.level = std::max(std::fabs(out), v.level * 0.9998f);
             if (v.struck && v.level < 1e-6f)
                v.active = false;

@@ -2119,11 +2119,17 @@ namespace app
          row.End();
       }
       {
-         // The exciter's own: the pick's hardness, the bow's force and noise.
+         // The exciter's own: the pick's hardness (pluck only: a strike's pulse follows velocity), the bow's force and
+         // noise (bow only). The ones the chosen exciter ignores fade out; they stay patchable, they just do nothing.
+         const bool bowed = n->exciter == StringNode::kBow;
          AudioKnobRow row(3);
+         ImGui::BeginDisabled((bowed || n->exciter == StringNode::kStrike) && !gParamRegisterOnly);
          row.Knob("hardness", &n->hardness, 0.0f, 1.0f, "%.2f");
+         ImGui::EndDisabled();
+         ImGui::BeginDisabled(!bowed && !gParamRegisterOnly);
          row.Knob("pressure", &n->pressure, 0.0f, 1.0f, "%.2f");
          row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         ImGui::EndDisabled();
          row.End();
       }
       EndAudioBody();

@@ -1170,6 +1170,7 @@ namespace
 
    void DeleteSelection();
    void DuplicateSelection();
+   void DuplicateClips();
    void DrawContextMenu(Arrange::Lane& page);
 
    // The transforms, for the Fx dropdown and the menus' Fx submenu.
@@ -1319,6 +1320,18 @@ namespace
          s.copyClip = id;
          s.pasteAt = to + s.copySpan;
       });
+   }
+
+   // Shift+D with clips selected: the copies become the selection, so the next press goes after them. Left on the
+   // originals, every press carved the same slot again and only swapped the clip's colour.
+   void DuplicateClips()
+   {
+      State& s = S();
+      std::vector<uint64_t> fresh;
+      const std::vector<uint64_t> ids(s.clips.begin(), s.clips.end());
+      ArrangeEdit([&] { Arrange::DuplicateBlock(gArrange, ids, &fresh); });
+      if (!fresh.empty())
+         s.clips = std::set<uint64_t>(fresh.begin(), fresh.end());
    }
 
    // Shift+D: the selection again, right after itself.
@@ -3062,14 +3075,14 @@ namespace
          if (any)
             DuplicateSelection();
          else if (!s.clips.empty())
-            ArrangeEdit([&] { Arrange::DuplicateBlock(gArrange, clipIds()); });
+            DuplicateClips();
       }
       else if (cmd && !shift && key(ImGuiKey_D))
       {
          if (any)
             DuplicateSelection();
          else if (!s.clips.empty())
-            ArrangeEdit([&] { Arrange::DuplicateBlock(gArrange, clipIds()); });
+            DuplicateClips();
       }
       else if (key(ImGuiKey_Delete) || key(ImGuiKey_Backspace))
       {

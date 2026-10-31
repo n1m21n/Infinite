@@ -1,6 +1,7 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -27,7 +28,11 @@ namespace app
       PushElevatedPanelStyle(/*isChild=*/false);
       // Cards reach SectionCard::kPad into the window padding, so 16 leaves an 8 pt margin to the window edge on every side.
       FormParts::PushWindowPad();
+      // The title starts where the tab labels start (window pad + kNavInset), so "Settings" sits over "Appearance".
+      constexpr float kNavInset = tok::space_2;
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4 + kNavInset, tok::space_3 + 2.0f));
       const bool settingsVisible = ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse);
+      ImGui::PopStyleVar();
       FormParts::PopWindowPad();
       if (!settingsVisible)
       {
@@ -67,10 +72,10 @@ namespace app
       float navW = 0.0f;
       for (const char* tab : kTabs)
          navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
-      navW += tok::space_3 * 2.0f;
+      navW += kNavInset * 2.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
-      // First tab level with the first card; a little air between tabs.
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + tok::space_3);
+      // Tiles sit kPad inside the nav well; a little air between tabs.
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SectionCard::kPad * 2.0f);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
       for (int i = 0; i < kTabCount; i++)
@@ -91,12 +96,23 @@ namespace app
                               tok::radius_tile);
          const char* label = T(kTabs[i]); // drawn text, not a widget label: L() would add the "###id" part
          const ImVec2 ts = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p.x + tok::space_3, p.y + (h - ts.y) * 0.5f),
+         dl->AddText(ImVec2(p.x + kNavInset, p.y + (h - ts.y) * 0.5f),
                      ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, sel ? 1.0f : 0.75f)), label);
       }
       ImGui::GetStyle().ItemSpacing = oldItemSpacing;
       ImGui::EndChild();
-      FormParts::Inline();
+      {
+         // The section list sits in its own well, the same one the cards use, kPad outside the tiles all round.
+         const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
+         constexpr float pad = SectionCard::kPad;
+         const ImVec2 a(navMin.x - pad, navMin.y + pad), b(navMax.x + pad, navMax.y - pad);
+         ImDrawList* wdl = ImGui::GetWindowDrawList();
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         wdl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
+         wdl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
+                      tok::radius_group);
+      }
+      FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * 2.0f);   // nav well, a gap, then the card column
       const ImVec2 oldWindowPadding = ImGui::GetStyle().WindowPadding;
       ImGui::GetStyle().WindowPadding = ImVec2(tok::space_4, 0.0f);
       ImGui::BeginChild("##SettingsBody", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
