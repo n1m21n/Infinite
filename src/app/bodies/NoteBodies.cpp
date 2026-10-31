@@ -470,8 +470,14 @@ namespace app
          std::string caption = n->deviceName.empty() ? options[0] : n->deviceName;
          if (n->DeviceMissing())
             caption += " (not connected)";
+         // One row, edge to edge in the section: device on the left, Learn on
+         // the right, the same height.
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float learnW = 84.0f;
+         const ImVec2 rowAt = ImGui::GetCursorScreenPos();
          PushDropdownStyle();
-         if (NodeDropdownField((caption + "##midiDevice").c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowAt.y));
+         if (NodeDropdownField((caption + "##midiDevice").c_str(), ImVec2(gAudioContentW - learnW - gap, 0)))
          {
             gDropdown.options = options;
             gDropdown.categories.assign(options.size(), "");
@@ -485,9 +491,11 @@ namespace app
             gDropdown.justOpened = true;
             gDropdown.focusSearch = false;
          }
+         const float rowH = ImGui::GetItemRectSize().y;
          PopDropdownStyle();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - learnW, rowAt.y));
          const bool learning = n->IsLearning();
-         if (ActionButton::Draw(learning ? "Play a key..." : "Learn", ImVec2(kPreviewSize, 0),
+         if (ActionButton::Draw(learning ? "Play a key" : "Learn", ImVec2(learnW, rowH),
                                 learning ? ActionButton::Kind::Learn : ActionButton::Kind::Plain))
          {
             if (learning)
@@ -499,9 +507,8 @@ namespace app
             }
          }
          if (n->DeviceMissing())
-            ImGui::TextDisabled("device not connected - listening to all inputs");
+            ImGui::TextDisabled("not connected - listening to all inputs");
       }
-      ImGui::TextDisabled("%s", n->channel < 0 ? "channel: omni (-1)" : "channel: filtered");
       EndAudioSection();
 
       EndAudioBody();
