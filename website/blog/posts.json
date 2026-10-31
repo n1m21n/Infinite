@@ -1,5 +1,14 @@
 [
  {
+  "slug": "modular-vst3-host-audio-routing-and-modulation",
+  "title": "Modular VST3 host: route plugins, MIDI and CV on an open canvas",
+  "description": "Explore modular VST3 host architecture in Infinite: patch audio and MIDI between plugins, route CV automation across an open canvas, and isolate plugin crashes.",
+  "date": "2026-10-31",
+  "updated": "2026-10-31",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/modular-vst3-host-audio-routing-and-modulation.html"
+ },
+ {
   "slug": "linux-daw-modular-audio-and-generative-visuals",
   "title": "Linux DAW workflows: modular audio, VST3 hosting and live visuals",
   "description": "Explore modular music production on Linux with Infinite: a Linux DAW to route synthesiser graphs, host Linux VST3 plugins, and patch audio into live visuals.",

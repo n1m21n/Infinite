@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Sat, 31 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Modular VST3 host: route plugins, MIDI and CV on an open canvas</title><link>https://infinitedevices.org/blog/modular-vst3-host-audio-routing-and-modulation.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/modular-vst3-host-audio-routing-and-modulation.html</guid>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0000</pubDate><category>product</category><description>Explore modular VST3 host architecture in Infinite: patch audio and MIDI between plugins, route CV automation across an open canvas, and isolate plugin crashes.</description></item>
   <item><title>Linux DAW workflows: modular audio, VST3 hosting and live visuals</title><link>https://infinitedevices.org/blog/linux-daw-modular-audio-and-generative-visuals.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/linux-daw-modular-audio-and-generative-visuals.html</guid>
     <pubDate>Fri, 30 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Explore modular music production on Linux with Infinite: a Linux DAW to route synthesiser graphs, host Linux VST3 plugins, and patch audio into live visuals.</description></item>
   <item><title>Generative visuals in live performance: audio, nodes and GPU</title><link>https://infinitedevices.org/blog/generative-visuals-live-performance.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/generative-visuals-live-performance.html</guid>
