@@ -1538,8 +1538,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
    // external tool (the Infinite MCP server) drive this running instance.
    // Loopback-only; port overridable for running more than one instance.
-   // Skipped in headless/test modes so self-test runs do not bind/unbind port 7777.
-   if (!IsHeadlessProcess())
+   // Skipped in headless/test modes so self-test runs do not bind/unbind port 7777, except a scripted
+   // screenshot run (INFINITE_SHOT_REQUEST), which is driven over this port.
+   if (!IsHeadlessProcess() || getenv("INFINITE_SHOT_REQUEST") != nullptr)
    {
       int controlPort = 7777;
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
