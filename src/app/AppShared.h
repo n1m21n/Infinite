@@ -1,5 +1,6 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
+#include <optional>
 #include "core/ModShapes.h"
 #include "core/Provenance.h"
 #include "app/ui/design/TokenColors.h"

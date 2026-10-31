@@ -2185,12 +2185,10 @@ namespace
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float h = ImGui::GetFrameHeight();
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
       ImGui::PushClipRect(p, ImVec2(p.x + kFieldLabelW - ImGui::GetCursorPosX() - 4.0f, p.y + h), true);
-      ImGui::TextUnformatted(text);
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", text);
       ImGui::PopClipRect();
-      ImGui::PopStyleColor();
-      ImGui::SameLine(kFieldLabelW);
+      FormParts::Inline(kFieldLabelW);
    }
 
    void Hint(const char* text)
@@ -2253,13 +2251,11 @@ namespace
       ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
       bool on = *v;
       bool hit = CheckBox::Box(FormParts::Id(label).c_str(), &on);
-      ImGui::SameLine(0.0f, tok::space_2);
+      FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
       ImGui::AlignTextToFramePadding();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
-      ImGui::TextUnformatted(label);
-      ImGui::PopStyleColor();
+      ImGui::TextColored(ImVec4(t.x, t.y, t.z, 0.72f), "%s", label);
       if (ImGui::IsItemClicked())
       {
          on = !on;
@@ -2969,7 +2965,9 @@ namespace
             KeepingLenses(scene, [&] { scene->renderH = (float)std::clamp(h, 16, 8192); });
          FloatRow(T("Resolution %"), &sSet->percent, 1.0f, 200.0f, "%.0f%%");
          FieldLabel(T("Final size"));
-         ImGui::Text("%d x %d", (int)(scene->renderW * sSet->percent / 100.0f), (int)(scene->renderH * sSet->percent / 100.0f));
+         char finalSize[32];
+         snprintf(finalSize, sizeof(finalSize), "%d x %d", (int)(scene->renderW * sSet->percent / 100.0f), (int)(scene->renderH * sSet->percent / 100.0f));
+         ImGui::TextUnformatted(finalSize);
          static const std::vector<int> kRates = { 24, 25, 30, 48, 50, 60, 120 };
          static const std::vector<std::string> kRateNames = { "24 fps", "25 fps", "30 fps", "48 fps", "50 fps", "60 fps", "120 fps" };
          int rate = (int)(std::find(kRates.begin(), kRates.end(), (int)sSet->fps) - kRates.begin());

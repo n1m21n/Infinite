@@ -28,6 +28,8 @@ ALLOW = {
     ("src/core/Extensions.cpp", 'FILE* f = fopen(target.c_str(), "wb");'),
     ("src/app/panels/Diagnostics.cpp", "std::ifstream f(p, std::ios::binary);"),
     ("src/core/ShareBundle.cpp", "std::ofstream f(dest, std::ios::binary);"),
+    ("src/app/graph/LearningLog.cpp", "std::ifstream f(p);"),
+    ("src/app/graph/LearningLog.cpp", "std::ifstream f(file);"),
     ("src/nodes/LooperNode.cpp", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
     ("src/platform/common/SingleInstance.h", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
     ("src/platform/common/SingleInstance.h", "std::ifstream f(req, std::ios::binary);"),
