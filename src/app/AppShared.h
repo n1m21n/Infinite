@@ -440,6 +440,8 @@ extern int gAudioBufferFrames;
 extern int gAudioOutputMode;
 extern std::string gAudioAsioDriver;
 extern int gAudioThreads;
+extern std::vector<std::string> gMidiOffSources;
+void SyncMidiSourceEnables(); // pushes gMidiOffSources onto the connected sources
 
 extern float gAudioOversample;
 

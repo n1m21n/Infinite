@@ -241,6 +241,11 @@ namespace
    // event has no real ALSA client/port to look up.
    void HandleSeqEvent(unsigned int dev, const snd_seq_event_t& ev)
    {
+      const bool transport = ev.type == SND_SEQ_EVENT_CLOCK || ev.type == SND_SEQ_EVENT_START ||
+                             ev.type == SND_SEQ_EVENT_STOP || ev.type == SND_SEQ_EVENT_CONTINUE ||
+                             ev.type == SND_SEQ_EVENT_SONGPOS;
+      if (!transport && !MidiSourceEnabled(dev))
+         return;
       switch (ev.type)
       {
          case SND_SEQ_EVENT_NOTEON:

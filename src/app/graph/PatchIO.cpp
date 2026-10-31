@@ -1,4 +1,5 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
+#include <algorithm>
 #include "app/AppShared.h"
 #include "app/graph/LearningLog.h"
 #include "core/MediaCollect.h"
@@ -526,11 +527,36 @@ namespace app
             gAudioAsioDriver = val;
          else if (key == "audioThreads")
             gAudioThreads = std::clamp(atoi(val.c_str()), 0, 1);
+         else if (key == "midiOff")
+         {
+            gMidiOffSources.clear();
+            size_t start = 0;
+            while (start <= val.size())
+            {
+               const size_t tab = val.find('\t', start);
+               const std::string name = val.substr(start, tab == std::string::npos ? std::string::npos : tab - start);
+               if (!name.empty())
+                  gMidiOffSources.push_back(name);
+               if (tab == std::string::npos)
+                  break;
+               start = tab + 1;
+            }
+         }
          else if (key == "creditInExports")
             Provenance::SetEnabled(val != "0");
       }
    }
 
+
+   void SyncMidiSourceEnables()
+   {
+      for (const auto& src : Platform::MidiListSources())
+      {
+         const bool off = std::find(gMidiOffSources.begin(), gMidiOffSources.end(), src.name) != gMidiOffSources.end();
+         if (Platform::MidiSourceEnabled(src.id) == off)
+            Platform::MidiSetSourceEnabled(src.id, !off);
+      }
+   }
 
    void SaveAudioSettings()
    {
@@ -552,6 +578,13 @@ namespace app
       file << "asioDriver=" << gAudioAsioDriver << "\n";
       file << "audioThreads=" << gAudioThreads << "\n";
       file << "creditInExports=" << (Provenance::Enabled() ? 1 : 0) << "\n";
+      if (!gMidiOffSources.empty())
+      {
+         file << "midiOff=";
+         for (size_t i = 0; i < gMidiOffSources.size(); i++)
+            file << (i ? "\t" : "") << gMidiOffSources[i];
+         file << "\n";
+      }
    }
 
 

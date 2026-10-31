@@ -5554,6 +5554,8 @@ namespace Platform
       {
          if (len < 2)
             return;
+         if (data[0] < 0xF0 && !MidiSourceEnabled(device))
+            return;
          const unsigned char status = data[0];
          const unsigned char hiNibble = status & 0xF0;
          const int channel = status & 0x0F;

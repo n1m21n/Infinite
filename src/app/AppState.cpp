@@ -222,6 +222,7 @@ namespace app
    // Audio threads for the graph (AudioEngine::SetAudioThreads): 0 = Auto,
    // one per core; 1 = the audio thread alone. Persisted.
    int gAudioThreads = 0;
+   std::vector<std::string> gMidiOffSources; // names of MIDI inputs switched off in Settings
 
    // Placeholder only - no DSP node reads this yet. P3c's Drive/AudioFilter
    // kernels are the intended future consumer (see README.md's Effects

@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <cstdint>
 #include <functional>
+#include <mutex>
+#include <unordered_set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -1127,6 +1129,30 @@ namespace Platform
    bool MidiIsRunning();
    std::string MidiDeviceSummary(); // comma-joined names of connected sources, for status text
    std::string MidiDeviceName(MidiDeviceId device); // "" if not currently connected
+   // Per-source switch (Settings > Audio > MIDI Inputs). A source that is off drops its note and controller messages
+   // before they reach any node; clock and transport still pass. On by default for every source.
+   namespace MidiGate
+   {
+      inline std::mutex& Mutex() { static std::mutex m; return m; }
+      inline std::unordered_set<MidiDeviceId>& Off() { static std::unordered_set<MidiDeviceId> s; return s; }
+      inline std::atomic<int>& OffCount() { static std::atomic<int> n{ 0 }; return n; }
+   }
+   inline void MidiSetSourceEnabled(MidiDeviceId device, bool enabled)
+   {
+      std::lock_guard<std::mutex> lock(MidiGate::Mutex());
+      if (enabled)
+         MidiGate::Off().erase(device);
+      else
+         MidiGate::Off().insert(device);
+      MidiGate::OffCount().store((int)MidiGate::Off().size());
+   }
+   inline bool MidiSourceEnabled(MidiDeviceId device)
+   {
+      if (MidiGate::OffCount().load() == 0)
+         return true;
+      std::lock_guard<std::mutex> lock(MidiGate::Mutex());
+      return MidiGate::Off().count(device) == 0;
+   }
    // Connected note sources, in a stable order, each with the id MidiNoteMessage.device carries. Empty when MIDI is not
    // started or nothing is plugged in (MidiDeviceSummary's text is not a test for that: it reads "no inputs connected").
    struct MidiSource

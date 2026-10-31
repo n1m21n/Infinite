@@ -423,6 +423,25 @@ namespace app
             gRequestDelete = true;
          else if (action == "bypass")
             gRequestBypass = true;
+         else if (action == "view3d-add")
+         {
+            // The menu's Add to 3D View, by node index; a node that cannot be added is an error, not a silent skip.
+            for (const json& index : params.value("nodes", json::array()))
+            {
+               GraphNode* gn = index.is_number_integer() ? FindNodeByIndex(index.get<int>()) : nullptr;
+               if (gn == nullptr)
+               {
+                  outError = "unknown node index";
+                  return true;
+               }
+               if (!View3DCanAdd(*gn))
+               {
+                  outError = "node " + std::to_string(index.get<int>()) + " cannot be added to the 3D View";
+                  return true;
+               }
+               View3DAddNode(*gn);
+            }
+         }
          else if (action == "group")
             gRequestGroup = true;
          else if (action == "ungroup")

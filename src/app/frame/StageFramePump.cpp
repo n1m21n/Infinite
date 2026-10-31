@@ -354,6 +354,9 @@ void DrawFramePump(FrameCtx& fc)
       if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
          PollAutosave();
 
+      if (frameId % 30 == 0 && !gMidiOffSources.empty())
+         SyncMidiSourceEnables();   // a switched-off controller that was unplugged and back stays off
+
       // Effect shaders compile ahead, one stage a frame. Off under the dev
       // harness (it would sit inside every fixture's sample window) except
       // for the edit bench, which measures exactly this.

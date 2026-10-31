@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include <algorithm>
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -71,8 +72,10 @@ namespace app
          navW = std::max(navW, ImGui::CalcTextSize(T(tab)).x);
       navW += kNavInset * 2.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
-      // Tiles sit kPad inside the nav well; a little air between tabs.
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SectionCard::kPad * 2.0f);
+      // The well's top lines up with the first card's: the body spends two item spacings (Spacing, then the card's
+      // lead-in Dummy) before a card's well starts. Tiles sit kPad inside it; a little air between tabs.
+      const float wellTop = ImGui::GetStyle().ItemSpacing.y * 2.0f;
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + wellTop + SectionCard::kPad);
       const ImVec2 oldItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, tok::space_2);
       for (int i = 0; i < kTabCount; i++)
@@ -102,7 +105,7 @@ namespace app
          // The section list sits in its own well, the same one the cards use, kPad outside the tiles all round.
          const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
          constexpr float pad = SectionCard::kPad;
-         const ImVec2 a(navMin.x - pad, navMin.y + pad), b(navMax.x + pad, navMax.y - pad);
+         const ImVec2 a(navMin.x - pad, navMin.y + wellTop), b(navMax.x + pad, navMax.y - pad);
          SectionCard::Well(a, b);
       }
       FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * 2.0f);   // nav well, a gap, then the card column
@@ -752,7 +755,21 @@ namespace app
                if (midiSources.empty())
                   ImGui::TextDisabled("%s", T("No MIDI inputs connected"));
                for (const auto& src : midiSources)
-                  ImGui::TextUnformatted(src.name.c_str());
+               {
+                  auto off = std::find(gMidiOffSources.begin(), gMidiOffSources.end(), src.name);
+                  bool on = off == gMidiOffSources.end();
+                  ImGui::PushID((int)src.id);
+                  if (ImGui::Checkbox(src.name.c_str(), &on))
+                  {
+                     if (on)
+                        gMidiOffSources.erase(off);
+                     else
+                        gMidiOffSources.push_back(src.name);
+                     Platform::MidiSetSourceEnabled(src.id, on);
+                     SaveAudioSettings();
+                  }
+                  ImGui::PopID();
+               }
             }
             SectionCard::End();
          }
