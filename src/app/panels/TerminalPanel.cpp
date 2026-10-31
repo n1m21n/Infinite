@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/RemoteControl.h"
@@ -769,7 +770,7 @@ namespace
          if (count > 0)
             tab.session->ScrollToLine(snap->searchHits[(size_t)sSearchIndex].line);
       }
-      ImGui::SameLine();
+      FormParts::Inline();
       char label[32];
       if (sSearchText[0] != '\0')
       {
@@ -1018,7 +1019,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    {
       grip();
       if (vertical)
-         ImGui::SameLine();
+         FormParts::Inline();
    }
    const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
    const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), std::max(1.0f, inner.y))
@@ -1042,7 +1043,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    if (!gripFirst)
    {
       if (vertical)
-         ImGui::SameLine();
+         FormParts::Inline();
       grip();
    }
    const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
