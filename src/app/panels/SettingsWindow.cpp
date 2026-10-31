@@ -1109,7 +1109,7 @@ namespace app
             }
 
             // Section 5: Operators & Math Functions
-            if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant sync quantize"))
+            if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant"))
             {
                FormParts::Heading("5. Operators & Built-in Math Functions");
                if (ImGui::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
@@ -1148,8 +1148,8 @@ namespace app
                   ImGui::TableNextColumn(); ImGui::Text("f() f(speed) f(min, max) f(min, max, speed, seed). rand jumps, noise glides, sh samples and holds. Deterministic in time and seed.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Phase Shapes");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "bend, pinch, mirror, skew, formant, sync, quantize");
-                  ImGui::TableNextColumn(); ImGui::Text("shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant/sync) leaves it unchanged.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "bend, pinch, mirror, skew, formant");
+                  ImGui::TableNextColumn(); ImGui::Text("shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant) leaves it unchanged.");
 
                   ImGui::EndTable();
                }
@@ -1301,7 +1301,7 @@ namespace app
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
                ImGui::TextDisabled("            length normalize distance dot cross");
                ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
-               ImGui::TextDisabled("            phase shapes: bend pinch mirror skew formant sync quantize (phase, amount)");
+               ImGui::TextDisabled("            phase shapes: bend pinch mirror skew formant (phase, amount)");
                ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
                ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
