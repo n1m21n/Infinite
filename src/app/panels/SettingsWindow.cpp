@@ -40,7 +40,8 @@ namespace app
       static int sTab = 0;
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
-                                           I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins") };
+                                           I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
+                                           I18N_KEY("Terminal") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -52,6 +53,12 @@ namespace app
             sTab = 3;
          if (o && strstr(o, "settingsplugins"))
             sTab = 7;
+         if (o && strstr(o, "settingsfield"))
+            sTab = 4;
+         if (o && strstr(o, "settingsglobals"))
+            sTab = 5;
+         if (o && strstr(o, "settingsterminal"))
+            sTab = 8;
       }
       const float navW = 200.0f;
       ImGui::BeginChild("##SettingsNav", ImVec2(navW, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
@@ -906,22 +913,6 @@ namespace app
                gShowUpdateCheckModal = true;
             }
 
-            ImGui::Spacing();
-            FormParts::Section(T("AI assistants"));
-            static std::string sPatchSkillStatus;
-            if (FormParts::Button(L("Install AI Skill##patchAuthoring")))
-            {
-               const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
-               if (!folder.empty())
-                  sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
-            }
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
-            if (!sPatchSkillStatus.empty())
-            {
-               ImGui::SameLine();
-               ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
-            }
 
             SectionCard::End();
          }
@@ -939,8 +930,10 @@ namespace app
                "4. Types & Vectors",
                "5. Operators & Math Functions",
                "6. Domain Transfer Operators",
-               "7. Branching & Control Flow",
-               "8. Canonical Recipes"
+               "7. Branching, Loops & Control Flow",
+               "8. Field Synth, Effect & Notes",
+               "9. Field Graph",
+               "10. Canonical Recipes"
             };
 
             ImGui::Spacing();
@@ -1029,11 +1022,13 @@ namespace app
                ImGui::BulletText("Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.");
                ImGui::BulletText("Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).");
                ImGui::BulletText("Real-Time Safe: Bounded loops, no dynamic heap allocation or recursion on execution threads.");
+               ImGui::BulletText("Nodes: Field Pixel (pixel), Field Modifier and Field Primitive (element), Field Synth, Field Effect and Field Notes (sample), Field Graph (graph).");
+               ImGui::BulletText("Live: press Apply in the node's editor (Revert goes back to the last applied text); compile errors name the line.");
                ImGui::Spacing();
             }
 
             // Section 2: Domains & Reserved Names
-            if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph"))
+            if ((sSelectedSection == 0 || sSelectedSection == 2) && MatchesFilter("domains reserved frame element pixel sample graph age note"))
             {
                FormParts::Heading("2. Domains & Reserved Names");
                if (ImGui::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
@@ -1046,8 +1041,8 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("frame");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 fps / Bytecode VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "t, dt, frame");
-                  ImGui::TableNextColumn(); ImGui::Text("Time in seconds, delta time, integer frame counter.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "t, dt, frame, age, pi");
+                  ImGui::TableNextColumn(); ImGui::Text("Time in seconds, delta time, global frame counter, cooks since this node's state was cleared (seed a simulation when age == 0), pi.");
 
                   ImGui::TableNextColumn(); ImGui::Text("element");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 x N / Bytecode VM");
@@ -1056,13 +1051,13 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("pixel");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 x W x H / GLSL");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "uv, xy, col, res, aspect, alpha");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "uv, xy, col, res, aspect, alpha, age");
                   ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha.");
 
                   ImGui::TableNextColumn(); ImGui::Text("sample");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("48 kHz / Register VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "in, out, sr, n, freq, gate");
-                  ImGui::TableNextColumn(); ImGui::Text("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0).");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "in, out, sr, n, freq, gate, noteOn, notePitch, noteVel");
+                  ImGui::TableNextColumn(); ImGui::Text("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0), the latest note event. Field Notes adds noteNum and beat.");
 
                   ImGui::TableNextColumn(); ImGui::Text("graph");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("Edit time / Interpreter");
@@ -1075,7 +1070,7 @@ namespace app
             }
 
             // Section 3: Declarations
-            if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output input image img offset sampling"))
+            if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output input image img offset sampling table geometry audio pin"))
             {
                FormParts::Heading("3. Declarations");
                ImGui::TextColored(app::AccentEmphasisSelected(), "param <type> <name> = <default> [<min>, <max>]");
@@ -1093,6 +1088,14 @@ namespace app
                ImGui::TextColored(app::AccentEmphasisSelected(), "attrib <type> <name> = <init>");
                ImGui::TextWrapped("Declares custom per-element attributes living on geometry points or vertices.");
                DrawCodeBox("attrib float heat = 0\nheat += bass * 0.1\nCd = vec3(heat, 0.2, 1.0 - heat)", "cb_attrib");
+
+               ImGui::TextColored(app::AccentEmphasisSelected(), "state <type> <name>[<size>] = <init>");
+               ImGui::TextWrapped("A state table: a fixed-size array of cells, indexed with name[idx]. The size is a compile-time integer literal; a table cannot be read as a bare name.");
+               DrawCodeBox("state float hist[16] = 0\nhist[frame % 16] = level", "cb_table");
+
+               ImGui::TextColored(app::AccentEmphasisSelected(), "output <domain> <type> <name> = <expr>   /   input <domain> <type> <name>");
+               ImGui::TextWrapped("Adds a pin to the node. Types are the scalar and vector types plus three pin types: geometry (input only, a whole mesh), audio (a sample-domain float) and image (a pixel-domain vec4). An output frame float becomes a modulation source.");
+               DrawCodeBox("output frame float level = 0.5 + 0.5 * sin(t)\ninput pixel image img", "cb_pins");
             }
 
             // Section 4: Types & Vectors
@@ -1106,7 +1109,7 @@ namespace app
             }
 
             // Section 5: Operators & Math Functions
-            if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp rand noise"))
+            if ((sSelectedSection == 0 || sSelectedSection == 5) && MatchesFilter("operators math functions sin cos lerp mix step rand noise sh bend pinch mirror skew formant sync quantize"))
             {
                FormParts::Heading("5. Operators & Built-in Math Functions");
                if (ImGui::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
@@ -1125,24 +1128,28 @@ namespace app
                   ImGui::TableNextColumn(); ImGui::Text("Standard boolean comparisons and logic gates.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Trigonometry");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "sin, cos, tan, asin, acos, atan, atan2");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "sin, cos, tan, atan2");
                   ImGui::TableNextColumn(); ImGui::Text("Standard trig functions (radians).");
 
                   ImGui::TableNextColumn(); ImGui::Text("Math Utilities");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "abs, floor, ceil, fract, clamp, lerp");
-                  ImGui::TableNextColumn(); ImGui::Text("lerp(a, b, t) is linear interpolation.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "abs, sign, floor, ceil, round, fract, mod, fmod, clamp, lerp, mix");
+                  ImGui::TableNextColumn(); ImGui::Text("lerp(a, b, t) and mix(a, b, t) are linear interpolation; mod and fmod are the floating-point remainder.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Advanced Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "smoothstep, pow, sqrt, exp, log, min, max");
-                  ImGui::TableNextColumn(); ImGui::Text("Hermite interpolation, exponents, roots, min/max bounds.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "step, smoothstep, pow, sqrt, exp, log, min, max, if(c, a, b)");
+                  ImGui::TableNextColumn(); ImGui::Text("Threshold and Hermite interpolation, exponents, roots, min/max bounds, a select that evaluates both sides.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Vector Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "length, normalize, dot, cross, reflect");
-                  ImGui::TableNextColumn(); ImGui::Text("Vector norms, dot/cross products, reflection.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "length, distance, normalize, dot, cross");
+                  ImGui::TableNextColumn(); ImGui::Text("Vector norms, distance between points, dot/cross products.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Pure Randomness");
-                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "rand(t, seed), noise(t, seed)");
-                  ImGui::TableNextColumn(); ImGui::Text("Deterministic, pure functions of time and seed.");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "rand, noise, sh");
+                  ImGui::TableNextColumn(); ImGui::Text("f() f(speed) f(min, max) f(min, max, speed, seed). rand jumps, noise glides, sh samples and holds. Deterministic in time and seed.");
+
+                  ImGui::TableNextColumn(); ImGui::Text("Phase Shapes");
+                  ImGui::TableNextColumn(); ImGui::TextColored(app::AccentEmphasisSelected(), "bend, pinch, mirror, skew, formant, sync, quantize");
+                  ImGui::TableNextColumn(); ImGui::Text("shape(phase, amount): warps a 0..1 phase the way Wavetable's warps do. Amount 0 (ratio 1 for formant/sync) leaves it unchanged.");
 
                   ImGui::EndTable();
                }
@@ -1180,9 +1187,9 @@ namespace app
             }
 
             // Section 7: Branching & Control Flow
-            if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("branching if control flow predication cost"))
+            if ((sSelectedSection == 0 || sSelectedSection == 7) && MatchesFilter("branching if else for loop control flow predication cost"))
             {
-               FormParts::Heading("7. Branching & Control Flow");
+               FormParts::Heading("7. Branching, Loops & Control Flow");
                ImGui::TextWrapped("Field allows data-dependent branching (unlike Kronos, which forbids it entirely). Every branch has a real cost that depends on the domain it runs in - always know which domain you're in before you branch.");
                DrawCodeBox("if (P.y > 0.5) { Cd = vec3(1, 0, 0) }", "cb_if_stmt");
 
@@ -1213,12 +1220,42 @@ namespace app
                }
                ImGui::Spacing();
                ImGui::TextWrapped("The function form if(cond, a, b) also exists (from the '=' parameter-expression language) and always evaluates both branches with no short-circuit - it is not the same construct as the statement form above, but both are valid Field/expression syntax.");
+               ImGui::Spacing();
+               ImGui::TextColored(app::AccentEmphasisSelected(), "for (init; cond; step) { ... }");
+               ImGui::TextWrapped("Loops are bounded. In the sample domain the bounds must be compile-time integer constants and the loop is unrolled (with a cap); a Field Graph loop stops at an iteration limit.");
+               DrawCodeBox("for (k = 0; k < 4; k += 1) { P.y += sin(P.x * (k + 1) + t) * 0.1 / (k + 1) }", "cb_for");
             }
 
-            // Section 8: Canonical Recipes
-            if ((sSelectedSection == 0 || sSelectedSection == 8) && MatchesFilter("recipes synth filter ripple sdf resonator glow example templates"))
+            // Section 8: Field Synth, Effect & Notes
+            if ((sSelectedSection == 0 || sSelectedSection == 8) && MatchesFilter("sample synth effect notes delay tick deg note noteNum beat arp"))
             {
-               FormParts::Heading("8. Canonical Recipes");
+               FormParts::Heading("8. Field Synth, Effect & Notes (sample domain)");
+               ImGui::TextWrapped("Sample kernels run on the audio thread. They have a smaller function set: abs, floor, ceil, clamp, lerp, min, max, pow, sqrt, exp, log, sin, cos, tan, if, plus the calls below.");
+               ImGui::Spacing();
+               ImGui::TextColored(app::AccentEmphasisSelected(), "delay(x, samples)");
+               ImGui::TextWrapped("A delay line; the length is a positive integer literal. Total delay memory per kernel is capped.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "tick(division)");
+               ImGui::TextWrapped("1.0 on the sample where the transport crosses a beat division (1/16, 1/8, 1/4...), else 0.");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "deg(degree)");
+               ImGui::TextWrapped("MIDI note of a scale degree in the project key and scale (top bar).");
+               ImGui::TextColored(app::AccentEmphasisSelected(), "note(pitch, vel, len)   - Field Notes only");
+               ImGui::TextWrapped("A statement that sends a note out of the node's notes pin; len is in beats (0 = as long as the incoming note). rand() with no arguments is also Field Notes only. noteNum is the incoming note number, beat the transport position in beats.");
+               DrawCodeBox("# Field Notes: Euclidean rhythm on the scale root\nparam float hits = 5 [1, 16]\nstate float step = 0\nif (tick(1/16) > 0.5) {\n   on = floor((step + 1) * hits / 16 + 0.001) - floor(step * hits / 16 + 0.001)\n   note(deg(0), 0.9 * on, 1/16)\n   step = (step + 1) % 16\n}", "cb_notes");
+               DrawCodeBox("# Field Effect: feedback echo\nparam float fb = 0.4 [0, 0.9]\nstate float y = 0\ny = in + delay(y, 12000) * fb\nout = y", "cb_delay");
+            }
+
+            // Section 9: Field Graph
+            if ((sSelectedSection == 0 || sSelectedSection == 9) && MatchesFilter("graph metaprogramming emit connect set place"))
+            {
+               FormParts::Heading("9. Field Graph (graph domain)");
+               ImGui::TextWrapped("Runs at edit time and builds nodes on the canvas. emit(\"Node Name\", key) adds a node and returns a handle (the key keeps it stable across re-runs), connect(a, outPin, b, inPin) patches a cable, set(handle, \"param\", value) sets a param, place(handle, x, y) positions it. Nodes it made are updated, not duplicated, when you apply again.");
+               DrawCodeBox("seq = emit(\"Note Sequencer\", 0)\nsynth = emit(\"Wavetable\", 1)\nout = emit(\"Audio Out\", 2)\nconnect(seq, 0, synth, 0)\nconnect(synth, 0, out, 0)\nplace(seq, -200, 0)\nplace(out, 200, 0)", "cb_graph");
+            }
+
+            // Section 10: Canonical Recipes
+            if ((sSelectedSection == 0 || sSelectedSection == 10) && MatchesFilter("recipes synth filter ripple sdf resonator glow example templates"))
+            {
+               FormParts::Heading("10. Canonical Recipes");
                ImGui::TextWrapped("Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges.");
                ImGui::Spacing();
 
@@ -1259,10 +1296,12 @@ namespace app
             {
                // i18n-skip-begin: expression vocabulary
                ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
-               ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
-               ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
+               ImGui::TextDisabled("functions   sin cos tan atan2 abs sign sqrt exp log pow");
+               ImGui::TextDisabled("            floor ceil round fract mod fmod min max clamp lerp mix");
                ImGui::TextDisabled("            step(edge,x) smoothstep(e0,e1,x) if(cond,a,b)");
+               ImGui::TextDisabled("            length normalize distance dot cross");
                ImGui::TextDisabled("            rand/noise/sh: f() f(speed) f(min,max) f(min,max,speed,seed)");
+               ImGui::TextDisabled("            phase shapes: bend pinch mirror skew formant sync quantize (phase, amount)");
                ImGui::TextDisabled("vectors     vec2(x,y) vec3(x,y,z) vec4(x,y,z,w) or splat vec3(1)");
                ImGui::TextDisabled("            swizzles: .xy .xyz .xyzw or .rg .rgb .rgba (e.g. P.xz, Cd.bgr)");
                ImGui::TextDisabled("bound       t = transport seconds, pi");
@@ -1614,6 +1653,90 @@ namespace app
             DrawPluginScanControls(true);
             FormParts::Section(T("Scanned plugins"));
             DrawPluginManagerList();
+            SectionCard::End();
+         }
+
+         // 9. Terminal Tab: the Terminal panel, the `infinite` command, the headless engine and the AI skill files.
+         if (sTab == 8)
+         {
+            ImGui::Spacing();
+            FormParts::Section(T("Terminal panel"));
+            ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
+            ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
+            if (FormParts::Button(gTerminalOpen ? L("Close Terminal") : L("Open Terminal")))
+            {
+               gTerminalOpen = !gTerminalOpen;
+               gTerminalFocus = gTerminalOpen;
+            }
+            SectionCard::End();
+
+            FormParts::Section(T("The infinite command"));
+            ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
+            ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
+            FormParts::PushReferenceStyle();
+            // i18n-skip-begin: command vocabulary
+            ImGui::TextDisabled("Look       graph  explain  params <node>  selection  status  nodes  describe <type>");
+            ImGui::TextDisabled("Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo");
+            ImGui::TextDisabled("Patch      new  recent  open  save  validate  canonicalize  apply");
+            ImGui::TextDisabled("Play       play  stop  rewind  seek <seconds>  tempo <bpm>");
+            ImGui::TextDisabled("Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set");
+            ImGui::TextDisabled("See        shot <node> [out.png]  frame  render  audio");
+            ImGui::TextDisabled("Code       code kinds|new|check|push|pull|watch|errors|docs|examples");
+            ImGui::TextDisabled("Generate   patch recipes|new|check|layout|apply");
+            ImGui::TextDisabled("App        panel  settings  show  view  quit");
+            ImGui::TextDisabled("Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run");
+            ImGui::Spacing();
+            ImGui::TextDisabled("Outside the panel (macOS):  /Applications/Infinite.app/Contents/MacOS/Infinite --cli graph");
+            // i18n-skip-end
+            FormParts::PopReferenceStyle();
+            SectionCard::End();
+
+            FormParts::Section(T("Headless engine"));
+            ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
+            FormParts::PushReferenceStyle();
+            // i18n-skip-begin: command vocabulary
+            ImGui::TextDisabled("Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png");
+            ImGui::TextDisabled("Infinite --render hello.inf hello.mp4 --duration 4 --fps 30");
+            ImGui::TextDisabled("Infinite --frames-dir hello.inf out/ --duration 4 --fps 30");
+            ImGui::TextDisabled("Infinite --version");
+            // i18n-skip-end
+            FormParts::PopReferenceStyle();
+            ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
+            SectionCard::End();
+
+            FormParts::Section(T("AI skills"));
+            ImGui::TextWrapped("%s", T("Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version."));
+            static std::string sSkillStatus;
+            if (FormParts::Button(L("Install All AI Skills")))
+            {
+               const std::string folder = Platform::OpenFolderDialog("Choose folder for the Infinite AI skill files");
+               if (!folder.empty())
+               {
+                  SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
+                  SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
+                  sSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
+               }
+            }
+            if (!sSkillStatus.empty())
+            {
+               ImGui::SameLine();
+               ImGui::TextDisabled("%s", sSkillStatus.c_str());
+            }
+            static std::string sPatchSkillStatus;
+            if (FormParts::Button(L("Install AI Skill##patchAuthoring")))
+            {
+               const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
+               if (!folder.empty())
+                  sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
+            if (!sPatchSkillStatus.empty())
+               ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
+            ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
+            ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
             SectionCard::End();
          }
 
