@@ -32,7 +32,9 @@ It only improves what comes after adding: composing, camera, lights, render and 
 | Per-object lighting | "Lit by": each item picks which scene lights reach it. Up to 8 lights. |
 | Add a Render 3D | Brings its geometry, lights, camera and environment. Its lights light only what it brought. |
 | Panel closed | The editor render costs nothing. The node still renders if an Output is wired. |
-| Scenes | Each scene is its own 3D View node. New scene is in the Add menu; with two or more, the outliner has a picker. |
+| Scenes | Each scene is its own 3D View node. New, Duplicate, Copy, Paste and Delete scene are in the Add menu; with two or more, the outliner has a picker. A duplicate references the same canvas nodes. |
+| Canvas | A scene made from the panel has no box on the canvas (saved as `panel 1` in the scene text), nor does its Output. Convert to node on the toolbar brings both out, once and for good. |
+| Groups | Items in a scene can be grouped. Picking one picks all, so move, rotate, scale, duplicate and remove act on the group. A copied group is a new group. |
 | Reassign | Object tab Source, or right-click Source: same kind only, placement kept. A missing item can take any node. |
 | Limit | 256 objects; past that the panel says how many were left out. |
 
@@ -72,6 +74,8 @@ Blender's keymap.
 | 0, Ctrl+0, Ctrl+Alt+0 | Through the camera, set active camera, camera to view |
 | Z, Shift+Z | Shading, toggle wire |
 | N | Sidebar |
+| Ctrl+G, Ctrl+Alt+G | Group, ungroup |
+| Ctrl+D, Ctrl+C, Ctrl+V | Duplicate, copy, paste the scene |
 | H, Shift+H, Alt+H | Hide, hide the rest, show all |
 | A, Alt+A, Ctrl+I, Shift+D, X or Delete | Select all, none, invert, duplicate, remove from scene |
 | Shift+A | Add from the canvas, a camera, a light, an HDRI or a new scene |

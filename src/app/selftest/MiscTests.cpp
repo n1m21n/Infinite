@@ -3305,11 +3305,22 @@ void RunView3DMenuTest(int frameId)
    }
    gView3DTestMenuNode = -1;
    int items = -1;
+   bool offCanvas = false, groupSaved = false;
    for (GraphNode& gn : gNodes)
       if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
+      {
          items = (int)s->Items().size();
-   const bool pass = items == 1;
-   printf("  [%s] the node menu's first add makes one item\n", pass ? "pass" : "FAIL");
+         offCanvas = gn.hiddenFromCanvas && s->panelOnly;
+         s->Items()[0].group = 7;
+         s->Commit();
+         Scene3DNode copy;
+         copy.SetSceneText(s->SceneText());
+         groupSaved = copy.Items().size() == 1 && copy.Items()[0].group == 7 && copy.panelOnly;
+      }
+   const bool pass = items == 1 && offCanvas && groupSaved;
+   printf("  [%s] the node menu's first add makes one item\n", items == 1 ? "pass" : "FAIL");
+   printf("  [%s] that scene stays off the canvas\n", offCanvas ? "pass" : "FAIL");
+   printf("  [%s] a copied scene keeps groups and stays off the canvas\n", groupSaved ? "pass" : "FAIL");
    printf("VIEW3DTEST %s\n", sView3DTestOk && pass ? "OK" : "FAIL");
 }
 

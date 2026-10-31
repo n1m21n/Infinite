@@ -30,7 +30,7 @@ public:
    struct Key
    {
       float t = 0;                  // seconds
-      float pos[3], rot[3], scale[3];
+      float pos[3] = {}, rot[3] = {}, scale[3] = {};
    };
 
    struct Item
@@ -42,6 +42,7 @@ public:
       float scale[3] = { 1, 1, 1 };
       bool visible = true;
       bool render = true;           // false: seen in the view, left out of the picture
+      int group = 0;                // items with the same number select and move together; 0 = none
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores
       std::vector<Key> keys;        // keyed placements, by time
@@ -87,6 +88,11 @@ public:
    void Commit();                    // call after changing an Item
    Kind ItemKind(const Item& item) const;
 
+   // The whole scene as saved, for duplicating and copying it.
+   const std::string& SceneText() const { return mText; }
+   void SetSceneText(const std::string& text) { mText = text; }
+
+   bool panelOnly = false;           // lives in the 3D View panel until Convert to node
    int activeCamera = 0;             // item id; 0 = the default view
    uint64_t worldUid = 0;            // an Environment node, or any node with a picture
    bool worldColorOn = false;

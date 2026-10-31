@@ -73,6 +73,7 @@ namespace
    int sTool = 1;                  // 0 select, 1 move, 2 rotate, 3 scale
    int sHot = -1;                  // last frame's handle: 0-2 axes, 3 centre, 4-6 planes
    std::vector<int> sSel;
+   std::string sCopiedScene;
    std::vector<int> sLocal;        // local view: only these, empty when off
    bool sOverlays = true;
    bool sZoomArmed = false, sBoxZoom = false;   // Shift+B, then a box to zoom into
@@ -99,7 +100,7 @@ namespace
    // drawing has let go of it.
    struct Pending
    {
-      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene } what = None;
+      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene } what = None;
       int lightType = 1;
       uint64_t uid = 0;
    } sPending;
@@ -195,7 +196,8 @@ namespace
    {
       ed::EditorContext* prev = ed::GetCurrentEditor();
       ed::SetCurrentEditor(gEditor);
-      const ImVec2 at = ed::GetNodePosition(gn.NodeId());
+      // A node off the canvas has never been placed, only given a spot.
+      const ImVec2 at = gn.hiddenFromCanvas ? ImVec2(gn.spawnX, gn.spawnY) : ed::GetNodePosition(gn.NodeId());
       ed::SetCurrentEditor(prev);
       return at;
    }
@@ -818,18 +820,60 @@ namespace
       sSel.clear();
    }
 
+   int NextGroup(Scene3DNode* scene)
+   {
+      int next = 1;
+      for (const Item& it : scene->Items())
+         next = std::max(next, it.group + 1);
+      return next;
+   }
+
+   void GroupSelected(Scene3DNode* scene, bool group)
+   {
+      if (sSel.size() < (group ? 2u : 1u))
+         return;
+      PushUndoCheckpoint(group ? "Group in 3D View" : "Ungroup in 3D View");
+      const int number = group ? NextGroup(scene) : 0;
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+            it->group = number;
+      scene->Commit();
+   }
+
+   // Picking one member picks them all, so move, duplicate and remove need no group code of their own.
+   void KeepGroupsTogether(Scene3DNode* scene)
+   {
+      std::vector<int> groups;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            if (it->group != 0)
+               groups.push_back(it->group);
+      for (const Item& it : scene->Items())
+         if (it.group != 0 && !Selected(it.id) && std::find(groups.begin(), groups.end(), it.group) != groups.end())
+            sSel.insert(sSel.begin(), it.id);
+   }
+
    void DuplicateSelected(Scene3DNode* scene, ImVec2 mouse)
    {
       if (sSel.empty())
          return;
       PushUndoCheckpoint("Duplicate in 3D View");
       std::vector<int> made;
+      std::map<int, int> groups;
       for (int id : std::vector<int>(sSel))
       {
          Item* it = scene->FindItem(id);
          if (it == nullptr)
             continue;
-         const Item copy = *it;
+         Item copy = *it;
+         if (copy.group != 0)
+         {
+            // A copied group is a new group, not more of the old one.
+            auto found = groups.find(copy.group);
+            if (found == groups.end())
+               found = groups.emplace(copy.group, NextGroup(scene) + (int)groups.size()).first;
+            copy.group = found->second;
+         }
          Item& fresh = scene->AddItem(copy.uid);
          const int freshId = fresh.id;
          fresh = copy;
@@ -1073,6 +1117,14 @@ namespace
       }
       if (command && pressed(ImGuiKey_GraveAccent))
          sOverlays = !sOverlays;
+      if (command && pressed(ImGuiKey_G))
+         GroupSelected(scene, !io.KeyAlt);
+      if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_C))
+         sCopiedScene = scene->SceneText();
+      if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_V) && !sCopiedScene.empty())
+         sPending.what = Pending::PasteScene;
+      if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_D))
+         sPending.what = Pending::DuplicateScene;
       if (command && !io.KeyAlt && pressed(ImGuiKey_I))
       {
          std::vector<int> others;
@@ -2107,6 +2159,12 @@ namespace
       if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
       next();
       if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
+      if (scene->panelOnly)
+      {
+         gap();
+         if (ActionButton::Draw(L("Convert to node"), ImVec2(0, 0)))
+            sPending.what = Pending::ConvertScene;
+      }
       ActionButton::RowNext();
       ImGui::SetCursorPosX(startX + availW - kIconW);
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
@@ -2374,6 +2432,7 @@ namespace
          const float midY = p.y + rowH * 0.5f;
          glyph::Draw(dl, ImVec2(p.x + 12.0f, midY), tok::icon_sm, text, KindGlyph(scene, it));
          const std::string name = ItemName(it);
+         const std::string shown = it.group != 0 ? name + "  (" + T("Group") + " " + std::to_string(it.group) + ")" : name;
          if (sRename == it.id)
          {
             ImGui::SetCursorScreenPos(ImVec2(p.x + 24.0f, midY - ImGui::GetFrameHeight() * 0.5f));
@@ -2396,7 +2455,7 @@ namespace
          else
          {
             dl->PushClipRect(p, ImVec2(p.x + availW - 44.0f, p.y + rowH), true);
-            dl->AddText(ImVec2(p.x + 26.0f, midY - ImGui::GetTextLineHeight() * 0.5f), text, name.c_str());
+            dl->AddText(ImVec2(p.x + 26.0f, midY - ImGui::GetTextLineHeight() * 0.5f), text, shown.c_str());
             dl->PopClipRect();
          }
          if (it.id == scene->activeCamera)
@@ -3091,6 +3150,14 @@ namespace
       MenuParts::Separator();
       if (MenuParts::Item(T("New scene")))
          sPending.what = Pending::Scene;
+      if (MenuParts::Item(T("Duplicate scene"), MODKEY "+D"))
+         sPending.what = Pending::DuplicateScene;
+      if (MenuParts::Item(T("Copy scene"), MODKEY "+C"))
+         sCopiedScene = scene->SceneText();
+      if (MenuParts::Item(T("Paste scene"), MODKEY "+V", false, !sCopiedScene.empty()))
+         sPending.what = Pending::PasteScene;
+      if (MenuParts::Item(T("Delete scene")))
+         sPending.what = Pending::DeleteScene;
    }
 
    void DrawPopups(Scene3DNode* scene)
@@ -3145,6 +3212,9 @@ namespace
                   SetSource(scene, *one, gn->uid);
             ImGui::EndMenu();
          }
+         MenuParts::Separator();
+         if (MenuParts::Item(T("Group"), MODKEY "+G", false, sSel.size() > 1)) GroupSelected(scene, true);
+         if (MenuParts::Item(T("Ungroup"), MODKEY "+Alt+G", false, any)) GroupSelected(scene, false);
          MenuParts::Separator();
          if (MenuParts::Item(T("Frame"), "F", false, any)) FrameItems(scene, false);
          if (MenuParts::Item(T("Frame all"), "Home")) FrameItems(scene, true);
@@ -3265,16 +3335,51 @@ namespace
    }
 
    // A scene is a 3D View node, so it saves, renders and has an Output like the first one.
-   void AddSceneNow(Scene3DNode* scene)
+   void AddSceneNow(const std::string& text, const char* undo)
    {
       GraphNode* self = SceneGraphNode();
       const ImVec2 at = self != nullptr ? NodePos(*self) : ImVec2(0, 0);
-      PushUndoCheckpoint("New scene in 3D View");
-      if (GraphNode* made = SpawnNode("3D View", "3D", at.x, at.y + 360.0f))
-      {
-         sSceneUid = made->uid;
-         sSel.clear();
-      }
+      PushUndoCheckpoint(undo);
+      GraphNode* made = SpawnNode("3D View", "3D", at.x, at.y + 360.0f);
+      auto* fresh = made != nullptr ? dynamic_cast<Scene3DNode*>(made->node.get()) : nullptr;
+      if (fresh == nullptr)
+         return;
+      fresh->SetSceneText(text);
+      fresh->Items();
+      fresh->panelOnly = true;
+      fresh->Commit();
+      made->hiddenFromCanvas = true;
+      sSceneUid = made->uid;
+      sSel.clear();
+   }
+
+   void ConvertScene(Scene3DNode* scene)
+   {
+      GraphNode* self = SceneGraphNode();
+      if (self == nullptr)
+         return;
+      PushUndoCheckpoint("Convert scene to node");
+      scene->panelOnly = false;
+      scene->Commit();
+      self->hiddenFromCanvas = false;
+      gRequestSelectNodeIndex = self->index;
+      gRequestFitViewNodeIndex = self->index;
+   }
+
+   void DeleteScene(Scene3DNode* scene)
+   {
+      PushUndoCheckpoint("Delete scene");
+      std::vector<int> nodes;
+      for (GraphNode& gn : gNodes)
+         if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
+            if (scene->panelOnly && out->Input().GetSource() == scene)
+               nodes.push_back(gn.index);
+      if (const GraphNode* self = SceneGraphNode())
+         nodes.push_back(self->index);
+      sSceneUid = 0;
+      sSel.clear();
+      for (int index : nodes)
+         RemoveNodeByIndex(index);
    }
 
    void RunPending(Scene3DNode* scene)
@@ -3288,7 +3393,15 @@ namespace
       else if (todo.what == Pending::Hdri || todo.what == Pending::PickHdri)
          ChooseHdri(scene, todo.what == Pending::PickHdri);
       else if (todo.what == Pending::Scene)
-         AddSceneNow(scene);
+         AddSceneNow("", "New scene in 3D View");
+      else if (todo.what == Pending::DuplicateScene)
+         AddSceneNow(scene->SceneText(), "Duplicate scene");
+      else if (todo.what == Pending::PasteScene)
+         AddSceneNow(sCopiedScene, "Paste scene");
+      else if (todo.what == Pending::ConvertScene)
+         ConvertScene(scene);
+      else if (todo.what == Pending::DeleteScene)
+         DeleteScene(scene);
       else if (todo.what == Pending::Node)
          if (GraphNode* gn = FindNodeByUid(todo.uid))
             View3DAddNode(*gn);
@@ -3329,6 +3442,7 @@ namespace
       scene->holdKeys = sOp.mode != 0;
       if (std::memcmp(&sSeen, sSet, sizeof(sSeen)) != 0)
          scene->Commit();
+      KeepGroupsTogether(scene);
       RunPending(scene);
    }
 }
@@ -3394,7 +3508,14 @@ namespace
          return s;
       const ImVec2 at = NodePos(near);
       GraphNode* made = SpawnNode("3D View", "3D", at.x + 340.0f, at.y);
-      return made != nullptr ? dynamic_cast<Scene3DNode*>(made->node.get()) : nullptr;
+      auto* scene = made != nullptr ? dynamic_cast<Scene3DNode*>(made->node.get()) : nullptr;
+      if (scene != nullptr)
+      {
+         scene->panelOnly = true;
+         scene->Commit();
+         made->hiddenFromCanvas = true;
+      }
+      return scene;
    }
 }
 

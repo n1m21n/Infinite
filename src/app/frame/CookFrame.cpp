@@ -720,6 +720,20 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
       }
    }
 
+   // A 3D View made from its panel stays off the canvas until Convert to node,
+   // and so does the Output its Render buttons wired to it.
+   for (GraphNode& gn : gNodes)
+   {
+      auto* scene = dynamic_cast<Scene3DNode*>(gn.node.get());
+      if (auto* out = dynamic_cast<OutputNode*>(gn.node.get()))
+         scene = dynamic_cast<Scene3DNode*>(out->Input().GetSource());
+      if (scene != nullptr)
+      {
+         scene->Items();
+         gn.hiddenFromCanvas = scene->panelOnly;
+      }
+   }
+
    // Colours, the same way and for the same reason: the registry was rebuilt
    // while the nodes drew, so every pointer here belongs to a node that
    // still exists. A palette has to cook before it can be read, and it is

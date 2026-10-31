@@ -241,6 +241,8 @@ void Scene3DNode::Serialize()
    std::ostringstream o;
    o << "next " << mNextId << "\n";
    o << "camera " << activeCamera << "\n";
+   if (panelOnly)
+      o << "panel 1\n";
    o << "world " << worldUid << " " << (worldColorOn ? 1 : 0) << " " << worldColor[0] << " " << worldColor[1]
      << " " << worldColor[2] << " " << worldStrength << " " << focusItem << "\n";
    o << "settings";
@@ -259,6 +261,8 @@ void Scene3DNode::Serialize()
          o << "label " << it.id << " " << it.name << "\n";
       if (!it.render)
          o << "itemx " << it.id << " 0\n";
+      if (it.group != 0)
+         o << "group " << it.id << " " << it.group << "\n";
       for (const Key& k : it.keys)
       {
          o << "key " << it.id << " " << k.t;
@@ -277,6 +281,7 @@ void Scene3DNode::Parse()
    mParsedText = mText;
    mItems.clear();
    settings = Settings();
+   panelOnly = false;
    mKeyTime = -1.0;
    std::istringstream in(mText);
    std::string line;
@@ -289,6 +294,8 @@ void Scene3DNode::Parse()
          l >> mNextId;
       else if (key == "camera")
          l >> activeCamera;
+      else if (key == "panel")
+         panelOnly = true;
       else if (key == "world")
       {
          int on = 0;
@@ -323,7 +330,7 @@ void Scene3DNode::Parse()
             if (l >> x)
                v = (std::decay_t<decltype(v)>)x;
          });
-      else if (key == "label" || key == "itemx" || key == "key")
+      else if (key == "label" || key == "itemx" || key == "group" || key == "key")
       {
          int id = 0;
          l >> id;
@@ -341,6 +348,8 @@ void Scene3DNode::Parse()
             l >> on;
             it->render = on != 0;
          }
+         else if (key == "group")
+            l >> it->group;
          else
          {
             Key k;
