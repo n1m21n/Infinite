@@ -489,7 +489,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             return e;
          };
          const std::vector<E> old = { mk("au", "au:old", ""), mk("vst3", "a", "/x/A.vst3"), mk("vst3", "b", "/y/B.vst3"),
-                                      mk("vst3", "c", "/y/sub/C.vst3"), mk("vst3", "d", "/yy/D.vst3") };
+                                      mk("vst3", "c", "/y/sub/C.vst3"), mk("vst3", "d", "/yy/D.vst3"),
+                                      mk("vst3", "e", "/z/\xE9.vst3") }; // ANSI bytes, as an older Windows build saved them
          const std::vector<E> found = { mk("au", "au:new", ""), mk("vst3", "b2", "/y/B2.vst3") };
          const auto ids = [](const std::vector<E>& v)
          {
@@ -500,7 +501,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          };
          const std::string merged = ids(PluginScanner::MergeScan(old, found, "/y/"));
          const std::string full = ids(PluginScanner::MergeScan(old, found, ""));
-         ok &= merged == "a d au:new b2 ";
+         ok &= merged == "a d e au:new b2 ";
          ok &= full == "au:new b2 ";
          printf("LIBREFRESH plugins %s (vst3 outside the folder %d -> %d; merge '%s', full '%s')\n", ok ? "OK" : "FAIL",
                 before, vst3Outside(), merged.c_str(), full.c_str());

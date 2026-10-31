@@ -1,5 +1,4 @@
 #include <cstdio>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -12,8 +11,12 @@
 #include "Platform.h"
 #include "PluginVST3.h"
 
-int main(int argc, char** argv)
+int main()
 {
+   // argv is in the ANSI code page, which cannot hold every plugin path, and
+   // the parent matches each "@done" line against the UTF-8 path it sent.
+   const std::vector<std::string> args = Platform::CommandLineUtf8();
+
    // stdout defaults to text mode, which translates '\n' to '\r\n' and
    // corrupts the tab-separated wire format the parent parses by comparing
    // fields to exact strings like "1" (see PluginVST3Win.cpp's
@@ -21,12 +24,12 @@ int main(int argc, char** argv)
    // half of this fix).
    _setmode(_fileno(stdout), _O_BINARY);
 
-   if (argc < 2)
+   if (args.size() < 2)
       return 1;
 
    // Parent's health check: proves this exe launches and can write to the
    // pipe, without touching any plugin.
-   if (std::strcmp(argv[1], "--selftest") == 0)
+   if (args[1] == "--selftest")
    {
       std::printf("@ok\n");
       std::fflush(stdout);
@@ -47,14 +50,14 @@ int main(int argc, char** argv)
    // would not.
    OleInitialize(nullptr);
 
-   int startIdx = 1;
-   if (std::strcmp(argv[1], "--batch") == 0)
+   size_t startIdx = 1;
+   if (args[1] == "--batch")
       startIdx = 2;
 
-   for (int i = startIdx; i < argc; i++)
+   for (size_t i = startIdx; i < args.size(); i++)
    {
-      const char* bundlePath = argv[i];
-      if (bundlePath == nullptr || bundlePath[0] == '\0')
+      const std::string& bundlePath = args[i];
+      if (bundlePath.empty())
          continue;
 
       std::vector<Platform::PluginDesc> descs;
@@ -68,7 +71,7 @@ int main(int argc, char** argv)
       // Progress marker, printed even when the bundle described nothing:
       // the parent's timeout is idle-based and resets on each of these, and
       // the first bundle without one is the one the child died inside.
-      std::printf("@done\t%s\n", bundlePath);
+      std::printf("@done\t%s\n", bundlePath.c_str());
       std::fflush(stdout);
    }
    // Leave without running static destructors or unloading the plugin DLLs.

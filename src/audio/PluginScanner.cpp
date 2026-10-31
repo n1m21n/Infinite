@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #if !defined(_WIN32)
    #include <sys/stat.h>
@@ -133,10 +135,10 @@ std::vector<PluginScanner::Entry> PluginScanner::MergeScan(const std::vector<Ent
 {
    if (folder.empty())
       return found;
-   const fs::path root = fs::path(folder).lexically_normal();
+   const fs::path root = AppPaths::FsPathOrEmpty(folder).lexically_normal();
    const auto under = [&root](const std::string& path)
    {
-      const fs::path rel = fs::path(path).lexically_normal().lexically_relative(root);
+      const fs::path rel = AppPaths::FsPathOrEmpty(path).lexically_normal().lexically_relative(root);
       return !rel.empty() && *rel.begin() != "..";
    };
    std::vector<Entry> merged;
@@ -152,18 +154,27 @@ void PluginScanner::ScanThreadMain(std::vector<std::string> vst3Folders, std::st
 {
    std::vector<Entry> found;
 
-   // 1. Audio Units registry enumeration. Safe in-process: this is a
-   // registry query against cached metadata, it does not load any plugin
-   // binary.
-   Platform::EnumerateAudioUnits(found);
-   mFound.store((int)found.size(), std::memory_order_relaxed);
+   // An exception leaving this thread ends the whole app, so a scan that
+   // throws reports what it found so far instead.
+   try
+   {
+      // 1. Audio Units registry enumeration. Safe in-process: this is a
+      // registry query against cached metadata, it does not load any plugin
+      // binary.
+      Platform::EnumerateAudioUnits(found);
+      mFound.store((int)found.size(), std::memory_order_relaxed);
 
-   // 2. VST3 directory walk. Unlike AU enumeration this loads each bundle
-   // in-process (CFBundleLoadExecutable) - see Platform::VST3Blocklist /
-   // VST3ScanFailures for the crash-safety and failure-reporting this goes
-   // through. No-op, returns nothing, when built with VST3 disabled.
-   Platform::EnumerateVST3Plugins(vst3Folders, found);
-   mFound.store((int)found.size(), std::memory_order_relaxed);
+      // 2. VST3 directory walk. Unlike AU enumeration this loads each bundle
+      // in-process (CFBundleLoadExecutable) - see Platform::VST3Blocklist /
+      // VST3ScanFailures for the crash-safety and failure-reporting this goes
+      // through. No-op, returns nothing, when built with VST3 disabled.
+      Platform::EnumerateVST3Plugins(vst3Folders, found);
+      mFound.store((int)found.size(), std::memory_order_relaxed);
+   }
+   catch (const std::exception& e)
+   {
+      std::fprintf(stderr, "[plugin scan] stopped early: %s\n", e.what());
+   }
    std::vector<std::string> failed = Platform::VST3ScanFailures();
    std::vector<std::string> unsupported = Platform::UnsupportedPluginsSeen();
 
@@ -284,7 +295,7 @@ void PluginScanner::LoadFromDisk()
          // leave the cache unseeded for it, so resolution correctly falls
          // through to a targeted rescan instead.
          std::error_code ec;
-         if (std::filesystem::exists(e.path, ec) && !ec)
+         if (std::filesystem::exists(AppPaths::FsPathOrEmpty(e.path), ec) && !ec)
             Platform::CacheVST3BundlePath(e.identifier, e.path);
       }
 

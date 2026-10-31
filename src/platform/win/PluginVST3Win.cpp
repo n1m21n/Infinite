@@ -83,6 +83,20 @@ namespace
       std::fflush(stderr);
    }
 
+   // Always on, unlike VST3Trace: stderr is log.txt in the app (see
+   // InstallCrashHandler), so after a scan takes the app down the last line
+   // here names the bundle. A scanner child's stderr is NUL.
+   void ScanLog(const char* fmt, ...)
+   {
+      va_list args;
+      va_start(args, fmt);
+      std::fprintf(stderr, "[vst3 scan] ");
+      std::vfprintf(stderr, fmt, args);
+      std::fprintf(stderr, "\n");
+      va_end(args);
+      std::fflush(stderr);
+   }
+
    // ------------------------------------------------------------------------
    // UID and string utilities - identical to PluginVST3.mm, zero OS calls.
    // ------------------------------------------------------------------------
@@ -395,7 +409,8 @@ namespace
          gBlocklist.push_back(crashed);
          SaveBlocklistLocked();
       }
-      std::remove(path.c_str());
+      std::error_code ec;
+      fs::remove(AppPaths::FsPath(path), ec);
    }
 
    void EnsureSentinelCheckedOnce()
@@ -437,8 +452,12 @@ namespace
    void ClearSentinel()
    {
       const std::string path = VST3SentinelPath();
-      if (!path.empty())
-         std::remove(path.c_str());
+      if (path.empty())
+         return;
+      // Not std::remove: it reads the path in the ANSI code page, so under a
+      // non-ASCII account name the sentinel stayed and blamed an innocent bundle.
+      std::error_code ec;
+      fs::remove(AppPaths::FsPath(path), ec);
    }
 
    void RecordScanFailure(const std::string& bundlePath)
@@ -704,7 +723,8 @@ namespace
    {
       std::string exe = Platform::ScannerExecutablePath();
       bool isDedicatedScanner = true;
-      if (exe.empty() || !fsProbe::exists(exe))
+      std::error_code existsEc;
+      if (exe.empty() || !fsProbe::exists(AppPaths::FsPath(exe), existsEc))
       {
          exe = Platform::ExecutablePath();
          isDedicatedScanner = false;
@@ -750,13 +770,13 @@ namespace
       DWORD exitCode = 0;
       if (!RunProbeChild(exe, {"--selftest"}, std::chrono::seconds(15), output, timedOut, cleanExit, &exitCode))
       {
-         VST3Trace("scanner could not be started: %s (error %lu)", exe.c_str(), (unsigned long)GetLastError());
+         ScanLog("scanner could not be started: %s (error %lu)", exe.c_str(), (unsigned long)GetLastError());
          return false;
       }
       if (!cleanExit || output.find("@ok") == std::string::npos)
       {
-         VST3Trace("scanner started but failed its self-test (exit code 0x%08lX): %s", (unsigned long)exitCode,
-                   exe.c_str());
+         ScanLog("scanner started but failed its self-test (exit code 0x%08lX): %s", (unsigned long)exitCode,
+                 exe.c_str());
          return false;
       }
       return true;
@@ -801,8 +821,11 @@ namespace
    {
       const HRESULT oleHr = OleInitialize(nullptr);
       for (const std::string& b : bundles)
+      {
+         ScanLog("loading within Infinite: %s", b.c_str());
          if (!Platform::DescribeVST3Bundle(b, out))
             RecordScanFailure(b);
+      }
       if (SUCCEEDED(oleHr))
          OleUninitialize();
    }
@@ -810,13 +833,15 @@ namespace
    void ProbeVST3BundlesBatch(std::vector<std::string> bundlesToScan, std::vector<Platform::PluginDesc>& out)
    {
       gScanFellBack.store(false);
+      ScanLog("%d bundle(s), %s", (int)bundlesToScan.size(), ScanInProcessSetting() ? "within Infinite" : "separate process");
       if (ScanInProcessSetting())
       {
          DescribeVST3BundlesInProcess(bundlesToScan, out);
          return;
       }
       const std::string exe = Platform::ScannerExecutablePath();
-      if (exe.empty() || !fsProbe::exists(exe))
+      std::error_code existsEc;
+      if (exe.empty() || !fsProbe::exists(AppPaths::FsPath(exe), existsEc))
       {
          // No dedicated scanner built (INFINITE_ENABLE_VST3 built the app but
          // something went wrong with the scanner target) - fall back to
@@ -848,7 +873,7 @@ namespace
       {
          // The scanner is the problem, not the plugins: blame none of them, and scan in this process so the
          // user is not left without plugins. The panel says this happened.
-         VST3Trace("scanner cannot run; scanning within the process instead");
+         ScanLog("scanner cannot run; scanning within Infinite instead");
          gScanFellBack.store(true);
          DescribeVST3BundlesInProcess(bundlesToScan, out);
          return;
@@ -913,7 +938,8 @@ namespace
          std::string output;
          bool timedOut = false;
          bool cleanExit = false;
-         if (!RunProbeChild(exe, args, std::chrono::seconds(45), output, timedOut, cleanExit))
+         DWORD exitCode = 0;
+         if (!RunProbeChild(exe, args, std::chrono::seconds(45), output, timedOut, cleanExit, &exitCode))
             break;
 
          for (Platform::PluginDesc& d : ParseProbeOutput(output))
@@ -952,6 +978,11 @@ namespace
          if (offender.empty())
             continue;
 
+         // The child died with its sentinel naming this bundle. Left there,
+         // the next child's first DescribeVST3Bundle would ban it unseen and
+         // the retry below could never clear it.
+         ClearSentinel();
+
          // Died before finishing a single bundle: make sure it was the plugin
          // and not the scanner (e.g. quarantined mid-scan) before the ban.
          if (!timedOut && donePaths.empty() && !ScannerCanRun(exe))
@@ -967,8 +998,7 @@ namespace
             // Slow or waiting on something (a licence prompt) - skip it this
             // scan but don't ban it for good. Drop the sentinel the child left
             // naming it, or the next launch would blocklist it anyway.
-            VST3Trace("bundle went silent for 45 s during scan, skipping: %s", offender.c_str());
-            ClearSentinel();
+            ScanLog("bundle went silent for 45 s, skipping: %s", offender.c_str());
          }
          else
          {
@@ -976,6 +1006,7 @@ namespace
             // earlier plugin's own thread can fault while this one loads. Try
             // it once alone in a fresh process, as a JUCE host's scan does one
             // plugin at a time; only a second death earns the (persistent) ban.
+            ScanLog("scanner died (exit code 0x%08lX) on: %s", (unsigned long)exitCode, offender.c_str());
             std::string retryOut;
             bool retryTimedOut = false, retryClean = false;
             if (RunProbeChild(exe, { "--batch", offender }, std::chrono::seconds(45), retryOut, retryTimedOut, retryClean))
@@ -983,14 +1014,15 @@ namespace
                const std::vector<std::string> retryDone = ParseProbeDoneMarkers(retryOut);
                if (std::find(retryDone.begin(), retryDone.end(), offender) != retryDone.end())
                {
-                  VST3Trace("bundle died in a batch but scans alone, keeping: %s", offender.c_str());
+                  ScanLog("bundle died in a batch but scans alone, keeping: %s", offender.c_str());
                   for (Platform::PluginDesc& d : ParseProbeOutput(retryOut))
                      out.push_back(std::move(d));
                   eraseAll(offender);
                   continue;
                }
             }
-            VST3Trace("bundle crashed the scanner, blocklisting: %s", offender.c_str());
+            ScanLog("bundle crashed the scanner, blocklisting: %s", offender.c_str());
+            ClearSentinel();
             std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
             AddToBlocklistLocked(offender);
          }
@@ -1034,7 +1066,10 @@ namespace Platform
          }
       }
       else
-         remove(path.c_str());
+      {
+         std::error_code ec;
+         fs::remove(AppPaths::FsPath(path), ec);
+      }
    }
 
    bool VST3ScanFellBack()
@@ -1083,7 +1118,7 @@ namespace Platform
          if (root.empty())
             continue;
          std::vector<fsProbe::path> dirStack;
-         dirStack.push_back(root);
+         dirStack.push_back(AppPaths::FsPathOrEmpty(root));
 
          while (!dirStack.empty())
          {
@@ -1103,13 +1138,13 @@ namespace Platform
                if (entry.is_directory(entryEc) && !entryEc)
                {
                   if (entry.path().extension() == ".vst3")
-                     bundlesToScan.push_back(entry.path().string());
+                     bundlesToScan.push_back(entry.path().u8string());
                   else
                      dirStack.push_back(entry.path());
                }
                else if (entry.is_regular_file(entryEc) && !entryEc && entry.path().extension() == ".vst3")
                {
-                  bundlesToScan.push_back(entry.path().string());
+                  bundlesToScan.push_back(entry.path().u8string());
                }
                else if (!entryEc)
                {
@@ -1119,9 +1154,11 @@ namespace Platform
                   // Windows VST2 plugin binary; ".vst" is the (rarer, legacy)
                   // VST2 extension some hosts also accept. Filename check
                   // only, never loaded.
-                  const std::string ext = entry.path().extension().string();
+                  // u8string throughout this walk: string() converts to the ANSI code page and throws on a
+                  // character that page lacks, which on this thread ended the app before any plugin was loaded.
+                  const std::string ext = entry.path().extension().u8string();
                   if (ext == ".dll" || ext == ".vst")
-                     unsupported.push_back(entry.path().string());
+                     unsupported.push_back(entry.path().u8string());
                }
                it.increment(ec);
                if (ec)
@@ -1223,18 +1260,14 @@ namespace Platform
          }
       }
 
-#ifdef INFINITE_VST3_SCANNER
-      // The scanner process ends right after the batch (scanner_main_win.cpp terminates it without teardown), so
-      // nothing is unloaded here. ExitDll and FreeLibrary run the plugin's own shutdown code (JUCE and DPF plugins
-      // such as Surge XT and Cardinal, and Native Instruments ones, crash in it), and a crash there came before the
-      // "@done" line was printed: the parent read it as the plugin crashing during the scan and blocklisted a plugin
-      // that had described itself fine. Leaking the module and factory for the life of the child is harmless.
+      // Nothing is unloaded here. ExitDll and FreeLibrary run the plugin's own shutdown code (JUCE and DPF plugins
+      // such as Surge XT and Cardinal, and Native Instruments ones, crash in it). In the scanner a crash there came
+      // before the "@done" line was printed: the parent read it as the plugin crashing during the scan and
+      // blocklisted a plugin that had described itself fine. Within Infinite it closed the app. Leaking the module
+      // and factory is harmless: the scanner ends right after the batch, and a plugin stays loaded for one session.
       (void)factory.take();
       (void)factory2.take();
       (void)module;
-#else
-      UnloadVST3Module(module);
-#endif
       ClearSentinel();
       return foundAny;
    }
@@ -2375,14 +2408,15 @@ namespace
    std::string FindVst3ModuleInArchFolder(const std::string& archFolderPath)
    {
       std::error_code ec;
-      if (!fs::is_directory(archFolderPath, ec))
+      const fs::path archFolder = AppPaths::FsPathOrEmpty(archFolderPath);
+      if (!fs::is_directory(archFolder, ec))
          return {};
-      for (const auto& entry : fs::directory_iterator(archFolderPath, ec))
+      for (const auto& entry : fs::directory_iterator(archFolder, ec))
       {
          if (ec)
             break;
          if (entry.is_regular_file(ec) && entry.path().extension() == ".vst3")
-            return entry.path().string();
+            return entry.path().u8string();
       }
       return {};
    }
@@ -2395,18 +2429,19 @@ namespace
    {
       std::error_code ec;
       const std::string contentsPath = bundlePath + "\\Contents";
-      if (!fs::is_directory(contentsPath, ec))
+      const fs::path contents = AppPaths::FsPathOrEmpty(contentsPath);
+      if (!fs::is_directory(contents, ec))
          return {};
-      for (const auto& archEntry : fs::directory_iterator(contentsPath, ec))
+      for (const auto& archEntry : fs::directory_iterator(contents, ec))
       {
          if (ec)
             break;
          if (!archEntry.is_directory(ec))
             continue;
-         const std::string archName = archEntry.path().filename().string();
+         const std::string archName = archEntry.path().filename().u8string();
          if (archName.size() < 4 || archName.compare(archName.size() - 4, 4, "-win") != 0)
             continue;
-         std::string found = FindVst3ModuleInArchFolder(archEntry.path().string());
+         std::string found = FindVst3ModuleInArchFolder(archEntry.path().u8string());
          if (!found.empty())
             return found;
       }
@@ -2422,11 +2457,12 @@ namespace
 
       std::error_code ec;
       std::string dllPath = bundlePath;
-      if (fs::is_directory(bundlePath, ec))
+      const fs::path bundle = AppPaths::FsPathOrEmpty(bundlePath);
+      if (fs::is_directory(bundle, ec))
       {
          const std::string archFolder = bundlePath + "\\Contents\\" + kVst3ArchFolder;
-         std::string conventional = archFolder + "\\" + fs::path(bundlePath).stem().string() + ".vst3";
-         if (fs::exists(conventional, ec))
+         std::string conventional = archFolder + "\\" + bundle.stem().u8string() + ".vst3";
+         if (fs::exists(AppPaths::FsPathOrEmpty(conventional), ec))
          {
             dllPath = conventional;
          }
@@ -2445,7 +2481,7 @@ namespace
       // automatically). Plugins that ship helper DLLs next to their module
       // fail to load without this. Requires an absolute path.
       std::error_code absEc;
-      std::wstring dllPathW = WinCommon::Utf8ToWide(fs::absolute(dllPath, absEc).string());
+      std::wstring dllPathW = fs::absolute(AppPaths::FsPathOrEmpty(dllPath), absEc).wstring();
       HMODULE module = LoadLibraryExW(dllPathW.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
       if (module == nullptr)
       {
@@ -2677,7 +2713,8 @@ namespace Platform
       std::string lastKnownPath;
       bool wasIndexed = false;
 
-      if (!desc.path.empty() && fs::exists(desc.path))
+      std::error_code descPathEc;
+      if (!desc.path.empty() && fs::exists(AppPaths::FsPathOrEmpty(desc.path), descPathEc))
       {
          bundlePath = desc.path;
          CacheVST3BundlePath(desc.identifier, bundlePath);

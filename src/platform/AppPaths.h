@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -50,6 +51,21 @@ namespace AppPaths
    inline std::filesystem::path FsPath(const std::string& utf8)
    {
       return std::filesystem::u8path(utf8);
+   }
+
+   // FsPath for a string that may not be UTF-8: a saved index or patch written
+   // by an older build holds ANSI code page bytes, and u8path throws on those.
+   // Gives an empty path instead, which simply does not exist.
+   inline std::filesystem::path FsPathOrEmpty(const std::string& utf8)
+   {
+      try
+      {
+         return FsPath(utf8);
+      }
+      catch (const std::exception&)
+      {
+         return {};
+      }
    }
 
    // fopen for a UTF-8 path. On Windows the narrow fopen reads the path in the
