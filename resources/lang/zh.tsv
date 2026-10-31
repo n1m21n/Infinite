@@ -2004,6 +2004,7 @@ Samples per frame when rendering out.	渲染输出时每帧的采样数。
 Sampling	采样
 Saving image...	正在保存图像...
 Scale	缩放
+Music\cScale	音阶
 Scale snap	音阶吸附
 Scale tool (Shift+Space, S). S scales at once	缩放工具（Shift+Space，S）。S 直接缩放
 Scanned plugins	已扫描的插件

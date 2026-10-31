@@ -2004,6 +2004,7 @@ Samples per frame when rendering out.	Samples pro Frame beim Rendern.
 Sampling	Sampling
 Saving image...	Bild wird gespeichert...
 Scale	Skalieren
+Music\cScale	Tonleiter
 Scale snap	Skalen-Einrasten
 Scale tool (Shift+Space, S). S scales at once	Skalier-Werkzeug (Shift+Space, S). S skaliert sofort
 Scanned plugins	Gescannte Plugins

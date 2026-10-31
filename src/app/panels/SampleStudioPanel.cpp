@@ -2673,7 +2673,7 @@ namespace
          s.dirty = true;
 
       // The project's key and scale, which "snap to scale" follows (the same values as the top bar's key).
-      SectionCard::Begin(T("Scale"));
+      SectionCard::Begin(TC("Music", "Scale"));
       {
          Transport& tr = Transport::Instance();
          static const char* const keys[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
@@ -2687,7 +2687,7 @@ namespace
                   tr.SetKey(i);
             MenuParts::EndCombo();
          }
-         Row(T("Scale"), fieldW);
+         Row(TC("Music", "Scale"), fieldW);
          const int sc = std::clamp(tr.Scale(), 0, (int)scales.size() - 1);
          if (MenuParts::BeginCombo("##studioscale", scales[(size_t)sc].c_str()))
          {

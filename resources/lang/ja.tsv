@@ -2004,6 +2004,7 @@ Samples per frame when rendering out.	書き出し時の 1 フレームあたり
 Sampling	サンプリング
 Saving image...	画像を保存中...
 Scale	スケール
+Music\cScale	音階
 Scale snap	スケールスナップ
 Scale tool (Shift+Space, S). S scales at once	スケールツール（Shift+Space、S）。S ですぐに拡大縮小
 Scanned plugins	スキャン済みプラグイン

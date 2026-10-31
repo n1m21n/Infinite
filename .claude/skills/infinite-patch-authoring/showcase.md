@@ -32,7 +32,9 @@ Run each on the finished template, from a different working directory (so a rela
 
 ## Thumbnails
 
-`assets/templates/thumbs/<slug>.png`, 320 x 320: a screenshot of the template's own node graph (owner's call, 2026-10-31), so a sound-only starter has a tile too. `python3 tools/templates/shoot_thumbs.py [slug ...]` writes them: one off-screen dev app per template in its own HOME, `view params on`, `view fit`, the app saves its own frame (`INFINITE_SHOT_REQUEST`), the canvas is cropped to the graph and centred in the tile. Run `gen_templates.py` first, wait for `ibuild.py status` to say the lock is free, and re-shoot whenever a template's layout changes.
+`assets/templates/thumbs/<slug>.png`, 320 x 320. The Showcase group is listed first in `index.txt` (the Templates window groups rows in file order). Showcase tile: a screenshot of the template's own node graph (owner's call, 2026-10-31). `python3 tools/templates/shoot_thumbs.py [slug ...]` writes it: one off-screen dev app per template in its own HOME, `view params on`, `view fit`, the app saves its own frame (`INFINITE_SHOT_REQUEST`), the canvas is cropped to the graph and centred in the tile. Run `gen_templates.py` first, wait for `ibuild.py status` to say the lock is free, and re-shoot whenever the template's layout changes.
+
+Starter tiles: the manuals' own retina screenshot of one relevant node (`docs/shots/raw/<Category>__<Node>__o.png`, made by `tools/docs-shots`; the folder is gitignored, so pass `--shots <path>` from a checkout that has it), trimmed to the node: `python3 tools/templates/node_thumbs.py`. The slug-to-node table is at the top of that script; tall nodes keep their top section. A new starter needs a row in that table.
 
 ## Packaging
 

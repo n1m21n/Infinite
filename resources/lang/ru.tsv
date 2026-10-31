@@ -2004,6 +2004,7 @@ Samples per frame when rendering out.	Сэмплов на кадр при рен
 Sampling	Сэмплирование
 Saving image...	Сохранение изображения...
 Scale	Масштаб
+Music\cScale	Гамма
 Scale snap	Привязка к ладу
 Scale tool (Shift+Space, S). S scales at once	Инструмент масштаба (Shift+Space, S). S масштабирует сразу
 Scanned plugins	Найденные плагины

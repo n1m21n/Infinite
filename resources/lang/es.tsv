@@ -2004,6 +2004,7 @@ Samples per frame when rendering out.	Muestras por fotograma al renderizar.
 Sampling	Muestreo
 Saving image...	Guardando imagen...
 Scale	Escalar
+Music\cScale	Escala
 Scale snap	Ajuste a escala
 Scale tool (Shift+Space, S). S scales at once	Herramienta Escalar (Shift+Space, S). S escala al instante
 Scanned plugins	Plugins analizados

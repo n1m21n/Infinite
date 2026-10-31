@@ -203,9 +203,9 @@ def main():
             shutil.copy2(os.path.join(ROOT, sc["media"], name), os.path.join(dest, name))
     with open(os.path.join(OUT, "index.txt"), "w") as f:
         f.write("# slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.\n")
+        for sc in SHOWCASE:     # the Templates window lists groups in file order: Showcase first
+            f.write(f"{sc['slug']}|Showcase|{sc['title']}|{sc['blurb']}\n")
         for t in T.all:
             f.write(f"{t.slug}|Starters|{t.title}|{t.blurb}\n")
-        for sc in SHOWCASE:
-            f.write(f"{sc['slug']}|Showcase|{sc['title']}|{sc['blurb']}\n")
     print(len(T.all), "starters,", len(SHOWCASE), "showcase")
 main()

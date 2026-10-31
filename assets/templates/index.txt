@@ -1,4 +1,5 @@
 # slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.
+infinite-v1-showcase|Showcase|Infinite v1 showcase|drums, pads, 3D and a Perf page, all playing
 first-sound|Starters|First sound|press play and hear notes
 first-image|Starters|First image|a shape on a colour wash
 first-music-image|Starters|Moves with the music|the shape grows with the sound
@@ -14,4 +15,3 @@ audio-effects|Starters|Audio Effects|shape the sound
 prediction|Starters|Prediction|notes that keep going on their own
 utility|Starters|Utility|mix and meter sound
 field|Starters|Field|write a picture as a formula
-infinite-v1-showcase|Showcase|Infinite v1 showcase|drums, pads, 3D and a Perf page, all playing

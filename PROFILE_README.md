@@ -121,7 +121,7 @@ flowchart LR
 - Discord Community: [Join the Infinite Server](https://discord.gg/GMeQTyJqkH)
 - Twitter / X: [@n1m21n](https://x.com/n1m21n)
 - Instagram: [@n1m21n](https://instagram.com/n1m21n)
-- Email: namansoniiii21@gmail.com
+- Email: namansoniii21@gmail.com
 
 <div align="center">
   <sub>Designed with curiosity and passion for generative sound and computational art.</sub>
