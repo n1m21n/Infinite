@@ -538,6 +538,17 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          report("GPU particles: past the CPU's 200k", r.alive > 400000 && r.finite);
       }
 
+      // Under a quarter of the smallest texture tier (1024): a cap under 256
+      // used to restart the run every cook, so nothing ever lived.
+      {
+         ParticleSystemNode p;
+         beam(p);
+         p.maxParticles = 55;
+         const Run r = simulate(true, p, 60, nullptr);
+         printf("gpu particles, cap 55: %zu alive\n", r.alive);
+         report("GPU particles: a cap under 256 still fills", r.alive == 55 && r.readAlive == 55);
+      }
+
       GpuPointsGL::SetEnabledForTest(wasEnabled);
       tr.SetTempo(wasTempo);
       tr.SetPlaying(wasPlaying);
