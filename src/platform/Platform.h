@@ -203,6 +203,9 @@ namespace Platform
    // Export a .wav. Returns the chosen path (with .wav), or "" if cancelled.
    std::string SaveWavDialog(const std::string& suggestedName = "sample.wav");
 
+   // Where a render goes: .mp4/.mov for video, else .png/.jpg. Returns the chosen path, or "" if cancelled.
+   std::string SaveRenderDialog(const std::string& suggestedName, bool video);
+
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
    // normalised so cap height is roughly 1. Curves are subdivided here because

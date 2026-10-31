@@ -27,12 +27,6 @@ public:
 
    enum class Kind { Missing, Geometry, Camera, Light };
 
-   struct Key
-   {
-      float t = 0;                  // seconds
-      float pos[3] = {}, rot[3] = {}, scale[3] = {};
-   };
-
    struct Item
    {
       int id = 0;
@@ -45,7 +39,6 @@ public:
       int group = 0;                // items with the same number select and move together; 0 = none
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores
-      std::vector<Key> keys;        // keyed placements, by time
    };
 
    // What the scene remembers beyond its items, saved with it.
@@ -101,7 +94,6 @@ public:
    int focusItem = 0;                // item id the camera stays focused on; 0 = the focus distance
    Settings settings;
    float renderW = 1920.0f, renderH = 1080.0f;   // before the resolution scale
-   bool holdKeys = false;            // a gesture owns the placements for now
 
    // INode
    unsigned int GetOutputTexture() override;
@@ -152,7 +144,6 @@ private:
    void Parse();
    const Item* FindConst(int id) const;
    void Serialize();
-   void ApplyKeys();
    void Sync(int frameId);
    void ApplyWorld(Render3DNode& render, bool show, bool background);
    unsigned int Composite(unsigned int sceneTex, int w, int h, unsigned int backdrop, GLUtil::Fbo& out);
@@ -181,7 +172,6 @@ private:
    unsigned long long mBuiltRevision = 0;
    unsigned long long mEditorRevision = 1;
    int mSyncedFrame = -1;
-   double mKeyTime = -1.0;
    int mLastCookFrame = -1;
    int mEditorFrame = 0;
    size_t mClipped = 0;

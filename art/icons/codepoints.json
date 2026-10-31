@@ -98,5 +98,6 @@
  "view-ortho": 59744,
  "view-persp": 59745,
  "world": 59746,
- "lock": 59747
+ "lock": 59747,
+ "view-3d": 59748
 }

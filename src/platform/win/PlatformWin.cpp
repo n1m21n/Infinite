@@ -535,6 +535,24 @@ namespace Platform
                            suggestedName.empty() ? "sample.wav" : suggestedName, err);
    }
 
+   std::string SaveRenderDialog(const std::string& suggestedName, bool video)
+   {
+      std::string err;
+      if (video)
+         return RunSaveDialog(L"Render Animation",
+                              {
+                                 { L"MP4 video (*.mp4)", L"*.mp4" },
+                                 { L"QuickTime movie (*.mov)", L"*.mov" },
+                              },
+                              suggestedName, err);
+      return RunSaveDialog(L"Render Image",
+                           {
+                              { L"PNG image (*.png)", L"*.png" },
+                              { L"JPEG image (*.jpg)", L"*.jpg" },
+                           },
+                           suggestedName, err);
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       std::string err;

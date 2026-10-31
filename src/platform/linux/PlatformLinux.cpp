@@ -468,6 +468,24 @@ namespace Platform
       return AppendExtensionIfMissing(std::string(res), ".wav");
    }
 
+   std::string SaveRenderDialog(const std::string& suggestedName, bool video)
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const char* const videoPatterns[] = { "*.mp4", "*.mov" };
+      const char* const imagePatterns[] = { "*.png", "*.jpg" };
+      const char* res = tinyfd_saveFileDialog(video ? "Render Animation" : "Render Image", suggestedName.c_str(), 2,
+                                              video ? videoPatterns : imagePatterns,
+                                              video ? "Video (*.mp4, *.mov)" : "Image (*.png, *.jpg)");
+      if (!res) return "";
+      std::string path(res);
+      const size_t dot = path.rfind('.');
+      const std::string ext = dot == std::string::npos ? std::string() : path.substr(dot);
+      const bool known = video ? (ext == ".mp4" || ext == ".mov") : (ext == ".png" || ext == ".jpg" || ext == ".jpeg");
+      return known ? path : path + (video ? ".mp4" : ".png");
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       if (IsHeadlessOrExitAfter()) return "";

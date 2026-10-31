@@ -44,13 +44,13 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railStudio", top + 6.0f * step, IconsInfinite::Waveform, nullptr, gSampleStudioOpen,
                        T("Sample studio - generate and shape a loop (Shift+W)")))
       gSampleStudioOpen = !gSampleStudioOpen;
-   if (PanelRail::Item("##railView3D", top + 8.0f * step, IconsInfinite::Cube, nullptr, gView3DOpen,
+   if (PanelRail::Item("##railView3D", top + 8.0f * step, IconsInfinite::View3d, nullptr, gView3DOpen,
                        T("3D View - arrange node outputs and render a camera (Shift+3)")))
       gView3DOpen = !gView3DOpen;
    if (PanelRail::Item("##railPianoRoll", top + 7.0f * step, IconsInfinite::Piano, nullptr, gPianoRollOpen,
                        T("Piano roll - edit and generate notes (Shift+R)")))
       gPianoRollOpen = !gPianoRollOpen;
-   if (PanelRail::Item("##railTerminal", top + 8.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
+   if (PanelRail::Item("##railTerminal", top + 9.0f * step, IconsInfinite::Terminal, nullptr, gTerminalOpen,
                        T("Terminal - a real shell, for you and your coding agents (Ctrl+`)")))
    {
       gTerminalOpen = !gTerminalOpen;

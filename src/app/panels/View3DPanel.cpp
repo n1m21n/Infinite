@@ -20,6 +20,7 @@
 #include "Transport.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <cctype>
 #include <cmath>
 #include <cstring>
@@ -61,6 +62,7 @@ namespace
    bool sOrtho = false;
    bool sAutoOrtho = false;        // an axis view went orthographic; orbiting gives it back
    bool sSideOpen = true;
+   bool sOutlinerOpen = true;
    int sViewName = -1;             // 0..5 while looking straight down an axis
    int sGridAxis = 1;
    int sTab = 0;                    // the settings tab
@@ -913,52 +915,6 @@ namespace
       scene->Commit();
    }
 
-   // Half a 60 fps frame: close enough to be the same key.
-   Scene3DNode::Key* KeyAt(Item& it, float t)
-   {
-      for (Scene3DNode::Key& k : it.keys)
-         if (std::abs(k.t - t) < 0.008f)
-            return &k;
-      return nullptr;
-   }
-
-   void InsertKeys(Scene3DNode* scene)
-   {
-      if (sSel.empty())
-         return;
-      PushUndoCheckpoint("Insert key");
-      const float t = (float)Transport::Instance().Seconds();
-      for (int id : sSel)
-         if (Item* it = scene->FindItem(id))
-         {
-            Scene3DNode::Key* key = KeyAt(*it, t);
-            if (key == nullptr)
-            {
-               Scene3DNode::Key fresh;
-               fresh.t = t;
-               auto at = std::find_if(it->keys.begin(), it->keys.end(), [&](const Scene3DNode::Key& k) { return k.t > t; });
-               key = &*it->keys.insert(at, fresh);
-            }
-            std::copy(it->pos, it->pos + 3, key->pos);
-            std::copy(it->rot, it->rot + 3, key->rot);
-            std::copy(it->scale, it->scale + 3, key->scale);
-         }
-      scene->Commit();
-   }
-
-   void RemoveKeysHere(Scene3DNode* scene)
-   {
-      if (sSel.empty())
-         return;
-      PushUndoCheckpoint("Remove key");
-      const float t = (float)Transport::Instance().Seconds();
-      for (int id : sSel)
-         if (Item* it = scene->FindItem(id))
-            if (Scene3DNode::Key* key = KeyAt(*it, t))
-               it->keys.erase(it->keys.begin() + (key - it->keys.data()));
-      scene->Commit();
-   }
-
    void ToggleLocal(Scene3DNode* scene)
    {
       if (!sLocal.empty())
@@ -1162,7 +1118,6 @@ namespace
          else if (pressed(ImGuiKey_Period)) sOpenPivot = true;
          else if (pressed(ImGuiKey_Comma)) sOpenOrient = true;
          else if (pressed(ImGuiKey_Slash) || pressed(ImGuiKey_KeypadDivide)) ToggleLocal(scene);
-         else if (pressed(ImGuiKey_I)) InsertKeys(scene);
          else if (pressed(ImGuiKey_F2))
          {
             if (const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back()))
@@ -1210,8 +1165,6 @@ namespace
          else if (pressed(ImGuiKey_KeypadSubtract) || pressed(ImGuiKey_Minus))
             Zoom(1.0f / 0.85f);
       }
-      if (io.KeyAlt && !command && pressed(ImGuiKey_I))
-         RemoveKeysHere(scene);
       if (io.KeyAlt && pressed(ImGuiKey_A))
          sSel.clear();
       if (io.KeyAlt && pressed(ImGuiKey_H))
@@ -2159,18 +2112,25 @@ namespace
       if (IconChip("##v3dgrid", IconsInfinite::GridDots, sGrid, T("Grid"))) sGrid = !sGrid;
       next();
       if (IconChip("##v3doverlays", IconsInfinite::Eye, sOverlays, T("Overlays (Ctrl+`)"))) sOverlays = !sOverlays;
+      ActionButton::RowNext();
+      // Pinned right like the Sample Studio's Convert.
+      const float rightX = startX + availW - kIconW;
       if (scene->panelOnly)
       {
-         gap();
-         if (ActionButton::Draw(L("Convert to node"), ImVec2(0, 0)))
+         const char* convertL = L("Convert##v3dconvert");
+         const float convertW = ImGui::CalcTextSize(convertL, ImGui::FindRenderedTextEnd(convertL)).x + 2.0f * tok::space_3;
+         ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX - tok::space_1 - convertW));
+         if (ActionButton::Draw(convertL, ImVec2(convertW, tok::tile)))
             sPending.what = Pending::ConvertScene;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Put this scene on the canvas"));
+         ActionButton::RowNext();
       }
-      ActionButton::RowNext();
-      ImGui::SetCursorPosX(startX + availW - kIconW);
+      ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightX));
       if (IconChip("##v3dside", IconsInfinite::Edit, sSideOpen, T("Properties (N)"))) sSideOpen = !sSideOpen;
    }
 
-   OutputNode* EnsureOutputImpl()
+   OutputNode* FindOutput()
    {
       GraphNode* self = SceneGraphNode();
       if (self == nullptr)
@@ -2179,6 +2139,16 @@ namespace
          if (auto* o = dynamic_cast<OutputNode*>(gn.node.get()))
             if (o->Input().GetSource() == self->node.get())
                return o;
+      return nullptr;
+   }
+
+   OutputNode* EnsureOutputImpl()
+   {
+      if (OutputNode* found = FindOutput())
+         return found;
+      GraphNode* self = SceneGraphNode();
+      if (self == nullptr)
+         return nullptr;
       const int selfIndex = self->index;
       const ImVec2 at = NodePos(*self);
       GraphNode* spawned = SpawnNode("Output", "Utility", at.x + 320.0f, at.y);
@@ -2261,9 +2231,24 @@ namespace
 
    bool BoolRow(const char* label, bool* v, const char* undo = "Edit in 3D View")
    {
-      FieldLabel(label);
+      // Box first and the label beside it, so a long label has the whole row.
+      const float rowY = ImGui::GetCursorPosY();
+      ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
       bool on = *v;
-      if (!CheckBox::Box(FormParts::Id(label).c_str(), &on))
+      bool hit = CheckBox::Box(FormParts::Id(label).c_str(), &on);
+      ImGui::SameLine(0.0f, tok::space_2);
+      ImGui::SetCursorPosY(rowY);
+      ImGui::AlignTextToFramePadding();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
+      ImGui::TextUnformatted(label);
+      ImGui::PopStyleColor();
+      if (ImGui::IsItemClicked())
+      {
+         on = !on;
+         hit = true;
+      }
+      if (!hit)
          return false;
       PushUndoCheckpoint(undo);
       *v = on;
@@ -2339,7 +2324,7 @@ namespace
    }
 
    // The list of what's in the scene. Eye hides, the camera mark says which one renders.
-   void DrawOutliner(Scene3DNode* scene, float availW)
+   void DrawOutliner(Scene3DNode* scene, float availW, float roomH)
    {
       SectionCard::Begin(T("Scene"));
       std::vector<GraphNode*> scenes;
@@ -2382,7 +2367,7 @@ namespace
       // Up to a third of the height, then it scrolls, so the settings below keep their room.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::clamp((int)(ImGui::GetContentRegionAvail().y * 0.34f / step), 2, 8));
+      const int shown = std::min(count, std::clamp((int)(roomH * 0.34f / step), 2, 8));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
@@ -2766,25 +2751,6 @@ namespace
       if (Card(T("Visibility")))
          if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
             scene->Commit();
-      if (Card(T("Animation")))
-      {
-         Transport& transport = Transport::Instance();
-         float at = (float)transport.Seconds();
-         if (FloatRow(T("Time"), &at, 0.0f, std::max(1.0f, sSet->seconds), "%.2f s"))
-            transport.Seek(at);
-         FieldLabel(T("Keys"));
-         ImGui::Text("%d", (int)item->keys.size());
-         if (ActionButton::Draw(L("Insert Key"), ImVec2(availW, 0)))
-            InsertKeys(scene);
-         ImGui::BeginDisabled(item->keys.empty());
-         if (ActionButton::Draw(L("Clear Keys"), ImVec2(availW, 0)))
-         {
-            PushUndoCheckpoint("Clear keys");
-            item->keys.clear();
-            scene->Commit();
-         }
-         ImGui::EndDisabled();
-      }
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry)
          DrawLitBy(scene, item);
@@ -2860,29 +2826,73 @@ namespace
       }
    }
 
+   std::string sLastRender;     // where the last render went, shown under the buttons
+   std::string sStillPath;      // a picture waiting for the Output's first cook
+
+   bool EndsWith(const std::string& text, const char* tail)
+   {
+      const size_t n = std::strlen(tail);
+      return text.size() >= n && text.compare(text.size() - n, n, tail) == 0;
+   }
+
    void StartRender(Scene3DNode* scene)
    {
       if (gOfflineRender.active || scene->activeCamera == 0)
          return;
+      const std::string path = Platform::SaveRenderDialog("infinite_render.mp4", true);
+      if (path.empty())
+         return;
       if (OutputNode* out = View3DEnsureOutput())
       {
+         // A hidden Output never draws the body that fills these in.
+         out->recordVideoPath = path;
+         out->videoFormat = EndsWith(path, ".mov") ? 1 : 0;
          out->offlineDurationSeconds = (int)sSet->seconds;
          out->offlineFps = (int)sSet->fps;
+         sLastRender = path;
          StartOfflineRenderSession(out);
       }
    }
 
-   // One picture through the active camera, to the path on the Output node.
+   // One picture through the active camera, once the Output has one to give.
    void RenderStill(Scene3DNode* scene)
    {
       if (gOfflineRender.active || scene->activeCamera == 0)
          return;
+      const std::string path = Platform::SaveRenderDialog("infinite_render.png", false);
+      if (path.empty())
+         return;
       if (OutputNode* out = View3DEnsureOutput())
       {
-         if (out->exportImagePath.empty())
-            out->exportImagePath = AppPaths::DesktopDir() + "/infinite_render.png";
-         ExportImage(out, out->exportImagePath);
+         out->exportImagePath = path;
+         out->imageFormat = EndsWith(path, ".jpg") || EndsWith(path, ".jpeg") ? 1 : 0;
+         sStillPath = path;
       }
+   }
+
+   void PumpStill()
+   {
+      OutputNode* out = sStillPath.empty() ? nullptr : FindOutput();
+      if (out == nullptr || out->GetOutputWidth() <= 0)
+         return;
+      ExportImage(out, sStillPath);
+      sLastRender = sStillPath;
+      sStillPath.clear();
+   }
+
+   void DrawRenderResult(float availW)
+   {
+      if (!sStillPath.empty())
+         Hint(T("Saving image..."));
+      OutputNode* out = FindOutput();
+      if (out != nullptr && !gOfflineRender.active && !out->RecordStatus().empty())
+         Hint(out->RecordStatus().c_str());
+      std::error_code ec;
+      if (sLastRender.empty() || !std::filesystem::exists(sLastRender, ec))
+         return;
+      Hint(sLastRender.c_str());
+      if (ActionButton::Draw(L("Reveal File"), ImVec2(availW, 0)))
+         Platform::RevealInFileManager(sLastRender);
    }
 
    void DrawRenderTab(Scene3DNode* scene)
@@ -2930,6 +2940,7 @@ namespace
 
    void DrawOutputTab(Scene3DNode* scene, float availW)
    {
+      PumpStill();
       Render3DNode& look = scene->Look();
       if (Card(T("Format")))
       {
@@ -2977,6 +2988,7 @@ namespace
       ImGui::EndDisabled();
       if (scene->activeCamera == 0)
          Hint(T("Add a camera to render."));
+      DrawRenderResult(availW);
    }
 
    const std::vector<std::string>& OrientationNames()
@@ -3041,6 +3053,22 @@ namespace
       }
    }
 
+   // A child whose first card touches its top and sides, so the card lines up with the rail.
+   void BeginCardColumn(const char* id, ImGuiChildFlags flags)
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SectionCard::kPad, 0.0f));
+      ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding | flags);
+      ImGui::PopStyleVar();
+      SectionCard::BeginWindow();
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+   }
+
+   void EndCardColumn()
+   {
+      SectionCard::EndWindow();
+      ImGui::EndChild();
+   }
+
    void DrawSide(Scene3DNode* scene, float panelW)
    {
       PushDockedPanelStyle(/*isChild=*/true);
@@ -3050,7 +3078,6 @@ namespace
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::GetStyle().WindowPadding = savedPad;
       PopDockedPanelStyle();
-      SectionCard::BeginWindow();
       float availW = ImGui::GetContentRegionAvail().x;
       SectionCard::Title(T("3D View"));
       FormParts::Inline(availW - 16.0f + ImGui::GetStyle().WindowPadding.x);
@@ -3062,9 +3089,22 @@ namespace
          glyph::DrawX(ImGui::GetWindowDrawList(), ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), sz * 0.65f,
                       ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled));
       }
-      DrawOutliner(scene, availW);
-      SectionCard::EndWindow();
-      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+
+      // One rail for every icon: each card starts level with its first icon, at the same x.
+      const auto sceneChip = [&]
+      {
+         if (IconChip("##v3dscenes", IconsInfinite::Arrange, sOutlinerOpen, T("Scene list")))
+            sOutlinerOpen = !sOutlinerOpen;
+      };
+      if (sOutlinerOpen)
+      {
+         const float roomH = ImGui::GetContentRegionAvail().y;
+         sceneChip();
+         ActionButton::RowNext();
+         BeginCardColumn("##v3dscenelist", ImGuiChildFlags_AutoResizeY);
+         DrawOutliner(scene, ImGui::GetContentRegionAvail().x, roomH);
+         EndCardColumn();
+      }
 
       // The tab strip, Blender's order: what renders, where it goes, the world, then the selection.
       Item* item = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
@@ -3082,6 +3122,8 @@ namespace
       if (sTab == 4 && !hasData)
          sTab = item != nullptr ? 3 : 0;
       ImGui::BeginGroup();
+      if (!sOutlinerOpen)
+         sceneChip();
       const struct { const char* id; const char* icon; const char* tip; bool show; } kTabs[6] = {
          { "##t0", IconsInfinite::ShadeRender, T("Render"), true },
          { "##t1", IconsInfinite::Folder, T("Output"), true },
@@ -3095,8 +3137,7 @@ namespace
             sTab = i;
       ImGui::EndGroup();
       ActionButton::RowNext();
-      ImGui::BeginChild("##v3dprops", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
-      SectionCard::BeginWindow();
+      BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
       availW = ImGui::GetContentRegionAvail().x;
       sFieldW = std::max(70.0f, availW - kFieldLabelW);
       if (sTab == 0) DrawRenderTab(scene);
@@ -3105,8 +3146,7 @@ namespace
       else if (sTab == 3) DrawObjectTab(scene, availW);
       else if (sTab == 4) DrawDataTab(scene, availW);
       else DrawViewTab(scene, availW);
-      SectionCard::EndWindow();
-      ImGui::EndChild();
+      EndCardColumn();
       ImGui::EndChild();
    }
 
@@ -3226,9 +3266,6 @@ namespace
             if (const Item* it = scene->FindItem(sSel.back()))
                StartRename(*it);
          MenuParts::Separator();
-         if (MenuParts::Item(T("Insert key"), "I", false, any)) InsertKeys(scene);
-         if (MenuParts::Item(T("Remove key"), "Alt+I", false, any)) RemoveKeysHere(scene);
-         MenuParts::Separator();
          if (MenuParts::Item(T("Cursor to Selected"), nullptr, false, any)) CursorToSelected(scene);
          if (MenuParts::Item(T("Selection to Cursor"), nullptr, false, any)) SelectionToCursor(scene);
          MenuParts::Separator();
@@ -3240,12 +3277,6 @@ namespace
                      gRequestSelectNodeIndex = gn->index;
                      gRequestFitViewNodeIndex = gn->index;
                   }
-         MenuParts::Separator();
-         if (MenuParts::SubMenu(T("Add")))
-         {
-            DrawAddItems(scene);
-            ImGui::EndMenu();
-         }
          MenuParts::EndPopup();
       }
    }
@@ -3439,7 +3470,6 @@ namespace
          DrawSide(scene, sideW);
       }
       DrawPopups(scene);
-      scene->holdKeys = sOp.mode != 0;
       if (std::memcmp(&sSeen, sSet, sizeof(sSeen)) != 0)
          scene->Commit();
       KeepGroupsTogether(scene);

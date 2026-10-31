@@ -192,6 +192,9 @@ namespace app
       ArrangeRenderQueuePosition(qIdx, qTotal);
       if (qTotal > 1 && qIdx > 0)
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 300.0f);
+      ImGui::TextDisabled("%s", n->recordVideoPath.c_str());
+      ImGui::PopTextWrapPos();
       // A cancelled take's progress bar is meaningless - it would sit frozen
       // at whatever fraction the render reached, which is precisely what
       // made a slow cancel look like a hang.

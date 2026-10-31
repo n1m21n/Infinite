@@ -1468,6 +1468,22 @@ namespace Platform
       }
    }
 
+   std::string SaveRenderDialog(const std::string& suggestedName, bool video)
+   {
+      @autoreleasepool
+      {
+         NSSavePanel* panel = [NSSavePanel savePanel];
+         [panel setTitle:video ? @"Render Animation" : @"Render Image"];
+         [panel setNameFieldStringValue:[NSString stringWithUTF8String:suggestedName.c_str()]];
+         if (@available(macOS 11.0, *))
+            [panel setAllowedContentTypes:video ? @[ UTTypeMPEG4Movie, UTTypeQuickTimeMovie ] : @[ UTTypePNG, UTTypeJPEG ]];
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [panel URL];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenModelDialog()
    {
       @autoreleasepool

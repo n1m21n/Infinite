@@ -45,7 +45,7 @@ It only improves what comes after adding: composing, camera, lights, render and 
 | Render | Sampling, Shadows, Ambient Occlusion, Bloom, Film, Color Management |
 | Output | Format (default 1920x1080, resolution %), Frame Range, colour depth, pass, projection, Render Image, Render Animation |
 | World | Surface (None, Background, Environment texture), Strength, Load HDRI, Ambient, Reflections |
-| Object | Source, Transform, Visibility, Animation (keys), Lit by |
+| Object | Source, Transform, Visibility, Lit by |
 | Data | Opens when a camera or light is picked. Camera: view (distance, orbit, elevation, roll, target), lens, shift, clip, sensor, depth of field (real f-stop). Light: its node's settings (type, colour, strength, orbit, elevation, distance), shadow caster. Both: point at 3D cursor |
 | Viewport | Transform, Snap, 3D Cursor, Navigation, Passepartout, Safe Areas, Composition Guides |
 
@@ -68,7 +68,6 @@ Blender's keymap.
 | Shift+B, / | Zoom into a box, local view |
 | Shift+Tab, Ctrl+` | Snap, overlays |
 | Shift+right-click | Place the 3D cursor |
-| I, Alt+I | Insert key, remove key at the current time |
 | F2 | Rename |
 | 1 3 7 9 5, 2 4 6 8 | Views, flip, ortho, orbit steps |
 | 0, Ctrl+0, Ctrl+Alt+0 | Through the camera, set active camera, camera to view |

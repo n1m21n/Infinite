@@ -3462,18 +3462,6 @@ void RunView3DTest()
    const float reach = std::sqrt(to[0] * to[0] + to[1] * to[1] + to[2] * to[2]);
    Check("a light aims at a point", aims && (aimed[0] * to[0] + aimed[1] * to[1] + aimed[2] * to[2]) / reach > 0.99f);
 
-   Scene3DNode::Key a, b;
-   a.t = 0.0f;
-   b.t = 2.0f;
-   b.pos[0] = 2.0f;
-   a.scale[0] = a.scale[1] = a.scale[2] = b.scale[0] = b.scale[1] = b.scale[2] = 1.0f;
-   moved.keys = { a, b };
-   Scene()->Commit();
-   Transport::Instance().Seek(1.0);
-   Scene()->CookIfNeeded(++sCookFrame);
-   Check("keys carry a placement between them", Scene()->FindItem(movedId)->pos[0] > 0.1f && Scene()->FindItem(movedId)->pos[0] < 1.9f);
-   Transport::Instance().Seek(0.0);
-
    Scene()->activeCamera = camItem;
    Scene()->settings.fStop = 2.8f;
    Scene()->Commit();
@@ -3493,16 +3481,14 @@ void RunView3DTest()
    Scene()->settings.fStop = 9.0f;
    Scene()->settings.pivot = 0;
    Scene()->FindItem(movedId)->name = "other";
-   Scene()->FindItem(movedId)->keys.clear();
    Scene()->Commit();
    Undo();
    const Scene3DNode::Item* back = Scene() != nullptr ? Scene()->FindItem(movedId) : nullptr;
-   Check("settings, names and keys survive a reload", back != nullptr && back->name == "hero" && !back->render && back->keys.size() == 2
+   Check("settings and names survive a reload", back != nullptr && back->name == "hero" && !back->render
       && Scene()->settings.fStop == 5.6f && Scene()->settings.pivot == 3 && Scene()->settings.cursor[1] == 2.0f);
    Scene()->settings = Scene3DNode::Settings();
    Scene()->activeCamera = 0;
    Scene()->Look().dofAperture = 0.0f;
-   Scene()->FindItem(movedId)->keys.clear();
    Scene()->Commit();
 
    // The scene stays up: the frames after this one draw the panel with it.

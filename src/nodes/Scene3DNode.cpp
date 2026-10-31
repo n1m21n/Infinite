@@ -10,7 +10,6 @@
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
-#include "Transport.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -263,14 +262,6 @@ void Scene3DNode::Serialize()
          o << "itemx " << it.id << " 0\n";
       if (it.group != 0)
          o << "group " << it.id << " " << it.group << "\n";
-      for (const Key& k : it.keys)
-      {
-         o << "key " << it.id << " " << k.t;
-         for (float v : k.pos) o << " " << v;
-         for (float v : k.rot) o << " " << v;
-         for (float v : k.scale) o << " " << v;
-         o << "\n";
-      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -282,7 +273,6 @@ void Scene3DNode::Parse()
    mItems.clear();
    settings = Settings();
    panelOnly = false;
-   mKeyTime = -1.0;
    std::istringstream in(mText);
    std::string line;
    while (std::getline(in, line))
@@ -330,7 +320,7 @@ void Scene3DNode::Parse()
             if (l >> x)
                v = (std::decay_t<decltype(v)>)x;
          });
-      else if (key == "label" || key == "itemx" || key == "group" || key == "key")
+      else if (key == "label" || key == "itemx" || key == "group")
       {
          int id = 0;
          l >> id;
@@ -348,18 +338,8 @@ void Scene3DNode::Parse()
             l >> on;
             it->render = on != 0;
          }
-         else if (key == "group")
-            l >> it->group;
          else
-         {
-            Key k;
-            l >> k.t;
-            for (float& v : k.pos) l >> v;
-            for (float& v : k.rot) l >> v;
-            for (float& v : k.scale) l >> v;
-            if (l)
-               it->keys.push_back(k);
-         }
+            l >> it->group;
       }
    }
 }
@@ -523,35 +503,6 @@ bool Scene3DNode::AimAt(Item& item, const float target[3]) const
    return true;
 }
 
-// Keyed items follow the transport, smoothly between keys and held past the
-// ends, the same way live and in a render since both read the same clock.
-void Scene3DNode::ApplyKeys()
-{
-   const double now = Transport::Instance().Seconds();
-   if (holdKeys || now == mKeyTime)
-      return;
-   mKeyTime = now;
-   const float t = (float)now;
-   for (Item& it : mItems)
-   {
-      if (it.keys.empty())
-         continue;
-      size_t next = 0;
-      while (next < it.keys.size() && it.keys[next].t <= t)
-         next++;
-      const Key& a = it.keys[next == 0 ? 0 : next - 1];
-      const Key& b = it.keys[std::min(next, it.keys.size() - 1)];
-      float f = b.t > a.t ? std::clamp((t - a.t) / (b.t - a.t), 0.0f, 1.0f) : 0.0f;
-      f = f * f * (3.0f - 2.0f * f);
-      for (int k = 0; k < 3; k++)
-      {
-         it.pos[k] = a.pos[k] + (b.pos[k] - a.pos[k]) * f;
-         it.rot[k] = a.rot[k] + (b.rot[k] - a.rot[k]) * f;
-         it.scale[k] = a.scale[k] + (b.scale[k] - a.scale[k]) * f;
-      }
-   }
-}
-
 void Scene3DNode::Sync(int frameId)
 {
    if (mSyncedFrame == frameId)
@@ -559,7 +510,6 @@ void Scene3DNode::Sync(int frameId)
    mSyncedFrame = frameId;
    if (mText != mParsedText)
       Parse();
-   ApplyKeys();
    if (!mRoot)
    {
       mRoot = std::make_unique<Root>();
