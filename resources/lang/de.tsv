@@ -2245,3 +2245,7 @@ With the pointer over a 3D preview (node, viewport card, Render 3D): front, righ
 Zoom 3D View	3D View zoomen
 Zoom in or out; Shift+B drags a box to zoom into	Hinein- oder herauszoomen; Shift+B zieht einen Rahmen zum Hineinzoomen
 infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite allein listet jedes Verb auf. infinite context gibt den geöffneten Patch, die Auswahl und Code-Fehler in einer Antwort aus.
+MIDI Inputs	MIDI-Eingänge
+Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	Alle angeschlossenen MIDI-Controller. Ein Midi-Notes-Node hört auf alle oder auf einen, und Learn wählt Gerät und Kanal anhand der nächsten gespielten Taste.
+Start MIDI	MIDI starten
+No MIDI inputs connected	Keine MIDI-Eingänge verbunden

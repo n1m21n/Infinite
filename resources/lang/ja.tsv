@@ -2245,3 +2245,7 @@ With the pointer over a 3D preview (node, viewport card, Render 3D): front, righ
 Zoom 3D View	3D View をズーム
 Zoom in or out; Shift+B drags a box to zoom into	ズームイン・アウト。Shift+B でドラッグした範囲にズーム
 infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite だけを実行するとすべてのコマンドを一覧表示します。infinite context は開いているパッチ、選択、コードエラーを 1 回でまとめて表示します。
+MIDI Inputs	MIDI入力
+Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	接続中のすべてのMIDIコントローラー。Midi Notesノードはすべて、または1台だけを受信し、Learnは次に弾いた鍵盤からデバイスとチャンネルを選びます。
+Start MIDI	MIDIを開始
+No MIDI inputs connected	MIDI入力が接続されていません

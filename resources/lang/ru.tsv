@@ -2245,3 +2245,7 @@ With the pointer over a 3D preview (node, viewport card, Render 3D): front, righ
 Zoom 3D View	Масштаб 3D View
 Zoom in or out; Shift+B drags a box to zoom into	Приблизить или отдалить; Shift+B — рамка для приближения
 infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	infinite без аргументов перечисляет все команды. infinite context выводит открытый патч, выделение и ошибки кода в одном ответе.
+MIDI Inputs	MIDI-входы
+Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	Все подключённые MIDI-контроллеры. Узел Midi Notes слушает все или один из них, а Learn выбирает устройство и канал по следующей сыгранной клавише.
+Start MIDI	Запустить MIDI
+No MIDI inputs connected	MIDI-входы не подключены

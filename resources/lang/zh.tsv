@@ -2245,3 +2245,7 @@ With the pointer over a 3D preview (node, viewport card, Render 3D): front, righ
 Zoom 3D View	缩放 3D View
 Zoom in or out; Shift+B drags a box to zoom into	放大或缩小；Shift+B 拖出方框进行放大
 infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer.	单独输入 infinite 会列出所有命令。infinite context 一次性输出当前补丁、所选内容和代码错误。
+MIDI Inputs	MIDI 输入
+Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	所有已连接的 MIDI 控制器。Midi Notes 节点可监听全部或其中一个，Learn 会根据你弹下的下一个琴键选择设备和通道。
+Start MIDI	启动 MIDI
+No MIDI inputs connected	未连接 MIDI 输入
