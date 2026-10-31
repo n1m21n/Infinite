@@ -7,7 +7,7 @@ from docs/node_screenshots/, captured with scripts/screenshot_all_nodes.py (BRAN
 ends with the UI chapter (ui_chapter.py, screenshots in docs/ui_screenshots/) and a gallery of every node.
 
     python3 scripts/screenshot_all_nodes.py --out docs/node_screenshots     # refresh the node screenshots
-    python3 tools/manual/build.py                                           # writes the PDF + website/assets copy
+    python3 tools/manual/build.py                                           # writes the PDF + website/assets and press_kit copies
 """
 import json
 import os
@@ -27,6 +27,7 @@ import shots  # noqa: E402
 
 OUT = os.path.join(ROOT, "Infinite_Node_Reference_Manual.pdf")
 OUT_WEB = os.path.join(ROOT, "website", "assets", "Infinite_Node_Reference_Manual.pdf")
+OUT_KIT = os.path.join(ROOT, "press_kit", "manuals", "Infinite_Node_Reference_Manual.pdf")
 FOOT_R = "INFINITE / NODE FIELD GUIDE"
 
 # Counts come from `Infinite --describe` (338 registered) minus the five types the spawn menu hides
@@ -196,7 +197,8 @@ def main():
     subprocess.run(["pdfunite"] + parts + [joined], check=True)
     shutil.copy(joined, OUT)
     shutil.copy(joined, OUT_WEB)
-    print("wrote", OUT, "and", OUT_WEB)
+    shutil.copy(joined, OUT_KIT)
+    print("wrote", OUT, "and copies in website/assets and press_kit/manuals")
 
 
 if __name__ == "__main__":

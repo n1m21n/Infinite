@@ -161,7 +161,7 @@ def main(argv=None):
                 fail += (not sid and st != "d")
                 print(("ok  " if sid else "FAIL"), cat, name, st, flush=True)
             C.save_manifest(m)
-    want = list(SCENES) if a.scenes == "all" else [s for s in a.scenes.split(",") if s]
+    want = [x for s in a.scenes.split(",") if s for x in (list(SCENES) if s == "all" else [s])]
     for s in want:
         if s in ("ui", "ui/gallery"):
             for th in ("dark", "light"):
