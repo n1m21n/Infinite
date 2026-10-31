@@ -67,6 +67,10 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
    bool IsHardwareDriven() const override { return true; }
+   // Runs every block even unpatched, like KeyboardNode: Learn and the inline
+   // keyboard only work inside ProcessBlock, and a freshly spawned node has no
+   // cable yet.
+   bool RequiresAudioProcessing() const override { return true; }
 
    AudioNode* GetAudioNode() override;
 
