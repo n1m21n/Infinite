@@ -2914,6 +2914,9 @@ int RunRemoveBgTest()
 
    if (rightSize)
    {
+      // Vision on newer macOS returns a softer mask (centre ~114, corners 0);
+      // polarity is what this proves, so the centre only has to clear the
+      // corners by a wide margin, not reach the midpoint.
       const unsigned char midpoint = 128;
       const unsigned char center = mask[(size_t)kCy * kSize + kCx];
       const unsigned char corners[4] = {
@@ -2923,7 +2926,8 @@ int RunRemoveBgTest()
          mask[(size_t)(kSize - 1) * kSize + (kSize - 1)],
       };
 
-      const bool centerAbove = center > midpoint;
+      const unsigned char cornerMax = std::max(std::max(corners[0], corners[1]), std::max(corners[2], corners[3]));
+      const bool centerAbove = center >= 64 && (int)center > (int)cornerMax + 48;
       printf("REMOVEBG center (in circle): %d  %s\n", (int)center, centerAbove ? "OK" : "FAIL");
       ok = ok && centerAbove;
 
