@@ -27,6 +27,16 @@ namespace SectionCard
       return s;
    }
 
+   // The soft well itself (5% text tint, hairline edge, radius_group), on the current window's draw list.
+   inline void Well(ImVec2 a, ImVec2 b)
+   {
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
+      dl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
+                  tok::radius_group);
+   }
+
    // Call right after the window / child begins (and before its first card).
    inline void BeginWindow()
    {
@@ -56,12 +66,7 @@ namespace SectionCard
       if (y1 - s.top >= 4.0f * kPad)   // nothing drawn in it: no empty sliver
       {
          s.split.SetCurrentChannel(dl, 0);
-         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         dl->AddRectFilled(ImVec2(x0, s.top - kPad), ImVec2(x1, y1), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)),
-                           tok::radius_group);
-         dl->AddRect(ImVec2(x0, s.top - kPad), ImVec2(x1, y1),
-                     ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
-                     tok::radius_group);
+         Well(ImVec2(x0, s.top - kPad), ImVec2(x1, y1));
          s.split.SetCurrentChannel(dl, 1);
       }
       ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, y1 - ImGui::GetStyle().ItemSpacing.y));

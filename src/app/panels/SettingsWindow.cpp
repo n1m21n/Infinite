@@ -1,7 +1,6 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/graph/LearningLog.h"
 #include "app/ui/design/components/MenuParts.h"
-#include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -106,11 +105,7 @@ namespace app
          const ImVec2 navMin = ImGui::GetItemRectMin(), navMax = ImGui::GetItemRectMax();
          constexpr float pad = SectionCard::kPad;
          const ImVec2 a(navMin.x - pad, navMin.y + pad), b(navMax.x + pad, navMax.y - pad);
-         ImDrawList* wdl = ImGui::GetWindowDrawList();
-         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         wdl->AddRectFilled(a, b, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)), tok::radius_group);
-         wdl->AddRect(a, b, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
-                      tok::radius_group);
+         SectionCard::Well(a, b);
       }
       FormParts::Inline(0.0f, ImGui::GetStyle().ItemSpacing.x + SectionCard::kPad * 2.0f);   // nav well, a gap, then the card column
       const ImVec2 oldWindowPadding = ImGui::GetStyle().WindowPadding;
