@@ -6,7 +6,7 @@ has a source of truth), chapters 21-28 from cards.py and cards_v06.py. Every nod
 from docs/node_screenshots/, captured with scripts/screenshot_all_nodes.py (BRAND.md section 10.1). The guide
 ends with the UI chapter (ui_chapter.py, screenshots in docs/ui_screenshots/) and a gallery of every node.
 
-    python3 scripts/screenshot_all_nodes.py --out docs/node_screenshots     # refresh the node screenshots
+    python3 scripts/screenshot_all_nodes.py --out docs/node_screenshots     # refresh the node screenshots (zoomed by default; never pass --no-zoom here)
     python3 tools/manual/build.py                                           # writes the PDF + website/assets and press_kit copies
 """
 import json
@@ -72,14 +72,32 @@ CHAPTER_COUNT = 20 + len(NEW_CHAPTERS)
 COUNT_WORD = {26: "Twenty-six", 27: "Twenty-seven", 28: "Twenty-eight"}.get(CHAPTER_COUNT, str(CHAPTER_COUNT))
 
 
-def shot_html(name, cls="shot", max_w=150, max_h=300):
+_CACHE = os.path.join(tempfile.gettempdir(), "infinite_manual_shots")
+
+
+def sharp(path, dw, dh):
+    """Path to a copy of the shot resampled to 2x its displayed size (crisp, but not 4x the PDF weight)."""
+    from PIL import Image
+    im = Image.open(path)
+    tw, th = max(1, dw * 2), max(1, dh * 2)
+    if im.size[0] <= tw:
+        return path
+    os.makedirs(_CACHE, exist_ok=True)
+    out = os.path.join(_CACHE, f"{tw}x{th}_{os.path.basename(path)}")
+    if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(path):
+        im.convert("RGBA").resize((tw, th), Image.LANCZOS).save(out, optimize=True)
+    return out
+
+
+def shot_html(name, cls="shot", max_w=150, max_h=470):
     imgs = shots.find(name)
     if not imgs:
         return ""
     parts = []
     for tid, path, w, h in imgs[:3]:
         k = min(1.0, max_w / (w / 2), max_h / (h / 2)) * 0.5
-        parts.append(f'<img src="file://{path}" width="{round(w * k)}" height="{round(h * k)}" alt="{esc(tid)}">')
+        dw, dh = round(w * k), round(h * k)
+        parts.append(f'<img src="file://{sharp(path, dw, dh)}" width="{dw}" height="{dh}" alt="{esc(tid)}">')
     return f'<div class="{cls}">{"".join(parts)}</div>'
 
 
@@ -160,7 +178,8 @@ def gallery_html():
         body.append(f"<h2>{esc(cat)} <span class='tag'>{len(cats[cat])} nodes</span></h2><div class='grid'>")
         for tid, path, w, h in sorted(cats[cat], key=lambda x: x[0].lower()):
             k = min(1.0, 150 / (h / 2), 140 / (w / 2)) * 0.5
-            body.append(f'<div class="cell"><img src="file://{path}" width="{round(w * k)}" height="{round(h * k)}"><span class="nm">{esc(tid)}</span></div>')
+            dw, dh = round(w * k), round(h * k)
+            body.append(f'<div class="cell"><img src="file://{sharp(path, dw, dh)}" width="{dw}" height="{dh}"><span class="nm">{esc(tid)}</span></div>')
         body.append("</div>")
     return P.doc("".join(body), "Gallery / every node", FOOT_R, P.PILL_CSS)
 

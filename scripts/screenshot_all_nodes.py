@@ -31,7 +31,8 @@ def main():
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--padding", type=int, default=12)
     ap.add_argument("--settle-seconds", type=float, default=1.0)
-    ap.add_argument("--zoom", action="store_true", help="zoom the view in on the node before capture, for a sharper, larger shot")
+    ap.add_argument("--no-zoom", action="store_true",
+                    help="skip the zoom-in before capture (small, soft shots; the manuals and website need the zoomed ones, so zoom is the default)")
     ap.add_argument("--keep-open", action="store_true", help="leave the app running afterward")
     args = ap.parse_args()
 
@@ -64,7 +65,7 @@ def main():
             print(f"[{i}/{len(node_list)}] {category} / {name}")
             try:
                 capture_one(client, name, category, args.out,
-                            padding=args.padding, settle_seconds=args.settle_seconds, zoom=args.zoom)
+                            padding=args.padding, settle_seconds=args.settle_seconds, zoom=not args.no_zoom)
             except Exception as e:
                 print(f"  FAILED: {e}", file=sys.stderr)
                 failures.append((category, name, str(e)))

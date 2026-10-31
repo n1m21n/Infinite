@@ -120,6 +120,23 @@ def check_i18n():
     return bad
 
 
+def check_node_shots():
+    """Node screenshots feed the manuals and the website; the unzoomed 1x capture (median ~128 px wide) prints soft."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    d = os.path.join(ROOT, "docs", "node_screenshots")
+    if not os.path.isdir(d):
+        return None
+    widths = sorted(Image.open(os.path.join(d, f)).size[0] for f in os.listdir(d) if f.endswith(".png"))
+    if not widths:
+        return None
+    med = widths[len(widths) // 2]
+    return [] if med >= 250 else [f"node screenshots look unzoomed (median {med}px wide): "
+                                  "python3 scripts/screenshot_all_nodes.py (zoomed by default), then rebuild the manual"]
+
+
 def check_manuals():
     """Brand lint on the committed manual PDFs (em dashes, fonts, page size)."""
     pdfs = [p for p in ("Infinite_Node_Reference_Manual.pdf", "Field_Language_Manual.pdf",
@@ -138,6 +155,7 @@ def check_release_app(app):
 STATIC = {
     "drift": ("driver/CI test lists, baselines and src/ agree", check_drift),
     "workflows": ("every workflow file parses", check_workflows),
+    "nodeshots": ("node screenshots are the zoomed capture", check_node_shots),
     "i18n": ("translations complete, no format mismatches", check_i18n),
     "manuals": ("committed manual PDFs pass brand lint", check_manuals),
 }

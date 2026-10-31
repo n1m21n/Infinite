@@ -164,9 +164,9 @@ def main():
                      help="don't force the node's collapsed params sections open before capture")
     ap.add_argument("--no-wire", action="store_true",
                      help="don't auto-connect feeder nodes into the node's unconnected input slots")
-    ap.add_argument("--zoom", action="store_true",
-                     help="zoom the view in on the node before capture, for a sharper, larger shot "
-                          "(use this for website and blog images)")
+    ap.add_argument("--no-zoom", action="store_true",
+                     help="skip the zoom-in before capture (small, soft shots; manuals, website and blog "
+                          "images need the zoomed ones, so zoom is the default)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -190,7 +190,7 @@ def main():
     try:
         capture_one(client, args.node_type, args.category, args.out,
                     padding=args.padding, settle_seconds=args.settle_seconds,
-                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire, zoom=args.zoom)
+                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire, zoom=not args.no_zoom)
     finally:
         client.close()
         if launched_here and not args.keep_open and proc is not None:
