@@ -229,10 +229,11 @@ namespace FormParts
    // Places the next widget on the same row. A component so surfaces never call ImGui::SameLine directly.
    inline void Inline(float offset = 0.0f, float spacing = -1.0f) { ImGui::SameLine(offset, spacing); }
 
-   inline void PushWindowPad()
+   // titleInset moves the title text right of the content line (a window whose content is inset by a nav well).
+   inline void PushWindowPad(float titleInset = 0.0f)
    {
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4, tok::space_3 + 2.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4 + titleInset, tok::space_3 + 2.0f));
    }
    inline void PopWindowPad() { ImGui::PopStyleVar(2); }
 

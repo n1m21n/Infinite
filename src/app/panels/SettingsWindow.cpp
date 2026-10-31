@@ -26,12 +26,10 @@ namespace app
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
       // Cards reach SectionCard::kPad into the window padding, so 16 leaves an 8 pt margin to the window edge on every side.
-      FormParts::PushWindowPad();
       // The title starts where the tab labels start (window pad + kNavInset), so "Settings" sits over "Appearance".
       constexpr float kNavInset = tok::space_2;
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4 + kNavInset, tok::space_3 + 2.0f));
+      FormParts::PushWindowPad(kNavInset);
       const bool settingsVisible = ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse);
-      ImGui::PopStyleVar();
       FormParts::PopWindowPad();
       if (!settingsVisible)
       {
