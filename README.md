@@ -23,7 +23,7 @@ Always the newest release. All files, checksums and release notes are on the [Re
 
 ---
 
-## What's new in v1.0 (beta)
+## What's new in v1.0
 
 v1.0 is the biggest release so far: about 600 commits since v0.6.6. The node canvas is still the centre; around it, Infinite now has the panels a full studio needs. Every panel docks to the edge of the window and opens from the rail or a key.
 
@@ -45,7 +45,7 @@ A real terminal inside Infinite (Ctrl + \`), docked on any side, running your ow
 
 A self-contained sample editor (Shift + W). Open a file, drop one in, record from the audio input, or generate a take. Zoom the waveform, cut it into slices by transients, grid or equal parts, and give each slice its own gain, pan, pitch, fine tune, stretch, fades, shape, colour, mute and solo. Editing never touches the canvas. When it sounds right, Convert puts it on the canvas as a node that plays it, or as the patch that made it; Export writes the whole edit or each slice to WAV, FLAC or MP3. Studio work is saved in the patch.
 
-### Session clips and the Timeline
+### Session clips and the Timeline (from 0.6.6, refined)
 
 | Session | Timeline |
 |---|---|
@@ -58,7 +58,7 @@ A self-contained sample editor (Shift + W). Open a file, drop one in, record fro
 
 A note editor (Shift + R) for MIDI lanes on the Timeline, played by the new Piano Roll node. Draw, erase, select and quantise notes, snap to the project's scale (in-scale lanes are coloured), and transform them with Humanize, Strum, Legato, Chop to Grid, Velocity Ramp, Reverse, Invert and half or double speed. Record from a MIDI input, import a `.mid` file, or press Generate (G) to write notes in the page's key.
 
-### Mod Matrix and Performance
+### Mod Matrix and Performance (from 0.6.6)
 
 <img src="docs/screenshots/v1/mod-matrix.png" alt="Mod Matrix listing every modulation in the patch" width="100%">
 
