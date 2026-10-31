@@ -21,6 +21,7 @@ Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Rol
 - A Piano Roll panel that docks at the bottom or top like the Timeline: MIDI lanes, clips, notes, quantise, scale-snap colours, per-clip colours and `.mid` import
 - Record from a MIDI input (notes appear on key-down in one growing clip), and Generate notes from the Generate Samples engine
 - A Piano Roll node plays its linked MIDI lane; Open in Piano Roll from a MIDI File node
+- A loop-region toggle in the toolbar, matching the Timeline; Shift+D and Ctrl+D copies continue to the right instead of overwriting the first copy
 
 ### Sample Studio
 
@@ -32,6 +33,11 @@ Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Rol
 - Piano: a physically modelled piano with Rhodes and Wurlitzer models
 - Wind: clarinet, sax, flute and brass
 - String: guitar, harp, violin and cello bodies, pick hardness, bow pressure and bow noise; new factory presets for String, Piano and Wind
+
+### Generate Samples
+
+- Real instruments in the full mix, a chord bank learned from real songs, genre grooves with struck toms and percussion ensembles, designed voices and bass types, and birds, water and leaves among the textures
+- A role critic checks each generated part and redraws one that does not fit
 
 ### MIDI
 
@@ -53,8 +59,16 @@ Infinite 1.0 adds a Terminal, a 3D View for composing a final scene, a Piano Rol
 
 - Local learning keeps takes with their outcomes, MIDI and patches on your machine. Settings has an off switch and Forget me. Nothing leaves your computer
 
+### Headless
+
+- `--plugin-params` reports each parameter's current value, `--plugin-state` returns a plugin's saved state, and `--audio-summary --batch` measures many patches in one process
+
 ### Fixes
 
 - Windows: VST3 plugin paths stay UTF-8, an exception during a scan no longer ends the app, and every scan is logged (issue #44)
 - Sample Studio: the wave past the end marker no longer turns into a solid block
 - Param bodies: status and hint lines wrap at the node's width
+- Particle System: a max particles value under 256 no longer leaves the system with no particles
+- Electric piano: moving the pickup knob no longer clicks
+- Chinese and Japanese text no longer shows missing glyphs
+- Mod Matrix shows its empty helper; the non-working Use as 3D View world menu item is gone
