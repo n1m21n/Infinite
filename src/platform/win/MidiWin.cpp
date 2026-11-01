@@ -200,7 +200,7 @@ namespace
    {
       const unsigned int dev = (unsigned int)deviceId + 1;
       const BYTE status = (BYTE)(param & 0xFF);
-      if (status < 0xF0 && !MidiSourceEnabled(dev))
+      if (status < 0xF0 && !Platform::MidiSourceEnabled(dev))
          return;
 
       // System Real-Time (0xF8..0xFF) and System Common (0xF0..0xF7) are NOT

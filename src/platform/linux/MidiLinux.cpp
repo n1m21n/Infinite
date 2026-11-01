@@ -244,7 +244,7 @@ namespace
       const bool transport = ev.type == SND_SEQ_EVENT_CLOCK || ev.type == SND_SEQ_EVENT_START ||
                              ev.type == SND_SEQ_EVENT_STOP || ev.type == SND_SEQ_EVENT_CONTINUE ||
                              ev.type == SND_SEQ_EVENT_SONGPOS;
-      if (!transport && !MidiSourceEnabled(dev))
+      if (!transport && !Platform::MidiSourceEnabled(dev))
          return;
       switch (ev.type)
       {
