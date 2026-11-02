@@ -1377,6 +1377,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "deep-house-rhodes-electric-synth",
+      "name": "Deep House Rhodes Electric Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Soulful deep house polyphonic synthesizer with detuned sine-saw blend, velocity-controlled resonant lowpass warmth, and lush harmonic decay.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-rhodes-electric-synth.webp",
+      "file": "assets/templates/deep-house-rhodes-electric-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "deep-house-organ-bass-synth",
+      "name": "Deep House Organ Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Classic Chicago deep house organ bass synthesizer with punchy percussive transient click, sub-harmonic octave warmth, and tight saturated decay.",
+      "price": 0,
+      "preview": "assets/templates/deep-house-organ-bass-synth.webp",
+      "file": "assets/templates/deep-house-organ-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "jungle-amen-tape-delay-fx",
+      "name": "Jungle Amen Tape Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage sound system tape delay processor with 16th-sync ping-pong repeats, high-frequency tape saturation damping, and analog flutter modulation.",
+      "price": 0,
+      "preview": "assets/templates/jungle-amen-tape-delay-fx.webp",
+      "file": "assets/templates/jungle-amen-tape-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "jungle-sub-bass-resonator-fx",
+      "name": "Jungle Sub Bass Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Heavy sound system sub-bass filter and harmonic resonator with tuned low-end boost, asymmetric saturation drive, and transient preservation.",
+      "price": 0,
+      "preview": "assets/templates/jungle-sub-bass-resonator-fx.webp",
+      "file": "assets/templates/jungle-sub-bass-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

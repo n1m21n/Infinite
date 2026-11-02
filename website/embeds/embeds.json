@@ -320,6 +320,16 @@
       "slug": "holographic-iridescent-prismatic-flux",
       "title": "Holographic Iridescent Prismatic Flux",
       "description": "Multi-layered prismatic crystal dispersion with rotating Fresnel polarization angles, liquid metallic sheen, and spectral caustic flares. Bass drives crystal facet breathing, mids rotate refractive polarization angles, highs illuminate shimmering spectral caustic dispersion."
+    },
+    {
+      "slug": "glitch-datamosh-buffer-tear",
+      "title": "Glitch Datamosh Buffer Tear",
+      "description": "Algorithmic video datamosh compression tearing shader with chromatic RGB channel separation, horizontal block motion vectors, and scanline glitch persistence. Bass drives macro compression slice tearing, mids distort chromatic RGB offset, highs illuminate sparkling bit-shift noise."
+    },
+    {
+      "slug": "glitch-datamosh-pixel-displace",
+      "title": "Glitch Datamosh Pixel Displace",
+      "description": "Digital compression artifact displacement shader with quantized mosaic buffer slices, feedback edge bleeding, and dynamic scanline wave distortion. Bass modulates quantized pixel block fragmentation, mids warp scanline wave shearing, highs trigger phosphor edge luminance flares."
     }
   ]
 }

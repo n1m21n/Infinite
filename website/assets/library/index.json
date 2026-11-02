@@ -4837,6 +4837,216 @@
       "file": "assets/library/pixel/holographic-iridescent-prismatic-flux.field",
       "preview": "assets/library/previews/holographic-iridescent-prismatic-flux.jpg",
       "bytes": 1603
+    },
+    {
+      "id": "acid-graphics-starburst-lattice",
+      "name": "Acid Graphics Starburst Lattice",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "typography",
+        "starburst",
+        "vector",
+        "drawing",
+        "rave"
+      ],
+      "description": "Procedural rave-era acid graphics with concentric warped starburst contours, high-contrast chartreuse vector frames, and dense technical alignment ticks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/acid-graphics-starburst-lattice.js",
+      "preview": "assets/library/previews/acid-graphics-starburst-lattice.jpg",
+      "bytes": 2642
+    },
+    {
+      "id": "acid-graphics-warp-typography",
+      "name": "Acid Graphics Warp Typography",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "typography",
+        "warp",
+        "layout",
+        "procedural",
+        "drawing"
+      ],
+      "description": "Algorithmic Warp-era typographic layout with curvilinear sine-distorted letterforms, bold chromatic contrast rules, and geometric registration marks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/acid-graphics-warp-typography.js",
+      "preview": "assets/library/previews/acid-graphics-warp-typography.jpg",
+      "bytes": 1893
+    },
+    {
+      "id": "vaporwave-collage-ionic-colonnade-3d",
+      "name": "Vaporwave Collage Ionic Colonnade 3D",
+      "kind": "Generator",
+      "tags": [
+        "vaporwave",
+        "neoclassical",
+        "colonnade",
+        "architecture",
+        "marble",
+        "3d"
+      ],
+      "description": "Neoclassical postmodern architectural colonnade with fluted marble columns, tiered stepped podiums, floating platonic spheres, and pastel aesthetic volumes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vaporwave-collage-ionic-colonnade-3d.js",
+      "preview": "assets/library/previews/vaporwave-collage-ionic-colonnade-3d.jpg",
+      "bytes": 1907
+    },
+    {
+      "id": "vaporwave-collage-pedestal-temple-3d",
+      "name": "Vaporwave Collage Pedestal Temple 3D",
+      "kind": "Generator",
+      "tags": [
+        "vaporwave",
+        "temple",
+        "pedestal",
+        "architecture",
+        "geometry",
+        "3d"
+      ],
+      "description": "Monumental stepped temple pavilion with cantilevered entablature beams, hollow archways, tiered ceremonial plinths, and geometric sun disc accents.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vaporwave-collage-pedestal-temple-3d.js",
+      "preview": "assets/library/previews/vaporwave-collage-pedestal-temple-3d.jpg",
+      "bytes": 2008
+    },
+    {
+      "id": "deep-house-rhodes-electric-synth",
+      "name": "Deep House Rhodes Electric Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "deep-house",
+        "chords",
+        "polyphonic",
+        "analog",
+        "audio"
+      ],
+      "description": "Soulful deep house polyphonic synthesizer with detuned sine-saw blend, velocity-controlled resonant lowpass warmth, and lush harmonic decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/deep-house-rhodes-electric-synth.inf",
+      "preview": "assets/library/previews/deep-house-rhodes-electric-synth.jpg",
+      "bytes": 2195
+    },
+    {
+      "id": "deep-house-organ-bass-synth",
+      "name": "Deep House Organ Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "deep-house",
+        "bass",
+        "organ",
+        "sub",
+        "audio"
+      ],
+      "description": "Classic Chicago deep house organ bass synthesizer with punchy percussive transient click, sub-harmonic octave warmth, and tight saturated decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/deep-house-organ-bass-synth.inf",
+      "preview": "assets/library/previews/deep-house-organ-bass-synth.jpg",
+      "bytes": 2328
+    },
+    {
+      "id": "jungle-amen-tape-delay-fx",
+      "name": "Jungle Amen Tape Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "jungle",
+        "delay",
+        "tape",
+        "echo",
+        "audio"
+      ],
+      "description": "Vintage sound system tape delay processor with 16th-sync ping-pong repeats, high-frequency tape saturation damping, and analog flutter modulation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/jungle-amen-tape-delay-fx.inf",
+      "preview": "assets/library/previews/jungle-amen-tape-delay-fx.jpg",
+      "bytes": 2144
+    },
+    {
+      "id": "jungle-sub-bass-resonator-fx",
+      "name": "Jungle Sub Bass Resonator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "jungle",
+        "sub",
+        "resonator",
+        "filter",
+        "audio"
+      ],
+      "description": "Heavy sound system sub-bass filter and harmonic resonator with tuned low-end boost, asymmetric saturation drive, and transient preservation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/jungle-sub-bass-resonator-fx.inf",
+      "preview": "assets/library/previews/jungle-sub-bass-resonator-fx.jpg",
+      "bytes": 2079
+    },
+    {
+      "id": "glitch-datamosh-buffer-tear",
+      "name": "Glitch Datamosh Buffer Tear",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "glitch",
+        "datamosh",
+        "rgb",
+        "compression",
+        "shader"
+      ],
+      "description": "Algorithmic video datamosh compression tearing shader with chromatic RGB channel separation, horizontal block motion vectors, and scanline glitch persistence.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-buffer-tear.field",
+      "preview": "assets/library/previews/glitch-datamosh-buffer-tear.jpg",
+      "bytes": 1836
+    },
+    {
+      "id": "glitch-datamosh-pixel-displace",
+      "name": "Glitch Datamosh Pixel Displace",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "glitch",
+        "displace",
+        "mosaic",
+        "feedback",
+        "shader"
+      ],
+      "description": "Digital compression artifact displacement shader with quantized mosaic buffer slices, feedback edge bleeding, and dynamic scanline wave distortion.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-pixel-displace.field",
+      "preview": "assets/library/previews/glitch-datamosh-pixel-displace.jpg",
+      "bytes": 1754
     }
   ]
 }
