@@ -7,6 +7,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "core/gl3.h"
+#include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/LibraryParts.h"
 
@@ -1031,6 +1032,7 @@ namespace app
             // AlwaysUseWindowPadding is needed alongside Border now.
             LibraryParts::BeginWell("##fieldrefcontent");
             FormParts::PushReferenceStyle();
+            ImGui::PushTextWrapPos(0.0f);   // bullets, table cells and coloured lines wrap at the edge instead of widening the page
 
             auto MatchesFilter = [](const char* text) -> bool {
                if (sFilterBuf[0] == '\0') return true;
@@ -1044,29 +1046,7 @@ namespace app
                return str.find(q) != std::string::npos;
             };
 
-            auto DrawCodeBox = [](const char* code, const char* copyId) {
-               // A recessed code well in the theme's own text tint, so it reads in either theme.
-               const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tx.x, tx.y, tx.z, 0.06f));
-               ImGui::PushStyleColor(ImGuiCol_Border, FormParts::EdgeCol());
-               ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tok::radius_tile);
-               ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
-               const float h = ImGui::CalcTextSize(code).y + 2.0f * tok::space_2;
-               ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-               ImGui::BeginChild(copyId, ImVec2(0, h), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
-                                 ImGuiWindowFlags_NoScrollbar);
-               ImGui::PopStyleVar();
-               ImGui::TextUnformatted(code);
-               ImGui::SameLine(ImGui::GetWindowWidth() - 72.0f);
-               char btnLabel[32];
-               snprintf(btnLabel, sizeof(btnLabel), "Copy##%s", copyId);
-               if (FormParts::Button(btnLabel, ImVec2(56.0f, 0)))
-                  ImGui::SetClipboardText(code);
-               ImGui::EndChild();
-               ImGui::PopStyleVar(2);
-               ImGui::PopStyleColor(2);
-               ImGui::Spacing();
-            };
+            auto DrawCodeBox = [](const char* code, const char* copyId) { CodeBlock::Draw(code, copyId); };
 
             // Section 1: Core Principles
             if ((sSelectedSection == 0 || sSelectedSection == 1) && MatchesFilter("principles primitive kernel inferred rates bare names"))
@@ -1087,10 +1067,10 @@ namespace app
                FormParts::Heading("2. Domains & Reserved Names");
                if (ImGui::BeginTable("##domainstbl", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthFixed, 140.0f);
-                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthFixed, 220.0f);
-                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 80.0f);
+                  ImGui::TableSetupColumn("Rate / Backend", ImGuiTableColumnFlags_WidthStretch, 140.0f);
+                  ImGui::TableSetupColumn("Reserved Names", ImGuiTableColumnFlags_WidthStretch, 220.0f);
+                  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch, 360.0f);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("frame");
@@ -1168,9 +1148,9 @@ namespace app
                FormParts::Heading("5. Operators & Built-in Math Functions");
                if (ImGui::BeginTable("##opstbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthFixed, 140.0f);
-                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthFixed, 240.0f);
-                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, 140.0f);
+                  ImGui::TableSetupColumn("Functions / Operators", ImGuiTableColumnFlags_WidthStretch, 240.0f);
+                  ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch, 360.0f);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("Operators");
@@ -1249,9 +1229,9 @@ namespace app
 
                if (ImGui::BeginTable("##branchtbl", 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
                {
-                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthFixed, 140.0f);
-                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch);
+                  ImGui::TableSetupColumn("Domain", ImGuiTableColumnFlags_WidthStretch, 90.0f);
+                  ImGui::TableSetupColumn("Lowering", ImGuiTableColumnFlags_WidthStretch, 140.0f);
+                  ImGui::TableSetupColumn("Cost", ImGuiTableColumnFlags_WidthStretch, 300.0f);
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("frame");
@@ -1333,6 +1313,7 @@ namespace app
             }
 
             // i18n-skip-end
+            ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
          }
@@ -1728,35 +1709,35 @@ namespace app
             {
                ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
                ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
-               FormParts::PushReferenceStyle();
                // i18n-skip-begin: command vocabulary
-               ImGui::TextDisabled("Look       graph  explain  params <node>  selection  status  nodes  describe <type>");
-               ImGui::TextDisabled("Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo");
-               ImGui::TextDisabled("Patch      new  recent  open  save  validate  canonicalize  apply");
-               ImGui::TextDisabled("Play       play  stop  rewind  seek <seconds>  tempo <bpm>");
-               ImGui::TextDisabled("Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set");
-               ImGui::TextDisabled("See        shot <node> [out.png]  frame  render  audio");
-               ImGui::TextDisabled("Code       code kinds|new|check|push|pull|watch|errors|docs|examples");
-               ImGui::TextDisabled("Generate   patch recipes|new|check|layout|apply");
-               ImGui::TextDisabled("App        panel  settings  show  view  quit");
-               ImGui::TextDisabled("Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run");
-               ImGui::Spacing();
-               ImGui::TextDisabled("Outside the panel (macOS):  /Applications/Infinite.app/Contents/MacOS/Infinite --cli graph");
+               CodeBlock::Draw(
+                  "Look       graph  explain  params <node>  selection  status  nodes  describe <type>\n"
+                  "Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo\n"
+                  "Patch      new  recent  open  save  validate  canonicalize  apply\n"
+                  "Play       play  stop  rewind  seek <seconds>  tempo <bpm>\n"
+                  "Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set\n"
+                  "See        shot <node> [out.png]  frame  render  audio\n"
+                  "Code       code kinds|new|check|push|pull|watch|errors|docs|examples\n"
+                  "Generate   patch recipes|new|check|layout|apply\n"
+                  "App        panel  settings  show  view  quit\n"
+                  "Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run",
+                  "cb_verbs");
+               ImGui::TextDisabled("%s", T("Outside the panel (macOS):"));
+               CodeBlock::Draw("/Applications/Infinite.app/Contents/MacOS/Infinite --cli graph", "cb_outside");
                // i18n-skip-end
-               FormParts::PopReferenceStyle();
                ImGui::TreePop();
             }
             if (ImGui::TreeNode(T("Headless engine")))
             {
                ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
-               FormParts::PushReferenceStyle();
                // i18n-skip-begin: command vocabulary
-               ImGui::TextDisabled("Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png");
-               ImGui::TextDisabled("Infinite --render hello.inf hello.mp4 --duration 4 --fps 30");
-               ImGui::TextDisabled("Infinite --frames-dir hello.inf out/ --duration 4 --fps 30");
-               ImGui::TextDisabled("Infinite --version");
+               CodeBlock::Draw(
+                  "Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png\n"
+                  "Infinite --render hello.inf hello.mp4 --duration 4 --fps 30\n"
+                  "Infinite --frames-dir hello.inf out/ --duration 4 --fps 30\n"
+                  "Infinite --version",
+                  "cb_headless");
                // i18n-skip-end
-               FormParts::PopReferenceStyle();
                ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
                ImGui::TreePop();
             }

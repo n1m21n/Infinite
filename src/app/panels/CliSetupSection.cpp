@@ -6,6 +6,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
 #include "platform/AppPaths.h"
@@ -215,14 +216,14 @@ namespace app
       if (ImGui::TreeNode(T("Show commands")))
       {
          ImGui::TextDisabled("%s", T("Connect terminal & agent types this line, and runs the script below it:"));
-         ImGui::TextUnformatted(v.setupLine.c_str());
+         CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
          if (v.showInstall)
          {
             ImGui::TextDisabled("%s", T("Install types:"));
-            ImGui::TextUnformatted(v.installLine.c_str());
+            CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
          }
          ImGui::TextDisabled("%s", T("Start agent types:"));
-         ImGui::TextWrapped("%s", v.startLine.c_str());
+         CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
          ImGui::TextDisabled("%s", T("The script (the exact text that runs):"));
          static std::string sScript;
          static std::string sScriptFor;
@@ -233,6 +234,8 @@ namespace app
             sScript = BuildScript(os, exe, *agent, paths.status);
          }
          ImGui::InputTextMultiline("##cli_script", sScript.data(), sScript.size() + 1, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 14), ImGuiInputTextFlags_ReadOnly);
+         if (FormParts::Button(L("Copy script")))
+            ImGui::SetClipboardText(sScript.c_str());
          ImGui::TreePop();
       }
 
