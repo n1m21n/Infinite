@@ -6,7 +6,7 @@ Skills to load before building: `node-ui-pillars`, `windows-parity`, `linux-pari
 
 | Block | What | State |
 |---|---|---|
-| A | Infinite side: Bluetooth link, packet decoder, `Apple Watch` node, gestures, help, selftest | not started |
+| A | Infinite side: Bluetooth link, packet decoder, `Apple Watch` node, gestures, help, selftest | built on `feature/watch-a`, WATCHPACKETTEST + WATCHNODETEST pass; not merged. For Block B: the Mac also exposes a 4th GATT characteristic `name` (9A1F0004, write: the watch sends its display name), and the watch must subscribe to `control` (9A1F0003) or the Mac treats it as gone |
 | B | watchOS app "Infinite Remote": sensors, crown, touch pad, double tap, Bluetooth sender | not started |
 | C | Haptics back to the wrist, Windows + Linux link, TestFlight + App Store | not started |
 
