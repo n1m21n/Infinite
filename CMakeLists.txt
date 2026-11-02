@@ -567,6 +567,7 @@ set(COMMON_SOURCES
     src/app/selftest/WatchTests.cpp
     src/core/WatchPacket.cpp
     src/platform/WatchLink.cpp
+    src/app/panels/WatchSetupWindow.cpp
     src/platform/WatchSetup.cpp
     src/platform/WatchSetupSystem.cpp
     src/app/selftest/PlatformTests.cpp
@@ -1858,4 +1859,24 @@ if(APPLE)
     set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
+endif()
+
+# Apple Watch app source (docs/plans/apple-watch/README.md, D-B1): the whole apps/watch folder ships in
+# Infinite.app/Contents/Resources/WatchRemote, with the Xcode project generated here by xcodegen so users need
+# neither a repo clone nor xcodegen. Without xcodegen on the build machine the bundle carries sources only and the
+# "Set up watch app" window says the project is missing.
+if(APPLE)
+    set(WATCH_REMOTE_DST "$<TARGET_BUNDLE_CONTENT_DIR:Infinite>/Resources/WatchRemote")
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove_directory "${WATCH_REMOTE_DST}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/apps/watch" "${WATCH_REMOTE_DST}"
+        COMMENT "Copying the watch app source into the bundle")
+    find_program(INFINITE_XCODEGEN xcodegen)
+    if(INFINITE_XCODEGEN)
+        add_custom_command(TARGET Infinite POST_BUILD
+            COMMAND "${INFINITE_XCODEGEN}" generate --quiet --spec "${WATCH_REMOTE_DST}/project.yml" --project "${WATCH_REMOTE_DST}"
+            COMMENT "Generating the watch app Xcode project")
+    else()
+        message(WARNING "xcodegen not found: this build ships the watch app without its Xcode project (brew install xcodegen)")
+    endif()
 endif()

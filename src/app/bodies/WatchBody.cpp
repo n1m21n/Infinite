@@ -34,6 +34,24 @@ namespace app
       ModSlider("range", &n->range, 15.0f, 180.0f, "%.0f", colW);
       ImGui::EndGroup();
 
+      NodeSeparator("watch app", colW * 2 + gutter);
+      WatchSetupTick();
+      const WatchSetupCardInfo setup = WatchSetupCard();
+      ImGui::BeginGroup();
+      if (ActionButton::Draw("Set up watch app", ImVec2(colW, 0)))
+      {
+         gWatchSetupOpen = true;
+         WatchSetupRefreshSoon();
+      }
+      ImGui::EndGroup();
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+      if (setup.reinstallDue && !setup.running && ActionButton::Draw("Reinstall", ImVec2(colW, 0), ActionButton::Kind::Primary))
+         WatchSetupReinstall();
+      ImGui::EndGroup();
+      if (!setup.line.empty())
+         ImGui::TextDisabled("%s", setup.line.c_str());
+
       NodeSeparator("outputs", colW * 2 + gutter);
       DrawOutputMeters(n, colW, 2, gutter);
    }

@@ -418,14 +418,14 @@ namespace app
 
       clock += 5 * 86400;
       check(list.DaysLeft() == 2 && list.ReinstallDue() && list.ExpiryText() == "watch app expires in 2 days", "5 days later: reinstall is offered");
-      clock += 86400 - 100;
+      clock += 86400 + 100;
       check(list.DaysLeft() == 1 && list.ExpiryText() == "watch app expires in 1 day", "singular day");
       clock += 3 * 86400;
       check(list.DaysLeft() == 0 && list.ExpiryText() == "watch app has expired" && list.ReinstallDue(), "expired");
 
       {
          // the date survives a restart
-         Checklist again(std::unique_ptr<IToolchain>(new FakeTools()), stateFile, [&] { return clock - 6 * 86400; });
+         Checklist again(std::unique_ptr<IToolchain>(new FakeTools()), stateFile, [&] { return (time_t)1000000 + 6 * 86400 + 100; });
          check(again.DaysLeft() == 1, "install date is kept in the state file");
       }
 
