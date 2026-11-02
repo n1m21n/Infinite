@@ -82,6 +82,7 @@ Open `~/Desktop/Infinite-dev.app`. Add 3+ objects to a 3D View. Right-click empt
 - [ ] Render tab > Output > Projection = Cylindrical 360: verticals stay straight; latitude rows trim the strip
 - [ ] Projection = Fisheye dome, Lens = Equisolid, Dome angle 300: wider than a half sphere, edges squeeze less than Equidistant
 - [ ] Ctrl+I inverts the selection (once); Shift+Keypad 4 / 6 rolls the view
+- [ ] Rigging R1: drop a skinned .glb (Mixamo or Blender export): it plays its first clip with the transport, stops when paused; Clip, Speed, Phase, Sync and each morph slider move it; an LFO on Phase scrubs it; Displacement after it follows the pose
 
 ## Keymap
 - [ ] Every row marked Same in docs/plans/3d-view/keymap.md does what Blender does

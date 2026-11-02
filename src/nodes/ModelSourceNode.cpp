@@ -9,6 +9,7 @@
 #include "GltfImport.h"
 #include "Platform.h"
 #include "PlyPoints.h"
+#include "Skinning.h"
 #include "Transport.h"
 
 namespace
@@ -116,6 +117,34 @@ bool ModelSourceNode::Load(const std::string& path)
          mMesh.vertices.push_back(v);
       }
 
+      mRig = GltfImport::GltfDecodePackage();
+      if (Skinning::HasRig(*pkg))
+      {
+         mRig.vertices = pkg->vertices;
+         mRig.skinJoints = pkg->skinJoints;
+         mRig.skinWeights = pkg->skinWeights;
+         mRig.joints = pkg->joints;
+         mRig.clips = pkg->clips;
+         mRig.morphNames = pkg->morphNames;
+         mRig.morphDeltas = pkg->morphDeltas;
+         mRig.morphDefaults = pkg->morphDefaults;
+         // A newly picked file starts on its first clip with the file's own
+         // morph weights; a patch reopening the same path keeps its values.
+         if (path != mPath)
+         {
+            clip = mRig.clips.empty() ? 0 : 1;
+            for (int i = 0; i < kMaxMorphs; i++)
+               morph[i] = i < (int)mRig.morphDefaults.size() ? mRig.morphDefaults[i] : 0.0f;
+         }
+         std::string rig;
+         if (!mRig.joints.empty())
+            rig = std::to_string(mRig.joints.size()) + " joints, " + std::to_string(mRig.clips.size()) + " clips";
+         if (!mRig.morphDeltas.empty())
+            rig += (rig.empty() ? "" : ", ") + std::to_string(mRig.morphDeltas.size()) +
+                   (mRig.morphDeltas.size() == 1 ? " morph" : " morphs");
+         note += " (" + rig + ")";
+      }
+
       if (pkg->hadMultipleMaterials)
          note += " (first of multiple materials)";
       if (pkg->hadMultipleUVSets)
@@ -159,6 +188,8 @@ bool ModelSourceNode::Load(const std::string& path)
       }
    }
 
+   if (!isGltf || cloud != nullptr)
+      mRig = GltfImport::GltfDecodePackage();
    if (cloud == nullptr)
    {
       mIsPoints = false;
@@ -167,6 +198,8 @@ bool ModelSourceNode::Load(const std::string& path)
    Normalize();
    mPath = path;
    mMeshRevision = NextMeshRevision();
+   mPoseKey.clear();
+   mPosedTime = 0.0f;
    mAppliedPointSize = -1.0f; // ApplyPointSize writes the scales and moves the point revision
 
    const size_t slash = path.find_last_of('/');
@@ -208,6 +241,9 @@ void ModelSourceNode::Normalize()
    // Matched to the primitives, which all sit inside a unit box, so an imported
    // model lands at a comparable size to a Cube rather than dwarfing it.
    const float scale = (normalizeScale && extent > 1e-6f) ? (1.0f / extent) : 1.0f;
+   mFitScale = scale;
+   for (int k = 0; k < 3; k++)
+      mFitCentre[k] = recenter ? centre[k] : 0.0f;
 
    for (Vertex& v : mMesh.vertices)
    {
@@ -336,4 +372,65 @@ void ModelSourceNode::CookIfNeeded(int frameId)
 
    if (mTextureInput.IsConnected())
       mTextureInput.Pull(frameId);
+
+   UpdatePose();
+}
+
+std::vector<std::string> ModelSourceNode::ClipNames() const
+{
+   std::vector<std::string> names{ "rest pose" };
+   for (const GltfImport::GltfClip& c : mRig.clips)
+      names.push_back(c.name);
+   return names;
+}
+
+void ModelSourceNode::ApplyFit(std::vector<Vertex>& out, const std::vector<Platform::ModelVertex>& src) const
+{
+   out.resize(src.size());
+   for (size_t i = 0; i < src.size(); i++)
+   {
+      Vertex& v = out[i];
+      v.px = (src[i].px - mFitCentre[0]) * mFitScale;
+      v.py = (src[i].py - mFitCentre[1]) * mFitScale;
+      v.pz = (src[i].pz - mFitCentre[2]) * mFitScale;
+      v.nx = src[i].nx; v.ny = src[i].ny; v.nz = src[i].nz;
+      v.u = src[i].u; v.v = src[i].v;
+   }
+}
+
+void ModelSourceNode::UpdatePose()
+{
+   if (!HasRig() || mIsPoints)
+      return;
+
+   const int clipIndex = std::clamp(clip, 0, (int)mRig.clips.size()) - 1;
+   float time = 0.0f;
+   if (clipIndex >= 0)
+   {
+      const float duration = mRig.clips[clipIndex].duration;
+      const Transport& tr = Transport::Instance();
+      const double run = clipSync == 1
+         ? tr.Beats() / std::max(0.01, (double)clipBeats) * duration
+         : tr.Seconds();
+      time = (float)std::fmod(run * clipSpeed, duration > 0.0f ? (double)duration : 1.0) + clipPhase * duration;
+   }
+
+   std::vector<float> weights(mRig.morphDeltas.size(), 0.0f);
+   for (int i = 0; i < MorphCount(); i++)
+      weights[i] = morph[i];
+
+   std::vector<float> key;
+   key.reserve(2 + weights.size());
+   key.push_back((float)clipIndex);
+   key.push_back(time);
+   key.insert(key.end(), weights.begin(), weights.end());
+   if (key == mPoseKey)
+      return;
+   mPoseKey = key;
+   mPosedTime = time;
+
+   std::vector<Platform::ModelVertex> posed;
+   Skinning::Evaluate(mRig, clipIndex, time, weights, posed);
+   ApplyFit(mMesh.vertices, posed);
+   mMeshRevision = NextMeshRevision();
 }

@@ -1068,6 +1068,32 @@ namespace app
             n->Load(n->Path());
       }
 
+      // Skinned / morphing glTF: clip, its time, and one weight per morph.
+      if (n->HasRig() || gParamRegisterOnly)
+      {
+         NodeSeparator("rig");
+         const std::vector<std::string> clips = n->ClipNames();
+         if (clips.size() > 1 || gParamRegisterOnly)
+         {
+            DropdownButton("clip", clips, std::clamp(n->clip, 0, (int)clips.size() - 1),
+                           [n](int i) { PushUndoCheckpoint(); n->clip = i; });
+            ModSlider("speed", &n->clipSpeed, -2.0f, 4.0f);
+            ModSlider("phase", &n->clipPhase, 0.0f, 1.0f);
+            DropdownButton("sync", { "seconds", "beats" }, n->clipSync,
+                           [n](int i) { PushUndoCheckpoint(); n->clipSync = i; }, kParamWidth, true, true);
+            if (n->clipSync == 1 || gParamRegisterOnly)
+               ModSlider("loop beats", &n->clipBeats, 0.25f, 64.0f);
+         }
+         const int morphs = gParamRegisterOnly ? ModelSourceNode::kMaxMorphs : n->MorphCount();
+         for (int i = 0; i < morphs; i++)
+         {
+            ImGui::PushID(i);
+            const std::string label = i < n->MorphCount() ? n->MorphName(i) : "morph " + std::to_string(i + 1);
+            ModSlider(label.c_str(), &n->morph[i], 0.0f, 1.0f);
+            ImGui::PopID();
+         }
+      }
+
       // A face-less .ply loads as points; their size is the only point knob.
       if (n->IsPointCloud() || gParamRegisterOnly)
       {

@@ -5923,6 +5923,7 @@ bool RunFormulaShadertoyTest();
 bool RunVmpcTest();
 bool RunRender3DHdrTest();
 bool RunRender3DPanoTest();
+bool RunRigTest();
 bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;
 

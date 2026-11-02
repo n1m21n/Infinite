@@ -1,5 +1,6 @@
 #include "GltfImport.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -197,6 +198,210 @@ namespace
          else { v.nx = 0; v.ny = 0; v.nz = 1; }
       }
    }
+
+   // Rotation part of a column-major matrix with no shear, as a unit
+   // quaternion (x, y, z, w); scale is divided out first.
+   void MatrixToTrs(const float m[16], float t[3], float r[4], float sc[3])
+   {
+      t[0] = m[12]; t[1] = m[13]; t[2] = m[14];
+      for (int c = 0; c < 3; c++)
+         sc[c] = std::sqrt(m[c * 4] * m[c * 4] + m[c * 4 + 1] * m[c * 4 + 1] + m[c * 4 + 2] * m[c * 4 + 2]);
+      float a[3][3]; // a[row][col]
+      for (int c = 0; c < 3; c++)
+         for (int row = 0; row < 3; row++)
+            a[row][c] = sc[c] > 1e-12f ? m[c * 4 + row] / sc[c] : 0.0f;
+      const float tr = a[0][0] + a[1][1] + a[2][2];
+      if (tr > 0.0f)
+      {
+         const float k = std::sqrt(tr + 1.0f) * 2.0f;
+         r[3] = 0.25f * k; r[0] = (a[2][1] - a[1][2]) / k; r[1] = (a[0][2] - a[2][0]) / k; r[2] = (a[1][0] - a[0][1]) / k;
+      }
+      else if (a[0][0] > a[1][1] && a[0][0] > a[2][2])
+      {
+         const float k = std::sqrt(1.0f + a[0][0] - a[1][1] - a[2][2]) * 2.0f;
+         r[3] = (a[2][1] - a[1][2]) / k; r[0] = 0.25f * k; r[1] = (a[0][1] + a[1][0]) / k; r[2] = (a[0][2] + a[2][0]) / k;
+      }
+      else if (a[1][1] > a[2][2])
+      {
+         const float k = std::sqrt(1.0f + a[1][1] - a[0][0] - a[2][2]) * 2.0f;
+         r[3] = (a[0][2] - a[2][0]) / k; r[0] = (a[0][1] + a[1][0]) / k; r[1] = 0.25f * k; r[2] = (a[1][2] + a[2][1]) / k;
+      }
+      else
+      {
+         const float k = std::sqrt(1.0f + a[2][2] - a[0][0] - a[1][1]) * 2.0f;
+         r[3] = (a[1][0] - a[0][1]) / k; r[0] = (a[0][2] + a[2][0]) / k; r[1] = (a[1][2] + a[2][1]) / k; r[2] = 0.25f * k;
+      }
+   }
+
+   void MulMat(const float a[16], const float b[16], float out[16])
+   {
+      float o[16];
+      for (int c = 0; c < 4; c++)
+         for (int row = 0; row < 4; row++)
+         {
+            float v = 0.0f;
+            for (int k = 0; k < 4; k++)
+               v += a[k * 4 + row] * b[c * 4 + k];
+            o[c * 4 + row] = v;
+         }
+      std::memcpy(out, o, sizeof(o));
+   }
+
+   // The first skin (preferring the one on the node that shows mesh 0), its
+   // joints parent-first, and every clip that moves those joints or the
+   // mesh's morph weights.
+   void ReadRig(const cgltf_data* data, const cgltf_primitive& prim, GltfImport::GltfDecodePackage& pkg)
+   {
+      const cgltf_mesh* mesh0 = &data->meshes[0];
+      const size_t vertexCount = pkg.vertices.size();
+
+      // Morph targets (positions only).
+      for (cgltf_size t = 0; t < prim.targets_count; t++)
+      {
+         std::vector<float> deltas(vertexCount * 3, 0.0f);
+         for (cgltf_size a = 0; a < prim.targets[t].attributes_count; a++)
+         {
+            const cgltf_attribute& attr = prim.targets[t].attributes[a];
+            if (attr.type == cgltf_attribute_type_position && attr.data->count == vertexCount)
+               cgltf_accessor_unpack_floats(attr.data, deltas.data(), deltas.size());
+         }
+         pkg.morphDeltas.push_back(std::move(deltas));
+         pkg.morphNames.push_back(t < mesh0->target_names_count && mesh0->target_names[t] != nullptr
+                                     ? std::string(mesh0->target_names[t]) : "morph " + std::to_string(t + 1));
+         pkg.morphDefaults.push_back(t < mesh0->weights_count ? mesh0->weights[t] : 0.0f);
+      }
+
+      const cgltf_skin* skin = nullptr;
+      for (cgltf_size i = 0; i < data->nodes_count && skin == nullptr; i++)
+         if (data->nodes[i].mesh == mesh0 && data->nodes[i].skin != nullptr)
+            skin = data->nodes[i].skin;
+      if (skin == nullptr && data->skins_count > 0)
+         skin = &data->skins[0];
+
+      const cgltf_accessor* jointAcc = nullptr;
+      const cgltf_accessor* weightAcc = nullptr;
+      for (cgltf_size i = 0; i < prim.attributes_count; i++)
+      {
+         const cgltf_attribute& attr = prim.attributes[i];
+         if (attr.index != 0)
+            continue;
+         if (attr.type == cgltf_attribute_type_joints) jointAcc = attr.data;
+         else if (attr.type == cgltf_attribute_type_weights) weightAcc = attr.data;
+      }
+
+      std::vector<const cgltf_node*> nodes; // joint index -> node, parent-first
+      std::vector<int> fileToOrdered;
+      if (skin != nullptr && skin->joints_count > 0 && jointAcc != nullptr && weightAcc != nullptr &&
+          jointAcc->count == vertexCount && weightAcc->count == vertexCount)
+      {
+         auto jointOf = [&](const cgltf_node* n) {
+            for (cgltf_size j = 0; j < skin->joints_count; j++)
+               if (skin->joints[j] == n)
+                  return (int)j;
+            return -1;
+         };
+         auto depth = [](const cgltf_node* n) { int d = 0; for (; n->parent != nullptr; n = n->parent) d++; return d; };
+         std::vector<int> order(skin->joints_count);
+         for (size_t j = 0; j < order.size(); j++)
+            order[j] = (int)j;
+         std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return depth(skin->joints[a]) < depth(skin->joints[b]); });
+         fileToOrdered.assign(order.size(), 0);
+         for (size_t k = 0; k < order.size(); k++)
+            fileToOrdered[order[k]] = (int)k;
+
+         for (size_t k = 0; k < order.size(); k++)
+         {
+            const cgltf_node* n = skin->joints[order[k]];
+            nodes.push_back(n);
+            GltfImport::GltfJoint j;
+            j.name = n->name != nullptr ? n->name : "joint " + std::to_string(k + 1);
+            float local[16];
+            cgltf_node_transform_local(n, local);
+            MatrixToTrs(local, j.t, j.r, j.s);
+            if (!n->has_matrix)
+            {
+               if (n->has_rotation) std::memcpy(j.r, n->rotation, sizeof(j.r));
+               if (n->has_scale) std::memcpy(j.s, n->scale, sizeof(j.s));
+            }
+            const cgltf_node* p = n->parent;
+            while (p != nullptr && jointOf(p) < 0)
+            {
+               float pl[16];
+               cgltf_node_transform_local(p, pl);
+               MulMat(pl, j.between, j.between);
+               p = p->parent;
+            }
+            j.parent = p != nullptr ? fileToOrdered[jointOf(p)] : -1;
+            if (skin->inverse_bind_matrices != nullptr)
+               cgltf_accessor_read_float(skin->inverse_bind_matrices, order[k], j.inverseBind, 16);
+            pkg.joints.push_back(j);
+         }
+
+         pkg.skinJoints.resize(vertexCount * 4);
+         pkg.skinWeights.resize(vertexCount * 4);
+         for (size_t v = 0; v < vertexCount; v++)
+         {
+            cgltf_uint ji[4] = { 0, 0, 0, 0 };
+            cgltf_accessor_read_uint(jointAcc, v, ji, 4);
+            cgltf_accessor_read_float(weightAcc, v, &pkg.skinWeights[v * 4], 4);
+            for (int k = 0; k < 4; k++)
+               pkg.skinJoints[v * 4 + k] = (unsigned short)(ji[k] < fileToOrdered.size() ? fileToOrdered[ji[k]] : 0);
+         }
+      }
+
+      for (cgltf_size a = 0; a < data->animations_count; a++)
+      {
+         const cgltf_animation& anim = data->animations[a];
+         GltfImport::GltfClip clip;
+         clip.name = anim.name != nullptr ? anim.name : "clip " + std::to_string(a + 1);
+         for (cgltf_size c = 0; c < anim.channels_count; c++)
+         {
+            const cgltf_animation_channel& ch = anim.channels[c];
+            if (ch.target_node == nullptr || ch.sampler == nullptr)
+               continue;
+            GltfImport::GltfChannel out;
+            switch (ch.target_path)
+            {
+            case cgltf_animation_path_type_translation: out.path = GltfImport::GltfChannel::kTranslation; out.width = 3; break;
+            case cgltf_animation_path_type_rotation: out.path = GltfImport::GltfChannel::kRotation; out.width = 4; break;
+            case cgltf_animation_path_type_scale: out.path = GltfImport::GltfChannel::kScale; out.width = 3; break;
+            case cgltf_animation_path_type_weights: out.path = GltfImport::GltfChannel::kWeights; out.width = (int)pkg.morphDeltas.size(); break;
+            default: continue;
+            }
+            if (out.path == GltfImport::GltfChannel::kWeights)
+            {
+               if (ch.target_node->mesh != mesh0 || out.width == 0)
+                  continue;
+            }
+            else
+            {
+               const auto it = std::find(nodes.begin(), nodes.end(), ch.target_node);
+               if (it == nodes.end())
+                  continue;
+               out.joint = (int)(it - nodes.begin());
+            }
+            const cgltf_animation_sampler& sm = *ch.sampler;
+            out.step = sm.interpolation == cgltf_interpolation_type_step;
+            const bool cubic = sm.interpolation == cgltf_interpolation_type_cubic_spline;
+            const size_t keys = sm.input->count;
+            out.times.resize(keys);
+            cgltf_accessor_unpack_floats(sm.input, out.times.data(), keys);
+            std::vector<float> raw(sm.output->count * cgltf_num_components(sm.output->type));
+            cgltf_accessor_unpack_floats(sm.output, raw.data(), raw.size());
+            const size_t perKey = (size_t)out.width * (cubic ? 3 : 1);
+            if (raw.size() < keys * perKey)
+               continue;
+            out.values.resize(keys * out.width);
+            for (size_t k = 0; k < keys; k++)
+               std::memcpy(&out.values[k * out.width], &raw[k * perKey + (cubic ? out.width : 0)], out.width * sizeof(float));
+            if (!out.times.empty())
+               clip.duration = std::max(clip.duration, out.times.back());
+            clip.channels.push_back(std::move(out));
+         }
+         if (!clip.channels.empty())
+            pkg.clips.push_back(std::move(clip));
+      }
+   }
 }
 
 namespace GltfImport
@@ -327,6 +532,8 @@ namespace GltfImport
       if (normAcc == nullptr)
          GenerateNormals(pkg.vertices, pkg.indices);
 
+      ReadRig(data, prim, pkg);
+
       pkg.hadMultipleMaterials = data->materials_count > 1 || mesh.primitives_count > 1 || data->meshes_count > 1;
       pkg.hadMultipleUVSets = uvSetsSeen > 1;
 
@@ -363,7 +570,14 @@ namespace GltfImport
       cgltf_free(data);
 
       size_t bytes = pkg.vertices.size() * sizeof(Platform::ModelVertex) +
-                     pkg.indices.size() * sizeof(unsigned int);
+                     pkg.indices.size() * sizeof(unsigned int) +
+                     pkg.skinJoints.size() * sizeof(unsigned short) + pkg.skinWeights.size() * sizeof(float) +
+                     pkg.joints.size() * sizeof(GltfJoint);
+      for (const auto& d : pkg.morphDeltas)
+         bytes += d.size() * sizeof(float);
+      for (const auto& c : pkg.clips)
+         for (const auto& ch : c.channels)
+            bytes += (ch.times.size() + ch.values.size()) * sizeof(float);
       for (const GltfDecodedImage* img : { &pkg.albedo, &pkg.roughness, &pkg.metallic, &pkg.normalMap,
                                            &pkg.occlusion, &pkg.emissive })
          bytes += img->pixels.size();

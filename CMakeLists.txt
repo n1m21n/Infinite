@@ -565,6 +565,7 @@ set(COMMON_SOURCES
     src/app/selftest/MiscTests.cpp
     src/app/selftest/VmpcTests.cpp
     src/app/selftest/Render3DHdrTests.cpp
+    src/app/selftest/RigTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
@@ -668,6 +669,7 @@ set(COMMON_SOURCES
     src/nodes/PoseTrackNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
+    src/core/Skinning.cpp
     src/audio/AudioEngine.cpp
     src/audio/AudioWorkerPool.cpp
     src/audio/ParamMailbox.cpp
