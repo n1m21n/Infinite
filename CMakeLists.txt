@@ -567,6 +567,7 @@ set(COMMON_SOURCES
     src/app/selftest/Render3DHdrTests.cpp
     src/app/selftest/RigTests.cpp
     src/app/selftest/BakeTests.cpp
+    src/app/selftest/BvhTests.cpp
     src/app/selftest/SculptTests.cpp
     src/app/selftest/ThreeDBench.cpp
     src/app/selftest/FlowTests.cpp
@@ -591,6 +592,7 @@ set(COMMON_SOURCES
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/Bvh.cpp
     src/core/GpuPoints.cpp
     src/core/PlyPoints.cpp
     src/core/DisplaceNoise.cpp
