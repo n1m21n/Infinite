@@ -459,6 +459,21 @@ namespace
       (void)from;
    }
 
+   // The view from before the camera, so toggling the camera off goes back to it (orbiting out starts at the camera).
+   struct { bool set = false; float view[6]; float roll; bool ortho; } sPreCam;
+
+   void EnterCamera()
+   {
+      if (!sCameraView)
+      {
+         ReadView(sPreCam.view);
+         sPreCam.roll = sRoll;
+         sPreCam.ortho = sOrtho;
+         sPreCam.set = true;
+      }
+      sCameraView = true;
+   }
+
    // Leaving a camera keeps the view where it is rather than jumping back.
    void LeaveCamera(bool force)
    {
@@ -1776,9 +1791,16 @@ namespace
       if (scene->activeCamera == 0)
          sPending.what = Pending::Camera;
       else if (sCameraView)
+      {
          LeaveCamera(true);
+         if (sPreCam.set)
+         {
+            sRoll = sPreCam.roll;
+            GlideTo([] { WriteView(sPreCam.view); sOrtho = sPreCam.ortho; });
+         }
+      }
       else
-         sCameraView = true;
+         EnterCamera();
    }
 
    void CameraToView(Scene3DNode* scene)
@@ -1792,7 +1814,7 @@ namespace
       PushUndoCheckpoint("Move camera to view");
       scene->AlignToView(*cam, OrbitView());
       scene->Commit();
-      sCameraView = true;
+      EnterCamera();
    }
 
    void HideSelected(Scene3DNode* scene)
@@ -1936,7 +1958,7 @@ namespace
                   PushUndoCheckpoint("Set 3D View camera");
                   scene->activeCamera = it->id;
                   scene->Commit();
-                  sCameraView = true;
+                  EnterCamera();
                }
       if (command && io.KeyAlt && digit(0))
          CameraToView(scene);
@@ -5346,7 +5368,10 @@ namespace
          scene->activeCamera = id;
       scene->Commit();
       sSel = { id };
-      sCameraView = scene->activeCamera == id;
+      if (scene->activeCamera == id)
+         EnterCamera();
+      else
+         sCameraView = false;
    }
 
    void AddLightNow(Scene3DNode* scene, int type)
