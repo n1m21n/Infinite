@@ -935,4 +935,148 @@ void FrameTest_COOKSWEEPTEST(int frameId, GLFWwindow* window)
    sRows.push_back(row);
    RemoveNodeByIndex(gn->index);
 }
+
+// Render 3D's "show more" fold must never touch modulation: a driven param inside a folded group stays shown and
+// keeps cooking, a collapsed node keeps cooking it, an undriven folded param stays hidden until the fold is
+// pinned open, and the binding plus the pinned state survive save/reload and undo.
+void FrameTest_RENDER3DFOLDTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_RENDER3DFOLDTEST") == nullptr)
+      return;
+   static bool ok = true;
+   static int sRenderIdx = -1, sLfoIdx = -1, sDrivenParam = -1, sHiddenParam = -1;
+   static std::set<int> sSeen;
+   static float sCollapsedFirst = 0.0f;
+   static std::map<std::pair<int, int>, bool> sHiddenState;
+   Modulation& mod = Modulation::Instance();
+   auto bad = [&](const char* what)
+   {
+      printf("RENDER3DFOLDTEST %s FAIL\n", what);
+      ok = false;
+   };
+   auto render = []() -> Render3DNode*
+   {
+      for (GraphNode& gn : gNodes)
+         if (auto* r = dynamic_cast<Render3DNode*>(gn.node.get()))
+            return r;
+      return nullptr;
+   };
+   auto findParam = [&](int nodeIdx, const char* name) -> int
+   {
+      for (const auto& kv : mod.AllKnownParams())
+         if (kv.second.nodeIndex == nodeIdx && kv.second.name == name)
+            return kv.second.paramIndex;
+      return -1;
+   };
+   auto pinDrawn = [&](int nodeIdx, int param) -> bool
+   {
+      auto it = sHiddenState.find({nodeIdx, param});   // hidden = registered but not drawn (gParamRegisterOnly)
+      return it != sHiddenState.end() && !it->second;
+   };
+   auto resolve = [&]()
+   {
+      sRenderIdx = sLfoIdx = -1;
+      for (GraphNode& gn : gNodes)
+      {
+         if (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr) sRenderIdx = gn.index;
+         if (dynamic_cast<LFONode*>(gn.node.get()) != nullptr) sLfoIdx = gn.index;
+      }
+      sDrivenParam = findParam(sRenderIdx, "bloom threshold");
+      sHiddenParam = findParam(sRenderIdx, "softness");
+   };
+
+   if (frameId == 4)
+   {
+      NewPatch();
+      // RegisterParam calls the probe right after appending the control to FrameParams, so back() is that control.
+      Modulation::Instance().SetStateProbe([](bool& disabled, bool& hidden) {
+         disabled = false;
+         hidden = gParamRegisterOnly;
+         const ParamRef& ref = Modulation::Instance().FrameParams().back();
+         sHiddenState[{ref.nodeIndex, ref.paramIndex}] = gParamRegisterOnly;
+      });
+      GraphNode* gn = SpawnNode("Render 3D", "3D", 0.0f, 0.0f);
+      if (gn != nullptr)
+      {
+         gn->showParams = true;
+         gn->showAdvancedParams = false;
+      }
+      SpawnNode("LFO", "Modulators", -400.0f, 0.0f);
+      gRequestFitView = true;
+   }
+   if (frameId == 8)
+   {
+      resolve();
+      if (sRenderIdx < 0 || sLfoIdx < 0 || sDrivenParam < 0 || sHiddenParam < 0)
+         bad("fixture: params did not register");
+      else
+         mod.Bind(sRenderIdx, sDrivenParam, sLfoIdx, 0);
+   }
+   if (frameId >= 10 && frameId < 22 && render() != nullptr)
+   {
+      // Folded and driven: the group shows itself, its pin is drawn, and the LFO moves the value.
+      sSeen.insert((int)(render()->bloomThreshold * 1000.0f));
+      if (frameId == 12)
+      {
+         if (!pinDrawn(sRenderIdx, sDrivenParam)) bad("driven folded param lost its pin");
+         if (pinDrawn(sRenderIdx, sHiddenParam)) bad("undriven folded param is shown while folded");
+      }
+   }
+   if (frameId == 22)
+   {
+      if (sSeen.size() < 3) bad("driven folded param did not change");
+      GraphNode* gn = FindNodeByIndex(sRenderIdx);
+      if (gn != nullptr)
+         gn->showParams = false; // collapsed node: body runs register-only
+      sSeen.clear();
+      sCollapsedFirst = render() != nullptr ? render()->bloomThreshold : 0.0f;
+   }
+   if (frameId > 22 && frameId < 34 && render() != nullptr)
+      sSeen.insert((int)(render()->bloomThreshold * 1000.0f));
+   if (frameId == 34)
+   {
+      if (sSeen.size() < 3) bad("collapsed node stopped cooking the driven param");
+      (void)sCollapsedFirst;
+      if (GraphNode* gn = FindNodeByIndex(sRenderIdx))
+      {
+         gn->showParams = true;
+         gn->showAdvancedParams = true; // pinned open, saved with the patch
+      }
+      SavePatchTo(TmpPath("infinite_render3dfoldtest.infinite"));
+   }
+   if (frameId == 36)
+   {
+      NewPatch();
+      LoadPatchFrom(TmpPath("infinite_render3dfoldtest.infinite"));
+   }
+   if (frameId == 40)
+   {
+      resolve();
+      GraphNode* gn = FindNodeByIndex(sRenderIdx);
+      if (gn == nullptr || sDrivenParam < 0 || sHiddenParam < 0)
+         bad("reload: node or params missing");
+      else
+      {
+         if (!gn->showAdvancedParams) bad("reload: pinned fold state lost");
+         if (!mod.IsModulated(sRenderIdx, sDrivenParam)) bad("reload: modulation lost");
+         if (!pinDrawn(sRenderIdx, sHiddenParam)) bad("pinned open: folded param not shown");
+         // Fold closed again, then undo a delete of the cable.
+         gn->showAdvancedParams = false;
+         PushUndoCheckpoint();
+         mod.Unbind(sRenderIdx, sDrivenParam);
+      }
+   }
+   if (frameId == 42)
+   {
+      if (pinDrawn(sRenderIdx, sHiddenParam)) bad("fold closed: undriven param still shown");
+      Undo();
+   }
+   if (frameId == 46)
+   {
+      resolve();
+      if (!mod.IsModulated(sRenderIdx, sDrivenParam)) bad("undo did not restore the modulation");
+      Modulation::Instance().SetStateProbe(nullptr);
+      printf("%s\n", ok ? "RENDER3DFOLDTEST OK" : "RENDER3DFOLDTEST FAIL");
+   }
+}
 }

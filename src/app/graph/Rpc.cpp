@@ -531,7 +531,7 @@ namespace app
          // (GraphNode.h) default off so a fresh node leads with its preview -
          // force them open so the full param body actually renders.
          gn->showParams = true;
-         gn->showAdvancedParams = true;
+         gn->showAdvancedParams = params.value("advanced", true);   // false: the "show less" look a fresh node has
          outResult = json::object();
          return true;
       }
