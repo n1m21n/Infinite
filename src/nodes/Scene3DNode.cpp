@@ -770,6 +770,7 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Int("projection", mRender.projection);
    v.Float("domeAngle", mRender.domeAngle);
    v.Float("domeTilt", mRender.domeTilt);
+   v.Int("fisheyeLens", mRender.fisheyeLens);
    v.Float("latMin", mRender.latMin);
    v.Float("latMax", mRender.latMax);
    v.Float("lonMin", mRender.lonMin);

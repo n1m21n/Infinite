@@ -6,9 +6,14 @@
 //                   middle of the picture. 2:1 is what VR players expect.
 //   Cubemap 3x2   - top row right, left, up; bottom row down, front, back
 //                   (the Facebook 360 3x2 order), each cell a 90 degree view.
-//   Fisheye dome  - equidistant fisheye in a circle the height of the output.
-//                   Tilt 0 is a planetarium dome (centre straight up, front at
-//                   the bottom of the circle); 90 looks straight ahead.
+//   Fisheye dome  - a fisheye in a circle the height of the output, 60 to 360
+//                   degrees across, equidistant (angle grows with radius) or
+//                   equisolid (equal areas, a real fisheye lens). Tilt 0 is a
+//                   planetarium dome (centre straight up, front at the bottom
+//                   of the circle); 90 looks straight ahead.
+//   Cylindrical   - longitude across like the 360, but straight up the frame
+//                   is tan(latitude), so verticals stay straight: the strip
+//                   panorama a rotating camera takes. Latitude stops at 80.
 // With HDR on, the faces are drawn untonemapped and the bloom/tonemap finish
 // runs once on the unwrapped picture, so it has no seams at the cube's edges.
 #include "Geometry3DNodes.h"
@@ -31,12 +36,13 @@ namespace
 
    const char* kPanoBody =
       "uniform samplerCube uCube;\n"
-      "uniform int uLayout;\n" // 0 equirect, 1 cubemap 3x2, 2 fisheye
+      "uniform int uLayout;\n" // 0 equirect, 1 cubemap 3x2, 2 fisheye, 3 cylindrical
       "uniform vec4 uLatLon;\n" // equirect: latitude min, max, longitude min, max, degrees
       "uniform int uDepth;\n"  // 1: the cube holds depth, outside the dome is far
       "uniform vec2 uSize;\n"
       "uniform float uDome;\n" // degrees across the dome circle
       "uniform float uTilt;\n" // degrees
+      "uniform int uLens;\n"   // fisheye: 0 equidistant, 1 equisolid
       "const float PI = 3.14159265;\n"
       // Directions are in the camera's level frame: x right, y up, -z forward.
       "bool dirFor(vec2 uv, out vec3 d) {\n"
@@ -45,6 +51,12 @@ namespace
       "      float lon = radians(mix(uLatLon.z, uLatLon.w, uv.x));\n"
       "      float lat = radians(mix(uLatLon.x, uLatLon.y, uv.y));\n"
       "      d = vec3(sin(lon) * cos(lat), sin(lat), -cos(lon) * cos(lat));\n"
+      "      return true;\n"
+      "   }\n"
+      "   if (uLayout == 3) {\n"
+      "      float lon = radians(mix(uLatLon.z, uLatLon.w, uv.x));\n"
+      "      float y = mix(tan(radians(uLatLon.x)), tan(radians(uLatLon.y)), uv.y);\n"
+      "      d = vec3(sin(lon), y, -cos(lon));\n"
       "      return true;\n"
       "   }\n"
       "   if (uLayout == 1) {\n"
@@ -65,7 +77,8 @@ namespace
       "   vec2 p = (uv * 2.0 - 1.0) * uSize / m;\n"
       "   float rr = length(p);\n"
       "   if (rr > 1.0) return false;\n"
-      "   float th = rr * radians(uDome) * 0.5;\n"
+      "   float th = uLens == 1 ? 2.0 * asin(min(1.0, rr * sin(radians(uDome) * 0.25)))\n"
+      "                         : rr * radians(uDome) * 0.5;\n"
       "   float t = radians(uTilt);\n"
       "   vec3 c = vec3(0.0, cos(t), -sin(t));\n" // the dome's centre
       "   vec3 y = vec3(0.0, sin(t), cos(t));\n"  // up in the picture
@@ -143,10 +156,10 @@ void Render3DNode::CookPano(int frameId)
    }
    const int w = GLUtil::TargetSide(width, 16);
    const int h = GLUtil::TargetSide(height, 16);
-   const float dome = std::clamp(domeAngle, 180.0f, 220.0f);
+   const float dome = std::clamp(domeAngle, 60.0f, 360.0f);
    // A face side that matches the output's pixel density at the centre of view.
    int side = 0;
-   if (projection == kEquirect)   // a narrower span puts more of the frame on each face
+   if (projection == kEquirect || projection == kCylindrical) // a narrower span puts more of the frame on each face
       side = (int)std::lround((float)w / 4.0f * 360.0f / std::max(1.0f, std::abs(lonMax - lonMin)));
    else if (projection == kCubemap3x2)
       side = std::max(w / 3, h / 2);
@@ -237,7 +250,8 @@ void Render3DNode::CookPano(int frameId)
    glDisable(GL_BLEND);
    glDisable(GL_SCISSOR_TEST);
    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-   const int layout = projection == kEquirect ? 0 : (projection == kCubemap3x2 ? 1 : 2);
+   const int layout = projection == kEquirect ? 0 : projection == kCubemap3x2 ? 1 : projection == kCylindrical ? 3 : 2;
+   const float latCap = projection == kCylindrical ? 80.0f : 90.0f; // tan(90) is infinitely tall
    auto resample = [&](const GLUtil::Fbo& out, unsigned int cube, int depthMode) {
       GLUtil::RunShaderPass(out, mProgPano, [&]() {
          glActiveTexture(GL_TEXTURE0);
@@ -248,7 +262,8 @@ void Render3DNode::CookPano(int frameId)
          glUniform2f(glGetUniformLocation(mProgPano, "uSize"), (float)w, (float)h);
          glUniform1f(glGetUniformLocation(mProgPano, "uDome"), dome);
          glUniform1f(glGetUniformLocation(mProgPano, "uTilt"), std::clamp(domeTilt, 0.0f, 90.0f));
-         glUniform4f(glGetUniformLocation(mProgPano, "uLatLon"), std::clamp(latMin, -90.0f, 90.0f), std::clamp(latMax, -90.0f, 90.0f),
+         glUniform1i(glGetUniformLocation(mProgPano, "uLens"), fisheyeLens);
+         glUniform4f(glGetUniformLocation(mProgPano, "uLatLon"), std::clamp(latMin, -latCap, latCap), std::clamp(latMax, -latCap, latCap),
                      std::clamp(lonMin, -180.0f, 180.0f), std::clamp(lonMax, -180.0f, 180.0f));
       });
       glBindTexture(GL_TEXTURE_CUBE_MAP, 0);

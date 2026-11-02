@@ -28,7 +28,8 @@ namespace
       "Klein Bottle", "Gear 3D", "Star 3D", "Disc", "Arrow 3D"
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
-   const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic", "Equirect 360", "Cubemap 3x2", "Fisheye dome" };
+   const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic", "Equirect 360", "Cubemap 3x2", "Fisheye dome", "Cylindrical 360" };
+   const std::vector<std::string> kFisheyeLensNames = { "Equidistant", "Equisolid" };
    const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position", "Mist",
                                                         "Object Index", "Emission", "Shadow", "AO", "Environment" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
@@ -1247,6 +1248,7 @@ void GeometryNode::CookIfNeeded(int frameId)
 // ================================================================= Render
 
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
+const std::vector<std::string>& Render3DNode::FisheyeLensNames() { return kFisheyeLensNames; }
 const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
 const std::vector<std::string>& Render3DNode::MistFalloffNames() { return kMistFalloffNames; }
 const std::vector<std::string>& Render3DNode::CavityTypeNames() { return kCavityTypeNames; }

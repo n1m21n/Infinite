@@ -1688,6 +1688,28 @@ namespace
    }
 
    // Ctrl+L: the active item's placement onto the rest of the selection.
+   // Ctrl+P / Alt+P: Blender's parent and clear parent, as Follow. Every other
+   // selected item follows the active one (last clicked), keeping where it is.
+   void FollowActive(Scene3DNode* scene, bool clear)
+   {
+      const int active = sSel.empty() ? 0 : sSel.back();
+      if (active == 0 || (!clear && sSel.size() < 2))
+         return;
+      PushUndoCheckpoint(clear ? "Clear follow in 3D View" : "Follow in 3D View");
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+         {
+            const int target = clear ? 0 : active;
+            if (id == active && !clear)
+               continue;
+            if (target != 0 && scene->FollowLoops(id, target))
+               continue;
+            it->follow = target;
+            it->followed[0] = NAN;
+         }
+      scene->Commit();
+   }
+
    void CopyTransformsFromActive(Scene3DNode* scene)
    {
       const Item* a = sSel.size() < 2 ? nullptr : scene->FindItem(sSel.back());
@@ -2045,6 +2067,8 @@ namespace
          if (MenuParts::Item(T("Z"))) AlignSelected(scene, 2);
          ImGui::EndMenu();
       }
+      if (MenuParts::Item(T("Follow Active"), "Ctrl+P", false, sSel.size() > 1)) FollowActive(scene, false);
+      if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
       if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
@@ -2205,10 +2229,12 @@ namespace
             }
          scene->Commit();
       }
-      if (io.KeyShift && !command && pressed(ImGuiKey_Z))
+      if (io.KeyShift && !io.KeyAlt && !command && pressed(ImGuiKey_Z))
          sShading = sShading == Shading::Wire ? Shading::Solid : Shading::Wire;
-      if (io.KeyAlt && !command && pressed(ImGuiKey_Z))
+      if (io.KeyAlt && !command && !io.KeyShift && pressed(ImGuiKey_Z))
          sSet->xray = !sSet->xray;
+      if (io.KeyAlt && io.KeyShift && !command && pressed(ImGuiKey_Z))
+         sOverlays = !sOverlays;
       if (io.KeyShift && !command && pressed(ImGuiKey_C))
       {
          if (sSet->cursor[0] != 0.0f || sSet->cursor[1] != 0.0f || sSet->cursor[2] != 0.0f)
@@ -2243,14 +2269,6 @@ namespace
          sPending.what = Pending::PasteScene;
       if (command && !io.KeyAlt && !io.KeyShift && pressed(ImGuiKey_D))
          sPending.what = Pending::DuplicateScene;
-      if (command && !io.KeyAlt && pressed(ImGuiKey_I))
-      {
-         std::vector<int> others;
-         for (const Item& it : scene->Items())
-            if (Pickable(scene, it) && !Selected(it.id))
-               others.push_back(it.id);
-         sSel.swap(others);
-      }
       if (command && !io.KeyAlt && digit(0))
          if (sSel.size() == 1)
             if (Item* it = scene->FindItem(sSel[0]))
@@ -2309,12 +2327,6 @@ namespace
             GlideTo([&] { OrbitBy(scene, kPi, 0.0f); });
          else if (digit(2) || digit(8))
             GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });
-         else if (io.KeyShift && (pressed(ImGuiKey_Keypad4) || pressed(ImGuiKey_Keypad6)))
-         {
-            LeaveCamera();
-            sRoll += pressed(ImGuiKey_Keypad6) ? RotStep() : -RotStep();
-            sViewName = -1;
-         }
          else if (digit(4) || digit(6))
             GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });
          else if (pressed(ImGuiKey_A))
@@ -2330,18 +2342,19 @@ namespace
             sSet->proportional = !sSet->proportional;
          }
          else if (pressed(ImGuiKey_H))
-         {
-            if (io.KeyShift)
-               HideUnselected(scene);
-            else
-               HideSelected(scene);
-         }
+            HideSelected(scene);
          else if (pressed(ImGuiKey_X) || pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace))
             DeleteSelected(scene);
          else if (pressed(ImGuiKey_KeypadAdd) || pressed(ImGuiKey_Equal))
             Zoom(0.85f);
          else if (pressed(ImGuiKey_KeypadSubtract) || pressed(ImGuiKey_Minus))
             Zoom(1.0f / 0.85f);
+      }
+      if (plain && io.KeyShift && (pressed(ImGuiKey_Keypad4) || pressed(ImGuiKey_Keypad6)))
+      {
+         LeaveCamera();
+         sRoll += pressed(ImGuiKey_Keypad6) ? RotStep() : -RotStep();
+         sViewName = -1;
       }
       if (io.KeyAlt && pressed(ImGuiKey_A))
          sSel.clear();
@@ -2358,6 +2371,10 @@ namespace
          RepeatLast(scene);
       if (command && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_L))
          CopyTransformsFromActive(scene);
+      if (command && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_P))
+         FollowActive(scene, false);
+      if (io.KeyAlt && !command && !io.KeyShift && pressed(ImGuiKey_P))
+         FollowActive(scene, true);
       if (io.KeyShift && !command && pressed(ImGuiKey_D))
          DuplicateSelected(scene, mouse);
       if (io.KeyShift && !command && pressed(ImGuiKey_A))
@@ -5546,16 +5563,17 @@ namespace
             FloatRow(T("Height"), &look.mistHeight, 0.0f, 100.0f, "%.2f");
          }
          ComboRow(T("Projection"), &look.projection, Render3DNode::ProjectionNames());
-         if (look.projection == 2)
+         if (look.projection == Render3DNode::kEquirect || look.projection == Render3DNode::kCylindrical)
          {
             FloatRow(T("Min latitude"), &look.latMin, -90.0f, 90.0f, "%.0f");
             FloatRow(T("Max latitude"), &look.latMax, -90.0f, 90.0f, "%.0f");
             FloatRow(T("Min longitude"), &look.lonMin, -180.0f, 180.0f, "%.0f");
             FloatRow(T("Max longitude"), &look.lonMax, -180.0f, 180.0f, "%.0f");
          }
-         if (look.projection == 4)
+         if (look.projection == Render3DNode::kFisheye)
          {
-            FloatRow(T("Dome angle"), &look.domeAngle, 180.0f, 220.0f, "%.0f");
+            ComboRow(T("Lens"), &look.fisheyeLens, Render3DNode::FisheyeLensNames());
+            FloatRow(T("Dome angle"), &look.domeAngle, 60.0f, 360.0f, "%.0f");
             FloatRow(T("Dome tilt"), &look.domeTilt, 0.0f, 90.0f, "%.0f");
          }
       }

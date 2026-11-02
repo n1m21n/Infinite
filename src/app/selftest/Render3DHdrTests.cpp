@@ -185,6 +185,21 @@ bool RunRender3DPanoTest()
    render();
    check(lumAt(0.5f, 0.5f) < 0.2 && lumAt(0.5f, 0.091f) > 0.5, "fisheye tilt 0, 220: centre is up, the cube on the horizon below",
          lumAt(0.5f, 0.5f), lumAt(0.5f, 0.091f));
+   r.domeTilt = 90.0f;
+   r.domeAngle = 360.0f;
+   r.fisheyeLens = 1; // equisolid: the rim of a 360 circle is straight behind
+   render();
+   check(lumAt(0.5f, 0.5f) > 0.5 && lumAt(0.5f, 0.02f) < 0.2, "fisheye 360 equisolid: the cube in the centre, the rim behind is empty",
+         lumAt(0.5f, 0.5f), lumAt(0.5f, 0.02f));
+   r.fisheyeLens = 0;
+   r.domeTilt = 0.0f;
+   r.domeAngle = 180.0f;
+
+   r.projection = Render3DNode::kCylindrical;
+   r.width = 512.0f; r.height = 256.0f;
+   render();
+   check(lumAt(0.5f, 0.5f) > 0.5 && lumAt(0.02f, 0.5f) < 0.2, "cylindrical: the cube is in the middle, behind is empty",
+         lumAt(0.5f, 0.5f), lumAt(0.02f, 0.5f));
 
    // Seams: two identical glowing spheres the same distance from the eye, one
    // straight ahead (the middle of a cube face), one 45 degrees right (exactly

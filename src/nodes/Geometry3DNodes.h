@@ -557,6 +557,7 @@ public:
 
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
+   static const std::vector<std::string>& FisheyeLensNames();
    static const std::vector<std::string>& RenderPassNames();
    // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position, 5 = mist,
    // 6 = object index, 7 = emission, 8 = shadow, 9 = AO, 10 = environment
@@ -679,13 +680,14 @@ public:
 
    float width = 1024.0f;
    float height = 1024.0f;
-   // perspective / orthographic / equirect 360 / cubemap 3x2 / fisheye dome.
-   // The last three render six 90 degree cube faces from the camera's eye and
+   // perspective / orthographic / equirect 360 / cubemap 3x2 / fisheye dome /
+   // cylindrical 360. The last four render six 90 degree cube faces from the camera's eye and
    // resample them into the output (Render3DPano.cpp); they need the built-in
    // camera, so a patched Camera node keeps its own projection.
    int projection = 0;
-   enum { kPerspective = 0, kOrthographic = 1, kEquirect = 2, kCubemap3x2 = 3, kFisheye = 4 };
-   float domeAngle = 180.0f; // fisheye: the field across the dome circle, degrees
+   enum { kPerspective = 0, kOrthographic = 1, kEquirect = 2, kCubemap3x2 = 3, kFisheye = 4, kCylindrical = 5 };
+   float domeAngle = 180.0f; // fisheye: the field across the dome circle, 60 to 360 degrees
+   int fisheyeLens = 0;      // fisheye: 0 equidistant, 1 equisolid
    float domeTilt = 0.0f;    // fisheye: 0 = the dome centre looks straight up, 90 = straight ahead
    // Equirect: the latitude and longitude the frame spans, degrees (a full sphere by default).
    float latMin = -90.0f, latMax = 90.0f, lonMin = -180.0f, lonMax = 180.0f;
@@ -851,7 +853,7 @@ public:
       v.Bool("motionBlur", motionBlur); v.Float("motionShutter", motionShutter);
       v.Int("motionPosition", motionPosition); v.Float("motionMax", motionMax);
       v.Int("projection", projection); v.Float("fov", fov);
-      v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
+      v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Int("fisheyeLens", fisheyeLens); v.Float("camDistance", camDistance);
       v.Float("latMin", latMin); v.Float("latMax", latMax); v.Float("lonMin", lonMin); v.Float("lonMax", lonMax);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);

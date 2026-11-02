@@ -769,6 +769,12 @@ namespace app
          { I18N_KEY("3D View"), I18N_KEY("Local View"), "/", I18N_KEY("Show only the selection (Keypad / too); press again to show everything") },
          { I18N_KEY("3D View"), I18N_KEY("Sidebar"), "N", I18N_KEY("Show or hide the side panel") },
          { I18N_KEY("3D View"), I18N_KEY("Overlays"), "Ctrl+`", I18N_KEY("Show or hide the overlays (over the 3D View this key does not open the Terminal)") },
+         { I18N_KEY("3D View"), I18N_KEY("X-ray / Overlays"), "Alt+Z / Shift+Alt+Z", I18N_KEY("See through surfaces in Solid; show or hide the overlays") },
+         { I18N_KEY("3D View"), I18N_KEY("Follow / Clear Follow"), MODKEY "+P / Alt+P", I18N_KEY("The selected items follow the active one (Blender's parent), or stop following") },
+         { I18N_KEY("3D View"), I18N_KEY("Copy Transforms"), MODKEY "+L", I18N_KEY("The selected items take the active item's location, rotation and scale") },
+         { I18N_KEY("3D View"), I18N_KEY("Repeat Last"), "Shift+R", I18N_KEY("Apply the last move, turn or scale again to the selection") },
+         { I18N_KEY("3D View"), I18N_KEY("Roll View"), "Shift+Keypad 4 / 6", I18N_KEY("Roll the view 15 degrees about the line of sight") },
+         { I18N_KEY("3D View"), I18N_KEY("Proportional Editing"), "O", I18N_KEY("Moving one item pulls its neighbours, weaker with distance") },
          { I18N_KEY("3D View"), I18N_KEY("Copy / Paste / Duplicate Scene"), MODKEY "+C / V / D", I18N_KEY("Copy the whole scene, paste it as a new scene, or duplicate it") },
          { I18N_KEY("3D View"), I18N_KEY("Render"), "F12 / " MODKEY "+F12", I18N_KEY("Render a still from the scene camera, or render the camera for its set duration") },
 

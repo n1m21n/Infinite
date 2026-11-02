@@ -2090,7 +2090,7 @@ namespace app
          if (n->projection == Render3DNode::kOrthographic)
             ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f, "%.3f", colW);
          else if (n->projection == Render3DNode::kFisheye)
-            ModSlider("dome angle", &n->domeAngle, 180.0f, 220.0f, "%.0f\xC2\xB0", colW);
+            ModSlider("dome angle", &n->domeAngle, 60.0f, 360.0f, "%.0f\xC2\xB0", colW);
          else
          {
             ImGui::BeginDisabled(n->projection != Render3DNode::kPerspective);
@@ -2100,7 +2100,10 @@ namespace app
          ImGui::BeginDisabled(n->projection != Render3DNode::kFisheye);
          ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
          ImGui::EndDisabled();
-         if (n->projection == Render3DNode::kEquirect)
+         if (n->projection == Render3DNode::kFisheye)
+            DropdownButton("lens", Render3DNode::FisheyeLensNames(), n->fisheyeLens,
+                           [n](int i) { n->fisheyeLens = i; }, colW);
+         if (n->projection == Render3DNode::kEquirect || n->projection == Render3DNode::kCylindrical)
          {
             ModSlider("min latitude", &n->latMin, -90.0f, 90.0f, "%.0f\xC2\xB0", colW);
             ModSlider("max latitude", &n->latMax, -90.0f, 90.0f, "%.0f\xC2\xB0", colW);
