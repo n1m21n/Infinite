@@ -137,6 +137,7 @@ namespace
       int plane = -1;              // moves in the plane facing this axis
       int orient = 0;              // 0 global, 1 local, 2 view
       bool gizmo = false;
+      bool track = false;          // rotate: free trackball turn (R again)
       ImVec2 start;
       float pivot[3] = { 0, 0, 0 };
       std::vector<Item> before;
@@ -754,10 +755,10 @@ namespace
    }
 
    // The 3D cursor's turn in the three ways Blender shows it, all read in the displayed frame.
-   void CursorQuaternion(float q[4])
+   void QuaternionOf(const float engineDeg[3], float q[4])
    {
       float r[3][3], d[3][3];
-      RotationOf(sSet->cursorRot, r);
+      RotationOf(engineDeg, r);
       Swap3(r, d, true);
       const float tr = d[0][0] + d[1][1] + d[2][2];
       if (tr > 0.0f)
@@ -782,7 +783,7 @@ namespace
       }
    }
 
-   void SetCursorQuaternion(const float qin[4])
+   void SetQuaternion(const float qin[4], float engineDeg[3])
    {
       const float len = std::max(1e-6f, std::sqrt(qin[0] * qin[0] + qin[1] * qin[1] + qin[2] * qin[2] + qin[3] * qin[3]));
       const float w = qin[0] / len, x = qin[1] / len, y = qin[2] / len, z = qin[3] / len;
@@ -791,8 +792,29 @@ namespace
                               { 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y) } };
       float r[3][3];
       Swap3(d, r, false);
-      EulerFrom(r, sSet->cursorRot);
+      EulerFrom(r, engineDeg);
    }
+
+   void CursorQuaternion(float q[4]) { QuaternionOf(sSet->cursorRot, q); }
+   void SetCursorQuaternion(const float q[4]) { SetQuaternion(q, sSet->cursorRot); }
+
+   // Axis-angle (degrees, then the axis) from a quaternion and back, for the Quaternion/Axis Angle rotation modes.
+   void AxisAngleOf(const float q[4], float aa[4])
+   {
+      const float half = std::acos(std::clamp(q[0], -1.0f, 1.0f)), sn = std::max(1e-6f, std::sin(half));
+      aa[0] = half * 2.0f * 180.0f / kPi; aa[1] = q[1] / sn; aa[2] = q[2] / sn; aa[3] = q[3] / sn;
+      if (half < 1e-4f)
+         aa[1] = aa[2] = 0.0f, aa[3] = 1.0f;
+   }
+
+   void QuaternionFromAxisAngle(const float aa[4], float q[4])
+   {
+      const float an = std::max(1e-6f, std::sqrt(aa[1] * aa[1] + aa[2] * aa[2] + aa[3] * aa[3]));
+      const float h = aa[0] * kPi / 360.0f, sh = std::sin(h) / an;
+      q[0] = std::cos(h); q[1] = aa[1] * sh; q[2] = aa[2] * sh; q[3] = aa[3] * sh;
+   }
+
+   int sItemRotMode = 0;   // 0 XYZ Euler, 1 Quaternion, 2 Axis Angle: how the Item tab shows the rotation
 
    void AxisAngle(const float a[3], float angle, float r[3][3])
    {
@@ -1028,7 +1050,19 @@ namespace
          const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x);
          const float a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
          float deg = (a1 - a0) * fine * 180.0f / kPi;
-         if (sOp.axis < 0)
+         if (sOp.track)
+         {
+            // Trackball: the drag turns the item about the screen axis square to it.
+            float t[3];
+            for (int k = 0; k < 3; k++)
+               t[k] = sCam.up[k] * d.x + sCam.right[k] * d.y;
+            const float len = std::sqrt(Dot(t, t));
+            if (len > 1e-4f)
+               for (int k = 0; k < 3; k++)
+                  axis[k] = t[k] / len;
+            deg = len * 0.5f;
+         }
+         else if (sOp.axis < 0)
          {
             for (int k = 0; k < 3; k++)
                axis[k] = -sCam.fwd[k];
@@ -2092,6 +2126,12 @@ namespace
       auto digit = [&](int i) { return pressed((ImGuiKey)(ImGuiKey_0 + i)) || pressed((ImGuiKey)(ImGuiKey_Keypad0 + i)); };
       if (sOp.mode != 0)
       {
+         if (sOp.mode == 'r' && !sOp.gizmo && pressed(ImGuiKey_R))
+         {
+            sOp.track = !sOp.track;
+            sOp.start = mouse;
+            sOp.axis = -1;
+         }
          for (int a = 0; a < 3; a++)
             if (pressed(a == 0 ? ImGuiKey_X : a == 1 ? ImGuiKey_Z : ImGuiKey_Y))
             {
@@ -4204,11 +4244,13 @@ namespace
          scrollToActive = true;
       }
       int dragFrom = -1, dragTo = -1;
+      std::vector<std::pair<float, int>> rowTops;   // for Alt-drag box select
       for (int row : order)
       {
          Item& it = items[row];
          ImGui::PushID(it.id);
          const ImVec2 p = ImGui::GetCursorScreenPos();
+         rowTops.push_back({ p.y, it.id });
          ImGui::SetNextItemAllowOverlap();
          if (ImGui::Selectable("##row", Selected(it.id), ImGuiSelectableFlags_None, ImVec2(availW, rowH)))
          {
@@ -4231,7 +4273,7 @@ namespace
             else
                sSel = { it.id };
          }
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+         if (!io.KeyAlt && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
          {
             ImGui::SetDragDropPayload("v3ditem", &row, sizeof(int));
             ImGui::TextUnformatted(ItemName(it).c_str());
@@ -4331,6 +4373,29 @@ namespace
       }
       if (count > 0)
          ImGui::EndChild();
+      static float sBoxY0 = 0.0f;
+      static bool sBoxing = false;
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         sBoxing = false;
+      if (io.KeyAlt && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !rowTops.empty())
+      {
+         // Alt-drag over the rows selects every row the drag passes.
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+         {
+            sBoxY0 = ImGui::GetMousePos().y;
+            sBoxing = true;
+         }
+         if (sBoxing && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            const float y0 = std::min(sBoxY0, ImGui::GetMousePos().y), y1 = std::max(sBoxY0, ImGui::GetMousePos().y);
+            std::vector<int> hit;
+            for (const auto& r : rowTops)
+               if (r.first + rowH > y0 && r.first < y1)
+                  hit.push_back(r.second);
+            if (!hit.empty())
+               sSel = hit;
+         }
+      }
       if (dragFrom >= 0 && dragTo >= 0 && dragFrom != dragTo)
       {
          PushUndoCheckpoint("Reorder in 3D View");
@@ -4747,12 +4812,45 @@ namespace
          if (radians)
             for (float& r : rot)
                r *= 0.0174532925f;
-         if (field(T("Rotation"), rot, radians ? 0.01f : 0.5f, radians ? "%.3f rad" : "%.2f"))
+         ComboRow(T("Rotation mode"), &sItemRotMode, { T("XYZ Euler"), T("Quaternion"), T("Axis Angle") }, "Rotation mode");
+         bool rotEdited = false;
+         if (sItemRotMode != 0)
+         {
+            float q[4];
+            QuaternionOf(item->rot, q);
+            FieldLabel(T("Rotation"));
+            ImGui::SetNextItemWidth(sFieldW);
+            if (sItemRotMode == 1)
+            {
+               if (ImGui::DragFloat4("##v3dirotq", q, 0.01f, -1.0f, 1.0f, "%.3f"))
+               {
+                  SetQuaternion(q, item->rot);
+                  rotEdited = true;
+               }
+            }
+            else
+            {
+               float aa[4];
+               AxisAngleOf(q, aa);
+               if (ImGui::DragFloat4("##v3dirotaa", aa, 0.5f, 0.0f, 0.0f, "%.2f"))
+               {
+                  QuaternionFromAxisAngle(aa, q);
+                  SetQuaternion(q, item->rot);
+                  rotEdited = true;
+               }
+            }
+            Undoable("Edit in 3D View");
+         }
+         else if (field(T("Rotation"), rot, radians ? 0.01f : 0.5f, radians ? "%.3f rad" : "%.2f"))
          {
             if (radians)
                for (float& r : rot)
                   r *= 57.2957795f;
             FromDisplayRotation(rot, item->rot);
+            rotEdited = true;
+         }
+         if (rotEdited)
+         {
             changed = true;
             changedChannel = 1;
          }
@@ -4868,6 +4966,8 @@ namespace
       if (Card(T("Visibility")))
       {
          if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
+            scene->Commit();
+         if (BoolRow(T("Cast shadows"), &item->castShadow, "Cast shadows"))
             scene->Commit();
          if (BoolRow(T("Hide selection"), &item->hideSelect, "Hide selection"))
             scene->Commit();

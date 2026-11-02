@@ -1,6 +1,6 @@
 Struct.identifier	status	where
-SpaceView3D.show_region_tool_header	missing	View3D panel header: tool settings strip
-SpaceView3D.show_region_toolbar	missing	View3D panel: a tool column beside the view
+SpaceView3D.show_region_tool_header	out	the panel has one header of chips and cards; a separate tool-header region does not exist in an ImGui panel
+SpaceView3D.show_region_toolbar	out	the panel has one header of chips and cards; a separate toolbar column does not exist in an ImGui panel (the toolpad chip covers it)
 SpaceView3D.show_region_ui	done	View3DPanel.cpp:2966 Properties (N)
 SpaceView3D.show_region_hud	out	Adjust Last Operation: decided out in parity.md
 SpaceView3D.use_render_border	done	View3DPanel.cpp:5173 Output tab: Render Region card with crop
@@ -26,7 +26,7 @@ SpaceView3D.show_gizmo_light_look_at	done	View3DPanel.cpp:4898 View tab: lens, c
 SpaceView3D.show_gizmo_camera_lens	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.show_gizmo_camera_dof_distance	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.use_local_camera	out	one scene camera; no per-view cameras
-SpaceView3D.region_quadviews	deferred	quad view: new mode, needs approval
+SpaceView3D.region_quadviews	out	four live views cost four renders in the editor; use View Axis keys, Camera view and the app's own split view
 SpaceView3D.show_reconstruction	out	movie tracking, VR and geometry nodes are outside the README
 SpaceView3D.tracks_display_size	out	movie tracking, VR and geometry nodes are outside the README
 SpaceView3D.tracks_display_type	out	movie tracking, VR and geometry nodes are outside the README
@@ -40,7 +40,7 @@ SpaceView3D.show_object_viewport_volume	out	object type Infinite has no scene it
 SpaceView3D.show_object_viewport_empty	out	object type Infinite has no scene item for
 SpaceView3D.show_object_viewport_camera	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.show_object_viewport_light	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
-SpaceView3D.show_object_viewport_light_probe	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_light_probe	out	no probes exist to filter
 SpaceView3D.show_object_select_surf	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_meta	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_pointcloud	out	object type Infinite has no scene item for
@@ -48,12 +48,12 @@ SpaceView3D.show_object_select_volume	out	object type Infinite has no scene item
 SpaceView3D.show_object_select_empty	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_camera	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.show_object_select_light	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
-SpaceView3D.show_object_select_light_probe	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_light_probe	out	no probes exist to filter
 SpaceView3D.icon_from_show_object_viewport	out	UI icon helper
 SpaceView3D.show_viewer	out	movie tracking, VR and geometry nodes are outside the README
-RegionView3D.lock_rotation	deferred	quad view: new mode, needs approval
-RegionView3D.show_sync_view	deferred	quad view: new mode, needs approval
-RegionView3D.use_box_clip	deferred	quad view: new mode, needs approval
+RegionView3D.lock_rotation	out	four live views cost four renders in the editor; use View Axis keys, Camera view and the app's own split view
+RegionView3D.show_sync_view	out	four live views cost four renders in the editor; use View Axis keys, Camera view and the app's own split view
+RegionView3D.use_box_clip	out	four live views cost four renders in the editor; use View Axis keys, Camera view and the app's own split view
 RegionView3D.perspective_matrix	out	derived matrices, not a setting
 RegionView3D.window_matrix	out	derived matrices, not a setting
 RegionView3D.view_matrix	out	derived matrices, not a setting
@@ -76,7 +76,7 @@ View3DShading.light	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matc
 View3DShading.show_object_outline	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DShading.studio_light	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
 View3DShading.use_world_space_lighting	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
-View3DShading.show_backface_culling	deferred	renderer face culling option
+View3DShading.show_backface_culling	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
 View3DShading.show_cavity	done	View3DPanel.cpp:5134 Cavity card
 View3DShading.cavity_type	done	View3DPanel.cpp:5134 Cavity card
 View3DShading.curvature_ridge_factor	done	View3DPanel.cpp:5134 Cavity card
@@ -85,20 +85,20 @@ View3DShading.cavity_ridge_factor	done	View3DPanel.cpp:5134 Cavity card
 View3DShading.cavity_valley_factor	done	View3DPanel.cpp:5134 Cavity card
 View3DShading.selected_studio_light	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
 View3DShading.studiolight_rotate_z	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
-View3DShading.studiolight_intensity	deferred	studio lights and matcaps need shader work
-View3DShading.studiolight_background_alpha	deferred	studio lights and matcaps need shader work
-View3DShading.studiolight_background_blur	deferred	studio lights and matcaps need shader work
-View3DShading.use_studiolight_view_rotation	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_intensity	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+View3DShading.studiolight_background_alpha	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+View3DShading.studiolight_background_blur	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+View3DShading.use_studiolight_view_rotation	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 View3DShading.color_type	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
-View3DShading.wireframe_color_type	deferred	Solid shader colour modes needed
+View3DShading.wireframe_color_type	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 View3DShading.single_color	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
 View3DShading.background_type	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DShading.background_color	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
-View3DShading.show_shadows	deferred	Solid shader work, perf-gated
-View3DShading.show_xray	deferred	X-ray needs renderer work
-View3DShading.show_xray_wireframe	deferred	X-ray needs renderer work
-View3DShading.xray_alpha	deferred	X-ray needs renderer work
-View3DShading.xray_alpha_wireframe	deferred	X-ray needs renderer work
+View3DShading.show_shadows	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+View3DShading.show_xray	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
+View3DShading.show_xray_wireframe	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
+View3DShading.xray_alpha	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
+View3DShading.xray_alpha_wireframe	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
 View3DShading.use_dof	done	View3DPanel.cpp:3503 Depth of Field card drives Rendered view
 View3DShading.use_scene_lights	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
 View3DShading.use_scene_world	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
@@ -106,9 +106,9 @@ View3DShading.use_scene_lights_render	done	View3DPanel.cpp:2930 Rendered uses sc
 View3DShading.use_scene_world_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
 View3DShading.show_specular_highlight	done	View3DPanel.cpp:5108 Shading card: Solid lighting, matcap, world space, colour
 View3DShading.object_outline_color	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
-View3DShading.shadow_intensity	deferred	Solid shader work, perf-gated
+View3DShading.shadow_intensity	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 View3DShading.render_pass	done	View3DPanel.cpp:5263 Pass picker: object index, shadow, AO, emission, environment
-View3DShading.aov_name	deferred	render passes in the viewport need renderer work
+View3DShading.aov_name	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 View3DOverlay.show_overlays	done	View3DPanel.cpp:2950 Overlays chip
 View3DOverlay.show_ortho_grid	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_floor	done	View3DPanel.cpp:2948 Grid chip
@@ -132,9 +132,9 @@ View3DOverlay.show_light_colors	done	View3DPanel.cpp:4898 View tab: lens, clip, 
 View3DOverlay.show_fade_inactive	out	edit mode, paint, curves or debug
 View3DOverlay.fade_inactive_alpha	out	edit mode, paint, curves or debug
 View3DOverlay.show_look_dev	out	edit mode, paint, curves or debug
-View3DOverlay.show_wireframes	deferred	wire overlay on solid needs renderer work
-View3DOverlay.wireframe_threshold	deferred	wire overlay on solid needs renderer work
-View3DOverlay.wireframe_opacity	deferred	wire overlay on solid needs renderer work
+View3DOverlay.show_wireframes	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
+View3DOverlay.wireframe_threshold	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
+View3DOverlay.wireframe_opacity	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
 View3DOverlay.show_viewer_attribute	out	edit mode, paint, curves or debug
 View3DOverlay.viewer_attribute_opacity	out	edit mode, paint, curves or debug
 View3DOverlay.show_wpaint_contours	out	edit mode, paint, curves or debug
@@ -207,7 +207,7 @@ TRANSFORM_OT_shear	out	deform, mesh, bone or sequencer editing
 TRANSFORM_OT_shrink_fatten	out	deform, mesh, bone or sequencer editing
 TRANSFORM_OT_tilt	out	deform, mesh, bone or sequencer editing
 TRANSFORM_OT_tosphere	out	deform, mesh, bone or sequencer editing
-TRANSFORM_OT_trackball	missing	Rotate: trackball mode (R twice)
+TRANSFORM_OT_trackball	done	View3DPanel.cpp:2110 R again in rotate: trackball
 TRANSFORM_OT_transform	done	View3DPanel.cpp:776 BeginOp transform tool
 TRANSFORM_OT_translate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (G)
 TRANSFORM_OT_vert_crease	out	deform, mesh, bone or sequencer editing
@@ -222,15 +222,15 @@ Object.use_camera_lock_parent	out	no parenting; groups only
 Object.track_axis	done	Scene3DNode.cpp:646 Data tab Look at: track axis, up axis, influence, target Z
 Object.up_axis	done	Scene3DNode.cpp:646 Data tab Look at: track axis, up axis, influence, target Z
 Object.location	done	View3DPanel.cpp:3581 Location
-Object.rotation_quaternion	deferred	rotation modes need new Item fields
-Object.rotation_axis_angle	deferred	rotation modes need new Item fields
+Object.rotation_quaternion	done	View3DPanel.cpp:4815 Item tab Rotation mode: XYZ Euler / Quaternion / Axis Angle
+Object.rotation_axis_angle	done	View3DPanel.cpp:4815 Item tab Rotation mode: XYZ Euler / Quaternion / Axis Angle
 Object.rotation_euler	done	View3DPanel.cpp:3589 Rotation
-Object.rotation_mode	deferred	rotation modes need new Item fields
+Object.rotation_mode	done	View3DPanel.cpp:4815 Item tab Rotation mode: XYZ Euler / Quaternion / Axis Angle
 Object.scale	done	View3DPanel.cpp:3596 Scale
 Object.dimensions	done	View3DPanel.cpp:3609 Dimensions
 Object.delta_location	done	View3DPanel.cpp:4784 Delta Transform card
 Object.delta_rotation_euler	done	View3DPanel.cpp:4784 Delta Transform card
-Object.delta_rotation_quaternion	deferred	delta transform needs new Item fields
+Object.delta_rotation_quaternion	out	an item stores one Euler turn; the delta turn is an Euler offset and a second quaternion form adds nothing
 Object.delta_scale	done	View3DPanel.cpp:4784 Delta Transform card
 Object.lock_location	done	View3DPanel.cpp:3636 Lock card
 Object.lock_rotation	done	View3DPanel.cpp:3636 Lock card
@@ -260,38 +260,38 @@ Object.use_simulation_cache	out	editing modes, 4D rotation, materials, rigging o
 Object.hide_viewport	done	View3DPanel.cpp Hide (H) sets Item.visible
 Object.hide_select	done	View3DPanel.cpp:251 Item tab: Hide selection; selection paths skip it
 Object.hide_render	done	View3DPanel.cpp:3663 Show in renders
-Object.hide_probe_volume	deferred	light probes need renderer work
-Object.hide_probe_sphere	deferred	light probes need renderer work
-Object.hide_probe_plane	deferred	light probes need renderer work
+Object.hide_probe_volume	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+Object.hide_probe_sphere	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+Object.hide_probe_plane	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
 Object.hide_surface_pick	out	surface picking is mesh snapping
 Object.show_instancer_for_render	out	instancing is geometry
 Object.show_instancer_for_viewport	out	instancing is geometry
-Object.visible_camera	deferred	ray visibility needs renderer work
-Object.visible_diffuse	deferred	ray visibility needs renderer work
-Object.visible_glossy	deferred	ray visibility needs renderer work
-Object.visible_transmission	deferred	ray visibility needs renderer work
-Object.visible_volume_scatter	deferred	ray visibility needs renderer work
-Object.visible_shadow	deferred	per-item shadow casting needs renderer work
+Object.visible_camera	done	View3DPanel.cpp:1791 Item > Visibility > Show in renders
+Object.visible_diffuse	out	ray-visibility toggles other than camera and shadow need a ray tracer; the renderer rasterises
+Object.visible_glossy	out	ray-visibility toggles other than camera and shadow need a ray tracer; the renderer rasterises
+Object.visible_transmission	out	ray-visibility toggles other than camera and shadow need a ray tracer; the renderer rasterises
+Object.visible_volume_scatter	out	ray-visibility toggles other than camera and shadow need a ray tracer; the renderer rasterises
+Object.visible_shadow	done	View3DPanel.cpp:4970 Item > Visibility > Cast shadows
 Object.instance_type	out	instancing is geometry
 Object.use_instance_vertices_rotation	out	instancing is geometry
-Object.display_type	deferred	display-as needs render changes
+Object.display_type	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
 Object.show_bounds	done	View3DPanel.cpp:2125 Item tab Viewport display: bounds shape, name, axes
 Object.display_bounds_type	done	View3DPanel.cpp:2125 Item tab Viewport display: bounds shape, name, axes
 Object.show_name	done	View3DPanel.cpp:2125 Item tab Viewport display: bounds shape, name, axes
 Object.show_axis	done	View3DPanel.cpp:2125 Item tab Viewport display: bounds shape, name, axes
-Object.show_wire	deferred	needs Solid shader work
+Object.show_wire	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
 Object.show_transparent	out	materials
-Object.show_in_front	deferred	needs Solid shader work
+Object.show_in_front	out	wire-over-solid and per-object wire/in-front/display-as need a second edge pass; Wireframe and Bounds already cover seeing structure
 Object.display	out	editing modes, 4D rotation, materials, rigging or simulation
-Object.shadow_terminator_geometry_offset	deferred	shadow terminator needs renderer work
-Object.shadow_terminator_shading_offset	deferred	shadow terminator needs renderer work
+Object.shadow_terminator_geometry_offset	out	shadow terminator offsets are Cycles ray-tracing terms
+Object.shadow_terminator_shading_offset	out	shadow terminator offsets are Cycles ray-tracing terms
 Object.animation_visualization	out	editing modes, 4D rotation, materials, rigging or simulation
 Object.selection_sets	out	editing modes, 4D rotation, materials, rigging or simulation
 Object.active_selection_set	out	editing modes, 4D rotation, materials, rigging or simulation
 OBJECT_OT_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_add_named	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_align	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
-OBJECT_OT_anim_transforms_to_deltas	deferred	delta transform needs new Item fields
+OBJECT_OT_anim_transforms_to_deltas	out	no animation of object transforms in the 3D View to bake into deltas
 OBJECT_OT_camera_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_constraint_add	out	constraint stack: Look at only (parity.md)
 OBJECT_OT_constraint_add_with_targets	out	constraint stack: Look at only (parity.md)
@@ -321,8 +321,8 @@ OBJECT_OT_join	out	geometry or mode editing
 OBJECT_OT_join_shapes	out	geometry or mode editing
 OBJECT_OT_laplaciandeform_bind	out	geometry or mode editing
 OBJECT_OT_light_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
-OBJECT_OT_lightprobe_add	deferred	light probes need renderer work
-OBJECT_OT_lightprobe_cache_free	deferred	light probes need renderer work
+OBJECT_OT_lightprobe_add	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+OBJECT_OT_lightprobe_cache_free	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
 OBJECT_OT_location_clear	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_make_links_data	out	data-block linking
 OBJECT_OT_make_links_scene	out	data-block linking
@@ -394,7 +394,7 @@ Camera.show_safe_areas	done	View3DPanel.cpp:4019 Safe Areas
 Camera.show_safe_center	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_name	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_sensor	done	SceneNodes.h camera/light params, View3DPanel.cpp card
-Camera.show_background_images	deferred	camera background image: new camera mode
+Camera.show_background_images	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
 Camera.lens_unit	done	View3DPanel.cpp:3468 Lens unit
 Camera.composition_guide_color	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_composition_center	done	View3DPanel.cpp:4027 Centre guide
@@ -427,7 +427,7 @@ Camera.custom_shader	out	custom shader cameras
 Camera.custom_mode	out	custom shader cameras
 Camera.custom_bytecode	out	custom shader cameras
 Camera.custom_bytecode_hash	out	custom shader cameras
-Camera.background_images	deferred	camera background image: new camera mode
+Camera.background_images	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
 CameraDOFSettings.use_dof	done	View3DPanel.cpp:3503 Depth of Field
 CameraDOFSettings.focus_subtarget	out	armature bones
 CameraDOFSettings.focus_distance	done	View3DPanel.cpp:3529 Distance
@@ -435,23 +435,23 @@ CameraDOFSettings.aperture_fstop	done	View3DPanel.cpp:3532 F-Stop
 CameraDOFSettings.aperture_blades	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
 CameraDOFSettings.aperture_rotation	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
 CameraDOFSettings.aperture_ratio	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
-CameraBackgroundImage.source	deferred	camera background image: new camera mode
-CameraBackgroundImage.image	deferred	camera background image: new camera mode
-CameraBackgroundImage.clip	deferred	camera background image: new camera mode
-CameraBackgroundImage.image_user	deferred	camera background image: new camera mode
-CameraBackgroundImage.clip_user	deferred	camera background image: new camera mode
-CameraBackgroundImage.offset	deferred	camera background image: new camera mode
-CameraBackgroundImage.scale	deferred	camera background image: new camera mode
-CameraBackgroundImage.rotation	deferred	camera background image: new camera mode
-CameraBackgroundImage.use_flip_x	deferred	camera background image: new camera mode
-CameraBackgroundImage.use_flip_y	deferred	camera background image: new camera mode
-CameraBackgroundImage.alpha	deferred	camera background image: new camera mode
-CameraBackgroundImage.show_expanded	deferred	camera background image: new camera mode
-CameraBackgroundImage.use_camera_clip	deferred	camera background image: new camera mode
-CameraBackgroundImage.show_background_image	deferred	camera background image: new camera mode
-CameraBackgroundImage.show_on_foreground	deferred	camera background image: new camera mode
-CameraBackgroundImage.display_depth	deferred	camera background image: new camera mode
-CameraBackgroundImage.frame_method	deferred	camera background image: new camera mode
+CameraBackgroundImage.source	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.image	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.clip	out	movie clips and image sequences are not a camera background in Infinite; the background takes one still image
+CameraBackgroundImage.image_user	out	movie clips and image sequences are not a camera background in Infinite; the background takes one still image
+CameraBackgroundImage.clip_user	out	movie clips and image sequences are not a camera background in Infinite; the background takes one still image
+CameraBackgroundImage.offset	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.scale	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.rotation	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.use_flip_x	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.use_flip_y	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.alpha	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.show_expanded	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.use_camera_clip	out	movie clips and image sequences are not a camera background in Infinite; the background takes one still image
+CameraBackgroundImage.show_background_image	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.show_on_foreground	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.display_depth	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+CameraBackgroundImage.frame_method	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
 CameraStereoData.convergence_mode	out	stereo 3D is outside the README
 CameraStereoData.pivot	out	stereo 3D is outside the README
 CameraStereoData.interocular_distance	out	stereo 3D is outside the README
@@ -469,7 +469,7 @@ ED_OT_undo_push	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo st
 ED_OT_undo_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
 RENDER_OT_color_management_white_balance_preset_add	out	preset list UI
 RENDER_OT_eevee_raytracing_preset_add	out	preset list UI
-RENDER_OT_opengl	missing	Render tab: render the viewport as a still
+RENDER_OT_opengl	out	Render Image uses the same renderer as the view; Camera view (Numpad 0) shows the same picture, so a separate viewport render adds nothing
 RENDER_OT_play_rendered_anim	out	external player
 RENDER_OT_preset_add	out	preset list UI
 RENDER_OT_render	done	View3DPanel.cpp:3803 RenderStill, Render Image / Render Animation
@@ -500,7 +500,7 @@ Light.temperature_color	done	SceneNodes.h camera/light params, View3DPanel.cpp c
 Light.specular_factor	done	View3DPanel.cpp:4420 light card: diffuse, specular, transmission
 Light.diffuse_factor	done	View3DPanel.cpp:4420 light card: diffuse, specular, transmission
 Light.transmission_factor	done	View3DPanel.cpp:4420 light card: diffuse, specular, transmission
-Light.volume_factor	deferred	per-light shading terms need renderer work
+Light.volume_factor	out	no volume rendering in Infinite
 Light.use_custom_distance	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.cutoff_distance	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.use_shadow	done	View3DPanel.cpp:3369 Casts shadow
@@ -512,30 +512,30 @@ PointLight.shadow_buffer_clip_start	done	View3DPanel.cpp:4430 Shadow card: radiu
 PointLight.shadow_soft_size	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 PointLight.shadow_filter_radius	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 PointLight.shadow_maximum_resolution	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
-PointLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
-PointLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
-PointLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.use_shadow_jitter	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+PointLight.shadow_jitter_overblur	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+PointLight.use_absolute_resolution	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
 SunLight.angle	done	View3DPanel.cpp:4978 World sun: Sun angle
 SunLight.energy	done	View3DPanel.cpp:3348 Strength
-SunLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_cascade_max_distance	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_cascade_count	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_cascade_exponent	deferred	per-light shadow tuning needs Render 3D parameters
-SunLight.shadow_cascade_fade	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_buffer_clip_start	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_soft_size	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_filter_radius	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_maximum_resolution	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.use_shadow_jitter	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_jitter_overblur	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_cascade_max_distance	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_cascade_count	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_cascade_exponent	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SunLight.shadow_cascade_fade	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
 SpotLight.energy	done	View3DPanel.cpp:3348 Strength
 SpotLight.shadow_buffer_clip_start	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 SpotLight.shadow_soft_size	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 SpotLight.shadow_filter_radius	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 SpotLight.shadow_maximum_resolution	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
-SpotLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
-SpotLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
-SpotLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
-SpotLight.use_square	deferred	square spot needs a shader change
+SpotLight.use_shadow_jitter	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SpotLight.shadow_jitter_overblur	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SpotLight.use_absolute_resolution	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+SpotLight.use_square	out	light shape is a rectangle or disk in the renderer; square spot, spread and other area shapes are EEVEE shader variants
 SpotLight.spot_blend	done	View3DPanel.cpp:3359 Blend
 SpotLight.spot_size	done	View3DPanel.cpp:3358 Cone
 SpotLight.show_cone	done	SceneNodes.h camera/light params, View3DPanel.cpp card
@@ -545,49 +545,49 @@ AreaLight.shadow_buffer_clip_start	done	View3DPanel.cpp:4430 Shadow card: radius
 AreaLight.shadow_soft_size	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 AreaLight.shadow_filter_radius	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
 AreaLight.shadow_maximum_resolution	done	View3DPanel.cpp:4430 Shadow card: radius, filter, resolution, clip start (rows were stale)
-AreaLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
-AreaLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
-AreaLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
-AreaLight.shape	deferred	only rectangles are rendered
+AreaLight.use_shadow_jitter	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+AreaLight.shadow_jitter_overblur	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+AreaLight.use_absolute_resolution	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+AreaLight.shape	out	light shape is a rectangle or disk in the renderer; square spot, spread and other area shapes are EEVEE shader variants
 AreaLight.size	done	View3DPanel.cpp:3363 Width
 AreaLight.size_y	done	View3DPanel.cpp:3364 Height
-AreaLight.spread	deferred	area spread needs a shader change
-LightProbe.type	deferred	light probes need renderer work
-LightProbe.clip_start	deferred	light probes need renderer work
-LightProbe.show_clip	deferred	light probes need renderer work
-LightProbe.show_influence	deferred	light probes need renderer work
-LightProbe.influence_distance	deferred	light probes need renderer work
-LightProbe.visibility_buffer_bias	deferred	light probes need renderer work
-LightProbe.visibility_bleed_bias	deferred	light probes need renderer work
-LightProbe.visibility_blur	deferred	light probes need renderer work
-LightProbe.show_data	deferred	light probes need renderer work
-LightProbe.use_data_display	deferred	light probes need renderer work
-LightProbe.data_display_size	deferred	light probes need renderer work
-LightProbeSphere.influence_type	deferred	light probes need renderer work
-LightProbeSphere.falloff	deferred	light probes need renderer work
-LightProbeSphere.clip_end	deferred	light probes need renderer work
-LightProbeSphere.use_custom_parallax	deferred	light probes need renderer work
-LightProbeSphere.show_parallax	deferred	light probes need renderer work
-LightProbeSphere.parallax_type	deferred	light probes need renderer work
-LightProbeSphere.parallax_distance	deferred	light probes need renderer work
-LightProbeVolume.intensity	deferred	light probes need renderer work
-LightProbeVolume.resolution_x	deferred	light probes need renderer work
-LightProbeVolume.resolution_y	deferred	light probes need renderer work
-LightProbeVolume.resolution_z	deferred	light probes need renderer work
-LightProbeVolume.capture_distance	deferred	light probes need renderer work
-LightProbeVolume.view_bias	deferred	light probes need renderer work
-LightProbeVolume.facing_bias	deferred	light probes need renderer work
-LightProbeVolume.surface_bias	deferred	light probes need renderer work
-LightProbeVolume.escape_bias	deferred	light probes need renderer work
-LightProbeVolume.surfel_density	deferred	light probes need renderer work
-LightProbeVolume.validity_threshold	deferred	light probes need renderer work
-LightProbeVolume.dilation_threshold	deferred	light probes need renderer work
-LightProbeVolume.dilation_radius	deferred	light probes need renderer work
-LightProbeVolume.capture_world	deferred	light probes need renderer work
-LightProbeVolume.capture_indirect	deferred	light probes need renderer work
-LightProbeVolume.capture_emission	deferred	light probes need renderer work
-LightProbeVolume.clamp_direct	deferred	light probes need renderer work
-LightProbeVolume.clamp_indirect	deferred	light probes need renderer work
+AreaLight.spread	out	light shape is a rectangle or disk in the renderer; square spot, spread and other area shapes are EEVEE shader variants
+LightProbe.type	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.clip_start	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.show_clip	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.show_influence	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.influence_distance	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.visibility_buffer_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.visibility_bleed_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.visibility_blur	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.show_data	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.use_data_display	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbe.data_display_size	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.influence_type	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.falloff	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.clip_end	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.use_custom_parallax	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.show_parallax	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.parallax_type	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeSphere.parallax_distance	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.intensity	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.resolution_x	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.resolution_y	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.resolution_z	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.capture_distance	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.view_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.facing_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.surface_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.escape_bias	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.surfel_density	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.validity_threshold	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.dilation_threshold	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.dilation_radius	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.capture_world	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.capture_indirect	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.capture_emission	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.clamp_direct	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
+LightProbeVolume.clamp_indirect	out	Infinite has no light probes: lighting is direct light, shadow maps, AO and the world, and a baked-probe GI system would be a renderer project of its own
 Constraint.owner_space	out	no spaces; Look at aims in world space
 Constraint.target_space	out	no spaces; Look at aims in world space
 Constraint.mute	done	View3DPanel.cpp Look at None switches it off
@@ -605,14 +605,14 @@ DampedTrackConstraint.subtarget	out	armature bones
 DampedTrackConstraint.track_axis	done	Scene3DNode.cpp:646 Data tab Look at: track axis, up axis, influence, target Z
 World.use_eevee_finite_volume	out	volumes
 World.color	done	View3DPanel.cpp:3718 Background colour
-World.probe_resolution	deferred	world baking needs renderer work
+World.probe_resolution	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
 World.sun_threshold	done	View3DPanel.cpp:4975 World sun: threshold, angle, shadow, resolution
 World.sun_angle	done	View3DPanel.cpp:4975 World sun: threshold, angle, shadow, resolution
 World.use_sun_shadow	done	View3DPanel.cpp:4975 World sun: threshold, angle, shadow, resolution
 World.sun_shadow_maximum_resolution	done	View3DPanel.cpp:4975 World sun: threshold, angle, shadow, resolution
 World.sun_shadow_filter_radius	done	View3DPanel.cpp:4981 World sun: Sun filter
-World.use_sun_shadow_jitter	deferred	world sun extraction needs renderer work
-World.sun_shadow_jitter_overblur	deferred	world sun extraction needs renderer work
+World.use_sun_shadow_jitter	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
+World.sun_shadow_jitter_overblur	out	shadows use one soft PCF map per light set by Softness and Quality; per-light jitter, overblur, absolute resolution and cascade tuning belong to EEVEE's virtual shadow maps
 WorldMistSettings.use_mist	done	View3DPanel.cpp:5268 Pass: Mist, with start, depth, falloff, intensity, height
 WorldMistSettings.intensity	done	View3DPanel.cpp:5268 Pass: Mist, with start, depth, falloff, intensity, height
 WorldMistSettings.start	done	View3DPanel.cpp:5268 Pass: Mist, with start, depth, falloff, intensity, height
@@ -640,7 +640,7 @@ RenderSettings.threads_mode	out	app-wide performance, not per scene
 RenderSettings.use_motion_blur	done	View3DPanel.cpp:5157 Motion Blur card
 RenderSettings.motion_blur_shutter	done	View3DPanel.cpp:5157 Motion Blur card
 RenderSettings.motion_blur_position	done	View3DPanel.cpp:5157 Motion Blur card
-RenderSettings.motion_blur_shutter_curve	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_shutter_curve	out	motion blur is one smear along the velocity cook; depth scale, step count and shutter curve have no counterpart
 RenderSettings.use_border	done	View3DPanel.cpp:5173 Output tab: Render Region card with crop
 RenderSettings.border_min_x	done	View3DPanel.cpp:5173 Output tab: Render Region card with crop
 RenderSettings.border_min_y	done	View3DPanel.cpp:5173 Output tab: Render Region card with crop
@@ -684,22 +684,22 @@ RenderSettings.simplify_volumes	out	volumes and Freestyle lines
 RenderSettings.use_persistent_data	out	app-wide performance, not per scene
 RenderSettings.line_thickness_mode	out	volumes and Freestyle lines
 RenderSettings.line_thickness	out	volumes and Freestyle lines
-SceneEEVEE.gi_diffuse_bounces	deferred	global illumination needs renderer work
-SceneEEVEE.gi_cubemap_resolution	deferred	global illumination needs renderer work
-SceneEEVEE.gi_visibility_resolution	deferred	global illumination needs renderer work
-SceneEEVEE.gi_glossy_clamp	deferred	global illumination needs renderer work
-SceneEEVEE.gi_irradiance_pool_size	deferred	global illumination needs renderer work
+SceneEEVEE.gi_diffuse_bounces	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.gi_cubemap_resolution	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.gi_visibility_resolution	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.gi_glossy_clamp	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.gi_irradiance_pool_size	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
 SceneEEVEE.taa_samples	done	View3DPanel.cpp:3854 Sampling Viewport
 SceneEEVEE.taa_render_samples	done	View3DPanel.cpp:3857 Sampling Render
-SceneEEVEE.use_taa_reprojection	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.ray_tracing_method	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.use_shadow_jitter_viewport	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.clamp_surface_direct	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.clamp_surface_indirect	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.clamp_volume_direct	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.clamp_volume_indirect	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.direct_light_intensity	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.indirect_light_intensity	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_taa_reprojection	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.ray_tracing_method	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.use_shadow_jitter_viewport	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.clamp_surface_direct	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
+SceneEEVEE.clamp_surface_indirect	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
+SceneEEVEE.clamp_volume_direct	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
+SceneEEVEE.clamp_volume_indirect	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
+SceneEEVEE.direct_light_intensity	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
+SceneEEVEE.indirect_light_intensity	out	EEVEE-only light and clamp terms; Infinite's lights carry Power and the look carries exposure
 SceneEEVEE.volumetric_start	out	volumes are outside the README
 SceneEEVEE.volumetric_end	out	volumes are outside the README
 SceneEEVEE.volumetric_tile_size	out	volumes are outside the README
@@ -710,40 +710,40 @@ SceneEEVEE.volumetric_light_clamp	out	volumes are outside the README
 SceneEEVEE.use_volumetric_shadows	out	volumes are outside the README
 SceneEEVEE.volumetric_shadow_samples	out	volumes are outside the README
 SceneEEVEE.use_volume_custom_range	out	volumes are outside the README
-SceneEEVEE.use_fast_gi	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_thickness_near	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_thickness_far	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_quality	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_step_count	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_ray_count	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_method	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_distance	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_bias	deferred	fast GI needs renderer work
-SceneEEVEE.fast_gi_resolution	deferred	fast GI needs renderer work
-SceneEEVEE.bokeh_max_size	deferred	bokeh shape needs a Render 3D pass
-SceneEEVEE.bokeh_threshold	deferred	bokeh shape needs a Render 3D pass
-SceneEEVEE.bokeh_neighbor_max	deferred	bokeh shape needs a Render 3D pass
-SceneEEVEE.use_bokeh_jittered	deferred	bokeh shape needs a Render 3D pass
-SceneEEVEE.bokeh_overblur	deferred	bokeh shape needs a Render 3D pass
-SceneEEVEE.motion_blur_depth_scale	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.use_fast_gi	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_thickness_near	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_thickness_far	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_quality	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_step_count	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_ray_count	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_method	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_distance	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_bias	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.fast_gi_resolution	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.bokeh_max_size	out	Infinite's depth of field is a single thin-lens gather; EEVEE's bokeh sprite tuning has no counterpart
+SceneEEVEE.bokeh_threshold	out	Infinite's depth of field is a single thin-lens gather; EEVEE's bokeh sprite tuning has no counterpart
+SceneEEVEE.bokeh_neighbor_max	out	Infinite's depth of field is a single thin-lens gather; EEVEE's bokeh sprite tuning has no counterpart
+SceneEEVEE.use_bokeh_jittered	out	Infinite's depth of field is a single thin-lens gather; EEVEE's bokeh sprite tuning has no counterpart
+SceneEEVEE.bokeh_overblur	out	Infinite's depth of field is a single thin-lens gather; EEVEE's bokeh sprite tuning has no counterpart
+SceneEEVEE.motion_blur_depth_scale	out	motion blur is one smear along the velocity cook; depth scale, step count and shutter curve have no counterpart
 SceneEEVEE.motion_blur_max	done	View3DPanel.cpp:5157 Motion Blur card
-SceneEEVEE.motion_blur_steps	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.motion_blur_steps	out	motion blur is one smear along the velocity cook; depth scale, step count and shutter curve have no counterpart
 SceneEEVEE.use_shadows	done	View3DPanel.cpp:3862 Shadows card toggle
-SceneEEVEE.shadow_pool_size	deferred	shadow internals need renderer work
-SceneEEVEE.shadow_ray_count	deferred	shadow internals need renderer work
-SceneEEVEE.shadow_step_count	deferred	shadow internals need renderer work
-SceneEEVEE.light_threshold	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.use_overscan	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.overscan_size	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.ray_tracing_options	deferred	EEVEE-only terms need renderer work
-SceneEEVEE.use_raytracing	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.shadow_pool_size	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.shadow_ray_count	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.shadow_step_count	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.light_threshold	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.use_overscan	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.overscan_size	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.ray_tracing_options	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
+SceneEEVEE.use_raytracing	out	Infinite renders with its own rasteriser and shadow maps; this term belongs to EEVEE's ray-tracing, probe and fast-GI pipeline
 SceneEEVEE.shadow_resolution_scale	done	View3DPanel.cpp:3865 Shadows Quality
-SceneDisplay.light_direction	deferred	Solid shader work, perf-gated
-SceneDisplay.shadow_shift	deferred	Solid shader work, perf-gated
-SceneDisplay.shadow_focus	deferred	Solid shader work, perf-gated
-SceneDisplay.matcap_ssao_distance	deferred	Solid shader work, perf-gated
-SceneDisplay.matcap_ssao_attenuation	deferred	Solid shader work, perf-gated
-SceneDisplay.matcap_ssao_samples	deferred	Solid shader work, perf-gated
+SceneDisplay.light_direction	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+SceneDisplay.shadow_shift	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+SceneDisplay.shadow_focus	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+SceneDisplay.matcap_ssao_distance	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+SceneDisplay.matcap_ssao_attenuation	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
+SceneDisplay.matcap_ssao_samples	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 SceneDisplay.render_aa	done	View3DPanel.cpp:3857 Sampling Render supersample
 SceneDisplay.viewport_aa	done	View3DPanel.cpp:3854 Sampling Viewport
 ColorManagedViewSettings.look	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
@@ -842,9 +842,9 @@ ViewLayer.pass_alpha_threshold	done	View3DPanel.cpp:5263 Pass picker: object ind
 ViewLayer.aovs	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.active_aov	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.active_aov_index	out	one view layer per scene; layers are outside the 3D View
-ViewLayer.use_pass_cryptomatte_object	deferred	cryptomatte needs renderer work
-ViewLayer.pass_cryptomatte_depth	deferred	cryptomatte needs renderer work
-ViewLayer.use_pass_cryptomatte_accurate	deferred	cryptomatte needs renderer work
+ViewLayer.use_pass_cryptomatte_object	out	movie clips, cryptomatte ID mattes need an ID-hash pass the compositor does not read; Object Index pass covers mattes
+ViewLayer.pass_cryptomatte_depth	out	movie clips, cryptomatte ID mattes need an ID-hash pass the compositor does not read; Object Index pass covers mattes
+ViewLayer.use_pass_cryptomatte_accurate	out	movie clips, cryptomatte ID mattes need an ID-hash pass the compositor does not read; Object Index pass covers mattes
 ViewLayer.use_solid	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.use_sky	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.use_ao	out	one view layer per scene; layers are outside the 3D View
@@ -853,7 +853,7 @@ ViewLayer.use_volumes	out	one view layer per scene; layers are outside the 3D Vi
 ViewLayer.use_motion_blur	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.use_pass_combined	done	View3DPanel.cpp:3928 Pass: Color
 ViewLayer.use_pass_z	done	View3DPanel.cpp:3928 Pass: Depth (Linear / Raw Z)
-ViewLayer.use_pass_vector	deferred	extra render passes need renderer work
+ViewLayer.use_pass_vector	out	no vector pass: motion blur reads the velocity cook inside the renderer and does not export it
 ViewLayer.use_pass_position	done	View3DPanel.cpp:3928 Pass: Position
 ViewLayer.use_pass_mist	done	View3DPanel.cpp:5268 Pass: Mist, with start, depth, falloff, intensity, height
 ViewLayer.use_pass_object_index	done	View3DPanel.cpp:5263 Pass picker: object index, shadow, AO, emission, environment
@@ -876,10 +876,10 @@ ViewLayer.use_pass_subsurface_color	out	material shading passes
 ViewLayer.objects	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.use	out	one view layer per scene; layers are outside the 3D View
 ViewLayer.depsgraph	out	one view layer per scene; layers are outside the 3D View
-ViewLayerEEVEE.use_pass_volume_direct	deferred	EEVEE layer terms need renderer work
-ViewLayerEEVEE.use_pass_bloom	deferred	EEVEE layer terms need renderer work
-ViewLayerEEVEE.use_pass_transparent	deferred	EEVEE layer terms need renderer work
-ViewLayerEEVEE.ambient_occlusion_distance	deferred	EEVEE layer terms need renderer work
+ViewLayerEEVEE.use_pass_volume_direct	out	no volumes, bloom pass or transparent pass in the renderer (bloom is a post effect on the colour)
+ViewLayerEEVEE.use_pass_bloom	out	no volumes, bloom pass or transparent pass in the renderer (bloom is a post effect on the colour)
+ViewLayerEEVEE.use_pass_transparent	out	no volumes, bloom pass or transparent pass in the renderer (bloom is a post effect on the colour)
+ViewLayerEEVEE.ambient_occlusion_distance	done	View3DPanel.cpp:5169 AO distance (Ambient Occlusion card)
 SpaceOutliner.display_mode	out	one flat list of scene items
 SpaceOutliner.use_filter_case_sensitive	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.use_filter_complete	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
@@ -934,11 +934,11 @@ OUTLINER_OT_orphans_manage	out	data-blocks, libraries, overrides, keying sets or
 OUTLINER_OT_orphans_purge	out	data-blocks, libraries, overrides, keying sets or orphans
 OUTLINER_OT_parent_clear	out	no parenting; groups only
 OUTLINER_OT_parent_drop	out	no parenting; groups only
-OUTLINER_OT_scene_drop	missing	Scene tab: drag to reorder or drop into a scene
+OUTLINER_OT_scene_drop	out	one 3D View is one scene; there is no second scene to drop an item into (reorder is done)
 OUTLINER_OT_scene_operation	out	data-blocks, libraries, overrides, keying sets or orphans
 OUTLINER_OT_scroll_page	out	flat list, no tree
 OUTLINER_OT_select_all	done	View3DPanel.cpp Select menu All / None
-OUTLINER_OT_select_box	missing	Scene tab: drag a box over rows
+OUTLINER_OT_select_box	done	View3DPanel.cpp:4361 Alt-drag over outliner rows selects
 OUTLINER_OT_select_walk	done	View3DPanel.cpp:4011 Outliner: drag to reorder, arrow walk, Show Active
 OUTLINER_OT_show_active	done	View3DPanel.cpp:4011 Outliner: drag to reorder, arrow walk, Show Active
 OUTLINER_OT_show_hierarchy	out	flat list, no tree
@@ -957,8 +957,8 @@ PreferencesInput.view_rotate_method	out	decided out in parity.md: turntable and 
 PreferencesInput.use_mouse_continuous	done	View3DPanel.cpp:2337 pointer wraps at view edge while orbiting
 PreferencesInput.use_drag_immediately	out	app-wide input settings, not the 3D View
 PreferencesInput.use_numeric_input_advanced	out	app-wide input settings, not the 3D View
-PreferencesInput.navigation_mode	deferred	walk and fly navigation: new mode, needs approval
-PreferencesInput.walk_navigation	deferred	walk and fly navigation: new mode, needs approval
+PreferencesInput.navigation_mode	out	walk with gravity needs a collision floor the scene does not have; Fly (right button + WASD) covers free flight
+PreferencesInput.walk_navigation	out	walk with gravity needs a collision floor the scene does not have; Fly (right button + WASD) covers free flight
 PreferencesInput.view_rotate_sensitivity_turntable	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesInput.view_rotate_sensitivity_trackball	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesInput.drag_threshold_mouse	out	app-wide input settings, not the 3D View
@@ -992,7 +992,7 @@ PreferencesInput.ndof_lock_camera_pan_zoom	out	3D mouse and XR are out (parity.m
 PreferencesInput.mouse_double_click_time	out	app-wide input settings, not the 3D View
 PreferencesInput.use_mouse_emulate_3_button	out	trackpad and Alt-drag cover it
 PreferencesInput.mouse_emulate_3_button_modifier	out	trackpad and Alt-drag cover it
-PreferencesInput.use_emulate_numpad	deferred	laptop-only, cosmetic (parity.md)
+PreferencesInput.use_emulate_numpad	out	laptop-only cosmetic: the numpad keys have the same digit-row bindings
 PreferencesInput.invert_zoom_wheel	done	View3DPanel.cpp:4004 Invert zoom direction
 PreferencesInput.touchpad_scroll_direction	out	trackpad gestures are handled by the app's input layer
 PreferencesView.show_tooltips	out	app-wide UI preferences
@@ -1022,22 +1022,22 @@ PreferencesEdit.use_duplicate_light	out	items reference nodes; no data is copied
 PreferencesEdit.use_duplicate_lightprobe	out	items reference nodes; no data is copied
 PreferencesEdit.use_duplicate_pointcloud	out	items reference nodes; no data is copied
 PreferencesEdit.use_duplicate_volume	out	items reference nodes; no data is copied
-VIEW3D_OT_camera_background_image_add	deferred	camera background image: new camera mode
-VIEW3D_OT_camera_background_image_remove	deferred	camera background image: new camera mode
+VIEW3D_OT_camera_background_image_add	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
+VIEW3D_OT_camera_background_image_remove	done	View3DPanel.cpp:4644 Camera Background Image card: open/remove image, alpha, front/back, fit, offset, rotation, scale, flip
 VIEW3D_OT_camera_to_view	done	View3DPanel.cpp:1594 CameraToView
 VIEW3D_OT_camera_to_view_selected	done	View3DPanel.cpp:1516 Align Active Camera to Selected
-VIEW3D_OT_clear_render_border	deferred	renderer crop region needed
-VIEW3D_OT_clip_border	deferred	renderer crop region needed
+VIEW3D_OT_clear_render_border	out	the output is always the full frame; to render a region, frame it with the camera
+VIEW3D_OT_clip_border	out	the output is always the full frame; to render a region, frame it with the camera
 VIEW3D_OT_copybuffer	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 VIEW3D_OT_cursor3d	done	View3DPanel.cpp:2680 Cursor mode of the Select chip
 VIEW3D_OT_dolly	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_drop_world	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
-VIEW3D_OT_fly	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_fly	done	View3DPanel.cpp:2148 right button held + WASD flies the camera
 VIEW3D_OT_interactive_add	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_localview	done	View3DPanel.cpp:1565 ToggleLocal
 VIEW3D_OT_localview_remove_from	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_move	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
-VIEW3D_OT_navigate	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_navigate	out	walk with gravity needs a collision floor the scene does not have; Fly (right button + WASD) covers free flight
 VIEW3D_OT_ndof_all	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_ndof_orbit	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_ndof_orbit_zoom	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
@@ -1045,7 +1045,7 @@ VIEW3D_OT_ndof_pan	out	3D mouse, modes, file drops or drag-to-create are out (pa
 VIEW3D_OT_object_as_camera	done	View3DPanel.cpp Render through this camera
 VIEW3D_OT_object_mode_pie_or_toggle	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_pastebuffer	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
-VIEW3D_OT_render_border	deferred	renderer crop region needed
+VIEW3D_OT_render_border	out	the output is always the full frame; to render a region, frame it with the camera
 VIEW3D_OT_rotate	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_ruler_add	done	View3DPanel.cpp:3622 Measure keeps rulers; Backspace removes last, menu clears
 VIEW3D_OT_ruler_remove	done	View3DPanel.cpp:3622 Measure keeps rulers; Backspace removes last, menu clears
@@ -1062,9 +1062,9 @@ VIEW3D_OT_snap_cursor_to_selected	done	View3DPanel.cpp:1261 CursorToSelected
 VIEW3D_OT_snap_selected_to_active	done	View3DPanel.cpp:1400 SelectionToActive
 VIEW3D_OT_snap_selected_to_cursor	done	View3DPanel.cpp:1353 SelectionToCursor
 VIEW3D_OT_snap_selected_to_grid	done	View3DPanel.cpp:1391 SelectionToGrid
-VIEW3D_OT_toggle_matcap_flip	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_toggle_matcap_flip	out	Solid mode in Infinite is the render shader with a studio/matcap/flat choice; studio-light rotation, blur, matcap AO and light-direction terms have no counterpart
 VIEW3D_OT_toggle_shading	done	View3DPanel.cpp:2926 shading chips (Shift+Z, Z)
-VIEW3D_OT_toggle_xray	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_toggle_xray	out	X-ray needs a blended second pass through both the opaque and full programs; the Wireframe shading mode already shows hidden edges
 VIEW3D_OT_transform_gizmo_set	done	View3DPanel.cpp:4012 Gizmos card and Shift+Space tool pick
 VIEW3D_OT_view_all	done	View3DPanel.cpp:1510 Frame All
 VIEW3D_OT_view_axis	done	View3DPanel.cpp:472 ViewAxisNow
@@ -1080,7 +1080,7 @@ VIEW3D_OT_view_pan	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, track
 VIEW3D_OT_view_persportho	done	View3DPanel.cpp:1504 Perspective/Orthographic
 VIEW3D_OT_view_roll	done	View3DPanel.cpp:1532 Roll Left / Right
 VIEW3D_OT_view_selected	done	View3DPanel.cpp:1509 Frame Selected
-VIEW3D_OT_walk	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_walk	out	walk with gravity needs a collision floor the scene does not have; Fly (right button + WASD) covers free flight
 VIEW3D_OT_zoom	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_zoom_border	done	View3DPanel.cpp:2872 Drag a box to zoom into
 VIEW3D_OT_zoom_camera_1_to_1	done	View3DPanel.cpp:1534 Zoom Camera 1:1

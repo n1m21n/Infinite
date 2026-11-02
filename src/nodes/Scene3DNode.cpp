@@ -118,10 +118,12 @@ public:
    unsigned int lightMask = ~0u;
    int passIndex = 0;
    float color[3] = { 1.0f, 1.0f, 1.0f };
+   bool casts = true;
    std::vector<std::unique_ptr<Placed>> children;
 
-   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index, const float* rgb)
+   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index, const float* rgb, bool castsShadow = true)
    {
+      casts = castsShadow;
       src = source;
       place = placement;
       lightMask = mask;
@@ -133,7 +135,7 @@ public:
       {
          if (!children[i])
             children[i] = std::make_unique<Placed>();
-         children[i]->Update(src->GroupChild(i), placement, mask, index, rgb);
+         children[i]->Update(src->GroupChild(i), placement, mask, index, rgb, castsShadow);
       }
    }
 
@@ -153,6 +155,7 @@ public:
    unsigned int LightMask() const override { return lightMask; }
    int PassIndex() const override { return passIndex; }
    void ObjectColor(float c[3]) const override { std::copy(color, color + 3, c); }
+   bool CastsShadow() const override { return casts; }
    Mat4 GetInstanceGroupMatrix() const override { return Mat4::Multiply(place, src->GetInstanceGroupMatrix()); }
    const std::vector<unsigned char>* InstanceSelection() const override { return src->InstanceSelection(); }
    unsigned long long InstanceSelectionRevision() const override { return src->InstanceSelectionRevision(); }
@@ -369,6 +372,8 @@ void Scene3DNode::Serialize()
          o << "look " << it.id << " " << it.lookAt << "\n";
       if (it.color[0] != 1.0f || it.color[1] != 1.0f || it.color[2] != 1.0f)
          o << "ocolor " << it.id << " " << it.color[0] << " " << it.color[1] << " " << it.color[2] << "\n";
+      if (!it.castShadow)
+         o << "shadowoff " << it.id << "\n";
       if (it.passIndex != 0)
          o << "pass " << it.id << " " << it.passIndex << "\n";
       if (it.trackAxis != 5 || it.upAxis != 1 || it.lookInfluence != 1.0f || it.lookTargetZ)
@@ -459,7 +464,7 @@ void Scene3DNode::Parse()
                v = (std::decay_t<decltype(v)>)x;
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
-               key == "delta" || key == "pass" || key == "ocolor" || key == "backdrop" || key == "lookx" || key == "show")
+               key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show")
       {
          int id = 0;
          l >> id;
@@ -483,6 +488,8 @@ void Scene3DNode::Parse()
             l >> it->lookAt;
          else if (key == "pass")
             l >> it->passIndex;
+         else if (key == "shadowoff")
+            it->castShadow = false;
          else if (key == "ocolor")
             l >> it->color[0] >> it->color[1] >> it->color[2];
          else if (key == "lookx")
@@ -850,7 +857,7 @@ void Scene3DNode::Sync(int frameId)
       std::unique_ptr<Placed>& placed = mPlaced[it.id];
       if (!placed)
          placed = std::make_unique<Placed>();
-      placed->Update(source, Placement(it), mask, it.passIndex, it.color);
+      placed->Update(source, Placement(it), mask, it.passIndex, it.color, it.castShadow);
       mRoot->draws.push_back(placed.get());
       if (it.render)
          mOutRoot->draws.push_back(placed.get());

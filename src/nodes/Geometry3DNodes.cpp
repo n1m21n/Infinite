@@ -2369,7 +2369,7 @@ void Render3DNode::CookOnce(int frameId)
          for (int i = 0; i < (int)mDraw.size(); i++)
          {
             IGeometrySource* source = mDraw[i];
-            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0)
+            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0 || !source->CastsShadow())
                continue;
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();

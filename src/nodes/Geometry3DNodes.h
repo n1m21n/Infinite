@@ -264,6 +264,9 @@ public:
    // The colour the Solid view's Object colour mode paints this source with; white by default.
    virtual void ObjectColor(float c[3]) const { c[0] = c[1] = c[2] = 1.0f; }
 
+   // False: the source is drawn to the picture but leaves no shadow (Blender's Object > Visibility > Shadow).
+   virtual bool CastsShadow() const { return true; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
