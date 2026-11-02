@@ -173,6 +173,7 @@ SETTINGS = {
     ("scene", "stampFrame"): S({"stamp": 1, "stampFrame": 1}),
     ("scene", "stampRange"): S({"stamp": 1, "stampRange": 1}),
     ("scene", "stampCamera"): S({"stamp": 1, "stampCamera": 1}),
+    ("scene", "stampRender"): S({"stamp": 1, "stampRender": 1}),
     ("scene", "stampLens"): S({"stamp": 1, "stampLens": 1}),
     ("scene", "stampScene"): S({"stamp": 1, "stampScene": 1}),
     ("scene", "stampLabels"): S({"stamp": 1, "stampDate": 1, "stampLabels": 0}),
@@ -218,7 +219,7 @@ SETTINGS = {
 }
 EXPECTED = {
     ("scene", "stampNote"): "the note text is its own line in the save file; the sweep cannot set it (VIEW3DTEST-level)",
-    ("scene", "stampRender"): "render-time stamp is not drawn yet",
+    ("scene", "frameStart"): "an offline render always begins at time 0; no start offset exists",
     ("cam", "orbitPerBeat"): "motion over beats; tested at frame 30",
     ("key", "orbitPerBeat"): "motion over beats; tested at frame 30",
     ("view", "floatOutput"): "16-bit float file; an 8-bit frame looks the same",

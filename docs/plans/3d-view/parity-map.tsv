@@ -290,7 +290,7 @@ Object.selection_sets	out	editing modes, 4D rotation, materials, rigging or simu
 Object.active_selection_set	out	editing modes, 4D rotation, materials, rigging or simulation
 OBJECT_OT_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_add_named	done	View3DPanel.cpp:2904 Add chip (Shift+A)
-OBJECT_OT_align	missing	Object menu: Align
+OBJECT_OT_align	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_anim_transforms_to_deltas	deferred	delta transform needs new Item fields
 OBJECT_OT_camera_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_constraint_add	out	constraint stack: Look at only (parity.md)
@@ -298,7 +298,7 @@ OBJECT_OT_constraint_add_with_targets	out	constraint stack: Look at only (parity
 OBJECT_OT_constraints_clear	out	constraint stack: Look at only (parity.md)
 OBJECT_OT_constraints_copy	out	constraint stack: Look at only (parity.md)
 OBJECT_OT_convert	out	geometry or mode editing
-OBJECT_OT_copy_global_transform	missing	Object menu: copy transform to clipboard
+OBJECT_OT_copy_global_transform	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_copy_relative_transform	out	relative to parent; no parenting
 OBJECT_OT_correctivesmooth_bind	out	geometry or mode editing
 OBJECT_OT_delete	done	View3DPanel.cpp:1183 DeleteSelected
@@ -310,20 +310,20 @@ OBJECT_OT_editmode_toggle	out	geometry or mode editing
 OBJECT_OT_empty_add	out	object types outside the scene
 OBJECT_OT_empty_image_add	out	object types outside the scene
 OBJECT_OT_forcefield_toggle	out	object types outside the scene
-OBJECT_OT_hide_render_clear_all	missing	Object menu: show all in renders
+OBJECT_OT_hide_render_clear_all	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_hide_view_clear	done	View3DPanel.cpp:3283 Show (Alt+H shows everything)
 OBJECT_OT_hide_view_set	done	View3DPanel.cpp:1608 HideSelected
 OBJECT_OT_instance_offset_from_cursor	out	instancing is geometry
 OBJECT_OT_instance_offset_from_object	out	instancing is geometry
 OBJECT_OT_instance_offset_to_cursor	out	instancing is geometry
-OBJECT_OT_isolate_type_render	missing	Object menu: render only one type
+OBJECT_OT_isolate_type_render	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_join	out	geometry or mode editing
 OBJECT_OT_join_shapes	out	geometry or mode editing
 OBJECT_OT_laplaciandeform_bind	out	geometry or mode editing
 OBJECT_OT_light_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
 OBJECT_OT_lightprobe_add	deferred	light probes need renderer work
 OBJECT_OT_lightprobe_cache_free	deferred	light probes need renderer work
-OBJECT_OT_location_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_location_clear	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_make_links_data	out	data-block linking
 OBJECT_OT_make_links_scene	out	data-block linking
 OBJECT_OT_meshdeform_bind	out	geometry or mode editing
@@ -341,22 +341,22 @@ OBJECT_OT_parent_clear	out	no parenting; groups only
 OBJECT_OT_parent_inverse_apply	out	no parenting; groups only
 OBJECT_OT_parent_no_inverse_set	out	no parenting; groups only
 OBJECT_OT_parent_set	out	no parenting; groups only
-OBJECT_OT_paste_transform	missing	Object menu: paste transform from clipboard
+OBJECT_OT_paste_transform	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_pointcloud_random_add	out	object types outside the scene
 OBJECT_OT_posemode_toggle	out	geometry or mode editing
 OBJECT_OT_quadriflow_remesh	out	geometry or mode editing
-OBJECT_OT_randomize_transform	missing	Object menu: randomize transform
-OBJECT_OT_rotation_clear	missing	Object menu: Clear Location, Rotation, Scale
-OBJECT_OT_scale_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_randomize_transform	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
+OBJECT_OT_rotation_clear	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
+OBJECT_OT_scale_clear	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_select_all	done	View3DPanel.cpp: Select menu All/None/Invert
 OBJECT_OT_select_by_type	done	View3DPanel.cpp:1328 SelectSameType
-OBJECT_OT_select_camera	missing	Select menu: select the active camera
+OBJECT_OT_select_camera	done	View3DPanel.cpp:1787 Select menu: active camera, pattern
 OBJECT_OT_select_grouped	done	View3DPanel.cpp:1315 SelectLinked (group)
 OBJECT_OT_select_hierarchy	out	no hierarchy
 OBJECT_OT_select_less	out	no hierarchy
 OBJECT_OT_select_linked	done	View3DPanel.cpp:1315 SelectLinked (group)
 OBJECT_OT_select_more	out	no hierarchy
-OBJECT_OT_select_pattern	missing	Select menu: select by name pattern
+OBJECT_OT_select_pattern	done	View3DPanel.cpp:1787 Select menu: active camera, pattern
 OBJECT_OT_select_random	done	View3DPanel.cpp:1290 SelectRandom
 OBJECT_OT_shade_auto_smooth	out	geometry or mode editing
 OBJECT_OT_shade_flat	out	geometry or mode editing
@@ -367,7 +367,7 @@ OBJECT_OT_track_clear	done	View3DPanel.cpp Look at card (lookAt)
 OBJECT_OT_track_set	done	View3DPanel.cpp Look at card (lookAt)
 OBJECT_OT_transform_apply	out	applies to mesh data; origins are node outputs
 OBJECT_OT_transform_axis_target	out	applies to mesh data; origins are node outputs
-OBJECT_OT_transform_to_mouse	missing	Object menu: move to mouse
+OBJECT_OT_transform_to_mouse	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 OBJECT_OT_transforms_to_deltas	deferred	delta transform needs new Item fields
 OBJECT_OT_unlink_data	out	data-block linking
 OBJECT_OT_visual_transform_apply	out	applies to mesh data; origins are node outputs
@@ -473,7 +473,7 @@ RENDER_OT_opengl	missing	Render tab: render the viewport as a still
 RENDER_OT_play_rendered_anim	out	external player
 RENDER_OT_preset_add	out	preset list UI
 RENDER_OT_render	done	View3DPanel.cpp:3803 RenderStill, Render Image / Render Animation
-RENDER_OT_view_cancel	missing	Render tab: cancel a running render
+RENDER_OT_view_cancel	done	View3DPanel.cpp:5094 Cancel Render button
 RENDER_OT_view_show	done	View3DPanel.cpp:3828 DrawRenderResult
 SCENE_OT_delete	done	View3DPanel.cpp:4159 Delete scene
 SCENE_OT_new	done	View3DPanel.cpp:4151 New scene
@@ -805,7 +805,7 @@ Scene.objects	done	View3DPanel.cpp:3159 Scene tab outliner
 Scene.frame_current	out	transport and timeline belong to the app
 Scene.frame_subframe	out	transport and timeline belong to the app
 Scene.frame_float	out	transport and timeline belong to the app
-Scene.frame_start	missing	Render tab > Frame Range: start and step
+Scene.frame_start	out	an offline render always begins at time 0; Infinite has no start offset (frame_step is built)
 Scene.frame_end	done	View3DPanel.cpp:3917 Seconds sets the render length
 Scene.frame_step	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 Scene.time_jump_unit	out	transport and timeline belong to the app
@@ -919,7 +919,7 @@ OUTLINER_OT_id_operation	out	data-blocks, libraries, overrides, keying sets or o
 OUTLINER_OT_id_paste	out	data-blocks, libraries, overrides, keying sets or orphans
 OUTLINER_OT_id_remap	out	data-blocks, libraries, overrides, keying sets or orphans
 OUTLINER_OT_item_activate	done	View3DPanel.cpp:3159 DrawOutliner row click selects
-OUTLINER_OT_item_drag_drop	missing	Scene tab: drag to reorder or drop into a scene
+OUTLINER_OT_item_drag_drop	done	View3DPanel.cpp:4011 Outliner: drag to reorder, arrow walk, Show Active
 OUTLINER_OT_item_openclose	out	flat list, no tree
 OUTLINER_OT_item_rename	done	View3DPanel.cpp Rename in the Scene tab list
 OUTLINER_OT_keyingset_add_selected	out	data-blocks, libraries, overrides, keying sets or orphans
@@ -939,8 +939,8 @@ OUTLINER_OT_scene_operation	out	data-blocks, libraries, overrides, keying sets o
 OUTLINER_OT_scroll_page	out	flat list, no tree
 OUTLINER_OT_select_all	done	View3DPanel.cpp Select menu All / None
 OUTLINER_OT_select_box	missing	Scene tab: drag a box over rows
-OUTLINER_OT_select_walk	missing	Scene tab: arrow keys walk the list
-OUTLINER_OT_show_active	missing	Scene tab: scroll to the active item
+OUTLINER_OT_select_walk	done	View3DPanel.cpp:4011 Outliner: drag to reorder, arrow walk, Show Active
+OUTLINER_OT_show_active	done	View3DPanel.cpp:4011 Outliner: drag to reorder, arrow walk, Show Active
 OUTLINER_OT_show_hierarchy	out	flat list, no tree
 OUTLINER_OT_show_one_level	out	flat list, no tree
 OUTLINER_OT_start_filter	done	View3DPanel.cpp:3185 Search field
@@ -951,7 +951,7 @@ PreferencesInput.use_multitouch_gestures	out	trackpad gestures are handled by th
 PreferencesInput.invert_mouse_zoom	done	View3DPanel.cpp:4004 Invert zoom direction
 PreferencesInput.use_mouse_depth_navigate	out	decided out in parity.md: turntable and zoom to pointer cover them
 PreferencesInput.use_zoom_to_mouse	done	View3DPanel.cpp:4002 Zoom to mouse
-PreferencesInput.use_auto_perspective	missing	View tab > Navigation: auto perspective
+PreferencesInput.use_auto_perspective	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesInput.use_rotate_around_active	done	View3DPanel.cpp:4003 Orbit around selection
 PreferencesInput.view_rotate_method	out	decided out in parity.md: turntable and zoom to pointer cover them
 PreferencesInput.use_mouse_continuous	missing	View tab > Navigation: wrap the pointer while dragging
@@ -959,8 +959,8 @@ PreferencesInput.use_drag_immediately	out	app-wide input settings, not the 3D Vi
 PreferencesInput.use_numeric_input_advanced	out	app-wide input settings, not the 3D View
 PreferencesInput.navigation_mode	deferred	walk and fly navigation: new mode, needs approval
 PreferencesInput.walk_navigation	deferred	walk and fly navigation: new mode, needs approval
-PreferencesInput.view_rotate_sensitivity_turntable	missing	View tab > Navigation: orbit sensitivity
-PreferencesInput.view_rotate_sensitivity_trackball	missing	View tab > Navigation: orbit sensitivity
+PreferencesInput.view_rotate_sensitivity_turntable	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesInput.view_rotate_sensitivity_trackball	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesInput.drag_threshold_mouse	out	app-wide input settings, not the 3D View
 PreferencesInput.drag_threshold_tablet	out	app-wide input settings, not the 3D View
 PreferencesInput.drag_threshold	out	app-wide input settings, not the 3D View
@@ -1003,16 +1003,16 @@ PreferencesView.show_splash	out	app-wide UI preferences
 PreferencesView.show_playback_fps	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 PreferencesView.show_navigate_ui	done	View3DPanel.cpp:4014 Navigate gizmo
 PreferencesView.use_mouse_over_open	out	app-wide UI preferences
-PreferencesView.mini_axis_type	missing	View tab: navigation gizmo size and brightness
-PreferencesView.mini_axis_size	missing	View tab: navigation gizmo size and brightness
-PreferencesView.mini_axis_brightness	missing	View tab: navigation gizmo size and brightness
-PreferencesView.smooth_view	missing	View tab > Navigation: smooth view time
-PreferencesView.rotation_angle	missing	View tab > Navigation: numpad step angle
+PreferencesView.mini_axis_type	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesView.mini_axis_size	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesView.mini_axis_brightness	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesView.smooth_view	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesView.rotation_angle	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesView.show_gizmo	done	View3DPanel.cpp:4012 Gizmos
-PreferencesView.gizmo_size	missing	View tab: gizmo size
-PreferencesView.gizmo_size_navigate_v3d	missing	View tab: gizmo size
+PreferencesView.gizmo_size	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
+PreferencesView.gizmo_size_navigate_v3d	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesView.lookdev_sphere_size	out	reference spheres belong to look dev, outside the README
-PreferencesEdit.object_align	missing	Add menu: align new items to world, view or cursor
+PreferencesEdit.object_align	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesEdit.undo_steps	out	the canvas owns undo
 PreferencesEdit.undo_memory_limit	out	the canvas owns undo
 PreferencesEdit.use_global_undo	out	the canvas owns undo
@@ -1028,14 +1028,14 @@ VIEW3D_OT_camera_to_view	done	View3DPanel.cpp:1594 CameraToView
 VIEW3D_OT_camera_to_view_selected	done	View3DPanel.cpp:1516 Align Active Camera to Selected
 VIEW3D_OT_clear_render_border	deferred	renderer crop region needed
 VIEW3D_OT_clip_border	deferred	renderer crop region needed
-VIEW3D_OT_copybuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_copybuffer	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 VIEW3D_OT_cursor3d	done	View3DPanel.cpp:2680 Cursor mode of the Select chip
 VIEW3D_OT_dolly	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_drop_world	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_fly	deferred	walk and fly navigation: new mode, needs approval
 VIEW3D_OT_interactive_add	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_localview	done	View3DPanel.cpp:1565 ToggleLocal
-VIEW3D_OT_localview_remove_from	missing	View menu: remove selected from local view
+VIEW3D_OT_localview_remove_from	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_move	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_navigate	deferred	walk and fly navigation: new mode, needs approval
 VIEW3D_OT_ndof_all	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
@@ -1044,7 +1044,7 @@ VIEW3D_OT_ndof_orbit_zoom	out	3D mouse, modes, file drops or drag-to-create are 
 VIEW3D_OT_ndof_pan	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
 VIEW3D_OT_object_as_camera	done	View3DPanel.cpp Render through this camera
 VIEW3D_OT_object_mode_pie_or_toggle	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
-VIEW3D_OT_pastebuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_pastebuffer	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 VIEW3D_OT_render_border	deferred	renderer crop region needed
 VIEW3D_OT_rotate	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_ruler_add	missing	Select chip: persistent ruler beside Measure
@@ -1057,7 +1057,7 @@ VIEW3D_OT_select_menu	out	click-cycle covers the overlapping list (parity.md)
 VIEW3D_OT_smoothview	done	View3DPanel.cpp:404 GlideTo
 VIEW3D_OT_snap_cursor_to_active	done	View3DPanel.cpp:1431 CursorToActive
 VIEW3D_OT_snap_cursor_to_center	done	View3DPanel.cpp:1425 CursorToOrigin
-VIEW3D_OT_snap_cursor_to_grid	missing	Snap menu: cursor to grid
+VIEW3D_OT_snap_cursor_to_grid	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_snap_cursor_to_selected	done	View3DPanel.cpp:1261 CursorToSelected
 VIEW3D_OT_snap_selected_to_active	done	View3DPanel.cpp:1400 SelectionToActive
 VIEW3D_OT_snap_selected_to_cursor	done	View3DPanel.cpp:1353 SelectionToCursor
@@ -1069,12 +1069,12 @@ VIEW3D_OT_transform_gizmo_set	done	View3DPanel.cpp:4012 Gizmos card and Shift+Sp
 VIEW3D_OT_view_all	done	View3DPanel.cpp:1510 Frame All
 VIEW3D_OT_view_axis	done	View3DPanel.cpp:472 ViewAxisNow
 VIEW3D_OT_view_camera	done	View3DPanel.cpp:2442 Camera view (0)
-VIEW3D_OT_view_center_camera	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_center_camera	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_center_cursor	done	View3DPanel.cpp:1527 Center Cursor and Frame All
-VIEW3D_OT_view_center_lock	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_center_lock	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_center_pick	missing	View menu: centre on camera or on the pointer
-VIEW3D_OT_view_lock_clear	missing	View tab: lock the view to the active item
-VIEW3D_OT_view_lock_to_active	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_lock_clear	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
+VIEW3D_OT_view_lock_to_active	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_orbit	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_view_pan	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
 VIEW3D_OT_view_persportho	done	View3DPanel.cpp:1504 Perspective/Orthographic

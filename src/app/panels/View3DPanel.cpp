@@ -97,8 +97,10 @@ namespace
    Scene3DNode::Settings* sSet = &sNoScene;
 
    float sTarget[3] = { 0, 0, 0 };
+   bool sLockActive = false;       // the orbit pivot follows the active item
    // One orbit speed for drag and trackpad: 0.4 degrees per pixel, the Blender default.
    constexpr float kOrbitPerPixel = 0.4f * 3.14159265f / 180.0f;
+   float RotStep();
    float sDist = 6.0f, sAz = 0.7f, sEl = 0.4f;
 
    bool sLasso = false;
@@ -342,6 +344,9 @@ namespace
       else
       {
          sCameraView = false;
+         if (sLockActive && !sSel.empty())
+            if (const Item* a = scene->FindItem(sSel.back()))
+               scene->ItemCenter(*a, sTarget);
          if (sSet->lockCursor)
             std::copy(sSet->cursor, sSet->cursor + 3, sTarget);
          EyeFromOrbit(sCam.eye);
@@ -441,7 +446,7 @@ namespace
       for (int i = 2; i < 6; i++)
          move = std::max(move, std::abs(to[i] - here[i]));
       const float turn = std::max(std::abs(to[0] - here[0]), std::abs(to[1] - here[1]));
-      float dur = 0.2f;
+      float dur = sSet->smoothTime;
       if (move < 1e-5f)
          dur *= turn / kPi;   // a small turn is quick, a half turn takes the full time
       if (dur < 0.012f || (turn < 1e-5f && move < 1e-5f))
@@ -458,6 +463,8 @@ namespace
       WriteView(here);
       (void)from;
    }
+
+   float RotStep() { return std::clamp(sSet->rotStep, 1.0f, 90.0f) * 3.14159265f / 180.0f; }
 
    // The view from before the camera, so toggling the camera off goes back to it (orbiting out starts at the camera).
    struct { bool set = false; float view[6]; float roll; bool ortho; } sPreCam;
@@ -513,8 +520,11 @@ namespace
       sEl = el[which];
       sViewName = which;
       sGridAxis = which / 2;
-      sAutoOrtho = sAutoOrtho || !sOrtho;
-      sOrtho = true;
+      if (sSet->autoPerspective)
+      {
+         sAutoOrtho = sAutoOrtho || !sOrtho;
+         sOrtho = true;
+      }
    }
 
    void ViewAxis(int which)
@@ -1468,20 +1478,6 @@ namespace
             sSel.insert(sSel.begin(), it.id);
    }
 
-   void DrawSelectItems(Scene3DNode* scene)
-   {
-      const bool any = !sSel.empty();
-      if (MenuParts::Item(T("All"), "A")) sSel = ShownIds(scene);
-      if (MenuParts::Item(T("None"), "Alt+A", false, any)) sSel.clear();
-      if (MenuParts::Item(T("Invert"), MODKEY "+I")) SelectInvert(scene);
-      MenuParts::Separator();
-      if (MenuParts::Item(T("Select Random"))) SelectRandom(scene, 0.5f);
-      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, sSel.size() > 1)) SelectChecker(scene);
-      MenuParts::Separator();
-      if (MenuParts::Item(T("Select Linked"), nullptr, false, any)) SelectLinked(scene);
-      if (MenuParts::Item(T("Select Same Type"), nullptr, false, any)) SelectSameType(scene);
-   }
-
    void SelectionToCursor(Scene3DNode* scene)
    {
       if (sSel.empty())
@@ -1683,6 +1679,224 @@ namespace
       scene->Commit();
    }
 
+   // ---- Object / Select / View operators ----
+   enum class ClearWhat { Location, Rotation, Scale };
+
+   void ClearTransform(Scene3DNode* scene, ClearWhat what)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Clear transform in 3D View");
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+         {
+            float* v = what == ClearWhat::Location ? it->pos : what == ClearWhat::Rotation ? it->rot : it->scale;
+            const float rest = what == ClearWhat::Scale ? 1.0f : 0.0f;
+            for (int k = 0; k < 3; k++)
+               if (!(it->lock & (1u << ((int)what * 3 + k))))
+                  v[k] = rest;
+         }
+      scene->Commit();
+   }
+
+   // Align every selected item to the active one along a display axis: 0 min, 1 centre, 2 max of the active's box.
+   void AlignSelected(Scene3DNode* scene, int displayAxis)
+   {
+      const Item* a = sSel.size() < 2 ? nullptr : scene->FindItem(sSel.back());
+      if (a == nullptr)
+         return;
+      float ac[3];
+      scene->ItemCenter(*a, ac);
+      const int axis = kDisp[displayAxis];
+      PushUndoCheckpoint("Align in 3D View");
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+            if (it != a)
+            {
+               float c[3];
+               scene->ItemCenter(*it, c);
+               it->pos[axis] += ac[axis] - c[axis];
+            }
+      scene->Commit();
+   }
+
+   void CopyGlobalTransform(Scene3DNode* scene)
+   {
+      const Item* a = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      if (a == nullptr)
+         return;
+      char buf[256];
+      snprintf(buf, sizeof(buf), "infinite-transform %g %g %g %g %g %g %g %g %g", a->pos[0], a->pos[1], a->pos[2], a->rot[0],
+               a->rot[1], a->rot[2], a->scale[0], a->scale[1], a->scale[2]);
+      ImGui::SetClipboardText(buf);
+   }
+
+   void PasteGlobalTransform(Scene3DNode* scene)
+   {
+      const char* text = ImGui::GetClipboardText();
+      float v[9];
+      if (text == nullptr || sSel.empty() ||
+          sscanf(text, "infinite-transform %f %f %f %f %f %f %f %f %f", v, v + 1, v + 2, v + 3, v + 4, v + 5, v + 6, v + 7, v + 8) != 9)
+         return;
+      PushUndoCheckpoint("Paste transform");
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+         {
+            std::copy(v, v + 3, it->pos);
+            std::copy(v + 3, v + 6, it->rot);
+            std::copy(v + 6, v + 9, it->scale);
+         }
+      scene->Commit();
+   }
+
+   void ShowAllInRenders(Scene3DNode* scene)
+   {
+      PushUndoCheckpoint("Show in renders");
+      for (Item& it : scene->Items())
+         it.render = true;
+      scene->Commit();
+   }
+
+   // Only the active item's kind stays in the render.
+   void IsolateTypeRender(Scene3DNode* scene)
+   {
+      const Item* a = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      if (a == nullptr)
+         return;
+      const Kind kind = scene->ItemKind(*a);
+      PushUndoCheckpoint("Render only one type");
+      for (Item& it : scene->Items())
+         it.render = scene->ItemKind(it) == kind;
+      scene->Commit();
+   }
+
+   void RandomizeTransform(Scene3DNode* scene)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Randomize transform");
+      static unsigned seed = 12345;
+      auto rnd = [&] { seed = seed * 1664525u + 1013904223u; return ((seed >> 8) & 0xFFFF) / 32768.0f - 1.0f; };
+      for (int id : sSel)
+         if (Item* it = scene->FindItem(id))
+            for (int k = 0; k < 3; k++)
+               it->pos[k] += rnd() * 0.5f;
+      scene->Commit();
+   }
+
+   void SelectActiveCamera(Scene3DNode* scene)
+   {
+      if (scene->FindItem(scene->activeCamera) != nullptr)
+         sSel = { scene->activeCamera };
+   }
+
+   char sPattern[64] = "*";
+   bool WildMatch(const char* pat, const char* str)
+   {
+      if (*pat == 0)
+         return *str == 0;
+      if (*pat == '*')
+         return WildMatch(pat + 1, str) || (*str != 0 && WildMatch(pat, str + 1));
+      return *str != 0 && std::tolower((unsigned char)*pat) == std::tolower((unsigned char)*str) && WildMatch(pat + 1, str + 1);
+   }
+
+   void SelectPattern(Scene3DNode* scene)
+   {
+      sSel.clear();
+      for (const Item& it : scene->Items())
+         if (Pickable(scene, it) && WildMatch(sPattern, ItemName(it).c_str()))
+            sSel.push_back(it.id);
+   }
+
+   // Move to the ground point under the last place the pointer was over the view.
+   ImVec2 sViewMouse(-1, -1);
+   void MoveToMouse(Scene3DNode* scene)
+   {
+      if (sSel.empty() || sViewMouse.x < 0)
+         return;
+      float o[3], d[3];
+      MouseRay(sViewMouse, o, d);
+      if (std::fabs(d[1]) < 1e-5f)
+         return;
+      const float t = -o[1] / d[1];
+      if (t <= 0.0f)
+         return;
+      const float hit[3] = { o[0] + d[0] * t, 0.0f, o[2] + d[2] * t };
+      MoveSelectionBy(scene, "Move to mouse", [&](const float c[3], float out[3]) {
+         for (int k = 0; k < 3; k++)
+            out[k] = hit[k] - c[k];
+      });
+   }
+
+   void SnapCursorToGrid()
+   {
+      const float step = sSet->snapMove > 0.0f ? sSet->snapMove : 1.0f;
+      PushUndoCheckpoint("Move 3D cursor");
+      for (int k = 0; k < 3; k++)
+         sSet->cursor[k] = SnapTo(sSet->cursor[k], step);
+   }
+
+   void RemoveFromLocal()
+   {
+      if (sLocal.empty())
+         return;
+      for (int id : sSel)
+         sLocal.erase(std::remove(sLocal.begin(), sLocal.end(), id), sLocal.end());
+   }
+
+   // The items last copied, to paste into this or another scene.
+   std::vector<Item> sBuffer;
+   void CopyBuffer(Scene3DNode* scene)
+   {
+      sBuffer.clear();
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            sBuffer.push_back(*it);
+   }
+
+   void PasteBuffer(Scene3DNode* scene)
+   {
+      if (sBuffer.empty())
+         return;
+      PushUndoCheckpoint("Paste in 3D View");
+      std::vector<int> made;
+      for (const Item& copy : sBuffer)
+      {
+         Item& fresh = scene->AddItem(copy.uid);
+         const int freshId = fresh.id;
+         fresh = copy;
+         fresh.id = freshId;
+         fresh.group = 0;
+         made.push_back(freshId);
+      }
+      scene->Commit();
+      sSel = made;
+   }
+
+   void DrawSelectItems(Scene3DNode* scene)
+   {
+      const bool any = !sSel.empty();
+      if (MenuParts::Item(T("All"), "A")) sSel = ShownIds(scene);
+      if (MenuParts::Item(T("None"), "Alt+A", false, any)) sSel.clear();
+      if (MenuParts::Item(T("Invert"), MODKEY "+I")) SelectInvert(scene);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Select Random"))) SelectRandom(scene, 0.5f);
+      if (MenuParts::Item(T("Checker Deselect"), nullptr, false, sSel.size() > 1)) SelectChecker(scene);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Select Linked"), nullptr, false, any)) SelectLinked(scene);
+      if (MenuParts::Item(T("Select Same Type"), nullptr, false, any)) SelectSameType(scene);
+      if (MenuParts::Item(T("Active Camera"), nullptr, false, scene->activeCamera != 0)) SelectActiveCamera(scene);
+      if (MenuParts::SubMenu(T("Select Pattern"), true))
+      {
+         ImGui::SetNextItemWidth(160.0f);
+         if (FieldWell::InputText("##v3dpattern", sPattern, sizeof(sPattern), ImGuiInputTextFlags_EnterReturnsTrue))
+            SelectPattern(scene);
+         if (MenuParts::Item(T("Select")))
+            SelectPattern(scene);
+         ImGui::EndMenu();
+      }
+   }
+
    void DrawSnapItems(Scene3DNode* scene)
    {
       const bool any = !sSel.empty();
@@ -1694,6 +1908,7 @@ namespace
       if (MenuParts::Item(T("Cursor to Selected"), nullptr, false, any)) CursorToSelected(scene);
       if (MenuParts::Item(T("Cursor to Active"), nullptr, false, any)) CursorToActive(scene);
       if (MenuParts::Item(T("Cursor to World Origin"))) CursorToOrigin();
+      if (MenuParts::Item(T("Cursor to Grid"))) SnapCursorToGrid();
    }
 
    void DrawViewItems(Scene3DNode* scene)
@@ -1714,6 +1929,12 @@ namespace
       if (MenuParts::Item(T("Frame Selected"), "F", false, any)) FrameItems(scene, false);
       if (MenuParts::Item(T("Frame All"), "Home")) FrameItems(scene, true);
       if (MenuParts::Item(T("Toggle Local View"), "/", !sLocal.empty(), any || !sLocal.empty())) ToggleLocal(scene);
+      if (MenuParts::Item(T("Remove from Local View"), nullptr, false, !sLocal.empty() && any)) RemoveFromLocal();
+      if (MenuParts::Item(T("Lock View to Active"), nullptr, sLockActive, any || sLockActive)) sLockActive = !sLockActive;
+      if (MenuParts::Item(T("Center Camera"), nullptr, false, sCameraView))
+      {
+         sCamPan = ImVec2(0, 0);
+      }
       MenuParts::Separator();
       MenuParts::Separator();
       const bool cam = scene->activeCamera != 0;
@@ -1734,8 +1955,8 @@ namespace
          CursorToOrigin();
          FrameItems(scene, true);
       }
-      if (MenuParts::Item(T("Roll Left"), "Shift+Numpad 4")) { LeaveCamera(); sRoll -= 0.2618f; sViewName = -1; }
-      if (MenuParts::Item(T("Roll Right"), "Shift+Numpad 6")) { LeaveCamera(); sRoll += 0.2618f; sViewName = -1; }
+      if (MenuParts::Item(T("Roll Left"), "Shift+Numpad 4")) { LeaveCamera(); sRoll -= RotStep(); sViewName = -1; }
+      if (MenuParts::Item(T("Roll Right"), "Shift+Numpad 6")) { LeaveCamera(); sRoll += RotStep(); sViewName = -1; }
       if (MenuParts::Item(T("Zoom Camera 1:1"), nullptr, false, sCameraView))
       {
          sCamZoom = 1.0f;
@@ -1762,6 +1983,30 @@ namespace
          ImGui::EndMenu();
       }
       if (MenuParts::Item(T("Copy Transforms from Active"), MODKEY "+L", false, sSel.size() > 1)) CopyTransformsFromActive(scene);
+      if (MenuParts::SubMenu(T("Clear"), any))
+      {
+         if (MenuParts::Item(T("Location"))) ClearTransform(scene, ClearWhat::Location);
+         if (MenuParts::Item(T("Rotation"))) ClearTransform(scene, ClearWhat::Rotation);
+         if (MenuParts::Item(T("Scale"))) ClearTransform(scene, ClearWhat::Scale);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(T("Align"), sSel.size() > 1))
+      {
+         if (MenuParts::Item(T("X"))) AlignSelected(scene, 0);
+         if (MenuParts::Item(T("Y"))) AlignSelected(scene, 1);
+         if (MenuParts::Item(T("Z"))) AlignSelected(scene, 2);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
+      if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
+      if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
+      if (MenuParts::Item(T("Move to Mouse"), nullptr, false, any)) MoveToMouse(scene);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Copy Items"), nullptr, false, any)) CopyBuffer(scene);
+      if (MenuParts::Item(T("Paste Items"), nullptr, false, !sBuffer.empty())) PasteBuffer(scene);
+      MenuParts::Separator();
+      if (MenuParts::Item(T("Show All in Renders"))) ShowAllInRenders(scene);
+      if (MenuParts::Item(T("Render Only This Type"), nullptr, false, any)) IsolateTypeRender(scene);
       MenuParts::Separator();
       if (MenuParts::Item(T("Hide Selected"), "H", false, any)) HideSelected(scene);
       if (MenuParts::Item(T("Hide Unselected"), "Shift+H", false, any)) HideUnselected(scene);
@@ -2007,15 +2252,15 @@ namespace
          else if (digit(9))
             GlideTo([&] { OrbitBy(scene, kPi, 0.0f); });
          else if (digit(2) || digit(8))
-            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? 0.2618f : -0.2618f); });
+            GlideTo([&] { OrbitBy(scene, 0.0f, digit(8) ? RotStep() : -RotStep()); });
          else if (io.KeyShift && (pressed(ImGuiKey_Keypad4) || pressed(ImGuiKey_Keypad6)))
          {
             LeaveCamera();
-            sRoll += pressed(ImGuiKey_Keypad6) ? 0.2618f : -0.2618f;
+            sRoll += pressed(ImGuiKey_Keypad6) ? RotStep() : -RotStep();
             sViewName = -1;
          }
          else if (digit(4) || digit(6))
-            GlideTo([&] { OrbitBy(scene, digit(6) ? 0.2618f : -0.2618f, 0.0f); });
+            GlideTo([&] { OrbitBy(scene, digit(6) ? RotStep() : -RotStep(), 0.0f); });
          else if (pressed(ImGuiKey_A))
          {
             sSel.clear();
@@ -2073,7 +2318,7 @@ namespace
          if (io.KeyShift)
             Pan(io.MouseDelta.x, io.MouseDelta.y);
          else
-            OrbitBy(scene, io.MouseDelta.x * kOrbitPerPixel, io.MouseDelta.y * kOrbitPerPixel);
+            OrbitBy(scene, io.MouseDelta.x * kOrbitPerPixel * sSet->orbitSens, io.MouseDelta.y * kOrbitPerPixel * sSet->orbitSens);
       }
       if (hovered && sOp.mode != 0 && sSet->proportional && io.MouseWheel != 0.0f)
          sSet->propSize = std::clamp(sSet->propSize * std::pow(1.1f, -io.MouseWheel), 0.05f, 500.0f);
@@ -2609,7 +2854,7 @@ namespace
       ImVec2 c;
       if (sTool == 0 || !Project(at, c))
          return -1;
-      const float len = UnitAt(at) * kGizmoPx;
+      const float len = UnitAt(at) * kGizmoPx * sSet->gizmoSize / 75.0f;
       int hot = -1;
       float best = 9.0f;
       const ImU32 white = Hex(kHotHandle);
@@ -2723,8 +2968,12 @@ namespace
    // Top right: the three axes as they stand now. Click a ball for that view, drag to orbit.
    int DrawNavGizmo(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImVec2 mouse, bool hovered, bool& onDisc)
    {
-      const ImVec2 c(mx.x - 52.0f, mn.y + 52.0f);
-      const float r = 34.0f;
+      const float pad = 52.0f * sSet->miniSize / 80.0f;
+      const ImVec2 c(mx.x - pad, mn.y + pad);
+      const float r = 34.0f * sSet->miniSize / 80.0f;
+      const float ballK = sSet->gizmoNavSize / 80.0f;
+      hovered = hovered && sSet->miniAxes == 2;
+      const int firstVtx = dl->VtxBuffer.Size;
       onDisc = hovered && std::hypot(mouse.x - c.x, mouse.y - c.y) < r + 12.0f;
       if (onDisc || sNavDrag)
          dl->AddCircleFilled(c, r + 12.0f, Hex(kHotHandle, 0.10f), 48);
@@ -2746,7 +2995,7 @@ namespace
          const bool hot = onDisc && std::hypot(mouse.x - b.at.x, mouse.y - b.at.y) < 10.0f;
          if (hot)
             hit = b.axis * 2 + ((b.neg != (b.axis == 2)) ? 1 : 0);   // ViewAxis counts engine sides
-         const float size = b.neg ? 7.0f : 9.0f;
+         const float size = (b.neg ? 7.0f : 9.0f) * ballK;
          if (b.neg)
          {
             dl->AddCircleFilled(b.at, size, AxisColor(b.axis, hot ? 0.9f : 0.35f), 24);
@@ -2758,6 +3007,12 @@ namespace
          const char label[2] = { (char)('X' + kDisp[b.axis]), 0 };
          const ImVec2 ts = ImGui::CalcTextSize(label);
          dl->AddText(ImVec2(b.at.x - ts.x * 0.5f, b.at.y - ts.y * 0.5f), Hex(0x000000), label);
+      }
+      for (int i = firstVtx; i < dl->VtxBuffer.Size; i++)
+      {
+         ImU32& col = dl->VtxBuffer[i].col;
+         const ImU32 al = (ImU32)(((col >> IM_COL32_A_SHIFT) & 0xFF) * std::clamp(sSet->miniBright, 0.0f, 1.0f));
+         col = (col & ~IM_COL32_A_MASK) | (al << IM_COL32_A_SHIFT);
       }
       return hit;
    }
@@ -3092,6 +3347,8 @@ namespace
          dl->AddImage((ImTextureID)(intptr_t)tex, mn, mx, ImVec2(0, 1), ImVec2(1, 0));
 
       const ImVec2 mouse = io.MousePos;
+      if (hovered)
+         sViewMouse = mouse;
       int selCount = 0;
       bool cameraSelected = false;
       for (const Item& it : scene->Items())
@@ -3154,7 +3411,7 @@ namespace
       const bool canGrab = hovered && sOp.mode == 0 && !sBoxOn;
       bool onNav = false;
       int navBall = -1;
-      if (sSet->gizmoNav)
+      if (sSet->gizmoNav && sSet->miniAxes > 0)
          navBall = DrawNavGizmo(dl, mn, mx, mouse, hovered && sOp.mode == 0, onNav);
       bool onPad = false;
       if (sSet->gizmoMove)
@@ -3797,6 +4054,9 @@ namespace
          BoolRow(T("Selectable column"), &f.colSelect);
          BoolRow(T("Render column"), &f.colRender);
       }
+      bool scrollToActive = false;
+      if (ActionButton::Draw(L("Show Active"), ImVec2(availW, 0)))
+         scrollToActive = true;
       const Scene3DNode::Settings& lf = *sSet;
       const std::string search = lf.listCase ? std::string(sSearch) : lower(sSearch);
       auto passes = [&](const Item& it)
@@ -3832,6 +4092,17 @@ namespace
             order.push_back(row);
       if (lf.listSort)
          std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return lower(ItemName(items[a])) < lower(ItemName(items[b])); });
+      if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !sSel.empty() && sRename == 0 &&
+          (ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)) && !order.empty())
+      {
+         // Arrow keys walk the shown list.
+         auto at = std::find_if(order.begin(), order.end(), [&](int r) { return items[r].id == sSel.back(); });
+         int next = at == order.end() ? 0 : (int)(at - order.begin()) + (ImGui::IsKeyPressed(ImGuiKey_DownArrow) ? 1 : -1);
+         next = std::clamp(next, 0, (int)order.size() - 1);
+         sSel = { items[order[next]].id };
+         scrollToActive = true;
+      }
+      int dragFrom = -1, dragTo = -1;
       for (int row : order)
       {
          Item& it = items[row];
@@ -3859,6 +4130,23 @@ namespace
             else
                sSel = { it.id };
          }
+         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+         {
+            ImGui::SetDragDropPayload("v3ditem", &row, sizeof(int));
+            ImGui::TextUnformatted(ItemName(it).c_str());
+            ImGui::EndDragDropSource();
+         }
+         if (ImGui::BeginDragDropTarget())
+         {
+            if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("v3ditem"))
+            {
+               dragFrom = *(const int*)pl->Data;
+               dragTo = row;
+            }
+            ImGui::EndDragDropTarget();
+         }
+         if (scrollToActive && !sSel.empty() && sSel.back() == it.id)
+            ImGui::SetScrollHereY();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             StartRename(it);
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -3942,6 +4230,14 @@ namespace
       }
       if (count > 0)
          ImGui::EndChild();
+      if (dragFrom >= 0 && dragTo >= 0 && dragFrom != dragTo)
+      {
+         PushUndoCheckpoint("Reorder in 3D View");
+         Item moved = items[dragFrom];
+         items.erase(items.begin() + dragFrom);
+         items.insert(items.begin() + dragTo, moved);
+         scene->Commit();
+      }
    }
 
    // What an item can point at: its own kind, or anything once its node is gone.
@@ -4629,7 +4925,6 @@ namespace
          out->videoFormat = EndsWith(path, ".mov") ? 1 : 0;
          out->offlineDurationSeconds = (int)sSet->seconds;
          out->offlineFps = std::max(1, (int)(sSet->fps / std::max(1, sSet->frameStep)));
-         out->offlineDurationSeconds = std::max(1, (int)sSet->seconds - (int)(sSet->frameStart / std::max(1.0f, sSet->fps)));
          KeepRender(path);
          StartOfflineRenderSession(out);
       }
@@ -4828,8 +5123,6 @@ namespace
             sSet->seconds = (float)std::clamp(seconds, 1, 3600);
          FieldLabel(T("Frames"));
          ImGui::Text("%d", (int)(sSet->seconds * sSet->fps) / std::max(1, sSet->frameStep));
-         IntInputRow(T("Start"), &sSet->frameStart);
-         sSet->frameStart = std::max(0, sSet->frameStart);
          IntInputRow(T("Step"), &sSet->frameStep);
          sSet->frameStep = std::clamp(sSet->frameStep, 1, 100);
       }
@@ -4843,6 +5136,7 @@ namespace
          BoolRow(T("Camera"), &sSet->stampCamera);
          BoolRow(T("Lens"), &sSet->stampLens);
          BoolRow(T("Scene"), &sSet->stampScene);
+         BoolRow(T("Render time"), &sSet->stampRender);
          BoolRow(T("Note"), &sSet->stampNote);
          if (sSet->stampNote)
          {
@@ -4897,6 +5191,10 @@ namespace
       if (ActionButton::Draw(L("Render Animation"), ImVec2(availW, 0), ActionButton::Kind::Primary))
          StartRender(scene);
       ImGui::EndDisabled();
+      ImGui::BeginDisabled(!gOfflineRender.active);
+      if (ActionButton::Draw(L("Cancel Render"), ImVec2(availW, 0)))
+         ArrangeRenderCancelActive();
+      ImGui::EndDisabled();
       if (scene->activeCamera == 0)
          Hint(T("Add a camera to render."));
       DrawRenderResult(availW);
@@ -4933,6 +5231,18 @@ namespace
          if (ActionButton::Draw(L("Delete Orientation"), ImVec2(availW, 0)))
             DeleteOrientation();
          ImGui::EndDisabled();
+      }
+      if (Card(T("Preferences"), nullptr, false))
+      {
+         ComboRow(T("Mini axes"), &set.miniAxes, std::vector<std::string>{ T("Off"), T("Simple axes"), T("Navigation") });
+         FloatRow(T("Mini axes size"), &set.miniSize, 40.0f, 160.0f, "%.0f");
+         FloatRow(T("Mini axes brightness"), &set.miniBright, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Navigation gizmo size"), &set.gizmoNavSize, 40.0f, 160.0f, "%.0f");
+         FloatRow(T("Transform gizmo size"), &set.gizmoSize, 40.0f, 160.0f, "%.0f");
+         FloatRow(T("Smooth view"), &set.smoothTime, 0.0f, 1.0f, "%.2f s");
+         FloatRow(T("Rotation step"), &set.rotStep, 1.0f, 90.0f, "%.0f");
+         BoolRow(T("Auto perspective"), &set.autoPerspective);
+         FloatRow(T("Orbit sensitivity"), &set.orbitSens, 0.1f, 5.0f, "%.2f");
       }
       if (Card(T("Units")))
       {

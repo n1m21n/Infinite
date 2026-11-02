@@ -33,13 +33,13 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | World | 3 | 0 | 14 | 1 | 18 |
 | Render | 36 | 1 | 56 | 45 | 138 |
 | Output | 1 | 0 | 0 | 41 | 42 |
-| Scene | 10 | 1 | 0 | 24 | 35 |
+| Scene | 10 | 0 | 0 | 25 | 35 |
 | View layer | 3 | 0 | 15 | 26 | 44 |
 | Outliner | 12 | 0 | 0 | 11 | 23 |
-| Preferences: navigation and input | 4 | 4 | 3 | 39 | 50 |
-| Preferences: viewport | 5 | 8 | 0 | 14 | 27 |
-| **All settings** | **247** | **18** | **249** | **330** | **844** |
-| **Operators** | **77** | **33** | **14** | **117** | **241** |
+| Preferences: navigation and input | 7 | 1 | 3 | 39 | 50 |
+| Preferences: viewport | 13 | 0 | 0 | 14 | 27 |
+| **All settings** | **258** | **6** | **249** | **331** | **844** |
+| **Operators** | **101** | **9** | **14** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
 Re-run the probe after each block: `python3 tools/3dview_parity_probe.py --md docs/plans/3d-view/blender-inventory.md`.
@@ -129,60 +129,18 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 
 - Stamp Render Time (`RenderSettings.use_stamp_render_time`): Render tab > Output: burn-in stamp fields
 
-### Scene (1)
+### Preferences: navigation and input (1)
 
-- Start Frame (`Scene.frame_start`): Render tab > Frame Range: start and step
-
-### Preferences: navigation and input (4)
-
-- Auto Perspective (`PreferencesInput.use_auto_perspective`): View tab > Navigation: auto perspective
 - Continuous Grab (`PreferencesInput.use_mouse_continuous`): View tab > Navigation: wrap the pointer while dragging
-- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_turntable`): View tab > Navigation: orbit sensitivity
-- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_trackball`): View tab > Navigation: orbit sensitivity
 
-### Preferences: viewport (8)
-
-- Mini Axes Type (`PreferencesView.mini_axis_type`): View tab: navigation gizmo size and brightness
-- Mini Axes Size (`PreferencesView.mini_axis_size`): View tab: navigation gizmo size and brightness
-- Mini Axes Brightness (`PreferencesView.mini_axis_brightness`): View tab: navigation gizmo size and brightness
-- Smooth View (`PreferencesView.smooth_view`): View tab > Navigation: smooth view time
-- Rotation Angle (`PreferencesView.rotation_angle`): View tab > Navigation: numpad step angle
-- Gizmo Size (`PreferencesView.gizmo_size`): View tab: gizmo size
-- Navigate Gizmo Size (`PreferencesView.gizmo_size_navigate_v3d`): View tab: gizmo size
-- Align Object To (`PreferencesEdit.object_align`): Add menu: align new items to world, view or cursor
-
-### Operators (33)
+### Operators (9)
 
 - Add Camera Preset (`CAMERA_OT_preset_add`): Camera Data tab: camera presets
-- Align Objects (`OBJECT_OT_align`): Object menu: Align
-- Copy Global Transform (`OBJECT_OT_copy_global_transform`): Object menu: copy transform to clipboard
-- Clear All Restrict Render (`OBJECT_OT_hide_render_clear_all`): Object menu: show all in renders
-- Restrict Render Unselected (`OBJECT_OT_isolate_type_render`): Object menu: render only one type
-- Clear Location (`OBJECT_OT_location_clear`): Object menu: Clear Location, Rotation, Scale
-- Paste Global Transform (`OBJECT_OT_paste_transform`): Object menu: paste transform from clipboard
-- Randomize Transform (`OBJECT_OT_randomize_transform`): Object menu: randomize transform
-- Clear Rotation (`OBJECT_OT_rotation_clear`): Object menu: Clear Location, Rotation, Scale
-- Clear Scale (`OBJECT_OT_scale_clear`): Object menu: Clear Location, Rotation, Scale
-- Select Camera (`OBJECT_OT_select_camera`): Select menu: select the active camera
-- Select Pattern (`OBJECT_OT_select_pattern`): Select menu: select by name pattern
-- Place Object Under Mouse (`OBJECT_OT_transform_to_mouse`): Object menu: move to mouse
-- Drag and Drop (`OUTLINER_OT_item_drag_drop`): Scene tab: drag to reorder or drop into a scene
 - Drop Object to Scene (`OUTLINER_OT_scene_drop`): Scene tab: drag to reorder or drop into a scene
 - Box Select (`OUTLINER_OT_select_box`): Scene tab: drag a box over rows
-- Walk Select (`OUTLINER_OT_select_walk`): Scene tab: arrow keys walk the list
-- Show Active (`OUTLINER_OT_show_active`): Scene tab: scroll to the active item
 - Viewport Render (`RENDER_OT_opengl`): Render tab: render the viewport as a still
-- Cancel Render View (`RENDER_OT_view_cancel`): Render tab: cancel a running render
 - Trackball (`TRANSFORM_OT_trackball`): Rotate: trackball mode (R twice)
-- Copy Objects (`VIEW3D_OT_copybuffer`): Object menu: copy and paste items between scenes
-- Remove from Local View (`VIEW3D_OT_localview_remove_from`): View menu: remove selected from local view
-- Paste Objects (`VIEW3D_OT_pastebuffer`): Object menu: copy and paste items between scenes
 - Ruler Add (`VIEW3D_OT_ruler_add`): Select chip: persistent ruler beside Measure
 - Ruler Remove (`VIEW3D_OT_ruler_remove`): Select chip: persistent ruler beside Measure
 - Circle Select (`VIEW3D_OT_select_circle`): Select chip: circle select
-- Snap Cursor to Grid (`VIEW3D_OT_snap_cursor_to_grid`): Snap menu: cursor to grid
-- Frame Camera Bounds (`VIEW3D_OT_view_center_camera`): View menu: centre on camera or on the pointer
-- View Lock Center (`VIEW3D_OT_view_center_lock`): View tab: lock the view to the active item
 - Center View to Mouse (`VIEW3D_OT_view_center_pick`): View menu: centre on camera or on the pointer
-- View Lock Clear (`VIEW3D_OT_view_lock_clear`): View tab: lock the view to the active item
-- View Lock to Active (`VIEW3D_OT_view_lock_to_active`): View tab: lock the view to the active item

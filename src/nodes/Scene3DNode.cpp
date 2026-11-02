@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <ctime>
 #include <sstream>
 
@@ -1062,6 +1063,7 @@ unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameI
          }
       }
       if (st.stampScene) add("Scene", "Scene");
+      if (st.stampRender) { std::snprintf(buf, sizeof(buf), "%.1f ms", mCookMs); add("Render", buf); }
       if (st.stampNote && !stampNote.empty()) add("Note", stampNote);
    }
    const bool stamped = !text.empty();
@@ -1191,7 +1193,9 @@ void Scene3DNode::CookIfNeeded(int frameId)
       mRender.samples = 0;
       mRender.supersample = 1;
    }
+   const auto cookStart = std::chrono::steady_clock::now();
    mRender.CookIfNeeded(frameId);
+   mCookMs = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - cookStart).count();
    mRender.samples = keptSamples;
    mRender.supersample = keptSuper;
 
@@ -1228,7 +1232,7 @@ void Scene3DNode::CookIfNeeded(int frameId)
       std::vector<float> vals = { settings.dither, settings.filterSize, settings.gamma, (float)settings.look, (float)settings.stamp,
                                   settings.stampSize, (float)(settings.stampTime + 2 * settings.stampDate + 4 * settings.stampFrame +
                                   8 * settings.stampRange + 16 * settings.stampCamera + 32 * settings.stampLens +
-                                  64 * settings.stampScene + 128 * settings.stampNote + 256 * settings.stampLabels),
+                                  64 * settings.stampScene + 128 * settings.stampNote + 256 * settings.stampLabels + 512 * settings.stampRender),
                                   settings.stampFg[0], settings.stampFg[1], settings.stampFg[2], settings.stampBg[0],
                                   settings.stampBg[1], settings.stampBg[2], settings.stamp ? (float)frameId : 0.0f };
       for (float f : vals)

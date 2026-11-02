@@ -292,6 +292,7 @@ private:
    unsigned int Border(unsigned int sceneTex, int w, int h);
    unsigned int Finish(unsigned int sceneTex, int w, int h, int frameId);
    GLUtil::Fbo mFinishFbo;
+   float mCookMs = 0.0f;
    unsigned int mFinishProgram = 0, mStampTex = 0;
    int mStampW = 0, mStampH = 0;
    std::string mStampKey;
