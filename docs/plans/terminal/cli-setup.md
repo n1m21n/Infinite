@@ -116,3 +116,11 @@ Adding Codex or Gemini later is one more row.
 - Manual on the owner's Mac: see the final report.
 
 Added for D18 to D20: launcher text identical on every run (rewritten only when different); "app moved": the record is stale and the old file gone, so the step is amber until the next start rewrites the record, and after it the launcher resolves; profile line removed, agent uninstalled, registration gone, node removed each turn exactly their own step amber; Repair types one sh line and seeds the others from the last status. Covered by the CLISETUPTEST cases 11.
+
+## Later decisions (2026-11-02)
+
+| # | Topic | Decision | Why |
+|---|---|---|---|
+| D21 | AI skills | The agent step also copies the three shipped skill files (patch authoring, Field language, Expression globals) into the agent's skills folder (`~/.claude/skills/<name>/SKILL.md` for Claude Code), only when they differ. The launch check compares them byte for byte; a missing or stale file turns the agent step amber with Repair | Agents write valid patches before the first prompt; Infinite updates keep them current |
+| D22 | Validators | Each skill ends with "validate before you hand over" (`infinite patch check`, `infinite code check`, `Infinite --validate`), and the MCP handshake says: read the patch-authoring skill before writing patches, validate before finishing | Unvalidated output sends users into debugging |
+| D23 | Page | One card of labelled rows at one control width (Status, Coding agent, Setup, Agent, Start with Terminal, Terminal panel). Steps list only what is wrong. Everything else (panel, command, headless, AI skills, setup commands) sits in a Reference card: topic dropdown plus the same recessed well and code blocks (with Copy) as the Field Language page | Owner review: less information, one design language |
