@@ -1,5 +1,5 @@
 #pragma once
-// Factory presets for audio nodes (v0.6 2.4): one table keyed by node type.
+// Factory presets for audio nodes (v0.6 2.4) and Material: one table keyed by node type.
 // A preset is a list of saved-param keys and values laid over the type's
 // defaults and applied through Patch::LoadParams, the same path a patch load
 // takes, so a preset can set anything a saved patch can and nothing else.

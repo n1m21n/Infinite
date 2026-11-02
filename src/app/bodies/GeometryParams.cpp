@@ -717,7 +717,8 @@ namespace app
       ImGui::EndDisabled();
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f, "%.3f", colW);
       ModCheckbox("texture alpha", &n->textureAlpha);
-      ImGui::BeginDisabled(!(n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha));
+      ImGui::BeginDisabled(!(n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha ||
+                             n->MapInput(kMapOpacity).IsConnected()));
       ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
 

@@ -1,6 +1,7 @@
 // The 3D View: a final-stage composer over node outputs. Everything here edits
 // the Scene3DNode's placements; the nodes themselves are only ever read, so a
 // source keeps animating under whatever arrangement is made on top of it.
+#include "core/FactoryPresets.h"
 #include "app/AppCommon.h"
 #include "app/AppShared.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -5669,6 +5670,19 @@ namespace
          return;
       }
       DrawPreviewBall(mat, availW);
+      if (const std::vector<FactoryPresets::Preset>* presets = FactoryPresets::For(gn->typeName))
+      {
+         // Picking lays a preset over the defaults; the row then shows "-" again.
+         std::vector<std::string> names = { "-" };
+         for (const FactoryPresets::Preset& p : *presets)
+            names.push_back(p.name);
+         int pick = 0;
+         if (ComboRow(T("Preset"), &pick, names, "Material preset") && pick > 0)
+         {
+            FactoryPresets::Apply(mat, gn->typeName, pick - 1);
+            gPatchDirty = true;
+         }
+      }
       if (Card(T("Surface")))
       {
          ComboRow(T("Shading"), &mat->shading, GeometryNode::ShadingNames(), "Material shading");
@@ -5691,7 +5705,8 @@ namespace
       if (Card(T("Maps")))
       {
          static const char* const kMaps[kMapCount] = { "Base colour", "Roughness", "Metallic", "Normal",
-                                                       "AO", "Emission", "Clearcoat", "Sheen" };
+                                                       "AO", "Emission", "Clearcoat", "Sheen",
+                                                       "Opacity", "Transmission" };
          const std::vector<GraphNode*> choices = ImageChoices(*gn);
          std::vector<std::string> names = { T("None") };
          for (GraphNode* c : choices)

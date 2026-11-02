@@ -46,7 +46,7 @@ is the open format, and Blender and Mixamo both export it).
 | M1 ✅ | Material tab in the 3D View sidebar | Edits the Material node that feeds the selected item. If there is none, "Add Material" inserts one on the canvas. Each map row shows the patched node's name, with a picker. |
 | M2 ✅ | Preview ball | A small sphere render in the tab, redrawn only when the material changes. |
 | M3 ✅ | Every material on import | A glTF with several materials becomes one item per material, grouped, each with its own Material and texture nodes, on the canvas and in the 3D View. Parts share the file's fit, so they stay aligned. OBJ/USD still load as one mesh (ModelIO submeshes: later). |
-| M4 | Opacity and transmission maps, plus presets | Two more map channels. About 12 node presets made from measured values (gold, copper, glass, water, rubber, car paint, velvet, skin, ceramic, plastic, chrome, emissive). |
+| M4 ✅ | Opacity and transmission maps, plus presets | Two more map channels (opacity cuts with the alpha cutoff, transmission scales the glass amount). 12 Material presets from measured F0 values (gold, copper, glass, water, rubber, car paint, velvet, skin, ceramic, plastic, chrome, emissive), in the node menu and a Preset row in the Material tab. |
 
 ## Block T: textures (2 steps)
 

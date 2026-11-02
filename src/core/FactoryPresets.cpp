@@ -4,6 +4,7 @@
 #include "NodeFactory.h"
 #include "Patch.h"
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -167,6 +168,21 @@ namespace FactoryPresets
          { "EQ", "Mud Cut", "band2Freq=300 band2Q=1.4 band2Gain=-5" },
          { "EQ", "Bass Boost", "band1Freq=90 band1Gain=6 band2Freq=250 band2Gain=-2" },
          { "EQ", "Vocal Shine", "band2Freq=250 band2Gain=-3 band4Freq=5000 band4Gain=3 band5Gain=4" },
+         // Material: measured where a measurement exists. Colours are sRGB (r,g,b): metals are their F0
+         // (Hoffman's table, linear -> sRGB), dielectrics take specular from IOR (F0 = ((n-1)/(n+1))^2,
+         // specular = F0 / 0.08): water 1.33 -> 0.25, skin 1.4 -> 0.35, glass and ceramic 1.5 -> 0.5.
+         { "Material", "Gold", "color=1,0.889,0.615 metallic=1 roughness=0.25" },
+         { "Material", "Copper", "color=0.98,0.82,0.76 metallic=1 roughness=0.3" },
+         { "Material", "Chrome", "color=0.767,0.771,0.77 metallic=1 roughness=0.05" },
+         { "Material", "Glass", "color=1,1,1 metallic=0 roughness=0.02 ior=1.5 transmission=1" },
+         { "Material", "Water", "color=0.92,0.97,1 metallic=0 roughness=0.02 ior=1.333 specular=0.25 transmission=1" },
+         { "Material", "Rubber", "color=0.152,0.152,0.152 metallic=0 roughness=0.85" },
+         { "Material", "Car Paint", "color=0.6,0.03,0.04 metallic=0.3 roughness=0.4 clearcoat=1 clearcoatRoughness=0.03" },
+         { "Material", "Velvet", "color=0.35,0.05,0.12 metallic=0 roughness=1 sheen=1 sheenColor=1,0.62,0.72 sheenRoughness=0.3" },
+         { "Material", "Skin", "color=0.85,0.64,0.55 metallic=0 roughness=0.5 ior=1.4 specular=0.35 subsurface=0.5 subsurfaceColor=0.9,0.25,0.15 subsurfaceRadius=0.5" },
+         { "Material", "Ceramic", "color=0.906,0.906,0.896 metallic=0 roughness=0.5 clearcoat=1 clearcoatRoughness=0.05" },
+         { "Material", "Plastic", "color=0.1,0.35,0.8 metallic=0 roughness=0.35 ior=1.46 specular=0.44" },
+         { "Material", "Emissive", "color=0.05,0.05,0.05 metallic=0 roughness=0.5 emissionColor=1,0.75,0.45 emission=4" },
       };
 
       struct Table
@@ -190,8 +206,12 @@ namespace FactoryPresets
                while (in >> pair)
                {
                   const size_t eq = pair.find('=');
-                  if (eq != std::string::npos)
-                     p.values.emplace_back(pair.substr(0, eq), pair.substr(eq + 1));
+                  if (eq == std::string::npos)
+                     continue;
+                  // A colour is written r,g,b in the table and saved r g b.
+                  std::string value = pair.substr(eq + 1);
+                  std::replace(value.begin(), value.end(), ',', ' ');
+                  p.values.emplace_back(pair.substr(0, eq), value);
                }
                t.byType[row.type].push_back(std::move(p));
             }

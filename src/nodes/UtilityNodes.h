@@ -313,7 +313,8 @@ public:
    const char* InputLabel(int slot) const override
    {
       static const char* kNames[] = { "geo", "albedo", "roughness", "metallic",
-                                      "normal", "ao", "emission", "clearcoat", "sheen" };
+                                      "normal", "ao", "emission", "clearcoat", "sheen",
+                                      "opacity", "transmission" };
       return (slot >= 0 && slot < (1 + kMapCount)) ? kNames[slot] : nullptr;
    }
    size_t TriangleCount() const;

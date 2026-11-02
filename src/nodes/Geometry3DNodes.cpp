@@ -521,6 +521,8 @@ namespace
       "uniform sampler2D uEmissionMap;\n"
       "uniform sampler2D uClearcoatMap;\n"
       "uniform sampler2D uSheenMap;\n"
+      "uniform sampler2D uOpacityMap;\n"
+      "uniform sampler2D uTransmissionMap;\n"
       "uniform int uHasRoughnessMap;\n"
       "uniform int uHasMetallicMap;\n"
       "uniform int uHasNormalMap;\n"
@@ -528,6 +530,8 @@ namespace
       "uniform int uHasEmissionMap;\n"
       "uniform int uHasClearcoatMap;\n"
       "uniform int uHasSheenMap;\n"
+      "uniform int uHasOpacityMap;\n"
+      "uniform int uHasTransmissionMap;\n"
       "uniform float uNormalStrength;\n"
       "uniform int uNormalBump;\n"
       // Mapping: which coordinate space the material maps sample (UV /
@@ -816,6 +820,7 @@ namespace
       "   }\n"
       "   float alpha = uOpacity;\n"
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
+      "   if (uHasOpacityMap == 1) alpha *= sampleMap(uOpacityMap, normalize(vNormal), computeMapUv(normalize(vNormal))).r;\n"
       "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
       // How far this pixel moved since the last frame, 0.5 = still; alpha 1 marks the scene.
       "   if (uVelocity == 1) {\n"
@@ -901,6 +906,8 @@ namespace
       "   if (uHasClearcoatMap == 1) cc *= sampleMap(uClearcoatMap, n, mapUv).r;\n"
       "   float sh = uSheen;\n"
       "   if (uHasSheenMap == 1) sh *= sampleMap(uSheenMap, n, mapUv).r;\n"
+      "   float trans = uTransmission;\n"
+      "   if (uHasTransmissionMap == 1) trans *= sampleMap(uTransmissionMap, n, mapUv).r;\n"
       "   vec3 emiss = toLinear(uEmissionColor) * uEmission;\n"
       "   if (uHasEmissionMap == 1) emiss *= toLinear(sampleMap(uEmissionMap, n, mapUv).rgb);\n"
       "\n"
@@ -1026,7 +1033,7 @@ namespace
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
       "      float shadow = (i == uShadowLight) ? shadowFactor(n, shadeDir) : 1.0;\n"
       "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
-      "      if (uTransmission > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
+      "      if (trans > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
@@ -1047,13 +1054,13 @@ namespace
       "   col = toneDisplay(col * uExposure);\n"
       "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
-      "   if (uTransmission > 0.0) {\n"
+      "   if (trans > 0.0) {\n"
       "      vec4 clipA = uViewProj * vec4(vWorldPos, 1.0);\n"
       "      vec4 clipB = uViewProj * vec4(vWorldPos + n * 0.1, 1.0);\n"
       "      vec2 uvA = (clipA.xy / max(clipA.w, 1e-5)) * 0.5 + 0.5;\n"
       "      vec2 uvB = (clipB.xy / max(clipB.w, 1e-5)) * 0.5 + 0.5;\n"
       "      vec2 bendDir = uvB - uvA;\n"
-      "      float bendStrength = (uIor - 1.0) * 4.0 * uTransmission;\n"
+      "      float bendStrength = (uIor - 1.0) * 4.0 * trans;\n"
       "      vec2 refractUv = clamp(gl_FragCoord.xy / uScreenSize + bendDir * bendStrength, 0.0, 1.0);\n"
       "      float lod = clamp(uTransmissionRoughness, 0.0, 1.0) * uSceneMaxLod;\n"
       "      vec3 refracted;\n"
@@ -1068,8 +1075,8 @@ namespace
       "      }\n"
       // The surface still reflects: light reflected at the rim does not pass through, and the
       // highlights go on top of what is seen through it, added as light rather than as display values.
-      "      col = mix(col, refracted * (vec3(1.0) - fAmbient), uTransmission);\n"
-      "      col = toSrgb(toLinear(col) + toneDisplay(glassSpec * uExposure) * uTransmission);\n"
+      "      col = mix(col, refracted * (vec3(1.0) - fAmbient), trans);\n"
+      "      col = toSrgb(toLinear(col) + toneDisplay(glassSpec * uExposure) * trans);\n"
       "   }\n"
       "   fragColor = uWire == 1 ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(col, alpha);\n"
       "}\n";
@@ -1581,7 +1588,7 @@ int Render3DGpuInstanceDrawsForTest() { return sGpuInstanceDraws; }
 static const GpuPoints* GpuInstancesFor(IGeometrySource* source, InstanceOnPointsNode* instancer,
                                         const Material& material)
 {
-   if ((material.opacity < 0.999f || material.textureAlpha) && material.transmission <= 0.001f)
+   if ((material.opacity < 0.999f || material.textureAlpha || material.opacityMapped) && material.transmission <= 0.001f)
       return nullptr;
    return ResolveGpuInstances(source, instancer);
 }
@@ -2857,7 +2864,8 @@ void Render3DNode::CookOnce(int frameId)
       // the previous slot's draw call last set them.
       static const char* kHasUniform[] = { "", "uHasRoughnessMap", "uHasMetallicMap",
                                            "uHasNormalMap", "uHasAoMap", "uHasEmissionMap",
-                                           "uHasClearcoatMap", "uHasSheenMap" };
+                                           "uHasClearcoatMap", "uHasSheenMap",
+                                              "uHasOpacityMap", "uHasTransmissionMap" };
       for (int map = kMapRoughness; map < kMapCount; map++)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
@@ -2949,7 +2957,7 @@ void Render3DNode::CookOnce(int frameId)
          // rest never discard, so they take the variant without discard and
          // the GPU may skip their hidden fragments.
          const Material m = source->GetMaterial();
-         const bool opaque = m.alphaCutoff <= 0.0f && m.opacity >= 0.999f && !m.textureAlpha &&
+         const bool opaque = m.alphaCutoff <= 0.0f && m.opacity >= 0.999f && !m.textureAlpha && !m.opacityMapped &&
                              m.transmission <= 0.001f;
          const bool variant = opaque && mProgramOpaque != 0 && sOpaqueVariantEnabled;
          useProgram(variant ? mProgramOpaque : mProgramFull);
@@ -3069,13 +3077,15 @@ void Render3DNode::CookOnce(int frameId)
       // Same wrap mode as albedo - a user tiling roughness/normal/etc. needs
       // the other channels to repeat/mirror in lockstep, not just the swatch.
       {
-         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10 };
+         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10, 13, 14 };
          static const char* kMapUniform[] = { "uTexture", "uRoughnessMap", "uMetallicMap",
                                               "uNormalMap", "uAoMap", "uEmissionMap",
-                                              "uClearcoatMap", "uSheenMap" };
+                                              "uClearcoatMap", "uSheenMap",
+                                              "uOpacityMap", "uTransmissionMap" };
          static const char* kHasUniform[] = { "uHasTexture", "uHasRoughnessMap", "uHasMetallicMap",
                                               "uHasNormalMap", "uHasAoMap", "uHasEmissionMap",
-                                              "uHasClearcoatMap", "uHasSheenMap" };
+                                              "uHasClearcoatMap", "uHasSheenMap",
+                                              "uHasOpacityMap", "uHasTransmissionMap" };
          for (int map = kMapRoughness; map < kMapCount; map++)
          {
             const unsigned int tex = source->GetMaterialTexture(map);
@@ -3158,7 +3168,7 @@ void Render3DNode::CookOnce(int frameId)
          // Blended copies of one mesh are drawn in a single call with depth writes off (the translucent pass), so
          // they composite in buffer order: unsorted, a near plane drawn first is painted over by the ones behind it.
          // Same test as isTranslucentMesh below.
-         const bool sortInstances = (material.opacity < 0.999f || material.textureAlpha) &&
+         const bool sortInstances = (material.opacity < 0.999f || material.textureAlpha || material.opacityMapped) &&
                                     material.transmission <= 0.001f;
          const bool eyeMoved = gpu.instanceSortEye[0] != eye[0] || gpu.instanceSortEye[1] != eye[1] ||
                                gpu.instanceSortEye[2] != eye[2];
@@ -3346,7 +3356,7 @@ void Render3DNode::CookOnce(int frameId)
       // textures are owned by other nodes and must not be left mutated.
       if (wrapMode != GL_CLAMP_TO_EDGE)
       {
-         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10 };
+         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10, 13, 14 };
          for (int map = kMapRoughness; map < kMapCount; map++)
          {
             const unsigned int tex = source->GetMaterialTexture(map);
@@ -3380,7 +3390,7 @@ void Render3DNode::CookOnce(int frameId)
       if (s == nullptr || IsCloudSource(s))
          return false;
       const Material m = s->GetMaterial();
-      return (m.opacity < 0.999f || m.textureAlpha) && m.transmission <= 0.001f;
+      return (m.opacity < 0.999f || m.textureAlpha || m.opacityMapped) && m.transmission <= 0.001f;
    };
 
    bool anyTransmissive = false;

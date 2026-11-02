@@ -10,6 +10,7 @@
 //            effects: 2 s of noise bursts comes out finite, over -60 dBFS, and
 //            not equal to the input
 // Headless (runs before glfwInit).
+#include <sstream>
 #include "app/AppShared.h"
 #include "audio/AudioBuffer.h"
 #include "audio/NoteEventQueue.h"
@@ -43,6 +44,16 @@ namespace
    {
       if (a == b)
          return true;
+      // A colour: compare each number.
+      if (a.find(' ') != std::string::npos || b.find(' ') != std::string::npos)
+      {
+         std::istringstream ia(a), ib(b);
+         std::string ta, tb;
+         while (ia >> ta)
+            if (!(ib >> tb) || !SameValue(ta, tb))
+               return false;
+         return !(ib >> tb);
+      }
       char* ea = nullptr;
       char* eb = nullptr;
       const double da = strtod(a.c_str(), &ea);
@@ -217,6 +228,8 @@ bool RunFactoryPresetTest()
 
          IAudioSource* src = dynamic_cast<IAudioSource*>(node.get());
          AudioNode* audio = src != nullptr ? src->GetAudioNode() : nullptr;
+         if (src == nullptr)
+            continue;   // a picture preset (Material): the read-back above is the check
          if (audio == nullptr)
          {
             fail(type, p.name, "no audio node");
@@ -231,7 +244,10 @@ bool RunFactoryPresetTest()
          if (!r.differs)
             fail(type, p.name, "output equals input");
       }
-      printf("  %-11s %2d presets, quietest %.1f dBFS\n", type.c_str(), (int)list.size(), quietest);
+      if (dynamic_cast<IAudioSource*>(probe.get()) != nullptr)
+         printf("  %-11s %2d presets, quietest %.1f dBFS\n", type.c_str(), (int)list.size(), quietest);
+      else
+         printf("  %-11s %2d presets\n", type.c_str(), (int)list.size());
    }
 
    printf("FACTORY PRESET TEST (%d presets, %d types): %s\n", total, (int)FactoryPresets::Types().size(),

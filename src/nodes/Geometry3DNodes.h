@@ -21,6 +21,7 @@ struct Material
    float metallic = 0.1f;
    float roughness = 0.45f;
    float opacity = 1.0f;
+   bool opacityMapped = false; // an opacity map is patched: draws in the see-through pass
    int shading = 0; // lit / normals / uv / flat
 
    // Light the surface emits on its own. Added after shading and before
@@ -101,6 +102,8 @@ enum MaterialMap
    kMapEmission,
    kMapClearcoat,
    kMapSheen,
+   kMapOpacity,
+   kMapTransmission,
    kMapCount
 };
 
