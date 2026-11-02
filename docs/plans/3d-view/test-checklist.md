@@ -72,6 +72,20 @@ Open `~/Desktop/Infinite-dev.app`. Add 3+ objects to a 3D View. Right-click empt
 - [ ] Select two or more items, Ctrl+L (Object > Copy Transforms from Active): all take the active item's location, rotation, scale; undo restores.
 - [ ] Render two stills: the Render result card shows Reveal Latest and Reveal Previous, each opening its own file.
 
+## Follow, motion, X-ray, drop, lenses (blocks I to L)
+- [ ] Object tab > Follow > pick an object: move that object, the follower keeps its distance and turn; Carry = Location only ignores the turn
+- [ ] Select two items, Ctrl+P: the first follows the last clicked; Alt+P clears it; one Ctrl+Z undoes each
+- [ ] Object tab > Motion: Location/Rotation/Scale offsets move the item; a Scene 3D node's param pins can modulate them (LFO into one moves it)
+- [ ] Alt+Z (or the cube chip) in Solid: surfaces see-through, the grid shows through; Overlays > Wireframe draws edges over Solid
+- [ ] Shift+Alt+Z hides and shows the overlays
+- [ ] Drag an .obj / .glb / .fbx from Finder onto the 3D View: a Model 3D node appears on the canvas and the item lands under the pointer
+- [ ] Render tab > Output > Projection = Cylindrical 360: verticals stay straight; latitude rows trim the strip
+- [ ] Projection = Fisheye dome, Lens = Equisolid, Dome angle 300: wider than a half sphere, edges squeeze less than Equidistant
+- [ ] Ctrl+I inverts the selection (once); Shift+Keypad 4 / 6 rolls the view
+
+## Keymap
+- [ ] Every row marked Same in docs/plans/3d-view/keymap.md does what Blender does
+
 ## Infinite only (manual)
 - [ ] 3D View image to the projector through an Output node: note fps.
 - [ ] 50, 128, 256 objects, panel open and closed: note fps.
