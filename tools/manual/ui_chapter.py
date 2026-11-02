@@ -291,7 +291,9 @@ def html_chapter(P):
                   "<p><b>Coding agent</b> picks the agent (Claude Code first). <b>Install</b> shows when it is missing and types the vendor's own installer into a Terminal tab. "
                   "<b>Start agent</b> opens a tab in the open patch's folder and starts it with Infinite's MCP server registered. "
                   "<i>Start the agent when the Terminal opens</i> is off by default. Infinite never asks for or stores an API key: the agent's own login runs in the tab. "
-                  "Nothing is installed until you press a button.</p>"))
+                  "Nothing is installed until you press a button.</p>"
+                  "<p>Setup is one time. It survives quitting, restarting and updating Infinite: the <code>infinite</code> command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. "
+                  "Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), that step turns amber with a <b>Repair</b> button that reruns only that step.</p>"))
 
     b.append(page("<h2>Sound panels: Session, Sample Studio, Piano Roll</h2>",
                   "<p>Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.</p>",

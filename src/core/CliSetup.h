@@ -24,18 +24,20 @@ namespace CliSetup
       const char* mcpCheck;     // prints the registration; exit code nonzero when missing
       const char* mcpAdd;
       const char* mcpRemove;
+      const char* configFile;   // the agent's own config, relative to HOME; holds the MCP registration
       const char* loginHint;    // shown under the agent row
    };
    const std::vector<Agent>& Agents();
    const Agent* FindAgent(const std::string& id);   // nullptr when unknown
 
-   enum class StepState { kPending, kRunning, kOk, kSkipped, kFailed, kWaiting };
+   enum class StepState { kPending, kRunning, kOk, kSkipped, kFailed, kWaiting, kRepair };
    struct StepStatus
    {
       const char* id;
       const char* title;
       StepState state = StepState::kPending;
       std::string detail;
+      std::string repairLine;   // only on a kRepair row: the line its Repair button types
       bool Green() const { return state == StepState::kOk || state == StepState::kSkipped; }
    };
    constexpr int kStepCount = 5;
@@ -55,12 +57,15 @@ namespace CliSetup
 
    struct Paths
    {
-      std::string dir, script, status, config;
+      std::string dir, script, status, config, record;   // record: the exe path Infinite writes at each start
    };
    Paths PathsFor(const std::string& appSupportDir, Os os);
 
    // The two scripts: shell-quoted variables first, then the fixed body. This is the exact text that runs.
-   std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath);
+   // `only` limits the run to those step ids (empty = all); `prior` seeds the other steps' last states so
+   // a repair leaves the rest of status.json as it was.
+   std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
+                           const std::vector<std::string>& only = {}, const Status* prior = nullptr);
    // The one line typed into the Terminal tab.
    std::string SetupLine(Os os, const std::string& scriptPath);
    std::string InstallAgentLine(Os os, const Agent& agent);
@@ -80,8 +85,30 @@ namespace CliSetup
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);
 
+   // ---- the silent check at launch (file stats and one small file read; never spawns a process) ----
+   enum class Health { kUnknown, kOk, kBroken };
+   struct HealthReport
+   {
+      bool checked = false;
+      Health step[kStepCount] = {};
+      std::string why[kStepCount];
+   };
+   struct HealthInput
+   {
+      Os os = Os::kMac;
+      std::string home, binDir, pathEnv, exe, recordFile;
+      const Agent* agent = nullptr;
+   };
+   // Does the recorded (or a usual install) Infinite still exist? This is what the launcher does.
+   bool LauncherResolves(Os os, const std::string& recordFile);
+   HealthReport CheckHealth(const HealthInput& in);
+   // Real HOME/PATH version. At launch: refreshes the recorded exe path when setup was done before, then
+   // checks on a worker thread. LatestHealth() returns the last finished report.
+   void StartLaunchCheck();
+   HealthReport LatestHealth();
+
    // What the page shows. Everything it draws and every button comes from here.
-   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent };
+   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep };
    struct View
    {
       std::vector<StepStatus> steps;
@@ -98,13 +125,13 @@ namespace CliSetup
       std::string unsupported;
    };
    View Describe(Os os, const Status& status, const Agent& agent, bool agentInstalled, const std::string& exe,
-                 const Paths& paths);
+                 const Paths& paths, const HealthReport* health = nullptr);
 
    // Opens a Terminal tab titled `title` and types `line` into it. The app supplies the real one.
    using Runner = std::function<void(const std::string& title, const std::string& line)>;
    // Runs the action on the fake or real runner. Writes the script first for kSetup. False when nothing ran.
    bool Perform(Action action, Os os, const Agent& agent, const std::string& exe, const Paths& paths, const Runner& run,
-                std::string* error);
+                std::string* error, const std::string& step = std::string(), const Status* prior = nullptr);
 
    // Process-wide state used by the app (Settings page and the Terminal panel).
    Config& Prefs();

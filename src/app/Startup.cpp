@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/graph/LearningLog.h"
 #include "platform/PluginCrashGuard.h"
+#include "core/CliSetup.h"
 #include "app/graph/NoteGen.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/Glyphs.gen.h"
@@ -1513,6 +1514,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    MovementLog::Start();
    if (gHeadlessJob.mode == Headless::Mode::None)
       LearningLog::Start(BundledResourcePath("starter-profile"));
+   if (gHeadlessJob.mode == Headless::Mode::None)
+      CliSetup::StartLaunchCheck();   // keeps the infinite launcher pointed at this app; no process spawned
    // Headless jobs neither read nor write the learned profiles: a render must not depend on (or change)
    // the user's accumulated data, or the same patch renders differently run to run.
    if (gHeadlessJob.mode == Headless::Mode::None)

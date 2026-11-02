@@ -114,7 +114,8 @@ namespace app
          check(script.find("sudo") != std::string::npos && script.find("brew install") != std::string::npos, "installs are visible in the script");
          check(Perform(Action::kInstallAgent, Os::kMac, claude, exe, real, runner, &err) && line == "curl -fsSL https://claude.ai/install.sh | bash", "install types the vendor's command");
          check(Perform(Action::kStartAgent, Os::kMac, claude, exe, real, runner, &err), "start action runs");
-         check(line.find("claude mcp get infinite >/dev/null 2>&1 ||") != std::string::npos && line.find("claude mcp add --scope user -e INFINITE_BIN='/Applications/Infinite'\\''s Dir") != std::string::npos &&
+         check(line.find("claude mcp get infinite 2>/dev/null | grep -qF \"$A\" ||") != std::string::npos && line.find("-e INFINITE_BIN=\"$A\"") != std::string::npos &&
+               line.find("A='/Applications/Infinite'\\''s Dir") != std::string::npos &&
                line.size() > 6 && line.compare(line.size() - 6, 6, "claude") == 0,
                "start registers MCP when missing, then launches");
          check(!Perform(Action::kSetup, Os::kMac, claude, "", real, runner, &err) && !err.empty(), "no executable: refused with a reason");
@@ -146,6 +147,76 @@ namespace app
          std::ofstream(cfg) << "{\"agent\":\"nope\",\"autoStart\":true}";
          check(LoadConfig(cfg).agent == "claude", "config: unknown agent falls back");
          std::filesystem::remove_all(dir);
+      }
+
+      // 11. the silent launch check: a set-up machine in a fake HOME, then break it one way at a time.
+      {
+         namespace fs = std::filesystem;
+         const fs::path root = fs::temp_directory_path() / "infinite_clisetup_health";
+         fs::remove_all(root);
+         const fs::path home = root / "home", bin = home / ".local" / "bin", app1 = root / "A" / "Infinite", app2 = root / "B" / "Infinite";
+         fs::create_directories(bin);
+         fs::create_directories(app1.parent_path());
+         fs::create_directories(app2.parent_path());
+         std::ofstream(app1.string()) << "x";
+         const std::string record = (root / "support" / "exe").string();
+         fs::create_directories(fs::path(record).parent_path());
+         std::ofstream(record) << app1.string() << "\n";
+         std::ofstream((bin / "infinite").string()) << "launcher";
+         std::ofstream((bin / "infinite-app").string()) << "launcher";
+         std::ofstream((bin / "claude").string()) << "x";
+         std::ofstream((bin / "node").string()) << "x";
+         std::ofstream((bin / "npx").string()) << "x";
+         std::ofstream((home / ".zshrc").string()) << "# >>> infinite cli >>>\nexport PATH\n# <<< infinite cli <<<\n";
+         std::ofstream((home / ".claude.json").string()) << "{\"infinite\":{\"env\":{\"INFINITE_BIN\":\"" << (bin / "infinite-app").string() << "\"}}}";
+         HealthInput in;
+         in.os = Os::kLinux; in.home = home.string(); in.binDir = bin.string(); in.pathEnv = "/nowhere"; in.exe = app1.string();
+         in.recordFile = record; in.agent = &claude;
+         auto all = [&](const HealthReport& r, Health h) { for (int i = 0; i < kStepCount; i++) if (r.step[i] != h && !(h == Health::kOk && r.step[i] == Health::kUnknown)) return false; return true; };
+         check(all(CheckHealth(in), Health::kOk), "health: a set-up machine is all fine");
+
+         // Describe: nothing shows when all holds; amber + repair line when a step broke.
+         const char* st[5] = { "ok", "skipped", "skipped", "ok", "ok" };
+         const std::string good = StatusJson(1, false, now - 90, st);
+         HealthReport fine = CheckHealth(in);
+         View v = Describe(Os::kLinux, ParseStatus(good, now), claude, true, exe, PathsFor("/tmp/fake support", Os::kLinux), &fine);
+         check(v.summary == "Everything is set up." && v.steps[0].state != StepState::kRepair, "health ok: nothing extra shows");
+
+         // The app moved: the record is stale, the old file is gone. The app rewrites the record at launch,
+         // so the launcher resolves; before that, the step shows Repair.
+         fs::remove(app1);
+         std::ofstream(app2.string()) << "x";
+         in.exe = app2.string();
+         HealthReport moved = CheckHealth(in);
+         check(moved.step[0] == Health::kBroken, "app moved, record stale: the PATH step is broken");
+         v = Describe(Os::kLinux, ParseStatus(good, now), claude, true, exe, PathsFor("/tmp/fake support", Os::kLinux), &moved);
+         check(v.steps[0].state == StepState::kRepair && !v.steps[0].repairLine.empty() && v.summary == "1 step needs repair.", "app moved: amber with a Repair line and a summary");
+         check(!v.steps[1].Green() == false && v.steps[1].state != StepState::kRepair, "app moved: the other steps stay ticked");
+         std::ofstream(record) << app2.string() << "\n";
+         check(LauncherResolves(Os::kLinux, record) && CheckHealth(in).step[0] == Health::kOk, "app moved, record refreshed at launch: the launcher resolves");
+
+         // Each other break turns exactly its own step amber.
+         fs::remove(home / ".zshrc");
+         check(CheckHealth(in).step[0] == Health::kBroken, "profile line removed: PATH step is broken");
+         in.pathEnv = bin.string();
+         check(CheckHealth(in).step[0] == Health::kOk, "no profile line but the folder is already on PATH: fine");
+         std::ofstream((home / ".claude.json").string()) << "{}";
+         check(CheckHealth(in).step[4] == Health::kBroken, "registration gone from the agent's config: agent step is broken");
+         fs::remove(bin / "claude");
+         check(CheckHealth(in).step[4] == Health::kBroken, "agent uninstalled: agent step is broken");
+         fs::remove(bin / "node");
+         check(CheckHealth(in).step[2] == Health::kBroken, "node removed: node step is broken");
+
+         // A repair reruns only its step and keeps the rest of status.json as it was.
+         std::string line, err;
+         const Paths real = PathsFor(root.string(), Os::kLinux);
+         const Status prior = ParseStatus(good, now);
+         check(Perform(Action::kRepairStep, Os::kLinux, claude, exe, real, [&](const std::string&, const std::string& l) { line = l; }, &err, "path", &prior) && line == "sh '" + real.script + "'", "repair types the same one-line sh command");
+         std::ifstream f(real.script);
+         std::string script((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+         check(script.find("ONLY='path'") != std::string::npos && script.find("ST_agent=ok; DT_agent='d4'") != std::string::npos, "repair script: only this step, others seeded from the last status");
+         check(!Perform(Action::kRepairStep, Os::kLinux, claude, exe, real, [&](const std::string&, const std::string&) {}, &err, "bogus", &prior), "repair refuses an unknown step");
+         fs::remove_all(root);
       }
 
       std::printf("CLISETUPTEST %s\n", ok ? "PASS" : "FAIL");

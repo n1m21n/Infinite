@@ -4,6 +4,8 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
+#include <thread>
 #include <sstream>
 
 #include "json.hpp"
@@ -78,6 +80,7 @@ namespace CliSetup
            "claude mcp get infinite",
            "claude mcp add --scope user -e INFINITE_BIN={EXE} infinite -- npx -y infinite-engine serve",
            "claude mcp remove infinite --scope user",
+           ".claude.json",
            "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },
       };
       return kAgents;
@@ -155,6 +158,7 @@ namespace CliSetup
       p.script = p.dir + (os == Os::kWindows ? "/setup.ps1" : "/setup.sh");
       p.status = p.dir + "/status.json";
       p.config = p.dir + "/config.json";
+      p.record = p.dir + "/exe";
       return p;
    }
 
@@ -168,8 +172,11 @@ namespace CliSetup
 OS=$(uname -s)
 STARTED=$(date +%s)
 STEPS="path headless node mcp agent"
-for s in $STEPS; do eval "ST_$s=pending; DT_$s="; done
+for s in $STEPS; do eval ": \"\${ST_$s:=pending}\"; : \"\${DT_$s:=}\""; done
 FAILED=0
+BIN="$HOME/.local/bin"; APPBIN="$BIN/infinite-app"
+RECORD="$(dirname "$STATUS")/exe"
+want() { [ -z "$ONLY" ] && return 0; case " $ONLY " in *" $1 "*) return 0 ;; esac; return 1; }
 
 clean() { printf '%s' "$1" | tr -d '"\\\n\r' | cut -c1-200; }
 write_status() {
@@ -208,19 +215,27 @@ node_ok() {
   command -v node >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 &&
     [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]
 }
+# The two launchers never name this copy of Infinite. They read the path Infinite records each time it
+# starts, then fall back to the usual install folders, so moving or updating the app does not break them.
+launcher() { # $1 = "--cli " for the infinite command, empty for infinite-app
+  printf '#!/bin/sh\nP=$(cat "%s" 2>/dev/null)\n[ -x "$P" ] || for P in /Applications/Infinite.app/Contents/MacOS/Infinite "$HOME/Applications/Infinite.app/Contents/MacOS/Infinite" /opt/Infinite/Infinite; do [ -x "$P" ] && break; done\n[ -x "$P" ] || { echo "infinite: Infinite is not installed or was moved. Open it once, then try again." >&2; exit 127; }\nexec "$P" %s"$@"\n' "$RECORD" "$1"
+}
 mkdir -p "$(dirname "$STATUS")"
 write_status true
 printf 'Infinite: command line and agent setup. Safe to run again.\n'
 
 # 1. the infinite command on PATH
+if want path; then
 begin 1 path "Put the infinite command on your PATH"
-BIN="$HOME/.local/bin"; SHIM="$BIN/infinite"
-WANT=$(printf '#!/bin/sh\nexec "%s" --cli "$@"\n' "$EXE")
-SHIM_NEW=0
-if ! { [ -x "$SHIM" ] && [ "$(cat "$SHIM")" = "$WANT" ]; }; then
-  SHIM_NEW=1
-  { mkdir -p "$BIN" && printf '%s\n' "$WANT" > "$SHIM" && chmod 755 "$SHIM"; } 2>/dev/null || SHIM_NEW=err
-fi
+printf '%s\n' "$EXE" > "$RECORD" 2>/dev/null
+SHIM_NEW=0; SHIM_ERR=0
+for pair in "infinite:--cli " "infinite-app:"; do
+  f="$BIN/${pair%%:*}"; text=$(launcher "${pair#*:}")
+  if ! { [ -x "$f" ] && [ "$(cat "$f")" = "$text" ]; }; then
+    SHIM_NEW=1
+    { mkdir -p "$BIN" && printf '%s\n' "$text" > "$f" && chmod 755 "$f"; } 2>/dev/null || SHIM_ERR=1
+  fi
+done
 case "$SHELL" in
   */zsh) RC="$HOME/.zshrc" ;;
   */bash) if [ "$OS" = Darwin ]; then RC="$HOME/.bash_profile"; else RC="$HOME/.bashrc"; fi ;;
@@ -228,10 +243,10 @@ case "$SHELL" in
 esac
 ON_PATH=0; case ":$PATH:" in *":$BIN:"*) ON_PATH=1 ;; esac
 IN_RC=0; grep -qs '# >>> infinite cli >>>' "$RC" && IN_RC=1
-if [ "$SHIM_NEW" = err ]; then
+if [ $SHIM_ERR = 1 ]; then
   finish failed "could not write ~/.local/bin/infinite"
 elif [ $ON_PATH = 1 ] || [ $IN_RC = 1 ]; then
-  if [ "$SHIM_NEW" = 1 ]; then finish ok "updated ~/.local/bin/infinite"; else finish skipped "~/.local/bin/infinite already set up"; fi
+  if [ $SHIM_NEW = 1 ]; then finish ok "updated ~/.local/bin/infinite"; else finish skipped "~/.local/bin/infinite already set up"; fi
 else
   if printf '\n# >>> infinite cli >>>\nexport PATH="$HOME/.local/bin:$PATH"\n# <<< infinite cli <<<\n' >> "$RC" 2>/dev/null; then
     finish ok "added ~/.local/bin/infinite and a PATH line in $(basename "$RC"). Open a new terminal tab to use it"
@@ -239,8 +254,10 @@ else
     finish failed "could not write $(basename "$RC")"
   fi
 fi
+fi
 
 # 2. the headless engine
+if want headless; then
 begin 2 headless "Check the headless engine"
 if ! VER=$("$EXE" --version 2>&1); then
   finish failed "$EXE --version did not run"
@@ -256,8 +273,10 @@ else
     finish skipped "$VER"
   fi
 fi
+fi
 
 # 3. Node.js
+if want node; then
 begin 3 node "Check Node.js (runs the MCP server)"
 if node_ok; then
   finish skipped "node $(node -v)"
@@ -266,8 +285,10 @@ elif pkg_install "nodejs npm" "nodejs npm" "nodejs npm" node && node_ok; then
 else
   finish failed "Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again"
 fi
+fi
 
 # 4. the MCP server
+if want mcp; then
 begin 4 mcp "Fetch the Infinite MCP server"
 if ! node_ok; then
   finish failed "needs Node.js (step 3)"
@@ -279,17 +300,22 @@ else
     finish failed "$(printf '%s' "$OUT" | tail -n 1)"
   fi
 fi
+fi
 
-# 5. the coding agent
+# 5. the coding agent. The registration names the launcher, not this copy of the app.
+if want agent; then
 begin 5 agent "Register the MCP server with $AGENT_NAME"
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
   finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then set up again"
-elif mcp_check_out=$(mcp_check 2>/dev/null) && printf '%s' "$mcp_check_out" | grep -qF "$EXE"; then
+elif [ ! -x "$APPBIN" ]; then
+  finish failed "run step 1 first: $APPBIN is missing"
+elif mcp_check_out=$(mcp_check 2>/dev/null) && printf '%s' "$mcp_check_out" | grep -qF "$APPBIN"; then
   finish skipped "already registered"
 else
   mcp_remove >/dev/null 2>&1
   if mcp_add; then finish ok "registered with $AGENT_NAME"; else finish failed "$AGENT_NAME refused the registration"; fi
+fi
 fi
 
 write_status false
@@ -301,8 +327,13 @@ printf '\nDone. %s step(s) need attention.\n' "$FAILED"
 # ---- fixed part -------------------------------------------------------------------------------
 $Started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $Steps = [ordered]@{ path = @('pending', ''); headless = @('pending', ''); node = @('pending', ''); mcp = @('pending', ''); agent = @('pending', '') }
+foreach ($k in @($Steps.Keys)) { if ($Prior.ContainsKey($k)) { $Steps[$k] = @($Prior[$k][0], $Prior[$k][1]) } }
 $Failed = 0
 $Id = ''
+$Bin = Join-Path $env:LOCALAPPDATA 'Infinite\bin'
+$AppBin = Join-Path $Bin 'infinite-app.cmd'
+$Record = Join-Path (Split-Path $Status) 'exe'
+function Want([string]$id) { return ($Only.Count -eq 0) -or ($Only -contains $id) }
 function Save([bool]$Running) {
   $fin = 0; if (-not $Running) { $fin = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
   $list = @(); foreach ($k in $Steps.Keys) { $d = [string]$Steps[$k][1]; if ($d.Length -gt 200) { $d = $d.Substring(0, 200) }; $list += [ordered]@{ id = $k; state = $Steps[$k][0]; detail = $d } }
@@ -318,36 +349,47 @@ function Finish([string]$state, [string]$detail) {
 }
 function NodeOk { $n = Get-Command node -ErrorAction SilentlyContinue; $x = Get-Command npx -ErrorAction SilentlyContinue; if (-not $n -or -not $x) { return $false }; return ([int](& node -p 'process.versions.node.split(".")[0]')) -ge 18 }
 function RefreshPath { $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User') }
+# The launchers never name this copy of Infinite: they read the path Infinite records at each start.
+function Launcher([string]$arg) { return "@echo off`r`nset /p P=<`"$Record`"`r`nif not exist `"%P%`" set P=C:\Program Files\Infinite\Infinite.exe`r`nif not exist `"%P%`" (echo infinite: Infinite is not installed or was moved. Open it once, then try again. 1>&2 & exit /b 127)`r`n`"%P%`" $arg%*`r`n" }
 Save $true
 Write-Host 'Infinite: command line and agent setup. Safe to run again.'
 
 # 1. the infinite command on PATH
+if (Want 'path') {
 Begin 1 'path' 'Put the infinite command on your PATH'
-$Bin = Join-Path $env:LOCALAPPDATA 'Infinite\bin'
-$Front = [IO.Path]::ChangeExtension($Exe, '.com'); if (-not (Test-Path $Front)) { $Front = $Exe }
-$Want = "@`"$Front`" --cli %*`r`n"
-$Shim = Join-Path $Bin 'infinite.cmd'
 try {
-  $new = $true; if ((Test-Path $Shim) -and ([IO.File]::ReadAllText($Shim) -eq $Want)) { $new = $false }
-  if ($new) { New-Item -ItemType Directory -Force $Bin | Out-Null; [IO.File]::WriteAllText($Shim, $Want) }
+  New-Item -ItemType Directory -Force $Bin, (Split-Path $Record) | Out-Null
+  $Front = [IO.Path]::ChangeExtension($Exe, '.com'); if (-not (Test-Path $Front)) { $Front = $Exe }
+  [IO.File]::WriteAllText($Record, "$Front`r`n")
+  $new = $false
+  foreach ($pair in @(@('infinite.cmd', '--cli '), @('infinite-app.cmd', ''))) {
+    $f = Join-Path $Bin $pair[0]; $text = Launcher $pair[1]
+    if (-not ((Test-Path $f) -and ([IO.File]::ReadAllText($f) -eq $text))) { [IO.File]::WriteAllText($f, $text); $new = $true }
+  }
   $user = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $user) { $user = '' }
-  if (($user -split ';') -contains $Bin) { if ($new) { Finish 'ok' "updated $Shim" } else { Finish 'skipped' "$Shim already set up" } }
+  if (($user -split ';') -contains $Bin) { if ($new) { Finish 'ok' "updated $Bin" } else { Finish 'skipped' "$Bin already set up" } }
   else { [Environment]::SetEnvironmentVariable('Path', ($user.TrimEnd(';') + ';' + $Bin), 'User'); Finish 'ok' "added $Bin to your PATH. Open a new terminal tab to use it" }
 } catch { Finish 'failed' "$_" }
+}
 
 # 2. the headless engine
+if (Want 'headless') {
 Begin 2 'headless' 'Check the headless engine'
 try { $ver = (& $Exe --version 2>&1 | Select-Object -First 1); if ($LASTEXITCODE -eq 0) { Finish 'skipped' "$ver" } else { Finish 'failed' "$Exe --version did not run" } } catch { Finish 'failed' "$_" }
+}
 
 # 3. Node.js
+if (Want 'node') {
 Begin 3 'node' 'Check Node.js (runs the MCP server)'
 if (NodeOk) { Finish 'skipped' "node $(& node -v)" }
 else {
   if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host '   running: winget install OpenJS.NodeJS.LTS'; winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements; RefreshPath }
   if (NodeOk) { Finish 'ok' "installed node $(& node -v)" } else { Finish 'failed' 'Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again' }
 }
+}
 
 # 4. the MCP server
+if (Want 'mcp') {
 Begin 4 'mcp' 'Fetch the Infinite MCP server'
 if (-not (NodeOk)) { Finish 'failed' 'needs Node.js (step 3)' }
 else {
@@ -356,15 +398,19 @@ else {
   if (($out -match 'infinite program: ') -and ($out -notmatch 'not found')) { Finish 'ok' 'infinite-engine finds this app' }
   else { Finish 'failed' (($out.Trim() -split "`n")[-1]) }
 }
+}
 
-# 5. the coding agent
+# 5. the coding agent. The registration names the launcher, not this copy of the app.
+if (Want 'agent') {
 Begin 5 'agent' "Register the MCP server with $AgentName"
 $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then set up again" }
+elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
 else {
   $cur = (McpCheck 2>$null | Out-String)
-  if ($cur.Contains($Exe)) { Finish 'skipped' 'already registered' }
+  if ($cur.Contains($AppBin)) { Finish 'skipped' 'already registered' }
   else { McpRemove 2>$null | Out-Null; McpAdd; if ($LASTEXITCODE -eq 0) { Finish 'ok' "registered with $AgentName" } else { Finish 'failed' "$AgentName refused the registration" } }
+}
 }
 
 Save $false
@@ -373,7 +419,8 @@ if ($Failed -gt 0) { exit 1 }
 )PS";
    }
 
-   std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath)
+   std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
+                           const std::vector<std::string>& only, const Status* prior)
    {
       std::ostringstream o;
       if (os == Os::kWindows)
@@ -381,18 +428,41 @@ if ($Failed -gt 0) { exit 1 }
          o << "# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
          o << "$Exe = " << PsQuote(exe) << "\n$Status = " << PsQuote(statusPath) << "\n";
          o << "$AgentId = " << PsQuote(agent.id) << "\n$AgentName = " << PsQuote(agent.name) << "\n$AgentBin = " << PsQuote(agent.binary) << "\n";
-         o << "function McpCheck { " << Replace(agent.mcpCheck, "{EXE}", "$Exe") << " }\n";
-         o << "function McpAdd { " << Replace(agent.mcpAdd, "{EXE}", "$Exe") << " }\n";
-         o << "function McpRemove { " << Replace(agent.mcpRemove, "{EXE}", "$Exe") << " }\n";
+         o << "$Only = @(";
+         for (size_t i = 0; i < only.size(); i++)
+            o << (i ? ", " : "") << PsQuote(only[i]);
+         o << ")\n$Prior = @{";
+         if (prior != nullptr && !only.empty())
+            for (const StepStatus& st : prior->steps)
+            {
+               const char* name = st.state == StepState::kOk ? "ok" : st.state == StepState::kSkipped ? "skipped" : st.state == StepState::kFailed ? "failed" : st.state == StepState::kWaiting ? "waiting" : "pending";
+               o << " " << PsQuote(st.id) << " = @(" << PsQuote(name) << ", " << PsQuote(st.detail) << ");";
+            }
+         o << " }\n";
+         o << "$AppBin = Join-Path (Join-Path $env:LOCALAPPDATA 'Infinite\\bin') 'infinite-app.cmd'\n";
+         o << "function McpCheck { " << Replace(agent.mcpCheck, "{EXE}", "$AppBin") << " }\n";
+         o << "function McpAdd { " << Replace(agent.mcpAdd, "{EXE}", "$AppBin") << " }\n";
+         o << "function McpRemove { " << Replace(agent.mcpRemove, "{EXE}", "$AppBin") << " }\n";
          o << kPsBody;
          return o.str();
       }
       o << "#!/bin/sh\n# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
       o << "EXE=" << ShQuote(exe) << "\nSTATUS=" << ShQuote(statusPath) << "\n";
       o << "AGENT_ID=" << ShQuote(agent.id) << "\nAGENT_NAME=" << ShQuote(agent.name) << "\nAGENT_BIN=" << ShQuote(agent.binary) << "\n";
-      o << "mcp_check() { " << Replace(agent.mcpCheck, "{EXE}", "\"$EXE\"") << "; }\n";
-      o << "mcp_add() { " << Replace(agent.mcpAdd, "{EXE}", "\"$EXE\"") << "; }\n";
-      o << "mcp_remove() { " << Replace(agent.mcpRemove, "{EXE}", "\"$EXE\"") << "; }\n";
+      o << "ONLY='";
+      for (size_t i = 0; i < only.size(); i++)
+         o << (i ? " " : "") << only[i];
+      o << "'\n";
+      if (prior != nullptr && !only.empty())
+         for (const StepStatus& st : prior->steps)
+         {
+            const char* name = st.state == StepState::kOk ? "ok" : st.state == StepState::kSkipped ? "skipped" : st.state == StepState::kFailed ? "failed" : st.state == StepState::kWaiting ? "waiting" : "pending";
+            o << "ST_" << st.id << "=" << name << "; DT_" << st.id << "=" << ShQuote(st.detail) << "\n";
+         }
+      o << "APPBIN=\"$HOME/.local/bin/infinite-app\"\n";
+      o << "mcp_check() { " << Replace(agent.mcpCheck, "{EXE}", "\"$APPBIN\"") << "; }\n";
+      o << "mcp_add() { " << Replace(agent.mcpAdd, "{EXE}", "\"$APPBIN\"") << "; }\n";
+      o << "mcp_remove() { " << Replace(agent.mcpRemove, "{EXE}", "\"$APPBIN\"") << "; }\n";
       o << kShBody;
       return o.str();
    }
@@ -412,13 +482,12 @@ if ($Failed -gt 0) { exit 1 }
    std::string StartAgentLine(Os os, const std::string& exe, const Agent& agent)
    {
       if (os == Os::kWindows)
-         return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:Path\"; $Exe = " + PsQuote(exe) + "; if (-not ((" +
-                Replace(agent.mcpCheck, "{EXE}", "$Exe") + " 2>$null | Out-String).Contains($Exe))) { " +
-                Replace(agent.mcpRemove, "{EXE}", "$Exe") + " 2>$null | Out-Null; " + Replace(agent.mcpAdd, "{EXE}", "$Exe") +
-                " }; " + agent.launch;
-      return std::string("export PATH=\"$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; ") +
-             agent.mcpCheck + " >/dev/null 2>&1 || { " + Replace(agent.mcpRemove, "{EXE}", ShQuote(exe)) + " >/dev/null 2>&1; " +
-             Replace(agent.mcpAdd, "{EXE}", ShQuote(exe)) + "; }; " + agent.launch;
+         return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
+                PsQuote(exe) + " }; if (-not ((" + Replace(agent.mcpCheck, "{EXE}", "$A") + " 2>$null | Out-String).Contains($A))) { " +
+                Replace(agent.mcpRemove, "{EXE}", "$A") + " 2>$null | Out-Null; " + Replace(agent.mcpAdd, "{EXE}", "$A") + " }; " + agent.launch;
+      return std::string("export PATH=\"$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; A=\"$HOME/.local/bin/infinite-app\"; [ -x \"$A\" ] || A=") +
+             ShQuote(exe) + "; " + agent.mcpCheck + " 2>/dev/null | grep -qF \"$A\" || { " + Replace(agent.mcpRemove, "{EXE}", "\"$A\"") +
+             " >/dev/null 2>&1; " + Replace(agent.mcpAdd, "{EXE}", "\"$A\"") + "; }; " + agent.launch;
    }
 
    bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv)
@@ -483,7 +552,164 @@ if ($Failed -gt 0) { exit 1 }
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart } }.dump(2) << "\n";
    }
 
-   View Describe(Os os, const Status& status, const Agent& agent, bool agentInstalled, const std::string& exe, const Paths& paths)
+   namespace
+   {
+      bool IsFile(const std::string& p)
+      {
+         std::error_code ec;
+         return !p.empty() && std::filesystem::is_regular_file(AppPaths::FsPath(p), ec);
+      }
+
+      std::string ReadAll(const std::string& p)
+      {
+         std::ifstream f(AppPaths::FsPath(p), std::ios::binary);
+         std::stringstream ss;
+         ss << f.rdbuf();
+         return ss.str();
+      }
+
+      std::string FirstLine(std::string t)
+      {
+         t = t.substr(0, t.find('\n'));
+         while (!t.empty() && (t.back() == '\r' || t.back() == ' '))
+            t.pop_back();
+         return t;
+      }
+
+      bool OnPath(Os os, const std::vector<std::string>& names, const std::string& home, const std::string& pathEnv)
+      {
+         std::vector<std::string> dirs;
+         std::stringstream ss(pathEnv);
+         for (std::string d; std::getline(ss, d, os == Os::kWindows ? ';' : ':');)
+            if (!d.empty())
+               dirs.push_back(d);
+         if (!home.empty())
+            dirs.push_back(home + "/.local/bin");
+         if (os == Os::kMac)
+         {
+            dirs.push_back("/opt/homebrew/bin");
+            dirs.push_back("/usr/local/bin");
+         }
+         if (os == Os::kLinux)
+            dirs.push_back("/usr/bin");
+         for (const std::string& d : dirs)
+            for (const std::string& n : names)
+               if (IsFile(d + "/" + n))
+                  return true;
+         return false;
+      }
+   }
+
+   bool LauncherResolves(Os os, const std::string& recordFile)
+   {
+      if (IsFile(FirstLine(ReadAll(recordFile))))
+         return true;
+      // The same fallbacks the launcher script tries.
+      if (os == Os::kMac)
+      {
+         const char* home = getenv("HOME");
+         return IsFile("/Applications/Infinite.app/Contents/MacOS/Infinite") ||
+                (home != nullptr && IsFile(std::string(home) + "/Applications/Infinite.app/Contents/MacOS/Infinite"));
+      }
+      if (os == Os::kLinux)
+         return IsFile("/opt/Infinite/Infinite");
+      return IsFile("C:/Program Files/Infinite/Infinite.exe");
+   }
+
+   HealthReport CheckHealth(const HealthInput& in)
+   {
+      HealthReport r;
+      r.checked = true;
+      auto set = [&](int i, Health h, const char* why = "") { r.step[i] = h; r.why[i] = why; };
+      const bool win = in.os == Os::kWindows;
+
+      // 0 path: both launchers exist, the recorded app still exists, and the folder is on PATH
+      const std::string shim = in.binDir + (win ? "/infinite.cmd" : "/infinite");
+      if (!IsFile(shim) || !IsFile(in.binDir + (win ? "/infinite-app.cmd" : "/infinite-app")))
+         set(0, Health::kBroken, "the infinite command is missing");
+      else if (!LauncherResolves(in.os, in.recordFile))
+         set(0, Health::kBroken, "Infinite was moved. Open it from its new place");
+      else if (!win)
+      {
+         bool onPath = false;
+         std::stringstream ss(in.pathEnv);
+         for (std::string d; std::getline(ss, d, ':');)
+            onPath = onPath || d == in.binDir;
+         bool inRc = false;
+         for (const char* rc : { "/.zshrc", "/.bash_profile", "/.bashrc", "/.profile" })
+            inRc = inRc || ReadAll(in.home + rc).find("# >>> infinite cli >>>") != std::string::npos;
+         if (onPath || inRc)
+            set(0, Health::kOk);
+         else
+            set(0, Health::kBroken, "the PATH line is gone from your shell profile");
+      }
+      else
+         set(0, Health::kOk);
+
+      // 1 headless: the app that is running
+      set(1, IsFile(in.exe) ? Health::kOk : Health::kUnknown);
+
+      // 2 and 3 node and the MCP server it fetches
+      const bool node = OnPath(in.os, win ? std::vector<std::string>{ "node.exe" } : std::vector<std::string>{ "node" }, in.home, in.pathEnv) &&
+                        OnPath(in.os, win ? std::vector<std::string>{ "npx.cmd" } : std::vector<std::string>{ "npx" }, in.home, in.pathEnv);
+      set(2, node ? Health::kOk : Health::kBroken, "Node.js was removed");
+      set(3, node ? Health::kOk : Health::kUnknown);
+
+      // 4 the agent: installed, and its own config still names the launcher
+      if (in.agent == nullptr)
+         set(4, Health::kUnknown);
+      else if (!OnPath(in.os, win ? std::vector<std::string>{ std::string(in.agent->binary) + ".exe", std::string(in.agent->binary) + ".cmd" } : std::vector<std::string>{ in.agent->binary }, in.home, in.pathEnv) &&
+               !IsFile(in.home + "/.claude/local/" + in.agent->binary))
+         set(4, Health::kBroken, "the coding agent was uninstalled");
+      else if (ReadAll(in.home + "/" + in.agent->configFile).find("infinite-app") == std::string::npos)
+         set(4, Health::kBroken, "the MCP registration is gone from the agent's config");
+      else
+         set(4, Health::kOk);
+      return r;
+   }
+
+   namespace
+   {
+      std::mutex gHealthMutex;
+      HealthReport gHealth;
+   }
+
+   void StartLaunchCheck()
+   {
+      const Os os = CurrentOs();
+      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
+      const std::string exe = RealExecutable();
+      const char* home = getenv(os == Os::kWindows ? "USERPROFILE" : "HOME");
+      const char* path = getenv("PATH");
+      const char* local = getenv("LOCALAPPDATA");
+      HealthInput in;
+      in.os = os;
+      in.home = home != nullptr ? home : "";
+      in.pathEnv = path != nullptr ? path : "";
+      in.exe = exe;
+      in.recordFile = paths.record;
+      in.binDir = os == Os::kWindows ? std::string(local != nullptr ? local : "") + "/Infinite/bin" : in.home + "/.local/bin";
+      in.agent = FindAgent(Prefs().agent);
+      std::thread([in, paths, exe]()
+      {
+         // Setup was done before: keep the launchers pointed at the app that is running now.
+         if (IsFile(paths.status) && !exe.empty() && FirstLine(ReadAll(paths.record)) != exe)
+         {
+            std::ofstream(AppPaths::FsPath(paths.record), std::ios::binary) << exe << "\n";
+         }
+         HealthReport r = CheckHealth(in);
+         std::lock_guard<std::mutex> lock(gHealthMutex);
+         gHealth = r;
+      }).detach();
+   }
+
+   HealthReport LatestHealth()
+   {
+      std::lock_guard<std::mutex> lock(gHealthMutex);
+      return gHealth;
+   }
+
+   View Describe(Os os, const Status& status, const Agent& agent, bool agentInstalled, const std::string& exe, const Paths& paths, const HealthReport* health)
    {
       View v;
       v.steps = status.steps;
@@ -495,18 +721,30 @@ if ($Failed -gt 0) { exit 1 }
       v.setupLine = SetupLine(os, paths.script);
       v.installLine = InstallAgentLine(os, agent);
       v.startLine = StartAgentLine(os, exe, agent);
+      int repairs = 0;
+      if (health != nullptr && health->checked && !status.running)
+         for (int i = 0; i < kStepCount && i < (int)v.steps.size(); i++)
+            if (v.steps[(size_t)i].Green() && health->step[i] == Health::kBroken)
+            {
+               v.steps[(size_t)i].state = StepState::kRepair;
+               v.steps[(size_t)i].detail = health->why[i];
+               v.steps[(size_t)i].repairLine = SetupLine(os, paths.script);
+               repairs++;
+            }
       v.setupEnabled = !status.running;
       if (status.running)
          v.setupLabel = "Setting up...";
       else
          v.setupLabel = status.present ? "Set up again" : "Set up everything";
-      const int green = status.GreenCount(), failed = status.FailedCount();
+      const int green = status.GreenCount() - repairs, failed = status.FailedCount();
       if (!status.present)
          v.summary = "Not set up yet.";
       else if (status.running)
          v.summary = std::to_string(green) + " of " + std::to_string(kStepCount) + " done so far.";
       else if (failed > 0)
          v.summary = std::to_string(failed) + (failed == 1 ? " step needs attention." : " steps need attention.");
+      else if (repairs > 0)
+         v.summary = std::to_string(repairs) + (repairs == 1 ? " step needs repair." : " steps need repair.");
       else if (green == kStepCount)
          v.summary = "Everything is set up.";
       else
@@ -514,7 +752,7 @@ if ($Failed -gt 0) { exit 1 }
       return v;
    }
 
-   bool Perform(Action action, Os os, const Agent& agent, const std::string& exe, const Paths& paths, const Runner& run, std::string* error)
+   bool Perform(Action action, Os os, const Agent& agent, const std::string& exe, const Paths& paths, const Runner& run, std::string* error, const std::string& step, const Status* prior)
    {
       auto fail = [&](const std::string& why) { if (error != nullptr) *error = why; return false; };
       if (!run)
@@ -533,6 +771,25 @@ if ($Failed -gt 0) { exit 1 }
          if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
             return fail("could not write " + paths.script);
          run("Infinite setup", SetupLine(os, paths.script));
+         return true;
+      }
+      case Action::kRepairStep:
+      {
+         if (exe.empty())
+            return fail("Infinite could not find its own executable");
+         bool known = false;
+         for (const char* id : kStepIds)
+            known = known || step == id;
+         if (!known)
+            return fail("unknown step");
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
+         out << BuildScript(os, exe, agent, paths.status, { step }, prior);
+         out.close();
+         if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
+            return fail("could not write " + paths.script);
+         run("Infinite repair", SetupLine(os, paths.script));
          return true;
       }
       case Action::kInstallAgent:

@@ -42,6 +42,12 @@ namespace app
             dl->AddLine(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), col, 2.0f);
             dl->AddLine(ImVec2(c.x + r, c.y - r), ImVec2(c.x - r, c.y + r), col, 2.0f);
          }
+         else if (s.state == S::kRepair)
+         {
+            const ImU32 col = tok::U32(tok::terminal_ansi3, light);
+            dl->AddLine(ImVec2(c.x, c.y - r), ImVec2(c.x, c.y + r * 0.3f), col, 2.0f);
+            dl->AddCircleFilled(ImVec2(c.x, c.y + r * 0.85f), 1.6f, col);
+         }
          else if (s.state == S::kRunning)
             dl->AddCircleFilled(c, r * 0.7f, tok::U32(tok::terminal_ansi3, light));
          else
@@ -68,19 +74,23 @@ namespace app
       if (now - sLastRead > 1.0)
       {
          sLastRead = now;
+         const bool wasRunning = sStatus.running;
          sStatus = ParseStatus(ReadFile(paths.status), (long long)std::time(nullptr));
+         if (wasRunning && !sStatus.running)
+            StartLaunchCheck();   // a setup or repair just finished: look again, quietly
       }
       const bool installed = AgentInstalledHere(*agent);
-      const View v = Describe(os, sStatus, *agent, installed, exe, paths);
+      const HealthReport health = LatestHealth();
+      const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
 
       FormParts::Section(T("Command line & agents"));
       ImGui::TextWrapped("%s", T("Sets up the infinite command in every terminal, checks the headless engine, and connects your coding agent to Infinite through MCP. It runs in a Terminal tab you can watch, so a password prompt works. Nothing is installed until you press a button."));
 
       static std::string sError;
-      auto perform = [&](Action a)
+      auto perform = [&](Action a, const std::string& step = std::string())
       {
          sError.clear();
-         Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError);
+         Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, step, &sStatus);
          sLastRead = -10.0;
       };
 
@@ -104,6 +114,14 @@ namespace app
          {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", s.detail.c_str());
+         }
+         if (s.state == StepState::kRepair)
+         {
+            ImGui::SameLine();
+            if (FormParts::Button(L("Repair")))
+               perform(Action::kRepairStep, s.id);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Opens a Terminal tab and reruns only this step."));
          }
          ImGui::PopID();
       }
