@@ -229,14 +229,14 @@ esac
 ON_PATH=0; case ":$PATH:" in *":$BIN:"*) ON_PATH=1 ;; esac
 IN_RC=0; grep -qs '# >>> infinite cli >>>' "$RC" && IN_RC=1
 if [ "$SHIM_NEW" = err ]; then
-  finish failed "could not write $SHIM"
+  finish failed "could not write ~/.local/bin/infinite"
 elif [ $ON_PATH = 1 ] || [ $IN_RC = 1 ]; then
-  if [ "$SHIM_NEW" = 1 ]; then finish ok "updated $SHIM"; else finish skipped "$SHIM already set up"; fi
+  if [ "$SHIM_NEW" = 1 ]; then finish ok "updated ~/.local/bin/infinite"; else finish skipped "~/.local/bin/infinite already set up"; fi
 else
   if printf '\n# >>> infinite cli >>>\nexport PATH="$HOME/.local/bin:$PATH"\n# <<< infinite cli <<<\n' >> "$RC" 2>/dev/null; then
-    finish ok "added $SHIM and a PATH line in $RC. Open a new terminal tab to use it"
+    finish ok "added ~/.local/bin/infinite and a PATH line in $(basename "$RC"). Open a new terminal tab to use it"
   else
-    finish failed "could not write $RC"
+    finish failed "could not write $(basename "$RC")"
   fi
 fi
 
