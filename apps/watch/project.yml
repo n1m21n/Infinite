@@ -22,7 +22,6 @@ targets:
         CFBundleDisplayName: Infinite Remote
         WKApplication: true
         WKWatchOnly: true
-        WKRunsIndependentlyOfCompanionApp: true
         NSMotionUsageDescription: Infinite Remote sends your wrist motion to Infinite on your Mac.
         NSBluetoothAlwaysUsageDescription: Infinite Remote connects to Infinite on your Mac over Bluetooth.
         NSHealthShareUsageDescription: Infinite Remote reads your heart rate to send it to Infinite (only with INFINITE_WATCH_HEALTH=1).
