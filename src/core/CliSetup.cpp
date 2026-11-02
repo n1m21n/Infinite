@@ -78,7 +78,7 @@ namespace CliSetup
            "irm https://claude.ai/install.ps1 | iex",
            "claude",
            "claude mcp get infinite",
-           "claude mcp add --scope user -e INFINITE_BIN={EXE} infinite -- npx -y infinite-engine serve",
+           "claude mcp add --scope user infinite -e INFINITE_BIN={EXE} -- npx -y infinite-engine serve",
            "claude mcp remove infinite --scope user",
            ".claude.json",
            "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },

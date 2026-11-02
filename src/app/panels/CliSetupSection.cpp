@@ -84,7 +84,7 @@ namespace app
       const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
 
       FormParts::Section(T("Command line & agents"));
-      ImGui::TextWrapped("%s", T("Sets up the infinite command in every terminal, checks the headless engine, and connects your coding agent to Infinite through MCP. It runs in a Terminal tab you can watch, so a password prompt works. Nothing is installed until you press a button."));
+      ImGui::TextWrapped("%s", T("Adds the infinite command to your terminal and connects your coding agent to Infinite. It runs in a Terminal tab you can watch. Nothing is installed until you press a button."));
 
       static std::string sError;
       auto perform = [&](Action a, const std::string& step = std::string())
@@ -99,13 +99,18 @@ namespace app
          perform(Action::kSetup);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Show the commands. Each step checks first and skips what is already done, so run it again any time to repair."));
+         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Details. Each step checks first and skips what is already done, so run it again any time to repair."));
       ImGui::SameLine();
       ImGui::TextDisabled("%s", T(v.summary.c_str()));
 
       const float icon = ImGui::GetTextLineHeight();
+      bool allGreen = sStatus.present && !sStatus.running;
+      for (const StepStatus& st : v.steps)
+         allGreen = allGreen && st.Green();
       for (const StepStatus& s : v.steps)
       {
+         if (allGreen)
+            break;   // everything holds: the list stays out of the way
          ImGui::PushID(s.id);
          DrawStepIcon(s, icon);
          ImGui::SameLine();
@@ -126,7 +131,7 @@ namespace app
          ImGui::PopID();
       }
 
-      if (ImGui::TreeNode(T("Show the commands")))
+      if (ImGui::TreeNode(T("Details")))
       {
          ImGui::TextDisabled("%s", T("Connect terminal & agent types this line, and runs the script below it:"));
          ImGui::TextUnformatted(v.setupLine.c_str());
@@ -179,7 +184,8 @@ namespace app
       if (FormParts::Button(L("Start agent")))
          perform(Action::kStartAgent);
       ImGui::EndDisabled();
-      ImGui::TextDisabled("%s", v.agentInstalled ? T("Installed.") : T("Not installed yet. Install runs the command shown above in a Terminal tab."));
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         HelpTip("%s", T(v.loginHint.c_str()));
       if (v.startEnabled)
       {
          bool autoStart = prefs.autoStart;
@@ -189,7 +195,6 @@ namespace app
             SaveConfig(paths.config, prefs);
          }
       }
-      ImGui::TextDisabled("%s", T(v.loginHint.c_str()));
       if (!sError.empty())
          ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::terminal_ansi1, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       SectionCard::End();
