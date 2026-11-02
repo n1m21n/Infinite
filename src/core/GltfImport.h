@@ -12,13 +12,12 @@
 // the geometry half, and ImageSourceNode::Load (via the "gltf://" pseudo-path
 // scheme) pulls one texture slot each.
 //
-// Scope, deliberately: first mesh, first primitive, first material only.
-// TEXCOORD_0 only. The first skin, its animation clips and the primitive's
-// morph targets are read (Skinning.h poses them); no Draco/meshopt
+// Every mesh in the default scene is read, placed by its node, and split into
+// one part per material (part 0 is the package itself, the rest are in
+// `parts`). TEXCOORD_0 only. The skin, its animation clips and a lone
+// primitive's morph targets are read (Skinning.h poses them); no Draco/meshopt
 // compression, no KHR_materials_* extensions beyond the base PBR
-// metallic-roughness set, no cameras/lights. A file
-// with more than the first of any of these still loads - see
-// hadMultipleMaterials/hadMultipleUVSets - it just doesn't use the rest.
+// metallic-roughness set, no cameras/lights.
 namespace GltfImport
 {
    struct GltfDecodedImage
@@ -86,8 +85,23 @@ namespace GltfImport
       std::vector<std::vector<float>> morphDeltas;
       std::vector<float> morphDefaults;
 
-      bool hadMultipleMaterials = false;
+      // The part's material: its name and base factors (glTF defaults when it has none).
+      std::string materialName;
+      float baseColor[4] = { 1, 1, 1, 1 };
+      float metallicFactor = 1.0f;
+      float roughnessFactor = 1.0f;
+      float emissiveFactor[3] = { 0, 0, 0 };
+
       bool hadMultipleUVSets = false;
+
+      // Parts 1.. of the file (one per further material); empty on a part.
+      std::vector<GltfDecodePackage> parts;
+      int PartCount() const { return 1 + (int)parts.size(); }
+      // Part n, or nullptr past the end.
+      const GltfDecodePackage* Part(int n) const
+      {
+         return n == 0 ? this : (n > 0 && n <= (int)parts.size()) ? &parts[n - 1] : nullptr;
+      }
    };
 
    // Parses and decodes `path` (.gltf or .glb), caching the result by path

@@ -1,6 +1,7 @@
 #include "ImageSourceNode.h"
 
 #include "gl3.h"
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -78,7 +79,7 @@ void ImageSourceNode::EnsurePlaceholder()
 
 namespace
 {
-   // gltf://<real path>#<slot> pseudo-path scheme - see ImageSourceNode.h's
+   // gltf://<real path>#<slot>[@<part>] pseudo-path scheme - see ImageSourceNode.h's
    // Load()/LoadFromDecoded() comments. Only ever constructed by main.cpp's
    // drop handler and parsed back here, so save/load and undo/redo (which
    // both just call Load(mLoadedPath) via ReloadFromPath()) reconstruct a
@@ -98,8 +99,20 @@ namespace
       return !outRealPath.empty() && !outSlot.empty();
    }
 
-   const GltfImport::GltfDecodedImage* SlotImage(const GltfImport::GltfDecodePackage& pkg, const std::string& slot)
+   // "<slot>@<part>" picks another part's map; a bare slot is part 0.
+   const GltfImport::GltfDecodedImage* SlotImage(const GltfImport::GltfDecodePackage& file, std::string slot)
    {
+      int part = 0;
+      const size_t at = slot.find('@');
+      if (at != std::string::npos)
+      {
+         part = std::atoi(slot.c_str() + at + 1);
+         slot.resize(at);
+      }
+      const GltfImport::GltfDecodePackage* found = file.Part(part);
+      if (found == nullptr)
+         return nullptr;
+      const GltfImport::GltfDecodePackage& pkg = *found;
       if (slot == "albedo") return &pkg.albedo;
       if (slot == "roughness") return &pkg.roughness;
       if (slot == "metallic") return &pkg.metallic;

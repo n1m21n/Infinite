@@ -3655,12 +3655,20 @@ void RunView3DTest()
 // A model file dropped on the 3D View becomes a Model 3D node and an item in the scene, selected.
 void RunView3DDropTest(int frameId)
 {
-   static std::string path;
+   static std::string path, gltfPath;
    if (frameId == 9)
    {
       path = (std::filesystem::temp_directory_path() / "infinite-view3d-drop.obj").string();
       std::ofstream(path) << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
-      gDroppedFiles = { path };
+      // Two triangles, two materials (red, blue): one item per material.
+      gltfPath = (std::filesystem::temp_directory_path() / "infinite-view3d-drop.gltf").string();
+      std::ofstream(gltfPath) << R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],)"
+         R"("meshes":[{"primitives":[{"attributes":{"POSITION":0},"material":0},{"attributes":{"POSITION":1},"material":1}]}],)"
+         R"("materials":[{"name":"red","pbrMetallicRoughness":{"baseColorFactor":[1,0,0,1]}},{"name":"blue","pbrMetallicRoughness":{"baseColorFactor":[0,0,1,1],"metallicFactor":0}}],)"
+         R"("buffers":[{"uri":"data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAQAAAAAAAAAAAAABAQAAAAAAAAAAAAAAAQAAAgD8AAAAA","byteLength":72}],)"
+         R"("bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36}],)"
+         R"("accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3","min":[2,0,0],"max":[3,1,0]}]})";
+      gDroppedFiles = { path, gltfPath };
       gDropPos = ImVec2(gView3DRectMin.x + (gView3DRectMax.x - gView3DRectMin.x) * 0.3f,
                         (gView3DRectMin.y + gView3DRectMax.y) * 0.5f);
       return;
@@ -3672,7 +3680,28 @@ void RunView3DDropTest(int frameId)
             if (GraphNode* src = FindNodeByUid(it.uid); src != nullptr && dynamic_cast<ModelSourceNode*>(src->node.get()) != nullptr)
                landed = true;
    printf("  [%s] a model dropped on the 3D View joins the scene\n", landed ? "pass" : "FAIL");
-   printf("VIEW3DDROP %s\n", landed && gDroppedFiles.empty() ? "OK" : "FAIL");
+   // The glTF: two Material-over-Model items in one group, red then blue, over parts 0 and 1.
+   std::vector<const Scene3DNode::Item*> mats;
+   std::vector<MaterialNode*> matNodes;
+   for (GraphNode& gn : gNodes)
+      if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
+         for (const Scene3DNode::Item& it : s->Items())
+            if (GraphNode* src = FindNodeByUid(it.uid))
+               if (auto* m = dynamic_cast<MaterialNode*>(src->node.get());
+                   m != nullptr && dynamic_cast<ModelSourceNode*>(m->input) != nullptr)
+               {
+                  mats.push_back(&it);
+                  matNodes.push_back(m);
+               }
+   bool parts = mats.size() == 2 && mats[0]->group != 0 && mats[0]->group == mats[1]->group &&
+                matNodes[0]->color[0] > 0.9f && matNodes[1]->color[2] > 0.9f;
+   for (size_t k = 0; parts && k < matNodes.size(); k++)
+   {
+      auto* model = dynamic_cast<ModelSourceNode*>(matNodes[k]->input);
+      parts = model != nullptr && model->part == (int)k;
+   }
+   printf("  [%s] a two-material glTF lands as two grouped items, one per material\n", parts ? "pass" : "FAIL");
+   printf("VIEW3DDROP %s\n", landed && parts && gDroppedFiles.empty() ? "OK" : "FAIL");
 }
 
 void RunClipboardTest()

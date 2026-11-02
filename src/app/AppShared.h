@@ -5787,6 +5787,9 @@ GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);
 void View3DAddMaterial(Scene3DNode* scene, int itemId);
 // The Material tab's preview ball for this material (192 px, GL texture).
 unsigned int View3DPreviewBall(class MaterialNode* mat);
+// StageDropHandling.cpp: a dropped glTF as one Model 3D + Material + maps per
+// material, stacked from (x, y). Returns each part's Material node index.
+std::vector<int> SpawnGltfParts(const std::string& path, float x, float y);
 void View3DSetWorld(GraphNode& gn);
 extern ImVec2 gPianoRollRectMin, gPianoRollRectMax;
 // A Library .mid released over the Piano Roll; the panel imports it next frame.

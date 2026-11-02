@@ -3759,7 +3759,22 @@ namespace
       std::vector<int> added;
       for (const std::string& path : files)
       {
-         if (HasExtension(path, kModels))
+         if (HasExtension(path, { "gltf", "glb" }))
+         {
+            // One item per material, grouped, each with its Material and maps.
+            const ImVec2 spot = SpawnSpot(scene);
+            const std::vector<int> parts = SpawnGltfParts(path, spot.x, spot.y);
+            const int group = parts.size() > 1 ? NextGroup(scene) : 0;
+            for (int index : parts)
+               if (GraphNode* gn = FindNodeByIndex(index))
+               {
+                  Item& it = scene->AddItem(gn->uid);
+                  std::copy(at, at + 3, it.pos);
+                  it.group = group;
+                  added.push_back(it.id);
+               }
+         }
+         else if (HasExtension(path, kModels))
          {
             const ImVec2 spot = SpawnSpot(scene);
             GraphNode* gn = SpawnNode("Model 3D", "3D", spot.x, spot.y + 120.0f * (float)added.size());

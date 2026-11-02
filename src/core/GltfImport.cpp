@@ -250,13 +250,34 @@ namespace
    // The first skin (preferring the one on the node that shows mesh 0), its
    // joints parent-first, and every clip that moves those joints or the
    // mesh's morph weights.
-   void ReadRig(const cgltf_data* data, const cgltf_primitive& prim, GltfImport::GltfDecodePackage& pkg)
+   // One primitive as placed in the scene: its node's world matrix, unless a
+   // skin places it (a skinned mesh's node transform is ignored, per the spec).
+   struct PrimRef
    {
-      const cgltf_mesh* mesh0 = &data->meshes[0];
+      const cgltf_primitive* prim = nullptr;
+      const cgltf_mesh* mesh = nullptr;
+      const cgltf_node* node = nullptr;
+      float world[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+      bool skinned = false;
+      size_t firstVertex = 0, vertexCount = 0;
+   };
+
+   const cgltf_accessor* SkinAccessor(const cgltf_primitive& prim, cgltf_attribute_type type)
+   {
+      for (cgltf_size i = 0; i < prim.attributes_count; i++)
+         if (prim.attributes[i].type == type && prim.attributes[i].index == 0)
+            return prim.attributes[i].data;
+      return nullptr;
+   }
+
+   void ReadRig(const cgltf_data* data, const std::vector<PrimRef>& refs, GltfImport::GltfDecodePackage& pkg)
+   {
+      const cgltf_mesh* mesh0 = refs[0].mesh;
+      const cgltf_primitive& prim = *refs[0].prim;
       const size_t vertexCount = pkg.vertices.size();
 
-      // Morph targets (positions only).
-      for (cgltf_size t = 0; t < prim.targets_count; t++)
+      // Morph targets (positions only), when the part is one primitive.
+      for (cgltf_size t = 0; refs.size() == 1 && t < prim.targets_count; t++)
       {
          std::vector<float> deltas(vertexCount * 3, 0.0f);
          for (cgltf_size a = 0; a < prim.targets[t].attributes_count; a++)
@@ -271,28 +292,22 @@ namespace
          pkg.morphDefaults.push_back(t < mesh0->weights_count ? mesh0->weights[t] : 0.0f);
       }
 
-      const cgltf_skin* skin = nullptr;
-      for (cgltf_size i = 0; i < data->nodes_count && skin == nullptr; i++)
-         if (data->nodes[i].mesh == mesh0 && data->nodes[i].skin != nullptr)
-            skin = data->nodes[i].skin;
+      const cgltf_skin* skin = refs[0].node != nullptr ? refs[0].node->skin : nullptr;
       if (skin == nullptr && data->skins_count > 0)
          skin = &data->skins[0];
 
-      const cgltf_accessor* jointAcc = nullptr;
-      const cgltf_accessor* weightAcc = nullptr;
-      for (cgltf_size i = 0; i < prim.attributes_count; i++)
+      // Every primitive of the part needs joints and weights, or none is skinned.
+      bool weighted = true;
+      for (const PrimRef& r : refs)
       {
-         const cgltf_attribute& attr = prim.attributes[i];
-         if (attr.index != 0)
-            continue;
-         if (attr.type == cgltf_attribute_type_joints) jointAcc = attr.data;
-         else if (attr.type == cgltf_attribute_type_weights) weightAcc = attr.data;
+         const cgltf_accessor* j = SkinAccessor(*r.prim, cgltf_attribute_type_joints);
+         const cgltf_accessor* w = SkinAccessor(*r.prim, cgltf_attribute_type_weights);
+         weighted = weighted && r.skinned && j != nullptr && w != nullptr && j->count == r.vertexCount && w->count == r.vertexCount;
       }
 
       std::vector<const cgltf_node*> nodes; // joint index -> node, parent-first
       std::vector<int> fileToOrdered;
-      if (skin != nullptr && skin->joints_count > 0 && jointAcc != nullptr && weightAcc != nullptr &&
-          jointAcc->count == vertexCount && weightAcc->count == vertexCount)
+      if (skin != nullptr && skin->joints_count > 0 && weighted)
       {
          auto jointOf = [&](const cgltf_node* n) {
             for (cgltf_size j = 0; j < skin->joints_count; j++)
@@ -339,13 +354,19 @@ namespace
 
          pkg.skinJoints.resize(vertexCount * 4);
          pkg.skinWeights.resize(vertexCount * 4);
-         for (size_t v = 0; v < vertexCount; v++)
+         for (const PrimRef& r : refs)
          {
-            cgltf_uint ji[4] = { 0, 0, 0, 0 };
-            cgltf_accessor_read_uint(jointAcc, v, ji, 4);
-            cgltf_accessor_read_float(weightAcc, v, &pkg.skinWeights[v * 4], 4);
-            for (int k = 0; k < 4; k++)
-               pkg.skinJoints[v * 4 + k] = (unsigned short)(ji[k] < fileToOrdered.size() ? fileToOrdered[ji[k]] : 0);
+            const cgltf_accessor* jointAcc = SkinAccessor(*r.prim, cgltf_attribute_type_joints);
+            const cgltf_accessor* weightAcc = SkinAccessor(*r.prim, cgltf_attribute_type_weights);
+            for (size_t i = 0; i < r.vertexCount; i++)
+            {
+               const size_t v = r.firstVertex + i;
+               cgltf_uint ji[4] = { 0, 0, 0, 0 };
+               cgltf_accessor_read_uint(jointAcc, i, ji, 4);
+               cgltf_accessor_read_float(weightAcc, i, &pkg.skinWeights[v * 4], 4);
+               for (int k = 0; k < 4; k++)
+                  pkg.skinJoints[v * 4 + k] = (unsigned short)(ji[k] < fileToOrdered.size() ? fileToOrdered[ji[k]] : 0);
+            }
          }
       }
 
@@ -441,125 +462,192 @@ namespace GltfImport
          return nullptr;
       }
 
-      if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0)
+      // Every triangle primitive in the default scene, placed by its node,
+      // grouped by material in the order they first appear.
+      std::vector<const cgltf_material*> mats;
+      std::vector<std::vector<PrimRef>> groups;
+      auto addPrims = [&](const cgltf_mesh* mesh, const cgltf_node* node) {
+         for (cgltf_size p = 0; p < mesh->primitives_count; p++)
+         {
+            const cgltf_primitive& prim = mesh->primitives[p];
+            if (prim.type != cgltf_primitive_type_triangles)
+               continue;
+            PrimRef r;
+            r.prim = &prim;
+            r.mesh = mesh;
+            r.node = node;
+            r.skinned = (node != nullptr && node->skin != nullptr) ||
+                        (data->skins_count > 0 && SkinAccessor(prim, cgltf_attribute_type_joints) != nullptr);
+            if (node != nullptr && !r.skinned)
+               cgltf_node_transform_world(node, r.world);
+            const auto it = std::find(mats.begin(), mats.end(), prim.material);
+            if (it == mats.end())
+            {
+               mats.push_back(prim.material);
+               groups.push_back({ r });
+            }
+            else
+               groups[it - mats.begin()].push_back(r);
+         }
+      };
+      std::vector<const cgltf_node*> stack;
+      const cgltf_scene* scene = data->scene != nullptr ? data->scene : data->scenes_count > 0 ? &data->scenes[0] : nullptr;
+      if (scene != nullptr)
+         for (cgltf_size i = scene->nodes_count; i-- > 0;)
+            stack.push_back(scene->nodes[i]);
+      else
+         for (cgltf_size i = data->nodes_count; i-- > 0;)
+            if (data->nodes[i].parent == nullptr)
+               stack.push_back(&data->nodes[i]);
+      while (!stack.empty())
+      {
+         const cgltf_node* n = stack.back();
+         stack.pop_back();
+         if (n->mesh != nullptr)
+            addPrims(n->mesh, n);
+         for (cgltf_size c = n->children_count; c-- > 0;)
+            stack.push_back(n->children[c]);
+      }
+      if (groups.empty())   // meshes no node places
+         for (cgltf_size m = 0; m < data->meshes_count; m++)
+            addPrims(&data->meshes[m], nullptr);
+      if (groups.empty())
       {
          cgltf_free(data);
          outError = "glTF file has no mesh geometry";
          return nullptr;
       }
 
-      const cgltf_mesh& mesh = data->meshes[0];
-      const cgltf_primitive& prim = mesh.primitives[0];
-
-      const cgltf_accessor* posAcc = nullptr;
-      const cgltf_accessor* normAcc = nullptr;
-      const cgltf_accessor* uvAcc = nullptr;
-      int uvSetsSeen = 0;
-      for (cgltf_size i = 0; i < prim.attributes_count; i++)
+      const std::string dir = DirOf(path);
+      std::vector<GltfDecodePackage> built(groups.size());
+      for (size_t g = 0; g < groups.size(); g++)
       {
-         const cgltf_attribute& attr = prim.attributes[i];
-         if (attr.type == cgltf_attribute_type_position && posAcc == nullptr)
-            posAcc = attr.data;
-         else if (attr.type == cgltf_attribute_type_normal && normAcc == nullptr)
-            normAcc = attr.data;
-         else if (attr.type == cgltf_attribute_type_texcoord)
+         GltfDecodePackage& pkg = built[g];
+         std::vector<PrimRef>& refs = groups[g];
+         int uvSetsSeen = 0;
+         bool anyMissingNormals = false;
+         for (PrimRef& r : refs)
          {
-            uvSetsSeen++;
-            if (attr.index == 0)
-               uvAcc = attr.data;
+            const cgltf_primitive& prim = *r.prim;
+            const cgltf_accessor* posAcc = nullptr;
+            const cgltf_accessor* normAcc = nullptr;
+            const cgltf_accessor* uvAcc = nullptr;
+            int uvSets = 0;
+            for (cgltf_size i = 0; i < prim.attributes_count; i++)
+            {
+               const cgltf_attribute& attr = prim.attributes[i];
+               if (attr.type == cgltf_attribute_type_position && posAcc == nullptr)
+                  posAcc = attr.data;
+               else if (attr.type == cgltf_attribute_type_normal && normAcc == nullptr)
+                  normAcc = attr.data;
+               else if (attr.type == cgltf_attribute_type_texcoord)
+               {
+                  uvSets++;
+                  if (attr.index == 0)
+                     uvAcc = attr.data;
+               }
+            }
+            uvSetsSeen = std::max(uvSetsSeen, uvSets);
+            if (posAcc == nullptr)
+               continue;
+
+            const size_t base = pkg.vertices.size();
+            const size_t count = posAcc->count;
+            r.firstVertex = base;
+            r.vertexCount = count;
+            pkg.vertices.resize(base + count);
+            Platform::ModelVertex* out = &pkg.vertices[base];
+            std::vector<float> buf(count * 3);
+            cgltf_accessor_unpack_floats(posAcc, buf.data(), buf.size());
+            const float* m = r.world;
+            for (size_t i = 0; i < count; i++)
+            {
+               const float x = buf[i * 3], y = buf[i * 3 + 1], z = buf[i * 3 + 2];
+               out[i].px = m[0] * x + m[4] * y + m[8] * z + m[12];
+               out[i].py = m[1] * x + m[5] * y + m[9] * z + m[13];
+               out[i].pz = m[2] * x + m[6] * y + m[10] * z + m[14];
+            }
+            // Normals turn by the cofactor matrix (the inverse transpose, scaled).
+            const float c[9] = { m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8],
+                                 m[2] * m[9] - m[1] * m[10], m[0] * m[10] - m[2] * m[8], m[1] * m[8] - m[0] * m[9],
+                                 m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4] };
+            const float det = m[0] * c[0] + m[4] * c[1] + m[8] * c[2];
+            if (normAcc != nullptr && normAcc->count == count)
+            {
+               cgltf_accessor_unpack_floats(normAcc, buf.data(), buf.size());
+               for (size_t i = 0; i < count; i++)
+               {
+                  const float x = buf[i * 3], y = buf[i * 3 + 1], z = buf[i * 3 + 2];
+                  float n[3] = { c[0] * x + c[3] * y + c[6] * z, c[1] * x + c[4] * y + c[7] * z, c[2] * x + c[5] * y + c[8] * z };
+                  const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+                  const float k = len > 1e-12f ? (det < 0.0f ? -1.0f : 1.0f) / len : 0.0f;
+                  out[i].nx = n[0] * k; out[i].ny = n[1] * k; out[i].nz = n[2] * k;
+               }
+            }
+            else
+               anyMissingNormals = true;
+            if (uvAcc != nullptr && uvAcc->count == count)
+            {
+               std::vector<float> uv(count * 2);
+               cgltf_accessor_unpack_floats(uvAcc, uv.data(), uv.size());
+               for (size_t i = 0; i < count; i++)
+               {
+                  // glTF puts v=0 at the image's top; our images load bottom-up.
+                  out[i].u = uv[i * 2 + 0];
+                  out[i].v = 1.0f - uv[i * 2 + 1];
+               }
+            }
+
+            const size_t firstIndex = pkg.indices.size();
+            if (prim.indices != nullptr)
+            {
+               pkg.indices.resize(firstIndex + prim.indices->count);
+               for (size_t i = 0; i < prim.indices->count; i++)
+                  pkg.indices[firstIndex + i] = (unsigned int)(base + cgltf_accessor_read_index(prim.indices, i));
+            }
+            else
+            {
+               pkg.indices.resize(firstIndex + count);
+               for (size_t i = 0; i < count; i++)
+                  pkg.indices[firstIndex + i] = (unsigned int)(base + i);
+            }
+            if (det < 0.0f)   // a mirrored node turns the winding inside out
+               for (size_t i = firstIndex; i + 2 < pkg.indices.size(); i += 3)
+                  std::swap(pkg.indices[i + 1], pkg.indices[i + 2]);
          }
-      }
+         refs.erase(std::remove_if(refs.begin(), refs.end(), [](const PrimRef& r) { return r.vertexCount == 0; }), refs.end());
+         if (refs.empty())
+            continue;
+         if (anyMissingNormals)
+            GenerateNormals(pkg.vertices, pkg.indices);
 
-      if (posAcc == nullptr)
-      {
-         cgltf_free(data);
-         outError = "glTF primitive has no POSITION attribute";
-         return nullptr;
-      }
+         ReadRig(data, refs, pkg);
+         pkg.hadMultipleUVSets = uvSetsSeen > 1;
 
-      GltfDecodePackage pkg;
-      const size_t vertexCount = posAcc->count;
-      pkg.vertices.resize(vertexCount);
-
-      {
-         std::vector<float> buf(vertexCount * 3);
-         cgltf_accessor_unpack_floats(posAcc, buf.data(), buf.size());
-         for (size_t i = 0; i < vertexCount; i++)
+         if (mats[g] == nullptr)
          {
-            pkg.vertices[i].px = buf[i * 3 + 0];
-            pkg.vertices[i].py = buf[i * 3 + 1];
-            pkg.vertices[i].pz = buf[i * 3 + 2];
+            pkg.materialName = "Material " + std::to_string(g + 1);
+            continue;
          }
-      }
-
-      if (normAcc != nullptr && normAcc->count == vertexCount)
-      {
-         std::vector<float> buf(vertexCount * 3);
-         cgltf_accessor_unpack_floats(normAcc, buf.data(), buf.size());
-         for (size_t i = 0; i < vertexCount; i++)
-         {
-            pkg.vertices[i].nx = buf[i * 3 + 0];
-            pkg.vertices[i].ny = buf[i * 3 + 1];
-            pkg.vertices[i].nz = buf[i * 3 + 2];
-         }
-      }
-
-      if (uvAcc != nullptr && uvAcc->count == vertexCount)
-      {
-         std::vector<float> buf(vertexCount * 2);
-         cgltf_accessor_unpack_floats(uvAcc, buf.data(), buf.size());
-         for (size_t i = 0; i < vertexCount; i++)
-         {
-            // glTF puts v=0 at the image's top; our images load bottom-up.
-            pkg.vertices[i].u = buf[i * 2 + 0];
-            pkg.vertices[i].v = 1.0f - buf[i * 2 + 1];
-         }
-      }
-
-      if (prim.indices != nullptr)
-      {
-         const size_t indexCount = prim.indices->count;
-         pkg.indices.resize(indexCount);
-         for (size_t i = 0; i < indexCount; i++)
-            pkg.indices[i] = (unsigned int)cgltf_accessor_read_index(prim.indices, i);
-      }
-      else
-      {
-         pkg.indices.resize(vertexCount);
-         for (size_t i = 0; i < vertexCount; i++)
-            pkg.indices[i] = (unsigned int)i;
-      }
-
-      if (normAcc == nullptr)
-         GenerateNormals(pkg.vertices, pkg.indices);
-
-      ReadRig(data, prim, pkg);
-
-      pkg.hadMultipleMaterials = data->materials_count > 1 || mesh.primitives_count > 1 || data->meshes_count > 1;
-      pkg.hadMultipleUVSets = uvSetsSeen > 1;
-
-      // First material's texture set, if any.
-      if (prim.material != nullptr)
-      {
-         const cgltf_material& mat = *prim.material;
+         const cgltf_material& mat = *mats[g];
+         pkg.materialName = mat.name != nullptr && mat.name[0] != '\0' ? mat.name : "Material " + std::to_string(g + 1);
+         std::copy(mat.emissive_factor, mat.emissive_factor + 3, pkg.emissiveFactor);
          std::string err;
-         const std::string dir = DirOf(path);
-
          if (mat.has_pbr_metallic_roughness)
          {
-            if (mat.pbr_metallic_roughness.base_color_texture.texture != nullptr)
-               DecodeCgltfImage(mat.pbr_metallic_roughness.base_color_texture.texture->image, dir, "albedo",
-                                pkg.albedo, err);
-
-            if (mat.pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr)
+            const cgltf_pbr_metallic_roughness& pbr = mat.pbr_metallic_roughness;
+            std::copy(pbr.base_color_factor, pbr.base_color_factor + 4, pkg.baseColor);
+            pkg.metallicFactor = pbr.metallic_factor;
+            pkg.roughnessFactor = pbr.roughness_factor;
+            if (pbr.base_color_texture.texture != nullptr)
+               DecodeCgltfImage(pbr.base_color_texture.texture->image, dir, "albedo", pkg.albedo, err);
+            if (pbr.metallic_roughness_texture.texture != nullptr)
             {
                GltfDecodedImage combined;
-               if (DecodeCgltfImage(mat.pbr_metallic_roughness.metallic_roughness_texture.texture->image, dir,
-                                    "metallicRoughness", combined, err))
+               if (DecodeCgltfImage(pbr.metallic_roughness_texture.texture->image, dir, "metallicRoughness", combined, err))
                   SplitMetallicRoughness(combined, pkg.roughness, pkg.metallic);
             }
          }
-
          if (mat.normal_texture.texture != nullptr)
             DecodeCgltfImage(mat.normal_texture.texture->image, dir, "normal", pkg.normalMap, err);
          if (mat.occlusion_texture.texture != nullptr)
@@ -567,21 +655,36 @@ namespace GltfImport
          if (mat.emissive_texture.texture != nullptr)
             DecodeCgltfImage(mat.emissive_texture.texture->image, dir, "emissive", pkg.emissive, err);
       }
+      built.erase(std::remove_if(built.begin(), built.end(), [](const GltfDecodePackage& p) { return p.vertices.empty(); }), built.end());
+      if (built.empty())
+      {
+         cgltf_free(data);
+         outError = "glTF primitive has no POSITION attribute";
+         return nullptr;
+      }
+      GltfDecodePackage pkg = std::move(built[0]);
+      for (size_t g = 1; g < built.size(); g++)
+         pkg.parts.push_back(std::move(built[g]));
 
       cgltf_free(data);
 
-      size_t bytes = pkg.vertices.size() * sizeof(Platform::ModelVertex) +
-                     pkg.indices.size() * sizeof(unsigned int) +
-                     pkg.skinJoints.size() * sizeof(unsigned short) + pkg.skinWeights.size() * sizeof(float) +
-                     pkg.joints.size() * sizeof(GltfJoint);
-      for (const auto& d : pkg.morphDeltas)
-         bytes += d.size() * sizeof(float);
-      for (const auto& c : pkg.clips)
-         for (const auto& ch : c.channels)
-            bytes += (ch.times.size() + ch.values.size()) * sizeof(float);
-      for (const GltfDecodedImage* img : { &pkg.albedo, &pkg.roughness, &pkg.metallic, &pkg.normalMap,
-                                           &pkg.occlusion, &pkg.emissive })
-         bytes += img->pixels.size();
+      size_t bytes = 0;
+      for (int n = 0; n < pkg.PartCount(); n++)
+      {
+         const GltfDecodePackage& part = *pkg.Part(n);
+         bytes += part.vertices.size() * sizeof(Platform::ModelVertex) +
+                  part.indices.size() * sizeof(unsigned int) +
+                  part.skinJoints.size() * sizeof(unsigned short) + part.skinWeights.size() * sizeof(float) +
+                  part.joints.size() * sizeof(GltfJoint);
+         for (const auto& d : part.morphDeltas)
+            bytes += d.size() * sizeof(float);
+         for (const auto& c : part.clips)
+            for (const auto& ch : c.channels)
+               bytes += (ch.times.size() + ch.values.size()) * sizeof(float);
+         for (const GltfDecodedImage* img : { &part.albedo, &part.roughness, &part.metallic, &part.normalMap,
+                                              &part.occlusion, &part.emissive })
+            bytes += img->pixels.size();
+      }
 
       cache.Put(path, pkg, bytes);
       return cache.Get(path);

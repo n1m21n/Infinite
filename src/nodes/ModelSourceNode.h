@@ -114,6 +114,9 @@ public:
    // file's animations. Sync 0 runs the clip in transport seconds times
    // speed; sync 1 fits one loop of the clip to clipBeats beats. Phase (0-1
    // of the clip) is added on top, so modulating it scrubs.
+   // Which of a glTF's materials this node shows (one part per material).
+   int part = 0;
+   int PartCount() const { return mPartCount; }
    int clip = 0;
    float clipSpeed = 1.0f;
    float clipPhase = 0.0f;
@@ -156,6 +159,7 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("path", mPath);
+      v.Int("part", part);
       v.Bool("normalize", normalizeScale); v.Bool("recenter", recenter);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
@@ -208,6 +212,10 @@ private:
    GltfImport::GltfDecodePackage mRig;
    float mFitCentre[3] = { 0, 0, 0 };
    float mFitScale = 1.0f;
+   int mLoadedPart = 0, mPartCount = 1;
+   // A multi-part file fits all its parts as one, so they stay lined up.
+   bool mHasFileBounds = false;
+   float mFileLo[3] = { 0, 0, 0 }, mFileHi[3] = { 0, 0, 0 };
    std::vector<float> mPoseKey;
    std::vector<float> mJointWorld;    // 16 per joint, mesh space, after the fit
    float mPosedTime = 0.0f;

@@ -98,11 +98,36 @@ bool ModelSourceNode::Load(const std::string& path)
    else if (isGltf)
    {
       std::string error;
-      const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, error);
-      if (pkg == nullptr)
+      const GltfImport::GltfDecodePackage* file = GltfImport::DecodeCached(path, error);
+      if (file == nullptr)
       {
          mStatus = error.empty() ? "could not load glTF model" : error;
          return false;
+      }
+      mPartCount = file->PartCount();
+      part = std::clamp(part, 0, mPartCount - 1);
+      const GltfImport::GltfDecodePackage* pkg = file->Part(part);
+      mHasFileBounds = mPartCount > 1;
+      if (mHasFileBounds)
+      {
+         for (int k = 0; k < 3; k++) { mFileLo[k] = 1e30f; mFileHi[k] = -1e30f; }
+         for (int n = 0; n < mPartCount; n++)
+         {
+            const GltfImport::GltfDecodePackage* p = file->Part(n);
+            std::vector<Platform::ModelVertex> rest;
+            if (!p->joints.empty())
+               Skinning::Evaluate(*p, -1, 0.0f, {}, rest);
+            for (const Platform::ModelVertex& v : rest.empty() ? p->vertices : rest)
+            {
+               const float q[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+                  if (std::isfinite(q[k]))
+                  {
+                     mFileLo[k] = std::min(mFileLo[k], q[k]);
+                     mFileHi[k] = std::max(mFileHi[k], q[k]);
+                  }
+            }
+         }
       }
 
       mMesh.vertices.clear();
@@ -146,8 +171,8 @@ bool ModelSourceNode::Load(const std::string& path)
          note += " (" + rig + ")";
       }
 
-      if (pkg->hadMultipleMaterials)
-         note += " (first of multiple materials)";
+      if (mPartCount > 1)
+         note += " (" + pkg->materialName + ", part " + std::to_string(part + 1) + " of " + std::to_string(mPartCount) + ")";
       if (pkg->hadMultipleUVSets)
          note += " (TEXCOORD_0 only)";
    }
@@ -190,7 +215,12 @@ bool ModelSourceNode::Load(const std::string& path)
    }
 
    if (!isGltf || cloud != nullptr)
+   {
       mRig = GltfImport::GltfDecodePackage();
+      mHasFileBounds = false;
+      mPartCount = 1;
+   }
+   mLoadedPart = part;
    if (cloud == nullptr)
    {
       mIsPoints = false;
@@ -245,10 +275,18 @@ void ModelSourceNode::Normalize()
          hi[k] = std::max(hi[k], p[k]);
       }
    };
-   for (const Vertex& v : mMesh.vertices)
-      grow(v.px, v.py, v.pz);
-   for (const Particle& p : mPoints)
-      grow(p.px, p.py, p.pz);
+   if (mHasFileBounds)
+   {
+      grow(mFileLo[0], mFileLo[1], mFileLo[2]);
+      grow(mFileHi[0], mFileHi[1], mFileHi[2]);
+   }
+   else
+   {
+      for (const Vertex& v : mMesh.vertices)
+         grow(v.px, v.py, v.pz);
+      for (const Particle& p : mPoints)
+         grow(p.px, p.py, p.pz);
+   }
 
    const float centre[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
    const float extent = std::max(hi[0] - lo[0], std::max(hi[1] - lo[1], hi[2] - lo[2]));
@@ -386,6 +424,11 @@ void ModelSourceNode::CookIfNeeded(int frameId)
 
    if (mTextureInput.IsConnected())
       mTextureInput.Pull(frameId);
+   if (part != mLoadedPart && !mPath.empty())
+   {
+      const std::string p = mPath;
+      Load(p);
+   }
 
    UpdatePose();
 }

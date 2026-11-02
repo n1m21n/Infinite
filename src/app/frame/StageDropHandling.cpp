@@ -4,6 +4,88 @@
 
 namespace app
 {
+// A glTF dropped anywhere: per material, a Model 3D showing that part, a
+// Material with the file's factors and one Image Source per map, wired. The
+// nodes stack in rows from (x, y). Returns each part's Material index. The
+// caller owns the undo step.
+std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
+{
+   std::vector<int> out;
+   std::string err;
+   const GltfImport::GltfDecodePackage* file = GltfImport::DecodeCached(path, err);
+   const int parts = file != nullptr ? file->PartCount() : 1;
+   for (int n = 0; n < parts; n++)
+   {
+      // SpawnNode can move gNodes: keep indices, never pointers, across spawns.
+      int modelIndex = -1, materialIndex = -1;
+      if (GraphNode* gn = SpawnNode("Model 3D", "3D", x, y))
+      {
+         modelIndex = gn->index;
+         auto* model = static_cast<ModelSourceNode*>(gn->node.get());
+         model->part = n;
+         model->Load(path);
+      }
+      if (GraphNode* gn = SpawnNode("Material", "3D", x + 260.0f, y))
+         materialIndex = gn->index;
+      if (modelIndex == -1 || materialIndex == -1)
+         break;
+      std::string wireErr;
+      ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
+      FindNodeByIndex(modelIndex)->showParams = parts == 1;
+
+      float rowH = 200.0f;
+      const GltfImport::GltfDecodePackage* pkg = file != nullptr ? file->Part(n) : nullptr;
+      if (pkg != nullptr)
+      {
+         auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(materialIndex)->node.get());
+         std::copy(pkg->baseColor, pkg->baseColor + 3, mat->color);
+         mat->opacity = pkg->baseColor[3];
+         mat->metallic = pkg->metallicFactor;
+         mat->roughness = pkg->roughnessFactor;
+         const float* e = pkg->emissiveFactor;
+         if (e[0] > 0.0f || e[1] > 0.0f || e[2] > 0.0f)
+         {
+            std::copy(e, e + 3, mat->emissionColor);
+            mat->emission = 1.0f;
+         }
+
+         struct MapSlot
+         {
+            const GltfImport::GltfDecodedImage* img;
+            int mapIndex;
+            const char* slot;
+         };
+         const MapSlot maps[] = {
+            { &pkg->albedo, kMapAlbedo, "albedo" },
+            { &pkg->roughness, kMapRoughness, "roughness" },
+            { &pkg->metallic, kMapMetallic, "metallic" },
+            { &pkg->normalMap, kMapNormal, "normal" },
+            { &pkg->occlusion, kMapAmbientOcclusion, "ao" },
+            { &pkg->emissive, kMapEmission, "emission" },
+         };
+         float texY = y;
+         for (const MapSlot& m : maps)
+         {
+            if (m.img->pixels.empty())
+               continue;
+            if (GraphNode* texNode = SpawnNode("Image Source", "Source", x + 560.0f, texY))
+            {
+               const std::string slot = n == 0 ? std::string(m.slot) : std::string(m.slot) + "@" + std::to_string(n);
+               static_cast<ImageSourceNode*>(texNode->node.get())
+                  ->LoadFromDecoded(m.img->pixels, m.img->width, m.img->height, "gltf://" + path + "#" + slot);
+               ConnectNodes(texNode->index, 0, materialIndex, 1 + m.mapIndex, wireErr);
+            }
+            texY += 160.0f;
+         }
+         rowH = std::max(rowH, texY - y);
+      }
+      FindNodeByIndex(materialIndex)->showParams = parts == 1;
+      out.push_back(materialIndex);
+      y += rowH;
+   }
+   return out;
+}
+
 void DrawDropHandling(FrameCtx& fc)
 {
    auto& dropInsideArrangePanel = fc.dropInsideArrangePanel;
@@ -388,86 +470,37 @@ void DrawDropHandling(FrameCtx& fc)
                   continue;
                }
 
-               // Fresh drop: Model 3D + Material + one Image Source per
-               // present texture map, already wired - the whole point of
-               // this feature is zero manual cabling. Everything from here
-               // to gSuppressUndoCheckpoints=false is one undo step.
+               // Fresh drop: per material, Model 3D + Material + one Image
+               // Source per map, already wired; several parts are joined by
+               // Group 3D so the file still leaves as one geometry. One undo step.
                ensureDroppedCheckpoint();
                gSuppressUndoCheckpoints = true;
-
-               // GraphNode* from SpawnNode points into gNodes' own storage,
-               // which a LATER SpawnNode call can reallocate (std::vector
-               // growth) - holding modelNode/materialNode across the several
-               // more SpawnNode calls below would dangle. Capture the
-               // stable `index` field immediately instead and re-resolve
-               // via FindNodeByIndex() each time a node is actually needed.
-               int modelIndex = -1;
+               const std::vector<int> parts = SpawnGltfParts(path, canvasPos.x + offset, canvasPos.y);
+               if (parts.size() > 1)
                {
-                  GraphNode* modelNode = SpawnNode("Model 3D", "3D", canvasPos.x + offset, canvasPos.y);
-                  if (modelNode != nullptr)
+                  // Group 3D takes 8: more parts nest one Group 3D per 8 under a top one.
+                  std::vector<int> level = parts;
+                  float gx = canvasPos.x + offset + 900.0f;
+                  while (level.size() > 1)
                   {
-                     modelIndex = modelNode->index;
-                     static_cast<ModelSourceNode*>(modelNode->node.get())->Load(path);
+                     std::vector<int> next;
+                     for (size_t i = 0; i < level.size(); i += 8)
+                        if (GraphNode* g = SpawnNode("Group 3D", "3D", gx, canvasPos.y + 220.0f * (float)next.size()))
+                        {
+                           const int gi = g->index;
+                           for (size_t k = i; k < std::min(level.size(), i + 8); k++)
+                           {
+                              std::string wireErr;
+                              ConnectNodes(level[k], 0, gi, (int)(k - i), wireErr);
+                           }
+                           next.push_back(gi);
+                        }
+                     if (next.empty())
+                        break;
+                     level = next;
+                     gx += 300.0f;
                   }
                }
-
-               int materialIndex = -1;
-               {
-                  GraphNode* materialNode =
-                     SpawnNode("Material", "3D", canvasPos.x + offset + 260.0f, canvasPos.y);
-                  if (materialNode != nullptr)
-                     materialIndex = materialNode->index;
-               }
-
-               if (modelIndex != -1 && materialIndex != -1)
-               {
-                  std::string wireErr;
-                  ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
-               }
-
-               std::string gltfErr;
-               const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, gltfErr);
-               if (pkg != nullptr && materialIndex != -1)
-               {
-                  struct MapSlot
-                  {
-                     const GltfImport::GltfDecodedImage* img;
-                     int mapIndex;
-                     const char* slot;
-                  };
-                  const MapSlot maps[] = {
-                     { &pkg->albedo, kMapAlbedo, "albedo" },
-                     { &pkg->roughness, kMapRoughness, "roughness" },
-                     { &pkg->metallic, kMapMetallic, "metallic" },
-                     { &pkg->normalMap, kMapNormal, "normal" },
-                     { &pkg->occlusion, kMapAmbientOcclusion, "ao" },
-                     { &pkg->emissive, kMapEmission, "emission" },
-                  };
-
-                  const float texX = canvasPos.x + offset + 560.0f;
-                  float texY = canvasPos.y;
-                  for (const MapSlot& m : maps)
-                  {
-                     if (m.img->pixels.empty())
-                        continue;
-
-                     GraphNode* texNode = SpawnNode("Image Source", "Source", texX, texY);
-                     if (texNode != nullptr)
-                     {
-                        auto* imgNode = static_cast<ImageSourceNode*>(texNode->node.get());
-                        imgNode->LoadFromDecoded(m.img->pixels, m.img->width, m.img->height,
-                                                 std::string("gltf://") + path + "#" + m.slot);
-                        std::string wireErr;
-                        ConnectNodes(texNode->index, 0, materialIndex, 1 + m.mapIndex, wireErr);
-                     }
-                     texY += 160.0f;
-                  }
-               }
-
-               if (GraphNode* modelNode = (modelIndex != -1) ? FindNodeByIndex(modelIndex) : nullptr)
-                  modelNode->showParams = true;
-               if (GraphNode* materialNode = (materialIndex != -1) ? FindNodeByIndex(materialIndex) : nullptr)
-                  materialNode->showParams = true;
 
                gSuppressUndoCheckpoints = false;
                gPatchDirty = true;
