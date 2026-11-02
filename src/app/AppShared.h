@@ -6279,6 +6279,7 @@ bool RunSplitterFixture();
 bool RunSpatialFixture();
 bool RunWatchPacketTest();
 bool RunWatchNodeTest();
+bool RunWatchSetupTest();
 
 bool RunSpectrumSlideFixture();
 

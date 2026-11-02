@@ -567,6 +567,8 @@ set(COMMON_SOURCES
     src/app/selftest/WatchTests.cpp
     src/core/WatchPacket.cpp
     src/platform/WatchLink.cpp
+    src/platform/WatchSetup.cpp
+    src/platform/WatchSetupSystem.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
     src/app/ui/ModWidgets.cpp

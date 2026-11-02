@@ -7,10 +7,13 @@
 #include "core/WatchPacket.h"
 #include "nodes/WatchNode.h"
 #include "platform/WatchLink.h"
+#include "platform/WatchSetup.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 
 namespace app
 {
@@ -293,6 +296,146 @@ namespace app
       }
 
       printf("WATCHNODETEST %s\n", ok ? "PASS" : "FAIL");
+      return ok;
+   }
+
+   namespace
+   {
+      // A toolchain that never touches the machine: the probe and the install result are set by the test.
+      class FakeTools : public WatchSetup::IToolchain
+      {
+      public:
+         WatchSetup::Probe probe;
+         bool installOk = true, fallback = false;
+         int installs = 0, opened = 0;
+         WatchSetup::InstallRequest lastReq;
+         WatchSetup::Probe Scan() override { return probe; }
+         bool Install(const WatchSetup::InstallRequest& r, const std::function<void(const std::string&)>& line) override
+         {
+            installs++;
+            lastReq = r;
+            line("STEP Building");
+            if (installOk) { line("STEP Installing on your watch"); line("DONE"); return true; }
+            line("ERROR No profiles for the bundle id");
+            if (fallback) line("FALLBACK");
+            return false;
+         }
+         void OpenXcodeAccounts() override { opened++; }
+         void OpenXcode() override { opened++; }
+         void OpenDeviceHelp() override { opened++; }
+      };
+   }
+
+   bool RunWatchSetupTest()
+   {
+      using namespace WatchSetup;
+      bool ok = true;
+      auto check = [&](bool c, const char* what)
+      {
+         printf("WATCHSETUPTEST %s  %s\n", what, c ? "OK" : "FAIL");
+         if (!c) ok = false;
+      };
+
+      // parsers, on captured tool output
+      const std::string teamsText =
+         "{\n    \"me@example.com\" =     (\n                {\n            isFreeProvisioningTeam = 1;\n"
+         "            teamID = ABCDE12345;\n            teamName = \"Me (Personal Team)\";\n            teamType = Individual;\n"
+         "        },\n                {\n            isFreeProvisioningTeam = 0;\n            teamID = ZZZZZ99999;\n"
+         "            teamName = \"Studio\";\n        }\n    );\n}\n";
+      const std::vector<Team> teams = ParseTeams(teamsText);
+      check(teams.size() == 2 && teams[0].id == "ABCDE12345" && teams[0].personal && teams[1].name == "Studio",
+            "teams parsed from `defaults read`");
+      check(PickTeam(teams) && PickTeam(teams)->id == "ABCDE12345", "the free Personal Team is picked");
+      check(PickTeam({}) == nullptr && ParseTeams("The domain/default pair does not exist").empty(), "no account gives no team");
+      const std::string devJson =
+         R"({"result":{"devices":[)"
+         R"({"identifier":"AAA","deviceProperties":{"name":"My iPhone","developerModeStatus":"enabled"},"hardwareProperties":{"deviceType":"iPhone"}},)"
+         R"({"identifier":"BBB","deviceProperties":{"name":"My Watch","developerModeStatus":"disabled"},"hardwareProperties":{"deviceType":"appleWatch"}}]}})";
+      const std::vector<Device> devs = ParseDevices(devJson);
+      check(devs.size() == 2 && !devs[0].isWatch && devs[0].developerMode && devs[1].isWatch && !devs[1].developerMode,
+            "devices parsed from devicectl json");
+      check(ParseDevices("not json").empty(), "bad json gives no devices");
+
+      const std::string stateFile = (std::filesystem::temp_directory_path() / "infinite-watchsetup-test.txt").string();
+      std::remove(stateFile.c_str());
+      time_t clock = 1000000;
+      FakeTools* tools = new FakeTools();
+      Checklist list(std::unique_ptr<IToolchain>(tools), stateFile, [&] { return clock; });
+      auto state = [&](int i) { return list.Steps()[i].state; };
+
+      check(state(0) == StepState::kPending && list.Steps()[0].text == "Checking...", "pending before the first scan");
+      check(list.ExpiryText().empty() && list.DaysLeft() == -1, "no expiry before an install");
+
+      tools->probe.supported = false;
+      list.RefreshNow();
+      check(state(0) == StepState::kMissing && !list.AllReady(), "unsupported system: nothing is ready");
+      tools->probe.supported = true;
+
+      list.RefreshNow();
+      check(state(0) == StepState::kMissing && list.Steps()[0].canOpen, "no Xcode: step 1 open button");
+      list.OpenStep(StepId::kXcode);
+      check(tools->opened == 1, "the Open button reaches the toolchain");
+
+      tools->probe.xcodeInstalled = true;
+      tools->probe.xcodeVersion = "16.2";
+      list.RefreshNow();
+      check(state(0) == StepState::kOk && state(1) == StepState::kMissing && list.Steps()[1].canOpen, "Xcode but no Apple ID");
+
+      tools->probe.teams = teams;
+      list.RefreshNow();
+      check(state(1) == StepState::kOk && list.ChosenTeam().id == "ABCDE12345" && state(2) == StepState::kMissing,
+            "Apple ID found, team chosen, no devices yet");
+
+      tools->probe.devices = { devs[0] };
+      list.RefreshNow();
+      check(state(2) == StepState::kMissing && list.Steps()[2].text.find("watch") != std::string::npos, "iPhone but no watch");
+      tools->probe.devices = { devs[0], devs[1] };
+      list.RefreshNow();
+      check(state(2) == StepState::kMissing && list.Steps()[2].text.find("Developer Mode") != std::string::npos &&
+               !list.AllReady(), "watch without Developer Mode");
+      list.StartInstall();
+      list.WaitInstall();
+      check(tools->installs == 0, "install is refused until the first three steps are green");
+
+      tools->probe.devices[1].developerMode = true;
+      list.RefreshNow();
+      check(list.AllReady() && state(3) == StepState::kPending && list.ChosenWatchId() == "BBB", "all green: install is offered");
+
+      // a failed install that opened Xcode, then a failed one that did not
+      tools->installOk = false; tools->fallback = true;
+      list.StartInstall(); list.WaitInstall();
+      check(list.Install().phase == InstallPhase::kFailedOpenedXcode && list.Install().error == "No profiles for the bundle id" &&
+               list.DaysLeft() == -1 && state(3) == StepState::kMissing, "failure opens Xcode, shows the last error, saves no date");
+      tools->fallback = false;
+      list.StartInstall(); list.WaitInstall();
+      check(list.Install().phase == InstallPhase::kFailed, "failure without Xcode fallback");
+
+      tools->installOk = true;
+      list.StartInstall(); list.WaitInstall();
+      check(tools->lastReq.teamId == "ABCDE12345" && tools->lastReq.deviceId == "BBB", "install gets the chosen team and watch");
+      check(list.Install().phase == InstallPhase::kDone && state(3) == StepState::kOk && list.DaysLeft() == 7 &&
+               list.ExpiryText() == "watch app expires in 7 days" && !list.ReinstallDue(), "installed: expires in 7 days");
+
+      clock += 5 * 86400;
+      check(list.DaysLeft() == 2 && list.ReinstallDue() && list.ExpiryText() == "watch app expires in 2 days", "5 days later: reinstall is offered");
+      clock += 86400 - 100;
+      check(list.DaysLeft() == 1 && list.ExpiryText() == "watch app expires in 1 day", "singular day");
+      clock += 3 * 86400;
+      check(list.DaysLeft() == 0 && list.ExpiryText() == "watch app has expired" && list.ReinstallDue(), "expired");
+
+      {
+         // the date survives a restart
+         Checklist again(std::unique_ptr<IToolchain>(new FakeTools()), stateFile, [&] { return clock - 6 * 86400; });
+         check(again.DaysLeft() == 1, "install date is kept in the state file");
+      }
+
+      tools->probe.projectBundled = false;
+      list.RefreshNow();
+      list.StartInstall();
+      check(list.Steps()[3].state == StepState::kMissing, "a build without the project says so");
+
+      std::remove(stateFile.c_str());
+      printf("WATCHSETUPTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;
    }
 }

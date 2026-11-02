@@ -635,6 +635,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunWatchPacketTest() ? 0 : 1;
    if (getenv("INFINITE_WATCHNODETEST") != nullptr)
       return RunWatchNodeTest() ? 0 : 1;
+   if (getenv("INFINITE_WATCHSETUPTEST") != nullptr)
+      return RunWatchSetupTest() ? 0 : 1;
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
