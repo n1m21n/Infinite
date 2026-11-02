@@ -510,8 +510,9 @@ namespace GltfImport
          cgltf_accessor_unpack_floats(uvAcc, buf.data(), buf.size());
          for (size_t i = 0; i < vertexCount; i++)
          {
+            // glTF puts v=0 at the image's top; our images load bottom-up.
             pkg.vertices[i].u = buf[i * 2 + 0];
-            pkg.vertices[i].v = buf[i * 2 + 1];
+            pkg.vertices[i].v = 1.0f - buf[i * 2 + 1];
          }
       }
 
