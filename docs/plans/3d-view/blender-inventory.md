@@ -16,7 +16,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Viewport: 3D cursor | 1/5 | 0/8 | 1 |
 | Viewport: shading | 6/10 | 5/7 | 30 |
 | Viewport: overlays | 7/19 | 0/0 | 77 |
-| Transform, snap, pivot | 7/51 | 36/56 | 82 |
+| Transform, snap, pivot | 10/25 | 31/48 | 108 |
 | Object | 8/76 | 30/80 | 33 |
 | Camera | 27/87 | 16/31 | 2 |
 | Light | 13/60 | 6/8 | 3 |
@@ -30,8 +30,8 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **168/767** | **162/460** | **392** |
-| **Operators (features)** | **32/241** | | **253** |
+| **All settings** | **171/741** | **157/452** | **418** |
+| **Operators (features)** | **32/231** | | **263** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
 ## Viewport: View tab and header
@@ -294,57 +294,31 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Lock Object Modes | ToolSettings.lock_object_mode | boolean |  | in | - |
 | Projected from View | ToolSettings.use_proportional_projected | boolean |  | in | - |
-| Connected Only | ToolSettings.use_proportional_connected | boolean |  | in | - |
-| Proportional Size | ToolSettings.proportional_size | float |  | in | - |
-| Proportional Size | ToolSettings.proportional_distance | float |  | in | - |
-| Merge Threshold | ToolSettings.double_threshold | float |  | in | - |
-| Transform Pivot Point | ToolSettings.transform_pivot_point | enum | Bounding Box Center, **3D Cursor**, **Individual Origins**, **Median Point**, **Active Element** | in | - |
+| Proportional Size | ToolSettings.proportional_size | float |  | in | yes |
+| Proportional Size | ToolSettings.proportional_distance | float |  | in | yes |
+| Transform Pivot Point | ToolSettings.transform_pivot_point | enum | Bounding Box Center, **3D Cursor**, **Individual Origins**, **Median Point**, **Active Element** | in | yes |
 | Only Locations | ToolSettings.use_transform_pivot_point_align | boolean |  | in | - |
-| Transform Origins | ToolSettings.use_transform_data_origin | boolean |  | in | - |
-| Transform Parents | ToolSettings.use_transform_skip_children | boolean |  | in | - |
-| Keep Connected | ToolSettings.use_transform_correct_keep_connected | boolean |  | in | - |
 | Snap | ToolSettings.use_snap | boolean |  | in | yes |
 | Align Rotation to Target | ToolSettings.use_snap_align_rotation | boolean |  | in | - |
 | Absolute Increment Snap | ToolSettings.use_snap_grid_absolute | boolean |  | in | - |
-| Rotation Increment | ToolSettings.snap_angle_increment_2d | float |  | in | - |
-| Rotation Precision Increment | ToolSettings.snap_angle_increment_2d_precision | float |  | in | - |
-| Rotation Increment | ToolSettings.snap_angle_increment_3d | float |  | in | - |
+| Rotation Increment | ToolSettings.snap_angle_increment_3d | float |  | in | yes |
 | Rotation Precision Increment | ToolSettings.snap_angle_increment_3d_precision | float |  | in | - |
-| Snap Element | ToolSettings.snap_elements | enum | **Increment**, **Grid**, **Vertex**, **Edge**, **Face**, **Volume**, Edge Center, Edge Perpendicular, Face Center, Face Project, Face Nearest | in | - |
-| Snap Element | ToolSettings.snap_elements_base | enum | **Increment**, **Grid**, **Vertex**, **Edge**, **Face**, **Volume**, Edge Center, Edge Perpendicular, Face Center | in | - |
-| Project Mode | ToolSettings.snap_elements_individual | enum | Face Project, Face Nearest | in | - |
-| Snap to Same Target | ToolSettings.use_snap_to_same_target | boolean |  | in | - |
-| Snap | ToolSettings.use_snap_anim | boolean |  | in | yes |
-| Absolute Time Snap | ToolSettings.use_snap_time_absolute | boolean |  | in | - |
-| Snap Animation Element | ToolSettings.snap_anim_element | enum | **Frame**, **Second**, Nearest Marker | in | - |
-| Use Snapping | ToolSettings.use_snap_playhead | boolean |  | in | - |
-| Snap Playhead Element | ToolSettings.snap_playhead_element | enum | **Frames**, **Seconds**, **Markers**, Keyframes, Strips | in | - |
-| Frame Step | ToolSettings.snap_playhead_frame_step | int |  | in | - |
-| Second Step | ToolSettings.snap_playhead_second_step | int |  | in | - |
-| Snap Distance | ToolSettings.playhead_snap_distance | int |  | in | - |
+| Snap Element | ToolSettings.snap_elements | enum | **Increment**, **Grid**, **Vertex**, **Edge**, **Face**, **Volume**, Edge Center, Edge Perpendicular, Face Center, Face Project, Face Nearest | in | yes |
+| Snap Element | ToolSettings.snap_elements_base | enum | **Increment**, **Grid**, **Vertex**, **Edge**, **Face**, **Volume**, Edge Center, Edge Perpendicular, Face Center | in | yes |
+| Project Mode | ToolSettings.snap_elements_individual | enum | Face Project, Face Nearest | in | yes |
 | Snap Target | ToolSettings.snap_target | enum | **Closest**, **Center**, **Median**, **Active** | in | - |
-| Snap Peel Object | ToolSettings.use_snap_peel_object | boolean |  | in | - |
-| Backface Culling | ToolSettings.use_snap_backface_culling | boolean |  | in | - |
-| Snap onto Active | ToolSettings.use_snap_self | boolean |  | in | - |
-| Snap onto Non-edited | ToolSettings.use_snap_nonedit | boolean |  | in | - |
 | Snap onto Selectable Only | ToolSettings.use_snap_selectable | boolean |  | in | - |
 | Use Snap for Translation | ToolSettings.use_snap_translate | boolean |  | in | - |
 | Use Snap for Rotation | ToolSettings.use_snap_rotate | boolean |  | in | - |
 | Use Snap for Scale | ToolSettings.use_snap_scale | boolean |  | in | - |
 | Plane Axis | ToolSettings.plane_axis | enum | X, Y, Z | in | - |
 | Auto Axis | ToolSettings.plane_axis_auto | boolean |  | in | - |
-| Position | ToolSettings.plane_depth | enum | **Surface**, Cursor Plane, Cursor View | in | yes |
-| Orientation | ToolSettings.plane_orientation | enum | **Surface**, **Default** | in | yes |
+| Position | ToolSettings.plane_depth | enum | **Surface**, Cursor Plane, Cursor View | in | - |
+| Orientation | ToolSettings.plane_orientation | enum | **Surface**, **Default** | in | - |
 | Snap to | ToolSettings.snap_elements_tool | enum | **Geometry**, **Default** | in | yes |
-| Use Location for Camera Fix | ToolSettings.anim_fix_to_cam_use_loc | boolean |  | in | - |
-| Use Rotation for Camera Fix | ToolSettings.anim_fix_to_cam_use_rot | boolean |  | in | - |
-| Use Scale for Camera Fix | ToolSettings.anim_fix_to_cam_use_scale | boolean |  | in | - |
-| Curve Profile Widget | ToolSettings.custom_bevel_profile_preset | pointer |  | in | - |
 | Orientation | TransformOrientationSlot.type | enum | **Global**, **Local**, **Normal**, Gimbal, **View**, **Cursor**, **Parent** | in | yes |
 | Current Transform Orientation | TransformOrientationSlot.custom_orientation | pointer |  | in | - |
-| Use | TransformOrientationSlot.use | boolean |  | in | yes |
 | Sculpt | ToolSettings.sculpt | pointer |  | out: sculpt | - |
 | Curves Sculpt | ToolSettings.curves_sculpt | pointer |  | out: curve | - |
 | Weight Paint Auto-Normalize | ToolSettings.use_auto_normalize | boolean |  | out: auto_normalize | - |
@@ -364,25 +338,46 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Particle Edit | ToolSettings.particle_edit | pointer |  | out: particle | - |
 | Lock Borders | ToolSettings.uv_sculpt_lock_borders | boolean |  | out: uv | - |
 | Sculpt All Islands | ToolSettings.uv_sculpt_all_islands | boolean |  | out: uv | - |
+| Lock Object Modes | ToolSettings.lock_object_mode | boolean |  | out: object modes are an editing concept | - |
 | Drag | ToolSettings.workspace_tool_type | enum | Active Tool, **Select** | out: workspace | yes |
 | Proportional Editing | ToolSettings.use_proportional_edit | boolean |  | out: edit | yes |
 | Proportional Editing Objects | ToolSettings.use_proportional_edit_objects | boolean |  | out: edit | - |
+| Connected Only | ToolSettings.use_proportional_connected | boolean |  | out: connected geometry; items are whole node outputs | - |
 | Proportional Editing Objects | ToolSettings.use_proportional_edit_mask | boolean |  | out: edit | - |
 | Proportional Editing Actions | ToolSettings.use_proportional_action | boolean |  | out: action | - |
 | Proportional Editing F-Curves | ToolSettings.use_proportional_fcurve | boolean |  | out: fcurve | - |
 | Lock Markers | ToolSettings.lock_markers | boolean |  | out: marker | - |
 | Proportional Editing Falloff | ToolSettings.proportional_edit_falloff | enum | **Smooth**, **Sphere**, **Root**, Inverse Square, **Sharp**, **Linear**, **Constant**, **Random** | out: edit | - |
+| Merge Threshold | ToolSettings.double_threshold | float |  | out: auto merge is mesh editing | - |
+| Transform Origins | ToolSettings.use_transform_data_origin | boolean |  | out: origins are node outputs, not editable shape offsets | - |
+| Transform Parents | ToolSettings.use_transform_skip_children | boolean |  | out: no parenting; groups move together | - |
 | Correct Face Attributes | ToolSettings.use_transform_correct_face_attributes | boolean |  | out: face | - |
+| Keep Connected | ToolSettings.use_transform_correct_keep_connected | boolean |  | out: face attribute correction is mesh editing | - |
 | Auto Merge Vertices | ToolSettings.use_mesh_automerge | boolean |  | out: mesh | - |
 | Split Edges & Faces | ToolSettings.use_mesh_automerge_and_split | boolean |  | out: mesh | - |
 | Snap | ToolSettings.use_snap_node | boolean |  | out: node | yes |
 | Use Snapping | ToolSettings.use_snap_sequencer | boolean |  | out: sequencer | - |
 | Snap | ToolSettings.use_snap_uv | boolean |  | out: uv | yes |
+| Rotation Increment | ToolSettings.snap_angle_increment_2d | float |  | out: 2D editors only | - |
+| Rotation Precision Increment | ToolSettings.snap_angle_increment_2d_precision | float |  | out: 2D editors only | - |
 | Face Nearest Steps | ToolSettings.snap_face_nearest_steps | int |  | out: face | - |
+| Snap to Same Target | ToolSettings.use_snap_to_same_target | boolean |  | out: face nearest snapping is mesh editing | - |
+| Snap | ToolSettings.use_snap_anim | boolean |  | out: timeline snapping, no keyframes in the panel | - |
 | Snap | ToolSettings.use_snap_driver | boolean |  | out: driver | yes |
+| Absolute Time Snap | ToolSettings.use_snap_time_absolute | boolean |  | out: timeline snapping, no keyframes in the panel | - |
 | Absolute Snap | ToolSettings.use_snap_driver_absolute | boolean |  | out: driver | - |
+| Snap Animation Element | ToolSettings.snap_anim_element | enum | **Frame**, **Second**, Nearest Marker | out: timeline snapping, no keyframes in the panel | - |
+| Use Snapping | ToolSettings.use_snap_playhead | boolean |  | out: timeline snapping, no keyframes in the panel | - |
+| Snap Playhead Element | ToolSettings.snap_playhead_element | enum | **Frames**, **Seconds**, **Markers**, Keyframes, Strips | out: timeline snapping, no keyframes in the panel | - |
+| Frame Step | ToolSettings.snap_playhead_frame_step | int |  | out: timeline snapping, no keyframes in the panel | - |
+| Second Step | ToolSettings.snap_playhead_second_step | int |  | out: timeline snapping, no keyframes in the panel | - |
+| Snap Distance | ToolSettings.playhead_snap_distance | int |  | out: timeline snapping, no keyframes in the panel | - |
 | Snap UV Element | ToolSettings.snap_uv_element | enum | **Increment**, **Grid**, **Vertex** | out: uv | - |
+| Snap Peel Object | ToolSettings.use_snap_peel_object | boolean |  | out: surface snapping needs mesh targets | - |
+| Backface Culling | ToolSettings.use_snap_backface_culling | boolean |  | out: surface snapping needs mesh targets | - |
+| Snap onto Active | ToolSettings.use_snap_self | boolean |  | out: surface snapping needs mesh targets | - |
 | Snap onto Edited | ToolSettings.use_snap_edit | boolean |  | out: edit | - |
+| Snap onto Non-edited | ToolSettings.use_snap_nonedit | boolean |  | out: surface snapping needs mesh targets | - |
 | Use Additive Drawing | ToolSettings.use_gpencil_draw_additive | boolean |  | out: gpencil | - |
 | Draw Strokes on Back | ToolSettings.use_gpencil_draw_onback | boolean |  | out: gpencil | - |
 | Compact List | ToolSettings.use_gpencil_thumbnail_list | boolean |  | out: gpencil | - |
@@ -414,6 +409,9 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Cycle-Aware Keying | ToolSettings.use_keyframe_cycle_aware | boolean |  | out: keyframe | - |
 | New Keyframe Type | ToolSettings.keyframe_type | enum | Keyframe, Breakdown, Moving Hold, Extreme, **Jitter**, **Generated** | out: keyframe | - |
 | Mirror Bone | ToolSettings.anim_mirror_bone | string |  | out: bone | - |
+| Use Location for Camera Fix | ToolSettings.anim_fix_to_cam_use_loc | boolean |  | out: keyframes are not made in the panel | - |
+| Use Rotation for Camera Fix | ToolSettings.anim_fix_to_cam_use_rot | boolean |  | out: keyframes are not made in the panel | - |
+| Use Scale for Camera Fix | ToolSettings.anim_fix_to_cam_use_scale | boolean |  | out: keyframes are not made in the panel | - |
 | UV Selection Mode | ToolSettings.uv_select_mode | enum | **Vertex**, **Edge**, **Face** | out: uv | - |
 | Sticky Selection Mode | ToolSettings.uv_sticky_select_mode | enum | **Disabled**, Shared Location, Shared Vertex | out: uv | - |
 | UV Sync Selection | ToolSettings.use_uv_select_sync | boolean |  | out: uv | - |
@@ -426,7 +424,9 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Normal Vector | ToolSettings.normal_vector | float |  | out: normal | - |
 | Curve Paint Settings | ToolSettings.curve_paint_settings | pointer |  | out: curve | - |
 | Mesh Statistics Visualization | ToolSettings.statvis | pointer |  | out: statvis | - |
+| Curve Profile Widget | ToolSettings.custom_bevel_profile_preset | pointer |  | out: bevel is modelling | - |
 | Sequencer Tool Settings | ToolSettings.sequencer_tool_settings | pointer |  | out: sequencer | - |
+| Use | TransformOrientationSlot.use | boolean |  | out: scene vs custom orientation switch, one scene setting | - |
 
 ## Object
 
@@ -1447,26 +1447,16 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Repeat History | SCREEN_OT_repeat_history | Display menu for previous actions performed | in | - |
 | Repeat Last | SCREEN_OT_repeat_last | Repeat last action | in | yes |
 | Toggle Maximize Area | SCREEN_OT_screen_full_area | Toggle display selected area as fullscreen/maximized | in | - |
-| Scale B-Bone | TRANSFORM_OT_bbone_resize | Scale selected bendy bones display size | in | - |
-| Bend | TRANSFORM_OT_bend | Bend selected items between the 3D cursor and the mouse | in | - |
 | Create Orientation | TRANSFORM_OT_create_orientation | Create transformation orientation from selection | in | - |
 | Delete Orientation | TRANSFORM_OT_delete_orientation | Delete transformation orientation | in | - |
-| Transform from Gizmo | TRANSFORM_OT_from_gizmo | Transform selected items by mode type | in | - |
+| Transform from Gizmo | TRANSFORM_OT_from_gizmo | Transform selected items by mode type | in | yes |
 | Mirror | TRANSFORM_OT_mirror | Mirror selected items around one or more axes | in | yes |
-| Push/Pull | TRANSFORM_OT_push_pull | Push/Pull selected items | in | - |
 | Resize | TRANSFORM_OT_resize | Scale (resize) selected items | in | yes |
 | Rotate | TRANSFORM_OT_rotate | Rotate selected items | in | yes |
-| Select Orientation | TRANSFORM_OT_select_orientation | Select transformation orientation | in | - |
-| Sequence Slide | TRANSFORM_OT_seq_slide | Slide a sequence strip in time | in | - |
-| Shear | TRANSFORM_OT_shear | Shear selected items along the given axis | in | yes |
-| Shrink/Fatten | TRANSFORM_OT_shrink_fatten | Shrink/fatten selected vertices along normals | in | - |
-| Tilt | TRANSFORM_OT_tilt | Tilt selected control vertices of 3D curve | in | yes |
-| To Sphere | TRANSFORM_OT_tosphere | Move selected items outward in a spherical shape around geometric center | in | - |
+| Select Orientation | TRANSFORM_OT_select_orientation | Select transformation orientation | in | yes |
 | Trackball | TRANSFORM_OT_trackball | Trackball style rotation of selected items | in | - |
 | Transform | TRANSFORM_OT_transform | Transform selected items by mode type | in | yes |
 | Move | TRANSFORM_OT_translate | Move selected items | in | yes |
-| Vertex Crease | TRANSFORM_OT_vert_crease | Change the crease of vertices | in | - |
-| Vertex Slide | TRANSFORM_OT_vert_slide | Slide a vertex along a mesh | in | - |
 | Add Camera Background Image | VIEW3D_OT_camera_background_image_add | Add a new background image to the active camera | in | - |
 | Remove Camera Background Image | VIEW3D_OT_camera_background_image_remove | Remove a background image from the camera | in | - |
 | Align Camera to View | VIEW3D_OT_camera_to_view | Set camera view to active view | in | - |
@@ -1770,11 +1760,21 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Remove Lightgroup | SCENE_OT_view_layer_remove_lightgroup | Remove Active Lightgroup | out: lightgroup | - |
 | Remove Unused Lightgroups | SCENE_OT_view_layer_remove_unused_lightgroups | Remove all unused Light Groups | out: lightgroup | - |
 | Jump to Keyframe | SCREEN_OT_keyframe_jump | Jump to previous/next keyframe | out: keyframe | - |
+| Scale B-Bone | TRANSFORM_OT_bbone_resize | Scale selected bendy bones display size | out: deform, mesh, bone or sequencer editing | - |
+| Bend | TRANSFORM_OT_bend | Bend selected items between the 3D cursor and the mouse | out: deform, mesh, bone or sequencer editing | - |
 | Edge Bevel Weight | TRANSFORM_OT_edge_bevelweight | Change the bevel weight of edges | out: edge | - |
 | Edge Crease | TRANSFORM_OT_edge_crease | Change the crease of edges | out: edge | - |
 | Edge Slide | TRANSFORM_OT_edge_slide | Slide an edge loop along a mesh | out: edge | - |
+| Push/Pull | TRANSFORM_OT_push_pull | Push/Pull selected items | out: deform, mesh, bone or sequencer editing | - |
 | Rotate Normals | TRANSFORM_OT_rotate_normal | Rotate custom normal of selected items | out: normal | - |
+| Sequence Slide | TRANSFORM_OT_seq_slide | Slide a sequence strip in time | out: deform, mesh, bone or sequencer editing | - |
+| Shear | TRANSFORM_OT_shear | Shear selected items along the given axis | out: deform, mesh, bone or sequencer editing | - |
+| Shrink/Fatten | TRANSFORM_OT_shrink_fatten | Shrink/fatten selected vertices along normals | out: deform, mesh, bone or sequencer editing | - |
 | Skin Resize | TRANSFORM_OT_skin_resize | Scale selected vertices' skin radii | out: skin | - |
+| Tilt | TRANSFORM_OT_tilt | Tilt selected control vertices of 3D curve | out: deform, mesh, bone or sequencer editing | - |
+| To Sphere | TRANSFORM_OT_tosphere | Move selected items outward in a spherical shape around geometric center | out: deform, mesh, bone or sequencer editing | - |
+| Vertex Crease | TRANSFORM_OT_vert_crease | Change the crease of vertices | out: deform, mesh, bone or sequencer editing | - |
+| Vertex Slide | TRANSFORM_OT_vert_slide | Slide a vertex along a mesh | out: deform, mesh, bone or sequencer editing | - |
 | Randomize | TRANSFORM_OT_vertex_random | Randomize vertices | out: vertex | - |
 | Warp | TRANSFORM_OT_vertex_warp | Warp vertices around the cursor | out: vertex | - |
 | Select Menu | VIEW3D_OT_bone_select_menu | Menu bone selection | out: bone | yes |

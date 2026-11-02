@@ -141,3 +141,74 @@ View3DOverlay.show_wpaint_contours	out	edit mode, paint, curves or debug
 View3DOverlay.show_extra_indices	out	edit mode, paint, curves or debug
 View3DOverlay.display_handle	out	edit mode, paint, curves or debug
 View3DOverlay.use_debug_freeze_view_culling	out	edit mode, paint, curves or debug
+ToolSettings.lock_object_mode	out	object modes are an editing concept
+ToolSettings.use_proportional_projected	missing	Proportional Editing card: projected from view
+ToolSettings.use_proportional_connected	out	connected geometry; items are whole node outputs
+ToolSettings.proportional_size	done	View3DPanel.cpp Proportional Editing card (propSize)
+ToolSettings.proportional_distance	done	View3DPanel.cpp Proportional Editing card (propSize)
+ToolSettings.double_threshold	out	auto merge is mesh editing
+ToolSettings.transform_pivot_point	done	View3DPanel.cpp:3955 Pivot (median, individual, active, cursor)
+ToolSettings.use_transform_pivot_point_align	missing	Transform card: only locations toggle
+ToolSettings.use_transform_data_origin	out	origins are node outputs, not editable shape offsets
+ToolSettings.use_transform_skip_children	out	no parenting; groups move together
+ToolSettings.use_transform_correct_keep_connected	out	face attribute correction is mesh editing
+ToolSettings.use_snap	done	View3DPanel.cpp:3967 Snap card (Shift+Tab)
+ToolSettings.use_snap_align_rotation	missing	Snap card: align rotation to target
+ToolSettings.use_snap_grid_absolute	missing	Snap card: absolute increment mode
+ToolSettings.snap_angle_increment_2d	out	2D editors only
+ToolSettings.snap_angle_increment_2d_precision	out	2D editors only
+ToolSettings.snap_angle_increment_3d	done	View3DPanel.cpp:3967 Snap card rotation step (snapRot)
+ToolSettings.snap_angle_increment_3d_precision	missing	Snap card: precision step with Shift
+ToolSettings.snap_elements	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.snap_elements_base	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.snap_elements_individual	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.use_snap_to_same_target	out	face nearest snapping is mesh editing
+ToolSettings.use_snap_anim	out	timeline snapping, no keyframes in the panel
+ToolSettings.use_snap_time_absolute	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_anim_element	out	timeline snapping, no keyframes in the panel
+ToolSettings.use_snap_playhead	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_element	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_frame_step	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_second_step	out	timeline snapping, no keyframes in the panel
+ToolSettings.playhead_snap_distance	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_target	missing	Snap card: closest, centre, median, active
+ToolSettings.use_snap_peel_object	out	surface snapping needs mesh targets
+ToolSettings.use_snap_backface_culling	out	surface snapping needs mesh targets
+ToolSettings.use_snap_self	out	surface snapping needs mesh targets
+ToolSettings.use_snap_nonedit	out	surface snapping needs mesh targets
+ToolSettings.use_snap_selectable	missing	Snap card: only onto selectable items
+ToolSettings.use_snap_translate	missing	Snap card: snap per tool toggles
+ToolSettings.use_snap_rotate	missing	Snap card: snap per tool toggles
+ToolSettings.use_snap_scale	missing	Snap card: snap per tool toggles
+ToolSettings.plane_axis	missing	Add menu: placement plane for new items
+ToolSettings.plane_axis_auto	missing	Add menu: placement plane for new items
+ToolSettings.plane_depth	missing	Add menu: placement plane for new items
+ToolSettings.plane_orientation	missing	Add menu: placement plane for new items
+ToolSettings.snap_elements_tool	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.anim_fix_to_cam_use_loc	out	keyframes are not made in the panel
+ToolSettings.anim_fix_to_cam_use_rot	out	keyframes are not made in the panel
+ToolSettings.anim_fix_to_cam_use_scale	out	keyframes are not made in the panel
+ToolSettings.custom_bevel_profile_preset	out	bevel is modelling
+TransformOrientationSlot.type	done	View3DPanel.cpp:3949 Orientation Global/Local/View
+TransformOrientationSlot.custom_orientation	missing	Transform card: custom orientations
+TransformOrientationSlot.use	out	scene vs custom orientation switch, one scene setting
+TRANSFORM_OT_bbone_resize	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_bend	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_create_orientation	missing	Transform card: save a custom orientation
+TRANSFORM_OT_delete_orientation	missing	Transform card: delete a custom orientation
+TRANSFORM_OT_from_gizmo	done	View3DPanel.cpp:776 BeginOp gizmo=true handles
+TRANSFORM_OT_mirror	done	View3DPanel.cpp:1441 MirrorSelected (Mirror X/Y/Z)
+TRANSFORM_OT_push_pull	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_resize	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (S)
+TRANSFORM_OT_rotate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (R)
+TRANSFORM_OT_select_orientation	done	View3DPanel.cpp:3949 Orientation combo
+TRANSFORM_OT_seq_slide	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_shear	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_shrink_fatten	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_tilt	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_tosphere	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_trackball	missing	Rotate: trackball mode (R twice)
+TRANSFORM_OT_transform	done	View3DPanel.cpp:776 BeginOp transform tool
+TRANSFORM_OT_translate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (G)
+TRANSFORM_OT_vert_crease	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_vert_slide	out	deform, mesh, bone or sequencer editing
