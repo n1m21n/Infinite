@@ -285,7 +285,7 @@ def html_chapter(P):
                   row((fig("settings_terminal", "Terminal: Command line &amp; agents (one-click setup, coding agent), the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
 
     b.append(page("<h2>Settings: Command line &amp; agents</h2>",
-                  "<p>On the Terminal page, <b>Connect terminal &amp; agent</b> opens a Terminal tab and runs a short script you can read first (<i>Show commands</i>). "
+                  "<p>On the Terminal page, <b>Connect terminal &amp; agent</b> opens a Terminal tab and runs a short script you can read first (<i>Reference, Setup commands</i>). "
                   "It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with your coding agent. "
                   "Each step checks first and is skipped when it is already done, so the button doubles as a repair. A tick appears per step when the script finishes it. Password prompts (Homebrew, sudo) appear in the tab.</p>",
                   "<p><b>Coding agent</b> picks the agent (Claude Code first). <b>Install</b> shows when it is missing and types the vendor's own installer into a Terminal tab. "

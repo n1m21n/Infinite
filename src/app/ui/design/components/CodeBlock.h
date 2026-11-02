@@ -21,6 +21,8 @@ namespace CodeBlock
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       ImGui::BeginChild(id, ImVec2(0, h), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
       ImGui::PopStyleVar();
+      const float textH = ImGui::CalcTextSize(code, nullptr, false, textW).y;
+      ImGui::SetCursorPosY(std::max(tok::space_2, (h - textH) * 0.5f));   // one line sits centred beside the button
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + textW);
       ImGui::TextUnformatted(code);
       ImGui::PopTextWrapPos();

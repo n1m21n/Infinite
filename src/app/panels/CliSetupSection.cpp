@@ -140,7 +140,7 @@ namespace app
          perform(Action::kSetup);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Show commands. Each step checks first and skips what is already done, so run it again any time to repair."));
+         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair."));
 
       FormParts::Label(L("Agent"));
       if (v.showInstall)
@@ -148,7 +148,7 @@ namespace app
          if (button((std::string(T("Install")) + "###cli_install").c_str(), Kind::Primary))
             perform(Action::kInstallAgent);
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Show commands."));
+            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands."));
       }
       else
       {
@@ -213,32 +213,39 @@ namespace app
          ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
 
-      if (ImGui::TreeNode(T("Show commands")))
-      {
-         ImGui::TextDisabled("%s", T("Connect terminal & agent types this line, and runs the script below it:"));
-         CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
-         if (v.showInstall)
-         {
-            ImGui::TextDisabled("%s", T("Install types:"));
-            CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
-         }
-         ImGui::TextDisabled("%s", T("Start agent types:"));
-         CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
-         ImGui::TextDisabled("%s", T("The script (the exact text that runs):"));
-         static std::string sScript;
-         static std::string sScriptFor;
-         const std::string key = exe + "|" + agent->id;
-         if (sScriptFor != key)
-         {
-            sScriptFor = key;
-            sScript = BuildScript(os, exe, *agent, paths.status);
-         }
-         ImGui::InputTextMultiline("##cli_script", sScript.data(), sScript.size() + 1, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 14), ImGuiInputTextFlags_ReadOnly);
-         if (FormParts::Button(L("Copy script")))
-            ImGui::SetClipboardText(sScript.c_str());
-         ImGui::TreePop();
-      }
-
       SectionCard::End();
+   }
+
+   // The exact commands and script behind the buttons, for the Reference well on the same page.
+   void DrawCliSetupCommands()
+   {
+      using namespace CliSetup;
+      const Os os = CurrentOs();
+      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
+      const Agent* agent = FindAgent(Prefs().agent);
+      if (agent == nullptr)
+         agent = &Agents()[0];
+      const std::string exe = RealExecutable();
+      const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, nullptr);
+
+      ImGui::TextWrapped("%s", T("Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done."));
+      CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
+      if (v.showInstall)
+      {
+         ImGui::TextWrapped("%s", T("Install runs the agent's own installer:"));
+         CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
+      }
+      ImGui::TextWrapped("%s", T("Start agent runs:"));
+      CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
+      ImGui::TextWrapped("%s", T("The script, exactly as it runs:"));
+      static std::string sScript;
+      static std::string sScriptFor;
+      const std::string key = exe + "|" + agent->id;
+      if (sScriptFor != key)
+      {
+         sScriptFor = key;
+         sScript = BuildScript(os, exe, *agent, paths.status);
+      }
+      CodeBlock::Draw(sScript.c_str(), "cb_cli_script");
    }
 }

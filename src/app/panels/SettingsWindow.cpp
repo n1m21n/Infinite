@@ -16,6 +16,7 @@ namespace app
    void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
    void DrawPluginManagerList();
    void DrawCliSetupSection();     // CliSetupSection.cpp
+   void DrawCliSetupCommands();    // CliSetupSection.cpp
 
    void DrawSettingsWindow(bool* open)
    {
@@ -1702,7 +1703,7 @@ namespace app
             ImGui::Spacing();
             static int sRef = 0;
             // i18n-skip-begin: topic names are the section titles below
-            static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills" };
+            static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills", "Setup commands" };
             // i18n-skip-end
             FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), 220.0f);
             LibraryParts::BeginWell("##terminalref", 380.0f);
@@ -1789,6 +1790,11 @@ namespace app
                ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
                ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
                ImGui::Spacing();
+            }
+            if (sRef == 0 || sRef == 5)
+            {
+               FormParts::Heading(T("Setup commands"));
+               DrawCliSetupCommands();
             }
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
