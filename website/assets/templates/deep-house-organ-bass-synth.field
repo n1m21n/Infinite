@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Deep House Organ Bass Synth",
+    "author": "Infinite",
+    "description": "Classic Chicago deep house organ bass synthesizer with punchy percussive transient click, sub-harmonic octave warmth, and tight saturated decay.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float modRatio = 2.0 [1.0, 4.0]\nparam float modIndex = 1.35 [0.0, 3.0]\nparam float cutoff = 2200.0 [400.0, 5500.0]\nparam float decay = 0.38 [0.08, 1.2]\nparam float subLevel = 0.35 [0.0, 0.8]\nstate float pCar = 0\nstate float pMod = 0\nstate float pSub = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00008, 0.02)\nenv = if(target > env, env + (target - env) * 0.3, env - env * decayRate)\n\nfBase = clamp(freq, 30.0, 2000.0)\nfMod = fBase * modRatio\nfSub = fBase * 0.5\n\npMod = (pMod + fMod / sr) % 1.0\nmSine = sin(pMod * 6.2831853) * modIndex * env\n\npCar = (pCar + (fBase + mSine * fBase) / sr) % 1.0\ncSine = sin(pCar * 6.2831853)\n\npSub = (pSub + fSub / sr) % 1.0\nsubSine = sin(pSub * 6.2831853) * subLevel\n\nraw = (cSine * 0.75 + subSine) * env\n\nfCut = clamp((cutoff + env * 1600.0) / sr * 2.2, 0.01, 0.45)\nlp1 = lp1 + fCut * (raw - lp1 - 0.25 * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * 1.35\nsat = clamp(u - 0.22 * u * u * u, -0.92, 0.92)\n\nout = sat * 0.36\n",
+    "params": {
+      "modRatio": 2.0,
+      "modIndex": 1.35,
+      "cutoff": 2200.0,
+      "decay": 0.38,
+      "subLevel": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

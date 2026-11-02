@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Datamosh Buffer Tear",
+    "author": "Infinite",
+    "description": "Algorithmic video datamosh compression tearing shader with chromatic RGB channel separation, horizontal block motion vectors, and scanline glitch persistence.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float sliceDensity = 24.0 [8.0, 48.0]\nparam float tearIntensity = 1.4 [0.2, 3.0]\nparam float rgbOffset = 0.08 [0.01, 0.25]\nparam float scanlineDarkness = 0.35 [0.0, 0.8]\nparam float persistence = 1.1 [0.4, 2.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * 0.7\n\nslice = floor(uv.y * sliceDensity)\nsliceNoise = sin(slice * 17.3 + floor(time * 8.0) * 4.1)\n\ntear = if(sin(sliceNoise * 5.5 + time * 2.0) > 0.4, sin(slice * 8.9) * 0.28 * tearIntensity, 0.0)\npTorn = vec2(p.x + tear, p.y)\n\ngrid = sin(pTorn.x * 12.0) * cos(pTorn.y * 12.0)\nrings = sin(length(pTorn) * 16.0 - time * 3.0)\n\nrChan = clamp(sin(grid * 4.0 + rings * 2.0 + pTorn.x * 2.0 + rgbOffset * 6.0) * 0.5 + 0.5, 0.0, 1.0)\ngChan = clamp(sin(grid * 4.0 + rings * 2.0 + pTorn.y * 2.0) * 0.5 + 0.5, 0.0, 1.0)\nbChan = clamp(sin(grid * 4.0 + rings * 2.0 - pTorn.x * 2.0 - rgbOffset * 6.0) * 0.5 + 0.5, 0.0, 1.0)\n\ncBg = vec3(0.06, 0.04, 0.10)\ncR = vec3(1.0, 0.08, 0.35)\ncG = vec3(0.05, 0.95, 0.55)\ncB = vec3(0.15, 0.65, 1.0)\n\ncol = cBg + cR * rChan * 0.65 + cG * gChan * 0.55 + cB * bChan * 0.65\n\nscan = clamp(sin(uv.y * 540.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = col * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "sliceDensity": 24.0,
+      "tearIntensity": 1.4,
+      "rgbOffset": 0.08,
+      "scanlineDarkness": 0.35,
+      "persistence": 1.1
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Jungle Sub Bass Resonator FX",
+    "author": "Infinite",
+    "description": "Heavy sound system sub-bass filter and harmonic resonator with tuned low-end boost, asymmetric saturation drive, and transient preservation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float centerFreq = 68.0 [40.0, 160.0]\nparam float boost = 2.2 [1.0, 4.5]\nparam float drive = 1.8 [0.8, 4.0]\nparam float tone = 2800.0 [500.0, 6000.0]\nparam float mix = 0.75 [0.0, 1.0]\nstate float subLp1 = 0\nstate float subLp2 = 0\nstate float toneLp = 0\n\nfSub = clamp(centerFreq / sr * 3.14159, 0.003, 0.1)\nsubLp1 = subLp1 + fSub * (in - subLp1)\nsubLp2 = subLp2 + fSub * (subLp1 - subLp2)\nsubBoost = subLp2 * boost\n\nhighPart = in - subLp2\nu = (highPart + subBoost * 0.5) * drive\nsat = clamp(u - 0.24 * u * u * u, -0.95, 0.95)\n\nfTone = clamp(tone / sr * 2.8, 0.02, 0.45)\ntoneLp = toneLp + fTone * (sat - toneLp)\n\nwet = subBoost * 0.55 + toneLp * 0.6\nout = (in * (1.0 - mix) + wet * mix) * 1.3\n",
+    "params": {
+      "centerFreq": 68.0,
+      "boost": 2.2,
+      "drive": 1.8,
+      "tone": 2800.0,
+      "mix": 0.75
+    }
+  }
+}
