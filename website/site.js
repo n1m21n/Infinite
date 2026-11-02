@@ -871,7 +871,7 @@
       }
     });
 
-    /* autoplay: advances every 5s while visible and not hovered */
+    /* autoplay: advances every 2s while visible and not hovered */
     const win = $('#hero-showcase');
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (win && !reduce) {
@@ -880,7 +880,7 @@
         const lbOpen = lightbox && lightbox.classList.contains('active');
         if (seen && !hover && !lbOpen && !document.hidden) goTo(current + 1);
       };
-      timer = setInterval(tick, 5000);
+      timer = setInterval(tick, 2000);
       win.addEventListener('mouseenter', () => { hover = true; });
       win.addEventListener('mouseleave', () => { hover = false; });
       if ('IntersectionObserver' in window) {
