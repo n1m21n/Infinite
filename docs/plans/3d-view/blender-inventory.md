@@ -22,15 +22,15 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Light | 11/18 | 4/4 | 45 |
 | Light probe | 0/0 | 0/0 | 40 |
 | Constraints (aim only) | 2/7 | 0/15 | 8 |
-| World | 9/18 | 5/9 | 5 |
-| Render | 24/138 | 10/67 | 29 |
+| World | 3/3 | 0/0 | 20 |
+| Render | 14/37 | 2/16 | 130 |
 | Output | 11/42 | 16/105 | 2 |
 | Scene | 3/35 | 9/14 | 20 |
 | View layer | 16/44 | 0/0 | 16 |
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **160/554** | **120/365** | **605** |
+| **All settings** | **144/438** | **107/305** | **721** |
 | **Operators (features)** | **49/158** | | **336** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
@@ -773,67 +773,45 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Finite Volume | World.use_eevee_finite_volume | boolean |  | in | - |
 | Color | World.color | float |  | in | yes |
-| Resolution | World.probe_resolution | enum | **128**, 256, **512**, **1024**, 2048, **4096** | in | yes |
-| Sun Threshold | World.sun_threshold | float |  | in | - |
-| Sun Angle | World.sun_angle | float |  | in | - |
-| Use Shadow | World.use_sun_shadow | boolean |  | in | - |
-| Shadows Resolution Limit | World.sun_shadow_maximum_resolution | float |  | in | - |
-| Shadow Filter Radius | World.sun_shadow_filter_radius | float |  | in | - |
-| Shadow Jitter | World.use_sun_shadow_jitter | boolean |  | in | - |
-| Shadow Jitter Overblur | World.sun_shadow_jitter_overblur | float |  | in | - |
-| Use Mist | WorldMistSettings.use_mist | boolean |  | in | - |
-| Minimum | WorldMistSettings.intensity | float |  | in | yes |
-| Start | WorldMistSettings.start | float |  | in | yes |
-| Depth | WorldMistSettings.depth | float |  | in | yes |
-| Height | WorldMistSettings.height | float |  | in | yes |
-| Falloff | WorldMistSettings.falloff | enum | Quadratic, **Linear**, Inverse Quadratic | in | yes |
 | Factor | WorldLighting.ao_factor | float |  | in | yes |
 | Distance | WorldLighting.distance | float |  | in | yes |
+| Finite Volume | World.use_eevee_finite_volume | boolean |  | out: volumes | - |
 | Node Tree | World.node_tree | pointer |  | out: node | - |
 | Use Nodes | World.use_nodes | boolean |  | out: node | - |
 | Lightgroup | World.lightgroup | string |  | out: lightgroup | - |
+| Resolution | World.probe_resolution | enum | **128**, 256, **512**, **1024**, 2048, **4096** | deferred: world baking needs renderer work | - |
+| Sun Threshold | World.sun_threshold | float |  | deferred: world sun extraction needs renderer work | - |
+| Sun Angle | World.sun_angle | float |  | deferred: world sun extraction needs renderer work | - |
+| Use Shadow | World.use_sun_shadow | boolean |  | deferred: world sun extraction needs renderer work | - |
+| Shadows Resolution Limit | World.sun_shadow_maximum_resolution | float |  | deferred: world sun extraction needs renderer work | - |
+| Shadow Filter Radius | World.sun_shadow_filter_radius | float |  | deferred: world sun extraction needs renderer work | - |
+| Shadow Jitter | World.use_sun_shadow_jitter | boolean |  | deferred: world sun extraction needs renderer work | - |
+| Shadow Jitter Overblur | World.sun_shadow_jitter_overblur | float |  | deferred: world sun extraction needs renderer work | - |
 | Cycles World Settings | World.cycles | pointer |  | out: cycles | yes |
 | Cycles Visibility Settings | World.cycles_visibility | pointer |  | out: cycles | - |
+| Use Mist | WorldMistSettings.use_mist | boolean |  | deferred: mist needs a Render 3D pass | - |
+| Minimum | WorldMistSettings.intensity | float |  | deferred: mist needs a Render 3D pass | - |
+| Start | WorldMistSettings.start | float |  | deferred: mist needs a Render 3D pass | - |
+| Depth | WorldMistSettings.depth | float |  | deferred: mist needs a Render 3D pass | - |
+| Height | WorldMistSettings.height | float |  | deferred: mist needs a Render 3D pass | - |
+| Falloff | WorldMistSettings.falloff | enum | Quadratic, **Linear**, Inverse Quadratic | deferred: mist needs a Render 3D pass | - |
 
 ## Render
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
 | Resolution X | RenderSettings.resolution_x | int |  | in | yes |
-| Resolution Y | RenderSettings.resolution_y | int |  | in | - |
+| Resolution Y | RenderSettings.resolution_y | int |  | in | yes |
 | Resolution Scale | RenderSettings.resolution_percentage | int |  | in | yes |
 | Pixel Aspect X | RenderSettings.pixel_aspect_x | float |  | in | - |
 | Pixel Aspect Y | RenderSettings.pixel_aspect_y | float |  | in | - |
-| PPM Factor | RenderSettings.ppm_factor | float |  | in | - |
-| PPM Base | RenderSettings.ppm_base | float |  | in | - |
 | FPS | RenderSettings.fps | int |  | in | yes |
 | FPS Base | RenderSettings.fps_base | float |  | in | - |
-| Frame Map Old | RenderSettings.frame_map_old | int |  | in | - |
-| Frame Map New | RenderSettings.frame_map_new | int |  | in | - |
 | Dither Intensity | RenderSettings.dither_intensity | float |  | in | - |
 | Filter Size | RenderSettings.filter_size | float |  | in | - |
 | Transparent | RenderSettings.film_transparent | boolean |  | in | yes |
-| Threads | RenderSettings.threads | int |  | in | - |
-| Threads Mode | RenderSettings.threads_mode | enum | Auto-Detect, **Fixed** | in | - |
-| Motion Blur | RenderSettings.use_motion_blur | boolean |  | in | - |
-| Shutter | RenderSettings.motion_blur_shutter | float |  | in | - |
-| Motion Blur Position | RenderSettings.motion_blur_position | enum | Start on Frame, Center on Frame, End on Frame | in | - |
-| Shutter Curve | RenderSettings.motion_blur_shutter_curve | pointer |  | in | - |
-| Render Region | RenderSettings.use_border | boolean |  | in | - |
-| Region Minimum X | RenderSettings.border_min_x | float |  | in | - |
-| Region Minimum Y | RenderSettings.border_min_y | float |  | in | - |
-| Region Maximum X | RenderSettings.border_max_x | float |  | in | - |
-| Region Maximum Y | RenderSettings.border_max_y | float |  | in | - |
-| Crop to Render Region | RenderSettings.use_crop_to_border | boolean |  | in | - |
-| Placeholders | RenderSettings.use_placeholder | boolean |  | in | - |
-| Overwrite | RenderSettings.use_overwrite | boolean |  | in | - |
-| File Extensions | RenderSettings.use_file_extension | boolean |  | in | - |
-| Extension | RenderSettings.file_extension | string |  | in | - |
-| Lock Interface | RenderSettings.use_lock_interface | boolean |  | in | - |
-| Output Path | RenderSettings.filepath | string |  | in | - |
-| Cache Result | RenderSettings.use_render_cache | boolean |  | in | - |
+| Output Path | RenderSettings.filepath | string |  | in | yes |
 | Stamp Time | RenderSettings.use_stamp_time | boolean |  | in | - |
 | Stamp Date | RenderSettings.use_stamp_date | boolean |  | in | - |
 | Stamp Frame | RenderSettings.use_stamp_frame | boolean |  | in | - |
@@ -842,118 +820,72 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Stamp Lens | RenderSettings.use_stamp_lens | boolean |  | in | - |
 | Stamp Scene | RenderSettings.use_stamp_scene | boolean |  | in | - |
 | Stamp Note | RenderSettings.use_stamp_note | boolean |  | in | - |
-| Stamp Marker | RenderSettings.use_stamp_marker | boolean |  | in | - |
-| Stamp Filename | RenderSettings.use_stamp_filename | boolean |  | in | - |
-| Stamp Sequence Strip | RenderSettings.use_stamp_sequencer_strip | boolean |  | in | - |
 | Stamp Render Time | RenderSettings.use_stamp_render_time | boolean |  | in | - |
 | Stamp Note Text | RenderSettings.stamp_note_text | string |  | in | - |
 | Stamp Output | RenderSettings.use_stamp | boolean |  | in | - |
 | Stamp Labels | RenderSettings.use_stamp_labels | boolean |  | in | - |
-| Metadata Input | RenderSettings.metadata_input | enum | **Scene**, Sequencer Strips | in | - |
-| Stamp Peak Memory | RenderSettings.use_stamp_memory | boolean |  | in | - |
-| Stamp Hostname | RenderSettings.use_stamp_hostname | boolean |  | in | - |
 | Font Size | RenderSettings.stamp_font_size | int |  | in | - |
 | Text Color | RenderSettings.stamp_foreground | float |  | in | - |
-| Background | RenderSettings.stamp_background | float |  | in | yes |
-| Render Single Layer | RenderSettings.use_single_layer | boolean |  | in | - |
-| Render Views | RenderSettings.views | collection |  | in | yes |
-| Engine | RenderSettings.engine | enum | EEVEE | in | yes |
-| Multiple Engines | RenderSettings.has_multiple_engines | boolean |  | in | - |
+| Background | RenderSettings.stamp_background | float |  | in | - |
 | Use Simplify | RenderSettings.use_simplify | boolean |  | in | - |
-| Simplify Volumes | RenderSettings.simplify_volumes | float |  | in | - |
-| Persistent Data | RenderSettings.use_persistent_data | boolean |  | in | - |
-| Line Thickness Mode | RenderSettings.line_thickness_mode | enum | Absolute, Relative | in | - |
-| Line Thickness | RenderSettings.line_thickness | float |  | in | - |
-| Diffuse Bounces | SceneEEVEE.gi_diffuse_bounces | int |  | in | - |
-| Cubemap Size | SceneEEVEE.gi_cubemap_resolution | enum | 128 px, 256 px, 512 px, 1024 px, 2048 px, 4096 px | in | - |
-| Irradiance Visibility Size | SceneEEVEE.gi_visibility_resolution | enum | **8 px**, 16 px, 32 px, 64 px | in | - |
-| Clamp Glossy | SceneEEVEE.gi_glossy_clamp | float |  | in | - |
-| Irradiance Pool Size | SceneEEVEE.gi_irradiance_pool_size | enum | 16 MB, 32 MB, 64 MB, 128 MB, 256 MB, 512 MB, 1 GB | in | - |
-| Viewport Samples | SceneEEVEE.taa_samples | int |  | in | - |
-| Render Samples | SceneEEVEE.taa_render_samples | int |  | in | - |
-| Viewport Denoising | SceneEEVEE.use_taa_reprojection | boolean |  | in | - |
-| Tracing Method | SceneEEVEE.ray_tracing_method | enum | Light Probe, Screen-Trace | in | - |
-| Jittered Shadows (Viewport) | SceneEEVEE.use_shadow_jitter_viewport | boolean |  | in | - |
-| Clamp Surface Direct | SceneEEVEE.clamp_surface_direct | float |  | in | - |
-| Clamp Surface Indirect | SceneEEVEE.clamp_surface_indirect | float |  | in | - |
-| Clamp Volume Direct | SceneEEVEE.clamp_volume_direct | float |  | in | - |
-| Clamp Volume Indirect | SceneEEVEE.clamp_volume_indirect | float |  | in | - |
-| Direct Light Strength | SceneEEVEE.direct_light_intensity | float |  | in | - |
-| Indirect Light Strength | SceneEEVEE.indirect_light_intensity | float |  | in | - |
-| Start | SceneEEVEE.volumetric_start | float |  | in | yes |
-| End | SceneEEVEE.volumetric_end | float |  | in | yes |
-| Resolution | SceneEEVEE.volumetric_tile_size | enum | **1:1**, 1:2, 1:4, 1:8, 1:16 | in | yes |
-| Steps | SceneEEVEE.volumetric_samples | int |  | in | yes |
-| Exponential Sampling | SceneEEVEE.volumetric_sample_distribution | float |  | in | - |
-| Volume Max Ray Depth | SceneEEVEE.volumetric_ray_depth | int |  | in | - |
-| Clamp | SceneEEVEE.volumetric_light_clamp | float |  | in | yes |
-| Volumetric Shadows | SceneEEVEE.use_volumetric_shadows | boolean |  | in | - |
-| Volumetric Shadow Samples | SceneEEVEE.volumetric_shadow_samples | int |  | in | - |
-| Volume Custom Range | SceneEEVEE.use_volume_custom_range | boolean |  | in | - |
-| Fast GI Approximation | SceneEEVEE.use_fast_gi | boolean |  | in | - |
-| Near Thickness | SceneEEVEE.fast_gi_thickness_near | float |  | in | - |
-| Far Thickness | SceneEEVEE.fast_gi_thickness_far | float |  | in | - |
-| Trace Precision | SceneEEVEE.fast_gi_quality | float |  | in | - |
-| Step Count | SceneEEVEE.fast_gi_step_count | int |  | in | - |
-| Ray Count | SceneEEVEE.fast_gi_ray_count | int |  | in | - |
-| Method | SceneEEVEE.fast_gi_method | enum | **Ambient Occlusion**, Global Illumination | in | - |
-| Distance | SceneEEVEE.fast_gi_distance | float |  | in | yes |
-| Bias | SceneEEVEE.fast_gi_bias | float |  | in | yes |
-| Resolution | SceneEEVEE.fast_gi_resolution | enum | **1:1**, 1:2, 1:4, 1:8, 1:16 | in | yes |
-| Max Size | SceneEEVEE.bokeh_max_size | float |  | in | - |
-| Sprite Threshold | SceneEEVEE.bokeh_threshold | float |  | in | - |
-| Neighbor Rejection | SceneEEVEE.bokeh_neighbor_max | float |  | in | - |
-| Jitter Camera | SceneEEVEE.use_bokeh_jittered | boolean |  | in | - |
-| Over-blur | SceneEEVEE.bokeh_overblur | float |  | in | - |
-| Bleeding Bias | SceneEEVEE.motion_blur_depth_scale | float |  | in | - |
-| Max Blur | SceneEEVEE.motion_blur_max | int |  | in | - |
-| Motion steps | SceneEEVEE.motion_blur_steps | int |  | in | - |
+| Viewport Samples | SceneEEVEE.taa_samples | int |  | in | yes |
+| Render Samples | SceneEEVEE.taa_render_samples | int |  | in | yes |
 | Shadows | SceneEEVEE.use_shadows | boolean |  | in | yes |
-| Shadow Pool Size | SceneEEVEE.shadow_pool_size | enum | 16 MB, 32 MB, 64 MB, 128 MB, 256 MB, 512 MB, 1 GB | in | - |
-| Shadow Ray Count | SceneEEVEE.shadow_ray_count | int |  | in | - |
-| Shadow Step Count | SceneEEVEE.shadow_step_count | int |  | in | - |
-| Light Threshold | SceneEEVEE.light_threshold | float |  | in | - |
-| Overscan | SceneEEVEE.use_overscan | boolean |  | in | - |
-| Overscan Size | SceneEEVEE.overscan_size | float |  | in | - |
-| Reflection Trace Options | SceneEEVEE.ray_tracing_options | pointer |  | in | - |
-| Use Ray-Tracing | SceneEEVEE.use_raytracing | boolean |  | in | - |
-| Shadows Resolution Scale | SceneEEVEE.shadow_resolution_scale | float |  | in | - |
-| Light Direction | SceneDisplay.light_direction | float |  | in | - |
-| Shadow Shift | SceneDisplay.shadow_shift | float |  | in | - |
-| Shadow Focus | SceneDisplay.shadow_focus | float |  | in | - |
-| Distance | SceneDisplay.matcap_ssao_distance | float |  | in | yes |
-| Attenuation | SceneDisplay.matcap_ssao_attenuation | float |  | in | - |
-| Samples | SceneDisplay.matcap_ssao_samples | int |  | in | yes |
-| Render Anti-Aliasing | SceneDisplay.render_aa | enum | No Anti-Aliasing, Single Pass Anti-Aliasing, 5 Samples, 8 Samples, 11 Samples, 16 Samples, 32 Samples | in | - |
-| Viewport Anti-Aliasing | SceneDisplay.viewport_aa | enum | No Anti-Aliasing, Single Pass Anti-Aliasing, 5 Samples, 8 Samples, 11 Samples, 16 Samples, 32 Samples | in | - |
-| Look | ColorManagedViewSettings.look | enum | **None** | in | yes |
+| Shadows Resolution Scale | SceneEEVEE.shadow_resolution_scale | float |  | in | yes |
+| Render Anti-Aliasing | SceneDisplay.render_aa | enum | No Anti-Aliasing, Single Pass Anti-Aliasing, 5 Samples, 8 Samples, 11 Samples, 16 Samples, 32 Samples | in | yes |
+| Viewport Anti-Aliasing | SceneDisplay.viewport_aa | enum | No Anti-Aliasing, Single Pass Anti-Aliasing, 5 Samples, 8 Samples, 11 Samples, 16 Samples, 32 Samples | in | yes |
+| Look | ColorManagedViewSettings.look | enum | **None** | in | - |
 | View | ColorManagedViewSettings.view_transform | enum | **None** | in | yes |
 | Exposure | ColorManagedViewSettings.exposure | float |  | in | yes |
 | Gamma | ColorManagedViewSettings.gamma | float |  | in | - |
-| Curve | ColorManagedViewSettings.curve_mapping | pointer |  | in | yes |
-| Use Curves | ColorManagedViewSettings.use_curve_mapping | boolean |  | in | - |
-| Use White Balance | ColorManagedViewSettings.use_white_balance | boolean |  | in | - |
-| Temperature | ColorManagedViewSettings.white_balance_temperature | float |  | in | - |
-| Tint | ColorManagedViewSettings.white_balance_tint | float |  | in | yes |
-| White Point | ColorManagedViewSettings.white_balance_whitepoint | float |  | in | - |
-| Support Emulation | ColorManagedViewSettings.support_emulation | boolean |  | in | - |
-| Display | ColorManagedDisplaySettings.display_device | enum | **None** | in | yes |
-| Display Emulation | ColorManagedDisplaySettings.emulation | enum | **Off**, Automatic | in | - |
 | Pixel Size | RenderSettings.preview_pixel_size | enum | Automatic, 1×, 2×, 4×, 8× | out: preview | - |
+| PPM Factor | RenderSettings.ppm_factor | float |  | out: image metadata | - |
+| PPM Base | RenderSettings.ppm_base | float |  | out: image metadata | - |
+| Frame Map Old | RenderSettings.frame_map_old | int |  | out: time remap belongs to Timeline and Shots | - |
+| Frame Map New | RenderSettings.frame_map_new | int |  | out: time remap belongs to Timeline and Shots | - |
 | Use Freestyle | RenderSettings.use_freestyle | boolean |  | out: freestyle | - |
+| Threads | RenderSettings.threads | int |  | out: app-wide performance, not per scene | - |
+| Threads Mode | RenderSettings.threads_mode | enum | Auto-Detect, **Fixed** | out: app-wide performance, not per scene | - |
+| Motion Blur | RenderSettings.use_motion_blur | boolean |  | deferred: 3D motion blur needs a Render 3D pass | - |
+| Shutter | RenderSettings.motion_blur_shutter | float |  | deferred: 3D motion blur needs a Render 3D pass | - |
+| Motion Blur Position | RenderSettings.motion_blur_position | enum | Start on Frame, Center on Frame, End on Frame | deferred: 3D motion blur needs a Render 3D pass | - |
+| Shutter Curve | RenderSettings.motion_blur_shutter_curve | pointer |  | deferred: 3D motion blur needs a Render 3D pass | - |
 | Curves Shape Type | RenderSettings.hair_type | enum | Strand, **Strip**, Cylinder | out: hair | - |
 | Additional Subdivision | RenderSettings.hair_subdiv | int |  | out: hair | - |
 | High Quality Normals | RenderSettings.use_high_quality_normals | boolean |  | out: normal | - |
+| Render Region | RenderSettings.use_border | boolean |  | deferred: renderer crop region needed | - |
+| Region Minimum X | RenderSettings.border_min_x | float |  | deferred: renderer crop region needed | - |
+| Region Minimum Y | RenderSettings.border_min_y | float |  | deferred: renderer crop region needed | - |
+| Region Maximum X | RenderSettings.border_max_x | float |  | deferred: renderer crop region needed | - |
+| Region Maximum Y | RenderSettings.border_max_y | float |  | deferred: renderer crop region needed | - |
+| Crop to Render Region | RenderSettings.use_crop_to_border | boolean |  | deferred: renderer crop region needed | - |
+| Placeholders | RenderSettings.use_placeholder | boolean |  | out: the Output node owns file naming | - |
+| Overwrite | RenderSettings.use_overwrite | boolean |  | out: the Output node owns file naming | - |
 | Compositing | RenderSettings.use_compositing | boolean |  | out: compositing | - |
 | Sequencer | RenderSettings.use_sequencer | boolean |  | out: sequencer | - |
+| File Extensions | RenderSettings.use_file_extension | boolean |  | out: the Output node owns file naming | - |
+| Extension | RenderSettings.file_extension | string |  | out: the Output node owns file naming | - |
+| Lock Interface | RenderSettings.use_lock_interface | boolean |  | out: app-wide performance, not per scene | - |
+| Cache Result | RenderSettings.use_render_cache | boolean |  | out: app-wide performance, not per scene | - |
+| Stamp Marker | RenderSettings.use_stamp_marker | boolean |  | out: metadata of the .blend, sequencer or machine | - |
+| Stamp Filename | RenderSettings.use_stamp_filename | boolean |  | out: metadata of the .blend, sequencer or machine | - |
+| Stamp Sequence Strip | RenderSettings.use_stamp_sequencer_strip | boolean |  | out: metadata of the .blend, sequencer or machine | - |
+| Metadata Input | RenderSettings.metadata_input | enum | **Scene**, Sequencer Strips | out: metadata of the .blend, sequencer or machine | - |
+| Stamp Peak Memory | RenderSettings.use_stamp_memory | boolean |  | out: metadata of the .blend, sequencer or machine | - |
+| Stamp Hostname | RenderSettings.use_stamp_hostname | boolean |  | out: metadata of the .blend, sequencer or machine | - |
+| Render Single Layer | RenderSettings.use_single_layer | boolean |  | out: one view layer, no stereo views | - |
+| Render Views | RenderSettings.views | collection |  | out: one view layer, no stereo views | - |
 | Render Views | RenderSettings.stereo_views | collection |  | out: stereo | - |
 | Multiple Views | RenderSettings.use_multiview | boolean |  | out: multiview | - |
 | Setup Stereo Mode | RenderSettings.views_format | enum | Stereo 3D, Multi-View | out: views_format | - |
+| Engine | RenderSettings.engine | enum | EEVEE | out: Render 3D is the only renderer | - |
+| Multiple Engines | RenderSettings.has_multiple_engines | boolean |  | out: one view layer, no stereo views | - |
 | Use Spherical Stereo | RenderSettings.use_spherical_stereo | boolean |  | out: stereo | - |
 | Simplify Subdivision | RenderSettings.simplify_subdivision | int |  | out: subdivision | - |
 | Simplify Child Particles | RenderSettings.simplify_child_particles | float |  | out: particle | - |
 | Simplify Subdivision | RenderSettings.simplify_subdivision_render | int |  | out: subdivision | - |
 | Simplify Child Particles | RenderSettings.simplify_child_particles_render | float |  | out: particle | - |
+| Simplify Volumes | RenderSettings.simplify_volumes | float |  | out: volumes and Freestyle lines | - |
 | Mesh Normals | RenderSettings.use_simplify_normals | boolean |  | out: normal | - |
 | Simplify | RenderSettings.simplify_gpencil | boolean |  | out: gpencil | - |
 | Playback Only | RenderSettings.simplify_gpencil_onplay | boolean |  | out: gpencil | - |
@@ -962,12 +894,80 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Modifiers | RenderSettings.simplify_gpencil_modifier | boolean |  | out: gpencil | - |
 | Shader Effects | RenderSettings.simplify_gpencil_shader_fx | boolean |  | out: gpencil | - |
 | Layers Tinting | RenderSettings.simplify_gpencil_tint | boolean |  | out: gpencil | - |
+| Persistent Data | RenderSettings.use_persistent_data | boolean |  | out: app-wide performance, not per scene | - |
+| Line Thickness Mode | RenderSettings.line_thickness_mode | enum | Absolute, Relative | out: volumes and Freestyle lines | - |
+| Line Thickness | RenderSettings.line_thickness | float |  | out: volumes and Freestyle lines | - |
 | Bake Data | RenderSettings.bake | pointer |  | out: bake | yes |
 | Compositor Device | RenderSettings.compositor_device | enum | CPU, **GPU** | out: compositor | - |
 | Compositor Precision | RenderSettings.compositor_precision | enum | **Auto**, **Full** | out: compositor | - |
 | Compositor Denoise Node Device | RenderSettings.compositor_denoise_device | enum | **Auto**, CPU, **GPU** | out: compositor | - |
 | Compositor Preview Denoise Quality | RenderSettings.compositor_denoise_preview_quality | enum | **High**, Balanced, **Fast** | out: compositor | - |
 | Compositor Final Denoise Quality | RenderSettings.compositor_denoise_final_quality | enum | **High**, Balanced, **Fast** | out: compositor | - |
+| Diffuse Bounces | SceneEEVEE.gi_diffuse_bounces | int |  | deferred: global illumination needs renderer work | - |
+| Cubemap Size | SceneEEVEE.gi_cubemap_resolution | enum | 128 px, 256 px, 512 px, 1024 px, 2048 px, 4096 px | deferred: global illumination needs renderer work | - |
+| Irradiance Visibility Size | SceneEEVEE.gi_visibility_resolution | enum | **8 px**, 16 px, 32 px, 64 px | deferred: global illumination needs renderer work | - |
+| Clamp Glossy | SceneEEVEE.gi_glossy_clamp | float |  | deferred: global illumination needs renderer work | - |
+| Irradiance Pool Size | SceneEEVEE.gi_irradiance_pool_size | enum | 16 MB, 32 MB, 64 MB, 128 MB, 256 MB, 512 MB, 1 GB | deferred: global illumination needs renderer work | - |
+| Viewport Denoising | SceneEEVEE.use_taa_reprojection | boolean |  | deferred: EEVEE-only terms need renderer work | - |
+| Tracing Method | SceneEEVEE.ray_tracing_method | enum | Light Probe, Screen-Trace | deferred: EEVEE-only terms need renderer work | - |
+| Jittered Shadows (Viewport) | SceneEEVEE.use_shadow_jitter_viewport | boolean |  | deferred: EEVEE-only terms need renderer work | - |
+| Clamp Surface Direct | SceneEEVEE.clamp_surface_direct | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Clamp Surface Indirect | SceneEEVEE.clamp_surface_indirect | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Clamp Volume Direct | SceneEEVEE.clamp_volume_direct | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Clamp Volume Indirect | SceneEEVEE.clamp_volume_indirect | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Direct Light Strength | SceneEEVEE.direct_light_intensity | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Indirect Light Strength | SceneEEVEE.indirect_light_intensity | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Start | SceneEEVEE.volumetric_start | float |  | out: volumes are outside the README | - |
+| End | SceneEEVEE.volumetric_end | float |  | out: volumes are outside the README | - |
+| Resolution | SceneEEVEE.volumetric_tile_size | enum | **1:1**, 1:2, 1:4, 1:8, 1:16 | out: volumes are outside the README | - |
+| Steps | SceneEEVEE.volumetric_samples | int |  | out: volumes are outside the README | - |
+| Exponential Sampling | SceneEEVEE.volumetric_sample_distribution | float |  | out: volumes are outside the README | - |
+| Volume Max Ray Depth | SceneEEVEE.volumetric_ray_depth | int |  | out: volumes are outside the README | - |
+| Clamp | SceneEEVEE.volumetric_light_clamp | float |  | out: volumes are outside the README | - |
+| Volumetric Shadows | SceneEEVEE.use_volumetric_shadows | boolean |  | out: volumes are outside the README | - |
+| Volumetric Shadow Samples | SceneEEVEE.volumetric_shadow_samples | int |  | out: volumes are outside the README | - |
+| Volume Custom Range | SceneEEVEE.use_volume_custom_range | boolean |  | out: volumes are outside the README | - |
+| Fast GI Approximation | SceneEEVEE.use_fast_gi | boolean |  | deferred: fast GI needs renderer work | - |
+| Near Thickness | SceneEEVEE.fast_gi_thickness_near | float |  | deferred: fast GI needs renderer work | - |
+| Far Thickness | SceneEEVEE.fast_gi_thickness_far | float |  | deferred: fast GI needs renderer work | - |
+| Trace Precision | SceneEEVEE.fast_gi_quality | float |  | deferred: fast GI needs renderer work | - |
+| Step Count | SceneEEVEE.fast_gi_step_count | int |  | deferred: fast GI needs renderer work | - |
+| Ray Count | SceneEEVEE.fast_gi_ray_count | int |  | deferred: fast GI needs renderer work | - |
+| Method | SceneEEVEE.fast_gi_method | enum | **Ambient Occlusion**, Global Illumination | deferred: fast GI needs renderer work | - |
+| Distance | SceneEEVEE.fast_gi_distance | float |  | deferred: fast GI needs renderer work | - |
+| Bias | SceneEEVEE.fast_gi_bias | float |  | deferred: fast GI needs renderer work | - |
+| Resolution | SceneEEVEE.fast_gi_resolution | enum | **1:1**, 1:2, 1:4, 1:8, 1:16 | deferred: fast GI needs renderer work | - |
+| Max Size | SceneEEVEE.bokeh_max_size | float |  | deferred: bokeh shape needs a Render 3D pass | - |
+| Sprite Threshold | SceneEEVEE.bokeh_threshold | float |  | deferred: bokeh shape needs a Render 3D pass | - |
+| Neighbor Rejection | SceneEEVEE.bokeh_neighbor_max | float |  | deferred: bokeh shape needs a Render 3D pass | - |
+| Jitter Camera | SceneEEVEE.use_bokeh_jittered | boolean |  | deferred: bokeh shape needs a Render 3D pass | - |
+| Over-blur | SceneEEVEE.bokeh_overblur | float |  | deferred: bokeh shape needs a Render 3D pass | - |
+| Bleeding Bias | SceneEEVEE.motion_blur_depth_scale | float |  | deferred: 3D motion blur needs a Render 3D pass | - |
+| Max Blur | SceneEEVEE.motion_blur_max | int |  | deferred: 3D motion blur needs a Render 3D pass | - |
+| Motion steps | SceneEEVEE.motion_blur_steps | int |  | deferred: 3D motion blur needs a Render 3D pass | - |
+| Shadow Pool Size | SceneEEVEE.shadow_pool_size | enum | 16 MB, 32 MB, 64 MB, 128 MB, 256 MB, 512 MB, 1 GB | deferred: shadow internals need renderer work | - |
+| Shadow Ray Count | SceneEEVEE.shadow_ray_count | int |  | deferred: shadow internals need renderer work | - |
+| Shadow Step Count | SceneEEVEE.shadow_step_count | int |  | deferred: shadow internals need renderer work | - |
+| Light Threshold | SceneEEVEE.light_threshold | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Overscan | SceneEEVEE.use_overscan | boolean |  | deferred: EEVEE-only terms need renderer work | - |
+| Overscan Size | SceneEEVEE.overscan_size | float |  | deferred: EEVEE-only terms need renderer work | - |
+| Reflection Trace Options | SceneEEVEE.ray_tracing_options | pointer |  | deferred: EEVEE-only terms need renderer work | - |
+| Use Ray-Tracing | SceneEEVEE.use_raytracing | boolean |  | deferred: EEVEE-only terms need renderer work | - |
+| Light Direction | SceneDisplay.light_direction | float |  | deferred: Solid shader work, perf-gated | - |
+| Shadow Shift | SceneDisplay.shadow_shift | float |  | deferred: Solid shader work, perf-gated | - |
+| Shadow Focus | SceneDisplay.shadow_focus | float |  | deferred: Solid shader work, perf-gated | - |
+| Distance | SceneDisplay.matcap_ssao_distance | float |  | deferred: Solid shader work, perf-gated | - |
+| Attenuation | SceneDisplay.matcap_ssao_attenuation | float |  | deferred: Solid shader work, perf-gated | - |
+| Samples | SceneDisplay.matcap_ssao_samples | int |  | deferred: Solid shader work, perf-gated | - |
+| Curve | ColorManagedViewSettings.curve_mapping | pointer |  | out: grading belongs to Color nodes after Output | - |
+| Use Curves | ColorManagedViewSettings.use_curve_mapping | boolean |  | out: grading belongs to Color nodes after Output | - |
+| Use White Balance | ColorManagedViewSettings.use_white_balance | boolean |  | out: grading belongs to Color nodes after Output | - |
+| Temperature | ColorManagedViewSettings.white_balance_temperature | float |  | out: grading belongs to Color nodes after Output | - |
+| Tint | ColorManagedViewSettings.white_balance_tint | float |  | out: grading belongs to Color nodes after Output | - |
+| White Point | ColorManagedViewSettings.white_balance_whitepoint | float |  | out: grading belongs to Color nodes after Output | - |
+| Support Emulation | ColorManagedViewSettings.support_emulation | boolean |  | out: display emulation is app-wide | - |
+| Display | ColorManagedDisplaySettings.display_device | enum | **None** | out: display device is app-wide | - |
+| Display Emulation | ColorManagedDisplaySettings.emulation | enum | **Off**, Automatic | out: display device is app-wide | - |
 
 ## Output
 

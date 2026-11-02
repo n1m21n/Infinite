@@ -603,3 +603,159 @@ DampedTrackConstraint.head_tail	out	armature bones
 DampedTrackConstraint.use_bbone_shape	out	armature bones
 DampedTrackConstraint.subtarget	out	armature bones
 DampedTrackConstraint.track_axis	missing	Camera and light Data tab: Look at axes
+World.use_eevee_finite_volume	out	volumes
+World.color	done	View3DPanel.cpp:3718 Background colour
+World.probe_resolution	deferred	world baking needs renderer work
+World.sun_threshold	deferred	world sun extraction needs renderer work
+World.sun_angle	deferred	world sun extraction needs renderer work
+World.use_sun_shadow	deferred	world sun extraction needs renderer work
+World.sun_shadow_maximum_resolution	deferred	world sun extraction needs renderer work
+World.sun_shadow_filter_radius	deferred	world sun extraction needs renderer work
+World.use_sun_shadow_jitter	deferred	world sun extraction needs renderer work
+World.sun_shadow_jitter_overblur	deferred	world sun extraction needs renderer work
+WorldMistSettings.use_mist	deferred	mist needs a Render 3D pass
+WorldMistSettings.intensity	deferred	mist needs a Render 3D pass
+WorldMistSettings.start	deferred	mist needs a Render 3D pass
+WorldMistSettings.depth	deferred	mist needs a Render 3D pass
+WorldMistSettings.height	deferred	mist needs a Render 3D pass
+WorldMistSettings.falloff	deferred	mist needs a Render 3D pass
+WorldLighting.ao_factor	done	View3DPanel.cpp:3874 Ambient Occlusion Strength
+WorldLighting.distance	done	View3DPanel.cpp:3875 Ambient Occlusion Distance
+RenderSettings.resolution_x	done	View3DPanel.cpp:3899 Resolution X
+RenderSettings.resolution_y	done	View3DPanel.cpp:3901 Y
+RenderSettings.resolution_percentage	done	View3DPanel.cpp:3903 Resolution %
+RenderSettings.pixel_aspect_x	missing	Render tab > Format: pixel aspect
+RenderSettings.pixel_aspect_y	missing	Render tab > Format: pixel aspect
+RenderSettings.ppm_factor	out	image metadata
+RenderSettings.ppm_base	out	image metadata
+RenderSettings.fps	done	View3DPanel.cpp:3911 Frame rate
+RenderSettings.fps_base	missing	Render tab > Format: 23.976 / 29.97 rates
+RenderSettings.frame_map_old	out	time remap belongs to Timeline and Shots
+RenderSettings.frame_map_new	out	time remap belongs to Timeline and Shots
+RenderSettings.dither_intensity	missing	Render tab > Output: dither
+RenderSettings.filter_size	missing	Render tab > Sampling: pixel filter width
+RenderSettings.film_transparent	done	View3DPanel.cpp:3884 Transparent
+RenderSettings.threads	out	app-wide performance, not per scene
+RenderSettings.threads_mode	out	app-wide performance, not per scene
+RenderSettings.use_motion_blur	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_shutter	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_position	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_shutter_curve	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.use_border	deferred	renderer crop region needed
+RenderSettings.border_min_x	deferred	renderer crop region needed
+RenderSettings.border_min_y	deferred	renderer crop region needed
+RenderSettings.border_max_x	deferred	renderer crop region needed
+RenderSettings.border_max_y	deferred	renderer crop region needed
+RenderSettings.use_crop_to_border	deferred	renderer crop region needed
+RenderSettings.use_placeholder	out	the Output node owns file naming
+RenderSettings.use_overwrite	out	the Output node owns file naming
+RenderSettings.use_file_extension	out	the Output node owns file naming
+RenderSettings.file_extension	out	the Output node owns file naming
+RenderSettings.use_lock_interface	out	app-wide performance, not per scene
+RenderSettings.filepath	done	Output node path; Render Image writes there (View3DPanel.cpp:3937)
+RenderSettings.use_render_cache	out	app-wide performance, not per scene
+RenderSettings.use_stamp_time	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_date	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_frame	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_frame_range	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_camera	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_lens	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_scene	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_note	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_marker	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_filename	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_sequencer_strip	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_render_time	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_note_text	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp	missing	Render tab > Output: burn-in stamp
+RenderSettings.use_stamp_labels	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.metadata_input	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_memory	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_hostname	out	metadata of the .blend, sequencer or machine
+RenderSettings.stamp_font_size	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_foreground	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_background	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_single_layer	out	one view layer, no stereo views
+RenderSettings.views	out	one view layer, no stereo views
+RenderSettings.engine	out	Render 3D is the only renderer
+RenderSettings.has_multiple_engines	out	one view layer, no stereo views
+RenderSettings.use_simplify	missing	Render tab > Sampling: simplify for preview
+RenderSettings.simplify_volumes	out	volumes and Freestyle lines
+RenderSettings.use_persistent_data	out	app-wide performance, not per scene
+RenderSettings.line_thickness_mode	out	volumes and Freestyle lines
+RenderSettings.line_thickness	out	volumes and Freestyle lines
+SceneEEVEE.gi_diffuse_bounces	deferred	global illumination needs renderer work
+SceneEEVEE.gi_cubemap_resolution	deferred	global illumination needs renderer work
+SceneEEVEE.gi_visibility_resolution	deferred	global illumination needs renderer work
+SceneEEVEE.gi_glossy_clamp	deferred	global illumination needs renderer work
+SceneEEVEE.gi_irradiance_pool_size	deferred	global illumination needs renderer work
+SceneEEVEE.taa_samples	done	View3DPanel.cpp:3854 Sampling Viewport
+SceneEEVEE.taa_render_samples	done	View3DPanel.cpp:3856 Sampling Render
+SceneEEVEE.use_taa_reprojection	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.ray_tracing_method	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_shadow_jitter_viewport	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_surface_direct	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_surface_indirect	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_volume_direct	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_volume_indirect	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.direct_light_intensity	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.indirect_light_intensity	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.volumetric_start	out	volumes are outside the README
+SceneEEVEE.volumetric_end	out	volumes are outside the README
+SceneEEVEE.volumetric_tile_size	out	volumes are outside the README
+SceneEEVEE.volumetric_samples	out	volumes are outside the README
+SceneEEVEE.volumetric_sample_distribution	out	volumes are outside the README
+SceneEEVEE.volumetric_ray_depth	out	volumes are outside the README
+SceneEEVEE.volumetric_light_clamp	out	volumes are outside the README
+SceneEEVEE.use_volumetric_shadows	out	volumes are outside the README
+SceneEEVEE.volumetric_shadow_samples	out	volumes are outside the README
+SceneEEVEE.use_volume_custom_range	out	volumes are outside the README
+SceneEEVEE.use_fast_gi	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_thickness_near	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_thickness_far	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_quality	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_step_count	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_ray_count	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_method	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_distance	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_bias	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_resolution	deferred	fast GI needs renderer work
+SceneEEVEE.bokeh_max_size	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_threshold	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_neighbor_max	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.use_bokeh_jittered	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_overblur	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.motion_blur_depth_scale	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.motion_blur_max	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.motion_blur_steps	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.use_shadows	done	View3DPanel.cpp:3862 Shadows card toggle
+SceneEEVEE.shadow_pool_size	deferred	shadow internals need renderer work
+SceneEEVEE.shadow_ray_count	deferred	shadow internals need renderer work
+SceneEEVEE.shadow_step_count	deferred	shadow internals need renderer work
+SceneEEVEE.light_threshold	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_overscan	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.overscan_size	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.ray_tracing_options	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_raytracing	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.shadow_resolution_scale	done	View3DPanel.cpp:3865 Shadows Quality
+SceneDisplay.light_direction	deferred	Solid shader work, perf-gated
+SceneDisplay.shadow_shift	deferred	Solid shader work, perf-gated
+SceneDisplay.shadow_focus	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_distance	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_attenuation	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_samples	deferred	Solid shader work, perf-gated
+SceneDisplay.render_aa	done	View3DPanel.cpp:3856 Sampling Render supersample
+SceneDisplay.viewport_aa	done	View3DPanel.cpp:3854 Sampling Viewport
+ColorManagedViewSettings.look	missing	Render tab > Color Management
+ColorManagedViewSettings.view_transform	done	View3DPanel.cpp:3887 Color Management View
+ColorManagedViewSettings.exposure	done	View3DPanel.cpp:3888 Exposure
+ColorManagedViewSettings.gamma	missing	Render tab > Color Management
+ColorManagedViewSettings.curve_mapping	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.use_curve_mapping	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.use_white_balance	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_temperature	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_tint	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_whitepoint	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.support_emulation	out	display emulation is app-wide
+ColorManagedDisplaySettings.display_device	out	display device is app-wide
+ColorManagedDisplaySettings.emulation	out	display device is app-wide
