@@ -5587,6 +5587,66 @@ namespace
       return out;
    }
 
+   // The Material tab's ball: a sphere wearing the selected Material's surface.
+   class PreviewBall : public INode, public IGeometrySource
+   {
+   public:
+      PreviewBall() { sphere.shape = 2; sphere.detail = 32; }
+      unsigned int GetOutputTexture() override { return 0; }
+      int GetOutputWidth() const override { return 0; }
+      int GetOutputHeight() const override { return 0; }
+      void CookIfNeeded(int frameId) override { sphere.CookIfNeeded(frameId); }
+      const Mesh& GetMesh() override { return sphere.GetMesh(); }
+      unsigned long long MeshRevision() override { return sphere.MeshRevision(); }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return src->GetMaterial(); }
+      unsigned long long MaterialRevision() const override { return src->MaterialRevision(); }
+      unsigned int GetSurfaceTexture() override { return src->GetSurfaceTexture(); }
+      unsigned int GetMaterialTexture(int map) override { return src->GetMaterialTexture(map); }
+      unsigned long long SurfaceTextureRevision() const override { return src->SurfaceTextureRevision(); }
+
+      IGeometrySource* src = nullptr;
+      GeometryNode sphere;
+   };
+
+   // Renders only when the material or one of its maps changed.
+   unsigned int PreviewBallTexture(MaterialNode* mat)
+   {
+      static PreviewBall* sBall = nullptr;   // kept for the app's life: GL objects outlive no context
+      static Render3DNode* sRender = nullptr;
+      static std::vector<unsigned long long> sKey;
+      static int sFrame = 0;
+      if (sRender == nullptr)
+      {
+         sBall = new PreviewBall();
+         sRender = new Render3DNode();
+         sRender->width = sRender->height = 192.0f;
+         sRender->camDistance = 2.6f;
+         sRender->camAzimuth = 35.0f;
+         sRender->camElevation = 20.0f;
+         sRender->geometry[0] = sBall;
+      }
+      sBall->src = mat;
+      std::vector<unsigned long long> key = { (unsigned long long)(uintptr_t)mat, mat->MaterialRevision(),
+                                              mat->SurfaceTextureRevision() };
+      for (int map = 0; map < kMapCount; map++)
+         key.push_back(mat->GetMaterialTexture(map));
+      if (key != sKey)
+      {
+         sKey = key;
+         sRender->CookIfNeeded(++sFrame);
+      }
+      return sRender->GetOutputTexture();
+   }
+
+   void DrawPreviewBall(MaterialNode* mat, float availW)
+   {
+      const unsigned int tex = PreviewBallTexture(mat);
+      const float side = std::min(availW, 160.0f);
+      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availW - side) * 0.5f);
+      ImGui::Image((ImTextureID)(intptr_t)tex, ImVec2(side, side), ImVec2(0, 1), ImVec2(1, 0));
+   }
+
    void DrawMaterialTab(Scene3DNode* scene, float availW)
    {
       Item* item = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
@@ -5603,6 +5663,7 @@ namespace
             AddMaterial(scene, *item);
          return;
       }
+      DrawPreviewBall(mat, availW);
       if (Card(T("Surface")))
       {
          ComboRow(T("Shading"), &mat->shading, GeometryNode::ShadingNames(), "Material shading");
@@ -6789,6 +6850,7 @@ GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId)
    return item != nullptr ? MaterialOf(*item) : nullptr;
 }
 
+unsigned int View3DPreviewBall(MaterialNode* mat) { return PreviewBallTexture(mat); }
 void View3DAddMaterial(Scene3DNode* scene, int itemId)
 {
    if (Scene3DNode::Item* item = scene->FindItem(itemId))

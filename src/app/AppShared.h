@@ -5785,6 +5785,8 @@ OutputNode* View3DEnsureOutput();
 void View3DAddNode(GraphNode& gn);
 GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);
 void View3DAddMaterial(Scene3DNode* scene, int itemId);
+// The Material tab's preview ball for this material (192 px, GL texture).
+unsigned int View3DPreviewBall(class MaterialNode* mat);
 void View3DSetWorld(GraphNode& gn);
 extern ImVec2 gPianoRollRectMin, gPianoRollRectMax;
 // A Library .mid released over the Piano Roll; the panel imports it next frame.

@@ -3356,7 +3356,7 @@ void RunView3DMenuTest(int frameId)
          break;
       }
    // The Material tab: an object with no Material gets one between its node and the view, keeping its look.
-   bool matAdded = false, matKept = false;
+   bool matAdded = false, matKept = false, ballFollows = false;
    for (GraphNode& gn : gNodes)
       if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()); s != nullptr && !s->Items().empty())
       {
@@ -3371,14 +3371,31 @@ void RunView3DMenuTest(int frameId)
          auto* mat = made != nullptr ? dynamic_cast<MaterialNode*>(made->node.get()) : nullptr;
          matAdded = mat != nullptr && mat->input == geo && s->FindItem(id)->uid == made->uid;
          matKept = mat != nullptr && mat->color[0] == was.color[0] && mat->roughness == was.roughness;
+         if (mat != nullptr)
+         {
+            // The preview ball's centre follows the colour: red, then blue.
+            auto centre = [&](float r, float g, float b) {
+               mat->color[0] = r; mat->color[1] = g; mat->color[2] = b;
+               std::vector<float> px(192 * 192 * 4);
+               glBindTexture(GL_TEXTURE_2D, View3DPreviewBall(mat));
+               glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+               glBindTexture(GL_TEXTURE_2D, 0);
+               const size_t c = ((size_t)96 * 192 + 96) * 4;
+               return std::vector<float>{ px[c], px[c + 1], px[c + 2] };
+            };
+            const std::vector<float> red = centre(0.9f, 0.05f, 0.05f), blue = centre(0.05f, 0.05f, 0.9f);
+            ballFollows = red[0] > red[2] + 0.1f && blue[2] > blue[0] + 0.1f;
+            printf("  ball centre red %.2f %.2f %.2f, blue %.2f %.2f %.2f\n", red[0], red[1], red[2], blue[0], blue[1], blue[2]);
+         }
          break;
       }
+   printf("  [%s] the preview ball shows the Material's colour\n", ballFollows ? "pass" : "FAIL");
    printf("  [%s] Add Material puts one between the object and the view\n", matAdded ? "pass" : "FAIL");
    printf("  [%s] the new Material keeps the object's look\n", matKept ? "pass" : "FAIL");
    printf("  [%s] a follower moves with its target\n", follows ? "pass" : "FAIL");
    printf("  [%s] motion adds on top of the transform\n", motionMoves ? "pass" : "FAIL");
    printf("  [%s] motion and follow save\n", motionSaved ? "pass" : "FAIL");
-   const bool pass = items == 1 && offCanvas && groupSaved && follows && motionMoves && motionSaved && matAdded && matKept;
+   const bool pass = items == 1 && offCanvas && groupSaved && follows && motionMoves && motionSaved && matAdded && matKept && ballFollows;
    printf("  [%s] the node menu's first add makes one item\n", items == 1 ? "pass" : "FAIL");
    printf("  [%s] that scene stays off the canvas\n", offCanvas ? "pass" : "FAIL");
    printf("  [%s] a copied scene keeps groups and stays off the canvas\n", groupSaved ? "pass" : "FAIL");
