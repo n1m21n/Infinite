@@ -255,7 +255,7 @@ Object.use_empty_image_alpha	out	no empty objects in the scene
 Object.empty_image_side	out	no empty objects in the scene
 Object.add_rest_position_attribute	out	editing modes, 4D rotation, materials, rigging or simulation
 Object.pass_index	done	View3DPanel.cpp:4871 Object index
-Object.color	deferred	object colour needs Solid shader work
+Object.color	done	View3DPanel.cpp:4575 Viewport Display card: object colour
 Object.use_simulation_cache	out	editing modes, 4D rotation, materials, rigging or simulation
 Object.hide_viewport	done	View3DPanel.cpp Hide (H) sets Item.visible
 Object.hide_select	done	View3DPanel.cpp:251 Item tab: Hide selection; selection paths skip it
@@ -388,7 +388,7 @@ Camera.display_size	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.shift_x	done	View3DPanel.cpp:3472 Shift X / Shift Y
 Camera.shift_y	done	View3DPanel.cpp:3472 Shift X / Shift Y
 Camera.show_limits	done	SceneNodes.h camera/light params, View3DPanel.cpp card
-Camera.show_mist	deferred	mist needs a World pass
+Camera.show_mist	done	View3DPanel.cpp:4594 Camera Viewport Display: Mist
 Camera.show_passepartout	done	View3DPanel.cpp:4017 Passepartout card
 Camera.show_safe_areas	done	View3DPanel.cpp:4019 Safe Areas
 Camera.show_safe_center	done	SceneNodes.h camera/light params, View3DPanel.cpp card

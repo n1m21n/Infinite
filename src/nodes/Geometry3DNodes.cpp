@@ -37,7 +37,7 @@ namespace
    const std::vector<std::string> kMotionPositionNames = { "Start on Frame", "Center on Frame", "End on Frame" };
    const std::vector<std::string> kViewShadingNames = { "Rendered", "Solid" };
    const std::vector<std::string> kSolidLightingNames = { "Studio", "MatCap", "Flat" };
-   const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture" };
+   const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture", "Object" };
    const std::vector<std::string> kMatcapNames = { "Clay", "Metal", "Toon", "Gloss" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
@@ -463,6 +463,7 @@ namespace
       "uniform int uStudioWorld;\n"
       "uniform float uStudioRotation;\n"
       "uniform float uDrawRandom;\n"
+      "uniform vec3 uObjectColor;\n"
       "uniform mat4 uView;\n"
       "uniform float uPassThreshold;\n"
       "uniform float uNear;\n"
@@ -782,6 +783,7 @@ namespace
       "   vec3 base;\n"
       "   if (uSolidColor == 1) base = vVertexColor;\n"
       "   else if (uSolidColor == 2) base = toLinear(uSolidSingle);\n"
+      "   else if (uSolidColor == 5) base = toLinear(uObjectColor);\n"
       "   else if (uSolidColor == 3) base = 0.55 + 0.4 * cos(6.2831853 * (uDrawRandom + vec3(0.0, 0.33, 0.67)));\n"
       "   else {\n"
       "      base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
@@ -2862,6 +2864,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
+      { float oc[3]; cloud->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
@@ -3278,6 +3281,7 @@ void Render3DNode::CookOnce(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
+      { float oc[3]; source->ObjectColor(oc); glUniform3fv(glGetUniformLocation(mProgram, "uObjectColor"), 1, oc); }
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);

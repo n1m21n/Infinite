@@ -25,8 +25,8 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Viewport: shading | 25 | 0 | 13 | 0 | 38 |
 | Viewport: overlays | 19 | 0 | 3 | 10 | 32 |
 | Transform, snap, pivot | 25 | 0 | 0 | 26 | 51 |
-| Object | 22 | 0 | 19 | 35 | 76 |
-| Camera | 44 | 0 | 20 | 23 | 87 |
+| Object | 23 | 0 | 18 | 35 | 76 |
+| Camera | 45 | 0 | 19 | 23 | 87 |
 | Light | 37 | 0 | 23 | 0 | 60 |
 | Light probe | 0 | 0 | 36 | 0 | 36 |
 | Constraints (aim only) | 7 | 0 | 0 | 8 | 15 |
@@ -38,7 +38,7 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Outliner | 12 | 0 | 0 | 11 | 23 |
 | Preferences: navigation and input | 8 | 0 | 3 | 39 | 50 |
 | Preferences: viewport | 13 | 0 | 0 | 14 | 27 |
-| **All settings** | **331** | **4** | **178** | **331** | **844** |
+| **All settings** | **333** | **4** | **176** | **331** | **844** |
 | **Operators** | **107** | **4** | **13** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
