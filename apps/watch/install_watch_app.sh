@@ -168,9 +168,13 @@ DEVELOPMENT_TEAM = $team
 INFINITE_BUNDLE_PREFIX = org.infinitedevices.remote.$hash
 INFINITE_WATCH_HEALTH = $health
 X
-if [ ! -d "$work/InfiniteRemote.xcodeproj" ]; then
-   command -v xcodegen >/dev/null 2>&1 || fail "This copy has no Xcode project and xcodegen is not installed." "run: brew install xcodegen"
+# Regenerate every time (xcodegen is quick) so a newer project.yml from an updated Infinite is always applied; this also
+# rewrites Config/Info.plist, which the copy above leaves alone. Without xcodegen the project that shipped inside
+# Infinite is used as copied.
+if command -v xcodegen >/dev/null 2>&1; then
    (cd "$work" && xcodegen generate --quiet) >"$log" 2>&1 || fail "xcodegen failed: $(lastlog)"
+elif [ ! -d "$work/InfiniteRemote.xcodeproj" ]; then
+   fail "This copy has no Xcode project and xcodegen is not installed." "run: brew install xcodegen"
 fi
 
 # 4: build --------------------------------------------------------------------------------------------------------
