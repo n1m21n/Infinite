@@ -669,6 +669,7 @@ void GrainMolderNode::LaunchJob(Job job, std::vector<float> sourceOverride, doub
    const bool isStereo = mSourceIsStereo;
 
    mWorkerThread = std::thread([this, monoCopy, rightCopy, sr, isStereo, params, job]() {
+      Platform::BackgroundJobThread();
       PendingResult res;
       res.renderedSR = sr;
       res.isStereo = isStereo;

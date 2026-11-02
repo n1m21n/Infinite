@@ -1,4 +1,5 @@
 #include "nodes/PredictiveNotesNode.h"
+#include "platform/Platform.h"
 
 #include <algorithm>
 #include <atomic>
@@ -692,7 +693,10 @@ void PredictiveNotesNode::StartBuild(const std::vector<Event>& events)
       mQueuedEvents = events;
       return;
    }
-   mBuild = std::async(std::launch::async, [events]() { return NoteModel::Build(events); });
+   mBuild = std::async(std::launch::async, [events]() {
+      Platform::BackgroundJobThread();
+      return NoteModel::Build(events);
+   });
 }
 
 void PredictiveNotesNode::SwapIn(Tables* t)

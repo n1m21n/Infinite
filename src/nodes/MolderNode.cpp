@@ -352,6 +352,7 @@ void MolderNode::LaunchJob(Job job, std::vector<float> sourceOverride, double so
    mWorkerThread = std::thread([pending, analysisCopy, sourceCopy, srCopy, genome, doAnalyze, isOriginalSource,
                                 abortPtr, readyPtr, workingPtr]() mutable
    {
+      Platform::BackgroundJobThread();
       MolderDsp::Analysis analysis = analysisCopy;
       bool didAnalyze = false;
       if (doAnalyze)

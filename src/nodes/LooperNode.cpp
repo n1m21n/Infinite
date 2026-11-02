@@ -1053,6 +1053,7 @@ void LooperNode::WriteLoop(const std::string& path, std::shared_ptr<const LoopSn
       gLoopWrites.insert(path);
    }
    std::thread([path, snap = std::move(snap)]() {
+      Platform::BackgroundJobThread();
       WriteFloatWav(path, snap->interleaved, snap->frames, snap->sampleRate);
       std::lock_guard<std::mutex> lock(gLoopWritesMutex);
       gLoopWrites.erase(path);

@@ -535,7 +535,10 @@ void PartialsNode::LoadMono(int which, std::vector<float> mono, double sr)
 #ifdef __EMSCRIPTEN__
    analyse(); // the website build has no threads: analyse inline
 #else
-   l.thread = std::thread(std::move(analyse));
+   l.thread = std::thread([analyse = std::move(analyse)]() mutable {
+      Platform::BackgroundJobThread();
+      analyse();
+   });
 #endif
 }
 

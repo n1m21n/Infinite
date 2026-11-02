@@ -52,6 +52,7 @@ public:
       Mesh mesh;
       int mode = 0, res = 512, samples = 16;
       float distance = 0.25f;
+      bool background = false;   // a live edit: every bake thread steps aside for the frame
    };
    // RGBA float, res x res, rows from v = 0. Public for the self-test.
    static std::vector<float> Bake(const Request& r);

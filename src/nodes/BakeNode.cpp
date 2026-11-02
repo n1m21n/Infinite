@@ -1,4 +1,5 @@
 #include "BakeNode.h"
+#include "platform/Platform.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -412,7 +413,11 @@ std::vector<float> BakeNode::Bake(const Request& r)
                           ? std::clamp((int)std::thread::hardware_concurrency(), 1, 8) : 1;
    std::vector<std::thread> pool;
    for (int w = 1; w < workers; w++)
-      pool.emplace_back(shade, res * w / workers, res * (w + 1) / workers);
+      pool.emplace_back([&shade, &r, res, w, workers] {
+         if (r.background)
+            Platform::BackgroundJobThread();
+         shade(res * w / workers, res * (w + 1) / workers);
+      });
    shade(0, res / workers);
    for (std::thread& th : pool)
       th.join();
@@ -520,5 +525,9 @@ void BakeNode::CookIfNeeded(int frameId)
       return;
    }
    mJobRes = res;
-   mJob = std::async(std::launch::async, [req = std::move(req)]() { return Bake(req); });
+   req.background = true;
+   mJob = std::async(std::launch::async, [req = std::move(req)]() {
+      Platform::BackgroundJobThread();
+      return Bake(req);
+   });
 }

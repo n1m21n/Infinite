@@ -5043,6 +5043,11 @@ namespace Platform
       delete h;
    }
 
+   void BackgroundJobThread()
+   {
+      pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+   }
+
    void* AudioWorkerJoin()
    {
       WorkerJoin* j = new WorkerJoin();

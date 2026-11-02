@@ -2568,4 +2568,9 @@ namespace Platform
    {
       return 1;
    }
+
+   void BackgroundJobThread()
+   {
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+   }
 }

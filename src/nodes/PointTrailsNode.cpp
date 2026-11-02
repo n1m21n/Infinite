@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "BenchReport.h"
+#include "Transport.h"
 
 namespace
 {
@@ -32,43 +33,74 @@ PointTrailsNode::~PointTrailsNode()
 {
    if (mReadFbo != 0)
       glDeleteFramebuffers(1, &mReadFbo);
+   mPosRead.Destroy();
+   mColRead.Destroy();
 }
 
-bool PointTrailsNode::ReadGpuPoints(const GpuPoints& gp, int n)
+int PointTrailsNode::ReadGpuPoints(const GpuPoints& gp, int n)
 {
-   mReadCloud.clear();
    const int texW = std::max(1, gp.texW);
    const int rows = std::min(gp.texH, (n + texW - 1) / texW);
    if (n <= 0 || rows <= 0 || gp.posTex == 0 || gp.colorTex == 0)
-      return false;
+   {
+      mReadCloud.clear();
+      return 0;
+   }
    if (mReadFbo == 0)
       glGenFramebuffers(1, &mReadFbo);
-   const size_t texels = (size_t)rows * (size_t)texW;
-   mReadPos.resize(texels * 4);
-   mReadCol.resize(texels * 4);
 
-   GLint prevFbo = 0, prevRead = 0;
-   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-   glGetIntegerv(GL_READ_BUFFER, &prevRead);
-   glBindFramebuffer(GL_FRAMEBUFFER, mReadFbo);
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gp.posTex, 0);
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gp.colorTex, 0);
-   bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-   if (ok)
+   // Live, the copy queued last frame is taken and this frame's is queued, so
+   // the frame never waits on the GPU; an offline render waits for this one.
+   const bool offline = Transport::Instance().IsOfflineMode();
+   bool got = false;
+   if (!offline && mPosRead.Pending())
    {
-      glPixelStorei(GL_PACK_ALIGNMENT, 4);
-      glReadBuffer(GL_COLOR_ATTACHMENT0);
-      glReadPixels(0, 0, texW, rows, GL_RGBA, GL_FLOAT, mReadPos.data());
-      glReadBuffer(GL_COLOR_ATTACHMENT1);
-      glReadPixels(0, 0, texW, rows, GL_RGBA, GL_FLOAT, mReadCol.data());
-      Bench::GpuMem::NoteReadback((mReadPos.size() + mReadCol.size()) * sizeof(float));
+      mReadPos.resize(mReadTexels * 4);
+      mReadCol.resize(mReadTexels * 4);
+      got = mPosRead.Take(mReadPos.data(), mReadPos.size() * sizeof(float), false) &&
+            mColRead.Take(mReadCol.data(), mReadCol.size() * sizeof(float), true);
+      if (!got && mPosRead.Pending())
+         return -1;   // not landed yet: keep the trails, try next frame
    }
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
-   glReadBuffer((GLenum)prevRead);
-   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
-   if (!ok)
-      return false;
+   bool ok = true;
+   if (offline || !mPosRead.Pending())
+   {
+      GLint prevFbo = 0, prevRead = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      glGetIntegerv(GL_READ_BUFFER, &prevRead);
+      glBindFramebuffer(GL_FRAMEBUFFER, mReadFbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gp.posTex, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gp.colorTex, 0);
+      ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+      if (ok)
+      {
+         glReadBuffer(GL_COLOR_ATTACHMENT1);
+         mColRead.Issue(texW, rows, GL_RGBA, GL_FLOAT, 4 * sizeof(float));
+         glReadBuffer(GL_COLOR_ATTACHMENT0);
+         mPosRead.Issue(texW, rows, GL_RGBA, GL_FLOAT, 4 * sizeof(float));
+         mReadTexels = (size_t)rows * (size_t)texW;
+         mReadCount = n;
+      }
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
+      glReadBuffer((GLenum)prevRead);
+      glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+   }
+   if (offline && ok)
+   {
+      mReadPos.resize(mReadTexels * 4);
+      mReadCol.resize(mReadTexels * 4);
+      got = mPosRead.Take(mReadPos.data(), mReadPos.size() * sizeof(float), true) &&
+            mColRead.Take(mReadCol.data(), mReadCol.size() * sizeof(float), true);
+   }
+   if (!got)
+   {
+      mReadCloud.clear();
+      return ok && !offline ? -1 : 0;   // live first read: nothing in hand yet
+   }
+   Bench::GpuMem::NoteReadback((mReadPos.size() + mReadCol.size()) * sizeof(float));
+   n = mReadCount;
+   const size_t texels = mReadPos.size() / 4;
 
    const size_t count = (size_t)std::min<long long>(n, (long long)texels);
    mReadCloud.resize(count);
@@ -151,10 +183,12 @@ void PointTrailsNode::CookIfNeeded(int frameId)
       mFromMatrix = model;
       if (mClear || ++mFramesSinceSample >= std::clamp(sampleEvery, 1, 10))
       {
-         if (gpu)
-            ReadGpuPoints(*gpu, std::min(mSlots, gpu->count));   // empty on failure: tails break, no stale data
-         Sample(cloud, mesh, model);
-         mFramesSinceSample = 0;
+         // Empty on failure: tails break, no stale data. Not landed yet: sample next frame.
+         if (!gpu || ReadGpuPoints(*gpu, std::min(mSlots, gpu->count)) >= 0)
+         {
+            Sample(cloud, mesh, model);
+            mFramesSinceSample = 0;
+         }
       }
    }
    mClear = false;

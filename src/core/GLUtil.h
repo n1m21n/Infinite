@@ -142,6 +142,22 @@ namespace GLUtil
    bool ReadTexturePixels(unsigned int& scratchFbo, unsigned int srcTex, int w, int h,
                           std::vector<float>& outRGBA);
 
+   // A readback that does not stall the frame: Issue queues a copy of the
+   // bound read framebuffer's current read buffer into a pixel buffer and
+   // fences it; Take hands the pixels over once the GPU is done (a frame
+   // later, live). wait = true blocks until then: an offline render needs this
+   // frame's pixels, not last frame's. One copy in flight at a time.
+   struct AsyncRead
+   {
+      unsigned int pbo = 0;
+      void* fence = nullptr;
+      size_t bytes = 0;
+      bool Pending() const { return fence != nullptr; }
+      void Issue(int w, int h, GLenum format, GLenum type, size_t bytesPerPixel);
+      bool Take(void* out, size_t outBytes, bool wait);
+      void Destroy();
+   };
+
    // Deletes the per-context GL objects this namespace lazily created for the
    // context that is current RIGHT NOW (today: the fullscreen-quad VAO).
    // Call it with a secondary context current, immediately before that

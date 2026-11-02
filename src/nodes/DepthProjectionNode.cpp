@@ -1,4 +1,5 @@
 #include "DepthProjectionNode.h"
+#include "Transport.h"
 
 #include <cmath>
 #include <cstring>
@@ -107,6 +108,8 @@ DepthProjectionNode::~DepthProjectionNode()
 {
    GLUtil::DestroyFbo(mDepthFbo);
    GLUtil::DestroyFbo(mColorFbo);
+   mDepthRead.Destroy();
+   mColorRead.Destroy();
    if (mProgram != 0)
       glDeleteProgram(mProgram);
 }
@@ -224,8 +227,9 @@ void DepthProjectionNode::CookIfNeeded(int frameId)
 
    const unsigned int colorTex = mColorInput.IsConnected() ? mColorInput.Pull(frameId) : 0;
 
-   const int n = std::max(8, std::min(density, 512));
-   if (!EnsureResources(n))
+   const int cur = std::max(8, std::min(density, 512));
+   int n = cur;   // the size of the pixels in hand, which trail by a frame live
+   if (!EnsureResources(cur))
       return;
 
    // 1. Resample Depth Texture on GPU to n x n
@@ -236,15 +240,10 @@ void DepthProjectionNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
    });
 
-   mDepthPixels.resize((size_t)n * (size_t)n * 4);
-   glBindTexture(GL_TEXTURE_2D, mDepthFbo.tex);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mDepthPixels.data());
-   glBindTexture(GL_TEXTURE_2D, 0);
-
    // 2. Resample Color Texture if present
-   const bool hasColorTex = (colorTex != 0);
-   if (hasColorTex)
+   const bool wantColor = (colorTex != 0);
+   bool hasColorTex = false;
+   if (wantColor)
    {
       GLUtil::RunShaderPass(mColorFbo, mProgram, [this, colorTex]()
       {
@@ -252,13 +251,53 @@ void DepthProjectionNode::CookIfNeeded(int frameId)
          glBindTexture(GL_TEXTURE_2D, colorTex);
          glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
       });
-
-      mColorPixels.resize((size_t)n * (size_t)n * 4);
-      glBindTexture(GL_TEXTURE_2D, mColorFbo.tex);
-      glPixelStorei(GL_PACK_ALIGNMENT, 1);
-      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mColorPixels.data());
-      glBindTexture(GL_TEXTURE_2D, 0);
    }
+
+   // 3. Read both back. An offline render needs this frame's pixels now; live,
+   // the copy queued last frame is taken and this frame's is queued, so the
+   // frame never waits on the GPU (the points trail the picture by a frame).
+   GLint prevFbo = 0;
+   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+   const bool offline = Transport::Instance().IsOfflineMode();
+   bool got = false;
+   if (!offline && mDepthRead.Pending())
+   {
+      mDepthPixels.resize((size_t)mReadN * (size_t)mReadN * 4);
+      got = mDepthRead.Take(mDepthPixels.data(), mDepthPixels.size(), false);
+      if (got)
+      {
+         // Queued before the depth copy, so it is already done.
+         mColorPixels.resize(mDepthPixels.size());
+         if (!mReadColor || !mColorRead.Take(mColorPixels.data(), mColorPixels.size(), true))
+            mColorPixels.clear();
+         n = mReadN;
+         hasColorTex = !mColorPixels.empty();
+      }
+   }
+   if (offline || !mDepthRead.Pending())
+   {
+      if (wantColor)
+      {
+         glBindFramebuffer(GL_FRAMEBUFFER, mColorFbo.fbo);
+         mColorRead.Issue(cur, cur, GL_RGBA, GL_UNSIGNED_BYTE, 4);
+      }
+      glBindFramebuffer(GL_FRAMEBUFFER, mDepthFbo.fbo);
+      mDepthRead.Issue(cur, cur, GL_RGBA, GL_UNSIGNED_BYTE, 4);
+      mReadN = cur;
+      mReadColor = wantColor;
+   }
+   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+   if (offline)
+   {
+      mDepthPixels.resize((size_t)n * (size_t)n * 4);
+      got = mDepthRead.Take(mDepthPixels.data(), mDepthPixels.size(), true);
+      mColorPixels.resize(mDepthPixels.size());
+      if (!wantColor || !mColorRead.Take(mColorPixels.data(), mColorPixels.size(), true))
+         mColorPixels.clear();
+      hasColorTex = !mColorPixels.empty();
+   }
+   if (!got)
+      return; // live: last frame's points stay until the copy lands
 
    // 3. Compute Aspect & Intrinsics
    float aspect = 1.0f;

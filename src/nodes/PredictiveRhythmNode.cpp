@@ -1,4 +1,5 @@
 #include "nodes/PredictiveRhythmNode.h"
+#include "platform/Platform.h"
 
 #include <algorithm>
 #include <array>
@@ -599,7 +600,10 @@ void PredictiveRhythmNode::StartBuild(const std::vector<Event>& events)
       mQueuedEvents = events;
       return;
    }
-   mBuild = std::async(std::launch::async, [events]() { return NoteModel::Build(events); });
+   mBuild = std::async(std::launch::async, [events]() {
+      Platform::BackgroundJobThread();
+      return NoteModel::Build(events);
+   });
 }
 
 void PredictiveRhythmNode::SwapIn(Tables* t)

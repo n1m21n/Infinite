@@ -450,6 +450,12 @@ namespace Platform
    void AudioWorkerLeave(void* token);
    uint32_t AudioWorkerEpoch();
 
+   // Called ON a thread that runs edit-time or background work (bakes,
+   // analysis, imports, helper pools): drops it to the background class so
+   // it never crowds the audio thread. macOS utility QoS (efficiency cores on
+   // Apple Silicon), Windows below-normal, Linux nice +10.
+   void BackgroundJobThread();
+
    // Actual buffer frame size CoreAudio reports for the given device right
    // now (0 = system default output device). Buffer size is a device-wide
    // property, not something AVAudioEngine hands back per-open, so this

@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 
 namespace GLUtil
@@ -568,5 +569,50 @@ namespace GLUtil
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
       glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
       return ok;
+   }
+
+   void AsyncRead::Issue(int w, int h, GLenum format, GLenum type, size_t bytesPerPixel)
+   {
+      if (fence != nullptr)
+         glDeleteSync((GLsync)fence);
+      bytes = (size_t)w * (size_t)h * bytesPerPixel;
+      if (pbo == 0)
+         glGenBuffers(1, &pbo);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
+      glBufferData(GL_PIXEL_PACK_BUFFER, (GLsizeiptr)bytes, nullptr, GL_STREAM_READ);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, format, type, (void*)0);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+      fence = (void*)glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+   }
+
+   bool AsyncRead::Take(void* out, size_t outBytes, bool wait)
+   {
+      if (fence == nullptr || outBytes < bytes)
+         return false;
+      const GLuint64 timeout = wait ? 2000000000ull : 0; // 2 s, then give up
+      const GLenum state = glClientWaitSync((GLsync)fence, GL_SYNC_FLUSH_COMMANDS_BIT, timeout);
+      if (state != GL_ALREADY_SIGNALED && state != GL_CONDITION_SATISFIED)
+         return false;
+      glDeleteSync((GLsync)fence);
+      fence = nullptr;
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
+      const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
+      if (mapped != nullptr)
+         std::memcpy(out, mapped, bytes);
+      glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+      return mapped != nullptr;
+   }
+
+   void AsyncRead::Destroy()
+   {
+      if (fence != nullptr)
+         glDeleteSync((GLsync)fence);
+      fence = nullptr;
+      if (pbo != 0)
+         glDeleteBuffers(1, &pbo);
+      pbo = 0;
+      bytes = 0;
    }
 }

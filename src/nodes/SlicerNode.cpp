@@ -1044,6 +1044,7 @@ void SlicerNode::LaunchJob(Job job)
    const double sr = mSourceSR;
 
    mWorkerThread = std::thread([this, monoCopy, sr, params]() {
+      Platform::BackgroundJobThread();
       std::vector<int> frames;
       std::vector<float> strengths;
       SlicerDsp::Detect(monoCopy.data(), (int)monoCopy.size(), sr, params, frames, strengths, &mAbort);

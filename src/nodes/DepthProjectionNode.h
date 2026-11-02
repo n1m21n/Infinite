@@ -206,6 +206,9 @@ private:
 
    GLUtil::Fbo mDepthFbo;
    GLUtil::Fbo mColorFbo;
+   GLUtil::AsyncRead mDepthRead, mColorRead;
+   int mReadN = 0;          // size and colour of the copy in flight
+   bool mReadColor = false;
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;

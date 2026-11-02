@@ -51,6 +51,9 @@
 
 #include <pthread.h>
 #include <sched.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <atomic>
@@ -994,5 +997,11 @@ namespace Platform
    uint32_t AudioWorkerEpoch()
    {
       return 1;
+   }
+
+   // Linux nice is per thread when given the thread id.
+   void BackgroundJobThread()
+   {
+      setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 10);
    }
 }

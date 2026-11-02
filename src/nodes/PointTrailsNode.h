@@ -5,6 +5,7 @@
 
 #include "INode.h"
 #include "Geometry3DNodes.h"
+#include "GLUtil.h"
 
 // --- Point Trails -------------------------------------------------------
 // Draws where each point has been: points in, a mesh of tails out, so a
@@ -117,8 +118,9 @@ private:
    void Sample(const std::vector<Particle>* cloud, const Mesh* mesh, const Mat4& model);
    void BuildMesh();
    // Reads the first `n` texels of `gp` (position + colour textures, nothing
-   // else) into mReadCloud. False when the read could not be set up.
-   bool ReadGpuPoints(const GpuPoints& gp, int n);
+   // else) into mReadCloud. 1 read, 0 the read could not be set up, -1 the
+   // copy has not landed yet (live reads trail by a frame).
+   int ReadGpuPoints(const GpuPoints& gp, int n);
 
    struct Slot
    {
@@ -156,6 +158,9 @@ private:
    bool mReadback = false;
    std::vector<Particle> mReadCloud;
    std::vector<float> mReadPos, mReadCol;
+   GLUtil::AsyncRead mPosRead, mColRead;
+   size_t mReadTexels = 0;   // the copy in flight
+   int mReadCount = 0;
 
    Mesh mMesh;
    unsigned long long mMeshRevision = 0;
