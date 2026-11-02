@@ -11,7 +11,7 @@ Do these once. Each step in Infinite's **Set up watch app** window turns green b
 1. Install **Xcode** from the App Store and open it once.
 2. In Xcode: **Settings > Accounts**, add your Apple ID. A "Personal Team" appears.
 3. Turn on Developer Mode on the iPhone paired with the watch (**Settings > Privacy & Security > Developer Mode**, then restart), and on the watch (same place). Connect the iPhone to the Mac once with a cable and tap Trust. Keep the watch unlocked.
-4. In Infinite, add the **Apple Watch** node (Modulators) and press **Set up watch app**. When the first three steps are green, press **Install on my watch**. It builds the app with your team and installs it; the first build takes a few minutes.
+4. In Infinite, add the **Apple Watch** node (Modulators) and press **Set up watch app**. When the first three steps are green, press **Install on my watch**. A tab named **Watch app** opens in Infinite's Terminal and does everything, one line per step ("Step 3/5: preparing the project..."). If it asks for your Mac password (to accept the Xcode license or select Xcode), type it there. The first build takes a few minutes.
 5. On the watch: **Settings > General > VPN & Device Management**, tap your Apple ID and **Trust**. Open Infinite Remote.
 
 No Infinite yet, or you work from a clone of the repository? Run `scripts/build_watch_app.sh` (needs `brew install xcodegen`). The first run creates `apps/watch/Config/Local.xcconfig`: put your team id in `DEVELOPMENT_TEAM` and a prefix that is unique to you (like `com.yourname`) in `INFINITE_BUNDLE_PREFIX`, then run it again and press Run in Xcode. `scripts/build_watch_app.sh --install DEVICE-ID` builds and installs from the terminal (`xcrun devicectl list devices` shows the id).
@@ -25,7 +25,7 @@ No Infinite yet, or you work from a clone of the repository? Run `scripts/build_
 
 ## Every 7 days
 
-A free Apple ID signs the app for 7 days. The Apple Watch node shows "watch app expires in N days" and, from 2 days before, a **Reinstall** button: one click does the same as Install on my watch. From a clone, run `scripts/build_watch_app.sh` again.
+A free Apple ID signs the app for 7 days. The Apple Watch node shows "watch app expires in N days" and, from 2 days before, a **Reinstall** button: one click does the same as Install on my watch. From a clone, run `scripts/build_watch_app.sh` again; it runs the same `apps/watch/install_watch_app.sh`.
 
 ## Two keep-alive modes
 
@@ -42,7 +42,7 @@ A free Apple ID signs the app for 7 days. The Apple Watch node shows "watch app 
 | "Allow Bluetooth in Settings" on the watch | Watch Settings > Privacy & Security > Bluetooth: allow Infinite Remote. |
 | The Mac asks for Bluetooth | System Settings > Privacy & Security > Bluetooth: allow Infinite, then restart Infinite. |
 | Xcode: "Failed to register bundle identifier" | The prefix is already taken. Choose another `INFINITE_BUNDLE_PREFIX`. |
-| Install on my watch fails | Xcode opens with your team filled in: pick your watch next to Run and press Run. The last error line is also shown in Infinite. |
+| Install on my watch fails | The Watch app tab prints the reason and the fix, and Xcode opens with your team filled in: pick your watch next to Run and press Run. The same reason is shown on the Apple Watch node. Run it again from the node once fixed. |
 | Xcode: "No account" or no team | Add your Apple ID in Xcode > Settings > Accounts and copy the team id into `DEVELOPMENT_TEAM`. |
 | Xcode: HealthKit capability not available | Use the default build (`INFINITE_WATCH_HEALTH = 0`). |
 | "Untrusted developer" or the app will not open | Trust your Apple ID on the watch (step 6). After 7 days, run the build again. |
