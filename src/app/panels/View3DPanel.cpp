@@ -253,9 +253,9 @@ namespace
       if (!Shown(it) || it.hideSelect)
          return false;
       const Kind k = scene->ItemKind(it);
-      if (k == Kind::Camera && !sSet->pickCameras)
+      if (k == Kind::Camera && (!sSet->pickCameras || !sSet->showCameras))
          return false;
-      if (k == Kind::Light && !sSet->pickLights)
+      if (k == Kind::Light && (!sSet->pickLights || !sSet->showLights))
          return false;
       return true;
    }
@@ -297,7 +297,9 @@ namespace
       return Mat4::LookAt(eye, sTarget, up);
    }
 
-   float OrthoHalfHeight() { return sDist * std::tan(kFov * 0.5f * kPi / 180.0f); }
+   // The view's field of view (vertical), from its lens: 50 mm is the 45 degrees the view always had.
+   float ViewFov() { return 2.0f * std::atan(std::tan(kFov * 0.5f * kPi / 180.0f) * 50.0f / std::max(1.0f, sSet->viewLens)) * 180.0f / kPi; }
+   float OrthoHalfHeight() { return sDist * std::tan(ViewFov() * 0.5f * kPi / 180.0f); }
 
    void BuildCam(Scene3DNode* scene, ImVec2 mn, ImVec2 mx)
    {
@@ -340,11 +342,13 @@ namespace
       else
       {
          sCameraView = false;
+         if (sSet->lockCursor)
+            std::copy(sSet->cursor, sSet->cursor + 3, sTarget);
          EyeFromOrbit(sCam.eye);
          sCam.view = OrbitView();
          sCam.ortho = sOrtho;
          sCam.proj = sOrtho ? Mat4::Orthographic(OrthoHalfHeight(), aspect, -2000.0f, 2000.0f)
-                            : Mat4::Perspective(kFov * kPi / 180.0f, aspect, 0.05f, 2000.0f);
+                            : Mat4::Perspective(ViewFov() * kPi / 180.0f, aspect, std::max(0.001f, sSet->clipStart), std::max(sSet->clipStart + 0.01f, sSet->clipEnd));
       }
       sCam.viewProj = Mat4::Multiply(sCam.proj, sCam.view);
       for (int k = 0; k < 3; k++)
@@ -719,6 +723,47 @@ namespace
       RotationOf(displayDeg, d);
       Swap3(d, r, false);
       EulerFrom(r, engineDeg);
+   }
+
+   // The 3D cursor's turn in the three ways Blender shows it, all read in the displayed frame.
+   void CursorQuaternion(float q[4])
+   {
+      float r[3][3], d[3][3];
+      RotationOf(sSet->cursorRot, r);
+      Swap3(r, d, true);
+      const float tr = d[0][0] + d[1][1] + d[2][2];
+      if (tr > 0.0f)
+      {
+         const float k = std::sqrt(tr + 1.0f) * 2.0f;
+         q[0] = 0.25f * k; q[1] = (d[2][1] - d[1][2]) / k; q[2] = (d[0][2] - d[2][0]) / k; q[3] = (d[1][0] - d[0][1]) / k;
+      }
+      else if (d[0][0] > d[1][1] && d[0][0] > d[2][2])
+      {
+         const float k = std::sqrt(1.0f + d[0][0] - d[1][1] - d[2][2]) * 2.0f;
+         q[0] = (d[2][1] - d[1][2]) / k; q[1] = 0.25f * k; q[2] = (d[0][1] + d[1][0]) / k; q[3] = (d[0][2] + d[2][0]) / k;
+      }
+      else if (d[1][1] > d[2][2])
+      {
+         const float k = std::sqrt(1.0f + d[1][1] - d[0][0] - d[2][2]) * 2.0f;
+         q[0] = (d[0][2] - d[2][0]) / k; q[1] = (d[0][1] + d[1][0]) / k; q[2] = 0.25f * k; q[3] = (d[1][2] + d[2][1]) / k;
+      }
+      else
+      {
+         const float k = std::sqrt(1.0f + d[2][2] - d[0][0] - d[1][1]) * 2.0f;
+         q[0] = (d[1][0] - d[0][1]) / k; q[1] = (d[0][2] + d[2][0]) / k; q[2] = (d[1][2] + d[2][1]) / k; q[3] = 0.25f * k;
+      }
+   }
+
+   void SetCursorQuaternion(const float qin[4])
+   {
+      const float len = std::max(1e-6f, std::sqrt(qin[0] * qin[0] + qin[1] * qin[1] + qin[2] * qin[2] + qin[3] * qin[3]));
+      const float w = qin[0] / len, x = qin[1] / len, y = qin[2] / len, z = qin[3] / len;
+      const float d[3][3] = { { 1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w) },
+                              { 2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w) },
+                              { 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y) } };
+      float r[3][3];
+      Swap3(d, r, false);
+      EulerFrom(r, sSet->cursorRot);
    }
 
    void AxisAngle(const float a[3], float angle, float r[3][3])
@@ -2122,6 +2167,28 @@ namespace
    }
 
    // Per-object viewport display: bounds shape, name and axes (Object > Viewport Display).
+   // Units: what a scene unit reads as in the Location row. None shows the bare number.
+   float LengthFactor()
+   {
+      const Scene3DNode::Settings& u = *sSet;
+      if (u.unitSystem == 0)
+         return 1.0f;
+      static const float kMetric[4] = { 1.0f, 100.0f, 1000.0f, 0.001f };
+      static const float kImperial[3] = { 3.28084f, 39.3701f, 1.09361f };
+      const float f = u.unitSystem == 1 ? kMetric[std::clamp(u.lengthUnit, 0, 3)] : kImperial[std::clamp(u.lengthUnit, 0, 2)];
+      return f * u.unitScale;
+   }
+
+   const char* LengthFormat()
+   {
+      const Scene3DNode::Settings& u = *sSet;
+      static const char* kMetric[4] = { "%.2f m", "%.2f cm", "%.2f mm", "%.4f km" };
+      static const char* kImperial[3] = { "%.2f ft", "%.2f in", "%.2f yd" };
+      if (u.unitSystem == 0)
+         return "%.2f";
+      return u.unitSystem == 1 ? kMetric[std::clamp(u.lengthUnit, 0, 3)] : kImperial[std::clamp(u.lengthUnit, 0, 2)];
+   }
+
    void DrawItemExtras(ImDrawList* dl, Scene3DNode* scene, const Item& it, ImU32 col)
    {
       float c[3];
@@ -2191,6 +2258,127 @@ namespace
             dl->AddText(ImVec2(sp.x + 8.0f, sp.y - 16.0f), col, nm.c_str());
          }
       }
+   }
+
+   void TransformBy(const Mat4& t, const float p[3], float out[3]);
+
+   struct ItemHandle
+   {
+      int id = 0, kind = 0;   // 1 light size, 2 light look-at, 3 camera lens, 4 camera focus distance
+   };
+   ItemHandle sHandle;
+
+   // Handles on the active camera or light (Gizmos > Light, Camera): small dots to drag. True while the mouse is on
+   // one or dragging one, so the click does not also select.
+   bool DrawItemHandles(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool canGrab)
+   {
+      const bool down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+      if (sHandle.kind != 0 && !down)
+         sHandle = {};
+      if (sSel.empty() || !sOverlays)
+         return false;
+      Item* it = scene->FindItem(sSel.back());
+      GraphNode* gn = it != nullptr ? FindNodeByUid(it->uid) : nullptr;
+      if (gn == nullptr || !it->visible)
+         return false;
+      auto* cam = dynamic_cast<CameraNode*>(gn->node.get());
+      auto* light = dynamic_cast<LightNode*>(gn->node.get());
+      const Mat4 world = Scene3DNode::Placement(*it);
+      auto at = [&](float x, float y, float z, float out[3]) { const float q[3] = { x, y, z }; TransformBy(world, q, out); };
+      float o[3], d[3];
+      MouseRay(mouse, o, d);
+      bool onHandle = sHandle.kind != 0;
+      auto handle = [&](int kind, const float w[3], ImU32 col)
+      {
+         ImVec2 sp;
+         if (!Project(w, sp))
+            return false;
+         const float dist = std::hypot(mouse.x - sp.x, mouse.y - sp.y);
+         const bool hot = canGrab && dist < 8.0f;
+         dl->AddCircleFilled(sp, hot || (sHandle.kind == kind && sHandle.id == it->id) ? 6.0f : 4.5f, col, 16);
+         dl->AddCircle(sp, 6.5f, Hex(0x000000, 0.6f), 16, 1.0f);
+         if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sHandle.kind == 0)
+         {
+            PushUndoCheckpoint("Drag handle");
+            sHandle = { it->id, kind };
+         }
+         onHandle = onHandle || hot;
+         return sHandle.kind == kind && sHandle.id == it->id;
+      };
+      float c[3], right[3], axis[3];
+      at(0, 0, 0, c);
+      at(1, 0, 0, right);
+      at(0, 0, -1, axis);
+      for (int k = 0; k < 3; k++)
+      {
+         right[k] -= c[k];
+         axis[k] -= c[k];
+      }
+      Normalize(right);
+      Normalize(axis);
+      const ImU32 hcol = Hex(0xE8C840);
+      if (cam != nullptr && sSet->gizmoCamLens)
+      {
+         const float dpt = 2.0f * cam->displaySize;
+         float w[3];
+         at(dpt * std::tan(cam->fov * 0.5f * kPi / 180.0f), 0, -dpt, w);
+         if (handle(3, w, hcol))
+         {
+            float base[3];
+            at(0, 0, -dpt, base);
+            const float x = std::abs(LineParam(base, right, o, d));
+            cam->fov = std::clamp(2.0f * std::atan(x / dpt) * 180.0f / kPi, 1.0f, 170.0f);
+            scene->Commit();
+         }
+      }
+      if (cam != nullptr && sSet->gizmoCamFocus && it->id == scene->activeCamera)
+      {
+         float w[3];
+         at(0, 0, -scene->Look().focusDistance, w);
+         if (handle(4, w, Hex(0x40C8E8)))
+         {
+            scene->Look().focusDistance = std::clamp(LineParam(c, axis, o, d), 0.05f, 100.0f);
+            scene->Commit();
+         }
+      }
+      float aim[3];
+      if (light != nullptr && scene->ItemLightAim(*it, aim))
+      {
+         float u[3];
+         const float ref[3] = { std::abs(aim[1]) > 0.9f ? 1.0f : 0.0f, std::abs(aim[1]) > 0.9f ? 0.0f : 1.0f, 0.0f };
+         Cross(aim, ref, u);
+         Normalize(u);
+         if (sSet->gizmoLightSize && (light->type == 4 || light->type == 5))
+         {
+            float w[3];
+            for (int k = 0; k < 3; k++)
+               w[k] = c[k] + (light->type == 4 ? aim[k] + u[k] * std::tan(light->spotAngle * kPi / 180.0f) : u[k] * light->areaWidth * 0.5f);
+            if (handle(1, w, hcol))
+            {
+               const float tip[3] = { c[0] + aim[0], c[1] + aim[1], c[2] + aim[2] };
+               const float x = std::abs(LineParam(light->type == 4 ? tip : c, u, o, d));
+               if (light->type == 4)
+                  light->spotAngle = std::clamp(std::atan(x) * 180.0f / kPi, 1.0f, 89.0f);
+               else
+                  light->areaWidth = std::clamp(x * 2.0f, 0.05f, 20.0f);
+               scene->Commit();
+            }
+         }
+         if (sSet->gizmoLightLook && light->type != 1 && light->type != 3)
+         {
+            float w[3];
+            const float reach = std::max(1.5f, light->distance * 0.5f);
+            for (int k = 0; k < 3; k++)
+               w[k] = c[k] + aim[k] * reach;
+            if (handle(2, w, Hex(0xE86840)))
+            {
+               float hit[3];
+               if (PlaneHit(w, sCam.fwd, o, d, hit) && scene->AimAt(*it, hit))
+                  scene->Commit();
+            }
+         }
+      }
+      return onHandle;
    }
 
    // Blender's 3D cursor: a red and white ring with four ticks.
@@ -2568,7 +2756,7 @@ namespace
       {
          float p[3], lo[3], hi[3];
          ImVec2 s;
-         if (!Shown(it) || (it.id == scene->activeCamera && sCameraView))
+         if (!Pickable(scene, it) || (it.id == scene->activeCamera && sCameraView))
             continue;
          if (scene->ItemPoint(it, p))
          {
@@ -2642,6 +2830,18 @@ namespace
          snprintf(text, sizeof(text), T("Objects %d/%d   Cameras %d   Lights %d"), (int)sSel.size(), geo + cams + lights, cams, lights);
          dl->AddText(ImVec2(mn.x + tok::space_3, mn.y + tok::space_2 + (sSet->textInfo ? ImGui::GetTextLineHeightWithSpacing() * 2.0f : 0.0f)),
                      Hex(0xFFFFFF, 0.6f), text);
+      }
+      if (sSet->showPerf || sSet->showFps)
+      {
+         char text[64];
+         const float fps = ImGui::GetIO().Framerate;
+         if (sSet->showPerf && sSet->showFps)
+            snprintf(text, sizeof(text), "%.0f fps   %.1f ms", fps, 1000.0f / std::max(1.0f, fps));
+         else if (sSet->showPerf)
+            snprintf(text, sizeof(text), "%.1f ms", 1000.0f / std::max(1.0f, fps));
+         else
+            snprintf(text, sizeof(text), "%.0f fps", fps);
+         dl->AddText(ImVec2(sCam.mx.x - ImGui::CalcTextSize(text).x - tok::space_3, mn.y + tok::space_2), Hex(0xFFFFFF, 0.6f), text);
       }
       if (!sSet->textInfo)
          return;
@@ -2835,7 +3035,15 @@ namespace
       const ImVec2 mx(mn.x + size.x, mn.y + size.y);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->PushClipRect(mn, mx, true);
-      dl->AddRectFilled(mn, mx, Hex(kBackdrop));
+      unsigned backdrop = kBackdrop;
+      if (sShading == Scene3DNode::Shading::Solid && sSet->bgType == 2)
+         backdrop = ((unsigned)(std::clamp(sSet->bgColor[0], 0.0f, 1.0f) * 255.0f) << 16) | ((unsigned)(std::clamp(sSet->bgColor[1], 0.0f, 1.0f) * 255.0f) << 8) |
+                    (unsigned)(std::clamp(sSet->bgColor[2], 0.0f, 1.0f) * 255.0f);
+      else if (sShading == Scene3DNode::Shading::Solid && sSet->bgType == 1 && scene->worldColorOn)
+         backdrop = ((unsigned)(std::clamp(scene->worldColor[0] * scene->worldStrength, 0.0f, 1.0f) * 255.0f) << 16) |
+                    ((unsigned)(std::clamp(scene->worldColor[1] * scene->worldStrength, 0.0f, 1.0f) * 255.0f) << 8) |
+                    (unsigned)(std::clamp(scene->worldColor[2] * scene->worldStrength, 0.0f, 1.0f) * 255.0f);
+      dl->AddRectFilled(mn, mx, Hex(backdrop));
 
       StepGlide();
       BuildCam(scene, mn, mx);
@@ -2844,7 +3052,7 @@ namespace
       view.proj = sCam.proj;
       std::copy(sCam.eye, sCam.eye + 3, view.eye);
       view.shading = sShading;
-      view.grid = sGrid && sOverlays;
+      view.grid = sGrid && sOverlays && (!sCam.ortho || sSet->orthoGrid || sCameraView);
       view.only = sLocal;
       view.gridAxis = sGridAxis;
       view.gridDist = sDist;
@@ -2889,21 +3097,26 @@ namespace
          }
          if (it.visible)
             DrawItemExtras(dl, scene, it, col);
+         const bool extras = sSet->showExtras;
          if (scene->ItemPoint(it, p))
          {
-            if (kind == Kind::Camera && !looking)
+            if (kind == Kind::Camera && !looking && sSet->showCameras && extras)
                DrawCameraShape(dl, scene, it, col);
-            else if (kind == Kind::Light)
-               DrawLightShape(dl, scene, it, p, col);
+            else if (kind == Kind::Light && sSet->showLights && extras)
+            {
+               GraphNode* lg = sSet->lightColors ? FindNodeByUid(it.uid) : nullptr;
+               auto* ln = lg != nullptr ? dynamic_cast<LightNode*>(lg->node.get()) : nullptr;
+               DrawLightShape(dl, scene, it, p, ln != nullptr && !sel ? ImGui::ColorConvertFloat4ToU32(ImVec4(ln->color[0], ln->color[1], ln->color[2], 0.9f)) : col);
+            }
          }
-         else if (sel)
+         else if (sel && sSet->outlineSel)
          {
             float lo[3], hi[3];
             if (scene->ItemBounds(it.id, lo, hi))
                DrawBox(dl, lo, hi, col);
          }
       }
-      if (sOverlays)
+      if (sOverlays && sSet->showCursor)
          DrawCursor(dl);
 
       if (sCameraView)
@@ -2933,6 +3146,9 @@ namespace
          hot = DrawGizmo(dl, scene, center, mouse, canGrab && !onNav);
       }
       sHot = hot;
+      bool onHandle = false;
+      if (sOp.mode == 0 && (sSet->gizmoLightSize || sSet->gizmoLightLook || sSet->gizmoCamLens || sSet->gizmoCamFocus))
+         onHandle = DrawItemHandles(dl, scene, mouse, canGrab && !onNav && hot < 0);
       if (sOp.mode != 0)
       {
          ImVec2 c;
@@ -2980,7 +3196,7 @@ namespace
             sBoxZoom = sBoxOn = true;
             sPressAt = mouse;
          }
-         else if (onPad)
+         else if (onPad || onHandle)
          {
          }
          else if (navBall >= 0)
@@ -3545,7 +3761,37 @@ namespace
          std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          return text;
       };
-      const std::string search = lower(sSearch);
+      if (Card(T("Filter"), nullptr, false))
+      {
+         Scene3DNode::Settings& f = *sSet;
+         BoolRow(T("Match case"), &f.listCase);
+         BoolRow(T("Exact match"), &f.listComplete);
+         BoolRow(T("Sort A to Z"), &f.listSort);
+         BoolRow(T("Objects"), &f.listObjects);
+         BoolRow(T("Lights"), &f.listLights);
+         BoolRow(T("Cameras"), &f.listCameras);
+         ComboRow(T("State"), &f.listState, std::vector<std::string>{ T("All"), T("Visible"), T("Selected"), T("Active"), T("Selectable") });
+         BoolRow(T("Invert filter"), &f.listInvert);
+         BoolRow(T("Selectable column"), &f.colSelect);
+         BoolRow(T("Render column"), &f.colRender);
+      }
+      const Scene3DNode::Settings& lf = *sSet;
+      const std::string search = lf.listCase ? std::string(sSearch) : lower(sSearch);
+      auto passes = [&](const Item& it)
+      {
+         const Kind k = scene->ItemKind(it);
+         if (k == Kind::Light ? !lf.listLights : k == Kind::Camera ? !lf.listCameras : !lf.listObjects)
+            return false;
+         const bool state = lf.listState == 0 || (lf.listState == 1 && it.visible) || (lf.listState == 2 && Selected(it.id)) ||
+                            (lf.listState == 3 && !sSel.empty() && sSel.back() == it.id) || (lf.listState == 4 && !it.hideSelect);
+         if (!state)
+            return false;
+         if (search.empty())
+            return true;
+         const std::string name = lf.listCase ? ItemName(it) : lower(ItemName(it));
+         const bool hit = lf.listComplete ? name == search : name.find(search) != std::string::npos;
+         return hit != lf.listInvert;
+      };
       const ImGuiIO& io = ImGui::GetIO();
       const float rowH = 24.0f;
       // Fills the tab below the search box, then scrolls.
@@ -3558,11 +3804,15 @@ namespace
       if (scrolls)
          availW -= ImGui::GetStyle().ScrollbarSize;
       std::vector<Item>& items = scene->Items();
+      std::vector<int> order;
       for (int row = 0; row < count; row++)
+         if (passes(items[row]))
+            order.push_back(row);
+      if (lf.listSort)
+         std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return lower(ItemName(items[a])) < lower(ItemName(items[b])); });
+      for (int row : order)
       {
          Item& it = items[row];
-         if (!search.empty() && lower(ItemName(it)).find(search) == std::string::npos)
-            continue;
          ImGui::PushID(it.id);
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImGui::SetNextItemAllowOverlap();
@@ -3629,6 +3879,31 @@ namespace
          }
          if (it.id == scene->activeCamera)
             glyph::Draw(dl, ImVec2(p.x + availW - 36.0f, midY), tok::icon_sm, ImGui::GetColorU32(AccentEmphasisSelected()), IconsInfinite::ViewCamera);
+         float colX = availW - 24.0f;
+         if (lf.colRender)
+         {
+            colX -= 24.0f;
+            ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
+            if (ImGui::InvisibleButton("##rnd", ImVec2(24.0f, rowH)))
+            {
+               PushUndoCheckpoint("Render toggle in 3D View");
+               it.render = !it.render;
+               scene->Commit();
+            }
+            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_sm, text, it.render ? IconsInfinite::ViewCamera : IconsInfinite::EyeOff);
+         }
+         if (lf.colSelect)
+         {
+            colX -= 24.0f;
+            ImGui::SetCursorScreenPos(ImVec2(p.x + colX, p.y));
+            if (ImGui::InvisibleButton("##sel", ImVec2(24.0f, rowH)))
+            {
+               PushUndoCheckpoint("Selectable toggle in 3D View");
+               it.hideSelect = !it.hideSelect;
+               scene->Commit();
+            }
+            glyph::Draw(dl, ImVec2(p.x + colX + 12.0f, midY), tok::icon_sm, text, it.hideSelect ? IconsInfinite::EyeOff : IconsInfinite::Cube);
+         }
          ImGui::SetCursorScreenPos(ImVec2(p.x + availW - 24.0f, p.y));
          if (ImGui::InvisibleButton("##eye", ImVec2(24.0f, rowH)))
          {
@@ -4013,28 +4288,36 @@ namespace
       }
       if (Card(T("Transform")))
       {
-         auto field = [&](const char* label, float* v, float speed)
+         auto field = [&](const char* label, float* v, float speed, const char* fmt = "%.2f")
          {
             FieldLabel(label);
             ImGui::SetNextItemWidth(sFieldW);
-            const bool changed = ImGui::DragFloat3(FormParts::Id(label).c_str(), v, speed, 0.0f, 0.0f, "%.2f");
+            const bool changed = ImGui::DragFloat3(FormParts::Id(label).c_str(), v, speed, 0.0f, 0.0f, fmt);
             Undoable("Edit in 3D View");
             return changed;
          };
          FieldWell::PushStyle();
          bool changed = false;
          int changedChannel = -1;
-         float loc[3] = { item->pos[0], -item->pos[2], item->pos[1] };
-         if (field(T("Location"), loc, 0.01f))
+         const float lenK = LengthFactor();
+         float loc[3] = { item->pos[0] * lenK, -item->pos[2] * lenK, item->pos[1] * lenK };
+         if (field(T("Location"), loc, 0.01f * lenK, LengthFormat()))
          {
-            item->pos[0] = loc[0]; item->pos[2] = -loc[1]; item->pos[1] = loc[2];
+            item->pos[0] = loc[0] / lenK; item->pos[2] = -loc[1] / lenK; item->pos[1] = loc[2] / lenK;
             changed = true;
             changedChannel = 0;
          }
          float rot[3];
          ToDisplayRotation(item->rot, rot);
-         if (field(T("Rotation"), rot, 0.5f))
+         const bool radians = sSet->rotUnits == 1;
+         if (radians)
+            for (float& r : rot)
+               r *= 0.0174532925f;
+         if (field(T("Rotation"), rot, radians ? 0.01f : 0.5f, radians ? "%.3f rad" : "%.2f"))
          {
+            if (radians)
+               for (float& r : rot)
+                  r *= 57.2957795f;
             FromDisplayRotation(rot, item->rot);
             changed = true;
             changedChannel = 1;
@@ -4323,7 +4606,8 @@ namespace
          out->recordVideoPath = path;
          out->videoFormat = EndsWith(path, ".mov") ? 1 : 0;
          out->offlineDurationSeconds = (int)sSet->seconds;
-         out->offlineFps = (int)sSet->fps;
+         out->offlineFps = std::max(1, (int)(sSet->fps / std::max(1, sSet->frameStep)));
+         out->offlineDurationSeconds = std::max(1, (int)sSet->seconds - (int)(sSet->frameStart / std::max(1.0f, sSet->fps)));
          KeepRender(path);
          StartOfflineRenderSession(out);
       }
@@ -4422,6 +4706,12 @@ namespace
             ComboRow(T("Color"), &look.solidColor, Render3DNode::SolidColorNames());
             if (look.solidColor == 2)
                ColorRow(T("Single color"), look.solidSingle);
+            BoolRow(T("Outline"), &sSet->outline);
+            if (sSet->outline)
+               ColorRow(T("Outline color"), sSet->outlineColor);
+            ComboRow(T("Background"), &sSet->bgType, { T("Theme"), T("World"), T("Viewport") });
+            if (sSet->bgType == 2)
+               ColorRow(T("Background color"), sSet->bgColor);
          }
       }
       if (Card(T("Cavity"), &look.cavity))
@@ -4457,7 +4747,12 @@ namespace
          Hint(T("Smears what moved since the last frame. Shown in the render, not the editor views."));
       }
       if (Card(T("Film")))
+      {
          BoolRow(T("Transparent"), &sSet->transparent);
+         FloatRow(T("Filter size"), &sSet->filterSize, 0.0f, 4.0f, "%.2f px");
+         FloatRow(T("Dither"), &sSet->dither, 0.0f, 2.0f, "%.2f");
+         BoolRow(T("Simplify"), &sSet->simplify);
+      }
       if (Card(T("Render Region")))
       {
          BoolRow(T("Region"), &sSet->border);
@@ -4474,6 +4769,8 @@ namespace
       {
          ComboRow(T("View"), &look.tonemap, Render3DNode::TonemapNames());
          FloatRow(T("Exposure"), &look.exposure, 0.1f, 4.0f, "%.2f");
+         FloatRow(T("Gamma"), &sSet->gamma, 0.2f, 3.0f, "%.2f");
+         ComboRow(T("Look"), &sSet->look, std::vector<std::string>{ T("None"), T("Low contrast"), T("Medium contrast"), T("High contrast"), T("Faded") });
       }
    }
 
@@ -4498,6 +4795,9 @@ namespace
          int rate = (int)(std::find(kRates.begin(), kRates.end(), (int)sSet->fps) - kRates.begin());
          if (ComboRow(T("Frame rate"), &rate, kRateNames))
             sSet->fps = (float)kRates[rate];
+         FloatRow(T("Base"), &sSet->fpsBase, 1.0f, 1.01f, "%.3f");
+         FloatRow(T("Pixel aspect X"), &sSet->pixelAspect[0], 0.1f, 10.0f, "%.2f");
+         FloatRow(T("Pixel aspect Y"), &sSet->pixelAspect[1], 0.1f, 10.0f, "%.2f");
       }
       if (Card(T("Frame Range")))
       {
@@ -4505,7 +4805,38 @@ namespace
          if (IntInputRow(T("Seconds"), &seconds))
             sSet->seconds = (float)std::clamp(seconds, 1, 3600);
          FieldLabel(T("Frames"));
-         ImGui::Text("%d", (int)(sSet->seconds * sSet->fps));
+         ImGui::Text("%d", (int)(sSet->seconds * sSet->fps) / std::max(1, sSet->frameStep));
+         IntInputRow(T("Start"), &sSet->frameStart);
+         sSet->frameStart = std::max(0, sSet->frameStart);
+         IntInputRow(T("Step"), &sSet->frameStep);
+         sSet->frameStep = std::clamp(sSet->frameStep, 1, 100);
+      }
+      if (Card(T("Stamp"), &sSet->stamp))
+      {
+         ImGui::BeginDisabled(!sSet->stamp);
+         BoolRow(T("Date"), &sSet->stampDate);
+         BoolRow(T("Time"), &sSet->stampTime);
+         BoolRow(T("Frame"), &sSet->stampFrame);
+         BoolRow(T("Frame range"), &sSet->stampRange);
+         BoolRow(T("Camera"), &sSet->stampCamera);
+         BoolRow(T("Lens"), &sSet->stampLens);
+         BoolRow(T("Scene"), &sSet->stampScene);
+         BoolRow(T("Note"), &sSet->stampNote);
+         if (sSet->stampNote)
+         {
+            char buf[128];
+            std::snprintf(buf, sizeof(buf), "%s", scene->stampNote.c_str());
+            FieldLabel(T("Note text"));
+            ImGui::SetNextItemWidth(sFieldW);
+            if (ImGui::InputText("##v3dstampnote", buf, sizeof(buf)))
+               scene->stampNote = buf;
+            Undoable("Edit in 3D View");
+         }
+         BoolRow(T("Labels"), &sSet->stampLabels);
+         FloatRow(T("Font size"), &sSet->stampSize, 6.0f, 96.0f, "%.0f");
+         ColorRow(T("Text"), sSet->stampFg);
+         ColorRow(T("Background"), sSet->stampBg);
+         ImGui::EndDisabled();
       }
       if (Card(T("Output")))
       {
@@ -4581,6 +4912,16 @@ namespace
             DeleteOrientation();
          ImGui::EndDisabled();
       }
+      if (Card(T("Units")))
+      {
+         ComboRow(T("System"), &set.unitSystem, std::vector<std::string>{ T("None"), T("Metric"), T("Imperial") });
+         if (set.unitSystem == 1)
+            ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Meters"), T("Centimeters"), T("Millimeters"), T("Kilometers") });
+         if (set.unitSystem == 2)
+            ComboRow(T("Length"), &set.lengthUnit, std::vector<std::string>{ T("Feet"), T("Inches"), T("Yards") });
+         FloatRow(T("Unit scale"), &set.unitScale, 0.001f, 1000.0f, "%.3f");
+         ComboRow(T("Rotation"), &set.rotUnits, std::vector<std::string>{ T("Degrees"), T("Radians") });
+      }
       if (Card(T("Snap")))
       {
          BoolRow(T("On"), &set.snap);
@@ -4628,12 +4969,63 @@ namespace
          }
          FieldWell::PopStyle();
          Undoable("Move 3D cursor");
+         ComboRow(T("Rotation mode"), &set.cursorRotMode, { T("XYZ Euler"), T("Quaternion"), T("Axis Angle") }, "3D cursor rotation mode");
+         FieldLabel(T("Rotation"));
+         ImGui::SetNextItemWidth(sFieldW);
+         FieldWell::PushStyle();
+         if (set.cursorRotMode == 0)
+         {
+            float disp[3];
+            ToDisplayRotation(set.cursorRot, disp);
+            if (ImGui::DragFloat3("##v3dcursorrot", disp, 0.5f, 0.0f, 0.0f, "%.1f"))
+               FromDisplayRotation(disp, set.cursorRot);
+         }
+         else
+         {
+            float q[4];
+            CursorQuaternion(q);
+            if (set.cursorRotMode == 1)
+            {
+               if (ImGui::DragFloat4("##v3dcursorrot", q, 0.01f, -1.0f, 1.0f, "%.3f"))
+                  SetCursorQuaternion(q);
+            }
+            else
+            {
+               const float half = std::acos(std::clamp(q[0], -1.0f, 1.0f)), sn = std::max(1e-6f, std::sin(half));
+               float aa[4] = { half * 2.0f * 180.0f / kPi, q[1] / sn, q[2] / sn, q[3] / sn };
+               if (half < 1e-4f)
+                  aa[1] = aa[2] = 0.0f, aa[3] = 1.0f;
+               if (ImGui::DragFloat4("##v3dcursorrot", aa, 0.5f, 0.0f, 0.0f, "%.2f"))
+               {
+                  const float an = std::max(1e-6f, std::sqrt(aa[1] * aa[1] + aa[2] * aa[2] + aa[3] * aa[3]));
+                  const float h = aa[0] * kPi / 360.0f, sh = std::sin(h) / an;
+                  const float nq[4] = { std::cos(h), aa[1] * sh, aa[2] * sh, aa[3] * sh };
+                  SetCursorQuaternion(nq);
+               }
+            }
+         }
+         FieldWell::PopStyle();
+         Undoable("Turn 3D cursor");
          ImGui::BeginDisabled(sSel.empty());
          if (ActionButton::Draw(L("Cursor to Selected"), ImVec2(availW, 0)))
             CursorToSelected(scene);
          if (ActionButton::Draw(L("Selection to Cursor"), ImVec2(availW, 0)))
             SelectionToCursor(scene);
          ImGui::EndDisabled();
+      }
+      if (Card(T("View"), nullptr, false))
+      {
+         FloatRow(T("Focal length"), &set.viewLens, 10.0f, 250.0f, "%.0f mm");
+         FloatRow(T("Clip start"), &set.clipStart, 0.001f, 10.0f, "%.3f");
+         FloatRow(T("Clip end"), &set.clipEnd, 10.0f, 10000.0f, "%.0f");
+         BoolRow(T("Lock to 3D cursor"), &set.lockCursor);
+      }
+      if (Card(T("Viewport Visibility"), nullptr, false))
+      {
+         BoolRow(T("Cameras shown"), &set.showCameras);
+         BoolRow(T("Cameras selectable"), &set.pickCameras);
+         BoolRow(T("Lights shown"), &set.showLights);
+         BoolRow(T("Lights selectable"), &set.pickLights);
       }
       if (Card(T("Navigation")))
       {
@@ -4646,11 +5038,32 @@ namespace
          BoolRow(T("Text info"), &set.textInfo);
          BoolRow(T("Statistics"), &set.stats);
          BoolRow(T("Origins (all)"), &set.originsAll);
+         BoolRow(T("3D cursor"), &set.showCursor);
+         BoolRow(T("Extras"), &set.showExtras);
+         BoolRow(T("Light colors"), &set.lightColors);
+         BoolRow(T("Outline selected"), &set.outlineSel);
+         BoolRow(T("Performance"), &set.showPerf);
+      }
+      if (Card(T("Grid"), nullptr, false))
+      {
+         BoolRow(T("Orthographic grid"), &set.orthoGrid);
+         BoolRow(T("Axis X"), &set.axisX);
+         BoolRow(T("Axis Y"), &set.axisY);
+         BoolRow(T("Axis Z"), &set.axisZ);
+         FloatRow(T("Scale"), &set.gridScale, 0.001f, 1000.0f, "%.3f");
+         if (IntInputRow(T("Lines"), &set.gridLines))
+            set.gridLines = std::clamp(set.gridLines, 1, 200);
+         if (IntInputRow(T("Subdivisions"), &set.gridSubdiv))
+            set.gridSubdiv = std::clamp(set.gridSubdiv, 2, 100);
       }
       if (Card(T("Gizmos")))
       {
          BoolRow(T("Navigate"), &set.gizmoNav);
          BoolRow(T("Move, rotate, scale"), &set.gizmoMove);
+         BoolRow(T("Light size"), &set.gizmoLightSize);
+         BoolRow(T("Light look-at"), &set.gizmoLightLook);
+         BoolRow(T("Camera lens"), &set.gizmoCamLens);
+         BoolRow(T("Camera focus distance"), &set.gizmoCamFocus);
       }
       if (Card(T("Passepartout")))
          FloatRow(T("Opacity"), &set.passAlpha, 0.0f, 1.0f, "%.2f");

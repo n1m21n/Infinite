@@ -133,8 +133,8 @@ public:
       float viewLens = 50.0f, clipStart = 0.01f, clipEnd = 1000.0f;
       bool gizmoLightSize = false, gizmoLightLook = false, gizmoCamLens = false, gizmoCamFocus = false;
       bool showCameras = true, showLights = true, pickCameras = true, pickLights = true;
-      bool outline = true;          // Solid: the selection outline
-      float outlineColor[3] = { 1.0f, 0.55f, 0.1f };
+      bool outline = false;         // Solid: a line round every object, where the depth jumps
+      float outlineColor[3] = { 0.05f, 0.05f, 0.05f };
       int bgType = 0;               // Solid view background: 0 theme, 1 world, 2 custom
       float bgColor[3] = { 0.05f, 0.05f, 0.05f };
       bool orthoGrid = true, axisX = true, axisY = true, axisZ = false;
@@ -162,6 +162,9 @@ public:
       bool listCase = false, listComplete = false, listSort = false, colSelect = false, colRender = false;
       bool listObjects = true, listInvert = false, listLights = true, listCameras = true;
       int listState = 0;            // 0 all, 1 visible, 2 selected, 3 active, 4 selectable
+      bool outlineSel = true;       // the selection's own outline (box) in the view
+      float dither = 0.0f, filterSize = 0.0f, gamma = 1.0f;   // the picture's finish
+      int look = 0;                 // 0 none, 1 soft contrast, 2 medium, 3 strong, 4 faded
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -287,6 +290,11 @@ private:
    unsigned int mBorderProgram = 0;
    int mOutW = 0, mOutH = 0;         // the picture's size after a crop; 0 = the render's
    unsigned int Border(unsigned int sceneTex, int w, int h);
+   unsigned int Finish(unsigned int sceneTex, int w, int h, int frameId);
+   GLUtil::Fbo mFinishFbo;
+   unsigned int mFinishProgram = 0, mStampTex = 0;
+   int mStampW = 0, mStampH = 0;
+   std::string mStampKey;
    unsigned int mGridProgram = 0;
    unsigned int mOutTex = 0;
    unsigned long long mRevision = 0;

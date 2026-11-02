@@ -20,10 +20,10 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 
 | Area | Done | Missing | Deferred | Out | Mapped |
 |---|---|---|---|---|---|
-| Viewport: View tab and header | 15 | 16 | 9 | 26 | 66 |
-| Viewport: 3D cursor | 1 | 4 | 0 | 1 | 6 |
-| Viewport: shading | 6 | 4 | 28 | 0 | 38 |
-| Viewport: overlays | 7 | 12 | 3 | 10 | 32 |
+| Viewport: View tab and header | 27 | 4 | 9 | 26 | 66 |
+| Viewport: 3D cursor | 5 | 0 | 0 | 1 | 6 |
+| Viewport: shading | 10 | 0 | 28 | 0 | 38 |
+| Viewport: overlays | 19 | 0 | 3 | 10 | 32 |
 | Transform, snap, pivot | 25 | 0 | 0 | 26 | 51 |
 | Object | 18 | 0 | 23 | 35 | 76 |
 | Camera | 44 | 0 | 20 | 23 | 87 |
@@ -31,14 +31,14 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Light probe | 0 | 0 | 36 | 0 | 36 |
 | Constraints (aim only) | 7 | 0 | 0 | 8 | 15 |
 | World | 3 | 0 | 14 | 1 | 18 |
-| Render | 14 | 23 | 56 | 45 | 138 |
+| Render | 36 | 1 | 56 | 45 | 138 |
 | Output | 1 | 0 | 0 | 41 | 42 |
-| Scene | 4 | 7 | 0 | 24 | 35 |
+| Scene | 10 | 1 | 0 | 24 | 35 |
 | View layer | 3 | 0 | 15 | 26 | 44 |
-| Outliner | 2 | 10 | 0 | 11 | 23 |
+| Outliner | 12 | 0 | 0 | 11 | 23 |
 | Preferences: navigation and input | 4 | 4 | 3 | 39 | 50 |
-| Preferences: viewport | 4 | 9 | 0 | 14 | 27 |
-| **All settings** | **176** | **89** | **249** | **330** | **844** |
+| Preferences: viewport | 5 | 8 | 0 | 14 | 27 |
+| **All settings** | **247** | **18** | **249** | **330** | **844** |
 | **Operators** | **77** | **33** | **14** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
@@ -118,102 +118,20 @@ decided out of this pass; reopen one when the owner asks.
 Every row the map marks "missing", grouped by area and ordered by how often a composer touches the area (camera, light and
 transform first, preferences last). The "where" is the panel tab or node it belongs on. Regenerate with the map, never by hand.
 
-### Viewport: View tab and header (16)
+### Viewport: View tab and header (4)
 
 - Tool Settings (`SpaceView3D.show_region_tool_header`): View3D panel header: tool settings strip
 - Toolbar (`SpaceView3D.show_region_toolbar`): View3D panel: a tool column beside the view
-- Lock to Cursor (`SpaceView3D.lock_cursor`): View tab > Navigation
-- Lens (`SpaceView3D.lens`): View tab: viewport lens (the view has a fixed lens)
-- Clip Start (`SpaceView3D.clip_start`): View tab: viewport clip (the camera has its own)
-- Clip End (`SpaceView3D.clip_end`): View tab: viewport clip (the camera has its own)
-- Show Light Size (`SpaceView3D.show_gizmo_light_size`): light gizmo handles in the viewport
-- Show Light Look-At (`SpaceView3D.show_gizmo_light_look_at`): light gizmo handles in the viewport
-- Show Camera Lens (`SpaceView3D.show_gizmo_camera_lens`): camera gizmo handles in the viewport
-- Show Camera Focus Distance (`SpaceView3D.show_gizmo_camera_dof_distance`): camera gizmo handles in the viewport
-- Camera (`SpaceView3D.show_object_viewport_camera`): View tab: per-type visibility filter
-- Light (`SpaceView3D.show_object_viewport_light`): View tab: per-type visibility filter
 - Light Probe (`SpaceView3D.show_object_viewport_light_probe`): View tab: per-type visibility filter
-- Camera (`SpaceView3D.show_object_select_camera`): View tab: per-type selectability filter
-- Light (`SpaceView3D.show_object_select_light`): View tab: per-type selectability filter
 - Light Probe (`SpaceView3D.show_object_select_light_probe`): View tab: per-type selectability filter
 
-### Viewport: 3D cursor (4)
+### Render (1)
 
-- Quaternion Rotation (`View3DCursor.rotation_quaternion`): 3D Cursor card: cursor has a location only
-- Axis-Angle Rotation (`View3DCursor.rotation_axis_angle`): 3D Cursor card: cursor has a location only
-- Euler Rotation (`View3DCursor.rotation_euler`): 3D Cursor card: cursor has a location only
-- Rotation Mode (`View3DCursor.rotation_mode`): 3D Cursor card: cursor has a location only
-
-### Viewport: shading (4)
-
-- Outline (`View3DShading.show_object_outline`): Overlays card: selection outline in Solid
-- Background (`View3DShading.background_type`): View tab: Solid view background
-- Background Color (`View3DShading.background_color`): View tab: Solid view background
-- Outline Color (`View3DShading.object_outline_color`): Overlays card: outline colour
-
-### Viewport: overlays (12)
-
-- Display Grid (`View3DOverlay.show_ortho_grid`): Overlays card: grid and axis options
-- Display X Axis (`View3DOverlay.show_axis_x`): Overlays card: grid and axis options
-- Display Y Axis (`View3DOverlay.show_axis_y`): Overlays card: grid and axis options
-- Display Z Axis (`View3DOverlay.show_axis_z`): Overlays card: grid and axis options
-- Grid Scale (`View3DOverlay.grid_scale`): Overlays card: grid and axis options
-- Grid Lines (`View3DOverlay.grid_lines`): Overlays card: grid and axis options
-- Grid Scale Unit (`View3DOverlay.grid_scale_unit`): Overlays card: grid and axis options
-- Outline Selected (`View3DOverlay.show_outline_selected`): Overlays card: selection outline
-- Show 3D Cursor (`View3DOverlay.show_cursor`): Overlays card: hide the 3D cursor
-- Show Performance (`View3DOverlay.show_performance`): Overlays card: frame time line
-- Extras (`View3DOverlay.show_extras`): Overlays card: hide camera and light markers
-- Light Colors (`View3DOverlay.show_light_colors`): Overlays card: tint light markers
-
-### Render (23)
-
-- Pixel Aspect X (`RenderSettings.pixel_aspect_x`): Render tab > Format: pixel aspect
-- Pixel Aspect Y (`RenderSettings.pixel_aspect_y`): Render tab > Format: pixel aspect
-- FPS Base (`RenderSettings.fps_base`): Render tab > Format: 23.976 / 29.97 rates
-- Dither Intensity (`RenderSettings.dither_intensity`): Render tab > Output: dither
-- Filter Size (`RenderSettings.filter_size`): Render tab > Sampling: pixel filter width
-- Stamp Time (`RenderSettings.use_stamp_time`): Render tab > Output: burn-in stamp fields
-- Stamp Date (`RenderSettings.use_stamp_date`): Render tab > Output: burn-in stamp fields
-- Stamp Frame (`RenderSettings.use_stamp_frame`): Render tab > Output: burn-in stamp fields
-- Stamp Frame (`RenderSettings.use_stamp_frame_range`): Render tab > Output: burn-in stamp fields
-- Stamp Camera (`RenderSettings.use_stamp_camera`): Render tab > Output: burn-in stamp fields
-- Stamp Lens (`RenderSettings.use_stamp_lens`): Render tab > Output: burn-in stamp fields
-- Stamp Scene (`RenderSettings.use_stamp_scene`): Render tab > Output: burn-in stamp fields
-- Stamp Note (`RenderSettings.use_stamp_note`): Render tab > Output: burn-in stamp fields
 - Stamp Render Time (`RenderSettings.use_stamp_render_time`): Render tab > Output: burn-in stamp fields
-- Stamp Note Text (`RenderSettings.stamp_note_text`): Render tab > Output: burn-in stamp fields
-- Stamp Output (`RenderSettings.use_stamp`): Render tab > Output: burn-in stamp
-- Stamp Labels (`RenderSettings.use_stamp_labels`): Render tab > Output: burn-in stamp fields
-- Font Size (`RenderSettings.stamp_font_size`): Render tab > Output: burn-in stamp fields
-- Text Color (`RenderSettings.stamp_foreground`): Render tab > Output: burn-in stamp fields
-- Background (`RenderSettings.stamp_background`): Render tab > Output: burn-in stamp fields
-- Use Simplify (`RenderSettings.use_simplify`): Render tab > Sampling: simplify for preview
-- Look (`ColorManagedViewSettings.look`): Render tab > Color Management
-- Gamma (`ColorManagedViewSettings.gamma`): Render tab > Color Management
 
-### Scene (7)
+### Scene (1)
 
 - Start Frame (`Scene.frame_start`): Render tab > Frame Range: start and step
-- Frame Step (`Scene.frame_step`): Render tab > Frame Range: start and step
-- Stamp Note (`Scene.use_stamp_note`): Render tab > Output: stamp note
-- Unit System (`UnitSettings.system`): View tab: scene units
-- Rotation Units (`UnitSettings.system_rotation`): View tab: scene units
-- Unit Scale (`UnitSettings.scale_length`): View tab: scene units
-- Length Unit (`UnitSettings.length_unit`): View tab: scene units
-
-### Outliner (10)
-
-- Case Sensitive Matches Only (`SpaceOutliner.use_filter_case_sensitive`): Scene tab: search and sort options
-- Complete Matches Only (`SpaceOutliner.use_filter_complete`): Scene tab: search and sort options
-- Sort Alphabetically (`SpaceOutliner.use_sort_alpha`): Scene tab: search and sort options
-- Selectable (`SpaceOutliner.show_restrict_column_select`): Scene tab: selectable column
-- Disable in Renders (`SpaceOutliner.show_restrict_column_render`): Scene tab: render toggle column
-- Filter Objects (`SpaceOutliner.use_filter_object`): Scene tab: filter by object
-- Object State Filter (`SpaceOutliner.filter_state`): Scene tab: state filter
-- Invert (`SpaceOutliner.filter_invert`): Scene tab: state filter
-- Show Lights (`SpaceOutliner.use_filter_object_light`): Scene tab: type filter
-- Show Cameras (`SpaceOutliner.use_filter_object_camera`): Scene tab: type filter
 
 ### Preferences: navigation and input (4)
 
@@ -222,9 +140,8 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_turntable`): View tab > Navigation: orbit sensitivity
 - Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_trackball`): View tab > Navigation: orbit sensitivity
 
-### Preferences: viewport (9)
+### Preferences: viewport (8)
 
-- Display Playback Frame Rate (FPS) (`PreferencesView.show_playback_fps`): Overlays card: frame rate
 - Mini Axes Type (`PreferencesView.mini_axis_type`): View tab: navigation gizmo size and brightness
 - Mini Axes Size (`PreferencesView.mini_axis_size`): View tab: navigation gizmo size and brightness
 - Mini Axes Brightness (`PreferencesView.mini_axis_brightness`): View tab: navigation gizmo size and brightness

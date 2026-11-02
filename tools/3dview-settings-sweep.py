@@ -162,6 +162,27 @@ SETTINGS = {
     ("scene", "transparent"): S(1),
     ("scene", "shadowItem"): S("rim"),
     ("scene", "fStop"): S(1.4, 0, 64),
+    ("scene", "simplify"): S(1),
+    ("scene", "dither"): S(2.0),
+    ("scene", "filterSize"): S(3.0),
+    ("scene", "gamma"): S(2.0, 0.5, 3.0),
+    ("scene", "look"): S(3, 1, 4),
+    ("scene", "stamp"): S({"stamp": 1, "stampDate": 1}),
+    ("scene", "stampDate"): S({"stamp": 1, "stampDate": 1}),
+    ("scene", "stampTime"): S({"stamp": 1, "stampTime": 1}),
+    ("scene", "stampFrame"): S({"stamp": 1, "stampFrame": 1}),
+    ("scene", "stampRange"): S({"stamp": 1, "stampRange": 1}),
+    ("scene", "stampCamera"): S({"stamp": 1, "stampCamera": 1}),
+    ("scene", "stampLens"): S({"stamp": 1, "stampLens": 1}),
+    ("scene", "stampScene"): S({"stamp": 1, "stampScene": 1}),
+    ("scene", "stampLabels"): S({"stamp": 1, "stampDate": 1, "stampLabels": 0}),
+    ("scene", "stampSize"): S({"stamp": 1, "stampDate": 1, "stampSize": 40}),
+    ("scene", "stampFg0"): S({"stamp": 1, "stampDate": 1, "stampFg0": 0}),
+    ("scene", "stampFg1"): S({"stamp": 1, "stampDate": 1, "stampFg1": 0}),
+    ("scene", "stampFg2"): S({"stamp": 1, "stampDate": 1, "stampFg2": 0}),
+    ("scene", "stampBg0"): S({"stamp": 1, "stampDate": 1, "stampBg0": 1}),
+    ("scene", "stampBg1"): S({"stamp": 1, "stampDate": 1, "stampBg1": 1}),
+    ("scene", "stampBg2"): S({"stamp": 1, "stampDate": 1, "stampBg2": 1}),
     ("scene", "border"): S({"border": 1, "borderMin0": 0.25, "borderMin1": 0.25, "borderMax0": 0.75, "borderMax1": 0.75}),
     ("scene", "crop"): S({"border": 1, "crop": 1, "borderMax0": 0.5}),
     ("scene", "borderMin0"): S({"border": 1, "borderMin0": 0.4}),
@@ -196,6 +217,8 @@ SETTINGS = {
     ("scene", "world.strength"): S(4.0),
 }
 EXPECTED = {
+    ("scene", "stampNote"): "the note text is its own line in the save file; the sweep cannot set it (VIEW3DTEST-level)",
+    ("scene", "stampRender"): "render-time stamp is not drawn yet",
     ("cam", "orbitPerBeat"): "motion over beats; tested at frame 30",
     ("key", "orbitPerBeat"): "motion over beats; tested at frame 30",
     ("view", "floatOutput"): "16-bit float file; an 8-bit frame looks the same",
@@ -232,12 +255,10 @@ EDITOR_ONLY = ["fps", "seconds", "snap", "snapMove", "snapRot", "snapScale", "pa
                "orthoGrid", "axisX", "axisY", "axisZ", "gridScale", "gridLines", "gridSubdiv", "showCursor",
                "showPerf", "showExtras", "lightColors", "showFps", "miniAxes", "miniSize", "miniBright",
                "smoothTime", "rotStep", "gizmoSize", "gizmoNavSize", "alignNew", "autoPerspective", "continuousGrab",
-               "orbitSens", "pixelAspect0", "pixelAspect1", "fpsBase", "simplify", "stamp", "stampTime", "stampDate",
-               "stampFrame", "stampRange", "stampCamera", "stampLens", "stampScene", "stampNote", "stampRender",
-               "stampLabels", "stampSize", "stampFg0", "stampFg1", "stampFg2", "stampBg0", "stampBg1", "stampBg2",
+               "orbitSens", "pixelAspect0", "pixelAspect1", "fpsBase", "stampRender",
                "frameStart", "frameStep", "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase",
                "listComplete", "listSort", "colSelect", "colRender", "listObjects", "listInvert", "listLights",
-               "listCameras", "listState"]
+               "listCameras", "listState", "outlineSel"]
 SETTING_FIELDS = ["fps", "seconds", "percent", "transparent", "snap", "snapMove", "snapRot", "snapScale", "passAlpha",
                   "safe", "thirds", "center", "golden", "safeTitle", "safeAction", "orientation", "pivot", "cursor0",
                   "cursor1", "cursor2", "zoomToMouse", "orbitSelection", "shadowItem", "fStop", "proportional", "propSize",
@@ -261,11 +282,17 @@ SETTING_FIELDS = ["fps", "seconds", "percent", "transparent", "snap", "snapMove"
                   "stampLens", "stampScene", "stampNote", "stampRender", "stampLabels", "stampSize", "stampFg0",
                   "stampFg1", "stampFg2", "stampBg0", "stampBg1", "stampBg2", "frameStart", "frameStep",
                   "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase", "listComplete", "listSort",
-                  "colSelect", "colRender", "listObjects", "listInvert", "listLights", "listCameras", "listState"]
+                  "colSelect", "colRender", "listObjects", "listInvert", "listLights", "listCameras", "listState", "outlineSel",
+                  "dither", "filterSize", "gamma", "look"]
 # What a field reads as when the settings line is padded out to reach a later one.
 FIELD_DEFAULT = {"propSize": 1, "borderMax0": 1, "borderMax1": 1,
                  "snapAbsolute": 1, "snapRotFine": 1, "snapTranslate": 1, "snapRotate": 1, "snapScaleOn": 1, "planeAxis": 2, "planeDepth": 1, "viewLens": 50, "clipStart": 0.01, "clipEnd": 1000, "showCameras": 1, "showLights": 1
-                 , "pickCameras": 1, "pickLights": 1, "outline": 1, "outlineColor0": 1, "outlineColor1": 0.55, "outlineColor2": 0.1, "bgColor0": 0.05, "bgColor1": 0.05, "bgColor2": 0.05, "orthoGrid": 1, "axisX": 1, "axisY": 1, "gridScale": 1, "gridLines": 10, "gridSubdiv": 10, "showCursor": 1, "showExtras": 1, "miniAxes": 2, "miniSize": 80, "miniBright": 1, "smoothTime": 0.2, "rotStep": 15, "gizmoSize": 75, "gizmoNavSize": 80, "autoPerspective": 1, "continuousGrab": 1, "orbitSens": 1, "pixelAspect0": 1, "pixelAspect1": 1, "fpsBase": 1, "stampLabels": 1, "stampSize": 12, "stampFg0": 1, "stampFg1": 1, "stampFg2": 1, "frameStep": 1, "unitSystem": 1, "unitScale": 1, "listObjects": 1, "listLights": 1, "listCameras": 1}
+                 , "pickCameras": 1, "pickLights": 1, "outlineSel": 1, "gamma": 1, "outlineColor0": 0.05, "outlineColor1": 0.05, "outlineColor2": 0.05,
+                 "bgColor0": 0.05, "bgColor1": 0.05, "bgColor2": 0.05,
+                 "orthoGrid": 1, "axisX": 1, "axisY": 1, "gridScale": 1, "gridLines": 10, "gridSubdiv": 10, "showCursor": 1, "showExtras": 1,
+                 "miniAxes": 2, "miniSize": 80, "miniBright": 1, "smoothTime": 0.2, "rotStep": 15, "gizmoSize": 75, "gizmoNavSize": 80, "autoPerspective": 1, "continuousGrab": 1, "orbitSens": 1,
+                 "pixelAspect0": 1, "pixelAspect1": 1, "fpsBase": 1, "stampLabels": 1, "stampSize": 12, "stampFg0": 1, "stampFg1": 1, "stampFg2": 1, "frameStep": 1,
+                 "unitSystem": 1, "unitScale": 1, "listObjects": 1, "listLights": 1, "listCameras": 1}
 
 
 def build(ctx):

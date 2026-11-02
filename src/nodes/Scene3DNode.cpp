@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <sstream>
 
 #include "gl3.h"
@@ -71,6 +72,8 @@ namespace
       f(s.unitSystem); f(s.rotUnits); f(s.lengthUnit); f(s.unitScale);
       f(s.listCase); f(s.listComplete); f(s.listSort); f(s.colSelect); f(s.colRender);
       f(s.listObjects); f(s.listInvert); f(s.listLights); f(s.listCameras); f(s.listState);
+      f(s.outlineSel);
+      f(s.dither); f(s.filterSize); f(s.gamma); f(s.look);
    }
 
    void Normalize(float v[3])
@@ -177,6 +180,11 @@ Scene3DNode::~Scene3DNode()
    GLUtil::DestroyFbo(mEditorFbo);
    GLUtil::DestroyFbo(mGridFbo);
    GLUtil::DestroyFbo(mBorderFbo);
+   GLUtil::DestroyFbo(mFinishFbo);
+   if (mFinishProgram != 0)
+      glDeleteProgram(mFinishProgram);
+   if (mStampTex != 0)
+      glDeleteTextures(1, &mStampTex);
    if (mBorderProgram != 0)
       glDeleteProgram(mBorderProgram);
    if (mCompositeProgram != 0)
@@ -1016,6 +1024,159 @@ unsigned int Scene3DNode::Border(unsigned int sceneTex, int w, int h)
    return mBorderFbo.tex;
 }
 
+// The picture's last touches: filter, gamma, look, dither and the burned-in stamp.
+unsigned int Scene3DNode::Finish(unsigned int sceneTex, int w, int h, int frameId)
+{
+   const Settings& st = settings;
+   const bool tint = st.dither > 0.0f || st.filterSize > 0.0f || st.gamma != 1.0f || st.look != 0;
+   std::string text;
+   if (st.stamp)
+   {
+      auto add = [&](const char* label, const std::string& value)
+      {
+         if (!text.empty())
+            text += "   ";
+         text += (st.stampLabels ? std::string(label) + " " : std::string()) + value;
+      };
+      char buf[96];
+      std::time_t now = std::time(nullptr);
+      std::tm tmv{};
+#ifdef _WIN32
+      localtime_s(&tmv, &now);
+#else
+      localtime_r(&now, &tmv);
+#endif
+      if (st.stampDate) { std::strftime(buf, sizeof(buf), "%Y-%m-%d", &tmv); add("Date", buf); }
+      if (st.stampTime) { std::strftime(buf, sizeof(buf), "%H:%M:%S", &tmv); add("Time", buf); }
+      if (st.stampFrame) add("Frame", std::to_string(frameId));
+      if (st.stampRange) add("Range", std::to_string(st.frameStart) + "-" + std::to_string((int)(st.seconds * st.fps)));
+      Item* cam = activeCamera != 0 ? FindItem(activeCamera) : nullptr;
+      if (st.stampCamera) add("Camera", cam != nullptr && !cam->name.empty() ? cam->name : std::string("Camera"));
+      if (st.stampLens)
+      {
+         INode* n = cam != nullptr && ResolveUid ? ResolveUid(cam->uid) : nullptr;
+         if (auto* cn = dynamic_cast<CameraNode*>(n))
+         {
+            std::snprintf(buf, sizeof(buf), "%.0f mm", 12.0f / std::tan(cn->fov * 0.5f * 3.14159265f / 180.0f));
+            add("Lens", buf);
+         }
+      }
+      if (st.stampScene) add("Scene", "Scene");
+      if (st.stampNote && !stampNote.empty()) add("Note", stampNote);
+   }
+   const bool stamped = !text.empty();
+   if (!tint && !stamped)
+      return sceneTex;
+   if (mFinishProgram == 0)
+      mFinishProgram = GLUtil::CompileProgram(
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uScene;\n"
+         "uniform sampler2D uStamp;\n"
+         "uniform vec2 uTexel;\n"
+         "uniform float uFilter, uGamma, uDither;\n"
+         "uniform int uLook, uStamped;\n"
+         "float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }\n"
+         "void main() {\n"
+         "   vec4 c = texture(uScene, vUv);\n"
+         "   if (uFilter > 0.0) {\n"
+         "      vec4 sum = c;\n"
+         "      for (int i = 0; i < 8; i++) {\n"
+         "         float a = 0.785398 * float(i);\n"
+         "         sum += texture(uScene, vUv + vec2(cos(a), sin(a)) * uTexel * uFilter);\n"
+         "      }\n"
+         "      c = sum / 9.0;\n"
+         "   }\n"
+         "   c.rgb = pow(max(c.rgb, vec3(0.0)), vec3(1.0 / max(uGamma, 0.05)));\n"
+         "   if (uLook > 0) {\n"
+         "      float k = uLook == 1 ? 0.25 : uLook == 2 ? 0.5 : uLook == 3 ? 0.8 : -0.35;\n"
+         "      vec3 sc = clamp(c.rgb, 0.0, 1.0); sc = sc * sc * (3.0 - 2.0 * sc);\n"
+         "      c.rgb = mix(c.rgb, sc, abs(k));\n"
+         "      if (k < 0.0) c.rgb = mix(c.rgb, vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))) * 0.9 + 0.05, 0.3);\n"
+         "   }\n"
+         "   if (uDither > 0.0) c.rgb += (hash(vUv / uTexel) - 0.5) * uDither / 255.0 * 2.0;\n"
+         "   if (uStamped == 1) {\n"
+         "      vec4 t = texture(uStamp, vUv);\n"
+         "      c.rgb = mix(c.rgb, t.rgb, t.a);\n"
+         "      c.a = max(c.a, t.a);\n"
+         "   }\n"
+         "   fragColor = c;\n"
+         "}\n");
+   if (mFinishProgram == 0 || !GLUtil::EnsureFbo(mFinishFbo, w, h))
+      return sceneTex;
+   if (stamped)
+   {
+      char key[160];
+      std::snprintf(key, sizeof(key), "%d %d %g %g %g %g %g %g %g|", w, h, st.stampSize, st.stampFg[0], st.stampFg[1],
+                    st.stampFg[2], st.stampBg[0], st.stampBg[1], st.stampBg[2]);
+      const std::string want = key + text;
+      if (want != mStampKey || mStampTex == 0)
+      {
+         mStampKey = want;
+         const int bar = std::max(4, (int)std::lround(st.stampSize * 1.8f * h / 720.0f));
+         std::vector<unsigned char> px((size_t)w * h * 4, 0);
+         for (int y = h - bar; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+               unsigned char* p = &px[((size_t)y * w + x) * 4];
+               p[0] = (unsigned char)(st.stampBg[0] * 255.0f);
+               p[1] = (unsigned char)(st.stampBg[1] * 255.0f);
+               p[2] = (unsigned char)(st.stampBg[2] * 255.0f);
+               p[3] = 255;
+            }
+         std::vector<unsigned char> glyphs((size_t)w * bar * 4, 0);
+         Platform::TextRasterRequest req;
+         req.text = text;
+         req.fontSize = st.stampSize * h / 720.0f;
+         req.color[0] = st.stampFg[0]; req.color[1] = st.stampFg[1]; req.color[2] = st.stampFg[2];
+         req.align = 0;
+         req.posX = 0.01f;
+         req.posY = 0.5f;
+         float fitted = 0;
+         Platform::RasterizeText(req, w, bar, glyphs.data(), fitted);
+         for (int y = 0; y < bar; y++)
+            for (int x = 0; x < w; x++)
+            {
+               const unsigned char* g = &glyphs[((size_t)y * w + x) * 4];
+               unsigned char* p = &px[((size_t)(h - bar + y) * w + x) * 4];
+               const float a = g[3] / 255.0f;
+               for (int k = 0; k < 3; k++)
+                  p[k] = (unsigned char)(p[k] * (1.0f - a) + g[k] * a);
+            }
+         // The rasterizer's top row is first; GL's row 0 is the bottom, so the bar lands at the bottom after a flip.
+         std::vector<unsigned char> flipped(px.size());
+         for (int y = 0; y < h; y++)
+            std::memcpy(&flipped[(size_t)y * w * 4], &px[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4);
+         if (mStampTex == 0)
+            glGenTextures(1, &mStampTex);
+         glBindTexture(GL_TEXTURE_2D, mStampTex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, flipped.data());
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      }
+   }
+   GLUtil::RunShaderPass(mFinishFbo, mFinishProgram, [&]
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, sceneTex);
+      glUniform1i(glGetUniformLocation(mFinishProgram, "uScene"), 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, stamped ? mStampTex : 0);
+      glUniform1i(glGetUniformLocation(mFinishProgram, "uStamp"), 1);
+      glActiveTexture(GL_TEXTURE0);
+      glUniform2f(glGetUniformLocation(mFinishProgram, "uTexel"), 1.0f / w, 1.0f / h);
+      glUniform1f(glGetUniformLocation(mFinishProgram, "uFilter"), st.filterSize);
+      glUniform1f(glGetUniformLocation(mFinishProgram, "uGamma"), st.gamma);
+      glUniform1f(glGetUniformLocation(mFinishProgram, "uDither"), st.dither);
+      glUniform1i(glGetUniformLocation(mFinishProgram, "uLook"), st.look);
+      glUniform1i(glGetUniformLocation(mFinishProgram, "uStamped"), stamped ? 1 : 0);
+   });
+   return mFinishFbo.tex;
+}
+
 void Scene3DNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -1023,7 +1184,16 @@ void Scene3DNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    Sync(frameId);
    ApplyWorld(mRender, true, !settings.transparent);
+   // Simplify: cook with the cheapest sampling, for a quick look.
+   const int keptSamples = mRender.samples, keptSuper = mRender.supersample;
+   if (settings.simplify)
+   {
+      mRender.samples = 0;
+      mRender.supersample = 1;
+   }
    mRender.CookIfNeeded(frameId);
+   mRender.samples = keptSamples;
+   mRender.supersample = keptSuper;
 
    unsigned int backdrop = 0;
    if (mWorldNode != nullptr && dynamic_cast<EnvironmentNode*>(mWorldNode) == nullptr && !settings.transparent &&
@@ -1035,6 +1205,10 @@ void Scene3DNode::CookIfNeeded(int frameId)
    mOutW = mOutH = 0;
    if (settings.border)
       mOutTex = Border(mOutTex, mRender.GetOutputWidth(), mRender.GetOutputHeight());
+   {
+      const int fw = mOutW > 0 ? mOutW : mRender.GetOutputWidth(), fh = mOutH > 0 ? mOutH : mRender.GetOutputHeight();
+      mOutTex = Finish(mOutTex, fw, fh, frameId);
+   }
    unsigned long long rev = mRender.TextureRevision() + (backdrop != 0 ? mWorldNode->TextureRevision() : 0);
    if (settings.border)
    {
@@ -1047,6 +1221,24 @@ void Scene3DNode::CookIfNeeded(int frameId)
          region = region * 1099511628211ull ^ bits;
       }
       rev += region;
+   }
+   {
+      // The finish changes the picture without a new render.
+      unsigned long long fin = 11;
+      std::vector<float> vals = { settings.dither, settings.filterSize, settings.gamma, (float)settings.look, (float)settings.stamp,
+                                  settings.stampSize, (float)(settings.stampTime + 2 * settings.stampDate + 4 * settings.stampFrame +
+                                  8 * settings.stampRange + 16 * settings.stampCamera + 32 * settings.stampLens +
+                                  64 * settings.stampScene + 128 * settings.stampNote + 256 * settings.stampLabels),
+                                  settings.stampFg[0], settings.stampFg[1], settings.stampFg[2], settings.stampBg[0],
+                                  settings.stampBg[1], settings.stampBg[2], settings.stamp ? (float)frameId : 0.0f };
+      for (float f : vals)
+      {
+         uint32_t bits;
+         std::memcpy(&bits, &f, sizeof(bits));
+         fin = fin * 1099511628211ull ^ bits;
+      }
+      fin = fin * 1099511628211ull ^ std::hash<std::string>()(stampNote);
+      rev += fin;
    }
    if (rev != mBuiltRevision)
    {
@@ -1108,6 +1300,14 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "uniform vec4 uPictureHalf;\n"  // half size in frame widths, then 1/frame aspect, alpha
          "uniform vec4 uPictureMove;\n"  // offset, rotation in radians, scale
          "uniform vec2 uPictureFlip;\n"
+         "uniform vec4 uGridOpt;\n"      // scale, subdivisions, range factor, 0
+         "uniform vec3 uAxisOn;\n"       // a line on each world axis
+         "uniform vec4 uOutline;\n"      // colour, on
+         "uniform vec3 uNearFar;\n"      // near, far, 1 when orthographic
+         "float linDepth(float d) {\n"
+         "   if (uNearFar.z > 0.5) return d;\n"
+         "   return 2.0 * uNearFar.x * uNearFar.y / (uNearFar.y + uNearFar.x - (2.0 * d - 1.0) * (uNearFar.y - uNearFar.x));\n"
+         "}\n"
          "vec4 picture() {\n"
          "   vec2 c = (vUv - uFrame.xy) / max(uFrame.zw - uFrame.xy, vec2(1e-6)) - 0.5;\n"
          "   vec2 q = vec2(c.x, c.y * uPictureHalf.z) - uPictureMove.xy;\n"
@@ -1148,21 +1348,38 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "      vec4 clip = uViewProj * vec4(p, 1.0);\n"
          "      float pd = clip.z / clip.w * 0.5 + 0.5;\n"
          "      float graze = abs(normalize(d)[uAxis]);\n"
-         "      float range = uDist * 14.0 + 12.0;\n"
+         "      float range = (uDist * 14.0 + 12.0) * uGridOpt.z;\n"
          "      float fade = (1.0 - smoothstep(range * 0.35, range, length(p - uEye))) * smoothstep(0.0, 0.06, graze);\n"
          "      if (t > 0.0 && t <= 1.0 && pd <= texture(uDepth, vUv).r + 1e-6 && fade > 0.0) {\n"
-         "         float level = log(max(uDist, 1e-3) * 0.25) / log(10.0);\n"
-         "         float scale = pow(10.0, floor(level));\n"
+         "         float sub = max(uGridOpt.y, 2.0);\n"
+         "         float level = log(max(uDist, 1e-3) * 0.25 / uGridOpt.x) / log(sub);\n"
+         "         float scale = pow(sub, floor(level)) * uGridOpt.x;\n"
          "         float step01 = fract(level);\n"
-         "         float grid = max(lines(uv, scale) * 0.4 * (1.0 - step01), lines(uv, scale * 10.0) * 0.75);\n"
+         "         float grid = max(lines(uv, scale) * 0.4 * (1.0 - step01), lines(uv, scale * sub) * 0.75);\n"
          "         vec3 col = vec3(0.329);\n"
          "         float ax = 1.0 - min(abs(uv.x) / max(fwidth(uv.x), 1e-5), 1.0);\n"
          "         float bx = 1.0 - min(abs(uv.y) / max(fwidth(uv.y), 1e-5), 1.0);\n"
-         "         if (ax > 0.0) { col = kAxis[ub]; grid = max(grid, ax); }\n"
-         "         if (bx > 0.0) { col = kAxis[ua]; grid = max(grid, bx); }\n"
+         "         if (ax > 0.0 && uAxisOn[ub] > 0.5) { col = kAxis[ub]; grid = max(grid, ax); }\n"
+         "         if (bx > 0.0 && uAxisOn[ua] > 0.5) { col = kAxis[ua]; grid = max(grid, bx); }\n"
          "         float g = grid * fade;\n"
          "         rgb = mix(rgb, col, g);\n"
          "         a = a + g * (1.0 - a);\n"
+         "      }\n"
+         "   }\n"
+         "   if (uOutline.w > 0.5) {\n"
+         "      vec2 px = 1.0 / vec2(textureSize(uDepth, 0));\n"
+         "      float d0 = texture(uDepth, vUv).r;\n"
+         "      if (d0 < 0.999999) {\n"
+         "         float l0 = linDepth(d0);\n"
+         "         float edge = 0.0;\n"
+         "         for (int i = 0; i < 4; i++) {\n"
+         "            vec2 o = vec2(i == 0 ? 1.0 : i == 1 ? -1.0 : 0.0, i == 2 ? 1.0 : i == 3 ? -1.0 : 0.0) * px;\n"
+         "            float ln = linDepth(texture(uDepth, vUv + o).r);\n"
+         "            float jump = uNearFar.z > 0.5 ? 0.0003 : 0.08 * l0;\n"
+         "            edge = max(edge, step(jump, ln - l0));\n"
+         "         }\n"
+         "         rgb = mix(rgb, uOutline.rgb, edge * 0.9);\n"
+         "         a = max(a, edge * 0.9);\n"
          "      }\n"
          "   }\n"
          "   if (uPictureOn == 2) {\n"
@@ -1225,6 +1442,15 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
       glUniform1i(glGetUniformLocation(mGridProgram, "uAxis"), v.gridAxis);
       glUniform1i(glGetUniformLocation(mGridProgram, "uDraw"), v.grid && mEditor->DepthValid() ? 1 : 0);
       glUniform1f(glGetUniformLocation(mGridProgram, "uDist"), v.gridDist);
+      glUniform4f(glGetUniformLocation(mGridProgram, "uGridOpt"), std::max(0.001f, settings.gridScale), (float)std::clamp(settings.gridSubdiv, 2, 100),
+                  std::clamp(settings.gridLines, 1, 200) / 10.0f, 0.0f);
+      // World axes: X, then the vertical one (shown as Z), then depth (shown as Y).
+      glUniform3f(glGetUniformLocation(mGridProgram, "uAxisOn"), settings.axisX ? 1.0f : 0.0f, settings.axisZ ? 1.0f : 0.0f, settings.axisY ? 1.0f : 0.0f);
+      const bool ortho = v.proj.m[15] != 0.0f;
+      const float pn = ortho ? 0.0f : v.proj.m[14] / (v.proj.m[10] - 1.0f), pf = ortho ? 1.0f : v.proj.m[14] / (v.proj.m[10] + 1.0f);
+      glUniform3f(glGetUniformLocation(mGridProgram, "uNearFar"), pn, pf, ortho ? 1.0f : 0.0f);
+      const bool outline = settings.outline && v.shading == Shading::Solid && mEditor->DepthValid();
+      glUniform4f(glGetUniformLocation(mGridProgram, "uOutline"), settings.outlineColor[0], settings.outlineColor[1], settings.outlineColor[2], outline ? 1.0f : 0.0f);
    });
    return mGridFbo.tex;
 }

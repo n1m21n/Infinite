@@ -8,10 +8,10 @@ SpaceView3D.render_border_min_x	deferred	renderer crop region needed
 SpaceView3D.render_border_min_y	deferred	renderer crop region needed
 SpaceView3D.render_border_max_x	deferred	renderer crop region needed
 SpaceView3D.render_border_max_y	deferred	renderer crop region needed
-SpaceView3D.lock_cursor	missing	View tab > Navigation
-SpaceView3D.lens	missing	View tab: viewport lens (the view has a fixed lens)
-SpaceView3D.clip_start	missing	View tab: viewport clip (the camera has its own)
-SpaceView3D.clip_end	missing	View tab: viewport clip (the camera has its own)
+SpaceView3D.lock_cursor	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.lens	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.clip_start	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.clip_end	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.lock_camera	done	View3DPanel.cpp:2443 Lock camera to view
 SpaceView3D.show_gizmo	done	View3DPanel.cpp:4012 Gizmos card
 SpaceView3D.show_gizmo_navigate	done	View3DPanel.cpp:4014 Navigate
@@ -21,10 +21,10 @@ SpaceView3D.show_gizmo_object_translate	done	View3DPanel.cpp:4012 Gizmos card mo
 SpaceView3D.show_gizmo_object_rotate	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
 SpaceView3D.show_gizmo_object_scale	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
 SpaceView3D.show_gizmo_empty_image	out	empty image objects are not in the scene
-SpaceView3D.show_gizmo_light_size	missing	light gizmo handles in the viewport
-SpaceView3D.show_gizmo_light_look_at	missing	light gizmo handles in the viewport
-SpaceView3D.show_gizmo_camera_lens	missing	camera gizmo handles in the viewport
-SpaceView3D.show_gizmo_camera_dof_distance	missing	camera gizmo handles in the viewport
+SpaceView3D.show_gizmo_light_size	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.show_gizmo_light_look_at	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.show_gizmo_camera_lens	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.show_gizmo_camera_dof_distance	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.use_local_camera	out	one scene camera; no per-view cameras
 SpaceView3D.region_quadviews	deferred	quad view: new mode, needs approval
 SpaceView3D.show_reconstruction	out	movie tracking, VR and geometry nodes are outside the README
@@ -38,16 +38,16 @@ SpaceView3D.show_object_viewport_meta	out	object type Infinite has no scene item
 SpaceView3D.show_object_viewport_pointcloud	out	object type Infinite has no scene item for
 SpaceView3D.show_object_viewport_volume	out	object type Infinite has no scene item for
 SpaceView3D.show_object_viewport_empty	out	object type Infinite has no scene item for
-SpaceView3D.show_object_viewport_camera	missing	View tab: per-type visibility filter
-SpaceView3D.show_object_viewport_light	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_camera	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.show_object_viewport_light	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.show_object_viewport_light_probe	missing	View tab: per-type visibility filter
 SpaceView3D.show_object_select_surf	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_meta	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_pointcloud	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_volume	out	object type Infinite has no scene item for
 SpaceView3D.show_object_select_empty	out	object type Infinite has no scene item for
-SpaceView3D.show_object_select_camera	missing	View tab: per-type selectability filter
-SpaceView3D.show_object_select_light	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_camera	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+SpaceView3D.show_object_select_light	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 SpaceView3D.show_object_select_light_probe	missing	View tab: per-type selectability filter
 SpaceView3D.icon_from_show_object_viewport	out	UI icon helper
 SpaceView3D.show_viewer	out	movie tracking, VR and geometry nodes are outside the README
@@ -66,14 +66,14 @@ RegionView3D.view_distance	done	View3DPanel.cpp: orbit distance (zoom)
 RegionView3D.view_camera_zoom	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
 RegionView3D.view_camera_offset	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
 View3DCursor.location	done	View3DPanel.cpp:3981 3D Cursor card
-View3DCursor.rotation_quaternion	missing	3D Cursor card: cursor has a location only
-View3DCursor.rotation_axis_angle	missing	3D Cursor card: cursor has a location only
-View3DCursor.rotation_euler	missing	3D Cursor card: cursor has a location only
-View3DCursor.rotation_mode	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_quaternion	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DCursor.rotation_axis_angle	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DCursor.rotation_euler	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DCursor.rotation_mode	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DCursor.matrix	out	derived matrix, not a setting
 View3DShading.type	done	View3DPanel.cpp:2926 Wireframe/Solid/Rendered chips
 View3DShading.light	deferred	studio lights and matcaps need shader work
-View3DShading.show_object_outline	missing	Overlays card: selection outline in Solid
+View3DShading.show_object_outline	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DShading.studio_light	deferred	studio lights and matcaps need shader work
 View3DShading.use_world_space_lighting	deferred	studio lights and matcaps need shader work
 View3DShading.show_backface_culling	deferred	renderer face culling option
@@ -92,8 +92,8 @@ View3DShading.use_studiolight_view_rotation	deferred	studio lights and matcaps n
 View3DShading.color_type	deferred	Solid shader colour modes needed
 View3DShading.wireframe_color_type	deferred	Solid shader colour modes needed
 View3DShading.single_color	deferred	Solid shader colour modes needed
-View3DShading.background_type	missing	View tab: Solid view background
-View3DShading.background_color	missing	View tab: Solid view background
+View3DShading.background_type	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DShading.background_color	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DShading.show_shadows	deferred	Solid shader work, perf-gated
 View3DShading.show_xray	deferred	X-ray needs renderer work
 View3DShading.show_xray_wireframe	deferred	X-ray needs renderer work
@@ -105,30 +105,30 @@ View3DShading.use_scene_world	done	View3DPanel.cpp:2930 Rendered uses scene ligh
 View3DShading.use_scene_lights_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
 View3DShading.use_scene_world_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
 View3DShading.show_specular_highlight	deferred	Solid shader work, perf-gated
-View3DShading.object_outline_color	missing	Overlays card: outline colour
+View3DShading.object_outline_color	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DShading.shadow_intensity	deferred	Solid shader work, perf-gated
 View3DShading.render_pass	deferred	render passes in the viewport need renderer work
 View3DShading.aov_name	deferred	render passes in the viewport need renderer work
 View3DOverlay.show_overlays	done	View3DPanel.cpp:2950 Overlays chip
-View3DOverlay.show_ortho_grid	missing	Overlays card: grid and axis options
+View3DOverlay.show_ortho_grid	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_floor	done	View3DPanel.cpp:2948 Grid chip
-View3DOverlay.show_axis_x	missing	Overlays card: grid and axis options
-View3DOverlay.show_axis_y	missing	Overlays card: grid and axis options
-View3DOverlay.show_axis_z	missing	Overlays card: grid and axis options
-View3DOverlay.grid_scale	missing	Overlays card: grid and axis options
-View3DOverlay.grid_lines	missing	Overlays card: grid and axis options
-View3DOverlay.grid_scale_unit	missing	Overlays card: grid and axis options
-View3DOverlay.show_outline_selected	missing	Overlays card: selection outline
+View3DOverlay.show_axis_x	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.show_axis_y	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.show_axis_z	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.grid_scale	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.grid_lines	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.grid_scale_unit	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.show_outline_selected	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_object_origins	done	View3DPanel.cpp: origin dot of selected items
 View3DOverlay.show_object_origins_all	done	View3DPanel.cpp:4010 Origins (all)
 View3DOverlay.show_relationship_lines	out	no parenting in the scene, groups only
-View3DOverlay.show_cursor	missing	Overlays card: hide the 3D cursor
+View3DOverlay.show_cursor	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_stats	done	View3DPanel.cpp:4009 Statistics
-View3DOverlay.show_performance	missing	Overlays card: frame time line
+View3DOverlay.show_performance	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_camera_guides	done	View3DPanel.cpp:4024 Composition Guides
 View3DOverlay.show_camera_passepartout	done	View3DPanel.cpp:4017 Passepartout
-View3DOverlay.show_extras	missing	Overlays card: hide camera and light markers
-View3DOverlay.show_light_colors	missing	Overlays card: tint light markers
+View3DOverlay.show_extras	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
+View3DOverlay.show_light_colors	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 View3DOverlay.show_fade_inactive	out	edit mode, paint, curves or debug
 View3DOverlay.fade_inactive_alpha	out	edit mode, paint, curves or debug
 View3DOverlay.show_look_dev	out	edit mode, paint, curves or debug
@@ -624,16 +624,16 @@ WorldLighting.distance	done	View3DPanel.cpp:3875 Ambient Occlusion Distance
 RenderSettings.resolution_x	done	View3DPanel.cpp:3899 Resolution X
 RenderSettings.resolution_y	done	View3DPanel.cpp:3901 Y
 RenderSettings.resolution_percentage	done	View3DPanel.cpp:3903 Resolution %
-RenderSettings.pixel_aspect_x	missing	Render tab > Format: pixel aspect
-RenderSettings.pixel_aspect_y	missing	Render tab > Format: pixel aspect
+RenderSettings.pixel_aspect_x	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.pixel_aspect_y	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.ppm_factor	out	image metadata
 RenderSettings.ppm_base	out	image metadata
 RenderSettings.fps	done	View3DPanel.cpp:3911 Frame rate
-RenderSettings.fps_base	missing	Render tab > Format: 23.976 / 29.97 rates
+RenderSettings.fps_base	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.frame_map_old	out	time remap belongs to Timeline and Shots
 RenderSettings.frame_map_new	out	time remap belongs to Timeline and Shots
-RenderSettings.dither_intensity	missing	Render tab > Output: dither
-RenderSettings.filter_size	missing	Render tab > Sampling: pixel filter width
+RenderSettings.dither_intensity	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.filter_size	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.film_transparent	done	View3DPanel.cpp:3884 Transparent
 RenderSettings.threads	out	app-wide performance, not per scene
 RenderSettings.threads_mode	out	app-wide performance, not per scene
@@ -654,32 +654,32 @@ RenderSettings.file_extension	out	the Output node owns file naming
 RenderSettings.use_lock_interface	out	app-wide performance, not per scene
 RenderSettings.filepath	done	Output node path; Render Image writes there (View3DPanel.cpp:3937)
 RenderSettings.use_render_cache	out	app-wide performance, not per scene
-RenderSettings.use_stamp_time	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_date	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_frame	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_frame_range	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_camera	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_lens	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_scene	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp_note	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_time	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_date	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_frame	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_frame_range	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_camera	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_lens	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_scene	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_note	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.use_stamp_marker	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_filename	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_sequencer_strip	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_render_time	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.stamp_note_text	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.use_stamp	missing	Render tab > Output: burn-in stamp
-RenderSettings.use_stamp_labels	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_note_text	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.use_stamp_labels	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.metadata_input	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_memory	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_hostname	out	metadata of the .blend, sequencer or machine
-RenderSettings.stamp_font_size	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.stamp_foreground	missing	Render tab > Output: burn-in stamp fields
-RenderSettings.stamp_background	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_font_size	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.stamp_foreground	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
+RenderSettings.stamp_background	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.use_single_layer	out	one view layer, no stereo views
 RenderSettings.views	out	one view layer, no stereo views
 RenderSettings.engine	out	Render 3D is the only renderer
 RenderSettings.has_multiple_engines	out	one view layer, no stereo views
-RenderSettings.use_simplify	missing	Render tab > Sampling: simplify for preview
+RenderSettings.use_simplify	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.simplify_volumes	out	volumes and Freestyle lines
 RenderSettings.use_persistent_data	out	app-wide performance, not per scene
 RenderSettings.line_thickness_mode	out	volumes and Freestyle lines
@@ -746,10 +746,10 @@ SceneDisplay.matcap_ssao_attenuation	deferred	Solid shader work, perf-gated
 SceneDisplay.matcap_ssao_samples	deferred	Solid shader work, perf-gated
 SceneDisplay.render_aa	done	View3DPanel.cpp:3857 Sampling Render supersample
 SceneDisplay.viewport_aa	done	View3DPanel.cpp:3854 Sampling Viewport
-ColorManagedViewSettings.look	missing	Render tab > Color Management
+ColorManagedViewSettings.look	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 ColorManagedViewSettings.view_transform	done	View3DPanel.cpp:3887 Color Management View
 ColorManagedViewSettings.exposure	done	View3DPanel.cpp:3888 Exposure
-ColorManagedViewSettings.gamma	missing	Render tab > Color Management
+ColorManagedViewSettings.gamma	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 ColorManagedViewSettings.curve_mapping	out	grading belongs to Color nodes after Output
 ColorManagedViewSettings.use_curve_mapping	out	grading belongs to Color nodes after Output
 ColorManagedViewSettings.use_white_balance	out	grading belongs to Color nodes after Output
@@ -807,14 +807,14 @@ Scene.frame_subframe	out	transport and timeline belong to the app
 Scene.frame_float	out	transport and timeline belong to the app
 Scene.frame_start	missing	Render tab > Frame Range: start and step
 Scene.frame_end	done	View3DPanel.cpp:3917 Seconds sets the render length
-Scene.frame_step	missing	Render tab > Frame Range: start and step
+Scene.frame_step	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 Scene.time_jump_unit	out	transport and timeline belong to the app
 Scene.time_jump_delta	out	transport and timeline belong to the app
 Scene.frame_current_final	out	transport and timeline belong to the app
 Scene.lock_frame_selection_to_range	out	transport and timeline belong to the app
 Scene.show_subframe	out	transport and timeline belong to the app
 Scene.show_keys_from_selected_only	out	transport and timeline belong to the app
-Scene.use_stamp_note	missing	Render tab > Output: stamp note
+Scene.use_stamp_note	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 Scene.use_custom_simulation_range	out	simulation and physics
 Scene.simulation_frame_start	out	simulation and physics
 Scene.simulation_frame_end	out	simulation and physics
@@ -828,11 +828,11 @@ Scene.audio_volume	out	audio, tracking, layers and Hydra are outside the 3D View
 Scene.active_clip	out	audio, tracking, layers and Hydra are outside the 3D View
 Scene.view_layers	out	audio, tracking, layers and Hydra are outside the 3D View
 Scene.hydra	out	audio, tracking, layers and Hydra are outside the 3D View
-UnitSettings.system	missing	View tab: scene units
-UnitSettings.system_rotation	missing	View tab: scene units
-UnitSettings.scale_length	missing	View tab: scene units
+UnitSettings.system	done	View3DPanel.cpp:2171 Units card and Location/Rotation rows
+UnitSettings.system_rotation	done	View3DPanel.cpp:2171 Units card and Location/Rotation rows
+UnitSettings.scale_length	done	View3DPanel.cpp:2171 Units card and Location/Rotation rows
 UnitSettings.use_separate	out	display-only units for physics and time
-UnitSettings.length_unit	missing	View tab: scene units
+UnitSettings.length_unit	done	View3DPanel.cpp:2171 Units card and Location/Rotation rows
 UnitSettings.mass_unit	out	display-only units for physics and time
 UnitSettings.time_unit	out	display-only units for physics and time
 UnitSettings.temperature_unit	out	display-only units for physics and time
@@ -881,27 +881,27 @@ ViewLayerEEVEE.use_pass_bloom	deferred	EEVEE layer terms need renderer work
 ViewLayerEEVEE.use_pass_transparent	deferred	EEVEE layer terms need renderer work
 ViewLayerEEVEE.ambient_occlusion_distance	deferred	EEVEE layer terms need renderer work
 SpaceOutliner.display_mode	out	one flat list of scene items
-SpaceOutliner.use_filter_case_sensitive	missing	Scene tab: search and sort options
-SpaceOutliner.use_filter_complete	missing	Scene tab: search and sort options
-SpaceOutliner.use_sort_alpha	missing	Scene tab: search and sort options
+SpaceOutliner.use_filter_case_sensitive	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
+SpaceOutliner.use_filter_complete	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
+SpaceOutliner.use_sort_alpha	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.use_sync_select	done	View3DPanel.cpp:201 FollowCanvasSelection: selection syncs with the canvas
 SpaceOutliner.show_mode_column	out	modes, view layers, holdout
 SpaceOutliner.show_restrict_column_enable	out	modes, view layers, holdout
-SpaceOutliner.show_restrict_column_select	missing	Scene tab: selectable column
+SpaceOutliner.show_restrict_column_select	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.show_restrict_column_hide	done	View3DPanel.cpp:3283 eye toggle per row
 SpaceOutliner.show_restrict_column_viewport	out	modes, view layers, holdout
-SpaceOutliner.show_restrict_column_render	missing	Scene tab: render toggle column
+SpaceOutliner.show_restrict_column_render	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.show_restrict_column_holdout	out	modes, view layers, holdout
 SpaceOutliner.show_restrict_column_indirect_only	out	modes, view layers, holdout
-SpaceOutliner.use_filter_object	missing	Scene tab: filter by object
+SpaceOutliner.use_filter_object	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.use_filter_object_content	out	no contents, children, layers or empties
 SpaceOutliner.use_filter_children	out	no contents, children, layers or empties
 SpaceOutliner.use_filter_view_layers	out	no contents, children, layers or empties
-SpaceOutliner.filter_state	missing	Scene tab: state filter
-SpaceOutliner.filter_invert	missing	Scene tab: state filter
+SpaceOutliner.filter_state	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
+SpaceOutliner.filter_invert	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.use_filter_object_empty	out	no contents, children, layers or empties
-SpaceOutliner.use_filter_object_light	missing	Scene tab: type filter
-SpaceOutliner.use_filter_object_camera	missing	Scene tab: type filter
+SpaceOutliner.use_filter_object_light	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
+SpaceOutliner.use_filter_object_camera	done	View3DPanel.cpp:3732 Outliner Filter card, columns, sort
 SpaceOutliner.use_filter_object_others	out	no contents, children, layers or empties
 OUTLINER_OT_animdata_operation	out	data-blocks, libraries, overrides, keying sets or orphans
 OUTLINER_OT_clear_filter	done	View3DPanel.cpp:3185 Search field
@@ -1000,7 +1000,7 @@ PreferencesView.show_tooltips_python	out	app-wide UI preferences
 PreferencesView.show_object_info	done	View3DPanel.cpp:4008 Text info
 PreferencesView.show_view_name	done	View3DPanel.cpp:4008 Text info
 PreferencesView.show_splash	out	app-wide UI preferences
-PreferencesView.show_playback_fps	missing	Overlays card: frame rate
+PreferencesView.show_playback_fps	done	View3DPanel.cpp:4898 View tab: lens, clip, cursor lock, gizmos, pick/show filters, cursor rotation, grid and overlay rows
 PreferencesView.show_navigate_ui	done	View3DPanel.cpp:4014 Navigate gizmo
 PreferencesView.use_mouse_over_open	out	app-wide UI preferences
 PreferencesView.mini_axis_type	missing	View tab: navigation gizmo size and brightness
