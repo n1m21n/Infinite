@@ -1716,18 +1716,14 @@ namespace app
             ImGui::Spacing();
             DrawCliSetupSection();
 
-            FormParts::Section(T("Terminal panel"));
-            ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
-            ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
-            if (FormParts::Button(gTerminalOpen ? L("Close Terminal") : L("Open Terminal")))
-            {
-               gTerminalOpen = !gTerminalOpen;
-               gTerminalFocus = gTerminalOpen;
-            }
-            SectionCard::End();
-
             FormParts::Section(T("Reference"));
             ImGui::TextDisabled("%s", T("Commands, headless rendering and AI skill files, for when you work outside the connected agent."));
+            if (ImGui::TreeNode(T("The Terminal panel")))
+            {
+               ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
+               ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
+               ImGui::TreePop();
+            }
             if (ImGui::TreeNode(T("The infinite command")))
             {
                ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));

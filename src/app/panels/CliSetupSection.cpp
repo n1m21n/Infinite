@@ -5,6 +5,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
+#include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
 #include "platform/AppPaths.h"
@@ -79,8 +80,9 @@ namespace app
       const HealthReport health = LatestHealth();
       const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
 
-      FormParts::Section(T("Command line & agents"));
-      ImGui::TextWrapped("%s", T("Adds the infinite command to your terminal and connects your coding agent to Infinite. It runs in a Terminal tab you can watch. Nothing is installed until you press a button."));
+      FormParts::Section(T("Terminal & coding agent"));
+      ImGui::TextDisabled("%s", T("Connect your coding agent to Infinite. It runs in a Terminal tab you can watch."));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
 
       static std::string sError;
       auto perform = [&](Action a, const std::string& step = std::string())
@@ -89,47 +91,128 @@ namespace app
          Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, step, &sStatus);
          sLastRead = -10.0;
       };
+      using Kind = ActionButton::Kind;
+      const ImVec2 wide(FormParts::ControlW(), FormParts::kRowH);
+      auto button = [&](const char* label, Kind kind) { return ActionButton::Draw(label, wide, kind); };
+
+      bool allGreen = sStatus.present && !sStatus.running;
+      bool anyFailed = false;
+      for (const StepStatus& st : v.steps)
+      {
+         allGreen = allGreen && st.Green();
+         anyFailed = anyFailed || st.state == StepState::kFailed;
+      }
+
+      // One status line: a glyph, then the sentence.
+      FormParts::Label(L("Status"));
+      {
+         StepStatus mark;
+         mark.state = allGreen ? StepState::kOk : anyFailed ? StepState::kFailed : sStatus.running ? StepState::kRunning : sStatus.present ? StepState::kRepair : StepState::kPending;
+         const float icon = ImGui::GetFrameHeight();
+         DrawStepIcon(mark, icon);
+         FormParts::Inline();
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(T(v.summary.c_str()));
+      }
+
+      {
+         std::string items;
+         int cur = 0;
+         for (size_t i = 0; i < Agents().size(); i++)
+         {
+            items += Agents()[i].name;
+            items.push_back('\0');
+            if (&Agents()[i] == agent)
+               cur = (int)i;
+         }
+         items.push_back('\0');
+         if (FormParts::Combo(L("Coding agent"), &cur, items.c_str()))
+         {
+            prefs.agent = Agents()[(size_t)cur].id;
+            SaveConfig(paths.config, prefs);
+         }
+      }
 
       FormParts::Label(L("Setup"));
       ImGui::BeginDisabled(!v.setupEnabled);
-      if (FormParts::Button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str()))
+      if (button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str(), allGreen ? Kind::Plain : Kind::Primary))
          perform(Action::kSetup);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Details. Each step checks first and skips what is already done, so run it again any time to repair."));
-      FormParts::Inline();
-      ImGui::AlignTextToFramePadding();
-      ImGui::TextDisabled("%s", T(v.summary.c_str()));
+         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Show commands. Each step checks first and skips what is already done, so run it again any time to repair."));
 
-      const float icon = ImGui::GetTextLineHeight();
-      bool allGreen = sStatus.present && !sStatus.running;
-      for (const StepStatus& st : v.steps)
-         allGreen = allGreen && st.Green();
-      for (const StepStatus& s : v.steps)
+      FormParts::Label(L("Agent"));
+      if (v.showInstall)
       {
-         if (allGreen)
-            break;   // everything holds: the list stays out of the way
-         ImGui::PushID(s.id);
-         DrawStepIcon(s, icon);
-         FormParts::Inline();
-         ImGui::TextUnformatted(T(s.title));
-         if (!s.detail.empty())
-         {
-            FormParts::Inline();
-            ImGui::TextDisabled("%s", s.detail.c_str());
-         }
-         if (s.state == StepState::kRepair)
-         {
-            FormParts::Inline();
-            if (FormParts::Button(L("Repair")))
-               perform(Action::kRepairStep, s.id);
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", T("Opens a Terminal tab and reruns only this step."));
-         }
-         ImGui::PopID();
+         if (button((std::string(T("Install")) + "###cli_install").c_str(), Kind::Primary))
+            perform(Action::kInstallAgent);
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Show commands."));
+      }
+      else
+      {
+         ImGui::BeginDisabled(!v.startEnabled);
+         if (button((std::string(T("Start agent")) + "###cli_start").c_str(), Kind::Plain))
+            perform(Action::kStartAgent);
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            HelpTip("%s", T(v.loginHint.c_str()));
       }
 
-      if (ImGui::TreeNode(T("Details")))
+      {
+         bool autoStart = prefs.autoStart;
+         ImGui::BeginDisabled(!v.startEnabled);
+         if (FormParts::Switch(L("Start with Terminal"), &autoStart))
+         {
+            prefs.autoStart = autoStart;
+            SaveConfig(paths.config, prefs);
+         }
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
+      }
+
+      FormParts::Label(L("Terminal panel"));
+      if (button(gTerminalOpen ? "Close Terminal###cli_term" : "Open Terminal###cli_term", Kind::Plain))
+      {
+         gTerminalOpen = !gTerminalOpen;
+         gTerminalFocus = gTerminalOpen;
+      }
+
+      // Only what is wrong is listed; when everything holds the steps stay out of the way.
+      if (!allGreen)
+      {
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         const float icon = ImGui::GetTextLineHeight();
+         for (const StepStatus& s : v.steps)
+         {
+            if (s.Green())
+               continue;
+            ImGui::PushID(s.id);
+            DrawStepIcon(s, icon);
+            FormParts::Inline();
+            ImGui::TextUnformatted(T(s.title));
+            if (!s.detail.empty())
+            {
+               FormParts::Inline();
+               ImGui::TextDisabled("%s", s.detail.c_str());
+            }
+            if (s.state == StepState::kRepair)
+            {
+               FormParts::Inline();
+               if (FormParts::Button(L("Repair")))
+                  perform(Action::kRepairStep, s.id);
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", T("Opens a Terminal tab and reruns only this step."));
+            }
+            ImGui::PopID();
+         }
+      }
+      if (!sError.empty())
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+
+      if (ImGui::TreeNode(T("Show commands")))
       {
          ImGui::TextDisabled("%s", T("Connect terminal & agent types this line, and runs the script below it:"));
          ImGui::TextUnformatted(v.setupLine.c_str());
@@ -153,52 +236,6 @@ namespace app
          ImGui::TreePop();
       }
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-      {
-         std::string items;
-         int cur = 0;
-         for (size_t i = 0; i < Agents().size(); i++)
-         {
-            items += Agents()[i].name;
-            items.push_back('\0');
-            if (&Agents()[i] == agent)
-               cur = (int)i;
-         }
-         items.push_back('\0');
-         if (FormParts::Combo(L("Coding agent"), &cur, items.c_str()))
-         {
-            prefs.agent = Agents()[(size_t)cur].id;
-            SaveConfig(paths.config, prefs);
-         }
-      }
-      FormParts::Label("##agent_actions");
-      if (v.showInstall)
-      {
-         if (FormParts::Button(L("Install")))
-            perform(Action::kInstallAgent);
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Details."));
-         FormParts::Inline();
-      }
-      ImGui::BeginDisabled(!v.startEnabled);
-      if (FormParts::Button(L("Start agent")))
-         perform(Action::kStartAgent);
-      ImGui::EndDisabled();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T(v.loginHint.c_str()));
-      if (v.startEnabled)
-      {
-         bool autoStart = prefs.autoStart;
-         if (FormParts::Switch(L("Start with Terminal"), &autoStart))
-         {
-            prefs.autoStart = autoStart;
-            SaveConfig(paths.config, prefs);
-         }
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
-      }
-      if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       SectionCard::End();
    }
 }
