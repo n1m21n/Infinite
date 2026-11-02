@@ -131,7 +131,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-350 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+351 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -212,6 +212,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
 | `Screw` | geo:geometry | out:geometry | 76 | bypass |
+| `Sculpt` | geo:geometry | out:geometry | 3 | bypass |
 | `Select` | geo:geometry | out:geometry | 76 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |

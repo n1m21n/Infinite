@@ -714,7 +714,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-350 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+351 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -796,6 +796,7 @@ R"AISKILL(| `Material` | geo:geometry, albedo:image, roughness:image, metallic:i
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
 | `Screw` | geo:geometry | out:geometry | 76 | bypass |
+| `Sculpt` | geo:geometry | out:geometry | 3 | bypass |
 | `Select` | geo:geometry | out:geometry | 76 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
@@ -967,9 +968,9 @@ R"AISKILL(| `Material` | geo:geometry, albedo:image, roughness:image, metallic:i
 | `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator, fist:modulator, point:modulator, peace:modulator, thumbs up:modulator, ok:modulator, rock:modulator | 3 | bypass |
 | `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
 | `Invert` | in:modulator | out:modulator | 3 | bypass |
-| `LFO` | trig:modulator | out:modulator | 11 | bypass |
 )AISKILL"
-R"AISKILL(| `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
+R"AISKILL(| `LFO` | trig:modulator | out:modulator | 11 | bypass |
+| `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
 | `MIDI Trigger` | none | out:modulator | 6 | hardware: refused headless, bypass |
 | `MSEG` | trig:modulator | out:modulator | 8 | bypass |
 | `Math` | input:modulator, input_2:modulator | out:modulator | 6 |  |

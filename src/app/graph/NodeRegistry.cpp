@@ -117,6 +117,7 @@ namespace app
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
       REGISTER_NODE(MergeByDistanceNode, Merge by Distance, "3D");
       REGISTER_NODE(BakeNode, Bake, "3D");
+      REGISTER_NODE(SculptNode, Sculpt, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
       REGISTER_NODE(Group3DNode, Group 3D, "3D");
       REGISTER_NODE(Scene3DNode, 3D View, "3D");

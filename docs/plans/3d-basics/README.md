@@ -61,8 +61,8 @@ Not building: texture painting, UDIM tiles, a UV editor with hand-placed seams.
 
 | Step | What | Decision |
 |---|---|---|
-| S1 | Sculpt node plus brushes in the 3D View | A pass-through node that holds an offset per vertex, with its own subdivide level (0 to 3). Select its item, then use the header's Sculpt chip or Ctrl+Tab. Seven brushes: Draw, Smooth, Grab, Inflate, Pinch, Flatten, Crease. F sets the radius, Shift+F the strength, Ctrl inverts. X / Y / Z symmetry. A face selection upstream acts as the mask. Each stroke is one undo step. |
-| S2 | Strength as a param | The node's Amount (0 to 2) blends the sculpt in. A sculpt becomes a shape key that audio or an LFO can drive. To layer sculpts, chain Sculpt nodes. |
+| S1 ✅ | Sculpt node plus brushes in the 3D View | Sculpt node: pass-through, holds an offset per welded point (vertices split at UV or normal seams share one, so strokes never crack), Level subdivides first (0-3). Ctrl+Tab or the header's Sculpt chip on the selected item adds the node if missing; a rigged item still poses. Seven brushes in a pill bar (keys X S G I P, Shift+T Flatten, Shift+C Crease), Shift smooths, Ctrl inverts, F / Shift+F drag radius / strength, X Y Z symmetry through the mesh origin. Brush radius is in screen pixels. A face selection upstream masks. One undo step per stroke: offsets are saved as a quantised base64 Text param (only moved points), so undo and save use the normal patch snapshot. A changed point count keeps the offsets, stops applying them and warns. SCULPTTEST. |
+| S2 ✅ | Strength as a param | Amount (0-2) scales the offsets; strokes are divided by it, so painting at any Amount moves the surface by what you see. Modulatable like any param. Layering = chain Sculpt nodes. |
 
 If the input's vertex count changes, the node keeps its offsets, stops
 applying them and shows "topology changed". Not building: dyntopo, multires

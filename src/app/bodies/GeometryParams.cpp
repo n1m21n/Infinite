@@ -1097,6 +1097,18 @@ namespace app
    }
 
 
+   void DrawSculptParams(SculptNode* n)
+   {
+      ModSlider("amount", &n->amount, 0.0f, 2.0f);
+      ModSliderInt("level", &n->level, 0, 3);
+      if (!gParamRegisterOnly && n->HasSculpt() && ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
+      {
+         PushUndoCheckpoint("Clear sculpt");
+         n->Clear();
+      }
+   }
+
+
    void DrawText3DParams(Text3DNode* n)
    {
       char buf[256];

@@ -567,6 +567,7 @@ set(COMMON_SOURCES
     src/app/selftest/Render3DHdrTests.cpp
     src/app/selftest/RigTests.cpp
     src/app/selftest/BakeTests.cpp
+    src/app/selftest/SculptTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
@@ -596,6 +597,7 @@ set(COMMON_SOURCES
     src/core/SweepRevolve.cpp
     src/core/BevelInset.cpp
     src/core/UVProject.cpp
+    src/core/Sculpt.cpp
     src/core/MeshDecimate.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
@@ -787,6 +789,7 @@ set(COMMON_SOURCES
     src/nodes/CurveOpsNode.cpp
     src/nodes/ArmatureNode.cpp
     src/nodes/BakeNode.cpp
+    src/nodes/SculptNode.cpp
     src/nodes/SweepRevolveNodes.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp

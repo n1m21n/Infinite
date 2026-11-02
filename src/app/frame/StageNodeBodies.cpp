@@ -1041,6 +1041,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawMergeByDistanceParams(n);
                else if (auto* n = dynamic_cast<BakeNode*>(gn.node.get()))
                   DrawBakeParams(n);
+               else if (auto* n = dynamic_cast<SculptNode*>(gn.node.get()))
+                  DrawSculptParams(n);
                else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                   DrawSwitcher3DParams(n);
                else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))

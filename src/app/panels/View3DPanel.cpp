@@ -123,6 +123,26 @@ namespace
       float q0[4] = { 0, 0, 0, 1 };
       float before[3] = { 0, 0, 0 };
    } sPose;
+   void ToggleSculpt(Scene3DNode* scene);
+   IRigged* PoseModel(const Item& it, Mat4& world);
+   // Sculpt mode's state; the mode itself is drawn by DrawSculpt.
+   struct SculptState
+   {
+      bool on = false;
+      int item = 0;
+      int brush = Sculpt::kDraw;
+      float radius = 50.0f;          // screen pixels, Blender's default
+      float strength = 0.5f;
+      int symmetry = 1;              // X on, as in Blender
+      bool stroking = false;
+      ImVec2 last;
+      int adjust = 0;                // 'r' radius, 's' strength (F / Shift+F)
+      ImVec2 adjustAt;
+      float adjustBefore = 0.0f;
+      std::vector<float> pos, nrm, posBase;
+      Sculpt::GrabHold grab;
+      float grabWorld[3] = { 0, 0, 0 };
+   } sSculpt;
    float sDist = 6.0f, sAz = 0.7f, sEl = 0.4f;
 
    bool sLasso = false;
@@ -135,8 +155,9 @@ namespace
    // drawing has let go of it.
    struct Pending
    {
-      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene } what = None;
+      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene, Sculpt } what = None;
       int lightType = 1;
+      int item = 0;
       uint64_t uid = 0;
    } sPending;
 
@@ -2077,6 +2098,7 @@ namespace
       if (MenuParts::Item(T("Follow Active"), "Ctrl+P", false, sSel.size() > 1)) FollowActive(scene, false);
       if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
       if (MenuParts::Item(T("Pose Mode"), "Ctrl+Tab", sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Sculpt Mode"), "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
@@ -2257,7 +2279,15 @@ namespace
       if (io.KeyShift && !command && pressed(ImGuiKey_B))
          sZoomArmed = true;
       if (command && !io.KeyShift && pressed(ImGuiKey_Tab))
-         TogglePose(scene);
+      {
+         // A rig poses; anything else sculpts.
+         Mat4 world;
+         const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+         if (it != nullptr && PoseModel(*it, world) != nullptr)
+            TogglePose(scene);
+         else
+            ToggleSculpt(scene);
+      }
       if (io.KeyShift && !command && pressed(ImGuiKey_Tab))
       {
          PushUndoCheckpoint("Snap in 3D View");
@@ -3068,6 +3098,339 @@ namespace
          sPose.startAngle = std::atan2(mouse.y - c.y, mouse.x - c.x);
          sPose.turning = true;
       }
+      return true;
+   }
+
+   // Sculpt mode (Ctrl+Tab on an item with no rig, or the brush chip):
+   // brushes paint the offsets held by the item's Sculpt node (one is
+   // added after the item's node if it has none). Each stroke is one undo
+   // step. Blender's keys: X Draw, S Smooth, G Grab, I Inflate, P Pinch,
+   // Shift+T Flatten, Shift+C Crease; F radius, Shift+F strength; Ctrl
+   // inverts, Shift smooths.
+
+   // The Sculpt node under an item (the one nearest the view) and the
+   // matrix from its mesh space to the view's world.
+   SculptNode* SculptOf(const Item& it, Mat4& world)
+   {
+      GraphNode* gn = FindNodeByUid(it.uid);
+      auto* top = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
+      SculptNode* node = nullptr;
+      for (IGeometrySource* s = top; s != nullptr && node == nullptr; s = s->PassthroughSource())
+         node = dynamic_cast<SculptNode*>(s);
+      if (node == nullptr)
+         return nullptr;
+      world = Mat4::Multiply(Scene3DNode::Placement(it), top->GetModelMatrix());
+      return node;
+   }
+
+   SculptNode* SculptTarget(Scene3DNode* scene, Mat4& world)
+   {
+      if (!sSculpt.on)
+         return nullptr;
+      const Item* it = scene->FindItem(sSculpt.item);
+      SculptNode* node = it != nullptr && it->visible ? SculptOf(*it, world) : nullptr;
+      if (node == nullptr)
+      {
+         const SculptState keep = sSculpt;
+         sSculpt = SculptState();
+         sSculpt.brush = keep.brush;
+         sSculpt.radius = keep.radius;
+         sSculpt.strength = keep.strength;
+         sSculpt.symmetry = keep.symmetry;
+      }
+      return node;
+   }
+
+   void ToggleSculpt(Scene3DNode* scene)
+   {
+      if (sSculpt.on)
+      {
+         sSculpt.on = sSculpt.stroking = false;
+         sSculpt.adjust = 0;
+         return;
+      }
+      Mat4 world;
+      const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      GraphNode* gn = it != nullptr ? FindNodeByUid(it->uid) : nullptr;
+      if (gn == nullptr || dynamic_cast<IGeometrySource*>(gn->node.get()) == nullptr)
+         return;
+      sPose = {};
+      if (SculptOf(*it, world) != nullptr)
+      {
+         sSculpt.on = true;
+         sSculpt.item = it->id;
+         return;
+      }
+      sPending.what = Pending::Sculpt;
+      sPending.item = it->id;
+   }
+
+   // A new Sculpt between the item's node and the view, then Sculpt mode on it.
+   void AddSculpt(Scene3DNode* scene, int itemId)
+   {
+      Item* item = scene->FindItem(itemId);
+      GraphNode* src = item != nullptr ? FindNodeByUid(item->uid) : nullptr;
+      if (src == nullptr || dynamic_cast<IGeometrySource*>(src->node.get()) == nullptr)
+         return;
+      PushUndoCheckpoint("Add Sculpt");
+      const int srcIndex = src->index;
+      const ImVec2 at = NodePos(*src);
+      GraphNode* made = SpawnNode("Sculpt", "3D", at.x + 320.0f, at.y);   // can move gNodes: src is stale after this
+      std::string error;
+      if (made == nullptr || dynamic_cast<SculptNode*>(made->node.get()) == nullptr ||
+          !ConnectNodes(srcIndex, 0, made->index, 0, error))
+         return;
+      item->uid = made->uid;
+      scene->Commit();
+      sSculpt.on = true;
+      sSculpt.item = itemId;
+   }
+
+   // Nearest hit of a mesh-space ray (d need not be unit) on the mesh; t in units of d.
+   bool RayMesh(const Mesh& m, const float o[3], const float d[3], float& best)
+   {
+      best = 1e30f;
+      const size_t nv = m.vertices.size();
+      for (size_t f = 0; f + 2 < m.indices.size(); f += 3)
+      {
+         if (m.indices[f] >= nv || m.indices[f + 1] >= nv || m.indices[f + 2] >= nv)
+            continue;
+         const Vertex &a = m.vertices[m.indices[f]], &b = m.vertices[m.indices[f + 1]], &c = m.vertices[m.indices[f + 2]];
+         const float e1[3] = { b.px - a.px, b.py - a.py, b.pz - a.pz }, e2[3] = { c.px - a.px, c.py - a.py, c.pz - a.pz };
+         const float p[3] = { d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0] };
+         const float det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
+         if (std::fabs(det) < 1e-12f)
+            continue;
+         const float inv = 1.0f / det;
+         const float s[3] = { o[0] - a.px, o[1] - a.py, o[2] - a.pz };
+         const float u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
+         if (u < 0.0f || u > 1.0f)
+            continue;
+         const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
+         const float v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
+         if (v < 0.0f || u + v > 1.0f)
+            continue;
+         const float t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
+         if (t > 0.0f && t < best)
+            best = t;
+      }
+      return best < 1e30f;
+   }
+
+   void LinearBy(const Mat4& t, const float v[3], float out[3])
+   {
+      for (int k = 0; k < 3; k++)
+         out[k] = t.m[k] * v[0] + t.m[4 + k] * v[1] + t.m[8 + k] * v[2];
+   }
+
+   // The mouse on the sculpted surface: mesh-space and world points.
+   bool SculptHit(SculptNode* node, const Mat4& world, ImVec2 mouse, float mesh[3], float worldHit[3])
+   {
+      float o[3], d[3], mo[3], md[3], t;
+      MouseRay(mouse, o, d);
+      const Mat4 inv = Mat4::Inverse(world);
+      TransformBy(inv, o, mo);
+      LinearBy(inv, d, md);
+      if (!RayMesh(node->Shaped(), mo, md, t))
+         return false;
+      for (int k = 0; k < 3; k++)
+      {
+         mesh[k] = mo[k] + md[k] * t;
+         worldHit[k] = o[k] + d[k] * t;
+      }
+      return true;
+   }
+
+   float WorldScale(const Mat4& w)
+   {
+      float s = 0.0f;
+      for (int c = 0; c < 3; c++)
+         s += std::sqrt(w.m[c * 4] * w.m[c * 4] + w.m[c * 4 + 1] * w.m[c * 4 + 1] + w.m[c * 4 + 2] * w.m[c * 4 + 2]);
+      return std::max(1e-6f, s / 3.0f);
+   }
+
+   void SculptDab(SculptNode* node, const Mat4& world, ImVec2 at)
+   {
+      float c[3], w[3];
+      if (!SculptHit(node, world, at, c, w))
+         return;
+      Sculpt::Dab d;
+      d.brush = ImGui::GetIO().KeyShift ? (int)Sculpt::kSmooth : sSculpt.brush;
+      std::copy(c, c + 3, d.center);
+      d.radius = sSculpt.radius * UnitAt(w) / WorldScale(world);
+      d.strength = sSculpt.strength;
+      d.invert = ImGui::GetIO().KeyCtrl;
+      d.symmetry = sSculpt.symmetry;
+      const float amount = std::clamp(node->amount, 0.0f, 2.0f);
+      std::vector<float>& off = node->Offsets();
+      Sculpt::Stroke(d, sSculpt.pos, sSculpt.nrm, node->Topology(), amount, off);
+      for (size_t i = 0; i < off.size() && i < sSculpt.pos.size(); i++)
+         sSculpt.pos[i] = sSculpt.posBase[i] + off[i] * amount;
+      node->OffsetsChanged();
+   }
+
+   // Draws the brush and its bar, runs strokes and keys. Returns true while
+   // the mode owns the mouse and keys (navigation still runs).
+   bool DrawSculpt(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
+   {
+      Mat4 world;
+      SculptNode* node = SculptTarget(scene, world);
+      if (node == nullptr)
+         return false;
+      const ImGuiIO& io = ImGui::GetIO();
+      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      const bool ok = node->Sculptable();
+
+      // The bar: brushes, then X Y Z symmetry, bottom left.
+      bool onBar = false;
+      {
+         float x = sCam.mn.x + 12.0f;
+         const float y = sCam.mx.y - 54.0f, h = ImGui::GetFontSize() + 8.0f;
+         auto pill = [&](const char* label, bool on) {
+            const ImVec2 ts = ImGui::CalcTextSize(label);
+            const ImVec2 a(x, y), b(x + ts.x + 14.0f, y + h);
+            const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
+            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.45f), h * 0.5f);
+            dl->AddText(ImVec2(a.x + 7.0f, a.y + 4.0f), Hex(0xFFFFFF), label);
+            x = b.x + 4.0f;
+            onBar = onBar || hot;
+            return hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+         };
+         for (int b = 0; b < Sculpt::kBrushCount; b++)
+            if (pill(Sculpt::BrushName(b), sSculpt.brush == b))
+               sSculpt.brush = b;
+         x += 8.0f;
+         const char* axes[3] = { "X", "Y", "Z" };
+         for (int k = 0; k < 3; k++)
+            if (pill(axes[k], (sSculpt.symmetry >> k & 1) != 0))
+               sSculpt.symmetry ^= 1 << k;
+      }
+      char label[96];
+      snprintf(label, sizeof(label), ok ? "Sculpt Mode   %.0f px   %.2f" : "Sculpt Mode   Topology changed", sSculpt.radius,
+               sSculpt.strength);
+      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), label);
+
+      // F / Shift+F: drag the radius or strength, click to keep, Esc to undo.
+      if (sSculpt.adjust != 0)
+      {
+         const float dist = std::hypot(mouse.x - sSculpt.adjustAt.x, mouse.y - sSculpt.adjustAt.y);
+         if (sSculpt.adjust == 'r')
+            sSculpt.radius = std::clamp(dist, 2.0f, 1000.0f);
+         else
+            sSculpt.strength = std::clamp(dist / 200.0f, 0.0f, 1.0f);
+         dl->AddCircle(sSculpt.adjustAt, sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength * 200.0f, Hex(kHotHandle), 64, 1.5f);
+         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         {
+            (sSculpt.adjust == 'r' ? sSculpt.radius : sSculpt.strength) = sSculpt.adjustBefore;
+            sSculpt.adjust = 0;
+         }
+         else if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            sSculpt.adjust = 0;
+         return true;
+      }
+
+      if (sSculpt.stroking)
+      {
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || !ok)
+         {
+            sSculpt.stroking = false;
+            return true;
+         }
+         const float amount = std::clamp(node->amount, 0.0f, 2.0f);
+         if (sSculpt.brush == Sculpt::kGrab && !io.KeyShift)
+         {
+            float o[3], d[3];
+            MouseRay(mouse, o, d);
+            const float den = d[0] * sCam.fwd[0] + d[1] * sCam.fwd[1] + d[2] * sCam.fwd[2];
+            if (std::fabs(den) > 1e-6f)
+            {
+               const float* h = sSculpt.grabWorld;
+               const float t = ((h[0] - o[0]) * sCam.fwd[0] + (h[1] - o[1]) * sCam.fwd[1] + (h[2] - o[2]) * sCam.fwd[2]) / den;
+               const float mw[3] = { o[0] + d[0] * t - h[0], o[1] + d[1] * t - h[1], o[2] + d[2] * t - h[2] };
+               float mv[3];
+               LinearBy(Mat4::Inverse(world), mw, mv);
+               Sculpt::GrabMove(sSculpt.grab, mv, amount, node->Offsets());
+               node->OffsetsChanged();
+            }
+         }
+         else
+         {
+            // Fresh point positions once a frame, then dabs along the drag.
+            Sculpt::PointFrame(node->Shaped(), node->Topology(), sSculpt.pos, sSculpt.nrm);
+            const std::vector<float>& off = node->Offsets();
+            sSculpt.posBase.resize(sSculpt.pos.size());
+            for (size_t i = 0; i < sSculpt.pos.size() && i < off.size(); i++)
+               sSculpt.posBase[i] = sSculpt.pos[i] - off[i] * amount;
+            const float step = std::max(2.0f, sSculpt.radius * 0.15f);
+            const float dist = std::hypot(mouse.x - sSculpt.last.x, mouse.y - sSculpt.last.y);
+            const int n = (int)(dist / step);
+            const ImVec2 from = sSculpt.last;
+            for (int i = 1; i <= n; i++)
+            {
+               const float f = (float)i * step / dist;
+               sSculpt.last = ImVec2(from.x + (mouse.x - from.x) * f, from.y + (mouse.y - from.y) * f);
+               SculptDab(node, world, sSculpt.last);
+            }
+         }
+      }
+
+      if (hovered && !onBar)
+         dl->AddCircle(mouse, sSculpt.radius, io.KeyCtrl ? Hex(0x60A0FF) : Hex(kHotHandle, 0.9f), 64, 1.5f);
+      if (sSculpt.stroking || !hovered || io.WantTextInput)
+         return true;
+      const bool command = io.KeyCtrl || io.KeySuper;
+      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      {
+         sSculpt.on = false;
+         return true;
+      }
+      if (!command && !io.KeyAlt)
+      {
+         struct Key { ImGuiKey key; bool shift; int brush; };
+         const Key keys[] = { { ImGuiKey_X, false, Sculpt::kDraw }, { ImGuiKey_S, false, Sculpt::kSmooth },
+                              { ImGuiKey_G, false, Sculpt::kGrab }, { ImGuiKey_I, false, Sculpt::kInflate },
+                              { ImGuiKey_P, false, Sculpt::kPinch }, { ImGuiKey_T, true, Sculpt::kFlatten },
+                              { ImGuiKey_C, true, Sculpt::kCrease } };
+         for (const Key& k : keys)
+            if (io.KeyShift == k.shift && pressed(k.key))
+               sSculpt.brush = k.brush;
+         if (pressed(ImGuiKey_F))
+         {
+            sSculpt.adjust = io.KeyShift ? 's' : 'r';
+            sSculpt.adjustBefore = io.KeyShift ? sSculpt.strength : sSculpt.radius;
+            const float r = io.KeyShift ? sSculpt.strength * 200.0f : sSculpt.radius;
+            sSculpt.adjustAt = ImVec2(mouse.x - r, mouse.y);
+            return true;
+         }
+      }
+      if (onBar || !ok || io.KeyAlt || !ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+         return true;
+      float c[3], w[3];
+      if (!SculptHit(node, world, mouse, c, w))
+         return true;
+      static std::string undoLabel;
+      undoLabel = std::string("Sculpt ") + Sculpt::BrushName(io.KeyShift ? (int)Sculpt::kSmooth : sSculpt.brush);
+      PushUndoCheckpoint(undoLabel.c_str());
+      sSculpt.stroking = true;
+      sSculpt.last = mouse;
+      const float amount = std::clamp(node->amount, 0.0f, 2.0f);
+      Sculpt::PointFrame(node->Shaped(), node->Topology(), sSculpt.pos, sSculpt.nrm);
+      const std::vector<float>& off = node->Offsets();
+      sSculpt.posBase.resize(sSculpt.pos.size());
+      for (size_t i = 0; i < sSculpt.pos.size() && i < off.size(); i++)
+         sSculpt.posBase[i] = sSculpt.pos[i] - off[i] * amount;
+      if (sSculpt.brush == Sculpt::kGrab && !io.KeyShift)
+      {
+         Sculpt::Dab d;
+         std::copy(c, c + 3, d.center);
+         d.radius = sSculpt.radius * UnitAt(w) / WorldScale(world);
+         d.strength = sSculpt.strength;
+         d.symmetry = sSculpt.symmetry;
+         Sculpt::GrabBegin(d, sSculpt.pos, node->Topology(), off, sSculpt.grab);
+         std::copy(w, w + 3, sSculpt.grabWorld);
+      }
+      else
+         SculptDab(node, world, mouse);
       return true;
    }
 
@@ -3920,7 +4283,7 @@ namespace
          DrawToolpad(dl, scene, mn, mx, mouse, hovered && sOp.mode == 0, onPad);
       onNav = onNav || onPad;
       int hot = -1;
-      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove && !sPose.on)
+      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove && !sPose.on && !sSculpt.on)
       {
          float center[3];
          PivotPoint(scene, center);
@@ -3947,8 +4310,8 @@ namespace
             dl->AddLine(c, mouse, Hex(kWire, 0.7f));
       }
 
-      const bool posing = sOp.mode == 0 && sOverlays && DrawPose(dl, scene, mouse, hovered);
-      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning;
+      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered));
+      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sSculpt.stroking || sSculpt.adjust != 0;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sRightOk = sOp.mode == 0 && !posing;
       if (!posing)
@@ -4332,6 +4695,8 @@ namespace
       if (IconChip("##v3drotate", IconsInfinite::ToolRotate, sTool == 2, T("Rotate tool (Shift+Space, R). R rotates at once"))) sTool = 2;
       next();
       if (IconChip("##v3dscale", IconsInfinite::ToolScale, sTool == 3, T("Scale tool (Shift+Space, S). S scales at once"))) sTool = 3;
+      next();
+      if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
       gap();
       if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
       next();
@@ -6719,6 +7084,8 @@ namespace
          ConvertScene(scene);
       else if (todo.what == Pending::DeleteScene)
          DeleteScene(scene);
+      else if (todo.what == Pending::Sculpt)
+         AddSculpt(scene, todo.item);
       else if (todo.what == Pending::Node)
          if (GraphNode* gn = FindNodeByUid(todo.uid))
             View3DAddNode(*gn);

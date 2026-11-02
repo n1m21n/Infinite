@@ -477,6 +477,8 @@ namespace app
          return 1;
       if (dynamic_cast<BakeNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<SculptNode*>(gn.node.get()) != nullptr)
+         return 1;
       // DistributePointsInGridNode has no inputs - falls through to 0 below.
       if (dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr)
          return Switcher3DNode::kSlots;
