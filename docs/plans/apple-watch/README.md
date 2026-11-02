@@ -213,27 +213,40 @@ Lives in `apps/watch/` with an XcodeGen `project.yml` (text, reviewable; the `.x
 |---|---|
 | `RemoteApp.swift` | App, `TabView` pages, keeps last Mac |
 | `MotionSource.swift` | `CMMotionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue)` at 50/100 Hz |
-| `WorkoutKeeper.swift` | `HKWorkoutSession` + `HKLiveWorkoutBuilder`, heart rate from `statistics(for: .heartRate)`; HealthKit entitlement + `NSHealthShareUsageDescription`, `NSMotionUsageDescription` |
+| `Keeper.swift` | default: `WKExtendedRuntimeSession` (no entitlement). With `INFINITE_WATCH_HEALTH=1`: `HKWorkoutSession` + `HKLiveWorkoutBuilder`, heart rate from `statistics(for: .heartRate)`; HealthKit entitlement + `NSHealthShareUsageDescription`, `NSMotionUsageDescription` |
 | `BLELink.swift` | `CBCentralManager`, scan for the service UUID, connect, `writeValue(.withoutResponse)` gated on `canSendWriteWithoutResponse`, reconnect on drop |
 | `Packet.swift` | Same layout as section 6; a unit test asserts byte equality with a golden packet produced by `WatchPacket.cpp` encode |
 | `PlayView.swift` | `DragGesture(minimumDistance: 0)` XY pad, `.digitalCrownRotation`, Play/Stop button with `.handGestureShortcut(.primaryAction)` while not playing, pad button during play |
 
 Simulator note: the watch simulator has no Bluetooth. Block B checks UI and packet bytes in the simulator; the link itself is tested on the owner's watch.
 
-Distribution needs the paid Apple Developer account (already used for notarising): TestFlight first, App Store in Block C. App Review note: explain the workout session is used to keep sensors alive during a performance and records heart rate.
+Distribution (decided 2026-11-02): the owner has no paid Apple Developer account, so there is no TestFlight and no App Store. The app lives in the repo and each user builds it in Xcode with their own free Apple ID (a "Personal Team") and installs it on their own watch. **macOS users only**, because building needs a Mac with Xcode. Free signing expires after 7 days, so the user re-runs the build weekly. Free teams need a unique bundle id per person, so the id prefix is a user-set value in `apps/watch/Config/Local.xcconfig` (with `DEVELOPMENT_TEAM`), never hard-coded.
+
+Build-it-yourself flow (details in `apps/watch/README.md`):
+
+```
+ install Xcode -> sign in with Apple ID -> Developer Mode (iPhone, watch)
+   -> set team + bundle prefix in Local.xcconfig -> scripts/build_watch_app.sh
+   -> trust the developer on the watch -> Apple Watch node + Play on the watch
+   -> repeat the build every 7 days
+```
+
+Keep-alive without HealthKit: free personal teams may not get the HealthKit entitlement. Default build uses `WKExtendedRuntimeSession` (physical-therapy session type, `WKBackgroundModes` in Info.plist, no entitlement), heart byte = 0. Building with `INFINITE_WATCH_HEALTH=1` switches to `HKWorkoutSession` + heart rate (`WorkoutKeeper.swift`) for users whose team allows HealthKit. The Mac side is identical in both cases.
 
 ## 9. Block C
 
 1. `control` notify + node input pin `haptic` -> `WKInterfaceDevice.current().play(.click)` on rising edge.
 2. Windows link: WinRT `GattServiceProvider` (Windows 10 1803+, adapter must support peripheral role; status says so when it does not).
 3. Linux link: BlueZ `GattManager1.RegisterApplication` over D-Bus (sd-bus or GDBus).
-4. TestFlight -> App Store submission, website + manual page, one tutorial film only if the owner asks.
+4. Website + manual page, one tutorial film only if the owner asks. (TestFlight / App Store are dropped: no paid developer account, see section 8.)
 
 ## 10. Risks
 
 | Risk | Plan |
 |---|---|
-| App Review rejects the workout session for a non-fitness app | Heart rate is shown and used; fallback is `WKExtendedRuntimeSession` (physical therapy, 1 h cap) |
+| Free team has no HealthKit entitlement | Default build uses `WKExtendedRuntimeSession` (physical therapy, no entitlement); `INFINITE_WATCH_HEALTH=1` opts into the workout session |
+| Free signing expires after 7 days; unique bundle id needed per person | README says re-run weekly; bundle prefix lives in `Local.xcconfig` |
+| Users without a Mac cannot build the app | Accepted: macOS users only |
 | Mac Bluetooth busy (AirPods, keyboard) raises latency | Measure on the owner's Mac in Block B; drop to 30 Hz automatically if writes back up |
 | Yaw drift | Recenter button, and help points users to roll/pitch for long holds |
 | macOS kills headless runs on Bluetooth | `WatchLink::Disable()` in every selftest path, like HeadTracker |
