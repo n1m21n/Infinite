@@ -46,6 +46,7 @@ namespace
    struct Tab
    {
       int id = 0;
+      std::string name;  // fixed title for a tab opened by the app (TerminalRunInNewTab)
       std::shared_ptr<term::TermSession> session;
       int cols = 0, rows = 0;
       uint32_t seenBells = 0;
@@ -688,7 +689,7 @@ namespace
             tab.seenBells = snap->bells;
          if (i == sActive)
             tab.attention = false;
-         std::string title = TabTitle(snap.get());
+         std::string title = tab.name.empty() ? TabTitle(snap.get()) : tab.name;
          if (title.size() > 28)
             title = title.substr(0, 27) + "...";
          const float width = ImGui::CalcTextSize(title.c_str()).x + 44.0f;
@@ -1066,6 +1067,25 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
    ImGui::EndChild();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
+}
+
+bool TerminalRunInNewTab(const std::string& name, const std::string& command)
+{
+   int cols = 80, rows = 24;
+   if (sActive >= 0 && sActive < (int)sTabs.size())
+   {
+      cols = sTabs[(size_t)sActive]->cols;
+      rows = sTabs[(size_t)sActive]->rows;
+   }
+   std::unique_ptr<Tab> tab = NewTab(cols, rows);
+   tab->name = name;
+   // the shell reads this once it has started; the tty holds it until then
+   tab->session->SendBytes(command + "\n");
+   sTabs.push_back(std::move(tab));
+   sActive = (int)sTabs.size() - 1;
+   gTerminalOpen = true;
+   gTerminalFocus = true;
+   return true;
 }
 
 void TerminalPanelHidden()

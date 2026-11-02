@@ -124,10 +124,34 @@ namespace WatchSetup
 
    // ---------------------------------------------------------------------------------------------------------------
 
+   StatusFile ParseStatusFile(const std::string& jsonText)
+   {
+      StatusFile out;
+      try
+      {
+         const nlohmann::json j = nlohmann::json::parse(jsonText);
+         const std::string state = j.value("state", "");
+         out.status.step = j.value("step", 0);
+         out.status.total = j.value("total", 0);
+         const std::string message = j.value("message", "");
+         out.installedAt = (time_t)j.value("installedAt", 0LL);
+         out.updatedAt = (time_t)j.value("updatedAt", 0LL);
+         if (state == "running") { out.status.phase = InstallPhase::kRunning; out.status.progress = message; }
+         else if (state == "ok") out.status.phase = InstallPhase::kDone;
+         else if (state == "failed") { out.status.phase = InstallPhase::kFailed; out.status.error = message; }
+         else return out;
+         out.present = true;
+      }
+      catch (const std::exception&)
+      {
+      }
+      return out;
+   }
+
    struct Checklist::Impl
    {
       std::unique_ptr<IToolchain> tools;
-      std::string stateFile;
+      std::string statusFile;
       std::function<time_t()> now;
 
       mutable std::mutex mu;
@@ -135,40 +159,45 @@ namespace WatchSetup
       bool scanned = false, scanning = false;
       InstallStatus install;
       time_t installedAt = 0;
-      std::thread scanThread, installThread;
+      std::thread scanThread;
    };
 
-   Checklist::Checklist(std::unique_ptr<IToolchain> tools, std::string stateFile, std::function<time_t()> now)
+   Checklist::Checklist(std::unique_ptr<IToolchain> tools, std::string statusFile, std::function<time_t()> now)
       : m(new Impl)
    {
       m->tools = std::move(tools);
-      m->stateFile = std::move(stateFile);
+      m->statusFile = std::move(statusFile);
       m->now = now ? now : [] { return std::time(nullptr); };
-      LoadInstallDate();
+      PollStatus();
    }
 
    Checklist::~Checklist()
    {
       if (m->scanThread.joinable()) m->scanThread.join();
-      if (m->installThread.joinable()) m->installThread.join();
    }
 
-   void Checklist::LoadInstallDate()
+   void Checklist::PollStatus()
    {
-      std::ifstream in(m->stateFile);
-      long long t = 0;
-      if (in >> t && t > 0)
-         m->installedAt = (time_t)t;
-   }
-
-   void Checklist::SaveInstallDate(time_t t)
-   {
+      std::ifstream in(m->statusFile);
+      std::stringstream ss;
+      ss << in.rdbuf();
+      StatusFile f = ParseStatusFile(ss.str());
+      std::lock_guard<std::mutex> lk(m->mu);
+      if (!f.present)
       {
-         std::lock_guard<std::mutex> lk(m->mu);
-         m->installedAt = t;
+         // no file yet: keep a launch the app just made, else nothing was ever installed from here
+         if (m->install.phase != InstallPhase::kRunning)
+            m->install = InstallStatus();
+         return;
       }
-      std::ofstream out(m->stateFile, std::ios::trunc);
-      out << (long long)t << "\n";
+      // the terminal was closed mid-install: nobody is updating the file any more
+      if (f.status.phase == InstallPhase::kRunning && f.updatedAt > 0 && (long long)m->now() - (long long)f.updatedAt > kStaleRunningSeconds)
+      {
+         f.status.phase = InstallPhase::kFailed;
+         f.status.error = "The install did not finish. Press Install on my watch to run it again.";
+      }
+      m->install = f.status;
+      m->installedAt = f.installedAt;
    }
 
    void Checklist::RefreshNow()
@@ -287,12 +316,7 @@ namespace WatchSetup
       }
       else if (inst.phase == InstallPhase::kRunning)
       {
-         i.text = inst.progress.empty() ? "Working..." : inst.progress;
-      }
-      else if (inst.phase == InstallPhase::kFailedOpenedXcode)
-      {
-         i.state = StepState::kMissing;
-         i.text = "Xcode is open with your team filled in: pick your watch and press Run. (" + inst.error + ")";
+         i.text = "Working in the Watch app tab of the Terminal: " + (inst.progress.empty() ? std::string("starting") : inst.progress) + ".";
       }
       else if (inst.phase == InstallPhase::kFailed)
       {
@@ -329,39 +353,29 @@ namespace WatchSetup
    {
       if (!AllReady())
          return;
-      InstallRequest req;
-      req.teamId = ChosenTeam().id;
-      req.deviceId = ChosenWatchId();
+      time_t installedAt;
       {
          std::lock_guard<std::mutex> lk(m->mu);
          if (m->install.phase == InstallPhase::kRunning)
             return;
-         m->install = InstallStatus();
-         m->install.phase = InstallPhase::kRunning;
+         installedAt = m->installedAt;
       }
-      if (m->installThread.joinable())
-         m->installThread.join();
-      m->installThread = std::thread([this, req]
+      // Write "running" first so an old "ok" in the file is not mistaken for this run's result. The old install
+      // date stays: the app already on the watch keeps counting down until the new one is in.
       {
-         bool fellBack = false;
-         const bool ok = m->tools->Install(req, [&](const std::string& line)
-         {
-            std::lock_guard<std::mutex> lk(m->mu);
-            if (line.rfind("STEP ", 0) == 0) m->install.progress = line.substr(5);
-            else if (line.rfind("ERROR ", 0) == 0) m->install.error = line.substr(6);
-            else if (line == "FALLBACK") fellBack = true;
-         });
-         if (ok)
-            SaveInstallDate(m->now());
+         std::ofstream out(m->statusFile, std::ios::trunc);
+         out << "{\"step\":0,\"total\":5,\"state\":\"running\",\"message\":\"starting\",\"installedAt\":" << (long long)installedAt
+             << ",\"updatedAt\":" << (long long)m->now() << "}\n";
+      }
+      if (!m->tools->LaunchInstall())
+      {
          std::lock_guard<std::mutex> lk(m->mu);
-         m->install.phase = ok ? InstallPhase::kDone : fellBack ? InstallPhase::kFailedOpenedXcode : InstallPhase::kFailed;
-      });
-   }
-
-   void Checklist::WaitInstall()
-   {
-      if (m->installThread.joinable())
-         m->installThread.join();
+         m->install = InstallStatus();
+         m->install.phase = InstallPhase::kFailed;
+         m->install.error = "Could not open the Terminal.";
+         return;
+      }
+      PollStatus();
    }
 
    InstallStatus Checklist::Install() const

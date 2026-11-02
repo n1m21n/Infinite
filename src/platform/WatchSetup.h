@@ -10,7 +10,7 @@
 // "Set up watch app": the checklist behind the Apple Watch node's setup window (docs/plans/apple-watch/README.md,
 // D-B2 to D-B5). Everything that touches Xcode or a device sits behind IToolchain, so the selftest fakes it and
 // never runs xcodebuild or devicectl. The real toolchain (macOS only) shells out to the system tools and to the
-// bundled apps/watch/install.sh.
+// bundled apps/watch/install_watch_app.sh.
 namespace WatchSetup
 {
    struct Team
@@ -37,27 +37,24 @@ namespace WatchSetup
       std::vector<Device> devices;
    };
 
-   struct InstallRequest
-   {
-      std::string teamId;
-      std::string deviceId;
-   };
-
    class IToolchain
    {
    public:
       virtual ~IToolchain() = default;
       virtual Probe Scan() = 0;                                     // may block for a second or two
-      // Runs the install; `line` gets the STEP / ERROR / FALLBACK / DONE lines as they arrive. True only when installed.
-      virtual bool Install(const InstallRequest& req, const std::function<void(const std::string&)>& line) = 0;
+      // Opens the Terminal panel in a tab named "Watch app" and runs the bundled install_watch_app.sh there, so a
+      // password prompt works. Returns at once; the script reports through status.json. False if it could not start.
+      virtual bool LaunchInstall() = 0;
       virtual void OpenXcodeAccounts() = 0;
       virtual void OpenXcode() = 0;
       virtual void OpenDeviceHelp() = 0;
    };
 
    // The real one. Never construct it in a selftest.
-   // `bundledSource` is Infinite.app/Contents/Resources/WatchRemote (the project and install.sh).
-   std::unique_ptr<IToolchain> MakeSystemToolchain(const std::string& bundledSource);
+   // `bundledSource` is Infinite.app/Contents/Resources/WatchRemote (the project and install_watch_app.sh);
+   // `runInTerminal(tabName, command)` opens a terminal tab and types the command into it (UI thread).
+   using RunInTerminal = std::function<bool(const std::string& tabName, const std::string& command)>;
+   std::unique_ptr<IToolchain> MakeSystemToolchain(const std::string& bundledSource, RunInTerminal runInTerminal);
 
    // The team to build with: the free Personal Team if there is one, else the first.
    const Team* PickTeam(const std::vector<Team>& teams);
@@ -77,20 +74,32 @@ namespace WatchSetup
       bool canOpen = false;  // show an Open button
    };
 
-   enum class InstallPhase { kIdle, kRunning, kDone, kFailedOpenedXcode, kFailed };
+   enum class InstallPhase { kIdle, kRunning, kDone, kFailed };
 
    struct InstallStatus
    {
       InstallPhase phase = InstallPhase::kIdle;
-      std::string progress;   // latest STEP line
-      std::string error;      // last error line
+      int step = 0, total = 0;
+      std::string progress;   // running: what the script is doing
+      std::string error;      // failed: the reason and the fix
    };
+
+   // <work dir>/status.json, written by install_watch_app.sh:
+   //   {"step":3,"total":5,"state":"running|ok|failed","message":"...","installedAt":<epoch>,"updatedAt":<epoch>}
+   struct StatusFile
+   {
+      bool present = false;
+      InstallStatus status;
+      time_t installedAt = 0, updatedAt = 0;
+   };
+   StatusFile ParseStatusFile(const std::string& jsonText);
 
    class Checklist
    {
    public:
-      // `stateFile` holds the install date; `now` is injectable so a test can move the clock.
-      Checklist(std::unique_ptr<IToolchain> tools, std::string stateFile, std::function<time_t()> now = nullptr);
+      // `statusFile` is the script's status.json (install progress and install date); `now` is injectable so a test
+      // can move the clock.
+      Checklist(std::unique_ptr<IToolchain> tools, std::string statusFile, std::function<time_t()> now = nullptr);
       ~Checklist();
 
       // Scan on a background thread, at most one at a time. Poll() reads the latest result without blocking.
@@ -104,8 +113,8 @@ namespace WatchSetup
       std::string ChosenWatchId() const;
 
       void OpenStep(StepId id);
-      void StartInstall();            // background thread; ignored while one is running
-      void WaitInstall();             // for tests
+      void StartInstall();            // opens the Terminal tab (UI thread); ignored while one is running
+      void PollStatus();              // re-reads status.json; cheap, call every half second while running
       InstallStatus Install() const;
 
       // -1 when the app was never installed from here, else whole days until the 7-day signing runs out (>= 0).
@@ -114,12 +123,11 @@ namespace WatchSetup
       std::string ExpiryText() const; // "watch app expires in 5 days", "", ...
 
    private:
-      void SaveInstallDate(time_t t);
-      void LoadInstallDate();
       struct Impl;
       std::unique_ptr<Impl> m;
    };
 
    constexpr int kSigningDays = 7;
+   constexpr int kStaleRunningSeconds = 20 * 60;   // a "running" status this old means the terminal was closed
    constexpr int kReinstallWithinDays = 2;
 }

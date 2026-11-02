@@ -301,25 +301,16 @@ namespace app
 
    namespace
    {
-      // A toolchain that never touches the machine: the probe and the install result are set by the test.
+      // A toolchain that never touches the machine: the probe is set by the test, and "launching the install" only
+      // counts (the real one opens a Terminal tab and runs install_watch_app.sh, which writes status.json).
       class FakeTools : public WatchSetup::IToolchain
       {
       public:
          WatchSetup::Probe probe;
-         bool installOk = true, fallback = false;
-         int installs = 0, opened = 0;
-         WatchSetup::InstallRequest lastReq;
+         bool launchOk = true;
+         int launches = 0, opened = 0;
          WatchSetup::Probe Scan() override { return probe; }
-         bool Install(const WatchSetup::InstallRequest& r, const std::function<void(const std::string&)>& line) override
-         {
-            installs++;
-            lastReq = r;
-            line("STEP Building");
-            if (installOk) { line("STEP Installing on your watch"); line("DONE"); return true; }
-            line("ERROR No profiles for the bundle id");
-            if (fallback) line("FALLBACK");
-            return false;
-         }
+         bool LaunchInstall() override { launches++; return launchOk; }
          void OpenXcodeAccounts() override { opened++; }
          void OpenXcode() override { opened++; }
          void OpenDeviceHelp() override { opened++; }
@@ -356,8 +347,15 @@ namespace app
             "devices parsed from devicectl json");
       check(ParseDevices("not json").empty(), "bad json gives no devices");
 
-      const std::string stateFile = (std::filesystem::temp_directory_path() / "infinite-watchsetup-test.txt").string();
+      const std::string stateFile = (std::filesystem::temp_directory_path() / "infinite-watchsetup-status.json").string();
       std::remove(stateFile.c_str());
+      // what install_watch_app.sh writes
+      auto writeStatus = [&](const char* st, int step, const char* msg, long long installedAt, long long updatedAt)
+      {
+         std::ofstream out(stateFile, std::ios::trunc);
+         out << "{\"step\":" << step << ",\"total\":5,\"state\":\"" << st << "\",\"message\":\"" << msg << "\",\"installedAt\":"
+             << installedAt << ",\"updatedAt\":" << updatedAt << "}\n";
+      };
       time_t clock = 1000000;
       FakeTools* tools = new FakeTools();
       Checklist list(std::unique_ptr<IToolchain>(tools), stateFile, [&] { return clock; });
@@ -394,25 +392,38 @@ namespace app
       check(state(2) == StepState::kMissing && list.Steps()[2].text.find("Developer Mode") != std::string::npos &&
                !list.AllReady(), "watch without Developer Mode");
       list.StartInstall();
-      list.WaitInstall();
-      check(tools->installs == 0, "install is refused until the first three steps are green");
+      check(tools->launches == 0, "install is refused until the first three steps are green");
 
       tools->probe.devices[1].developerMode = true;
       list.RefreshNow();
       check(list.AllReady() && state(3) == StepState::kPending && list.ChosenWatchId() == "BBB", "all green: install is offered");
 
-      // a failed install that opened Xcode, then a failed one that did not
-      tools->installOk = false; tools->fallback = true;
-      list.StartInstall(); list.WaitInstall();
-      check(list.Install().phase == InstallPhase::kFailedOpenedXcode && list.Install().error == "No profiles for the bundle id" &&
-               list.DaysLeft() == -1 && state(3) == StepState::kMissing, "failure opens Xcode, shows the last error, saves no date");
-      tools->fallback = false;
-      list.StartInstall(); list.WaitInstall();
-      check(list.Install().phase == InstallPhase::kFailed, "failure without Xcode fallback");
+      // pressing the button launches the terminal once and writes "running" before the script has said anything
+      list.StartInstall();
+      check(tools->launches == 1 && list.Install().phase == InstallPhase::kRunning && state(3) == StepState::kPending,
+            "Install launches the terminal tab and shows running");
+      list.StartInstall();
+      check(tools->launches == 1, "a second press while running does nothing");
+      writeStatus("running", 4, "building for your watch", 0, clock);
+      list.PollStatus();
+      check(list.Install().step == 4 && list.Install().total == 5 && list.Install().progress == "building for your watch",
+            "the card reads step and message from status.json");
 
-      tools->installOk = true;
-      list.StartInstall(); list.WaitInstall();
-      check(tools->lastReq.teamId == "ABCDE12345" && tools->lastReq.deviceId == "BBB", "install gets the chosen team and watch");
+      // a failure: the reason and the fix, no install date
+      writeStatus("failed", 4, "The build failed: No profiles for the bundle id. To fix: sign in under Xcode > Settings > Accounts.", 0, clock);
+      list.PollStatus();
+      check(list.Install().phase == InstallPhase::kFailed && list.Install().error.find("No profiles") != std::string::npos &&
+               list.DaysLeft() == -1 && state(3) == StepState::kMissing, "failure shows the reason and saves no date");
+
+      // the terminal could not open
+      tools->launchOk = false;
+      list.StartInstall();
+      check(list.Install().phase == InstallPhase::kFailed && list.Install().error == "Could not open the Terminal.", "launch failure is reported");
+      tools->launchOk = true;
+
+      // success: the date comes from installedAt in the file
+      writeStatus("ok", 5, "Installed. Open Infinite Remote on the watch.", clock, clock);
+      list.PollStatus();
       check(list.Install().phase == InstallPhase::kDone && state(3) == StepState::kOk && list.DaysLeft() == 7 &&
                list.ExpiryText() == "watch app expires in 7 days" && !list.ReinstallDue(), "installed: expires in 7 days");
 
@@ -423,15 +434,32 @@ namespace app
       clock += 3 * 86400;
       check(list.DaysLeft() == 0 && list.ExpiryText() == "watch app has expired" && list.ReinstallDue(), "expired");
 
+      // a reinstall keeps counting from the old install until the new one is in
+      const int launchesBefore = tools->launches;
+      list.StartInstall();
+      check(tools->launches == launchesBefore + 1 && list.Install().phase == InstallPhase::kRunning && list.DaysLeft() == 0,
+            "Reinstall keeps the old install date while running");
+      writeStatus("failed", 2, "Your watch is not visible to this Mac.", 1000000, clock);
+      list.PollStatus();
+      check(list.DaysLeft() == 0 && list.Install().phase == InstallPhase::kFailed, "a failed reinstall keeps the old date");
+
+      // a terminal closed mid-install must not leave the button stuck
+      writeStatus("running", 4, "building for your watch", 1000000, clock);
+      clock += 30 * 60;
+      list.PollStatus();
+      check(list.Install().phase == InstallPhase::kFailed && list.Install().error.find("did not finish") != std::string::npos,
+            "a stale running status becomes a failure");
+
       {
-         // the date survives a restart
+         // the date survives a restart: it is in the file
+         writeStatus("ok", 5, "Installed.", 1000000, 1000000);
          Checklist again(std::unique_ptr<IToolchain>(new FakeTools()), stateFile, [&] { return (time_t)1000000 + 6 * 86400 + 100; });
-         check(again.DaysLeft() == 1, "install date is kept in the state file");
+         check(again.DaysLeft() == 1 && again.Install().phase == InstallPhase::kDone, "install date is kept in status.json");
       }
+      check(ParseStatusFile("garbage").present == false && ParseStatusFile("{\"state\":\"weird\"}").present == false, "bad status files are ignored");
 
       tools->probe.projectBundled = false;
       list.RefreshNow();
-      list.StartInstall();
       check(list.Steps()[3].state == StepState::kMissing, "a build without the project says so");
 
       std::remove(stateFile.c_str());

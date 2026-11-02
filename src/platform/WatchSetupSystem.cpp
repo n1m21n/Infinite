@@ -1,5 +1,5 @@
 // The real WatchSetup::IToolchain: shells out to xcode-select, defaults, xcrun devicectl and the bundled
-// install.sh. macOS only; elsewhere the checklist reports "needs a Mac". Selftests never construct this.
+// install_watch_app.sh. macOS only; elsewhere the checklist reports "needs a Mac". Selftests never construct this.
 #include "platform/WatchSetup.h"
 
 #include <cstdio>
@@ -52,7 +52,7 @@ namespace WatchSetup
       class SystemToolchain : public IToolchain
       {
       public:
-         explicit SystemToolchain(std::string src) : mSource(std::move(src)) {}
+         SystemToolchain(std::string src, RunInTerminal run) : mSource(std::move(src)), mRun(std::move(run)) {}
 
          Probe Scan() override
          {
@@ -88,28 +88,9 @@ namespace WatchSetup
             return p;
          }
 
-         bool Install(const InstallRequest& req, const std::function<void(const std::string&)>& line) override
+         bool LaunchInstall() override
          {
-            const std::string cmd = Quote(mSource + "/install.sh") + " --team " + Quote(req.teamId) + " --device " +
-                                    Quote(req.deviceId) + " --source " + Quote(mSource) + " 2>&1";
-            FILE* p = popen(cmd.c_str(), "r");
-            if (!p)
-            {
-               line("ERROR could not start install.sh");
-               return false;
-            }
-            bool done = false;
-            std::string cur;
-            int c;
-            while ((c = fgetc(p)) != EOF)
-            {
-               if (c != '\n') { cur += (char)c; continue; }
-               if (cur == "DONE") done = true;
-               line(cur);
-               cur.clear();
-            }
-            pclose(p);
-            return done;
+            return mRun && mRun("Watch app", Quote(mSource + "/install_watch_app.sh") + " --source " + Quote(mSource));
          }
 
          void OpenXcodeAccounts() override { std::system("open -a Xcode >/dev/null 2>&1"); }
@@ -121,6 +102,7 @@ namespace WatchSetup
 
       private:
          std::string mSource;
+         RunInTerminal mRun;
       };
 #endif
 
@@ -128,19 +110,20 @@ namespace WatchSetup
       {
       public:
          Probe Scan() override { Probe p; p.supported = false; return p; }
-         bool Install(const InstallRequest&, const std::function<void(const std::string&)>&) override { return false; }
+         bool LaunchInstall() override { return false; }
          void OpenXcodeAccounts() override {}
          void OpenXcode() override {}
          void OpenDeviceHelp() override {}
       };
    }
 
-   std::unique_ptr<IToolchain> MakeSystemToolchain(const std::string& bundledSource)
+   std::unique_ptr<IToolchain> MakeSystemToolchain(const std::string& bundledSource, RunInTerminal runInTerminal)
    {
 #if defined(__APPLE__)
-      return std::unique_ptr<IToolchain>(new SystemToolchain(bundledSource));
+      return std::unique_ptr<IToolchain>(new SystemToolchain(bundledSource, std::move(runInTerminal)));
 #else
       (void)bundledSource;
+      (void)runInTerminal;
       return std::unique_ptr<IToolchain>(new UnsupportedToolchain());
 #endif
    }

@@ -5755,6 +5755,8 @@ extern std::vector<std::string> gTerminalDropPending; // paths dropped on the pa
 void TerminalLoadFonts(float bakedPx);
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 void TerminalPanelHidden();
+// Opens a tab with a fixed title and types the command into it; true when the tab was started.
+bool TerminalRunInNewTab(const std::string& name, const std::string& command);
 void TerminalToggleShortcut();
 int TerminalBusyCount();
 void TerminalGuardQuit(std::function<void()> action);

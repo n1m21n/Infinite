@@ -1,6 +1,7 @@
 // "Set up watch app": the checklist window opened from the Apple Watch node (docs/plans/apple-watch/README.md,
 // D-B2 to D-B4). Each step is green when the machine says so; the scan runs in the background every few seconds
-// while the window is open. The install runs on a background thread inside WatchSetup::Checklist.
+// while the window is open. The install runs in the Terminal panel (tab "Watch app") so password prompts work;
+// the card and the checklist read its progress from status.json, not from the terminal text.
 #include "app/AppShared.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FormParts.h"
@@ -16,12 +17,15 @@ namespace
 constexpr const char* kGuideUrl = "https://infinitedevices.org/watch.html";
 
 bool gReinstallPending = false;   // "Reinstall" pressed: scan, then install as soon as the steps are green
-double gLastScan = -100.0;
+double gLastScan = -100.0, gLastPoll = -100.0;
 
 WatchSetup::Checklist& List()
 {
-   static WatchSetup::Checklist list(WatchSetup::MakeSystemToolchain(BundledResourcePath("WatchRemote")),
-                                     AppPaths::AppSupportDir() + "/watch_install.txt");
+   static WatchSetup::Checklist list(
+      WatchSetup::MakeSystemToolchain(BundledResourcePath("WatchRemote"), [](const std::string& tab, const std::string& cmd) {
+         return TerminalRunInNewTab(tab, cmd);
+      }),
+      AppPaths::AppSupportDir() + "/WatchRemote/status.json");
    return list;
 }
 }
@@ -34,9 +38,8 @@ WatchSetupCardInfo WatchSetupCard()
    const WatchSetup::InstallStatus s = l.Install();
    c.running = s.phase == WatchSetup::InstallPhase::kRunning;
    if (c.running)
-      c.line = s.progress.empty() ? "Working..." : s.progress;
-   else if (s.phase == WatchSetup::InstallPhase::kFailedOpenedXcode)
-      c.line = "Xcode is open: pick your watch and press Run. " + s.error;
+      c.line = (s.total > 0 ? "Step " + std::to_string(s.step) + "/" + std::to_string(s.total) + ": " : std::string()) +
+               (s.progress.empty() ? "working" : s.progress);
    else if (s.phase == WatchSetup::InstallPhase::kFailed)
       c.line = "Install failed: " + s.error;
    else
@@ -49,6 +52,11 @@ WatchSetupCardInfo WatchSetupCard()
 void WatchSetupTick()
 {
    WatchSetup::Checklist& l = List();
+   if (ImGui::GetTime() - gLastPoll > 0.5)
+   {
+      l.PollStatus();
+      gLastPoll = ImGui::GetTime();
+   }
    if (gReinstallPending && !l.Scanning() && l.Install().phase != WatchSetup::InstallPhase::kRunning && ImGui::GetTime() - gLastScan < 60.0)
    {
       if (l.AllReady())
