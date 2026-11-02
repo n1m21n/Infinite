@@ -212,3 +212,163 @@ TRANSFORM_OT_transform	done	View3DPanel.cpp:776 BeginOp transform tool
 TRANSFORM_OT_translate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (G)
 TRANSFORM_OT_vert_crease	out	deform, mesh, bone or sequencer editing
 TRANSFORM_OT_vert_slide	out	deform, mesh, bone or sequencer editing
+Object.type	done	Scene3DNode.h Kind (geometry, camera, light)
+Object.mode	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.bound_box	done	View3DPanel.cpp:3609 Dimensions via ItemBounds
+Object.parent_type	out	no parenting; groups only
+Object.parent_vertices	out	no parenting; groups only
+Object.use_parent_final_indices	out	no parenting; groups only
+Object.use_camera_lock_parent	out	no parenting; groups only
+Object.track_axis	missing	Camera and light Data tab: Look at axes
+Object.up_axis	missing	Camera and light Data tab: Look at axes
+Object.location	done	View3DPanel.cpp:3581 Location
+Object.rotation_quaternion	deferred	rotation modes need new Item fields
+Object.rotation_axis_angle	deferred	rotation modes need new Item fields
+Object.rotation_euler	done	View3DPanel.cpp:3589 Rotation
+Object.rotation_mode	deferred	rotation modes need new Item fields
+Object.scale	done	View3DPanel.cpp:3596 Scale
+Object.dimensions	done	View3DPanel.cpp:3609 Dimensions
+Object.delta_location	deferred	delta transform needs new Item fields
+Object.delta_rotation_euler	deferred	delta transform needs new Item fields
+Object.delta_rotation_quaternion	deferred	delta transform needs new Item fields
+Object.delta_scale	deferred	delta transform needs new Item fields
+Object.lock_location	done	View3DPanel.cpp:3636 Lock card
+Object.lock_rotation	done	View3DPanel.cpp:3636 Lock card
+Object.lock_rotation_w	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.lock_rotations_4d	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.lock_scale	done	View3DPanel.cpp:3636 Lock card
+Object.matrix_world	out	derived matrix, not a setting
+Object.matrix_local	out	no parenting; groups only
+Object.matrix_basis	out	derived matrix, not a setting
+Object.matrix_parent_inverse	out	no parenting; groups only
+Object.shader_effects	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.constraints	out	constraint stack: Look at only (parity.md)
+Object.empty_display_type	out	no empty objects in the scene
+Object.empty_display_size	out	no empty objects in the scene
+Object.empty_image_offset	out	no empty objects in the scene
+Object.image_user	out	no empty objects in the scene
+Object.empty_image_depth	out	no empty objects in the scene
+Object.show_empty_image_perspective	out	no empty objects in the scene
+Object.show_empty_image_orthographic	out	no empty objects in the scene
+Object.show_empty_image_only_axis_aligned	out	no empty objects in the scene
+Object.use_empty_image_alpha	out	no empty objects in the scene
+Object.empty_image_side	out	no empty objects in the scene
+Object.add_rest_position_attribute	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.pass_index	deferred	object index pass needs renderer work
+Object.color	deferred	object colour needs Solid shader work
+Object.use_simulation_cache	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.hide_viewport	done	View3DPanel.cpp Hide (H) sets Item.visible
+Object.hide_select	missing	Item tab: disable selection toggle
+Object.hide_render	done	View3DPanel.cpp:3663 Show in renders
+Object.hide_probe_volume	deferred	light probes need renderer work
+Object.hide_probe_sphere	deferred	light probes need renderer work
+Object.hide_probe_plane	deferred	light probes need renderer work
+Object.hide_surface_pick	out	surface picking is mesh snapping
+Object.show_instancer_for_render	out	instancing is geometry
+Object.show_instancer_for_viewport	out	instancing is geometry
+Object.visible_camera	deferred	ray visibility needs renderer work
+Object.visible_diffuse	deferred	ray visibility needs renderer work
+Object.visible_glossy	deferred	ray visibility needs renderer work
+Object.visible_transmission	deferred	ray visibility needs renderer work
+Object.visible_volume_scatter	deferred	ray visibility needs renderer work
+Object.visible_shadow	deferred	per-item shadow casting needs renderer work
+Object.instance_type	out	instancing is geometry
+Object.use_instance_vertices_rotation	out	instancing is geometry
+Object.display_type	deferred	display-as needs render changes
+Object.show_bounds	missing	Item tab: show bounds
+Object.display_bounds_type	missing	Item tab: show bounds
+Object.show_name	missing	Item tab: show name and axes in the view
+Object.show_axis	missing	Item tab: show name and axes in the view
+Object.show_wire	deferred	needs Solid shader work
+Object.show_transparent	out	materials
+Object.show_in_front	deferred	needs Solid shader work
+Object.display	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.shadow_terminator_geometry_offset	deferred	shadow terminator needs renderer work
+Object.shadow_terminator_shading_offset	deferred	shadow terminator needs renderer work
+Object.animation_visualization	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.selection_sets	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.active_selection_set	out	editing modes, 4D rotation, materials, rigging or simulation
+OBJECT_OT_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_add_named	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_align	missing	Object menu: Align
+OBJECT_OT_anim_transforms_to_deltas	deferred	delta transform needs new Item fields
+OBJECT_OT_camera_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_constraint_add	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraint_add_with_targets	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraints_clear	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraints_copy	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_convert	out	geometry or mode editing
+OBJECT_OT_copy_global_transform	missing	Object menu: copy transform to clipboard
+OBJECT_OT_copy_relative_transform	out	relative to parent; no parenting
+OBJECT_OT_correctivesmooth_bind	out	geometry or mode editing
+OBJECT_OT_delete	done	View3DPanel.cpp:1183 DeleteSelected
+OBJECT_OT_duplicate	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicate_move	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicate_move_linked	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicates_make_real	out	geometry or mode editing
+OBJECT_OT_editmode_toggle	out	geometry or mode editing
+OBJECT_OT_empty_add	out	object types outside the scene
+OBJECT_OT_empty_image_add	out	object types outside the scene
+OBJECT_OT_forcefield_toggle	out	object types outside the scene
+OBJECT_OT_hide_render_clear_all	missing	Object menu: show all in renders
+OBJECT_OT_hide_view_clear	done	View3DPanel.cpp:3283 Show (Alt+H shows everything)
+OBJECT_OT_hide_view_set	done	View3DPanel.cpp:1608 HideSelected
+OBJECT_OT_instance_offset_from_cursor	out	instancing is geometry
+OBJECT_OT_instance_offset_from_object	out	instancing is geometry
+OBJECT_OT_instance_offset_to_cursor	out	instancing is geometry
+OBJECT_OT_isolate_type_render	missing	Object menu: render only one type
+OBJECT_OT_join	out	geometry or mode editing
+OBJECT_OT_join_shapes	out	geometry or mode editing
+OBJECT_OT_laplaciandeform_bind	out	geometry or mode editing
+OBJECT_OT_light_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_lightprobe_add	deferred	light probes need renderer work
+OBJECT_OT_lightprobe_cache_free	deferred	light probes need renderer work
+OBJECT_OT_location_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_make_links_data	out	data-block linking
+OBJECT_OT_make_links_scene	out	data-block linking
+OBJECT_OT_meshdeform_bind	out	geometry or mode editing
+OBJECT_OT_multires_base_apply	out	geometry or mode editing
+OBJECT_OT_multires_external_pack	out	geometry or mode editing
+OBJECT_OT_multires_external_save	out	geometry or mode editing
+OBJECT_OT_multires_higher_levels_delete	out	geometry or mode editing
+OBJECT_OT_multires_rebuild_subdiv	out	geometry or mode editing
+OBJECT_OT_multires_reshape	out	geometry or mode editing
+OBJECT_OT_multires_subdivide	out	geometry or mode editing
+OBJECT_OT_multires_unsubdivide	out	geometry or mode editing
+OBJECT_OT_origin_clear	out	applies to mesh data; origins are node outputs
+OBJECT_OT_origin_set	out	applies to mesh data; origins are node outputs
+OBJECT_OT_parent_clear	out	no parenting; groups only
+OBJECT_OT_parent_inverse_apply	out	no parenting; groups only
+OBJECT_OT_parent_no_inverse_set	out	no parenting; groups only
+OBJECT_OT_parent_set	out	no parenting; groups only
+OBJECT_OT_paste_transform	missing	Object menu: paste transform from clipboard
+OBJECT_OT_pointcloud_random_add	out	object types outside the scene
+OBJECT_OT_posemode_toggle	out	geometry or mode editing
+OBJECT_OT_quadriflow_remesh	out	geometry or mode editing
+OBJECT_OT_randomize_transform	missing	Object menu: randomize transform
+OBJECT_OT_rotation_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_scale_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_select_all	done	View3DPanel.cpp: Select menu All/None/Invert
+OBJECT_OT_select_by_type	done	View3DPanel.cpp:1328 SelectSameType
+OBJECT_OT_select_camera	missing	Select menu: select the active camera
+OBJECT_OT_select_grouped	done	View3DPanel.cpp:1315 SelectLinked (group)
+OBJECT_OT_select_hierarchy	out	no hierarchy
+OBJECT_OT_select_less	out	no hierarchy
+OBJECT_OT_select_linked	done	View3DPanel.cpp:1315 SelectLinked (group)
+OBJECT_OT_select_more	out	no hierarchy
+OBJECT_OT_select_pattern	missing	Select menu: select by name pattern
+OBJECT_OT_select_random	done	View3DPanel.cpp:1290 SelectRandom
+OBJECT_OT_shade_auto_smooth	out	geometry or mode editing
+OBJECT_OT_shade_flat	out	geometry or mode editing
+OBJECT_OT_shade_smooth	out	geometry or mode editing
+OBJECT_OT_shade_smooth_by_angle	out	geometry or mode editing
+OBJECT_OT_surfacedeform_bind	out	geometry or mode editing
+OBJECT_OT_track_clear	done	View3DPanel.cpp Look at card (lookAt)
+OBJECT_OT_track_set	done	View3DPanel.cpp Look at card (lookAt)
+OBJECT_OT_transform_apply	out	applies to mesh data; origins are node outputs
+OBJECT_OT_transform_axis_target	out	applies to mesh data; origins are node outputs
+OBJECT_OT_transform_to_mouse	missing	Object menu: move to mouse
+OBJECT_OT_transforms_to_deltas	deferred	delta transform needs new Item fields
+OBJECT_OT_unlink_data	out	data-block linking
+OBJECT_OT_visual_transform_apply	out	applies to mesh data; origins are node outputs
+OBJECT_OT_volume_import	out	object types outside the scene

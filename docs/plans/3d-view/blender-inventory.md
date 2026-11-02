@@ -17,7 +17,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Viewport: shading | 6/10 | 5/7 | 30 |
 | Viewport: overlays | 7/19 | 0/0 | 77 |
 | Transform, snap, pivot | 10/25 | 31/48 | 108 |
-| Object | 8/76 | 30/80 | 33 |
+| Object | 11/18 | 11/30 | 91 |
 | Camera | 27/87 | 16/31 | 2 |
 | Light | 13/60 | 6/8 | 3 |
 | Light probe | 8/36 | 7/7 | 4 |
@@ -30,8 +30,8 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **171/741** | **157/452** | **418** |
-| **Operators (features)** | **32/231** | | **263** |
+| **All settings** | **174/683** | **138/402** | **476** |
+| **Operators (features)** | **42/176** | | **318** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
 ## Viewport: View tab and header
@@ -433,105 +433,100 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
 | Type | Object.type | enum | **Mesh**, **Curve**, **Surface**, Metaball, **Text**, Hair Curves, Point Cloud, **Volume**, Grease Pencil, Armature, Lattice, **Empty**, **Light**, Light Probe, **Camera**, Speaker | in | yes |
-| Mode | Object.mode | enum | Object Mode, Edit Mode, Pose Mode, Sculpt Mode, Vertex Paint, Weight Paint, Texture Paint, Particle Edit, Edit Mode, Sculpt Mode, Draw Mode, Weight Paint, Vertex Paint, Sculpt Mode | in | yes |
-| Bounding Box | Object.bound_box | float |  | in | - |
-| Parent Type | Object.parent_type | enum | **Object**, Armature, Lattice, **Vertex**, 3 Vertices, Bone | in | - |
-| Parent Vertices | Object.parent_vertices | int |  | in | - |
-| Use Final Indices | Object.use_parent_final_indices | boolean |  | in | - |
-| Camera Parent Lock | Object.use_camera_lock_parent | boolean |  | in | - |
+| Bounding Box | Object.bound_box | float |  | in | yes |
 | Track Axis | Object.track_axis | enum | +X, +Y, +Z, -X, -Y, -Z | in | - |
 | Up Axis | Object.up_axis | enum | X, Y, Z | in | - |
 | Location | Object.location | float |  | in | yes |
-| Quaternion Rotation | Object.rotation_quaternion | float |  | in | - |
-| Axis-Angle Rotation | Object.rotation_axis_angle | float |  | in | - |
-| Euler Rotation | Object.rotation_euler | float |  | in | - |
-| Rotation Mode | Object.rotation_mode | enum | Quaternion (WXYZ), XYZ Euler, XZY Euler, YXZ Euler, YZX Euler, ZXY Euler, ZYX Euler, Axis Angle | in | - |
+| Euler Rotation | Object.rotation_euler | float |  | in | yes |
 | Scale | Object.scale | float |  | in | yes |
 | Dimensions | Object.dimensions | float |  | in | yes |
-| Delta Location | Object.delta_location | float |  | in | - |
-| Delta Rotation (Euler) | Object.delta_rotation_euler | float |  | in | - |
-| Delta Rotation (Quaternion) | Object.delta_rotation_quaternion | float |  | in | - |
-| Delta Scale | Object.delta_scale | float |  | in | - |
-| Lock Location | Object.lock_location | boolean |  | in | - |
-| Lock Rotation | Object.lock_rotation | boolean |  | in | - |
-| Lock Rotation (4D Angle) | Object.lock_rotation_w | boolean |  | in | - |
-| Lock Rotations (4D) | Object.lock_rotations_4d | boolean |  | in | - |
-| Lock Scale | Object.lock_scale | boolean |  | in | - |
-| Matrix World | Object.matrix_world | float |  | in | - |
-| Local Matrix | Object.matrix_local | float |  | in | - |
-| Input Matrix | Object.matrix_basis | float |  | in | - |
-| Parent Inverse Matrix | Object.matrix_parent_inverse | float |  | in | - |
-| Shader Effects | Object.shader_effects | collection |  | in | - |
-| Constraints | Object.constraints | collection |  | in | - |
-| Empty Display Type | Object.empty_display_type | enum | Plain Axes, **Arrows**, Single Arrow, **Circle**, **Cube**, **Sphere**, **Cone**, **Image** | in | - |
-| Empty Display Size | Object.empty_display_size | float |  | in | - |
-| Origin Offset | Object.empty_image_offset | float |  | in | - |
-| Image User | Object.image_user | pointer |  | in | - |
-| Empty Image Depth | Object.empty_image_depth | enum | **Default**, **Front**, **Back** | in | - |
-| Display in Perspective Mode | Object.show_empty_image_perspective | boolean |  | in | - |
-| Display in Orthographic Mode | Object.show_empty_image_orthographic | boolean |  | in | - |
-| Display Only Axis Aligned | Object.show_empty_image_only_axis_aligned | boolean |  | in | - |
-| Use Alpha | Object.use_empty_image_alpha | boolean |  | in | - |
-| Empty Image Side | Object.empty_image_side | enum | **Both**, **Front**, **Back** | in | - |
-| Add Rest Position | Object.add_rest_position_attribute | boolean |  | in | - |
-| Pass Index | Object.pass_index | int |  | in | - |
-| Color | Object.color | float |  | in | yes |
-| Use Simulation Cache | Object.use_simulation_cache | boolean |  | in | - |
-| Disable in Viewports | Object.hide_viewport | boolean |  | in | - |
+| Lock Location | Object.lock_location | boolean |  | in | yes |
+| Lock Rotation | Object.lock_rotation | boolean |  | in | yes |
+| Lock Scale | Object.lock_scale | boolean |  | in | yes |
+| Disable in Viewports | Object.hide_viewport | boolean |  | in | yes |
 | Disable Selection | Object.hide_select | boolean |  | in | - |
-| Disable in Renders | Object.hide_render | boolean |  | in | - |
-| Disable in Volume Probes | Object.hide_probe_volume | boolean |  | in | - |
-| Disable in Spherical Light Probes | Object.hide_probe_sphere | boolean |  | in | - |
-| Disable in Planar Light Probes | Object.hide_probe_plane | boolean |  | in | - |
-| Disable in Surface Picking | Object.hide_surface_pick | boolean |  | in | - |
-| Render Instancer | Object.show_instancer_for_render | boolean |  | in | - |
-| Display Instancer | Object.show_instancer_for_viewport | boolean |  | in | - |
-| Camera Visibility | Object.visible_camera | boolean |  | in | - |
-| Diffuse Visibility | Object.visible_diffuse | boolean |  | in | - |
-| Glossy Visibility | Object.visible_glossy | boolean |  | in | - |
-| Transmission Visibility | Object.visible_transmission | boolean |  | in | - |
-| Volume Scatter Visibility | Object.visible_volume_scatter | boolean |  | in | - |
-| Shadow Visibility | Object.visible_shadow | boolean |  | in | - |
-| Instance Type | Object.instance_type | enum | **None**, Vertices, **Faces**, Collection | in | - |
-| Orient with Normals | Object.use_instance_vertices_rotation | boolean |  | in | - |
-| Display As | Object.display_type | enum | **Bounds**, **Wire**, **Solid**, Textured | in | - |
+| Disable in Renders | Object.hide_render | boolean |  | in | yes |
 | Display Bounds | Object.show_bounds | boolean |  | in | - |
 | Display Bounds Type | Object.display_bounds_type | enum | **Box**, **Sphere**, Cylinder, **Cone**, Capsule | in | - |
 | Display Name | Object.show_name | boolean |  | in | - |
 | Display Axes | Object.show_axis | boolean |  | in | - |
-| Display Wire | Object.show_wire | boolean |  | in | - |
-| Display Transparent | Object.show_transparent | boolean |  | in | - |
-| In Front | Object.show_in_front | boolean |  | in | yes |
-| Object Display | Object.display | pointer |  | in | yes |
-| Shadow Terminator Geometry Offset | Object.shadow_terminator_geometry_offset | float |  | in | - |
-| Shadow Terminator Shading Offset | Object.shadow_terminator_shading_offset | float |  | in | - |
-| Animation Visualization | Object.animation_visualization | pointer |  | in | - |
-| Selection Sets | Object.selection_sets | collection |  | in | - |
-| Active Selection Set | Object.active_selection_set | int |  | in | - |
+| Mode | Object.mode | enum | Object Mode, Edit Mode, Pose Mode, Sculpt Mode, Vertex Paint, Weight Paint, Texture Paint, Particle Edit, Edit Mode, Sculpt Mode, Draw Mode, Weight Paint, Vertex Paint, Sculpt Mode | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Parent Type | Object.parent_type | enum | **Object**, Armature, Lattice, **Vertex**, 3 Vertices, Bone | out: no parenting; groups only | - |
+| Parent Vertices | Object.parent_vertices | int |  | out: no parenting; groups only | - |
 | Parent Bone | Object.parent_bone | string |  | out: bone | - |
+| Use Final Indices | Object.use_parent_final_indices | boolean |  | out: no parenting; groups only | - |
+| Camera Parent Lock | Object.use_camera_lock_parent | boolean |  | out: no parenting; groups only | - |
 | Material Slots | Object.material_slots | collection |  | out: material | - |
 | Active Material | Object.active_material | pointer |  | out: material | - |
 | Active Material Index | Object.active_material_index | int |  | out: material | - |
+| Quaternion Rotation | Object.rotation_quaternion | float |  | deferred: rotation modes need new Item fields | - |
+| Axis-Angle Rotation | Object.rotation_axis_angle | float |  | deferred: rotation modes need new Item fields | - |
+| Rotation Mode | Object.rotation_mode | enum | Quaternion (WXYZ), XYZ Euler, XZY Euler, YXZ Euler, YZX Euler, ZXY Euler, ZYX Euler, Axis Angle | deferred: rotation modes need new Item fields | - |
+| Delta Location | Object.delta_location | float |  | deferred: delta transform needs new Item fields | - |
+| Delta Rotation (Euler) | Object.delta_rotation_euler | float |  | deferred: delta transform needs new Item fields | - |
+| Delta Rotation (Quaternion) | Object.delta_rotation_quaternion | float |  | deferred: delta transform needs new Item fields | - |
+| Delta Scale | Object.delta_scale | float |  | deferred: delta transform needs new Item fields | - |
+| Lock Rotation (4D Angle) | Object.lock_rotation_w | boolean |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Lock Rotations (4D) | Object.lock_rotations_4d | boolean |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Matrix World | Object.matrix_world | float |  | out: derived matrix, not a setting | - |
+| Local Matrix | Object.matrix_local | float |  | out: no parenting; groups only | - |
+| Input Matrix | Object.matrix_basis | float |  | out: derived matrix, not a setting | - |
+| Parent Inverse Matrix | Object.matrix_parent_inverse | float |  | out: no parenting; groups only | - |
 | Modifiers | Object.modifiers | collection |  | out: modifier | - |
+| Shader Effects | Object.shader_effects | collection |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Constraints | Object.constraints | collection |  | out: constraint stack: Look at only (parity.md) | - |
 | Vertex Groups | Object.vertex_groups | collection |  | out: vertex | - |
+| Empty Display Type | Object.empty_display_type | enum | Plain Axes, **Arrows**, Single Arrow, **Circle**, **Cube**, **Sphere**, **Cone**, **Image** | out: no empty objects in the scene | - |
+| Empty Display Size | Object.empty_display_size | float |  | out: no empty objects in the scene | - |
+| Origin Offset | Object.empty_image_offset | float |  | out: no empty objects in the scene | - |
+| Image User | Object.image_user | pointer |  | out: no empty objects in the scene | - |
+| Empty Image Depth | Object.empty_image_depth | enum | **Default**, **Front**, **Back** | out: no empty objects in the scene | - |
+| Display in Perspective Mode | Object.show_empty_image_perspective | boolean |  | out: no empty objects in the scene | - |
+| Display in Orthographic Mode | Object.show_empty_image_orthographic | boolean |  | out: no empty objects in the scene | - |
+| Display Only Axis Aligned | Object.show_empty_image_only_axis_aligned | boolean |  | out: no empty objects in the scene | - |
+| Use Alpha | Object.use_empty_image_alpha | boolean |  | out: no empty objects in the scene | - |
+| Empty Image Side | Object.empty_image_side | enum | **Both**, **Front**, **Back** | out: no empty objects in the scene | - |
+| Add Rest Position | Object.add_rest_position_attribute | boolean |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Pass Index | Object.pass_index | int |  | deferred: object index pass needs renderer work | - |
+| Color | Object.color | float |  | deferred: object colour needs Solid shader work | - |
 | Field Settings | Object.field | pointer |  | out: field | yes |
 | Collision Settings | Object.collision | pointer |  | out: collision | - |
 | Soft Body Settings | Object.soft_body | pointer |  | out: soft_body | - |
 | Particle Systems | Object.particle_systems | collection |  | out: particle | - |
 | Rigid Body Settings | Object.rigid_body | pointer |  | out: rigid | - |
 | Rigid Body Constraint | Object.rigid_body_constraint | pointer |  | out: rigid | - |
+| Use Simulation Cache | Object.use_simulation_cache | boolean |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Disable in Volume Probes | Object.hide_probe_volume | boolean |  | deferred: light probes need renderer work | - |
+| Disable in Spherical Light Probes | Object.hide_probe_sphere | boolean |  | deferred: light probes need renderer work | - |
+| Disable in Planar Light Probes | Object.hide_probe_plane | boolean |  | deferred: light probes need renderer work | - |
+| Disable in Surface Picking | Object.hide_surface_pick | boolean |  | out: surface picking is mesh snapping | - |
+| Render Instancer | Object.show_instancer_for_render | boolean |  | out: instancing is geometry | - |
+| Display Instancer | Object.show_instancer_for_viewport | boolean |  | out: instancing is geometry | - |
+| Camera Visibility | Object.visible_camera | boolean |  | deferred: ray visibility needs renderer work | - |
+| Diffuse Visibility | Object.visible_diffuse | boolean |  | deferred: ray visibility needs renderer work | - |
+| Glossy Visibility | Object.visible_glossy | boolean |  | deferred: ray visibility needs renderer work | - |
+| Transmission Visibility | Object.visible_transmission | boolean |  | deferred: ray visibility needs renderer work | - |
+| Volume Scatter Visibility | Object.visible_volume_scatter | boolean |  | deferred: ray visibility needs renderer work | - |
+| Shadow Visibility | Object.visible_shadow | boolean |  | deferred: per-item shadow casting needs renderer work | - |
+| Instance Type | Object.instance_type | enum | **None**, Vertices, **Faces**, Collection | out: instancing is geometry | - |
+| Orient with Normals | Object.use_instance_vertices_rotation | boolean |  | out: instancing is geometry | - |
 | Scale to Face Sizes | Object.use_instance_faces_scale | boolean |  | out: face | - |
 | Instance Faces Scale | Object.instance_faces_scale | float |  | out: face | - |
 | Instance Collection | Object.instance_collection | pointer |  | out: collection | - |
+| Display As | Object.display_type | enum | **Bounds**, **Wire**, **Solid**, Textured | deferred: display-as needs render changes | - |
 | Display Texture Space | Object.show_texture_space | boolean |  | out: texture | - |
+| Display Wire | Object.show_wire | boolean |  | deferred: needs Solid shader work | - |
 | Display All Edges | Object.show_all_edges | boolean |  | out: edge | - |
 | Use Lights | Object.use_grease_pencil_lights | boolean |  | out: grease | - |
+| Display Transparent | Object.show_transparent | boolean |  | out: materials | - |
+| In Front | Object.show_in_front | boolean |  | deferred: needs Solid shader work | - |
 | Pose | Object.pose | pointer |  | out: pose | yes |
 | Solo Active Shape Key | Object.show_only_shape_key | boolean |  | out: shape_key | - |
 | Shape Key Edit Mode | Object.use_shape_key_edit_mode | boolean |  | out: shape_key | - |
 | Active Shape Key | Object.active_shape_key | pointer |  | out: shape_key | - |
 | Active Shape Key Index | Object.active_shape_key_index | int |  | out: shape_key | - |
 | Dynamic Topology Sculpting | Object.use_dynamic_topology_sculpting | boolean |  | out: dynamic | - |
+| Object Display | Object.display | pointer |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
 | Line Art | Object.lineart | pointer |  | out: lineart | - |
 | X | Object.use_mesh_mirror_x | boolean |  | out: mesh | - |
 | Y | Object.use_mesh_mirror_y | boolean |  | out: mesh | - |
@@ -539,7 +534,12 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Lightgroup | Object.lightgroup | string |  | out: lightgroup | - |
 | Light Linking | Object.light_linking | pointer |  | out: light_linking | yes |
 | Shadow Terminator Normal Offset | Object.shadow_terminator_normal_offset | float |  | out: normal | - |
+| Shadow Terminator Geometry Offset | Object.shadow_terminator_geometry_offset | float |  | deferred: shadow terminator needs renderer work | - |
+| Shadow Terminator Shading Offset | Object.shadow_terminator_shading_offset | float |  | deferred: shadow terminator needs renderer work | - |
+| Animation Visualization | Object.animation_visualization | pointer |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
 | Motion Path | Object.motion_path | pointer |  | out: motion_path | - |
+| Selection Sets | Object.selection_sets | collection |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
+| Active Selection Set | Object.active_selection_set | int |  | out: editing modes, 4D rotation, materials, rigging or simulation | - |
 | Cycles Object Settings | Object.cycles | pointer |  | out: cycles | yes |
 
 ## Camera
@@ -1297,90 +1297,35 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Undo History | ED_OT_undo_history | Undo or redo specific action in history | in | - |
 | Undo Push | ED_OT_undo_push | Add an undo state (internal use only) | in | - |
 | Undo and Redo | ED_OT_undo_redo | Undo and redo previous action | in | - |
-| Add Object | OBJECT_OT_add | Add an object to the scene | in | - |
-| Add Object | OBJECT_OT_add_named | Add named object | in | - |
+| Add Object | OBJECT_OT_add | Add an object to the scene | in | yes |
+| Add Object | OBJECT_OT_add_named | Add named object | in | yes |
 | Align Objects | OBJECT_OT_align | Align objects | in | - |
-| Animated Transforms to Deltas | OBJECT_OT_anim_transforms_to_deltas | Convert object animation for normal transforms to delta transforms | in | - |
 | Add Camera | OBJECT_OT_camera_add | Add a camera object to the scene | in | yes |
-| Add Constraint | OBJECT_OT_constraint_add | Add a constraint to the active object | in | - |
-| Add Constraint (with Targets) | OBJECT_OT_constraint_add_with_targets | Add a constraint to the active object, with target (where applicable) set to the selected objects/bones | in | - |
-| Clear Object Constraints | OBJECT_OT_constraints_clear | Clear all constraints from the selected objects | in | - |
-| Copy Constraints to Selected Objects | OBJECT_OT_constraints_copy | Copy constraints to other selected objects | in | - |
-| Convert To | OBJECT_OT_convert | Convert selected objects to another type | in | yes |
 | Copy Global Transform | OBJECT_OT_copy_global_transform | Copies the matrix of the currently active object or pose bone to the clipboard. Uses world-space matrices | in | - |
-| Copy Relative Transform | OBJECT_OT_copy_relative_transform | Copies the matrix of the currently active object or pose bone to the clipboard. Uses matrices relative to a sp | in | - |
-| Corrective Smooth Bind | OBJECT_OT_correctivesmooth_bind | Bind base pose in Corrective Smooth modifier | in | - |
 | Delete | OBJECT_OT_delete | Delete selected objects | in | yes |
-| Duplicate Objects | OBJECT_OT_duplicate | Duplicate selected objects | in | - |
-| Duplicate Objects | OBJECT_OT_duplicate_move | Duplicate the selected objects and move them | in | - |
-| Duplicate Linked | OBJECT_OT_duplicate_move_linked | Duplicate the selected objects, but not their object data, and move them | in | - |
-| Make Instances Real | OBJECT_OT_duplicates_make_real | Make instanced objects attached to this object real | in | - |
-| Edit Mode | OBJECT_OT_editmode_toggle | Toggle object's edit mode | in | - |
-| Add Empty | OBJECT_OT_empty_add | Add an empty object to the scene | in | - |
-| Add Empty Image/Drop Image to Empty | OBJECT_OT_empty_image_add | Add an empty image type to scene with data | in | - |
-| Toggle Force Field | OBJECT_OT_forcefield_toggle | Toggle object's force field | in | - |
+| Duplicate Objects | OBJECT_OT_duplicate | Duplicate selected objects | in | yes |
+| Duplicate Objects | OBJECT_OT_duplicate_move | Duplicate the selected objects and move them | in | yes |
+| Duplicate Linked | OBJECT_OT_duplicate_move_linked | Duplicate the selected objects, but not their object data, and move them | in | yes |
 | Clear All Restrict Render | OBJECT_OT_hide_render_clear_all | Reveal all render objects by setting the hide render flag | in | - |
-| Show Hidden Objects | OBJECT_OT_hide_view_clear | Reveal temporarily hidden objects | in | - |
-| Hide Objects | OBJECT_OT_hide_view_set | Temporarily hide objects from the viewport | in | - |
-| Set Offset from Cursor | OBJECT_OT_instance_offset_from_cursor | Set offset used for collection instances based on cursor position | in | - |
-| Set Offset from Object | OBJECT_OT_instance_offset_from_object | Set offset used for collection instances based on the active object position | in | - |
-| Set Cursor to Offset | OBJECT_OT_instance_offset_to_cursor | Set cursor position to the offset used for collection instances | in | - |
+| Show Hidden Objects | OBJECT_OT_hide_view_clear | Reveal temporarily hidden objects | in | yes |
+| Hide Objects | OBJECT_OT_hide_view_set | Temporarily hide objects from the viewport | in | yes |
 | Restrict Render Unselected | OBJECT_OT_isolate_type_render | Hide unselected render objects of same type as active by setting the hide render flag | in | - |
-| Join | OBJECT_OT_join | Join selected objects into active object | in | yes |
-| Join as Shapes | OBJECT_OT_join_shapes | Add the vertex positions of selected objects as shape keys or update existing shape keys with matching names | in | - |
-| Laplacian Deform Bind | OBJECT_OT_laplaciandeform_bind | Bind mesh to system in laplacian deform modifier | in | - |
 | Add Light | OBJECT_OT_light_add | Add a light object to the scene | in | yes |
-| Add Light Probe | OBJECT_OT_lightprobe_add | Add a light probe object | in | - |
-| Delete Light Cache | OBJECT_OT_lightprobe_cache_free | Delete cached indirect lighting | in | - |
 | Clear Location | OBJECT_OT_location_clear | Clear the object's location | in | - |
-| Link/Transfer Data | OBJECT_OT_make_links_data | Transfer data from active object to selected objects | in | - |
-| Link Objects to Scene | OBJECT_OT_make_links_scene | Link selection to another scene | in | - |
-| Mesh Deform Bind | OBJECT_OT_meshdeform_bind | Bind mesh to cage in mesh deform modifier | in | - |
-| Multires Apply Base | OBJECT_OT_multires_base_apply | Modify the base mesh to conform to the displaced mesh | in | - |
-| Multires Pack External | OBJECT_OT_multires_external_pack | Pack displacements from an external file | in | - |
-| Multires Save External | OBJECT_OT_multires_external_save | Save displacements to an external file | in | - |
-| Delete Higher Levels | OBJECT_OT_multires_higher_levels_delete | Deletes the higher resolution mesh, potential loss of detail | in | - |
-| Rebuild Lower Subdivisions | OBJECT_OT_multires_rebuild_subdiv | Rebuilds all possible subdivisions levels to generate a lower resolution base mesh | in | - |
-| Multires Reshape | OBJECT_OT_multires_reshape | Copy vertex coordinates from other object | in | - |
-| Multires Subdivide | OBJECT_OT_multires_subdivide | Add a new level of subdivision | in | - |
-| Unsubdivide | OBJECT_OT_multires_unsubdivide | Rebuild a lower subdivision level of the current base mesh | in | - |
-| Clear Origin | OBJECT_OT_origin_clear | Clear the object's origin | in | - |
-| Set Origin | OBJECT_OT_origin_set | Set the object's origin, by either moving the data, or set to center of data, or use 3D cursor | in | - |
-| Clear Parent | OBJECT_OT_parent_clear | Clear the object's parenting | in | - |
-| Apply Parent Inverse | OBJECT_OT_parent_inverse_apply | Apply the object's parent inverse to its data | in | - |
-| Make Parent without Inverse | OBJECT_OT_parent_no_inverse_set | Set the object's parenting without setting the inverse parent correction | in | - |
-| Make Parent | OBJECT_OT_parent_set | Set the object's parenting | in | - |
 | Paste Global Transform | OBJECT_OT_paste_transform | Pastes the matrix from the clipboard to the currently active pose bone or object. Uses world-space matrices | in | - |
-| Add Point Cloud | OBJECT_OT_pointcloud_random_add | Add a point cloud object to the scene | in | - |
-| Toggle Pose Mode | OBJECT_OT_posemode_toggle | Enable or disable posing/selecting bones | in | - |
-| QuadriFlow Remesh | OBJECT_OT_quadriflow_remesh | Create a new quad based mesh using the surface data of the current mesh. All data layers will be lost | in | - |
 | Randomize Transform | OBJECT_OT_randomize_transform | Randomize objects location, rotation, and scale | in | - |
 | Clear Rotation | OBJECT_OT_rotation_clear | Clear the object's rotation | in | - |
 | Clear Scale | OBJECT_OT_scale_clear | Clear the object's scale | in | - |
-| (De)select All | OBJECT_OT_select_all | Change selection of all visible objects in scene | in | - |
-| Select by Type | OBJECT_OT_select_by_type | Select all visible objects that are of a type | in | - |
+| (De)select All | OBJECT_OT_select_all | Change selection of all visible objects in scene | in | yes |
+| Select by Type | OBJECT_OT_select_by_type | Select all visible objects that are of a type | in | yes |
 | Select Camera | OBJECT_OT_select_camera | Select the active camera | in | - |
-| Select Grouped | OBJECT_OT_select_grouped | Select all visible objects grouped by various properties | in | - |
-| Select Hierarchy | OBJECT_OT_select_hierarchy | Select object relative to the active object's position in the hierarchy | in | - |
-| Select Less | OBJECT_OT_select_less | Deselect objects at the boundaries of parent/child relationships | in | - |
+| Select Grouped | OBJECT_OT_select_grouped | Select all visible objects grouped by various properties | in | yes |
 | Select Linked | OBJECT_OT_select_linked | Select all visible objects that are linked | in | yes |
-| Select More | OBJECT_OT_select_more | Select connected parent/child objects | in | - |
 | Select Pattern | OBJECT_OT_select_pattern | Select objects matching a naming pattern | in | - |
 | Select Random | OBJECT_OT_select_random | Select or deselect random visible objects | in | yes |
-| Shade Auto Smooth | OBJECT_OT_shade_auto_smooth | Add modifier to automatically set the sharpness of mesh edges based on the angle between the neighboring faces | in | - |
-| Shade Flat | OBJECT_OT_shade_flat | Render and display faces uniform, using face normals | in | - |
-| Shade Smooth | OBJECT_OT_shade_smooth | Render and display faces smooth, using interpolated vertex normals | in | - |
-| Shade Smooth by Angle | OBJECT_OT_shade_smooth_by_angle | Set the sharpness of mesh edges based on the angle between the neighboring faces | in | - |
-| Surface Deform Bind | OBJECT_OT_surfacedeform_bind | Bind mesh to target in surface deform modifier | in | - |
-| Clear Track | OBJECT_OT_track_clear | Clear tracking constraint or flag from object | in | - |
-| Make Track | OBJECT_OT_track_set | Make the object track another object, using various methods/constraints | in | - |
-| Apply Object Transform | OBJECT_OT_transform_apply | Apply the object's transformation to its data | in | - |
-| Interactive Light Track to Cursor | OBJECT_OT_transform_axis_target | Interactively point cameras and lights to a location (Ctrl translates) | in | - |
+| Clear Track | OBJECT_OT_track_clear | Clear tracking constraint or flag from object | in | yes |
+| Make Track | OBJECT_OT_track_set | Make the object track another object, using various methods/constraints | in | yes |
 | Place Object Under Mouse | OBJECT_OT_transform_to_mouse | Snap selected item(s) to the mouse location | in | - |
-| Transforms to Deltas | OBJECT_OT_transforms_to_deltas | Convert normal object transforms to delta transforms, any existing delta transforms will be included as well | in | - |
-| Unlink | OBJECT_OT_unlink_data | (undocumented operator) | in | - |
-| Apply Visual Transform | OBJECT_OT_visual_transform_apply | Apply the object's visual transformation to its data | in | - |
-| Import OpenVDB Volume | OBJECT_OT_volume_import | Import OpenVDB volume file | in | - |
 | Outliner Animation Data Operation | OUTLINER_OT_animdata_operation | (undocumented operator) | in | - |
 | Clear Filter | OUTLINER_OT_clear_filter | Clear the search filter | in | - |
 | Outliner Constraint Operation | OUTLINER_OT_constraint_operation | (undocumented operator) | in | - |
@@ -1528,6 +1473,7 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Toggle Library Override Editable | ED_OT_lib_id_override_editable_toggle | Set if this library override data-block can be edited | out: override | - |
 | Remove Preview | ED_OT_lib_id_remove_preview | Remove the preview of this data-block | out: preview | - |
 | Add Modifier | OBJECT_OT_add_modifier_menu | (undocumented operator) | out: modifier | - |
+| Animated Transforms to Deltas | OBJECT_OT_anim_transforms_to_deltas | Convert object animation for normal transforms to delta transforms | deferred: delta transform needs new Item fields | - |
 | Add Armature | OBJECT_OT_armature_add | Add an armature object to the scene | out: armature | - |
 | Assign Custom Property Values as Default | OBJECT_OT_assign_property_defaults | Assign the current values of custom properties as their defaults, for use as part of the rest pose state in NL | out: assign_property | - |
 | Bake | OBJECT_OT_bake | Bake image textures of selected objects | out: bake | yes |
@@ -1541,6 +1487,13 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Select Objects in Collection | OBJECT_OT_collection_objects_select | Select all objects in collection | out: collection | - |
 | Remove Collection | OBJECT_OT_collection_remove | Remove the active object from this collection | out: collection | - |
 | Unlink Collection | OBJECT_OT_collection_unlink | Unlink the collection from all objects | out: collection | - |
+| Add Constraint | OBJECT_OT_constraint_add | Add a constraint to the active object | out: constraint stack: Look at only (parity.md) | - |
+| Add Constraint (with Targets) | OBJECT_OT_constraint_add_with_targets | Add a constraint to the active object, with target (where applicable) set to the selected objects/bones | out: constraint stack: Look at only (parity.md) | - |
+| Clear Object Constraints | OBJECT_OT_constraints_clear | Clear all constraints from the selected objects | out: constraint stack: Look at only (parity.md) | - |
+| Copy Constraints to Selected Objects | OBJECT_OT_constraints_copy | Copy constraints to other selected objects | out: constraint stack: Look at only (parity.md) | - |
+| Convert To | OBJECT_OT_convert | Convert selected objects to another type | out: geometry or mode editing | - |
+| Copy Relative Transform | OBJECT_OT_copy_relative_transform | Copies the matrix of the currently active object or pose bone to the clipboard. Uses matrices relative to a sp | out: relative to parent; no parenting | - |
+| Corrective Smooth Bind | OBJECT_OT_correctivesmooth_bind | Bind base pose in Corrective Smooth modifier | out: geometry or mode editing | - |
 | Add Empty Curves | OBJECT_OT_curves_empty_hair_add | Add an empty curve object to the scene with the selected mesh as surface | out: curve | - |
 | Add Random Curves | OBJECT_OT_curves_random_add | Add a curves object with random curves to the scene | out: curve | - |
 | Add Object Data Instance | OBJECT_OT_data_instance_add | Add an object data instance | out: data_instance | - |
@@ -1549,9 +1502,14 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Delete Generated Keys | OBJECT_OT_delete_fix_to_camera_keys | Delete all keys that were generated by the 'Fix to Scene Camera' operator | out: fix_to_camera | - |
 | Drop Geometry Node Group on Object | OBJECT_OT_drop_geometry_nodes | (undocumented operator) | out: geometry_node | - |
 | Drop Named Material on Object | OBJECT_OT_drop_named_material | (undocumented operator) | out: material | - |
+| Make Instances Real | OBJECT_OT_duplicates_make_real | Make instanced objects attached to this object real | out: geometry or mode editing | - |
+| Edit Mode | OBJECT_OT_editmode_toggle | Toggle object's edit mode | out: geometry or mode editing | - |
 | Add Effector | OBJECT_OT_effector_add | Add an empty object with a physics effector to the scene | out: effector | - |
+| Add Empty | OBJECT_OT_empty_add | Add an empty object to the scene | out: object types outside the scene | - |
+| Add Empty Image/Drop Image to Empty | OBJECT_OT_empty_image_add | Add an empty image type to scene with data | out: object types outside the scene | - |
 | Explode Refresh | OBJECT_OT_explode_refresh | Refresh data in the Explode modifier | out: explode | - |
 | Fix to Scene Camera | OBJECT_OT_fix_to_camera | Generate new keys to fix the selected object/bone to the camera on unkeyed frames | out: fix_to_camera | - |
+| Toggle Force Field | OBJECT_OT_forcefield_toggle | Toggle object's force field | out: object types outside the scene | - |
 | Delete Geometry Node Bake | OBJECT_OT_geometry_node_bake_delete_single | Delete baked data of a single bake node or simulation | out: geometry_node | - |
 | Pack Geometry Node Bake | OBJECT_OT_geometry_node_bake_pack_single | Pack baked data from disk into the .blend file | out: geometry_node | - |
 | Bake Geometry Node | OBJECT_OT_geometry_node_bake_single | Bake a single bake node or simulation | out: geometry_node | - |
@@ -1574,7 +1532,13 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Remove Hook | OBJECT_OT_hook_remove | Remove a hook from the active object | out: hook | - |
 | Reset Hook | OBJECT_OT_hook_reset | Recalculate and clear offset transformation | out: hook | - |
 | Select Hook | OBJECT_OT_hook_select | Select affected vertices on mesh | out: hook | - |
+| Set Offset from Cursor | OBJECT_OT_instance_offset_from_cursor | Set offset used for collection instances based on cursor position | out: instancing is geometry | - |
+| Set Offset from Object | OBJECT_OT_instance_offset_from_object | Set offset used for collection instances based on the active object position | out: instancing is geometry | - |
+| Set Cursor to Offset | OBJECT_OT_instance_offset_to_cursor | Set cursor position to the offset used for collection instances | out: instancing is geometry | - |
+| Join | OBJECT_OT_join | Join selected objects into active object | out: geometry or mode editing | - |
+| Join as Shapes | OBJECT_OT_join_shapes | Add the vertex positions of selected objects as shape keys or update existing shape keys with matching names | out: geometry or mode editing | - |
 | Transfer UV Maps | OBJECT_OT_join_uvs | Transfer UV Maps from active to selected objects (needs matching geometry) | out: uv | - |
+| Laplacian Deform Bind | OBJECT_OT_laplaciandeform_bind | Bind mesh to system in laplacian deform modifier | out: geometry or mode editing | - |
 | Add Lattice Deformer | OBJECT_OT_lattice_add_to_selected | Add a lattice and use it to deform selected objects | out: lattice | - |
 | New Light Linking Collection | OBJECT_OT_light_linking_blocker_collection_new | Create new light linking collection used by the active emitter | out: light_linking | - |
 | Link Blockers to Emitter | OBJECT_OT_light_linking_blockers_link | Light link selected blockers to the active emitter object | out: light_linking | - |
@@ -1583,11 +1547,15 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Link Receivers to Emitter | OBJECT_OT_light_linking_receivers_link | Light link selected receivers to the active emitter object | out: light_linking | - |
 | Select Light Linking Receivers | OBJECT_OT_light_linking_receivers_select | Select all objects which receive light from this emitter | out: light_linking | - |
 | Remove From Light Linking Collection | OBJECT_OT_light_linking_unlink_from_collection | Remove this object or collection from the light linking collection | out: light_linking | - |
+| Add Light Probe | OBJECT_OT_lightprobe_add | Add a light probe object | deferred: light probes need renderer work | - |
 | Bake Light Cache | OBJECT_OT_lightprobe_cache_bake | Bake irradiance volume light cache | out: bake | - |
+| Delete Light Cache | OBJECT_OT_lightprobe_cache_free | Delete cached indirect lighting | deferred: light probes need renderer work | - |
 | Bake Line Art | OBJECT_OT_lineart_bake_strokes | Bake Line Art for current Grease Pencil object | out: lineart | - |
 | Clear Baked Line Art | OBJECT_OT_lineart_clear | Clear all strokes in current Grease Pencil object | out: lineart | - |
 | Link to Collection | OBJECT_OT_link_to_collection | Link objects to a collection | out: collection | - |
 | Make Instance Face | OBJECT_OT_make_dupli_face | Convert objects into instanced faces | out: dupli | - |
+| Link/Transfer Data | OBJECT_OT_make_links_data | Transfer data from active object to selected objects | out: data-block linking | - |
+| Link Objects to Scene | OBJECT_OT_make_links_scene | Link selection to another scene | out: data-block linking | - |
 | Make Local | OBJECT_OT_make_local | Make library linked data-blocks local to this file | out: make_local | - |
 | Make Library Override | OBJECT_OT_make_override_library | Create a local override of the selected linked objects, and their hierarchy of dependencies | out: override | - |
 | Make Single User | OBJECT_OT_make_single_user | Make linked data local to each object | out: single_user | - |
@@ -1600,6 +1568,7 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Remove All Materials | OBJECT_OT_material_slot_remove_all | Remove all materials | out: material | - |
 | Remove Unused Slots | OBJECT_OT_material_slot_remove_unused | Remove unused material slots | out: material | - |
 | Select Material Slot | OBJECT_OT_material_slot_select | Select by active material slot | out: material | - |
+| Mesh Deform Bind | OBJECT_OT_meshdeform_bind | Bind mesh to cage in mesh deform modifier | out: geometry or mode editing | - |
 | Add Metaball | OBJECT_OT_metaball_add | Add a metaball object to the scene | out: metaball | - |
 | Set Object Mode | OBJECT_OT_mode_set | Sets the object interaction mode | out: mode_set | - |
 | Set Object Mode with Sub-mode | OBJECT_OT_mode_set_with_submode | Sets the object interaction mode | out: mode_set | - |
@@ -1618,20 +1587,44 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Clear Object Modifiers | OBJECT_OT_modifiers_clear | Clear all modifiers from the selected objects | out: modifier | - |
 | Copy Modifiers to Selected Objects | OBJECT_OT_modifiers_copy_to_selected | Copy modifiers to other selected objects | out: modifier | - |
 | Move to Collection | OBJECT_OT_move_to_collection | Move objects to a collection | out: collection | - |
+| Multires Apply Base | OBJECT_OT_multires_base_apply | Modify the base mesh to conform to the displaced mesh | out: geometry or mode editing | - |
+| Multires Pack External | OBJECT_OT_multires_external_pack | Pack displacements from an external file | out: geometry or mode editing | - |
+| Multires Save External | OBJECT_OT_multires_external_save | Save displacements to an external file | out: geometry or mode editing | - |
+| Delete Higher Levels | OBJECT_OT_multires_higher_levels_delete | Deletes the higher resolution mesh, potential loss of detail | out: geometry or mode editing | - |
+| Rebuild Lower Subdivisions | OBJECT_OT_multires_rebuild_subdiv | Rebuilds all possible subdivisions levels to generate a lower resolution base mesh | out: geometry or mode editing | - |
+| Multires Reshape | OBJECT_OT_multires_reshape | Copy vertex coordinates from other object | out: geometry or mode editing | - |
+| Multires Subdivide | OBJECT_OT_multires_subdivide | Add a new level of subdivision | out: geometry or mode editing | - |
+| Unsubdivide | OBJECT_OT_multires_unsubdivide | Rebuild a lower subdivision level of the current base mesh | out: geometry or mode editing | - |
 | Bake Ocean | OBJECT_OT_ocean_bake | Bake an image sequence of ocean data | out: bake | - |
+| Clear Origin | OBJECT_OT_origin_clear | Clear the object's origin | out: applies to mesh data; origins are node outputs | - |
+| Set Origin | OBJECT_OT_origin_set | Set the object's origin, by either moving the data, or set to center of data, or use 3D cursor | out: applies to mesh data; origins are node outputs | - |
+| Clear Parent | OBJECT_OT_parent_clear | Clear the object's parenting | out: no parenting; groups only | - |
+| Apply Parent Inverse | OBJECT_OT_parent_inverse_apply | Apply the object's parent inverse to its data | out: no parenting; groups only | - |
+| Make Parent without Inverse | OBJECT_OT_parent_no_inverse_set | Set the object's parenting without setting the inverse parent correction | out: no parenting; groups only | - |
+| Make Parent | OBJECT_OT_parent_set | Set the object's parenting | out: no parenting; groups only | - |
 | Add Particle System Slot | OBJECT_OT_particle_system_add | Add a particle system | out: particle | - |
 | Remove Particle System Slot | OBJECT_OT_particle_system_remove | Remove the selected particle system | out: particle | - |
 | Calculate Object Motion Paths | OBJECT_OT_paths_calculate | Generate motion paths for the selected objects | out: paths | - |
 | Clear Object Paths | OBJECT_OT_paths_clear | (undocumented operator) | out: paths | - |
 | Update Object Paths | OBJECT_OT_paths_update | Recalculate motion paths for selected objects | out: paths | - |
 | Update All Object Paths | OBJECT_OT_paths_update_visible | Recalculate all visible motion paths for objects and poses | out: paths | - |
+| Add Point Cloud | OBJECT_OT_pointcloud_random_add | Add a point cloud object to the scene | out: object types outside the scene | - |
+| Toggle Pose Mode | OBJECT_OT_posemode_toggle | Enable or disable posing/selecting bones | out: geometry or mode editing | - |
+| QuadriFlow Remesh | OBJECT_OT_quadriflow_remesh | Create a new quad based mesh using the surface data of the current mesh. All data layers will be lost | out: geometry or mode editing | - |
 | Quick Explode | OBJECT_OT_quick_explode | Make selected objects explode | out: explode | - |
 | Quick Fur | OBJECT_OT_quick_fur | Add a fur setup to the selected objects | out: fur | - |
 | Quick Liquid | OBJECT_OT_quick_liquid | Make selected objects liquid | out: liquid | - |
 | Quick Smoke | OBJECT_OT_quick_smoke | Use selected objects as smoke emitters | out: smoke | - |
 | Reset Library Override | OBJECT_OT_reset_override_library | Reset the selected local overrides to their linked references values | out: override | - |
+| Select Hierarchy | OBJECT_OT_select_hierarchy | Select object relative to the active object's position in the hierarchy | out: no hierarchy | - |
+| Select Less | OBJECT_OT_select_less | Deselect objects at the boundaries of parent/child relationships | out: no hierarchy | - |
 | Select Mirror | OBJECT_OT_select_mirror | Select the mirror objects of the selected object e.g. "L.sword" and "R.sword" | out: select_mirror | - |
+| Select More | OBJECT_OT_select_more | Select connected parent/child objects | out: no hierarchy | - |
 | Select Same Collection | OBJECT_OT_select_same_collection | Select object in the same collection | out: collection | - |
+| Shade Auto Smooth | OBJECT_OT_shade_auto_smooth | Add modifier to automatically set the sharpness of mesh edges based on the angle between the neighboring faces | out: geometry or mode editing | - |
+| Shade Flat | OBJECT_OT_shade_flat | Render and display faces uniform, using face normals | out: geometry or mode editing | - |
+| Shade Smooth | OBJECT_OT_shade_smooth | Render and display faces smooth, using interpolated vertex normals | out: geometry or mode editing | - |
+| Shade Smooth by Angle | OBJECT_OT_shade_smooth_by_angle | Set the sharpness of mesh edges based on the angle between the neighboring faces | out: geometry or mode editing | - |
 | Add Effect | OBJECT_OT_shaderfx_add | Add a visual effect to the active object | out: shaderfx | - |
 | Copy Effect | OBJECT_OT_shaderfx_copy | Duplicate effect at the same position in the stack | out: shaderfx | - |
 | Move Down Effect | OBJECT_OT_shaderfx_move_down | Move effect down in the stack | out: shaderfx | - |
@@ -1658,8 +1651,13 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Skin Root Mark | OBJECT_OT_skin_root_mark | Mark selected vertices as roots | out: skin | - |
 | Add Speaker | OBJECT_OT_speaker_add | Add a speaker object to the scene | out: speaker | - |
 | Subdivision Set | OBJECT_OT_subdivision_set | Sets a Subdivision Surface level (1 to 5) | out: subdivision | - |
+| Surface Deform Bind | OBJECT_OT_surfacedeform_bind | Bind mesh to target in surface deform modifier | out: geometry or mode editing | - |
 | Add Text | OBJECT_OT_text_add | Add a text object to the scene | out: text | - |
 | Transfer Mode | OBJECT_OT_transfer_mode | Switches the active object and assigns the same mode to a new one under the mouse cursor, leaving the active m | out: transfer | - |
+| Apply Object Transform | OBJECT_OT_transform_apply | Apply the object's transformation to its data | out: applies to mesh data; origins are node outputs | - |
+| Interactive Light Track to Cursor | OBJECT_OT_transform_axis_target | Interactively point cameras and lights to a location (Ctrl translates) | out: applies to mesh data; origins are node outputs | - |
+| Transforms to Deltas | OBJECT_OT_transforms_to_deltas | Convert normal object transforms to delta transforms, any existing delta transforms will be included as well | deferred: delta transform needs new Item fields | - |
+| Unlink | OBJECT_OT_unlink_data | (undocumented operator) | out: data-block linking | - |
 | Update from Objects | OBJECT_OT_update_shapes | Update existing shape keys with the vertex positions of selected objects with matching names | out: update_shapes | - |
 | Add Vertex Group | OBJECT_OT_vertex_group_add | Add a new vertex group to the active object | out: vertex | - |
 | Assign to Vertex Group | OBJECT_OT_vertex_group_assign | Assign the selected vertices to the active vertex group | out: vertex | - |
@@ -1690,7 +1688,9 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Paste Weight to Selected | OBJECT_OT_vertex_weight_paste | Copy this group's weight to other selected vertices (disabled if vertex group is locked) | out: vertex | - |
 | Set Active Group | OBJECT_OT_vertex_weight_set_active | Set as active vertex group | out: vertex | - |
 | Visual Geometry to Objects | OBJECT_OT_visual_geometry_to_objects | Convert geometry and instances into editable objects and collections | out: visual_geometry | - |
+| Apply Visual Transform | OBJECT_OT_visual_transform_apply | Apply the object's visual transformation to its data | out: applies to mesh data; origins are node outputs | - |
 | Add Volume | OBJECT_OT_volume_add | Add a volume object to the scene | out: volume_add | - |
+| Import OpenVDB Volume | OBJECT_OT_volume_import | Import OpenVDB volume file | out: object types outside the scene | - |
 | Voxel Remesh | OBJECT_OT_voxel_remesh | Calculates a new manifold mesh based on the volume of the current mesh. All data layers will be lost | out: voxel | - |
 | Edit Voxel Size | OBJECT_OT_voxel_size_edit | Modify the mesh voxel size interactively used in the voxel remesher | out: voxel | - |
 | Outliner Set Action | OUTLINER_OT_action_set | Change the active action used | out: action | - |
