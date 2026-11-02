@@ -2,7 +2,9 @@
 // CliSetup::Describe() says; reads only status.json, never terminal text, and spawns nothing itself:
 // the buttons hand one line to a new Terminal tab.
 #include "app/AppShared.h"
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
 #include "platform/AppPaths.h"
@@ -31,25 +33,19 @@ namespace app
          const ImVec2 c(p.x + size * 0.5f, p.y + size * 0.5f);
          const float r = size * 0.28f;
          using S = CliSetup::StepState;
+         // Semantic roles, the same everywhere: go = green, learn = amber, record = red. A glyph or label
+         // always rides with the colour.
          if (s.Green())
          {
-            const ImU32 col = tok::U32(tok::terminal_ansi2, light);
+            const ImU32 col = tok::U32(tok::action_go, light);
             dl->AddPolyline(std::array<ImVec2, 3>{ ImVec2(c.x - r, c.y), ImVec2(c.x - r * 0.25f, c.y + r * 0.8f), ImVec2(c.x + r, c.y - r * 0.7f) }.data(), 3, col, 0, 2.0f);
          }
          else if (s.state == S::kFailed)
-         {
-            const ImU32 col = tok::U32(tok::terminal_ansi1, light);
-            dl->AddLine(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), col, 2.0f);
-            dl->AddLine(ImVec2(c.x + r, c.y - r), ImVec2(c.x - r, c.y + r), col, 2.0f);
-         }
+            glyph::Draw(dl, c, size, tok::U32(tok::action_record, light), IconsInfinite::Error);
          else if (s.state == S::kRepair)
-         {
-            const ImU32 col = tok::U32(tok::terminal_ansi3, light);
-            dl->AddLine(ImVec2(c.x, c.y - r), ImVec2(c.x, c.y + r * 0.3f), col, 2.0f);
-            dl->AddCircleFilled(ImVec2(c.x, c.y + r * 0.85f), 1.6f, col);
-         }
+            glyph::Draw(dl, c, size, tok::U32(tok::action_learn, light), IconsInfinite::Warning);
          else if (s.state == S::kRunning)
-            dl->AddCircleFilled(c, r * 0.7f, tok::U32(tok::terminal_ansi3, light));
+            dl->AddCircleFilled(c, r * 0.7f, tok::U32(tok::action_learn, light));
          else
             dl->AddLine(ImVec2(c.x - r * 0.7f, c.y), ImVec2(c.x + r * 0.7f, c.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), 2.0f);
          ImGui::Dummy(ImVec2(size, size));
@@ -94,13 +90,15 @@ namespace app
          sLastRead = -10.0;
       };
 
+      FormParts::Label(L("Setup"));
       ImGui::BeginDisabled(!v.setupEnabled);
       if (FormParts::Button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str()))
          perform(Action::kSetup);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Details. Each step checks first and skips what is already done, so run it again any time to repair."));
-      ImGui::SameLine();
+      FormParts::Inline();
+      ImGui::AlignTextToFramePadding();
       ImGui::TextDisabled("%s", T(v.summary.c_str()));
 
       const float icon = ImGui::GetTextLineHeight();
@@ -113,16 +111,16 @@ namespace app
             break;   // everything holds: the list stays out of the way
          ImGui::PushID(s.id);
          DrawStepIcon(s, icon);
-         ImGui::SameLine();
+         FormParts::Inline();
          ImGui::TextUnformatted(T(s.title));
          if (!s.detail.empty())
          {
-            ImGui::SameLine();
+            FormParts::Inline();
             ImGui::TextDisabled("%s", s.detail.c_str());
          }
          if (s.state == StepState::kRepair)
          {
-            ImGui::SameLine();
+            FormParts::Inline();
             if (FormParts::Button(L("Repair")))
                perform(Action::kRepairStep, s.id);
             if (ImGui::IsItemHovered())
@@ -155,30 +153,32 @@ namespace app
          ImGui::TreePop();
       }
 
-      ImGui::Spacing();
-      ImGui::TextUnformatted(T("Coding agent"));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
       {
-         std::vector<const char*> names;
+         std::string items;
          int cur = 0;
          for (size_t i = 0; i < Agents().size(); i++)
          {
-            names.push_back(Agents()[i].name);
+            items += Agents()[i].name;
+            items.push_back('\0');
             if (&Agents()[i] == agent)
                cur = (int)i;
          }
-         ImGui::SameLine();
-         if (FormParts::BareCombo("##cli_agent", &cur, names.data(), (int)names.size(), 180.0f))
+         items.push_back('\0');
+         if (FormParts::Combo(L("Coding agent"), &cur, items.c_str()))
          {
             prefs.agent = Agents()[(size_t)cur].id;
             SaveConfig(paths.config, prefs);
          }
       }
-      ImGui::SameLine();
+      FormParts::Label("##agent_actions");
       if (v.showInstall)
       {
          if (FormParts::Button(L("Install")))
             perform(Action::kInstallAgent);
-         ImGui::SameLine();
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Details."));
+         FormParts::Inline();
       }
       ImGui::BeginDisabled(!v.startEnabled);
       if (FormParts::Button(L("Start agent")))
@@ -189,14 +189,16 @@ namespace app
       if (v.startEnabled)
       {
          bool autoStart = prefs.autoStart;
-         if (FormParts::Checkbox(T("Start the agent when the Terminal opens"), &autoStart))
+         if (FormParts::Switch(L("Start with Terminal"), &autoStart))
          {
             prefs.autoStart = autoStart;
             SaveConfig(paths.config, prefs);
          }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
       }
       if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::terminal_ansi1, CategoryColors::IsThemeLight())), "%s", sError.c_str());
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       SectionCard::End();
    }
 }
