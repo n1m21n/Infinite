@@ -62,7 +62,20 @@ SETTINGS = {
     ("view", "ambient"): S("1 0.2 0.2"),
     ("view", "envIntensity"): S(3.0, 0, 20, ctx="env"),
     ("view", "floatOutput"): S(1),
-    ("view", "renderPass"): S(1, 0, 8),
+    ("view", "renderPass"): S(1, 0, 10),
+    ("view", "mistStart"): S(0.0, 0, 100, sets=("view.renderPass=5",)),
+    ("view", "mistDepth"): S(5.0, 0.01, 200, sets=("view.renderPass=5",)),
+    ("view", "mistFalloff"): S(1, 0, 2, sets=("view.renderPass=5",)),
+    ("view", "mistIntensity"): S(0.5, 0, 0.9, sets=("view.renderPass=5",)),   # 1 is mist everywhere: rightly flat
+    ("view", "mistHeight"): S(1.0, 0, 100, sets=("view.renderPass=5", "view.mistStart=0", "view.mistDepth=10")),
+    ("view", "passThreshold"): S(0.0, 0, 1, ctx="fade", sets=("view.renderPass=1",)),
+    ("view", "cavity"): S(1),
+    ("view", "cavityType"): S(1, 0, 2, sets=("view.cavity=1",)),
+    ("view", "cavityRidge"): S(2.5, 0, 2.5, sets=("view.cavity=1",)),
+    ("view", "cavityValley"): S(2.5, 0, 2.5, sets=("view.cavity=1",)),
+    ("view", "cavityDistance"): S(1.0, 0.01, 2, sets=("view.cavity=1",)),
+    ("view", "curvatureRidge"): S(0.0, 0, 2, sets=("view.cavity=1", "view.cavityType=1")),
+    ("view", "curvatureValley"): S(0.0, 0, 2, sets=("view.cavity=1", "view.cavityType=1")),
     ("view", "projection"): S(2, 0, 4),
     ("view", "domeAngle"): S(200, 180, 220, sets=("view.projection=4",)),
     ("view", "domeTilt"): S(30, -90, 90, sets=("view.projection=4",)),
@@ -138,6 +151,7 @@ SETTINGS = {
     ("scene", "item.scale"): S(2.0),
     ("scene", "item.lookAt"): S("box"),
     ("scene", "item.unlit"): S("key"),
+    ("scene", "item.pass"): S(40, sets=("view.renderPass=6",)),
     ("scene", "world.color"): S("0.8 0.1 0.1"),
     ("scene", "world.strength"): S(4.0),
 }
@@ -176,6 +190,8 @@ def build(ctx):
     lab.sphere(s, "Metal", (0, 0, 0.4), 1.0, color=(0.9, 0.9, 0.9), metallic=1, roughness=0.15)
     lab.sphere(s, "Glow", (1.2, 0, 0), 0.6, color=(0, 0, 0), emission=6, emissionColor=(1, 0.5, 0.2))
     s.add("Cube", "Box", (0.6, 0.3, -1.2), scale=0.6, color=(0.2, 0.5, 0.9), roughness=0.4)
+    if ctx == "fade":
+        lab.sphere(s, "Fade", (0.2, 0, 1.6), 1.0, color=(1, 1, 1), opacity=0.3)
     if ctx == "glass":
         lab.sphere(s, "Glass", (0.2, 0, 1.6), 1.0, color=(1, 1, 1), roughness=0.3, transmission=1, ior=1.45)
     s.camera_at(70, 20, 6, (0, 0.4, 0), 35)
@@ -253,6 +269,8 @@ def scene_edit(path, s, key, value):
             else:
                 f[6] = str(value)
         lines[n] = " ".join(f)
+    if key == "item.pass":
+        lines.append(f"pass {item} {value}")
     if key == "item.render":
         lines.append(f"itemx {item} 0")
     if key == "item.delta":

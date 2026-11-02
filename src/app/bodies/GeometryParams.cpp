@@ -1986,6 +1986,17 @@ namespace app
       NodeSeparator("output", colW);
       DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
                      [n](int i) { n->renderPass = i; }, colW);
+      if (n->renderPass >= 1 && n->renderPass <= 9)
+         ModSlider("pass alpha threshold", &n->passThreshold, 0.0f, 1.0f, "%.2f", colW);
+      if (n->renderPass == 5)
+      {
+         ModSlider("mist start", &n->mistStart, 0.0f, 100.0f, "%.2f", colW);
+         ModSlider("mist depth", &n->mistDepth, 0.01f, 200.0f, "%.2f", colW);
+         DropdownButton("mist falloff", Render3DNode::MistFalloffNames(), n->mistFalloff,
+                        [n](int i) { n->mistFalloff = i; }, colW);
+         ModSlider("mist intensity", &n->mistIntensity, 0.0f, 1.0f, "%.2f", colW);
+         ModSlider("mist height", &n->mistHeight, 0.0f, 100.0f, "%.2f", colW);
+      }
       // This is the export resolution: Output sizes its own buffer from whatever
       // its input hands it, so a 4000px PNG needs 4000 set here or it is an
       // upscale of a smaller render.
@@ -2099,6 +2110,16 @@ namespace app
       ModSlider("ambient occlusion", &n->aoStrength, 0.0f, 1.0f, "%.3f", colW);
       ImGui::BeginDisabled(n->aoStrength <= 0.0f);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
+      ImGui::EndDisabled();
+      ModCheckbox("cavity", &n->cavity);
+      ImGui::BeginDisabled(!n->cavity);
+      DropdownButton("cavity type", Render3DNode::CavityTypeNames(), n->cavityType,
+                     [n](int i) { n->cavityType = i; }, colW);
+      ModSlider("cavity ridge", &n->cavityRidge, 0.0f, 2.5f, "%.2f", colW);
+      ModSlider("cavity valley", &n->cavityValley, 0.0f, 2.5f, "%.2f", colW);
+      ModSlider("cavity distance", &n->cavityDistance, 0.01f, 2.0f, "%.2f", colW);
+      ModSlider("curvature ridge", &n->curvatureRidge, 0.0f, 2.0f, "%.2f", colW);
+      ModSlider("curvature valley", &n->curvatureValley, 0.0f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);

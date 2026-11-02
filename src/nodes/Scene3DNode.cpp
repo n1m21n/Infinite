@@ -84,20 +84,22 @@ public:
    IGeometrySource* src = nullptr;
    Mat4 place;
    unsigned int lightMask = ~0u;
+   int passIndex = 0;
    std::vector<std::unique_ptr<Placed>> children;
 
-   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask)
+   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index)
    {
       src = source;
       place = placement;
       lightMask = mask;
+      passIndex = index;
       const int count = src != nullptr ? src->GroupChildCount() : 0;
       children.resize(count);
       for (int i = 0; i < count; i++)
       {
          if (!children[i])
             children[i] = std::make_unique<Placed>();
-         children[i]->Update(src->GroupChild(i), placement, mask);
+         children[i]->Update(src->GroupChild(i), placement, mask, index);
       }
    }
 
@@ -115,6 +117,7 @@ public:
    int GroupChildCount() const override { return (int)children.size(); }
    IGeometrySource* GroupChild(int index) const override { return children[index].get(); }
    unsigned int LightMask() const override { return lightMask; }
+   int PassIndex() const override { return passIndex; }
    Mat4 GetInstanceGroupMatrix() const override { return Mat4::Multiply(place, src->GetInstanceGroupMatrix()); }
    const std::vector<unsigned char>* InstanceSelection() const override { return src->InstanceSelection(); }
    unsigned long long InstanceSelectionRevision() const override { return src->InstanceSelectionRevision(); }
@@ -319,6 +322,8 @@ void Scene3DNode::Serialize()
          o << "lock " << it.id << " " << it.lock << "\n";
       if (it.lookAt != 0)
          o << "look " << it.id << " " << it.lookAt << "\n";
+      if (it.passIndex != 0)
+         o << "pass " << it.id << " " << it.passIndex << "\n";
       const bool delta = it.dpos[0] != 0 || it.dpos[1] != 0 || it.dpos[2] != 0 || it.drot[0] != 0 ||
                          it.drot[1] != 0 || it.drot[2] != 0 || it.dscale[0] != 1 || it.dscale[1] != 1 ||
                          it.dscale[2] != 1;
@@ -389,7 +394,7 @@ void Scene3DNode::Parse()
                v = (std::decay_t<decltype(v)>)x;
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
-               key == "delta")
+               key == "delta" || key == "pass")
       {
          int id = 0;
          l >> id;
@@ -411,6 +416,8 @@ void Scene3DNode::Parse()
             l >> it->lock;
          else if (key == "look")
             l >> it->lookAt;
+         else if (key == "pass")
+            l >> it->passIndex;
          else if (key == "delta")
          {
             for (float& v : it->dpos) l >> v;
@@ -447,6 +454,19 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("envIntensity", mRender.envIntensity);
    v.Bool("floatOutput", mRender.floatOutput);
    v.Int("renderPass", mRender.renderPass);
+   v.Float("mistStart", mRender.mistStart);
+   v.Float("mistDepth", mRender.mistDepth);
+   v.Int("mistFalloff", mRender.mistFalloff);
+   v.Float("mistIntensity", mRender.mistIntensity);
+   v.Float("mistHeight", mRender.mistHeight);
+   v.Float("passThreshold", mRender.passThreshold);
+   v.Bool("cavity", mRender.cavity);
+   v.Int("cavityType", mRender.cavityType);
+   v.Float("cavityRidge", mRender.cavityRidge);
+   v.Float("cavityValley", mRender.cavityValley);
+   v.Float("curvatureRidge", mRender.curvatureRidge);
+   v.Float("curvatureValley", mRender.curvatureValley);
+   v.Float("cavityDistance", mRender.cavityDistance);
    v.Int("projection", mRender.projection);
    v.Float("domeAngle", mRender.domeAngle);
    v.Float("domeTilt", mRender.domeTilt);
@@ -678,7 +698,7 @@ void Scene3DNode::Sync(int frameId)
       std::unique_ptr<Placed>& placed = mPlaced[it.id];
       if (!placed)
          placed = std::make_unique<Placed>();
-      placed->Update(source, Placement(it), mask);
+      placed->Update(source, Placement(it), mask, it.passIndex);
       mRoot->draws.push_back(placed.get());
       if (it.render)
          mOutRoot->draws.push_back(placed.get());

@@ -256,6 +256,10 @@ public:
    // them by default; only the 3D View's placed sources narrow it.
    virtual unsigned int LightMask() const { return ~0u; }
 
+   // The number this source writes into Render 3D's Object Index pass. 0 by
+   // default, as in Blender; the 3D View's placed sources carry their own.
+   virtual int PassIndex() const { return 0; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
@@ -547,7 +551,21 @@ public:
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
    static const std::vector<std::string>& RenderPassNames();
-   int renderPass = 0; // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position
+   // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position, 5 = mist,
+   // 6 = object index, 7 = emission, 8 = shadow, 9 = AO, 10 = environment
+   int renderPass = 0;
+   // Mist pass: 0 from `mistStart` out to start + depth, shaped by the falloff
+   // (quadratic / linear / inverse quadratic). `mistIntensity` is the least mist
+   // anywhere; `mistHeight` > 0 thins it out to nothing at that height.
+   static const std::vector<std::string>& MistFalloffNames();
+   float mistStart = 5.0f;
+   float mistDepth = 25.0f;
+   int mistFalloff = 0;
+   float mistIntensity = 0.0f;
+   float mistHeight = 0.0f;
+   // Data passes (depth, normals, position, mist, index, emission, shadow, AO)
+   // leave out surfaces whose alpha is under this.
+   float passThreshold = 0.5f;
 
    ~Render3DNode() override;
 
@@ -737,7 +755,7 @@ public:
    float bloomThreshold = 1.0f; // linear light, 0.5..8
    float bloomRadius = 0.5f;    // 0 tight .. 1 wide
    bool HdrActive() const { return hdr && renderPass == 0; }
-   void BeforeLoadParams() override { hdr = false; tonemap = 1; }
+   void BeforeLoadParams() override { hdr = false; tonemap = 1; passThreshold = 0.0f; }
    int ActiveSamples() const { return mActiveSamples; }
 
    // --- Render quality (v0.6 3.5). All off by default, so a patch saved before
@@ -757,7 +775,19 @@ public:
    // Offline renders only (export, --frame, a take): draw this many sub-pixel
    // jittered passes and average them, on top of the multisampling. 1 is one pass.
    int supersample = 1;
-   bool PostActive() const { return renderPass == 0 && (aoStrength > 0.0f || dofAperture > 0.0f); }
+   // Cavity (Blender's Solid-mode option, here on the lit render): darkens valleys
+   // and lightens ridges. World cavity measures them across `cavityDistance` in
+   // scene units, screen cavity from the pixel-to-pixel turn of the surface.
+   static const std::vector<std::string>& CavityTypeNames();
+   bool cavity = false;
+   int cavityType = 0;          // world / screen / both
+   float cavityRidge = 1.0f, cavityValley = 1.0f;
+   float curvatureRidge = 1.0f, curvatureValley = 1.0f;
+   float cavityDistance = 0.2f;
+   bool PostActive() const
+   {
+      return renderPass == 9 || (renderPass == 0 && (aoStrength > 0.0f || dofAperture > 0.0f || cavity));
+   }
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -766,6 +796,13 @@ public:
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);
       v.Float("width", width); v.Float("height", height);
       v.Int("renderPass", renderPass);
+      v.Float("mistStart", mistStart); v.Float("mistDepth", mistDepth); v.Int("mistFalloff", mistFalloff);
+      v.Float("mistIntensity", mistIntensity); v.Float("mistHeight", mistHeight);
+      v.Float("passThreshold", passThreshold);
+      v.Bool("cavity", cavity); v.Int("cavityType", cavityType);
+      v.Float("cavityRidge", cavityRidge); v.Float("cavityValley", cavityValley);
+      v.Float("curvatureRidge", curvatureRidge); v.Float("curvatureValley", curvatureValley);
+      v.Float("cavityDistance", cavityDistance);
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);

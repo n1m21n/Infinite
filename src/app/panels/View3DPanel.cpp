@@ -3724,6 +3724,15 @@ namespace
       if (Card(T("Visibility")))
          if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
             scene->Commit();
+      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
+      {
+         if (IntInputRow(T("Index"), &item->passIndex))
+         {
+            item->passIndex = std::clamp(item->passIndex, 0, 255);
+            scene->Commit();
+         }
+         Hint(T("Written by the Object Index pass, as index / 255."));
+      }
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry)
          DrawLitBy(scene, item);
@@ -3944,6 +3953,23 @@ namespace
          FloatRow(T("Strength"), &look.aoStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Distance"), &look.aoRadius, 0.05f, 3.0f, "%.2f");
       }
+      if (Card(T("Cavity"), &look.cavity))
+      {
+         ImGui::BeginDisabled(!look.cavity);
+         ComboRow(T("Type"), &look.cavityType, Render3DNode::CavityTypeNames());
+         if (look.cavityType != 1)
+         {
+            FloatRow(T("Ridge"), &look.cavityRidge, 0.0f, 2.5f, "%.2f");
+            FloatRow(T("Valley"), &look.cavityValley, 0.0f, 2.5f, "%.2f");
+            FloatRow(T("Distance"), &look.cavityDistance, 0.01f, 2.0f, "%.2f");
+         }
+         if (look.cavityType != 0)
+         {
+            FloatRow(T("Curvature ridge"), &look.curvatureRidge, 0.0f, 2.0f, "%.2f");
+            FloatRow(T("Curvature valley"), &look.curvatureValley, 0.0f, 2.0f, "%.2f");
+         }
+         ImGui::EndDisabled();
+      }
       if (Card(T("Bloom")))
       {
          FloatRow(T("Strength"), &look.bloom, 0.0f, 1.0f, "%.2f");
@@ -4008,6 +4034,16 @@ namespace
          if (ComboRow(T("Color depth"), &depth, kDepths))
             look.floatOutput = depth == 1;
          ComboRow(T("Pass"), &look.renderPass, Render3DNode::RenderPassNames());
+         if (look.renderPass >= 1 && look.renderPass <= 9)
+            FloatRow(T("Alpha threshold"), &look.passThreshold, 0.0f, 1.0f, "%.2f");
+         if (look.renderPass == 5)
+         {
+            FloatRow(T("Mist start"), &look.mistStart, 0.0f, 100.0f, "%.2f");
+            FloatRow(T("Mist depth"), &look.mistDepth, 0.01f, 200.0f, "%.2f");
+            ComboRow(T("Falloff"), &look.mistFalloff, Render3DNode::MistFalloffNames());
+            FloatRow(T("Intensity"), &look.mistIntensity, 0.0f, 1.0f, "%.2f");
+            FloatRow(T("Height"), &look.mistHeight, 0.0f, 100.0f, "%.2f");
+         }
          ComboRow(T("Projection"), &look.projection, Render3DNode::ProjectionNames());
          if (look.projection == 4)
          {

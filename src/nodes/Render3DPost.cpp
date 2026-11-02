@@ -1,5 +1,5 @@
-// Render 3D quality stage (v0.6 3.5): ambient occlusion, depth of field and the
-// offline supersample accumulator. Everything here runs after the scene is
+// Render 3D quality stage (v0.6 3.5): ambient occlusion, cavity, depth of field,
+// the AO pass and the offline supersample accumulator. Everything here runs after the scene is
 // drawn and resolved, reads the depth texture, and writes back into the same
 // output texture, so the 2D graph downstream sees an ordinary image.
 #include "Geometry3DNodes.h"
@@ -105,6 +105,10 @@ namespace
       "uniform float uFocus;\n"
       "uniform float uAperturePx;\n"
       "uniform float uMaxCoc;\n"
+      "uniform int uAoOnly;\n"
+      "uniform int uCavity;\n"        // bit 0 world, bit 1 screen
+      "uniform vec4 uCavityK;\n"      // ridge, valley, curvature ridge, curvature valley
+      "uniform float uCavityDist;\n"
       "float cocOf(vec2 uv) {\n"
       "   float d = texture(uDepth, uv).r;\n"
       "   float dist = d >= 0.999999 ? 1.0e4 : viewDist(d);\n"
@@ -129,12 +133,66 @@ namespace
       "   }\n"
       "   return sum / wsum;\n"
       "}\n"
+      "vec3 normalAt(vec2 uv) {\n"
+      "   vec2 t = 1.0 / uSize;\n"
+      "   vec3 P = viewPos(uv);\n"
+      "   vec3 pl = viewPos(uv - vec2(t.x, 0.0)), pr = viewPos(uv + vec2(t.x, 0.0));\n"
+      "   vec3 pd = viewPos(uv - vec2(0.0, t.y)), pu = viewPos(uv + vec2(0.0, t.y));\n"
+      "   vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;\n"
+      "   vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;\n"
+      "   return normalize(cross(dx, dy));\n"
+      "}\n"
+      "bool isBg(vec2 uv) { return texture(uDepth, uv).r >= 0.999999; }\n"
+      // World: how far the surface around rises above (valley) or falls below (ridge)
+      // this point's own plane, across the distance. Screen: how much the normal turns
+      // from one pixel to the next. Both lighten a ridge and darken a valley.
+      "float cavityAt(vec2 uv) {\n"
+      "   if (isBg(uv)) return 1.0;\n"
+      "   vec2 t = 1.0 / uSize;\n"
+      "   float f = 1.0;\n"
+      "   if ((uCavity & 1) != 0) {\n"
+      "      vec3 P = viewPos(uv);\n"
+      "      vec3 N = normalAt(uv);\n"
+      "      float pxPerUnit = uProj.y * uSize.y * 0.5 / ((uOrtho == 1) ? 1.0 : max(-P.z, 1.0e-3));\n"
+      "      float rPx = clamp(uCavityDist * pxPerUnit, 1.5, 0.1 * uSize.y);\n"
+      "      float rot = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "      float s = 0.0;\n"
+      "      for (int i = 0; i < 8; i++) {\n"
+      "         float a = rot + float(i) * 0.7853982;\n"
+      "         vec2 q = uv + vec2(cos(a), sin(a)) * rPx * t;\n"
+      "         if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0 || isBg(q)) continue;\n"
+      "         vec3 v = viewPos(q) - P;\n"
+      "         float len = length(v);\n"
+      "         if (len < 1.0e-5) continue;\n"
+      "         s += dot(N, v) / len * (1.0 - clamp(len / (uCavityDist * 2.0), 0.0, 1.0));\n"
+      "      }\n"
+      "      s /= 8.0;\n"
+      "      f *= (1.0 - clamp(s * 2.0, 0.0, 1.0) * uCavityK.y) * (1.0 + clamp(-s * 2.0, 0.0, 1.0) * uCavityK.x);\n"
+      "   }\n"
+      // The normals come from depth, so they see the facets smooth shading hides: a turn
+      // under the dead zone (a sphere's segments) counts for nothing, and a pair across a
+      // silhouette (one surface in front of another) is left out rather than outlined.
+      "   if ((uCavity & 2) != 0) {\n"
+      "      vec2 ox = vec2(t.x, 0.0), oy = vec2(0.0, t.y);\n"
+      "      float z = viewPos(uv).z;\n"
+      "      float c = 0.0;\n"
+      "      if (!(isBg(uv + ox) || isBg(uv - ox)) && abs(viewPos(uv + ox).z - viewPos(uv - ox).z) < 0.05 * abs(z))\n"
+      "         c += normalAt(uv + ox).x - normalAt(uv - ox).x;\n"
+      "      if (!(isBg(uv + oy) || isBg(uv - oy)) && abs(viewPos(uv + oy).z - viewPos(uv - oy).z) < 0.05 * abs(z))\n"
+      "         c += normalAt(uv + oy).y - normalAt(uv - oy).y;\n"
+      "      c = sign(c) * max(abs(c) - 0.3, 0.0) * 2.0;\n"
+      "      f *= (1.0 - clamp(-c, 0.0, 1.0) * uCavityK.w) * (1.0 + clamp(c, 0.0, 1.0) * uCavityK.z);\n"
+      "   }\n"
+      "   return clamp(f, 0.0, 2.0);\n"
+      "}\n"
       "vec4 shade(vec2 uv) {\n"
       "   vec4 c = texture(uColor, uv);\n"
       "   if (uAoOn == 1) c.rgb *= mix(1.0, aoAt(uv), uAoStrength);\n"
+      "   if (uCavity != 0) c.rgb *= cavityAt(uv);\n"
       "   return c;\n"
       "}\n"
       "void main() {\n"
+      "   if (uAoOnly == 1) { fragColor = vec4(vec3(aoAt(vUv)), texture(uColor, vUv).a); return; }\n"
       "   vec4 c0 = shade(vUv);\n"
       "   if (uDofOn == 0) { fragColor = c0; return; }\n"
       "   float coc0 = cocOf(vUv);\n"
@@ -220,8 +278,10 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
 {
    if (!EnsurePostShaders() || mDepthTex == 0)
       return;
-   const bool aoOn = aoStrength > 0.0f;
-   const bool dofOn = dofAperture > 0.0f;
+   const bool aoOnly = renderPass == 9;
+   const bool aoOn = aoStrength > 0.0f || aoOnly;
+   const bool dofOn = dofAperture > 0.0f && !aoOnly;
+   const int cavityBits = (cavity && !aoOnly) ? (cavityType == 0 ? 1 : cavityType == 1 ? 2 : 3) : 0;
    const GLenum outFmt = mFloatTarget ? GL_RGBA16F : GL_RGBA8;
    bool ok = GLUtil::EnsureFbo(mPostOut, w, h, outFmt, "Render3D_Post");
    if (aoOn)
@@ -281,6 +341,10 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       glUniform1f(glGetUniformLocation(mProgPost, "uFocus"), focusDistance);
       glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 24.0f * hScale);
       glUniform1f(glGetUniformLocation(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
+      glUniform1i(glGetUniformLocation(mProgPost, "uAoOnly"), aoOnly ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgPost, "uCavity"), cavityBits);
+      glUniform4f(glGetUniformLocation(mProgPost, "uCavityK"), cavityRidge, cavityValley, curvatureRidge, curvatureValley);
+      glUniform1f(glGetUniformLocation(mProgPost, "uCavityDist"), std::max(0.001f, cavityDistance));
    });
    glActiveTexture(GL_TEXTURE0);
 

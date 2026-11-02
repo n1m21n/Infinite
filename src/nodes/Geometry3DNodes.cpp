@@ -29,8 +29,11 @@ namespace
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic", "Equirect 360", "Cubemap 3x2", "Fisheye dome" };
-   const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
+   const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position", "Mist",
+                                                        "Object Index", "Emission", "Shadow", "AO", "Environment" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
+   const std::vector<std::string> kMistFalloffNames = { "Quadratic", "Linear", "Inverse Quadratic" };
+   const std::vector<std::string> kCavityTypeNames = { "World", "Screen", "Both" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
@@ -427,6 +430,13 @@ namespace
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
       "uniform int uRenderPass;\n"
+      "uniform float uMistStart;\n"
+      "uniform float uMistDepth;\n"
+      "uniform float uMistFalloff;\n"   // the power: 2 quadratic, 1 linear, 0.5 inverse quadratic
+      "uniform float uMistIntensity;\n"
+      "uniform float uMistHeight;\n"
+      "uniform int uObjectIndex;\n"
+      "uniform float uPassThreshold;\n"
       "uniform float uNear;\n"
       "uniform float uFar;\n"
       "uniform float uIor;\n"
@@ -737,6 +747,9 @@ namespace
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
       "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
       "   vec3 n = normalize(vNormal);\n"
+      // Data passes leave out what is more see-through than the threshold, the way a
+      // depth or index pass cannot hold half a value.
+      "   if (uRenderPass >= 1 && uRenderPass <= 9 && alpha < uPassThreshold) KILL_FRAGMENT;\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
       "      fragColor = vec4(vec3(d), alpha);\n"
@@ -754,6 +767,38 @@ namespace
       "      fragColor = vec4(vWorldPos, alpha);\n"
       "      return;\n"
       "   }\n"
+      "   if (uRenderPass == 5) {\n"
+      "      float m = clamp((length(vWorldPos - uCamPos) - uMistStart) / max(uMistDepth, 1e-4), 0.0, 1.0);\n"
+      "      m = pow(m, uMistFalloff);\n"
+      "      if (uMistHeight > 0.0) m *= clamp(1.0 - max(vWorldPos.y, 0.0) / uMistHeight, 0.0, 1.0);\n"
+      "      fragColor = vec4(vec3(mix(uMistIntensity, 1.0, m)), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      // n / 255, so an 8-bit image keeps the exact integer.
+      "   if (uRenderPass == 6) {\n"
+      "      fragColor = vec4(vec3(float(uObjectIndex) / 255.0), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 7) {\n"
+      "      vec3 e = toLinear(uEmissionColor) * uEmission;\n"
+      "      if (uHasEmissionMap == 1) e *= toLinear(sampleMap(uEmissionMap, n, computeMapUv(n)).rgb);\n"
+      "      fragColor = vec4(toSrgb(e), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 8) {\n"
+      "      float s = 1.0;\n"
+      "      if (uShadowLight >= 0 && uShadowLight < uLightCount) {\n"
+      "         int t = uLightType[uShadowLight];\n"
+      "         vec3 ld = (t == 1 || t == 4 || t == 5) ? normalize(uLightDir[uShadowLight] - vWorldPos) : normalize(uLightDir[uShadowLight]);\n"
+      "         s = shadowFactor(n, ld);\n"
+      "      }\n"
+      "      fragColor = vec4(vec3(s), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      // AO: white here, the post stage writes the occlusion from depth. Environment: the
+      // objects are black holes in the world behind them.
+      "   if (uRenderPass == 9) { fragColor = vec4(1.0, 1.0, 1.0, alpha); return; }\n"
+      "   if (uRenderPass == 10) { fragColor = vec4(0.0, 0.0, 0.0, alpha); return; }\n"
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, alpha); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, alpha); return; }\n"
       "\n"
@@ -1121,6 +1166,8 @@ void GeometryNode::CookIfNeeded(int frameId)
 
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
 const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
+const std::vector<std::string>& Render3DNode::MistFalloffNames() { return kMistFalloffNames; }
+const std::vector<std::string>& Render3DNode::CavityTypeNames() { return kCavityTypeNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
@@ -2236,10 +2283,12 @@ void Render3DNode::CookOnce(int frameId)
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
-   if (renderPass == 1 || renderPass == 2)
+   if (renderPass == 1 || renderPass == 2 || renderPass == 5 || renderPass == 8 || renderPass == 9)
       glClearColor(1.0f, 1.0f, 1.0f, bgOpacity);
    else if (renderPass == 3)
       glClearColor(0.5f, 0.5f, 0.5f, bgOpacity);
+   else if (renderPass == 6 || renderPass == 7 || renderPass == 10)
+      glClearColor(0.0f, 0.0f, 0.0f, bgOpacity);
    else
       glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
    glClearDepth(1.0);
@@ -2248,8 +2297,10 @@ void Render3DNode::CookOnce(int frameId)
    // HDRI background: drawn first, into the just-cleared buffer, so it needs
    // neither depth testing nor a depth write - every geometry draw that
    // follows simply paints over it in the usual way.
-   mEnvBgDrawn = hasEnvMap && envAsBackground;
-   if (hasEnvMap && envAsBackground && EnsureEnvBgShader())
+   // A data pass keeps its own clear value; the Environment pass always shows the world,
+   // the gradient one when no HDRI is patched in.
+   mEnvBgDrawn = (hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10;
+   if (mEnvBgDrawn && EnsureEnvBgShader())
    {
       if (mEnvBgVao == 0)
          glGenVertexArrays(1, &mEnvBgVao);
@@ -2266,7 +2317,7 @@ void Render3DNode::CookOnce(int frameId)
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, envTex);
       glUniform1i(glGetUniformLocation(mEnvBgProgram, "uEnvMap"), 0);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), 1);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
       glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvRotation"), envRotationRad);
       glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvSky"), 1, envSky);
       glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
@@ -2348,6 +2399,12 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
       glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistStart"), mistStart);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistDepth"), mistDepth);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistIntensity"), mistIntensity);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistHeight"), mistHeight);
+      glUniform1f(glGetUniformLocation(mProgram, "uPassThreshold"), passThreshold);
       glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
       glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
       glActiveTexture(GL_TEXTURE1);
@@ -2642,6 +2699,7 @@ void Render3DNode::CookOnce(int frameId)
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
+      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
@@ -3054,6 +3112,7 @@ void Render3DNode::CookOnce(int frameId)
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
+      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
