@@ -974,9 +974,12 @@ namespace
       "            vec3 spotDir = uLightAim[i];\n"
       "            float cosCur = dot(-lightDir, spotDir);\n"
       "            float cosOuter = cos(radians(uLightSpotAngle[i]));\n"
-      "            float cosInner = cos(radians(uLightSpotAngle[i] * (1.0 - uLightSpotPenumbra[i])));\n"
-      "            float spotAtten = clamp((cosCur - cosOuter) / max(cosInner - cosOuter, 1e-4), 0.0, 1.0);\n"
-      "            attenuation *= spotAtten * spotAtten;\n"
+      // Blender's spot: the cosine to the axis inside the cone, and the blend a smoothstep over the
+      // last blend * (1 - cos half-angle) of that cosine (Cycles' spot_attenuation).
+      "            float smoothW = (1.0 - cosOuter) * uLightSpotPenumbra[i];\n"
+      "            float spotAtten = cosCur > cosOuter ? cosCur : 0.0;\n"
+      "            if (smoothW > 0.0) spotAtten *= smoothstep(0.0, smoothW, cosCur - cosOuter);\n"
+      "            attenuation *= spotAtten;\n"
       "         }\n"
       "      } else {\n"
       "         lightDir = normalize(uLightDir[i]);\n"

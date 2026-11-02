@@ -3508,7 +3508,10 @@ namespace
       if (type == 4)
       {
          const float len = 1.0f, r = len * std::tan(light->spotAngle * kPi / 180.0f);
-         const float blend = r * (1.0f - light->spotPenumbra);
+         // Inner ring where the blend ends, as the shader's smoothstep places it.
+         const float cosOuter = std::cos(light->spotAngle * kPi / 180.0f);
+         const float cosInner = std::min(1.0f, cosOuter + (1.0f - cosOuter) * light->spotPenumbra);
+         const float blend = len * std::tan(std::acos(cosInner));
          float prev[3], prevIn[3];
          for (int i = 0; i <= 32; i++)
          {
