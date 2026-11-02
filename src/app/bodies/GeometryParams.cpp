@@ -1116,6 +1116,34 @@ namespace app
             }
             ImGui::PopID();
          }
+
+         // IK: a joint reaches for a target (set from a 3D View item in
+         // Pose mode, or typed / modulated here in the model's space).
+         if (n->JointCount() > 1 || gParamRegisterOnly)
+         {
+            NodeSeparator("ik");
+            ModCheckbox("ik", &n->ikOn);
+            if (n->ikOn || gParamRegisterOnly)
+            {
+               std::vector<std::string> joints{ "none" };
+               for (int j = 0; j < n->JointCount(); j++)
+                  joints.push_back(n->JointName(j));
+               DropdownButton("reach with", joints, std::clamp(n->ikJoint + 1, 0, (int)joints.size() - 1),
+                              [n](int i) { PushUndoCheckpoint(); n->ikJoint = i - 1; });
+               ModSliderInt("chain", &n->ikChain, 1, 8);
+               ModSlider("ik weight", &n->ikWeight, 0.0f, 1.0f);
+               ModSlider("target X", &n->ikTarget[0], -2.0f, 2.0f);
+               ModSlider("target Y", &n->ikTarget[1], -2.0f, 2.0f);
+               ModSlider("target Z", &n->ikTarget[2], -2.0f, 2.0f);
+               ModCheckbox("pole", &n->ikPoleOn);
+               if (n->ikPoleOn || gParamRegisterOnly)
+               {
+                  ModSlider("pole X", &n->ikPole[0], -2.0f, 2.0f);
+                  ModSlider("pole Y", &n->ikPole[1], -2.0f, 2.0f);
+                  ModSlider("pole Z", &n->ikPole[2], -2.0f, 2.0f);
+               }
+            }
+         }
       }
 
       // A face-less .ply loads as points; their size is the only point knob.

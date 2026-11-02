@@ -137,6 +137,8 @@ bool ModelSourceNode::Load(const std::string& path)
                morph[i] = i < (int)mRig.morphDefaults.size() ? mRig.morphDefaults[i] : 0.0f;
             std::fill(poseJoint, poseJoint + kPoseSlots, -1);
             std::fill(&poseRot[0][0], &poseRot[0][0] + kPoseSlots * 3, 0.0f);
+            ikOn = false;
+            ikJoint = -1;
          }
          std::string rig;
          if (!mRig.joints.empty())
@@ -431,6 +433,13 @@ void ModelSourceNode::UpdatePose()
       key.push_back((float)poseJoint[i]);
       key.insert(key.end(), poseRot[i], poseRot[i] + 3);
    }
+   const bool ik = ikOn && ikJoint >= 0 && ikJoint < (int)mRig.joints.size() && ikWeight > 0.0f;
+   if (ik)
+   {
+      key.insert(key.end(), { (float)ikJoint, (float)ikChain, ikWeight, (float)ikPoleOn });
+      key.insert(key.end(), ikTarget, ikTarget + 3);
+      key.insert(key.end(), ikPole, ikPole + 3);
+   }
    if (key == mPoseKey)
       return;
    mPoseKey = key;
@@ -454,8 +463,24 @@ void ModelSourceNode::UpdatePose()
       std::copy(combined, combined + 4, &offsets[poseJoint[i] * 4]);
    }
 
+   // Target and pole come in fitted space; the solver works in the file's.
+   Skinning::IkGoal goal;
+   if (ik)
+   {
+      const float inv = mFitScale != 0.0f ? 1.0f / mFitScale : 1.0f;
+      goal.joint = ikJoint;
+      goal.chain = std::clamp(ikChain, 1, 8);
+      goal.weight = std::clamp(ikWeight, 0.0f, 1.0f);
+      goal.usePole = ikPoleOn;
+      for (int k = 0; k < 3; k++)
+      {
+         goal.target[k] = ikTarget[k] * inv + mFitCentre[k];
+         goal.pole[k] = ikPole[k] * inv + mFitCentre[k];
+      }
+   }
    std::vector<Platform::ModelVertex> posed;
-   Skinning::Evaluate(mRig, clipIndex, time, weights, posed, &mJointWorld, offsets.empty() ? nullptr : &offsets);
+   Skinning::Evaluate(mRig, clipIndex, time, weights, posed, &mJointWorld, offsets.empty() ? nullptr : &offsets,
+                      ik ? &goal : nullptr);
    ApplyFit(mMesh.vertices, posed);
    // The fit (move by -centre, then scale) goes onto the joints too.
    for (size_t j = 0; j < mJointWorld.size() / 16; j++)

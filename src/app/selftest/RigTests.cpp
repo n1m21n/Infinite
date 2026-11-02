@@ -46,8 +46,8 @@ bool RunRigTest()
       printf("RIGTEST FAIL\n");
       return false;
    }
-   check(n.JointCount() == 2 && n.ClipNames().size() == 3 && n.MorphCount() == 1,
-         "2 joints, 2 clips, 1 morph", n.JointCount(), (double)n.ClipNames().size() - 1);
+   check(n.JointCount() == 3 && n.ClipNames().size() == 3 && n.MorphCount() == 1,
+         "3 joints, 2 clips, 1 morph", n.JointCount(), (double)n.ClipNames().size() - 1);
    check(n.clip == 1, "a new file starts on its first clip", n.clip, 1);
 
    auto near3 = [](const Vertex& v, float x, float y, float z)
@@ -99,6 +99,42 @@ bool RunRigTest()
       check(std::fabs(back[0] - e[0]) < 1e-2f && std::fabs(back[1] - e[1]) < 1e-2f && std::fabs(back[2] - e[2]) < 1e-2f,
             "Euler round-trips through a quaternion", back[1], back[2]);
    }
+
+   // IK. Fitted space halves the file and moves y = 1 to 0, so root is at
+   // (0, -0.5, 0), tip at the origin and end at (0, 0.5, 0); bones are 0.5.
+   n.clip = 0;
+   auto head = [&](int j, float x, float y, float z)
+   {
+      float w[16];
+      n.GetMesh();
+      return n.JointMatrix(j, w) && std::fabs(w[12] - x) < 2e-3f && std::fabs(w[13] - y) < 2e-3f && std::fabs(w[14] - z) < 2e-3f;
+   };
+   n.ikOn = true; n.ikJoint = 1; n.ikChain = 1;
+   n.ikTarget[0] = 0.5f; n.ikTarget[1] = -0.5f; n.ikTarget[2] = 0.0f;
+   m = &n.GetMesh();
+   check(head(1, 0.5f, -0.5f, 0.0f) && near3(m->vertices[kTop], 1.0f, -0.6f, 0.1f),
+         "one-bone IK swings the column to the target", m->vertices[kTop].px, m->vertices[kTop].py);
+   n.ikTarget[0] = 3.0f;
+   check(head(1, 0.5f, -0.5f, 0.0f), "out of reach, the bone points at the target", 0, 0);
+   n.ikJoint = 2; n.ikChain = 2;
+   n.ikTarget[0] = 0.5f; n.ikTarget[1] = 0.0f;
+   float tipX[2] = { 0, 0 };
+   for (int side = 0; side < 2; side++)
+   {
+      n.ikPoleOn = true;
+      n.ikPole[0] = side == 0 ? 2.0f : -2.0f; n.ikPole[1] = 0.0f; n.ikPole[2] = 0.0f;
+      n.GetMesh();
+      float w[16];
+      n.JointMatrix(1, w);
+      tipX[side] = w[12];
+      check(head(2, 0.5f, 0.0f, 0.0f), side == 0 ? "two-bone IK reaches (pole +X)" : "two-bone IK reaches (pole -X)",
+            w[12], w[13]);
+   }
+   check(tipX[0] > 0.05f && tipX[1] < tipX[0] - 0.05f, "the pole picks the elbow's side", tipX[0], tipX[1]);
+   n.ikPoleOn = false;
+   n.ikWeight = 0.0f;
+   check(head(2, 0.0f, 0.5f, 0.0f), "IK weight 0 leaves the pose alone", 0, 0);
+   n.ikOn = false; n.ikWeight = 1.0f;
 
    n.clip = 1; n.clipSpeed = 1.0f;
    Transport::Instance().SetPlaying(false);

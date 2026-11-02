@@ -125,6 +125,17 @@ public:
    float morph[kMaxMorphs] = {};
    int poseJoint[kPoseSlots] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
    float poseRot[kPoseSlots][3] = {};
+   // IK (Blender's IK constraint): the head of ikJoint reaches for the
+   // target by turning the ikChain joints above it; ikWeight blends it in.
+   // Target and pole are in this node's mesh space (after the unit-box fit).
+   // A 3D View item set as the target writes them every frame (Scene3DNode).
+   bool ikOn = false;
+   int ikJoint = -1;
+   int ikChain = 2;
+   float ikWeight = 1.0f;
+   float ikTarget[3] = { 0.0f, 0.0f, 0.0f };
+   bool ikPoleOn = false;
+   float ikPole[3] = { 0.0f, 0.0f, 1.0f };
 
    float color[3] = { 0.82f, 0.83f, 0.86f };
    float metallic = 0.1f;
@@ -185,6 +196,11 @@ public:
          for (int a = 0; a < 3; a++)
             v.Float(kPoseKeys[i][a + 1], poseRot[i][a]);
       }
+      v.Bool("ikOn", ikOn); v.Int("ikJoint", ikJoint); v.Int("ikChain", ikChain);
+      v.Float("ikWeight", ikWeight);
+      v.Float("ikX", ikTarget[0]); v.Float("ikY", ikTarget[1]); v.Float("ikZ", ikTarget[2]);
+      v.Bool("ikPoleOn", ikPoleOn);
+      v.Float("ikPoleX", ikPole[0]); v.Float("ikPoleY", ikPole[1]); v.Float("ikPoleZ", ikPole[2]);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);

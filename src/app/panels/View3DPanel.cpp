@@ -106,6 +106,7 @@ namespace
    constexpr float kOrbitPerPixel = 0.4f * 3.14159265f / 180.0f;
    float RotStep();
    void TogglePose(Scene3DNode* scene);
+   void PoseIk(Scene3DNode* scene, bool clear);
    // Pose mode's state; the mode itself is drawn by DrawPose.
    struct PoseState
    {
@@ -2086,6 +2087,8 @@ namespace
       if (MenuParts::Item(T("Follow Active"), "Ctrl+P", false, sSel.size() > 1)) FollowActive(scene, false);
       if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
       if (MenuParts::Item(T("Pose Mode"), "Ctrl+Tab", sPose.on, any || sPose.on)) TogglePose(scene);
+      if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
+      if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
       if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
@@ -2873,6 +2876,40 @@ namespace
       sPose.slot = -1;
    }
 
+   // Shift+I (Blender's Add IK > To Active Bone): the picked bone reaches
+   // for the last other selected item; one more selected item becomes the
+   // pole. With nothing else selected the target starts on the bone's head,
+   // to be typed or modulated in the node. Alt+I clears it.
+   void PoseIk(Scene3DNode* scene, bool clear)
+   {
+      Mat4 world;
+      ModelSourceNode* model = PoseTarget(scene, world);
+      Item* it = model != nullptr ? scene->FindItem(sPose.item) : nullptr;
+      if (it == nullptr || (!clear && (sPose.joint < 0 || sPose.joint >= model->JointCount())))
+         return;
+      PushUndoCheckpoint(clear ? "Clear IK" : "Add IK");
+      if (clear)
+      {
+         model->ikOn = false;
+         it->ikTarget = it->ikPole = 0;
+         scene->Commit();
+         return;
+      }
+      std::vector<int> others;
+      for (int id : sSel)
+         if (id != it->id)
+            others.push_back(id);
+      it->ikTarget = others.empty() ? 0 : others.back();
+      it->ikPole = others.size() > 1 ? others[others.size() - 2] : 0;
+      float m[16];
+      if (it->ikTarget == 0 && model->JointMatrix(sPose.joint, m))
+         std::copy(m + 12, m + 15, model->ikTarget);
+      model->ikJoint = sPose.joint;
+      model->ikPoleOn = it->ikPole != 0;
+      model->ikOn = true;
+      scene->Commit();
+   }
+
    // Draws the bones and runs the mode's clicks and keys. Returns true while
    // the mode owns the mouse and keys (navigation still runs).
    bool DrawPose(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
@@ -2948,6 +2985,18 @@ namespace
          const std::string& name = model->JointName(sPose.joint);
          dl->AddText(ImVec2(heads[sPose.joint].x + 8.0f, heads[sPose.joint].y - 18.0f), Hex(kHotHandle), name.c_str());
       }
+      // The IK goal: a line from the reaching joint to its target.
+      if (model->ikOn && model->ikJoint >= 0 && model->ikJoint < count && shown[model->ikJoint])
+      {
+         float t[3];
+         ImVec2 tp;
+         TransformBy(world, model->ikTarget, t);
+         if (Project(t, tp))
+         {
+            dl->AddLine(heads[model->ikJoint], tp, Hex(kHotHandle, 0.8f), 1.5f);
+            dl->AddCircle(tp, 6.0f, Hex(kHotHandle), 16, 1.5f);
+         }
+      }
       dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), "Pose Mode");
 
       if (sPose.turning)
@@ -2985,6 +3034,11 @@ namespace
          sPose.joint = hotJoint;
       if (sPose.joint < 0 || sPose.joint >= count)
          return true;
+      if (!command && pressed(ImGuiKey_I) && (io.KeyShift || io.KeyAlt))
+      {
+         PoseIk(scene, io.KeyAlt);
+         return true;
+      }
       if (io.KeyAlt && !command && pressed(ImGuiKey_R))
       {
          const int slot = model->PoseSlot(sPose.joint, false);

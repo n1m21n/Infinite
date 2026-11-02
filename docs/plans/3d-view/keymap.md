@@ -49,6 +49,7 @@ handles keys only while the pointer is over it. `Ctrl` reads `Cmd` on macOS.
 | I / Alt+I | Insert / clear keyframe | No | motion comes from modulation, Motion card and the timeline |
 | Tab | Edit mode | No | geometry is edited in nodes, not in the view |
 | Ctrl+Tab | Pose mode | Same | skinned Model 3D items only; R turns a bone about the view axis, Alt+R clears; G/S on bones not built (rotation is what a glTF rig is posed with) |
+| Shift+I / Alt+I (Pose) | Add IK to bone / clear IK | Same | the last other selected item is the target, one more is the pole; with none, the target is params on Model 3D |
 | F3 | Search | No | the canvas search covers nodes |
 | F9 | Adjust last operation | No | |
 | Ctrl+B / Alt+B | Render region / clipping region | No | candidates for a later block |

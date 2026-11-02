@@ -84,6 +84,7 @@ Open `~/Desktop/Infinite-dev.app`. Add 3+ objects to a 3D View. Right-click empt
 - [ ] Ctrl+I inverts the selection (once); Shift+Keypad 4 / 6 rolls the view
 - [ ] Rigging R1: drop a skinned .glb (Mixamo or Blender export): it plays its first clip with the transport, stops when paused; Clip, Speed, Phase, Sync and each morph slider move it; an LFO on Phase scrubs it; Displacement after it follows the pose
 - [ ] Rigging R2: select the skinned item, Ctrl+Tab: bones show with "Pose Mode"; click a bone, R + mouse turns it, click keeps, Esc puts it back; Alt+R clears; the node body gains a pose row whose sliders take an LFO; undo restores; save and reopen keeps the pose
+- [ ] Rigging R3: select an Empty or sphere item, then shift-select the skinned item, Ctrl+Tab, pick a hand or tip bone, Shift+I: the arm reaches for the item and follows it as you move it (G), a line marks the goal; Chain, IK weight and Pole act in the node body; select a third item before Shift+I and the elbow bends toward it; Alt+I clears; save and reopen keeps the target
 
 ## Keymap
 - [ ] Every row marked Same in docs/plans/3d-view/keymap.md does what Blender does

@@ -88,6 +88,9 @@ public:
       int followMode = 0;           // 0 location, rotation and scale; 1 location only
       float fpos[3] = { 0, 0, 0 }, frot[3] = { 0, 0, 0 }, fscale[3] = { 1, 1, 1 };
       float followed[9] = { NAN };   // not saved: where Follow last put it, so a tool's move reads as new
+      // IK (rigged Model 3D only): items whose centres become the model's IK target and pole, written
+      // into the node in its own mesh space every frame. 0 = none.
+      int ikTarget = 0, ikPole = 0;
    };
 
    static constexpr int kMotionSlots = 80;
@@ -285,6 +288,7 @@ private:
    void Serialize();
    void AssignMotionSlots();
    void ApplyFollow();
+   void ApplyIk();
    void TakeFollowOffset(Item& it, const Item& target);
    void Sync(int frameId);
    void ApplyWorld(Render3DNode& render, bool show, bool background);

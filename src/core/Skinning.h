@@ -11,6 +11,21 @@
 // total, vertices with no weight left as they are).
 namespace Skinning
 {
+   // An IK goal (Blender's IK constraint): the head of `joint` reaches for
+   // `target` by turning the `chain` joints above it (chain 1 turns only its
+   // parent, chain 2 the parent and grandparent: an arm reaching with its
+   // wrist). Positions are in the file's own space. With `usePole` the chain bends toward `pole`. `weight` blends
+   // from the unsolved pose (0) to the solved one (1).
+   struct IkGoal
+   {
+      int joint = -1;
+      int chain = 2;
+      float weight = 1.0f;
+      float target[3] = { 0, 0, 0 };
+      bool usePole = false;
+      float pole[3] = { 0, 0, 0 };
+   };
+
    // `clip` indexes pkg.clips, -1 is the rest pose. `time` is in the clip's
    // seconds and is wrapped into [0, duration). `morphWeights` adds on top of
    // any weights the clip animates. `out` gets one vertex per pkg.vertices,
@@ -23,7 +38,8 @@ namespace Skinning
                  const std::vector<float>& morphWeights,
                  std::vector<Platform::ModelVertex>& out,
                  std::vector<float>* jointWorld = nullptr,
-                 const std::vector<float>* poseOffsets = nullptr);
+                 const std::vector<float>* poseOffsets = nullptr,
+                 const IkGoal* ik = nullptr);
 
    // Euler degrees (X, then Y, then Z, about fixed axes: R = Rz * Ry * Rx)
    // to and from a quaternion (x, y, z, w).

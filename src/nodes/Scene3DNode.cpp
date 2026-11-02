@@ -14,6 +14,7 @@
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
+#include "ModelSourceNode.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -529,6 +530,8 @@ void Scene3DNode::Serialize()
          for (float v : it.motion) o << " " << v;
          o << "\n";
       }
+      if (it.ikTarget != 0 || it.ikPole != 0)
+         o << "ik " << it.id << " " << it.ikTarget << " " << it.ikPole << "\n";
       if (it.follow != 0)
       {
          o << "follow " << it.id << " " << it.follow << " " << it.followMode;
@@ -632,7 +635,7 @@ void Scene3DNode::Parse()
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
                key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show" ||
-               key == "motion" || key == "follow")
+               key == "motion" || key == "follow" || key == "ik")
       {
          int id = 0;
          l >> id;
@@ -666,6 +669,8 @@ void Scene3DNode::Parse()
             for (float& v : it->frot) l >> v;
             for (float& v : it->fscale) l >> v;
          }
+         else if (key == "ik")
+            l >> it->ikTarget >> it->ikPole;
          else if (key == "pass")
             l >> it->passIndex;
          else if (key == "shadowoff")
@@ -946,6 +951,37 @@ bool Scene3DNode::AimAt(Item& item, const float target[3], const float* targetUp
    return true;
 }
 
+// An IK target or pole is any item: its centre, moved into the rigged
+// model's own mesh space (through the item's placement and the node's own
+// transform), lands on the Model 3D node's target params.
+void Scene3DNode::ApplyIk()
+{
+   for (Item& it : mItems)
+   {
+      if ((it.ikTarget == 0 && it.ikPole == 0) || !ResolveUid)
+         continue;
+      auto* top = dynamic_cast<IGeometrySource*>(ResolveUid(it.uid));
+      ModelSourceNode* model = nullptr;
+      for (IGeometrySource* s = top; s != nullptr && model == nullptr; s = s->PassthroughSource())
+         model = dynamic_cast<ModelSourceNode*>(s);
+      if (model == nullptr)
+         continue;
+      const Mat4 toMesh = Mat4::Inverse(Mat4::Multiply(Placement(it), top->GetModelMatrix()));
+      auto bind = [&](int id, float out[3])
+      {
+         const Item* target = id != it.id ? FindItem(id) : nullptr;
+         if (target == nullptr)
+            return;
+         float c[3];
+         ItemCenter(*target, c);
+         TransformPoint(toMesh, c, out);
+      };
+      bind(it.ikTarget, model->ikTarget);
+      if (it.ikPole != 0)
+         bind(it.ikPole, model->ikPole);
+   }
+}
+
 void Scene3DNode::Sync(int frameId)
 {
    if (mSyncedFrame == frameId)
@@ -965,6 +1001,7 @@ void Scene3DNode::Sync(int frameId)
             Normalize(tUp);
             AimAt(it, c, tUp);
          }
+   ApplyIk();
    if (!mRoot)
    {
       mRoot = std::make_unique<Root>();

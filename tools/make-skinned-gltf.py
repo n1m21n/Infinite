@@ -3,7 +3,8 @@
 rigging self-test needs, made here so no test asset is downloaded.
 
 A square column 2 units tall (rings at y = 0, 0.5, 1, 1.5, 2) on two joints:
-  root at the origin, tip at y = 1 (child of root).
+  root at the origin, tip at y = 1 (child of root), end at y = 2 (child of
+  tip, no weights: the IK effector at the top of the column).
   Weights: rings 0-1 on root, ring 2 half and half, rings 3-4 on tip.
 Clips:
   "bend"  - tip turns 90 degrees about Z over 1 s (linear).
@@ -80,7 +81,8 @@ a_blg = add(bulge, "<3f", len(bulge), F, "VEC3", 34962, bounds(bulge))
 a_idx = add(idx, "<I", len(idx), U32, "SCALAR", 34963)
 ident = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 tip_ibm = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1)   # column-major: translate (0, -1, 0)
-a_ibm = add([ident, tip_ibm], "<16f", 2, F, "MAT4")
+end_ibm = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -2, 0, 1)
+a_ibm = add([ident, tip_ibm, end_ibm], "<16f", 3, F, "MAT4")
 a_t1 = add([0.0, 1.0], "<f", 2, F, "SCALAR", None, [[0.0], [1.0]])
 a_bend = add([(0, 0, 0, 1), (0, 0, s45, s45)], "<4f", 2, F, "VEC4")
 a_t2 = add([0.0, 2.0], "<f", 2, F, "SCALAR", None, [[0.0], [2.0]])
@@ -93,7 +95,8 @@ gltf = {
     "nodes": [
         {"name": "column", "mesh": 0, "skin": 0},
         {"name": "root", "children": [2]},
-        {"name": "tip", "translation": [0, 1, 0]},
+        {"name": "tip", "translation": [0, 1, 0], "children": [3]},
+        {"name": "end", "translation": [0, 1, 0]},
     ],
     "meshes": [{
         "name": "column",
@@ -105,7 +108,7 @@ gltf = {
         "weights": [0.0],
         "extras": {"targetNames": ["bulge"]},
     }],
-    "skins": [{"joints": [1, 2], "inverseBindMatrices": a_ibm, "skeleton": 1}],
+    "skins": [{"joints": [1, 2, 3], "inverseBindMatrices": a_ibm, "skeleton": 1}],
     "animations": [
         {"name": "bend", "samplers": [{"input": a_t1, "output": a_bend, "interpolation": "LINEAR"}],
          "channels": [{"sampler": 0, "target": {"node": 2, "path": "rotation"}}]},

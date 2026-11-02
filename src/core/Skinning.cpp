@@ -1,6 +1,7 @@
 #include "Skinning.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 
@@ -80,6 +81,142 @@ namespace
       for (int k = 0; k < w; k++)
          out[k] = a[k] + (b[k] - a[k]) * f;
    }
+
+   // Rotation part of a column-major matrix (columns normalised) as a quaternion.
+   void MatQuat(const float m[16], float q[4])
+   {
+      float a[3][3]; // a[row][col]
+      for (int c = 0; c < 3; c++)
+      {
+         const float len = std::sqrt(m[c * 4] * m[c * 4] + m[c * 4 + 1] * m[c * 4 + 1] + m[c * 4 + 2] * m[c * 4 + 2]);
+         for (int r = 0; r < 3; r++)
+            a[r][c] = len > 1e-12f ? m[c * 4 + r] / len : 0.0f;
+      }
+      const float tr = a[0][0] + a[1][1] + a[2][2];
+      if (tr > 0.0f)
+      {
+         const float k = std::sqrt(tr + 1.0f) * 2.0f;
+         q[3] = 0.25f * k; q[0] = (a[2][1] - a[1][2]) / k; q[1] = (a[0][2] - a[2][0]) / k; q[2] = (a[1][0] - a[0][1]) / k;
+      }
+      else if (a[0][0] > a[1][1] && a[0][0] > a[2][2])
+      {
+         const float k = std::sqrt(1.0f + a[0][0] - a[1][1] - a[2][2]) * 2.0f;
+         q[3] = (a[2][1] - a[1][2]) / k; q[0] = 0.25f * k; q[1] = (a[0][1] + a[1][0]) / k; q[2] = (a[0][2] + a[2][0]) / k;
+      }
+      else if (a[1][1] > a[2][2])
+      {
+         const float k = std::sqrt(1.0f + a[1][1] - a[0][0] - a[2][2]) * 2.0f;
+         q[3] = (a[0][2] - a[2][0]) / k; q[0] = (a[0][1] + a[1][0]) / k; q[1] = 0.25f * k; q[2] = (a[1][2] + a[2][1]) / k;
+      }
+      else
+      {
+         const float k = std::sqrt(1.0f + a[2][2] - a[0][0] - a[1][1]) * 2.0f;
+         q[3] = (a[1][0] - a[0][1]) / k; q[0] = (a[0][2] + a[2][0]) / k; q[1] = (a[1][2] + a[2][1]) / k; q[2] = 0.25f * k;
+      }
+   }
+
+   float Len(const float v[3]) { return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+
+   // The shortest turn taking direction a onto direction b.
+   void QuatBetween(const float a[3], const float b[3], float q[4])
+   {
+      const float la = Len(a), lb = Len(b);
+      q[0] = q[1] = q[2] = 0.0f; q[3] = 1.0f;
+      if (la < 1e-9f || lb < 1e-9f)
+         return;
+      const float u[3] = { a[0] / la, a[1] / la, a[2] / la }, v[3] = { b[0] / lb, b[1] / lb, b[2] / lb };
+      const float d = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+      if (d < -0.999999f)
+      {
+         // Opposite: any axis square to u.
+         float ax[3] = { 0.0f, -u[2], u[1] };
+         if (Len(ax) < 1e-6f) { ax[0] = u[2]; ax[1] = 0.0f; ax[2] = -u[0]; }
+         const float l = Len(ax);
+         q[0] = ax[0] / l; q[1] = ax[1] / l; q[2] = ax[2] / l; q[3] = 0.0f;
+         return;
+      }
+      q[0] = u[1] * v[2] - u[2] * v[1];
+      q[1] = u[2] * v[0] - u[0] * v[2];
+      q[2] = u[0] * v[1] - u[1] * v[0];
+      q[3] = 1.0f + d;
+      const float l = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+      for (int k = 0; k < 4; k++)
+         q[k] /= l;
+   }
+
+   // FABRIK (Aristidou and Lasenby): pull the chain to the target from the
+   // tip, then back to the fixed root, until the tip is close. A pole then
+   // swings each middle joint about the line through its neighbours toward
+   // the pole, which keeps the reach (Blender's pole angle, without the
+   // extra roll).
+   void Fabrik(std::vector<std::array<float, 3>>& p, const float target[3], const float* pole)
+   {
+      const size_t n = p.size();
+      std::vector<float> len(n - 1);
+      float total = 0.0f;
+      for (size_t i = 0; i + 1 < n; i++)
+      {
+         const float d[3] = { p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1], p[i + 1][2] - p[i][2] };
+         len[i] = Len(d);
+         total += len[i];
+      }
+      const std::array<float, 3> root = p[0];
+      auto place = [](std::array<float, 3>& moved, const std::array<float, 3>& anchor, float l)
+      {
+         const float d[3] = { moved[0] - anchor[0], moved[1] - anchor[1], moved[2] - anchor[2] };
+         const float dl = Len(d);
+         const float f = dl > 1e-9f ? l / dl : 0.0f;
+         for (int k = 0; k < 3; k++)
+            moved[k] = anchor[k] + d[k] * f;
+      };
+      for (int iter = 0; iter < 16; iter++)
+      {
+         const float e[3] = { p[n - 1][0] - target[0], p[n - 1][1] - target[1], p[n - 1][2] - target[2] };
+         if (Len(e) < total * 1e-4f)
+            break;
+         p[n - 1] = { target[0], target[1], target[2] };
+         for (size_t i = n - 1; i-- > 0;)
+            place(p[i], p[i + 1], len[i]);
+         p[0] = root;
+         for (size_t i = 1; i < n; i++)
+            place(p[i], p[i - 1], len[i - 1]);
+      }
+      if (pole == nullptr)
+         return;
+      for (size_t i = 1; i + 1 < n; i++)
+      {
+         const float* a = p[i - 1].data();
+         const float* b = p[i + 1].data();
+         float axis[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] };
+         const float al = Len(axis);
+         if (al < 1e-9f)
+            continue;
+         for (float& v : axis) v /= al;
+         auto flat = [&](const float* x, float out[3])
+         {
+            const float d[3] = { x[0] - a[0], x[1] - a[1], x[2] - a[2] };
+            const float along = d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+            for (int k = 0; k < 3; k++)
+               out[k] = d[k] - axis[k] * along;
+         };
+         float j[3], pl[3];
+         flat(p[i].data(), j);
+         flat(pole, pl);
+         if (Len(j) < 1e-9f || Len(pl) < 1e-9f)
+            continue;
+         // Turn the joint about the a-b line by the signed angle from j to
+         // pl (Rodrigues), which also covers the pole straight opposite.
+         const float cr[3] = { j[1] * pl[2] - j[2] * pl[1], j[2] * pl[0] - j[0] * pl[2], j[0] * pl[1] - j[1] * pl[0] };
+         const float angle = std::atan2(cr[0] * axis[0] + cr[1] * axis[1] + cr[2] * axis[2],
+                                        j[0] * pl[0] + j[1] * pl[1] + j[2] * pl[2]);
+         const float cs = std::cos(angle), sn = std::sin(angle);
+         const float d[3] = { p[i][0] - a[0], p[i][1] - a[1], p[i][2] - a[2] };
+         const float along = d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+         const float ad[3] = { axis[1] * d[2] - axis[2] * d[1], axis[2] * d[0] - axis[0] * d[2], axis[0] * d[1] - axis[1] * d[0] };
+         for (int k = 0; k < 3; k++)
+            p[i][k] = a[k] + d[k] * cs + ad[k] * sn + axis[k] * along * (1.0f - cs);
+      }
+   }
 }
 
 namespace Skinning
@@ -139,7 +276,8 @@ namespace Skinning
                  const std::vector<float>& morphWeights,
                  std::vector<Platform::ModelVertex>& out,
                  std::vector<float>* jointWorld,
-                 const std::vector<float>* poseOffsets)
+                 const std::vector<float>* poseOffsets,
+                 const IkGoal* ik)
    {
       const size_t vertexCount = pkg.vertices.size();
       const size_t jointCount = pkg.joints.size();
@@ -210,18 +348,87 @@ namespace Skinning
 
       // Joints are parent-first, so one pass builds every world matrix.
       std::vector<float> world(jointCount * 16);
+      auto build = [&]()
+      {
+         for (size_t j = 0; j < jointCount; j++)
+         {
+            const GltfImport::GltfJoint& jt = pkg.joints[j];
+            float m[16];
+            Trs(local[j].t, local[j].r, local[j].s, m);
+            Mul(jt.between, m, m);
+            if (jt.parent >= 0)
+               Mul(&world[jt.parent * 16], m, m);
+            std::memcpy(&world[j * 16], m, sizeof(m));
+         }
+      };
+      build();
+
+      // IK: solve the chain's head positions, then turn each joint so its
+      // child's head lands on the solved spot, root first.
+      if (ik != nullptr && ik->joint >= 0 && ik->joint < (int)jointCount && ik->weight > 0.0f)
+      {
+         std::vector<int> chain{ ik->joint };
+         while ((int)chain.size() <= std::max(1, ik->chain) && pkg.joints[chain.back()].parent >= 0)
+            chain.push_back(pkg.joints[chain.back()].parent);
+         std::reverse(chain.begin(), chain.end());
+         if (chain.size() >= 2)
+         {
+            auto head = [&](int j) { return std::array<float, 3>{ world[j * 16 + 12], world[j * 16 + 13], world[j * 16 + 14] }; };
+            std::vector<std::array<float, 3>> pos;
+            for (int j : chain)
+               pos.push_back(head(j));
+            // A dead-straight chain has no bend for FABRIK to grow, so its
+            // middle joints start a hair off the line, toward the pole if any.
+            for (size_t i = 1; i + 1 < pos.size(); i++)
+            {
+               float off[3];
+               for (int k = 0; k < 3; k++)
+                  off[k] = ik->usePole ? ik->pole[k] - pos[i][k] : world[chain[i] * 16 + k];   // else the joint's own X
+               const float l = Len(off);
+               if (l > 1e-9f)
+                  for (int k = 0; k < 3; k++) pos[i][k] += off[k] / l * 1e-3f;
+            }
+            Fabrik(pos, ik->target, ik->usePole ? ik->pole : nullptr);
+            for (size_t i = 0; i + 1 < chain.size(); i++)
+            {
+               const int j = chain[i];
+               const std::array<float, 3> h = head(j), c = head(chain[i + 1]);
+               const float from[3] = { c[0] - h[0], c[1] - h[1], c[2] - h[2] };
+               const float to[3] = { pos[i + 1][0] - h[0], pos[i + 1][1] - h[1], pos[i + 1][2] - h[2] };
+               float dq[4];
+               QuatBetween(from, to, dq);
+               if (ik->weight < 1.0f)
+               {
+                  const float wgt = ik->weight;
+                  float l = 0.0f;
+                  for (int k = 0; k < 4; k++)
+                  {
+                     dq[k] = (k == 3 ? 1.0f - wgt : 0.0f) + dq[k] * wgt;
+                     l += dq[k] * dq[k];
+                  }
+                  l = std::sqrt(l);
+                  for (float& v : dq) v /= l;
+               }
+               // A world turn about the head, moved into the joint's local
+               // frame: r' = P^-1 dq P r, P = the parent side's rotation.
+               float pm[16];
+               std::memcpy(pm, pkg.joints[j].between, sizeof(pm));
+               if (pkg.joints[j].parent >= 0)
+                  Mul(&world[pkg.joints[j].parent * 16], pm, pm);
+               float qp[4], qpi[4], t1[4], t2[4];
+               MatQuat(pm, qp);
+               qpi[0] = -qp[0]; qpi[1] = -qp[1]; qpi[2] = -qp[2]; qpi[3] = qp[3];
+               QuatMul(qpi, dq, t1);
+               QuatMul(t1, qp, t2);
+               QuatMul(t2, local[j].r, local[j].r);
+               build();
+            }
+         }
+      }
+
       std::vector<float> skin(jointCount * 16);
       for (size_t j = 0; j < jointCount; j++)
-      {
-         const GltfImport::GltfJoint& jt = pkg.joints[j];
-         float m[16];
-         Trs(local[j].t, local[j].r, local[j].s, m);
-         Mul(jt.between, m, m);
-         if (jt.parent >= 0)
-            Mul(&world[jt.parent * 16], m, m);
-         std::memcpy(&world[j * 16], m, sizeof(m));
-         Mul(m, jt.inverseBind, &skin[j * 16]);
-      }
+         Mul(&world[j * 16], pkg.joints[j].inverseBind, &skin[j * 16]);
       if (jointWorld != nullptr)
          *jointWorld = world;
 
