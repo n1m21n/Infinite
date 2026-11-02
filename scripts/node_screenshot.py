@@ -108,7 +108,7 @@ def find_category(client, type_name):
 
 
 def capture_one(client, node_type, category, out_dir, padding=12, settle_seconds=1.0,
-                 keep_node=False, no_expand=False, no_wire=False, zoom=False):
+                 keep_node=False, no_expand=False, no_wire=False, zoom=False, advanced=True):
     """Spawn `node_type`, optionally auto-wire/expand it, screenshot it to
     `out_dir/<node_type>.png`, and clean up. Shared by the single-node CLI
     below and scripts/screenshot_all_nodes.py."""
@@ -127,7 +127,7 @@ def capture_one(client, node_type, category, out_dir, padding=12, settle_seconds
             print(f"  Auto-wired input slot(s) {wired['wiredSlots']} with {len(feeder_indices)} feeder node(s).")
 
     if not no_expand:
-        client.call("expand_node", index=index)
+        client.call("expand_node", index=index, advanced=advanced)
 
     client.call("fit_view_node", index=index, zoom=zoom)
     time.sleep(settle_seconds)
@@ -164,6 +164,8 @@ def main():
                      help="don't force the node's collapsed params sections open before capture")
     ap.add_argument("--no-wire", action="store_true",
                      help="don't auto-connect feeder nodes into the node's unconnected input slots")
+    ap.add_argument("--less", action="store_true",
+                     help="expand the body but leave the node's 'show more' fold closed (a fresh node's look)")
     ap.add_argument("--no-zoom", action="store_true",
                      help="skip the zoom-in before capture (small, soft shots; manuals, website and blog "
                           "images need the zoomed ones, so zoom is the default)")
@@ -190,7 +192,8 @@ def main():
     try:
         capture_one(client, args.node_type, args.category, args.out,
                     padding=args.padding, settle_seconds=args.settle_seconds,
-                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire, zoom=not args.no_zoom)
+                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire, zoom=not args.no_zoom,
+                    advanced=not args.less)
     finally:
         client.close()
         if launched_here and not args.keep_open and proc is not None:

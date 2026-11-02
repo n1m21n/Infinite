@@ -2165,20 +2165,49 @@ namespace app
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
-      if (ActionButton::Column("Frame scene", colW))
-         FrameSceneInView(n);
+      // The rarely-touched rows sit behind one node-wide "show more" (GraphNode::showAdvancedParams, saved with
+      // the patch), the first row of the right column, level with Frame scene on the left. Folded rows are still registered, in the
+      // same order, so indices, modulation, expressions and the matrix are unchanged; a folded row with a cable,
+      // expression or palette binding stays shown (see hideBegin) and its pin with it.
+      GraphNode* gn = FindNodeByIndex(gCurrentNodeIndex);
+      const bool pinned = gn != nullptr && gn->showAdvancedParams;
+      static std::map<int, bool> sFoldedInUse;   // last frame's "a folded row is shown because it is driven"
+      bool& foldedInUse = sFoldedInUse[gCurrentNodeIndex];
+      const bool wasInUse = foldedInUse;
+      foldedInUse = false;
+      const bool savedRegisterOnly = gParamRegisterOnly;
+      // Starts a folded group of rows: how many float params (ModSlider/ModSliderInt) and colours it registers and
+      // which discrete params (checkbox/dropdown labels). Shown when pinned open, forced, or any of them is driven.
+      auto hideBegin = [&](int floatCount, int colorCount, std::initializer_list<const char*> discrete,
+                           bool force = false) {
+         bool inUse = false;
+         for (int k = 0; k < colorCount && !inUse; k++)
+            inUse = PaletteBinding::Instance().IsBound(gCurrentNodeIndex, gColorCounter + k);
+         for (int k = 0; k < floatCount && !inUse; k++)
+            inUse = Modulation::Instance().IsModulated(gCurrentNodeIndex, gParamCounter + k) ||
+                    Modulation::Instance().HasExpression(gCurrentNodeIndex, gParamCounter + k);
+         for (const char* d : discrete)
+            if (!inUse)
+               inUse = Modulation::Instance().IsModulated(gCurrentNodeIndex, DiscreteParamSlot(gCurrentNodeIndex, d));
+         if (inUse && !pinned)
+            foldedInUse = true;
+         gParamRegisterOnly = savedRegisterOnly || !(pinned || inUse || force);
+      };
+      auto hideEnd = [&]() { gParamRegisterOnly = savedRegisterOnly; };
 
       // Both columns draw every row every frame: a row that does not apply right now is greyed, never
       // dropped, so nothing grows, shifts or leaves a gap when a switch flips or a param is added.
-      // Left: output, camera, points, raster (27 rows). Right: light, shadows, environment, quality (28 rows).
+      // Sections are drawn in one fixed order (so param ordinals never move) and split into two columns at a point
+      // that depends on the fold: shown less, output/camera/raster | light/shadows/environment/quality; shown more,
+      // light moves to the left so both columns stay within a few rows of each other.
       char label[64];
       // Same clamp the renderer applies (Render3DNode::Cook): a patch can hold any int here.
       const int aaIndex = std::clamp(n->samples, 0, (int)Render3DNode::SampleNames().size() - 1);
       const int wantedAa = (aaIndex == 0) ? 0 : (1 << aaIndex);
 
-      // --- Left Column ---
-      ImGui::BeginGroup();
+      std::vector<std::function<void()>> sections;
 
+      sections.push_back([&]() {
       NodeSeparator("output", colW);
       DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
                      [n](int i) { n->renderPass = i; }, colW);
@@ -2214,8 +2243,12 @@ namespace app
       ImGui::EndDisabled();
       ColorSwatch("background", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f, "%.3f", colW);
+      hideBegin(0, 0, {"16-bit float output"});
       ModCheckbox("16-bit float output", &n->floatOutput);
+      hideEnd();
+      });
 
+      sections.push_back([&]() {
       snprintf(label, sizeof(label), n->camera != nullptr ? "camera - from a Camera node" : "camera");
       NodeSeparator(label, colW);
       {
@@ -2239,9 +2272,11 @@ namespace app
             ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.3f", colW);
             ImGui::EndDisabled();
          }
+         hideBegin(1, 0, {}, n->projection == Render3DNode::kFisheye);
          ImGui::BeginDisabled(n->projection != Render3DNode::kFisheye);
          ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
          ImGui::EndDisabled();
+         hideEnd();
          if (n->projection == Render3DNode::kFisheye)
             DropdownButton("lens", Render3DNode::FisheyeLensNames(), n->fisheyeLens,
                            [n](int i) { n->fisheyeLens = i; }, colW);
@@ -2260,23 +2295,26 @@ namespace app
          ModSlider("target z", &n->targetZ, -3.0f, 3.0f, "%.3f", colW);
          ImGui::EndDisabled();
       }
+      });
 
-      NodeSeparator("points", colW);
+      sections.push_back([&]() {
+      hideBegin(0, 0, {"sprite shape", "sprite size"});
+      if (!gParamRegisterOnly)
+         NodeSeparator("points", colW);
       DropdownButton("sprite shape", Render3DNode::SpriteShapeNames(), n->spriteShape,
                      [n](int i) { n->spriteShape = i; }, colW);
       DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
                      [n](int i) { n->spriteSizeMode = i; }, colW);
+      hideEnd();
+      });
 
+      sections.push_back([&]() {
       NodeSeparator("raster", colW);
       ModCheckbox("depth test", &n->depthTest);
       ModCheckbox("cull backfaces", &n->backfaceCull);
+      });
 
-      ImGui::EndGroup();
-
-      // --- Right Column ---
-      ImGui::SameLine(0.0f, gutter);
-      ImGui::BeginGroup();
-
+      sections.push_back([&]() {
       int patchedLights = 0;
       for (int i = 0; i < Render3DNode::kLightSlots; i++)
          if (n->lights[i] != nullptr)
@@ -2291,17 +2329,25 @@ namespace app
       ImGui::EndDisabled();
       ColorSwatch("ambient", n->ambientColor, n);
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f, "%.3f", colW);
+      });
 
+      sections.push_back([&]() {
       NodeSeparator("shadows", colW);
       ModCheckbox("cast shadows", &n->shadowsEnabled);
       ImGui::BeginDisabled(!n->shadowsEnabled);
+      hideBegin(0, 0, {"resolution"});
       DropdownButton("resolution", Render3DNode::ShadowQualityNames(), n->shadowQuality,
                      [n](int i) { n->shadowQuality = i; }, colW);
+      hideEnd();
       ModSlider("strength", &n->shadowStrength, 0.0f, 1.0f, "%.3f", colW);
+      hideBegin(2, 0, {});
       ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f, "%.3f", colW);
       ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f", colW);
+      hideEnd();
       ImGui::EndDisabled();
+      });
 
+      sections.push_back([&]() {
       const bool envConnected = n->envInput.IsConnected();
       NodeSeparator(envConnected ? "environment - from an HDRI node" : "environment", colW);
       ModCheckbox("use as background", &n->envAsBackground);
@@ -2311,12 +2357,16 @@ namespace app
       ColorSwatch("ground", n->envGround, n);
       ImGui::EndDisabled();
       ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f, "%.3f", colW);
+      });
 
+      sections.push_back([&]() {
       NodeSeparator("quality", colW);
       ModSlider("ambient occlusion", &n->aoStrength, 0.0f, 1.0f, "%.3f", colW);
+      hideBegin(1, 0, {});
       ImGui::BeginDisabled(n->aoStrength <= 0.0f);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      hideEnd();
       DropdownButton("shading", Render3DNode::ViewShadingNames(), n->viewShading,
                      [n](int i) { n->viewShading = i; }, colW);
       if (n->viewShading == 1)
@@ -2339,6 +2389,7 @@ namespace app
          if (n->solidColor == 2)
             ColorSwatch("single color", n->solidSingle, n);
       }
+      hideBegin(5, 0, {"cavity", "cavity type"});
       ModCheckbox("cavity", &n->cavity);
       ImGui::BeginDisabled(!n->cavity);
       DropdownButton("cavity type", Render3DNode::CavityTypeNames(), n->cavityType,
@@ -2349,9 +2400,11 @@ namespace app
       ModSlider("curvature ridge", &n->curvatureRidge, 0.0f, 2.0f, "%.2f", colW);
       ModSlider("curvature valley", &n->curvatureValley, 0.0f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
+      hideEnd();
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      hideBegin(5, 0, {});   // focus distance, aperture x3, offline supersample
       ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());
       ModSlider("focus distance", &n->focusDistance, 0.3f, 30.0f, "%.3f", colW);
       ModSliderInt("aperture blades", &n->dofBlades, 0, 16, colW);
@@ -2359,23 +2412,49 @@ namespace app
       ModSlider("aperture ratio", &n->dofRatio, 0.01f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
+      hideEnd();
       ImGui::BeginDisabled(!n->HdrActive());
       ModSlider("bloom", &n->bloom, 0.0f, 1.0f, "%.3f", colW);
+      hideBegin(2, 0, {});
       ImGui::BeginDisabled(n->bloom <= 0.0f);
       ModSlider("bloom threshold", &n->bloomThreshold, 0.5f, 8.0f, "%.2f", colW);
       ModSlider("bloom radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      hideEnd();
       ImGui::EndDisabled();
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no previous frame to smear from
       ModCheckbox("motion blur", &n->motionBlur);
       ImGui::BeginDisabled(!n->motionBlur);
+      hideBegin(2, 0, {"motion position"});
       DropdownButton("motion position", Render3DNode::MotionPositionNames(), n->motionPosition,
                      [n](int i) { n->motionPosition = i; }, colW);
       ModSlider("motion shutter", &n->motionShutter, 0.0f, 2.0f, "%.2f", colW);
       ModSlider("motion max blur", &n->motionMax, 1.0f, 256.0f, "%.0f", colW);
+      hideEnd();
       ImGui::EndDisabled();
       ImGui::EndDisabled();
+      });
 
+      const size_t splitAt = pinned ? 5 : 4;
+      ImGui::BeginGroup();
+      if (ActionButton::Column("Frame scene", colW))
+         FrameSceneInView(n);
+      for (size_t i = 0; i < sections.size(); i++)
+      {
+         if (i == splitAt)
+         {
+            ImGui::EndGroup();
+            ImGui::SameLine(0.0f, gutter);
+            ImGui::BeginGroup();
+            ImGui::PushID("showMoreRender3D");
+            if (ActionButton::Column(wasInUse && !pinned ? "show more (in use)" : pinned ? "show less" : "show more",
+                                     colW) &&
+                gn != nullptr)
+               gn->showAdvancedParams = !gn->showAdvancedParams;
+            ImGui::PopID();
+         }
+         sections[i]();
+      }
       ImGui::EndGroup();
    }
 

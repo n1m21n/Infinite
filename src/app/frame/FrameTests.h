@@ -29,6 +29,7 @@ void FrameTest_INSTANCESELECTTEST(int frameId, GLFWwindow* window);
 void FrameTest_PADPATHTEST(int frameId, GLFWwindow* window);
 void FrameTest_UNDOTEST(int frameId, GLFWwindow* window);
 void FrameTest_MODDROPDOWNUNDOTEST(int frameId, GLFWwindow* window);
+void FrameTest_RENDER3DFOLDTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGETEST(int frameId, GLFWwindow* window);
 void FrameTest_TRANSPORTTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGESAMPLEEXPORTTEST(int frameId, GLFWwindow* window);

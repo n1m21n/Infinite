@@ -60,6 +60,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // click runs - to prove the pick pushes one entry and Undo restores it.
       FrameTest_MODDROPDOWNUNDOTEST(frameId, window);
 
+      // Render 3D "show more" fold vs modulation (driven folded params stay shown and cook, collapse, reload, undo).
+      FrameTest_RENDER3DFOLDTEST(frameId, window);
+
       FrameTest_ARRANGETEST(frameId, window);
 
       // Overhaul WP2 (docs/plans/arrangement/overhaul-prompt.md): the transport
