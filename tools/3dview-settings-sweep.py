@@ -173,6 +173,15 @@ SETTINGS = {
     ("scene", "item.render"): S(0),
     ("scene", "item.scale"): S(2.0),
     ("scene", "item.lookAt"): S("box"),
+    ("scene", "item.trackAxis"): S(4, 0, 5, ctx="look"),
+    ("scene", "item.upAxis"): S(0, 0, 2, ctx="look"),
+    ("scene", "item.lookInfluence"): S(0.0, 0.0, 1.0, ctx="look"),
+    ("scene", "item.lookTargetZ"): S(1, ctx="look"),
+    ("scene", "item.hideSelect"): S(1),
+    ("scene", "item.showBounds"): S(1),
+    ("scene", "item.boundsType"): S(1, 0, 4),
+    ("scene", "item.showName"): S(1),
+    ("scene", "item.showAxes"): S(1),
     ("view", "viewShading"): S(1, 0, 1),
     ("view", "solidLighting"): S(1, 0, 2, sets=("view.viewShading=1",)),
     ("view", "matcap"): S(1, 0, 3, sets=("view.viewShading=1", "view.solidLighting=1")),
@@ -200,22 +209,63 @@ EXPECTED = {
     ("cam", "displaySize"): "camera marker size: 3D View only", ("cam", "showLimits"): "clip range line: 3D View only",
     ("cam", "showName"): "name in the camera view: 3D View only", ("cam", "showSensor"): "sensor gate: 3D View only",
     ("key", "showCone"): "spot cone shell: 3D View only",
+    ("scene", "item.lookTargetZ"): "the sweep's look-at target is unrotated, so its up equals the world's; VIEW3DTEST-level only",
+    ("scene", "item.hideSelect"): "selection filter: 3D View only",
+    ("scene", "item.showBounds"): "viewport overlay: 3D View only", ("scene", "item.boundsType"): "viewport overlay: 3D View only",
+    ("scene", "item.showName"): "viewport overlay: 3D View only", ("scene", "item.showAxes"): "viewport overlay: 3D View only",
 }
 # Settings-line fields that only drive the editor (view, gizmos, snapping, guides): a headless render can't see them.
 EDITOR_ONLY = ["fps", "seconds", "snap", "snapMove", "snapRot", "snapScale", "passAlpha", "safe", "thirds", "center",
                "golden", "safeTitle", "safeAction", "orientation", "pivot", "cursor", "zoomToMouse", "orbitSelection",
                "proportional", "propSize", "propFalloff", "invertZoom", "textInfo", "stats", "originsAll", "gizmoMove",
                "gizmoNav", "snapObjects", "safeCenter", "guideColor", "diagonal", "goldenTriA", "goldenTriB",
-               "harmonyTriA", "harmonyTriB"]
+               "harmonyTriA", "harmonyTriB",
+               # Block D: view, snap, placement and outliner state; the render ones move to SETTINGS as they land
+               "projectedProp", "onlyLocations", "snapAlign", "snapAbsolute", "snapRotFine", "snapTarget",
+               "snapSelectable", "snapTranslate", "snapRotate", "snapScaleOn", "planeAxis", "planeAuto",
+               "planeDepth", "planeOrient", "customCount", "customRot00", "customRot01", "customRot02",
+               "customRot10", "customRot11", "customRot12", "customRot20", "customRot21", "customRot22",
+               "customRot30", "customRot31", "customRot32", "cursorRot0", "cursorRot1", "cursorRot2",
+               "cursorRotMode", "lockCursor", "viewLens", "clipStart", "clipEnd", "gizmoLightSize", "gizmoLightLook",
+               "gizmoCamLens", "gizmoCamFocus", "showCameras", "showLights", "pickCameras", "pickLights", "outline",
+               "outlineColor0", "outlineColor1", "outlineColor2", "bgType", "bgColor0", "bgColor1", "bgColor2",
+               "orthoGrid", "axisX", "axisY", "axisZ", "gridScale", "gridLines", "gridSubdiv", "showCursor",
+               "showPerf", "showExtras", "lightColors", "showFps", "miniAxes", "miniSize", "miniBright",
+               "smoothTime", "rotStep", "gizmoSize", "gizmoNavSize", "alignNew", "autoPerspective", "continuousGrab",
+               "orbitSens", "pixelAspect0", "pixelAspect1", "fpsBase", "simplify", "stamp", "stampTime", "stampDate",
+               "stampFrame", "stampRange", "stampCamera", "stampLens", "stampScene", "stampNote", "stampRender",
+               "stampLabels", "stampSize", "stampFg0", "stampFg1", "stampFg2", "stampBg0", "stampBg1", "stampBg2",
+               "frameStart", "frameStep", "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase",
+               "listComplete", "listSort", "colSelect", "colRender", "listObjects", "listInvert", "listLights",
+               "listCameras", "listState"]
 SETTING_FIELDS = ["fps", "seconds", "percent", "transparent", "snap", "snapMove", "snapRot", "snapScale", "passAlpha",
                   "safe", "thirds", "center", "golden", "safeTitle", "safeAction", "orientation", "pivot", "cursor0",
                   "cursor1", "cursor2", "zoomToMouse", "orbitSelection", "shadowItem", "fStop", "proportional", "propSize",
                   "propFalloff", "invertZoom", "textInfo", "stats", "originsAll", "gizmoMove", "gizmoNav", "snapObjects",
                   "border", "crop", "borderMin0", "borderMin1", "borderMax0", "borderMax1",
                   "safeCenter", "guideColor0", "guideColor1", "guideColor2", "diagonal", "goldenTriA", "goldenTriB",
-                  "harmonyTriA", "harmonyTriB"]
+                  "harmonyTriA", "harmonyTriB",
+                  "projectedProp", "onlyLocations", "snapAlign", "snapAbsolute", "snapRotFine", "snapTarget",
+                  "snapSelectable", "snapTranslate", "snapRotate", "snapScaleOn", "planeAxis", "planeAuto",
+                  "planeDepth", "planeOrient", "customCount", "customRot00", "customRot01", "customRot02",
+                  "customRot10", "customRot11", "customRot12", "customRot20", "customRot21", "customRot22",
+                  "customRot30", "customRot31", "customRot32", "cursorRot0", "cursorRot1", "cursorRot2",
+                  "cursorRotMode", "lockCursor", "viewLens", "clipStart", "clipEnd", "gizmoLightSize",
+                  "gizmoLightLook", "gizmoCamLens", "gizmoCamFocus", "showCameras", "showLights", "pickCameras",
+                  "pickLights", "outline", "outlineColor0", "outlineColor1", "outlineColor2", "bgType", "bgColor0",
+                  "bgColor1", "bgColor2", "orthoGrid", "axisX", "axisY", "axisZ", "gridScale", "gridLines",
+                  "gridSubdiv", "showCursor", "showPerf", "showExtras", "lightColors", "showFps", "miniAxes",
+                  "miniSize", "miniBright", "smoothTime", "rotStep", "gizmoSize", "gizmoNavSize", "alignNew",
+                  "autoPerspective", "continuousGrab", "orbitSens", "pixelAspect0", "pixelAspect1", "fpsBase",
+                  "simplify", "stamp", "stampTime", "stampDate", "stampFrame", "stampRange", "stampCamera",
+                  "stampLens", "stampScene", "stampNote", "stampRender", "stampLabels", "stampSize", "stampFg0",
+                  "stampFg1", "stampFg2", "stampBg0", "stampBg1", "stampBg2", "frameStart", "frameStep",
+                  "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase", "listComplete", "listSort",
+                  "colSelect", "colRender", "listObjects", "listInvert", "listLights", "listCameras", "listState"]
 # What a field reads as when the settings line is padded out to reach a later one.
-FIELD_DEFAULT = {"propSize": 1, "borderMax0": 1, "borderMax1": 1}
+FIELD_DEFAULT = {"propSize": 1, "borderMax0": 1, "borderMax1": 1,
+                 "snapAbsolute": 1, "snapRotFine": 1, "snapTranslate": 1, "snapRotate": 1, "snapScaleOn": 1, "planeAxis": 2, "planeDepth": 1, "viewLens": 50, "clipStart": 0.01, "clipEnd": 1000, "showCameras": 1, "showLights": 1
+                 , "pickCameras": 1, "pickLights": 1, "outline": 1, "outlineColor0": 1, "outlineColor1": 0.55, "outlineColor2": 0.1, "bgColor0": 0.05, "bgColor1": 0.05, "bgColor2": 0.05, "orthoGrid": 1, "axisX": 1, "axisY": 1, "gridScale": 1, "gridLines": 10, "gridSubdiv": 10, "showCursor": 1, "showExtras": 1, "miniAxes": 2, "miniSize": 80, "miniBright": 1, "smoothTime": 0.2, "rotStep": 15, "gizmoSize": 75, "gizmoNavSize": 80, "autoPerspective": 1, "continuousGrab": 1, "orbitSens": 1, "pixelAspect0": 1, "pixelAspect1": 1, "fpsBase": 1, "stampLabels": 1, "stampSize": 12, "stampFg0": 1, "stampFg1": 1, "stampFg2": 1, "frameStep": 1, "unitSystem": 1, "unitScale": 1, "listObjects": 1, "listLights": 1, "listCameras": 1}
 
 
 def build(ctx):
@@ -262,7 +312,7 @@ def sun_hdri():
     return path
 
 
-def patch_text(s, path):
+def patch_text(s, path, ctx="dir"):
     s.write(path)
     lines, out = open(path).read().split("\n"), []
     ids = {}
@@ -275,7 +325,12 @@ def patch_text(s, path):
         m = re.match(r"\s+uid (\d+)$", line)
         if m and int(m.group(1)) in ids:
             out.append(f"  id {ids[int(m.group(1))]}")
-    open(path, "w").write("\n".join(out))
+    text = "\n".join(out)
+    if ctx == "look":   # the camera already looks at the box, so the look-at settings have something to change
+        m = re.search(r"(  s scene )(.*)", text)
+        look = f"look {s.camera} {next(t[0] for t in s.items if t[2] == 'Box')}"
+        text = text[:m.end(2)] + "\\n" + look + text[m.end(2):]
+    open(path, "w").write(text)
 
 
 def scene_edit(path, s, key, value):
@@ -313,6 +368,14 @@ def scene_edit(path, s, key, value):
         lines.append(f"itemx {item} 0")
     if key == "item.delta":
         lines.append(f"delta {item} {value}")
+    if key in ("item.trackAxis", "item.upAxis", "item.lookInfluence", "item.lookTargetZ"):
+        v = {"item.trackAxis": 5, "item.upAxis": 1, "item.lookInfluence": 1, "item.lookTargetZ": 0}
+        v[key] = value
+        lines.append(f"lookx {s.camera} {v['item.trackAxis']} {v['item.upAxis']} {v['item.lookInfluence']} {v['item.lookTargetZ']}")
+    if key in ("item.hideSelect", "item.showBounds", "item.boundsType", "item.showName", "item.showAxes"):
+        v = {"item.hideSelect": 0, "item.showBounds": 0, "item.boundsType": 0, "item.showName": 0, "item.showAxes": 0}
+        v[key] = value
+        lines.append(f"show {item} " + " ".join(str(v[k]) for k in v))
     if key == "item.lookAt":   # the camera turns to keep the box in view
         lines.append(f"look {s.camera} {next(t[0] for t in s.items if t[2] == 'Box')}")
     text = text[:m.start(2)] + "\\n".join(lines) + text[m.end(2):]
@@ -402,7 +465,7 @@ def main():
     for ctx in sorted({v["ctx"] for _, v in todo}):
         s = build(ctx)
         path = os.path.join(args.out, f"base-{ctx}.inf")
-        patch_text(s, path)
+        patch_text(s, path, ctx)
         scenes[ctx] = (s, path)
 
     def base_frame(ctx, sets, frame):

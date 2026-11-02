@@ -247,6 +247,19 @@ namespace
 
    bool Shown(const Item& it) { return it.visible && InLocal(it.id); }
 
+   // Shown and allowed to be picked: honours Hide Selection and the Selectability type filters.
+   bool Pickable(Scene3DNode* scene, const Item& it)
+   {
+      if (!Shown(it) || it.hideSelect)
+         return false;
+      const Kind k = scene->ItemKind(it);
+      if (k == Kind::Camera && !sSet->pickCameras)
+         return false;
+      if (k == Kind::Light && !sSet->pickLights)
+         return false;
+      return true;
+   }
+
    std::string ItemName(const Item& it)
    {
       if (!it.name.empty())
@@ -727,10 +740,11 @@ namespace
    void OrientAxis(const Item& item, int orient, int a, float out[3])
    {
       out[0] = out[1] = out[2] = 0.0f;
-      if (orient == 1)
+      if (orient == 1 || orient >= 3)
       {
          float r[3][3];
-         RotationOf(item.rot, r);
+         // 1 the item's own turn, 3 the 3D cursor's, above that a saved one.
+         RotationOf(orient == 1 ? item.rot : orient == 3 ? sSet->cursorRot : sSet->customRot[std::clamp(orient - 4, 0, 3)], r);
          for (int k = 0; k < 3; k++)
             out[k] = r[k][a];
       }
@@ -842,8 +856,13 @@ namespace
    void ApplyOp(Scene3DNode* scene, ImVec2 mouse)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      const bool snap = sSet->snap != (io.KeyCtrl || io.KeySuper);   // Cmd or Ctrl on macOS, Ctrl elsewhere
-      const float fine = io.KeyShift && sOp.plane < 0 ? 0.1f : 1.0f;
+      const bool snapOn = sSet->snap != (io.KeyCtrl || io.KeySuper);   // Cmd or Ctrl on macOS, Ctrl elsewhere
+      // One switch per tool (Snap card), so a grid can hold the move and leave the turn free.
+      const bool snap = snapOn && (sOp.mode == 'g' ? sSet->snapTranslate : sOp.mode == 'r' ? sSet->snapRotate : sSet->snapScaleOn);
+      // Turning with the snap on, Shift swaps the slow drag for the finer increment.
+      const bool fineSnap = snap && sOp.mode == 'r' && io.KeyShift;
+      const float fine = io.KeyShift && sOp.plane < 0 && !fineSnap ? 0.1f : 1.0f;
+      const Item* alignTo = nullptr;   // snapped onto this item's origin: its turn follows when asked
       const bool hasTyped = !sOp.typed.empty() && sOp.typed != "-";
       const float typed = hasTyped ? std::strtof(sOp.typed.c_str(), nullptr) : 0.0f;
       const ImVec2 d((mouse.x - sOp.start.x) * fine, (mouse.y - sOp.start.y) * fine);
@@ -911,7 +930,7 @@ namespace
                float best = 24.0f;
                for (const Item& other : scene->Items())
                {
-                  if (!Shown(other) || Selected(other.id))
+                  if (!Shown(other) || Selected(other.id) || (sSet->snapSelectable && other.hideSelect))
                      continue;
                   float oc[3];
                   ImVec2 os;
@@ -925,6 +944,7 @@ namespace
                      for (int k = 0; k < 3; k++)
                         move[k] = oc[k] - sOp.pivot[k];
                      snapStep = false;
+                     alignTo = &other;
                   }
                }
             }
@@ -946,7 +966,7 @@ namespace
          if (hasTyped)
             deg = typed;
          else if (snap)
-            deg = SnapTo(deg, sSet->snapRot);
+            deg = SnapTo(deg, io.KeyShift ? sSet->snapRotFine : sSet->snapRot);
          angle = deg * kPi / 180.0f;
       }
       else
@@ -976,6 +996,42 @@ namespace
             factor = 0.001f;
       }
 
+      if (sOp.mode == 'g' && snapStep && !sOp.fixed)
+      {
+         // Relative: the move itself lands on the increments. Absolute: what the Snap Target names lands on the
+         // grid (closest = each item on its own, the default).
+         float ref[3] = { 0, 0, 0 };
+         bool whole = false;
+         if (!sSet->snapAbsolute)
+         {
+            for (int k = 0; k < 3; k++)
+               if (moved[k])
+                  move[k] = SnapTo(move[k], sSet->snapMove);
+            snapStep = false;
+         }
+         else if (sSet->snapTarget != 0 && !sOp.centers.empty())
+         {
+            const size_t n = sOp.centers.size() / 3;
+            for (int k = 0; k < 3; k++)
+            {
+               float lo = 1e30f, hi = -1e30f, sum = 0.0f;
+               for (size_t j = 0; j < n; j++)
+               {
+                  lo = std::min(lo, sOp.centers[j * 3 + k]); hi = std::max(hi, sOp.centers[j * 3 + k]);
+                  sum += sOp.centers[j * 3 + k];
+               }
+               ref[k] = sSet->snapTarget == 1 ? (lo + hi) * 0.5f : sSet->snapTarget == 2 ? sum / (float)n : sOp.centers[(n - 1) * 3 + k];
+            }
+            whole = true;
+         }
+         if (whole)
+         {
+            for (int k = 0; k < 3; k++)
+               if (moved[k])
+                  move[k] = SnapTo(ref[k] + move[k], sSet->snapMove) - ref[k];
+            snapStep = false;
+         }
+      }
       if (sOp.fixed)
       {
          std::copy(sOp.fMove, sOp.fMove + 3, move);
@@ -1007,6 +1063,8 @@ namespace
                if (snapStep && moved[k])
                   it->pos[k] = SnapTo(it->pos[k], sSet->snapMove);
             }
+            if (alignTo != nullptr && sSet->snapAlign)
+               std::copy(alignTo->rot, alignTo->rot + 3, it->rot);
          }
          else if (sOp.mode == 'r')
          {
@@ -1014,7 +1072,8 @@ namespace
             AxisAngle(axis, angle, dr);
             RotationOf(was.rot, r0);
             Mul(dr, r0, r1);
-            EulerFrom(r1, it->rot);
+            if (!sSet->onlyLocations)
+               EulerFrom(r1, it->rot);
             for (int k = 0; k < 3; k++)
                it->pos[k] = pivot[k] + dr[k][0] * off[0] + dr[k][1] * off[1] + dr[k][2] * off[2];
          }
@@ -1027,7 +1086,8 @@ namespace
             {
                const float f = (sOp.axis < 0 && sOp.plane < 0) || sOp.axis == k || (sOp.plane >= 0 && sOp.plane != k) ? factor : 1.0f;
                local[k] = (r[0][k] * off[0] + r[1][k] * off[1] + r[2][k] * off[2]) * f;
-               it->scale[k] = was.scale[k] * f;
+               if (!sSet->onlyLocations)
+                  it->scale[k] = was.scale[k] * f;
             }
             for (int k = 0; k < 3; k++)
                it->pos[k] = pivot[k] + r[k][0] * local[0] + r[k][1] * local[1] + r[k][2] * local[2];
@@ -1043,7 +1103,16 @@ namespace
          const float* nc = &sOp.nearCenters[i * 3];
          float dist = 1e30f;
          for (size_t j = 0; j < sOp.centers.size(); j += 3)
-            dist = std::min(dist, std::hypot(nc[0] - sOp.centers[j], std::hypot(nc[1] - sOp.centers[j + 1], nc[2] - sOp.centers[j + 2])));
+         {
+            float dv[3] = { nc[0] - sOp.centers[j], nc[1] - sOp.centers[j + 1], nc[2] - sOp.centers[j + 2] };
+            if (sSet->projectedProp)   // measured across the view: depth doesn't count
+            {
+               const float depth = Dot(dv, sCam.fwd);
+               for (int k = 0; k < 3; k++)
+                  dv[k] -= sCam.fwd[k] * depth;
+            }
+            dist = std::min(dist, std::hypot(dv[0], std::hypot(dv[1], dv[2])));
+         }
          const float w = Falloff(dist);
          *it = was;
          if (w <= 0.0f)
@@ -1060,7 +1129,8 @@ namespace
             AxisAngle(axis, angle * w, dr);
             RotationOf(was.rot, r0);
             Mul(dr, r0, r1);
-            EulerFrom(r1, it->rot);
+            if (!sSet->onlyLocations)
+               EulerFrom(r1, it->rot);
             for (int k = 0; k < 3; k++)
                it->pos[k] = sOp.pivot[k] + dr[k][0] * off[0] + dr[k][1] * off[1] + dr[k][2] * off[2];
          }
@@ -1073,7 +1143,8 @@ namespace
                const float full = (sOp.axis < 0 && sOp.plane < 0) || sOp.axis == k || (sOp.plane >= 0 && sOp.plane != k) ? factor : 1.0f;
                const float f = 1.0f + (full - 1.0f) * w;
                local[k] = (r[0][k] * off[0] + r[1][k] * off[1] + r[2][k] * off[2]) * f;
-               it->scale[k] = was.scale[k] * f;
+               if (!sSet->onlyLocations)
+                  it->scale[k] = was.scale[k] * f;
             }
             for (int k = 0; k < 3; k++)
                it->pos[k] = sOp.pivot[k] + r[k][0] * local[0] + r[k][1] * local[1] + r[k][2] * local[2];
@@ -1321,7 +1392,7 @@ namespace
             if (it->group != 0)
                groups.push_back(it->group);
       for (const Item& it : scene->Items())
-         if (Shown(it) && !Selected(it.id) && std::find(groups.begin(), groups.end(), it.group) != groups.end())
+         if (Pickable(scene, it) && !Selected(it.id) && std::find(groups.begin(), groups.end(), it.group) != groups.end())
             sSel.insert(sSel.begin(), it.id);
    }
 
@@ -1333,7 +1404,7 @@ namespace
          return;
       const Kind kind = scene->ItemKind(*active);
       for (const Item& it : scene->Items())
-         if (Shown(it) && !Selected(it.id) && scene->ItemKind(it) == kind)
+         if (Pickable(scene, it) && !Selected(it.id) && scene->ItemKind(it) == kind)
             sSel.insert(sSel.begin(), it.id);
    }
 
@@ -1421,6 +1492,79 @@ namespace
          for (int k = 0; k < 3; k++)
             d[k] = sSet->cursor[k] - m[k];
       });
+   }
+
+   // Saves the active item's turn as a named orientation, and picks it.
+   void CreateOrientation(Scene3DNode* scene)
+   {
+      const Item* a = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      if (a == nullptr || sSet->customCount >= 4)
+         return;
+      PushUndoCheckpoint("Create orientation");
+      const Mat4 m = Scene3DNode::Placement(*a);
+      float whole[3][3];
+      // The turn without the scale: each column of the placement, normalised.
+      for (int col = 0; col < 3; col++)
+      {
+         const float len = std::max(1e-6f, std::sqrt(m.m[col * 4] * m.m[col * 4] + m.m[col * 4 + 1] * m.m[col * 4 + 1] + m.m[col * 4 + 2] * m.m[col * 4 + 2]));
+         for (int row = 0; row < 3; row++)
+            whole[row][col] = m.m[col * 4 + row] / len;
+      }
+      EulerFrom(whole, sSet->customRot[sSet->customCount]);
+      sSet->orientation = 4 + sSet->customCount;
+      sSet->customCount++;
+   }
+
+   // Drops the orientation in use, when it is a saved one.
+   void DeleteOrientation()
+   {
+      const int at = sSet->orientation - 4;
+      if (at < 0 || at >= sSet->customCount)
+         return;
+      PushUndoCheckpoint("Delete orientation");
+      for (int i = at; i + 1 < sSet->customCount; i++)
+         std::copy(sSet->customRot[i + 1], sSet->customRot[i + 1] + 3, sSet->customRot[i]);
+      sSet->customCount--;
+      sSet->orientation = 0;
+   }
+
+   // The plane a click sets the 3D cursor on (Cursor tool, Shift+right-click): across the view by default, or a
+   // world plane through the cursor, its axis chosen or taken from the view.
+   void PlacementPlane(float anchor[3], float n[3])
+   {
+      if (sSet->planeDepth != 1)
+         std::copy(sSet->cursor, sSet->cursor + 3, anchor);
+      if (sSet->planeDepth == 1 || sSet->planeOrient == 1)
+      {
+         std::copy(sCam.fwd, sCam.fwd + 3, n);
+         return;
+      }
+      int axis = sSet->planeAxis;   // display X, Y, Z = engine 0, 2, 1
+      if (sSet->planeAuto)
+      {
+         int best = 0;
+         for (int k = 1; k < 3; k++)
+            if (std::abs(sCam.fwd[k]) > std::abs(sCam.fwd[best]))
+               best = k;
+         axis = best == 0 ? 0 : best == 2 ? 1 : 2;
+      }
+      n[0] = n[1] = n[2] = 0.0f;
+      n[axis == 0 ? 0 : axis == 1 ? 2 : 1] = 1.0f;
+      std::copy(sSet->cursor, sSet->cursor + 3, anchor);
+   }
+
+   // A new item stands at the 3D cursor, turned as the Align New Items setting says.
+   void PlaceNew(Item& it)
+   {
+      std::copy(sSet->cursor, sSet->cursor + 3, it.pos);
+      if (sSet->alignNew == 2)
+         std::copy(sSet->cursorRot, sSet->cursorRot + 3, it.rot);
+      else if (sSet->alignNew == 1)
+      {
+         const float r[3][3] = { { sCam.right[0], sCam.up[0], -sCam.fwd[0] }, { sCam.right[1], sCam.up[1], -sCam.fwd[1] },
+                                 { sCam.right[2], sCam.up[2], -sCam.fwd[2] } };
+         EulerFrom(r, it.rot);
+      }
    }
 
    void CursorToOrigin()
@@ -1735,7 +1879,7 @@ namespace
       {
          std::vector<int> others;
          for (const Item& it : scene->Items())
-            if (Shown(it) && !Selected(it.id))
+            if (Pickable(scene, it) && !Selected(it.id))
                others.push_back(it.id);
          sSel.swap(others);
       }
@@ -1809,7 +1953,7 @@ namespace
          {
             sSel.clear();
             for (const Item& it : scene->Items())
-               if (Shown(it))
+               if (Pickable(scene, it))
                   sSel.push_back(it.id);
          }
          else if (pressed(ImGuiKey_O) && !io.KeyShift)
@@ -1957,6 +2101,96 @@ namespace
                const float q[3] = { (j & 1) ? hi[0] : lo[0], (j & 2) ? hi[1] : lo[1], (j & 4) ? hi[2] : lo[2] };
                Line3D(dl, p, q, col, 1.5f);
             }
+   }
+
+   // Axis-aligned ellipse in the plane spanned by axes a and b, around centre c with half extents h.
+   void DrawEllipse3D(ImDrawList* dl, const float c[3], const float h[3], int a, int b, ImU32 col, float fixed = 0.0f, int n = 32)
+   {
+      float prev[3] = {};
+      for (int i = 0; i <= n; i++)
+      {
+         const float t = (float)i / n * 2.0f * kPi;
+         float q[3] = { c[0], c[1], c[2] };
+         const int o = 3 - a - b;
+         q[o] += fixed;
+         q[a] += std::cos(t) * h[a];
+         q[b] += std::sin(t) * h[b];
+         if (i > 0)
+            Line3D(dl, prev, q, col, 1.0f);
+         std::copy(q, q + 3, prev);
+      }
+   }
+
+   // Per-object viewport display: bounds shape, name and axes (Object > Viewport Display).
+   void DrawItemExtras(ImDrawList* dl, Scene3DNode* scene, const Item& it, ImU32 col)
+   {
+      float c[3];
+      scene->ItemCenter(it, c);
+      if (it.showBounds)
+      {
+         float lo[3], hi[3];
+         if (scene->ItemBounds(it.id, lo, hi))
+         {
+            const float m[3] = { (lo[0] + hi[0]) * 0.5f, (lo[1] + hi[1]) * 0.5f, (lo[2] + hi[2]) * 0.5f };
+            const float h[3] = { (hi[0] - lo[0]) * 0.5f, (hi[1] - lo[1]) * 0.5f, (hi[2] - lo[2]) * 0.5f };
+            const ImU32 bc = Hex(0xFFFFFF, 0.55f);
+            switch (it.boundsType)
+            {
+            case 1:
+               for (int a = 0; a < 3; a++)
+                  DrawEllipse3D(dl, m, h, a, (a + 1) % 3, bc);
+               break;
+            case 2:
+            case 4:
+               DrawEllipse3D(dl, m, h, 0, 2, bc, h[1]);
+               DrawEllipse3D(dl, m, h, 0, 2, bc, -h[1]);
+               for (int k = 0; k < 4; k++)
+               {
+                  float p[3] = { m[0] + ((k & 1) ? h[0] : -h[0]) * ((k & 2) ? 0.0f : 1.0f), m[1] - h[1], m[2] + ((k & 2) ? ((k & 1) ? h[2] : -h[2]) : 0.0f) };
+                  float q[3] = { p[0], m[1] + h[1], p[2] };
+                  Line3D(dl, p, q, bc, 1.0f);
+               }
+               if (it.boundsType == 4)
+               {
+                  DrawEllipse3D(dl, m, h, 0, 1, bc);
+                  DrawEllipse3D(dl, m, h, 2, 1, bc);
+               }
+               break;
+            case 3:
+               DrawEllipse3D(dl, m, h, 0, 2, bc, -h[1]);
+               for (int k = 0; k < 4; k++)
+               {
+                  float p[3] = { m[0] + ((k & 2) ? 0.0f : ((k & 1) ? h[0] : -h[0])), m[1] - h[1], m[2] + ((k & 2) ? ((k & 1) ? h[2] : -h[2]) : 0.0f) };
+                  float apex[3] = { m[0], m[1] + h[1], m[2] };
+                  Line3D(dl, p, apex, bc, 1.0f);
+               }
+               break;
+            default:
+               DrawBox(dl, lo, hi, bc);
+               break;
+            }
+         }
+      }
+      if (it.showAxes)
+      {
+         const float len = UnitAt(c) * 40.0f;
+         for (int a = 0; a < 3; a++)
+         {
+            float w[3];
+            OrientAxis(it, 1, a, w);
+            const float e[3] = { c[0] + w[0] * len, c[1] + w[1] * len, c[2] + w[2] * len };
+            Line3D(dl, c, e, AxisColor(a, 0.95f), 1.5f);
+         }
+      }
+      if (it.showName)
+      {
+         ImVec2 sp;
+         if (Project(c, sp))
+         {
+            const std::string nm = ItemName(it);
+            dl->AddText(ImVec2(sp.x + 8.0f, sp.y - 16.0f), col, nm.c_str());
+         }
+      }
    }
 
    // Blender's 3D cursor: a red and white ring with four ticks.
@@ -2653,6 +2887,8 @@ namespace
             if (Project(oc, os))
                dl->AddCircleFilled(os, 2.5f, Hex(0xFFA040, 0.8f));
          }
+         if (it.visible)
+            DrawItemExtras(dl, scene, it, col);
          if (scene->ItemPoint(it, p))
          {
             if (kind == Kind::Camera && !looking)
@@ -2791,9 +3027,10 @@ namespace
             else if (sTool == 0 && (sSelMode == 2 || sSelMode == 3))
             {
                // Both read a point on the plane through the view's centre that faces the viewer.
-               float o[3], d[3], hit[3];
+               float o[3], d[3], hit[3], pa[3] = { sTarget[0], sTarget[1], sTarget[2] }, pn[3];
+               PlacementPlane(pa, pn);
                MouseRay(mouse, o, d);
-               if (PlaneHit(sTarget, sCam.fwd, o, d, hit))
+               if (PlaneHit(pa, pn, o, d, hit))
                {
                   if (sSelMode == 2)
                   {
@@ -2861,7 +3098,7 @@ namespace
                   float c[3];
                   scene->ItemCenter(it, c);
                   ImVec2 q;
-                  if (!Shown(it) || !Project(c, q) || Selected(it.id))
+                  if (!Pickable(scene, it) || !Project(c, q) || Selected(it.id))
                      continue;
                   bool inside = false;
                   for (size_t i = 0, j = n - 1; i < n; j = i++)
@@ -2930,7 +3167,7 @@ namespace
                   float c[3];
                   scene->ItemCenter(it, c);
                   ImVec2 s;
-                  if (Shown(it) && Project(c, s) && s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y && !Selected(it.id))
+                  if (Pickable(scene, it) && Project(c, s) && s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y && !Selected(it.id))
                      sSel.push_back(it.id);
                }
          }
@@ -2943,7 +3180,9 @@ namespace
          MouseRay(mouse, o, d);
          if (io.KeyShift)
          {
-            if (PlaneHit(sSet->cursor, sCam.fwd, o, d, hit))
+            float pa[3] = { sSet->cursor[0], sSet->cursor[1], sSet->cursor[2] }, pn[3];
+            PlacementPlane(pa, pn);
+            if (PlaneHit(pa, pn, o, d, hit))
             {
                PushUndoCheckpoint("Move 3D cursor");
                std::copy(hit, hit + 3, sSet->cursor);
@@ -3910,8 +4149,22 @@ namespace
          }
       }
       if (Card(T("Visibility")))
+      {
          if (BoolRow(T("Show in renders"), &item->render, "Show in renders"))
             scene->Commit();
+         if (BoolRow(T("Hide selection"), &item->hideSelect, "Hide selection"))
+            scene->Commit();
+      }
+      if (Card(T("Viewport display")))
+      {
+         bool changed = BoolRow(T("Name"), &item->showName, "Show name");
+         changed |= BoolRow(T("Axes"), &item->showAxes, "Show axes");
+         changed |= BoolRow(T("Bounds"), &item->showBounds, "Show bounds");
+         if (item->showBounds)
+            changed |= ComboRow(T("Shape"), &item->boundsType, { T("Box"), T("Sphere"), T("Cylinder"), T("Cone"), T("Capsule") }, "Bounds shape");
+         if (changed)
+            scene->Commit();
+      }
       if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
       {
          if (IntInputRow(T("Index"), &item->passIndex))
@@ -3962,6 +4215,16 @@ namespace
          {
             item->lookAt = ids[pick];
             scene->Commit();
+         }
+         if (item->lookAt != 0)
+         {
+            const std::vector<std::string> axes = { "+X", "+Y", "+Z", "-X", "-Y", "-Z" };
+            bool changed = ComboRow(T("Track axis"), &item->trackAxis, axes, "Look at track axis");
+            changed |= ComboRow(T("Up axis"), &item->upAxis, { "X", "Y", "Z" }, "Look at up axis");
+            changed |= FloatRow(T("Influence"), &item->lookInfluence, 0.0f, 1.0f, "%.2f", "Look at influence");
+            changed |= BoolRow(T("Target Z"), &item->lookTargetZ, "Look at target up");
+            if (changed)
+               scene->Commit();
          }
       }
    }
@@ -4288,8 +4551,11 @@ namespace
 
    const std::vector<std::string>& OrientationNames()
    {
-      static const std::vector<std::string> kNames = { T("Global"), T("Local"), T("View") };
-      return kNames;
+      static std::vector<std::string> names;
+      names = { T("Global"), T("Local"), T("View"), T("Cursor") };
+      for (int i = 0; i < sSet->customCount; i++)
+         names.push_back(std::string(T("Custom")) + " " + std::to_string(i + 1));
+      return names;
    }
 
    const std::vector<std::string>& PivotNames()
@@ -4305,6 +4571,15 @@ namespace
       {
          ComboRow(T("Orientation"), &set.orientation, OrientationNames());
          ComboRow(T("Pivot"), &set.pivot, PivotNames());
+         BoolRow(T("Only locations"), &set.onlyLocations);
+         ImGui::BeginDisabled(sSel.empty() || set.customCount >= 4);
+         if (ActionButton::Draw(L("Create Orientation"), ImVec2(availW, 0)))
+            CreateOrientation(scene);
+         ImGui::EndDisabled();
+         ImGui::BeginDisabled(set.orientation < 4);
+         if (ActionButton::Draw(L("Delete Orientation"), ImVec2(availW, 0)))
+            DeleteOrientation();
+         ImGui::EndDisabled();
       }
       if (Card(T("Snap")))
       {
@@ -4313,12 +4588,33 @@ namespace
          FloatRow(T("Rotate"), &set.snapRot, 1.0f, 90.0f, "%.0f");
          FloatRow(T("Scale"), &set.snapScale, 0.01f, 1.0f, "%.2f");
          BoolRow(T("To other objects"), &set.snapObjects);
+         BoolRow(T("Use for move"), &set.snapTranslate);
+         BoolRow(T("Use for rotate"), &set.snapRotate);
+         BoolRow(T("Use for scale"), &set.snapScaleOn);
+         BoolRow(T("Absolute increment"), &set.snapAbsolute);
+         FloatRow(T("Rotate precision"), &set.snapRotFine, 0.1f, 15.0f, "%.1f");
+         ComboRow(T("Snap target"), &set.snapTarget, std::vector<std::string>{ T("Closest"), T("Center"), T("Median"), T("Active") });
+         BoolRow(T("Selectable only"), &set.snapSelectable);
+         BoolRow(T("Align rotation to target"), &set.snapAlign);
       }
       if (Card(T("Proportional Editing")))
       {
          BoolRow(T("On (O)"), &set.proportional);
          ComboRow(T("Falloff"), &set.propFalloff, std::vector<std::string>{ T("Smooth"), T("Sphere"), T("Root"), T("Linear"), T("Sharp"), T("Constant") });
          FloatRow(T("Size"), &set.propSize, 0.05f, 50.0f, "%.2f");
+         BoolRow(T("Projected from view"), &set.projectedProp);
+      }
+      if (Card(T("Placement"), nullptr, false))
+      {
+         ComboRow(T("Depth"), &set.planeDepth, std::vector<std::string>{ T("Cursor Plane"), T("Cursor View") });
+         ComboRow(T("Orientation"), &set.planeOrient, std::vector<std::string>{ T("Default"), T("Surface") });
+         ImGui::BeginDisabled(set.planeDepth == 1 || set.planeOrient == 1);
+         BoolRow(T("Auto axis"), &set.planeAuto);
+         ImGui::BeginDisabled(set.planeAuto);
+         ComboRow(T("Plane axis"), &set.planeAxis, std::vector<std::string>{ "X", "Y", "Z" });
+         ImGui::EndDisabled();
+         ImGui::EndDisabled();
+         Hint(T("Where a click puts the 3D cursor."));
       }
       if (Card(T("3D Cursor")))
       {
@@ -4648,7 +4944,9 @@ namespace
       if (gn == nullptr)
          return;
       dynamic_cast<LightNode*>(gn->node.get())->type = type;
-      sSel = { scene->AddItem(gn->uid).id };
+      Item& placed = scene->AddItem(gn->uid);
+      PlaceNew(placed);
+      sSel = { placed.id };
       scene->Commit();
       ShowLighting();
    }

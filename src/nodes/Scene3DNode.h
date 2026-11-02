@@ -62,6 +62,17 @@ public:
       Backdrop backdrop;
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores
+      // Look at, in Blender's terms: which of the item's own axes points at the target (0 X, 1 Y, 2 Z, 3 -X, 4 -Y,
+      // 5 -Z, so -Z is a camera's or light's natural aim), which axis stays up (0 X, 1 Y, 2 Z), how far the aim goes
+      // (0 = the unturned pose, 1 = all the way) and whether the target's own up decides the roll.
+      int trackAxis = 5, upAxis = 1;
+      float lookInfluence = 1.0f;
+      bool lookTargetZ = false;
+      // Shown in the 3D View only.
+      bool hideSelect = false;      // clicks and box selects pass over it
+      bool showBounds = false;
+      int boundsType = 0;           // 0 box, 1 sphere, 2 cylinder, 3 cone, 4 capsule
+      bool showName = false, showAxes = false;
    };
 
    // What the scene remembers beyond its items, saved with it.
@@ -98,6 +109,59 @@ public:
       float guideColor[3] = { 0.784f, 0.784f, 0.784f };
       bool diagonal = false;        // corner to corner, both ways
       bool goldenTriA = false, goldenTriB = false, harmonyTriA = false, harmonyTriB = false;
+      // Block D. Transform: proportional falloff measured across the view, rotate and scale moving only locations,
+      // snap onto the target's rotation, increments off the world grid (absolute) or off the move (relative),
+      // the finer rotation step held with Shift, what lands on the snap (0 closest, 1 centre, 2 median, 3 active),
+      // snapping onto selectable items only, and one switch per tool.
+      bool projectedProp = false, onlyLocations = false, snapAlign = false, snapAbsolute = true;
+      float snapRotFine = 1.0f;
+      int snapTarget = 0;
+      bool snapSelectable = false, snapTranslate = true, snapRotate = true, snapScaleOn = true;
+      // Where a new item goes: on a plane through the 3D cursor (axis 0 X, 1 Y, 2 Z; auto = the axis facing the view)
+      // or across the view; depth 0 on the plane, 1 across the view (orientation 1 also faces the view).
+      int planeAxis = 2;
+      bool planeAuto = false;
+      int planeDepth = 1, planeOrient = 0;
+      // Saved orientations (the Orientation menu's Custom entries): the turn of the item they were made from.
+      int customCount = 0;
+      float customRot[4][3] = {};
+      // The 3D cursor's turn (Euler, degrees; the other rotation modes show the same turn) and how the card shows it.
+      float cursorRot[3] = { 0, 0, 0 };
+      int cursorRotMode = 0;
+      // View tab.
+      bool lockCursor = false;      // the view keeps the 3D cursor in the middle
+      float viewLens = 50.0f, clipStart = 0.01f, clipEnd = 1000.0f;
+      bool gizmoLightSize = false, gizmoLightLook = false, gizmoCamLens = false, gizmoCamFocus = false;
+      bool showCameras = true, showLights = true, pickCameras = true, pickLights = true;
+      bool outline = true;          // Solid: the selection outline
+      float outlineColor[3] = { 1.0f, 0.55f, 0.1f };
+      int bgType = 0;               // Solid view background: 0 theme, 1 world, 2 custom
+      float bgColor[3] = { 0.05f, 0.05f, 0.05f };
+      bool orthoGrid = true, axisX = true, axisY = true, axisZ = false;
+      float gridScale = 1.0f;
+      int gridLines = 10, gridSubdiv = 10;
+      bool showCursor = true, showPerf = false, showExtras = true, lightColors = false, showFps = false;
+      // Preferences that belong to the view.
+      int miniAxes = 2;             // 0 off, 1 simple axes, 2 interactive navigation
+      float miniSize = 80.0f, miniBright = 1.0f, smoothTime = 0.2f, rotStep = 15.0f;
+      float gizmoSize = 75.0f, gizmoNavSize = 80.0f;
+      int alignNew = 0;             // new items: 0 world, 1 view, 2 3D cursor
+      bool autoPerspective = true, continuousGrab = true;
+      float orbitSens = 1.0f;
+      // Render and scene.
+      float pixelAspect[2] = { 1, 1 };
+      float fpsBase = 1.0f;
+      bool simplify = false;
+      bool stamp = false, stampTime = false, stampDate = false, stampFrame = false, stampRange = false, stampCamera = false,
+           stampLens = false, stampScene = false, stampNote = false, stampRender = false, stampLabels = true;
+      float stampSize = 12.0f, stampFg[3] = { 1, 1, 1 }, stampBg[3] = { 0, 0, 0 };
+      int frameStart = 0, frameStep = 1;
+      int unitSystem = 1, rotUnits = 0, lengthUnit = 0;   // system: 0 none, 1 metric, 2 imperial; rotation: 0 degrees, 1 radians
+      float unitScale = 1.0f;
+      // Outliner (the Scene tab's list).
+      bool listCase = false, listComplete = false, listSort = false, colSelect = false, colRender = false;
+      bool listObjects = true, listInvert = false, listLights = true, listCameras = true;
+      int listState = 0;            // 0 all, 1 visible, 2 selected, 3 active, 4 selectable
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -136,6 +200,7 @@ public:
    float worldStrength = 1.0f;       // the colour lights the scene as well as filling it
    int focusItem = 0;                // item id the camera stays focused on; 0 = the focus distance
    Settings settings;
+   std::string stampNote;   // the stamp note; saved on its own line
    float renderW = 1920.0f, renderH = 1080.0f;   // before the resolution scale
 
    // INode
@@ -170,7 +235,7 @@ public:
    // The placement that makes a camera item see `view`.
    void AlignToView(Item& item, const Mat4& view) const;
    // Turns a camera or light about its own point until it looks at `target`.
-   bool AimAt(Item& item, const float target[3]) const;
+   bool AimAt(Item& item, const float target[3], const float* targetUp = nullptr) const;
    // Render 3D's look settings, shared by the output and the Final view.
    Render3DNode& Look() { return mRender; }
 

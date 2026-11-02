@@ -1,6 +1,7 @@
 #include "Scene3DNode.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -46,6 +47,30 @@ namespace
       f(s.border); f(s.crop); f(s.borderMin[0]); f(s.borderMin[1]); f(s.borderMax[0]); f(s.borderMax[1]);
       f(s.safeCenter); f(s.guideColor[0]); f(s.guideColor[1]); f(s.guideColor[2]);
       f(s.diagonal); f(s.goldenTriA); f(s.goldenTriB); f(s.harmonyTriA); f(s.harmonyTriB);
+      // Block D, in the order of the struct.
+      f(s.projectedProp); f(s.onlyLocations); f(s.snapAlign); f(s.snapAbsolute); f(s.snapRotFine); f(s.snapTarget);
+      f(s.snapSelectable); f(s.snapTranslate); f(s.snapRotate); f(s.snapScaleOn);
+      f(s.planeAxis); f(s.planeAuto); f(s.planeDepth); f(s.planeOrient);
+      f(s.customCount);
+      for (auto& c : s.customRot) { f(c[0]); f(c[1]); f(c[2]); }
+      f(s.cursorRot[0]); f(s.cursorRot[1]); f(s.cursorRot[2]); f(s.cursorRotMode);
+      f(s.lockCursor); f(s.viewLens); f(s.clipStart); f(s.clipEnd);
+      f(s.gizmoLightSize); f(s.gizmoLightLook); f(s.gizmoCamLens); f(s.gizmoCamFocus);
+      f(s.showCameras); f(s.showLights); f(s.pickCameras); f(s.pickLights);
+      f(s.outline); f(s.outlineColor[0]); f(s.outlineColor[1]); f(s.outlineColor[2]);
+      f(s.bgType); f(s.bgColor[0]); f(s.bgColor[1]); f(s.bgColor[2]);
+      f(s.orthoGrid); f(s.axisX); f(s.axisY); f(s.axisZ); f(s.gridScale); f(s.gridLines); f(s.gridSubdiv);
+      f(s.showCursor); f(s.showPerf); f(s.showExtras); f(s.lightColors); f(s.showFps);
+      f(s.miniAxes); f(s.miniSize); f(s.miniBright); f(s.smoothTime); f(s.rotStep);
+      f(s.gizmoSize); f(s.gizmoNavSize); f(s.alignNew); f(s.autoPerspective); f(s.continuousGrab); f(s.orbitSens);
+      f(s.pixelAspect[0]); f(s.pixelAspect[1]); f(s.fpsBase); f(s.simplify);
+      f(s.stamp); f(s.stampTime); f(s.stampDate); f(s.stampFrame); f(s.stampRange); f(s.stampCamera);
+      f(s.stampLens); f(s.stampScene); f(s.stampNote); f(s.stampRender); f(s.stampLabels);
+      f(s.stampSize); for (float& c : s.stampFg) f(c); for (float& c : s.stampBg) f(c);
+      f(s.frameStart); f(s.frameStep);
+      f(s.unitSystem); f(s.rotUnits); f(s.lengthUnit); f(s.unitScale);
+      f(s.listCase); f(s.listComplete); f(s.listSort); f(s.colSelect); f(s.colRender);
+      f(s.listObjects); f(s.listInvert); f(s.listLights); f(s.listCameras); f(s.listState);
    }
 
    void Normalize(float v[3])
@@ -309,6 +334,8 @@ void Scene3DNode::Serialize()
    o << "settings";
    SettingFields(settings, [&](auto& v) { o << " " << +v; });
    o << "\n";
+   if (!stampNote.empty())
+      o << "stampnote " << stampNote << "\n";
    for (const Item& it : mItems)
    {
       o << "item " << it.id << " " << it.uid;
@@ -330,6 +357,12 @@ void Scene3DNode::Serialize()
          o << "look " << it.id << " " << it.lookAt << "\n";
       if (it.passIndex != 0)
          o << "pass " << it.id << " " << it.passIndex << "\n";
+      if (it.trackAxis != 5 || it.upAxis != 1 || it.lookInfluence != 1.0f || it.lookTargetZ)
+         o << "lookx " << it.id << " " << it.trackAxis << " " << it.upAxis << " " << it.lookInfluence << " "
+           << (it.lookTargetZ ? 1 : 0) << "\n";
+      if (it.hideSelect || it.showBounds || it.boundsType != 0 || it.showName || it.showAxes)
+         o << "show " << it.id << " " << (it.hideSelect ? 1 : 0) << " " << (it.showBounds ? 1 : 0) << " " << it.boundsType
+           << " " << (it.showName ? 1 : 0) << " " << (it.showAxes ? 1 : 0) << "\n";
       if (!it.backdrop.path.empty())
       {
          const Backdrop& b = it.backdrop;
@@ -399,6 +432,11 @@ void Scene3DNode::Parse()
          mNextId = std::max(mNextId, it.id + 1);
          mItems.push_back(std::move(it));
       }
+      else if (key == "stampnote")
+      {
+         l >> std::ws;
+         std::getline(l, stampNote);
+      }
       else if (key == "settings")
          SettingFields(settings, [&](auto& v)
          {
@@ -407,7 +445,7 @@ void Scene3DNode::Parse()
                v = (std::decay_t<decltype(v)>)x;
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
-               key == "delta" || key == "pass" || key == "backdrop")
+               key == "delta" || key == "pass" || key == "backdrop" || key == "lookx" || key == "show")
       {
          int id = 0;
          l >> id;
@@ -431,6 +469,18 @@ void Scene3DNode::Parse()
             l >> it->lookAt;
          else if (key == "pass")
             l >> it->passIndex;
+         else if (key == "lookx")
+         {
+            int tz = 0;
+            l >> it->trackAxis >> it->upAxis >> it->lookInfluence >> tz;
+            it->lookTargetZ = tz != 0;
+         }
+         else if (key == "show")
+         {
+            int a = 0, b = 0, c = 0, d = 0;
+            l >> a >> b >> it->boundsType >> c >> d;
+            it->hideSelect = a != 0; it->showBounds = b != 0; it->showName = c != 0; it->showAxes = d != 0;
+         }
          else if (key == "backdrop")
          {
             Backdrop& b = it->backdrop;
@@ -593,7 +643,7 @@ void Scene3DNode::AlignToView(Item& item, const Mat4& view) const
    SetTurn(item, r);
 }
 
-bool Scene3DNode::AimAt(Item& item, const float target[3]) const
+bool Scene3DNode::AimAt(Item& item, const float target[3], const float* targetUp) const
 {
    INode* node = ResolveUid ? ResolveUid(item.uid) : nullptr;
    float own[3], forward[3], up[3] = { 0, 1, 0 };
@@ -622,13 +672,54 @@ bool Scene3DNode::AimAt(Item& item, const float target[3]) const
    if (wanted[0] * wanted[0] + wanted[1] * wanted[1] + wanted[2] * wanted[2] < 1e-8f)
       return false;
 
-   const float worldUp[3] = { 0, 1, 0 };
+   // The item's own axes in the node's frame, so any of them can be the one that points at the target.
+   float axes[3][3];
+   Normalize(forward);
+   Cross(forward, up, axes[0]);
+   Normalize(axes[0]);
+   std::copy(up, up + 3, axes[1]);
+   for (int k = 0; k < 3; k++)
+      axes[2][k] = -forward[k];
+   const int track = std::clamp(item.trackAxis, 0, 5);
+   float trackVec[3], upVec[3];
+   for (int k = 0; k < 3; k++)
+   {
+      trackVec[k] = axes[track % 3][k] * (track >= 3 ? -1.0f : 1.0f);
+      upVec[k] = axes[std::clamp(item.upAxis, 0, 2)][k];
+   }
+
+   float worldUp[3] = { 0, 1, 0 };
+   if (item.lookTargetZ && targetUp != nullptr)
+      std::copy(targetUp, targetUp + 3, worldUp);
    float from[3][3], to[3][3], r[3][3];
-   LookBasis(forward, up, from);
+   LookBasis(trackVec, upVec, from);
    LookBasis(wanted, worldUp, to);
    for (int row = 0; row < 3; row++)
       for (int col = 0; col < 3; col++)
          r[row][col] = to[0][row] * from[0][col] + to[1][row] * from[1][col] + to[2][row] * from[2][col];
+
+   // Influence: slide from the unturned pose to the full aim along the shortest turn.
+   const float infl = std::clamp(item.lookInfluence, 0.0f, 1.0f);
+   if (infl < 1.0f)
+   {
+      const float tr = r[0][0] + r[1][1] + r[2][2];
+      const float angle = std::acos(std::clamp((tr - 1.0f) * 0.5f, -1.0f, 1.0f));
+      float ax[3] = { r[2][1] - r[1][2], r[0][2] - r[2][0], r[1][0] - r[0][1] };
+      float len = std::sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+      if (len < 1e-5f)   // a half turn (or none): the axis is the biggest diagonal term
+      {
+         int m = r[0][0] >= r[1][1] && r[0][0] >= r[2][2] ? 0 : r[1][1] >= r[2][2] ? 1 : 2;
+         ax[0] = ax[1] = ax[2] = 0.0f;
+         ax[m] = 1.0f;
+         len = 1.0f;
+      }
+      for (float& c : ax)
+         c /= len;
+      const float c = std::cos(angle * infl), sn = std::sin(angle * infl), t = 1.0f - c;
+      r[0][0] = t * ax[0] * ax[0] + c;          r[0][1] = t * ax[0] * ax[1] - sn * ax[2]; r[0][2] = t * ax[0] * ax[2] + sn * ax[1];
+      r[1][0] = t * ax[0] * ax[1] + sn * ax[2]; r[1][1] = t * ax[1] * ax[1] + c;          r[1][2] = t * ax[1] * ax[2] - sn * ax[0];
+      r[2][0] = t * ax[0] * ax[2] - sn * ax[1]; r[2][1] = t * ax[1] * ax[2] + sn * ax[0]; r[2][2] = t * ax[2] * ax[2] + c;
+   }
 
    // r turns the node's own frame; an item already carrying a delta turn keeps it.
    SetTurn(item, r);
@@ -655,9 +746,11 @@ void Scene3DNode::Sync(int frameId)
       if (it.lookAt != 0 && it.lookAt != it.id)
          if (Item* target = FindItem(it.lookAt))
          {
-            float c[3];
+            float c[3], tUp[3];
             ItemCenter(*target, c);
-            AimAt(it, c);
+            TransformDir(Placement(*target), std::array<float, 3>{ 0, 1, 0 }.data(), tUp);
+            Normalize(tUp);
+            AimAt(it, c, tUp);
          }
    if (!mRoot)
    {

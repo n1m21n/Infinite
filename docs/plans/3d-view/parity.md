@@ -24,12 +24,12 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Viewport: 3D cursor | 1 | 4 | 0 | 1 | 6 |
 | Viewport: shading | 6 | 4 | 28 | 0 | 38 |
 | Viewport: overlays | 7 | 12 | 3 | 10 | 32 |
-| Transform, snap, pivot | 10 | 15 | 0 | 26 | 51 |
-| Object | 11 | 7 | 23 | 35 | 76 |
+| Transform, snap, pivot | 25 | 0 | 0 | 26 | 51 |
+| Object | 18 | 0 | 23 | 35 | 76 |
 | Camera | 44 | 0 | 20 | 23 | 87 |
 | Light | 18 | 0 | 42 | 0 | 60 |
 | Light probe | 0 | 0 | 36 | 0 | 36 |
-| Constraints (aim only) | 2 | 5 | 0 | 8 | 15 |
+| Constraints (aim only) | 7 | 0 | 0 | 8 | 15 |
 | World | 3 | 0 | 14 | 1 | 18 |
 | Render | 14 | 23 | 56 | 45 | 138 |
 | Output | 1 | 0 | 0 | 41 | 42 |
@@ -38,8 +38,8 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Outliner | 2 | 10 | 0 | 11 | 23 |
 | Preferences: navigation and input | 4 | 4 | 3 | 39 | 50 |
 | Preferences: viewport | 4 | 9 | 0 | 14 | 27 |
-| **All settings** | **149** | **116** | **249** | **330** | **844** |
-| **Operators** | **75** | **35** | **14** | **117** | **241** |
+| **All settings** | **176** | **89** | **249** | **330** | **844** |
+| **Operators** | **77** | **33** | **14** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
 Re-run the probe after each block: `python3 tools/3dview_parity_probe.py --md docs/plans/3d-view/blender-inventory.md`.
@@ -166,42 +166,6 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Extras (`View3DOverlay.show_extras`): Overlays card: hide camera and light markers
 - Light Colors (`View3DOverlay.show_light_colors`): Overlays card: tint light markers
 
-### Transform, snap, pivot (15)
-
-- Projected from View (`ToolSettings.use_proportional_projected`): Proportional Editing card: projected from view
-- Only Locations (`ToolSettings.use_transform_pivot_point_align`): Transform card: only locations toggle
-- Align Rotation to Target (`ToolSettings.use_snap_align_rotation`): Snap card: align rotation to target
-- Absolute Increment Snap (`ToolSettings.use_snap_grid_absolute`): Snap card: absolute increment mode
-- Rotation Precision Increment (`ToolSettings.snap_angle_increment_3d_precision`): Snap card: precision step with Shift
-- Snap Target (`ToolSettings.snap_target`): Snap card: closest, centre, median, active
-- Snap onto Selectable Only (`ToolSettings.use_snap_selectable`): Snap card: only onto selectable items
-- Use Snap for Translation (`ToolSettings.use_snap_translate`): Snap card: snap per tool toggles
-- Use Snap for Rotation (`ToolSettings.use_snap_rotate`): Snap card: snap per tool toggles
-- Use Snap for Scale (`ToolSettings.use_snap_scale`): Snap card: snap per tool toggles
-- Plane Axis (`ToolSettings.plane_axis`): Add menu: placement plane for new items
-- Auto Axis (`ToolSettings.plane_axis_auto`): Add menu: placement plane for new items
-- Position (`ToolSettings.plane_depth`): Add menu: placement plane for new items
-- Orientation (`ToolSettings.plane_orientation`): Add menu: placement plane for new items
-- Current Transform Orientation (`TransformOrientationSlot.custom_orientation`): Transform card: custom orientations
-
-### Object (7)
-
-- Track Axis (`Object.track_axis`): Camera and light Data tab: Look at axes
-- Up Axis (`Object.up_axis`): Camera and light Data tab: Look at axes
-- Disable Selection (`Object.hide_select`): Item tab: disable selection toggle
-- Display Bounds (`Object.show_bounds`): Item tab: show bounds
-- Display Bounds Type (`Object.display_bounds_type`): Item tab: show bounds
-- Display Name (`Object.show_name`): Item tab: show name and axes in the view
-- Display Axes (`Object.show_axis`): Item tab: show name and axes in the view
-
-### Constraints (aim only) (5)
-
-- Influence (`Constraint.influence`): Camera and light Data tab: Look at influence
-- Track Axis (`TrackToConstraint.track_axis`): Camera and light Data tab: Look at axes
-- Up Axis (`TrackToConstraint.up_axis`): Camera and light Data tab: Look at axes
-- Target Z (`TrackToConstraint.use_target_z`): Camera and light Data tab: Look at target Z up
-- Track Axis (`DampedTrackConstraint.track_axis`): Camera and light Data tab: Look at axes
-
 ### Render (23)
 
 - Pixel Aspect X (`RenderSettings.pixel_aspect_x`): Render tab > Format: pixel aspect
@@ -270,7 +234,7 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Navigate Gizmo Size (`PreferencesView.gizmo_size_navigate_v3d`): View tab: gizmo size
 - Align Object To (`PreferencesEdit.object_align`): Add menu: align new items to world, view or cursor
 
-### Operators (35)
+### Operators (33)
 
 - Add Camera Preset (`CAMERA_OT_preset_add`): Camera Data tab: camera presets
 - Align Objects (`OBJECT_OT_align`): Object menu: Align
@@ -292,8 +256,6 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Show Active (`OUTLINER_OT_show_active`): Scene tab: scroll to the active item
 - Viewport Render (`RENDER_OT_opengl`): Render tab: render the viewport as a still
 - Cancel Render View (`RENDER_OT_view_cancel`): Render tab: cancel a running render
-- Create Orientation (`TRANSFORM_OT_create_orientation`): Transform card: save a custom orientation
-- Delete Orientation (`TRANSFORM_OT_delete_orientation`): Transform card: delete a custom orientation
 - Trackball (`TRANSFORM_OT_trackball`): Rotate: trackball mode (R twice)
 - Copy Objects (`VIEW3D_OT_copybuffer`): Object menu: copy and paste items between scenes
 - Remove from Local View (`VIEW3D_OT_localview_remove_from`): View menu: remove selected from local view
