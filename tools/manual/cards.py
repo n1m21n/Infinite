@@ -327,7 +327,7 @@ CHAPTERS = [
              "raise an arm to bring a chord in.",
              ["Video In", "Pose Track", "Gain (Level)"]),
             ("Apple Watch", "MODULATORS · WATCH IN",
-             "Your Apple Watch as 22 modulators: tilt, turn speed and acceleration on each axis, energy, Digital Crown, touch pad, tap, heart rate and four gestures (flick left, flick right, shake, strike). Press Recenter to set the middle. Needs macOS and Bluetooth, and the Infinite Remote app on the watch.",
+             "Your Apple Watch as 22 modulators: tilt, turn speed and acceleration on each axis, energy, Digital Crown, touch pad, tap, heart rate and four gestures (flick left, flick right, shake, strike). Press Recenter to set the middle. Needs macOS and Bluetooth, and the Infinite Remote app, which you build for your watch yourself with Xcode and a free Apple ID (apps/watch/README.md).",
              "tilt your wrist to sweep a filter cutoff.",
              ["Apple Watch", "Audio Filter (Cutoff)"]),
         ],
