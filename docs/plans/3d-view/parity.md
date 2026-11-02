@@ -20,26 +20,26 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 
 | Area | Done | Missing | Deferred | Out | Mapped |
 |---|---|---|---|---|---|
-| Viewport: View tab and header | 27 | 4 | 9 | 26 | 66 |
+| Viewport: View tab and header | 32 | 4 | 4 | 26 | 66 |
 | Viewport: 3D cursor | 5 | 0 | 0 | 1 | 6 |
-| Viewport: shading | 10 | 0 | 28 | 0 | 38 |
+| Viewport: shading | 25 | 0 | 13 | 0 | 38 |
 | Viewport: overlays | 19 | 0 | 3 | 10 | 32 |
 | Transform, snap, pivot | 25 | 0 | 0 | 26 | 51 |
-| Object | 18 | 0 | 23 | 35 | 76 |
+| Object | 22 | 0 | 19 | 35 | 76 |
 | Camera | 44 | 0 | 20 | 23 | 87 |
-| Light | 18 | 0 | 42 | 0 | 60 |
+| Light | 37 | 0 | 23 | 0 | 60 |
 | Light probe | 0 | 0 | 36 | 0 | 36 |
 | Constraints (aim only) | 7 | 0 | 0 | 8 | 15 |
-| World | 3 | 0 | 14 | 1 | 18 |
-| Render | 37 | 0 | 56 | 45 | 138 |
+| World | 14 | 0 | 3 | 1 | 18 |
+| Render | 47 | 0 | 46 | 45 | 138 |
 | Output | 1 | 0 | 0 | 41 | 42 |
 | Scene | 10 | 0 | 0 | 25 | 35 |
-| View layer | 3 | 0 | 15 | 26 | 44 |
+| View layer | 10 | 0 | 8 | 26 | 44 |
 | Outliner | 12 | 0 | 0 | 11 | 23 |
 | Preferences: navigation and input | 8 | 0 | 3 | 39 | 50 |
 | Preferences: viewport | 13 | 0 | 0 | 14 | 27 |
-| **All settings** | **260** | **4** | **249** | **331** | **844** |
-| **Operators** | **106** | **4** | **14** | **117** | **241** |
+| **All settings** | **331** | **4** | **178** | **331** | **844** |
+| **Operators** | **107** | **4** | **13** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
 Re-run the probe after each block: `python3 tools/3dview_parity_probe.py --md docs/plans/3d-view/blender-inventory.md`.
