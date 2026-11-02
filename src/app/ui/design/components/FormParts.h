@@ -266,6 +266,14 @@ namespace FormParts
    }
 
    // Muted section title for long reference text (no card): Body size, medium.
+   // Bullet whose text wraps at the window edge (ImGui::BulletText never wraps, so long lines widen the page).
+   inline void Bullet(const char* text)
+   {
+      ImGui::Bullet();
+      ImGui::SameLine();
+      ImGui::TextWrapped("%s", text);
+   }
+
    inline void Heading(const char* text)
    {
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));

@@ -1053,12 +1053,12 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 1) && MatchesFilter("principles primitive kernel inferred rates bare names"))
             {
                FormParts::Heading("1. Core Principles");
-               ImGui::BulletText("One Primitive: A kernel is a body of code run once per element of its domain.");
-               ImGui::BulletText("Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.");
-               ImGui::BulletText("Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).");
-               ImGui::BulletText("Real-Time Safe: Bounded loops, no dynamic heap allocation or recursion on execution threads.");
-               ImGui::BulletText("Nodes: Field Pixel (pixel), Field Modifier and Field Primitive (element), Field Synth, Field Effect and Field Notes (sample), Field Graph (graph).");
-               ImGui::BulletText("Live: press Apply in the node's editor (Revert goes back to the last applied text); compile errors name the line.");
+               FormParts::Bullet("One Primitive: A kernel is a body of code run once per element of its domain.");
+               FormParts::Bullet("Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.");
+               FormParts::Bullet("Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).");
+               FormParts::Bullet("Real-Time Safe: Bounded loops, no dynamic heap allocation or recursion on execution threads.");
+               FormParts::Bullet("Nodes: Field Pixel (pixel), Field Modifier and Field Primitive (element), Field Synth, Field Effect and Field Notes (sample), Field Graph (graph).");
+               FormParts::Bullet("Live: press Apply in the node's editor (Revert goes back to the last applied text); compile errors name the line.");
                ImGui::Spacing();
             }
 
@@ -1137,9 +1137,9 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 4) && MatchesFilter("types vectors vec2 vec3 vec4 swizzle rank polymorphism"))
             {
                FormParts::Heading("4. Types & Rank Polymorphism");
-               ImGui::BulletText("Types: float, int, bool, vec2, vec3, vec4.");
-               ImGui::BulletText("Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.");
-               ImGui::BulletText("Rank Polymorphism: Scalars implicitly broadcast across all vector lanes when combined.");
+               FormParts::Bullet("Types: float, int, bool, vec2, vec3, vec4.");
+               FormParts::Bullet("Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.");
+               FormParts::Bullet("Rank Polymorphism: Scalars implicitly broadcast across all vector lanes when combined.");
                DrawCodeBox("P *= 2.0;               # Scalar 2.0 broadcasts across vec3 P\nCd = vec3(1, 0, 0);     # RGB Red assignment\nvec2 st = uv.yx;        # Swizzle coordinate inversion", "cb_types");
             }
 
@@ -1199,10 +1199,10 @@ namespace app
                ImGui::Spacing();
 
                ImGui::TextColored(app::AccentEmphasisSelected(), "reduce.<op>(x) - many to one, written explicitly");
-               ImGui::BulletText("Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.");
-               ImGui::BulletText("reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).");
-               ImGui::BulletText("Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.");
-               ImGui::BulletText("In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.");
+               FormParts::Bullet("Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.");
+               FormParts::Bullet("reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).");
+               FormParts::Bullet("Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.");
+               FormParts::Bullet("In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.");
                DrawCodeBox("# inside a sample-domain kernel (Field Synth / Field Effect)\noutput frame float bass = reduce.rms(in, 20, 200)   # exposed as a pin, not usable below\nout = in   # per-sample processing is independent of the line above", "cb_reduce");
 
                ImGui::TextColored(app::AccentEmphasisSelected(), "map(N) { ... } - one kernel invocation per lane, explicit");
