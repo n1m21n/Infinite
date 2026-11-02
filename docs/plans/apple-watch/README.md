@@ -7,7 +7,7 @@ Skills to load before building: `node-ui-pillars`, `windows-parity`, `linux-pari
 | Block | What | State |
 |---|---|---|
 | A | Infinite side: Bluetooth link, packet decoder, `Apple Watch` node, gestures, help, selftest | built on `feature/watch-a`, WATCHPACKETTEST + WATCHNODETEST pass; not merged. For Block B: the Mac also exposes a 4th GATT characteristic `name` (9A1F0004, write: the watch sends its display name), and the watch must subscribe to `control` (9A1F0003) or the Mac treats it as gone |
-| B | watchOS app "Infinite Remote": sensors, crown, touch pad, double tap, Bluetooth sender | not started |
+| B | watchOS app "Infinite Remote": sensors, crown, touch pad, double tap, Bluetooth sender | written on `feature/watch-b` (`apps/watch/`, build-it-yourself, no store); golden packet test passes on both sides; NOT compiled for watchOS (no Xcode on the build Mac), real-watch test pending |
 | C | Haptics back to the wrist, Windows + Linux link, TestFlight + App Store | not started |
 
 ## 1. The idea
@@ -231,7 +231,7 @@ Build-it-yourself flow (details in `apps/watch/README.md`):
    -> repeat the build every 7 days
 ```
 
-Keep-alive without HealthKit: free personal teams may not get the HealthKit entitlement. Default build uses `WKExtendedRuntimeSession` (physical-therapy session type, `WKBackgroundModes` in Info.plist, no entitlement), heart byte = 0. Building with `INFINITE_WATCH_HEALTH=1` switches to `HKWorkoutSession` + heart rate (`WorkoutKeeper.swift`) for users whose team allows HealthKit. The Mac side is identical in both cases.
+Keep-alive without HealthKit: free personal teams may not get the HealthKit entitlement. Default build uses `WKExtendedRuntimeSession` (physical-therapy session type, `WKBackgroundModes` in Info.plist, no entitlement), heart byte = 0. Building with `INFINITE_WATCH_HEALTH=1` switches to `HKWorkoutSession` + heart rate (`Keeper.swift`) for users whose team allows HealthKit. The Mac side is identical in both cases.
 
 ## 9. Block C
 
