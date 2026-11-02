@@ -45,6 +45,10 @@ namespace Skinning
    // to and from a quaternion (x, y, z, w).
    void QuatFromEuler(const float deg[3], float q[4]);
    void EulerFromQuat(const float q[4], float deg[3]);
+   // The shortest turn taking direction `from` onto direction `to`.
+   void QuatFromTo(const float from[3], const float to[3], float q[4]);
+   // v turned by q.
+   void QuatRotate(const float q[4], const float v[3], float out[3]);
    void QuatMul(const float a[4], const float b[4], float out[4]);
 
    bool HasRig(const GltfImport::GltfDecodePackage& pkg);

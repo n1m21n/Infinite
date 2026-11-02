@@ -469,6 +469,8 @@ namespace app
          return 1;
       if (dynamic_cast<SweepNode*>(gn.node.get()) != nullptr)
          return 2;
+      if (dynamic_cast<ArmatureNode*>(gn.node.get()) != nullptr)
+         return 2; // in, path
       if (dynamic_cast<RevolveNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MergeByDistanceNode*>(gn.node.get()) != nullptr)

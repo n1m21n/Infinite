@@ -4114,6 +4114,7 @@ void DrawDelaunayParams(DelaunayMeshNode* n);
 void DrawCurveOpsParams(CurveOpsNode* n);
 void DrawRevolveParams(RevolveNode* n);
 void DrawSweepParams(SweepNode* n);
+void DrawArmatureParams(ArmatureNode* n);
 
 void DrawDistributePointsInGridParams(DistributePointsInGridNode* n);
 
@@ -5924,6 +5925,7 @@ bool RunVmpcTest();
 bool RunRender3DHdrTest();
 bool RunRender3DPanoTest();
 bool RunRigTest();
+bool RunArmatureTest();
 bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;
 

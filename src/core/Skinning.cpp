@@ -221,6 +221,21 @@ namespace
 
 namespace Skinning
 {
+   void QuatFromTo(const float from[3], const float to[3], float q[4])
+   {
+      QuatBetween(from, to, q);
+   }
+
+   void QuatRotate(const float q[4], const float v[3], float out[3])
+   {
+      const float x = q[0], y = q[1], z = q[2], w = q[3];
+      const float r[3] = {
+         (1 - 2 * (y * y + z * z)) * v[0] + 2 * (x * y - z * w) * v[1] + 2 * (x * z + y * w) * v[2],
+         2 * (x * y + z * w) * v[0] + (1 - 2 * (x * x + z * z)) * v[1] + 2 * (y * z - x * w) * v[2],
+         2 * (x * z - y * w) * v[0] + 2 * (y * z + x * w) * v[1] + (1 - 2 * (x * x + y * y)) * v[2] };
+      out[0] = r[0]; out[1] = r[1]; out[2] = r[2];
+   }
+
    void QuatMul(const float a[4], const float b[4], float out[4])
    {
       const float o[4] = { a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],

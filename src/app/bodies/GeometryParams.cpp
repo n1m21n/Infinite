@@ -9,6 +9,60 @@ namespace app
 {
    inline const std::vector<std::string> kAxisXYZ = { "x", "y", "z" };
 
+   // The pose and IK sections every rigged node shows (Model 3D, Armature):
+   // joints turned in the 3D View's Pose mode (Ctrl+Tab), three angles each, and
+   // the IK goal, set from a 3D View item in Pose mode or typed / modulated here
+   // in the node's own space.
+   void DrawRigPoseParams(IRigged* rig)
+   {
+      RigPose& p = rig->Pose();
+      bool anyPose = false;
+      for (int i = 0; i < RigPose::kSlots; i++)
+      {
+         const int j = p.poseJoint[i];
+         const bool used = j >= 0 && j < rig->JointCount();
+         if (!used && !gParamRegisterOnly)
+            continue;
+         if (!anyPose)
+            NodeSeparator("pose");
+         anyPose = true;
+         ImGui::PushID(1000 + i);
+         const std::string name = used ? rig->JointName(j) : "joint " + std::to_string(i + 1);
+         for (int a = 0; a < 3; a++)
+         {
+            const std::string label = name + (a == 0 ? " X" : a == 1 ? " Y" : " Z");
+            ImGui::PushID(a);
+            ModSlider(label.c_str(), &p.poseRot[i][a], -180.0f, 180.0f, "%.1f");
+            ImGui::PopID();
+         }
+         ImGui::PopID();
+      }
+
+      if (rig->JointCount() < 2 && !gParamRegisterOnly)
+         return;
+      NodeSeparator("ik");
+      ModCheckbox("ik", &p.ikOn);
+      if (!p.ikOn && !gParamRegisterOnly)
+         return;
+      std::vector<std::string> joints{ "none" };
+      for (int j = 0; j < rig->JointCount(); j++)
+         joints.push_back(rig->JointName(j));
+      DropdownButton("reach with", joints, std::clamp(p.ikJoint + 1, 0, (int)joints.size() - 1),
+                     [&p](int i) { PushUndoCheckpoint(); p.ikJoint = i - 1; });
+      ModSliderInt("chain", &p.ikChain, 1, 8);
+      ModSlider("ik weight", &p.ikWeight, 0.0f, 1.0f);
+      ModSlider("target X", &p.ikTarget[0], -2.0f, 2.0f);
+      ModSlider("target Y", &p.ikTarget[1], -2.0f, 2.0f);
+      ModSlider("target Z", &p.ikTarget[2], -2.0f, 2.0f);
+      ModCheckbox("pole", &p.ikPoleOn);
+      if (p.ikPoleOn || gParamRegisterOnly)
+      {
+         ModSlider("pole X", &p.ikPole[0], -2.0f, 2.0f);
+         ModSlider("pole Y", &p.ikPole[1], -2.0f, 2.0f);
+         ModSlider("pole Z", &p.ikPole[2], -2.0f, 2.0f);
+      }
+   }
+
    void DrawAudioFileParams(AudioFileNode* n)
    {
       if (ActionButton::Draw("Choose audio...", ImVec2(kPreviewSize, 0)))
@@ -973,6 +1027,27 @@ namespace app
    }
 
 
+   void DrawArmatureParams(ArmatureNode* n)
+   {
+      PushTextWrapWidth(kPreviewSize);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      PopTextWrapWidth();
+      if (n->path == nullptr || gParamRegisterOnly)
+         DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; });
+      ModSliderInt("bones", &n->bones, 2, 32);
+      ModSlider("envelope", &n->envelope, 0.25f, 3.0f);
+      NodeSeparator("bend");
+      ModSlider("curl", &n->curl, -360.0f, 360.0f, "%.0f");
+      ModSlider("curl direction", &n->curlDirection, 0.0f, 360.0f, "%.0f");
+      ModSlider("twist", &n->twist, -360.0f, 360.0f, "%.0f");
+      NodeSeparator("wave");
+      ModSlider("wave amount", &n->waveAmount, 0.0f, 90.0f, "%.1f");
+      ModSlider("wave length", &n->waveLength, 0.1f, 4.0f);
+      ModSlider("wave speed", &n->waveSpeed, -4.0f, 4.0f);
+      ModSlider("wave phase", &n->wavePhase, 0.0f, 1.0f);
+      DrawRigPoseParams(n);
+   }
+
    void DrawDelaunayParams(DelaunayMeshNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -1093,57 +1168,7 @@ namespace app
             ImGui::PopID();
          }
 
-         // Joints turned in the 3D View's Pose mode (Ctrl+Tab), three
-         // angles each; a joint with no slot shows nothing here.
-         bool anyPose = false;
-         for (int i = 0; i < ModelSourceNode::kPoseSlots; i++)
-         {
-            const int j = n->poseJoint[i];
-            const bool used = j >= 0 && j < n->JointCount();
-            if (!used && !gParamRegisterOnly)
-               continue;
-            if (!anyPose)
-               NodeSeparator("pose");
-            anyPose = true;
-            ImGui::PushID(1000 + i);
-            const std::string name = used ? n->JointName(j) : "joint " + std::to_string(i + 1);
-            for (int a = 0; a < 3; a++)
-            {
-               const std::string label = name + (a == 0 ? " X" : a == 1 ? " Y" : " Z");
-               ImGui::PushID(a);
-               ModSlider(label.c_str(), &n->poseRot[i][a], -180.0f, 180.0f, "%.1f");
-               ImGui::PopID();
-            }
-            ImGui::PopID();
-         }
-
-         // IK: a joint reaches for a target (set from a 3D View item in
-         // Pose mode, or typed / modulated here in the model's space).
-         if (n->JointCount() > 1 || gParamRegisterOnly)
-         {
-            NodeSeparator("ik");
-            ModCheckbox("ik", &n->ikOn);
-            if (n->ikOn || gParamRegisterOnly)
-            {
-               std::vector<std::string> joints{ "none" };
-               for (int j = 0; j < n->JointCount(); j++)
-                  joints.push_back(n->JointName(j));
-               DropdownButton("reach with", joints, std::clamp(n->ikJoint + 1, 0, (int)joints.size() - 1),
-                              [n](int i) { PushUndoCheckpoint(); n->ikJoint = i - 1; });
-               ModSliderInt("chain", &n->ikChain, 1, 8);
-               ModSlider("ik weight", &n->ikWeight, 0.0f, 1.0f);
-               ModSlider("target X", &n->ikTarget[0], -2.0f, 2.0f);
-               ModSlider("target Y", &n->ikTarget[1], -2.0f, 2.0f);
-               ModSlider("target Z", &n->ikTarget[2], -2.0f, 2.0f);
-               ModCheckbox("pole", &n->ikPoleOn);
-               if (n->ikPoleOn || gParamRegisterOnly)
-               {
-                  ModSlider("pole X", &n->ikPole[0], -2.0f, 2.0f);
-                  ModSlider("pole Y", &n->ikPole[1], -2.0f, 2.0f);
-                  ModSlider("pole Z", &n->ikPole[2], -2.0f, 2.0f);
-               }
-            }
-         }
+         DrawRigPoseParams(n);
       }
 
       // A face-less .ply loads as points; their size is the only point knob.

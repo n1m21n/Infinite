@@ -2811,27 +2811,28 @@ namespace
    // the view axis, Alt+R clears it. A turn is stored on the Model 3D node as
    // a pose slot (three params), so it saves, undoes and can be modulated.
 
-   // The skinned Model 3D under an item (through any pass-through nodes) and
-   // the matrix from its mesh space to the view's world.
-   ModelSourceNode* PoseModel(const Item& it, Mat4& world)
+   // The rigged node under an item (Armature, or a skinned Model 3D, through
+   // any pass-through nodes; the one nearest the view wins) and the matrix
+   // from its mesh space to the view's world.
+   IRigged* PoseModel(const Item& it, Mat4& world)
    {
       GraphNode* gn = FindNodeByUid(it.uid);
       auto* top = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
-      ModelSourceNode* model = nullptr;
+      IRigged* model = nullptr;
       for (IGeometrySource* s = top; s != nullptr && model == nullptr; s = s->PassthroughSource())
-         model = dynamic_cast<ModelSourceNode*>(s);
-      if (model == nullptr || !model->HasSkin())
+         model = dynamic_cast<IRigged*>(s);
+      if (model == nullptr || !model->Poseable())
          return nullptr;
       world = Mat4::Multiply(Scene3DNode::Placement(it), top->GetModelMatrix());
       return model;
    }
 
-   ModelSourceNode* PoseTarget(Scene3DNode* scene, Mat4& world)
+   IRigged* PoseTarget(Scene3DNode* scene, Mat4& world)
    {
       if (!sPose.on)
          return nullptr;
       const Item* it = scene->FindItem(sPose.item);
-      ModelSourceNode* model = it != nullptr && it->visible ? PoseModel(*it, world) : nullptr;
+      IRigged* model = it != nullptr && it->visible ? PoseModel(*it, world) : nullptr;
       if (model == nullptr)
          sPose = {};
       return model;
@@ -2854,7 +2855,7 @@ namespace
       }
    }
 
-   bool JointHead(ModelSourceNode* model, const Mat4& world, int j, float out[3])
+   bool JointHead(IRigged* model, const Mat4& world, int j, float out[3])
    {
       float m[16];
       if (!model->JointMatrix(j, m))
@@ -2864,13 +2865,13 @@ namespace
       return true;
    }
 
-   void EndPoseTurn(ModelSourceNode* model, bool keep)
+   void EndPoseTurn(IRigged* model, bool keep)
    {
       if (!keep && sPose.slot >= 0)
       {
-         std::copy(sPose.before, sPose.before + 3, model->poseRot[sPose.slot]);
+         std::copy(sPose.before, sPose.before + 3, model->Pose().poseRot[sPose.slot]);
          if (sPose.madeSlot)
-            model->poseJoint[sPose.slot] = -1;
+            model->Pose().poseJoint[sPose.slot] = -1;
       }
       sPose.turning = false;
       sPose.slot = -1;
@@ -2883,14 +2884,14 @@ namespace
    void PoseIk(Scene3DNode* scene, bool clear)
    {
       Mat4 world;
-      ModelSourceNode* model = PoseTarget(scene, world);
+      IRigged* model = PoseTarget(scene, world);
       Item* it = model != nullptr ? scene->FindItem(sPose.item) : nullptr;
       if (it == nullptr || (!clear && (sPose.joint < 0 || sPose.joint >= model->JointCount())))
          return;
       PushUndoCheckpoint(clear ? "Clear IK" : "Add IK");
       if (clear)
       {
-         model->ikOn = false;
+         model->Pose().ikOn = false;
          it->ikTarget = it->ikPole = 0;
          scene->Commit();
          return;
@@ -2903,10 +2904,10 @@ namespace
       it->ikPole = others.size() > 1 ? others[others.size() - 2] : 0;
       float m[16];
       if (it->ikTarget == 0 && model->JointMatrix(sPose.joint, m))
-         std::copy(m + 12, m + 15, model->ikTarget);
-      model->ikJoint = sPose.joint;
-      model->ikPoleOn = it->ikPole != 0;
-      model->ikOn = true;
+         std::copy(m + 12, m + 15, model->Pose().ikTarget);
+      model->Pose().ikJoint = sPose.joint;
+      model->Pose().ikPoleOn = it->ikPole != 0;
+      model->Pose().ikOn = true;
       scene->Commit();
    }
 
@@ -2915,7 +2916,7 @@ namespace
    bool DrawPose(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
    {
       Mat4 world;
-      ModelSourceNode* model = PoseTarget(scene, world);
+      IRigged* model = PoseTarget(scene, world);
       if (model == nullptr)
          return false;
       const ImGuiIO& io = ImGui::GetIO();
@@ -2986,14 +2987,14 @@ namespace
          dl->AddText(ImVec2(heads[sPose.joint].x + 8.0f, heads[sPose.joint].y - 18.0f), Hex(kHotHandle), name.c_str());
       }
       // The IK goal: a line from the reaching joint to its target.
-      if (model->ikOn && model->ikJoint >= 0 && model->ikJoint < count && shown[model->ikJoint])
+      if (model->Pose().ikOn && model->Pose().ikJoint >= 0 && model->Pose().ikJoint < count && shown[model->Pose().ikJoint])
       {
          float t[3];
          ImVec2 tp;
-         TransformBy(world, model->ikTarget, t);
+         TransformBy(world, model->Pose().ikTarget, t);
          if (Project(t, tp))
          {
-            dl->AddLine(heads[model->ikJoint], tp, Hex(kHotHandle, 0.8f), 1.5f);
+            dl->AddLine(heads[model->Pose().ikJoint], tp, Hex(kHotHandle, 0.8f), 1.5f);
             dl->AddCircle(tp, 6.0f, Hex(kHotHandle), 16, 1.5f);
          }
       }
@@ -3014,7 +3015,7 @@ namespace
          const float turn[4] = { sPose.axis[0] * std::sin(half), sPose.axis[1] * std::sin(half), sPose.axis[2] * std::sin(half), std::cos(half) };
          float q[4];
          Skinning::QuatMul(sPose.q0, turn, q);
-         Skinning::EulerFromQuat(q, model->poseRot[sPose.slot]);
+         Skinning::EulerFromQuat(q, model->Pose().poseRot[sPose.slot]);
          if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
             EndPoseTurn(model, false);
          else if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -3041,12 +3042,12 @@ namespace
       }
       if (io.KeyAlt && !command && pressed(ImGuiKey_R))
       {
-         const int slot = model->PoseSlot(sPose.joint, false);
+         const int slot = model->Pose().Slot(sPose.joint, false);
          if (slot >= 0)
          {
             PushUndoCheckpoint("Clear pose");
-            model->poseJoint[slot] = -1;
-            std::fill(model->poseRot[slot], model->poseRot[slot] + 3, 0.0f);
+            model->Pose().poseJoint[slot] = -1;
+            std::fill(model->Pose().poseRot[slot], model->Pose().poseRot[slot] + 3, 0.0f);
          }
       }
       else if (!io.KeyAlt && !command && pressed(ImGuiKey_R))
@@ -3056,11 +3057,11 @@ namespace
          if (!JointHead(model, world, sPose.joint, h) || !Project(h, c) || !model->JointMatrix(sPose.joint, m))
             return true;
          PushUndoCheckpoint("Pose joint");
-         sPose.madeSlot = model->PoseSlot(sPose.joint, false) < 0;
-         sPose.slot = model->PoseSlot(sPose.joint, true);
+         sPose.madeSlot = model->Pose().Slot(sPose.joint, false) < 0;
+         sPose.slot = model->Pose().Slot(sPose.joint, true);
          if (sPose.slot < 0)
             return true;
-         std::copy(model->poseRot[sPose.slot], model->poseRot[sPose.slot] + 3, sPose.before);
+         std::copy(model->Pose().poseRot[sPose.slot], model->Pose().poseRot[sPose.slot] + 3, sPose.before);
          Skinning::QuatFromEuler(sPose.before, sPose.q0);
          // The view axis, into mesh space, then into the joint's frame.
          const Mat4 inv = Mat4::Inverse(world);
@@ -5122,7 +5123,6 @@ namespace
             edit |= BoolRow(T("Flip vertically"), &back.flipY);
             ImGui::EndDisabled();
          }
-         Hint(T("Seen when looking through this camera, never in the render."));
          if (edit)
             scene->Commit();
       }
@@ -5400,7 +5400,6 @@ namespace
       {
          if (ColorRow(T("Color"), item->color, "Edit in 3D View"))
             scene->Commit();
-         Hint(T("Paints the object in the Solid view when its Color is set to Object."));
       }
       if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
       {
@@ -5409,7 +5408,6 @@ namespace
             item->passIndex = std::clamp(item->passIndex, 0, 255);
             scene->Commit();
          }
-         Hint(T("Written by the Object Index pass, as index / 255."));
       }
       if (Card(T("Follow")))
       {
@@ -5436,7 +5434,6 @@ namespace
             PushUndoCheckpoint("Follow in 3D View");
             scene->Commit();
          }
-         Hint(T("Moves with the object it follows, keeping today's distance and turn."));
       }
       if (Card(T("Motion")))
       {
@@ -5462,7 +5459,6 @@ namespace
          }
          if (changed)
             scene->Commit();
-         Hint(T("Added on top of the transform. Patch a modulator into the 3D View node's motion sliders to move it."));
       }
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry)
@@ -5687,7 +5683,6 @@ namespace
          FloatRow(T("Softness"), &look.shadowSoftness, 0.0f, 4.0f, "%.2f");
          FloatRow(T("Bias"), &look.shadowBias, 0.0002f, 0.02f, "%.4f");
          ImGui::EndDisabled();
-         Hint(T("Cast by one light, any but a point. Pick it in the light's settings."));
       }
       if (Card(T("Ambient Occlusion")))
       {
@@ -5750,7 +5745,6 @@ namespace
          FloatRow(T("Shutter"), &look.motionShutter, 0.0f, 2.0f, "%.2f");
          FloatRow(T("Max blur"), &look.motionMax, 1.0f, 256.0f, "%.0f px");
          ImGui::EndDisabled();
-         Hint(T("Smears what moved since the last frame. Shown in the render, not the editor views."));
       }
       if (Card(T("Film")))
       {
@@ -5978,7 +5972,6 @@ namespace
          ComboRow(T("Plane axis"), &set.planeAxis, std::vector<std::string>{ "X", "Y", "Z" });
          ImGui::EndDisabled();
          ImGui::EndDisabled();
-         Hint(T("Where a click puts the 3D cursor."));
       }
       if (Card(T("3D Cursor")))
       {

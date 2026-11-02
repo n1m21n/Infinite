@@ -6,6 +6,7 @@
 
 #include "Geometry3DNodes.h"
 #include "GltfImport.h"
+#include "RigPose.h"
 
 // Loads a mesh off disk and feeds it into the geometry graph, so an imported
 // model can be run through the same operators as a generated primitive.
@@ -25,7 +26,7 @@
 // cloud instead (core/PlyPoints.h, read the same on every platform): the mesh
 // is empty, GetPointCloud() carries the points with the file's colours, and
 // GetGpuPoints() uploads them once per load or point-size change.
-class ModelSourceNode : public INode, public IGeometrySource
+class ModelSourceNode : public INode, public IGeometrySource, public IRigged
 {
 public:
    static INode* Create() { return new ModelSourceNode(); }
@@ -82,22 +83,18 @@ public:
    std::vector<std::string> ClipNames() const;
    int MorphCount() const { return (int)std::min<size_t>(mRig.morphNames.size(), kMaxMorphs); }
    const std::string& MorphName(int i) const { return mRig.morphNames[i]; }
-   int JointCount() const { return (int)mRig.joints.size(); }
    // Seconds into the current clip as last posed (0 in the rest pose).
    float ClipTime() const { return mPosedTime; }
 
-   // Pose (the 3D View's Pose mode): up to kPoseSlots joints carry a turn on
-   // top of the clip, in the joint's own frame, as Euler degrees. Each slot
-   // is three modulatable params, so an LFO can swing an arm.
-   static constexpr int kPoseSlots = 16;
-   const std::string& JointName(int j) const { return mRig.joints[j].name; }
-   int JointParent(int j) const { return mRig.joints[j].parent; }
+   // IRigged (the 3D View's Pose mode): pose slots and IK live in `pose`.
+   bool Poseable() const override { return HasSkin(); }
+   int JointCount() const override { return (int)mRig.joints.size(); }
+   const std::string& JointName(int j) const override { return mRig.joints[j].name; }
+   int JointParent(int j) const override { return mRig.joints[j].parent; }
    // The joint's posed matrix in this node's mesh space (after the unit-box
    // fit), column-major; false when the joint does not exist.
-   bool JointMatrix(int j, float out[16]);
-   // The slot holding joint j, or -1. With `make`, takes a free slot (or -1
-   // when all are used).
-   int PoseSlot(int j, bool make);
+   bool JointMatrix(int j, float out[16]) override;
+   RigPose& Pose() override { return pose; }
 
    // Imported files arrive at wildly different scales - millimetres, metres,
    // whatever the authoring tool used. Fitting to a unit box on load means a
@@ -123,19 +120,8 @@ public:
    int clipSync = 0;
    float clipBeats = 4.0f;
    float morph[kMaxMorphs] = {};
-   int poseJoint[kPoseSlots] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-   float poseRot[kPoseSlots][3] = {};
-   // IK (Blender's IK constraint): the head of ikJoint reaches for the
-   // target by turning the ikChain joints above it; ikWeight blends it in.
-   // Target and pole are in this node's mesh space (after the unit-box fit).
-   // A 3D View item set as the target writes them every frame (Scene3DNode).
-   bool ikOn = false;
-   int ikJoint = -1;
-   int ikChain = 2;
-   float ikWeight = 1.0f;
-   float ikTarget[3] = { 0.0f, 0.0f, 0.0f };
-   bool ikPoleOn = false;
-   float ikPole[3] = { 0.0f, 0.0f, 1.0f };
+   // Pose mode's 16 joint turns and the IK goal (RigPose.h).
+   RigPose pose;
 
    float color[3] = { 0.82f, 0.83f, 0.86f };
    float metallic = 0.1f;
@@ -181,26 +167,7 @@ public:
                                                           "morph4", "morph5", "morph6", "morph7" };
       for (int i = 0; i < kMaxMorphs; i++)
          v.Float(kMorphKeys[i], morph[i]);
-      static const char* const kPoseKeys[kPoseSlots][4] = {
-         { "pose0", "pose0X", "pose0Y", "pose0Z" }, { "pose1", "pose1X", "pose1Y", "pose1Z" },
-         { "pose2", "pose2X", "pose2Y", "pose2Z" }, { "pose3", "pose3X", "pose3Y", "pose3Z" },
-         { "pose4", "pose4X", "pose4Y", "pose4Z" }, { "pose5", "pose5X", "pose5Y", "pose5Z" },
-         { "pose6", "pose6X", "pose6Y", "pose6Z" }, { "pose7", "pose7X", "pose7Y", "pose7Z" },
-         { "pose8", "pose8X", "pose8Y", "pose8Z" }, { "pose9", "pose9X", "pose9Y", "pose9Z" },
-         { "pose10", "pose10X", "pose10Y", "pose10Z" }, { "pose11", "pose11X", "pose11Y", "pose11Z" },
-         { "pose12", "pose12X", "pose12Y", "pose12Z" }, { "pose13", "pose13X", "pose13Y", "pose13Z" },
-         { "pose14", "pose14X", "pose14Y", "pose14Z" }, { "pose15", "pose15X", "pose15Y", "pose15Z" } };
-      for (int i = 0; i < kPoseSlots; i++)
-      {
-         v.Int(kPoseKeys[i][0], poseJoint[i]);
-         for (int a = 0; a < 3; a++)
-            v.Float(kPoseKeys[i][a + 1], poseRot[i][a]);
-      }
-      v.Bool("ikOn", ikOn); v.Int("ikJoint", ikJoint); v.Int("ikChain", ikChain);
-      v.Float("ikWeight", ikWeight);
-      v.Float("ikX", ikTarget[0]); v.Float("ikY", ikTarget[1]); v.Float("ikZ", ikTarget[2]);
-      v.Bool("ikPoleOn", ikPoleOn);
-      v.Float("ikPoleX", ikPole[0]); v.Float("ikPoleY", ikPole[1]); v.Float("ikPoleZ", ikPole[2]);
+      pose.Visit(v);
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);

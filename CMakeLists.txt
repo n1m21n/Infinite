@@ -783,6 +783,7 @@ set(COMMON_SOURCES
     src/nodes/PointTrailsNode.cpp
     src/nodes/DelaunayNodes.cpp
     src/nodes/CurveOpsNode.cpp
+    src/nodes/ArmatureNode.cpp
     src/nodes/SweepRevolveNodes.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp

@@ -1027,6 +1027,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawPointTrailsParams(n);
                else if (auto* n = dynamic_cast<CurveOpsNode*>(gn.node.get()))
                   DrawCurveOpsParams(n);
+               else if (auto* n = dynamic_cast<ArmatureNode*>(gn.node.get()))
+                  DrawArmatureParams(n);
                else if (auto* n = dynamic_cast<SweepNode*>(gn.node.get()))
                   DrawSweepParams(n);
                else if (auto* n = dynamic_cast<RevolveNode*>(gn.node.get()))

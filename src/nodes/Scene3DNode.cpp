@@ -14,7 +14,7 @@
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
-#include "ModelSourceNode.h"
+#include "RigPose.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -952,8 +952,8 @@ bool Scene3DNode::AimAt(Item& item, const float target[3], const float* targetUp
 }
 
 // An IK target or pole is any item: its centre, moved into the rigged
-// model's own mesh space (through the item's placement and the node's own
-// transform), lands on the Model 3D node's target params.
+// node's own mesh space (through the item's placement and the node's own
+// transform), lands on the node's target params (Model 3D, Armature).
 void Scene3DNode::ApplyIk()
 {
    for (Item& it : mItems)
@@ -961,9 +961,9 @@ void Scene3DNode::ApplyIk()
       if ((it.ikTarget == 0 && it.ikPole == 0) || !ResolveUid)
          continue;
       auto* top = dynamic_cast<IGeometrySource*>(ResolveUid(it.uid));
-      ModelSourceNode* model = nullptr;
+      IRigged* model = nullptr;
       for (IGeometrySource* s = top; s != nullptr && model == nullptr; s = s->PassthroughSource())
-         model = dynamic_cast<ModelSourceNode*>(s);
+         model = dynamic_cast<IRigged*>(s);
       if (model == nullptr)
          continue;
       const Mat4 toMesh = Mat4::Inverse(Mat4::Multiply(Placement(it), top->GetModelMatrix()));
@@ -976,9 +976,9 @@ void Scene3DNode::ApplyIk()
          ItemCenter(*target, c);
          TransformPoint(toMesh, c, out);
       };
-      bind(it.ikTarget, model->ikTarget);
+      bind(it.ikTarget, model->Pose().ikTarget);
       if (it.ikPole != 0)
-         bind(it.ikPole, model->ikPole);
+         bind(it.ikPole, model->Pose().ikPole);
    }
 }
 

@@ -135,10 +135,7 @@ bool ModelSourceNode::Load(const std::string& path)
             clip = mRig.clips.empty() ? 0 : 1;
             for (int i = 0; i < kMaxMorphs; i++)
                morph[i] = i < (int)mRig.morphDefaults.size() ? mRig.morphDefaults[i] : 0.0f;
-            std::fill(poseJoint, poseJoint + kPoseSlots, -1);
-            std::fill(&poseRot[0][0], &poseRot[0][0] + kPoseSlots * 3, 0.0f);
-            ikOn = false;
-            ikJoint = -1;
+            pose.Clear();
          }
          std::string rig;
          if (!mRig.joints.empty())
@@ -424,60 +421,22 @@ void ModelSourceNode::UpdatePose()
       weights[i] = morph[i];
 
    std::vector<float> key;
-   key.reserve(2 + weights.size() + kPoseSlots * 4);
+   key.reserve(2 + weights.size() + RigPose::kSlots * 4);
    key.push_back((float)clipIndex);
    key.push_back(time);
    key.insert(key.end(), weights.begin(), weights.end());
-   for (int i = 0; i < kPoseSlots; i++)
-   {
-      key.push_back((float)poseJoint[i]);
-      key.insert(key.end(), poseRot[i], poseRot[i] + 3);
-   }
-   const bool ik = ikOn && ikJoint >= 0 && ikJoint < (int)mRig.joints.size() && ikWeight > 0.0f;
-   if (ik)
-   {
-      key.insert(key.end(), { (float)ikJoint, (float)ikChain, ikWeight, (float)ikPoleOn });
-      key.insert(key.end(), ikTarget, ikTarget + 3);
-      key.insert(key.end(), ikPole, ikPole + 3);
-   }
+   const int jointCount = (int)mRig.joints.size();
+   pose.AppendKey(key, jointCount);
    if (key == mPoseKey)
       return;
    mPoseKey = key;
    mPosedTime = time;
 
-   const size_t jointCount = mRig.joints.size();
    std::vector<float> offsets;
-   for (int i = 0; i < kPoseSlots; i++)
-   {
-      if (poseJoint[i] < 0 || poseJoint[i] >= (int)jointCount)
-         continue;
-      if (offsets.empty())
-      {
-         offsets.assign(jointCount * 4, 0.0f);
-         for (size_t j = 0; j < jointCount; j++)
-            offsets[j * 4 + 3] = 1.0f;
-      }
-      float q[4], combined[4];
-      Skinning::QuatFromEuler(poseRot[i], q);
-      Skinning::QuatMul(&offsets[poseJoint[i] * 4], q, combined);
-      std::copy(combined, combined + 4, &offsets[poseJoint[i] * 4]);
-   }
-
+   pose.ApplySlots(offsets, jointCount);
    // Target and pole come in fitted space; the solver works in the file's.
    Skinning::IkGoal goal;
-   if (ik)
-   {
-      const float inv = mFitScale != 0.0f ? 1.0f / mFitScale : 1.0f;
-      goal.joint = ikJoint;
-      goal.chain = std::clamp(ikChain, 1, 8);
-      goal.weight = std::clamp(ikWeight, 0.0f, 1.0f);
-      goal.usePole = ikPoleOn;
-      for (int k = 0; k < 3; k++)
-      {
-         goal.target[k] = ikTarget[k] * inv + mFitCentre[k];
-         goal.pole[k] = ikPole[k] * inv + mFitCentre[k];
-      }
-   }
+   const bool ik = pose.Goal(jointCount, mFitCentre, mFitScale, goal);
    std::vector<Platform::ModelVertex> posed;
    Skinning::Evaluate(mRig, clipIndex, time, weights, posed, &mJointWorld, offsets.empty() ? nullptr : &offsets,
                       ik ? &goal : nullptr);
@@ -502,21 +461,4 @@ bool ModelSourceNode::JointMatrix(int j, float out[16])
       return false;
    std::copy(&mJointWorld[j * 16], &mJointWorld[j * 16] + 16, out);
    return true;
-}
-
-int ModelSourceNode::PoseSlot(int j, bool make)
-{
-   for (int i = 0; i < kPoseSlots; i++)
-      if (poseJoint[i] == j)
-         return i;
-   if (!make)
-      return -1;
-   for (int i = 0; i < kPoseSlots; i++)
-      if (poseJoint[i] < 0)
-      {
-         poseJoint[i] = j;
-         std::fill(poseRot[i], poseRot[i] + 3, 0.0f);
-         return i;
-      }
-   return -1;
 }
