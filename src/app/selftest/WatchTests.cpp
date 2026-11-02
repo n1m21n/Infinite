@@ -2,6 +2,7 @@
 // (docs/plans/apple-watch/README.md, Tests). Both are early exits before glfwInit(). WatchLink is disabled
 // here (a terminal-launched process can be killed by TCC on its first Bluetooth call), so the node is driven
 // only through WatchLink::InjectPacket.
+#include <string>
 #include "app/AppShared.h"
 #include "core/WatchPacket.h"
 #include "nodes/WatchNode.h"
@@ -71,6 +72,24 @@ namespace app
       check(Decode(bad, kSize, keep) == Result::kNewerVersion && keep.seq == 200, "newer version refused");
       check(Decode(bad, 3, keep) == Result::kNewerVersion, "newer version is named even when the packet is short");
       check(Decode(buf, kSize + 3, keep) == Result::kOk, "trailing bytes are ignored");
+
+      {
+         // The watch app's Swift encoder is pinned to this same hex (apps/watch/Sources/GoldenPacket.swift).
+         Sample g;
+         g.seq = 7; g.timeMs = 123456; g.flags = kTouching | kWorkoutRunning;
+         g.q[0] = 0.9f; g.q[1] = 0.1f; g.q[2] = -0.2f; g.q[3] = 0.3f;
+         g.rot[0] = 12.3f; g.rot[1] = -45.6f; g.rot[2] = 78.9f;
+         g.accel[0] = 0.5f; g.accel[1] = -1.25f; g.accel[2] = 2.0f;
+         g.gravity[0] = 0.1f; g.gravity[1] = -0.2f; g.gravity[2] = 0.97f;
+         g.crown = 0.123f; g.touchX = 0.25f; g.touchY = 0.75f; g.heart = 72; g.battery = 88;
+         uint8_t gb[kSize];
+         Encode(g, gb);
+         char hex[kSize * 2 + 1];
+         for (size_t i = 0; i < kSize; i++)
+            snprintf(hex + i * 2, 3, "%02x", gb[i]);
+         check(std::string(hex) == "4957010740e2010001013373cd0c66e666267b0038fe1503f4011efbd007640038ffca037b000040ffbf4858",
+               "golden packet bytes match the watch app's Swift encoder");
+      }
 
       printf("WATCHPACKETTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;
