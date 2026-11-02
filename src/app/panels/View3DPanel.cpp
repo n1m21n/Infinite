@@ -127,6 +127,7 @@ namespace
    bool sLasso = false;
    std::vector<ImVec2> sLassoPts;
    bool sBoxOn = false, sTweak = false, sRightOk = false, sNavDrag = false, sOpenAdd = false, sOpenMenu = false, sOpenPivot = false, sOpenOrient = false;
+   bool sMenuOnItem = false;   // the right-click landed on an item (else empty space)
    ImVec2 sPressAt;
 
    // Spawning moves gNodes, so anything that makes a node waits until the frame's
@@ -1991,68 +1992,55 @@ namespace
    void DrawViewItems(Scene3DNode* scene)
    {
       const bool any = !sSel.empty();
-      if (MenuParts::Item(T("Top"), "7")) ViewAxis(2);
-      if (MenuParts::Item(T("Bottom"), MODKEY "+7")) ViewAxis(3);
-      if (MenuParts::Item(T("Front"), "1")) ViewAxis(4);
-      if (MenuParts::Item(T("Back"), MODKEY "+1")) ViewAxis(5);
-      if (MenuParts::Item(T("Right"), "3")) ViewAxis(0);
-      if (MenuParts::Item(T("Left"), MODKEY "+3")) ViewAxis(1);
-      MenuParts::Separator();
-      if (MenuParts::Item(T("Perspective/Orthographic"), "5"))
+      if (MenuParts::SubMenu(T("Viewpoint"), true))
+      {
+         if (MenuParts::Item(T("Top"), "7")) ViewAxis(2);
+         if (MenuParts::Item(T("Bottom"), MODKEY "+7")) ViewAxis(3);
+         if (MenuParts::Item(T("Front"), "1")) ViewAxis(4);
+         if (MenuParts::Item(T("Back"), MODKEY "+1")) ViewAxis(5);
+         if (MenuParts::Item(T("Right"), "3")) ViewAxis(0);
+         if (MenuParts::Item(T("Left"), MODKEY "+3")) ViewAxis(1);
+         ImGui::EndMenu();
+      }
+      if (MenuParts::Item(T("Persp / Ortho"), "5"))
       {
          sOrtho = !sOrtho;
          sAutoOrtho = false;
       }
-      if (MenuParts::Item(T("Frame Selected"), "F", false, any)) FrameItems(scene, false);
-      if (MenuParts::Item(T("Frame All"), "Home")) FrameItems(scene, true);
-      if (MenuParts::Item(T("Toggle Local View"), "/", !sLocal.empty(), any || !sLocal.empty())) ToggleLocal(scene);
-      if (MenuParts::Item(T("Remove from Local View"), nullptr, false, !sLocal.empty() && any)) RemoveFromLocal();
-      if (MenuParts::Item(T("Lock View to Active"), nullptr, sLockActive, any || sLockActive)) sLockActive = !sLockActive;
-      if (MenuParts::Item(T("Center View to Mouse"), nullptr, false, sViewMouse.x >= 0 && !sCameraView))
+      // Only what applies right now: no greyed-out rows.
+      if (any && MenuParts::Item(T("Frame selected"), "F")) FrameItems(scene, false);
+      if ((any || !sLocal.empty()) && MenuParts::Item(T("Local view"), "/", !sLocal.empty())) ToggleLocal(scene);
+      if (!sLocal.empty() && any && MenuParts::Item(T("Remove from local view"))) RemoveFromLocal();
+      if ((any || sLockActive) && MenuParts::Item(T("Lock to active"), nullptr, sLockActive)) sLockActive = !sLockActive;
+      MenuParts::Separator();
+      if (MenuParts::SubMenu(T("Camera"), true))
       {
-         float o[3], d[3];
-         MouseRay(sViewMouse, o, d);
-         if (std::fabs(d[1]) > 1e-5f && -o[1] / d[1] > 0.0f)
+         const bool cam = scene->activeCamera != 0;
+         if (MenuParts::Item(T("Align to view"), MODKEY "+Alt+0")) CameraToView(scene);
+         if (cam && any && MenuParts::Item(T("Align to selected")))
          {
-            const float t = -o[1] / d[1];
-            const float hit[3] = { o[0] + d[0] * t, 0.0f, o[2] + d[2] * t };
-            GlideTo([&] { std::copy(hit, hit + 3, sTarget); });
+            float m[3];
+            if (Item* c = scene->FindItem(scene->activeCamera))
+               if (SelectionCenter(scene, m))
+               {
+                  PushUndoCheckpoint("Aim camera");
+                  scene->AimAt(*c, m);
+                  scene->Commit();
+               }
          }
+         if (sCameraView && MenuParts::Item(T("Zoom 1:1")))
+         {
+            sCamZoom = 1.0f;
+            sCamPan = ImVec2(0, 0);
+         }
+         if (sCameraView && MenuParts::Item(T("Center"))) sCamPan = ImVec2(0, 0);
+         ImGui::EndMenu();
       }
-      if (MenuParts::Item(T("Center Camera"), nullptr, false, sCameraView))
-      {
-         sCamPan = ImVec2(0, 0);
-      }
-      MenuParts::Separator();
-      MenuParts::Separator();
-      const bool cam = scene->activeCamera != 0;
-      if (MenuParts::Item(T("Align Active Camera to View"), MODKEY "+Alt+0", false, true)) CameraToView(scene);
-      if (MenuParts::Item(T("Align Active Camera to Selected"), nullptr, false, cam && any))
-      {
-         float m[3];
-         if (Item* c = scene->FindItem(scene->activeCamera))
-            if (SelectionCenter(scene, m))
-            {
-               PushUndoCheckpoint("Aim camera");
-               scene->AimAt(*c, m);
-               scene->Commit();
-            }
-      }
-      if (MenuParts::Item(T("Center Cursor and Frame All"), "Shift+C"))
+      if (MenuParts::Item(T("Cursor + frame all"), "Shift+C"))
       {
          CursorToOrigin();
          FrameItems(scene, true);
       }
-      if (MenuParts::Item(T("Roll Left"), "Shift+Numpad 4")) { LeaveCamera(); sRoll -= RotStep(); sViewName = -1; }
-      if (MenuParts::Item(T("Roll Right"), "Shift+Numpad 6")) { LeaveCamera(); sRoll += RotStep(); sViewName = -1; }
-      if (MenuParts::Item(T("Zoom Camera 1:1"), nullptr, false, sCameraView))
-      {
-         sCamZoom = 1.0f;
-         sCamPan = ImVec2(0, 0);
-      }
-      MenuParts::Separator();
-      if (MenuParts::Item(T("Zoom In"), "+")) Zoom(0.85f);
-      if (MenuParts::Item(T("Zoom Out"), "-")) Zoom(1.0f / 0.85f);
    }
 
    void DrawObjectItems(Scene3DNode* scene)
@@ -4254,6 +4242,7 @@ namespace
             const int id = Pick(scene, mouse);
             if (id != 0 && !Selected(id))
                sSel = { id };
+            sMenuOnItem = id != 0;
             sOpenMenu = true;
          }
       }
@@ -4726,6 +4715,7 @@ namespace
          {
             if (!Selected(it.id))
                sSel = { it.id };
+            sMenuOnItem = true;
             sOpenMenu = true;
          }
          const bool missing = scene->ItemKind(it) == Kind::Missing;
@@ -6493,59 +6483,66 @@ namespace
       }
       if (MenuParts::BeginPopup("##v3dcontext"))
       {
+         // On an object: what to do with it. On empty space: add, select, view.
          const bool any = !sSel.empty();
-         if (MenuParts::SubMenu(T("Add"), true))
-         {
-            DrawAddItems(scene);
-            ImGui::EndMenu();
-         }
-         if (MenuParts::SubMenu(T("Select"), true))
-         {
-            DrawSelectItems(scene);
-            ImGui::EndMenu();
-         }
          Item* one = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
-         if (MenuParts::SubMenu(T("Source"), one != nullptr))
+         if (sMenuOnItem && any)
          {
-            for (GraphNode* gn : SourceChoices(scene, *one))
-               if (MenuParts::Item((gn->typeName + " " + std::to_string(gn->index)).c_str(), nullptr, gn->uid == one->uid) && gn->uid != one->uid)
-                  SetSource(scene, *one, gn->uid);
-            ImGui::EndMenu();
-         }
-         MenuParts::Separator();
-         if (MenuParts::Item(T("Group"), MODKEY "+G", false, sSel.size() > 1)) GroupSelected(scene, true);
-         if (MenuParts::Item(T("Ungroup"), MODKEY "+Alt+G", false, any)) GroupSelected(scene, false);
-         MenuParts::Separator();
-         if (MenuParts::Item(T("Frame"), "F", false, any)) FrameItems(scene, false);
-         if (MenuParts::Item(T("Frame all"), "Home")) FrameItems(scene, true);
-         MenuParts::Separator();
-         if (MenuParts::Item(T("Duplicate"), "Shift+D", false, any)) DuplicateSelected(scene, ImGui::GetIO().MousePos);
-         if (MenuParts::Item(T("Hide"), "H", false, any)) HideSelected(scene);
-         if (MenuParts::Item(T("Remove from scene"), "X", false, any)) DeleteSelected(scene);
-         if (MenuParts::Item(T("Rename"), "F2", false, sSel.size() == 1))
-            if (const Item* it = scene->FindItem(sSel.back()))
-               StartRename(*it);
-         MenuParts::Separator();
-         if (MenuParts::SubMenu(T("View"), true))
-         {
-            DrawViewItems(scene);
-            ImGui::EndMenu();
-         }
-         if (MenuParts::SubMenu(T("Object"), true))
-         {
-            DrawObjectItems(scene);
-            ImGui::EndMenu();
-         }
-         if (sSel.size() == 1)
-            MenuParts::Separator();   // a closing separator with no row after it trips ImGui's cursor check
-         if (sSel.size() == 1)
-            if (MenuParts::Item(T("Go to node")))
-               if (const Item* it = scene->FindItem(sSel[0]))
-                  if (GraphNode* gn = FindNodeByUid(it->uid))
+            if (MenuParts::Item(T("Duplicate"), "Shift+D")) DuplicateSelected(scene, ImGui::GetIO().MousePos);
+            if (one != nullptr && MenuParts::Item(T("Rename"), "F2")) StartRename(*one);
+            if (MenuParts::Item(T("Hide"), "H")) HideSelected(scene);
+            if (MenuParts::Item(T("Remove"), "X")) DeleteSelected(scene);
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Frame"), "F")) FrameItems(scene, false);
+            bool grouped = false;
+            for (int id : sSel)
+               if (const Item* it = scene->FindItem(id); it != nullptr && it->group != 0)
+                  grouped = true;
+            if (sSel.size() > 1 && MenuParts::Item(T("Group"), MODKEY "+G")) GroupSelected(scene, true);
+            if (grouped && MenuParts::Item(T("Ungroup"), MODKEY "+Alt+G")) GroupSelected(scene, false);
+            if (one != nullptr && MenuParts::SubMenu(T("Source"), true))
+            {
+               for (GraphNode* gn : SourceChoices(scene, *one))
+                  if (MenuParts::Item((gn->typeName + " " + std::to_string(gn->index)).c_str(), nullptr, gn->uid == one->uid) && gn->uid != one->uid)
+                     SetSource(scene, *one, gn->uid);
+               ImGui::EndMenu();
+            }
+            if (MenuParts::SubMenu(T("Object"), true))
+            {
+               DrawObjectItems(scene);
+               ImGui::EndMenu();
+            }
+            if (one != nullptr)
+            {
+               MenuParts::Separator();
+               if (MenuParts::Item(T("Go to node")))
+                  if (GraphNode* gn = FindNodeByUid(one->uid))
                   {
                      gRequestSelectNodeIndex = gn->index;
                      gRequestFitViewNodeIndex = gn->index;
                   }
+            }
+         }
+         else
+         {
+            if (MenuParts::SubMenu(T("Add"), true))
+            {
+               DrawAddItems(scene);
+               ImGui::EndMenu();
+            }
+            if (MenuParts::SubMenu(T("Select"), true))
+            {
+               DrawSelectItems(scene);
+               ImGui::EndMenu();
+            }
+            MenuParts::Separator();
+            if (MenuParts::Item(T("Frame all"), "Home")) FrameItems(scene, true);
+            if (MenuParts::SubMenu(T("View"), true))
+            {
+               DrawViewItems(scene);
+               ImGui::EndMenu();
+            }
+         }
          MenuParts::EndPopup();
       }
    }
@@ -6789,7 +6786,13 @@ void View3DAddCamera()
 void View3DShotState(int state)
 {
    // Ones: the side tab. Tens: 1 looks through the camera. Hundreds: 1 Solid with X-ray, 2 Solid with the wire overlay.
+   // Thousands: the right-click menu, 1 on an item, 2 on empty space.
    sTab = state % 10;
+   if (state / 1000 != 0)
+   {
+      sMenuOnItem = state / 1000 == 1;
+      sOpenMenu = true;
+   }
    sCameraView = (state / 10) % 10 == 1;
    const int look = state / 100;
    sShading = look == 0 ? Shading::Final : Shading::Solid;
