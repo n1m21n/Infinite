@@ -70,6 +70,8 @@ namespace CliSetup
    // File probe: is the agent's binary in PATH or a usual install folder? `home` and `pathEnv` are injected.
    bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv);
 
+   bool AgentInstalledHere(const Agent& agent);   // the real HOME and PATH
+
    struct Config
    {
       std::string agent = "claude";

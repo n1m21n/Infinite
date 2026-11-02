@@ -526,6 +526,8 @@ set(COMMON_SOURCES
     src/app/panels/PianoRollPanel.cpp
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
+    src/app/panels/CliSetupSection.cpp
+    src/core/CliSetup.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
@@ -538,6 +540,7 @@ set(COMMON_SOURCES
     src/app/selftest/AvRecTests.cpp
     src/app/selftest/ImgAudit.cpp
     src/app/selftest/MidiOutTests.cpp
+    src/app/selftest/CliSetupTests.cpp
     src/app/selftest/BenchScenes.cpp
     src/app/selftest/DspFixtures1.cpp
     src/app/selftest/DspFixtures2.cpp

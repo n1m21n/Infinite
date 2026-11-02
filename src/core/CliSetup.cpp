@@ -452,6 +452,14 @@ if ($Failed -gt 0) { exit 1 }
       return false;
    }
 
+   bool AgentInstalledHere(const Agent& agent)
+   {
+      const Os os = CurrentOs();
+      const char* home = getenv(os == Os::kWindows ? "USERPROFILE" : "HOME");
+      const char* path = getenv("PATH");
+      return AgentInstalled(os, agent, home != nullptr ? home : "", path != nullptr ? path : "");
+   }
+
    Config LoadConfig(const std::string& file)
    {
       Config c;

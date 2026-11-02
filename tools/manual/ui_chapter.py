@@ -282,7 +282,16 @@ def html_chapter(P):
                   row((fig("settings_audio", "Audio", box=(410, 200, 1190, 805)), 1), (fig("settings_general", "General & Performance", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_field", "Field Language", box=(410, 200, 1190, 805)), 1), (fig("settings_globals", "Expression Globals", box=(410, 200, 1190, 805)), 1))),
              page(row((fig("settings_extensions", "Extensions: install extension packs.", box=(410, 200, 1190, 805)), 1), (fig("settings_plugins", "Plugins: VST3 folders and every scanned plugin.", box=(410, 200, 1190, 805)), 1)),
-                  row((fig("settings_terminal", "Terminal: the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
+                  row((fig("settings_terminal", "Terminal: Command line &amp; agents (one-click setup, coding agent), the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
+
+    b.append(page("<h2>Settings: Command line &amp; agents</h2>",
+                  "<p>On the Terminal page, <b>Set up everything</b> opens a Terminal tab and runs a short script you can read first (<i>Show the commands</i>). "
+                  "It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with your coding agent. "
+                  "Each step checks first and is skipped when it is already done, so the button doubles as a repair. A tick appears per step when the script finishes it. Password prompts (Homebrew, sudo) appear in the tab.</p>",
+                  "<p><b>Coding agent</b> picks the agent (Claude Code first). <b>Install</b> shows when it is missing and types the vendor's own installer into a Terminal tab. "
+                  "<b>Start agent</b> opens a tab in the open patch's folder and starts it with Infinite's MCP server registered. "
+                  "<i>Start the agent when the Terminal opens</i> is off by default. Infinite never asks for or stores an API key: the agent's own login runs in the tab. "
+                  "Nothing is installed until you press a button.</p>"))
 
     b.append(page("<h2>Sound panels: Session, Sample Studio, Piano Roll</h2>",
                   "<p>Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.</p>",

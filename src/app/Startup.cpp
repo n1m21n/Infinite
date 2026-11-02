@@ -801,6 +801,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_CLISETUPTEST") != nullptr)
+      return RunCliSetupTest() ? 0 : 1;
+
    if (getenv("INFINITE_MIDIOUTTEST") != nullptr)
    {
       RunMidiOutTest();

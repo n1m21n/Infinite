@@ -59,6 +59,7 @@ public:
       unsigned lock = 0;            // bits 0-2 location, 3-5 rotation, 6-8 scale (engine axes): the transform tools leave them alone
       int group = 0;                // items with the same number select and move together; 0 = none
       int passIndex = 0;            // written by Render 3D's Object Index pass
+      float color[3] = { 1.0f, 1.0f, 1.0f };   // the Solid view's Object colour mode
       Backdrop backdrop;
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores

@@ -2748,6 +2748,21 @@ namespace
          else
             dl->AddTriangle(s[0], s[1], s[2], col);
       }
+      if (lens->showMist)   // where the Mist pass starts and where it is full
+      {
+         auto along = [&](float d, float out[3]) { const float p[3] = { 0.0f, 0.0f, -d }; TransformBy(world, p, out); };
+         const Render3DNode& look = scene->Look();
+         float a[3], b[3];
+         along(look.mistStart, a);
+         along(look.mistStart + look.mistDepth, b);
+         const ImU32 mist = Hex(0x60B0E8, 0.9f);
+         Line3D(dl, a, b, mist);
+         ImVec2 sa, sb;
+         if (Project(a, sa))
+            dl->AddCircleFilled(sa, 3.0f, mist);
+         if (Project(b, sb))
+            dl->AddCircle(sb, 4.0f, mist, 12, 1.5f);
+      }
       if (lens->showLimits)   // the clip range along the view, and where it focuses
       {
          auto along = [&](float d, float out[3]) { const float p[3] = { 0.0f, 0.0f, -d }; TransformBy(world, p, out); };
@@ -4576,6 +4591,7 @@ namespace
       {
          FloatRow(T("Size"), &cam->displaySize, 0.01f, 10.0f, "%.2f");
          BoolRow(T("Limits"), &cam->showLimits);
+         BoolRow(T("Mist"), &cam->showMist);
          BoolRow(T("Name"), &cam->showName);
          BoolRow(T("Sensor"), &cam->showSensor);
       }
@@ -4865,6 +4881,12 @@ namespace
             changed |= ComboRow(T("Shape"), &item->boundsType, { T("Box"), T("Sphere"), T("Cylinder"), T("Cone"), T("Capsule") }, "Bounds shape");
          if (changed)
             scene->Commit();
+      }
+      if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Viewport Display")))
+      {
+         if (ColorRow(T("Color"), item->color, "Edit in 3D View"))
+            scene->Commit();
+         Hint(T("Paints the object in the Solid view when its Color is set to Object."));
       }
       if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Pass Index")))
       {

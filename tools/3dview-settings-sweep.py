@@ -101,6 +101,7 @@ SETTINGS = {
     ("cam", "showLimits"): S(1),
     ("cam", "showName"): S(1),
     ("cam", "showSensor"): S(1),
+    ("cam", "showMist"): S(1),
     ("cam", "orthoHeight"): S(4, 0.01, 1000, sets=("cam.projection=1",)),
     ("cam", "distance"): S(14, 0.3, 20),
     ("cam", "azimuth"): S(120, -180, 180),
@@ -191,6 +192,7 @@ SETTINGS = {
     ("scene", "borderMax0"): S({"border": 1, "borderMax0": 0.6}),
     ("scene", "borderMax1"): S({"border": 1, "borderMax1": 0.6}),
     ("scene", "item.delta"): S("1 0 0 0 30 0 1 1 1"),
+    ("scene", "item.color"): S("1 0.2 0.2", sets=("view.viewShading=1", "view.solidColor=5")),
     ("scene", "item.visible"): S(0),
     ("scene", "item.render"): S(0),
     ("scene", "item.scale"): S(2.0),
@@ -207,7 +209,7 @@ SETTINGS = {
     ("view", "viewShading"): S(1, 0, 1),
     ("view", "solidLighting"): S(1, 0, 2, sets=("view.viewShading=1",)),
     ("view", "matcap"): S(1, 0, 3, sets=("view.viewShading=1", "view.solidLighting=1")),
-    ("view", "solidColor"): S(3, 0, 4, sets=("view.viewShading=1",)),
+    ("view", "solidColor"): S(3, 0, 5, sets=("view.viewShading=1",)),
     ("view", "solidSingle"): S("1 0.2 0.2", sets=("view.viewShading=1", "view.solidColor=2")),
     ("view", "solidSpecular"): S(0, sets=("view.viewShading=1",)),
     ("view", "studioWorld"): S(1, sets=("view.viewShading=1",)),
@@ -231,7 +233,7 @@ EXPECTED = {
     ("scene", "transparent"): "alpha only, and --frame writes opaque PNGs (--alpha is --frames-dir only)",
     ("scene", "item.backdrop"): "camera background image: 3D View only, never rendered (VIEW3DTEST checks it)",
     ("cam", "displaySize"): "camera marker size: 3D View only", ("cam", "showLimits"): "clip range line: 3D View only",
-    ("cam", "showName"): "name in the camera view: 3D View only", ("cam", "showSensor"): "sensor gate: 3D View only",
+    ("cam", "showName"): "name in the camera view: 3D View only", ("cam", "showSensor"): "sensor gate: 3D View only", ("cam", "showMist"): "mist range line: 3D View only",
     ("key", "showCone"): "spot cone shell: 3D View only",
     ("scene", "item.lookTargetZ"): "the sweep's look-at target is unrotated, so its up equals the world's; VIEW3DTEST-level only",
     ("scene", "item.hideSelect"): "selection filter: 3D View only",
@@ -394,6 +396,8 @@ def scene_edit(path, s, key, value):
         lines.append(f"pass {item} {value}")
     if key == "item.render":
         lines.append(f"itemx {item} 0")
+    if key == "item.color":
+        lines.append(f"ocolor {item} {value}")
     if key == "item.delta":
         lines.append(f"delta {item} {value}")
     if key in ("item.trackAxis", "item.upAxis", "item.lookInfluence", "item.lookTargetZ"):

@@ -5753,6 +5753,8 @@ extern std::vector<std::string> gTerminalDropPending; // paths dropped on the pa
 void TerminalLoadFonts(float bakedPx);
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 void TerminalPanelHidden();
+// A new tab with `line` typed and entered (the CLI setup section and the agent buttons).
+void TerminalRunInNewTab(const std::string& line);
 void TerminalToggleShortcut();
 int TerminalBusyCount();
 void TerminalGuardQuit(std::function<void()> action);
@@ -6320,6 +6322,7 @@ void RunRecExportTest(int width, int height, bool starved, const char* label);
 
 bool RunAudioPdcTest();
 bool RunMidiOutTest();
+bool RunCliSetupTest();
 bool RunI18nTest();
 
 #if defined(__linux__)

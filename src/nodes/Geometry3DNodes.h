@@ -261,6 +261,9 @@ public:
    // default, as in Blender; the 3D View's placed sources carry their own.
    virtual int PassIndex() const { return 0; }
 
+   // The colour the Solid view's Object colour mode paints this source with; white by default.
+   virtual void ObjectColor(float c[3]) const { c[0] = c[1] = c[2] = 1.0f; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's

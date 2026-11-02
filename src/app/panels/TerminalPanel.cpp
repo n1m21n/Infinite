@@ -9,6 +9,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "core/CliSetup.h"
 #include "core/RemoteControl.h"
 #include "core/term/TermSession.h"
 #include "imgui_internal.h"
@@ -169,6 +170,17 @@ namespace
       tab->rows = o.spawn.rows;
       tab->session = term::TermSession::Start(o);
       return tab;
+   }
+
+   // "Start the agent when the Terminal opens" (Settings > Terminal > Command line & agents, off by default):
+   // types the start line into the panel's first tab, only when the agent is installed.
+   void StartAgentOnOpen(Tab& tab)
+   {
+      const CliSetup::Config& prefs = CliSetup::Prefs();
+      const CliSetup::Agent* agent = CliSetup::FindAgent(prefs.agent);
+      if (!prefs.autoStart || agent == nullptr || !CliSetup::AgentInstalledHere(*agent))
+         return;
+      tab.session->SendBytes(CliSetup::StartAgentLine(CliSetup::CurrentOs(), CliSetup::RealExecutable(), *agent) + "\n");
    }
 
    void CloseTab(int index)
@@ -886,6 +898,7 @@ namespace
       {
          sTabs.push_back(NewTab(80, 24));
          sActive = 0;
+         StartAgentOnOpen(*sTabs[0]);
       }
       if (sFont == nullptr)
       {
@@ -1066,6 +1079,21 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
    ImGui::EndChild();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
+}
+
+void TerminalRunInNewTab(const std::string& line)
+{
+   int cols = 80, rows = 24;
+   if (!sTabs.empty())
+   {
+      cols = sTabs[(size_t)sActive]->cols;
+      rows = sTabs[(size_t)sActive]->rows;
+   }
+   sTabs.push_back(NewTab(cols, rows));
+   sActive = (int)sTabs.size() - 1;
+   sTabs.back()->session->SendBytes(line + "\n");
+   gTerminalOpen = true;
+   gTerminalFocus = true;
 }
 
 void TerminalPanelHidden()

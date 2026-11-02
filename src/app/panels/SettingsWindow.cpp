@@ -14,6 +14,7 @@ namespace app
 {
    void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
    void DrawPluginManagerList();
+   void DrawCliSetupSection();     // CliSetupSection.cpp
 
    void DrawSettingsWindow(bool* open)
    {
@@ -1713,6 +1714,8 @@ namespace app
          if (sTab == 8)
          {
             ImGui::Spacing();
+            DrawCliSetupSection();
+
             FormParts::Section(T("Terminal panel"));
             ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
             ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));

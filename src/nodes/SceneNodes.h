@@ -42,7 +42,7 @@ public:
    int sensorFit = 0;                    // 0 auto (the longer side), 1 horizontal, 2 vertical
    // In the 3D View only: marker size, clip range and focus line, name and sensor gate in the camera view.
    float displaySize = 1.0f;
-   bool showLimits = false, showName = false, showSensor = false;
+   bool showLimits = false, showName = false, showSensor = false, showMist = false;
 
    static const std::vector<std::string>& SensorFitNames();
    // The vertical view's sensor size in mm for a frame of `aspect` (width / height): focal length
@@ -56,7 +56,7 @@ public:
       v.Float("shiftX", shiftX); v.Float("shiftY", shiftY); v.Float("sensorWidth", sensorWidth);
       v.Float("sensorHeight", sensorHeight); v.Int("sensorFit", sensorFit);
       v.Float("displaySize", displaySize); v.Bool("showLimits", showLimits);
-      v.Bool("showName", showName); v.Bool("showSensor", showSensor);
+      v.Bool("showName", showName); v.Bool("showSensor", showSensor); v.Bool("showMist", showMist);
       v.Float("orthoHeight", orthoHeight); v.Float("distance", distance);
       v.Float("azimuth", azimuth); v.Float("elevation", elevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);
