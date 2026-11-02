@@ -50,6 +50,7 @@
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 #include "nodes/MacroNodes.h"
+#include "platform/WatchLink.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/NoteNodes.h"
@@ -1375,6 +1376,7 @@ namespace
 
    bool AuditCpu(Flags& flags)
    {
+      WatchLink::Disable();   // a terminal-launched process is killed on its first Bluetooth call
       const Registered all[] = {
          Reg<LFONode>("LFO"), Reg<ConstantNode>("Constant"), Reg<RandomNode>("Random"), Reg<PatternNode>("Pattern"),
          Reg<MathNode>("Math"), Reg<CompareNode>("Compare"), Reg<RangeToRangeNode>("Range to Range", false),
@@ -1387,7 +1389,7 @@ namespace
          Reg<MacroNumBoxNode>("Macro NumBox"), Reg<MacroRadioSelectorNode>("Macro Radio"), Reg<MacroStepGateNode>("Macro Step Gate"),
          Reg<MidiCCNode>("MIDI CC"), Reg<MidiTriggerNode>("MIDI Trigger"), Reg<OscReceiveNode>("OSC Receive"),
          Reg<PathNode>("Path"), Reg<GeometryTableNode>("Geometry Table"), Reg<DriftNode>("Drift"),
-         Reg<MovesNode>("Moves"), Reg<PredictiveModulatorNode>("Predictive"),
+         Reg<MovesNode>("Moves"), Reg<PredictiveModulatorNode>("Predictive"), Reg<WatchNode>("Apple Watch"),
          RegLegacy<LFONode>("LFO legacy"), RegLegacy<RandomNode>("Random legacy"), RegLegacy<SmoothNode>("Smooth legacy"),
          RegLegacy<EnvelopeNode>("Envelope legacy"), RegLegacy<CVToPitchNode>("CV Pitch legacy"),
       };

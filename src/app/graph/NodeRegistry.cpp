@@ -193,6 +193,7 @@ namespace app
       REGISTER_NODE(HandTrackNode, Hand Track, "Modulators");
       REGISTER_NODE(FaceTrackNode, Face Track, "Modulators");
       REGISTER_NODE(PoseTrackNode, Pose Track, "Modulators");
+      REGISTER_NODE(WatchNode, Apple Watch, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
