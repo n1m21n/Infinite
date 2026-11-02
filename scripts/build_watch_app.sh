@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds and installs "Infinite Remote" (apps/watch) with the user's own Apple ID.
 #   scripts/build_watch_app.sh           generate the Xcode project and open it
-#   scripts/build_watch_app.sh --device  build for the paired watch with xcodebuild (needs the team set)
+#   scripts/build_watch_app.sh --install [DEVICE-ID]   build and install from the terminal (xcrun devicectl list devices)
 # Set INFINITE_WATCH_HEALTH=1 to build the heart-rate version (needs the HealthKit capability).
 set -e
 cd "$(dirname "$0")/../apps/watch"
@@ -35,10 +35,9 @@ fi
 
 xcodegen generate --quiet
 
-if [ "$1" = "--device" ]; then
-   xcodebuild -project InfiniteRemote.xcodeproj -scheme InfiniteRemote -configuration Release \
-      -destination 'generic/platform=watchOS' -allowProvisioningUpdates build
-   echo "Built. To install, use Xcode: pick your watch next to the Run button and press Run."
+if [ "$1" = "--install" ]; then
+   # same steps as Infinite's "Set up watch app" window: build with your team, install on the watch given as $2
+   exec ./install.sh --team "$team" ${2:+--device "$2"} --health "${INFINITE_WATCH_HEALTH:-0}"
 else
    open InfiniteRemote.xcodeproj
    echo "Opened in Xcode: pick your watch next to the Run button and press Run."
