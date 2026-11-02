@@ -1049,6 +1049,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawImageAnalyzeParams(n);
                else if (auto* n = dynamic_cast<TrackNodeBase*>(gn.node.get()))
                   DrawTrackParams(n);
+               else if (auto* n = dynamic_cast<WatchNode*>(gn.node.get()))
+                  DrawWatchParams(n);
                else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                   DrawNullModulatorParams(n);
                else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))

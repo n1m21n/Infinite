@@ -187,6 +187,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/AnalyzeNodes.h"
 #include "nodes/TrackNodeBase.h"
 #include "nodes/HandTrackNode.h"
+#include "nodes/WatchNode.h"
 #include "nodes/FaceTrackNode.h"
 #include "nodes/PoseTrackNode.h"
 #include "nodes/Geometry3DNodes.h"

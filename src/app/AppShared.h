@@ -2963,6 +2963,7 @@ void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
 void DrawTrackParams(TrackNodeBase* n);
+void DrawWatchParams(WatchNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 

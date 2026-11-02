@@ -459,6 +459,7 @@ set(COMMON_SOURCES
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
     src/app/bodies/SpatialMixerBody.cpp
+    src/app/bodies/WatchBody.cpp
     src/app/bodies/VmpcBody.cpp
     src/app/frame/CookFrame.cpp
     src/app/frame/FrameStatics.cpp
@@ -666,6 +667,7 @@ set(COMMON_SOURCES
     src/nodes/HandTrackNode.cpp
     src/nodes/FaceTrackNode.cpp
     src/nodes/PoseTrackNode.cpp
+    src/nodes/WatchNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp
