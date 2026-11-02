@@ -571,7 +571,8 @@ namespace GltfImport
             const float c[9] = { m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8],
                                  m[2] * m[9] - m[1] * m[10], m[0] * m[10] - m[2] * m[8], m[1] * m[8] - m[0] * m[9],
                                  m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4] };
-            const float det = m[0] * c[0] + m[4] * c[1] + m[8] * c[2];
+            // Column 0 against its cofactors (c[0..2] are column 0's).
+            const float det = m[0] * c[0] + m[1] * c[1] + m[2] * c[2];
             if (normAcc != nullptr && normAcc->count == count)
             {
                cgltf_accessor_unpack_floats(normAcc, buf.data(), buf.size());

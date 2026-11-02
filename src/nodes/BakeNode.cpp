@@ -367,7 +367,11 @@ std::vector<float> BakeNode::Bake(const Request& r)
             const V3 n = Norm(Nrm(m.vertices[c[0]]) * t.w[0] + Nrm(m.vertices[c[1]]) * t.w[1] +
                               Nrm(m.vertices[c[2]]) * t.w[2]);
             float rgb[3] = { 0, 0, 0 };
-            const float turn = std::fmod((float)(x * 7919 + y * 104729) * 0.6180339f, 1.0f);
+            // Each texel turns its rays by its own amount, so neighbours dither
+            // instead of banding. Hashed in integers: in float, x * 7919 +
+            // y * 104729 is past 2^24, fmod(.., 1) read 0, and every texel
+            // shot the same 16 rays.
+            const float turn = (float)(((unsigned)x * 7919u + (unsigned)y * 104729u) * 2654435769u >> 8) / 16777216.0f;
             switch (r.mode)
             {
                case kAO:

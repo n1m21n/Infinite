@@ -460,6 +460,11 @@ private:
    Signature mBuilt;
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
+   // UV Project: each output vertex's input vertex, and the topology the
+   // layout was cut on, so moving points keep their UVs.
+   std::vector<unsigned> mUVFrom;
+   std::vector<unsigned int> mUVInputIndices;
+   size_t mUVInputVerts = 0;
    mutable unsigned long long mMaterialRevision = 0;
    mutable size_t mLastMaterialHash = 0;
    mutable unsigned long long mMappingRevision = 0;

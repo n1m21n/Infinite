@@ -5937,6 +5937,7 @@ bool RunRigTest();
 bool RunBakeTest();
 bool RunSculptTest();
 bool RunThreeDBench();
+bool RunThreeDFlowTest();
 bool RunArmatureTest();
 bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;

@@ -1379,10 +1379,12 @@ void FrameTest_MODELTEST(int frameId, GLFWwindow* window)
             }
             const float extent = mesh.vertices.empty() ? 0.0f
                : std::max(hi[0]-lo[0], std::max(hi[1]-lo[1], hi[2]-lo[2]));
-            // Normalisation should land every model on a unit box no matter
-            // what scale it was authored at.
+            // Normalisation should land every model inside a unit box no matter
+            // what scale it was authored at. Inside, not on: a part keeps the
+            // whole file's fit (so parts line up) and a skinned model is fit
+            // to its rest pose, not to the clip frame shown.
             const bool sane = loaded && finite && mesh.indices.size() >= 3 &&
-                              std::fabs(extent - 1.0f) < 0.01f;
+                              extent > 0.05f && extent < 1.01f;
             printf("  %-28s %5zu tris  extent %.3f  %s\n",
                    path.c_str(), mesh.indices.size() / 3, extent, sane ? "OK" : "FAIL");
             printf("     status: %s\n", model->Status().c_str());

@@ -62,8 +62,10 @@ namespace
 
 namespace MeshOps
 {
-   Mesh UVProject(const Mesh& in, int mode, float angleDeg, float margin, float scale)
+   Mesh UVProject(const Mesh& in, int mode, float angleDeg, float margin, float scale, std::vector<unsigned>* from)
    {
+      if (from != nullptr)
+         from->clear();
       if (in.Empty())
          return in;
       const size_t faces = in.FaceCount();
@@ -293,6 +295,8 @@ namespace MeshOps
             nv.v = v;
             it = made.emplace(key, (unsigned)out.vertices.size()).first;
             out.vertices.push_back(nv);
+            if (from != nullptr)
+               from->push_back(src);
             if (colour)
                for (int k = 0; k < 3; k++)
                   out.vertexColor.push_back(in.vertexColor[src * 3 + k]);

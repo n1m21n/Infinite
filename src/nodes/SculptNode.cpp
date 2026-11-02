@@ -45,8 +45,12 @@ void SculptNode::Update()
       mKeyInput = input;
       mKeyRevision = rev;
       mKeyLevel = lv;
+      const size_t oldVerts = mBase.vertices.size();
+      std::vector<unsigned int> oldIndices = std::move(mBase.indices);
       mBase = lv > 0 ? MeshOps::Subdivide(input->GetMesh(), lv, 1.0f) : input->GetMesh();
-      Sculpt::Build(mBase, mTopo);
+      // Only the points moved (a pose, a clip): the topology still holds.
+      if (mTopo.points == 0 || mBase.vertices.size() != oldVerts || mBase.indices != oldIndices)
+         Sculpt::Build(mBase, mTopo);
       mMaxEdge = 0.0f;
       const size_t nv = mBase.vertices.size();
       for (size_t f = 0; f * 3 + 2 < mBase.indices.size(); f++)

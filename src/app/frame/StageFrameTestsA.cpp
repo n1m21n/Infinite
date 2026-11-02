@@ -2787,6 +2787,14 @@ void DrawFrameTestsA(FrameCtx& fc)
 
       FrameTest_MODELTEST(frameId, window);
 
+      // The 3D chain on real models, saved and reopened (selftest/FlowTests.cpp).
+      if (getenv("INFINITE_3DFLOWTEST") != nullptr && frameId == 4)
+      {
+         const bool ok = RunThreeDFlowTest();
+         fflush(stdout);
+         std::_Exit(ok ? 0 : 1);
+      }
+
       // Exercises every mesh operator directly, checking each produces a
       // non-degenerate mesh with finite coordinates and a sane bounding box.
       // A silently empty or NaN-riddled result is the failure mode that matters

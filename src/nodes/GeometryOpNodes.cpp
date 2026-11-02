@@ -352,9 +352,39 @@ const Mesh& GeometryOpNode::GetMesh()
                                       insetWidth, insetDepth, bevelAngle);
          break;
       case kUVProject:
+      {
          // Whole-mesh: islands and packing need every face. selectionOnly hidden.
-         mCache = MeshOps::UVProject(src, uvMode, uvAngle, uvMargin, uvScale);
+         // UVs stay on the surface, as in Blender: while only the points move
+         // (a pose, a clip, a sculpt) the layout is kept and the new points
+         // carried through, so a texture rides the mesh instead of swimming,
+         // and an animated model is not re-projected every frame.
+         const bool keep = mHasBuilt && mBuilt.op == kUVProject && mBuilt.upstream == sig.upstream &&
+                           mBuilt.uvMode == sig.uvMode && mBuilt.uvAngle == sig.uvAngle &&
+                           mBuilt.uvMargin == sig.uvMargin && mBuilt.uvScale == sig.uvScale &&
+                           mUVFrom.size() == mCache.vertices.size() && src.vertices.size() == mUVInputVerts &&
+                           src.indices == mUVInputIndices;
+         if (keep)
+         {
+            const bool colour = src.HasVertexColor() && mCache.vertexColor.size() == mCache.vertices.size() * 3;
+            for (size_t i = 0; i < mUVFrom.size(); i++)
+            {
+               Vertex& o = mCache.vertices[i];
+               const Vertex& in = src.vertices[mUVFrom[i]];
+               o.px = in.px; o.py = in.py; o.pz = in.pz;
+               o.nx = in.nx; o.ny = in.ny; o.nz = in.nz;
+               if (colour)
+                  for (int k = 0; k < 3; k++)
+                     mCache.vertexColor[i * 3 + k] = src.vertexColor[mUVFrom[i] * 3 + k];
+            }
+            mCache.faceMask = src.faceMask;
+            mCache.selectionGroup = src.selectionGroup;
+            break;
+         }
+         mCache = MeshOps::UVProject(src, uvMode, uvAngle, uvMargin, uvScale, &mUVFrom);
+         mUVInputIndices = src.indices;
+         mUVInputVerts = src.vertices.size();
          break;
+      }
       case kScrew:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
          mCache = MeshOps::Screw(src, screwSteps, turns, rise, radiusOffset, axis);

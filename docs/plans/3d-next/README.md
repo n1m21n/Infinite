@@ -99,3 +99,60 @@ Known edges: the first dab of a stroke on a fresh sculpt re-shapes in full
 computed ones. Dab cost scales with points under the brush, about 0.5 us a
 point: a brush over a UV sphere's pole (every ring crowds in) touches ~60k
 points and costs ~14 ms.
+
+F, 2026-11-02. `INFINITE_3DFLOWTEST=<glb,glb,..>` (`_OUT` = folder for the
+saved patches) builds Model 3D -> Sculpt -> UV Project -> Bake AO -> Material
+-> pose -> Render 3D on each model and checks every stage passes something
+on. It saves the patch, reopens it, and renders it headless. OK, 0 failures
+on Fox, CesiumMan and AntiqueCamera. The saved patches render with
+`--frame` in a fresh process (not black, no warnings).
+
+| Check | Fox | CesiumMan | AntiqueCamera |
+|---|---|---|---|
+| a pose change re-cooks the chain (budget 25 ms) | 3.7 ms | 19.2 ms | n/a (no rig) |
+| another part flows through, Sculpt warns it does not fit | n/a | n/a | OK |
+
+What broke and was fixed:
+
+- **glTF import turned rotated parts inside out.** The node-matrix
+  determinant read column 0 as `m[0], m[4], m[8]` (a row), which gives
+  cos 2θ for a Y turn. Any node turned more than 45° came in with its
+  winding and normals flipped. Self-tests passed for months; a Blender A/B
+  of the AntiqueCamera AO bake exposed it (ours 0.04, Blender's bright).
+- **Bake banded.** Each texel's ray turn was `fmod(float(x*7919 +
+  y*104729) * 0.618, 1)`. Past 2^24 a float holds only even integers, so it
+  read 0 and every texel shot the same 16 rays: stepped rectangles instead
+  of fine noise. Now hashed in integers.
+- **UV Project re-projected every pose (90 ms).** The layout is kept when
+  only the points move (same topology, same settings); positions, normals
+  and colours are copied through `from` indices: 0.1-0.5 ms. As in Blender,
+  UVs ride the surface instead of swimming.
+- **Sculpt rebuilt its topology every pose.** Build runs only when the point
+  count or indices change.
+- MODELTEST's extent check expected every model *on* the unit box; a part
+  keeps the whole file's fit and a skinned model is fit to its rest pose,
+  so it now checks *inside*.
+
+Known edge: CesiumMan at Sculpt Level 1 spends ~15 ms of a pose in
+Subdivide (10k points). The lever is subdivision stencils (re-use the
+weights, only re-mix positions); not needed under the 25 ms budget.
+
+Blender A/B (`tools/blender-ab/ab.py`, see its docstring). Same mesh,
+reach, rays, texture size and camera in headless Blender and Infinite. Plain
+display: Render 3D `tonemap None` = Blender Standard; both default to AgX,
+which dims white to 0.8. Reference = Cycles AO computed per pixel (no UVs),
+not Blender's bake, because a bake can itself be the outlier (Smart UV
+without packing filled 1.9% of the texture). Mean |error| against the
+reference, AO 512, 16 rays, reach 0.25:
+
+| Object | Blender bake | Infinite bake |
+|---|---|---|
+| Suzanne (repo) / generated | 0.039 / 0.013 | 0.020 / 0.015 |
+| Fox | 0.008 | 0.007 |
+| AntiqueCamera | 0.073 | 0.045 |
+| torus on slab, corner box, cup, stairs | 0.013, 0.009, 0.062, 0.016 | 0.016, 0.009, 0.016, 0.016 |
+| node_lfo | Blender 5.1 aborts packing its UVs | 0.018 |
+| controls_kit | no reading (empty mask, not looked at) | |
+
+Mean error alone missed the banding (the bands average out), so read the
+sheet (truth, Blender bake, Infinite, diff x4) before the number.
