@@ -77,6 +77,11 @@ pick() {
          }
          var j = JSON.parse($.NSString.stringWithContentsOfFileEncodingError(a[1], $.NSUTF8StringEncoding, null).js);
          var ds = (j.result || {}).devices || [];
+         if (a[0] == "state") {
+            for (var n = 0; n < ds.length; n++)
+               if (ds[n].identifier == a[2]) return String((ds[n].connectionProperties || {}).tunnelState || "");
+            return "";
+         }
          var any = "";
          for (var i = 0; i < ds.length; i++) {
             var hw = ds[i].hardwareProperties || {}, p = ds[i].deviceProperties || {};
@@ -86,7 +91,7 @@ pick() {
             if (!any) any = ds[i].identifier;   // a paired watch reads "disabled" until Xcode has prepared it
          }
          return any;
-      }' "$1" "$2" 2>/dev/null
+      }' "$1" "$2" "$3" 2>/dev/null
 }
 
 # The team id, from the first place that knows it: Xcode's account prefs, an Apple Development certificate in the
@@ -155,8 +160,8 @@ if [ -z "$team" ]; then
    open -a Xcode 2>/dev/null
    fail "No Apple ID team found in Xcode." "in Xcode open Settings > Accounts (add your Apple ID with + if it is not there), click your Apple ID and wait for 'Personal Team' to show, then run this again."
 fi
+xcrun devicectl list devices --json-output "$log" >/dev/null 2>&1
 if [ -z "$device" ]; then
-   xcrun devicectl list devices --json-output "$log" >/dev/null 2>&1
    device="$(pick watch "$log")"
 fi
 if [ -z "$device" ]; then
@@ -183,17 +188,23 @@ elif [ ! -d "$work/InfiniteRemote.xcodeproj" ]; then
    fail "This copy has no Xcode project and xcodegen is not installed." "run: brew install xcodegen"
 fi
 
+# The watch has to be reachable now: devicectl reads "unavailable" while the iPhone is unplugged or asleep, and the
+# build would only fail after a minute with a destination error.
+watch_hint="the watch is not connected to Xcode: unlock it, turn Bluetooth on, use the same Wi-Fi as this Mac, turn on Developer Mode, and check it shows in Xcode > Window > Devices and Simulators."
+if [ "$(pick state "$log" "$device")" = "unavailable" ]; then
+   fail "Xcode cannot reach your watch." "$watch_hint"
+fi
+
 # 4: build --------------------------------------------------------------------------------------------------------
 step 4 "building for your watch (the first build takes a few minutes)"
 # A free team can only make a profile for a registered device, and a device is registered when the build targets it,
 # so the build names the watch instead of building for "any watchOS device".
-watch_hint="the watch is not connected to Xcode: unlock it, turn Bluetooth on, use the same Wi-Fi as this Mac, turn on Developer Mode, and check it shows in Xcode > Window > Devices and Simulators."
 build() {
    xcodebuild -project "$work/InfiniteRemote.xcodeproj" -scheme InfiniteRemote -configuration Release \
       -destination "id=$device" -derivedDataPath "$work/build" -allowProvisioningUpdates build >"$log" 2>&1
 }
 if ! build; then
-   if grep -qiE "Timed out waiting for all destinations|discoverable via Bluetooth|team has no devices" "$log"; then
+   if grep -qiE "Timed out waiting for all destinations|Unable to find a destination matching|discoverable via Bluetooth|team has no devices" "$log"; then
       fail "Xcode cannot reach your watch." "$watch_hint"
    elif grep -qiE "watchOS .*(is not installed|must be installed)|platform .*watchOS.*not installed" "$log"; then
       echo "Downloading the watchOS components for Xcode..."
