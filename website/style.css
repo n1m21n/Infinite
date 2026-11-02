@@ -1079,3 +1079,5 @@ p.mono { font-size: 0.84375rem; }
 .faq-item[open] .faq-arrow { transform: rotate(180deg); }
 .faq-answer { padding: 0 20px 16px; color: var(--ink2); font-size: var(--fs-small); line-height: 1.55; }
 .faq-answer p { margin: 0; }
+
+.product-shot.is-wide { object-fit: contain; background: var(--midnight-950, #0d1020); }
