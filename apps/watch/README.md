@@ -32,7 +32,7 @@ A free Apple ID signs the app for 7 days. The Apple Watch node shows "watch app 
 | Build | How the app stays awake with the wrist down | Heart rate | Needs |
 |---|---|---|---|
 | Default (`INFINITE_WATCH_HEALTH = 0`) | extended runtime session (physical therapy type) | not sent | nothing, works on free teams; it runs about an hour per start |
-| Health (`INFINITE_WATCH_HEALTH = 1` in `Local.xcconfig`, or `INFINITE_WATCH_HEALTH=1 scripts/build_watch_app.sh`) | workout session | sent | a team that allows the HealthKit capability (Xcode shows an error at signing if yours does not) |
+| Health (`scripts/build_watch_app.sh --health 1`; the choice is remembered in `Local.xcconfig`, so Install on my watch and Reinstall keep it, and `--health 0` turns it off) | workout session | sent | a team that allows the HealthKit capability (Xcode shows an error at signing if yours does not) |
 
 ## Troubleshooting
 

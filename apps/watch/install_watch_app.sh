@@ -11,7 +11,7 @@
 set -u
 
 total=5
-team=""; device=""; health=0
+team=""; device=""; health=""
 source_dir="$(cd "$(dirname "$0")" && pwd)"
 work="$HOME/Library/Application Support/Infinite/WatchRemote"
 while [ $# -gt 0 ]; do
@@ -115,6 +115,12 @@ find_team() {
    rm -rf "$tmp"
    printf '%s' "$t"
 }
+
+# --health is remembered in Local.xcconfig, so the app's Install button and the 7-day reinstall keep the last choice
+if [ -z "$health" ]; then
+   health="$(sed -n -E 's/^INFINITE_WATCH_HEALTH *= *([01]).*/\1/p' "$work/Config/Local.xcconfig" 2>/dev/null | head -1)"
+   health="${health:-0}"
+fi
 
 # 1: Xcode, its license, and xcode-select -----------------------------------------------------------------------
 step 1 "checking Xcode"
