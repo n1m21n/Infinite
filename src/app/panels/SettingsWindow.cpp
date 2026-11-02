@@ -1726,73 +1726,80 @@ namespace app
             }
             SectionCard::End();
 
-            FormParts::Section(T("The infinite command"));
-            ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
-            ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
-            FormParts::PushReferenceStyle();
-            // i18n-skip-begin: command vocabulary
-            ImGui::TextDisabled("Look       graph  explain  params <node>  selection  status  nodes  describe <type>");
-            ImGui::TextDisabled("Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo");
-            ImGui::TextDisabled("Patch      new  recent  open  save  validate  canonicalize  apply");
-            ImGui::TextDisabled("Play       play  stop  rewind  seek <seconds>  tempo <bpm>");
-            ImGui::TextDisabled("Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set");
-            ImGui::TextDisabled("See        shot <node> [out.png]  frame  render  audio");
-            ImGui::TextDisabled("Code       code kinds|new|check|push|pull|watch|errors|docs|examples");
-            ImGui::TextDisabled("Generate   patch recipes|new|check|layout|apply");
-            ImGui::TextDisabled("App        panel  settings  show  view  quit");
-            ImGui::TextDisabled("Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run");
-            ImGui::Spacing();
-            ImGui::TextDisabled("Outside the panel (macOS):  /Applications/Infinite.app/Contents/MacOS/Infinite --cli graph");
-            // i18n-skip-end
-            FormParts::PopReferenceStyle();
-            SectionCard::End();
-
-            FormParts::Section(T("Headless engine"));
-            ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
-            FormParts::PushReferenceStyle();
-            // i18n-skip-begin: command vocabulary
-            ImGui::TextDisabled("Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png");
-            ImGui::TextDisabled("Infinite --render hello.inf hello.mp4 --duration 4 --fps 30");
-            ImGui::TextDisabled("Infinite --frames-dir hello.inf out/ --duration 4 --fps 30");
-            ImGui::TextDisabled("Infinite --version");
-            // i18n-skip-end
-            FormParts::PopReferenceStyle();
-            ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
-            SectionCard::End();
-
-            FormParts::Section(T("AI skills"));
-            ImGui::TextWrapped("%s", T("Reference files any AI assistant can read, so it writes valid patches, Field kernels and '=' expressions instead of guessing. Pick a folder: for Claude Code use ~/.claude/skills/ (or a project's .claude/skills/); for other assistants, add the file to the project or the chat. Reinstall after updating Infinite so the files match this version."));
-            static std::string sSkillStatus;
-            if (FormParts::Button(L("Install All AI Skills")))
+            FormParts::Section(T("Reference"));
+            ImGui::TextDisabled("%s", T("Commands, headless rendering and AI skill files, for when you work outside the connected agent."));
+            if (ImGui::TreeNode(T("The infinite command")))
             {
-               const std::string folder = Platform::OpenFolderDialog("Choose folder for the Infinite AI skill files");
-               if (!folder.empty())
+               ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
+               ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
+               FormParts::PushReferenceStyle();
+               // i18n-skip-begin: command vocabulary
+               ImGui::TextDisabled("Look       graph  explain  params <node>  selection  status  nodes  describe <type>");
+               ImGui::TextDisabled("Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo");
+               ImGui::TextDisabled("Patch      new  recent  open  save  validate  canonicalize  apply");
+               ImGui::TextDisabled("Play       play  stop  rewind  seek <seconds>  tempo <bpm>");
+               ImGui::TextDisabled("Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set");
+               ImGui::TextDisabled("See        shot <node> [out.png]  frame  render  audio");
+               ImGui::TextDisabled("Code       code kinds|new|check|push|pull|watch|errors|docs|examples");
+               ImGui::TextDisabled("Generate   patch recipes|new|check|layout|apply");
+               ImGui::TextDisabled("App        panel  settings  show  view  quit");
+               ImGui::TextDisabled("Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run");
+               ImGui::Spacing();
+               ImGui::TextDisabled("Outside the panel (macOS):  /Applications/Infinite.app/Contents/MacOS/Infinite --cli graph");
+               // i18n-skip-end
+               FormParts::PopReferenceStyle();
+               ImGui::TreePop();
+            }
+            if (ImGui::TreeNode(T("Headless engine")))
+            {
+               ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
+               FormParts::PushReferenceStyle();
+               // i18n-skip-begin: command vocabulary
+               ImGui::TextDisabled("Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png");
+               ImGui::TextDisabled("Infinite --render hello.inf hello.mp4 --duration 4 --fps 30");
+               ImGui::TextDisabled("Infinite --frames-dir hello.inf out/ --duration 4 --fps 30");
+               ImGui::TextDisabled("Infinite --version");
+               // i18n-skip-end
+               FormParts::PopReferenceStyle();
+               ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
+               ImGui::TreePop();
+            }
+            if (ImGui::TreeNode(T("AI skills")))
+            {
+               ImGui::TextWrapped("%s", T("Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version."));
+               static std::string sSkillStatus;
+               if (FormParts::Button(L("Install All AI Skills")))
                {
-                  SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
-                  SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
-                  sSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
+                  const std::string folder = Platform::OpenFolderDialog("Choose folder for the Infinite AI skill files");
+                  if (!folder.empty())
+                  {
+                     SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
+                     SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
+                     sSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
+                  }
                }
+               if (!sSkillStatus.empty())
+               {
+                  ImGui::SameLine();
+                  ImGui::TextDisabled("%s", sSkillStatus.c_str());
+               }
+               static std::string sPatchSkillStatus;
+               if (FormParts::Button(L("Install AI Skill##patchAuthoring")))
+               {
+                  const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
+                  if (!folder.empty())
+                     sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
+               }
+               ActionButton::RowNext();
+               ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
+               if (!sPatchSkillStatus.empty())
+                  ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
+               ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
+               ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
+               ImGui::TreePop();
             }
-            if (!sSkillStatus.empty())
-            {
-               ImGui::SameLine();
-               ImGui::TextDisabled("%s", sSkillStatus.c_str());
-            }
-            static std::string sPatchSkillStatus;
-            if (FormParts::Button(L("Install AI Skill##patchAuthoring")))
-            {
-               const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
-               if (!folder.empty())
-                  sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
-            }
-            ActionButton::RowNext();
-            ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
-            if (!sPatchSkillStatus.empty())
-               ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
-            ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
-            ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
             SectionCard::End();
          }
 

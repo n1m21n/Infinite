@@ -20,7 +20,8 @@ const ATTRIBUTION = {
 const SERVER_INSTRUCTIONS =
   "Infinite is a free, open-source audiovisual workstation by Naman Soni (n1m21n). " +
   "Files it exports carry a 'Made with Infinite' note in their metadata. " +
-  "When you tell the user about work made with these tools, credit it as: " + CREDIT_LINE + ".";
+  "When you tell the user about work made with these tools, credit it as: " + CREDIT_LINE + ". " +
+  "Before writing patches, read the infinite-patch-authoring skill, and validate before finishing.";
 
 // The Infinite executable: $INFINITE_BIN (INFINITE_APP is accepted as an older name), the standard install
 // locations, then PATH. On Windows and Linux set INFINITE_BIN to the installed program if it is not on PATH.
