@@ -93,7 +93,7 @@ namespace app
          sLastRead = -10.0;
       };
       using Kind = ActionButton::Kind;
-      const ImVec2 wide(FormParts::ControlW(), FormParts::kRowH);
+      const ImVec2 wide(FormParts::ControlW(), 0.0f);   // frame height, the same as the dropdown above it
       auto button = [&](const char* label, Kind kind) { return ActionButton::Draw(label, wide, kind); };
 
       bool allGreen = sStatus.present && !sStatus.running;
@@ -109,7 +109,8 @@ namespace app
       {
          StepStatus mark;
          mark.state = allGreen ? StepState::kOk : anyFailed ? StepState::kFailed : sStatus.running ? StepState::kRunning : sStatus.present ? StepState::kRepair : StepState::kPending;
-         const float icon = ImGui::GetFrameHeight();
+         const float icon = ImGui::GetTextLineHeight();
+         ImGui::AlignTextToFramePadding();
          DrawStepIcon(mark, icon);
          FormParts::Inline();
          ImGui::AlignTextToFramePadding();

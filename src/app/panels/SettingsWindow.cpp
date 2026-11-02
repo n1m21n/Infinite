@@ -1700,12 +1700,13 @@ namespace app
             DrawCliSetupSection();
             ImGui::PopTextWrapPos();
 
-            ImGui::Spacing();
+            FormParts::Section(T("Reference"));
             static int sRef = 0;
             // i18n-skip-begin: topic names are the section titles below
             static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills", "Setup commands" };
             // i18n-skip-end
-            FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), 220.0f);
+            FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), FormParts::kControlW);
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             LibraryParts::BeginWell("##terminalref", 380.0f);
             FormParts::PushReferenceStyle();
             ImGui::PushTextWrapPos(0.0f);
@@ -1799,6 +1800,7 @@ namespace app
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();
             LibraryParts::EndWell();
+            SectionCard::End();
          }
 
       }
