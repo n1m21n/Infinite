@@ -15,6 +15,10 @@ targets:
     platform: watchOS
     sources:
       - path: Sources
+      - path: Resources
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     # Signing team, bundle id and the HealthKit switch come from Config/Local.xcconfig (see README.md).
     info:
       path: Config/Info.plist
