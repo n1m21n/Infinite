@@ -565,6 +565,7 @@ set(COMMON_SOURCES
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/WatchTests.cpp
     src/core/WatchPacket.cpp
+    src/platform/WatchLink.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
     src/app/ui/ModWidgets.cpp
@@ -902,6 +903,7 @@ set(APPLE_SOURCES
     src/platform/Platform.mm
     src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
+    src/platform/WatchLink.mm
     src/audio/AudioFileWriter.mm
     ${SYPHON_SOURCES}
 )
@@ -939,6 +941,7 @@ set(WIN32_SOURCES
     src/platform/win/Infinite.manifest
     src/platform/win/PlatformWin.cpp
     src/platform/HeadTrackerStub.cpp
+    src/platform/WatchLinkStub.cpp
     src/platform/win/TextWin.cpp
     src/platform/win/CrashHandlerWin.cpp
     # GL-only half of the Spout bridge (glad), kept out of PlatformWin.cpp's
@@ -972,6 +975,7 @@ set(WIN32_SOURCES
 set(LINUX_SOURCES
     src/platform/linux/PlatformLinux.cpp
     src/platform/HeadTrackerStub.cpp
+    src/platform/WatchLinkStub.cpp
     src/platform/linux/TextLinux.cpp
     src/platform/linux/CrashHandlerLinux.cpp
     src/platform/linux/AudioDeviceLinux.cpp
@@ -1659,7 +1663,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
-    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/platform/WatchLink.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
@@ -1756,6 +1760,7 @@ if(APPLE)
         "-framework AVFoundation"
         "-framework Vision"
         "-framework CoreMotion"
+        "-framework CoreBluetooth"
         "-framework QuartzCore"
         "-framework ModelIO"
         "-framework Accelerate"
