@@ -5,7 +5,7 @@ Skills before building: `windows-parity`, `linux-parity`, `build-discipline`.
 
 ## Goal
 
-Settings has a "Command line & agents" section. One button, "Get set up", opens a new Terminal tab and runs a setup script there (so a `sudo` or `brew` prompt works). When it ends, a green tick per step shows. A "Coding agent" row installs Claude Code if missing and starts it in the open patch's folder with Infinite's MCP server already registered.
+Settings has a "Command line & agents" section. One button, "Connect terminal & agent", opens a new Terminal tab and runs a setup script there (so a `sudo` or `brew` prompt works). When it ends, a green tick per step shows. A "Coding agent" row installs Claude Code if missing and starts it in the open patch's folder with Infinite's MCP server already registered.
 
 ## What exists today
 
@@ -23,7 +23,7 @@ Settings has a "Command line & agents" section. One button, "Get set up", opens 
 
 ```
  Settings > Terminal > "Command line & agents"
-   [Get set up]  [Agent: Claude Code v]  [Install]  [Start agent]  [x] start on open
+   [Connect terminal & agent]  [Agent: Claude Code v]  [Install]  [Start agent]  [x] start on open
         |                                                         |
         | writes <AppSupport>/cli-setup/setup.sh|.ps1             | types ONE line into a new tab
         v                                                         v
@@ -82,7 +82,7 @@ Adding Codex or Gemini later is one more row.
 | D5 | Show commands first? | The section prints the exact line that will be typed and a collapsible "Show the script" with the full text. Nothing runs until a button is pressed | Requirement 5 |
 | D6 | Installing prerequisites | Script installs Node (brew/apt/dnf/pacman/winget) and Linux `xvfb`; the preview lists them as "only if missing". No installer of Homebrew itself | Needs the visible terminal for passwords; stops at a link when no package manager exists |
 | D7 | PATH, permanently | Shim in `~/.local/bin` plus a marked block in the shell rc (zsh `.zshrc`, bash `.bash_profile` on macOS / `.bashrc` on Linux, else `.profile`). Windows: `%LOCALAPPDATA%\Infinite\bin` + user PATH | Same shape as other CLIs; marked block makes reruns and removal clean |
-| D8 | Rerun | Every step checks first; the shim is rewritten only if its text differs (app moved) | "Get set up" doubles as repair |
+| D8 | Rerun | Every step checks first; the shim is rewritten only if its text differs (app moved) | "Connect terminal & agent" doubles as repair |
 | D9 | Terminal tab API | `TerminalRunInNewTab(title, line)` in `TerminalPanel.cpp`: opens the panel, adds a tab, types the line plus Enter | The terminal already types via `SendBytes`; no new RPC |
 | D10 | Agent start line | `export PATH=~/.local/bin:$PATH; <mcpCheck> >/dev/null 2>&1 \|\| <mcpAdd>; <launch>` so MCP is registered even when setup was never run | "MCP already registered" holds |
 | D11 | Auto-start | Toggle persisted in `<AppSupport>/cli-setup/config.json` with the chosen agent. When the panel creates its first tab and the toggle is on and the agent is installed, the line is typed into that tab. Off by default | Never surprises a user; one tab, not on every tab |

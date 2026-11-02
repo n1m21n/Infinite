@@ -733,9 +733,9 @@ if ($Failed -gt 0) { exit 1 }
             }
       v.setupEnabled = !status.running;
       if (status.running)
-         v.setupLabel = "Setting up...";
+         v.setupLabel = "Connecting...";
       else
-         v.setupLabel = status.present ? "Set up again" : "Get set up";
+         v.setupLabel = status.present ? "Connect again" : "Connect terminal & agent";
       const int green = status.GreenCount() - repairs, failed = status.FailedCount();
       if (!status.present)
          v.summary = "Not set up yet.";
@@ -748,7 +748,7 @@ if ($Failed -gt 0) { exit 1 }
       else if (green == kStepCount)
          v.summary = "Everything is set up.";
       else
-         v.summary = std::to_string(green) + " of " + std::to_string(kStepCount) + " done. Press Set up again after installing " + agent.name + ".";
+         v.summary = std::to_string(green) + " of " + std::to_string(kStepCount) + " done. Press Connect again after installing " + agent.name + ".";
       return v;
    }
 

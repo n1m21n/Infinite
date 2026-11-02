@@ -112,7 +112,7 @@ namespace CliSetup
    struct View
    {
       std::vector<StepStatus> steps;
-      std::string setupLabel;       // "Get set up" / "Set up again" / "Setting up..."
+      std::string setupLabel;       // "Connect terminal & agent" / "Connect again" / "Connecting..."
       bool setupEnabled = true;
       std::string summary;          // "3 of 5 done", "1 step needs attention", ...
       std::string agentName;

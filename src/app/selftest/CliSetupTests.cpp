@@ -46,7 +46,7 @@ namespace app
       {
          View v = describe("", false);
          check(v.steps.size() == 5 && v.steps[0].state == StepState::kPending, "no file: five pending steps");
-         check(v.setupLabel == "Get set up" && v.setupEnabled && v.summary == "Not set up yet.", "no file: first-run button");
+         check(v.setupLabel == "Connect terminal & agent" && v.setupEnabled && v.summary == "Not set up yet.", "no file: first-run button");
          check(v.showInstall && !v.startEnabled, "agent missing: Install shown, Start disabled");
       }
       // 2. garbage, wrong version, wrong shape: the same as no file.
@@ -60,7 +60,7 @@ namespace app
       {
          const char* st[5] = { "ok", "skipped", "running", "pending", "pending" };
          View v = describe(StatusJson(1, true, now - 5, st), false);
-         check(v.setupLabel == "Setting up..." && !v.setupEnabled, "running: button disabled");
+         check(v.setupLabel == "Connecting..." && !v.setupEnabled, "running: button disabled");
          check(v.steps[0].Green() && v.steps[1].Green() && v.steps[2].state == StepState::kRunning, "running: ticks and the live step");
          check(v.summary == "2 of 5 done so far.", "running: summary");
       }
@@ -74,7 +74,7 @@ namespace app
       {
          const char* st[5] = { "ok", "skipped", "skipped", "ok", "ok" };
          View v = describe(StatusJson(1, false, now - 90, st), true);
-         check(v.setupLabel == "Set up again" && v.summary == "Everything is set up.", "all green: summary");
+         check(v.setupLabel == "Connect again" && v.summary == "Everything is set up.", "all green: summary");
          check(!v.showInstall && v.startEnabled, "agent present: Start enabled, no Install");
          int green = 0;
          for (const StepStatus& s : v.steps) green += s.Green();
