@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "json.hpp"
+#include "core/AISkillContent.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 
@@ -66,7 +67,7 @@ namespace CliSetup
          "Check the headless engine",
          "Check Node.js (runs the MCP server)",
          "Fetch the Infinite MCP server",
-         "Register the MCP server with your coding agent",
+         "Connect your coding agent (MCP server and AI skills)",
       };
    }
 
@@ -81,9 +82,20 @@ namespace CliSetup
            "claude mcp add --scope user infinite -e INFINITE_BIN={EXE} -- npx -y infinite-engine serve",
            "claude mcp remove infinite --scope user",
            ".claude.json",
+           ".claude/skills",
            "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },
       };
       return kAgents;
+   }
+
+   const std::vector<Skill>& Skills()
+   {
+      static const std::vector<Skill> kSkills = {
+         { "infinite-patch-authoring", AISkillContent::kPatchAuthoringMarkdown },
+         { "infinite-field-language", AISkillContent::kFieldLanguageMarkdown },
+         { "infinite-expression-globals", AISkillContent::kExpressionGlobalsMarkdown },
+      };
+      return kSkills;
    }
 
    const Agent* FindAgent(const std::string& id)
@@ -302,19 +314,43 @@ else
 fi
 fi
 
-# 5. the coding agent. The registration names the launcher, not this copy of the app.
+# 5. the coding agent: the MCP registration names the launcher, not this copy of the app; the AI skill
+#    files are copied into the agent's skills folder (a changed file is replaced, an equal one is left).
+skills_sync() {
+  SK_N=0
+  [ -n "$SKILLS_DIR" ] || return 0
+  for d in "$SKILLS_SRC"/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    n=$(basename "$d")
+    if ! cmp -s "$d/SKILL.md" "$SKILLS_DIR/$n/SKILL.md"; then
+      mkdir -p "$SKILLS_DIR/$n" && cp "$d/SKILL.md" "$SKILLS_DIR/$n/SKILL.md" || return 1
+      SK_N=$((SK_N + 1))
+    fi
+  done
+}
 if want agent; then
-begin 5 agent "Register the MCP server with $AGENT_NAME"
+begin 5 agent "Connect $AGENT_NAME (MCP server and AI skills)"
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
-  finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then set up again"
+  finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"
 elif [ ! -x "$APPBIN" ]; then
   finish failed "run step 1 first: $APPBIN is missing"
-elif mcp_check_out=$(mcp_check 2>/dev/null) && printf '%s' "$mcp_check_out" | grep -qF "$APPBIN"; then
-  finish skipped "already registered"
 else
-  mcp_remove >/dev/null 2>&1
-  if mcp_add; then finish ok "registered with $AGENT_NAME"; else finish failed "$AGENT_NAME refused the registration"; fi
+  REG=skipped
+  if mcp_check_out=$(mcp_check 2>/dev/null) && printf '%s' "$mcp_check_out" | grep -qF "$APPBIN"; then :
+  else
+    mcp_remove >/dev/null 2>&1
+    if mcp_add; then REG=ok; else REG=failed; fi
+  fi
+  if ! skills_sync; then
+    finish failed "could not write the AI skills to $SKILLS_DIR"
+  elif [ "$REG" = failed ]; then
+    finish failed "$AGENT_NAME refused the registration"
+  elif [ "$REG" = ok ] || [ "$SK_N" -gt 0 ]; then
+    finish ok "registered with $AGENT_NAME; $SK_N AI skill file(s) installed"
+  else
+    finish skipped "already registered; AI skills up to date"
+  fi
 fi
 fi
 
@@ -400,16 +436,33 @@ else {
 }
 }
 
-# 5. the coding agent. The registration names the launcher, not this copy of the app.
+# 5. the coding agent: the MCP registration names the launcher; the AI skill files are copied into the agent's skills folder.
+function SkillsSync {
+  $script:SkN = 0
+  if (-not $SkillsDir) { return $true }
+  foreach ($d in (Get-ChildItem -Directory $SkillsSrc -ErrorAction SilentlyContinue)) {
+    $src = Join-Path $d.FullName 'SKILL.md'; if (-not (Test-Path $src)) { continue }
+    $dst = Join-Path (Join-Path $SkillsDir $d.Name) 'SKILL.md'
+    if (-not ((Test-Path $dst) -and ((Get-FileHash $src).Hash -eq (Get-FileHash $dst).Hash))) {
+      New-Item -ItemType Directory -Force (Split-Path $dst) | Out-Null; Copy-Item -Force $src $dst; $script:SkN++
+    }
+  }
+  return $true
+}
 if (Want 'agent') {
-Begin 5 'agent' "Register the MCP server with $AgentName"
+Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
 $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then set up again" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" }
 elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
 else {
+  $reg = 'skipped'
   $cur = (McpCheck 2>$null | Out-String)
-  if ($cur.Contains($AppBin)) { Finish 'skipped' 'already registered' }
-  else { McpRemove 2>$null | Out-Null; McpAdd; if ($LASTEXITCODE -eq 0) { Finish 'ok' "registered with $AgentName" } else { Finish 'failed' "$AgentName refused the registration" } }
+  if (-not $cur.Contains($AppBin)) { McpRemove 2>$null | Out-Null; McpAdd; if ($LASTEXITCODE -eq 0) { $reg = 'ok' } else { $reg = 'failed' } }
+  try { [void](SkillsSync); $skOk = $true } catch { $skOk = $false }
+  if (-not $skOk) { Finish 'failed' "could not write the AI skills to $SkillsDir" }
+  elseif ($reg -eq 'failed') { Finish 'failed' "$AgentName refused the registration" }
+  elseif ($reg -eq 'ok' -or $SkN -gt 0) { Finish 'ok' "registered with $AgentName; $SkN AI skill file(s) installed" }
+  else { Finish 'skipped' 'already registered; AI skills up to date' }
 }
 }
 
@@ -440,6 +493,8 @@ if ($Failed -gt 0) { exit 1 }
             }
          o << " }\n";
          o << "$AppBin = Join-Path (Join-Path $env:LOCALAPPDATA 'Infinite\\bin') 'infinite-app.cmd'\n";
+         o << "$SkillsSrc = Join-Path (Split-Path $Status) 'skills'\n$SkillsDir = "
+           << (agent.skillsDir[0] != '\0' ? "Join-Path $env:USERPROFILE " + PsQuote(Replace(agent.skillsDir, "/", "\\")) : std::string("''")) << "\n";
          o << "function McpCheck { " << Replace(agent.mcpCheck, "{EXE}", "$AppBin") << " }\n";
          o << "function McpAdd { " << Replace(agent.mcpAdd, "{EXE}", "$AppBin") << " }\n";
          o << "function McpRemove { " << Replace(agent.mcpRemove, "{EXE}", "$AppBin") << " }\n";
@@ -459,7 +514,8 @@ if ($Failed -gt 0) { exit 1 }
             const char* name = st.state == StepState::kOk ? "ok" : st.state == StepState::kSkipped ? "skipped" : st.state == StepState::kFailed ? "failed" : st.state == StepState::kWaiting ? "waiting" : "pending";
             o << "ST_" << st.id << "=" << name << "; DT_" << st.id << "=" << ShQuote(st.detail) << "\n";
          }
-      o << "APPBIN=\"$HOME/.local/bin/infinite-app\"\n";
+      o << "APPBIN=\"$HOME/.local/bin/infinite-app\"\nSKILLS_SRC=\"$(dirname \"$STATUS\")/skills\"\n";
+      o << "SKILLS_DIR=" << (agent.skillsDir[0] != '\0' ? "\"$HOME/" + std::string(agent.skillsDir) + "\"" : std::string("''")) << "\n";
       o << "mcp_check() { " << Replace(agent.mcpCheck, "{EXE}", "\"$APPBIN\"") << "; }\n";
       o << "mcp_add() { " << Replace(agent.mcpAdd, "{EXE}", "\"$APPBIN\"") << "; }\n";
       o << "mcp_remove() { " << Replace(agent.mcpRemove, "{EXE}", "\"$APPBIN\"") << "; }\n";
@@ -664,7 +720,13 @@ if ($Failed -gt 0) { exit 1 }
       else if (ReadAll(in.home + "/" + in.agent->configFile).find("infinite-app") == std::string::npos)
          set(4, Health::kBroken, "the MCP registration is gone from the agent's config");
       else
+      {
          set(4, Health::kOk);
+         if (in.agent->skillsDir[0] != '\0')
+            for (const Skill& k : Skills())
+               if (ReadAll(in.home + "/" + in.agent->skillsDir + "/" + k.name + "/SKILL.md") != k.content)
+                  set(4, Health::kBroken, "the AI skill files are missing or out of date");
+      }
       return r;
    }
 
@@ -752,6 +814,21 @@ if ($Failed -gt 0) { exit 1 }
       return v;
    }
 
+   namespace
+   {
+      // Writes the shipped skill files where the script copies them from.
+      void StageSkills(const Paths& paths)
+      {
+         for (const Skill& k : Skills())
+         {
+            const std::string dir = paths.dir + "/skills/" + k.name;
+            std::error_code ec;
+            std::filesystem::create_directories(AppPaths::FsPath(dir), ec);
+            std::ofstream(AppPaths::FsPath(dir + "/SKILL.md"), std::ios::binary) << k.content;
+         }
+      }
+   }
+
    bool Perform(Action action, Os os, const Agent& agent, const std::string& exe, const Paths& paths, const Runner& run, std::string* error, const std::string& step, const Status* prior)
    {
       auto fail = [&](const std::string& why) { if (error != nullptr) *error = why; return false; };
@@ -765,6 +842,7 @@ if ($Failed -gt 0) { exit 1 }
             return fail("Infinite could not find its own executable");
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         StageSkills(paths);
          std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
          out << BuildScript(os, exe, agent, paths.status);
          out.close();
@@ -784,6 +862,7 @@ if ($Failed -gt 0) { exit 1 }
             return fail("unknown step");
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         StageSkills(paths);
          std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
          out << BuildScript(os, exe, agent, paths.status, { step }, prior);
          out.close();

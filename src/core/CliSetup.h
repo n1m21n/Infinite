@@ -25,10 +25,16 @@ namespace CliSetup
       const char* mcpAdd;
       const char* mcpRemove;
       const char* configFile;   // the agent's own config, relative to HOME; holds the MCP registration
+      const char* skillsDir;    // where the agent loads skills from, relative to HOME; "" = it has none
       const char* loginHint;    // shown under the agent row
    };
    const std::vector<Agent>& Agents();
    const Agent* FindAgent(const std::string& id);   // nullptr when unknown
+
+   // The AI skill files Infinite ships (patch authoring, Field language, Expression globals). Setup copies
+   // them into the agent's skills folder as <name>/SKILL.md; the launch check compares them byte for byte.
+   struct Skill { const char* name; const char* content; };
+   const std::vector<Skill>& Skills();
 
    enum class StepState { kPending, kRunning, kOk, kSkipped, kFailed, kWaiting, kRepair };
    struct StepStatus

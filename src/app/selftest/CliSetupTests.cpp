@@ -169,6 +169,11 @@ namespace app
          std::ofstream((bin / "npx").string()) << "x";
          std::ofstream((home / ".zshrc").string()) << "# >>> infinite cli >>>\nexport PATH\n# <<< infinite cli <<<\n";
          std::ofstream((home / ".claude.json").string()) << "{\"infinite\":{\"env\":{\"INFINITE_BIN\":\"" << (bin / "infinite-app").string() << "\"}}}";
+         for (const Skill& k : Skills())
+         {
+            fs::create_directories(home / ".claude" / "skills" / k.name);
+            std::ofstream((home / ".claude" / "skills" / k.name / "SKILL.md").string(), std::ios::binary) << k.content;
+         }
          HealthInput in;
          in.os = Os::kLinux; in.home = home.string(); in.binDir = bin.string(); in.pathEnv = "/nowhere"; in.exe = app1.string();
          in.recordFile = record; in.agent = &claude;
@@ -195,6 +200,15 @@ namespace app
          std::ofstream(record) << app2.string() << "\n";
          check(LauncherResolves(Os::kLinux, record) && CheckHealth(in).step[0] == Health::kOk, "app moved, record refreshed at launch: the launcher resolves");
 
+         // Skills: three shipped, an edited or deleted one turns the agent step amber.
+         check(Skills().size() == 3 && std::string(Skills()[0].name) == "infinite-patch-authoring", "three AI skills ship, patch authoring first");
+         const fs::path sk = home / ".claude" / "skills" / "infinite-field-language" / "SKILL.md";
+         std::ofstream(sk.string()) << "old";
+         check(CheckHealth(in).step[4] == Health::kBroken && std::string(CheckHealth(in).why[4]).find("skill") != std::string::npos, "stale AI skill file: agent step is broken");
+         fs::remove(sk);
+         check(CheckHealth(in).step[4] == Health::kBroken, "missing AI skill file: agent step is broken");
+         std::ofstream(sk.string(), std::ios::binary) << Skills()[1].content;
+
          // Each other break turns exactly its own step amber.
          fs::remove(home / ".zshrc");
          check(CheckHealth(in).step[0] == Health::kBroken, "profile line removed: PATH step is broken");
@@ -215,6 +229,7 @@ namespace app
          std::ifstream f(real.script);
          std::string script((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
          check(script.find("ONLY='path'") != std::string::npos && script.find("ST_agent=ok; DT_agent='d4'") != std::string::npos, "repair script: only this step, others seeded from the last status");
+         check(fs::exists(fs::path(real.dir) / "skills" / "infinite-expression-globals" / "SKILL.md") && script.find("SKILLS_DIR=\"$HOME/.claude/skills\"") != std::string::npos && script.find("cmp -s") != std::string::npos, "repair stages the skill files and the script copies them");
          check(!Perform(Action::kRepairStep, Os::kLinux, claude, exe, real, [&](const std::string&, const std::string&) {}, &err, "bogus", &prior), "repair refuses an unknown step");
          fs::remove_all(root);
       }
