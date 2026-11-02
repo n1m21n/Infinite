@@ -18,7 +18,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Viewport: overlays | 7/19 | 0/0 | 77 |
 | Transform, snap, pivot | 10/25 | 31/48 | 108 |
 | Object | 11/18 | 11/30 | 91 |
-| Camera | 27/87 | 16/31 | 2 |
+| Camera | 24/44 | 7/16 | 45 |
 | Light | 13/60 | 6/8 | 3 |
 | Light probe | 8/36 | 7/7 | 4 |
 | Constraints (aim only) | 3/15 | 0/26 | 0 |
@@ -30,8 +30,8 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **174/683** | **138/402** | **476** |
-| **Operators (features)** | **42/176** | | **318** |
+| **All settings** | **171/640** | **129/387** | **519** |
+| **Operators (features)** | **49/158** | | **336** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
 ## Viewport: View tab and header
@@ -548,93 +548,93 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 |---|---|---|---|---|---|
 | Type | Camera.type | enum | **Perspective**, **Orthographic**, Panoramic, Custom | in | yes |
 | Sensor Fit | Camera.sensor_fit | enum | **Auto**, Horizontal, **Vertical** | in | - |
-| Passepartout Alpha | Camera.passepartout_alpha | float |  | in | - |
-| Horizontal FOV | Camera.angle_x | float |  | in | - |
-| Vertical FOV | Camera.angle_y | float |  | in | - |
+| Passepartout Alpha | Camera.passepartout_alpha | float |  | in | yes |
+| Horizontal FOV | Camera.angle_x | float |  | in | yes |
+| Vertical FOV | Camera.angle_y | float |  | in | yes |
 | Field of View | Camera.angle | float |  | in | yes |
 | Clip Start | Camera.clip_start | float |  | in | yes |
 | Clip End | Camera.clip_end | float |  | in | yes |
 | Focal Length | Camera.lens | float |  | in | yes |
-| Sensor Width | Camera.sensor_width | float |  | in | - |
-| Sensor Height | Camera.sensor_height | float |  | in | yes |
-| Orthographic Scale | Camera.ortho_scale | float |  | in | - |
+| Sensor Width | Camera.sensor_width | float |  | in | yes |
+| Sensor Height | Camera.sensor_height | float |  | in | - |
+| Orthographic Scale | Camera.ortho_scale | float |  | in | yes |
 | Display Size | Camera.display_size | float |  | in | - |
 | Shift X | Camera.shift_x | float |  | in | yes |
 | Shift Y | Camera.shift_y | float |  | in | yes |
 | Show Limits | Camera.show_limits | boolean |  | in | - |
-| Show Mist | Camera.show_mist | boolean |  | in | - |
-| Show Passepartout | Camera.show_passepartout | boolean |  | in | - |
-| Show Safe Areas | Camera.show_safe_areas | boolean |  | in | - |
+| Show Passepartout | Camera.show_passepartout | boolean |  | in | yes |
+| Show Safe Areas | Camera.show_safe_areas | boolean |  | in | yes |
 | Show Center-Cut Safe Areas | Camera.show_safe_center | boolean |  | in | - |
 | Show Name | Camera.show_name | boolean |  | in | - |
 | Show Sensor Size | Camera.show_sensor | boolean |  | in | - |
-| Display Background Images | Camera.show_background_images | boolean |  | in | - |
 | Lens Unit | Camera.lens_unit | enum | **Millimeters**, **Field of View** | in | yes |
 | Composition Guide Color | Camera.composition_guide_color | float |  | in | - |
 | Center | Camera.show_composition_center | boolean |  | in | yes |
 | Center Diagonal | Camera.show_composition_center_diagonal | boolean |  | in | - |
 | Thirds | Camera.show_composition_thirds | boolean |  | in | yes |
-| Golden Ratio | Camera.show_composition_golden | boolean |  | in | - |
+| Golden Ratio | Camera.show_composition_golden | boolean |  | in | yes |
 | Golden Triangle A | Camera.show_composition_golden_tria_a | boolean |  | in | - |
 | Golden Triangle B | Camera.show_composition_golden_tria_b | boolean |  | in | - |
 | Harmonious Triangle A | Camera.show_composition_harmony_tri_a | boolean |  | in | - |
 | Harmonious Triangle B | Camera.show_composition_harmony_tri_b | boolean |  | in | - |
-| Panorama Type | Camera.panorama_type | enum | **Equirectangular**, Equiangular Cubemap Face, Mirror Ball, Fisheye Equidistant, Fisheye Equisolid, Fisheye Lens Polynomial, Central Cylindrical | in | - |
+| Panorama Type | Camera.panorama_type | enum | **Equirectangular**, Equiangular Cubemap Face, Mirror Ball, Fisheye Equidistant, Fisheye Equisolid, Fisheye Lens Polynomial, Central Cylindrical | in | yes |
 | Field of View | Camera.fisheye_fov | float |  | in | yes |
-| Fisheye Lens | Camera.fisheye_lens | float |  | in | - |
+| Fisheye Lens | Camera.fisheye_lens | float |  | in | yes |
 | Min Latitude | Camera.latitude_min | float |  | in | - |
 | Max Latitude | Camera.latitude_max | float |  | in | - |
 | Min Longitude | Camera.longitude_min | float |  | in | - |
 | Max Longitude | Camera.longitude_max | float |  | in | - |
-| Fisheye Polynomial K0 | Camera.fisheye_polynomial_k0 | float |  | in | - |
-| Fisheye Polynomial K1 | Camera.fisheye_polynomial_k1 | float |  | in | - |
-| Fisheye Polynomial K2 | Camera.fisheye_polynomial_k2 | float |  | in | - |
-| Fisheye Polynomial K3 | Camera.fisheye_polynomial_k3 | float |  | in | - |
-| Fisheye Polynomial K4 | Camera.fisheye_polynomial_k4 | float |  | in | - |
-| Min Longitude | Camera.central_cylindrical_range_u_min | float |  | in | - |
-| Max Longitude | Camera.central_cylindrical_range_u_max | float |  | in | - |
-| Min Height | Camera.central_cylindrical_range_v_min | float |  | in | - |
-| Max Height | Camera.central_cylindrical_range_v_max | float |  | in | - |
-| Cylinder Radius | Camera.central_cylindrical_radius | float |  | in | - |
-| Custom File Path | Camera.custom_filepath | string |  | in | - |
-| Custom Shader | Camera.custom_shader | pointer |  | in | - |
-| Custom shader source | Camera.custom_mode | enum | **Internal**, External | in | - |
-| Custom Bytecode | Camera.custom_bytecode | string |  | in | - |
-| Custom Bytecode Hash | Camera.custom_bytecode_hash | string |  | in | - |
-| Background Images | Camera.background_images | collection |  | in | - |
 | Depth of Field | CameraDOFSettings.use_dof | boolean |  | in | yes |
-| Focus Bone | CameraDOFSettings.focus_subtarget | string |  | in | - |
 | Focus Distance | CameraDOFSettings.focus_distance | float |  | in | yes |
 | F-Stop | CameraDOFSettings.aperture_fstop | float |  | in | yes |
 | Blades | CameraDOFSettings.aperture_blades | int |  | in | - |
-| Rotation | CameraDOFSettings.aperture_rotation | float |  | in | yes |
-| Ratio | CameraDOFSettings.aperture_ratio | float |  | in | yes |
-| Background Source | CameraBackgroundImage.source | enum | **Image**, Movie Clip | in | yes |
-| Image | CameraBackgroundImage.image | pointer |  | in | yes |
-| MovieClip | CameraBackgroundImage.clip | pointer |  | in | yes |
-| Image User | CameraBackgroundImage.image_user | pointer |  | in | - |
-| Clip User | CameraBackgroundImage.clip_user | pointer |  | in | - |
-| Offset | CameraBackgroundImage.offset | float |  | in | yes |
-| Scale | CameraBackgroundImage.scale | float |  | in | yes |
-| Rotation | CameraBackgroundImage.rotation | float |  | in | yes |
-| Flip Horizontally | CameraBackgroundImage.use_flip_x | boolean |  | in | - |
-| Flip Vertically | CameraBackgroundImage.use_flip_y | boolean |  | in | - |
-| Opacity | CameraBackgroundImage.alpha | float |  | in | yes |
-| Show Expanded | CameraBackgroundImage.show_expanded | boolean |  | in | - |
-| Camera Clip | CameraBackgroundImage.use_camera_clip | boolean |  | in | - |
-| Show Background Image | CameraBackgroundImage.show_background_image | boolean |  | in | - |
-| Show On Foreground | CameraBackgroundImage.show_on_foreground | boolean |  | in | - |
-| Depth | CameraBackgroundImage.display_depth | enum | **Back**, **Front** | in | yes |
-| Frame Method | CameraBackgroundImage.frame_method | enum | **Stretch**, **Fit**, Crop | in | - |
-| Mode | CameraStereoData.convergence_mode | enum | Off-Axis, Parallel, Toe-in | in | yes |
-| Pivot | CameraStereoData.pivot | enum | **Left**, **Right**, **Center** | in | yes |
-| Interocular Distance | CameraStereoData.interocular_distance | float |  | in | - |
-| Convergence Plane Distance | CameraStereoData.convergence_distance | float |  | in | - |
-| Use Pole Merge | CameraStereoData.use_pole_merge | boolean |  | in | - |
-| Pole Merge Start Angle | CameraStereoData.pole_merge_angle_from | float |  | in | - |
-| Pole Merge End Angle | CameraStereoData.pole_merge_angle_to | float |  | in | - |
+| Rotation | CameraDOFSettings.aperture_rotation | float |  | in | - |
+| Ratio | CameraDOFSettings.aperture_ratio | float |  | in | - |
+| Show Mist | Camera.show_mist | boolean |  | deferred: mist needs a World pass | - |
+| Display Background Images | Camera.show_background_images | boolean |  | deferred: camera background image: new camera mode | - |
+| Fisheye Polynomial K0 | Camera.fisheye_polynomial_k0 | float |  | out: custom lens polynomial | - |
+| Fisheye Polynomial K1 | Camera.fisheye_polynomial_k1 | float |  | out: custom lens polynomial | - |
+| Fisheye Polynomial K2 | Camera.fisheye_polynomial_k2 | float |  | out: custom lens polynomial | - |
+| Fisheye Polynomial K3 | Camera.fisheye_polynomial_k3 | float |  | out: custom lens polynomial | - |
+| Fisheye Polynomial K4 | Camera.fisheye_polynomial_k4 | float |  | out: custom lens polynomial | - |
+| Min Longitude | Camera.central_cylindrical_range_u_min | float |  | out: cylindrical panorama | - |
+| Max Longitude | Camera.central_cylindrical_range_u_max | float |  | out: cylindrical panorama | - |
+| Min Height | Camera.central_cylindrical_range_v_min | float |  | out: cylindrical panorama | - |
+| Max Height | Camera.central_cylindrical_range_v_max | float |  | out: cylindrical panorama | - |
+| Cylinder Radius | Camera.central_cylindrical_radius | float |  | out: cylindrical panorama | - |
+| Custom File Path | Camera.custom_filepath | string |  | out: custom shader cameras | - |
+| Custom Shader | Camera.custom_shader | pointer |  | out: custom shader cameras | - |
+| Custom shader source | Camera.custom_mode | enum | **Internal**, External | out: custom shader cameras | - |
+| Custom Bytecode | Camera.custom_bytecode | string |  | out: custom shader cameras | - |
+| Custom Bytecode Hash | Camera.custom_bytecode_hash | string |  | out: custom shader cameras | - |
+| Background Images | Camera.background_images | collection |  | deferred: camera background image: new camera mode | - |
 | Cycles Custom Camera Settings | Camera.cycles_custom | pointer |  | out: cycles | - |
+| Focus Bone | CameraDOFSettings.focus_subtarget | string |  | out: armature bones | - |
+| Background Source | CameraBackgroundImage.source | enum | **Image**, Movie Clip | deferred: camera background image: new camera mode | - |
+| Image | CameraBackgroundImage.image | pointer |  | deferred: camera background image: new camera mode | - |
+| MovieClip | CameraBackgroundImage.clip | pointer |  | deferred: camera background image: new camera mode | - |
+| Image User | CameraBackgroundImage.image_user | pointer |  | deferred: camera background image: new camera mode | - |
+| Clip User | CameraBackgroundImage.clip_user | pointer |  | deferred: camera background image: new camera mode | - |
+| Offset | CameraBackgroundImage.offset | float |  | deferred: camera background image: new camera mode | - |
+| Scale | CameraBackgroundImage.scale | float |  | deferred: camera background image: new camera mode | - |
+| Rotation | CameraBackgroundImage.rotation | float |  | deferred: camera background image: new camera mode | - |
+| Flip Horizontally | CameraBackgroundImage.use_flip_x | boolean |  | deferred: camera background image: new camera mode | - |
+| Flip Vertically | CameraBackgroundImage.use_flip_y | boolean |  | deferred: camera background image: new camera mode | - |
+| Opacity | CameraBackgroundImage.alpha | float |  | deferred: camera background image: new camera mode | - |
+| Show Expanded | CameraBackgroundImage.show_expanded | boolean |  | deferred: camera background image: new camera mode | - |
+| Camera Clip | CameraBackgroundImage.use_camera_clip | boolean |  | deferred: camera background image: new camera mode | - |
+| Show Background Image | CameraBackgroundImage.show_background_image | boolean |  | deferred: camera background image: new camera mode | - |
+| Show On Foreground | CameraBackgroundImage.show_on_foreground | boolean |  | deferred: camera background image: new camera mode | - |
+| Depth | CameraBackgroundImage.display_depth | enum | **Back**, **Front** | deferred: camera background image: new camera mode | - |
+| Frame Method | CameraBackgroundImage.frame_method | enum | **Stretch**, **Fit**, Crop | deferred: camera background image: new camera mode | - |
+| Mode | CameraStereoData.convergence_mode | enum | Off-Axis, Parallel, Toe-in | out: stereo 3D is outside the README | - |
+| Pivot | CameraStereoData.pivot | enum | **Left**, **Right**, **Center** | out: stereo 3D is outside the README | - |
+| Interocular Distance | CameraStereoData.interocular_distance | float |  | out: stereo 3D is outside the README | - |
+| Convergence Plane Distance | CameraStereoData.convergence_distance | float |  | out: stereo 3D is outside the README | - |
 | Spherical Stereo | CameraStereoData.use_spherical_stereo | boolean |  | out: stereo | - |
+| Use Pole Merge | CameraStereoData.use_pole_merge | boolean |  | out: stereo 3D is outside the README | - |
+| Pole Merge Start Angle | CameraStereoData.pole_merge_angle_from | float |  | out: stereo 3D is outside the README | - |
+| Pole Merge End Angle | CameraStereoData.pole_merge_angle_to | float |  | out: stereo 3D is outside the README | - |
 
 ## Light
 
@@ -1290,13 +1290,11 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Operator | Id | What it does | Scope | Infinite |
 |---|---|---|---|---|
 | Add Camera Preset | CAMERA_OT_preset_add | Add or remove a Camera Preset | in | - |
-| Add Safe Area Preset | CAMERA_OT_safe_areas_preset_add | Add or remove a Safe Areas Preset | in | - |
-| Unlink Data-Block | ED_OT_lib_id_unlink | Remove a usage of a data-block, clearing the assignment | in | - |
-| Redo | ED_OT_redo | Redo previous action | in | - |
+| Redo | ED_OT_redo | Redo previous action | in | yes |
 | Undo | ED_OT_undo | Undo previous action | in | yes |
-| Undo History | ED_OT_undo_history | Undo or redo specific action in history | in | - |
-| Undo Push | ED_OT_undo_push | Add an undo state (internal use only) | in | - |
-| Undo and Redo | ED_OT_undo_redo | Undo and redo previous action | in | - |
+| Undo History | ED_OT_undo_history | Undo or redo specific action in history | in | yes |
+| Undo Push | ED_OT_undo_push | Add an undo state (internal use only) | in | yes |
+| Undo and Redo | ED_OT_undo_redo | Undo and redo previous action | in | yes |
 | Add Object | OBJECT_OT_add | Add an object to the scene | in | yes |
 | Add Object | OBJECT_OT_add_named | Add named object | in | yes |
 | Align Objects | OBJECT_OT_align | Align objects | in | - |
@@ -1368,30 +1366,14 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Show/Hide One Level | OUTLINER_OT_show_one_level | Expand/collapse all entries by one level | in | - |
 | Filter | OUTLINER_OT_start_filter | Start entering filter text | in | yes |
 | Unhide All | OUTLINER_OT_unhide_all | Unhide all objects and collections | in | - |
-| Add White Balance Preset | RENDER_OT_color_management_white_balance_preset_add | Add or remove a white balance preset | in | - |
-| Add Raytracing Preset | RENDER_OT_eevee_raytracing_preset_add | Add or remove an EEVEE ray-tracing preset | in | - |
 | Viewport Render | RENDER_OT_opengl | Take a snapshot of the active viewport | in | - |
-| Play Rendered Animation | RENDER_OT_play_rendered_anim | Play back rendered frames/movies using an external player | in | - |
-| Add Render Preset | RENDER_OT_preset_add | Add or remove a Render Preset | in | - |
 | Render | RENDER_OT_render | (undocumented operator) | in | yes |
 | Cancel Render View | RENDER_OT_view_cancel | Cancel showing the render view | in | - |
-| Show/Hide Render View | RENDER_OT_view_show | Toggle show render view | in | - |
+| Show/Hide Render View | RENDER_OT_view_show | Toggle show render view | in | yes |
 | Delete Scene | SCENE_OT_delete | Delete active scene | in | yes |
 | New Scene | SCENE_OT_new | Add new scene by type | in | yes |
-| Add Render View | SCENE_OT_render_view_add | Add a render view | in | - |
-| Remove Render View | SCENE_OT_render_view_remove | Remove the selected render view | in | - |
-| Add View Layer | SCENE_OT_view_layer_add | Add a view layer | in | - |
-| Add AOV | SCENE_OT_view_layer_add_aov | Add a Shader AOV | in | - |
-| Remove View Layer | SCENE_OT_view_layer_remove | Remove the selected view layer | in | - |
-| Remove AOV | SCENE_OT_view_layer_remove_aov | Remove Active AOV | in | - |
-| Play Animation | SCREEN_OT_animation_play | Play animation | in | - |
-| Jump to Endpoint | SCREEN_OT_frame_jump | Jump to first/last frame in frame range | in | - |
-| Frame Offset | SCREEN_OT_frame_offset | Move current frame forward/backward by a given number | in | - |
-| Redo Last | SCREEN_OT_redo_last | Display parameters for last action performed | in | - |
-| Toggle Region | SCREEN_OT_region_toggle | Hide or unhide the region | in | - |
-| Repeat History | SCREEN_OT_repeat_history | Display menu for previous actions performed | in | - |
+| Toggle Region | SCREEN_OT_region_toggle | Hide or unhide the region | in | yes |
 | Repeat Last | SCREEN_OT_repeat_last | Repeat last action | in | yes |
-| Toggle Maximize Area | SCREEN_OT_screen_full_area | Toggle display selected area as fullscreen/maximized | in | - |
 | Create Orientation | TRANSFORM_OT_create_orientation | Create transformation orientation from selection | in | - |
 | Delete Orientation | TRANSFORM_OT_delete_orientation | Delete transformation orientation | in | - |
 | Transform from Gizmo | TRANSFORM_OT_from_gizmo | Transform selected items by mode type | in | yes |
@@ -1464,7 +1446,8 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Zoom View | VIEW3D_OT_zoom | Zoom in/out in the view | in | - |
 | Zoom to Border | VIEW3D_OT_zoom_border | Zoom in the view to the nearest object contained in the border | in | - |
 | Zoom Camera 1:1 | VIEW3D_OT_zoom_camera_1_to_1 | Match the camera to 1:1 to the render output | in | yes |
-| New World | WORLD_OT_new | Create a new world Data-Block | in | - |
+| New World | WORLD_OT_new | Create a new world Data-Block | in | yes |
+| Add Safe Area Preset | CAMERA_OT_safe_areas_preset_add | Add or remove a Safe Areas Preset | out: preset UI; safe areas are two numbers | - |
 | Flush Edits | ED_OT_flush_edits | Flush edit data from active editing modes | out: edit | - |
 | Toggle Fake User | ED_OT_lib_id_fake_user_toggle | Save this data-block even if it has no users | out: fake_user | - |
 | Generate Preview | ED_OT_lib_id_generate_preview | Create an automatic preview for the selected data-block | out: preview | - |
@@ -1472,6 +1455,7 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Load Custom Preview | ED_OT_lib_id_load_custom_preview | Choose an image to help identify the data-block visually | out: preview | - |
 | Toggle Library Override Editable | ED_OT_lib_id_override_editable_toggle | Set if this library override data-block can be edited | out: override | - |
 | Remove Preview | ED_OT_lib_id_remove_preview | Remove the preview of this data-block | out: preview | - |
+| Unlink Data-Block | ED_OT_lib_id_unlink | Remove a usage of a data-block, clearing the assignment | out: data-block linking | - |
 | Add Modifier | OBJECT_OT_add_modifier_menu | (undocumented operator) | out: modifier | - |
 | Animated Transforms to Deltas | OBJECT_OT_anim_transforms_to_deltas | Convert object animation for normal transforms to delta transforms | deferred: delta transform needs new Item fields | - |
 | Add Armature | OBJECT_OT_armature_add | Add an armature object to the scene | out: armature | - |
@@ -1723,10 +1707,14 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Delete Drivers for Selected | OUTLINER_OT_drivers_delete_selected | Delete drivers assigned to selected items | out: driver | - |
 | Drop Material on Object | OUTLINER_OT_material_drop | Drag material to object in Outliner | out: material | - |
 | Outliner Modifier Operation | OUTLINER_OT_modifier_operation | (undocumented operator) | out: modifier | - |
+| Add White Balance Preset | RENDER_OT_color_management_white_balance_preset_add | Add or remove a white balance preset | out: preset list UI | - |
 | Add Integrator Preset | RENDER_OT_cycles_integrator_preset_add | Add an Integrator Preset | out: cycles | - |
 | Add Performance Preset | RENDER_OT_cycles_performance_preset_add | Add an Performance Preset | out: cycles | - |
 | Add Sampling Preset | RENDER_OT_cycles_sampling_preset_add | Add a Sampling Preset | out: cycles | - |
 | Add Viewport Sampling Preset | RENDER_OT_cycles_viewport_sampling_preset_add | Add a Viewport Sampling Preset | out: cycles | - |
+| Add Raytracing Preset | RENDER_OT_eevee_raytracing_preset_add | Add or remove an EEVEE ray-tracing preset | out: preset list UI | - |
+| Play Rendered Animation | RENDER_OT_play_rendered_anim | Play back rendered frames/movies using an external player | out: external player | - |
+| Add Render Preset | RENDER_OT_preset_add | Add or remove a Render Preset | out: preset list UI | - |
 | Shutter Curve Preset | RENDER_OT_shutter_curve_preset | Set shutter curve | out: curve | - |
 | Drop Scene | SCENE_OT_drop_scene_asset | Import scene and set it as the active one in the window | out: asset | - |
 | Add Edge Marks to Keying Set | SCENE_OT_freestyle_add_edge_marks_to_keying_set | Add the data paths to the Freestyle Edge Mark property of selected edges to the active keying set | out: freestyle | - |
@@ -1755,11 +1743,23 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Add Grease Pencil Material Preset | SCENE_OT_gpencil_material_preset_add | Add or remove Grease Pencil material preset | out: gpencil | - |
 | New Scene | SCENE_OT_new_sequencer | Add new scene by type in the sequence editor and assign to active strip | out: sequencer | yes |
 | New Sequencer Scene | SCENE_OT_new_sequencer_scene | Add new scene to be used by the sequencer | out: sequencer | - |
+| Add Render View | SCENE_OT_render_view_add | Add a render view | out: one view layer per scene; stereo views out | - |
+| Remove Render View | SCENE_OT_render_view_remove | Remove the selected render view | out: one view layer per scene; stereo views out | - |
+| Add View Layer | SCENE_OT_view_layer_add | Add a view layer | out: one view layer per scene; stereo views out | - |
+| Add AOV | SCENE_OT_view_layer_add_aov | Add a Shader AOV | out: one view layer per scene; stereo views out | - |
 | Add Lightgroup | SCENE_OT_view_layer_add_lightgroup | Add a Light Group | out: lightgroup | - |
 | Add Used Lightgroups | SCENE_OT_view_layer_add_used_lightgroups | Add all used Light Groups | out: lightgroup | - |
+| Remove View Layer | SCENE_OT_view_layer_remove | Remove the selected view layer | out: one view layer per scene; stereo views out | - |
+| Remove AOV | SCENE_OT_view_layer_remove_aov | Remove Active AOV | out: one view layer per scene; stereo views out | - |
 | Remove Lightgroup | SCENE_OT_view_layer_remove_lightgroup | Remove Active Lightgroup | out: lightgroup | - |
 | Remove Unused Lightgroups | SCENE_OT_view_layer_remove_unused_lightgroups | Remove all unused Light Groups | out: lightgroup | - |
+| Play Animation | SCREEN_OT_animation_play | Play animation | out: transport belongs to the app, not the panel | - |
+| Jump to Endpoint | SCREEN_OT_frame_jump | Jump to first/last frame in frame range | out: transport belongs to the app, not the panel | - |
+| Frame Offset | SCREEN_OT_frame_offset | Move current frame forward/backward by a given number | out: transport belongs to the app, not the panel | - |
 | Jump to Keyframe | SCREEN_OT_keyframe_jump | Jump to previous/next keyframe | out: keyframe | - |
+| Redo Last | SCREEN_OT_redo_last | Display parameters for last action performed | out: Adjust Last decided out in parity.md | - |
+| Repeat History | SCREEN_OT_repeat_history | Display menu for previous actions performed | out: Adjust Last decided out in parity.md | - |
+| Toggle Maximize Area | SCREEN_OT_screen_full_area | Toggle display selected area as fullscreen/maximized | out: panel layout belongs to the app | - |
 | Scale B-Bone | TRANSFORM_OT_bbone_resize | Scale selected bendy bones display size | out: deform, mesh, bone or sequencer editing | - |
 | Bend | TRANSFORM_OT_bend | Bend selected items between the 3D cursor and the mouse | out: deform, mesh, bone or sequencer editing | - |
 | Edge Bevel Weight | TRANSFORM_OT_edge_bevelweight | Change the bevel weight of edges | out: edge | - |

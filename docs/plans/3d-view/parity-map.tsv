@@ -372,3 +372,123 @@ OBJECT_OT_transforms_to_deltas	deferred	delta transform needs new Item fields
 OBJECT_OT_unlink_data	out	data-block linking
 OBJECT_OT_visual_transform_apply	out	applies to mesh data; origins are node outputs
 OBJECT_OT_volume_import	out	object types outside the scene
+Camera.type	done	View3DPanel.cpp:3453 Type Perspective/Orthographic
+Camera.sensor_fit	missing	Camera Data tab: sensor fit
+Camera.passepartout_alpha	done	View3DPanel.cpp:4018 Passepartout Opacity
+Camera.angle_x	done	View3DPanel.cpp:3463 Field of view
+Camera.angle_y	done	View3DPanel.cpp:3463 Field of view
+Camera.angle	done	View3DPanel.cpp:3463 Field of view
+Camera.clip_start	done	View3DPanel.cpp:3474 Clip start
+Camera.clip_end	done	View3DPanel.cpp:3475 Clip end
+Camera.lens	done	View3DPanel.cpp:3459 Focal length
+Camera.sensor_width	done	View3DPanel.cpp:3480 Sensor
+Camera.sensor_height	missing	Camera Data tab: sensor height
+Camera.ortho_scale	done	View3DPanel.cpp:3471 Scale (orthoHeight)
+Camera.display_size	missing	Camera Data tab: marker size
+Camera.shift_x	done	View3DPanel.cpp:3472 Shift X / Shift Y
+Camera.shift_y	done	View3DPanel.cpp:3472 Shift X / Shift Y
+Camera.show_limits	missing	Camera Data tab: show clip range and focus
+Camera.show_mist	deferred	mist needs a World pass
+Camera.show_passepartout	done	View3DPanel.cpp:4017 Passepartout card
+Camera.show_safe_areas	done	View3DPanel.cpp:4019 Safe Areas
+Camera.show_safe_center	missing	Safe Areas card: centre-cut areas
+Camera.show_name	missing	Overlays card: show camera name
+Camera.show_sensor	missing	Overlays card: sensor gate
+Camera.show_background_images	deferred	camera background image: new camera mode
+Camera.lens_unit	done	View3DPanel.cpp:3468 Lens unit
+Camera.composition_guide_color	missing	Composition Guides card: colour
+Camera.show_composition_center	done	View3DPanel.cpp:4026 Centre guide
+Camera.show_composition_center_diagonal	missing	Composition Guides card: diagonals
+Camera.show_composition_thirds	done	View3DPanel.cpp:4025 Thirds
+Camera.show_composition_golden	done	View3DPanel.cpp:4027 Golden
+Camera.show_composition_golden_tria_a	missing	Composition Guides card: triangles
+Camera.show_composition_golden_tria_b	missing	Composition Guides card: triangles
+Camera.show_composition_harmony_tri_a	missing	Composition Guides card: triangles
+Camera.show_composition_harmony_tri_b	missing	Composition Guides card: triangles
+Camera.panorama_type	done	Render3DPano.cpp: equirect, cubemap, fisheye dome (Render tab)
+Camera.fisheye_fov	done	Render3DPano.cpp: fisheye dome angle
+Camera.fisheye_lens	done	Render3DPano.cpp: fisheye dome angle
+Camera.latitude_min	missing	Render tab: panorama range
+Camera.latitude_max	missing	Render tab: panorama range
+Camera.longitude_min	missing	Render tab: panorama range
+Camera.longitude_max	missing	Render tab: panorama range
+Camera.fisheye_polynomial_k0	out	custom lens polynomial
+Camera.fisheye_polynomial_k1	out	custom lens polynomial
+Camera.fisheye_polynomial_k2	out	custom lens polynomial
+Camera.fisheye_polynomial_k3	out	custom lens polynomial
+Camera.fisheye_polynomial_k4	out	custom lens polynomial
+Camera.central_cylindrical_range_u_min	out	cylindrical panorama
+Camera.central_cylindrical_range_u_max	out	cylindrical panorama
+Camera.central_cylindrical_range_v_min	out	cylindrical panorama
+Camera.central_cylindrical_range_v_max	out	cylindrical panorama
+Camera.central_cylindrical_radius	out	cylindrical panorama
+Camera.custom_filepath	out	custom shader cameras
+Camera.custom_shader	out	custom shader cameras
+Camera.custom_mode	out	custom shader cameras
+Camera.custom_bytecode	out	custom shader cameras
+Camera.custom_bytecode_hash	out	custom shader cameras
+Camera.background_images	deferred	camera background image: new camera mode
+CameraDOFSettings.use_dof	done	View3DPanel.cpp:3503 Depth of Field
+CameraDOFSettings.focus_subtarget	out	armature bones
+CameraDOFSettings.focus_distance	done	View3DPanel.cpp:3529 Distance
+CameraDOFSettings.aperture_fstop	done	View3DPanel.cpp:3532 F-Stop
+CameraDOFSettings.aperture_blades	missing	Depth of Field card: bokeh shape
+CameraDOFSettings.aperture_rotation	missing	Depth of Field card: bokeh shape
+CameraDOFSettings.aperture_ratio	missing	Depth of Field card: bokeh shape
+CameraBackgroundImage.source	deferred	camera background image: new camera mode
+CameraBackgroundImage.image	deferred	camera background image: new camera mode
+CameraBackgroundImage.clip	deferred	camera background image: new camera mode
+CameraBackgroundImage.image_user	deferred	camera background image: new camera mode
+CameraBackgroundImage.clip_user	deferred	camera background image: new camera mode
+CameraBackgroundImage.offset	deferred	camera background image: new camera mode
+CameraBackgroundImage.scale	deferred	camera background image: new camera mode
+CameraBackgroundImage.rotation	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_flip_x	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_flip_y	deferred	camera background image: new camera mode
+CameraBackgroundImage.alpha	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_expanded	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_camera_clip	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_background_image	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_on_foreground	deferred	camera background image: new camera mode
+CameraBackgroundImage.display_depth	deferred	camera background image: new camera mode
+CameraBackgroundImage.frame_method	deferred	camera background image: new camera mode
+CameraStereoData.convergence_mode	out	stereo 3D is outside the README
+CameraStereoData.pivot	out	stereo 3D is outside the README
+CameraStereoData.interocular_distance	out	stereo 3D is outside the README
+CameraStereoData.convergence_distance	out	stereo 3D is outside the README
+CameraStereoData.use_pole_merge	out	stereo 3D is outside the README
+CameraStereoData.pole_merge_angle_from	out	stereo 3D is outside the README
+CameraStereoData.pole_merge_angle_to	out	stereo 3D is outside the README
+CAMERA_OT_preset_add	missing	Camera Data tab: camera presets
+CAMERA_OT_safe_areas_preset_add	out	preset UI; safe areas are two numbers
+ED_OT_lib_id_unlink	out	data-block linking
+ED_OT_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_history	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_push	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+RENDER_OT_color_management_white_balance_preset_add	out	preset list UI
+RENDER_OT_eevee_raytracing_preset_add	out	preset list UI
+RENDER_OT_opengl	missing	Render tab: render the viewport as a still
+RENDER_OT_play_rendered_anim	out	external player
+RENDER_OT_preset_add	out	preset list UI
+RENDER_OT_render	done	View3DPanel.cpp:3803 RenderStill, Render Image / Render Animation
+RENDER_OT_view_cancel	missing	Render tab: cancel a running render
+RENDER_OT_view_show	done	View3DPanel.cpp:3828 DrawRenderResult
+SCENE_OT_delete	done	View3DPanel.cpp:4159 Delete scene
+SCENE_OT_new	done	View3DPanel.cpp:4151 New scene
+SCENE_OT_render_view_add	out	one view layer per scene; stereo views out
+SCENE_OT_render_view_remove	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_add	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_add_aov	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_remove	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_remove_aov	out	one view layer per scene; stereo views out
+SCREEN_OT_animation_play	out	transport belongs to the app, not the panel
+SCREEN_OT_frame_jump	out	transport belongs to the app, not the panel
+SCREEN_OT_frame_offset	out	transport belongs to the app, not the panel
+SCREEN_OT_redo_last	out	Adjust Last decided out in parity.md
+SCREEN_OT_region_toggle	done	View3DPanel.cpp:2966 Properties (N)
+SCREEN_OT_repeat_history	out	Adjust Last decided out in parity.md
+SCREEN_OT_repeat_last	done	View3DPanel.cpp:1127 RepeatLast
+SCREEN_OT_screen_full_area	out	panel layout belongs to the app
+WORLD_OT_new	done	View3DPanel.cpp:4089 World tab (Load HDRI)
