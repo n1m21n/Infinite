@@ -467,6 +467,14 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("curvatureRidge", mRender.curvatureRidge);
    v.Float("curvatureValley", mRender.curvatureValley);
    v.Float("cavityDistance", mRender.cavityDistance);
+   v.Int("viewShading", mRender.viewShading);
+   v.Int("solidLighting", mRender.solidLighting);
+   v.Int("solidColor", mRender.solidColor);
+   v.Color("solidSingle", mRender.solidSingle);
+   v.Int("matcap", mRender.matcap);
+   v.Bool("solidSpecular", mRender.solidSpecular);
+   v.Bool("studioWorld", mRender.studioWorld);
+   v.Float("studioRotation", mRender.studioRotation);
    v.Int("projection", mRender.projection);
    v.Float("domeAngle", mRender.domeAngle);
    v.Float("domeTilt", mRender.domeTilt);

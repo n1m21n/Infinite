@@ -34,6 +34,10 @@ namespace
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kMistFalloffNames = { "Quadratic", "Linear", "Inverse Quadratic" };
    const std::vector<std::string> kCavityTypeNames = { "World", "Screen", "Both" };
+   const std::vector<std::string> kViewShadingNames = { "Rendered", "Solid" };
+   const std::vector<std::string> kSolidLightingNames = { "Studio", "MatCap", "Flat" };
+   const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture" };
+   const std::vector<std::string> kMatcapNames = { "Clay", "Metal", "Toon", "Gloss" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
@@ -436,6 +440,16 @@ namespace
       "uniform float uMistIntensity;\n"
       "uniform float uMistHeight;\n"
       "uniform int uObjectIndex;\n"
+      "uniform int uSolid;\n"
+      "uniform int uSolidLighting;\n"
+      "uniform int uSolidColor;\n"
+      "uniform vec3 uSolidSingle;\n"
+      "uniform int uMatcap;\n"
+      "uniform int uSolidSpecular;\n"
+      "uniform int uStudioWorld;\n"
+      "uniform float uStudioRotation;\n"
+      "uniform float uDrawRandom;\n"
+      "uniform mat4 uView;\n"
       "uniform float uPassThreshold;\n"
       "uniform float uNear;\n"
       "uniform float uFar;\n"
@@ -733,6 +747,45 @@ namespace
       "   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;\n"
       "}\n"
       "\n"
+      // Solid mode (Blender's Solid viewport shading, made here, not ported). Studio: a fixed
+      // three-light rig in camera space (or turning with the world). MatCap: lighting looked up
+      // from the view-space normal; the four looks are drawn in code, so there are no images.
+      "vec3 matcapLook(int id, vec3 nv) {\n"
+      "   vec3 l = normalize(vec3(-0.45, 0.6, 0.65));\n"
+      "   float d = max(dot(nv, l), 0.0);\n"
+      "   float rim = pow(1.0 - max(nv.z, 0.0), 3.0);\n"
+      "   float spec = pow(max(dot(reflect(vec3(0.0, 0.0, -1.0), nv), l), 0.0), 60.0);\n"
+      "   if (id == 1) {\n"
+      "      float band = 0.5 + 0.5 * sin(nv.y * 4.0 + 0.6);\n"
+      "      return vec3(0.08 + 0.7 * band * band + 0.25 * rim) + vec3(1.2 * spec);\n"
+      "   }\n"
+      "   if (id == 2) return vec3(d > 0.6 ? 1.0 : d > 0.15 ? 0.6 : 0.3) + vec3(spec > 0.5 ? 0.4 : 0.0);\n"
+      "   if (id == 3) return vec3(0.12 + 0.75 * d + 0.3 * rim) + vec3(0.9 * spec);\n"
+      "   return vec3(0.2 + 0.7 * d) * vec3(1.0, 0.94, 0.88) + vec3(0.15 * rim);\n"
+      "}\n"
+      "vec3 solidShade(vec3 n, vec2 mapUv) {\n"
+      "   vec3 base;\n"
+      "   if (uSolidColor == 1) base = vVertexColor;\n"
+      "   else if (uSolidColor == 2) base = toLinear(uSolidSingle);\n"
+      "   else if (uSolidColor == 3) base = 0.55 + 0.4 * cos(6.2831853 * (uDrawRandom + vec3(0.0, 0.33, 0.67)));\n"
+      "   else {\n"
+      "      base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
+      "      if (uSolidColor == 4 && uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
+      "   }\n"
+      "   if (uSolidLighting == 2) return base;\n"
+      "   vec3 nv = normalize(mat3(uView) * n);\n"
+      "   if (uSolidLighting == 1) return base * matcapLook(uMatcap, nv);\n"
+      "   vec3 ns = nv;\n"
+      "   if (uStudioWorld == 1) {\n"
+      "      float c = cos(uStudioRotation), sn = sin(uStudioRotation);\n"
+      "      ns = vec3(c * n.x + sn * n.z, n.y, -sn * n.x + c * n.z);\n"
+      "   }\n"
+      "   vec3 k = normalize(vec3(-0.5, 0.7, 0.5)), f = normalize(vec3(0.7, 0.1, 0.7)), b = normalize(vec3(0.0, 0.4, -0.9));\n"
+      "   vec3 col = base * (0.22 + 0.7 * max(dot(ns, k), 0.0) + 0.25 * max(dot(ns, f), 0.0) + 0.3 * max(dot(ns, b), 0.0));\n"
+      "   if (uSolidSpecular == 1) col += vec3(0.35) * pow(max(dot(reflect(vec3(0.0, 0.0, -1.0), nv), normalize(vec3(-0.5, 0.7, 0.5))), 0.0), 48.0);\n"
+      "   return col;\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   if (uIsSprite == 1) {\n"
       "      vec2 uv0 = computeMapUv(normalize(vNormal));\n"
@@ -799,6 +852,7 @@ namespace
       // objects are black holes in the world behind them.
       "   if (uRenderPass == 9) { fragColor = vec4(1.0, 1.0, 1.0, alpha); return; }\n"
       "   if (uRenderPass == 10) { fragColor = vec4(0.0, 0.0, 0.0, alpha); return; }\n"
+      "   if (uSolid == 1) { fragColor = vec4(toSrgb(solidShade(n, computeMapUv(n))), alpha); return; }\n"
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, alpha); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, alpha); return; }\n"
       "\n"
@@ -1168,6 +1222,10 @@ const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjec
 const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
 const std::vector<std::string>& Render3DNode::MistFalloffNames() { return kMistFalloffNames; }
 const std::vector<std::string>& Render3DNode::CavityTypeNames() { return kCavityTypeNames; }
+const std::vector<std::string>& Render3DNode::ViewShadingNames() { return kViewShadingNames; }
+const std::vector<std::string>& Render3DNode::SolidLightingNames() { return kSolidLightingNames; }
+const std::vector<std::string>& Render3DNode::SolidColorNames() { return kSolidColorNames; }
+const std::vector<std::string>& Render3DNode::MatcapNames() { return kMatcapNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
@@ -2405,6 +2463,14 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uMistIntensity"), mistIntensity);
       glUniform1f(glGetUniformLocation(mProgram, "uMistHeight"), mistHeight);
       glUniform1f(glGetUniformLocation(mProgram, "uPassThreshold"), passThreshold);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolid"), SolidActive() ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidLighting"), solidLighting);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidColor"), solidColor);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSolidSingle"), 1, solidSingle);
+      glUniform1i(glGetUniformLocation(mProgram, "uMatcap"), matcap);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidSpecular"), solidSpecular ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uStudioWorld"), studioWorld ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uStudioRotation"), studioRotation * 3.14159265f / 180.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
       glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
       glActiveTexture(GL_TEXTURE1);
@@ -2700,6 +2766,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
+      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
@@ -3113,6 +3180,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
+      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);

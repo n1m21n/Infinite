@@ -754,7 +754,7 @@ public:
    float bloom = 0.0f;          // amount 0..1; 0 is off
    float bloomThreshold = 1.0f; // linear light, 0.5..8
    float bloomRadius = 0.5f;    // 0 tight .. 1 wide
-   bool HdrActive() const { return hdr && renderPass == 0; }
+   bool HdrActive() const { return hdr && renderPass == 0 && !SolidActive(); }
    void BeforeLoadParams() override { hdr = false; tonemap = 1; passThreshold = 0.0f; }
    int ActiveSamples() const { return mActiveSamples; }
 
@@ -779,6 +779,23 @@ public:
    // and lightens ridges. World cavity measures them across `cavityDistance` in
    // scene units, screen cavity from the pixel-to-pixel turn of the surface.
    static const std::vector<std::string>& CavityTypeNames();
+   // Solid shading: the scene's shapes without its materials' lighting, for
+   // blocking out and checking form. Lit by a studio rig, a matcap or nothing,
+   // coloured by material, vertex colour, one colour, a colour per object, or
+   // the texture. Only the Color pass; no HDR, bloom or tonemap.
+   static const std::vector<std::string>& ViewShadingNames();
+   static const std::vector<std::string>& SolidLightingNames();
+   static const std::vector<std::string>& SolidColorNames();
+   static const std::vector<std::string>& MatcapNames();
+   int viewShading = 0;         // rendered / solid
+   int solidLighting = 0;       // studio / matcap / flat
+   int solidColor = 0;          // material / attribute / single / random / texture
+   float solidSingle[3] = { 0.8f, 0.8f, 0.8f };
+   int matcap = 0;
+   bool solidSpecular = true;
+   bool studioWorld = false;    // the studio rig turns with the world instead of the camera
+   float studioRotation = 0.0f; // degrees about the world's up axis, world-space rig only
+   bool SolidActive() const { return viewShading == 1 && renderPass == 0; }
    bool cavity = false;
    int cavityType = 0;          // world / screen / both
    float cavityRidge = 1.0f, cavityValley = 1.0f;
@@ -800,6 +817,9 @@ public:
       v.Float("mistIntensity", mistIntensity); v.Float("mistHeight", mistHeight);
       v.Float("passThreshold", passThreshold);
       v.Bool("cavity", cavity); v.Int("cavityType", cavityType);
+      v.Int("viewShading", viewShading); v.Int("solidLighting", solidLighting); v.Int("solidColor", solidColor);
+      v.Color("solidSingle", solidSingle); v.Int("matcap", matcap); v.Bool("solidSpecular", solidSpecular);
+      v.Bool("studioWorld", studioWorld); v.Float("studioRotation", studioRotation);
       v.Float("cavityRidge", cavityRidge); v.Float("cavityValley", cavityValley);
       v.Float("curvatureRidge", curvatureRidge); v.Float("curvatureValley", curvatureValley);
       v.Float("cavityDistance", cavityDistance);

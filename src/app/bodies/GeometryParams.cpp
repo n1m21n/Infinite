@@ -2111,6 +2111,28 @@ namespace app
       ImGui::BeginDisabled(n->aoStrength <= 0.0f);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      DropdownButton("shading", Render3DNode::ViewShadingNames(), n->viewShading,
+                     [n](int i) { n->viewShading = i; }, colW);
+      if (n->viewShading == 1)
+      {
+         DropdownButton("solid lighting", Render3DNode::SolidLightingNames(), n->solidLighting,
+                        [n](int i) { n->solidLighting = i; }, colW);
+         if (n->solidLighting == 1)
+            DropdownButton("matcap", Render3DNode::MatcapNames(), n->matcap,
+                           [n](int i) { n->matcap = i; }, colW);
+         if (n->solidLighting == 0)
+         {
+            ModCheckbox("studio world space", &n->studioWorld);
+            ImGui::BeginDisabled(!n->studioWorld);
+            ModSlider("studio rotation", &n->studioRotation, -180.0f, 180.0f, "%.0f", colW);
+            ImGui::EndDisabled();
+            ModCheckbox("solid specular", &n->solidSpecular);
+         }
+         DropdownButton("solid color", Render3DNode::SolidColorNames(), n->solidColor,
+                        [n](int i) { n->solidColor = i; }, colW);
+         if (n->solidColor == 2)
+            ColorSwatch("single color", n->solidSingle, n);
+      }
       ModCheckbox("cavity", &n->cavity);
       ImGui::BeginDisabled(!n->cavity);
       DropdownButton("cavity type", Render3DNode::CavityTypeNames(), n->cavityType,

@@ -3953,6 +3953,26 @@ namespace
          FloatRow(T("Strength"), &look.aoStrength, 0.0f, 1.0f, "%.2f");
          FloatRow(T("Distance"), &look.aoRadius, 0.05f, 3.0f, "%.2f");
       }
+      if (Card(T("Shading")))
+      {
+         ComboRow(T("Mode"), &look.viewShading, Render3DNode::ViewShadingNames());
+         if (look.viewShading == 1)
+         {
+            ComboRow(T("Lighting"), &look.solidLighting, Render3DNode::SolidLightingNames());
+            if (look.solidLighting == 1)
+               ComboRow(T("MatCap"), &look.matcap, Render3DNode::MatcapNames());
+            if (look.solidLighting == 0)
+            {
+               BoolRow(T("World space"), &look.studioWorld);
+               if (look.studioWorld)
+                  FloatRow(T("Rotation"), &look.studioRotation, -180.0f, 180.0f, "%.0f");
+               BoolRow(T("Specular"), &look.solidSpecular);
+            }
+            ComboRow(T("Color"), &look.solidColor, Render3DNode::SolidColorNames());
+            if (look.solidColor == 2)
+               ColorRow(T("Single color"), look.solidSingle);
+         }
+      }
       if (Card(T("Cavity"), &look.cavity))
       {
          ImGui::BeginDisabled(!look.cavity);
