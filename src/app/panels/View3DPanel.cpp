@@ -67,6 +67,7 @@ namespace
    int sViewName = -1;             // 0..5 while looking straight down an axis
    int sGridAxis = 1;
    constexpr int kSceneTab = 6;
+   constexpr int kMaterialTab = 7;
    int sTab = kSceneTab;            // the settings tab
    int sLensUnit = 0;               // 0 millimeters, 1 field of view
    bool sLockCam = false;           // navigating in camera view moves the camera
@@ -5515,6 +5516,144 @@ namespace
       }
    }
 
+   // The Material node that colours an item: the item's own node, or the first one met walking up
+   // through nodes that pass the surface through.
+   GraphNode* MaterialOf(const Item& item)
+   {
+      GraphNode* gn = FindNodeByUid(item.uid);
+      auto* geo = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
+      for (int hops = 0; geo != nullptr && hops < 32; hops++)
+      {
+         if (auto* mat = dynamic_cast<MaterialNode*>(geo))
+            for (GraphNode& other : gNodes)
+               if (other.node.get() == mat)
+                  return &other;
+         geo = geo->PassthroughSource();
+      }
+      return nullptr;
+   }
+
+   // A new Material between the item's node and the view, starting from the look it already had.
+   void AddMaterial(Scene3DNode* scene, Item& item)
+   {
+      GraphNode* src = FindNodeByUid(item.uid);
+      auto* geo = src != nullptr ? dynamic_cast<IGeometrySource*>(src->node.get()) : nullptr;
+      if (geo == nullptr)
+         return;
+      PushUndoCheckpoint("Add Material");
+      const Material was = geo->GetMaterial();
+      const int srcIndex = src->index;
+      const ImVec2 at = NodePos(*src);
+      GraphNode* made = SpawnNode("Material", "3D", at.x + 320.0f, at.y);   // can move gNodes: src is stale after this
+      auto* mat = made != nullptr ? dynamic_cast<MaterialNode*>(made->node.get()) : nullptr;
+      std::string error;
+      if (mat == nullptr || !ConnectNodes(srcIndex, 0, made->index, 0, error))
+         return;
+      std::copy(was.color, was.color + 3, mat->color);
+      mat->metallic = was.metallic;
+      mat->roughness = was.roughness;
+      mat->opacity = was.opacity;
+      mat->shading = was.shading;
+      std::copy(was.emissionColor, was.emissionColor + 3, mat->emissionColor);
+      mat->emission = was.emission;
+      mat->ior = was.ior;
+      mat->specular = was.specular;
+      mat->transmission = was.transmission;
+      mat->transmissionRoughness = was.transmissionRoughness;
+      mat->clearcoat = was.clearcoat;
+      mat->clearcoatRoughness = was.clearcoatRoughness;
+      mat->subsurface = was.subsurface;
+      std::copy(was.subsurfaceColor, was.subsurfaceColor + 3, mat->subsurfaceColor);
+      mat->subsurfaceRadius = was.subsurfaceRadius;
+      item.uid = made->uid;
+      scene->Commit();
+   }
+
+   // Nodes whose picture can feed a map pin.
+   std::vector<GraphNode*> ImageChoices(const GraphNode& self)
+   {
+      std::vector<GraphNode*> out;
+      for (GraphNode& gn : gNodes)
+      {
+         INode* n = gn.node.get();
+         if (&gn == &self || gn.hiddenFromCanvas || dynamic_cast<IModulator*>(n) || dynamic_cast<IGeometrySource*>(n) ||
+             dynamic_cast<CameraNode*>(n) || dynamic_cast<LightNode*>(n) || dynamic_cast<EnvironmentNode*>(n) ||
+             dynamic_cast<IAudioSource*>(n) || dynamic_cast<INoteSource*>(n) || dynamic_cast<IPredictor*>(n) ||
+             dynamic_cast<IPaletteSource*>(n) || dynamic_cast<OutputNode*>(n) || dynamic_cast<Scene3DNode*>(n) ||
+             dynamic_cast<CommentNode*>(n))
+            continue;
+         out.push_back(&gn);
+      }
+      return out;
+   }
+
+   void DrawMaterialTab(Scene3DNode* scene, float availW)
+   {
+      Item* item = sSel.size() == 1 ? scene->FindItem(sSel[0]) : nullptr;
+      if (item == nullptr || scene->ItemKind(*item) != Kind::Geometry)
+      {
+         Hint(T("Select one object."));
+         return;
+      }
+      GraphNode* gn = MaterialOf(*item);
+      auto* mat = gn != nullptr ? dynamic_cast<MaterialNode*>(gn->node.get()) : nullptr;
+      if (mat == nullptr)
+      {
+         if (ActionButton::Draw(L("Add Material"), ImVec2(availW, 0)))
+            AddMaterial(scene, *item);
+         return;
+      }
+      if (Card(T("Surface")))
+      {
+         ComboRow(T("Shading"), &mat->shading, GeometryNode::ShadingNames(), "Material shading");
+         ColorRow(T("Colour"), mat->color, "Material colour");
+         FloatRow(T("Metallic"), &mat->metallic, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Roughness"), &mat->roughness, 0.02f, 1.0f, "%.2f");
+         FloatRow(T("Specular"), &mat->specular, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("IOR"), &mat->ior, 1.0f, 3.0f, "%.2f");
+         FloatRow(T("Opacity"), &mat->opacity, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Transmission"), &mat->transmission, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Clearcoat"), &mat->clearcoat, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Sheen"), &mat->sheen, 0.0f, 1.0f, "%.2f");
+         FloatRow(T("Subsurface"), &mat->subsurface, 0.0f, 1.0f, "%.2f");
+      }
+      if (Card(T("Emission")))
+      {
+         ColorRow(T("Colour"), mat->emissionColor, "Material emission colour");
+         FloatRow(T("Strength"), &mat->emission, 0.0f, 8.0f, "%.2f");
+      }
+      if (Card(T("Maps")))
+      {
+         static const char* const kMaps[kMapCount] = { "Base colour", "Roughness", "Metallic", "Normal",
+                                                       "AO", "Emission", "Clearcoat", "Sheen" };
+         const std::vector<GraphNode*> choices = ImageChoices(*gn);
+         std::vector<std::string> names = { T("None") };
+         for (GraphNode* c : choices)
+            names.push_back(NodeTitle(*c));
+         const int matIndex = gn->index;
+         for (int map = 0; map < kMapCount; map++)
+         {
+            INode* src = mat->MapInput(map).GetSource();
+            int pick = 0;
+            for (size_t i = 0; i < choices.size(); i++)
+               if (choices[i]->node.get() == src)
+                  pick = (int)i + 1;
+            if (ComboRow(T(kMaps[map]), &pick, names, "Material map"))
+            {
+               if (pick == 0)
+                  DisconnectDstPin(gn->InputPinId(1 + map));
+               else
+               {
+                  std::string error;
+                  ConnectNodes(choices[pick - 1]->index, 0, matIndex, 1 + map, error);
+               }
+            }
+         }
+         if (mat->MapInput(kMapNormal).IsConnected())
+            FloatRow(T("Normal strength"), &mat->normalStrength, 0.0f, 4.0f, "%.2f");
+      }
+   }
+
    void DrawWorldTab(Scene3DNode* scene, float availW)
    {
       GraphNode* world = scene->worldUid != 0 ? FindNodeByUid(scene->worldUid) : nullptr;
@@ -6157,13 +6296,17 @@ namespace
       if (sTab == 4 && !hasData)
          sTab = item != nullptr ? 3 : 0;
       ImGui::BeginGroup();
-      const struct { int tab; const char* id; const char* icon; const char* tip; bool show; } kTabs[7] = {
+      const bool isGeometry = kind == Kind::Geometry && sSel.size() == 1;
+      if (sTab == kMaterialTab && !isGeometry)
+         sTab = item != nullptr ? 3 : 0;
+      const struct { int tab; const char* id; const char* icon; const char* tip; bool show; } kTabs[8] = {
          { kSceneTab, "##t6", IconsInfinite::Arrange, T("Scene"), true },
          { 0, "##t0", IconsInfinite::ShadeRender, T("Render"), true },
          { 1, "##t1", IconsInfinite::Folder, T("Output"), true },
          { 2, "##t2", IconsInfinite::World, T("World"), true },
          { 3, "##t3", IconsInfinite::Cube, T("Object"), item != nullptr },
          { 4, "##t4", dataGlyph, kind == Kind::Light ? T("Light") : T("Camera"), hasData },
+         { kMaterialTab, "##t7", IconsInfinite::ShadeSolid, T("Material"), isGeometry },
          { 5, "##t5", IconsInfinite::Settings, T("Viewport"), true },
       };
       for (const auto& tab : kTabs)
@@ -6180,6 +6323,7 @@ namespace
       else if (sTab == 2) DrawWorldTab(scene, availW);
       else if (sTab == 3) DrawObjectTab(scene, availW);
       else if (sTab == 4) DrawDataTab(scene, availW);
+      else if (sTab == kMaterialTab) DrawMaterialTab(scene, availW);
       else DrawViewTab(scene, availW);
       EndCardColumn();
       ImGui::EndChild();
@@ -6636,6 +6780,19 @@ void View3DSetWorld(GraphNode& gn)
    scene->worldUid = uid;
    scene->Commit();
    gView3DOpen = true;
+}
+
+// The Material tab's two actions, for the self-test.
+GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId)
+{
+   const Scene3DNode::Item* item = scene->FindItem(itemId);
+   return item != nullptr ? MaterialOf(*item) : nullptr;
+}
+
+void View3DAddMaterial(Scene3DNode* scene, int itemId)
+{
+   if (Scene3DNode::Item* item = scene->FindItem(itemId))
+      AddMaterial(scene, *item);
 }
 
 void View3DAddNode(GraphNode& gn)

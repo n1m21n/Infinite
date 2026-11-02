@@ -5783,6 +5783,8 @@ void DrawView3DDocked(const char* id, const ImVec2& size);
 bool View3DCanAdd(const GraphNode& gn);
 OutputNode* View3DEnsureOutput();
 void View3DAddNode(GraphNode& gn);
+GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);
+void View3DAddMaterial(Scene3DNode* scene, int itemId);
 void View3DSetWorld(GraphNode& gn);
 extern ImVec2 gPianoRollRectMin, gPianoRollRectMax;
 // A Library .mid released over the Piano Roll; the panel imports it next frame.

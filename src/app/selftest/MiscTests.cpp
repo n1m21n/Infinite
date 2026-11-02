@@ -3355,10 +3355,30 @@ void RunView3DMenuTest(int frameId)
          s->Commit();
          break;
       }
+   // The Material tab: an object with no Material gets one between its node and the view, keeping its look.
+   bool matAdded = false, matKept = false;
+   for (GraphNode& gn : gNodes)
+      if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()); s != nullptr && !s->Items().empty())
+      {
+         const int id = s->Items()[0].id;
+         GraphNode* src = FindNodeByUid(s->Items()[0].uid);
+         auto* geo = src != nullptr ? dynamic_cast<IGeometrySource*>(src->node.get()) : nullptr;
+         if (geo == nullptr || View3DMaterialOf(s, id) != nullptr)
+            break;
+         const Material was = geo->GetMaterial();
+         View3DAddMaterial(s, id);
+         GraphNode* made = View3DMaterialOf(s, id);
+         auto* mat = made != nullptr ? dynamic_cast<MaterialNode*>(made->node.get()) : nullptr;
+         matAdded = mat != nullptr && mat->input == geo && s->FindItem(id)->uid == made->uid;
+         matKept = mat != nullptr && mat->color[0] == was.color[0] && mat->roughness == was.roughness;
+         break;
+      }
+   printf("  [%s] Add Material puts one between the object and the view\n", matAdded ? "pass" : "FAIL");
+   printf("  [%s] the new Material keeps the object's look\n", matKept ? "pass" : "FAIL");
    printf("  [%s] a follower moves with its target\n", follows ? "pass" : "FAIL");
    printf("  [%s] motion adds on top of the transform\n", motionMoves ? "pass" : "FAIL");
    printf("  [%s] motion and follow save\n", motionSaved ? "pass" : "FAIL");
-   const bool pass = items == 1 && offCanvas && groupSaved && follows && motionMoves && motionSaved;
+   const bool pass = items == 1 && offCanvas && groupSaved && follows && motionMoves && motionSaved && matAdded && matKept;
    printf("  [%s] the node menu's first add makes one item\n", items == 1 ? "pass" : "FAIL");
    printf("  [%s] that scene stays off the canvas\n", offCanvas ? "pass" : "FAIL");
    printf("  [%s] a copied scene keeps groups and stays off the canvas\n", groupSaved ? "pass" : "FAIL");
