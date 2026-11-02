@@ -77,12 +77,15 @@ pick() {
          }
          var j = JSON.parse($.NSString.stringWithContentsOfFileEncodingError(a[1], $.NSUTF8StringEncoding, null).js);
          var ds = (j.result || {}).devices || [];
+         var any = "";
          for (var i = 0; i < ds.length; i++) {
             var hw = ds[i].hardwareProperties || {}, p = ds[i].deviceProperties || {};
             var kind = ((hw.deviceType || "") + " " + (hw.platform || "") + " " + (hw.productType || "")).toLowerCase();
-            if (kind.indexOf("watch") >= 0 && p.developerModeStatus == "enabled") return ds[i].identifier;
+            if (kind.indexOf("watch") < 0) continue;
+            if (p.developerModeStatus == "enabled") return ds[i].identifier;
+            if (!any) any = ds[i].identifier;   // a paired watch reads "disabled" until Xcode has prepared it
          }
-         return "";
+         return any;
       }' "$1" "$2" 2>/dev/null
 }
 
@@ -172,12 +175,17 @@ fi
 
 # 4: build --------------------------------------------------------------------------------------------------------
 step 4 "building for your watch (the first build takes a few minutes)"
+# A free team can only make a profile for a registered device, and a device is registered when the build targets it,
+# so the build names the watch instead of building for "any watchOS device".
+watch_hint="the watch is not connected to Xcode: unlock it, turn Bluetooth on, use the same Wi-Fi as this Mac, turn on Developer Mode, and check it shows in Xcode > Window > Devices and Simulators."
 build() {
    xcodebuild -project "$work/InfiniteRemote.xcodeproj" -scheme InfiniteRemote -configuration Release \
-      -destination 'generic/platform=watchOS' -derivedDataPath "$work/build" -allowProvisioningUpdates build >"$log" 2>&1
+      -destination "id=$device" -derivedDataPath "$work/build" -allowProvisioningUpdates build >"$log" 2>&1
 }
 if ! build; then
-   if grep -qiE "watchOS .*(is not installed|must be installed)|platform .*watchOS.*not installed" "$log"; then
+   if grep -qiE "Timed out waiting for all destinations|discoverable via Bluetooth|team has no devices" "$log"; then
+      fail "Xcode cannot reach your watch." "$watch_hint"
+   elif grep -qiE "watchOS .*(is not installed|must be installed)|platform .*watchOS.*not installed" "$log"; then
       echo "Downloading the watchOS components for Xcode..."
       xcodebuild -downloadPlatform watchOS || fail "The watchOS components could not be downloaded." "open Xcode > Settings > Components and install watchOS."
       build || fail "The build failed: $(lastlog)" "if it mentions signing, check that your Apple ID is signed in under Xcode > Settings > Accounts."
@@ -186,6 +194,7 @@ if ! build; then
    fi
 fi
 built="$work/build/Build/Products/Release-watchos/InfiniteRemote.app"
+[ -d "$built" ] || built="$(find "$work/build/Build/Products" -maxdepth 2 -name InfiniteRemote.app 2>/dev/null | head -1)"
 [ -d "$built" ] || fail "The build finished but the app was not found."
 
 # 5: install ------------------------------------------------------------------------------------------------------
