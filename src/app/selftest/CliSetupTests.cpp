@@ -46,7 +46,7 @@ namespace app
       {
          View v = describe("", false);
          check(v.steps.size() == 5 && v.steps[0].state == StepState::kPending, "no file: five pending steps");
-         check(v.setupLabel == "Set up everything" && v.setupEnabled && v.summary == "Not set up yet.", "no file: first-run button");
+         check(v.setupLabel == "Get set up" && v.setupEnabled && v.summary == "Not set up yet.", "no file: first-run button");
          check(v.showInstall && !v.startEnabled, "agent missing: Install shown, Start disabled");
       }
       // 2. garbage, wrong version, wrong shape: the same as no file.

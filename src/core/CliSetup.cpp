@@ -735,7 +735,7 @@ if ($Failed -gt 0) { exit 1 }
       if (status.running)
          v.setupLabel = "Setting up...";
       else
-         v.setupLabel = status.present ? "Set up again" : "Set up everything";
+         v.setupLabel = status.present ? "Set up again" : "Get set up";
       const int green = status.GreenCount() - repairs, failed = status.FailedCount();
       if (!status.present)
          v.summary = "Not set up yet.";

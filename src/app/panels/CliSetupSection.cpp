@@ -128,7 +128,7 @@ namespace app
 
       if (ImGui::TreeNode(T("Show the commands")))
       {
-         ImGui::TextDisabled("%s", T("Set up everything types this line, and runs the script below it:"));
+         ImGui::TextDisabled("%s", T("Get set up types this line, and runs the script below it:"));
          ImGui::TextUnformatted(v.setupLine.c_str());
          if (v.showInstall)
          {
