@@ -2207,6 +2207,8 @@ namespace
       }
       if (io.KeyShift && !command && pressed(ImGuiKey_Z))
          sShading = sShading == Shading::Wire ? Shading::Solid : Shading::Wire;
+      if (io.KeyAlt && !command && pressed(ImGuiKey_Z))
+         sSet->xray = !sSet->xray;
       if (io.KeyShift && !command && pressed(ImGuiKey_C))
       {
          if (sSet->cursor[0] != 0.0f || sSet->cursor[1] != 0.0f || sSet->cursor[2] != 0.0f)
@@ -3436,6 +3438,8 @@ namespace
       view.proj = sCam.proj;
       std::copy(sCam.eye, sCam.eye + 3, view.eye);
       view.shading = sShading;
+      view.xray = sSet->xray;
+      view.wireOver = sSet->wireOver && sOverlays;
       view.grid = sGrid && sOverlays && (!sCam.ortho || sSet->orthoGrid || sCameraView);
       view.only = sLocal;
       view.gridAxis = sGridAxis;
@@ -3940,6 +3944,9 @@ namespace
       if (IconChip("##v3dsolid", IconsInfinite::ShadeSolid, sShading == Shading::Solid, T("Solid: a neutral light, to see the shapes"))) sShading = Shading::Solid;
       next();
       if (IconChip("##v3dfinal", IconsInfinite::ShadeRender, sShading == Shading::Final, T("Rendered: your lights, world and render settings (Z cycles)"))) sShading = Shading::Final;
+      next();
+      if (IconChip("##v3dxray", IconsInfinite::Cube, sSet->xray && sShading == Shading::Solid, T("X-ray: see through surfaces in Solid (Alt+Z)")))
+         sSet->xray = !sSet->xray;
       gap();
       if (IconChip("##v3dcamera", IconsInfinite::ViewCamera, sCameraView,
                    scene->activeCamera != 0 ? T("Camera view (Numpad 0 or 0)") : T("Add a camera from this view (0)")))
@@ -5670,6 +5677,7 @@ namespace
          BoolRow(T("Extras"), &set.showExtras);
          BoolRow(T("Light colors"), &set.lightColors);
          BoolRow(T("Outline selected"), &set.outlineSel);
+         BoolRow(T("Wireframe"), &set.wireOver);
          BoolRow(T("Performance"), &set.showPerf);
       }
       if (Card(T("Grid"), nullptr, false))
@@ -6179,12 +6187,16 @@ void View3DAddCamera()
 // For the screenshot tool: which tab shows, and whether through the camera.
 void View3DShotState(int state)
 {
+   // Ones: the side tab. Tens: 1 looks through the camera. Hundreds: 1 Solid with X-ray, 2 Solid with the wire overlay.
    sTab = state % 10;
-   sCameraView = state >= 10;
-   sShading = Shading::Final;
+   sCameraView = (state / 10) % 10 == 1;
+   const int look = state / 100;
+   sShading = look == 0 ? Shading::Final : Shading::Solid;
    sSideOpen = true;
    if (Scene3DNode* scene = FindScene())
    {
+      scene->settings.xray = look == 1;
+      scene->settings.wireOver = look == 2;
       scene->settings.thirds = sCameraView;
       if (const Item* cam = scene->FindItem(scene->activeCamera))
          sSel = { cam->id };

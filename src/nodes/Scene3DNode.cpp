@@ -75,6 +75,7 @@ namespace
       f(s.listObjects); f(s.listInvert); f(s.listLights); f(s.listCameras); f(s.listState);
       f(s.outlineSel);
       f(s.dither); f(s.filterSize); f(s.gamma); f(s.look);
+      f(s.xray); f(s.wireOver);
    }
 
    void Normalize(float v[3])
@@ -705,6 +706,13 @@ void Scene3DNode::Parse()
       }
    }
    AssignMotionSlots();
+   // A saved follower is where its saved offset puts it, so the offset is the one to keep.
+   for (Item& it : mItems)
+   {
+      std::copy(it.pos, it.pos + 3, it.followed);
+      std::copy(it.rot, it.rot + 3, it.followed + 3);
+      std::copy(it.scale, it.scale + 3, it.followed + 6);
+   }
 }
 
 void Scene3DNode::VisitParams(ParamVisitor& v)
@@ -1503,6 +1511,9 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "uniform vec3 uAxisOn;\n"       // a line on each world axis
          "uniform vec4 uOutline;\n"      // colour, on
          "uniform vec3 uNearFar;\n"      // near, far, 1 when orthographic
+         "uniform sampler2D uWire;\n"
+         "uniform sampler2D uWireDepth;\n"
+         "uniform int uWireMode;\n"      // 0 none, 1 edges over the surfaces, 2 X-ray
          "float linDepth(float d) {\n"
          "   if (uNearFar.z > 0.5) return d;\n"
          "   return 2.0 * uNearFar.x * uNearFar.y / (uNearFar.y + uNearFar.x - (2.0 * d - 1.0) * (uNearFar.y - uNearFar.x));\n"
@@ -1526,6 +1537,7 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "}\n"
          "void main() {\n"
          "   vec4 s = texture(uScene, vUv);\n"
+         "   if (uWireMode == 2) s *= 0.5;\n"
          "   vec3 rgb = s.rgb;\n"
          "   float a = s.a;\n"
          "   if (uPictureOn == 1) {\n"
@@ -1549,7 +1561,7 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "      float graze = abs(normalize(d)[uAxis]);\n"
          "      float range = (uDist * 14.0 + 12.0) * uGridOpt.z;\n"
          "      float fade = (1.0 - smoothstep(range * 0.35, range, length(p - uEye))) * smoothstep(0.0, 0.06, graze);\n"
-         "      if (t > 0.0 && t <= 1.0 && pd <= texture(uDepth, vUv).r + 1e-6 && fade > 0.0) {\n"
+         "      if (t > 0.0 && t <= 1.0 && (uWireMode == 2 || pd <= texture(uDepth, vUv).r + 1e-6) && fade > 0.0) {\n"
          "         float sub = max(uGridOpt.y, 2.0);\n"
          "         float level = log(max(uDist, 1e-3) * 0.25 / uGridOpt.x) / log(sub);\n"
          "         float scale = pow(sub, floor(level)) * uGridOpt.x;\n"
@@ -1580,6 +1592,16 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "         rgb = mix(rgb, uOutline.rgb, edge * 0.9);\n"
          "         a = max(a, edge * 0.9);\n"
          "      }\n"
+         "   }\n"
+         "   if (uWireMode > 0) {\n"
+         "      float line = texture(uWire, vUv).a;\n"
+         "      float wd = texture(uWireDepth, vUv).r, sd = texture(uDepth, vUv).r;\n"
+         "      float lw = linDepth(wd), ls = linDepth(sd);\n"
+         "      bool shown = sd >= 0.999999 || lw <= ls + (uNearFar.z > 0.5 ? 0.0005 : 0.01 * ls);\n"
+         "      vec3 col = uWireMode == 2 ? vec3(0.85) : vec3(0.02);\n"
+         "      float k = line * (uWireMode == 2 ? (shown ? 0.7 : 0.35) : (shown ? 0.6 : 0.0));\n"
+         "      rgb = mix(rgb, col, k);\n"
+         "      a = a + k * (1.0 - a);\n"
          "   }\n"
          "   if (uPictureOn == 2) {\n"
          "      vec4 p = picture();\n"
@@ -1650,6 +1672,15 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
       glUniform3f(glGetUniformLocation(mGridProgram, "uNearFar"), pn, pf, ortho ? 1.0f : 0.0f);
       const bool outline = settings.outline && v.shading == Shading::Solid && mEditor->DepthValid();
       glUniform4f(glGetUniformLocation(mGridProgram, "uOutline"), settings.outlineColor[0], settings.outlineColor[1], settings.outlineColor[2], outline ? 1.0f : 0.0f);
+      const bool wireOn = !wire && mEditorWire != nullptr && mEditorWire->GetOutputTexture() != 0 && (v.xray || v.wireOver);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uWireMode"), !wireOn ? 0 : v.xray && v.shading == Shading::Solid ? 2 : 1);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, wireOn ? mEditorWire->GetOutputTexture() : 0);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uWire"), 3);
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, wireOn && mEditorWire->DepthValid() ? mEditorWire->DepthTexture() : mEditor->DepthTexture());
+      glUniform1i(glGetUniformLocation(mGridProgram, "uWireDepth"), 4);
+      glActiveTexture(GL_TEXTURE0);
    });
    return mGridFbo.tex;
 }
@@ -1738,6 +1769,30 @@ unsigned int Scene3DNode::RenderView(int w, int h, const View& v)
    e.renderPass = final ? mRender.renderPass : 0;
    ApplyWorld(e, !wire, !settings.transparent);
    e.CookIfNeeded(++mEditorFrame);
+   if (!wire && (v.xray || v.wireOver))
+   {
+      // The same scene again as lines, with its own depth, so the grid pass can tell
+      // the edges in front of a surface from the ones behind it.
+      if (!mEditorWire)
+      {
+         mEditorWire = std::make_unique<Render3DNode>();
+         mEditorWire->samples = 2;
+         mEditorWire->RequestDepth();
+      }
+      Render3DNode& lw = *mEditorWire;
+      lw.geometry[0] = root;
+      lw.width = (float)w;
+      lw.height = (float)h;
+      mEditorWireRig = mEditorRig;
+      mEditorWireRig.wireframe = true;
+      lw.rig = &mEditorWireRig;
+      lw.hdr = false;
+      lw.depthTest = true;
+      lw.backfaceCull = false;
+      lw.renderPass = 0;
+      ApplyWorld(lw, false, false);
+      lw.CookIfNeeded(mEditorFrame);
+   }
 
    unsigned int tex = e.GetOutputTexture();
    if (!wire && !settings.transparent && e.renderPass == 0 && mWorldNode != nullptr &&

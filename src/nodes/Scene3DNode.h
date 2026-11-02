@@ -187,6 +187,8 @@ public:
       bool outlineSel = true;       // the selection's own outline (box) in the view
       float dither = 0.0f, filterSize = 0.0f, gamma = 1.0f;   // the picture's finish
       int look = 0;                 // 0 none, 1 soft contrast, 2 medium, 3 strong, 4 faded
+      bool xray = false;            // Solid: surfaces half see-through, hidden edges show (Alt+Z)
+      bool wireOver = false;        // the edges drawn over shaded surfaces
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
@@ -251,6 +253,8 @@ public:
       std::vector<int> only;  // local view: just these items
       int camera = 0;            // looking through this camera item: its backdrop shows
       float frame[4] = { 0, 0, 1, 1 };  // the camera's frame in the picture, 0-1 from bottom left
+      bool xray = false;         // surfaces half see-through, every edge shows (Solid only)
+      bool wireOver = false;     // the edges drawn over the shaded surfaces
    };
    unsigned int RenderView(int w, int h, const View& v);
    // The active camera's view as the output sees it.
@@ -305,8 +309,8 @@ private:
    std::map<int, std::unique_ptr<Placed>> mPlaced;
 
    Render3DNode mRender;
-   std::unique_ptr<Render3DNode> mEditor;
-   Render3DNode::Rig mRig, mOutRig, mEditorRig;
+   std::unique_ptr<Render3DNode> mEditor, mEditorWire;   // the wire pass only exists once X-ray or wire overlay asks
+   Render3DNode::Rig mRig, mOutRig, mEditorRig, mEditorWireRig;
    std::vector<float> mRigStamp, mEditorStamp;
    INode* mWorldNode = nullptr;
    GLUtil::Fbo mOutFbo, mEditorFbo, mGridFbo;

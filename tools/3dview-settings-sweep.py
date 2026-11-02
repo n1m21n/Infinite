@@ -198,6 +198,8 @@ SETTINGS = {
     ("scene", "item.castShadow"): S(0),
     ("scene", "item.scale"): S(2.0),
     ("scene", "item.lookAt"): S("box"),
+    ("scene", "item.motion"): S("1 0 0.5 0 30 0 1.5 1 1"),
+    ("scene", "item.follow"): S("box"),
     ("scene", "item.trackAxis"): S(4, 0, 5, ctx="look"),
     ("scene", "item.upAxis"): S(0, 0, 2, ctx="look"),
     ("scene", "item.lookInfluence"): S(0.0, 0.0, 1.0, ctx="look"),
@@ -262,7 +264,7 @@ EDITOR_ONLY = ["fps", "seconds", "snap", "snapMove", "snapRot", "snapScale", "pa
                "orbitSens", "pixelAspect0", "pixelAspect1", "fpsBase", "stampRender",
                "frameStart", "frameStep", "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase",
                "listComplete", "listSort", "colSelect", "colRender", "listObjects", "listInvert", "listLights",
-               "listCameras", "listState", "outlineSel"]
+               "listCameras", "listState", "outlineSel", "xray", "wireOver"]
 SETTING_FIELDS = ["fps", "seconds", "percent", "transparent", "snap", "snapMove", "snapRot", "snapScale", "passAlpha",
                   "safe", "thirds", "center", "golden", "safeTitle", "safeAction", "orientation", "pivot", "cursor0",
                   "cursor1", "cursor2", "zoomToMouse", "orbitSelection", "shadowItem", "fStop", "proportional", "propSize",
@@ -287,7 +289,7 @@ SETTING_FIELDS = ["fps", "seconds", "percent", "transparent", "snap", "snapMove"
                   "stampFg1", "stampFg2", "stampBg0", "stampBg1", "stampBg2", "frameStart", "frameStep",
                   "unitSystem", "rotUnits", "lengthUnit", "unitScale", "listCase", "listComplete", "listSort",
                   "colSelect", "colRender", "listObjects", "listInvert", "listLights", "listCameras", "listState", "outlineSel",
-                  "dither", "filterSize", "gamma", "look"]
+                  "dither", "filterSize", "gamma", "look", "xray", "wireOver"]
 # What a field reads as when the settings line is padded out to reach a later one.
 FIELD_DEFAULT = {"propSize": 1, "borderMax0": 1, "borderMax1": 1,
                  "snapAbsolute": 1, "snapRotFine": 1, "snapTranslate": 1, "snapRotate": 1, "snapScaleOn": 1, "planeAxis": 2, "planeDepth": 1, "viewLens": 50, "clipStart": 0.01, "clipEnd": 1000, "showCameras": 1, "showLights": 1
@@ -411,6 +413,10 @@ def scene_edit(path, s, key, value):
         v = {"item.hideSelect": 0, "item.showBounds": 0, "item.boundsType": 0, "item.showName": 0, "item.showAxes": 0}
         v[key] = value
         lines.append(f"show {item} " + " ".join(str(v[k]) for k in v))
+    if key == "item.motion":
+        lines.append(f"motion {item} 1 {value}")
+    if key == "item.follow":   # the ball keeps a place two units off the box
+        lines.append(f"follow {item} {next(t[0] for t in s.items if t[2] == 'Box')} 0 2 0 0 0 0 0 1 1 1")
     if key == "item.lookAt":   # the camera turns to keep the box in view
         lines.append(f"look {s.camera} {next(t[0] for t in s.items if t[2] == 'Box')}")
     text = text[:m.start(2)] + "\\n".join(lines) + text[m.end(2):]
