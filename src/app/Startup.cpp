@@ -630,6 +630,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_SPATIALTEST") != nullptr)
       return RunSpatialFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_WATCHPACKETTEST") != nullptr)
+      return RunWatchPacketTest() ? 0 : 1;
+   if (getenv("INFINITE_WATCHNODETEST") != nullptr)
+      return RunWatchNodeTest() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 

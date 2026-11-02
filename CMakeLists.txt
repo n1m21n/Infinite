@@ -563,6 +563,8 @@ set(COMMON_SOURCES
     src/app/selftest/VmpcTests.cpp
     src/app/selftest/Render3DHdrTests.cpp
     src/app/selftest/SpatialTests.cpp
+    src/app/selftest/WatchTests.cpp
+    src/core/WatchPacket.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
     src/app/ui/ModWidgets.cpp
