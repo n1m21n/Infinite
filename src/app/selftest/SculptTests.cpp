@@ -280,6 +280,47 @@ bool RunSculptTest()
       n.Clear();
    }
 
+   // A dab re-shapes only its neighbourhood; the result matches a full re-shape.
+   {
+      std::vector<unsigned int> touched;
+      for (int i = 0; i < 6; i++)
+      {
+         const float at[3] = { c[0], c[1] + 0.05f * i, c[2] };
+         Sculpt::Dab d;
+         d.brush = i % 2 ? Sculpt::kSmooth : Sculpt::kDraw;
+         std::copy(at, at + 3, d.center);
+         d.radius = 0.2f;
+         d.symmetry = 1;
+         touched.clear();
+         Sculpt::Stroke(d, n.PointPos(), n.PointNrm(), n.Topology(), 1.0f, n.Offsets(), &touched, n.PointGrid(d.radius));
+         n.OffsetsChanged(&touched);
+      }
+      Mesh full;
+      Sculpt::Apply(base, n.Topology(), n.Offsets(), 1.0f, full);
+      const Mesh& part = n.GetMesh();
+      float dp = 0.0f, dn = 0.0f;
+      for (size_t i = 0; i < full.vertices.size() && i < part.vertices.size(); i++)
+      {
+         const Vertex &a = full.vertices[i], &b = part.vertices[i];
+         dp = std::max(dp, std::fabs(a.px - b.px) + std::fabs(a.py - b.py) + std::fabs(a.pz - b.pz));
+         dn = std::max(dn, std::fabs(a.nx - b.nx) + std::fabs(a.ny - b.ny) + std::fabs(a.nz - b.nz));
+      }
+      check(dp < 1e-6f && dn < 1e-4f && full.vertices.size() == part.vertices.size(), "a dab's re-shape matches a full one",
+            dp, dn);
+      std::vector<float> pos, nrm;
+      Sculpt::PointFrame(full, n.Topology(), pos, nrm);
+      float df = 0.0f;
+      for (size_t i = 0; i < pos.size(); i++)
+         df = std::max(df, std::fabs(pos[i] - n.PointPos()[i]) + std::fabs(nrm[i] - n.PointNrm()[i]));
+      check(df < 1e-4f, "the cached points follow", df, 0);
+      // The grid's ray finds the same hit as testing every face.
+      const float o[3] = { 0.03f, 2.0f, 0.02f }, dir[3] = { 0, -1, 0 };
+      float tg = 0.0f, tb = 0.0f;
+      const bool hg = n.Raycast(o, dir, tg), hb = Sculpt::Raycast(n.GetMesh(), o, dir, tb);
+      check(hg && hb && std::fabs(tg - tb) < 1e-5f, "the grid's ray hits where a full test does", tg, tb);
+      n.Clear();
+   }
+
    // Symmetry X: a dab on +X lands on -X too.
    {
       const float mirror[3] = { -2, 0, 0 };

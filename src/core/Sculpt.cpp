@@ -53,19 +53,61 @@ namespace Sculpt
          float center[3] = { 0, 0, 0 };
       };
 
+      uint64_t CellKey(int x, int y, int z)
+      {
+         return (uint64_t)(x + (1 << 20)) & 0x1FFFFF | ((uint64_t)(y + (1 << 20)) & 0x1FFFFF) << 21 |
+                ((uint64_t)(z + (1 << 20)) & 0x1FFFFF) << 42;
+      }
+      int CellOf(float v, float cell) { return (int)std::floor(v / cell); }
+
+      // Calls f(point) for every point that can be within r of c: the grid's
+      // cells around c, or every point when there is no grid (or r spans
+      // too many cells).
+      template <class F>
+      void ForNear(const Grid* g, const float c[3], float r, int points, F f)
+      {
+         if (g != nullptr && g->cell > 0.0f)
+         {
+            const float reach = r;
+            int lo[3], hi[3];
+            long count = 1;
+            for (int k = 0; k < 3; k++)
+            {
+               lo[k] = CellOf(c[k] - reach, g->cell);
+               hi[k] = CellOf(c[k] + reach, g->cell);
+               count *= hi[k] - lo[k] + 1;
+            }
+            if (count <= 4096)
+            {
+               for (int x = lo[0]; x <= hi[0]; x++)
+                  for (int y = lo[1]; y <= hi[1]; y++)
+                     for (int z = lo[2]; z <= hi[2]; z++)
+                     {
+                        auto it = g->cells.find(CellKey(x, y, z));
+                        if (it != g->cells.end())
+                           for (unsigned int i : it->second)
+                              f(i);
+                     }
+               return;
+            }
+         }
+         for (int i = 0; i < points; i++)
+            f((unsigned int)i);
+      }
+
       Area Gather(const float c[3], float radius, const std::vector<float>& pos, const std::vector<float>& nrm,
-                  const Topology& t, bool sharp)
+                  const Topology& t, bool sharp, const Grid* grid)
       {
          Area a;
          float wsum = 0.0f;
          const float r2 = radius * radius;
-         for (int i = 0; i < t.points; i++)
+         ForNear(grid, c, radius, t.points, [&](unsigned int i)
          {
             const float* p = &pos[(size_t)i * 3];
             const float d[3] = { p[0] - c[0], p[1] - c[1], p[2] - c[2] };
             const float dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
             if (dd >= r2)
-               continue;
+               return;
             float f = Falloff(std::sqrt(dd) / radius);
             if (sharp)
                f *= f;
@@ -76,10 +118,10 @@ namespace Sculpt
             }
             wsum += f;
             if (!t.mask.empty() && t.mask[i] == 0)
-               continue;
-            a.idx.push_back((unsigned int)i);
+               return;
+            a.idx.push_back(i);
             a.f.push_back(f);
-         }
+         });
          Normalize(a.normal);
          if (wsum > 0.0f)
             for (int k = 0; k < 3; k++)
@@ -141,45 +183,78 @@ namespace Sculpt
          t.point[i] = it.first->second;
       }
 
-      // Neighbours over welded edges.
-      std::vector<std::vector<unsigned int>> nb(t.points);
-      std::vector<std::vector<std::pair<unsigned int, unsigned int>>> corners(t.points);   // (face, vertex)
+      // Per point: its vertices, and the faces with a corner there (CSR).
+      auto prefix = [](std::vector<unsigned int>& start) {
+         for (size_t p = 1; p < start.size(); p++)
+            start[p] += start[p - 1];
+      };
+      t.pointVertStart.assign(t.points + 1, 0);
+      for (size_t i = 0; i < nv; i++)
+         t.pointVertStart[t.point[i] + 1]++;
+      prefix(t.pointVertStart);
+      t.pointVert.resize(nv);
+      std::vector<unsigned int> fill(t.pointVertStart.begin(), t.pointVertStart.end() - 1);
+      for (size_t i = 0; i < nv; i++)
+         t.pointVert[fill[t.point[i]]++] = (unsigned int)i;
       const size_t nf = base.FaceCount();
-      for (size_t f = 0; f < nf; f++)
-      {
+      auto valid = [&](size_t f) {
          const unsigned int* tri = &base.indices[f * 3];
-         if (tri[0] >= nv || tri[1] >= nv || tri[2] >= nv)
-            continue;
-         for (int c = 0; c < 3; c++)
+         return tri[0] < nv && tri[1] < nv && tri[2] < nv;
+      };
+      t.pointFaceStart.assign(t.points + 1, 0);
+      for (size_t f = 0; f < nf; f++)
+         if (valid(f))
+            for (int c = 0; c < 3; c++)
+               t.pointFaceStart[t.point[base.indices[f * 3 + c]] + 1]++;
+      prefix(t.pointFaceStart);
+      t.pointFace.resize(t.pointFaceStart.back());
+      std::vector<unsigned int> cornerVert(t.pointFace.size());
+      // The other two corners of each (point, face), in the same order, so
+      // the neighbours below sort in place instead of chasing faces.
+      std::vector<unsigned int> other(t.pointFace.size() * 2);
+      fill.assign(t.pointFaceStart.begin(), t.pointFaceStart.end() - 1);
+      for (size_t f = 0; f < nf; f++)
+         if (valid(f))
          {
-            const unsigned int a = t.point[tri[c]], b = t.point[tri[(c + 1) % 3]];
-            corners[a].push_back({ (unsigned int)f, tri[c] });
-            if (a == b)
-               continue;
-            nb[a].push_back(b);
-            nb[b].push_back(a);
+            const unsigned int fp[3] = { t.point[base.indices[f * 3]], t.point[base.indices[f * 3 + 1]],
+                                         t.point[base.indices[f * 3 + 2]] };
+            for (int c = 0; c < 3; c++)
+            {
+               const unsigned int at = fill[fp[c]]++;
+               t.pointFace[at] = (unsigned int)f;
+               cornerVert[at] = base.indices[f * 3 + c];
+               other[(size_t)at * 2] = fp[(c + 1) % 3];
+               other[(size_t)at * 2 + 1] = fp[(c + 2) % 3];
+            }
          }
-      }
+
+      // Neighbours: the other corners of a point's faces.
       t.nbrStart.assign(t.points + 1, 0);
+      t.nbr.reserve(other.size() / 2);
       for (int p = 0; p < t.points; p++)
       {
-         std::sort(nb[p].begin(), nb[p].end());
-         nb[p].erase(std::unique(nb[p].begin(), nb[p].end()), nb[p].end());
-         t.nbrStart[p + 1] = t.nbrStart[p] + (unsigned int)nb[p].size();
-         t.nbr.insert(t.nbr.end(), nb[p].begin(), nb[p].end());
+         const auto first = other.begin() + (size_t)t.pointFaceStart[p] * 2;
+         const auto last = other.begin() + (size_t)t.pointFaceStart[p + 1] * 2;
+         std::sort(first, last);
+         for (auto it = first; it != last; ++it)
+            if (*it != (unsigned int)p && (it == first || *it != *(it - 1)))
+               t.nbr.push_back(*it);
+         t.nbrStart[p + 1] = (unsigned int)t.nbr.size();
       }
 
       // Each vertex shades from the faces at its point whose corner normal
       // agrees with its own.
       t.shadeStart.assign(nv + 1, 0);
+      t.shadeFace.reserve(t.pointFace.size());
       for (size_t i = 0; i < nv; i++)
       {
          const Vertex& v = base.vertices[i];
-         for (const auto& fc : corners[t.point[i]])
+         const unsigned int p = t.point[i];
+         for (unsigned int s = t.pointFaceStart[p]; s < t.pointFaceStart[p + 1]; s++)
          {
-            const Vertex& w = base.vertices[fc.second];
-            if (fc.second == i || v.nx * w.nx + v.ny * w.ny + v.nz * w.nz > 0.5f)
-               t.shadeFace.push_back(fc.first);
+            const Vertex& w = base.vertices[cornerVert[s]];
+            if (cornerVert[s] == i || v.nx * w.nx + v.ny * w.ny + v.nz * w.nz > 0.5f)
+               t.shadeFace.push_back(t.pointFace[s]);
          }
          t.shadeStart[i + 1] = (unsigned int)t.shadeFace.size();
       }
@@ -189,6 +264,59 @@ namespace Sculpt
             if (base.FaceSelected(f))
                for (int c = 0; c < 3; c++)
                   t.mask[t.point[base.indices[f * 3 + c]]] = 1;
+   }
+
+   namespace
+   {
+      void FaceNormal(const Mesh& m, size_t f, float n[3])
+      {
+         const unsigned int* tri = &m.indices[f * 3];
+         const Vertex &a = m.vertices[tri[0]], &b = m.vertices[tri[1]], &c = m.vertices[tri[2]];
+         const float e1[3] = { b.px - a.px, b.py - a.py, b.pz - a.pz };
+         const float e2[3] = { c.px - a.px, c.py - a.py, c.pz - a.pz };
+         n[0] = e1[1] * e2[2] - e1[2] * e2[1];
+         n[1] = e1[2] * e2[0] - e1[0] * e2[2];
+         n[2] = e1[0] * e2[1] - e1[1] * e2[0];
+      }
+
+      // A vertex's normal from its shading faces' (area-weighted) normals,
+      // kept on the side its base normal faces.
+      void SetNormal(const Mesh& base, size_t i, float n[3], Mesh& out)
+      {
+         const Vertex& b = base.vertices[i];
+         if (n[0] * b.nx + n[1] * b.ny + n[2] * b.nz < 0.0f && (b.nx != 0.0f || b.ny != 0.0f || b.nz != 0.0f))
+            for (int k = 0; k < 3; k++)
+               n[k] = -n[k];
+         const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+         if (l > 1e-20f)
+         {
+            out.vertices[i].nx = n[0] / l;
+            out.vertices[i].ny = n[1] / l;
+            out.vertices[i].nz = n[2] / l;
+         }
+      }
+
+      // Marks that reset in O(1): a value is marked when it holds the epoch.
+      struct Marks
+      {
+         std::vector<unsigned int> v;
+         unsigned int epoch = 0;
+         void Next(size_t n)
+         {
+            if (v.size() != n || ++epoch == 0)
+            {
+               v.assign(n, 0);
+               epoch = 1;
+            }
+         }
+         bool Mark(size_t i)
+         {
+            if (v[i] == epoch)
+               return false;
+            v[i] = epoch;
+            return true;
+         }
+      };
    }
 
    void Apply(const Mesh& base, const Topology& t, const std::vector<float>& offsets, float amount, Mesh& out)
@@ -225,19 +353,243 @@ namespace Sculpt
          for (unsigned int s = t.shadeStart[i]; s < t.shadeStart[i + 1]; s++)
             for (int k = 0; k < 3; k++)
                n[k] += fn[(size_t)t.shadeFace[s] * 3 + k];
-         // Base normals point the way the surface faces; keep that side.
-         const Vertex& b = base.vertices[i];
-         if (n[0] * b.nx + n[1] * b.ny + n[2] * b.nz < 0.0f && (b.nx != 0.0f || b.ny != 0.0f || b.nz != 0.0f))
-            for (int k = 0; k < 3; k++)
-               n[k] = -n[k];
-         const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-         if (l > 1e-20f)
-         {
-            out.vertices[i].nx = n[0] / l;
-            out.vertices[i].ny = n[1] / l;
-            out.vertices[i].nz = n[2] / l;
-         }
+         SetNormal(base, i, n, out);
       }
+   }
+
+   bool ApplyPoints(const Mesh& base, const Topology& t, const std::vector<float>& offsets, float amount,
+                    const std::vector<unsigned int>& points, Mesh& out, std::vector<unsigned int>& changed)
+   {
+      changed.clear();
+      if (out.vertices.size() != base.vertices.size() || out.indices.size() != base.indices.size() ||
+          offsets.size() != (size_t)t.points * 3 || t.point.size() != base.vertices.size() ||
+          t.pointVertStart.size() != (size_t)t.points + 1)
+         return false;
+      thread_local Marks pointMarks, faceMarks;
+      thread_local std::vector<unsigned int> faces;
+      faces.clear();
+      pointMarks.Next(t.points);
+      faceMarks.Next(base.FaceCount());
+      for (unsigned int p : points)
+      {
+         if (p >= (unsigned int)t.points || !pointMarks.Mark(p))
+            continue;
+         const float* o = &offsets[(size_t)p * 3];
+         for (unsigned int s = t.pointVertStart[p]; s < t.pointVertStart[p + 1]; s++)
+         {
+            const unsigned int i = t.pointVert[s];
+            out.vertices[i].px = base.vertices[i].px + o[0] * amount;
+            out.vertices[i].py = base.vertices[i].py + o[1] * amount;
+            out.vertices[i].pz = base.vertices[i].pz + o[2] * amount;
+         }
+         for (unsigned int s = t.pointFaceStart[p]; s < t.pointFaceStart[p + 1]; s++)
+            if (faceMarks.Mark(t.pointFace[s]))
+               faces.push_back(t.pointFace[s]);
+      }
+      // Every corner of a moved face shades from it.
+      pointMarks.Next(t.points);
+      for (unsigned int f : faces)
+         for (int c = 0; c < 3; c++)
+         {
+            const unsigned int p = t.point[base.indices[(size_t)f * 3 + c]];
+            if (pointMarks.Mark(p))
+               changed.push_back(p);
+         }
+      for (unsigned int p : changed)
+         for (unsigned int s = t.pointVertStart[p]; s < t.pointVertStart[p + 1]; s++)
+         {
+            const unsigned int i = t.pointVert[s];
+            float n[3] = { 0, 0, 0 };
+            for (unsigned int e = t.shadeStart[i]; e < t.shadeStart[i + 1]; e++)
+            {
+               float fn[3];
+               FaceNormal(out, t.shadeFace[e], fn);
+               for (int k = 0; k < 3; k++)
+                  n[k] += fn[k];
+            }
+            SetNormal(base, i, n, out);
+         }
+      return true;
+   }
+
+   void PointFrameAt(const Mesh& shaped, const Topology& t, const std::vector<unsigned int>& points,
+                     std::vector<float>& pos, std::vector<float>& nrm)
+   {
+      if (pos.size() != (size_t)t.points * 3 || nrm.size() != pos.size() || t.point.size() != shaped.vertices.size())
+         return;
+      for (unsigned int p : points)
+      {
+         float* q = &pos[(size_t)p * 3];
+         float* n = &nrm[(size_t)p * 3];
+         n[0] = n[1] = n[2] = 0.0f;
+         for (unsigned int s = t.pointVertStart[p]; s < t.pointVertStart[p + 1]; s++)
+         {
+            const Vertex& v = shaped.vertices[t.pointVert[s]];
+            q[0] = v.px;
+            q[1] = v.py;
+            q[2] = v.pz;
+            n[0] += v.nx;
+            n[1] += v.ny;
+            n[2] += v.nz;
+         }
+         Normalize(n);
+      }
+   }
+
+   void BuildGrid(const std::vector<float>& pos, float cell, Grid& g)
+   {
+      g = Grid();
+      g.cell = std::max(cell, 1e-6f);
+      g.at = pos;
+      g.cells.reserve(pos.size() / 12 + 1);
+      for (int k = 0; k < 3; k++)
+      {
+         g.lo[k] = 1e30f;
+         g.hi[k] = -1e30f;
+      }
+      for (size_t i = 0; i < pos.size(); i++)
+      {
+         g.lo[i % 3] = std::min(g.lo[i % 3], pos[i] - g.cell);
+         g.hi[i % 3] = std::max(g.hi[i % 3], pos[i] + g.cell);
+      }
+      for (size_t i = 0; i + 2 < pos.size(); i += 3)
+         g.cells[CellKey(CellOf(pos[i], g.cell), CellOf(pos[i + 1], g.cell), CellOf(pos[i + 2], g.cell))].push_back(
+            (unsigned int)(i / 3));
+   }
+
+   void MoveInGrid(const std::vector<float>& pos, const std::vector<unsigned int>& points, Grid& g)
+   {
+      if (g.cell <= 0.0f || g.at.size() != pos.size())
+         return;
+      for (unsigned int p : points)
+      {
+         const float* q = &pos[(size_t)p * 3];
+         float* was = &g.at[(size_t)p * 3];
+         const uint64_t from = CellKey(CellOf(was[0], g.cell), CellOf(was[1], g.cell), CellOf(was[2], g.cell));
+         const uint64_t to = CellKey(CellOf(q[0], g.cell), CellOf(q[1], g.cell), CellOf(q[2], g.cell));
+         for (int k = 0; k < 3; k++)
+         {
+            was[k] = q[k];
+            g.lo[k] = std::min(g.lo[k], q[k] - g.cell);
+            g.hi[k] = std::max(g.hi[k], q[k] + g.cell);
+         }
+         if (from == to)
+            continue;
+         auto it = g.cells.find(from);
+         if (it != g.cells.end())
+         {
+            std::vector<unsigned int>& v = it->second;
+            auto e = std::find(v.begin(), v.end(), p);
+            if (e != v.end())
+            {
+               *e = v.back();
+               v.pop_back();
+            }
+         }
+         g.cells[to].push_back(p);
+      }
+   }
+
+   namespace
+   {
+      // Möller-Trumbore; true with t when the ray hits face f ahead of o.
+      bool HitFace(const Mesh& m, size_t f, const float o[3], const float d[3], float& t)
+      {
+         const unsigned int* tri = &m.indices[f * 3];
+         const Vertex &a = m.vertices[tri[0]], &b = m.vertices[tri[1]], &c = m.vertices[tri[2]];
+         const float e1[3] = { b.px - a.px, b.py - a.py, b.pz - a.pz }, e2[3] = { c.px - a.px, c.py - a.py, c.pz - a.pz };
+         const float p[3] = { d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0] };
+         const float det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
+         if (std::fabs(det) < 1e-12f)
+            return false;
+         const float inv = 1.0f / det;
+         const float s[3] = { o[0] - a.px, o[1] - a.py, o[2] - a.pz };
+         const float u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
+         if (u < 0.0f || u > 1.0f)
+            return false;
+         const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
+         const float v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
+         if (v < 0.0f || u + v > 1.0f)
+            return false;
+         t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
+         return t > 0.0f;
+      }
+   }
+
+   bool Raycast(const Mesh& m, const float o[3], const float d[3], float& best, const Topology* topo, const Grid* grid)
+   {
+      best = 1e30f;
+      const size_t nv = m.vertices.size();
+      const bool walk = topo != nullptr && grid != nullptr && grid->cell > 0.0f && topo->point.size() == nv &&
+                        topo->pointFaceStart.size() == (size_t)topo->points + 1;
+      if (!walk)
+      {
+         float t;
+         for (size_t f = 0; f * 3 + 2 < m.indices.size(); f++)
+            if (m.indices[f * 3] < nv && m.indices[f * 3 + 1] < nv && m.indices[f * 3 + 2] < nv && HitFace(m, f, o, d, t) &&
+                t < best)
+               best = t;
+         return best < 1e30f;
+      }
+      // March the ray through the grid in half cells, testing the faces of
+      // the points in the cells around each step (the grid's cells are at
+      // least two edges wide, so a face hit at a step has its corners
+      // there). The first hit is final once the march has passed it.
+      float lo[3], hi[3];
+      for (int a = 0; a < 3; a++)
+      {
+         lo[a] = grid->lo[a];
+         hi[a] = grid->hi[a];
+      }
+      float t0 = 0.0f, t1 = 1e30f;
+      for (int a = 0; a < 3; a++)
+      {
+         if (std::fabs(d[a]) < 1e-20f)
+         {
+            if (o[a] < lo[a] || o[a] > hi[a])
+               return false;
+            continue;
+         }
+         float ta = (lo[a] - o[a]) / d[a], tb = (hi[a] - o[a]) / d[a];
+         if (ta > tb)
+            std::swap(ta, tb);
+         t0 = std::max(t0, ta);
+         t1 = std::min(t1, tb);
+      }
+      if (t0 > t1)
+         return false;
+      const float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      const float step = grid->cell * 0.5f / std::max(len, 1e-20f);
+      thread_local Marks faceMarks;
+      faceMarks.Next(m.FaceCount());
+      std::unordered_map<uint64_t, bool> seen;
+      for (float t = t0; t <= t1 + step; t += step)
+      {
+         if (best < t - step)
+            break;
+         const float p[3] = { o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t };
+         const int c[3] = { CellOf(p[0], grid->cell), CellOf(p[1], grid->cell), CellOf(p[2], grid->cell) };
+         for (int x = c[0] - 1; x <= c[0] + 1; x++)
+            for (int y = c[1] - 1; y <= c[1] + 1; y++)
+               for (int z = c[2] - 1; z <= c[2] + 1; z++)
+               {
+                  const uint64_t key = CellKey(x, y, z);
+                  if (!seen.emplace(key, true).second)
+                     continue;
+                  auto it = grid->cells.find(key);
+                  if (it == grid->cells.end())
+                     continue;
+                  for (unsigned int q : it->second)
+                     for (unsigned int s = topo->pointFaceStart[q]; s < topo->pointFaceStart[q + 1]; s++)
+                     {
+                        const unsigned int f = topo->pointFace[s];
+                        float th;
+                        if (faceMarks.Mark(f) && HitFace(m, f, o, d, th) && th < best)
+                           best = th;
+                     }
+               }
+      }
+      return best < 1e30f;
    }
 
    void PointFrame(const Mesh& shaped, const Topology& t, std::vector<float>& pos, std::vector<float>& nrm)
@@ -262,7 +614,7 @@ namespace Sculpt
    }
 
    void Stroke(const Dab& d, const std::vector<float>& pos, const std::vector<float>& nrm, const Topology& t,
-               float amount, std::vector<float>& offsets)
+               float amount, std::vector<float>& offsets, std::vector<unsigned int>* touched, const Grid* grid)
    {
       if (amount < 0.01f || d.radius <= 0.0f || pos.size() != (size_t)t.points * 3 || offsets.size() != pos.size())
          return;
@@ -272,7 +624,9 @@ namespace Sculpt
       {
          float c[3];
          Flip(d.center, m, c);
-         const Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease);
+         const Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid);
+         if (touched != nullptr)
+            touched->insert(touched->end(), a.idx.begin(), a.idx.end());
          for (size_t e = 0; e < a.idx.size(); e++)
          {
             const unsigned int i = a.idx[e];

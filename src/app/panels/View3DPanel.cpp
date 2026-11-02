@@ -139,7 +139,6 @@ namespace
       int adjust = 0;                // 'r' radius, 's' strength (F / Shift+F)
       ImVec2 adjustAt;
       float adjustBefore = 0.0f;
-      std::vector<float> pos, nrm, posBase;
       Sculpt::GrabHold grab;
       float grabWorld[3] = { 0, 0, 0 };
    } sSculpt;
@@ -3186,37 +3185,6 @@ namespace
       sSculpt.item = itemId;
    }
 
-   // Nearest hit of a mesh-space ray (d need not be unit) on the mesh; t in units of d.
-   bool RayMesh(const Mesh& m, const float o[3], const float d[3], float& best)
-   {
-      best = 1e30f;
-      const size_t nv = m.vertices.size();
-      for (size_t f = 0; f + 2 < m.indices.size(); f += 3)
-      {
-         if (m.indices[f] >= nv || m.indices[f + 1] >= nv || m.indices[f + 2] >= nv)
-            continue;
-         const Vertex &a = m.vertices[m.indices[f]], &b = m.vertices[m.indices[f + 1]], &c = m.vertices[m.indices[f + 2]];
-         const float e1[3] = { b.px - a.px, b.py - a.py, b.pz - a.pz }, e2[3] = { c.px - a.px, c.py - a.py, c.pz - a.pz };
-         const float p[3] = { d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0] };
-         const float det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
-         if (std::fabs(det) < 1e-12f)
-            continue;
-         const float inv = 1.0f / det;
-         const float s[3] = { o[0] - a.px, o[1] - a.py, o[2] - a.pz };
-         const float u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
-         if (u < 0.0f || u > 1.0f)
-            continue;
-         const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
-         const float v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
-         if (v < 0.0f || u + v > 1.0f)
-            continue;
-         const float t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
-         if (t > 0.0f && t < best)
-            best = t;
-      }
-      return best < 1e30f;
-   }
-
    void LinearBy(const Mat4& t, const float v[3], float out[3])
    {
       for (int k = 0; k < 3; k++)
@@ -3231,7 +3199,7 @@ namespace
       const Mat4 inv = Mat4::Inverse(world);
       TransformBy(inv, o, mo);
       LinearBy(inv, d, md);
-      if (!RayMesh(node->Shaped(), mo, md, t))
+      if (!node->Raycast(mo, md, t))
          return false;
       for (int k = 0; k < 3; k++)
       {
@@ -3261,12 +3229,12 @@ namespace
       d.strength = sSculpt.strength;
       d.invert = ImGui::GetIO().KeyCtrl;
       d.symmetry = sSculpt.symmetry;
-      const float amount = std::clamp(node->amount, 0.0f, 2.0f);
-      std::vector<float>& off = node->Offsets();
-      Sculpt::Stroke(d, sSculpt.pos, sSculpt.nrm, node->Topology(), amount, off);
-      for (size_t i = 0; i < off.size() && i < sSculpt.pos.size(); i++)
-         sSculpt.pos[i] = sSculpt.posBase[i] + off[i] * amount;
-      node->OffsetsChanged();
+      static std::vector<unsigned int> touched;
+      touched.clear();
+      const Sculpt::Grid* grid = node->PointGrid(d.radius);
+      Sculpt::Stroke(d, node->PointPos(), node->PointNrm(), node->Topology(), std::clamp(node->amount, 0.0f, 2.0f),
+                     node->Offsets(), &touched, grid);
+      node->OffsetsChanged(&touched);
    }
 
    // Draws the brush and its bar, runs strokes and keys. Returns true while
@@ -3350,17 +3318,12 @@ namespace
                float mv[3];
                LinearBy(Mat4::Inverse(world), mw, mv);
                Sculpt::GrabMove(sSculpt.grab, mv, amount, node->Offsets());
-               node->OffsetsChanged();
+               node->OffsetsChanged(&sSculpt.grab.idx);
             }
          }
          else
          {
-            // Fresh point positions once a frame, then dabs along the drag.
-            Sculpt::PointFrame(node->Shaped(), node->Topology(), sSculpt.pos, sSculpt.nrm);
-            const std::vector<float>& off = node->Offsets();
-            sSculpt.posBase.resize(sSculpt.pos.size());
-            for (size_t i = 0; i < sSculpt.pos.size() && i < off.size(); i++)
-               sSculpt.posBase[i] = sSculpt.pos[i] - off[i] * amount;
+            // Dabs along the drag.
             const float step = std::max(2.0f, sSculpt.radius * 0.15f);
             const float dist = std::hypot(mouse.x - sSculpt.last.x, mouse.y - sSculpt.last.y);
             const int n = (int)(dist / step);
@@ -3413,12 +3376,6 @@ namespace
       PushUndoCheckpoint(undoLabel.c_str());
       sSculpt.stroking = true;
       sSculpt.last = mouse;
-      const float amount = std::clamp(node->amount, 0.0f, 2.0f);
-      Sculpt::PointFrame(node->Shaped(), node->Topology(), sSculpt.pos, sSculpt.nrm);
-      const std::vector<float>& off = node->Offsets();
-      sSculpt.posBase.resize(sSculpt.pos.size());
-      for (size_t i = 0; i < sSculpt.pos.size() && i < off.size(); i++)
-         sSculpt.posBase[i] = sSculpt.pos[i] - off[i] * amount;
       if (sSculpt.brush == Sculpt::kGrab && !io.KeyShift)
       {
          Sculpt::Dab d;
@@ -3426,7 +3383,7 @@ namespace
          d.radius = sSculpt.radius * UnitAt(w) / WorldScale(world);
          d.strength = sSculpt.strength;
          d.symmetry = sSculpt.symmetry;
-         Sculpt::GrabBegin(d, sSculpt.pos, node->Topology(), off, sSculpt.grab);
+         Sculpt::GrabBegin(d, node->PointPos(), node->Topology(), node->Offsets(), sSculpt.grab);
          std::copy(w, w + 3, sSculpt.grabWorld);
       }
       else

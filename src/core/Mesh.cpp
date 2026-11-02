@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <set>
@@ -569,6 +570,17 @@ namespace MeshOps
       return out;
    }
 
+   struct WeldKeyHash
+   {
+      size_t operator()(const std::array<long long, 3>& k) const
+      {
+         uint64_t h = 1469598103934665603ull;
+         for (long long v : k)
+            h = (h ^ (uint64_t)v) * 1099511628211ull;
+         return (size_t)(h ^ h >> 29);
+      }
+   };
+
    // Primitives here duplicate vertices wherever UVs or normals split - the
    // sphere's date line, every edge of a flat-shaded cube. Any operator that
    // reasons about connectivity has to weld those back together first or it
@@ -579,7 +591,8 @@ namespace MeshOps
    // differ only in the last float bit still land together.
    std::vector<unsigned int> BuildWeldMap(const Mesh& in)
    {
-      std::map<std::array<long long, 3>, unsigned int> unique;
+      std::unordered_map<std::array<long long, 3>, unsigned int, WeldKeyHash> unique;
+      unique.reserve(in.vertices.size());
       std::vector<unsigned int> weld(in.vertices.size());
       const double kQuantum = 1e5; // ~0.00001 units
 
@@ -764,15 +777,46 @@ namespace MeshOps
          // Connectivity has to be computed on welded vertices, or the sphere's
          // seam and every cube edge read as a boundary and stay creased.
          const std::vector<unsigned int> weld = BuildWeldMap(current);
-         const std::map<unsigned int, std::set<unsigned int>> adjacency =
-            BuildAdjacency(current, weld);
+         const size_t nv = current.vertices.size();
 
-         // For each welded edge: how many triangles use it, and the opposite
-         // vertex of each. Loop's interior edge point is 3/8 of the two endpoints
-         // plus 1/8 of the two opposite vertices.
-         using Edge = std::pair<unsigned int, unsigned int>;
-         std::map<Edge, int> edgeCount;
-         std::map<Edge, std::vector<unsigned int>> edgeOpposite;
+         // Neighbours of each welded vertex, ascending (every edge of every
+         // triangle, as BuildAdjacency gives them).
+         std::vector<std::vector<unsigned int>> neighbours(nv);
+         for (size_t t = 0; t + 2 < current.indices.size(); t += 3)
+         {
+            const unsigned int v[3] = { weld[current.indices[t]], weld[current.indices[t + 1]],
+                                        weld[current.indices[t + 2]] };
+            for (int e = 0; e < 3; e++)
+            {
+               const unsigned int a = v[e], b = v[(e + 1) % 3];
+               if (a == b)
+                  continue;
+               neighbours[a].push_back(b);
+               neighbours[b].push_back(a);
+            }
+         }
+         for (std::vector<unsigned int>& n : neighbours)
+         {
+            std::sort(n.begin(), n.end());
+            n.erase(std::unique(n.begin(), n.end()), n.end());
+         }
+
+         // For each welded edge: how many triangles use it, the opposite
+         // vertex of the first two, and its split point once made. Loop's
+         // interior edge point is 3/8 of the two endpoints plus 1/8 of the two
+         // opposite vertices.
+         struct EdgeInfo
+         {
+            int count = 0;
+            unsigned int opposite[2] = { 0, 0 };
+            unsigned int point = ~0u;
+         };
+         auto edgeKey = [](unsigned int a, unsigned int b)
+         {
+            return a < b ? (uint64_t)a << 32 | b : (uint64_t)b << 32 | a;
+         };
+         std::unordered_map<uint64_t, EdgeInfo> edges;
+         edges.reserve(current.indices.size());
 
          // A triangle with two corners on one welded vertex (a UV sphere's pole
          // fan) has no area and is not surface. Counting it would give its one
@@ -792,11 +836,10 @@ namespace MeshOps
                                         weld[current.indices[t + 2]] };
             for (int e = 0; e < 3; e++)
             {
-               const auto key = std::minmax(w[e], w[(e + 1) % 3]);
-               if (key.first == key.second)
-                  continue;
-               edgeCount[{ key.first, key.second }]++;
-               edgeOpposite[{ key.first, key.second }].push_back(w[(e + 2) % 3]);
+               EdgeInfo& info = edges[edgeKey(w[e], w[(e + 1) % 3])];
+               if (info.count < 2)
+                  info.opposite[info.count] = w[(e + 2) % 3];
+               info.count++;
             }
          }
 
@@ -807,12 +850,14 @@ namespace MeshOps
          };
 
          // --- repositioned original vertices ---
-         std::map<unsigned int, std::array<float, 3>> movedVertex;
-         for (const auto& entry : adjacency)
+         std::vector<std::array<float, 3>> movedVertex(nv);
+         std::vector<unsigned char> moves(nv, 0);
+         for (unsigned int v = 0; v < (unsigned int)nv; v++)
          {
-            const unsigned int v = entry.first;
-            const std::set<unsigned int>& neighbours = entry.second;
-            const int n = (int)neighbours.size();
+            const std::vector<unsigned int>& around = neighbours[v];
+            if (around.empty())
+               continue;
+            const int n = (int)around.size();
 
             float original[3];
             position(v, original);
@@ -821,11 +866,10 @@ namespace MeshOps
             // one triangle. Those follow the 1/8, 3/4, 1/8 curve rule so the
             // border stays put instead of shrinking inward.
             std::vector<unsigned int> boundaryNeighbours;
-            for (unsigned int nb : neighbours)
+            for (unsigned int nb : around)
             {
-               const auto key = std::minmax(v, nb);
-               auto it = edgeCount.find({ key.first, key.second });
-               if (it != edgeCount.end() && it->second == 1)
+               auto it = edges.find(edgeKey(v, nb));
+               if (it != edges.end() && it->second.count == 1)
                   boundaryNeighbours.push_back(nb);
             }
 
@@ -845,7 +889,7 @@ namespace MeshOps
                const float t = 0.375f + 0.25f * std::cos(2.0f * kPi / (float)n);
                const float beta = (0.625f - t * t) / (float)n;
                float sum[3] = { 0, 0, 0 };
-               for (unsigned int nb : neighbours)
+               for (unsigned int nb : around)
                {
                   float p[3];
                   position(nb, p);
@@ -858,6 +902,7 @@ namespace MeshOps
             for (int k = 0; k < 3; k++)
                moved[k] = original[k] + (moved[k] - original[k]) * blend;
             movedVertex[v] = moved;
+            moves[v] = 1;
          }
 
          Mesh next;
@@ -868,24 +913,20 @@ namespace MeshOps
          next.vertexColor = current.vertexColor;
          for (size_t i = 0; i < next.vertices.size(); i++)
          {
-            auto it = movedVertex.find(weld[i]);
-            if (it == movedVertex.end())
+            if (!moves[weld[i]])
                continue;
-            next.vertices[i].px = it->second[0];
-            next.vertices[i].py = it->second[1];
-            next.vertices[i].pz = it->second[2];
+            next.vertices[i].px = movedVertex[weld[i]][0];
+            next.vertices[i].py = movedVertex[weld[i]][1];
+            next.vertices[i].pz = movedVertex[weld[i]][2];
          }
 
          // --- edge points ---
          // Cached on the welded pair so the two triangles either side of an edge
          // agree on one vertex, rather than each making its own and cracking.
-         std::map<Edge, unsigned int> edgePoint;
          auto splitEdge = [&](unsigned int ia, unsigned int ib) -> unsigned int {
-            const auto key = std::minmax(weld[ia], weld[ib]);
-            const Edge e = { key.first, key.second };
-            auto cached = edgePoint.find(e);
-            if (cached != edgePoint.end())
-               return cached->second;
+            EdgeInfo& info = edges[edgeKey(weld[ia], weld[ib])];
+            if (info.point != ~0u)
+               return info.point;
 
             const Vertex& va = current.vertices[ia];
             const Vertex& vb = current.vertices[ib];
@@ -907,16 +948,11 @@ namespace MeshOps
                              (pa[2] + pb[2]) * 0.5f };
             float limit[3] = { mid[0], mid[1], mid[2] };
 
-            auto opposites = edgeOpposite.find(e);
-            auto count = edgeCount.find(e);
-            const bool interior = count != edgeCount.end() && count->second == 2 &&
-                                  opposites != edgeOpposite.end() &&
-                                  opposites->second.size() >= 2;
-            if (interior)
+            if (info.count == 2)
             {
                float c[3], d[3];
-               position(opposites->second[0], c);
-               position(opposites->second[1], d);
+               position(info.opposite[0], c);
+               position(info.opposite[1], d);
                for (int k = 0; k < 3; k++)
                   limit[k] = 0.375f * (pa[k] + pb[k]) + 0.125f * (c[k] + d[k]);
             }
@@ -935,11 +971,11 @@ namespace MeshOps
                   next.vertexColor.push_back(
                      (current.vertexColor[ia * 3 + k] + current.vertexColor[ib * 3 + k]) * 0.5f);
             }
-            const unsigned int index = (unsigned int)next.vertices.size() - 1;
-            edgePoint[e] = index;
-            return index;
+            info.point = (unsigned int)next.vertices.size() - 1;
+            return info.point;
          };
 
+         next.indices.reserve(current.indices.size() * 4);
          for (size_t t = 0; t + 2 < current.indices.size(); t += 3)
          {
             if (degenerate(t))

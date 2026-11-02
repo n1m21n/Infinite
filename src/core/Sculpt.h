@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Mesh.h"
@@ -24,6 +26,8 @@ namespace Sculpt
       std::vector<unsigned int> nbrStart, nbr;   // per point, CSR
       std::vector<unsigned int> shadeStart, shadeFace;   // per vertex, CSR
       std::vector<unsigned char> mask;        // per point: 1 when a selected face touches it
+      std::vector<unsigned int> pointVertStart, pointVert;   // per point: its vertices, CSR
+      std::vector<unsigned int> pointFaceStart, pointFace;   // per point: faces with a corner there, CSR
       std::vector<unsigned int> indices;      // what it was built from
       size_t vertexCount = 0;
    };
@@ -34,8 +38,37 @@ namespace Sculpt
    // every offset is zero or amount is 0).
    void Apply(const Mesh& base, const Topology& t, const std::vector<float>& offsets, float amount, Mesh& out);
 
+   // Apply for a few points only (a dab's): their vertices move, and every
+   // vertex shading from a face they touch gets a new normal. `out` must hold
+   // Apply's result from before the change. `changed` gets each point whose
+   // position or normal moved. False when `out` does not fit (call Apply).
+   bool ApplyPoints(const Mesh& base, const Topology& t, const std::vector<float>& offsets, float amount,
+                    const std::vector<unsigned int>& points, Mesh& out, std::vector<unsigned int>& changed);
+
    // One point of the shaped mesh: its position and smooth normal.
    void PointFrame(const Mesh& shaped, const Topology& t, std::vector<float>& pos, std::vector<float>& nrm);
+   // The same for some points only.
+   void PointFrameAt(const Mesh& shaped, const Topology& t, const std::vector<unsigned int>& points,
+                     std::vector<float>& pos, std::vector<float>& nrm);
+
+   // Points bucketed by position, so a brush or a ray looks at its
+   // neighbourhood only. Moved points are re-filed with MoveInGrid.
+   struct Grid
+   {
+      float cell = 0.0f;
+      float lo[3] = { 0, 0, 0 }, hi[3] = { 0, 0, 0 };   // bounds at the build, one cell wider
+      std::vector<float> at;   // positions at the build
+      std::unordered_map<uint64_t, std::vector<unsigned int>> cells;
+   };
+   // Cells must be at least two of the mesh's longest edges wide for Raycast.
+   void BuildGrid(const std::vector<float>& pos, float cell, Grid& g);
+   // Re-files points that moved (pos is their new place).
+   void MoveInGrid(const std::vector<float>& pos, const std::vector<unsigned int>& points, Grid& g);
+
+   // Nearest hit of a ray (d need not be unit) on the mesh; t in units of d.
+   // With a grid (built on this mesh's points), only faces near the ray.
+   bool Raycast(const Mesh& m, const float o[3], const float d[3], float& t, const Topology* topo = nullptr,
+                const Grid* grid = nullptr);
 
    struct Dab
    {
@@ -49,8 +82,10 @@ namespace Sculpt
    // Adds one dab to `offsets` (per point, xyz), measured on the shaped
    // mesh's points. Offsets are in the sculpt's own units: a dab moves the
    // shown surface by its amount, so they are divided by `amount`.
+   // `touched` (optional) gets the points it moved; `grid` limits the search.
    void Stroke(const Dab& d, const std::vector<float>& pos, const std::vector<float>& nrm, const Topology& t,
-               float amount, std::vector<float>& offsets);
+               float amount, std::vector<float>& offsets, std::vector<unsigned int>* touched = nullptr,
+               const Grid* grid = nullptr);
 
    // Grab: the points under the brush at the press, and how much each follows.
    struct GrabHold

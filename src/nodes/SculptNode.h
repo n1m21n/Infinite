@@ -86,8 +86,17 @@ public:
    bool Sculptable();
    const Mesh& Shaped() { Update(); return mMesh; }
    const Sculpt::Topology& Topology() const { return mTopo; }
+   // The shaped mesh's points (position, normal), kept up to date by
+   // OffsetsChanged, and a grid over them for a brush of this radius.
+   const std::vector<float>& PointPos();
+   const std::vector<float>& PointNrm();
+   const Sculpt::Grid* PointGrid(float radius);
+   // The nearest hit on the shaped mesh (mesh space, d need not be unit).
+   bool Raycast(const float o[3], const float d[3], float& t);
    std::vector<float>& Offsets() { return mOffsets; }
-   void OffsetsChanged();
+   // After editing Offsets(). With the points a dab touched, only the mesh
+   // around them is re-shaped.
+   void OffsetsChanged(const std::vector<unsigned int>* touched = nullptr);
    bool HasSculpt() const;
    void Clear();
 
@@ -103,9 +112,18 @@ private:
    Sculpt::Topology mTopo;
    std::vector<float> mOffsets;
    int mPoints = 0;                 // how many points the offsets were made for (0: none yet)
+   float mMaxEdge = 0.0f;           // the base's longest edge (sizes the grid)
    const void* mKeyInput = nullptr;
-   unsigned long long mKeyRevision = 0, mBaseRevision = 0, mShapeOf = ~0ull;
+   unsigned long long mKeyRevision = 0, mBaseRevision = 0;
    int mKeyLevel = -1;
+   // What mMesh was shaped from; mReshaped: its normals were rebuilt (not
+   // the base's), so a dab can re-shape just its neighbourhood.
+   unsigned long long mShapeBase = ~0ull, mShapeOffsets = ~0ull;
    float mShapeAmount = -1.0f;
+   bool mFits = false, mReshaped = false;
    unsigned long long mOffsetsRevision = 1, mMeshRevision = 0;
+   std::vector<float> mPos, mNrm;
+   bool mFrameStale = true;
+   Sculpt::Grid mGrid;
+   std::vector<unsigned int> mChanged;
 };

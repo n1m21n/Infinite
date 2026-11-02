@@ -568,6 +568,7 @@ set(COMMON_SOURCES
     src/app/selftest/RigTests.cpp
     src/app/selftest/BakeTests.cpp
     src/app/selftest/SculptTests.cpp
+    src/app/selftest/ThreeDBench.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
