@@ -3497,6 +3497,78 @@ void RunView3DTest()
    shown->worldColor[0] = 0.05f; shown->worldColor[1] = 0.12f; shown->worldColor[2] = 0.22f;
    View3DAddNode(*FindNodeByIndex(sphere));
    shown->Commit();
+   // A camera's background image: behind the objects, over them, and only in the view.
+   {
+      const std::string picPath = AppPaths::TempDir() + "/infinite-backdrop.png";
+      std::vector<unsigned char> red(4 * 4 * 4);
+      for (size_t i = 0; i < red.size(); i += 4)
+      {
+         red[i] = 255; red[i + 1] = 0; red[i + 2] = 0; red[i + 3] = 255;
+      }
+      WriteSrgbPng(picPath, 4, 4, red.data());
+      auto Shot = [&]()
+      {
+         Scene3DNode* s = Scene();
+         const float eye[3] = { 0, 0, 3 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
+         Scene3DNode::View view;
+         view.view = Mat4::LookAt(eye, target, up);
+         view.proj = Mat4::Perspective(45.0f * 3.14159265f / 180.0f, 1.0f, 0.05f, 2000.0f);
+         std::copy(eye, eye + 3, view.eye);
+         view.shading = Scene3DNode::Shading::Solid;
+         view.grid = false;
+         view.camera = s->activeCamera;
+         FindNodeByIndex(sphere)->node->CookIfNeeded(++sCookFrame);
+         s->CookIfNeeded(++sCookFrame);
+         s->RenderView(32, 32, view);
+         const unsigned int tex = s->RenderView(32, 32, view);
+         std::vector<float> px(32 * 32 * 4);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+      auto Red = [](const std::vector<float>& px, int i) { return px[i * 4] > 0.9f && px[i * 4 + 1] < 0.1f && px[i * 4 + 2] < 0.1f; };
+      int lookThrough = 0;
+      for (const Scene3DNode::Item& it : Scene()->Items())
+         if (Scene()->ItemKind(it) == Scene3DNode::Kind::Camera)
+            lookThrough = it.id;
+      Scene()->activeCamera = lookThrough;
+      shown->worldColorOn = false;
+      Scene3DNode::Item* camItem = Scene()->FindItem(Scene()->activeCamera);
+      Check("the scene has a camera to look through", camItem != nullptr);
+      if (camItem != nullptr)
+      {
+         const std::vector<float> plain = Shot();
+         int covered = -1, empty = -1;
+         for (int i = 0; i < 32 * 32; i++)
+         {
+            if (covered < 0 && plain[i * 4 + 3] > 0.99f) covered = i;
+            if (empty < 0 && plain[i * 4 + 3] < 0.01f) empty = i;
+         }
+         Check("the view has an object and empty space", covered >= 0 && empty >= 0);
+         camItem->backdrop.path = picPath;
+         camItem->backdrop.show = true;
+         camItem->backdrop.alpha = 1.0f;
+         const std::vector<float> back = Shot();
+         camItem = Scene()->FindItem(Scene()->activeCamera);
+         camItem->backdrop.front = true;
+         const std::vector<float> front = Shot();
+         camItem = Scene()->FindItem(Scene()->activeCamera);
+         camItem->backdrop.show = false;
+         const std::vector<float> hidden = Shot();
+         if (covered >= 0 && empty >= 0)
+         {
+            Check("a back image fills the empty view", Red(back, empty) && back[empty * 4 + 3] > 0.99f);
+            Check("a back image stays behind the objects", !Red(back, covered));
+            Check("a front image covers them", Red(front, covered));
+            Check("a hidden image is gone", hidden[empty * 4 + 3] < 0.01f);
+         }
+         camItem = Scene()->FindItem(Scene()->activeCamera);
+         camItem->backdrop = Scene3DNode::Backdrop();
+      }
+      Scene()->activeCamera = 0;
+      shown->worldColorOn = true;
+   }
    gView3DOpen = true;
    if (const char* state = getenv("INFINITE_VIEW3DSHOT"))
       View3DShotState(atoi(state));

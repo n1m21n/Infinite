@@ -173,6 +173,7 @@ EXPECTED = {
     ("out", "offlineFps"): "render length/rate, not a still", ("out", "offlineDurationSeconds"): "render length, not a still",
     ("out", "offlinePrerollFrames"): "pre-roll before frame 0, not frame 0 itself",
     ("scene", "transparent"): "alpha only, and --frame writes opaque PNGs (--alpha is --frames-dir only)",
+    ("scene", "item.backdrop"): "camera background image: 3D View only, never rendered (VIEW3DTEST checks it)",
 }
 # Settings-line fields that only drive the editor (view, gizmos, snapping, guides): a headless render can't see them.
 EDITOR_ONLY = ["fps", "seconds", "snap", "snapMove", "snapRot", "snapScale", "passAlpha", "safe", "thirds", "center",

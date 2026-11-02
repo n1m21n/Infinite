@@ -27,6 +27,20 @@ public:
 
    enum class Kind { Missing, Geometry, Camera, Light };
 
+   // Camera only: a picture seen through the camera in the view, never in the render.
+   struct Backdrop
+   {
+      std::string path;             // empty: none
+      bool show = false;
+      float alpha = 0.5f;
+      bool front = false;           // false: behind the objects, true: over them
+      int fit = 0;                  // 0 stretch, 1 fit, 2 crop
+      float offset[2] = { 0, 0 };   // in frame widths
+      float rotation = 0.0f;        // degrees
+      float scale = 1.0f;
+      bool flipX = false, flipY = false;
+   };
+
    struct Item
    {
       int id = 0;
@@ -45,6 +59,7 @@ public:
       unsigned lock = 0;            // bits 0-2 location, 3-5 rotation, 6-8 scale (engine axes): the transform tools leave them alone
       int group = 0;                // items with the same number select and move together; 0 = none
       int passIndex = 0;            // written by Render 3D's Object Index pass
+      Backdrop backdrop;
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores
    };
@@ -140,6 +155,8 @@ public:
       int gridAxis = 1;       // the axis the grid plane faces
       float gridDist = 6.0f;  // how far the view stands back, which picks the grid's scale
       std::vector<int> only;  // local view: just these items
+      int camera = 0;            // looking through this camera item: its backdrop shows
+      float frame[4] = { 0, 0, 1, 1 };  // the camera's frame in the picture, 0-1 from bottom left
    };
    unsigned int RenderView(int w, int h, const View& v);
    // The active camera's view as the output sees it.
@@ -172,6 +189,13 @@ private:
    void ApplyWorld(Render3DNode& render, bool show, bool background);
    unsigned int Composite(unsigned int sceneTex, int w, int h, unsigned int backdrop, GLUtil::Fbo& out);
    unsigned int GridPass(unsigned int sceneTex, int w, int h, const View& v);
+   struct Picture
+   {
+      unsigned int tex = 0;
+      int w = 0, h = 0;
+   };
+   const Picture& LoadPicture(const std::string& path);
+   std::map<std::string, Picture> mPictures;
 
    std::vector<Item> mItems;
    int mNextId = 1;

@@ -17,6 +17,7 @@
 #include "nodes/OutputNode.h"
 #include "nodes/Scene3DNode.h"
 #include "nodes/SceneNodes.h"
+#include "platform/Platform.h"
 #include "Transport.h"
 
 #include <algorithm>
@@ -2504,6 +2505,14 @@ namespace
       view.only = sLocal;
       view.gridAxis = sGridAxis;
       view.gridDist = sDist;
+      if (sCameraView)
+      {
+         view.camera = scene->activeCamera;
+         view.frame[0] = (sCam.frameMn.x - mn.x) / std::max(1.0f, size.x);
+         view.frame[1] = 1.0f - (sCam.frameMx.y - mn.y) / std::max(1.0f, size.y);
+         view.frame[2] = (sCam.frameMx.x - mn.x) / std::max(1.0f, size.x);
+         view.frame[3] = 1.0f - (sCam.frameMn.y - mn.y) / std::max(1.0f, size.y);
+      }
       const float dpi = io.DisplayFramebufferScale.y;
       const unsigned int tex = scene->RenderView((int)(size.x * dpi), (int)(size.y * dpi), view);
       if (tex != 0)
@@ -3515,6 +3524,59 @@ namespace
          else if (ActionButton::Draw(L("Move camera to view"), ImVec2(availW, 0)))
             CameraToView(scene);
          PointAtCursor(scene, item, availW);
+      }
+      Scene3DNode::Backdrop& back = item->backdrop;
+      bool backShow = back.show;
+      const bool backOpen = Card(T("Background Image"), &backShow, false);
+      if (backShow != back.show)
+      {
+         PushUndoCheckpoint("Edit in 3D View");
+         back.show = backShow;
+         scene->Commit();
+      }
+      if (backOpen)
+      {
+         bool edit = false;
+         const std::string file = back.path.empty() ? std::string(T("Open image")) : back.path.substr(back.path.find_last_of("/\\") + 1);
+         if (ActionButton::Draw(file.c_str(), ImVec2(availW, 0)))
+         {
+            const std::string path = Platform::OpenImageDialog();
+            if (!path.empty())
+            {
+               PushUndoCheckpoint("Set camera background image");
+               back.path = path;
+               back.show = true;
+               edit = true;
+            }
+         }
+         if (!back.path.empty())
+         {
+            if (ActionButton::Draw(L("Remove image"), ImVec2(availW, 0)))
+            {
+               PushUndoCheckpoint("Remove camera background image");
+               back.path.clear();
+               edit = true;
+            }
+            ImGui::BeginDisabled(!back.show);
+            edit |= FloatRow(T("Opacity"), &back.alpha, 0.0f, 1.0f, "%.2f");
+            int depth = back.front ? 1 : 0;
+            if (ComboRow(T("Depth"), &depth, { T("Back"), T("Front") }))
+            {
+               back.front = depth == 1;
+               edit = true;
+            }
+            edit |= ComboRow(T("Frame method"), &back.fit, { T("Stretch"), T("Fit"), T("Crop") });
+            edit |= FloatRow(T("Offset X"), &back.offset[0], -2.0f, 2.0f, "%.3f");
+            edit |= FloatRow(T("Offset Y"), &back.offset[1], -2.0f, 2.0f, "%.3f");
+            edit |= FloatRow(T("Rotation"), &back.rotation, -180.0f, 180.0f, "%.1f");
+            edit |= FloatRow(T("Scale"), &back.scale, 0.01f, 10.0f, "%.3f");
+            edit |= BoolRow(T("Flip horizontally"), &back.flipX);
+            edit |= BoolRow(T("Flip vertically"), &back.flipY);
+            ImGui::EndDisabled();
+         }
+         Hint(T("Seen when looking through this camera, never in the render."));
+         if (edit)
+            scene->Commit();
       }
       Render3DNode& look = scene->Look();
       Scene3DNode::Settings& set = *sSet;

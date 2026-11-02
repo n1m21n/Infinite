@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "gl3.h"
+#include "Platform.h"
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
@@ -155,6 +156,9 @@ Scene3DNode::~Scene3DNode()
       glDeleteProgram(mCompositeProgram);
    if (mGridProgram != 0)
       glDeleteProgram(mGridProgram);
+   for (auto& [path, pic] : mPictures)
+      if (pic.tex != 0)
+         glDeleteTextures(1, &pic.tex);
 }
 
 namespace
@@ -324,6 +328,13 @@ void Scene3DNode::Serialize()
          o << "look " << it.id << " " << it.lookAt << "\n";
       if (it.passIndex != 0)
          o << "pass " << it.id << " " << it.passIndex << "\n";
+      if (!it.backdrop.path.empty())
+      {
+         const Backdrop& b = it.backdrop;
+         o << "backdrop " << it.id << " " << (b.show ? 1 : 0) << " " << b.alpha << " " << (b.front ? 1 : 0) << " "
+           << b.fit << " " << b.offset[0] << " " << b.offset[1] << " " << b.rotation << " " << b.scale << " "
+           << (b.flipX ? 1 : 0) << " " << (b.flipY ? 1 : 0) << " " << b.path << "\n";
+      }
       const bool delta = it.dpos[0] != 0 || it.dpos[1] != 0 || it.dpos[2] != 0 || it.drot[0] != 0 ||
                          it.drot[1] != 0 || it.drot[2] != 0 || it.dscale[0] != 1 || it.dscale[1] != 1 ||
                          it.dscale[2] != 1;
@@ -394,7 +405,7 @@ void Scene3DNode::Parse()
                v = (std::decay_t<decltype(v)>)x;
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
-               key == "delta" || key == "pass")
+               key == "delta" || key == "pass" || key == "backdrop")
       {
          int id = 0;
          l >> id;
@@ -418,6 +429,17 @@ void Scene3DNode::Parse()
             l >> it->lookAt;
          else if (key == "pass")
             l >> it->passIndex;
+         else if (key == "backdrop")
+         {
+            Backdrop& b = it->backdrop;
+            int show = 1, front = 0, fx = 0, fy = 0;
+            l >> show >> b.alpha >> front >> b.fit >> b.offset[0] >> b.offset[1] >> b.rotation >> b.scale >> fx >> fy >> std::ws;
+            std::getline(l, b.path);
+            b.show = show != 0;
+            b.front = front != 0;
+            b.flipX = fx != 0;
+            b.flipY = fy != 0;
+         }
          else if (key == "delta")
          {
             for (float& v : it->dpos) l >> v;
@@ -935,6 +957,29 @@ unsigned int Scene3DNode::GetOutputTexture()
 // The floor, drawn after the scene against its depth: endless, always fine at
 // any zoom, fading into the distance, and hidden by whatever stands in front.
 // Colours are Blender's theme defaults.
+// A camera's backdrop, decoded once per path; a path that fails stays empty until it changes.
+const Scene3DNode::Picture& Scene3DNode::LoadPicture(const std::string& path)
+{
+   auto found = mPictures.find(path);
+   if (found != mPictures.end())
+      return found->second;
+   Picture& pic = mPictures[path];
+   std::vector<unsigned char> pixels;
+   std::string error;
+   if (!Platform::LoadImageRGBA(path, pixels, pic.w, pic.h, error) || pic.w <= 0 || pic.h <= 0)
+      return pic;
+   glGenTextures(1, &pic.tex);
+   glBindTexture(GL_TEXTURE_2D, pic.tex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, pic.w, pic.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   return pic;
+}
+
 unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const View& v)
 {
    if (mGridProgram == 0)
@@ -950,6 +995,24 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "uniform int uAxis;\n"
          "uniform int uDraw;\n"
          "uniform float uDist;\n"
+         "uniform sampler2D uPicture;\n"
+         "uniform int uPictureOn;\n"     // 0 none, 1 behind, 2 over
+         "uniform int uPictureWire;\n"
+         "uniform vec4 uFrame;\n"
+         "uniform vec4 uPictureHalf;\n"  // half size in frame widths, then 1/frame aspect, alpha
+         "uniform vec4 uPictureMove;\n"  // offset, rotation in radians, scale
+         "uniform vec2 uPictureFlip;\n"
+         "vec4 picture() {\n"
+         "   vec2 c = (vUv - uFrame.xy) / max(uFrame.zw - uFrame.xy, vec2(1e-6)) - 0.5;\n"
+         "   vec2 q = vec2(c.x, c.y * uPictureHalf.z) - uPictureMove.xy;\n"
+         "   float cr = cos(uPictureMove.z), sr = sin(uPictureMove.z);\n"
+         "   q = vec2(cr * q.x + sr * q.y, -sr * q.x + cr * q.y) / max(uPictureMove.w, 1e-4);\n"
+         "   vec2 uv = q / (2.0 * uPictureHalf.xy) + 0.5;\n"
+         "   if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec4(0.0);\n"
+         "   uv = mix(uv, 1.0 - uv, uPictureFlip);\n"
+         "   vec4 p = texture(uPicture, vec2(uv.x, 1.0 - uv.y));\n"
+         "   return vec4(p.rgb, p.a * uPictureHalf.w);\n"
+         "}\n"
          "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.157, 0.565, 1.0), vec3(0.545, 0.863, 0.0));\n"
          "float lines(vec2 uv, float s) {\n"
          "   vec2 c = uv / s;\n"
@@ -960,6 +1023,13 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "   vec4 s = texture(uScene, vUv);\n"
          "   vec3 rgb = s.rgb;\n"
          "   float a = s.a;\n"
+         "   if (uPictureOn == 1) {\n"
+         "      vec4 p = picture();\n"
+         "      float open = uPictureWire == 1 ? 1.0 - s.a : step(0.999999, texture(uDepth, vUv).r);\n"
+         "      float k = p.a * open;\n"
+         "      rgb = mix(rgb, p.rgb, k);\n"
+         "      a = a + k * (1.0 - a);\n"
+         "   }\n"
          "   if (uDraw == 1) {\n"
          "      vec4 n = uInv * vec4(vUv * 2.0 - 1.0, -1.0, 1.0);\n"
          "      vec4 f = uInv * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);\n"
@@ -989,14 +1059,54 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "         a = a + g * (1.0 - a);\n"
          "      }\n"
          "   }\n"
+         "   if (uPictureOn == 2) {\n"
+         "      vec4 p = picture();\n"
+         "      rgb = mix(rgb, p.rgb, p.a);\n"
+         "      a = a + p.a * (1.0 - a);\n"
+         "   }\n"
          "   fragColor = a > 1e-4 ? vec4(rgb / a, a) : vec4(0.0);\n"
          "}\n");
    if (mGridProgram == 0 || !GLUtil::EnsureFbo(mGridFbo, w, h))
       return sceneTex;
    const Mat4 viewProj = Mat4::Multiply(v.proj, v.view);
    const Mat4 inv = Mat4::Inverse(viewProj);
+   const Item* camera = v.camera != 0 ? FindConst(v.camera) : nullptr;
+   const Backdrop* back = camera != nullptr && camera->backdrop.show && !camera->backdrop.path.empty() ? &camera->backdrop : nullptr;
+   const Picture& pic = back != nullptr ? LoadPicture(back->path) : Picture();
+   const bool wire = v.shading == Shading::Wire;
    GLUtil::RunShaderPass(mGridFbo, mGridProgram, [&]
    {
+      int on = 0;
+      if (pic.tex != 0)
+      {
+         // The frame's shape against the picture's picks how it covers: stretch fills,
+         // fit shows all of it, crop fills and cuts the overhang.
+         const float frameW = (v.frame[2] - v.frame[0]) * w, frameH = (v.frame[3] - v.frame[1]) * h;
+         const float fa = frameH > 0 ? frameW / frameH : 1.0f;
+         const float ia = (float)pic.w / (float)std::max(1, pic.h);
+         float hx = 0.5f, hy = 0.5f / fa;
+         if (back->fit == 1)
+         {
+            if (ia > fa) hy = 0.5f / ia;
+            else hx = 0.5f * ia / fa;
+         }
+         else if (back->fit == 2)
+         {
+            if (ia > fa) hx = 0.5f * ia / fa;
+            else hy = 0.5f / ia;
+         }
+         on = back->front ? 2 : 1;
+         glActiveTexture(GL_TEXTURE2);
+         glBindTexture(GL_TEXTURE_2D, pic.tex);
+         glUniform1i(glGetUniformLocation(mGridProgram, "uPicture"), 2);
+         glUniform4fv(glGetUniformLocation(mGridProgram, "uFrame"), 1, v.frame);
+         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureHalf"), hx, hy, 1.0f / fa, std::clamp(back->alpha, 0.0f, 1.0f));
+         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureMove"), back->offset[0], back->offset[1],
+                     back->rotation * 3.14159265f / 180.0f, back->scale);
+         glUniform2f(glGetUniformLocation(mGridProgram, "uPictureFlip"), back->flipX ? 1.0f : 0.0f, back->flipY ? 1.0f : 0.0f);
+      }
+      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureOn"), on);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureWire"), wire || !mEditor->DepthValid() ? 1 : 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mEditor->DepthTexture());
       glUniform1i(glGetUniformLocation(mGridProgram, "uDepth"), 1);
