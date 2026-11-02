@@ -459,7 +459,7 @@ CameraStereoData.convergence_distance	out	stereo 3D is outside the README
 CameraStereoData.use_pole_merge	out	stereo 3D is outside the README
 CameraStereoData.pole_merge_angle_from	out	stereo 3D is outside the README
 CameraStereoData.pole_merge_angle_to	out	stereo 3D is outside the README
-CAMERA_OT_preset_add	missing	Camera Data tab: camera presets
+CAMERA_OT_preset_add	done	View3DPanel.cpp:4542 Camera card: sensor preset list
 CAMERA_OT_safe_areas_preset_add	out	preset UI; safe areas are two numbers
 ED_OT_lib_id_unlink	out	data-block linking
 ED_OT_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
@@ -665,7 +665,7 @@ RenderSettings.use_stamp_note	done	Scene3DNode.cpp:1028 Finish pass + Render/Out
 RenderSettings.use_stamp_marker	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_filename	out	metadata of the .blend, sequencer or machine
 RenderSettings.use_stamp_sequencer_strip	out	metadata of the .blend, sequencer or machine
-RenderSettings.use_stamp_render_time	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_render_time	done	Scene3DNode.cpp:1066 Stamp card: render time
 RenderSettings.stamp_note_text	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.use_stamp	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
 RenderSettings.use_stamp_labels	done	Scene3DNode.cpp:1028 Finish pass + Render/Output tab rows
@@ -954,7 +954,7 @@ PreferencesInput.use_zoom_to_mouse	done	View3DPanel.cpp:4002 Zoom to mouse
 PreferencesInput.use_auto_perspective	done	View3DPanel.cpp:5218 Preferences card: navigation, mini axes, gizmo sizes
 PreferencesInput.use_rotate_around_active	done	View3DPanel.cpp:4003 Orbit around selection
 PreferencesInput.view_rotate_method	out	decided out in parity.md: turntable and zoom to pointer cover them
-PreferencesInput.use_mouse_continuous	missing	View tab > Navigation: wrap the pointer while dragging
+PreferencesInput.use_mouse_continuous	done	View3DPanel.cpp:2337 pointer wraps at view edge while orbiting
 PreferencesInput.use_drag_immediately	out	app-wide input settings, not the 3D View
 PreferencesInput.use_numeric_input_advanced	out	app-wide input settings, not the 3D View
 PreferencesInput.navigation_mode	deferred	walk and fly navigation: new mode, needs approval
@@ -1047,11 +1047,11 @@ VIEW3D_OT_object_mode_pie_or_toggle	out	3D mouse, modes, file drops or drag-to-c
 VIEW3D_OT_pastebuffer	done	View3DPanel.cpp:1685 Object menu: Clear, Align, copy/paste transform, copy/paste items, randomize, move to mouse, render isolate
 VIEW3D_OT_render_border	deferred	renderer crop region needed
 VIEW3D_OT_rotate	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
-VIEW3D_OT_ruler_add	missing	Select chip: persistent ruler beside Measure
-VIEW3D_OT_ruler_remove	missing	Select chip: persistent ruler beside Measure
+VIEW3D_OT_ruler_add	done	View3DPanel.cpp:3622 Measure keeps rulers; Backspace removes last, menu clears
+VIEW3D_OT_ruler_remove	done	View3DPanel.cpp:3622 Measure keeps rulers; Backspace removes last, menu clears
 VIEW3D_OT_select	done	View3DPanel.cpp:2278 Pick
 VIEW3D_OT_select_box	done	View3DPanel.cpp:2694 box select
-VIEW3D_OT_select_circle	missing	Select chip: circle select
+VIEW3D_OT_select_circle	done	View3DPanel.cpp:3638 Select Circle mode: wheel sizes brush
 VIEW3D_OT_select_lasso	done	View3DPanel.cpp:2670 lasso select
 VIEW3D_OT_select_menu	out	click-cycle covers the overlapping list (parity.md)
 VIEW3D_OT_smoothview	done	View3DPanel.cpp:404 GlideTo
@@ -1072,7 +1072,7 @@ VIEW3D_OT_view_camera	done	View3DPanel.cpp:2442 Camera view (0)
 VIEW3D_OT_view_center_camera	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_center_cursor	done	View3DPanel.cpp:1527 Center Cursor and Frame All
 VIEW3D_OT_view_center_lock	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
-VIEW3D_OT_view_center_pick	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_center_pick	done	View3DPanel.cpp:1937 View menu: Center View to Mouse
 VIEW3D_OT_view_lock_clear	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_lock_to_active	done	View3DPanel.cpp:1831 Snap menu, View menu: cursor to grid, remove from local, lock view, center camera
 VIEW3D_OT_view_orbit	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad

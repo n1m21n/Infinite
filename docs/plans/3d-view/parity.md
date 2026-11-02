@@ -31,15 +31,15 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Light probe | 0 | 0 | 36 | 0 | 36 |
 | Constraints (aim only) | 7 | 0 | 0 | 8 | 15 |
 | World | 3 | 0 | 14 | 1 | 18 |
-| Render | 36 | 1 | 56 | 45 | 138 |
+| Render | 37 | 0 | 56 | 45 | 138 |
 | Output | 1 | 0 | 0 | 41 | 42 |
 | Scene | 10 | 0 | 0 | 25 | 35 |
 | View layer | 3 | 0 | 15 | 26 | 44 |
 | Outliner | 12 | 0 | 0 | 11 | 23 |
-| Preferences: navigation and input | 7 | 1 | 3 | 39 | 50 |
+| Preferences: navigation and input | 8 | 0 | 3 | 39 | 50 |
 | Preferences: viewport | 13 | 0 | 0 | 14 | 27 |
-| **All settings** | **258** | **6** | **249** | **331** | **844** |
-| **Operators** | **101** | **9** | **14** | **117** | **241** |
+| **All settings** | **260** | **4** | **249** | **331** | **844** |
+| **Operators** | **106** | **4** | **14** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
 Re-run the probe after each block: `python3 tools/3dview_parity_probe.py --md docs/plans/3d-view/blender-inventory.md`.
@@ -125,22 +125,9 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Light Probe (`SpaceView3D.show_object_viewport_light_probe`): View tab: per-type visibility filter
 - Light Probe (`SpaceView3D.show_object_select_light_probe`): View tab: per-type selectability filter
 
-### Render (1)
+### Operators (4)
 
-- Stamp Render Time (`RenderSettings.use_stamp_render_time`): Render tab > Output: burn-in stamp fields
-
-### Preferences: navigation and input (1)
-
-- Continuous Grab (`PreferencesInput.use_mouse_continuous`): View tab > Navigation: wrap the pointer while dragging
-
-### Operators (9)
-
-- Add Camera Preset (`CAMERA_OT_preset_add`): Camera Data tab: camera presets
 - Drop Object to Scene (`OUTLINER_OT_scene_drop`): Scene tab: drag to reorder or drop into a scene
 - Box Select (`OUTLINER_OT_select_box`): Scene tab: drag a box over rows
 - Viewport Render (`RENDER_OT_opengl`): Render tab: render the viewport as a still
 - Trackball (`TRANSFORM_OT_trackball`): Rotate: trackball mode (R twice)
-- Ruler Add (`VIEW3D_OT_ruler_add`): Select chip: persistent ruler beside Measure
-- Ruler Remove (`VIEW3D_OT_ruler_remove`): Select chip: persistent ruler beside Measure
-- Circle Select (`VIEW3D_OT_select_circle`): Select chip: circle select
-- Center View to Mouse (`VIEW3D_OT_view_center_pick`): View menu: centre on camera or on the pointer

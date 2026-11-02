@@ -73,9 +73,12 @@ namespace
    bool sLockUndo = false;
    bool sToolKey = false;           // Shift+Space was pressed; the next key picks the tool
    int sPadDrag = 0;                // 1 zoom, 2 pan, by dragging the toolpad
-   int sSelMode = 0;               // with the select tool: 0 box, 1 lasso, 2 place the 3D cursor, 3 measure
+   int sSelMode = 0;               // with the select tool: 0 box, 1 lasso, 2 place the 3D cursor, 3 measure, 4 circle
    bool sMeasuring = false, sMeasured = false;
    float sMeasureA[3] = {}, sMeasureB[3] = {};
+   struct Ruler { float a[3], b[3]; };
+   std::vector<Ruler> sRulers;     // finished measurements, kept until removed
+   float sCircleR = 40.0f;         // circle select brush radius, pixels
    int sTool = 1;                  // 0 select, 1 move, 2 rotate, 3 scale
    int sHot = -1;                  // last frame's handle: 0-2 axes, 3 centre, 4-6 planes
    std::vector<int> sSel;
@@ -1931,6 +1934,17 @@ namespace
       if (MenuParts::Item(T("Toggle Local View"), "/", !sLocal.empty(), any || !sLocal.empty())) ToggleLocal(scene);
       if (MenuParts::Item(T("Remove from Local View"), nullptr, false, !sLocal.empty() && any)) RemoveFromLocal();
       if (MenuParts::Item(T("Lock View to Active"), nullptr, sLockActive, any || sLockActive)) sLockActive = !sLockActive;
+      if (MenuParts::Item(T("Center View to Mouse"), nullptr, false, sViewMouse.x >= 0 && !sCameraView))
+      {
+         float o[3], d[3];
+         MouseRay(sViewMouse, o, d);
+         if (std::fabs(d[1]) > 1e-5f && -o[1] / d[1] > 0.0f)
+         {
+            const float t = -o[1] / d[1];
+            const float hit[3] = { o[0] + d[0] * t, 0.0f, o[2] + d[2] * t };
+            GlideTo([&] { std::copy(hit, hit + 3, sTarget); });
+         }
+      }
       if (MenuParts::Item(T("Center Camera"), nullptr, false, sCameraView))
       {
          sCamPan = ImVec2(0, 0);
@@ -2319,6 +2333,25 @@ namespace
             Pan(io.MouseDelta.x, io.MouseDelta.y);
          else
             OrbitBy(scene, io.MouseDelta.x * kOrbitPerPixel * sSet->orbitSens, io.MouseDelta.y * kOrbitPerPixel * sSet->orbitSens);
+      }
+      if (sSet->continuousGrab && (hovered || sNavDrag) && orbitDrag)
+      {
+         // The pointer wraps at the view's edge so a drag can go on turning.
+         const float mx0 = sCam.mn.x, mx1 = sCam.mx.x, my0 = sCam.mn.y, my1 = sCam.mx.y;
+         ImVec2 p = io.MousePos;
+         const float w = mx1 - mx0, h = my1 - my0;
+         if (w > 40.0f && h > 40.0f)
+         {
+            if (p.x < mx0 + 2.0f) p.x += w - 4.0f; else if (p.x > mx1 - 2.0f) p.x -= w - 4.0f;
+            if (p.y < my0 + 2.0f) p.y += h - 4.0f; else if (p.y > my1 - 2.0f) p.y -= h - 4.0f;
+            if (p.x != io.MousePos.x || p.y != io.MousePos.y)
+            {
+               ImGuiIO& wio = ImGui::GetIO();
+               wio.WantSetMousePos = true;
+               wio.MousePos = p;
+               wio.MousePosPrev = p;
+            }
+         }
       }
       if (hovered && sOp.mode != 0 && sSet->proportional && io.MouseWheel != 0.0f)
          sSet->propSize = std::clamp(sSet->propSize * std::pow(1.1f, -io.MouseWheel), 0.05f, 500.0f);
@@ -3519,6 +3552,12 @@ namespace
                sLasso = true;
                sLassoPts.assign(1, mouse);
             }
+            else if (sTool == 0 && sSelMode == 4)
+            {
+               // Circle select: the drag below picks what the brush passes over.
+               if (!io.KeyShift && !io.KeyCtrl && !io.KeySuper)
+                  sSel.clear();
+            }
             else if (sTool == 0 && (sSelMode == 2 || sSelMode == 3))
             {
                // Both read a point on the plane through the view's centre that faces the viewer.
@@ -3553,7 +3592,18 @@ namespace
             if (PlaneHit(sMeasureA, sCam.fwd, o, d, hit))
                std::copy(hit, hit + 3, sMeasureB);
             if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
                sMeasuring = false;
+               const float dx0 = sMeasureB[0] - sMeasureA[0], dy0 = sMeasureB[1] - sMeasureA[1], dz0 = sMeasureB[2] - sMeasureA[2];
+               if (dx0 * dx0 + dy0 * dy0 + dz0 * dz0 > 1e-8f)
+               {
+                  Ruler r;
+                  std::copy(sMeasureA, sMeasureA + 3, r.a);
+                  std::copy(sMeasureB, sMeasureB + 3, r.b);
+                  sRulers.push_back(r);
+               }
+               sMeasured = false;
+            }
          }
          ImVec2 a, b;
          if (Project(sMeasureA, a) && Project(sMeasureB, b))
@@ -3568,6 +3618,40 @@ namespace
          }
          if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || sTool != 0 || sSelMode != 3)
             sMeasured = sMeasuring = false;
+      }
+      for (const Ruler& r : sRulers)
+      {
+         ImVec2 a, b;
+         if (Project(r.a, a) && Project(r.b, b))
+         {
+            dl->AddLine(a, b, Hex(0xFFD040, 0.95f), 2.0f);
+            dl->AddCircleFilled(a, 3.0f, Hex(0xFFD040));
+            dl->AddCircleFilled(b, 3.0f, Hex(0xFFD040));
+            const float dx = r.b[0] - r.a[0], dy = -(r.b[2] - r.a[2]), dz = r.b[1] - r.a[1];
+            char text[64];
+            snprintf(text, sizeof(text), "%.3f", std::sqrt(dx * dx + dy * dy + dz * dz));
+            dl->AddText(ImVec2((a.x + b.x) * 0.5f + 8.0f, (a.y + b.y) * 0.5f - 18.0f), Hex(0xFFFFFF, 0.95f), text);
+         }
+      }
+      if (sTool == 0 && sSelMode == 3 && hovered && !sRulers.empty() && ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+         sRulers.pop_back();
+      if (sTool == 0 && sSelMode == 4 && hovered)
+      {
+         // Circle select: the wheel sizes the brush, a drag selects, shift or ctrl keeps what was selected.
+         if (io.MouseWheel != 0.0f)
+            sCircleR = std::clamp(sCircleR * std::pow(1.1f, io.MouseWheel), 8.0f, 400.0f);
+         dl->AddCircle(mouse, sCircleR, Hex(0xFFFFFF, 0.8f), 48, 1.5f);
+         if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && !sNavDrag)
+            for (const Item& it : scene->Items())
+            {
+               float c[3];
+               ImVec2 sp;
+               if (!Pickable(scene, it) || !InLocal(it.id) || Selected(it.id))
+                  continue;
+               scene->ItemCenter(it, c);
+               if (Project(c, sp) && std::hypot(mouse.x - sp.x, mouse.y - sp.y) < sCircleR)
+                  sSel.push_back(it.id);
+            }
       }
       if (sLasso)
       {
@@ -3759,13 +3843,15 @@ namespace
       if (IconChip("##v3dselect", IconsInfinite::Pointer, sTool == 0, T("Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure"))) sTool = 0;
       if (MenuParts::BeginContextItem("##v3dselmode"))
       {
-         const char* modes[4] = { T("Select Box"), T("Select Lasso"), T("Cursor"), T("Measure") };
-         for (int i = 0; i < 4; i++)
+         const char* modes[5] = { T("Select Box"), T("Select Lasso"), T("Cursor"), T("Measure"), T("Select Circle") };
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Item(modes[i], nullptr, sSelMode == i))
             {
                sSelMode = i;
                sTool = 0;
             }
+         if (MenuParts::Item(T("Clear Rulers"), nullptr, false, !sRulers.empty()))
+            sRulers.clear();
          MenuParts::EndPopup();
       }
       next();
@@ -4450,6 +4536,20 @@ namespace
          if (ComboRow(T("Sensor fit"), &fit, cam->SensorFitNames()))
          {
             cam->sensorFit = fit;
+            cam->SetFocalLength(mm, RenderAspect(scene));
+         }
+         struct Preset { const char* name; float w, h; };
+         static const Preset kPresets[] = { { "Full Frame", 36.0f, 24.0f }, { "APS-C", 23.6f, 15.6f }, { "APS-C (Canon)", 22.3f, 14.9f },
+                                            { "Micro Four Thirds", 17.3f, 13.0f }, { "Super 35", 24.89f, 18.66f },
+                                            { "16 mm film", 10.26f, 7.49f }, { "IMAX 70", 70.41f, 52.63f } };
+         static int sPreset = 0;
+         std::vector<std::string> presetNames{ T("Custom") };
+         for (const Preset& pr : kPresets)
+            presetNames.push_back(T(pr.name));
+         if (ComboRow(T("Preset"), &sPreset, presetNames) && sPreset > 0)
+         {
+            cam->sensorWidth = kPresets[sPreset - 1].w;
+            cam->sensorHeight = kPresets[sPreset - 1].h;
             cam->SetFocalLength(mm, RenderAspect(scene));
          }
          float* side = cam->sensorFit == 2 ? &cam->sensorHeight : &cam->sensorWidth;
@@ -5242,6 +5342,7 @@ namespace
          FloatRow(T("Smooth view"), &set.smoothTime, 0.0f, 1.0f, "%.2f s");
          FloatRow(T("Rotation step"), &set.rotStep, 1.0f, 90.0f, "%.0f");
          BoolRow(T("Auto perspective"), &set.autoPerspective);
+         BoolRow(T("Continuous grab"), &set.continuousGrab);
          FloatRow(T("Orbit sensitivity"), &set.orbitSens, 0.1f, 5.0f, "%.2f");
       }
       if (Card(T("Units")))
