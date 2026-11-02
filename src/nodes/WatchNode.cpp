@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 
 #include "platform/WatchLink.h"
 
@@ -84,6 +85,8 @@ WatchNode::WatchNode()
 
 WatchNode::~WatchNode()
 {
+   if (mLog)
+      std::fclose(mLog);
    if (mStarted)
       WatchLink::Stop();
 }
@@ -168,8 +171,41 @@ void WatchNode::Update()
       Feed(s);
 }
 
+// Opt-in raw capture. Lines: "S,t,seq,q0..3,rot0..2,accel0..2,grav0..2,crown,flags" per sample and
+// "R,wallSec,packetsInLastSecond" once a second, so a BLE drop shows as a rate below 50.
+void WatchNode::LogSample(const WatchPacket::Sample& s)
+{
+   if (!mLogChecked)
+   {
+      mLogChecked = true;
+      if (const char* path = std::getenv("INFINITE_WATCH_LOG"); path != nullptr && path[0] != '\0')
+      {
+         mLog = std::fopen(path, "a");
+         if (mLog)
+            std::fprintf(mLog, "# S,t_ms,seq,qw,qx,qy,qz,rotx,roty,rotz,accx,accy,accz,gx,gy,gz,crown,flags  |  R,wall_s,packets_per_s\n");
+      }
+   }
+   if (!mLog)
+      return;
+   std::fprintf(mLog, "S,%u,%u,%.5f,%.5f,%.5f,%.5f,%.2f,%.2f,%.2f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%u\n", s.timeMs, s.seq,
+                s.q[0], s.q[1], s.q[2], s.q[3], s.rot[0], s.rot[1], s.rot[2], s.accel[0], s.accel[1], s.accel[2],
+                s.gravity[0], s.gravity[1], s.gravity[2], s.crown, s.flags);
+   const double wall = NowSec();
+   if (mRateT0 == 0)
+      mRateT0 = wall;
+   mRateCount++;
+   if (wall - mRateT0 >= 1.0)
+   {
+      std::fprintf(mLog, "R,%.2f,%d\n", wall, mRateCount);
+      std::fflush(mLog);
+      mRateT0 = wall;
+      mRateCount = 0;
+   }
+}
+
 void WatchNode::Feed(const WatchPacket::Sample& s)
 {
+   LogSample(s);
    const uint32_t t = s.timeMs;
    const double ts = (double)t * 0.001;
    const float k = 1.0f / std::max(0.25f, std::min(4.0f, sens));   // thresholds scale down as sens goes up

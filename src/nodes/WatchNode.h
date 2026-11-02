@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,7 @@ private:
    void Update();
    void Feed(const WatchPacket::Sample& s);
    void Fire(Output o, uint32_t tMs);
+   void LogSample(const WatchPacket::Sample& s);
    void Smoothed(Output o, float x, double t);
 
    Tap mTaps[kOutputCount];
@@ -128,4 +130,10 @@ private:
    bool mStrikeArmed = false;
    bool mStrikeSpent = false;   // a push that lasted too long: wait for it to end before arming again
    uint32_t mStrikeAt = 0;
+
+   // INFINITE_WATCH_LOG=<path>: raw samples and the arrival rate as CSV, for tuning the gestures from real numbers.
+   bool mLogChecked = false;
+   FILE* mLog = nullptr;
+   double mRateT0 = 0;
+   int mRateCount = 0;
 };
