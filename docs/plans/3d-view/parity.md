@@ -13,33 +13,35 @@ Blender, headless, for its own settings, operators and keymap. It is a keyword p
 differently, so confirm by testing. Rows the README puts out of scope (modelling, sculpting, painting, rigging, modifiers,
 materials, particles, physics, animation data) are still listed, marked "out", and not counted below.
 
-## Coverage by area (Blender 5.1, in-scope settings present / all)
+## Coverage by area (Blender 5.1, every row decided in `parity-map.tsv`)
 
-| Area | Settings | Options | Out of scope | Missing (first 8, from the inventory) |
-|---|---|---|---|---|
-| Viewport: View tab and header | 18/66 | 8/10 | 28 | tool settings, sidebar, adjust last operation, render region, region minimum x, region minimum y, region maximum x, region maximum y (+40) |
-| Viewport: 3D cursor | 2/6 | 0/8 | 0 | quaternion rotation, axis-angle rotation, euler rotation, rotation mode |
-| Viewport: shading | 10/38 | 24/41 | 2 | studiolight, world space lighting, backface culling, cavity, cavity type, curvature ridge, curvature valley, cavity ridge (+20) |
-| Viewport: overlays | 2/32 | 3/3 | 64 | show overlays, display grid, display grid floor, display x axis, display y axis, display z axis, grid scale, grid lines (+22) |
-| Transform, snap, pivot | 7/51 | 36/56 | 82 | lock object modes, projected from view, connected only, proportional size, proportional size, merge threshold, transform pivot point, only locations (+36) |
-| Object | 8/76 | 30/80 | 33 | bounding box, parent type, parent vertices, use final indices, camera parent lock, track axis, up axis, quaternion rotation (+60) |
-| Camera | 27/87 | 16/31 | 2 | sensor fit, passepartout alpha, horizontal fov, vertical fov, sensor width, orthographic scale, display size, show limits (+52) |
-| Light | 13/60 | 6/8 | 3 | use temperature, temperature, temperature color, specular factor, diffuse factor, transmission factor, volume factor, custom attenuation (+39) |
-| Light probe | 8/36 | 7/7 | 4 | clipping, influence, influence distance, visibility bias, visibility bleed bias, visibility blur, display data (deprecated), display data (+20) |
-| Constraints (aim only) | 3/15 | 0/26 | 0 | owner space, target space, influence, head/tail, follow b-bone, sub-target, track axis, up axis (+4) |
-| World | 9/18 | 5/9 | 5 | finite volume, sun threshold, sun angle, use shadow, shadows resolution limit, shadow filter radius, shadow jitter, shadow jitter overblur (+1) |
-| Render | 24/138 | 10/67 | 29 | resolution y, pixel aspect x, pixel aspect y, ppm factor, ppm base, fps base, frame map old, frame map new (+106) |
-| Output | 11/42 | 16/105 | 2 | media type, file format, color mode, compression, ycc, cinema, cinema (48), compression (+23) |
-| Scene | 3/35 | 9/14 | 20 | current frame, current subframe, current subframe, start frame, end frame, frame step, time jump unit, time jump delta (+24) |
-| View layer | 16/44 | 0/0 | 16 | alpha threshold, shader aov, shader aov, active aov index, cryptomatte object, cryptomatte levels, cryptomatte accurate, strand (+20) |
-| Outliner | 2/23 | 6/12 | 5 | display mode, case sensitive matches only, complete matches only, sort alphabetically, sync outliner selection, show mode column, exclude from view layer, hide in viewport (+13) |
-| Preferences: navigation and input | 6/50 | 9/21 | 0 | zoom style, zoom axis, multi-touch gestures, auto depth, zoom to mouse position, auto perspective, orbit method, continuous grab (+36) |
-| Preferences: viewport | 2/27 | 4/6 | 20 | tooltips, python tooltips, display object info, display view name, show splash, display playback frame rate (fps), navigation controls, open on mouse over (+17) |
-| **All settings** | **171/844** | **189/504** | **315** | |
-| **Operators (features)** | **31/241** | | **253** | add camera preset, add safe area preset, unlink data-block, redo, undo history, undo push, undo and redo, add object (+202) |
-| **Keymap entries** | 457 in scope | | 49 | listed, not matched; compare with README Controls by hand |
+Status counts per area. done = Infinite has it (cited), missing = in scope and not built, deferred = needs renderer work or
+owner approval, out = outside the README. The probe prints the undecided count: `python3 tools/3dview_parity_probe.py --unresolved`.
 
-Read the counts as a floor: Infinite often names a thing differently (Render 3D params, node settings), so many "-" rows are done.
+| Area | Done | Missing | Deferred | Out | Mapped |
+|---|---|---|---|---|---|
+| Viewport: View tab and header | 15 | 16 | 9 | 26 | 66 |
+| Viewport: 3D cursor | 1 | 4 | 0 | 1 | 6 |
+| Viewport: shading | 6 | 4 | 28 | 0 | 38 |
+| Viewport: overlays | 7 | 12 | 3 | 10 | 32 |
+| Transform, snap, pivot | 10 | 15 | 0 | 26 | 51 |
+| Object | 11 | 7 | 23 | 35 | 76 |
+| Camera | 24 | 20 | 20 | 23 | 87 |
+| Light | 11 | 7 | 42 | 0 | 60 |
+| Light probe | 0 | 0 | 36 | 0 | 36 |
+| Constraints (aim only) | 2 | 5 | 0 | 8 | 15 |
+| World | 3 | 0 | 14 | 1 | 18 |
+| Render | 14 | 23 | 56 | 45 | 138 |
+| Output | 1 | 0 | 0 | 41 | 42 |
+| Scene | 4 | 7 | 0 | 24 | 35 |
+| View layer | 3 | 0 | 15 | 26 | 44 |
+| Outliner | 2 | 10 | 0 | 11 | 23 |
+| Preferences: navigation and input | 4 | 4 | 3 | 39 | 50 |
+| Preferences: viewport | 4 | 9 | 0 | 14 | 27 |
+| **All settings** | **122** | **143** | **249** | **330** | **844** |
+| **Operators** | **75** | **35** | **14** | **117** | **241** |
+| **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
+
 Re-run the probe after each block: `python3 tools/3dview_parity_probe.py --md docs/plans/3d-view/blender-inventory.md`.
 
 ## Behaviour the probe can't judge
@@ -110,3 +112,232 @@ Built means compiled and in the Desktop dev build; tick it in `test-checklist.md
 
 Every row is now built or decided (2026-11-02). Rows left in the Deferred column need new modes or renderer work and were
 decided out of this pass; reopen one when the owner asks.
+
+## Missing, ranked
+
+Every row the map marks "missing", grouped by area and ordered by how often a composer touches the area (camera, light and
+transform first, preferences last). The "where" is the panel tab or node it belongs on. Regenerate with the map, never by hand.
+
+### Camera (20)
+
+- Sensor Fit (`Camera.sensor_fit`): Camera Data tab: sensor fit
+- Sensor Height (`Camera.sensor_height`): Camera Data tab: sensor height
+- Display Size (`Camera.display_size`): Camera Data tab: marker size
+- Show Limits (`Camera.show_limits`): Camera Data tab: show clip range and focus
+- Show Center-Cut Safe Areas (`Camera.show_safe_center`): Safe Areas card: centre-cut areas
+- Show Name (`Camera.show_name`): Overlays card: show camera name
+- Show Sensor Size (`Camera.show_sensor`): Overlays card: sensor gate
+- Composition Guide Color (`Camera.composition_guide_color`): Composition Guides card: colour
+- Center Diagonal (`Camera.show_composition_center_diagonal`): Composition Guides card: diagonals
+- Golden Triangle A (`Camera.show_composition_golden_tria_a`): Composition Guides card: triangles
+- Golden Triangle B (`Camera.show_composition_golden_tria_b`): Composition Guides card: triangles
+- Harmonious Triangle A (`Camera.show_composition_harmony_tri_a`): Composition Guides card: triangles
+- Harmonious Triangle B (`Camera.show_composition_harmony_tri_b`): Composition Guides card: triangles
+- Min Latitude (`Camera.latitude_min`): Render tab: panorama range
+- Max Latitude (`Camera.latitude_max`): Render tab: panorama range
+- Min Longitude (`Camera.longitude_min`): Render tab: panorama range
+- Max Longitude (`Camera.longitude_max`): Render tab: panorama range
+- Blades (`CameraDOFSettings.aperture_blades`): Depth of Field card: bokeh shape
+- Rotation (`CameraDOFSettings.aperture_rotation`): Depth of Field card: bokeh shape
+- Ratio (`CameraDOFSettings.aperture_ratio`): Depth of Field card: bokeh shape
+
+### Light (7)
+
+- Use Temperature (`Light.use_temperature`): Light card: colour temperature
+- Temperature (`Light.temperature`): Light card: colour temperature
+- Temperature Color (`Light.temperature_color`): Light card: colour temperature
+- Custom Attenuation (`Light.use_custom_distance`): Light card: cutoff distance
+- Cutoff Distance (`Light.cutoff_distance`): Light card: cutoff distance
+- Exposure (`Light.exposure`): Light card: exposure
+- Show Cone (`SpotLight.show_cone`): Overlays card: spot cone in the view
+
+### Transform, snap, pivot (15)
+
+- Projected from View (`ToolSettings.use_proportional_projected`): Proportional Editing card: projected from view
+- Only Locations (`ToolSettings.use_transform_pivot_point_align`): Transform card: only locations toggle
+- Align Rotation to Target (`ToolSettings.use_snap_align_rotation`): Snap card: align rotation to target
+- Absolute Increment Snap (`ToolSettings.use_snap_grid_absolute`): Snap card: absolute increment mode
+- Rotation Precision Increment (`ToolSettings.snap_angle_increment_3d_precision`): Snap card: precision step with Shift
+- Snap Target (`ToolSettings.snap_target`): Snap card: closest, centre, median, active
+- Snap onto Selectable Only (`ToolSettings.use_snap_selectable`): Snap card: only onto selectable items
+- Use Snap for Translation (`ToolSettings.use_snap_translate`): Snap card: snap per tool toggles
+- Use Snap for Rotation (`ToolSettings.use_snap_rotate`): Snap card: snap per tool toggles
+- Use Snap for Scale (`ToolSettings.use_snap_scale`): Snap card: snap per tool toggles
+- Plane Axis (`ToolSettings.plane_axis`): Add menu: placement plane for new items
+- Auto Axis (`ToolSettings.plane_axis_auto`): Add menu: placement plane for new items
+- Position (`ToolSettings.plane_depth`): Add menu: placement plane for new items
+- Orientation (`ToolSettings.plane_orientation`): Add menu: placement plane for new items
+- Current Transform Orientation (`TransformOrientationSlot.custom_orientation`): Transform card: custom orientations
+
+### Object (7)
+
+- Track Axis (`Object.track_axis`): Camera and light Data tab: Look at axes
+- Up Axis (`Object.up_axis`): Camera and light Data tab: Look at axes
+- Disable Selection (`Object.hide_select`): Item tab: disable selection toggle
+- Display Bounds (`Object.show_bounds`): Item tab: show bounds
+- Display Bounds Type (`Object.display_bounds_type`): Item tab: show bounds
+- Display Name (`Object.show_name`): Item tab: show name and axes in the view
+- Display Axes (`Object.show_axis`): Item tab: show name and axes in the view
+
+### Constraints (aim only) (5)
+
+- Influence (`Constraint.influence`): Camera and light Data tab: Look at influence
+- Track Axis (`TrackToConstraint.track_axis`): Camera and light Data tab: Look at axes
+- Up Axis (`TrackToConstraint.up_axis`): Camera and light Data tab: Look at axes
+- Target Z (`TrackToConstraint.use_target_z`): Camera and light Data tab: Look at target Z up
+- Track Axis (`DampedTrackConstraint.track_axis`): Camera and light Data tab: Look at axes
+
+### Viewport: View tab and header (16)
+
+- Tool Settings (`SpaceView3D.show_region_tool_header`): View3D panel header: tool settings strip
+- Toolbar (`SpaceView3D.show_region_toolbar`): View3D panel: a tool column beside the view
+- Lock to Cursor (`SpaceView3D.lock_cursor`): View tab > Navigation
+- Lens (`SpaceView3D.lens`): View tab: viewport lens (the view has a fixed lens)
+- Clip Start (`SpaceView3D.clip_start`): View tab: viewport clip (the camera has its own)
+- Clip End (`SpaceView3D.clip_end`): View tab: viewport clip (the camera has its own)
+- Show Light Size (`SpaceView3D.show_gizmo_light_size`): light gizmo handles in the viewport
+- Show Light Look-At (`SpaceView3D.show_gizmo_light_look_at`): light gizmo handles in the viewport
+- Show Camera Lens (`SpaceView3D.show_gizmo_camera_lens`): camera gizmo handles in the viewport
+- Show Camera Focus Distance (`SpaceView3D.show_gizmo_camera_dof_distance`): camera gizmo handles in the viewport
+- Camera (`SpaceView3D.show_object_viewport_camera`): View tab: per-type visibility filter
+- Light (`SpaceView3D.show_object_viewport_light`): View tab: per-type visibility filter
+- Light Probe (`SpaceView3D.show_object_viewport_light_probe`): View tab: per-type visibility filter
+- Camera (`SpaceView3D.show_object_select_camera`): View tab: per-type selectability filter
+- Light (`SpaceView3D.show_object_select_light`): View tab: per-type selectability filter
+- Light Probe (`SpaceView3D.show_object_select_light_probe`): View tab: per-type selectability filter
+
+### Viewport: 3D cursor (4)
+
+- Quaternion Rotation (`View3DCursor.rotation_quaternion`): 3D Cursor card: cursor has a location only
+- Axis-Angle Rotation (`View3DCursor.rotation_axis_angle`): 3D Cursor card: cursor has a location only
+- Euler Rotation (`View3DCursor.rotation_euler`): 3D Cursor card: cursor has a location only
+- Rotation Mode (`View3DCursor.rotation_mode`): 3D Cursor card: cursor has a location only
+
+### Viewport: shading (4)
+
+- Outline (`View3DShading.show_object_outline`): Overlays card: selection outline in Solid
+- Background (`View3DShading.background_type`): View tab: Solid view background
+- Background Color (`View3DShading.background_color`): View tab: Solid view background
+- Outline Color (`View3DShading.object_outline_color`): Overlays card: outline colour
+
+### Viewport: overlays (12)
+
+- Display Grid (`View3DOverlay.show_ortho_grid`): Overlays card: grid and axis options
+- Display X Axis (`View3DOverlay.show_axis_x`): Overlays card: grid and axis options
+- Display Y Axis (`View3DOverlay.show_axis_y`): Overlays card: grid and axis options
+- Display Z Axis (`View3DOverlay.show_axis_z`): Overlays card: grid and axis options
+- Grid Scale (`View3DOverlay.grid_scale`): Overlays card: grid and axis options
+- Grid Lines (`View3DOverlay.grid_lines`): Overlays card: grid and axis options
+- Grid Scale Unit (`View3DOverlay.grid_scale_unit`): Overlays card: grid and axis options
+- Outline Selected (`View3DOverlay.show_outline_selected`): Overlays card: selection outline
+- Show 3D Cursor (`View3DOverlay.show_cursor`): Overlays card: hide the 3D cursor
+- Show Performance (`View3DOverlay.show_performance`): Overlays card: frame time line
+- Extras (`View3DOverlay.show_extras`): Overlays card: hide camera and light markers
+- Light Colors (`View3DOverlay.show_light_colors`): Overlays card: tint light markers
+
+### Render (23)
+
+- Pixel Aspect X (`RenderSettings.pixel_aspect_x`): Render tab > Format: pixel aspect
+- Pixel Aspect Y (`RenderSettings.pixel_aspect_y`): Render tab > Format: pixel aspect
+- FPS Base (`RenderSettings.fps_base`): Render tab > Format: 23.976 / 29.97 rates
+- Dither Intensity (`RenderSettings.dither_intensity`): Render tab > Output: dither
+- Filter Size (`RenderSettings.filter_size`): Render tab > Sampling: pixel filter width
+- Stamp Time (`RenderSettings.use_stamp_time`): Render tab > Output: burn-in stamp fields
+- Stamp Date (`RenderSettings.use_stamp_date`): Render tab > Output: burn-in stamp fields
+- Stamp Frame (`RenderSettings.use_stamp_frame`): Render tab > Output: burn-in stamp fields
+- Stamp Frame (`RenderSettings.use_stamp_frame_range`): Render tab > Output: burn-in stamp fields
+- Stamp Camera (`RenderSettings.use_stamp_camera`): Render tab > Output: burn-in stamp fields
+- Stamp Lens (`RenderSettings.use_stamp_lens`): Render tab > Output: burn-in stamp fields
+- Stamp Scene (`RenderSettings.use_stamp_scene`): Render tab > Output: burn-in stamp fields
+- Stamp Note (`RenderSettings.use_stamp_note`): Render tab > Output: burn-in stamp fields
+- Stamp Render Time (`RenderSettings.use_stamp_render_time`): Render tab > Output: burn-in stamp fields
+- Stamp Note Text (`RenderSettings.stamp_note_text`): Render tab > Output: burn-in stamp fields
+- Stamp Output (`RenderSettings.use_stamp`): Render tab > Output: burn-in stamp
+- Stamp Labels (`RenderSettings.use_stamp_labels`): Render tab > Output: burn-in stamp fields
+- Font Size (`RenderSettings.stamp_font_size`): Render tab > Output: burn-in stamp fields
+- Text Color (`RenderSettings.stamp_foreground`): Render tab > Output: burn-in stamp fields
+- Background (`RenderSettings.stamp_background`): Render tab > Output: burn-in stamp fields
+- Use Simplify (`RenderSettings.use_simplify`): Render tab > Sampling: simplify for preview
+- Look (`ColorManagedViewSettings.look`): Render tab > Color Management
+- Gamma (`ColorManagedViewSettings.gamma`): Render tab > Color Management
+
+### Scene (7)
+
+- Start Frame (`Scene.frame_start`): Render tab > Frame Range: start and step
+- Frame Step (`Scene.frame_step`): Render tab > Frame Range: start and step
+- Stamp Note (`Scene.use_stamp_note`): Render tab > Output: stamp note
+- Unit System (`UnitSettings.system`): View tab: scene units
+- Rotation Units (`UnitSettings.system_rotation`): View tab: scene units
+- Unit Scale (`UnitSettings.scale_length`): View tab: scene units
+- Length Unit (`UnitSettings.length_unit`): View tab: scene units
+
+### Outliner (10)
+
+- Case Sensitive Matches Only (`SpaceOutliner.use_filter_case_sensitive`): Scene tab: search and sort options
+- Complete Matches Only (`SpaceOutliner.use_filter_complete`): Scene tab: search and sort options
+- Sort Alphabetically (`SpaceOutliner.use_sort_alpha`): Scene tab: search and sort options
+- Selectable (`SpaceOutliner.show_restrict_column_select`): Scene tab: selectable column
+- Disable in Renders (`SpaceOutliner.show_restrict_column_render`): Scene tab: render toggle column
+- Filter Objects (`SpaceOutliner.use_filter_object`): Scene tab: filter by object
+- Object State Filter (`SpaceOutliner.filter_state`): Scene tab: state filter
+- Invert (`SpaceOutliner.filter_invert`): Scene tab: state filter
+- Show Lights (`SpaceOutliner.use_filter_object_light`): Scene tab: type filter
+- Show Cameras (`SpaceOutliner.use_filter_object_camera`): Scene tab: type filter
+
+### Preferences: viewport (9)
+
+- Display Playback Frame Rate (FPS) (`PreferencesView.show_playback_fps`): Overlays card: frame rate
+- Mini Axes Type (`PreferencesView.mini_axis_type`): View tab: navigation gizmo size and brightness
+- Mini Axes Size (`PreferencesView.mini_axis_size`): View tab: navigation gizmo size and brightness
+- Mini Axes Brightness (`PreferencesView.mini_axis_brightness`): View tab: navigation gizmo size and brightness
+- Smooth View (`PreferencesView.smooth_view`): View tab > Navigation: smooth view time
+- Rotation Angle (`PreferencesView.rotation_angle`): View tab > Navigation: numpad step angle
+- Gizmo Size (`PreferencesView.gizmo_size`): View tab: gizmo size
+- Navigate Gizmo Size (`PreferencesView.gizmo_size_navigate_v3d`): View tab: gizmo size
+- Align Object To (`PreferencesEdit.object_align`): Add menu: align new items to world, view or cursor
+
+### Preferences: navigation and input (4)
+
+- Auto Perspective (`PreferencesInput.use_auto_perspective`): View tab > Navigation: auto perspective
+- Continuous Grab (`PreferencesInput.use_mouse_continuous`): View tab > Navigation: wrap the pointer while dragging
+- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_turntable`): View tab > Navigation: orbit sensitivity
+- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_trackball`): View tab > Navigation: orbit sensitivity
+
+### Operators (35)
+
+- Add Camera Preset (`CAMERA_OT_preset_add`): Camera Data tab: camera presets
+- Align Objects (`OBJECT_OT_align`): Object menu: Align
+- Copy Global Transform (`OBJECT_OT_copy_global_transform`): Object menu: copy transform to clipboard
+- Clear All Restrict Render (`OBJECT_OT_hide_render_clear_all`): Object menu: show all in renders
+- Restrict Render Unselected (`OBJECT_OT_isolate_type_render`): Object menu: render only one type
+- Clear Location (`OBJECT_OT_location_clear`): Object menu: Clear Location, Rotation, Scale
+- Paste Global Transform (`OBJECT_OT_paste_transform`): Object menu: paste transform from clipboard
+- Randomize Transform (`OBJECT_OT_randomize_transform`): Object menu: randomize transform
+- Clear Rotation (`OBJECT_OT_rotation_clear`): Object menu: Clear Location, Rotation, Scale
+- Clear Scale (`OBJECT_OT_scale_clear`): Object menu: Clear Location, Rotation, Scale
+- Select Camera (`OBJECT_OT_select_camera`): Select menu: select the active camera
+- Select Pattern (`OBJECT_OT_select_pattern`): Select menu: select by name pattern
+- Place Object Under Mouse (`OBJECT_OT_transform_to_mouse`): Object menu: move to mouse
+- Drag and Drop (`OUTLINER_OT_item_drag_drop`): Scene tab: drag to reorder or drop into a scene
+- Drop Object to Scene (`OUTLINER_OT_scene_drop`): Scene tab: drag to reorder or drop into a scene
+- Box Select (`OUTLINER_OT_select_box`): Scene tab: drag a box over rows
+- Walk Select (`OUTLINER_OT_select_walk`): Scene tab: arrow keys walk the list
+- Show Active (`OUTLINER_OT_show_active`): Scene tab: scroll to the active item
+- Viewport Render (`RENDER_OT_opengl`): Render tab: render the viewport as a still
+- Cancel Render View (`RENDER_OT_view_cancel`): Render tab: cancel a running render
+- Create Orientation (`TRANSFORM_OT_create_orientation`): Transform card: save a custom orientation
+- Delete Orientation (`TRANSFORM_OT_delete_orientation`): Transform card: delete a custom orientation
+- Trackball (`TRANSFORM_OT_trackball`): Rotate: trackball mode (R twice)
+- Copy Objects (`VIEW3D_OT_copybuffer`): Object menu: copy and paste items between scenes
+- Remove from Local View (`VIEW3D_OT_localview_remove_from`): View menu: remove selected from local view
+- Paste Objects (`VIEW3D_OT_pastebuffer`): Object menu: copy and paste items between scenes
+- Ruler Add (`VIEW3D_OT_ruler_add`): Select chip: persistent ruler beside Measure
+- Ruler Remove (`VIEW3D_OT_ruler_remove`): Select chip: persistent ruler beside Measure
+- Circle Select (`VIEW3D_OT_select_circle`): Select chip: circle select
+- Snap Cursor to Grid (`VIEW3D_OT_snap_cursor_to_grid`): Snap menu: cursor to grid
+- Frame Camera Bounds (`VIEW3D_OT_view_center_camera`): View menu: centre on camera or on the pointer
+- View Lock Center (`VIEW3D_OT_view_center_lock`): View tab: lock the view to the active item
+- Center View to Mouse (`VIEW3D_OT_view_center_pick`): View menu: centre on camera or on the pointer
+- View Lock Clear (`VIEW3D_OT_view_lock_clear`): View tab: lock the view to the active item
+- View Lock to Active (`VIEW3D_OT_view_lock_to_active`): View tab: lock the view to the active item
+

@@ -397,10 +397,10 @@ Camera.show_sensor	missing	Overlays card: sensor gate
 Camera.show_background_images	deferred	camera background image: new camera mode
 Camera.lens_unit	done	View3DPanel.cpp:3468 Lens unit
 Camera.composition_guide_color	missing	Composition Guides card: colour
-Camera.show_composition_center	done	View3DPanel.cpp:4026 Centre guide
+Camera.show_composition_center	done	View3DPanel.cpp:4027 Centre guide
 Camera.show_composition_center_diagonal	missing	Composition Guides card: diagonals
-Camera.show_composition_thirds	done	View3DPanel.cpp:4025 Thirds
-Camera.show_composition_golden	done	View3DPanel.cpp:4027 Golden
+Camera.show_composition_thirds	done	View3DPanel.cpp:4026 Thirds
+Camera.show_composition_golden	done	View3DPanel.cpp:4028 Golden
 Camera.show_composition_golden_tria_a	missing	Composition Guides card: triangles
 Camera.show_composition_golden_tria_b	missing	Composition Guides card: triangles
 Camera.show_composition_harmony_tri_a	missing	Composition Guides card: triangles
@@ -690,7 +690,7 @@ SceneEEVEE.gi_visibility_resolution	deferred	global illumination needs renderer 
 SceneEEVEE.gi_glossy_clamp	deferred	global illumination needs renderer work
 SceneEEVEE.gi_irradiance_pool_size	deferred	global illumination needs renderer work
 SceneEEVEE.taa_samples	done	View3DPanel.cpp:3854 Sampling Viewport
-SceneEEVEE.taa_render_samples	done	View3DPanel.cpp:3856 Sampling Render
+SceneEEVEE.taa_render_samples	done	View3DPanel.cpp:3857 Sampling Render
 SceneEEVEE.use_taa_reprojection	deferred	EEVEE-only terms need renderer work
 SceneEEVEE.ray_tracing_method	deferred	EEVEE-only terms need renderer work
 SceneEEVEE.use_shadow_jitter_viewport	deferred	EEVEE-only terms need renderer work
@@ -744,7 +744,7 @@ SceneDisplay.shadow_focus	deferred	Solid shader work, perf-gated
 SceneDisplay.matcap_ssao_distance	deferred	Solid shader work, perf-gated
 SceneDisplay.matcap_ssao_attenuation	deferred	Solid shader work, perf-gated
 SceneDisplay.matcap_ssao_samples	deferred	Solid shader work, perf-gated
-SceneDisplay.render_aa	done	View3DPanel.cpp:3856 Sampling Render supersample
+SceneDisplay.render_aa	done	View3DPanel.cpp:3857 Sampling Render supersample
 SceneDisplay.viewport_aa	done	View3DPanel.cpp:3854 Sampling Viewport
 ColorManagedViewSettings.look	missing	Render tab > Color Management
 ColorManagedViewSettings.view_transform	done	View3DPanel.cpp:3887 Color Management View
@@ -945,3 +945,142 @@ OUTLINER_OT_show_hierarchy	out	flat list, no tree
 OUTLINER_OT_show_one_level	out	flat list, no tree
 OUTLINER_OT_start_filter	done	View3DPanel.cpp:3185 Search field
 OUTLINER_OT_unhide_all	done	View3DPanel.cpp:3283 eye toggle and Alt+H
+PreferencesInput.view_zoom_method	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.view_zoom_axis	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_multitouch_gestures	out	trackpad gestures are handled by the app's input layer
+PreferencesInput.invert_mouse_zoom	done	View3DPanel.cpp:4004 Invert zoom direction
+PreferencesInput.use_mouse_depth_navigate	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_zoom_to_mouse	done	View3DPanel.cpp:4002 Zoom to mouse
+PreferencesInput.use_auto_perspective	missing	View tab > Navigation: auto perspective
+PreferencesInput.use_rotate_around_active	done	View3DPanel.cpp:4003 Orbit around selection
+PreferencesInput.view_rotate_method	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_mouse_continuous	missing	View tab > Navigation: wrap the pointer while dragging
+PreferencesInput.use_drag_immediately	out	app-wide input settings, not the 3D View
+PreferencesInput.use_numeric_input_advanced	out	app-wide input settings, not the 3D View
+PreferencesInput.navigation_mode	deferred	walk and fly navigation: new mode, needs approval
+PreferencesInput.walk_navigation	deferred	walk and fly navigation: new mode, needs approval
+PreferencesInput.view_rotate_sensitivity_turntable	missing	View tab > Navigation: orbit sensitivity
+PreferencesInput.view_rotate_sensitivity_trackball	missing	View tab > Navigation: orbit sensitivity
+PreferencesInput.drag_threshold_mouse	out	app-wide input settings, not the 3D View
+PreferencesInput.drag_threshold_tablet	out	app-wide input settings, not the 3D View
+PreferencesInput.drag_threshold	out	app-wide input settings, not the 3D View
+PreferencesInput.move_threshold	out	app-wide input settings, not the 3D View
+PreferencesInput.pressure_threshold_max	out	app-wide input settings, not the 3D View
+PreferencesInput.pressure_softness	out	app-wide input settings, not the 3D View
+PreferencesInput.tablet_api	out	app-wide input settings, not the 3D View
+PreferencesInput.show_tablet_debug_values	out	app-wide input settings, not the 3D View
+PreferencesInput.xr_navigation	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_translation_sensitivity	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotation_sensitivity	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_deadzone	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_zoom_direction	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_show_guide_orbit_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_show_guide_orbit_center	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_navigation_mode	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_lock_horizon	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_fly_speed_auto	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_orbit_center_auto	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_orbit_center_selected	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotx_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_roty_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotz_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_panx_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_pany_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_panz_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_fly_helicopter	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_lock_camera_pan_zoom	out	3D mouse and XR are out (parity.md)
+PreferencesInput.mouse_double_click_time	out	app-wide input settings, not the 3D View
+PreferencesInput.use_mouse_emulate_3_button	out	trackpad and Alt-drag cover it
+PreferencesInput.mouse_emulate_3_button_modifier	out	trackpad and Alt-drag cover it
+PreferencesInput.use_emulate_numpad	deferred	laptop-only, cosmetic (parity.md)
+PreferencesInput.invert_zoom_wheel	done	View3DPanel.cpp:4004 Invert zoom direction
+PreferencesInput.touchpad_scroll_direction	out	trackpad gestures are handled by the app's input layer
+PreferencesView.show_tooltips	out	app-wide UI preferences
+PreferencesView.show_tooltips_python	out	app-wide UI preferences
+PreferencesView.show_object_info	done	View3DPanel.cpp:4008 Text info
+PreferencesView.show_view_name	done	View3DPanel.cpp:4008 Text info
+PreferencesView.show_splash	out	app-wide UI preferences
+PreferencesView.show_playback_fps	missing	Overlays card: frame rate
+PreferencesView.show_navigate_ui	done	View3DPanel.cpp:4014 Navigate gizmo
+PreferencesView.use_mouse_over_open	out	app-wide UI preferences
+PreferencesView.mini_axis_type	missing	View tab: navigation gizmo size and brightness
+PreferencesView.mini_axis_size	missing	View tab: navigation gizmo size and brightness
+PreferencesView.mini_axis_brightness	missing	View tab: navigation gizmo size and brightness
+PreferencesView.smooth_view	missing	View tab > Navigation: smooth view time
+PreferencesView.rotation_angle	missing	View tab > Navigation: numpad step angle
+PreferencesView.show_gizmo	done	View3DPanel.cpp:4012 Gizmos
+PreferencesView.gizmo_size	missing	View tab: gizmo size
+PreferencesView.gizmo_size_navigate_v3d	missing	View tab: gizmo size
+PreferencesView.lookdev_sphere_size	out	reference spheres belong to look dev, outside the README
+PreferencesEdit.object_align	missing	Add menu: align new items to world, view or cursor
+PreferencesEdit.undo_steps	out	the canvas owns undo
+PreferencesEdit.undo_memory_limit	out	the canvas owns undo
+PreferencesEdit.use_global_undo	out	the canvas owns undo
+PreferencesEdit.use_duplicate_surface	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_camera	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_light	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_lightprobe	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_pointcloud	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_volume	out	items reference nodes; no data is copied
+VIEW3D_OT_camera_background_image_add	deferred	camera background image: new camera mode
+VIEW3D_OT_camera_background_image_remove	deferred	camera background image: new camera mode
+VIEW3D_OT_camera_to_view	done	View3DPanel.cpp:1594 CameraToView
+VIEW3D_OT_camera_to_view_selected	done	View3DPanel.cpp:1516 Align Active Camera to Selected
+VIEW3D_OT_clear_render_border	deferred	renderer crop region needed
+VIEW3D_OT_clip_border	deferred	renderer crop region needed
+VIEW3D_OT_copybuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_cursor3d	done	View3DPanel.cpp:2680 Cursor mode of the Select chip
+VIEW3D_OT_dolly	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_drop_world	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_fly	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_interactive_add	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_localview	done	View3DPanel.cpp:1565 ToggleLocal
+VIEW3D_OT_localview_remove_from	missing	View menu: remove selected from local view
+VIEW3D_OT_move	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_navigate	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_ndof_all	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_orbit	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_orbit_zoom	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_pan	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_object_as_camera	done	View3DPanel.cpp Render through this camera
+VIEW3D_OT_object_mode_pie_or_toggle	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_pastebuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_render_border	deferred	renderer crop region needed
+VIEW3D_OT_rotate	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_ruler_add	missing	Select chip: persistent ruler beside Measure
+VIEW3D_OT_ruler_remove	missing	Select chip: persistent ruler beside Measure
+VIEW3D_OT_select	done	View3DPanel.cpp:2278 Pick
+VIEW3D_OT_select_box	done	View3DPanel.cpp:2694 box select
+VIEW3D_OT_select_circle	missing	Select chip: circle select
+VIEW3D_OT_select_lasso	done	View3DPanel.cpp:2670 lasso select
+VIEW3D_OT_select_menu	out	click-cycle covers the overlapping list (parity.md)
+VIEW3D_OT_smoothview	done	View3DPanel.cpp:404 GlideTo
+VIEW3D_OT_snap_cursor_to_active	done	View3DPanel.cpp:1431 CursorToActive
+VIEW3D_OT_snap_cursor_to_center	done	View3DPanel.cpp:1425 CursorToOrigin
+VIEW3D_OT_snap_cursor_to_grid	missing	Snap menu: cursor to grid
+VIEW3D_OT_snap_cursor_to_selected	done	View3DPanel.cpp:1261 CursorToSelected
+VIEW3D_OT_snap_selected_to_active	done	View3DPanel.cpp:1400 SelectionToActive
+VIEW3D_OT_snap_selected_to_cursor	done	View3DPanel.cpp:1353 SelectionToCursor
+VIEW3D_OT_snap_selected_to_grid	done	View3DPanel.cpp:1391 SelectionToGrid
+VIEW3D_OT_toggle_matcap_flip	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_toggle_shading	done	View3DPanel.cpp:2926 shading chips (Shift+Z, Z)
+VIEW3D_OT_toggle_xray	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_transform_gizmo_set	done	View3DPanel.cpp:4012 Gizmos card and Shift+Space tool pick
+VIEW3D_OT_view_all	done	View3DPanel.cpp:1510 Frame All
+VIEW3D_OT_view_axis	done	View3DPanel.cpp:472 ViewAxisNow
+VIEW3D_OT_view_camera	done	View3DPanel.cpp:2442 Camera view (0)
+VIEW3D_OT_view_center_camera	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_center_cursor	done	View3DPanel.cpp:1527 Center Cursor and Frame All
+VIEW3D_OT_view_center_lock	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_center_pick	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_lock_clear	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_lock_to_active	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_orbit	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_view_pan	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_view_persportho	done	View3DPanel.cpp:1504 Perspective/Orthographic
+VIEW3D_OT_view_roll	done	View3DPanel.cpp:1532 Roll Left / Right
+VIEW3D_OT_view_selected	done	View3DPanel.cpp:1509 Frame Selected
+VIEW3D_OT_walk	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_zoom	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_zoom_border	done	View3DPanel.cpp:2872 Drag a box to zoom into
+VIEW3D_OT_zoom_camera_1_to_1	done	View3DPanel.cpp:1534 Zoom Camera 1:1
