@@ -1788,6 +1788,49 @@ namespace app
    }
 
 
+   // The 3D View node: each placed item's Motion (location, rotation, scale on top of where it was put) as
+   // params, so a cable, MIDI or an expression can move it. The sliders shown are the item selected in the 3D View
+   // (or picked here); every other item's nine still register, unseen, so their modulation keeps playing.
+   void DrawScene3DParams(Scene3DNode* n)
+   {
+      auto& items = n->Items();
+      std::vector<std::string> names;
+      std::vector<int> ids;
+      for (const Scene3DNode::Item& it : items)
+         if (it.motionSlot != 0)
+         {
+            const GraphNode* gn = FindNodeByUid(it.uid);
+            names.push_back(!it.name.empty() ? it.name : gn != nullptr ? gn->typeName + " " + std::to_string(gn->index) : "source missing");
+            ids.push_back(it.id);
+         }
+      if (ids.empty())
+      {
+         ImGui::TextDisabled("Add something in the 3D View to move it from here");
+         return;
+      }
+      int shown = 0;
+      for (int i = 0; i < (int)ids.size(); i++)
+         if (ids[i] == n->motionShown)
+            shown = i;
+      DropdownButton("motion of", names, shown, [n, ids](int i) { n->motionShown = ids[i]; });
+      static const float kLo[3] = { -20.0f, -360.0f, 0.0f }, kHi[3] = { 20.0f, 360.0f, 4.0f };
+      static const char* kFmt[3] = { "%.2f m", "%.1f\xC2\xB0", "%.3f" };
+      const bool keptOnly = gParamRegisterOnly;
+      for (int i = 0; i < (int)ids.size(); i++)
+      {
+         Scene3DNode::Item* it = n->FindItem(ids[i]);
+         gParamRegisterOnly = keptOnly || i != shown;
+         for (int c = 0; c < 9; c++)
+         {
+            const int group = c / 3;
+            const std::string full = names[i] + " " + Scene3DNode::MotionChannelName(c);
+            ModSlider(Scene3DNode::MotionChannelName(c), &it->motion[c], kLo[group], kHi[group], kFmt[group], kParamWidth,
+                      false, 0.0f, nullptr, nullptr, Scene3DNode::kMotionParamBase + (it->motionSlot - 1) * 9 + c, full.c_str());
+         }
+      }
+      gParamRegisterOnly = keptOnly;
+   }
+
    void DrawCameraParams(CameraNode* n)
    {
       DropdownButton("projection", CameraNode::ProjectionNames(), n->projection,

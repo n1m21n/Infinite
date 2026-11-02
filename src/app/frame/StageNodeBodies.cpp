@@ -1045,6 +1045,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawLightParams(n);
                else if (auto* n = dynamic_cast<Render3DNode*>(gn.node.get()))
                   DrawRender3DParams(n);
+               else if (auto* n = dynamic_cast<Scene3DNode*>(gn.node.get()))
+                  DrawScene3DParams(n);
                else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                   DrawImageAnalyzeParams(n);
                else if (auto* n = dynamic_cast<TrackNodeBase*>(gn.node.get()))

@@ -2529,10 +2529,29 @@ namespace
       return u.unitSystem == 1 ? kMetric[std::clamp(u.lengthUnit, 0, 3)] : kImperial[std::clamp(u.lengthUnit, 0, 2)];
    }
 
+   void DashedLine(ImDrawList* dl, ImVec2 p, ImVec2 q, ImU32 col)
+   {
+      const float len = std::hypot(q.x - p.x, q.y - p.y), step = 4.0f;
+      for (float t = 0.0f; t < len; t += step * 2.0f)
+      {
+         const float e = std::min(len, t + step);
+         dl->AddLine(ImVec2(p.x + (q.x - p.x) * t / len, p.y + (q.y - p.y) * t / len),
+                     ImVec2(p.x + (q.x - p.x) * e / len, p.y + (q.y - p.y) * e / len), col);
+      }
+   }
+
    void DrawItemExtras(ImDrawList* dl, Scene3DNode* scene, const Item& it, ImU32 col)
    {
       float c[3];
       scene->ItemCenter(it, c);
+      if (const Item* target = it.follow != 0 && sSet->showExtras ? scene->FindItem(it.follow) : nullptr)
+      {
+         float tc[3];
+         ImVec2 a, b;
+         scene->ItemCenter(*target, tc);
+         if (Project(c, a) && Project(tc, b))
+            DashedLine(dl, a, b, Hex(0x8FB0FF, 0.6f));   // relationship line, follower to target
+      }
       if (it.showBounds)
       {
          float lo[3], hi[3];
@@ -4764,6 +4783,7 @@ namespace
          Hint(T("Select one object."));
          return;
       }
+      scene->motionShown = item->id;
       if (Card(T("Source")))
       {
          const std::vector<GraphNode*> nodes = SourceChoices(scene, *item);
@@ -4996,6 +5016,59 @@ namespace
             scene->Commit();
          }
          Hint(T("Written by the Object Index pass, as index / 255."));
+      }
+      if (Card(T("Follow")))
+      {
+         std::vector<std::string> names = { T("None") };
+         std::vector<int> ids = { 0 };
+         for (const Item& other : scene->Items())
+            if (other.id != item->id && !scene->FollowLoops(item->id, other.id))
+            {
+               names.push_back(ItemName(other));
+               ids.push_back(other.id);
+            }
+         int pick = std::max(0, (int)(std::find(ids.begin(), ids.end(), item->follow) - ids.begin()));
+         if (pick >= (int)ids.size())
+            pick = 0;
+         bool changed = ComboRow(T("Object"), &pick, names, "Follow in 3D View");
+         if (changed)
+            item->follow = ids[pick];
+         if (item->follow != 0)
+            changed |= ComboRow(T("Carry"), &item->followMode, { T("Location, rotation and scale"), T("Location only") },
+                                "Follow carry");
+         if (changed)
+         {
+            item->followed[0] = NAN;   // keep where it is now, relative to the new target
+            PushUndoCheckpoint("Follow in 3D View");
+            scene->Commit();
+         }
+         Hint(T("Moves with the object it follows, keeping today's distance and turn."));
+      }
+      if (Card(T("Motion")))
+      {
+         auto field = [&](const char* label, float* v, float speed)
+         {
+            FieldLabel(label);
+            ImGui::SetNextItemWidth(sFieldW);
+            const bool changed = ImGui::DragFloat3(FormParts::Id(label).c_str(), v, speed, 0.0f, 0.0f, "%.2f");
+            Undoable("Edit motion in 3D View");
+            return changed;
+         };
+         FieldWell::PushStyle();
+         bool changed = field(T("Location"), item->motion, 0.01f);
+         changed |= field(T("Rotation"), item->motion + 3, 0.5f);
+         changed |= field(T("Scale"), item->motion + 6, 0.01f);
+         FieldWell::PopStyle();
+         if (ActionButton::Draw(L("Reset motion"), ImVec2(availW, 0)))
+         {
+            const float rest[9] = { 0, 0, 0, 0, 0, 0, 1, 1, 1 };
+            std::copy(rest, rest + 9, item->motion);
+            PushUndoCheckpoint("Reset motion in 3D View");
+            changed = true;
+         }
+         if (changed)
+            scene->Commit();
+         Hint(T("Added on top of the transform. Patch a modulator into the 3D View node's motion sliders to move it."));
       }
       GraphNode* gn = FindNodeByUid(item->uid);
       if (scene->ItemKind(*item) == Kind::Geometry)

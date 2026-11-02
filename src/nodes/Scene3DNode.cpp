@@ -219,21 +219,83 @@ namespace
       rot[0] = std::atan2(r[2][1], r[2][2]) * d;
       rot[2] = std::atan2(r[1][0], r[0][0]) * d;
    }
+   // The motion turn, from the 3D View's axes (X, Y, Z up) into the engine's (X, Y up, -Z): about
+   // view X is about engine X, about view Y is about engine -Z, about view Z is about engine Y.
+   Mat4 MotionTurn(const float m[9])
+   {
+      Mat4 r = Mat4::RotationY(m[5] * kDeg);
+      r = Mat4::Multiply(r, Mat4::RotationZ(-m[4] * kDeg));
+      return Mat4::Multiply(r, Mat4::RotationX(m[3] * kDeg));
+   }
+   void Rows(const Mat4& m, float r[3][3])
+   {
+      for (int row = 0; row < 3; row++)
+         for (int col = 0; col < 3; col++)
+            r[row][col] = m.m[col * 4 + row];
+   }
+   // A placement split into where it is, how it is turned and how big it is on each of its own axes.
+   struct Frame
+   {
+      float t[3];
+      float r[3][3];
+      float s[3];
+   };
+   Frame FrameOf(const Mat4& m)
+   {
+      Frame f;
+      for (int k = 0; k < 3; k++)
+         f.t[k] = m.m[12 + k];
+      for (int col = 0; col < 3; col++)
+      {
+         const float* c = &m.m[col * 4];
+         f.s[col] = std::max(1e-6f, std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]));
+         for (int row = 0; row < 3; row++)
+            f.r[row][col] = c[row] / f.s[col];
+      }
+      return f;
+   }
+   void MulRows(const float a[3][3], const float b[3][3], float out[3][3])
+   {
+      for (int i = 0; i < 3; i++)
+         for (int j = 0; j < 3; j++)
+            out[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j];
+   }
+}
+
+const char* Scene3DNode::MotionChannelName(int channel)
+{
+   static const char* kNames[9] = { "location X", "location Y", "location Z", "rotation X", "rotation Y",
+                                    "rotation Z", "scale X", "scale Y", "scale Z" };
+   return kNames[std::clamp(channel, 0, 8)];
+}
+
+bool Scene3DNode::FollowLoops(int id, int target)
+{
+   for (int hops = 0; target != 0 && hops < 64; hops++)
+   {
+      if (target == id)
+         return true;
+      const Item* t = FindItem(target);
+      target = t != nullptr ? t->follow : 0;
+   }
+   return target != 0;
 }
 
 Mat4 Scene3DNode::Placement(const Item& it)
 {
-   Mat4 m = Mat4::Translation(it.pos[0] + it.dpos[0], it.pos[1] + it.dpos[1], it.pos[2] + it.dpos[2]);
+   const float* mo = it.motion;
+   Mat4 m = Mat4::Translation(it.pos[0] + it.dpos[0] + mo[0], it.pos[1] + it.dpos[1] + mo[2], it.pos[2] + it.dpos[2] - mo[1]);
    m = Mat4::Multiply(m, Turn(it.rot));
    m = Mat4::Multiply(m, Turn(it.drot));
-   return Mat4::Multiply(m, Mat4::Scale(it.scale[0] * it.dscale[0], it.scale[1] * it.dscale[1],
-                                        it.scale[2] * it.dscale[2]));
+   m = Mat4::Multiply(m, MotionTurn(mo));
+   return Mat4::Multiply(m, Mat4::Scale(it.scale[0] * it.dscale[0] * mo[6], it.scale[1] * it.dscale[1] * mo[8],
+                                        it.scale[2] * it.dscale[2] * mo[7]));
 }
 
 void Scene3DNode::SetTurn(Item& item, const float r[3][3])
 {
-   // r = main * delta, so main = r * transpose(delta).
-   const Mat4 dm = Turn(item.drot);
+   // r = main * delta * motion, so main = r * transpose(delta * motion).
+   const Mat4 dm = Mat4::Multiply(Turn(item.drot), MotionTurn(item.motion));
    float main[3][3];
    for (int row = 0; row < 3; row++)
       for (int col = 0; col < 3; col++)
@@ -312,6 +374,7 @@ Scene3DNode::Item& Scene3DNode::AddItem(uint64_t uid)
    it.id = mNextId++;
    it.uid = uid;
    mItems.push_back(it);
+   AssignMotionSlots();
    Commit();
    return mItems.back();
 }
@@ -326,8 +389,97 @@ void Scene3DNode::RemoveItem(int id)
       focusItem = 0;
    if (settings.shadowItem == id)
       settings.shadowItem = 0;
+   for (Item& it : mItems)
+      if (it.follow == id)
+         it.follow = 0;   // the follower stays where it is
    mPlaced.erase(id);
    Commit();
+}
+
+void Scene3DNode::AssignMotionSlots()
+{
+   std::vector<bool> used(kMotionSlots + 1, false);
+   for (const Item& it : mItems)
+      if (it.motionSlot >= 1 && it.motionSlot <= kMotionSlots && !used[it.motionSlot])
+         used[it.motionSlot] = true;
+      else
+         const_cast<Item&>(it).motionSlot = 0;
+   int next = 1;
+   for (Item& it : mItems)
+      if (it.motionSlot == 0)
+      {
+         while (next <= kMotionSlots && used[next])
+            next++;
+         if (next > kMotionSlots)
+            break;
+         it.motionSlot = next;
+         used[next] = true;
+      }
+}
+
+// Each follower's place, from its target's and the offset it keeps in the target's space. A follower a tool
+// has moved since (it is not where Follow last put it) first takes its offset again, so it stays put.
+void Scene3DNode::ApplyFollow()
+{
+   for (int pass = 0; pass < 8; pass++)   // chains settle from the root out
+      for (Item& it : mItems)
+      {
+         const Item* target = it.follow != 0 && it.follow != it.id ? FindItem(it.follow) : nullptr;
+         if (target == nullptr)
+            continue;
+         float now[9];
+         std::copy(it.pos, it.pos + 3, now);
+         std::copy(it.rot, it.rot + 3, now + 3);
+         std::copy(it.scale, it.scale + 3, now + 6);
+         if (!std::equal(now, now + 9, it.followed))
+            TakeFollowOffset(it, *target);
+         const Frame tf = FrameOf(Placement(*target));
+         if (it.followMode == 1)
+            for (int k = 0; k < 3; k++)
+               it.pos[k] = tf.t[k] + it.fpos[k];
+         else
+         {
+            for (int row = 0; row < 3; row++)
+            {
+               it.pos[row] = tf.t[row];
+               for (int col = 0; col < 3; col++)
+                  it.pos[row] += tf.r[row][col] * tf.s[col] * it.fpos[col];
+            }
+            float local[3][3], world[3][3];
+            Rows(Turn(it.frot), local);
+            MulRows(tf.r, local, world);
+            TurnAngles(world, it.rot);
+            for (int k = 0; k < 3; k++)
+               it.scale[k] = it.fscale[k] * tf.s[k];
+         }
+         std::copy(it.pos, it.pos + 3, it.followed);
+         std::copy(it.rot, it.rot + 3, it.followed + 3);
+         std::copy(it.scale, it.scale + 3, it.followed + 6);
+      }
+}
+
+void Scene3DNode::TakeFollowOffset(Item& it, const Item& target)
+{
+   const Frame tf = FrameOf(Placement(target));
+   float d[3];
+   for (int k = 0; k < 3; k++)
+      d[k] = it.pos[k] - tf.t[k];
+   if (it.followMode == 1)
+   {
+      std::copy(d, d + 3, it.fpos);
+      return;
+   }
+   for (int col = 0; col < 3; col++)
+      it.fpos[col] = (tf.r[0][col] * d[0] + tf.r[1][col] * d[1] + tf.r[2][col] * d[2]) / tf.s[col];
+   float own[3][3], tT[3][3], local[3][3];
+   Rows(Turn(it.rot), own);
+   for (int i = 0; i < 3; i++)
+      for (int j = 0; j < 3; j++)
+         tT[i][j] = tf.r[j][i];
+   MulRows(tT, own, local);
+   TurnAngles(local, it.frot);
+   for (int k = 0; k < 3; k++)
+      it.fscale[k] = it.scale[k] / tf.s[k];
 }
 
 void Scene3DNode::Commit()
@@ -370,6 +522,20 @@ void Scene3DNode::Serialize()
          o << "lock " << it.id << " " << it.lock << "\n";
       if (it.lookAt != 0)
          o << "look " << it.id << " " << it.lookAt << "\n";
+      if (it.motionSlot != 0)
+      {
+         o << "motion " << it.id << " " << it.motionSlot;
+         for (float v : it.motion) o << " " << v;
+         o << "\n";
+      }
+      if (it.follow != 0)
+      {
+         o << "follow " << it.id << " " << it.follow << " " << it.followMode;
+         for (float v : it.fpos) o << " " << v;
+         for (float v : it.frot) o << " " << v;
+         for (float v : it.fscale) o << " " << v;
+         o << "\n";
+      }
       if (it.color[0] != 1.0f || it.color[1] != 1.0f || it.color[2] != 1.0f)
          o << "ocolor " << it.id << " " << it.color[0] << " " << it.color[1] << " " << it.color[2] << "\n";
       if (!it.castShadow)
@@ -464,7 +630,8 @@ void Scene3DNode::Parse()
                v = (std::decay_t<decltype(v)>)x;
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
-               key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show")
+               key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show" ||
+               key == "motion" || key == "follow")
       {
          int id = 0;
          l >> id;
@@ -486,6 +653,18 @@ void Scene3DNode::Parse()
             l >> it->lock;
          else if (key == "look")
             l >> it->lookAt;
+         else if (key == "motion")
+         {
+            l >> it->motionSlot;
+            for (float& v : it->motion) l >> v;
+         }
+         else if (key == "follow")
+         {
+            l >> it->follow >> it->followMode;
+            for (float& v : it->fpos) l >> v;
+            for (float& v : it->frot) l >> v;
+            for (float& v : it->fscale) l >> v;
+         }
          else if (key == "pass")
             l >> it->passIndex;
          else if (key == "shadowoff")
@@ -525,6 +704,7 @@ void Scene3DNode::Parse()
             l >> it->group;
       }
    }
+   AssignMotionSlots();
 }
 
 void Scene3DNode::VisitParams(ParamVisitor& v)
@@ -764,6 +944,7 @@ void Scene3DNode::Sync(int frameId)
    mSyncedFrame = frameId;
    if (mText != mParsedText)
       Parse();
+   ApplyFollow();
    // Items told to look at another keep facing it as it moves or animates.
    for (Item& it : mItems)
       if (it.lookAt != 0 && it.lookAt != it.id)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -75,7 +76,26 @@ public:
       bool showBounds = false;
       int boundsType = 0;           // 0 box, 1 sphere, 2 cylinder, 3 cone, 4 capsule
       bool showName = false, showAxes = false;
+      // Motion: a third offset on top of the main and delta ones, in the 3D View's own axes (Z up):
+      // location X Y Z, rotation X Y Z in degrees, scale X Y Z. It is what modulation, MIDI and
+      // expressions drive (each item's nine channels are params of the 3D View node, numbered by its
+      // motion slot), so a modulator never fights a hand edit and unbinding it puts the item back.
+      int motionSlot = 0;           // 1..kMotionSlots, saved; 0 = none free
+      float motion[9] = { 0, 0, 0, 0, 0, 0, 1, 1, 1 };
+      // Follow (Blender's Child Of and Copy Location): the item rides along with another. The tools
+      // keep working in world space; the offset in the target's space is kept here and re-taken on Commit.
+      int follow = 0;               // item id, 0 = none
+      int followMode = 0;           // 0 location, rotation and scale; 1 location only
+      float fpos[3] = { 0, 0, 0 }, frot[3] = { 0, 0, 0 }, fscale[3] = { 1, 1, 1 };
+      float followed[9] = { NAN };   // not saved: where Follow last put it, so a tool's move reads as new
    };
+
+   static constexpr int kMotionSlots = 80;
+   static constexpr int kMotionParamBase = 50;   // param index = base + (slot - 1) * 9 + channel
+   static const char* MotionChannelName(int channel);
+   // Whether `id` following `target` would close a loop.
+   bool FollowLoops(int id, int target);
+   int motionShown = 0;              // item whose Motion sliders the node body shows (follows the 3D View selection)
 
    // What the scene remembers beyond its items, saved with it.
    struct Settings
@@ -259,6 +279,9 @@ private:
    void Parse();
    const Item* FindConst(int id) const;
    void Serialize();
+   void AssignMotionSlots();
+   void ApplyFollow();
+   void TakeFollowOffset(Item& it, const Item& target);
    void Sync(int frameId);
    void ApplyWorld(Render3DNode& render, bool show, bool background);
    unsigned int Composite(unsigned int sceneTex, int w, int h, unsigned int backdrop, GLUtil::Fbo& out);

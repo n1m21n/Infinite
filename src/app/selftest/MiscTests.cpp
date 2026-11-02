@@ -3321,7 +3321,44 @@ void RunView3DMenuTest(int frameId)
          copy.SetSceneText(s->SceneText());
          groupSaved = copy.Items().size() == 1 && copy.Items()[0].group == 7 && copy.panelOnly;
       }
-   const bool pass = items == 1 && offCanvas && groupSaved;
+   // Follow carries a follower when its target moves; Motion adds on top of the transform; both save.
+   bool follows = false, motionMoves = false, motionSaved = false;
+   for (GraphNode& gn : gNodes)
+      if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()); s != nullptr && !s->Items().empty())
+      {
+         const uint64_t uid = s->Items()[0].uid;
+         const int a = s->AddItem(uid).id, b = s->AddItem(uid).id;
+         Scene3DNode::Item* ia = s->FindItem(a);
+         Scene3DNode::Item* ib = s->FindItem(b);
+         ib->pos[0] = 2.0f;
+         ib->follow = a;
+         s->Commit();
+         s->CookIfNeeded(100000);
+         ia = s->FindItem(a);
+         ia->pos[1] = 5.0f;
+         s->Commit();
+         s->CookIfNeeded(100001);
+         ib = s->FindItem(b);
+         follows = std::abs(ib->pos[0] - 2.0f) < 1e-4f && std::abs(ib->pos[1] - 5.0f) < 1e-4f;
+         ia = s->FindItem(a);
+         ia->motion[0] = 1.0f;
+         s->Commit();
+         motionMoves = std::abs(Scene3DNode::Placement(*s->FindItem(a)).m[12] - 1.0f) < 1e-4f;
+         Scene3DNode copy;
+         copy.SetSceneText(s->SceneText());
+         const Scene3DNode::Item* ca = copy.FindItem(a);
+         const Scene3DNode::Item* cb = copy.FindItem(b);
+         motionSaved = ca != nullptr && cb != nullptr && ca->motion[0] == 1.0f && ca->motionSlot > 0
+                       && cb->follow == a && ca->motionSlot != cb->motionSlot;
+         s->RemoveItem(b);
+         s->RemoveItem(a);
+         s->Commit();
+         break;
+      }
+   printf("  [%s] a follower moves with its target\n", follows ? "pass" : "FAIL");
+   printf("  [%s] motion adds on top of the transform\n", motionMoves ? "pass" : "FAIL");
+   printf("  [%s] motion and follow save\n", motionSaved ? "pass" : "FAIL");
+   const bool pass = items == 1 && offCanvas && groupSaved && follows && motionMoves && motionSaved;
    printf("  [%s] the node menu's first add makes one item\n", items == 1 ? "pass" : "FAIL");
    printf("  [%s] that scene stays off the canvas\n", offCanvas ? "pass" : "FAIL");
    printf("  [%s] a copied scene keeps groups and stays off the canvas\n", groupSaved ? "pass" : "FAIL");

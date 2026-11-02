@@ -4149,6 +4149,7 @@ void DrawLightParams(LightNode* n);
 void FrameSceneInView(Render3DNode* n);
 
 void DrawRender3DParams(Render3DNode* n);
+void DrawScene3DParams(Scene3DNode* n);
 
 void DrawBlendParams(BlendNode* n);
 
