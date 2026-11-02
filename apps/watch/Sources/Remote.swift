@@ -20,6 +20,9 @@ final class Remote: ObservableObject {
     private var edges: Packet.Flags = []
     private var seq: UInt8 = 0
     private let started = Date()
+    private var heldRot: (Float, Packet)?
+    private var heldAccel: (Float, Packet)?
+    private let pendingEdgeMask: Packet.Flags = [.doubleTap, .pad(0), .pad(1), .pad(2), .pad(3)]
 
     init() {
         WKInterfaceDevice.current().isBatteryMonitoringEnabled = true
@@ -81,12 +84,47 @@ final class Remote: ObservableObject {
         p.touchX = touchX; p.touchY = touchY
         p.heart = keeper.heart
         p.battery = UInt8(max(0, min(100, device.batteryLevel * 100)))
-        let pending = edges
         lock.unlock()
 
-        if link.send(p.encode()) {
-            lock.lock(); seq &+= 1; edges.subtract(pending); lock.unlock()
-            DispatchQueue.main.async { self.packetsSent += 1 }
+        // The radio refuses writes while its queue is full, which is exactly when the wrist moves fast. Refused
+        // packets are not thrown away: the strongest rotation and the strongest acceleration since the last write
+        // are kept and go out first when the radio is ready again. seq counts every tick, so the Mac sees what
+        // was still lost as gaps.
+        lock.lock()
+        seq &+= 1
+        var queue: [Packet] = []
+        while let h = takeHeld() { queue.append(h) }
+        queue.append(p)
+        lock.unlock()
+
+        var sent = 0
+        for (i, pk) in queue.enumerated() {
+            if link.send(pk.encode()) {
+                sent += 1
+                lock.lock(); edges.subtract(pendingEdgeMask.intersection(pk.flags)); lock.unlock()
+            } else {
+                lock.lock(); for rest in queue[i...] { putBack(rest) }; lock.unlock()
+                break
+            }
         }
+        if sent > 0 { DispatchQueue.main.async { self.packetsSent += sent } }
+    }
+
+    // MARK: held peaks (called with the lock held)
+
+    /// The oldest held packet first; the same packet can be both peaks and goes out once.
+    private func takeHeld() -> Packet? {
+        let a = heldRot?.1, b = heldAccel?.1
+        guard let first = [a, b].compactMap({ $0 }).min(by: { $0.timeMs < $1.timeMs }) else { return nil }
+        if a?.timeMs == first.timeMs { heldRot = nil }
+        if b?.timeMs == first.timeMs { heldAccel = nil }
+        return first
+    }
+
+    private func putBack(_ p: Packet) {
+        let m = (p.rot[0] * p.rot[0] + p.rot[1] * p.rot[1] + p.rot[2] * p.rot[2]).squareRoot()
+        let a = (p.accel[0] * p.accel[0] + p.accel[1] * p.accel[1] + p.accel[2] * p.accel[2]).squareRoot()
+        if heldRot == nil || m > heldRot!.0 { heldRot = (m, p) }
+        if heldAccel == nil || a > heldAccel!.0 { heldAccel = (a, p) }
     }
 }

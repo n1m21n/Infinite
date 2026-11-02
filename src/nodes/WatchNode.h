@@ -136,4 +136,7 @@ private:
    FILE* mLog = nullptr;
    double mRateT0 = 0;
    int mRateCount = 0;
+   int mRateDrops = 0;
+   uint8_t mPrevSeq = 0;
+   bool mHaveSeq = false;
 };

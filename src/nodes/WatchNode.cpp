@@ -172,7 +172,7 @@ void WatchNode::Update()
 }
 
 // Opt-in raw capture. Lines: "S,t,seq,q0..3,rot0..2,accel0..2,grav0..2,crown,flags" per sample and
-// "R,wallSec,packetsInLastSecond" once a second, so a BLE drop shows as a rate below 50.
+// "R,wallSec,packetsInLastSecond,seqGaps" once a second, so a BLE drop shows as a rate below 50.
 void WatchNode::LogSample(const WatchPacket::Sample& s)
 {
    if (!mLogChecked)
@@ -182,7 +182,7 @@ void WatchNode::LogSample(const WatchPacket::Sample& s)
       {
          mLog = std::fopen(path, "a");
          if (mLog)
-            std::fprintf(mLog, "# S,t_ms,seq,qw,qx,qy,qz,rotx,roty,rotz,accx,accy,accz,gx,gy,gz,crown,flags  |  R,wall_s,packets_per_s\n");
+            std::fprintf(mLog, "# S,t_ms,seq,qw,qx,qy,qz,rotx,roty,rotz,accx,accy,accz,gx,gy,gz,crown,flags  |  R,wall_s,packets_per_s,seq_gaps\n");
       }
    }
    if (!mLog)
@@ -194,9 +194,14 @@ void WatchNode::LogSample(const WatchPacket::Sample& s)
    if (mRateT0 == 0)
       mRateT0 = wall;
    mRateCount++;
+   if (mHaveSeq)
+      mRateDrops += (int)((uint8_t)(s.seq - mPrevSeq - 1));   // the watch counts seq every tick, so a gap is a refused write
+   mPrevSeq = s.seq;
+   mHaveSeq = true;
    if (wall - mRateT0 >= 1.0)
    {
-      std::fprintf(mLog, "R,%.2f,%d\n", wall, mRateCount);
+      std::fprintf(mLog, "R,%.2f,%d,%d\n", wall, mRateCount, mRateDrops);
+      mRateDrops = 0;
       std::fflush(mLog);
       mRateT0 = wall;
       mRateCount = 0;
@@ -282,20 +287,22 @@ void WatchNode::Feed(const WatchPacket::Sample& s)
    mPrevFlags = s.flags;
 
    // ---- gestures. Each has its own gap (250 ms) after it fires. ----
-   // Flick: a fast turn about z; the sign picks the side (mirrored on the right wrist). Left and right share the
+   // Axes as worn (measured on a Series 8, left wrist): x runs across the wrist, y along the forearm, z out of the
+   // display. A flick of the wrist turns about x; a push or shake runs along y.
+   // Flick: a fast turn about x; the sign picks the side (mirrored on the right wrist). Left and right share the
    // gap, so the backswing of a flick does not read as the opposite flick.
-   const float rz = s.rot[2] * mirror;
-   if (std::fabs(rz) > 400.f * k && (int32_t)(t - mFlickBlockedUntil) >= 0)
+   const float rx = s.rot[0] * mirror;
+   if (std::fabs(rx) > 400.f * k && (int32_t)(t - mFlickBlockedUntil) >= 0)
    {
-      Fire(rz > 0 ? kFlickRight : kFlickLeft, t);
+      Fire(rx > 0 ? kFlickRight : kFlickLeft, t);
       mFlickBlockedUntil = t + kRefractoryMs;
    }
 
-   // Shake: 4 or more sign changes of acceleration along x, each side beyond 1.2 g, inside 600 ms.
-   const float ax = s.accel[0];
-   if (std::fabs(ax) > 1.2f * k)
+   // Shake: 4 or more sign changes of acceleration along y, each side beyond 1.2 g, inside 600 ms.
+   const float ay = s.accel[1];
+   if (std::fabs(ay) > 1.2f * k)
    {
-      const int sign = ax > 0 ? 1 : -1;
+      const int sign = ay > 0 ? 1 : -1;
       if (mShakeSign != 0 && sign != mShakeSign)
       {
          if (mShakeCount == 8) { std::copy(mShakeTimes + 1, mShakeTimes + 8, mShakeTimes); mShakeCount--; }
@@ -317,20 +324,20 @@ void WatchNode::Feed(const WatchPacket::Sample& s)
       mStrikeBlockedUntil = std::max(mStrikeBlockedUntil, t + kRefractoryMs);
    }
 
-   // Strike: a hard push along the forearm (x beyond 2.5 g) that stops within 120 ms. A shake's own peaks do not count.
+   // Strike: a hard push along the forearm (y beyond 2.5 g) that stops within 120 ms. A shake's own peaks do not count.
    if (mStrikeSpent)
    {
-      if (ax < 1.0f) mStrikeSpent = false;
+      if (ay < 1.0f) mStrikeSpent = false;
    }
    else if (!mStrikeArmed)
    {
-      if (ax > 2.5f * k)
+      if (ay > 2.5f * k)
       {
          mStrikeArmed = true;
          mStrikeAt = t;
       }
    }
-   else if (ax < 1.0f)
+   else if (ay < 1.0f)
    {
       if (t - mStrikeAt <= kStrikeWindowMs && mShakeCount < 2 && (int32_t)(t - mStrikeBlockedUntil) >= 0)
       {

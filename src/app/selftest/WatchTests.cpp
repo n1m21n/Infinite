@@ -189,29 +189,29 @@ namespace app
          WatchLink::InjectDisconnect(w.name);
       }
 
-      // 3. A z-spike fires flick right once, the backswing and a repeat inside the gap do not; later ones do.
+      // 3. A x-spike fires flick right once, the backswing and a repeat inside the gap do not; later ones do.
       {
          Wrist w; N n; fresh(w, n);
          w.Still(4, &n);
-         w.rot[2] = 500.f;
+         w.rot[0] = 500.f;
          w.Send();
-         check(n.FireCount(N::kFlickRight) == 1 && n.Value(N::kFlickRight) == 1.f, "500 deg/s z-spike fires flick right");
-         w.rot[2] = 450.f; w.Send(); n.Value(N::kConnected);
-         w.rot[2] = -450.f; w.Send(); n.Value(N::kConnected);   // backswing
-         w.rot[2] = 500.f; w.Send(); n.Value(N::kConnected);
+         check(n.FireCount(N::kFlickRight) == 1 && n.Value(N::kFlickRight) == 1.f, "500 deg/s x-spike fires flick right");
+         w.rot[0] = 450.f; w.Send(); n.Value(N::kConnected);
+         w.rot[0] = -450.f; w.Send(); n.Value(N::kConnected);   // backswing
+         w.rot[0] = 500.f; w.Send(); n.Value(N::kConnected);
          check(n.FireCount(N::kFlickRight) == 1 && n.FireCount(N::kFlickLeft) == 0, "refractory gap holds the same flick, backswing and repeat");
          w.Still(16, &n);   // 320 ms
-         w.rot[2] = 500.f; w.Send();
+         w.rot[0] = 500.f; w.Send();
          check(n.FireCount(N::kFlickRight) == 2, "fires again after the gap");
          w.Still(16, &n);
-         w.rot[2] = -500.f; w.Send();
-         check(n.FireCount(N::kFlickLeft) == 1 && n.FireCount(N::kFlickRight) == 2, "negative z-spike fires flick left");
+         w.rot[0] = -500.f; w.Send();
+         check(n.FireCount(N::kFlickLeft) == 1 && n.FireCount(N::kFlickRight) == 2, "negative x-spike fires flick left");
          w.Still(16, &n);
-         w.rot[2] = 300.f; w.Send();
+         w.rot[0] = 300.f; w.Send();
          check(n.FireCount(N::kFlickRight) == 2, "a 300 deg/s turn is below the threshold");
          n.sens = 2.f;
          w.Still(16, &n);
-         w.rot[2] = 300.f; w.Send();
+         w.rot[0] = 300.f; w.Send();
          check(n.FireCount(N::kFlickRight) == 3, "sens 2 lowers the threshold");
          check(n.Value(N::kShake) == 0.f && n.FireCount(N::kStrike) == 0, "a flick is not a shake or a strike");
          clock = w.t + 400;
@@ -224,11 +224,11 @@ namespace app
          w.Still(4, &n);
          for (int i = 0; i < 10; i++)
          {
-            w.accel[0] = (i % 2 == 0) ? 1.6f : -1.6f;
+            w.accel[1] = (i % 2 == 0) ? 1.6f : -1.6f;
             w.Send(); n.Value(N::kConnected);
             w.Send(); n.Value(N::kConnected);   // two samples per swing: 40 ms
          }
-         check(n.FireCount(N::kShake) == 1, "alternating 1.6 g along x fires shake once");
+         check(n.FireCount(N::kShake) == 1, "alternating 1.6 g along y fires shake once");
          check(n.FireCount(N::kStrike) == 0 && n.FireCount(N::kFlickRight) + n.FireCount(N::kFlickLeft) == 0, "no strike or flick from a shake");
          check(n.Value(N::kEnergy) > 0.5f, "energy follows the movement");
          w.Still(60, &n);
@@ -241,16 +241,16 @@ namespace app
       {
          Wrist w; N n; fresh(w, n);
          w.Still(4, &n);
-         w.accel[0] = 3.0f; w.Send(); n.Value(N::kConnected);
-         w.accel[0] = 0.2f; w.Send(); n.Value(N::kConnected);
+         w.accel[1] = 3.0f; w.Send(); n.Value(N::kConnected);
+         w.accel[1] = 0.2f; w.Send(); n.Value(N::kConnected);
          check(n.FireCount(N::kStrike) == 1, "3 g that falls away within 120 ms fires strike");
          w.Still(16, &n);
-         w.accel[0] = 3.0f;
+         w.accel[1] = 3.0f;
          for (int i = 0; i < 10; i++) { w.Send(); n.Value(N::kConnected); }
-         w.accel[0] = 0.f; w.Send(); n.Value(N::kConnected);
+         w.accel[1] = 0.f; w.Send(); n.Value(N::kConnected);
          check(n.FireCount(N::kStrike) == 1, "a push held for 200 ms is not a strike");
          w.Still(16, &n);
-         for (int i = 0; i < 12; i++) { w.accel[0] = (i % 2 == 0) ? 1.0f : -1.0f; w.Send(); n.Value(N::kConnected); }
+         for (int i = 0; i < 12; i++) { w.accel[1] = (i % 2 == 0) ? 1.0f : -1.0f; w.Send(); n.Value(N::kConnected); }
          check(n.FireCount(N::kShake) == 0, "1 g rocking stays under the shake threshold");
          clock = w.t + 400;
          WatchLink::InjectDisconnect(w.name);
