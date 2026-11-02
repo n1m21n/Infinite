@@ -31,7 +31,7 @@ approval), lands on its own branch and merges into main.
 | Step | What | Decision |
 |---|---|---|
 | R1 ✅ | Skinned glTF import: joints, weights, clips and morph targets in Model 3D | Skinning on the CPU (linear blend, 4 weights per vertex), so geometry ops after Model 3D see the posed mesh. New params: Clip, Speed, Phase (scrub, 0-1 of the clip), Sync (seconds / one loop per N beats), and one weight per morph target (up to 8). "Free" time was dropped: a clip that runs while the transport is paused breaks the source-node rule. Built: core/Skinning, RIGTEST. |
-| R2 | Pose in the 3D View | Bones drawn as an overlay on the selected model. Ctrl+Tab enters Pose (Blender's key). Click a bone, R rotates, Alt+R clears. A posed joint is stored on the node as a param, so it can be modulated. |
+| R2 ✅ | Pose in the 3D View | Bones drawn as an overlay on the selected model. Ctrl+Tab enters Pose (Blender's key, also Object > Pose Mode). Click a bone, R turns it about the view axis, Alt+R clears. Built as 16 pose slots on Model 3D (joint + X/Y/Z degrees, turned in the joint's own frame after the clip), each angle a modulatable param shown in the node body. G/S on bones are not built. On Windows and Linux, Ctrl+Tab may also open ImGui's window switcher, which is left as is for now. |
 | R3 | IK | Chain length plus a target that is any 3D View item. Two bones solve exactly; longer chains use FABRIK. Optional pole item. Follows Blender's IK constraint fields: target, pole, chain length, weight. |
 | R4 | Armature node for any mesh | A bone chain along a Curve node or a straight axis with N segments. Weights come automatically from distance with a smooth falloff (Blender's envelope). Bends tentacles, plants and cables. Pose and IK from R2/R3 work on it too. |
 

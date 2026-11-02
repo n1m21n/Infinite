@@ -86,6 +86,19 @@ public:
    // Seconds into the current clip as last posed (0 in the rest pose).
    float ClipTime() const { return mPosedTime; }
 
+   // Pose (the 3D View's Pose mode): up to kPoseSlots joints carry a turn on
+   // top of the clip, in the joint's own frame, as Euler degrees. Each slot
+   // is three modulatable params, so an LFO can swing an arm.
+   static constexpr int kPoseSlots = 16;
+   const std::string& JointName(int j) const { return mRig.joints[j].name; }
+   int JointParent(int j) const { return mRig.joints[j].parent; }
+   // The joint's posed matrix in this node's mesh space (after the unit-box
+   // fit), column-major; false when the joint does not exist.
+   bool JointMatrix(int j, float out[16]);
+   // The slot holding joint j, or -1. With `make`, takes a free slot (or -1
+   // when all are used).
+   int PoseSlot(int j, bool make);
+
    // Imported files arrive at wildly different scales - millimetres, metres,
    // whatever the authoring tool used. Fitting to a unit box on load means a
    // model always shows up framed rather than invisible or filling the scene.
@@ -110,6 +123,8 @@ public:
    int clipSync = 0;
    float clipBeats = 4.0f;
    float morph[kMaxMorphs] = {};
+   int poseJoint[kPoseSlots] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+   float poseRot[kPoseSlots][3] = {};
 
    float color[3] = { 0.82f, 0.83f, 0.86f };
    float metallic = 0.1f;
@@ -155,6 +170,21 @@ public:
                                                           "morph4", "morph5", "morph6", "morph7" };
       for (int i = 0; i < kMaxMorphs; i++)
          v.Float(kMorphKeys[i], morph[i]);
+      static const char* const kPoseKeys[kPoseSlots][4] = {
+         { "pose0", "pose0X", "pose0Y", "pose0Z" }, { "pose1", "pose1X", "pose1Y", "pose1Z" },
+         { "pose2", "pose2X", "pose2Y", "pose2Z" }, { "pose3", "pose3X", "pose3Y", "pose3Z" },
+         { "pose4", "pose4X", "pose4Y", "pose4Z" }, { "pose5", "pose5X", "pose5Y", "pose5Z" },
+         { "pose6", "pose6X", "pose6Y", "pose6Z" }, { "pose7", "pose7X", "pose7Y", "pose7Z" },
+         { "pose8", "pose8X", "pose8Y", "pose8Z" }, { "pose9", "pose9X", "pose9Y", "pose9Z" },
+         { "pose10", "pose10X", "pose10Y", "pose10Z" }, { "pose11", "pose11X", "pose11Y", "pose11Z" },
+         { "pose12", "pose12X", "pose12Y", "pose12Z" }, { "pose13", "pose13X", "pose13Y", "pose13Z" },
+         { "pose14", "pose14X", "pose14Y", "pose14Z" }, { "pose15", "pose15X", "pose15Y", "pose15Z" } };
+      for (int i = 0; i < kPoseSlots; i++)
+      {
+         v.Int(kPoseKeys[i][0], poseJoint[i]);
+         for (int a = 0; a < 3; a++)
+            v.Float(kPoseKeys[i][a + 1], poseRot[i][a]);
+      }
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
       v.Int("shading", shading);
@@ -196,6 +226,7 @@ private:
    float mFitCentre[3] = { 0, 0, 0 };
    float mFitScale = 1.0f;
    std::vector<float> mPoseKey;
+   std::vector<float> mJointWorld;    // 16 per joint, mesh space, after the fit
    float mPosedTime = 0.0f;
    unsigned long long mMeshRevision = 0;
    bool mIsPoints = false;

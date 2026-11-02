@@ -776,6 +776,8 @@ namespace app
          { I18N_KEY("3D View"), I18N_KEY("Repeat Last"), "Shift+R", I18N_KEY("Apply the last move, turn or scale again to the selection") },
          { I18N_KEY("3D View"), I18N_KEY("Roll View"), "Shift+Keypad 4 / 6", I18N_KEY("Roll the view 15 degrees about the line of sight") },
          { I18N_KEY("3D View"), I18N_KEY("Proportional Editing"), "O", I18N_KEY("Moving one item pulls its neighbours, weaker with distance") },
+         { I18N_KEY("3D View"), I18N_KEY("Pose Mode"), "Ctrl+Tab", I18N_KEY("On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves") },
+         { I18N_KEY("3D View"), I18N_KEY("Turn / Clear Bone"), "R / Alt+R", I18N_KEY("In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node") },
          { I18N_KEY("3D View"), I18N_KEY("Copy / Paste / Duplicate Scene"), MODKEY "+C / V / D", I18N_KEY("Copy the whole scene, paste it as a new scene, or duplicate it") },
          { I18N_KEY("3D View"), I18N_KEY("Render"), "F12 / " MODKEY "+F12", I18N_KEY("Render a still from the scene camera, or render the camera for its set duration") },
 

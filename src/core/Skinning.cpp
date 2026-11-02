@@ -84,6 +84,52 @@ namespace
 
 namespace Skinning
 {
+   void QuatMul(const float a[4], const float b[4], float out[4])
+   {
+      const float o[4] = { a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+                           a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+                           a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+                           a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2] };
+      std::memcpy(out, o, sizeof(o));
+   }
+
+   void QuatFromEuler(const float deg[3], float q[4])
+   {
+      const float k = 3.14159265f / 360.0f;
+      const float qx[4] = { std::sin(deg[0] * k), 0, 0, std::cos(deg[0] * k) };
+      const float qy[4] = { 0, std::sin(deg[1] * k), 0, std::cos(deg[1] * k) };
+      const float qz[4] = { 0, 0, std::sin(deg[2] * k), std::cos(deg[2] * k) };
+      float zy[4];
+      QuatMul(qz, qy, zy);
+      QuatMul(zy, qx, q);
+   }
+
+   void EulerFromQuat(const float q[4], float deg[3])
+   {
+      const float x = q[0], y = q[1], z = q[2], w = q[3];
+      const float k = 180.0f / 3.14159265f;
+      // R = Rz * Ry * Rx: r20 = -sin(y), r21 = cos(y) sin(x), r22 = cos(y) cos(x), r10, r00.
+      const float r20 = 2 * (x * z - w * y);
+      const float r21 = 2 * (y * z + w * x);
+      const float r22 = 1 - 2 * (x * x + y * y);
+      const float r10 = 2 * (x * y + w * z);
+      const float r00 = 1 - 2 * (y * y + z * z);
+      deg[1] = std::asin(std::clamp(-r20, -1.0f, 1.0f)) * k;
+      if (std::fabs(r20) < 0.9999f)
+      {
+         deg[0] = std::atan2(r21, r22) * k;
+         deg[2] = std::atan2(r10, r00) * k;
+      }
+      else
+      {
+         // Gimbal lock: put the whole turn into Z.
+         const float r01 = 2 * (x * y - w * z);
+         const float r11 = 1 - 2 * (x * x + z * z);
+         deg[0] = 0.0f;
+         deg[2] = std::atan2(-r01, r11) * k;
+      }
+   }
+
    bool HasRig(const GltfImport::GltfDecodePackage& pkg)
    {
       return !pkg.joints.empty() || !pkg.morphDeltas.empty();
@@ -92,7 +138,8 @@ namespace Skinning
    void Evaluate(const GltfImport::GltfDecodePackage& pkg, int clip, float time,
                  const std::vector<float>& morphWeights,
                  std::vector<Platform::ModelVertex>& out,
-                 std::vector<float>* jointWorld)
+                 std::vector<float>* jointWorld,
+                 const std::vector<float>* poseOffsets)
    {
       const size_t vertexCount = pkg.vertices.size();
       const size_t jointCount = pkg.joints.size();
@@ -139,6 +186,10 @@ namespace Skinning
             std::memcpy(dst, tmp.data(), ch.width * sizeof(float));
          }
       }
+
+      if (poseOffsets != nullptr && poseOffsets->size() == jointCount * 4)
+         for (size_t j = 0; j < jointCount; j++)
+            QuatMul(local[j].r, &(*poseOffsets)[j * 4], local[j].r);
 
       for (size_t m = 0; m < weights.size(); m++)
       {

@@ -19,6 +19,7 @@
 #include "nodes/SceneNodes.h"
 #include "platform/Platform.h"
 #include "Transport.h"
+#include "core/Skinning.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -104,6 +105,21 @@ namespace
    // One orbit speed for drag and trackpad: 0.4 degrees per pixel, the Blender default.
    constexpr float kOrbitPerPixel = 0.4f * 3.14159265f / 180.0f;
    float RotStep();
+   void TogglePose(Scene3DNode* scene);
+   // Pose mode's state; the mode itself is drawn by DrawPose.
+   struct PoseState
+   {
+      bool on = false;
+      int item = 0;
+      int joint = -1;
+      bool turning = false;
+      bool madeSlot = false;
+      int slot = -1;
+      float startAngle = 0.0f;
+      float axis[3] = { 0, 0, 1 };  // the turn's axis in the joint's own frame
+      float q0[4] = { 0, 0, 0, 1 };
+      float before[3] = { 0, 0, 0 };
+   } sPose;
    float sDist = 6.0f, sAz = 0.7f, sEl = 0.4f;
 
    bool sLasso = false;
@@ -2069,6 +2085,7 @@ namespace
       }
       if (MenuParts::Item(T("Follow Active"), "Ctrl+P", false, sSel.size() > 1)) FollowActive(scene, false);
       if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
+      if (MenuParts::Item(T("Pose Mode"), "Ctrl+Tab", sPose.on, any || sPose.on)) TogglePose(scene);
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
       if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
@@ -2246,6 +2263,8 @@ namespace
       }
       if (io.KeyShift && !command && pressed(ImGuiKey_B))
          sZoomArmed = true;
+      if (command && !io.KeyShift && pressed(ImGuiKey_Tab))
+         TogglePose(scene);
       if (io.KeyShift && !command && pressed(ImGuiKey_Tab))
       {
          PushUndoCheckpoint("Snap in 3D View");
@@ -2782,6 +2801,229 @@ namespace
    {
       for (int k = 0; k < 3; k++)
          out[k] = t.m[k] * p[0] + t.m[4 + k] * p[1] + t.m[8 + k] * p[2] + t.m[12 + k];
+   }
+
+   // Pose mode (Ctrl+Tab on a skinned Model 3D item, Blender's key): the
+   // joints drawn as bones over the model, a click picks one, R turns it about
+   // the view axis, Alt+R clears it. A turn is stored on the Model 3D node as
+   // a pose slot (three params), so it saves, undoes and can be modulated.
+
+   // The skinned Model 3D under an item (through any pass-through nodes) and
+   // the matrix from its mesh space to the view's world.
+   ModelSourceNode* PoseModel(const Item& it, Mat4& world)
+   {
+      GraphNode* gn = FindNodeByUid(it.uid);
+      auto* top = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
+      ModelSourceNode* model = nullptr;
+      for (IGeometrySource* s = top; s != nullptr && model == nullptr; s = s->PassthroughSource())
+         model = dynamic_cast<ModelSourceNode*>(s);
+      if (model == nullptr || !model->HasSkin())
+         return nullptr;
+      world = Mat4::Multiply(Scene3DNode::Placement(it), top->GetModelMatrix());
+      return model;
+   }
+
+   ModelSourceNode* PoseTarget(Scene3DNode* scene, Mat4& world)
+   {
+      if (!sPose.on)
+         return nullptr;
+      const Item* it = scene->FindItem(sPose.item);
+      ModelSourceNode* model = it != nullptr && it->visible ? PoseModel(*it, world) : nullptr;
+      if (model == nullptr)
+         sPose = {};
+      return model;
+   }
+
+   void TogglePose(Scene3DNode* scene)
+   {
+      if (sPose.on)
+      {
+         sPose = {};
+         return;
+      }
+      Mat4 world;
+      const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      if (it != nullptr && PoseModel(*it, world) != nullptr)
+      {
+         sPose = {};
+         sPose.on = true;
+         sPose.item = it->id;
+      }
+   }
+
+   bool JointHead(ModelSourceNode* model, const Mat4& world, int j, float out[3])
+   {
+      float m[16];
+      if (!model->JointMatrix(j, m))
+         return false;
+      const float p[3] = { m[12], m[13], m[14] };
+      TransformBy(world, p, out);
+      return true;
+   }
+
+   void EndPoseTurn(ModelSourceNode* model, bool keep)
+   {
+      if (!keep && sPose.slot >= 0)
+      {
+         std::copy(sPose.before, sPose.before + 3, model->poseRot[sPose.slot]);
+         if (sPose.madeSlot)
+            model->poseJoint[sPose.slot] = -1;
+      }
+      sPose.turning = false;
+      sPose.slot = -1;
+   }
+
+   // Draws the bones and runs the mode's clicks and keys. Returns true while
+   // the mode owns the mouse and keys (navigation still runs).
+   bool DrawPose(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
+   {
+      Mat4 world;
+      ModelSourceNode* model = PoseTarget(scene, world);
+      if (model == nullptr)
+         return false;
+      const ImGuiIO& io = ImGui::GetIO();
+      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      const int count = model->JointCount();
+
+      // Bones: parent head to child head belongs to the parent (turning the
+      // parent swings it); a joint with no children gets a short tail along
+      // its own Y, Blender's bone axis.
+      std::vector<ImVec2> heads(count);
+      std::vector<bool> shown(count, false), hasChild(count, false);
+      for (int j = 0; j < count; j++)
+      {
+         float h[3];
+         shown[j] = JointHead(model, world, j, h) && Project(h, heads[j]);
+         if (model->JointParent(j) >= 0)
+            hasChild[model->JointParent(j)] = true;
+      }
+      int hotJoint = -1;
+      float hotDist = 9.0f;
+      auto bone = [&](int owner, ImVec2 a, ImVec2 b)
+      {
+         const bool sel = owner == sPose.joint;
+         dl->AddLine(a, b, Hex(0x000000, 0.6f), 4.0f);
+         dl->AddLine(a, b, sel ? Hex(kActive) : Hex(kWire, 0.85f), 2.0f);
+         const float d = SegDist(mouse, a, b);
+         if (d < hotDist)
+         {
+            hotDist = d;
+            hotJoint = owner;
+         }
+      };
+      for (int j = 0; j < count; j++)
+      {
+         if (!shown[j])
+            continue;
+         const int parent = model->JointParent(j);
+         if (parent >= 0 && shown[parent])
+            bone(parent, heads[parent], heads[j]);
+         if (!hasChild[j])
+         {
+            float m[16], tip[3], h[3];
+            model->JointMatrix(j, m);
+            const float len = 0.08f;
+            const float local[3] = { m[12] + m[4] * len, m[13] + m[5] * len, m[14] + m[6] * len };
+            TransformBy(world, local, tip);
+            ImVec2 t;
+            if (JointHead(model, world, j, h) && Project(tip, t))
+               bone(j, heads[j], t);
+         }
+      }
+      for (int j = 0; j < count; j++)
+      {
+         if (!shown[j])
+            continue;
+         const float d = std::hypot(mouse.x - heads[j].x, mouse.y - heads[j].y);
+         if (d < 7.0f)
+         {
+            hotDist = 0.0f;
+            hotJoint = j;
+         }
+         dl->AddCircleFilled(heads[j], j == sPose.joint ? 4.5f : 3.5f, j == sPose.joint ? Hex(kActive) : Hex(kWire), 12);
+         dl->AddCircle(heads[j], 5.0f, Hex(0x000000, 0.6f), 12, 1.0f);
+      }
+      if (sPose.joint >= 0 && sPose.joint < count && shown[sPose.joint])
+      {
+         const std::string& name = model->JointName(sPose.joint);
+         dl->AddText(ImVec2(heads[sPose.joint].x + 8.0f, heads[sPose.joint].y - 18.0f), Hex(kHotHandle), name.c_str());
+      }
+      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), "Pose Mode");
+
+      if (sPose.turning)
+      {
+         float h[3];
+         ImVec2 c;
+         if (sPose.slot < 0 || !JointHead(model, world, sPose.joint, h) || !Project(h, c))
+         {
+            EndPoseTurn(model, false);
+            return true;
+         }
+         dl->AddLine(c, mouse, Hex(kWire, 0.7f));
+         const float angle = std::atan2(mouse.y - c.y, mouse.x - c.x) - sPose.startAngle;
+         const float half = angle * 0.5f;
+         const float turn[4] = { sPose.axis[0] * std::sin(half), sPose.axis[1] * std::sin(half), sPose.axis[2] * std::sin(half), std::cos(half) };
+         float q[4];
+         Skinning::QuatMul(sPose.q0, turn, q);
+         Skinning::EulerFromQuat(q, model->poseRot[sPose.slot]);
+         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            EndPoseTurn(model, false);
+         else if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            EndPoseTurn(model, true);
+         return true;
+      }
+
+      if (!hovered || io.WantTextInput)
+         return true;
+      const bool command = io.KeyCtrl || io.KeySuper;
+      if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      {
+         sPose = {};
+         return true;
+      }
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+         sPose.joint = hotJoint;
+      if (sPose.joint < 0 || sPose.joint >= count)
+         return true;
+      if (io.KeyAlt && !command && pressed(ImGuiKey_R))
+      {
+         const int slot = model->PoseSlot(sPose.joint, false);
+         if (slot >= 0)
+         {
+            PushUndoCheckpoint("Clear pose");
+            model->poseJoint[slot] = -1;
+            std::fill(model->poseRot[slot], model->poseRot[slot] + 3, 0.0f);
+         }
+      }
+      else if (!io.KeyAlt && !command && pressed(ImGuiKey_R))
+      {
+         float h[3], m[16];
+         ImVec2 c;
+         if (!JointHead(model, world, sPose.joint, h) || !Project(h, c) || !model->JointMatrix(sPose.joint, m))
+            return true;
+         PushUndoCheckpoint("Pose joint");
+         sPose.madeSlot = model->PoseSlot(sPose.joint, false) < 0;
+         sPose.slot = model->PoseSlot(sPose.joint, true);
+         if (sPose.slot < 0)
+            return true;
+         std::copy(model->poseRot[sPose.slot], model->poseRot[sPose.slot] + 3, sPose.before);
+         Skinning::QuatFromEuler(sPose.before, sPose.q0);
+         // The view axis, into mesh space, then into the joint's frame.
+         const Mat4 inv = Mat4::Inverse(world);
+         float a[3];
+         for (int k = 0; k < 3; k++)
+            a[k] = inv.m[k] * sCam.fwd[0] + inv.m[4 + k] * sCam.fwd[1] + inv.m[8 + k] * sCam.fwd[2];
+         for (int c3 = 0; c3 < 3; c3++)
+         {
+            float col[3] = { m[c3 * 4], m[c3 * 4 + 1], m[c3 * 4 + 2] };
+            Normalize(col);
+            sPose.axis[c3] = col[0] * a[0] + col[1] * a[1] + col[2] * a[2];
+         }
+         Normalize(sPose.axis);
+         sPose.startAngle = std::atan2(mouse.y - c.y, mouse.x - c.x);
+         sPose.turning = true;
+      }
+      return true;
    }
 
    // The camera as a frustum, the shape of what it will render.
@@ -3618,7 +3860,7 @@ namespace
          DrawToolpad(dl, scene, mn, mx, mouse, hovered && sOp.mode == 0, onPad);
       onNav = onNav || onPad;
       int hot = -1;
-      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove)
+      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove && !sPose.on)
       {
          float center[3];
          PivotPoint(scene, center);
@@ -3645,10 +3887,12 @@ namespace
             dl->AddLine(c, mouse, Hex(kWire, 0.7f));
       }
 
-      gView3DClaimedKeys = hovered || sOp.mode != 0;
+      const bool posing = sOp.mode == 0 && sOverlays && DrawPose(dl, scene, mouse, hovered);
+      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         sRightOk = sOp.mode == 0;
-      HandleKeys(scene, mouse, hovered);
+         sRightOk = sOp.mode == 0 && !posing;
+      if (!posing)
+         HandleKeys(scene, mouse, hovered);
       if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
          sNavDrag = false;
       HandleNavigation(scene, hovered);
@@ -3667,7 +3911,7 @@ namespace
       if (!ImGui::IsAnyMouseDown())
          sLockUndo = false;
 
-      if (hovered && sOp.mode == 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+      if (hovered && sOp.mode == 0 && !posing && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
       {
          if (sZoomArmed)
          {

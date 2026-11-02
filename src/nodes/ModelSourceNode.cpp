@@ -135,6 +135,8 @@ bool ModelSourceNode::Load(const std::string& path)
             clip = mRig.clips.empty() ? 0 : 1;
             for (int i = 0; i < kMaxMorphs; i++)
                morph[i] = i < (int)mRig.morphDefaults.size() ? mRig.morphDefaults[i] : 0.0f;
+            std::fill(poseJoint, poseJoint + kPoseSlots, -1);
+            std::fill(&poseRot[0][0], &poseRot[0][0] + kPoseSlots * 3, 0.0f);
          }
          std::string rig;
          if (!mRig.joints.empty())
@@ -420,17 +422,76 @@ void ModelSourceNode::UpdatePose()
       weights[i] = morph[i];
 
    std::vector<float> key;
-   key.reserve(2 + weights.size());
+   key.reserve(2 + weights.size() + kPoseSlots * 4);
    key.push_back((float)clipIndex);
    key.push_back(time);
    key.insert(key.end(), weights.begin(), weights.end());
+   for (int i = 0; i < kPoseSlots; i++)
+   {
+      key.push_back((float)poseJoint[i]);
+      key.insert(key.end(), poseRot[i], poseRot[i] + 3);
+   }
    if (key == mPoseKey)
       return;
    mPoseKey = key;
    mPosedTime = time;
 
+   const size_t jointCount = mRig.joints.size();
+   std::vector<float> offsets;
+   for (int i = 0; i < kPoseSlots; i++)
+   {
+      if (poseJoint[i] < 0 || poseJoint[i] >= (int)jointCount)
+         continue;
+      if (offsets.empty())
+      {
+         offsets.assign(jointCount * 4, 0.0f);
+         for (size_t j = 0; j < jointCount; j++)
+            offsets[j * 4 + 3] = 1.0f;
+      }
+      float q[4], combined[4];
+      Skinning::QuatFromEuler(poseRot[i], q);
+      Skinning::QuatMul(&offsets[poseJoint[i] * 4], q, combined);
+      std::copy(combined, combined + 4, &offsets[poseJoint[i] * 4]);
+   }
+
    std::vector<Platform::ModelVertex> posed;
-   Skinning::Evaluate(mRig, clipIndex, time, weights, posed);
+   Skinning::Evaluate(mRig, clipIndex, time, weights, posed, &mJointWorld, offsets.empty() ? nullptr : &offsets);
    ApplyFit(mMesh.vertices, posed);
+   // The fit (move by -centre, then scale) goes onto the joints too.
+   for (size_t j = 0; j < mJointWorld.size() / 16; j++)
+   {
+      float* m = &mJointWorld[j * 16];
+      for (int c = 0; c < 3; c++)
+         for (int r = 0; r < 3; r++)
+            m[c * 4 + r] *= mFitScale;
+      for (int r = 0; r < 3; r++)
+         m[12 + r] = (m[12 + r] - mFitCentre[r]) * mFitScale;
+   }
    mMeshRevision = NextMeshRevision();
+}
+
+bool ModelSourceNode::JointMatrix(int j, float out[16])
+{
+   UpdatePose();
+   if (j < 0 || (size_t)(j + 1) * 16 > mJointWorld.size())
+      return false;
+   std::copy(&mJointWorld[j * 16], &mJointWorld[j * 16] + 16, out);
+   return true;
+}
+
+int ModelSourceNode::PoseSlot(int j, bool make)
+{
+   for (int i = 0; i < kPoseSlots; i++)
+      if (poseJoint[i] == j)
+         return i;
+   if (!make)
+      return -1;
+   for (int i = 0; i < kPoseSlots; i++)
+      if (poseJoint[i] < 0)
+      {
+         poseJoint[i] = j;
+         std::fill(poseRot[i], poseRot[i] + 3, 0.0f);
+         return i;
+      }
+   return -1;
 }

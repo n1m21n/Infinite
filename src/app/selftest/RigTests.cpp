@@ -4,6 +4,7 @@
 
 #include <cmath>
 
+#include "core/Skinning.h"
 #include "nodes/ModelSourceNode.h"
 
 namespace app
@@ -13,7 +14,9 @@ namespace app
 // skins back onto itself (inverse binds right); half of "bend" turns the top
 // ring 45 degrees about the tip joint; half of "twist" turns the base about
 // Y; the "bulge" morph moves only the top ring; a paused transport does not
-// re-pose. The unit-box fit is centre (0, 1, 0), scale 0.5.
+// re-pose; a pose slot turns a joint on top of the clip (Pose mode's
+// store) and joint matrices come out in fitted mesh space; Euler <-> quaternion
+// round-trips. The unit-box fit is centre (0, 1, 0), scale 0.5.
 bool RunRigTest()
 {
    printf("[RIG TEST] skinned glTF: joints, clips, morphs\n");
@@ -73,7 +76,31 @@ bool RunRigTest()
    check(near3(m->vertices[kTop], 0.15f, 0.5f, 0.15f) && near3(m->vertices[kTop - 4], 0.1f, 0.25f, 0.1f),
          "bulge moves the top ring only", m->vertices[kTop].px, m->vertices[kTop - 4].px);
 
-   n.morph[0] = 0.0f; n.clip = 1; n.clipSpeed = 1.0f;
+   n.morph[0] = 0.0f;
+   n.clip = 0;
+   const int slot = n.PoseSlot(1, true);
+   n.poseRot[slot][2] = 90.0f;
+   m = &n.GetMesh();
+   check(slot == 0 && near3(m->vertices[kTop], -0.5f, 0.1f, 0.1f), "a pose slot turns the tip 90 degrees",
+         m->vertices[kTop].px, m->vertices[kTop].py);
+   float jm[16];
+   check(n.JointMatrix(1, jm) && std::fabs(jm[12]) < 1e-4f && std::fabs(jm[13]) < 1e-4f && std::fabs(jm[1] - 0.5f) < 1e-3f,
+         "tip joint sits at the fitted origin, turned and scaled", jm[13], jm[1]);
+   n.clip = 1; n.clipPhase = 0.5f; n.poseRot[slot][2] = 45.0f;
+   m = &n.GetMesh();
+   check(near3(m->vertices[kTop], -0.5f, 0.1f, 0.1f), "pose adds on top of the clip (45 + 45)",
+         m->vertices[kTop].px, m->vertices[kTop].py);
+   n.poseJoint[slot] = -1; n.poseRot[slot][2] = 0.0f; n.clipPhase = 0.0f;
+   {
+      const float e[3] = { 10.0f, -35.0f, 120.0f };
+      float q[4], back[3];
+      Skinning::QuatFromEuler(e, q);
+      Skinning::EulerFromQuat(q, back);
+      check(std::fabs(back[0] - e[0]) < 1e-2f && std::fabs(back[1] - e[1]) < 1e-2f && std::fabs(back[2] - e[2]) < 1e-2f,
+            "Euler round-trips through a quaternion", back[1], back[2]);
+   }
+
+   n.clip = 1; n.clipSpeed = 1.0f;
    Transport::Instance().SetPlaying(false);
    const unsigned long long r0 = n.MeshRevision();
    const unsigned long long r1 = n.MeshRevision();

@@ -1092,6 +1092,30 @@ namespace app
             ModSlider(label.c_str(), &n->morph[i], 0.0f, 1.0f);
             ImGui::PopID();
          }
+
+         // Joints turned in the 3D View's Pose mode (Ctrl+Tab), three
+         // angles each; a joint with no slot shows nothing here.
+         bool anyPose = false;
+         for (int i = 0; i < ModelSourceNode::kPoseSlots; i++)
+         {
+            const int j = n->poseJoint[i];
+            const bool used = j >= 0 && j < n->JointCount();
+            if (!used && !gParamRegisterOnly)
+               continue;
+            if (!anyPose)
+               NodeSeparator("pose");
+            anyPose = true;
+            ImGui::PushID(1000 + i);
+            const std::string name = used ? n->JointName(j) : "joint " + std::to_string(i + 1);
+            for (int a = 0; a < 3; a++)
+            {
+               const std::string label = name + (a == 0 ? " X" : a == 1 ? " Y" : " Z");
+               ImGui::PushID(a);
+               ModSlider(label.c_str(), &n->poseRot[i][a], -180.0f, 180.0f, "%.1f");
+               ImGui::PopID();
+            }
+            ImGui::PopID();
+         }
       }
 
       // A face-less .ply loads as points; their size is the only point knob.

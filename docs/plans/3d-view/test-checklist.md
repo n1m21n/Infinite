@@ -83,6 +83,7 @@ Open `~/Desktop/Infinite-dev.app`. Add 3+ objects to a 3D View. Right-click empt
 - [ ] Projection = Fisheye dome, Lens = Equisolid, Dome angle 300: wider than a half sphere, edges squeeze less than Equidistant
 - [ ] Ctrl+I inverts the selection (once); Shift+Keypad 4 / 6 rolls the view
 - [ ] Rigging R1: drop a skinned .glb (Mixamo or Blender export): it plays its first clip with the transport, stops when paused; Clip, Speed, Phase, Sync and each morph slider move it; an LFO on Phase scrubs it; Displacement after it follows the pose
+- [ ] Rigging R2: select the skinned item, Ctrl+Tab: bones show with "Pose Mode"; click a bone, R + mouse turns it, click keeps, Esc puts it back; Alt+R clears; the node body gains a pose row whose sliders take an LFO; undo restores; save and reopen keeps the pose
 
 ## Keymap
 - [ ] Every row marked Same in docs/plans/3d-view/keymap.md does what Blender does
