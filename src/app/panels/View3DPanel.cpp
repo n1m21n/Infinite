@@ -3410,6 +3410,77 @@ namespace
       }
    }
 
+   ImVec2 SpawnSpot(Scene3DNode* scene);
+
+   // Files dropped on the 3D View: a model lands where it was dropped (on the ground, else at the
+   // 3D cursor) as a Model 3D node, an .hdr or .exr becomes the world, and a picture dropped while
+   // looking through a camera becomes that camera's background.
+   void TakeDroppedFiles(Scene3DNode* scene)
+   {
+      if (gDroppedFiles.empty() || gDropPos.x < gView3DRectMin.x || gDropPos.x >= gView3DRectMax.x ||
+          gDropPos.y < gView3DRectMin.y || gDropPos.y >= gView3DRectMax.y)
+         return;
+      static const std::vector<std::string> kModels = { "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc", "gltf", "glb" };
+      static const std::vector<std::string> kWorlds = { "hdr", "exr" };
+      static const std::vector<std::string> kPictures = { "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp" };
+      const std::vector<std::string> files = std::move(gDroppedFiles);
+      gDroppedFiles.clear();
+      float at[3] = { sSet->cursor[0], sSet->cursor[1], sSet->cursor[2] };
+      const bool inView = gDropPos.x >= sCam.mn.x && gDropPos.x < sCam.mx.x && gDropPos.y >= sCam.mn.y && gDropPos.y < sCam.mx.y;
+      if (inView)
+      {
+         float o[3], d[3];
+         MouseRay(gDropPos, o, d);
+         if (d[1] < -1e-4f)
+         {
+            const float t = -o[1] / d[1];
+            for (int k = 0; k < 3; k++)
+               at[k] = o[k] + d[k] * t;
+         }
+      }
+      PushUndoCheckpoint("Drop into 3D View");
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+      std::vector<int> added;
+      for (const std::string& path : files)
+      {
+         if (HasExtension(path, kModels))
+         {
+            const ImVec2 spot = SpawnSpot(scene);
+            GraphNode* gn = SpawnNode("Model 3D", "3D", spot.x, spot.y + 120.0f * (float)added.size());
+            if (gn == nullptr)
+               continue;
+            static_cast<ModelSourceNode*>(gn->node.get())->Load(path);
+            Item& it = scene->AddItem(gn->uid);
+            std::copy(at, at + 3, it.pos);
+            added.push_back(it.id);
+         }
+         else if (HasExtension(path, kWorlds))
+         {
+            const ImVec2 spot = SpawnSpot(scene);
+            if (GraphNode* gn = SpawnNode("HDRI", "3D", spot.x, spot.y))
+               if (auto* env = dynamic_cast<EnvironmentNode*>(gn->node.get()); env != nullptr && env->Load(path))
+               {
+                  scene->worldUid = gn->uid;
+                  scene->worldColorOn = false;
+               }
+         }
+         else if (HasExtension(path, kPictures) && sCameraView)
+         {
+            if (Item* cam = scene->FindItem(scene->activeCamera))
+            {
+               cam->backdrop.path = path;
+               cam->backdrop.show = true;
+            }
+         }
+      }
+      scene->Commit();
+      gSuppressUndoCheckpoints = wasSuppressed;
+      if (!added.empty())
+         sSel = added;
+      gPatchDirty = true;
+   }
+
    void DrawViewport(Scene3DNode* scene, ImVec2 size)
    {
       const ImGuiIO& io = ImGui::GetIO();
@@ -3433,6 +3504,7 @@ namespace
 
       StepGlide();
       BuildCam(scene, mn, mx);
+      TakeDroppedFiles(scene);
       Scene3DNode::View view;
       view.view = sCam.view;
       view.proj = sCam.proj;

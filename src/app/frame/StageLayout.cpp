@@ -470,6 +470,8 @@ void DrawLayout(FrameCtx& fc)
                                 gDropPos.y >= gSampleStudioRectMin.y && gDropPos.y < gSampleStudioRectMax.y) ||
                                (gPianoRollOpen && gDropPos.x >= gPianoRollRectMin.x && gDropPos.x < gPianoRollRectMax.x &&
                                 gDropPos.y >= gPianoRollRectMin.y && gDropPos.y < gPianoRollRectMax.y) ||
+                               (gView3DOpen && gDropPos.x >= gView3DRectMin.x && gDropPos.x < gView3DRectMax.x &&
+                                gDropPos.y >= gView3DRectMin.y && gDropPos.y < gView3DRectMax.y) ||
                                (gTerminalOpen && gDropPos.x >= gTerminalRectMin.x && gDropPos.x < gTerminalRectMax.x &&
                                 gDropPos.y >= gTerminalRectMin.y && gDropPos.y < gTerminalRectMax.y);
       // Files dropped on the Terminal become shell words at its prompt.

@@ -3615,6 +3615,29 @@ void RunView3DTest()
       View3DShotState(atoi(state));
 }
 
+// A model file dropped on the 3D View becomes a Model 3D node and an item in the scene, selected.
+void RunView3DDropTest(int frameId)
+{
+   static std::string path;
+   if (frameId == 9)
+   {
+      path = (std::filesystem::temp_directory_path() / "infinite-view3d-drop.obj").string();
+      std::ofstream(path) << "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+      gDroppedFiles = { path };
+      gDropPos = ImVec2(gView3DRectMin.x + (gView3DRectMax.x - gView3DRectMin.x) * 0.3f,
+                        (gView3DRectMin.y + gView3DRectMax.y) * 0.5f);
+      return;
+   }
+   bool landed = false;
+   for (GraphNode& gn : gNodes)
+      if (auto* s = dynamic_cast<Scene3DNode*>(gn.node.get()))
+         for (const Scene3DNode::Item& it : s->Items())
+            if (GraphNode* src = FindNodeByUid(it.uid); src != nullptr && dynamic_cast<ModelSourceNode*>(src->node.get()) != nullptr)
+               landed = true;
+   printf("  [%s] a model dropped on the 3D View joins the scene\n", landed ? "pass" : "FAIL");
+   printf("VIEW3DDROP %s\n", landed && gDroppedFiles.empty() ? "OK" : "FAIL");
+}
+
 void RunClipboardTest()
 {
    bool ok = true;

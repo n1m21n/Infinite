@@ -4,6 +4,7 @@
 namespace app
 {
 void RunView3DMenuTest(int frameId);
+void RunView3DDropTest(int frameId);
 
 void DrawFrameTestsA(FrameCtx& fc)
 {
@@ -1991,6 +1992,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunView3DTest();
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && getenv("INFINITE_VIEW3DSHOT") == nullptr && (frameId == 7 || frameId == 8))
          RunView3DMenuTest(frameId);
+      if (getenv("INFINITE_VIEW3DTEST") != nullptr && getenv("INFINITE_VIEW3DSHOT") == nullptr && (frameId == 9 || frameId == 11))
+         RunView3DDropTest(frameId);
 
       if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop
          RunPatchWatchTest();
