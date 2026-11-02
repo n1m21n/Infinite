@@ -870,6 +870,26 @@
         if (e.key === 'ArrowLeft') { goTo(current - 1); openLightbox(); }
       }
     });
+
+    /* autoplay: advances every 5s while visible and not hovered; any manual input ends it */
+    const win = $('#hero-showcase');
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (win && !reduce) {
+      let timer = null, seen = false, hover = false, done = false;
+      const tick = () => {
+        const lbOpen = lightbox && lightbox.classList.contains('active');
+        if (seen && !hover && !lbOpen && !document.hidden) goTo(current + 1);
+      };
+      timer = setInterval(tick, 5000);
+      const stop = () => { done = true; clearInterval(timer); };
+      win.addEventListener('mouseenter', () => { hover = true; });
+      win.addEventListener('mouseleave', () => { hover = false; });
+      win.addEventListener('pointerdown', stop, true);
+      window.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') stop(); });
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((en) => { seen = en[0].isIntersecting; }, { threshold: 0.5 }).observe(win);
+      } else seen = true;
+    }
   }
 
   /* ------------------------------------------------------------ boot */
