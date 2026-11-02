@@ -3,7 +3,8 @@
 
 Reads Blender's own data (RNA properties with their UI names and options, operators, the default keymap) by running
 inside the installed Blender, headless. Reference only, nothing is copied.
-Usage: tools/3dview_parity_probe.py [--md docs/plans/3d-view/blender-inventory.md] [--unresolved]
+Usage: tools/3dview_parity_probe.py [--md docs/plans/3d-view/blender-inventory.md] [--unresolved] [--tracker]
+--tracker rewrites the coverage table and Missing list in docs/plans/3d-view/parity.md from the map.
 MAP (docs/plans/3d-view/parity-map.tsv: Struct.identifier or operator id, status, where) overrides the keyword guess:
 status done = Infinite has it, missing = in scope and not built, deferred = needs renderer work or approval, out = outside the README.
 --unresolved prints how many in-scope settings and operators have no map row (0 = every row decided).
@@ -123,6 +124,37 @@ def load_map():
                 m[c[0]] = (c[1], c[2] if len(c) > 2 else '')
     return m
 
+TRACKER = ROOT / 'docs/plans/3d-view/parity.md'
+
+def tracker(props, ops, mp):
+    """Rewrite the coverage table and the "Missing, ranked" list of parity.md from the map, so they never drift."""
+    def st(key): return mp.get(key, ('', ''))[0]
+    areas = list(dict.fromkeys(p[0] for p in props))
+    rows, tot = [], [0, 0, 0, 0, 0]
+    for a in areas:
+        ids = [f'{p[1]}.{p[2]}' for p in props if p[0] == a]
+        n = [sum(st(i) == k for i in ids) for k in ('done', 'missing', 'deferred', 'out')] + [0]
+        n[4] = sum(n[:4]); tot = [x + y for x, y in zip(tot, n)]
+        rows.append(f'| {a} | ' + ' | '.join(map(str, n)) + ' |')
+    on = [sum(st(o[0]) == k for o in ops) for k in ('done', 'missing', 'deferred', 'out')] + [0]
+    on[4] = sum(on[:4])
+    table = ['| Area | Done | Missing | Deferred | Out | Mapped |', '|---|---|---|---|---|---|'] + rows
+    table.append('| **All settings** | ' + ' | '.join(f'**{x}**' for x in tot) + ' |')
+    table.append('| **Operators** | ' + ' | '.join(f'**{x}**' for x in on) + ' |')
+    table.append('| **Keymap entries** | | | | | not mapped: compare with README Controls by hand |')
+    out = []
+    for a in areas:
+        items = [f'- {p[3]} (`{p[1]}.{p[2]}`): {mp[p[1] + "." + p[2]][1]}' for p in props if p[0] == a and st(f'{p[1]}.{p[2]}') == 'missing']
+        if items: out += [f'### {a} ({len(items)})', ''] + items + ['']
+    items = [f'- {o[1]} (`{o[0]}`): {mp[o[0]][1]}' for o in ops if st(o[0]) == 'missing']
+    if items: out += [f'### Operators ({len(items)})', ''] + items + ['']
+    t = TRACKER.read_text()
+    a, b = t.index('| Area | Done |'), t.index('\nRe-run the probe')
+    t = t[:a] + '\n'.join(table) + '\n' + t[b:]
+    c = t.index('### ', t.index('## Missing, ranked'))
+    t = t[:c] + '\n'.join(out).rstrip() + '\n'
+    TRACKER.write_text(t)
+
 def main():
     d = dump()
     mp = load_map()
@@ -157,6 +189,8 @@ def main():
             for p in left:
                 print(p[1] + '.' + p[2] if len(p) > 10 else p[0])
         return
+    if '--tracker' in sys.argv:
+        return tracker(props, ops, mp)
     keys = [(km, k, op, pr, scope(op)) for km, k, op, pr in d['keys']]
     areas = list(dict.fromkeys(p[0] for p in props))
     md = ['# Blender vs Infinite 3D View: full inventory', '',

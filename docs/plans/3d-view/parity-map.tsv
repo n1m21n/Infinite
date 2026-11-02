@@ -373,7 +373,7 @@ OBJECT_OT_unlink_data	out	data-block linking
 OBJECT_OT_visual_transform_apply	out	applies to mesh data; origins are node outputs
 OBJECT_OT_volume_import	out	object types outside the scene
 Camera.type	done	View3DPanel.cpp:3453 Type Perspective/Orthographic
-Camera.sensor_fit	missing	Camera Data tab: sensor fit
+Camera.sensor_fit	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.passepartout_alpha	done	View3DPanel.cpp:4018 Passepartout Opacity
 Camera.angle_x	done	View3DPanel.cpp:3463 Field of view
 Camera.angle_y	done	View3DPanel.cpp:3463 Field of view
@@ -382,36 +382,36 @@ Camera.clip_start	done	View3DPanel.cpp:3474 Clip start
 Camera.clip_end	done	View3DPanel.cpp:3475 Clip end
 Camera.lens	done	View3DPanel.cpp:3459 Focal length
 Camera.sensor_width	done	View3DPanel.cpp:3480 Sensor
-Camera.sensor_height	missing	Camera Data tab: sensor height
+Camera.sensor_height	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.ortho_scale	done	View3DPanel.cpp:3471 Scale (orthoHeight)
-Camera.display_size	missing	Camera Data tab: marker size
+Camera.display_size	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.shift_x	done	View3DPanel.cpp:3472 Shift X / Shift Y
 Camera.shift_y	done	View3DPanel.cpp:3472 Shift X / Shift Y
-Camera.show_limits	missing	Camera Data tab: show clip range and focus
+Camera.show_limits	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_mist	deferred	mist needs a World pass
 Camera.show_passepartout	done	View3DPanel.cpp:4017 Passepartout card
 Camera.show_safe_areas	done	View3DPanel.cpp:4019 Safe Areas
-Camera.show_safe_center	missing	Safe Areas card: centre-cut areas
-Camera.show_name	missing	Overlays card: show camera name
-Camera.show_sensor	missing	Overlays card: sensor gate
+Camera.show_safe_center	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Camera.show_name	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Camera.show_sensor	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_background_images	deferred	camera background image: new camera mode
 Camera.lens_unit	done	View3DPanel.cpp:3468 Lens unit
-Camera.composition_guide_color	missing	Composition Guides card: colour
+Camera.composition_guide_color	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_composition_center	done	View3DPanel.cpp:4027 Centre guide
-Camera.show_composition_center_diagonal	missing	Composition Guides card: diagonals
+Camera.show_composition_center_diagonal	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.show_composition_thirds	done	View3DPanel.cpp:4026 Thirds
 Camera.show_composition_golden	done	View3DPanel.cpp:4028 Golden
-Camera.show_composition_golden_tria_a	missing	Composition Guides card: triangles
-Camera.show_composition_golden_tria_b	missing	Composition Guides card: triangles
-Camera.show_composition_harmony_tri_a	missing	Composition Guides card: triangles
-Camera.show_composition_harmony_tri_b	missing	Composition Guides card: triangles
+Camera.show_composition_golden_tria_a	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Camera.show_composition_golden_tria_b	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Camera.show_composition_harmony_tri_a	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Camera.show_composition_harmony_tri_b	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Camera.panorama_type	done	Render3DPano.cpp: equirect, cubemap, fisheye dome (Render tab)
 Camera.fisheye_fov	done	Render3DPano.cpp: fisheye dome angle
 Camera.fisheye_lens	done	Render3DPano.cpp: fisheye dome angle
-Camera.latitude_min	missing	Render tab: panorama range
-Camera.latitude_max	missing	Render tab: panorama range
-Camera.longitude_min	missing	Render tab: panorama range
-Camera.longitude_max	missing	Render tab: panorama range
+Camera.latitude_min	done	SceneNodes.h params, Render3DPano.cpp panorama range, View3DPanel.cpp card
+Camera.latitude_max	done	SceneNodes.h params, Render3DPano.cpp panorama range, View3DPanel.cpp card
+Camera.longitude_min	done	SceneNodes.h params, Render3DPano.cpp panorama range, View3DPanel.cpp card
+Camera.longitude_max	done	SceneNodes.h params, Render3DPano.cpp panorama range, View3DPanel.cpp card
 Camera.fisheye_polynomial_k0	out	custom lens polynomial
 Camera.fisheye_polynomial_k1	out	custom lens polynomial
 Camera.fisheye_polynomial_k2	out	custom lens polynomial
@@ -432,9 +432,9 @@ CameraDOFSettings.use_dof	done	View3DPanel.cpp:3503 Depth of Field
 CameraDOFSettings.focus_subtarget	out	armature bones
 CameraDOFSettings.focus_distance	done	View3DPanel.cpp:3529 Distance
 CameraDOFSettings.aperture_fstop	done	View3DPanel.cpp:3532 F-Stop
-CameraDOFSettings.aperture_blades	missing	Depth of Field card: bokeh shape
-CameraDOFSettings.aperture_rotation	missing	Depth of Field card: bokeh shape
-CameraDOFSettings.aperture_ratio	missing	Depth of Field card: bokeh shape
+CameraDOFSettings.aperture_blades	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
+CameraDOFSettings.aperture_rotation	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
+CameraDOFSettings.aperture_ratio	done	SceneNodes.h params, Render3DPost.cpp polygonal bokeh, View3DPanel.cpp card
 CameraBackgroundImage.source	deferred	camera background image: new camera mode
 CameraBackgroundImage.image	deferred	camera background image: new camera mode
 CameraBackgroundImage.clip	deferred	camera background image: new camera mode
@@ -493,18 +493,18 @@ SCREEN_OT_repeat_last	done	View3DPanel.cpp:1127 RepeatLast
 SCREEN_OT_screen_full_area	out	panel layout belongs to the app
 WORLD_OT_new	done	View3DPanel.cpp:4089 World tab (Load HDRI)
 Light.type	done	View3DPanel.cpp:3346 Light Type
-Light.use_temperature	missing	Light card: colour temperature
+Light.use_temperature	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.color	done	View3DPanel.cpp:3347 Colour
-Light.temperature	missing	Light card: colour temperature
-Light.temperature_color	missing	Light card: colour temperature
+Light.temperature	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Light.temperature_color	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.specular_factor	deferred	per-light shading terms need renderer work
 Light.diffuse_factor	deferred	per-light shading terms need renderer work
 Light.transmission_factor	deferred	per-light shading terms need renderer work
 Light.volume_factor	deferred	per-light shading terms need renderer work
-Light.use_custom_distance	missing	Light card: cutoff distance
-Light.cutoff_distance	missing	Light card: cutoff distance
+Light.use_custom_distance	done	SceneNodes.h camera/light params, View3DPanel.cpp card
+Light.cutoff_distance	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.use_shadow	done	View3DPanel.cpp:3369 Casts shadow
-Light.exposure	missing	Light card: exposure
+Light.exposure	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 Light.normalize	deferred	per-light shading terms need renderer work
 PointLight.use_soft_falloff	deferred	per-light shading terms need renderer work
 PointLight.energy	done	View3DPanel.cpp:3348 Strength
@@ -538,7 +538,7 @@ SpotLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 
 SpotLight.use_square	deferred	square spot needs a shader change
 SpotLight.spot_blend	done	View3DPanel.cpp:3359 Blend
 SpotLight.spot_size	done	View3DPanel.cpp:3358 Cone
-SpotLight.show_cone	missing	Overlays card: spot cone in the view
+SpotLight.show_cone	done	SceneNodes.h camera/light params, View3DPanel.cpp card
 SpotLight.use_soft_falloff	deferred	per-light shading terms need renderer work
 AreaLight.energy	done	View3DPanel.cpp:3348 Strength
 AreaLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters

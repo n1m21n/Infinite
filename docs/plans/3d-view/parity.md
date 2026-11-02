@@ -26,8 +26,8 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Viewport: overlays | 7 | 12 | 3 | 10 | 32 |
 | Transform, snap, pivot | 10 | 15 | 0 | 26 | 51 |
 | Object | 11 | 7 | 23 | 35 | 76 |
-| Camera | 24 | 20 | 20 | 23 | 87 |
-| Light | 11 | 7 | 42 | 0 | 60 |
+| Camera | 44 | 0 | 20 | 23 | 87 |
+| Light | 18 | 0 | 42 | 0 | 60 |
 | Light probe | 0 | 0 | 36 | 0 | 36 |
 | Constraints (aim only) | 2 | 5 | 0 | 8 | 15 |
 | World | 3 | 0 | 14 | 1 | 18 |
@@ -38,7 +38,7 @@ owner approval, out = outside the README. The probe prints the undecided count: 
 | Outliner | 2 | 10 | 0 | 11 | 23 |
 | Preferences: navigation and input | 4 | 4 | 3 | 39 | 50 |
 | Preferences: viewport | 4 | 9 | 0 | 14 | 27 |
-| **All settings** | **122** | **143** | **249** | **330** | **844** |
+| **All settings** | **149** | **116** | **249** | **330** | **844** |
 | **Operators** | **75** | **35** | **14** | **117** | **241** |
 | **Keymap entries** | | | | | not mapped: compare with README Controls by hand |
 
@@ -118,75 +118,6 @@ decided out of this pass; reopen one when the owner asks.
 Every row the map marks "missing", grouped by area and ordered by how often a composer touches the area (camera, light and
 transform first, preferences last). The "where" is the panel tab or node it belongs on. Regenerate with the map, never by hand.
 
-### Camera (20)
-
-- Sensor Fit (`Camera.sensor_fit`): Camera Data tab: sensor fit
-- Sensor Height (`Camera.sensor_height`): Camera Data tab: sensor height
-- Display Size (`Camera.display_size`): Camera Data tab: marker size
-- Show Limits (`Camera.show_limits`): Camera Data tab: show clip range and focus
-- Show Center-Cut Safe Areas (`Camera.show_safe_center`): Safe Areas card: centre-cut areas
-- Show Name (`Camera.show_name`): Overlays card: show camera name
-- Show Sensor Size (`Camera.show_sensor`): Overlays card: sensor gate
-- Composition Guide Color (`Camera.composition_guide_color`): Composition Guides card: colour
-- Center Diagonal (`Camera.show_composition_center_diagonal`): Composition Guides card: diagonals
-- Golden Triangle A (`Camera.show_composition_golden_tria_a`): Composition Guides card: triangles
-- Golden Triangle B (`Camera.show_composition_golden_tria_b`): Composition Guides card: triangles
-- Harmonious Triangle A (`Camera.show_composition_harmony_tri_a`): Composition Guides card: triangles
-- Harmonious Triangle B (`Camera.show_composition_harmony_tri_b`): Composition Guides card: triangles
-- Min Latitude (`Camera.latitude_min`): Render tab: panorama range
-- Max Latitude (`Camera.latitude_max`): Render tab: panorama range
-- Min Longitude (`Camera.longitude_min`): Render tab: panorama range
-- Max Longitude (`Camera.longitude_max`): Render tab: panorama range
-- Blades (`CameraDOFSettings.aperture_blades`): Depth of Field card: bokeh shape
-- Rotation (`CameraDOFSettings.aperture_rotation`): Depth of Field card: bokeh shape
-- Ratio (`CameraDOFSettings.aperture_ratio`): Depth of Field card: bokeh shape
-
-### Light (7)
-
-- Use Temperature (`Light.use_temperature`): Light card: colour temperature
-- Temperature (`Light.temperature`): Light card: colour temperature
-- Temperature Color (`Light.temperature_color`): Light card: colour temperature
-- Custom Attenuation (`Light.use_custom_distance`): Light card: cutoff distance
-- Cutoff Distance (`Light.cutoff_distance`): Light card: cutoff distance
-- Exposure (`Light.exposure`): Light card: exposure
-- Show Cone (`SpotLight.show_cone`): Overlays card: spot cone in the view
-
-### Transform, snap, pivot (15)
-
-- Projected from View (`ToolSettings.use_proportional_projected`): Proportional Editing card: projected from view
-- Only Locations (`ToolSettings.use_transform_pivot_point_align`): Transform card: only locations toggle
-- Align Rotation to Target (`ToolSettings.use_snap_align_rotation`): Snap card: align rotation to target
-- Absolute Increment Snap (`ToolSettings.use_snap_grid_absolute`): Snap card: absolute increment mode
-- Rotation Precision Increment (`ToolSettings.snap_angle_increment_3d_precision`): Snap card: precision step with Shift
-- Snap Target (`ToolSettings.snap_target`): Snap card: closest, centre, median, active
-- Snap onto Selectable Only (`ToolSettings.use_snap_selectable`): Snap card: only onto selectable items
-- Use Snap for Translation (`ToolSettings.use_snap_translate`): Snap card: snap per tool toggles
-- Use Snap for Rotation (`ToolSettings.use_snap_rotate`): Snap card: snap per tool toggles
-- Use Snap for Scale (`ToolSettings.use_snap_scale`): Snap card: snap per tool toggles
-- Plane Axis (`ToolSettings.plane_axis`): Add menu: placement plane for new items
-- Auto Axis (`ToolSettings.plane_axis_auto`): Add menu: placement plane for new items
-- Position (`ToolSettings.plane_depth`): Add menu: placement plane for new items
-- Orientation (`ToolSettings.plane_orientation`): Add menu: placement plane for new items
-- Current Transform Orientation (`TransformOrientationSlot.custom_orientation`): Transform card: custom orientations
-
-### Object (7)
-
-- Track Axis (`Object.track_axis`): Camera and light Data tab: Look at axes
-- Up Axis (`Object.up_axis`): Camera and light Data tab: Look at axes
-- Disable Selection (`Object.hide_select`): Item tab: disable selection toggle
-- Display Bounds (`Object.show_bounds`): Item tab: show bounds
-- Display Bounds Type (`Object.display_bounds_type`): Item tab: show bounds
-- Display Name (`Object.show_name`): Item tab: show name and axes in the view
-- Display Axes (`Object.show_axis`): Item tab: show name and axes in the view
-
-### Constraints (aim only) (5)
-
-- Influence (`Constraint.influence`): Camera and light Data tab: Look at influence
-- Track Axis (`TrackToConstraint.track_axis`): Camera and light Data tab: Look at axes
-- Up Axis (`TrackToConstraint.up_axis`): Camera and light Data tab: Look at axes
-- Target Z (`TrackToConstraint.use_target_z`): Camera and light Data tab: Look at target Z up
-- Track Axis (`DampedTrackConstraint.track_axis`): Camera and light Data tab: Look at axes
-
 ### Viewport: View tab and header (16)
 
 - Tool Settings (`SpaceView3D.show_region_tool_header`): View3D panel header: tool settings strip
@@ -234,6 +165,42 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Show Performance (`View3DOverlay.show_performance`): Overlays card: frame time line
 - Extras (`View3DOverlay.show_extras`): Overlays card: hide camera and light markers
 - Light Colors (`View3DOverlay.show_light_colors`): Overlays card: tint light markers
+
+### Transform, snap, pivot (15)
+
+- Projected from View (`ToolSettings.use_proportional_projected`): Proportional Editing card: projected from view
+- Only Locations (`ToolSettings.use_transform_pivot_point_align`): Transform card: only locations toggle
+- Align Rotation to Target (`ToolSettings.use_snap_align_rotation`): Snap card: align rotation to target
+- Absolute Increment Snap (`ToolSettings.use_snap_grid_absolute`): Snap card: absolute increment mode
+- Rotation Precision Increment (`ToolSettings.snap_angle_increment_3d_precision`): Snap card: precision step with Shift
+- Snap Target (`ToolSettings.snap_target`): Snap card: closest, centre, median, active
+- Snap onto Selectable Only (`ToolSettings.use_snap_selectable`): Snap card: only onto selectable items
+- Use Snap for Translation (`ToolSettings.use_snap_translate`): Snap card: snap per tool toggles
+- Use Snap for Rotation (`ToolSettings.use_snap_rotate`): Snap card: snap per tool toggles
+- Use Snap for Scale (`ToolSettings.use_snap_scale`): Snap card: snap per tool toggles
+- Plane Axis (`ToolSettings.plane_axis`): Add menu: placement plane for new items
+- Auto Axis (`ToolSettings.plane_axis_auto`): Add menu: placement plane for new items
+- Position (`ToolSettings.plane_depth`): Add menu: placement plane for new items
+- Orientation (`ToolSettings.plane_orientation`): Add menu: placement plane for new items
+- Current Transform Orientation (`TransformOrientationSlot.custom_orientation`): Transform card: custom orientations
+
+### Object (7)
+
+- Track Axis (`Object.track_axis`): Camera and light Data tab: Look at axes
+- Up Axis (`Object.up_axis`): Camera and light Data tab: Look at axes
+- Disable Selection (`Object.hide_select`): Item tab: disable selection toggle
+- Display Bounds (`Object.show_bounds`): Item tab: show bounds
+- Display Bounds Type (`Object.display_bounds_type`): Item tab: show bounds
+- Display Name (`Object.show_name`): Item tab: show name and axes in the view
+- Display Axes (`Object.show_axis`): Item tab: show name and axes in the view
+
+### Constraints (aim only) (5)
+
+- Influence (`Constraint.influence`): Camera and light Data tab: Look at influence
+- Track Axis (`TrackToConstraint.track_axis`): Camera and light Data tab: Look at axes
+- Up Axis (`TrackToConstraint.up_axis`): Camera and light Data tab: Look at axes
+- Target Z (`TrackToConstraint.use_target_z`): Camera and light Data tab: Look at target Z up
+- Track Axis (`DampedTrackConstraint.track_axis`): Camera and light Data tab: Look at axes
 
 ### Render (23)
 
@@ -284,6 +251,13 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Show Lights (`SpaceOutliner.use_filter_object_light`): Scene tab: type filter
 - Show Cameras (`SpaceOutliner.use_filter_object_camera`): Scene tab: type filter
 
+### Preferences: navigation and input (4)
+
+- Auto Perspective (`PreferencesInput.use_auto_perspective`): View tab > Navigation: auto perspective
+- Continuous Grab (`PreferencesInput.use_mouse_continuous`): View tab > Navigation: wrap the pointer while dragging
+- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_turntable`): View tab > Navigation: orbit sensitivity
+- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_trackball`): View tab > Navigation: orbit sensitivity
+
 ### Preferences: viewport (9)
 
 - Display Playback Frame Rate (FPS) (`PreferencesView.show_playback_fps`): Overlays card: frame rate
@@ -295,13 +269,6 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Gizmo Size (`PreferencesView.gizmo_size`): View tab: gizmo size
 - Navigate Gizmo Size (`PreferencesView.gizmo_size_navigate_v3d`): View tab: gizmo size
 - Align Object To (`PreferencesEdit.object_align`): Add menu: align new items to world, view or cursor
-
-### Preferences: navigation and input (4)
-
-- Auto Perspective (`PreferencesInput.use_auto_perspective`): View tab > Navigation: auto perspective
-- Continuous Grab (`PreferencesInput.use_mouse_continuous`): View tab > Navigation: wrap the pointer while dragging
-- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_turntable`): View tab > Navigation: orbit sensitivity
-- Orbit Sensitivity (`PreferencesInput.view_rotate_sensitivity_trackball`): View tab > Navigation: orbit sensitivity
 
 ### Operators (35)
 
@@ -340,4 +307,3 @@ transform first, preferences last). The "where" is the panel tab or node it belo
 - Center View to Mouse (`VIEW3D_OT_view_center_pick`): View menu: centre on camera or on the pointer
 - View Lock Clear (`VIEW3D_OT_view_lock_clear`): View tab: lock the view to the active item
 - View Lock to Active (`VIEW3D_OT_view_lock_to_active`): View tab: lock the view to the active item
-
