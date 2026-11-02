@@ -196,6 +196,19 @@ bool ModelSourceNode::Load(const std::string& path)
       mIsPoints = false;
       mPoints.clear();
    }
+   // A skin draws its rest pose, not the raw bind vertices (a skeleton with
+   // its own scale or turn moves them), so the fit is taken from that.
+   if (!mRig.joints.empty() && mRig.vertices.size() == mMesh.vertices.size())
+   {
+      std::vector<Platform::ModelVertex> rest;
+      Skinning::Evaluate(mRig, -1, 0.0f, {}, rest);
+      for (size_t i = 0; i < rest.size(); i++)
+      {
+         Vertex& v = mMesh.vertices[i];
+         v.px = rest[i].px; v.py = rest[i].py; v.pz = rest[i].pz;
+         v.nx = rest[i].nx; v.ny = rest[i].ny; v.nz = rest[i].nz;
+      }
+   }
    Normalize();
    mPath = path;
    mMeshRevision = NextMeshRevision();
