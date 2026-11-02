@@ -19,9 +19,9 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Transform, snap, pivot | 10/25 | 31/48 | 108 |
 | Object | 11/18 | 11/30 | 91 |
 | Camera | 24/44 | 7/16 | 45 |
-| Light | 13/60 | 6/8 | 3 |
-| Light probe | 8/36 | 7/7 | 4 |
-| Constraints (aim only) | 3/15 | 0/26 | 0 |
+| Light | 11/18 | 4/4 | 45 |
+| Light probe | 0/0 | 0/0 | 40 |
+| Constraints (aim only) | 2/7 | 0/15 | 8 |
 | World | 9/18 | 5/9 | 5 |
 | Render | 24/138 | 10/67 | 29 |
 | Output | 11/42 | 16/105 | 2 |
@@ -30,7 +30,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **171/640** | **129/387** | **519** |
+| **All settings** | **160/554** | **120/365** | **605** |
 | **Operators (features)** | **49/158** | | **336** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
@@ -645,129 +645,129 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Color | Light.color | float |  | in | yes |
 | Temperature | Light.temperature | float |  | in | - |
 | Temperature Color | Light.temperature_color | float |  | in | - |
-| Specular Factor | Light.specular_factor | float |  | in | - |
-| Diffuse Factor | Light.diffuse_factor | float |  | in | - |
-| Transmission Factor | Light.transmission_factor | float |  | in | - |
-| Volume Factor | Light.volume_factor | float |  | in | - |
 | Custom Attenuation | Light.use_custom_distance | boolean |  | in | - |
 | Cutoff Distance | Light.cutoff_distance | float |  | in | - |
-| use_shadow | Light.use_shadow | boolean |  | in | - |
-| Exposure | Light.exposure | float |  | in | yes |
-| Normalize | Light.normalize | boolean |  | in | yes |
-| Soft Falloff | PointLight.use_soft_falloff | boolean |  | in | - |
+| use_shadow | Light.use_shadow | boolean |  | in | yes |
+| Exposure | Light.exposure | float |  | in | - |
 | Power | PointLight.energy | float |  | in | yes |
-| Shadow Buffer Clip Start | PointLight.shadow_buffer_clip_start | float |  | in | - |
-| Shadow Soft Size | PointLight.shadow_soft_size | float |  | in | - |
-| Shadow Filter Radius | PointLight.shadow_filter_radius | float |  | in | - |
-| Shadows Resolution Limit | PointLight.shadow_maximum_resolution | float |  | in | - |
-| Shadow Jitter | PointLight.use_shadow_jitter | boolean |  | in | - |
-| Shadow Jitter Overblur | PointLight.shadow_jitter_overblur | float |  | in | - |
-| Absolute Resolution Limit | PointLight.use_absolute_resolution | boolean |  | in | - |
-| Angle | SunLight.angle | float |  | in | yes |
 | Strength | SunLight.energy | float |  | in | yes |
-| Shadow Buffer Clip Start | SunLight.shadow_buffer_clip_start | float |  | in | - |
-| Shadow Soft Size | SunLight.shadow_soft_size | float |  | in | - |
-| Shadow Filter Radius | SunLight.shadow_filter_radius | float |  | in | - |
-| Shadows Resolution Limit | SunLight.shadow_maximum_resolution | float |  | in | - |
-| Shadow Jitter | SunLight.use_shadow_jitter | boolean |  | in | - |
-| Shadow Jitter Overblur | SunLight.shadow_jitter_overblur | float |  | in | - |
-| Cascade Max Distance | SunLight.shadow_cascade_max_distance | float |  | in | - |
-| Cascade Count | SunLight.shadow_cascade_count | int |  | in | - |
-| Exponential Distribution | SunLight.shadow_cascade_exponent | float |  | in | - |
-| Cascade Fade | SunLight.shadow_cascade_fade | float |  | in | - |
 | Power | SpotLight.energy | float |  | in | yes |
-| Shadow Buffer Clip Start | SpotLight.shadow_buffer_clip_start | float |  | in | - |
-| Shadow Soft Size | SpotLight.shadow_soft_size | float |  | in | - |
-| Shadow Filter Radius | SpotLight.shadow_filter_radius | float |  | in | - |
-| Shadows Resolution Limit | SpotLight.shadow_maximum_resolution | float |  | in | - |
-| Shadow Jitter | SpotLight.use_shadow_jitter | boolean |  | in | - |
-| Shadow Jitter Overblur | SpotLight.shadow_jitter_overblur | float |  | in | - |
-| Absolute Resolution Limit | SpotLight.use_absolute_resolution | boolean |  | in | - |
-| Square | SpotLight.use_square | boolean |  | in | yes |
-| Spot Blend | SpotLight.spot_blend | float |  | in | - |
-| Beam Angle | SpotLight.spot_size | float |  | in | - |
+| Spot Blend | SpotLight.spot_blend | float |  | in | yes |
+| Beam Angle | SpotLight.spot_size | float |  | in | yes |
 | Show Cone | SpotLight.show_cone | boolean |  | in | - |
-| Soft Falloff | SpotLight.use_soft_falloff | boolean |  | in | - |
 | Power | AreaLight.energy | float |  | in | yes |
-| Shadow Buffer Clip Start | AreaLight.shadow_buffer_clip_start | float |  | in | - |
-| Shadow Soft Size | AreaLight.shadow_soft_size | float |  | in | - |
-| Shadow Filter Radius | AreaLight.shadow_filter_radius | float |  | in | - |
-| Shadows Resolution Limit | AreaLight.shadow_maximum_resolution | float |  | in | - |
-| Shadow Jitter | AreaLight.use_shadow_jitter | boolean |  | in | - |
-| Shadow Jitter Overblur | AreaLight.shadow_jitter_overblur | float |  | in | - |
-| Absolute Resolution Limit | AreaLight.use_absolute_resolution | boolean |  | in | - |
-| Shape | AreaLight.shape | enum | **Square**, **Rectangle**, Disk, Ellipse | in | yes |
 | Size | AreaLight.size | float |  | in | yes |
-| Size Y | AreaLight.size_y | float |  | in | - |
-| Spread | AreaLight.spread | float |  | in | yes |
+| Size Y | AreaLight.size_y | float |  | in | yes |
+| Specular Factor | Light.specular_factor | float |  | deferred: per-light shading terms need renderer work | - |
+| Diffuse Factor | Light.diffuse_factor | float |  | deferred: per-light shading terms need renderer work | - |
+| Transmission Factor | Light.transmission_factor | float |  | deferred: per-light shading terms need renderer work | - |
+| Volume Factor | Light.volume_factor | float |  | deferred: per-light shading terms need renderer work | - |
+| Normalize | Light.normalize | boolean |  | deferred: per-light shading terms need renderer work | - |
 | Node Tree | Light.node_tree | pointer |  | out: node | - |
 | Use Nodes | Light.use_nodes | boolean |  | out: node | - |
 | Cycles Light Settings | Light.cycles | pointer |  | out: cycles | yes |
+| Soft Falloff | PointLight.use_soft_falloff | boolean |  | deferred: per-light shading terms need renderer work | - |
+| Shadow Buffer Clip Start | PointLight.shadow_buffer_clip_start | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Soft Size | PointLight.shadow_soft_size | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Filter Radius | PointLight.shadow_filter_radius | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadows Resolution Limit | PointLight.shadow_maximum_resolution | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter | PointLight.use_shadow_jitter | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter Overblur | PointLight.shadow_jitter_overblur | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Absolute Resolution Limit | PointLight.use_absolute_resolution | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Angle | SunLight.angle | float |  | deferred: sun angle needs a Render 3D parameter | - |
+| Shadow Buffer Clip Start | SunLight.shadow_buffer_clip_start | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Soft Size | SunLight.shadow_soft_size | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Filter Radius | SunLight.shadow_filter_radius | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadows Resolution Limit | SunLight.shadow_maximum_resolution | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter | SunLight.use_shadow_jitter | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter Overblur | SunLight.shadow_jitter_overblur | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Cascade Max Distance | SunLight.shadow_cascade_max_distance | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Cascade Count | SunLight.shadow_cascade_count | int |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Exponential Distribution | SunLight.shadow_cascade_exponent | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Cascade Fade | SunLight.shadow_cascade_fade | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Buffer Clip Start | SpotLight.shadow_buffer_clip_start | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Soft Size | SpotLight.shadow_soft_size | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Filter Radius | SpotLight.shadow_filter_radius | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadows Resolution Limit | SpotLight.shadow_maximum_resolution | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter | SpotLight.use_shadow_jitter | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter Overblur | SpotLight.shadow_jitter_overblur | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Absolute Resolution Limit | SpotLight.use_absolute_resolution | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Square | SpotLight.use_square | boolean |  | deferred: square spot needs a shader change | - |
+| Soft Falloff | SpotLight.use_soft_falloff | boolean |  | deferred: per-light shading terms need renderer work | - |
+| Shadow Buffer Clip Start | AreaLight.shadow_buffer_clip_start | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Soft Size | AreaLight.shadow_soft_size | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Filter Radius | AreaLight.shadow_filter_radius | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadows Resolution Limit | AreaLight.shadow_maximum_resolution | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter | AreaLight.use_shadow_jitter | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shadow Jitter Overblur | AreaLight.shadow_jitter_overblur | float |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Absolute Resolution Limit | AreaLight.use_absolute_resolution | boolean |  | deferred: per-light shadow tuning needs Render 3D parameters | - |
+| Shape | AreaLight.shape | enum | **Square**, **Rectangle**, Disk, Ellipse | deferred: only rectangles are rendered | - |
+| Spread | AreaLight.spread | float |  | deferred: area spread needs a shader change | - |
 
 ## Light probe
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Type | LightProbe.type | enum | **Sphere**, **Plane**, **Volume** | in | yes |
-| Clip Start | LightProbe.clip_start | float |  | in | yes |
-| Clipping | LightProbe.show_clip | boolean |  | in | - |
-| Influence | LightProbe.show_influence | boolean |  | in | - |
-| Influence Distance | LightProbe.influence_distance | float |  | in | - |
-| Visibility Bias | LightProbe.visibility_buffer_bias | float |  | in | - |
-| Visibility Bleed Bias | LightProbe.visibility_bleed_bias | float |  | in | - |
-| Visibility Blur | LightProbe.visibility_blur | float |  | in | - |
-| Display Data (Deprecated) | LightProbe.show_data | boolean |  | in | - |
-| Display Data | LightProbe.use_data_display | boolean |  | in | - |
-| Display Data Size | LightProbe.data_display_size | float |  | in | - |
-| Type | LightProbeSphere.influence_type | enum | **Sphere**, **Box** | in | yes |
-| Falloff | LightProbeSphere.falloff | float |  | in | yes |
-| Clip End | LightProbeSphere.clip_end | float |  | in | yes |
-| Use Custom Parallax | LightProbeSphere.use_custom_parallax | boolean |  | in | - |
-| Parallax | LightProbeSphere.show_parallax | boolean |  | in | - |
-| Type | LightProbeSphere.parallax_type | enum | **Sphere**, **Box** | in | yes |
-| Parallax Radius | LightProbeSphere.parallax_distance | float |  | in | - |
-| Intensity | LightProbeVolume.intensity | float |  | in | yes |
-| Resolution X | LightProbeVolume.resolution_x | int |  | in | yes |
-| Resolution Y | LightProbeVolume.resolution_y | int |  | in | - |
-| Resolution Z | LightProbeVolume.resolution_z | int |  | in | - |
-| Capture Distance | LightProbeVolume.capture_distance | float |  | in | - |
-| View Bias | LightProbeVolume.view_bias | float |  | in | - |
-| Facing Bias | LightProbeVolume.facing_bias | float |  | in | - |
-| Surface Offset | LightProbeVolume.surface_bias | float |  | in | - |
-| Search Distance | LightProbeVolume.escape_bias | float |  | in | - |
-| Surfel Resolution | LightProbeVolume.surfel_density | int |  | in | - |
-| Validity Threshold | LightProbeVolume.validity_threshold | float |  | in | - |
-| Dilation Threshold | LightProbeVolume.dilation_threshold | float |  | in | - |
-| Dilation Radius | LightProbeVolume.dilation_radius | float |  | in | - |
-| Capture World | LightProbeVolume.capture_world | boolean |  | in | - |
-| Capture Indirect | LightProbeVolume.capture_indirect | boolean |  | in | - |
-| Capture Emission | LightProbeVolume.capture_emission | boolean |  | in | - |
-| Clamp Direct | LightProbeVolume.clamp_direct | float |  | in | - |
-| Clamp Indirect | LightProbeVolume.clamp_indirect | float |  | in | - |
+| Type | LightProbe.type | enum | **Sphere**, **Plane**, **Volume** | deferred: light probes need renderer work | - |
+| Clip Start | LightProbe.clip_start | float |  | deferred: light probes need renderer work | - |
+| Clipping | LightProbe.show_clip | boolean |  | deferred: light probes need renderer work | - |
+| Influence | LightProbe.show_influence | boolean |  | deferred: light probes need renderer work | - |
+| Influence Distance | LightProbe.influence_distance | float |  | deferred: light probes need renderer work | - |
+| Visibility Bias | LightProbe.visibility_buffer_bias | float |  | deferred: light probes need renderer work | - |
+| Visibility Bleed Bias | LightProbe.visibility_bleed_bias | float |  | deferred: light probes need renderer work | - |
+| Visibility Blur | LightProbe.visibility_blur | float |  | deferred: light probes need renderer work | - |
 | Visibility Collection | LightProbe.visibility_collection | pointer |  | out: collection | - |
 | Invert Collection | LightProbe.invert_visibility_collection | boolean |  | out: collection | - |
+| Display Data (Deprecated) | LightProbe.show_data | boolean |  | deferred: light probes need renderer work | - |
+| Display Data | LightProbe.use_data_display | boolean |  | deferred: light probes need renderer work | - |
+| Display Data Size | LightProbe.data_display_size | float |  | deferred: light probes need renderer work | - |
+| Type | LightProbeSphere.influence_type | enum | **Sphere**, **Box** | deferred: light probes need renderer work | - |
+| Falloff | LightProbeSphere.falloff | float |  | deferred: light probes need renderer work | - |
+| Clip End | LightProbeSphere.clip_end | float |  | deferred: light probes need renderer work | - |
+| Use Custom Parallax | LightProbeSphere.use_custom_parallax | boolean |  | deferred: light probes need renderer work | - |
+| Parallax | LightProbeSphere.show_parallax | boolean |  | deferred: light probes need renderer work | - |
+| Type | LightProbeSphere.parallax_type | enum | **Sphere**, **Box** | deferred: light probes need renderer work | - |
+| Parallax Radius | LightProbeSphere.parallax_distance | float |  | deferred: light probes need renderer work | - |
+| Intensity | LightProbeVolume.intensity | float |  | deferred: light probes need renderer work | - |
+| Resolution X | LightProbeVolume.resolution_x | int |  | deferred: light probes need renderer work | - |
+| Resolution Y | LightProbeVolume.resolution_y | int |  | deferred: light probes need renderer work | - |
+| Resolution Z | LightProbeVolume.resolution_z | int |  | deferred: light probes need renderer work | - |
+| Capture Distance | LightProbeVolume.capture_distance | float |  | deferred: light probes need renderer work | - |
 | Normal Bias | LightProbeVolume.normal_bias | float |  | out: normal | - |
+| View Bias | LightProbeVolume.view_bias | float |  | deferred: light probes need renderer work | - |
+| Facing Bias | LightProbeVolume.facing_bias | float |  | deferred: light probes need renderer work | - |
 | Bake Samples | LightProbeVolume.bake_samples | int |  | out: bake | - |
+| Surface Offset | LightProbeVolume.surface_bias | float |  | deferred: light probes need renderer work | - |
+| Search Distance | LightProbeVolume.escape_bias | float |  | deferred: light probes need renderer work | - |
+| Surfel Resolution | LightProbeVolume.surfel_density | int |  | deferred: light probes need renderer work | - |
+| Validity Threshold | LightProbeVolume.validity_threshold | float |  | deferred: light probes need renderer work | - |
+| Dilation Threshold | LightProbeVolume.dilation_threshold | float |  | deferred: light probes need renderer work | - |
+| Dilation Radius | LightProbeVolume.dilation_radius | float |  | deferred: light probes need renderer work | - |
+| Capture World | LightProbeVolume.capture_world | boolean |  | deferred: light probes need renderer work | - |
+| Capture Indirect | LightProbeVolume.capture_indirect | boolean |  | deferred: light probes need renderer work | - |
+| Capture Emission | LightProbeVolume.capture_emission | boolean |  | deferred: light probes need renderer work | - |
+| Clamp Direct | LightProbeVolume.clamp_direct | float |  | deferred: light probes need renderer work | - |
+| Clamp Indirect | LightProbeVolume.clamp_indirect | float |  | deferred: light probes need renderer work | - |
 
 ## Constraints (aim only)
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Owner Space | Constraint.owner_space | enum | World Space, Custom Space, Pose Space, Local With Parent, Local Space | in | - |
-| Target Space | Constraint.target_space | enum | World Space, Custom Space, Pose Space, Local With Parent, Local Space, Local Space (Owner Orientation) | in | - |
 | Disable | Constraint.mute | boolean |  | in | yes |
 | Enabled | Constraint.enabled | boolean |  | in | yes |
 | Influence | Constraint.influence | float |  | in | - |
-| Head/Tail | TrackToConstraint.head_tail | float |  | in | - |
-| Follow B-Bone | TrackToConstraint.use_bbone_shape | boolean |  | in | - |
-| Sub-Target | TrackToConstraint.subtarget | string |  | in | - |
 | Track Axis | TrackToConstraint.track_axis | enum | X, Y, Z, -X, -Y, -Z | in | - |
 | Up Axis | TrackToConstraint.up_axis | enum | X, Y, Z | in | - |
-| Target Z | TrackToConstraint.use_target_z | boolean |  | in | yes |
-| Head/Tail | DampedTrackConstraint.head_tail | float |  | in | - |
-| Follow B-Bone | DampedTrackConstraint.use_bbone_shape | boolean |  | in | - |
-| Sub-Target | DampedTrackConstraint.subtarget | string |  | in | - |
+| Target Z | TrackToConstraint.use_target_z | boolean |  | in | - |
 | Track Axis | DampedTrackConstraint.track_axis | enum | X, Y, Z, -X, -Y, -Z | in | - |
+| Owner Space | Constraint.owner_space | enum | World Space, Custom Space, Pose Space, Local With Parent, Local Space | out: no spaces; Look at aims in world space | - |
+| Target Space | Constraint.target_space | enum | World Space, Custom Space, Pose Space, Local With Parent, Local Space, Local Space (Owner Orientation) | out: no spaces; Look at aims in world space | - |
+| Head/Tail | TrackToConstraint.head_tail | float |  | out: armature bones | - |
+| Follow B-Bone | TrackToConstraint.use_bbone_shape | boolean |  | out: armature bones | - |
+| Sub-Target | TrackToConstraint.subtarget | string |  | out: armature bones | - |
+| Head/Tail | DampedTrackConstraint.head_tail | float |  | out: armature bones | - |
+| Follow B-Bone | DampedTrackConstraint.use_bbone_shape | boolean |  | out: armature bones | - |
+| Sub-Target | DampedTrackConstraint.subtarget | string |  | out: armature bones | - |
 
 ## World
 

@@ -492,3 +492,114 @@ SCREEN_OT_repeat_history	out	Adjust Last decided out in parity.md
 SCREEN_OT_repeat_last	done	View3DPanel.cpp:1127 RepeatLast
 SCREEN_OT_screen_full_area	out	panel layout belongs to the app
 WORLD_OT_new	done	View3DPanel.cpp:4089 World tab (Load HDRI)
+Light.type	done	View3DPanel.cpp:3346 Light Type
+Light.use_temperature	missing	Light card: colour temperature
+Light.color	done	View3DPanel.cpp:3347 Colour
+Light.temperature	missing	Light card: colour temperature
+Light.temperature_color	missing	Light card: colour temperature
+Light.specular_factor	deferred	per-light shading terms need renderer work
+Light.diffuse_factor	deferred	per-light shading terms need renderer work
+Light.transmission_factor	deferred	per-light shading terms need renderer work
+Light.volume_factor	deferred	per-light shading terms need renderer work
+Light.use_custom_distance	missing	Light card: cutoff distance
+Light.cutoff_distance	missing	Light card: cutoff distance
+Light.use_shadow	done	View3DPanel.cpp:3369 Casts shadow
+Light.exposure	missing	Light card: exposure
+Light.normalize	deferred	per-light shading terms need renderer work
+PointLight.use_soft_falloff	deferred	per-light shading terms need renderer work
+PointLight.energy	done	View3DPanel.cpp:3348 Strength
+PointLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.angle	deferred	sun angle needs a Render 3D parameter
+SunLight.energy	done	View3DPanel.cpp:3348 Strength
+SunLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_max_distance	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_count	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_exponent	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_fade	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.energy	done	View3DPanel.cpp:3348 Strength
+SpotLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_square	deferred	square spot needs a shader change
+SpotLight.spot_blend	done	View3DPanel.cpp:3359 Blend
+SpotLight.spot_size	done	View3DPanel.cpp:3358 Cone
+SpotLight.show_cone	missing	Overlays card: spot cone in the view
+SpotLight.use_soft_falloff	deferred	per-light shading terms need renderer work
+AreaLight.energy	done	View3DPanel.cpp:3348 Strength
+AreaLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shape	deferred	only rectangles are rendered
+AreaLight.size	done	View3DPanel.cpp:3363 Width
+AreaLight.size_y	done	View3DPanel.cpp:3364 Height
+AreaLight.spread	deferred	area spread needs a shader change
+LightProbe.type	deferred	light probes need renderer work
+LightProbe.clip_start	deferred	light probes need renderer work
+LightProbe.show_clip	deferred	light probes need renderer work
+LightProbe.show_influence	deferred	light probes need renderer work
+LightProbe.influence_distance	deferred	light probes need renderer work
+LightProbe.visibility_buffer_bias	deferred	light probes need renderer work
+LightProbe.visibility_bleed_bias	deferred	light probes need renderer work
+LightProbe.visibility_blur	deferred	light probes need renderer work
+LightProbe.show_data	deferred	light probes need renderer work
+LightProbe.use_data_display	deferred	light probes need renderer work
+LightProbe.data_display_size	deferred	light probes need renderer work
+LightProbeSphere.influence_type	deferred	light probes need renderer work
+LightProbeSphere.falloff	deferred	light probes need renderer work
+LightProbeSphere.clip_end	deferred	light probes need renderer work
+LightProbeSphere.use_custom_parallax	deferred	light probes need renderer work
+LightProbeSphere.show_parallax	deferred	light probes need renderer work
+LightProbeSphere.parallax_type	deferred	light probes need renderer work
+LightProbeSphere.parallax_distance	deferred	light probes need renderer work
+LightProbeVolume.intensity	deferred	light probes need renderer work
+LightProbeVolume.resolution_x	deferred	light probes need renderer work
+LightProbeVolume.resolution_y	deferred	light probes need renderer work
+LightProbeVolume.resolution_z	deferred	light probes need renderer work
+LightProbeVolume.capture_distance	deferred	light probes need renderer work
+LightProbeVolume.view_bias	deferred	light probes need renderer work
+LightProbeVolume.facing_bias	deferred	light probes need renderer work
+LightProbeVolume.surface_bias	deferred	light probes need renderer work
+LightProbeVolume.escape_bias	deferred	light probes need renderer work
+LightProbeVolume.surfel_density	deferred	light probes need renderer work
+LightProbeVolume.validity_threshold	deferred	light probes need renderer work
+LightProbeVolume.dilation_threshold	deferred	light probes need renderer work
+LightProbeVolume.dilation_radius	deferred	light probes need renderer work
+LightProbeVolume.capture_world	deferred	light probes need renderer work
+LightProbeVolume.capture_indirect	deferred	light probes need renderer work
+LightProbeVolume.capture_emission	deferred	light probes need renderer work
+LightProbeVolume.clamp_direct	deferred	light probes need renderer work
+LightProbeVolume.clamp_indirect	deferred	light probes need renderer work
+Constraint.owner_space	out	no spaces; Look at aims in world space
+Constraint.target_space	out	no spaces; Look at aims in world space
+Constraint.mute	done	View3DPanel.cpp Look at None switches it off
+Constraint.enabled	done	View3DPanel.cpp Look at None switches it off
+Constraint.influence	missing	Camera and light Data tab: Look at influence
+TrackToConstraint.head_tail	out	armature bones
+TrackToConstraint.use_bbone_shape	out	armature bones
+TrackToConstraint.subtarget	out	armature bones
+TrackToConstraint.track_axis	missing	Camera and light Data tab: Look at axes
+TrackToConstraint.up_axis	missing	Camera and light Data tab: Look at axes
+TrackToConstraint.use_target_z	missing	Camera and light Data tab: Look at target Z up
+DampedTrackConstraint.head_tail	out	armature bones
+DampedTrackConstraint.use_bbone_shape	out	armature bones
+DampedTrackConstraint.subtarget	out	armature bones
+DampedTrackConstraint.track_axis	missing	Camera and light Data tab: Look at axes

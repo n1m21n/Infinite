@@ -6,3 +6,4 @@ One line per area: area, rows resolved, rows left overall, date.
 - Transform, snap, pivot: 74 rows resolved, 872 left (2026-11-02)
 - Object: 160 rows resolved, 712 left (2026-11-02)
 - Camera (settings, DOF, background, stereo, camera/render/scene/screen operators): 125 rows resolved, 592 left (2026-11-02)
+- Light, light probe, constraints: 96 rows resolved, 481 left (2026-11-02)
