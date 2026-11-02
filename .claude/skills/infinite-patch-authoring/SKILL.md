@@ -130,20 +130,20 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-347 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+348 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 26 | bypass |
+| `3D View` | none | out:image | 58 | bypass |
 | `Array` | geo:geometry | out:geometry | 72 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
 | `Bevel` | geo:geometry | out:geometry | 72 | bypass |
-| `Camera` | none | out:camera | 16 | bypass |
+| `Camera` | none | out:camera | 22 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
 | `Cloth` | geo:geometry | out:geometry | 38 | bypass |
 | `Cone` | texture:image | out:geometry | 51 | bypass |
@@ -171,7 +171,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Gear 3D` | texture:image | out:geometry | 51 | bypass |
 | `Geometry` | texture:image | out:geometry | 51 | bypass |
 | `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
-| `HDRI` | none | out:environment | 3 | bypass |
+| `HDRI` | none | out:environment | 8 | bypass |
 | `Helix` | texture:image | out:geometry | 51 | bypass |
 | `Icosphere` | texture:image | out:geometry | 51 | bypass |
 | `Image to Points` | input:image | out:geometry | 10 | bypass |
@@ -181,7 +181,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
-| `Light` | none | out:light | 12 | bypass |
+| `Light` | none | out:light | 28 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
@@ -203,7 +203,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 51 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 83 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -366,6 +366,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
+| `Apple Watch` | none | connected:modulator, roll:modulator, pitch:modulator, yaw:modulator, rot x:modulator, rot y:modulator, rot z:modulator, accel x:modulator, accel y:modulator, accel z:modulator, energy:modulator, crown:modulator, crown speed:modulator, touch x:modulator, touch y:modulator, touching:modulator, tap:modulator, flick left:modulator, flick right:modulator, shake:modulator, strike:modulator, heart:modulator | 4 | bypass |
 | `Audio Analyze` | audio:audio | level:modulator, low:modulator, mid:modulator, high:modulator, onset:modulator, b1:modulator, b2:modulator, b3:modulator, b4:modulator, b5:modulator, b6:modulator, b7:modulator, b8:modulator | 4 | bypass |
 | `Audio File` | none | out:audio | 9 | bypass |
 | `Audio to CV` | audio:audio | out:modulator | 6 | bypass |
@@ -413,7 +414,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
 | `MIDI File` | none | out:note | 7 | bypass |
-| `MIDI Notes` | none | out:note | 6 | hardware: refused headless, bypass |
+| `MIDI Notes` | none | out:note | 7 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |
 | `Note Filter` | notes:note | out:note | 6 | bypass |
