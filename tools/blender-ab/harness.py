@@ -78,12 +78,16 @@ def to_patch(scene, case):
         m = o.get("material", {})
         model = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "obj_%d.glb" % i),
                                         "  b normalize 0", "  b recenter 0"])
+        trans = m.get("transmission", 0.0)
+        trough = m.get("transmission_roughness", m.get("roughness", 0.0) if trans > 0 else 0.0)
         mat = node("3D", "Material", [
             "  c color %g %g %g" % tuple(srgb(m.get("base_color", (0.8, 0.8, 0.8)))),
             "  f metallic %g" % m.get("metallic", 0.0), "  f roughness %g" % m.get("roughness", 0.5),
-            "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % m.get("transmission", 0.0),
+            "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % trans,
+            "  f transmissionRoughness %g" % trough,
             "  f clearcoat %g" % m.get("coat", 0.0), "  f clearcoatRoughness %g" % m.get("coat_roughness", 0.03),
-            "  f sheen %g" % m.get("sheen", 0.0), "  f specular 0.5",
+            "  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5),
+            "  f specular 0.5",
             "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
             "  f emission %g" % m.get("emission_strength", 0.0)])
         wires.append("geo %d 0 %d" % (mat, model))
@@ -147,7 +151,37 @@ def luma(p):
     return lin @ np.array([0.2126, 0.7152, 0.0722], np.float32)
 
 
-def score(case_dir):
+def furnace_metric(scene, lt, li):
+    """Per-sphere mean linear luminance inside the sphere mask divided by the background."""
+    h, w = lt.shape
+    cam = scene["camera"]
+    target = np.array(cam.get("target", (0, 0, 0)), np.float32)
+    a, e = math.radians(cam["azimuth"]), math.radians(cam["elevation"])
+    eye = target + np.array([math.cos(e) * math.cos(a), -math.cos(e) * math.sin(a), math.sin(e)], np.float32) * cam["distance"]
+    fwd = target - eye; fwd /= np.linalg.norm(fwd)
+    right = np.cross(fwd, np.array([0.0, 0.0, 1.0], np.float32)); right /= np.linalg.norm(right)
+    up = np.cross(right, fwd)
+    tan_half = math.tan(math.radians(cam["fov"]) * 0.5)
+    gx, gy = np.meshgrid((np.arange(w, dtype=np.float32) + 0.5) / w * 2.0 - 1.0,
+                         1.0 - (np.arange(h, dtype=np.float32) + 0.5) / h * 2.0)
+    dirs = fwd + gx[..., None] * tan_half * right + gy[..., None] * tan_half * (h / w) * up
+    dirs /= np.linalg.norm(dirs, axis=-1, keepdims=True)
+    bg = np.ones((h, w), dtype=bool)
+    masks = []
+    for o in scene["objects"]:
+        c = np.array(o.get("location", (0, 0, 0)), np.float32)
+        r = float(o.get("scale", 1.0))
+        oc = c - eye
+        proj = dirs @ oc
+        d2 = float(oc @ oc) - proj * proj
+        masks.append((o["material"].get("roughness", 0.0), (proj > 0) & (d2 < (r * 0.9) ** 2)))
+        bg &= d2 > (r * 1.15) ** 2
+    bg_t, bg_i = max(float(lt[bg].mean()), 1e-6), max(float(li[bg].mean()), 1e-6)
+    return {str(rough): {"cycles": round(float(lt[m].mean()) / bg_t, 4),
+                         "infinite": round(float(li[m].mean()) / bg_i, 4)} for rough, m in masks}
+
+
+def score(case_dir, name="", scene=None):
     import flip_evaluator as flip
     truth, inf = load(os.path.join(case_dir, "truth.png")), load(os.path.join(case_dir, "inf.png"))
     if truth.shape != inf.shape:
@@ -155,10 +189,13 @@ def score(case_dir):
     err, mean, _ = flip.evaluate(truth, inf, "LDR", applyMagma=True)
     Image.fromarray((np.clip(err, 0, 1) * 255).astype(np.uint8)).save(os.path.join(case_dir, "flip.png"))
     lt, li = luma(truth), luma(inf)
-    return {"flip": round(float(mean), 4),
-            # Infinite's mean linear brightness over Blender's: a units or energy mismatch shows here first.
-            "brightness_ratio": round(float(li.mean() / max(lt.mean(), 1e-6)), 3),
-            "luma_err": round(float(np.abs(li - lt).mean()), 4)}
+    out = {"flip": round(float(mean), 4),
+           # Infinite's mean linear brightness over Blender's: a units or energy mismatch shows here first.
+           "brightness_ratio": round(float(li.mean() / max(lt.mean(), 1e-6)), 3),
+           "luma_err": round(float(np.abs(li - lt).mean()), 4)}
+    if scene and name.startswith("furnace"):
+        out["furnace"] = furnace_metric(scene, lt, li)
+    return out
 
 
 def board(out, rows):
@@ -215,7 +252,7 @@ def main():
         if not status.get("ok"):
             sys.exit("infinite failed on %s:\n%s" % (name, log[-3000:]))
         os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf.png"))
-        r = {"case": name, **score(d)}
+        r = {"case": name, **score(d, name, scene)}
         r["baseline"] = base.get(name)
         r["pass"] = r["baseline"] is None or r["flip"] <= r["baseline"] + FLIP_SLACK
         rows.append(r)
