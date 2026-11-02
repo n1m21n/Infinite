@@ -195,6 +195,7 @@ SETTINGS = {
     ("scene", "item.color"): S("1 0.2 0.2", sets=("view.viewShading=1", "view.solidColor=5")),
     ("scene", "item.visible"): S(0),
     ("scene", "item.render"): S(0),
+    ("scene", "item.castShadow"): S(0),
     ("scene", "item.scale"): S(2.0),
     ("scene", "item.lookAt"): S("box"),
     ("scene", "item.trackAxis"): S(4, 0, 5, ctx="look"),
@@ -396,6 +397,8 @@ def scene_edit(path, s, key, value):
         lines.append(f"pass {item} {value}")
     if key == "item.render":
         lines.append(f"itemx {item} 0")
+    if key == "item.castShadow":
+        lines.append(f"shadowoff {item}")
     if key == "item.color":
         lines.append(f"ocolor {item} {value}")
     if key == "item.delta":
