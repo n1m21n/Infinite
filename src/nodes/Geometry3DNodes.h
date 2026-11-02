@@ -596,6 +596,14 @@ public:
       int type = 0;
       float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
       float aim[3] = { 0, -1, 0 };       // where a spot or area light points
+      float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
+      float falloff = 0.25f;             // distance falloff; negative = hard (no soft core)
+      bool castShadow = true;
+      float shadowSoft = 1.0f;           // multiplies the look's shadow softness
+      int shadowRes = 0;                 // 0 = the look's quality, else 1024 / 2048 / 4096
+      float shadowClip = 0.05f;
+      // Everything above that the light node sets, from its params.
+      void From(const class LightNode& n);
    };
    struct Rig
    {
@@ -912,6 +920,7 @@ private:
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
       float envIntensity = 1.0f;
+      std::vector<float> envSun;
       bool animated = false;
       bool texturedMaterial = false;
 
@@ -945,7 +954,7 @@ private:
                return false;
          }
          return envConnected == o.envConnected && envRev == o.envRev && envRotation == o.envRotation &&
-                envIntensity == o.envIntensity;
+                envIntensity == o.envIntensity && envSun == o.envSun;
       }
    };
    SceneSignature BuildSceneSignature();

@@ -40,6 +40,9 @@ namespace
       f(s.safe); f(s.thirds); f(s.center); f(s.golden); f(s.safeTitle); f(s.safeAction);
       f(s.orientation); f(s.pivot); f(s.cursor[0]); f(s.cursor[1]); f(s.cursor[2]);
       f(s.zoomToMouse); f(s.orbitSelection); f(s.shadowItem); f(s.fStop);
+      f(s.proportional); f(s.propSize); f(s.propFalloff);
+      f(s.invertZoom); f(s.textInfo); f(s.stats); f(s.originsAll); f(s.gizmoMove); f(s.gizmoNav); f(s.snapObjects);
+      f(s.border); f(s.crop); f(s.borderMin[0]); f(s.borderMin[1]); f(s.borderMax[0]); f(s.borderMax[1]);
    }
 
    void Normalize(float v[3])
@@ -142,19 +145,69 @@ Scene3DNode::~Scene3DNode()
    GLUtil::DestroyFbo(mOutFbo);
    GLUtil::DestroyFbo(mEditorFbo);
    GLUtil::DestroyFbo(mGridFbo);
+   GLUtil::DestroyFbo(mBorderFbo);
+   if (mBorderProgram != 0)
+      glDeleteProgram(mBorderProgram);
    if (mCompositeProgram != 0)
       glDeleteProgram(mCompositeProgram);
    if (mGridProgram != 0)
       glDeleteProgram(mGridProgram);
 }
 
+namespace
+{
+   Mat4 Turn(const float rot[3])
+   {
+      Mat4 m = Mat4::RotationZ(rot[2] * kDeg);
+      m = Mat4::Multiply(m, Mat4::RotationY(rot[1] * kDeg));
+      return Mat4::Multiply(m, Mat4::RotationX(rot[0] * kDeg));
+   }
+   // X then Y then Z angles, in degrees, of the rotation with rows `r`.
+   void TurnAngles(const float r[3][3], float rot[3])
+   {
+      const float d = 180.0f / 3.14159265f;
+      rot[1] = std::asin(std::clamp(-r[2][0], -1.0f, 1.0f)) * d;
+      rot[0] = std::atan2(r[2][1], r[2][2]) * d;
+      rot[2] = std::atan2(r[1][0], r[0][0]) * d;
+   }
+}
+
 Mat4 Scene3DNode::Placement(const Item& it)
 {
-   Mat4 m = Mat4::Translation(it.pos[0], it.pos[1], it.pos[2]);
-   m = Mat4::Multiply(m, Mat4::RotationZ(it.rot[2] * kDeg));
-   m = Mat4::Multiply(m, Mat4::RotationY(it.rot[1] * kDeg));
-   m = Mat4::Multiply(m, Mat4::RotationX(it.rot[0] * kDeg));
-   return Mat4::Multiply(m, Mat4::Scale(it.scale[0], it.scale[1], it.scale[2]));
+   Mat4 m = Mat4::Translation(it.pos[0] + it.dpos[0], it.pos[1] + it.dpos[1], it.pos[2] + it.dpos[2]);
+   m = Mat4::Multiply(m, Turn(it.rot));
+   m = Mat4::Multiply(m, Turn(it.drot));
+   return Mat4::Multiply(m, Mat4::Scale(it.scale[0] * it.dscale[0], it.scale[1] * it.dscale[1],
+                                        it.scale[2] * it.dscale[2]));
+}
+
+void Scene3DNode::SetTurn(Item& item, const float r[3][3])
+{
+   // r = main * delta, so main = r * transpose(delta).
+   const Mat4 dm = Turn(item.drot);
+   float main[3][3];
+   for (int row = 0; row < 3; row++)
+      for (int col = 0; col < 3; col++)
+         main[row][col] = r[row][0] * dm.m[col] + r[row][1] * dm.m[4 + col] + r[row][2] * dm.m[8 + col];
+   TurnAngles(main, item.rot);
+}
+
+void Scene3DNode::TransformsToDeltas(Item& item)
+{
+   const Mat4 whole = Mat4::Multiply(Turn(item.rot), Turn(item.drot));
+   float r[3][3];
+   for (int row = 0; row < 3; row++)
+      for (int col = 0; col < 3; col++)
+         r[row][col] = whole.m[col * 4 + row];
+   for (int k = 0; k < 3; k++)
+   {
+      item.dpos[k] += item.pos[k];
+      item.dscale[k] *= item.scale[k];
+      item.pos[k] = 0.0f;
+      item.scale[k] = 1.0f;
+      item.rot[k] = 0.0f;
+   }
+   TurnAngles(r, item.drot);
 }
 
 Scene3DNode::Kind Scene3DNode::KindOf(const INode* node)
@@ -262,6 +315,21 @@ void Scene3DNode::Serialize()
          o << "itemx " << it.id << " 0\n";
       if (it.group != 0)
          o << "group " << it.id << " " << it.group << "\n";
+      if (it.lock != 0)
+         o << "lock " << it.id << " " << it.lock << "\n";
+      if (it.lookAt != 0)
+         o << "look " << it.id << " " << it.lookAt << "\n";
+      const bool delta = it.dpos[0] != 0 || it.dpos[1] != 0 || it.dpos[2] != 0 || it.drot[0] != 0 ||
+                         it.drot[1] != 0 || it.drot[2] != 0 || it.dscale[0] != 1 || it.dscale[1] != 1 ||
+                         it.dscale[2] != 1;
+      if (delta)
+      {
+         o << "delta " << it.id;
+         for (float v : it.dpos) o << " " << v;
+         for (float v : it.drot) o << " " << v;
+         for (float v : it.dscale) o << " " << v;
+         o << "\n";
+      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -320,7 +388,8 @@ void Scene3DNode::Parse()
             if (l >> x)
                v = (std::decay_t<decltype(v)>)x;
          });
-      else if (key == "label" || key == "itemx" || key == "group")
+      else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
+               key == "delta")
       {
          int id = 0;
          l >> id;
@@ -337,6 +406,16 @@ void Scene3DNode::Parse()
             int on = 1;
             l >> on;
             it->render = on != 0;
+         }
+         else if (key == "lock")
+            l >> it->lock;
+         else if (key == "look")
+            l >> it->lookAt;
+         else if (key == "delta")
+         {
+            for (float& v : it->dpos) l >> v;
+            for (float& v : it->drot) l >> v;
+            for (float& v : it->dscale) l >> v;
          }
          else
             l >> it->group;
@@ -440,15 +519,15 @@ void Scene3DNode::AlignToView(Item& item, const Mat4& view) const
    if (cam == nullptr)
       return;
    const Mat4 place = Mat4::Multiply(Mat4::Inverse(view), cam->ViewMatrix());
-   const float d = 180.0f / 3.14159265f;
+   float r[3][3];
    for (int k = 0; k < 3; k++)
    {
-      item.pos[k] = place.m[12 + k];
-      item.scale[k] = 1.0f;
+      item.pos[k] = place.m[12 + k] - item.dpos[k];
+      item.scale[k] = 1.0f / (item.dscale[k] != 0.0f ? item.dscale[k] : 1.0f);
+      for (int col = 0; col < 3; col++)
+         r[k][col] = place.m[col * 4 + k];
    }
-   item.rot[1] = std::asin(std::clamp(-place.m[2], -1.0f, 1.0f)) * d;
-   item.rot[0] = std::atan2(place.m[6], place.m[10]) * d;
-   item.rot[2] = std::atan2(place.m[1], place.m[0]) * d;
+   SetTurn(item, r);
 }
 
 bool Scene3DNode::AimAt(Item& item, const float target[3]) const
@@ -488,10 +567,8 @@ bool Scene3DNode::AimAt(Item& item, const float target[3]) const
       for (int col = 0; col < 3; col++)
          r[row][col] = to[0][row] * from[0][col] + to[1][row] * from[1][col] + to[2][row] * from[2][col];
 
-   const float d = 180.0f / 3.14159265f;
-   item.rot[1] = std::asin(std::clamp(-r[2][0], -1.0f, 1.0f)) * d;
-   item.rot[0] = std::atan2(r[2][1], r[2][2]) * d;
-   item.rot[2] = std::atan2(r[1][0], r[0][0]) * d;
+   // r turns the node's own frame; an item already carrying a delta turn keeps it.
+   SetTurn(item, r);
 
    // The point stays put; the turn must not swing it about the node's origin.
    Item turned = item;
@@ -510,6 +587,15 @@ void Scene3DNode::Sync(int frameId)
    mSyncedFrame = frameId;
    if (mText != mParsedText)
       Parse();
+   // Items told to look at another keep facing it as it moves or animates.
+   for (Item& it : mItems)
+      if (it.lookAt != 0 && it.lookAt != it.id)
+         if (Item* target = FindItem(it.lookAt))
+         {
+            float c[3];
+            ItemCenter(*target, c);
+            AimAt(it, c);
+         }
    if (!mRoot)
    {
       mRoot = std::make_unique<Root>();
@@ -561,13 +647,7 @@ void Scene3DNode::Sync(int frameId)
       const float aimLen = std::max(1e-4f, std::sqrt(l.aim[0] * l.aim[0] + l.aim[1] * l.aim[1] + l.aim[2] * l.aim[2]));
       for (float& a : l.aim)
          a /= aimLen;
-      std::memcpy(l.color, light->color, sizeof(l.color));
-      l.intensity = light->intensity;
-      l.type = light->type;
-      l.spotAngle = light->spotAngle;
-      l.spotPenumbra = light->spotPenumbra;
-      l.areaW = light->areaWidth;
-      l.areaH = light->areaHeight;
+      l.From(*light);
       mRig.lights.push_back(l);
       lightOrder.push_back(it.uid);
       marks.push_back(it.render ? 1.0f : 0.0f);
@@ -633,6 +713,8 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back(l.spotAngle); stamp.push_back(l.spotPenumbra);
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
       stamp.insert(stamp.end(), l.aim, l.aim + 3);
+      stamp.insert(stamp.end(), { l.intensity, l.diffuse, l.specular, l.transmission, l.falloff,
+                                  l.castShadow ? 1.0f : 0.0f, l.shadowSoft, (float)l.shadowRes, l.shadowClip });
    }
    const bool worldLights = worldColorOn && mWorldNode == nullptr;
    for (int k = 0; k < 3; k++)
@@ -741,6 +823,43 @@ unsigned int Scene3DNode::Composite(unsigned int sceneTex, int w, int h, unsigne
    return out.tex;
 }
 
+// The render region: clear outside it, or with crop the picture is just the region.
+unsigned int Scene3DNode::Border(unsigned int sceneTex, int w, int h)
+{
+   const float x0 = std::clamp(std::min(settings.borderMin[0], settings.borderMax[0]), 0.0f, 1.0f);
+   const float y0 = std::clamp(std::min(settings.borderMin[1], settings.borderMax[1]), 0.0f, 1.0f);
+   const float x1 = std::clamp(std::max(settings.borderMin[0], settings.borderMax[0]), 0.0f, 1.0f);
+   const float y1 = std::clamp(std::max(settings.borderMin[1], settings.borderMax[1]), 0.0f, 1.0f);
+   const int ow = settings.crop ? std::max(1, (int)std::lround((x1 - x0) * w)) : w;
+   const int oh = settings.crop ? std::max(1, (int)std::lround((y1 - y0) * h)) : h;
+   if (mBorderProgram == 0)
+      mBorderProgram = GLUtil::CompileProgram(
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uScene;\n"
+         "uniform vec4 uRegion;\n"
+         "uniform int uCrop;\n"
+         "void main() {\n"
+         "   if (uCrop == 1) { fragColor = texture(uScene, mix(uRegion.xy, uRegion.zw, vUv)); return; }\n"
+         "   bool inside = all(greaterThanEqual(vUv, uRegion.xy)) && all(lessThanEqual(vUv, uRegion.zw));\n"
+         "   fragColor = inside ? texture(uScene, vUv) : vec4(0.0);\n"
+         "}\n");
+   if (mBorderProgram == 0 || !GLUtil::EnsureFbo(mBorderFbo, ow, oh))
+      return sceneTex;
+   GLUtil::RunShaderPass(mBorderFbo, mBorderProgram, [&]
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, sceneTex);
+      glUniform1i(glGetUniformLocation(mBorderProgram, "uScene"), 0);
+      glUniform4f(glGetUniformLocation(mBorderProgram, "uRegion"), x0, y0, x1, y1);
+      glUniform1i(glGetUniformLocation(mBorderProgram, "uCrop"), settings.crop ? 1 : 0);
+   });
+   mOutW = ow;
+   mOutH = oh;
+   return mBorderFbo.tex;
+}
+
 void Scene3DNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -757,7 +876,22 @@ void Scene3DNode::CookIfNeeded(int frameId)
    mOutTex = mRender.GetOutputTexture();
    if (backdrop != 0)
       mOutTex = Composite(mOutTex, mRender.GetOutputWidth(), mRender.GetOutputHeight(), backdrop, mOutFbo);
-   const unsigned long long rev = mRender.TextureRevision() + (backdrop != 0 ? mWorldNode->TextureRevision() : 0);
+   mOutW = mOutH = 0;
+   if (settings.border)
+      mOutTex = Border(mOutTex, mRender.GetOutputWidth(), mRender.GetOutputHeight());
+   unsigned long long rev = mRender.TextureRevision() + (backdrop != 0 ? mWorldNode->TextureRevision() : 0);
+   if (settings.border)
+   {
+      // Moving the region changes the picture without a new render.
+      unsigned long long region = settings.crop ? 7 : 3;
+      for (float f : { settings.borderMin[0], settings.borderMin[1], settings.borderMax[0], settings.borderMax[1] })
+      {
+         uint32_t bits;
+         std::memcpy(&bits, &f, sizeof(bits));
+         region = region * 1099511628211ull ^ bits;
+      }
+      rev += region;
+   }
    if (rev != mBuiltRevision)
    {
       mBuiltRevision = rev;
@@ -788,7 +922,7 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "uniform int uAxis;\n"
          "uniform int uDraw;\n"
          "uniform float uDist;\n"
-         "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.545, 0.863, 0.0), vec3(0.157, 0.565, 1.0));\n"
+         "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.157, 0.565, 1.0), vec3(0.545, 0.863, 0.0));\n"
          "float lines(vec2 uv, float s) {\n"
          "   vec2 c = uv / s;\n"
          "   vec2 g = abs(fract(c - 0.5) - 0.5) / max(fwidth(c), vec2(1e-5));\n"

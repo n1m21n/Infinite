@@ -77,6 +77,16 @@ public:
    // the brightness of the emitting face, so resizing it changes the soft look, not the exposure.
    float areaWidth = 1.0f;
    float areaHeight = 1.0f;
+   bool normalize = true;          // area: off, a bigger panel gives more light
+   // How much of each kind of shading this light does, 1 = all of it.
+   float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
+   bool softFalloff = true;        // point, spot, area: no blow-up close to the light
+   // Used when this light casts the scene's shadow.
+   bool castShadow = true;
+   float shadowRadius = 0.25f;     // size of the light: a bigger one softens the shadow edge
+   float shadowFilter = 1.0f;      // extra blur on top of that
+   int shadowRes = 0;              // 0 = the look's quality, 1 / 2 / 3 = 1024 / 2048 / 4096
+   float shadowClip = 0.05f;       // nothing nearer the light than this casts
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -86,6 +96,11 @@ public:
       v.Float("spotAngle", spotAngle); v.Float("spotPenumbra", spotPenumbra);
       v.Float("orbitPerBeat", orbitPerBeat);
       v.Float("areaWidth", areaWidth); v.Float("areaHeight", areaHeight);
+      v.Bool("normalize", normalize);
+      v.Float("diffuse", diffuse); v.Float("specular", specular); v.Float("transmission", transmission);
+      v.Bool("softFalloff", softFalloff);
+      v.Bool("castShadow", castShadow); v.Float("shadowRadius", shadowRadius);
+      v.Float("shadowFilter", shadowFilter); v.Int("shadowRes", shadowRes); v.Float("shadowClip", shadowClip);
    }
    float orbitPerBeat = 0.0f;
 };

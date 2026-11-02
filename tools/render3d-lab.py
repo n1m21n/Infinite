@@ -106,6 +106,8 @@ INT_PARAMS = {"type", "detail", "sides", "samples", "shadowQuality", "supersampl
 def param_line(key, value):
     if isinstance(value, bool):
         return f"b {key} {int(value)}"
+    if isinstance(value, str):
+        return f"s {key} {value}"
     if isinstance(value, tuple):
         return f"c {key} {value[0]} {value[1]} {value[2]}"
     if key in INT_PARAMS:

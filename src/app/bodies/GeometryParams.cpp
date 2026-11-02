@@ -1826,6 +1826,11 @@ namespace app
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
+      ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
+      ModSlider("falloff", &n->falloff, 0.0f, 4.0f);
+      ImGui::EndDisabled();
+      ModSlider("diffuse", &n->diffuse, 0.0f, 2.0f);
+      ModSlider("specular", &n->specular, 0.0f, 2.0f);
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
    }
 
