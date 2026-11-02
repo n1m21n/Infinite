@@ -61,18 +61,21 @@ fail() {   # reason, then the fix
 
 lastlog() { grep -v '^[[:space:]]*$' "$log" | tail -1; }
 
-# $1 = team | watch, $2 = a JSON file; prints the id or nothing
+# $1 = team | watch, $2 = a JSON file (watch) or a plist file (team); prints the id or nothing
 pick() {
    osascript -l JavaScript -e '
       function run(a) {
          ObjC.import("Foundation");
-         var j = JSON.parse($.NSString.stringWithContentsOfFileEncodingError(a[1], $.NSUTF8StringEncoding, null).js);
          if (a[0] == "team") {
+            // a real plist reader: Xcode keeps data and date values in its prefs, which JSON cannot hold
+            var d = $.NSDictionary.dictionaryWithContentsOfFile(a[1]);
+            if (!d) return "";
             var found = [];
-            (function walk(o) { if (o && typeof o == "object") { if (o.teamID) found.push(o); for (var k in o) walk(o[k]); } })(j);
+            (function walk(o) { if (o && typeof o == "object") { if (o.teamID) found.push(o); for (var k in o) walk(o[k]); } })(ObjC.deepUnwrap(d));
             found.sort(function (x, y) { return (y.isFreeProvisioningTeam ? 1 : 0) - (x.isFreeProvisioningTeam ? 1 : 0); });
-            return found.length ? found[0].teamID : "";
+            return found.length ? String(found[0].teamID) : "";
          }
+         var j = JSON.parse($.NSString.stringWithContentsOfFileEncodingError(a[1], $.NSUTF8StringEncoding, null).js);
          var ds = (j.result || {}).devices || [];
          for (var i = 0; i < ds.length; i++) {
             var hw = ds[i].hardwareProperties || {}, p = ds[i].deviceProperties || {};
@@ -81,6 +84,33 @@ pick() {
          }
          return "";
       }' "$1" "$2" 2>/dev/null
+}
+
+# The team id, from the first place that knows it: Xcode's account prefs, an Apple Development certificate in the
+# keychain (its OU is the team), or a provisioning profile Xcode has already made.
+find_team() {
+   local t="" tmp f
+   tmp="$(mktemp -d -t infinite-team)"
+   defaults export com.apple.dt.Xcode "$tmp/prefs.plist" >/dev/null 2>&1
+   t="$(pick team "$tmp/prefs.plist")"
+   if [ -z "$t" ]; then
+      security find-certificate -a -c "Apple Development" -p 2>/dev/null | awk -v d="$tmp" '/BEGIN CERT/{n++} {print > (d "/c" n ".pem")}'
+      for f in "$tmp"/c*.pem; do
+         [ -f "$f" ] || continue
+         t="$(openssl x509 -in "$f" -noout -subject -nameopt multiline 2>/dev/null | sed -n -E 's/^ *organizationalUnitName *= *([A-Z0-9]+) *$/\1/p' | head -1)"
+         [ -n "$t" ] && break
+      done
+   fi
+   if [ -z "$t" ]; then
+      for f in "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision; do
+         [ -f "$f" ] || continue
+         security cms -D -i "$f" >"$tmp/p.plist" 2>/dev/null
+         t="$(plutil -extract TeamIdentifier.0 raw -o - "$tmp/p.plist" 2>/dev/null)"
+         [ -n "$t" ] && break
+      done
+   fi
+   rm -rf "$tmp"
+   printf '%s' "$t"
 }
 
 # 1: Xcode, its license, and xcode-select -----------------------------------------------------------------------
@@ -110,19 +140,18 @@ fi
 # 2: team and watch ----------------------------------------------------------------------------------------------
 step 2 "finding your Apple ID team and your watch"
 if [ -z "$team" ]; then
-   defaults export com.apple.dt.Xcode - 2>/dev/null | plutil -convert json -o "$log" - 2>/dev/null
-   team="$(pick team "$log")"
+   team="$(find_team)"
 fi
 if [ -z "$team" ]; then
    open -a Xcode 2>/dev/null
-   fail "No Apple ID team found in Xcode." "in Xcode open Settings > Accounts, press +, sign in with your Apple ID, then run this again."
+   fail "No Apple ID team found in Xcode." "in Xcode open Settings > Accounts (add your Apple ID with + if it is not there), click your Apple ID and wait for 'Personal Team' to show, then run this again."
 fi
 if [ -z "$device" ]; then
    xcrun devicectl list devices --json-output "$log" >/dev/null 2>&1
    device="$(pick watch "$log")"
 fi
 if [ -z "$device" ]; then
-   fail "Your watch is not visible to this Mac." "connect your iPhone with a cable once, unlock it, turn on Developer Mode on the iPhone and the watch (Settings > Privacy & Security), keep the watch unlocked, then run this again."
+   fail "Your watch is not visible to this Mac." "connect your iPhone, unlock it, and in Xcode open Window > Devices and Simulators once so the paired watch appears there. Turn on Developer Mode on the iPhone and the watch (Settings > Privacy & Security), keep the watch unlocked, then run this again."
 fi
 
 # 3: project ------------------------------------------------------------------------------------------------------
