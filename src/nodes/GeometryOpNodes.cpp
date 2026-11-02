@@ -19,7 +19,7 @@ namespace
       // still named here so a saved index still has a label, just not spawned
       // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
-      "Delete", "Decimate", "Bevel", "Inset"
+      "Delete", "Decimate", "Bevel", "Inset", "UV Project"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -206,6 +206,7 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.lockBorder = lockBorder;
    s.bevelWidth = bevelWidth; s.bevelSegments = bevelSegments; s.bevelAngle = bevelAngle;
    s.insetWidth = insetWidth; s.insetDepth = insetDepth;
+   s.uvMode = uvMode; s.uvAngle = uvAngle; s.uvMargin = uvMargin; s.uvScale = uvScale;
    s.upstream = input;
    // The upstream's own revision stamp, not its triangle count: Select and
    // other mask-only operators leave the vertex/index count unchanged, so a
@@ -349,6 +350,10 @@ const Mesh& GeometryOpNode::GetMesh()
          // Like Extrude: the incoming mask is honoured only with selectionOnly.
          mCache = MeshOps::InsetFaces(selectionOnly ? src : MeshOps::ClearSelection(src),
                                       insetWidth, insetDepth, bevelAngle);
+         break;
+      case kUVProject:
+         // Whole-mesh: islands and packing need every face. selectionOnly hidden.
+         mCache = MeshOps::UVProject(src, uvMode, uvAngle, uvMargin, uvScale);
          break;
       case kScrew:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.

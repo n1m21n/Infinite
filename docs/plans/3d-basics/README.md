@@ -52,8 +52,8 @@ is the open format, and Blender and Mixamo both export it).
 
 | Step | What | Decision |
 |---|---|---|
-| T1 | UV Project op in Geometry Op | Cube, cylinder, sphere and Smart Project (split by face angle, pack the islands). Writes real UVs, so a texture sticks to a moving or deforming mesh. Modelled on Blender's Smart UV Project, written fresh. |
-| T2 | Bake node | Geometry in, image out, rendered in UV space: AO, curvature, position, normal, thickness. It re-bakes when the mesh changes. The image goes into any 2D chain and back into a Material map: mesh → image → 2D effects → mesh. |
+| T1 ✅ | UV Project op in Geometry Op | Cube, cylinder, sphere and Smart Project (split by face angle, shelf-pack the islands). Writes real UVs, splitting vertices only at seams, so a texture sticks to a moving or deforming mesh. Modelled on Blender's Smart UV Project, written fresh. |
+| T2 ✅ | Bake node | Geometry in, image out, rendered in UV space: AO, curvature, position, normal (object space), thickness. CPU ray casts against a BVH, rows split over threads (512 px AO on the Fox about 1 s). The first bake and offline renders bake in the cook; live changes re-bake on a worker thread and keep the last image up. The image goes into any 2D chain and back into a Material map: mesh → image → 2D effects → mesh. |
 
 Not building: texture painting, UDIM tiles, a UV editor with hand-placed seams.
 

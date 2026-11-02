@@ -62,6 +62,8 @@ public:
       kDecimate,
       // True edge bevel and face inset (MeshOps::BevelEdges / InsetFaces, v0.6 3.7).
       kBevel, kInset,
+      // Writes real UVs from a projection (MeshOps::UVProject).
+      kUVProject,
       kOpCount
    };
 
@@ -246,6 +248,11 @@ public:
    float bevelAngle = 30.0f;
    float insetWidth = 0.05f;
    float insetDepth = 0.0f;
+   // UV Project
+   int uvMode = 0;              // MeshOps::UVProjectMode
+   float uvAngle = 66.0f;       // Smart: faces within this of a direction share it
+   float uvMargin = 0.02f;
+   float uvScale = 1.0f;
    // Decimate
    float decimateRatio = 0.5f;
    bool lockBorder = true;
@@ -321,6 +328,8 @@ public:
       v.Float("bevelWidth", bevelWidth); v.Int("bevelSegments", bevelSegments);
       v.Float("bevelAngle", bevelAngle); v.Float("insetWidth", insetWidth);
       v.Float("insetDepth", insetDepth);
+      v.Int("uvMode", uvMode); v.Float("uvAngle", uvAngle);
+      v.Float("uvMargin", uvMargin); v.Float("uvScale", uvScale);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
       v.Int("selectMode", selectMode); v.Float("selectA", selectA);
       v.Float("selectB", selectB); v.Float("selectC", selectC);
@@ -360,6 +369,8 @@ private:
       float decimateRatio = 0;
       bool lockBorder = false;
       float bevelWidth = 0, bevelAngle = 0, insetWidth = 0, insetDepth = 0;
+      int uvMode = 0;
+      float uvAngle = 0, uvMargin = 0, uvScale = 0;
       int bevelSegments = 0;
       int selectMode = -1;
       float selectA = 0, selectB = 0, selectC = 0, selectSeed = 0, normalAmount = 0;
@@ -393,6 +404,8 @@ private:
                 bevelWidth == o.bevelWidth && bevelSegments == o.bevelSegments &&
                 bevelAngle == o.bevelAngle && insetWidth == o.insetWidth &&
                 insetDepth == o.insetDepth &&
+                uvMode == o.uvMode && uvAngle == o.uvAngle &&
+                uvMargin == o.uvMargin && uvScale == o.uvScale &&
                 selectMode == o.selectMode && selectA == o.selectA &&
                 selectB == o.selectB && selectC == o.selectC &&
                 selectSeed == o.selectSeed && normalAmount == o.normalAmount &&

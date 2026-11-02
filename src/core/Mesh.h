@@ -404,6 +404,12 @@ namespace MeshOps
    // selected when the input carried a selection.
    Mesh InsetFaces(const Mesh& in, float width, float depth, float angleDeg);
 
+   // Real UVs from a projection (src/core/UVProject.cpp). Smart splits the mesh into islands of
+   // faces within `angleDeg` of a shared direction, flattens and packs them into 0-1 with
+   // `margin`; Cube, Cylinder and Sphere project from the bounds. Vertices split at seams.
+   enum UVProjectMode { kUVSmart = 0, kUVCube, kUVCylinder, kUVSphere };
+   Mesh UVProject(const Mesh& in, int mode, float angleDeg, float margin, float scale);
+
    // --- curves ---
    // Samples a polyline by arc length rather than by index, so a point moving
    // at constant t moves at constant speed even where the control points bunch

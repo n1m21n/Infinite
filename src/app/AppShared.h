@@ -4119,6 +4119,7 @@ void DrawArmatureParams(ArmatureNode* n);
 void DrawDistributePointsInGridParams(DistributePointsInGridNode* n);
 
 void DrawMergeByDistanceParams(MergeByDistanceNode* n);
+void DrawBakeParams(BakeNode* n);
 
 void DrawText3DParams(Text3DNode* n);
 
@@ -5932,6 +5933,7 @@ bool RunVmpcTest();
 bool RunRender3DHdrTest();
 bool RunRender3DPanoTest();
 bool RunRigTest();
+bool RunBakeTest();
 bool RunArmatureTest();
 bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;

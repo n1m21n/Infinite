@@ -1197,6 +1197,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_BAKETEST") != nullptr)
+   {
+      const bool ok = RunBakeTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_RIGTEST") != nullptr)
    {
       const bool ok = RunRigTest();

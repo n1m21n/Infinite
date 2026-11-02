@@ -1083,6 +1083,20 @@ namespace app
    }
 
 
+   void DrawBakeParams(BakeNode* n)
+   {
+      DropdownButton("bake", BakeNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; }, kParamWidth, true, true);
+      DropdownButton("size", BakeNode::SizeNames(), n->size, [n](int i) { PushUndoCheckpoint(); n->size = i; }, kParamWidth, true, true);
+      if (n->mode == BakeNode::kAO || n->mode == BakeNode::kThickness)
+      {
+         ModSliderInt("samples", &n->samples, 1, 128);
+         ModSlider("distance", &n->distance, 0.01f, 1.0f);
+      }
+      if (n->Baking())
+         ImGui::TextDisabled("baking");
+   }
+
+
    void DrawText3DParams(Text3DNode* n)
    {
       char buf[256];
@@ -1507,6 +1521,18 @@ namespace app
             ModSlider("depth", &n->insetDepth, -0.5f, 0.5f, "%.3f");
             ModSlider("patch angle", &n->bevelAngle, 1.0f, 120.0f, "%.0f deg");
             break;
+         case GeometryOpNode::kUVProject:
+         {
+            static const std::vector<std::string> kUVModes = { "Smart", "Cube", "Cylinder", "Sphere" };
+            DropdownButton("project", kUVModes, n->uvMode, [n](int i) { PushUndoCheckpoint(); n->uvMode = i; }, kParamWidth, true, true);
+            if (n->uvMode == 0)
+            {
+               ModSlider("angle", &n->uvAngle, 1.0f, 89.0f, "%.0f deg");
+               ModSlider("margin", &n->uvMargin, 0.0f, 0.2f, "%.3f");
+            }
+            ModSlider("scale", &n->uvScale, 0.1f, 10.0f);
+            break;
+         }
          case GeometryOpNode::kDecimate:
             ModSlider("keep", &n->decimateRatio, 0.01f, 1.0f, "%.2f");
             ModCheckbox("lock border", &n->lockBorder);

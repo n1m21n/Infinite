@@ -131,19 +131,21 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-347 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+350 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 58 | bypass |
-| `Array` | geo:geometry | out:geometry | 72 | bypass |
+| `3D View` | none | out:image | 59 | bypass |
+| `Armature` | in:geometry, path:geometry | out:geometry | 85 |  |
+| `Array` | geo:geometry | out:geometry | 76 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
-| `Bevel` | geo:geometry | out:geometry | 72 | bypass |
+| `Bake` | geo:geometry | out:image | 4 | bypass |
+| `Bevel` | geo:geometry | out:geometry | 76 | bypass |
 | `Camera` | none | out:camera | 23 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
 | `Cloth` | geo:geometry | out:geometry | 38 | bypass |
@@ -152,10 +154,10 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Curve` | none | out:geometry | 32 | bypass |
 | `Curve Ops` | curve:geometry | out:geometry | 9 | bypass |
 | `Cylinder` | texture:image | out:geometry | 51 | bypass |
-| `Decimate` | geo:geometry | out:geometry | 72 | bypass |
+| `Decimate` | geo:geometry | out:geometry | 76 | bypass |
 | `Delaunay Mesh` | points:geometry | out:geometry | 4 | bypass |
-| `Delete` | geo:geometry | out:geometry | 72 | bypass |
-| `Delete Selected` | geo:geometry | out:geometry | 72 | bypass |
+| `Delete` | geo:geometry | out:geometry | 76 | bypass |
+| `Delete Selected` | geo:geometry | out:geometry | 76 | bypass |
 | `Depth Projection` | depth:image, color:image | out:geometry | 35 |  |
 | `Difference` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Disc` | texture:image | out:geometry | 51 | bypass |
@@ -163,9 +165,9 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |
-| `Explode` | geo:geometry | out:geometry | 72 | bypass |
-| `Extrude` | geo:geometry | out:geometry | 72 | bypass |
-| `Extrude Selected` | geo:geometry | out:geometry | 72 | bypass |
+| `Explode` | geo:geometry | out:geometry | 76 | bypass |
+| `Extrude` | geo:geometry | out:geometry | 76 | bypass |
+| `Extrude Selected` | geo:geometry | out:geometry | 76 | bypass |
 | `Feedback 3D` | seed:geometry, loop:geometry | out:geometry | 0 |  |
 | `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
 | `Field Primitive` | none | out:geometry | 13 | bypass |
@@ -176,7 +178,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Helix` | texture:image | out:geometry | 51 | bypass |
 | `Icosphere` | texture:image | out:geometry | 51 | bypass |
 | `Image to Points` | input:image | out:geometry | 10 | bypass |
-| `Inset` | geo:geometry | out:geometry | 72 | bypass |
+| `Inset` | geo:geometry | out:geometry | 76 | bypass |
 | `Instance on Points` | points:geometry, shape:geometry, cloud:geometry | out:geometry | 25 |  |
 | `Intersect` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
@@ -184,16 +186,16 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `L-System` | none | out:geometry | 21 | bypass |
 | `Light` | none | out:light | 28 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Points` | geo:geometry | out:geometry | 22 | bypass |
 | `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
-| `Mirror` | geo:geometry | out:geometry | 72 | bypass |
+| `Mirror` | geo:geometry | out:geometry | 76 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
-| `Model 3D` | texture:image | out:geometry | 28 | bypass |
-| `Normals` | geo:geometry | out:geometry | 72 | bypass |
+| `Model 3D` | texture:image | out:geometry | 117 | bypass |
+| `Normals` | geo:geometry | out:geometry | 76 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
 | `Ocean` | texture:image | out:geometry | 29 | bypass |
 | `Octahedron` | texture:image | out:geometry | 51 | bypass |
@@ -204,20 +206,20 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 83 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 84 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
-| `Screw` | geo:geometry | out:geometry | 72 | bypass |
-| `Select` | geo:geometry | out:geometry | 72 | bypass |
+| `Screw` | geo:geometry | out:geometry | 76 | bypass |
+| `Select` | geo:geometry | out:geometry | 76 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
-| `Smooth` | geo:geometry | out:geometry | 72 | bypass |
-| `Solidify` | geo:geometry | out:geometry | 72 | bypass |
+| `Smooth` | geo:geometry | out:geometry | 76 | bypass |
+| `Solidify` | geo:geometry | out:geometry | 76 | bypass |
 | `Sphere` | texture:image | out:geometry | 51 | bypass |
 | `Star 3D` | texture:image | out:geometry | 51 | bypass |
-| `Subdivide` | geo:geometry | out:geometry | 72 | bypass |
+| `Subdivide` | geo:geometry | out:geometry | 76 | bypass |
 | `Supershape` | texture:image | out:geometry | 51 | bypass |
 | `Sweep` | profile:geometry, path:geometry | out:geometry | 6 |  |
 | `Switcher 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 5 |  |
@@ -225,14 +227,15 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Text 3D` | texture:image | out:geometry | 29 | bypass |
 | `Torus` | texture:image | out:geometry | 51 | bypass |
 | `Torus Knot` | texture:image | out:geometry | 51 | bypass |
-| `Transform` | geo:geometry | out:geometry | 72 | bypass |
-| `Transform Selected` | geo:geometry | out:geometry | 72 | bypass |
-| `Triangulate` | geo:geometry | out:geometry | 72 | bypass |
+| `Transform` | geo:geometry | out:geometry | 76 | bypass |
+| `Transform Selected` | geo:geometry | out:geometry | 76 | bypass |
+| `Triangulate` | geo:geometry | out:geometry | 76 | bypass |
 | `Tube` | texture:image | out:geometry | 51 | bypass |
-| `Twist` | geo:geometry | out:geometry | 72 | bypass |
+| `Twist` | geo:geometry | out:geometry | 76 | bypass |
+| `UV Project` | geo:geometry | out:geometry | 76 | bypass |
 | `Union` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Voronoi Cells` | points:geometry | out:geometry | 4 | bypass |
-| `Wireframe` | geo:geometry | out:geometry | 72 | bypass |
+| `Wireframe` | geo:geometry | out:geometry | 76 | bypass |
 | `Wrap` | source:geometry, target:geometry | out:geometry | 26 |  |
 
 ### AudioEffects
