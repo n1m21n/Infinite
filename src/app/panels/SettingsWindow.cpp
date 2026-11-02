@@ -1695,18 +1695,29 @@ namespace app
          if (sTab == 8)
          {
             ImGui::Spacing();
+            ImGui::PushTextWrapPos(0.0f);   // no line of the page may be wider than the window
             DrawCliSetupSection();
+            ImGui::PopTextWrapPos();
 
-            FormParts::Section(T("Reference"));
-            ImGui::TextDisabled("%s", T("Commands, headless rendering and AI skill files, for when you work outside the connected agent."));
-            if (ImGui::TreeNode(T("The Terminal panel")))
+            ImGui::Spacing();
+            static int sRef = 0;
+            // i18n-skip-begin: topic names are the section titles below
+            static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills" };
+            // i18n-skip-end
+            FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), 220.0f);
+            LibraryParts::BeginWell("##terminalref", 380.0f);
+            FormParts::PushReferenceStyle();
+            ImGui::PushTextWrapPos(0.0f);
+            if (sRef == 0 || sRef == 1)
             {
+               FormParts::Heading(T("The Terminal panel"));
                ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
                ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
-               ImGui::TreePop();
+               ImGui::Spacing();
             }
-            if (ImGui::TreeNode(T("The infinite command")))
+            if (sRef == 0 || sRef == 2)
             {
+               FormParts::Heading(T("The infinite command"));
                ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
                ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
                // i18n-skip-begin: command vocabulary
@@ -1725,10 +1736,11 @@ namespace app
                ImGui::TextDisabled("%s", T("Outside the panel (macOS):"));
                CodeBlock::Draw("/Applications/Infinite.app/Contents/MacOS/Infinite --cli graph", "cb_outside");
                // i18n-skip-end
-               ImGui::TreePop();
+               ImGui::Spacing();
             }
-            if (ImGui::TreeNode(T("Headless engine")))
+            if (sRef == 0 || sRef == 3)
             {
+               FormParts::Heading(T("Headless engine"));
                ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
                // i18n-skip-begin: command vocabulary
                CodeBlock::Draw(
@@ -1739,10 +1751,11 @@ namespace app
                   "cb_headless");
                // i18n-skip-end
                ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
-               ImGui::TreePop();
+               ImGui::Spacing();
             }
-            if (ImGui::TreeNode(T("AI skills")))
+            if (sRef == 0 || sRef == 4)
             {
+               FormParts::Heading(T("AI skills"));
                ImGui::TextWrapped("%s", T("Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version."));
                static std::string sSkillStatus;
                if (FormParts::Button(L("Install All AI Skills")))
@@ -1775,9 +1788,11 @@ namespace app
                   ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
                ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
                ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
-               ImGui::TreePop();
+               ImGui::Spacing();
             }
-            SectionCard::End();
+            ImGui::PopTextWrapPos();
+            FormParts::PopReferenceStyle();
+            LibraryParts::EndWell();
          }
 
       }
