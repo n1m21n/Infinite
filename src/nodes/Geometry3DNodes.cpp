@@ -500,6 +500,7 @@ namespace
       "uniform float uLightSpotPenumbra[8];\n"
       "uniform vec2 uLightArea[8];\n"
       "uniform vec4 uLightTerms[8];\n"   // diffuse, specular, transmission, falloff (< 0: hard)
+      "uniform float uLightCutoff[8];\n"  // no light past this distance; 0 = none
       "float lightFalloff(float dist, float k) {\n"
       "   if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k);\n"
       "   return min(1.0 / max(dist * dist * -k, 1e-4), 20.0);\n"
@@ -952,11 +953,13 @@ namespace
       "         shadeDir = toCentre / max(dist, 1e-4);\n"
       "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
       "         attenuation *= clamp(dot(-shadeDir, fwd) * 4.0, 0.0, 1.0);\n"
+      "         if (uLightCutoff[i] > 0.0 && dist > uLightCutoff[i]) attenuation = 0.0;\n"
       "      } else if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
       "         float dist = length(toLight);\n"
       "         lightDir = toLight / max(dist, 1e-4);\n"
       "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
+      "         if (uLightCutoff[i] > 0.0 && dist > uLightCutoff[i]) attenuation = 0.0;\n"
       "         if (uLightType[i] == 4) {\n"
       "            vec3 spotDir = uLightAim[i];\n"
       "            float cosCur = dot(-lightDir, spotDir);\n"
@@ -1257,9 +1260,18 @@ const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kSha
 void Render3DNode::RigLight::From(const LightNode& n)
 {
    std::memcpy(color, n.color, sizeof(color));
+   if (n.useTemperature)   // the black body tints the colour; both are mixed in linear light, sent as sRGB
+   {
+      float tint[3];
+      LightNode::TemperatureColor(n.temperature, tint);
+      for (int k = 0; k < 3; k++)
+         color[k] = std::pow(std::pow(std::max(0.0f, color[k]), 2.2f) * tint[k], 1.0f / 2.2f);
+   }
    type = n.type;
    // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
    intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight) : 1.0f);
+   intensity *= std::exp2(n.exposure);
+   cutoff = n.useCutoff ? std::max(0.001f, n.cutoffDistance) : 0.0f;
    spotAngle = n.spotAngle;
    spotPenumbra = n.spotPenumbra;
    areaW = n.areaWidth;
@@ -2160,6 +2172,7 @@ void Render3DNode::CookOnce(int frameId)
    float lightSpotPenumbra[kMaxLights];
    float lightArea[kMaxLights * 2];
    float lightTerms[kMaxLights * 4];
+   float lightCutoff[kMaxLights] = {};
    RigLight caster;   // the first light's shadow settings; the built-in light keeps the defaults
    for (int i = 0; i < kMaxLights; i++)
    {
@@ -2190,6 +2203,7 @@ void Render3DNode::CookOnce(int frameId)
          lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
          const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
          std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
+         lightCutoff[lightCount] = l.cutoff;
          if (lightCount == 0)
             caster = l;
          lightCount++;
@@ -2218,6 +2232,7 @@ void Render3DNode::CookOnce(int frameId)
       lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
       const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
       std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
+      lightCutoff[lightCount] = l.cutoff;
       if (lightCount == 0)
          caster = l;
       lightCount++;
@@ -2517,6 +2532,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
       glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kMaxLights, lightArea);
       glUniform4fv(glGetUniformLocation(mProgram, "uLightTerms"), kMaxLights, lightTerms);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightCutoff"), kMaxLights, lightCutoff);
       glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
                                     ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),

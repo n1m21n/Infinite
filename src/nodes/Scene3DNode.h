@@ -94,6 +94,10 @@ public:
       // clear; crop makes the picture just the region.
       bool border = false, crop = false;
       float borderMin[2] = { 0, 0 }, borderMax[2] = { 1, 1 };
+      bool safeCenter = false;      // the centre-cut title and action areas, for a 4:3 crop of a wide frame
+      float guideColor[3] = { 0.784f, 0.784f, 0.784f };
+      bool diagonal = false;        // corner to corner, both ways
+      bool goldenTriA = false, goldenTriB = false, harmonyTriA = false, harmonyTriB = false;
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.

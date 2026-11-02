@@ -1994,7 +1994,7 @@ namespace
          return;
       const Mat4 world = Mat4::Inverse(view);
       const float aspect = (float)std::max(1, scene->GetOutputWidth()) / (float)std::max(1, scene->GetOutputHeight());
-      const float depth = 1.0f;
+      const float depth = std::max(0.01f, lens->displaySize);
       const bool ortho = lens->projection != 0;
       const float h = ortho ? lens->orthoHeight : depth * std::tan(lens->fov * 0.5f * kPi / 180.0f), w = h * aspect;
       float c[4][3];
@@ -2025,6 +2025,31 @@ namespace
             dl->AddTriangleFilled(s[0], s[1], s[2], col);
          else
             dl->AddTriangle(s[0], s[1], s[2], col);
+      }
+      if (lens->showLimits)   // the clip range along the view, and where it focuses
+      {
+         auto along = [&](float d, float out[3]) { const float p[3] = { 0.0f, 0.0f, -d }; TransformBy(world, p, out); };
+         float n[3], f[3];
+         along(lens->nearPlane, n);
+         along(lens->farPlane, f);
+         const ImU32 limit = Hex(0xE8C840, 0.9f);
+         Line3D(dl, n, f, limit);
+         ImVec2 sn, sf;
+         if (Project(n, sn))
+            dl->AddCircleFilled(sn, 3.0f, limit);
+         if (Project(f, sf))
+            dl->AddCircleFilled(sf, 3.0f, limit);
+         if (it.id == scene->activeCamera && scene->settings.fStop > 0.0f)
+         {
+            float fp[3];
+            ImVec2 sp;
+            along(scene->Look().focusDistance, fp);
+            if (Project(fp, sp))
+            {
+               dl->AddLine(ImVec2(sp.x - 5, sp.y - 5), ImVec2(sp.x + 5, sp.y + 5), limit, 1.5f);
+               dl->AddLine(ImVec2(sp.x - 5, sp.y + 5), ImVec2(sp.x + 5, sp.y - 5), limit, 1.5f);
+            }
+         }
       }
    }
 
@@ -2082,6 +2107,30 @@ namespace
                Line3D(dl, p, q, col);
             std::copy(q, q + 3, prev);
             std::copy(in, in + 3, prevIn);
+         }
+      }
+      if (type == 4 && light->showCone)   // the whole volume the spot lights, as a faint shell
+      {
+         const float len = light->useCutoff ? light->cutoffDistance : std::max(0.05f, light->distance);
+         const float r = len * std::tan(light->spotAngle * kPi / 180.0f);
+         const ImU32 fill = (col & 0x00FFFFFF) | 0x26000000;
+         ImVec2 prev;
+         bool prevOk = false;
+         for (int i = 0; i <= 32; i++)
+         {
+            const float a = (float)i / 32.0f * 2.0f * kPi, cs = std::cos(a), sn = std::sin(a);
+            float q[3];
+            for (int k = 0; k < 3; k++)
+               q[k] = p[k] + aim[k] * len + (u[k] * cs + v[k] * sn) * r;
+            ImVec2 qs;
+            const bool ok = Project(q, qs);
+            if (ok && prevOk)
+            {
+               dl->AddTriangleFilled(s, prev, qs, fill);
+               dl->AddLine(prev, qs, col & 0x80FFFFFF);
+            }
+            prev = qs;
+            prevOk = ok;
          }
       }
       if (type == 5)
@@ -2401,11 +2450,12 @@ namespace
    }
 
    // The frame, as Blender draws it: dashes round the render, then any guides inside.
-   void DrawCameraGuides(ImDrawList* dl)
+   void DrawCameraGuides(ImDrawList* dl, Scene3DNode* scene)
    {
       const ImVec2 a = sCam.frameMn, b = sCam.frameMx;
       const float w = b.x - a.x, h = b.y - a.y;
-      const ImU32 edge = Hex(0x000000, 0.9f), guide = Hex(kWire, 0.7f);
+      const float* gc = sSet->guideColor;
+      const ImU32 edge = Hex(0x000000, 0.9f), guide = ImGui::ColorConvertFloat4ToU32(ImVec4(gc[0], gc[1], gc[2], 0.7f));
       DashedRect(dl, a, b, edge);
       auto cross = [&](float fx, float fy)
       {
@@ -2431,6 +2481,65 @@ namespace
          const float m = act + sSet->safeTitle;
          dl->AddRect(ImVec2(a.x + w * m, a.y + h * m), ImVec2(b.x - w * m, b.y - h * m), guide);
       }
+      if (sSet->safe && sSet->safeCenter)   // Blender's centre-cut margins: title 17.5% / 5%, action 15% / 5%
+      {
+         dl->AddRect(ImVec2(a.x + w * 0.15f, a.y + h * 0.05f), ImVec2(b.x - w * 0.15f, b.y - h * 0.05f), guide);
+         dl->AddRect(ImVec2(a.x + w * 0.175f, a.y + h * 0.05f), ImVec2(b.x - w * 0.175f, b.y - h * 0.05f), guide);
+      }
+      if (sSet->diagonal)
+      {
+         dl->AddLine(a, b, guide);
+         dl->AddLine(ImVec2(a.x, b.y), ImVec2(b.x, a.y), guide);
+      }
+      // A triangle guide: one diagonal, then from the two other corners a line square to it. The golden kind
+      // stops on the diagonal; the harmonious kind runs on to the frame's far edge.
+      auto triangles = [&](ImVec2 p0, ImVec2 p1, ImVec2 c0, ImVec2 c1, bool harmonious)
+      {
+         dl->AddLine(p0, p1, guide);
+         const ImVec2 d(p1.x - p0.x, p1.y - p0.y);
+         const float dd = std::max(1e-6f, d.x * d.x + d.y * d.y);
+         for (ImVec2 c : { c0, c1 })
+         {
+            const float k = ((c.x - p0.x) * d.x + (c.y - p0.y) * d.y) / dd;
+            ImVec2 end(p0.x + d.x * k, p0.y + d.y * k);
+            if (harmonious)
+            {
+               const ImVec2 r(end.x - c.x, end.y - c.y);
+               float s = 1e9f;
+               if (r.x > 1e-6f) s = std::min(s, (b.x - c.x) / r.x);
+               if (r.x < -1e-6f) s = std::min(s, (a.x - c.x) / r.x);
+               if (r.y > 1e-6f) s = std::min(s, (b.y - c.y) / r.y);
+               if (r.y < -1e-6f) s = std::min(s, (a.y - c.y) / r.y);
+               end = ImVec2(c.x + r.x * s, c.y + r.y * s);
+            }
+            dl->AddLine(c, end, guide);
+         }
+      };
+      const ImVec2 bl(a.x, b.y), tr(b.x, a.y);
+      if (sSet->goldenTriA)
+         triangles(bl, tr, a, b, false);
+      if (sSet->goldenTriB)
+         triangles(a, b, bl, tr, false);
+      if (sSet->harmonyTriA)
+         triangles(bl, tr, a, b, true);
+      if (sSet->harmonyTriB)
+         triangles(a, b, bl, tr, true);
+
+      const Item* active = scene->FindItem(scene->activeCamera);
+      GraphNode* gn = active != nullptr ? FindNodeByUid(active->uid) : nullptr;
+      auto* cam = gn != nullptr ? dynamic_cast<CameraNode*>(gn->node.get()) : nullptr;
+      if (cam == nullptr)
+         return;
+      if (cam->showSensor)   // the sensor's own shape, fitted to the frame along the side it fits
+      {
+         const float ratio = std::max(0.01f, cam->sensorWidth) / std::max(0.01f, cam->sensorHeight);
+         const bool tall = cam->sensorFit == 2 || (cam->sensorFit == 0 && w < h);
+         const float gw = tall ? h * ratio : w, gh = tall ? h : w / ratio;
+         const ImVec2 mid((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+         DashedRect(dl, ImVec2(mid.x - gw * 0.5f, mid.y - gh * 0.5f), ImVec2(mid.x + gw * 0.5f, mid.y + gh * 0.5f), guide);
+      }
+      if (cam->showName)
+         dl->AddText(ImVec2(a.x + 6.0f, b.y - ImGui::GetFontSize() - 4.0f), Hex(kWire, 0.9f), ItemName(*active).c_str());
    }
 
    // Along the bottom edge: drag to zoom, drag to pan, camera view, then the lock or the projection.
@@ -2568,7 +2677,7 @@ namespace
          dl->AddRectFilled(ImVec2(mn.x, sCam.frameMx.y), mx, shade);
          dl->AddRectFilled(ImVec2(mn.x, sCam.frameMn.y), ImVec2(sCam.frameMn.x, sCam.frameMx.y), shade);
          dl->AddRectFilled(ImVec2(sCam.frameMx.x, sCam.frameMn.y), ImVec2(mx.x, sCam.frameMx.y), shade);
-         DrawCameraGuides(dl);
+         DrawCameraGuides(dl, scene);
       }
 
       const bool canGrab = hovered && sOp.mode == 0 && !sBoxOn;
@@ -3354,7 +3463,11 @@ namespace
          names.push_back(T(n.c_str()));
       ComboRow(T("Type"), &light->type, names, "Light type");
       ColorRow(T("Colour"), light->color, "Light colour");
+      BoolRow(T("Temperature"), &light->useTemperature);
+      if (light->useTemperature)
+         FloatRow(T("Kelvin"), &light->temperature, 800.0f, 20000.0f, "%.0f K");
       FloatRow(T("Strength"), &light->intensity, 0.0f, 20.0f, "%.2f");
+      FloatRow(T("Exposure"), &light->exposure, -10.0f, 10.0f, "%.2f");
       if (light->type != 3)
       {
          FloatRow(T("Orbit"), &light->azimuth, -180.0f, 180.0f, "%.1f");
@@ -3366,6 +3479,7 @@ namespace
       {
          FloatRow(T("Cone"), &light->spotAngle, 1.0f, 89.0f, "%.1f");
          FloatRow(T("Blend"), &light->spotPenumbra, 0.0f, 1.0f, "%.2f");
+         BoolRow(T("Show cone"), &light->showCone);
       }
       if (light->type == 5)
       {
@@ -3377,6 +3491,9 @@ namespace
       {
          FloatRow(T("Falloff"), &light->falloff, 0.0f, 4.0f, "%.2f");
          BoolRow(T("Soft falloff"), &light->softFalloff);
+         BoolRow(T("Custom distance"), &light->useCutoff);
+         if (light->useCutoff)
+            FloatRow(T("Cutoff"), &light->cutoffDistance, 0.01f, 100.0f, "%.2f");
       }
       FloatRow(T("Diffuse"), &light->diffuse, 0.0f, 2.0f, "%.2f");
       if (light->type != 3)
@@ -3435,16 +3552,6 @@ namespace
       return std::max(1.0f, scene->renderW) / std::max(1.0f, scene->renderH);
    }
 
-   float FocalFromFov(float fov, float sensor, float aspect)
-   {
-      return sensor / (2.0f * std::tan(fov * 0.5f * kPi / 180.0f) * std::max(1.0f, aspect));
-   }
-
-   float FovFromFocal(float mm, float sensor, float aspect)
-   {
-      return 2.0f * std::atan(sensor / (2.0f * mm * std::max(1.0f, aspect))) * 180.0f / kPi;
-   }
-
    // Blender's focal length holds when the frame or sensor changes; only the view angle moves.
    template <typename Change>
    void KeepingLenses(Scene3DNode* scene, Change&& change)
@@ -3454,11 +3561,11 @@ namespace
       {
          GraphNode* gn = FindNodeByUid(it.uid);
          if (auto* cam = gn != nullptr ? dynamic_cast<CameraNode*>(gn->node.get()) : nullptr)
-            lenses.push_back({ cam, FocalFromFov(cam->fov, cam->sensorWidth, RenderAspect(scene)) });
+            lenses.push_back({ cam, cam->FocalLength(RenderAspect(scene)) });
       }
       change();
       for (auto& lens : lenses)
-         lens.first->fov = FovFromFocal(lens.second, lens.first->sensorWidth, RenderAspect(scene));
+         lens.first->SetFocalLength(lens.second, RenderAspect(scene));
    }
 
    void DrawCameraCards(Scene3DNode* scene, Item* item, CameraNode* cam, float availW)
@@ -3484,9 +3591,9 @@ namespace
          {
             if (sLensUnit == 0)
             {
-               float mm = FocalFromFov(cam->fov, cam->sensorWidth, RenderAspect(scene));
+               float mm = cam->FocalLength(RenderAspect(scene));
                if (FloatRow(T("Focal length"), &mm, 1.0f, 300.0f, "%.0f mm"))
-                  cam->fov = FovFromFocal(mm, cam->sensorWidth, RenderAspect(scene));
+                  cam->SetFocalLength(mm, RenderAspect(scene));
             }
             else
                FloatRow(T("Field of view"), &cam->fov, 1.0f, 170.0f, "%.1f");
@@ -3505,12 +3612,20 @@ namespace
       }
       if (Card(T("Camera")))
       {
-         float sensor = cam->sensorWidth;
-         if (FloatRow(T("Sensor"), &sensor, 1.0f, 100.0f, "%.0f mm"))
+         // Blender holds the focal length while the sensor changes; the view angle follows.
+         const float mm = cam->FocalLength(RenderAspect(scene));
+         int fit = cam->sensorFit;
+         if (ComboRow(T("Sensor fit"), &fit, cam->SensorFitNames()))
          {
-            const float mm = FocalFromFov(cam->fov, cam->sensorWidth, RenderAspect(scene));
-            cam->sensorWidth = sensor;
-            cam->fov = FovFromFocal(mm, sensor, RenderAspect(scene));
+            cam->sensorFit = fit;
+            cam->SetFocalLength(mm, RenderAspect(scene));
+         }
+         float* side = cam->sensorFit == 2 ? &cam->sensorHeight : &cam->sensorWidth;
+         float sensor = *side;
+         if (FloatRow(cam->sensorFit == 0 ? T("Sensor") : cam->sensorFit == 1 ? T("Width") : T("Height"), &sensor, 1.0f, 100.0f, "%.0f mm"))
+         {
+            *side = sensor;
+            cam->SetFocalLength(mm, RenderAspect(scene));
          }
          if (scene->activeCamera != item->id)
          {
@@ -3524,6 +3639,13 @@ namespace
          else if (ActionButton::Draw(L("Move camera to view"), ImVec2(availW, 0)))
             CameraToView(scene);
          PointAtCursor(scene, item, availW);
+      }
+      if (Card(T("Viewport Display")))
+      {
+         FloatRow(T("Size"), &cam->displaySize, 0.01f, 10.0f, "%.2f");
+         BoolRow(T("Limits"), &cam->showLimits);
+         BoolRow(T("Name"), &cam->showName);
+         BoolRow(T("Sensor"), &cam->showSensor);
       }
       Scene3DNode::Backdrop& back = item->backdrop;
       bool backShow = back.show;
@@ -3613,6 +3735,10 @@ namespace
          float stop = set.fStop > 0.0f ? set.fStop : 2.8f;
          if (FloatRow(T("F-Stop"), &stop, 0.7f, 128.0f, "%.1f"))
             set.fStop = stop;
+         if (IntInputRow(T("Blades"), &look.dofBlades))
+            look.dofBlades = look.dofBlades < 3 ? (look.dofBlades > 0 ? 3 : 0) : std::min(look.dofBlades, 16);
+         FloatRow(T("Rotation"), &look.dofRotation, -180.0f, 180.0f, "%.0f");
+         FloatRow(T("Ratio"), &look.dofRatio, 0.01f, 2.0f, "%.2f");
          ImGui::EndDisabled();
       }
    }
@@ -4136,6 +4262,13 @@ namespace
             FloatRow(T("Height"), &look.mistHeight, 0.0f, 100.0f, "%.2f");
          }
          ComboRow(T("Projection"), &look.projection, Render3DNode::ProjectionNames());
+         if (look.projection == 2)
+         {
+            FloatRow(T("Min latitude"), &look.latMin, -90.0f, 90.0f, "%.0f");
+            FloatRow(T("Max latitude"), &look.latMax, -90.0f, 90.0f, "%.0f");
+            FloatRow(T("Min longitude"), &look.lonMin, -180.0f, 180.0f, "%.0f");
+            FloatRow(T("Max longitude"), &look.lonMax, -180.0f, 180.0f, "%.0f");
+         }
          if (look.projection == 4)
          {
             FloatRow(T("Dome angle"), &look.domeAngle, 180.0f, 220.0f, "%.0f");
@@ -4229,12 +4362,19 @@ namespace
       {
          FloatRow(T("Title"), &set.safeTitle, 0.0f, 0.3f, "%.3f");
          FloatRow(T("Action"), &set.safeAction, 0.0f, 0.3f, "%.3f");
+         BoolRow(T("Center-cut"), &set.safeCenter);
       }
       if (Card(T("Composition Guides")))
       {
+         ColorRow(T("Colour"), set.guideColor);
          BoolRow(T("Thirds"), &set.thirds);
          BoolRow(T("Center"), &set.center);
+         BoolRow(T("Diagonal"), &set.diagonal);
          BoolRow(T("Golden"), &set.golden);
+         BoolRow(T("Golden triangle A"), &set.goldenTriA);
+         BoolRow(T("Golden triangle B"), &set.goldenTriB);
+         BoolRow(T("Harmonious triangle A"), &set.harmonyTriA);
+         BoolRow(T("Harmonious triangle B"), &set.harmonyTriB);
       }
    }
 

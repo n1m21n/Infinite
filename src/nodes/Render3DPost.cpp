@@ -105,6 +105,7 @@ namespace
       "uniform float uFocus;\n"
       "uniform float uAperturePx;\n"
       "uniform float uMaxCoc;\n"
+      "uniform vec3 uBokeh;\n"       // blades (0 round), rotation in radians, ratio
       "uniform int uAoOnly;\n"
       "uniform int uCavity;\n"        // bit 0 world, bit 1 screen
       "uniform vec4 uCavityK;\n"      // ridge, valley, curvature ridge, curvature valley
@@ -206,7 +207,15 @@ namespace
       "   for (int i = 0; i < taps; i++) {\n"
       "      float a = rot + float(i) * 2.399963;\n"
       "      float r = sqrt((float(i) + 0.5) / float(taps)) * coc0;\n"
-      "      vec2 uv = vUv + vec2(cos(a), sin(a)) * r * t;\n"
+      // A polygon aperture: the disc's radius shrinks to the polygon's edge between its corners.
+      "      if (uBokeh.x >= 3.0) {\n"
+      "         float seg = 6.2831853 / uBokeh.x;\n"
+      "         r *= cos(0.5 * seg) / cos(mod(a - uBokeh.y, seg) - 0.5 * seg);\n"
+      "      }\n"
+      "      vec2 off = vec2(cos(a), sin(a)) * r;\n"
+      "      off *= uBokeh.z >= 1.0 ? vec2(1.0 / uBokeh.z, 1.0) : vec2(1.0, uBokeh.z);\n"
+      "      r = length(off);\n"
+      "      vec2 uv = vUv + off * t;\n"
       "      float w = clamp(cocOf(uv) - r + 1.0, 0.0, 1.0);\n"
       "      if (w <= 0.0) continue;\n"
       "      sum += shade(uv) * w;\n"
@@ -403,6 +412,8 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       glUniform1f(glGetUniformLocation(mProgPost, "uFocus"), focusDistance);
       glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 24.0f * hScale);
       glUniform1f(glGetUniformLocation(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
+      glUniform3f(glGetUniformLocation(mProgPost, "uBokeh"), dofBlades >= 3 ? (float)std::min(dofBlades, 16) : 0.0f,
+                  dofRotation * 3.14159265f / 180.0f, std::clamp(dofRatio, 0.01f, 2.0f));
       glUniform1i(glGetUniformLocation(mProgPost, "uAoOnly"), aoOnly ? 1 : 0);
       glUniform1i(glGetUniformLocation(mProgPost, "uCavity"), cavityBits);
       glUniform4f(glGetUniformLocation(mProgPost, "uCavityK"), cavityRidge, cavityValley, curvatureRidge, curvatureValley);

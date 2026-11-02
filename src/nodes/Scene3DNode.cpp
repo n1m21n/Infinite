@@ -44,6 +44,8 @@ namespace
       f(s.proportional); f(s.propSize); f(s.propFalloff);
       f(s.invertZoom); f(s.textInfo); f(s.stats); f(s.originsAll); f(s.gizmoMove); f(s.gizmoNav); f(s.snapObjects);
       f(s.border); f(s.crop); f(s.borderMin[0]); f(s.borderMin[1]); f(s.borderMax[0]); f(s.borderMax[1]);
+      f(s.safeCenter); f(s.guideColor[0]); f(s.guideColor[1]); f(s.guideColor[2]);
+      f(s.diagonal); f(s.goldenTriA); f(s.goldenTriB); f(s.harmonyTriA); f(s.harmonyTriB);
    }
 
    void Normalize(float v[3])
@@ -472,6 +474,9 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("shadowStrength", mRender.shadowStrength);
    v.Float("dofAperture", mRender.dofAperture);
    v.Float("focusDistance", mRender.focusDistance);
+   v.Int("dofBlades", mRender.dofBlades);
+   v.Float("dofRotation", mRender.dofRotation);
+   v.Float("dofRatio", mRender.dofRatio);
    v.Color("ambient", mRender.ambientColor);
    v.Float("envIntensity", mRender.envIntensity);
    v.Bool("floatOutput", mRender.floatOutput);
@@ -504,6 +509,10 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Int("projection", mRender.projection);
    v.Float("domeAngle", mRender.domeAngle);
    v.Float("domeTilt", mRender.domeTilt);
+   v.Float("latMin", mRender.latMin);
+   v.Float("latMax", mRender.latMax);
+   v.Float("lonMin", mRender.lonMin);
+   v.Float("lonMax", mRender.lonMax);
    v.Text("scene", mText);
 }
 
@@ -768,7 +777,7 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
       stamp.insert(stamp.end(), l.aim, l.aim + 3);
       stamp.insert(stamp.end(), { l.intensity, l.diffuse, l.specular, l.transmission, l.falloff,
-                                  l.castShadow ? 1.0f : 0.0f, l.shadowSoft, (float)l.shadowRes, l.shadowClip });
+                                  l.castShadow ? 1.0f : 0.0f, l.shadowSoft, (float)l.shadowRes, l.shadowClip, l.cutoff });
    }
    const bool worldLights = worldColorOn && mWorldNode == nullptr;
    for (int k = 0; k < 3; k++)
@@ -794,10 +803,10 @@ void Scene3DNode::Sync(int frameId)
    CameraNode* lens = nullptr;
    if (settings.fStop > 0.0f && CameraView(lensView, lensEye, &lens) && lens != nullptr)
    {
-      const float aspect = std::max(1.0f, std::max(1.0f, renderW) / std::max(1.0f, renderH));
-      const float mm = lens->sensorWidth / (2.0f * std::tan(lens->fov * 0.5f * 3.14159265f / 180.0f) * aspect);
+      const float aspect = std::max(1.0f, renderW) / std::max(1.0f, renderH);
+      const float mm = lens->FocalLength(aspect);
       const float focusMm = std::max(mRender.focusDistance * 1000.0f, mm * 1.01f);
-      mRender.dofAperture = mm * mm / (settings.fStop * (focusMm - mm)) / (lens->sensorWidth / aspect) * 45.0f;
+      mRender.dofAperture = mm * mm / (settings.fStop * (focusMm - mm)) / lens->SensorSpan(aspect) * 45.0f;
    }
    stamp.push_back(mRender.focusDistance);
    stamp.insert(stamp.end(), marks.begin(), marks.end());

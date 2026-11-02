@@ -38,10 +38,25 @@ public:
    float orbitPerBeat = 0.0f; // free rotation, useful for turntables
    float shiftX = 0.0f, shiftY = 0.0f;   // lens shift, in widths of the sensor
    float sensorWidth = 36.0f;            // mm, what focal length is measured against
+   float sensorHeight = 24.0f;           // mm, used when the sensor fits the frame's height
+   int sensorFit = 0;                    // 0 auto (the longer side), 1 horizontal, 2 vertical
+   // In the 3D View only: marker size, clip range and focus line, name and sensor gate in the camera view.
+   float displaySize = 1.0f;
+   bool showLimits = false, showName = false, showSensor = false;
+
+   static const std::vector<std::string>& SensorFitNames();
+   // The vertical view's sensor size in mm for a frame of `aspect` (width / height): focal length
+   // and field of view convert through it, tan(fov / 2) = span / (2 * mm).
+   float SensorSpan(float aspect) const;
+   float FocalLength(float aspect) const;
+   void SetFocalLength(float mm, float aspect);
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("shiftX", shiftX); v.Float("shiftY", shiftY); v.Float("sensorWidth", sensorWidth);
+      v.Float("sensorHeight", sensorHeight); v.Int("sensorFit", sensorFit);
+      v.Float("displaySize", displaySize); v.Bool("showLimits", showLimits);
+      v.Bool("showName", showName); v.Bool("showSensor", showSensor);
       v.Float("orthoHeight", orthoHeight); v.Float("distance", distance);
       v.Float("azimuth", azimuth); v.Float("elevation", elevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);
@@ -63,6 +78,8 @@ public:
 
    // Direction for a directional light, world position for a point light.
    void ComputeVector(float out[3]) const;
+   // A black body's colour at `kelvin`, linear sRGB, brightest channel 1 (6500 K is about white).
+   static void TemperatureColor(float kelvin, float out[3]);
 
    int type = 0; // directional / point / sun / ambient / spot / area
    float azimuth = 51.5662f;
@@ -87,6 +104,12 @@ public:
    float shadowFilter = 1.0f;      // extra blur on top of that
    int shadowRes = 0;              // 0 = the look's quality, 1 / 2 / 3 = 1024 / 2048 / 4096
    float shadowClip = 0.05f;       // nothing nearer the light than this casts
+   bool useTemperature = false;    // tint the colour by a black body at `temperature`
+   float temperature = 6500.0f;    // kelvin
+   float exposure = 0.0f;          // stops on top of the strength
+   bool useCutoff = false;         // point, spot, area: no light at all past `cutoffDistance`
+   float cutoffDistance = 40.0f;
+   bool showCone = false;          // spot: the 3D View draws its whole cone, out to the target or the cutoff
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -101,6 +124,10 @@ public:
       v.Bool("softFalloff", softFalloff);
       v.Bool("castShadow", castShadow); v.Float("shadowRadius", shadowRadius);
       v.Float("shadowFilter", shadowFilter); v.Int("shadowRes", shadowRes); v.Float("shadowClip", shadowClip);
+      v.Bool("useTemperature", useTemperature); v.Float("temperature", temperature);
+      v.Float("exposure", exposure);
+      v.Bool("useCutoff", useCutoff); v.Float("cutoffDistance", cutoffDistance);
+      v.Bool("showCone", showCone);
    }
    float orbitPerBeat = 0.0f;
 };

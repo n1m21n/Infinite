@@ -32,6 +32,7 @@ namespace
    const char* kPanoBody =
       "uniform samplerCube uCube;\n"
       "uniform int uLayout;\n" // 0 equirect, 1 cubemap 3x2, 2 fisheye
+      "uniform vec4 uLatLon;\n" // equirect: latitude min, max, longitude min, max, degrees
       "uniform int uDepth;\n"  // 1: the cube holds depth, outside the dome is far
       "uniform vec2 uSize;\n"
       "uniform float uDome;\n" // degrees across the dome circle
@@ -41,8 +42,8 @@ namespace
       "bool dirFor(vec2 uv, out vec3 d) {\n"
       "   d = vec3(0.0, 0.0, -1.0);\n"
       "   if (uLayout == 0) {\n"
-      "      float lon = (uv.x - 0.5) * 2.0 * PI;\n"
-      "      float lat = (uv.y - 0.5) * PI;\n"
+      "      float lon = radians(mix(uLatLon.z, uLatLon.w, uv.x));\n"
+      "      float lat = radians(mix(uLatLon.x, uLatLon.y, uv.y));\n"
       "      d = vec3(sin(lon) * cos(lat), sin(lat), -cos(lon) * cos(lat));\n"
       "      return true;\n"
       "   }\n"
@@ -145,8 +146,8 @@ void Render3DNode::CookPano(int frameId)
    const float dome = std::clamp(domeAngle, 180.0f, 220.0f);
    // A face side that matches the output's pixel density at the centre of view.
    int side = 0;
-   if (projection == kEquirect)
-      side = w / 4;
+   if (projection == kEquirect)   // a narrower span puts more of the frame on each face
+      side = (int)std::lround((float)w / 4.0f * 360.0f / std::max(1.0f, std::abs(lonMax - lonMin)));
    else if (projection == kCubemap3x2)
       side = std::max(w / 3, h / 2);
    else
@@ -247,6 +248,8 @@ void Render3DNode::CookPano(int frameId)
          glUniform2f(glGetUniformLocation(mProgPano, "uSize"), (float)w, (float)h);
          glUniform1f(glGetUniformLocation(mProgPano, "uDome"), dome);
          glUniform1f(glGetUniformLocation(mProgPano, "uTilt"), std::clamp(domeTilt, 0.0f, 90.0f));
+         glUniform4f(glGetUniformLocation(mProgPano, "uLatLon"), std::clamp(latMin, -90.0f, 90.0f), std::clamp(latMax, -90.0f, 90.0f),
+                     std::clamp(lonMin, -180.0f, 180.0f), std::clamp(lonMax, -180.0f, 180.0f));
       });
       glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
    };

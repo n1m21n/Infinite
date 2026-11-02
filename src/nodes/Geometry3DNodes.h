@@ -621,6 +621,7 @@ public:
       float shadowSoft = 1.0f;           // multiplies the look's shadow softness
       int shadowRes = 0;                 // 0 = the look's quality, else 1024 / 2048 / 4096
       float shadowClip = 0.05f;
+      float cutoff = 0.0f;               // point, spot, area: no light past this distance; 0 = none
       // Everything above that the light node sets, from its params.
       void From(const class LightNode& n);
    };
@@ -680,6 +681,8 @@ public:
    enum { kPerspective = 0, kOrthographic = 1, kEquirect = 2, kCubemap3x2 = 3, kFisheye = 4 };
    float domeAngle = 180.0f; // fisheye: the field across the dome circle, degrees
    float domeTilt = 0.0f;    // fisheye: 0 = the dome centre looks straight up, 90 = straight ahead
+   // Equirect: the latitude and longitude the frame spans, degrees (a full sphere by default).
+   float latMin = -90.0f, latMax = 90.0f, lonMin = -180.0f, lonMax = 180.0f;
    bool PanoActive() const { return projection >= kEquirect && camera == nullptr; }
    float fov = 45.0f;
    float orthoHeight = 1.5f;
@@ -770,6 +773,11 @@ public:
    // is off; `focusDistance` is the distance from the camera that stays sharp.
    float dofAperture = 0.0f;
    float focusDistance = 4.0f;
+   // The aperture's shape: 0 blades is round, 3 or more a polygon turned by `dofRotation` degrees;
+   // `dofRatio` stretches it tall (above 1) or wide (below 1), as an anamorphic lens does.
+   int dofBlades = 0;
+   float dofRotation = 0.0f;
+   float dofRatio = 1.0f;
    // Keep the output texture as 16-bit float instead of 8-bit, so a 16-bit PNG
    // or EXR carries real precision and, with tonemap off, light above 1.0.
    bool floatOutput = false;
@@ -820,6 +828,7 @@ public:
    {
       v.Float("ao", aoStrength); v.Float("aoRadius", aoRadius);
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
+      v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);
       v.Float("width", width); v.Float("height", height);
       v.Int("renderPass", renderPass);
@@ -837,6 +846,7 @@ public:
       v.Int("motionPosition", motionPosition); v.Float("motionMax", motionMax);
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
+      v.Float("latMin", latMin); v.Float("latMax", latMax); v.Float("lonMin", lonMin); v.Float("lonMax", lonMax);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);
       v.Float("near", nearPlane); v.Float("far", farPlane);

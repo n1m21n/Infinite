@@ -1827,9 +1827,18 @@ namespace app
       ModSlider("height", &n->areaHeight, 0.05f, 10.0f);
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
+      ModCheckbox("temperature", &n->useTemperature);
+      ImGui::BeginDisabled(!n->useTemperature);
+      ModSlider("kelvin", &n->temperature, 800.0f, 20000.0f, "%.0f K");
+      ImGui::EndDisabled();
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
+      ModSlider("exposure", &n->exposure, -10.0f, 10.0f, "%.2f");
       ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
       ModSlider("falloff", &n->falloff, 0.0f, 4.0f);
+      ModCheckbox("cutoff", &n->useCutoff);
+      ImGui::BeginDisabled(!n->useCutoff);
+      ModSlider("cutoff distance", &n->cutoffDistance, 0.01f, 100.0f);
+      ImGui::EndDisabled();
       ImGui::EndDisabled();
       ModSlider("diffuse", &n->diffuse, 0.0f, 2.0f);
       ModSlider("specular", &n->specular, 0.0f, 2.0f);
@@ -2048,6 +2057,13 @@ namespace app
          ImGui::BeginDisabled(n->projection != Render3DNode::kFisheye);
          ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
          ImGui::EndDisabled();
+         if (n->projection == Render3DNode::kEquirect)
+         {
+            ModSlider("min latitude", &n->latMin, -90.0f, 90.0f, "%.0f\xC2\xB0", colW);
+            ModSlider("max latitude", &n->latMax, -90.0f, 90.0f, "%.0f\xC2\xB0", colW);
+            ModSlider("min longitude", &n->lonMin, -180.0f, 180.0f, "%.0f\xC2\xB0", colW);
+            ModSlider("max longitude", &n->lonMax, -180.0f, 180.0f, "%.0f\xC2\xB0", colW);
+         }
          ModSlider("distance", &n->camDistance, 0.3f, 20.0f, "%.3f", colW);
          ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
          ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
@@ -2150,6 +2166,9 @@ namespace app
       ImGui::EndDisabled();
       ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());
       ModSlider("focus distance", &n->focusDistance, 0.3f, 30.0f, "%.3f", colW);
+      ModSliderInt("aperture blades", &n->dofBlades, 0, 16, colW);
+      ModSlider("aperture rotation", &n->dofRotation, -180.0f, 180.0f, "%.0f\xC2\xB0", colW);
+      ModSlider("aperture ratio", &n->dofRatio, 0.01f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
       ImGui::BeginDisabled(!n->HdrActive());
