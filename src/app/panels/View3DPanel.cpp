@@ -137,6 +137,7 @@ namespace
       int plane = -1;              // moves in the plane facing this axis
       int orient = 0;              // 0 global, 1 local, 2 view
       bool gizmo = false;
+      bool track = false;          // rotate: free trackball turn (R again)
       ImVec2 start;
       float pivot[3] = { 0, 0, 0 };
       std::vector<Item> before;
@@ -1028,7 +1029,19 @@ namespace
          const float a0 = std::atan2(sOp.start.y - c.y, sOp.start.x - c.x);
          const float a1 = std::atan2(mouse.y - c.y, mouse.x - c.x);
          float deg = (a1 - a0) * fine * 180.0f / kPi;
-         if (sOp.axis < 0)
+         if (sOp.track)
+         {
+            // Trackball: the drag turns the item about the screen axis square to it.
+            float t[3];
+            for (int k = 0; k < 3; k++)
+               t[k] = sCam.up[k] * d.x + sCam.right[k] * d.y;
+            const float len = std::sqrt(Dot(t, t));
+            if (len > 1e-4f)
+               for (int k = 0; k < 3; k++)
+                  axis[k] = t[k] / len;
+            deg = len * 0.5f;
+         }
+         else if (sOp.axis < 0)
          {
             for (int k = 0; k < 3; k++)
                axis[k] = -sCam.fwd[k];
@@ -2092,6 +2105,12 @@ namespace
       auto digit = [&](int i) { return pressed((ImGuiKey)(ImGuiKey_0 + i)) || pressed((ImGuiKey)(ImGuiKey_Keypad0 + i)); };
       if (sOp.mode != 0)
       {
+         if (sOp.mode == 'r' && !sOp.gizmo && pressed(ImGuiKey_R))
+         {
+            sOp.track = !sOp.track;
+            sOp.start = mouse;
+            sOp.axis = -1;
+         }
          for (int a = 0; a < 3; a++)
             if (pressed(a == 0 ? ImGuiKey_X : a == 1 ? ImGuiKey_Z : ImGuiKey_Y))
             {
@@ -4204,11 +4223,13 @@ namespace
          scrollToActive = true;
       }
       int dragFrom = -1, dragTo = -1;
+      std::vector<std::pair<float, int>> rowTops;   // for Alt-drag box select
       for (int row : order)
       {
          Item& it = items[row];
          ImGui::PushID(it.id);
          const ImVec2 p = ImGui::GetCursorScreenPos();
+         rowTops.push_back({ p.y, it.id });
          ImGui::SetNextItemAllowOverlap();
          if (ImGui::Selectable("##row", Selected(it.id), ImGuiSelectableFlags_None, ImVec2(availW, rowH)))
          {
@@ -4231,7 +4252,7 @@ namespace
             else
                sSel = { it.id };
          }
-         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+         if (!io.KeyAlt && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
          {
             ImGui::SetDragDropPayload("v3ditem", &row, sizeof(int));
             ImGui::TextUnformatted(ItemName(it).c_str());
@@ -4331,6 +4352,29 @@ namespace
       }
       if (count > 0)
          ImGui::EndChild();
+      static float sBoxY0 = 0.0f;
+      static bool sBoxing = false;
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         sBoxing = false;
+      if (io.KeyAlt && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && !rowTops.empty())
+      {
+         // Alt-drag over the rows selects every row the drag passes.
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+         {
+            sBoxY0 = ImGui::GetMousePos().y;
+            sBoxing = true;
+         }
+         if (sBoxing && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            const float y0 = std::min(sBoxY0, ImGui::GetMousePos().y), y1 = std::max(sBoxY0, ImGui::GetMousePos().y);
+            std::vector<int> hit;
+            for (const auto& r : rowTops)
+               if (r.first + rowH > y0 && r.first < y1)
+                  hit.push_back(r.second);
+            if (!hit.empty())
+               sSel = hit;
+         }
+      }
       if (dragFrom >= 0 && dragTo >= 0 && dragFrom != dragTo)
       {
          PushUndoCheckpoint("Reorder in 3D View");
