@@ -233,6 +233,16 @@ Build-it-yourself flow (details in `apps/watch/README.md`):
 
 Keep-alive without HealthKit: free personal teams may not get the HealthKit entitlement. Default build uses `WKExtendedRuntimeSession` (physical-therapy session type, `WKBackgroundModes` in Info.plist, no entitlement), heart byte = 0. Building with `INFINITE_WATCH_HEALTH=1` switches to `HKWorkoutSession` + heart rate (`Keeper.swift`) for users whose team allows HealthKit. The Mac side is identical in both cases.
 
+### One-click setup from inside Infinite (decided 2026-11-02, D-B1 to D-B5)
+
+| Id | Decision |
+|---|---|
+| D-B1 | The source ships inside `Infinite.app/Contents/Resources/WatchRemote/`. The `.xcodeproj` is generated at Infinite build time with xcodegen (release builds need xcodegen; a dev build without it ships sources only and the checklist says the project is missing). Users need neither a repo clone nor xcodegen. Mac builds only. |
+| D-B2 | The Apple Watch node card has a "Set up watch app" button that opens a checklist window. Each step checks itself every few seconds and turns green alone: (1) Xcode installed (`xcode-select -p`, `xcodebuild -version`); (2) Apple ID in Xcode (`defaults read com.apple.dt.Xcode IDEProvisioningTeams`, the free Personal Team is picked automatically); (3) iPhone and watch visible with Developer Mode on (`xcrun devicectl list devices`); (4) "Install on my watch". An unmet step shows one sentence and an Open button where it helps. The website page `website/watch.html` is the same guide with screenshots, generated from `apps/watch/README.md` (the single source) by `tools/gen-watch-page.py`. |
+| D-B3 | "Install on my watch" runs `apps/watch/install.sh` (the same script `scripts/build_watch_app.sh` uses) on a background thread: copy the bundled project to `~/Library/Application Support/Infinite/WatchRemote/`, set `DEVELOPMENT_TEAM` and a bundle id `org.infinitedevices.remote.<8 hex of a hash of the team id>`, `xcodebuild -allowProvisioningUpdates` for the watch, then `xcrun devicectl device install app`. The card shows a progress line and the last error line. On any failure it opens the project in Xcode with the team filled in and says to press Run. |
+| D-B4 | The install date is saved (`watch_install.txt` in the app support folder). The card shows "watch app expires in N days"; from 2 days before it offers a one-click "Reinstall" (same path as D-B3). |
+| D-B5 | Selftests never run xcodebuild or devicectl. The checks and the install sit behind `WatchSetup::IToolchain`; `WATCHSETUPTEST` fakes it and walks the checklist through every state. |
+
 ## 9. Block C
 
 1. `control` notify + node input pin `haptic` -> `WKInterfaceDevice.current().play(.click)` on rising edge.
