@@ -104,3 +104,7 @@ measure = mod(t * 0.5, 1)
 | expecting `if(cond, a, b)` to skip the untaken branch | assume both are always evaluated | there is no short-circuit in this language |
 | writing Field syntax here (`param float x = ...`, `state`, `attrib`, domains) | plain expressions only | this is the flat expression language, not Field — no declarations, no kernels |
 | hardcoding raw units inside a parameter's own `=` field | use `lo`/`hi` and `lerp` | keeps the expression correct if the parameter's range is later changed |
+
+## Before you finish
+
+Put the expression in a patch and run `Infinite --validate patch.inf` (or `infinite patch check patch.inf`). Warnings count as errors. Fix every one before you tell the user it works. With the app running, `infinite context` shows `codeErrors` for what is open right now. Never hand over an expression that has not passed.

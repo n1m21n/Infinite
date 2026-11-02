@@ -441,3 +441,7 @@ Cd = vec3(bass, 0.3, 1.0 - bass)
 | a metaball/blob field using `1 / dist` falloff | use inverse-square, `r*r / dist2` | `1/dist` drops off too fast for two fields to ever merge; it always renders as separate flat circles |
 | a Field Modifier/Primitive preset with nothing feeding the mod matrix | end with `publish = <frame-scope scalar>` | `publish` is the reserved output name that becomes the node's second pin |
 | `emit("Field Element", ...)` / `emit("Field Sample", ...)` in a Field Graph kernel | `emit("Field Modifier", ...)` / `emit("Field Effect", ...)` | those are the node browser's actual spawnable names |
+
+## Before you finish
+
+Check every kernel before you tell the user it works: `infinite code check <file>` (add `--type <kind>` for a node kind). Read the errors, fix them, and check again until `ok` is true. With the app running, `infinite code errors` lists what the open patch reports right now, and `infinite code docs <language>` prints the facts, so never write from memory. Never hand over a kernel that has not passed.

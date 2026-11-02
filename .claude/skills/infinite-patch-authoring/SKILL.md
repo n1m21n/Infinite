@@ -31,7 +31,8 @@ the result back as JSON. Never guess a node's name, keys, slots or ranges: ask t
    (`# near <id>`); the tool places them. Check with `python3 tools/patch-layout-preview.py patch.inf box.png`
    (no GUI needed). New SIZES entries go in the tool when a type overlaps its neighbours.
 4. **Validate** - `Infinite --validate patch.inf`. Strict by default: warnings are errors too.
-   Fix until the exit code is 0. Every error carries a line number and a hint.
+   Fix until the exit code is 0. Every error carries a line number and a hint. Never tell the user a
+   patch works, and never hand it over, before this passes: skipping it is how users end up debugging.
 5. **Explain and compare to intent** - `Infinite --explain patch.inf`. It prints the graph that
    was actually built. Read it against what the user asked for: is every wire you wrote there,
    is every node you expect reachable from an Output or Audio Out, is any parameter still at a
@@ -137,13 +138,13 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 26 | bypass |
+| `3D View` | none | out:image | 58 | bypass |
 | `Array` | geo:geometry | out:geometry | 72 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
 | `Bevel` | geo:geometry | out:geometry | 72 | bypass |
-| `Camera` | none | out:camera | 16 | bypass |
+| `Camera` | none | out:camera | 23 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
 | `Cloth` | geo:geometry | out:geometry | 38 | bypass |
 | `Cone` | texture:image | out:geometry | 51 | bypass |
@@ -171,7 +172,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Gear 3D` | texture:image | out:geometry | 51 | bypass |
 | `Geometry` | texture:image | out:geometry | 51 | bypass |
 | `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
-| `HDRI` | none | out:environment | 3 | bypass |
+| `HDRI` | none | out:environment | 8 | bypass |
 | `Helix` | texture:image | out:geometry | 51 | bypass |
 | `Icosphere` | texture:image | out:geometry | 51 | bypass |
 | `Image to Points` | input:image | out:geometry | 10 | bypass |
@@ -181,7 +182,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
-| `Light` | none | out:light | 12 | bypass |
+| `Light` | none | out:light | 28 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
@@ -203,7 +204,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 51 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 83 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -413,7 +414,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
 | `MIDI File` | none | out:note | 7 | bypass |
-| `MIDI Notes` | none | out:note | 6 | hardware: refused headless, bypass |
+| `MIDI Notes` | none | out:note | 7 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |
 | `Note Filter` | notes:note | out:note | 6 | bypass |
