@@ -24,14 +24,14 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Constraints (aim only) | 2/7 | 0/15 | 8 |
 | World | 3/3 | 0/0 | 20 |
 | Render | 14/37 | 2/16 | 130 |
-| Output | 11/42 | 16/105 | 2 |
-| Scene | 3/35 | 9/14 | 20 |
-| View layer | 16/44 | 0/0 | 16 |
-| Outliner | 2/23 | 6/12 | 5 |
+| Output | 1/1 | 0/5 | 43 |
+| Scene | 4/11 | 4/6 | 44 |
+| View layer | 3/3 | 0/0 | 57 |
+| Outliner | 2/12 | 5/5 | 16 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **144/438** | **107/305** | **721** |
-| **Operators (features)** | **49/158** | | **336** |
+| **All settings** | **122/321** | **85/190** | **838** |
+| **Operators (features)** | **52/129** | | **365** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
 ## Viewport: View tab and header
@@ -973,208 +973,208 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Media Type | ImageFormatSettings.media_type | enum | **Image**, Multi-Layer EXR, **Video** | in | - |
-| File Format | ImageFormatSettings.file_format | enum | AVIF (.avif), JPEG (.jpg), OpenEXR (.exr), PNG (.png), WebP (.webp), Bitmap (.bmp), Cineon (.cin), DPX (.dpx), Iris (.rgb), JPEG 2000 (.jp2), Radiance HDR (.hdr), Targa (.tga), Targa Raw (.tga), TIFF (.tif), OpenEXR MultiLayer (.exr), FFmpeg Video | in | - |
-| Color Mode | ImageFormatSettings.color_mode | enum | BW, **RGB**, **RGBA** | in | - |
 | Color Depth | ImageFormatSettings.color_depth | enum | 8, 10, 12, 16, 32 | in | yes |
-| Quality | ImageFormatSettings.quality | int |  | in | yes |
-| Compression | ImageFormatSettings.compression | int |  | in | - |
-| Codec | ImageFormatSettings.exr_codec | enum | **None**, ZIP, PIZ, DWAA (lossy), DWAB (lossy), HTJ2K, ZIPS, **RLE**, Pxr24 (lossy), B44 (lossy), B44A (lossy) | in | yes |
-| Interleave | ImageFormatSettings.use_exr_interleave | boolean |  | in | yes |
-| YCC | ImageFormatSettings.use_jpeg2k_ycc | boolean |  | in | - |
-| Cinema | ImageFormatSettings.use_jpeg2k_cinema_preset | boolean |  | in | - |
-| Cinema (48) | ImageFormatSettings.use_jpeg2k_cinema_48 | boolean |  | in | - |
-| Codec | ImageFormatSettings.jpeg2k_codec | enum | JP2, J2K | in | yes |
-| Compression | ImageFormatSettings.tiff_codec | enum | **None**, Deflate, LZW, Pack Bits | in | - |
-| Log | ImageFormatSettings.use_cineon_log | boolean |  | in | yes |
-| Black | ImageFormatSettings.cineon_black | int |  | in | yes |
-| White | ImageFormatSettings.cineon_white | int |  | in | yes |
-| Gamma | ImageFormatSettings.cineon_gamma | float |  | in | - |
-| Color Management | ImageFormatSettings.color_management | enum | Follow Scene, **Override** | in | yes |
-| Color Space Settings | ImageFormatSettings.linear_colorspace_settings | pointer |  | in | - |
-| Has Linear Color Space | ImageFormatSettings.has_linear_colorspace | boolean |  | in | - |
-| Container | FFmpegSettings.format | enum | MPEG-4, Matroska, WebM, **AVI**, DV, **Flash**, MPEG-1, MPEG-2, **Ogg**, QuickTime | in | yes |
-| Video Codec | FFmpegSettings.codec | enum | No Video, AV1, **H.264**, H.265 / HEVC, WebM / VP9, DNxHD, DV, FFmpeg video codec #1, Flash Video, HuffYUV, MPEG-1, MPEG-2, MPEG-4 (divx), **PNG**, **ProRes**, QuickTime Animation, Theora | in | - |
-| Bitrate | FFmpegSettings.video_bitrate | int |  | in | - |
-| Min Rate | FFmpegSettings.minrate | int |  | in | - |
-| Max Rate | FFmpegSettings.maxrate | int |  | in | - |
-| Mux Rate | FFmpegSettings.muxrate | int |  | in | - |
-| Keyframe Interval | FFmpegSettings.gopsize | int |  | in | - |
-| Max B-Frames | FFmpegSettings.max_b_frames | int |  | in | - |
-| Use Max B-Frames | FFmpegSettings.use_max_b_frames | boolean |  | in | - |
-| Buffersize | FFmpegSettings.buffersize | int |  | in | - |
-| Mux Packet Size | FFmpegSettings.packetsize | int |  | in | - |
-| Output Quality | FFmpegSettings.constant_rate_factor | enum | Constant Bitrate, Lossless, Perceptually Lossless, High Quality, Medium Quality, Low Quality, Very Low Quality, Lowest Quality, Custom Quality | in | - |
-| CRF | FFmpegSettings.custom_constant_rate_factor | int |  | in | - |
-| Encoding Speed | FFmpegSettings.ffmpeg_preset | enum | Slowest, Good, **Realtime** | in | - |
-| Profile | FFmpegSettings.ffmpeg_prores_profile | enum | ProRes 422 Proxy, ProRes 422 LT, ProRes 422, ProRes 422 HQ, ProRes 4444, ProRes 4444 XQ | in | - |
-| Autosplit Output | FFmpegSettings.use_autosplit | boolean |  | in | - |
-| Lossless Output | FFmpegSettings.use_lossless_output | boolean |  | in | - |
-| Audio Codec | FFmpegSettings.audio_codec | enum | **No Audio**, AAC, AC3, FLAC, MP2, MP3, Opus, PCM, Vorbis | in | - |
-| Bitrate | FFmpegSettings.audio_bitrate | int |  | in | - |
-| Volume | FFmpegSettings.audio_volume | float |  | in | yes |
-| Sample Rate | FFmpegSettings.audio_mixrate | int |  | in | - |
-| Audio Channels | FFmpegSettings.audio_channels | enum | Mono, Stereo, 4 Channels, 5.1 Surround, 7.1 Surround | in | - |
+| Media Type | ImageFormatSettings.media_type | enum | **Image**, Multi-Layer EXR, **Video** | out: file formats belong to the app's Export dialog and Output node | - |
+| File Format | ImageFormatSettings.file_format | enum | AVIF (.avif), JPEG (.jpg), OpenEXR (.exr), PNG (.png), WebP (.webp), Bitmap (.bmp), Cineon (.cin), DPX (.dpx), Iris (.rgb), JPEG 2000 (.jp2), Radiance HDR (.hdr), Targa (.tga), Targa Raw (.tga), TIFF (.tif), OpenEXR MultiLayer (.exr), FFmpeg Video | out: file formats belong to the app's Export dialog and Output node | - |
+| Color Mode | ImageFormatSettings.color_mode | enum | BW, **RGB**, **RGBA** | out: file formats belong to the app's Export dialog and Output node | - |
+| Quality | ImageFormatSettings.quality | int |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Compression | ImageFormatSettings.compression | int |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Codec | ImageFormatSettings.exr_codec | enum | **None**, ZIP, PIZ, DWAA (lossy), DWAB (lossy), HTJ2K, ZIPS, **RLE**, Pxr24 (lossy), B44 (lossy), B44A (lossy) | out: file formats belong to the app's Export dialog and Output node | - |
+| Interleave | ImageFormatSettings.use_exr_interleave | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| YCC | ImageFormatSettings.use_jpeg2k_ycc | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Cinema | ImageFormatSettings.use_jpeg2k_cinema_preset | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Cinema (48) | ImageFormatSettings.use_jpeg2k_cinema_48 | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Codec | ImageFormatSettings.jpeg2k_codec | enum | JP2, J2K | out: file formats belong to the app's Export dialog and Output node | - |
+| Compression | ImageFormatSettings.tiff_codec | enum | **None**, Deflate, LZW, Pack Bits | out: file formats belong to the app's Export dialog and Output node | - |
+| Log | ImageFormatSettings.use_cineon_log | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Black | ImageFormatSettings.cineon_black | int |  | out: file formats belong to the app's Export dialog and Output node | - |
+| White | ImageFormatSettings.cineon_white | int |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Gamma | ImageFormatSettings.cineon_gamma | float |  | out: file formats belong to the app's Export dialog and Output node | - |
 | Views Format | ImageFormatSettings.views_format | enum | **Individual**, Stereo 3D, Multi-View | out: views_format | - |
 | Stereo 3D Format | ImageFormatSettings.stereo_3d_format | pointer |  | out: stereo | - |
+| Color Management | ImageFormatSettings.color_management | enum | Follow Scene, **Override** | out: file formats belong to the app's Export dialog and Output node | - |
+| Color Space Settings | ImageFormatSettings.linear_colorspace_settings | pointer |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Has Linear Color Space | ImageFormatSettings.has_linear_colorspace | boolean |  | out: file formats belong to the app's Export dialog and Output node | - |
+| Container | FFmpegSettings.format | enum | MPEG-4, Matroska, WebM, **AVI**, DV, **Flash**, MPEG-1, MPEG-2, **Ogg**, QuickTime | out: video encoding belongs to the app's Export dialog | - |
+| Video Codec | FFmpegSettings.codec | enum | No Video, AV1, **H.264**, H.265 / HEVC, WebM / VP9, DNxHD, DV, FFmpeg video codec #1, Flash Video, HuffYUV, MPEG-1, MPEG-2, MPEG-4 (divx), **PNG**, **ProRes**, QuickTime Animation, Theora | out: video encoding belongs to the app's Export dialog | - |
+| Bitrate | FFmpegSettings.video_bitrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Min Rate | FFmpegSettings.minrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Max Rate | FFmpegSettings.maxrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Mux Rate | FFmpegSettings.muxrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Keyframe Interval | FFmpegSettings.gopsize | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Max B-Frames | FFmpegSettings.max_b_frames | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Use Max B-Frames | FFmpegSettings.use_max_b_frames | boolean |  | out: video encoding belongs to the app's Export dialog | - |
+| Buffersize | FFmpegSettings.buffersize | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Mux Packet Size | FFmpegSettings.packetsize | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Output Quality | FFmpegSettings.constant_rate_factor | enum | Constant Bitrate, Lossless, Perceptually Lossless, High Quality, Medium Quality, Low Quality, Very Low Quality, Lowest Quality, Custom Quality | out: video encoding belongs to the app's Export dialog | - |
+| CRF | FFmpegSettings.custom_constant_rate_factor | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Encoding Speed | FFmpegSettings.ffmpeg_preset | enum | Slowest, Good, **Realtime** | out: video encoding belongs to the app's Export dialog | - |
+| Profile | FFmpegSettings.ffmpeg_prores_profile | enum | ProRes 422 Proxy, ProRes 422 LT, ProRes 422, ProRes 422 HQ, ProRes 4444, ProRes 4444 XQ | out: video encoding belongs to the app's Export dialog | - |
+| Autosplit Output | FFmpegSettings.use_autosplit | boolean |  | out: video encoding belongs to the app's Export dialog | - |
+| Lossless Output | FFmpegSettings.use_lossless_output | boolean |  | out: video encoding belongs to the app's Export dialog | - |
+| Audio Codec | FFmpegSettings.audio_codec | enum | **No Audio**, AAC, AC3, FLAC, MP2, MP3, Opus, PCM, Vorbis | out: video encoding belongs to the app's Export dialog | - |
+| Bitrate | FFmpegSettings.audio_bitrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Volume | FFmpegSettings.audio_volume | float |  | out: video encoding belongs to the app's Export dialog | - |
+| Sample Rate | FFmpegSettings.audio_mixrate | int |  | out: video encoding belongs to the app's Export dialog | - |
+| Audio Channels | FFmpegSettings.audio_channels | enum | Mono, Stereo, 4 Channels, 5.1 Surround, 7.1 Surround | out: video encoding belongs to the app's Export dialog | - |
 
 ## Scene
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
 | Objects | Scene.objects | collection |  | in | yes |
-| Current Frame | Scene.frame_current | int |  | in | - |
-| Current Subframe | Scene.frame_subframe | float |  | in | - |
-| Current Subframe | Scene.frame_float | float |  | in | - |
 | Start Frame | Scene.frame_start | int |  | in | - |
-| End Frame | Scene.frame_end | int |  | in | - |
+| End Frame | Scene.frame_end | int |  | in | yes |
 | Frame Step | Scene.frame_step | int |  | in | - |
-| Time Jump Unit | Scene.time_jump_unit | enum | **Frame**, **Second** | in | - |
-| Time Jump Delta | Scene.time_jump_delta | float |  | in | - |
-| Current Frame Final | Scene.frame_current_final | float |  | in | - |
-| Lock Frame Selection | Scene.lock_frame_selection_to_range | boolean |  | in | - |
-| Show Subframe | Scene.show_subframe | boolean |  | in | - |
-| Only Show Selected | Scene.show_keys_from_selected_only | boolean |  | in | - |
 | Stamp Note | Scene.use_stamp_note | string |  | in | - |
-| Custom Simulation Range | Scene.use_custom_simulation_range | boolean |  | in | - |
-| Simulation Frame Start | Scene.simulation_frame_start | int |  | in | - |
-| Simulation Frame End | Scene.simulation_frame_end | int |  | in | - |
-| Sync Mode | Scene.sync_mode | enum | Play Every Frame, Frame Dropping, Sync to Audio | in | - |
-| Rigid Body World | Scene.rigidbody_world | pointer |  | in | - |
-| Gravity | Scene.gravity | float |  | in | - |
-| Global Gravity | Scene.use_gravity | boolean |  | in | - |
 | Safe Areas | Scene.safe_areas | pointer |  | in | yes |
-| Transform Orientation Slots | Scene.transform_orientation_slots | collection |  | in | - |
-| Volume | Scene.audio_volume | float |  | in | yes |
-| Active Movie Clip | Scene.active_clip | pointer |  | in | - |
-| View Layers | Scene.view_layers | collection |  | in | - |
-| Hydra | Scene.hydra | pointer |  | in | - |
+| Transform Orientation Slots | Scene.transform_orientation_slots | collection |  | in | yes |
 | Unit System | UnitSettings.system | enum | **None**, Metric, Imperial | in | - |
 | Rotation Units | UnitSettings.system_rotation | enum | **Degrees**, **Radians** | in | - |
 | Unit Scale | UnitSettings.scale_length | float |  | in | - |
-| Separate Units | UnitSettings.use_separate | boolean |  | in | - |
 | Length Unit | UnitSettings.length_unit | enum | **Default** | in | - |
-| Mass Unit | UnitSettings.mass_unit | enum | **Default** | in | - |
-| Time Unit | UnitSettings.time_unit | enum | **Default** | in | - |
-| Temperature Unit | UnitSettings.temperature_unit | enum | **Default** | in | - |
+| Current Frame | Scene.frame_current | int |  | out: transport and timeline belong to the app | - |
+| Current Subframe | Scene.frame_subframe | float |  | out: transport and timeline belong to the app | - |
+| Current Subframe | Scene.frame_float | float |  | out: transport and timeline belong to the app | - |
+| Time Jump Unit | Scene.time_jump_unit | enum | **Frame**, **Second** | out: transport and timeline belong to the app | - |
+| Time Jump Delta | Scene.time_jump_delta | float |  | out: transport and timeline belong to the app | - |
+| Current Frame Final | Scene.frame_current_final | float |  | out: transport and timeline belong to the app | - |
+| Lock Frame Selection | Scene.lock_frame_selection_to_range | boolean |  | out: transport and timeline belong to the app | - |
 | Use Preview Range | Scene.use_preview_range | boolean |  | out: preview | - |
 | Preview Range Start Frame | Scene.frame_preview_start | int |  | out: preview | - |
 | Preview Range End Frame | Scene.frame_preview_end | int |  | out: preview | - |
+| Show Subframe | Scene.show_subframe | boolean |  | out: transport and timeline belong to the app | - |
+| Only Show Selected | Scene.show_keys_from_selected_only | boolean |  | out: transport and timeline belong to the app | - |
+| Custom Simulation Range | Scene.use_custom_simulation_range | boolean |  | out: simulation and physics | - |
+| Simulation Frame Start | Scene.simulation_frame_start | int |  | out: simulation and physics | - |
+| Simulation Frame End | Scene.simulation_frame_end | int |  | out: simulation and physics | - |
+| Sync Mode | Scene.sync_mode | enum | Play Every Frame, Frame Dropping, Sync to Audio | out: transport and timeline belong to the app | - |
 | Node Tree | Scene.compositing_node_group | pointer |  | out: compositing | - |
 | Use Nodes | Scene.use_nodes | boolean |  | out: node | - |
 | Sequence Editor | Scene.sequence_editor | pointer |  | out: sequence | - |
 | Absolute Keying Sets | Scene.keying_sets | collection |  | out: keying | - |
 | All Keying Sets | Scene.keying_sets_all | collection |  | out: keying | - |
+| Rigid Body World | Scene.rigidbody_world | pointer |  | out: simulation and physics | - |
+| Gravity | Scene.gravity | float |  | out: simulation and physics | - |
+| Global Gravity | Scene.use_gravity | boolean |  | out: simulation and physics | - |
 | Timeline Markers | Scene.timeline_markers | collection |  | out: marker | - |
 | Play Audio | Scene.use_audio | boolean |  | out: audio | - |
 | Audio Scrubbing | Scene.use_audio_scrub | boolean |  | out: audio | - |
 | Speed of Sound | Scene.audio_doppler_speed | float |  | out: audio | - |
 | Doppler Factor | Scene.audio_doppler_factor | float |  | out: audio | - |
 | Distance Model | Scene.audio_distance_model | enum | **None**, **Inverse**, Inverse Clamped, **Linear**, Linear Clamped, Exponential, Exponential Clamped | out: audio | - |
+| Volume | Scene.audio_volume | float |  | out: audio, tracking, layers and Hydra are outside the 3D View | - |
 | Annotations | Scene.annotation | pointer |  | out: annotation | - |
+| Active Movie Clip | Scene.active_clip | pointer |  | out: audio, tracking, layers and Hydra are outside the 3D View | - |
 | Sequencer Color Space Settings | Scene.sequencer_colorspace_settings | pointer |  | out: sequencer | - |
+| View Layers | Scene.view_layers | collection |  | out: audio, tracking, layers and Hydra are outside the 3D View | - |
 | Collection | Scene.collection | pointer |  | out: collection | - |
 | Grease Pencil | Scene.grease_pencil_settings | pointer |  | out: grease | - |
+| Hydra | Scene.hydra | pointer |  | out: audio, tracking, layers and Hydra are outside the 3D View | - |
 | Cycles Render Settings | Scene.cycles | pointer |  | out: cycles | yes |
 | Cycles Curves Rendering Settings | Scene.cycles_curves | pointer |  | out: cycles | - |
+| Separate Units | UnitSettings.use_separate | boolean |  | out: display-only units for physics and time | - |
+| Mass Unit | UnitSettings.mass_unit | enum | **Default** | out: display-only units for physics and time | - |
+| Time Unit | UnitSettings.time_unit | enum | **Default** | out: display-only units for physics and time | - |
+| Temperature Unit | UnitSettings.temperature_unit | enum | **Default** | out: display-only units for physics and time | - |
 
 ## View layer
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Name | ViewLayer.name | string |  | in | yes |
-| Samples | ViewLayer.samples | int |  | in | yes |
-| Alpha Threshold | ViewLayer.pass_alpha_threshold | float |  | in | - |
-| Shader AOV | ViewLayer.aovs | collection |  | in | - |
-| Shader AOV | ViewLayer.active_aov | pointer |  | in | - |
-| Active AOV Index | ViewLayer.active_aov_index | int |  | in | - |
-| Cryptomatte Object | ViewLayer.use_pass_cryptomatte_object | boolean |  | in | - |
-| Cryptomatte Levels | ViewLayer.pass_cryptomatte_depth | int |  | in | - |
-| Cryptomatte Accurate | ViewLayer.use_pass_cryptomatte_accurate | boolean |  | in | - |
-| Solid | ViewLayer.use_solid | boolean |  | in | yes |
-| Sky | ViewLayer.use_sky | boolean |  | in | yes |
-| Ambient Occlusion | ViewLayer.use_ao | boolean |  | in | yes |
-| Strand | ViewLayer.use_strand | boolean |  | in | - |
-| Volumes | ViewLayer.use_volumes | boolean |  | in | - |
-| Motion Blur | ViewLayer.use_motion_blur | boolean |  | in | - |
-| Combined | ViewLayer.use_pass_combined | boolean |  | in | - |
+| Combined | ViewLayer.use_pass_combined | boolean |  | in | yes |
 | Depth | ViewLayer.use_pass_z | boolean |  | in | yes |
-| Vector | ViewLayer.use_pass_vector | boolean |  | in | yes |
 | Position | ViewLayer.use_pass_position | boolean |  | in | yes |
-| Mist | ViewLayer.use_pass_mist | boolean |  | in | - |
-| Object Index | ViewLayer.use_pass_object_index | boolean |  | in | - |
-| Shadow | ViewLayer.use_pass_shadow | boolean |  | in | yes |
-| Ambient Occlusion | ViewLayer.use_pass_ambient_occlusion | boolean |  | in | yes |
-| Emission | ViewLayer.use_pass_emit | boolean |  | in | - |
-| Environment | ViewLayer.use_pass_environment | boolean |  | in | yes |
-| Diffuse Direct | ViewLayer.use_pass_diffuse_direct | boolean |  | in | - |
-| Diffuse Indirect | ViewLayer.use_pass_diffuse_indirect | boolean |  | in | - |
-| Diffuse Color | ViewLayer.use_pass_diffuse_color | boolean |  | in | - |
-| Glossy Direct | ViewLayer.use_pass_glossy_direct | boolean |  | in | - |
-| Glossy Indirect | ViewLayer.use_pass_glossy_indirect | boolean |  | in | - |
-| Glossy Color | ViewLayer.use_pass_glossy_color | boolean |  | in | - |
-| Transmission Direct | ViewLayer.use_pass_transmission_direct | boolean |  | in | - |
-| Transmission Indirect | ViewLayer.use_pass_transmission_indirect | boolean |  | in | - |
-| Transmission Color | ViewLayer.use_pass_transmission_color | boolean |  | in | - |
-| Subsurface Direct | ViewLayer.use_pass_subsurface_direct | boolean |  | in | - |
-| Subsurface Indirect | ViewLayer.use_pass_subsurface_indirect | boolean |  | in | - |
-| Subsurface Color | ViewLayer.use_pass_subsurface_color | boolean |  | in | - |
-| Objects | ViewLayer.objects | collection |  | in | yes |
-| Enabled | ViewLayer.use | boolean |  | in | yes |
-| Dependency Graph | ViewLayer.depsgraph | pointer |  | in | - |
-| Volume Light | ViewLayerEEVEE.use_pass_volume_direct | boolean |  | in | - |
-| Bloom | ViewLayerEEVEE.use_pass_bloom | boolean |  | in | yes |
-| Transparent | ViewLayerEEVEE.use_pass_transparent | boolean |  | in | yes |
-| Distance | ViewLayerEEVEE.ambient_occlusion_distance | float |  | in | yes |
+| Name | ViewLayer.name | string |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Samples | ViewLayer.samples | int |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Alpha Threshold | ViewLayer.pass_alpha_threshold | float |  | deferred: extra render passes need renderer work | - |
+| Shader AOV | ViewLayer.aovs | collection |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Shader AOV | ViewLayer.active_aov | pointer |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Active AOV Index | ViewLayer.active_aov_index | int |  | out: one view layer per scene; layers are outside the 3D View | - |
 | Light Groups | ViewLayer.lightgroups | collection |  | out: lightgroup | - |
 | Light Groups | ViewLayer.active_lightgroup | pointer |  | out: lightgroup | - |
 | Active Lightgroup Index | ViewLayer.active_lightgroup_index | int |  | out: lightgroup | - |
+| Cryptomatte Object | ViewLayer.use_pass_cryptomatte_object | boolean |  | deferred: cryptomatte needs renderer work | - |
 | Cryptomatte Material | ViewLayer.use_pass_cryptomatte_material | boolean |  | out: material | - |
 | Cryptomatte Asset | ViewLayer.use_pass_cryptomatte_asset | boolean |  | out: asset | - |
+| Cryptomatte Levels | ViewLayer.pass_cryptomatte_depth | int |  | deferred: cryptomatte needs renderer work | - |
+| Cryptomatte Accurate | ViewLayer.use_pass_cryptomatte_accurate | boolean |  | deferred: cryptomatte needs renderer work | - |
+| Solid | ViewLayer.use_solid | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Sky | ViewLayer.use_sky | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Ambient Occlusion | ViewLayer.use_ao | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Strand | ViewLayer.use_strand | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Volumes | ViewLayer.use_volumes | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Motion Blur | ViewLayer.use_motion_blur | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
 | Grease Pencil | ViewLayer.use_grease_pencil | boolean |  | out: grease | - |
+| Vector | ViewLayer.use_pass_vector | boolean |  | deferred: extra render passes need renderer work | - |
 | Normal | ViewLayer.use_pass_normal | boolean |  | out: normal | yes |
 | UV | ViewLayer.use_pass_uv | boolean |  | out: uv | - |
+| Mist | ViewLayer.use_pass_mist | boolean |  | deferred: extra render passes need renderer work | - |
+| Object Index | ViewLayer.use_pass_object_index | boolean |  | deferred: extra render passes need renderer work | - |
 | Material Index | ViewLayer.use_pass_material_index | boolean |  | out: material | - |
+| Shadow | ViewLayer.use_pass_shadow | boolean |  | deferred: extra render passes need renderer work | - |
+| Ambient Occlusion | ViewLayer.use_pass_ambient_occlusion | boolean |  | deferred: extra render passes need renderer work | - |
+| Emission | ViewLayer.use_pass_emit | boolean |  | deferred: extra render passes need renderer work | - |
+| Environment | ViewLayer.use_pass_environment | boolean |  | deferred: extra render passes need renderer work | - |
+| Diffuse Direct | ViewLayer.use_pass_diffuse_direct | boolean |  | out: material shading passes | - |
+| Diffuse Indirect | ViewLayer.use_pass_diffuse_indirect | boolean |  | out: material shading passes | - |
+| Diffuse Color | ViewLayer.use_pass_diffuse_color | boolean |  | out: material shading passes | - |
+| Glossy Direct | ViewLayer.use_pass_glossy_direct | boolean |  | out: material shading passes | - |
+| Glossy Indirect | ViewLayer.use_pass_glossy_indirect | boolean |  | out: material shading passes | - |
+| Glossy Color | ViewLayer.use_pass_glossy_color | boolean |  | out: material shading passes | - |
+| Transmission Direct | ViewLayer.use_pass_transmission_direct | boolean |  | out: material shading passes | - |
+| Transmission Indirect | ViewLayer.use_pass_transmission_indirect | boolean |  | out: material shading passes | - |
+| Transmission Color | ViewLayer.use_pass_transmission_color | boolean |  | out: material shading passes | - |
+| Subsurface Direct | ViewLayer.use_pass_subsurface_direct | boolean |  | out: material shading passes | - |
+| Subsurface Indirect | ViewLayer.use_pass_subsurface_indirect | boolean |  | out: material shading passes | - |
+| Subsurface Color | ViewLayer.use_pass_subsurface_color | boolean |  | out: material shading passes | - |
 | Layer Collection | ViewLayer.layer_collection | pointer |  | out: collection | - |
 | Active Layer Collection | ViewLayer.active_layer_collection | pointer |  | out: collection | - |
+| Objects | ViewLayer.objects | collection |  | out: one view layer per scene; layers are outside the 3D View | - |
+| Enabled | ViewLayer.use | boolean |  | out: one view layer per scene; layers are outside the 3D View | - |
 | Has export collections | ViewLayer.has_export_collections | boolean |  | out: collection | - |
 | Freestyle | ViewLayer.use_freestyle | boolean |  | out: freestyle | - |
 | Freestyle Settings | ViewLayer.freestyle_settings | pointer |  | out: freestyle | - |
 | Grease Pencil | ViewLayer.use_pass_grease_pencil | boolean |  | out: grease | - |
+| Dependency Graph | ViewLayer.depsgraph | pointer |  | out: one view layer per scene; layers are outside the 3D View | - |
 | Cycles ViewLayer Settings | ViewLayer.cycles | pointer |  | out: cycles | yes |
+| Volume Light | ViewLayerEEVEE.use_pass_volume_direct | boolean |  | deferred: EEVEE layer terms need renderer work | - |
+| Bloom | ViewLayerEEVEE.use_pass_bloom | boolean |  | deferred: EEVEE layer terms need renderer work | - |
+| Transparent | ViewLayerEEVEE.use_pass_transparent | boolean |  | deferred: EEVEE layer terms need renderer work | - |
+| Distance | ViewLayerEEVEE.ambient_occlusion_distance | float |  | deferred: EEVEE layer terms need renderer work | - |
 
 ## Outliner
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Display Mode | SpaceOutliner.display_mode | enum | **Scenes**, View Layer, Video Sequencer, Blender File, Data API, Library Overrides, Unused Data | in | - |
 | Case Sensitive Matches Only | SpaceOutliner.use_filter_case_sensitive | boolean |  | in | - |
 | Complete Matches Only | SpaceOutliner.use_filter_complete | boolean |  | in | - |
 | Sort Alphabetically | SpaceOutliner.use_sort_alpha | boolean |  | in | - |
-| Sync Outliner Selection | SpaceOutliner.use_sync_select | boolean |  | in | - |
-| Show Mode Column | SpaceOutliner.show_mode_column | boolean |  | in | - |
-| Exclude from View Layer | SpaceOutliner.show_restrict_column_enable | boolean |  | in | - |
-| Selectable | SpaceOutliner.show_restrict_column_select | boolean |  | in | yes |
-| Hide in Viewport | SpaceOutliner.show_restrict_column_hide | boolean |  | in | - |
-| Disable in Viewports | SpaceOutliner.show_restrict_column_viewport | boolean |  | in | - |
+| Sync Outliner Selection | SpaceOutliner.use_sync_select | boolean |  | in | yes |
+| Selectable | SpaceOutliner.show_restrict_column_select | boolean |  | in | - |
+| Hide in Viewport | SpaceOutliner.show_restrict_column_hide | boolean |  | in | yes |
 | Disable in Renders | SpaceOutliner.show_restrict_column_render | boolean |  | in | - |
-| Holdout | SpaceOutliner.show_restrict_column_holdout | boolean |  | in | - |
-| Indirect Only | SpaceOutliner.show_restrict_column_indirect_only | boolean |  | in | - |
 | Filter Objects | SpaceOutliner.use_filter_object | boolean |  | in | - |
-| Show Object Contents | SpaceOutliner.use_filter_object_content | boolean |  | in | - |
-| Show Object Children | SpaceOutliner.use_filter_children | boolean |  | in | - |
-| Show All View Layers | SpaceOutliner.use_filter_view_layers | boolean |  | in | - |
 | Object State Filter | SpaceOutliner.filter_state | enum | **All**, **Visible**, **Selected**, **Active**, **Selectable** | in | - |
-| Invert | SpaceOutliner.filter_invert | boolean |  | in | yes |
-| Show Empties | SpaceOutliner.use_filter_object_empty | boolean |  | in | - |
+| Invert | SpaceOutliner.filter_invert | boolean |  | in | - |
 | Show Lights | SpaceOutliner.use_filter_object_light | boolean |  | in | - |
 | Show Cameras | SpaceOutliner.use_filter_object_camera | boolean |  | in | - |
-| Show Other Objects | SpaceOutliner.use_filter_object_others | boolean |  | in | - |
+| Display Mode | SpaceOutliner.display_mode | enum | **Scenes**, View Layer, Video Sequencer, Blender File, Data API, Library Overrides, Unused Data | out: one flat list of scene items | - |
 | Display Filter | SpaceOutliner.filter_text | string |  | out: text | - |
+| Show Mode Column | SpaceOutliner.show_mode_column | boolean |  | out: modes, view layers, holdout | - |
+| Exclude from View Layer | SpaceOutliner.show_restrict_column_enable | boolean |  | out: modes, view layers, holdout | - |
+| Disable in Viewports | SpaceOutliner.show_restrict_column_viewport | boolean |  | out: modes, view layers, holdout | - |
+| Holdout | SpaceOutliner.show_restrict_column_holdout | boolean |  | out: modes, view layers, holdout | - |
+| Indirect Only | SpaceOutliner.show_restrict_column_indirect_only | boolean |  | out: modes, view layers, holdout | - |
+| Show Object Contents | SpaceOutliner.use_filter_object_content | boolean |  | out: no contents, children, layers or empties | - |
+| Show Object Children | SpaceOutliner.use_filter_children | boolean |  | out: no contents, children, layers or empties | - |
 | Show Collections | SpaceOutliner.use_filter_collection | boolean |  | out: collection | - |
+| Show All View Layers | SpaceOutliner.use_filter_view_layers | boolean |  | out: no contents, children, layers or empties | - |
 | Show Meshes | SpaceOutliner.use_filter_object_mesh | boolean |  | out: mesh | - |
 | Show Armatures | SpaceOutliner.use_filter_object_armature | boolean |  | out: armature | - |
+| Show Empties | SpaceOutliner.use_filter_object_empty | boolean |  | out: no contents, children, layers or empties | - |
 | Show Grease Pencil | SpaceOutliner.use_filter_object_grease_pencil | boolean |  | out: grease | - |
+| Show Other Objects | SpaceOutliner.use_filter_object_others | boolean |  | out: no contents, children, layers or empties | - |
 
 ## Preferences: navigation and input
 
@@ -1324,48 +1324,19 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Clear Track | OBJECT_OT_track_clear | Clear tracking constraint or flag from object | in | yes |
 | Make Track | OBJECT_OT_track_set | Make the object track another object, using various methods/constraints | in | yes |
 | Place Object Under Mouse | OBJECT_OT_transform_to_mouse | Snap selected item(s) to the mouse location | in | - |
-| Outliner Animation Data Operation | OUTLINER_OT_animdata_operation | (undocumented operator) | in | - |
-| Clear Filter | OUTLINER_OT_clear_filter | Clear the search filter | in | - |
-| Outliner Constraint Operation | OUTLINER_OT_constraint_operation | (undocumented operator) | in | - |
-| Outliner Data Operation | OUTLINER_OT_data_operation | (undocumented operator) | in | - |
-| Data Stack Drop | OUTLINER_OT_datastack_drop | Copy or reorder modifiers, constraints, and effects | in | - |
+| Clear Filter | OUTLINER_OT_clear_filter | Clear the search filter | in | yes |
 | Delete | OUTLINER_OT_delete | Delete selected objects and collections | in | yes |
-| Expand/Collapse All | OUTLINER_OT_expanded_toggle | Expand/Collapse all items | in | - |
 | Hide | OUTLINER_OT_hide | Hide selected objects and collections | in | yes |
-| Update Highlight | OUTLINER_OT_highlight_update | Update the item highlight based on the current mouse position | in | - |
-| Outliner ID Data Copy | OUTLINER_OT_id_copy | Copy the selected data-blocks to the internal clipboard | in | - |
-| Delete Data-Block | OUTLINER_OT_id_delete | Delete the ID under cursor | in | - |
-| Relocate Linked ID | OUTLINER_OT_id_linked_relocate | Replace the active linked ID (and its dependencies if any) by another one, from the same or a different librar | in | - |
-| Outliner ID Data Operation | OUTLINER_OT_id_operation | General data-block management operations | in | - |
-| Outliner ID Data Paste | OUTLINER_OT_id_paste | Paste data-blocks from the internal clipboard | in | - |
-| Outliner ID Data Remap | OUTLINER_OT_id_remap | (undocumented operator) | in | - |
 | Select | OUTLINER_OT_item_activate | Handle mouse clicks to select and activate items | in | yes |
 | Drag and Drop | OUTLINER_OT_item_drag_drop | Drag and drop element to another place | in | - |
-| Open/Close | OUTLINER_OT_item_openclose | Toggle whether item under cursor is open or closed | in | - |
 | Rename | OUTLINER_OT_item_rename | Rename the active element | in | yes |
-| Keying Set Add Selected | OUTLINER_OT_keyingset_add_selected | Add selected items (blue-gray rows) to active Keying Set | in | - |
-| Keying Set Remove Selected | OUTLINER_OT_keyingset_remove_selected | Remove selected items (blue-gray rows) from active Keying Set | in | - |
-| Outliner Library Operation | OUTLINER_OT_lib_operation | (undocumented operator) | in | - |
-| Relocate Library | OUTLINER_OT_lib_relocate | Relocate the library under cursor | in | - |
-| Outliner Library Override Operation | OUTLINER_OT_liboverride_operation | Create, reset or clear library override hierarchies | in | - |
-| Outliner Library Override Troubleshoot Operation | OUTLINER_OT_liboverride_troubleshoot_operation | Advanced operations over library override to help fix broken hierarchies | in | - |
-| Outliner Object Operation | OUTLINER_OT_object_operation | (undocumented operator) | in | - |
-| Context Menu | OUTLINER_OT_operation | Context menu for item operations | in | - |
-| Manage Unused Data | OUTLINER_OT_orphans_manage | Open a window to manage unused data | in | - |
-| Purge All | OUTLINER_OT_orphans_purge | Clear all orphaned data-blocks without any users from the file | in | - |
-| Drop to Clear Parent (hold Alt to not keep transforms) | OUTLINER_OT_parent_clear | Drag to clear parent in Outliner | in | - |
-| Drop to Set Parent (hold Alt to not keep transforms) | OUTLINER_OT_parent_drop | Drag to parent in Outliner | in | - |
 | Drop Object to Scene | OUTLINER_OT_scene_drop | Drag object to scene in Outliner | in | - |
-| Outliner Scene Operation | OUTLINER_OT_scene_operation | Context menu for scene operations | in | - |
-| Scroll Page | OUTLINER_OT_scroll_page | Scroll page up or down | in | - |
-| Toggle Selected | OUTLINER_OT_select_all | Toggle the Outliner selection of items | in | - |
+| Toggle Selected | OUTLINER_OT_select_all | Toggle the Outliner selection of items | in | yes |
 | Box Select | OUTLINER_OT_select_box | Use box selection to select tree elements | in | - |
 | Walk Select | OUTLINER_OT_select_walk | Use walk navigation to select tree elements | in | - |
 | Show Active | OUTLINER_OT_show_active | Open up the tree and adjust the view so that the active object is shown centered | in | - |
-| Show Hierarchy | OUTLINER_OT_show_hierarchy | Open all object entries and close all others | in | - |
-| Show/Hide One Level | OUTLINER_OT_show_one_level | Expand/collapse all entries by one level | in | - |
 | Filter | OUTLINER_OT_start_filter | Start entering filter text | in | yes |
-| Unhide All | OUTLINER_OT_unhide_all | Unhide all objects and collections | in | - |
+| Unhide All | OUTLINER_OT_unhide_all | Unhide all objects and collections | in | yes |
 | Viewport Render | RENDER_OT_opengl | Take a snapshot of the active viewport | in | - |
 | Render | RENDER_OT_render | (undocumented operator) | in | yes |
 | Cancel Render View | RENDER_OT_view_cancel | Cancel showing the render view | in | - |
@@ -1678,6 +1649,7 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Voxel Remesh | OBJECT_OT_voxel_remesh | Calculates a new manifold mesh based on the volume of the current mesh. All data layers will be lost | out: voxel | - |
 | Edit Voxel Size | OBJECT_OT_voxel_size_edit | Modify the mesh voxel size interactively used in the voxel remesher | out: voxel | - |
 | Outliner Set Action | OUTLINER_OT_action_set | Change the active action used | out: action | - |
+| Outliner Animation Data Operation | OUTLINER_OT_animdata_operation | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
 | Set Color Tag | OUTLINER_OT_collection_color_tag_set | Set a color tag for the selected collections | out: collection | - |
 | Disable Collection | OUTLINER_OT_collection_disable | Disable viewport display in the view layers | out: collection | - |
 | Disable Collection in Render | OUTLINER_OT_collection_disable_render | Do not render this collection | out: collection | - |
@@ -1703,10 +1675,38 @@ Every operator Blender ships for the viewport, objects, transform, outliner, ren
 | Select Objects | OUTLINER_OT_collection_objects_select | Select objects in collection | out: collection | - |
 | Show Collection | OUTLINER_OT_collection_show | Show the collection in this view layer | out: collection | - |
 | Show Inside Collection | OUTLINER_OT_collection_show_inside | Show all the objects and collections inside the collection | out: collection | - |
+| Outliner Constraint Operation | OUTLINER_OT_constraint_operation | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner Data Operation | OUTLINER_OT_data_operation | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Data Stack Drop | OUTLINER_OT_datastack_drop | Copy or reorder modifiers, constraints, and effects | out: data-blocks, libraries, overrides, keying sets or orphans | - |
 | Add Drivers for Selected | OUTLINER_OT_drivers_add_selected | Add drivers to selected items | out: driver | - |
 | Delete Drivers for Selected | OUTLINER_OT_drivers_delete_selected | Delete drivers assigned to selected items | out: driver | - |
+| Expand/Collapse All | OUTLINER_OT_expanded_toggle | Expand/Collapse all items | out: flat list, no tree | - |
+| Update Highlight | OUTLINER_OT_highlight_update | Update the item highlight based on the current mouse position | out: flat list, no tree | - |
+| Outliner ID Data Copy | OUTLINER_OT_id_copy | Copy the selected data-blocks to the internal clipboard | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Delete Data-Block | OUTLINER_OT_id_delete | Delete the ID under cursor | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Relocate Linked ID | OUTLINER_OT_id_linked_relocate | Replace the active linked ID (and its dependencies if any) by another one, from the same or a different librar | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner ID Data Operation | OUTLINER_OT_id_operation | General data-block management operations | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner ID Data Paste | OUTLINER_OT_id_paste | Paste data-blocks from the internal clipboard | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner ID Data Remap | OUTLINER_OT_id_remap | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Open/Close | OUTLINER_OT_item_openclose | Toggle whether item under cursor is open or closed | out: flat list, no tree | - |
+| Keying Set Add Selected | OUTLINER_OT_keyingset_add_selected | Add selected items (blue-gray rows) to active Keying Set | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Keying Set Remove Selected | OUTLINER_OT_keyingset_remove_selected | Remove selected items (blue-gray rows) from active Keying Set | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner Library Operation | OUTLINER_OT_lib_operation | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Relocate Library | OUTLINER_OT_lib_relocate | Relocate the library under cursor | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner Library Override Operation | OUTLINER_OT_liboverride_operation | Create, reset or clear library override hierarchies | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Outliner Library Override Troubleshoot Operation | OUTLINER_OT_liboverride_troubleshoot_operation | Advanced operations over library override to help fix broken hierarchies | out: data-blocks, libraries, overrides, keying sets or orphans | - |
 | Drop Material on Object | OUTLINER_OT_material_drop | Drag material to object in Outliner | out: material | - |
 | Outliner Modifier Operation | OUTLINER_OT_modifier_operation | (undocumented operator) | out: modifier | - |
+| Outliner Object Operation | OUTLINER_OT_object_operation | (undocumented operator) | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Context Menu | OUTLINER_OT_operation | Context menu for item operations | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Manage Unused Data | OUTLINER_OT_orphans_manage | Open a window to manage unused data | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Purge All | OUTLINER_OT_orphans_purge | Clear all orphaned data-blocks without any users from the file | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Drop to Clear Parent (hold Alt to not keep transforms) | OUTLINER_OT_parent_clear | Drag to clear parent in Outliner | out: no parenting; groups only | - |
+| Drop to Set Parent (hold Alt to not keep transforms) | OUTLINER_OT_parent_drop | Drag to parent in Outliner | out: no parenting; groups only | - |
+| Outliner Scene Operation | OUTLINER_OT_scene_operation | Context menu for scene operations | out: data-blocks, libraries, overrides, keying sets or orphans | - |
+| Scroll Page | OUTLINER_OT_scroll_page | Scroll page up or down | out: flat list, no tree | - |
+| Show Hierarchy | OUTLINER_OT_show_hierarchy | Open all object entries and close all others | out: flat list, no tree | - |
+| Show/Hide One Level | OUTLINER_OT_show_one_level | Expand/collapse all entries by one level | out: flat list, no tree | - |
 | Add White Balance Preset | RENDER_OT_color_management_white_balance_preset_add | Add or remove a white balance preset | out: preset list UI | - |
 | Add Integrator Preset | RENDER_OT_cycles_integrator_preset_add | Add an Integrator Preset | out: cycles | - |
 | Add Performance Preset | RENDER_OT_cycles_performance_preset_add | Add an Performance Preset | out: cycles | - |
