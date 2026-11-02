@@ -63,7 +63,11 @@ public:
 
    float Value(int index);
    // How many times a trigger output has fired since the node was made (tests, and the matrix's activity hint).
-   uint32_t FireCount(int index) const { return (index >= 0 && index < kOutputCount) ? mFires[index] : 0; }
+   uint32_t FireCount(int index)
+   {
+      Update();
+      return (index >= 0 && index < kOutputCount) ? mFires[index] : 0;
+   }
    // Roll, pitch and yaw relative to the recentred pose, degrees, before mapping (the card's meters).
    void Angles(float& rollDeg, float& pitchDeg, float& yawDeg) const;
 
@@ -122,5 +126,6 @@ private:
    uint32_t mShakeTimes[8] = {};
    int mShakeCount = 0;
    bool mStrikeArmed = false;
+   bool mStrikeSpent = false;   // a push that lasted too long: wait for it to end before arming again
    uint32_t mStrikeAt = 0;
 };

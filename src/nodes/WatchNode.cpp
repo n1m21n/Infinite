@@ -188,7 +188,7 @@ void WatchNode::Feed(const WatchPacket::Sample& s)
       mCrownSpeed = 0;
       mPrevCrown = s.crown;
       mPrevFlags = s.flags;
-      mShakeSign = 0; mShakeCount = 0; mStrikeArmed = false;
+      mShakeSign = 0; mShakeCount = 0; mStrikeArmed = mStrikeSpent = false;
       mFlickBlockedUntil = mShakeBlockedUntil = mStrikeBlockedUntil = t;
       mFirst = mRecenterPending = false;
    }
@@ -282,24 +282,31 @@ void WatchNode::Feed(const WatchPacket::Sample& s)
    }
 
    // Strike: a hard push along the forearm (x beyond 2.5 g) that stops within 120 ms. A shake's own peaks do not count.
-   if (ax > 2.5f * k && !mStrikeArmed)
+   if (mStrikeSpent)
    {
-      mStrikeArmed = true;
-      mStrikeAt = t;
+      if (ax < 1.0f) mStrikeSpent = false;
    }
-   else if (mStrikeArmed)
+   else if (!mStrikeArmed)
    {
-      if (ax < 1.0f)
+      if (ax > 2.5f * k)
       {
-         if (t - mStrikeAt <= kStrikeWindowMs && mShakeCount < 2 && (int32_t)(t - mStrikeBlockedUntil) >= 0)
-         {
-            Fire(kStrike, t);
-            mStrikeBlockedUntil = t + kRefractoryMs;
-         }
-         mStrikeArmed = false;
+         mStrikeArmed = true;
+         mStrikeAt = t;
       }
-      else if (t - mStrikeAt > kStrikeWindowMs)
-         mStrikeArmed = false;   // a push that lasts is not a strike
+   }
+   else if (ax < 1.0f)
+   {
+      if (t - mStrikeAt <= kStrikeWindowMs && mShakeCount < 2 && (int32_t)(t - mStrikeBlockedUntil) >= 0)
+      {
+         Fire(kStrike, t);
+         mStrikeBlockedUntil = t + kRefractoryMs;
+      }
+      mStrikeArmed = false;
+   }
+   else if (t - mStrikeAt > kStrikeWindowMs)
+   {
+      mStrikeArmed = false;   // a push that lasts is not a strike
+      mStrikeSpent = true;
    }
 }
 
