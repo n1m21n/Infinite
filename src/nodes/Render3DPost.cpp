@@ -1,5 +1,5 @@
-// Render 3D quality stage (v0.6 3.5): ambient occlusion, depth of field and the
-// offline supersample accumulator. Everything here runs after the scene is
+// Render 3D quality stage (v0.6 3.5): ambient occlusion, cavity, depth of field,
+// the AO pass and the offline supersample accumulator. Everything here runs after the scene is
 // drawn and resolved, reads the depth texture, and writes back into the same
 // output texture, so the 2D graph downstream sees an ordinary image.
 #include "Geometry3DNodes.h"
@@ -105,6 +105,10 @@ namespace
       "uniform float uFocus;\n"
       "uniform float uAperturePx;\n"
       "uniform float uMaxCoc;\n"
+      "uniform int uAoOnly;\n"
+      "uniform int uCavity;\n"        // bit 0 world, bit 1 screen
+      "uniform vec4 uCavityK;\n"      // ridge, valley, curvature ridge, curvature valley
+      "uniform float uCavityDist;\n"
       "float cocOf(vec2 uv) {\n"
       "   float d = texture(uDepth, uv).r;\n"
       "   float dist = d >= 0.999999 ? 1.0e4 : viewDist(d);\n"
@@ -129,12 +133,66 @@ namespace
       "   }\n"
       "   return sum / wsum;\n"
       "}\n"
+      "vec3 normalAt(vec2 uv) {\n"
+      "   vec2 t = 1.0 / uSize;\n"
+      "   vec3 P = viewPos(uv);\n"
+      "   vec3 pl = viewPos(uv - vec2(t.x, 0.0)), pr = viewPos(uv + vec2(t.x, 0.0));\n"
+      "   vec3 pd = viewPos(uv - vec2(0.0, t.y)), pu = viewPos(uv + vec2(0.0, t.y));\n"
+      "   vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;\n"
+      "   vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;\n"
+      "   return normalize(cross(dx, dy));\n"
+      "}\n"
+      "bool isBg(vec2 uv) { return texture(uDepth, uv).r >= 0.999999; }\n"
+      // World: how far the surface around rises above (valley) or falls below (ridge)
+      // this point's own plane, across the distance. Screen: how much the normal turns
+      // from one pixel to the next. Both lighten a ridge and darken a valley.
+      "float cavityAt(vec2 uv) {\n"
+      "   if (isBg(uv)) return 1.0;\n"
+      "   vec2 t = 1.0 / uSize;\n"
+      "   float f = 1.0;\n"
+      "   if ((uCavity & 1) != 0) {\n"
+      "      vec3 P = viewPos(uv);\n"
+      "      vec3 N = normalAt(uv);\n"
+      "      float pxPerUnit = uProj.y * uSize.y * 0.5 / ((uOrtho == 1) ? 1.0 : max(-P.z, 1.0e-3));\n"
+      "      float rPx = clamp(uCavityDist * pxPerUnit, 1.5, 0.1 * uSize.y);\n"
+      "      float rot = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "      float s = 0.0;\n"
+      "      for (int i = 0; i < 8; i++) {\n"
+      "         float a = rot + float(i) * 0.7853982;\n"
+      "         vec2 q = uv + vec2(cos(a), sin(a)) * rPx * t;\n"
+      "         if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0 || isBg(q)) continue;\n"
+      "         vec3 v = viewPos(q) - P;\n"
+      "         float len = length(v);\n"
+      "         if (len < 1.0e-5) continue;\n"
+      "         s += dot(N, v) / len * (1.0 - clamp(len / (uCavityDist * 2.0), 0.0, 1.0));\n"
+      "      }\n"
+      "      s /= 8.0;\n"
+      "      f *= (1.0 - clamp(s * 2.0, 0.0, 1.0) * uCavityK.y) * (1.0 + clamp(-s * 2.0, 0.0, 1.0) * uCavityK.x);\n"
+      "   }\n"
+      // The normals come from depth, so they see the facets smooth shading hides: a turn
+      // under the dead zone (a sphere's segments) counts for nothing, and a pair across a
+      // silhouette (one surface in front of another) is left out rather than outlined.
+      "   if ((uCavity & 2) != 0) {\n"
+      "      vec2 ox = vec2(t.x, 0.0), oy = vec2(0.0, t.y);\n"
+      "      float z = viewPos(uv).z;\n"
+      "      float c = 0.0;\n"
+      "      if (!(isBg(uv + ox) || isBg(uv - ox)) && abs(viewPos(uv + ox).z - viewPos(uv - ox).z) < 0.05 * abs(z))\n"
+      "         c += normalAt(uv + ox).x - normalAt(uv - ox).x;\n"
+      "      if (!(isBg(uv + oy) || isBg(uv - oy)) && abs(viewPos(uv + oy).z - viewPos(uv - oy).z) < 0.05 * abs(z))\n"
+      "         c += normalAt(uv + oy).y - normalAt(uv - oy).y;\n"
+      "      c = sign(c) * max(abs(c) - 0.3, 0.0) * 2.0;\n"
+      "      f *= (1.0 - clamp(-c, 0.0, 1.0) * uCavityK.w) * (1.0 + clamp(c, 0.0, 1.0) * uCavityK.z);\n"
+      "   }\n"
+      "   return clamp(f, 0.0, 2.0);\n"
+      "}\n"
       "vec4 shade(vec2 uv) {\n"
       "   vec4 c = texture(uColor, uv);\n"
       "   if (uAoOn == 1) c.rgb *= mix(1.0, aoAt(uv), uAoStrength);\n"
+      "   if (uCavity != 0) c.rgb *= cavityAt(uv);\n"
       "   return c;\n"
       "}\n"
       "void main() {\n"
+      "   if (uAoOnly == 1) { fragColor = vec4(vec3(aoAt(vUv)), texture(uColor, vUv).a); return; }\n"
       "   vec4 c0 = shade(vUv);\n"
       "   if (uDofOn == 0) { fragColor = c0; return; }\n"
       "   float coc0 = cocOf(vUv);\n"
@@ -187,6 +245,66 @@ namespace
       glBindTexture(GL_TEXTURE_2D, tex);
       glUniform1i(glGetUniformLocation(prog, name), unit);
    }
+
+   // Motion blur (after McGuire et al. 2012, reduced to one pass): find the fastest motion
+   // near the pixel, walk back along it over the shutter, and keep each tap that this
+   // pixel's or the tap's own smear reaches, with the nearer one in front.
+   const char* kMotionBody =
+      "uniform sampler2D uColor;\n"
+      "uniform sampler2D uVel;\n"
+      "uniform vec2 uSize;\n"
+      "uniform float uReach;\n"      // the longest smear, pixels
+      "uniform vec2 uShutter;\n"     // the open interval, in frames from the frame's moment
+      "uniform mat4 uReproj;\n"      // this frame's clip space to last frame's, for the sky
+      "vec2 velAt(vec2 uv) {\n"
+      "   vec4 e = texture(uVel, uv);\n"
+      "   if (e.a > 0.5) return (e.xy - 0.5) * 2.0 * uReach;\n"
+      "   vec2 ndc = uv * 2.0 - 1.0;\n"
+      "   vec4 p = uReproj * vec4(ndc, 1.0, 1.0);\n"
+      "   if (p.w <= 1e-4) return vec2(0.0);\n"
+      "   vec2 d = (ndc - p.xy / p.w) * 0.5 * uSize;\n"
+      "   float l = length(d);\n"
+      "   return l > uReach ? d * (uReach / l) : d;\n"
+      "}\n"
+      "float cone(float d, float l) { return clamp(1.0 - d / max(l, 1e-3), 0.0, 1.0); }\n"
+      "float cylinder(float d, float l) { return 1.0 - smoothstep(0.95 * l, 1.05 * l, d); }\n"
+      "void main() {\n"
+      "   vec4 c0 = texture(uColor, vUv);\n"
+      "   vec2 vc = velAt(vUv);\n"
+      "   vec2 vm = vc;\n"
+      "   for (int i = 0; i < 8; i++) {\n"
+      "      float a = float(i) * 0.7853982;\n"
+      "      for (int r = 1; r <= 2; r++) {\n"
+      "         vec2 v = velAt(vUv + vec2(cos(a), sin(a)) * (uReach * 0.5 * float(r)) / uSize);\n"
+      "         if (dot(v, v) > dot(vm, vm)) vm = v;\n"
+      "      }\n"
+      "   }\n"
+      "   float span = max(abs(uShutter.x), abs(uShutter.y));\n"
+      "   if (length(vm) * (uShutter.y - uShutter.x) < 0.5) { fragColor = c0; return; }\n"
+      "   float zc = viewDist(texture(uDepth, vUv).r);\n"
+      "   float lc = max(length(vc) * span, 0.5);\n"
+      "   float wc = 1.0 / lc;\n"
+      "   vec4 sum = c0 * wc;\n"
+      "   float wsum = wc;\n"
+      "   float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "   for (int k = 0; k < 16; k++) {\n"
+      "      float t = mix(uShutter.x, uShutter.y, (float(k) + jitter) / 16.0);\n"
+      "      vec2 off = -t * vm;\n"
+      "      float d = length(off);\n"
+      "      if (d < 0.5) continue;\n"
+      "      vec2 uv = vUv + off / uSize;\n"
+      "      if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) continue;\n"
+      "      float zs = viewDist(texture(uDepth, uv).r);\n"
+      "      float ls = max(length(velAt(uv)) * span, 0.5);\n"
+      "      float soft = 0.05 * min(zc, zs) + 1e-3;\n"
+      "      float fore = clamp(1.0 - (zs - zc) / soft, 0.0, 1.0);\n"
+      "      float back = clamp(1.0 - (zc - zs) / soft, 0.0, 1.0);\n"
+      "      float w = fore * cone(d, ls) + back * cone(d, lc) + cylinder(d, ls) * cylinder(d, lc) * 2.0;\n"
+      "      sum += texture(uColor, uv) * w;\n"
+      "      wsum += w;\n"
+      "   }\n"
+      "   fragColor = sum / wsum;\n"
+      "}\n";
 }
 
 bool Render3DNode::EnsurePostShaders()
@@ -203,16 +321,18 @@ bool Render3DNode::EnsurePostShaders()
    mProgPost = GLUtil::CompileProgram(post.c_str());
    mProgAccum = GLUtil::CompileProgram(kAccumFrag);
    mProgAccumDone = GLUtil::CompileProgram(kAccumDoneFrag);
-   if (!(mProgAo && mProgAoBlur && mProgPost && mProgAccum && mProgAccumDone))
+   const std::string motion = head + kViewSpaceGlsl + kMotionBody;
+   mProgMotion = GLUtil::CompileProgram(motion.c_str());
+   if (!(mProgAo && mProgAoBlur && mProgPost && mProgAccum && mProgAccumDone && mProgMotion))
       mProgPost = 0;
    return mProgPost != 0;
 }
 
 void Render3DNode::ReleasePost()
 {
-   for (GLUtil::Fbo* f : { &mPostAo[0], &mPostAo[1], &mPostOut, &mAccum[0], &mAccum[1] })
+   for (GLUtil::Fbo* f : { &mPostAo[0], &mPostAo[1], &mPostOut, &mAccum[0], &mAccum[1], &mVelocity, &mMotionOut })
       GLUtil::DestroyFbo(*f);
-   for (unsigned int* p : { &mProgAo, &mProgAoBlur, &mProgPost, &mProgAccum, &mProgAccumDone })
+   for (unsigned int* p : { &mProgAo, &mProgAoBlur, &mProgPost, &mProgAccum, &mProgAccumDone, &mProgMotion })
       if (*p != 0) { glDeleteProgram(*p); *p = 0; }
 }
 
@@ -220,8 +340,10 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
 {
    if (!EnsurePostShaders() || mDepthTex == 0)
       return;
-   const bool aoOn = aoStrength > 0.0f;
-   const bool dofOn = dofAperture > 0.0f;
+   const bool aoOnly = renderPass == 9;
+   const bool aoOn = aoStrength > 0.0f || aoOnly;
+   const bool dofOn = dofAperture > 0.0f && !aoOnly;
+   const int cavityBits = (cavity && !aoOnly) ? (cavityType == 0 ? 1 : cavityType == 1 ? 2 : 3) : 0;
    const GLenum outFmt = mFloatTarget ? GL_RGBA16F : GL_RGBA8;
    bool ok = GLUtil::EnsureFbo(mPostOut, w, h, outFmt, "Render3D_Post");
    if (aoOn)
@@ -281,6 +403,10 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
       glUniform1f(glGetUniformLocation(mProgPost, "uFocus"), focusDistance);
       glUniform1f(glGetUniformLocation(mProgPost, "uAperturePx"), dofAperture * 24.0f * hScale);
       glUniform1f(glGetUniformLocation(mProgPost, "uMaxCoc"), std::max(2.0f, 0.03f * (float)h));
+      glUniform1i(glGetUniformLocation(mProgPost, "uAoOnly"), aoOnly ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgPost, "uCavity"), cavityBits);
+      glUniform4f(glGetUniformLocation(mProgPost, "uCavityK"), cavityRidge, cavityValley, curvatureRidge, curvatureValley);
+      glUniform1f(glGetUniformLocation(mProgPost, "uCavityDist"), std::max(0.001f, cavityDistance));
    });
    glActiveTexture(GL_TEXTURE0);
 
@@ -293,6 +419,49 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
    glDepthMask(GL_TRUE);
    if (wasDepth) glEnable(GL_DEPTH_TEST);
    if (wasCull) glEnable(GL_CULL_FACE);
+}
+
+// Motion blur: the picture smeared along the velocity cook's motion, back into the output.
+void Render3DNode::RunMotionBlur(const Mat4& proj, const Mat4& viewProj, int w, int h)
+{
+   if (!EnsurePostShaders() || mDepthTex == 0 ||
+       !GLUtil::EnsureFbo(mMotionOut, w, h, mFloatTarget ? GL_RGBA16F : GL_RGBA8, "Render3D_Motion"))
+      return;
+   const GLboolean wasDepth = glIsEnabled(GL_DEPTH_TEST);
+   const GLboolean wasCull = glIsEnabled(GL_CULL_FACE);
+   const GLboolean wasBlend = glIsEnabled(GL_BLEND);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_CULL_FACE);
+   glDisable(GL_BLEND);
+   glDepthMask(GL_FALSE);
+
+   const float s = std::clamp(motionShutter, 0.0f, 2.0f);
+   const float open = motionPosition == 0 ? 0.0f : motionPosition == 2 ? -s : -0.5f * s;
+   const Mat4 reproj = Mat4::Multiply(mPrevViewProj, Mat4::Inverse(viewProj));
+   const float projVec[4] = { proj.m[0], proj.m[5], proj.m[10], proj.m[14] };
+   GLUtil::RunShaderPass(mMotionOut, mProgMotion, [&]() {
+      Bind(mProgMotion, 0, mColorTex, "uColor");
+      Bind(mProgMotion, 1, mDepthTex, "uDepth");
+      Bind(mProgMotion, 2, GLUtil::FboTexture(mVelocity), "uVel");
+      glUniform4fv(glGetUniformLocation(mProgMotion, "uProj"), 1, projVec);
+      glUniform1i(glGetUniformLocation(mProgMotion, "uOrtho"), proj.m[11] == 0.0f ? 1 : 0);
+      glUniform2f(glGetUniformLocation(mProgMotion, "uSize"), (float)w, (float)h);
+      glUniform1f(glGetUniformLocation(mProgMotion, "uReach"), std::max(1.0f, motionMax * (float)h / 1080.0f));
+      glUniform2f(glGetUniformLocation(mProgMotion, "uShutter"), open, open + s);
+      glUniformMatrix4fv(glGetUniformLocation(mProgMotion, "uReproj"), 1, GL_FALSE, reproj.m);
+   });
+   glActiveTexture(GL_TEXTURE0);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, mMotionOut.fbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
+   glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+   glDepthMask(GL_TRUE);
+   if (wasDepth) glEnable(GL_DEPTH_TEST);
+   if (wasCull) glEnable(GL_CULL_FACE);
+   if (wasBlend) glEnable(GL_BLEND);
 }
 
 // Offline supersampling: cook the scene `supersample` times with the camera

@@ -330,6 +330,7 @@ namespace app
 
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      ModSlider("sun threshold", &n->sunThreshold, 0.0f, 100.0f);
    }
 
 

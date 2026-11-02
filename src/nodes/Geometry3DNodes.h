@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -255,6 +256,10 @@ public:
    // Which of the render's lights reach this source, one bit per light. All of
    // them by default; only the 3D View's placed sources narrow it.
    virtual unsigned int LightMask() const { return ~0u; }
+
+   // The number this source writes into Render 3D's Object Index pass. 0 by
+   // default, as in Blender; the 3D View's placed sources carry their own.
+   virtual int PassIndex() const { return 0; }
 
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
@@ -547,7 +552,21 @@ public:
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
    static const std::vector<std::string>& RenderPassNames();
-   int renderPass = 0; // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position
+   // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position, 5 = mist,
+   // 6 = object index, 7 = emission, 8 = shadow, 9 = AO, 10 = environment
+   int renderPass = 0;
+   // Mist pass: 0 from `mistStart` out to start + depth, shaped by the falloff
+   // (quadratic / linear / inverse quadratic). `mistIntensity` is the least mist
+   // anywhere; `mistHeight` > 0 thins it out to nothing at that height.
+   static const std::vector<std::string>& MistFalloffNames();
+   float mistStart = 5.0f;
+   float mistDepth = 25.0f;
+   int mistFalloff = 0;
+   float mistIntensity = 0.0f;
+   float mistHeight = 0.0f;
+   // Data passes (depth, normals, position, mist, index, emission, shadow, AO)
+   // leave out surfaces whose alpha is under this.
+   float passThreshold = 0.5f;
 
    ~Render3DNode() override;
 
@@ -596,6 +615,14 @@ public:
       int type = 0;
       float spotAngle = 45.0f, spotPenumbra = 0.2f, areaW = 1.0f, areaH = 1.0f;
       float aim[3] = { 0, -1, 0 };       // where a spot or area light points
+      float diffuse = 1.0f, specular = 1.0f, transmission = 1.0f;
+      float falloff = 0.25f;             // distance falloff; negative = hard (no soft core)
+      bool castShadow = true;
+      float shadowSoft = 1.0f;           // multiplies the look's shadow softness
+      int shadowRes = 0;                 // 0 = the look's quality, else 1024 / 2048 / 4096
+      float shadowClip = 0.05f;
+      // Everything above that the light node sets, from its params.
+      void From(const class LightNode& n);
    };
    struct Rig
    {
@@ -728,8 +755,8 @@ public:
    float bloom = 0.0f;          // amount 0..1; 0 is off
    float bloomThreshold = 1.0f; // linear light, 0.5..8
    float bloomRadius = 0.5f;    // 0 tight .. 1 wide
-   bool HdrActive() const { return hdr && renderPass == 0; }
-   void BeforeLoadParams() override { hdr = false; tonemap = 1; }
+   bool HdrActive() const { return hdr && renderPass == 0 && !SolidActive(); }
+   void BeforeLoadParams() override { hdr = false; tonemap = 1; passThreshold = 0.0f; }
    int ActiveSamples() const { return mActiveSamples; }
 
    // --- Render quality (v0.6 3.5). All off by default, so a patch saved before
@@ -749,7 +776,45 @@ public:
    // Offline renders only (export, --frame, a take): draw this many sub-pixel
    // jittered passes and average them, on top of the multisampling. 1 is one pass.
    int supersample = 1;
-   bool PostActive() const { return renderPass == 0 && (aoStrength > 0.0f || dofAperture > 0.0f); }
+   // Cavity (Blender's Solid-mode option, here on the lit render): darkens valleys
+   // and lightens ridges. World cavity measures them across `cavityDistance` in
+   // scene units, screen cavity from the pixel-to-pixel turn of the surface.
+   static const std::vector<std::string>& CavityTypeNames();
+   // Solid shading: the scene's shapes without its materials' lighting, for
+   // blocking out and checking form. Lit by a studio rig, a matcap or nothing,
+   // coloured by material, vertex colour, one colour, a colour per object, or
+   // the texture. Only the Color pass; no HDR, bloom or tonemap.
+   static const std::vector<std::string>& ViewShadingNames();
+   static const std::vector<std::string>& SolidLightingNames();
+   static const std::vector<std::string>& SolidColorNames();
+   static const std::vector<std::string>& MatcapNames();
+   int viewShading = 0;         // rendered / solid
+   int solidLighting = 0;       // studio / matcap / flat
+   int solidColor = 0;          // material / attribute / single / random / texture
+   float solidSingle[3] = { 0.8f, 0.8f, 0.8f };
+   int matcap = 0;
+   bool solidSpecular = true;
+   bool studioWorld = false;    // the studio rig turns with the world instead of the camera
+   float studioRotation = 0.0f; // degrees about the world's up axis, world-space rig only
+   bool SolidActive() const { return viewShading == 1 && renderPass == 0; }
+   bool cavity = false;
+   int cavityType = 0;          // world / screen / both
+   float cavityRidge = 1.0f, cavityValley = 1.0f;
+   float curvatureRidge = 1.0f, curvatureValley = 1.0f;
+   float cavityDistance = 0.2f;
+   bool PostActive() const
+   {
+      return renderPass == 9 || (renderPass == 0 && (aoStrength > 0.0f || dofAperture > 0.0f || cavity));
+   }
+   // Motion blur: each pixel smeared along how far it moved since the last frame,
+   // for `motionShutter` of a frame, before, around or after the frame's moment.
+   // Object and camera motion; a shape that changes in place does not blur.
+   static const std::vector<std::string>& MotionPositionNames();
+   bool motionBlur = false;
+   float motionShutter = 0.5f;  // fraction of a frame
+   int motionPosition = 1;      // start / center / end
+   float motionMax = 32.0f;     // longest smear, pixels at 1080 high
+   bool MotionActive() const { return motionBlur && motionShutter > 0.0f && renderPass == 0 && !PanoActive(); }
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -758,6 +823,18 @@ public:
       v.Bool("floatOutput", floatOutput); v.Int("supersample", supersample);
       v.Float("width", width); v.Float("height", height);
       v.Int("renderPass", renderPass);
+      v.Float("mistStart", mistStart); v.Float("mistDepth", mistDepth); v.Int("mistFalloff", mistFalloff);
+      v.Float("mistIntensity", mistIntensity); v.Float("mistHeight", mistHeight);
+      v.Float("passThreshold", passThreshold);
+      v.Bool("cavity", cavity); v.Int("cavityType", cavityType);
+      v.Int("viewShading", viewShading); v.Int("solidLighting", solidLighting); v.Int("solidColor", solidColor);
+      v.Color("solidSingle", solidSingle); v.Int("matcap", matcap); v.Bool("solidSpecular", solidSpecular);
+      v.Bool("studioWorld", studioWorld); v.Float("studioRotation", studioRotation);
+      v.Float("cavityRidge", cavityRidge); v.Float("cavityValley", cavityValley);
+      v.Float("curvatureRidge", curvatureRidge); v.Float("curvatureValley", curvatureValley);
+      v.Float("cavityDistance", cavityDistance);
+      v.Bool("motionBlur", motionBlur); v.Float("motionShutter", motionShutter);
+      v.Int("motionPosition", motionPosition); v.Float("motionMax", motionMax);
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
@@ -912,6 +989,7 @@ private:
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
       float envIntensity = 1.0f;
+      std::vector<float> envSun;
       bool animated = false;
       bool texturedMaterial = false;
 
@@ -945,7 +1023,7 @@ private:
                return false;
          }
          return envConnected == o.envConnected && envRev == o.envRev && envRotation == o.envRotation &&
-                envIntensity == o.envIntensity;
+                envIntensity == o.envIntensity && envSun == o.envSun;
       }
    };
    SceneSignature BuildSceneSignature();
@@ -974,6 +1052,16 @@ private:
    bool mInAccumulate = false;
    bool EnsurePostShaders();
    void RunPost(const Mat4& proj, bool ortho, int w, int h);
+   // Motion blur state: last frame's matrices per source, and this frame's as they are drawn.
+   std::map<const void*, Mat4> mPrevModel, mCurModel;
+   Mat4 mPrevViewProj, mCurViewProj;
+   bool mHasPrev = false;
+   int mMotionFrame = -1;
+   bool mVelocityPass = false;     // this cook draws screen motion instead of colour
+   GLUtil::Fbo mVelocity, mMotionOut;
+   unsigned int mProgMotion = 0;
+   Mat4 MotionDelta(const void* source, const Mat4& model);
+   void RunMotionBlur(const Mat4& proj, const Mat4& viewProj, int w, int h);
    void ReleasePost();
    // HDR finish (Render3DHdr.cpp): bloom chain, then tonemap, back into mColorTex.
    static constexpr int kBloomLevels = 6;

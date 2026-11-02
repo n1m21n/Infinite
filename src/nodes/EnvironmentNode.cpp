@@ -136,6 +136,50 @@ void EnvironmentNode::Upload(const float* pixels, int w, int h)
       }
    }
 
+   // Sun extraction, in the same direction convention as Render 3D's dirToEquirect: texel row r
+   // sits at v = (r + 0.5) / h, theta = pi * v (row 0 is the zenith); column x at phi = 2 pi (u - 0.5).
+   mHasSun = false;
+   mUploadedThreshold = sunThreshold;
+   if (sunThreshold > 0.0f)
+   {
+      const double kPi = 3.14159265358979;
+      double light[3] = { 0, 0, 0 }, dir[3] = { 0, 0, 0 };
+      for (int r = 0; r < h; r++)
+      {
+         const double theta = kPi * (r + 0.5) / h;
+         // Solid angle of one texel: rows near the poles cover less sky.
+         const double omega = (2.0 * kPi / w) * (kPi / h) * std::sin(theta);
+         for (int x = 0; x < w; x++)
+         {
+            float* p = &sanitized[((size_t)r * w + x) * 3];
+            const float lum = 0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2];
+            if (lum <= sunThreshold)
+               continue;
+            const float keep = sunThreshold / lum;
+            const double phi = 2.0 * kPi * ((x + 0.5) / w - 0.5);
+            const double weight = (lum - sunThreshold) * omega;
+            for (int k = 0; k < 3; k++)
+            {
+               light[k] += p[k] * (1.0f - keep) * omega;
+               p[k] *= keep;
+            }
+            dir[0] += std::sin(theta) * std::cos(phi) * weight;
+            dir[1] += std::cos(theta) * weight;
+            dir[2] += std::sin(theta) * std::sin(phi) * weight;
+         }
+      }
+      const double len = std::sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+      if (len > 0.0 && light[0] + light[1] + light[2] > 0.0)
+      {
+         mHasSun = true;
+         for (int k = 0; k < 3; k++)
+         {
+            mSunDir[k] = (float)(dir[k] / len);
+            mSunLight[k] = (float)light[k];
+         }
+      }
+   }
+
    if (mTex == 0)
       glGenTextures(1, &mTex);
    glBindTexture(GL_TEXTURE_2D, mTex);
@@ -254,6 +298,18 @@ unsigned int EnvironmentNode::GetOutputTexture()
    return mTex;
 }
 
+bool EnvironmentNode::Sun(float dir[3], float light[3]) const
+{
+   if (!mHasImage || !mHasSun || sunThreshold <= 0.0f)
+      return false;
+   for (int k = 0; k < 3; k++)
+   {
+      dir[k] = mSunDir[k];
+      light[k] = mSunLight[k];
+   }
+   return true;
+}
+
 unsigned int EnvironmentNode::GetEnvironmentTexture()
 {
    return mHasImage ? mTex : 0;
@@ -263,4 +319,6 @@ void EnvironmentNode::CookIfNeeded(int /*frameId*/)
 {
    if (!mHasImage)
       EnsurePlaceholder();
+   else if (sunThreshold != mUploadedThreshold)
+      ReloadFromPath();   // the decode is cached, so this is just the cut and the upload again
 }

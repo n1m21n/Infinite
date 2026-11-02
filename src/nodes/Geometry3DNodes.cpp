@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <string>
 
@@ -28,8 +29,16 @@ namespace
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic", "Equirect 360", "Cubemap 3x2", "Fisheye dome" };
-   const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
+   const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position", "Mist",
+                                                        "Object Index", "Emission", "Shadow", "AO", "Environment" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
+   const std::vector<std::string> kMistFalloffNames = { "Quadratic", "Linear", "Inverse Quadratic" };
+   const std::vector<std::string> kCavityTypeNames = { "World", "Screen", "Both" };
+   const std::vector<std::string> kMotionPositionNames = { "Start on Frame", "Center on Frame", "End on Frame" };
+   const std::vector<std::string> kViewShadingNames = { "Rendered", "Solid" };
+   const std::vector<std::string> kSolidLightingNames = { "Studio", "MatCap", "Flat" };
+   const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture" };
+   const std::vector<std::string> kMatcapNames = { "Clay", "Metal", "Toon", "Gloss" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
@@ -256,11 +265,9 @@ namespace
       "vec2 dirToEquirect(vec3 d, float rot) {\n"
       "   float phi = atan(d.z, d.x) + rot;\n"
       "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
-      // The loaded HDRI's row 0 is the image's top (sky/zenith) but that row
-      // lands at texture v=0 on upload, which GL treats as the *bottom* of
-      // its own coordinate space - so a naive theta/pi here samples ground
-      // for "look up" and sky for "look down". Flipping v corrects it.
-      "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
+      // The loaded HDRI's row 0 is the image's top (sky/zenith) and lands at texture v=0, so
+      // "look up" (theta 0) reads v=0. A flipped v here drew every HDRI upside down.
+      "   return vec2(phi / 6.28318530718 + 0.5, theta / 3.14159265359);\n"
       "}\n"
       // A plain texture() at the u=0/u=1 wrap uses screen-space ddx/ddy of u
       // to pick a mip - and right at the wrap, adjacent fragments see u flip
@@ -349,6 +356,13 @@ namespace
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
       "out vec3 vVertexColor;\n"
+      // Motion blur's velocity cook: where this point was last frame, through last
+      // frame's camera. uMotionDelta takes this frame's world to last frame's.
+      "uniform int uVelocity;\n"
+      "uniform mat4 uPrevViewProj;\n"
+      "uniform mat4 uMotionDelta;\n"
+      "out vec4 vCurClip;\n"
+      "out vec4 vPrevClip;\n"
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
@@ -399,6 +413,8 @@ namespace
       "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
       "   vLightSpacePos = uLightViewProj * vec4(worldPos, 1.0);\n"
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
+      "   vCurClip = gl_Position;\n"
+      "   vPrevClip = uVelocity == 1 ? uPrevViewProj * (uMotionDelta * vec4(worldPos, 1.0)) : gl_Position;\n"
       "}\n";
 
    // Linked twice (EnsureShader): once as is, and once with INF_NO_DISCARD
@@ -420,7 +436,11 @@ namespace
       "in vec3 vInstanceColor;\n"
       "in vec3 vVertexColor;\n"
       "in vec4 vLightSpacePos;\n"
+      "in vec4 vCurClip;\n"
+      "in vec4 vPrevClip;\n"
       "out vec4 fragColor;\n"
+      "uniform int uVelocity;\n"
+      "uniform vec2 uVelocityScale;\n"   // NDC to encoded: half the size over twice the longest smear
       "uniform mat4 uViewProj;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform float uMetallic;\n"
@@ -428,6 +448,23 @@ namespace
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
       "uniform int uRenderPass;\n"
+      "uniform float uMistStart;\n"
+      "uniform float uMistDepth;\n"
+      "uniform float uMistFalloff;\n"   // the power: 2 quadratic, 1 linear, 0.5 inverse quadratic
+      "uniform float uMistIntensity;\n"
+      "uniform float uMistHeight;\n"
+      "uniform int uObjectIndex;\n"
+      "uniform int uSolid;\n"
+      "uniform int uSolidLighting;\n"
+      "uniform int uSolidColor;\n"
+      "uniform vec3 uSolidSingle;\n"
+      "uniform int uMatcap;\n"
+      "uniform int uSolidSpecular;\n"
+      "uniform int uStudioWorld;\n"
+      "uniform float uStudioRotation;\n"
+      "uniform float uDrawRandom;\n"
+      "uniform mat4 uView;\n"
+      "uniform float uPassThreshold;\n"
       "uniform float uNear;\n"
       "uniform float uFar;\n"
       "uniform float uIor;\n"
@@ -462,6 +499,11 @@ namespace
       "uniform float uLightSpotAngle[8];\n"
       "uniform float uLightSpotPenumbra[8];\n"
       "uniform vec2 uLightArea[8];\n"
+      "uniform vec4 uLightTerms[8];\n"   // diffuse, specular, transmission, falloff (< 0: hard)
+      "float lightFalloff(float dist, float k) {\n"
+      "   if (k >= 0.0) return 1.0 / (1.0 + dist * dist * k);\n"
+      "   return min(1.0 / max(dist * dist * -k, 1e-4), 20.0);\n"
+      "}\n"
       "uniform int uLightCount;\n"
       "uniform int uLightMask;\n"
       "uniform vec3 uAmbient;\n"
@@ -510,6 +552,7 @@ namespace
       "uniform float uEnvMaxLod;\n"
       "uniform sampler2DShadow uShadowMap;\n"
       "uniform int uShadowsOn;\n"
+      "uniform int uShadowLight;\n"
       "uniform float uShadowBias;\n"
       "uniform float uShadowSoftness;\n"
       "uniform float uShadowStrength;\n"
@@ -562,7 +605,7 @@ namespace
       "vec2 dirToEquirect(vec3 d) {\n"
       "   float phi = atan(d.z, d.x) + uEnvRotation;\n"
       "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
-      "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
+      "   return vec2(phi / 6.28318530718 + 0.5, theta / 3.14159265359);\n"
       "}\n"
       "\n"
       "vec3 sampleEnv(vec3 dir, float rough) {\n"
@@ -718,6 +761,45 @@ namespace
       "   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;\n"
       "}\n"
       "\n"
+      // Solid mode (Blender's Solid viewport shading, made here, not ported). Studio: a fixed
+      // three-light rig in camera space (or turning with the world). MatCap: lighting looked up
+      // from the view-space normal; the four looks are drawn in code, so there are no images.
+      "vec3 matcapLook(int id, vec3 nv) {\n"
+      "   vec3 l = normalize(vec3(-0.45, 0.6, 0.65));\n"
+      "   float d = max(dot(nv, l), 0.0);\n"
+      "   float rim = pow(1.0 - max(nv.z, 0.0), 3.0);\n"
+      "   float spec = pow(max(dot(reflect(vec3(0.0, 0.0, -1.0), nv), l), 0.0), 60.0);\n"
+      "   if (id == 1) {\n"
+      "      float band = 0.5 + 0.5 * sin(nv.y * 4.0 + 0.6);\n"
+      "      return vec3(0.08 + 0.7 * band * band + 0.25 * rim) + vec3(1.2 * spec);\n"
+      "   }\n"
+      "   if (id == 2) return vec3(d > 0.6 ? 1.0 : d > 0.15 ? 0.6 : 0.3) + vec3(spec > 0.5 ? 0.4 : 0.0);\n"
+      "   if (id == 3) return vec3(0.12 + 0.75 * d + 0.3 * rim) + vec3(0.9 * spec);\n"
+      "   return vec3(0.2 + 0.7 * d) * vec3(1.0, 0.94, 0.88) + vec3(0.15 * rim);\n"
+      "}\n"
+      "vec3 solidShade(vec3 n, vec2 mapUv) {\n"
+      "   vec3 base;\n"
+      "   if (uSolidColor == 1) base = vVertexColor;\n"
+      "   else if (uSolidColor == 2) base = toLinear(uSolidSingle);\n"
+      "   else if (uSolidColor == 3) base = 0.55 + 0.4 * cos(6.2831853 * (uDrawRandom + vec3(0.0, 0.33, 0.67)));\n"
+      "   else {\n"
+      "      base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
+      "      if (uSolidColor == 4 && uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
+      "   }\n"
+      "   if (uSolidLighting == 2) return base;\n"
+      "   vec3 nv = normalize(mat3(uView) * n);\n"
+      "   if (uSolidLighting == 1) return base * matcapLook(uMatcap, nv);\n"
+      "   vec3 ns = nv;\n"
+      "   if (uStudioWorld == 1) {\n"
+      "      float c = cos(uStudioRotation), sn = sin(uStudioRotation);\n"
+      "      ns = vec3(c * n.x + sn * n.z, n.y, -sn * n.x + c * n.z);\n"
+      "   }\n"
+      "   vec3 k = normalize(vec3(-0.5, 0.7, 0.5)), f = normalize(vec3(0.7, 0.1, 0.7)), b = normalize(vec3(0.0, 0.4, -0.9));\n"
+      "   vec3 col = base * (0.22 + 0.7 * max(dot(ns, k), 0.0) + 0.25 * max(dot(ns, f), 0.0) + 0.3 * max(dot(ns, b), 0.0));\n"
+      "   if (uSolidSpecular == 1) col += vec3(0.35) * pow(max(dot(reflect(vec3(0.0, 0.0, -1.0), nv), normalize(vec3(-0.5, 0.7, 0.5))), 0.0), 48.0);\n"
+      "   return col;\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   if (uIsSprite == 1) {\n"
       "      vec2 uv0 = computeMapUv(normalize(vNormal));\n"
@@ -731,7 +813,19 @@ namespace
       "   float alpha = uOpacity;\n"
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
       "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
+      // How far this pixel moved since the last frame, 0.5 = still; alpha 1 marks the scene.
+      "   if (uVelocity == 1) {\n"
+      "      vec2 d = (vCurClip.xy / vCurClip.w - vPrevClip.xy / max(vPrevClip.w, 1e-4)) * uVelocityScale;\n"
+      "      if (vPrevClip.w <= 1e-4) d = vec2(0.0);\n"
+      "      float l = length(d);\n"
+      "      if (l > 0.5) d *= 0.5 / l;\n"
+      "      fragColor = vec4(d + 0.5, 0.0, 1.0);\n"
+      "      return;\n"
+      "   }\n"
       "   vec3 n = normalize(vNormal);\n"
+      // Data passes leave out what is more see-through than the threshold, the way a
+      // depth or index pass cannot hold half a value.
+      "   if (uRenderPass >= 1 && uRenderPass <= 9 && alpha < uPassThreshold) KILL_FRAGMENT;\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
       "      fragColor = vec4(vec3(d), alpha);\n"
@@ -749,6 +843,39 @@ namespace
       "      fragColor = vec4(vWorldPos, alpha);\n"
       "      return;\n"
       "   }\n"
+      "   if (uRenderPass == 5) {\n"
+      "      float m = clamp((length(vWorldPos - uCamPos) - uMistStart) / max(uMistDepth, 1e-4), 0.0, 1.0);\n"
+      "      m = pow(m, uMistFalloff);\n"
+      "      if (uMistHeight > 0.0) m *= clamp(1.0 - max(vWorldPos.y, 0.0) / uMistHeight, 0.0, 1.0);\n"
+      "      fragColor = vec4(vec3(mix(uMistIntensity, 1.0, m)), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      // n / 255, so an 8-bit image keeps the exact integer.
+      "   if (uRenderPass == 6) {\n"
+      "      fragColor = vec4(vec3(float(uObjectIndex) / 255.0), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 7) {\n"
+      "      vec3 e = toLinear(uEmissionColor) * uEmission;\n"
+      "      if (uHasEmissionMap == 1) e *= toLinear(sampleMap(uEmissionMap, n, computeMapUv(n)).rgb);\n"
+      "      fragColor = vec4(toSrgb(e), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 8) {\n"
+      "      float s = 1.0;\n"
+      "      if (uShadowLight >= 0 && uShadowLight < uLightCount) {\n"
+      "         int t = uLightType[uShadowLight];\n"
+      "         vec3 ld = (t == 1 || t == 4 || t == 5) ? normalize(uLightDir[uShadowLight] - vWorldPos) : normalize(uLightDir[uShadowLight]);\n"
+      "         s = shadowFactor(n, ld);\n"
+      "      }\n"
+      "      fragColor = vec4(vec3(s), alpha);\n"
+      "      return;\n"
+      "   }\n"
+      // AO: white here, the post stage writes the occlusion from depth. Environment: the
+      // objects are black holes in the world behind them.
+      "   if (uRenderPass == 9) { fragColor = vec4(1.0, 1.0, 1.0, alpha); return; }\n"
+      "   if (uRenderPass == 10) { fragColor = vec4(0.0, 0.0, 0.0, alpha); return; }\n"
+      "   if (uSolid == 1) { fragColor = vec4(toSrgb(solidShade(n, computeMapUv(n))), alpha); return; }\n"
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, alpha); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, alpha); return; }\n"
       "\n"
@@ -793,7 +920,7 @@ namespace
       "      if (i >= uLightCount) break;\n"
       "      if ((uLightMask & (1 << i)) == 0) continue;\n"
       "      if (uLightType[i] == 3) {\n"
-      "         col += base * (1.0 - metal) * toLinear(uLightColor[i]) * uLightIntensity[i];\n"
+      "         col += base * (1.0 - metal) * toLinear(uLightColor[i]) * uLightIntensity[i] * uLightTerms[i].x;\n"
       "         continue;\n"
       "      }\n"
       "      vec3 lightDir;\n"
@@ -823,13 +950,13 @@ namespace
       "         vec3 toCentre = lp - vWorldPos;\n"
       "         float dist = length(toCentre);\n"
       "         shadeDir = toCentre / max(dist, 1e-4);\n"
-      "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
+      "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
       "         attenuation *= clamp(dot(-shadeDir, fwd) * 4.0, 0.0, 1.0);\n"
       "      } else if (uLightType[i] == 1 || uLightType[i] == 4) {\n"
       "         vec3 toLight = uLightDir[i] - vWorldPos;\n"
       "         float dist = length(toLight);\n"
       "         lightDir = toLight / max(dist, 1e-4);\n"
-      "         attenuation = 1.0 / (1.0 + dist * dist * 0.25);\n"
+      "         attenuation = lightFalloff(dist, uLightTerms[i].w);\n"
       "         if (uLightType[i] == 4) {\n"
       "            vec3 spotDir = uLightAim[i];\n"
       "            float cosCur = dot(-lightDir, spotDir);\n"
@@ -853,7 +980,7 @@ namespace
       "      float sssWrap = uSubsurfaceRadius * 2.0;\n"
       "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
       "      vec3 sssRadiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      "      col += base * uSubsurfaceColor * sssNdotL * uSubsurface * sssRadiance;\n"
+      "      col += base * uSubsurfaceColor * sssNdotL * uSubsurface * sssRadiance * uLightTerms[i].x;\n"
       "      if (nDotL <= 0.0) continue;\n"
       "      float nDotH = max(dot(n, halfway), 0.0);\n"
       "\n"
@@ -891,9 +1018,9 @@ namespace
       "\n"
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * (1.0 - cc * 0.5);\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
-      "      float shadow = (i == 0) ? shadowFactor(n, shadeDir) : 1.0;\n"
-      "      col += (kD * base / 3.14159265 + specular + vec3(clearcoatSpec) + sheenSpec) * radiance * nDotL * shadow;\n"
-      "      if (uTransmission > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow;\n"
+      "      float shadow = (i == uShadowLight) ? shadowFactor(n, shadeDir) : 1.0;\n"
+      "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
+      "      if (uTransmission > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
@@ -1116,9 +1243,36 @@ void GeometryNode::CookIfNeeded(int frameId)
 
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
 const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
+const std::vector<std::string>& Render3DNode::MistFalloffNames() { return kMistFalloffNames; }
+const std::vector<std::string>& Render3DNode::CavityTypeNames() { return kCavityTypeNames; }
+const std::vector<std::string>& Render3DNode::MotionPositionNames() { return kMotionPositionNames; }
+const std::vector<std::string>& Render3DNode::ViewShadingNames() { return kViewShadingNames; }
+const std::vector<std::string>& Render3DNode::SolidLightingNames() { return kSolidLightingNames; }
+const std::vector<std::string>& Render3DNode::SolidColorNames() { return kSolidColorNames; }
+const std::vector<std::string>& Render3DNode::MatcapNames() { return kMatcapNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
+
+void Render3DNode::RigLight::From(const LightNode& n)
+{
+   std::memcpy(color, n.color, sizeof(color));
+   type = n.type;
+   // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
+   intensity = n.intensity * ((type == 5 && !n.normalize) ? std::max(0.01f, n.areaWidth * n.areaHeight) : 1.0f);
+   spotAngle = n.spotAngle;
+   spotPenumbra = n.spotPenumbra;
+   areaW = n.areaWidth;
+   areaH = n.areaHeight;
+   diffuse = n.diffuse;
+   specular = n.specular;
+   transmission = n.transmission;
+   falloff = 0.25f * std::max(0.0f, n.falloff) * (n.softFalloff ? 1.0f : -1.0f);
+   castShadow = n.castShadow;
+   shadowSoft = std::max(0.0f, n.shadowRadius) / 0.25f * std::max(0.0f, n.shadowFilter);
+   shadowRes = n.shadowRes;
+   shadowClip = n.shadowClip;
+}
 const std::vector<std::string>& Render3DNode::SpriteShapeNames() { return kSpriteShapeNames; }
 const std::vector<std::string>& Render3DNode::SpriteSizeModeNames() { return kSpriteSizeModeNames; }
 
@@ -1776,6 +1930,8 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       {
          sig.envRotation = env->rotation;
          sig.envIntensity = env->intensity;
+         sig.envSun = { env->sunThreshold, env->sunAngle, env->sunShadow ? 1.0f : 0.0f, (float)env->sunShadowRes,
+                        env->sunShadowFilter };
       }
    }
 
@@ -1796,11 +1952,39 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (mCubeColor != 0 || mPano.tex != 0)   // projection went back to Perspective: give the cube memory back
       ReleasePanoTargets();
    mPanoValid = false;
+   // Motion blur needs the frame before this one; after a jump or a gap there is none, and nothing smears.
+   if (MotionActive())
+   {
+      mHasPrev = mMotionFrame >= 0 && frameId == mMotionFrame + 1 && !mCurModel.empty();
+      if (mHasPrev)
+      {
+         mPrevModel.swap(mCurModel);
+         mPrevViewProj = mCurViewProj;
+      }
+      mCurModel.clear();
+      mMotionFrame = frameId;
+   }
+   else
+   {
+      mHasPrev = false;
+      mMotionFrame = -1;
+      mCurModel.clear();
+      mPrevModel.clear();
+   }
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
       return;
    CookOnce(frameId);
+}
+
+// This frame's world to last frame's for one source; still when it was not drawn last frame.
+Mat4 Render3DNode::MotionDelta(const void* source, const Mat4& model)
+{
+   if (!mVelocityPass)
+      mCurModel[source] = model;
+   auto found = mPrevModel.find(source);
+   return found != mPrevModel.end() ? Mat4::Multiply(found->second, Mat4::Inverse(model)) : Mat4::Identity();
 }
 
 void Render3DNode::CookOnce(int frameId)
@@ -1814,6 +1998,20 @@ void Render3DNode::CookOnce(int frameId)
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
       return;
+
+   // Motion blur: the same scene first, drawn as how far each pixel moved, kept for the blur at the end.
+   if (MotionActive() && mHasPrev && !mVelocityPass && mFaceOverride < 0 &&
+       GLUtil::EnsureFbo(mVelocity, w, h, GL_RGBA8, "Render3D_Velocity"))
+   {
+      mVelocityPass = true;
+      CookOnce(frameId);
+      mVelocityPass = false;
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, mFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mVelocity.fbo);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   }
 
    // Pull any textures the geometry wants before we start drawing.
    CollectDraw();
@@ -1945,6 +2143,8 @@ void Render3DNode::CookOnce(int frameId)
       else { proj.m[12] += jx; proj.m[13] += jy; }
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
+   if (MotionActive() && !mVelocityPass)
+      mCurViewProj = viewProj;
    // Camera basis in world space for billboarding point-cloud sprites - rows
    // of the view matrix's rotation part (see Mat4::LookAt), not columns.
    const float camRight[3] = { view.m[0], view.m[4], view.m[8] };
@@ -1959,8 +2159,12 @@ void Render3DNode::CookOnce(int frameId)
    float lightSpotAngle[kMaxLights];
    float lightSpotPenumbra[kMaxLights];
    float lightArea[kMaxLights * 2];
+   float lightTerms[kMaxLights * 4];
+   RigLight caster;   // the first light's shadow settings; the built-in light keeps the defaults
    for (int i = 0; i < kMaxLights; i++)
    {
+      lightTerms[i * 4 + 0] = lightTerms[i * 4 + 1] = lightTerms[i * 4 + 2] = 1.0f;
+      lightTerms[i * 4 + 3] = 0.25f;
       lightSpotAngle[i] = 45.0f;
       lightSpotPenumbra[i] = 0.2f;
       lightArea[i * 2] = lightArea[i * 2 + 1] = 1.0f;
@@ -1984,6 +2188,10 @@ void Render3DNode::CookOnce(int frameId)
          lightSpotPenumbra[lightCount] = l.spotPenumbra;
          lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
          lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
+         const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
+         std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
+         if (lightCount == 0)
+            caster = l;
          lightCount++;
       }
    }
@@ -1999,16 +2207,47 @@ void Render3DNode::CookOnce(int frameId)
       const float vecLen = std::max(1e-4f, std::sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]));
       for (int k = 0; k < 3; k++)
          lightAims[lightCount * 3 + k] = -vec[k] / vecLen;   // a node's own spot or area faces the origin
-      lightCols[lightCount * 3 + 0] = lights[i]->color[0];
-      lightCols[lightCount * 3 + 1] = lights[i]->color[1];
-      lightCols[lightCount * 3 + 2] = lights[i]->color[2];
-      lightPower[lightCount] = lights[i]->intensity;
-      lightTypes[lightCount] = lights[i]->type;
-      lightSpotAngle[lightCount] = lights[i]->spotAngle;
-      lightSpotPenumbra[lightCount] = lights[i]->spotPenumbra;
-      lightArea[lightCount * 2 + 0] = std::max(0.01f, lights[i]->areaWidth);
-      lightArea[lightCount * 2 + 1] = std::max(0.01f, lights[i]->areaHeight);
+      RigLight l;
+      l.From(*lights[i]);
+      std::memcpy(&lightCols[lightCount * 3], l.color, sizeof(l.color));
+      lightPower[lightCount] = l.intensity;
+      lightTypes[lightCount] = l.type;
+      lightSpotAngle[lightCount] = l.spotAngle;
+      lightSpotPenumbra[lightCount] = l.spotPenumbra;
+      lightArea[lightCount * 2 + 0] = std::max(0.01f, l.areaW);
+      lightArea[lightCount * 2 + 1] = std::max(0.01f, l.areaH);
+      const float terms[4] = { l.diffuse, l.specular, l.transmission, l.falloff };
+      std::memcpy(&lightTerms[lightCount * 4], terms, sizeof(terms));
+      if (lightCount == 0)
+         caster = l;
       lightCount++;
+   }
+   // The sun an Environment node took out of its image: one more light, at the end so no item's
+   // light mask moves. It casts when nothing ahead of it does.
+   int ci = 0;   // the light that casts the shadow
+   if (auto* env = dynamic_cast<EnvironmentNode*>(envInput.IsConnected() ? envInput.Resolved() : nullptr))
+   {
+      float sunDir[3], sunLight[3];
+      if (lightCount < kMaxLights && env->Sun(sunDir, sunLight))
+      {
+         const float c = std::cos(envRotationRad), sn = std::sin(envRotationRad);
+         lightDirs[lightCount * 3 + 0] = sunDir[0] * c + sunDir[2] * sn;
+         lightDirs[lightCount * 3 + 1] = sunDir[1];
+         lightDirs[lightCount * 3 + 2] = -sunDir[0] * sn + sunDir[2] * c;
+         const float peak = std::max({ sunLight[0], sunLight[1], sunLight[2], 1e-6f });
+         for (int k = 0; k < 3; k++)   // the shader takes colours in sRGB
+            lightCols[lightCount * 3 + k] = std::pow(sunLight[k] / peak, 1.0f / 2.2f);
+         lightPower[lightCount] = peak * envHdriIntensity;
+         lightTypes[lightCount] = 0;
+         if (env->sunShadow && (lightCount == 0 || !caster.castShadow))
+         {
+            ci = lightCount;
+            caster = RigLight();
+            caster.shadowSoft = std::max(0.0f, env->sunAngle) / 0.526f * std::max(0.0f, env->sunShadowFilter);
+            caster.shadowRes = env->sunShadowRes;
+         }
+         lightCount++;
+      }
    }
    if (lightCount == 0)
    {
@@ -2030,9 +2269,11 @@ void Render3DNode::CookOnce(int frameId)
    // direction: a point light would need a depth cube map and six passes.
    bool shadowsActive = false;
    float shadowBiasDepth = shadowBias;
-   if (shadowsEnabled && lightTypes[0] != 1 && EnsureShadowShader())
+   const float casterSoftness = shadowSoftness * caster.shadowSoft;
+   if (shadowsEnabled && !mVelocityPass && caster.castShadow && lightTypes[ci] != 1 && EnsureShadowShader())
    {
-      const int wantSize = kShadowSizes[std::max(0, std::min(shadowQuality, 2))];
+      const int quality = caster.shadowRes > 0 ? caster.shadowRes - 1 : shadowQuality;
+      const int wantSize = kShadowSizes[std::max(0, std::min(quality, 2))];
       float sceneLo[3], sceneHi[3];
       if (EnsureShadowResources(wantSize) && SceneBounds(sceneLo, sceneHi))
       {
@@ -2049,7 +2290,8 @@ void Render3DNode::CookOnce(int frameId)
          // the ortho box is fitted to that sphere. Fitting to the scene rather
          // than using a fixed volume is what keeps texel density usable whether
          // the scene is a centimetre or a hundred units across.
-         float dir[3] = { lightDirs[0], lightDirs[1], lightDirs[2] };
+         const float* casterVec = &lightDirs[ci * 3];
+         float dir[3] = { casterVec[0], casterVec[1], casterVec[2] };
          const float dirLen = std::sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
          if (dirLen > 1e-5f) { dir[0] /= dirLen; dir[1] /= dirLen; dir[2] /= dirLen; }
          else { dir[0] = 0.0f; dir[1] = 1.0f; dir[2] = 0.0f; }
@@ -2065,15 +2307,26 @@ void Render3DNode::CookOnce(int frameId)
          const float upZ[3] = { 0.0f, 0.0f, 1.0f };
          const Mat4 lightView =
             Mat4::LookAt(eye, centre, (std::fabs(dir[1]) > 0.99f) ? upZ : upY);
+         // Clip start: depth from the light's own position, which sits at the light's distance
+         // from the centre for a positioned light and outside the scene for a direction.
+         float clipNear = caster.shadowClip;
+         if (lightTypes[ci] == 4 || lightTypes[ci] == 5)
+         {
+            const float toLight = std::sqrt((casterVec[0] - centre[0]) * (casterVec[0] - centre[0]) +
+                                            (casterVec[1] - centre[1]) * (casterVec[1] - centre[1]) +
+                                            (casterVec[2] - centre[2]) * (casterVec[2] - centre[2]));
+            clipNear += radius * 2.5f - toLight;
+         }
+         clipNear = std::clamp(clipNear, 0.05f, radius * 4.0f);
          const Mat4 lightProj = Mat4::Orthographic(radius * 1.2f, 1.0f,
-                                                   0.05f, radius * 5.0f);
+                                                   clipNear, radius * 5.0f);
          mLightViewProj = Mat4::Multiply(lightProj, lightView);
          // The bias is a distance in the scene, at least the size of the filtered shadow texels.
          // The depth map spans the whole scene, so a bias in depth units grew with the floor and
          // lifted shadows off whatever cast them.
          const float shadowTexelWorld = 2.4f * radius / (float)mShadowSize;
-         shadowBiasDepth = (shadowBias + 2.5f * shadowTexelWorld * std::max(1.0f, shadowSoftness)) /
-                           (radius * 5.0f - 0.05f);
+         shadowBiasDepth = (shadowBias + 2.5f * shadowTexelWorld * std::max(1.0f, casterSoftness)) /
+                           (radius * 5.0f - clipNear);
 
          GLint prevFboShadow = 0, prevViewportShadow[4];
          glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFboShadow);
@@ -2156,10 +2409,14 @@ void Render3DNode::CookOnce(int frameId)
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
-   if (renderPass == 1 || renderPass == 2)
+   if (mVelocityPass)
+      glClearColor(0.5f, 0.5f, 0.0f, 0.0f);
+   else if (renderPass == 1 || renderPass == 2 || renderPass == 5 || renderPass == 8 || renderPass == 9)
       glClearColor(1.0f, 1.0f, 1.0f, bgOpacity);
    else if (renderPass == 3)
       glClearColor(0.5f, 0.5f, 0.5f, bgOpacity);
+   else if (renderPass == 6 || renderPass == 7 || renderPass == 10)
+      glClearColor(0.0f, 0.0f, 0.0f, bgOpacity);
    else
       glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
    glClearDepth(1.0);
@@ -2168,8 +2425,10 @@ void Render3DNode::CookOnce(int frameId)
    // HDRI background: drawn first, into the just-cleared buffer, so it needs
    // neither depth testing nor a depth write - every geometry draw that
    // follows simply paints over it in the usual way.
-   mEnvBgDrawn = hasEnvMap && envAsBackground;
-   if (hasEnvMap && envAsBackground && EnsureEnvBgShader())
+   // A data pass keeps its own clear value; the Environment pass always shows the world,
+   // the gradient one when no HDRI is patched in.
+   mEnvBgDrawn = ((hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10) && !mVelocityPass;
+   if (mEnvBgDrawn && EnsureEnvBgShader())
    {
       if (mEnvBgVao == 0)
          glGenVertexArrays(1, &mEnvBgVao);
@@ -2186,7 +2445,7 @@ void Render3DNode::CookOnce(int frameId)
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, envTex);
       glUniform1i(glGetUniformLocation(mEnvBgProgram, "uEnvMap"), 0);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), 1);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
       glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvRotation"), envRotationRad);
       glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvSky"), 1, envSky);
       glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvHorizon"), 1, envHorizon);
@@ -2257,6 +2516,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kMaxLights, lightSpotAngle);
       glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kMaxLights, lightSpotPenumbra);
       glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kMaxLights, lightArea);
+      glUniform4fv(glGetUniformLocation(mProgram, "uLightTerms"), kMaxLights, lightTerms);
       glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
       const float rigAmbient[3] = { ambientColor[0] + (rig != nullptr ? rig->ambient[0] : 0.0f),
                                     ambientColor[1] + (rig != nullptr ? rig->ambient[1] : 0.0f),
@@ -2267,6 +2527,28 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
       glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1i(glGetUniformLocation(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
+      if (mVelocityPass)
+      {
+         const float reach = std::max(1.0f, motionMax * (float)h / 1080.0f);
+         glUniform2f(glGetUniformLocation(mProgram, "uVelocityScale"), 0.5f * (float)w / (2.0f * reach),
+                     0.5f * (float)h / (2.0f * reach));
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPrevViewProj"), 1, GL_FALSE, mPrevViewProj.m);
+      }
+      glUniform1f(glGetUniformLocation(mProgram, "uMistStart"), mistStart);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistDepth"), mistDepth);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistIntensity"), mistIntensity);
+      glUniform1f(glGetUniformLocation(mProgram, "uMistHeight"), mistHeight);
+      glUniform1f(glGetUniformLocation(mProgram, "uPassThreshold"), passThreshold);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolid"), SolidActive() ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidLighting"), solidLighting);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidColor"), solidColor);
+      glUniform3fv(glGetUniformLocation(mProgram, "uSolidSingle"), 1, solidSingle);
+      glUniform1i(glGetUniformLocation(mProgram, "uMatcap"), matcap);
+      glUniform1i(glGetUniformLocation(mProgram, "uSolidSpecular"), solidSpecular ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uStudioWorld"), studioWorld ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uStudioRotation"), studioRotation * 3.14159265f / 180.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
       glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
       glActiveTexture(GL_TEXTURE1);
@@ -2275,7 +2557,9 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBiasDepth);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
-                  lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
+                  lightTypes[ci] == 5 ? casterSoftness * (1.0f + 1.5f * std::max(lightArea[ci * 2], lightArea[ci * 2 + 1]))
+                                      : casterSoftness);
+      glUniform1i(glGetUniformLocation(mProgram, "uShadowLight"), ci);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
                   mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
@@ -2558,7 +2842,11 @@ void Render3DNode::CookOnce(int frameId)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
+      if (MotionActive())
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
+      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
+      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
@@ -2970,7 +3258,11 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
+      if (MotionActive())
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
+      glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
+      glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
       glUniformMatrix3fv(glGetUniformLocation(mProgram, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
@@ -3214,18 +3506,20 @@ void Render3DNode::CookOnce(int frameId)
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       // Depth comes along only when the post stage or a Volume node will read it.
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
-                        GL_COLOR_BUFFER_BIT | ((PostActive() || HdrActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
+                        GL_COLOR_BUFFER_BIT | ((PostActive() || HdrActive() || MotionActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
 
-   mDepthResolved = !multisampling || PostActive() || HdrActive() || mDepthWanted;
-   if (PostActive())
+   mDepthResolved = !multisampling || PostActive() || HdrActive() || MotionActive() || mDepthWanted;
+   if (PostActive() && !mVelocityPass)
    {
       Bench::ConditionalGpuStageTimer benchPost(benchPassRing, "r3d_post", frameId);
       RunPost(proj, proj.m[11] == 0.0f, w, h);
    }
-   if (HdrActive() && mFaceOverride < 0) // a panorama runs the finish once, on the unwrapped picture
+   if (MotionActive() && mHasPrev && !mVelocityPass && mVelocity.fbo != 0)
+      RunMotionBlur(proj, viewProj, w, h);
+   if (HdrActive() && mFaceOverride < 0 && !mVelocityPass) // a panorama runs the finish once, on the unwrapped picture
    {
       Bench::ConditionalGpuStageTimer benchHdr(benchPassRing, "r3d_hdr", frameId);
       RunHdr(mColorTex, mDepthTex, w, h, mFbo);

@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "gl3.h"
+#include "Platform.h"
 #include "EnvironmentNode.h"
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
@@ -40,6 +41,9 @@ namespace
       f(s.safe); f(s.thirds); f(s.center); f(s.golden); f(s.safeTitle); f(s.safeAction);
       f(s.orientation); f(s.pivot); f(s.cursor[0]); f(s.cursor[1]); f(s.cursor[2]);
       f(s.zoomToMouse); f(s.orbitSelection); f(s.shadowItem); f(s.fStop);
+      f(s.proportional); f(s.propSize); f(s.propFalloff);
+      f(s.invertZoom); f(s.textInfo); f(s.stats); f(s.originsAll); f(s.gizmoMove); f(s.gizmoNav); f(s.snapObjects);
+      f(s.border); f(s.crop); f(s.borderMin[0]); f(s.borderMin[1]); f(s.borderMax[0]); f(s.borderMax[1]);
    }
 
    void Normalize(float v[3])
@@ -81,20 +85,22 @@ public:
    IGeometrySource* src = nullptr;
    Mat4 place;
    unsigned int lightMask = ~0u;
+   int passIndex = 0;
    std::vector<std::unique_ptr<Placed>> children;
 
-   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask)
+   void Update(IGeometrySource* source, const Mat4& placement, unsigned int mask, int index)
    {
       src = source;
       place = placement;
       lightMask = mask;
+      passIndex = index;
       const int count = src != nullptr ? src->GroupChildCount() : 0;
       children.resize(count);
       for (int i = 0; i < count; i++)
       {
          if (!children[i])
             children[i] = std::make_unique<Placed>();
-         children[i]->Update(src->GroupChild(i), placement, mask);
+         children[i]->Update(src->GroupChild(i), placement, mask, index);
       }
    }
 
@@ -112,6 +118,7 @@ public:
    int GroupChildCount() const override { return (int)children.size(); }
    IGeometrySource* GroupChild(int index) const override { return children[index].get(); }
    unsigned int LightMask() const override { return lightMask; }
+   int PassIndex() const override { return passIndex; }
    Mat4 GetInstanceGroupMatrix() const override { return Mat4::Multiply(place, src->GetInstanceGroupMatrix()); }
    const std::vector<unsigned char>* InstanceSelection() const override { return src->InstanceSelection(); }
    unsigned long long InstanceSelectionRevision() const override { return src->InstanceSelectionRevision(); }
@@ -142,19 +149,72 @@ Scene3DNode::~Scene3DNode()
    GLUtil::DestroyFbo(mOutFbo);
    GLUtil::DestroyFbo(mEditorFbo);
    GLUtil::DestroyFbo(mGridFbo);
+   GLUtil::DestroyFbo(mBorderFbo);
+   if (mBorderProgram != 0)
+      glDeleteProgram(mBorderProgram);
    if (mCompositeProgram != 0)
       glDeleteProgram(mCompositeProgram);
    if (mGridProgram != 0)
       glDeleteProgram(mGridProgram);
+   for (auto& [path, pic] : mPictures)
+      if (pic.tex != 0)
+         glDeleteTextures(1, &pic.tex);
+}
+
+namespace
+{
+   Mat4 Turn(const float rot[3])
+   {
+      Mat4 m = Mat4::RotationZ(rot[2] * kDeg);
+      m = Mat4::Multiply(m, Mat4::RotationY(rot[1] * kDeg));
+      return Mat4::Multiply(m, Mat4::RotationX(rot[0] * kDeg));
+   }
+   // X then Y then Z angles, in degrees, of the rotation with rows `r`.
+   void TurnAngles(const float r[3][3], float rot[3])
+   {
+      const float d = 180.0f / 3.14159265f;
+      rot[1] = std::asin(std::clamp(-r[2][0], -1.0f, 1.0f)) * d;
+      rot[0] = std::atan2(r[2][1], r[2][2]) * d;
+      rot[2] = std::atan2(r[1][0], r[0][0]) * d;
+   }
 }
 
 Mat4 Scene3DNode::Placement(const Item& it)
 {
-   Mat4 m = Mat4::Translation(it.pos[0], it.pos[1], it.pos[2]);
-   m = Mat4::Multiply(m, Mat4::RotationZ(it.rot[2] * kDeg));
-   m = Mat4::Multiply(m, Mat4::RotationY(it.rot[1] * kDeg));
-   m = Mat4::Multiply(m, Mat4::RotationX(it.rot[0] * kDeg));
-   return Mat4::Multiply(m, Mat4::Scale(it.scale[0], it.scale[1], it.scale[2]));
+   Mat4 m = Mat4::Translation(it.pos[0] + it.dpos[0], it.pos[1] + it.dpos[1], it.pos[2] + it.dpos[2]);
+   m = Mat4::Multiply(m, Turn(it.rot));
+   m = Mat4::Multiply(m, Turn(it.drot));
+   return Mat4::Multiply(m, Mat4::Scale(it.scale[0] * it.dscale[0], it.scale[1] * it.dscale[1],
+                                        it.scale[2] * it.dscale[2]));
+}
+
+void Scene3DNode::SetTurn(Item& item, const float r[3][3])
+{
+   // r = main * delta, so main = r * transpose(delta).
+   const Mat4 dm = Turn(item.drot);
+   float main[3][3];
+   for (int row = 0; row < 3; row++)
+      for (int col = 0; col < 3; col++)
+         main[row][col] = r[row][0] * dm.m[col] + r[row][1] * dm.m[4 + col] + r[row][2] * dm.m[8 + col];
+   TurnAngles(main, item.rot);
+}
+
+void Scene3DNode::TransformsToDeltas(Item& item)
+{
+   const Mat4 whole = Mat4::Multiply(Turn(item.rot), Turn(item.drot));
+   float r[3][3];
+   for (int row = 0; row < 3; row++)
+      for (int col = 0; col < 3; col++)
+         r[row][col] = whole.m[col * 4 + row];
+   for (int k = 0; k < 3; k++)
+   {
+      item.dpos[k] += item.pos[k];
+      item.dscale[k] *= item.scale[k];
+      item.pos[k] = 0.0f;
+      item.scale[k] = 1.0f;
+      item.rot[k] = 0.0f;
+   }
+   TurnAngles(r, item.drot);
 }
 
 Scene3DNode::Kind Scene3DNode::KindOf(const INode* node)
@@ -262,6 +322,30 @@ void Scene3DNode::Serialize()
          o << "itemx " << it.id << " 0\n";
       if (it.group != 0)
          o << "group " << it.id << " " << it.group << "\n";
+      if (it.lock != 0)
+         o << "lock " << it.id << " " << it.lock << "\n";
+      if (it.lookAt != 0)
+         o << "look " << it.id << " " << it.lookAt << "\n";
+      if (it.passIndex != 0)
+         o << "pass " << it.id << " " << it.passIndex << "\n";
+      if (!it.backdrop.path.empty())
+      {
+         const Backdrop& b = it.backdrop;
+         o << "backdrop " << it.id << " " << (b.show ? 1 : 0) << " " << b.alpha << " " << (b.front ? 1 : 0) << " "
+           << b.fit << " " << b.offset[0] << " " << b.offset[1] << " " << b.rotation << " " << b.scale << " "
+           << (b.flipX ? 1 : 0) << " " << (b.flipY ? 1 : 0) << " " << b.path << "\n";
+      }
+      const bool delta = it.dpos[0] != 0 || it.dpos[1] != 0 || it.dpos[2] != 0 || it.drot[0] != 0 ||
+                         it.drot[1] != 0 || it.drot[2] != 0 || it.dscale[0] != 1 || it.dscale[1] != 1 ||
+                         it.dscale[2] != 1;
+      if (delta)
+      {
+         o << "delta " << it.id;
+         for (float v : it.dpos) o << " " << v;
+         for (float v : it.drot) o << " " << v;
+         for (float v : it.dscale) o << " " << v;
+         o << "\n";
+      }
    }
    mText = o.str();
    mParsedText = mText;
@@ -320,7 +404,8 @@ void Scene3DNode::Parse()
             if (l >> x)
                v = (std::decay_t<decltype(v)>)x;
          });
-      else if (key == "label" || key == "itemx" || key == "group")
+      else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
+               key == "delta" || key == "pass" || key == "backdrop")
       {
          int id = 0;
          l >> id;
@@ -337,6 +422,29 @@ void Scene3DNode::Parse()
             int on = 1;
             l >> on;
             it->render = on != 0;
+         }
+         else if (key == "lock")
+            l >> it->lock;
+         else if (key == "look")
+            l >> it->lookAt;
+         else if (key == "pass")
+            l >> it->passIndex;
+         else if (key == "backdrop")
+         {
+            Backdrop& b = it->backdrop;
+            int show = 1, front = 0, fx = 0, fy = 0;
+            l >> show >> b.alpha >> front >> b.fit >> b.offset[0] >> b.offset[1] >> b.rotation >> b.scale >> fx >> fy >> std::ws;
+            std::getline(l, b.path);
+            b.show = show != 0;
+            b.front = front != 0;
+            b.flipX = fx != 0;
+            b.flipY = fy != 0;
+         }
+         else if (key == "delta")
+         {
+            for (float& v : it->dpos) l >> v;
+            for (float& v : it->drot) l >> v;
+            for (float& v : it->dscale) l >> v;
          }
          else
             l >> it->group;
@@ -368,6 +476,31 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("envIntensity", mRender.envIntensity);
    v.Bool("floatOutput", mRender.floatOutput);
    v.Int("renderPass", mRender.renderPass);
+   v.Float("mistStart", mRender.mistStart);
+   v.Float("mistDepth", mRender.mistDepth);
+   v.Int("mistFalloff", mRender.mistFalloff);
+   v.Float("mistIntensity", mRender.mistIntensity);
+   v.Float("mistHeight", mRender.mistHeight);
+   v.Float("passThreshold", mRender.passThreshold);
+   v.Bool("cavity", mRender.cavity);
+   v.Int("cavityType", mRender.cavityType);
+   v.Float("cavityRidge", mRender.cavityRidge);
+   v.Float("cavityValley", mRender.cavityValley);
+   v.Float("curvatureRidge", mRender.curvatureRidge);
+   v.Float("curvatureValley", mRender.curvatureValley);
+   v.Float("cavityDistance", mRender.cavityDistance);
+   v.Bool("motionBlur", mRender.motionBlur);
+   v.Float("motionShutter", mRender.motionShutter);
+   v.Int("motionPosition", mRender.motionPosition);
+   v.Float("motionMax", mRender.motionMax);
+   v.Int("viewShading", mRender.viewShading);
+   v.Int("solidLighting", mRender.solidLighting);
+   v.Int("solidColor", mRender.solidColor);
+   v.Color("solidSingle", mRender.solidSingle);
+   v.Int("matcap", mRender.matcap);
+   v.Bool("solidSpecular", mRender.solidSpecular);
+   v.Bool("studioWorld", mRender.studioWorld);
+   v.Float("studioRotation", mRender.studioRotation);
    v.Int("projection", mRender.projection);
    v.Float("domeAngle", mRender.domeAngle);
    v.Float("domeTilt", mRender.domeTilt);
@@ -440,15 +573,15 @@ void Scene3DNode::AlignToView(Item& item, const Mat4& view) const
    if (cam == nullptr)
       return;
    const Mat4 place = Mat4::Multiply(Mat4::Inverse(view), cam->ViewMatrix());
-   const float d = 180.0f / 3.14159265f;
+   float r[3][3];
    for (int k = 0; k < 3; k++)
    {
-      item.pos[k] = place.m[12 + k];
-      item.scale[k] = 1.0f;
+      item.pos[k] = place.m[12 + k] - item.dpos[k];
+      item.scale[k] = 1.0f / (item.dscale[k] != 0.0f ? item.dscale[k] : 1.0f);
+      for (int col = 0; col < 3; col++)
+         r[k][col] = place.m[col * 4 + k];
    }
-   item.rot[1] = std::asin(std::clamp(-place.m[2], -1.0f, 1.0f)) * d;
-   item.rot[0] = std::atan2(place.m[6], place.m[10]) * d;
-   item.rot[2] = std::atan2(place.m[1], place.m[0]) * d;
+   SetTurn(item, r);
 }
 
 bool Scene3DNode::AimAt(Item& item, const float target[3]) const
@@ -488,10 +621,8 @@ bool Scene3DNode::AimAt(Item& item, const float target[3]) const
       for (int col = 0; col < 3; col++)
          r[row][col] = to[0][row] * from[0][col] + to[1][row] * from[1][col] + to[2][row] * from[2][col];
 
-   const float d = 180.0f / 3.14159265f;
-   item.rot[1] = std::asin(std::clamp(-r[2][0], -1.0f, 1.0f)) * d;
-   item.rot[0] = std::atan2(r[2][1], r[2][2]) * d;
-   item.rot[2] = std::atan2(r[1][0], r[0][0]) * d;
+   // r turns the node's own frame; an item already carrying a delta turn keeps it.
+   SetTurn(item, r);
 
    // The point stays put; the turn must not swing it about the node's origin.
    Item turned = item;
@@ -510,6 +641,15 @@ void Scene3DNode::Sync(int frameId)
    mSyncedFrame = frameId;
    if (mText != mParsedText)
       Parse();
+   // Items told to look at another keep facing it as it moves or animates.
+   for (Item& it : mItems)
+      if (it.lookAt != 0 && it.lookAt != it.id)
+         if (Item* target = FindItem(it.lookAt))
+         {
+            float c[3];
+            ItemCenter(*target, c);
+            AimAt(it, c);
+         }
    if (!mRoot)
    {
       mRoot = std::make_unique<Root>();
@@ -561,13 +701,7 @@ void Scene3DNode::Sync(int frameId)
       const float aimLen = std::max(1e-4f, std::sqrt(l.aim[0] * l.aim[0] + l.aim[1] * l.aim[1] + l.aim[2] * l.aim[2]));
       for (float& a : l.aim)
          a /= aimLen;
-      std::memcpy(l.color, light->color, sizeof(l.color));
-      l.intensity = light->intensity;
-      l.type = light->type;
-      l.spotAngle = light->spotAngle;
-      l.spotPenumbra = light->spotPenumbra;
-      l.areaW = light->areaWidth;
-      l.areaH = light->areaHeight;
+      l.From(*light);
       mRig.lights.push_back(l);
       lightOrder.push_back(it.uid);
       marks.push_back(it.render ? 1.0f : 0.0f);
@@ -598,7 +732,7 @@ void Scene3DNode::Sync(int frameId)
       std::unique_ptr<Placed>& placed = mPlaced[it.id];
       if (!placed)
          placed = std::make_unique<Placed>();
-      placed->Update(source, Placement(it), mask);
+      placed->Update(source, Placement(it), mask, it.passIndex);
       mRoot->draws.push_back(placed.get());
       if (it.render)
          mOutRoot->draws.push_back(placed.get());
@@ -633,6 +767,8 @@ void Scene3DNode::Sync(int frameId)
       stamp.push_back(l.spotAngle); stamp.push_back(l.spotPenumbra);
       stamp.push_back(l.areaW); stamp.push_back(l.areaH);
       stamp.insert(stamp.end(), l.aim, l.aim + 3);
+      stamp.insert(stamp.end(), { l.intensity, l.diffuse, l.specular, l.transmission, l.falloff,
+                                  l.castShadow ? 1.0f : 0.0f, l.shadowSoft, (float)l.shadowRes, l.shadowClip });
    }
    const bool worldLights = worldColorOn && mWorldNode == nullptr;
    for (int k = 0; k < 3; k++)
@@ -741,6 +877,43 @@ unsigned int Scene3DNode::Composite(unsigned int sceneTex, int w, int h, unsigne
    return out.tex;
 }
 
+// The render region: clear outside it, or with crop the picture is just the region.
+unsigned int Scene3DNode::Border(unsigned int sceneTex, int w, int h)
+{
+   const float x0 = std::clamp(std::min(settings.borderMin[0], settings.borderMax[0]), 0.0f, 1.0f);
+   const float y0 = std::clamp(std::min(settings.borderMin[1], settings.borderMax[1]), 0.0f, 1.0f);
+   const float x1 = std::clamp(std::max(settings.borderMin[0], settings.borderMax[0]), 0.0f, 1.0f);
+   const float y1 = std::clamp(std::max(settings.borderMin[1], settings.borderMax[1]), 0.0f, 1.0f);
+   const int ow = settings.crop ? std::max(1, (int)std::lround((x1 - x0) * w)) : w;
+   const int oh = settings.crop ? std::max(1, (int)std::lround((y1 - y0) * h)) : h;
+   if (mBorderProgram == 0)
+      mBorderProgram = GLUtil::CompileProgram(
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uScene;\n"
+         "uniform vec4 uRegion;\n"
+         "uniform int uCrop;\n"
+         "void main() {\n"
+         "   if (uCrop == 1) { fragColor = texture(uScene, mix(uRegion.xy, uRegion.zw, vUv)); return; }\n"
+         "   bool inside = all(greaterThanEqual(vUv, uRegion.xy)) && all(lessThanEqual(vUv, uRegion.zw));\n"
+         "   fragColor = inside ? texture(uScene, vUv) : vec4(0.0);\n"
+         "}\n");
+   if (mBorderProgram == 0 || !GLUtil::EnsureFbo(mBorderFbo, ow, oh))
+      return sceneTex;
+   GLUtil::RunShaderPass(mBorderFbo, mBorderProgram, [&]
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, sceneTex);
+      glUniform1i(glGetUniformLocation(mBorderProgram, "uScene"), 0);
+      glUniform4f(glGetUniformLocation(mBorderProgram, "uRegion"), x0, y0, x1, y1);
+      glUniform1i(glGetUniformLocation(mBorderProgram, "uCrop"), settings.crop ? 1 : 0);
+   });
+   mOutW = ow;
+   mOutH = oh;
+   return mBorderFbo.tex;
+}
+
 void Scene3DNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -757,7 +930,22 @@ void Scene3DNode::CookIfNeeded(int frameId)
    mOutTex = mRender.GetOutputTexture();
    if (backdrop != 0)
       mOutTex = Composite(mOutTex, mRender.GetOutputWidth(), mRender.GetOutputHeight(), backdrop, mOutFbo);
-   const unsigned long long rev = mRender.TextureRevision() + (backdrop != 0 ? mWorldNode->TextureRevision() : 0);
+   mOutW = mOutH = 0;
+   if (settings.border)
+      mOutTex = Border(mOutTex, mRender.GetOutputWidth(), mRender.GetOutputHeight());
+   unsigned long long rev = mRender.TextureRevision() + (backdrop != 0 ? mWorldNode->TextureRevision() : 0);
+   if (settings.border)
+   {
+      // Moving the region changes the picture without a new render.
+      unsigned long long region = settings.crop ? 7 : 3;
+      for (float f : { settings.borderMin[0], settings.borderMin[1], settings.borderMax[0], settings.borderMax[1] })
+      {
+         uint32_t bits;
+         std::memcpy(&bits, &f, sizeof(bits));
+         region = region * 1099511628211ull ^ bits;
+      }
+      rev += region;
+   }
    if (rev != mBuiltRevision)
    {
       mBuiltRevision = rev;
@@ -773,6 +961,29 @@ unsigned int Scene3DNode::GetOutputTexture()
 // The floor, drawn after the scene against its depth: endless, always fine at
 // any zoom, fading into the distance, and hidden by whatever stands in front.
 // Colours are Blender's theme defaults.
+// A camera's backdrop, decoded once per path; a path that fails stays empty until it changes.
+const Scene3DNode::Picture& Scene3DNode::LoadPicture(const std::string& path)
+{
+   auto found = mPictures.find(path);
+   if (found != mPictures.end())
+      return found->second;
+   Picture& pic = mPictures[path];
+   std::vector<unsigned char> pixels;
+   std::string error;
+   if (!Platform::LoadImageRGBA(path, pixels, pic.w, pic.h, error) || pic.w <= 0 || pic.h <= 0)
+      return pic;
+   glGenTextures(1, &pic.tex);
+   glBindTexture(GL_TEXTURE_2D, pic.tex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, pic.w, pic.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   return pic;
+}
+
 unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const View& v)
 {
    if (mGridProgram == 0)
@@ -788,7 +999,25 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "uniform int uAxis;\n"
          "uniform int uDraw;\n"
          "uniform float uDist;\n"
-         "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.545, 0.863, 0.0), vec3(0.157, 0.565, 1.0));\n"
+         "uniform sampler2D uPicture;\n"
+         "uniform int uPictureOn;\n"     // 0 none, 1 behind, 2 over
+         "uniform int uPictureWire;\n"
+         "uniform vec4 uFrame;\n"
+         "uniform vec4 uPictureHalf;\n"  // half size in frame widths, then 1/frame aspect, alpha
+         "uniform vec4 uPictureMove;\n"  // offset, rotation in radians, scale
+         "uniform vec2 uPictureFlip;\n"
+         "vec4 picture() {\n"
+         "   vec2 c = (vUv - uFrame.xy) / max(uFrame.zw - uFrame.xy, vec2(1e-6)) - 0.5;\n"
+         "   vec2 q = vec2(c.x, c.y * uPictureHalf.z) - uPictureMove.xy;\n"
+         "   float cr = cos(uPictureMove.z), sr = sin(uPictureMove.z);\n"
+         "   q = vec2(cr * q.x + sr * q.y, -sr * q.x + cr * q.y) / max(uPictureMove.w, 1e-4);\n"
+         "   vec2 uv = q / (2.0 * uPictureHalf.xy) + 0.5;\n"
+         "   if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec4(0.0);\n"
+         "   uv = mix(uv, 1.0 - uv, uPictureFlip);\n"
+         "   vec4 p = texture(uPicture, vec2(uv.x, 1.0 - uv.y));\n"
+         "   return vec4(p.rgb, p.a * uPictureHalf.w);\n"
+         "}\n"
+         "const vec3 kAxis[3] = vec3[3](vec3(1.0, 0.2, 0.32), vec3(0.157, 0.565, 1.0), vec3(0.545, 0.863, 0.0));\n"
          "float lines(vec2 uv, float s) {\n"
          "   vec2 c = uv / s;\n"
          "   vec2 g = abs(fract(c - 0.5) - 0.5) / max(fwidth(c), vec2(1e-5));\n"
@@ -798,6 +1027,13 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "   vec4 s = texture(uScene, vUv);\n"
          "   vec3 rgb = s.rgb;\n"
          "   float a = s.a;\n"
+         "   if (uPictureOn == 1) {\n"
+         "      vec4 p = picture();\n"
+         "      float open = uPictureWire == 1 ? 1.0 - s.a : step(0.999999, texture(uDepth, vUv).r);\n"
+         "      float k = p.a * open;\n"
+         "      rgb = mix(rgb, p.rgb, k);\n"
+         "      a = a + k * (1.0 - a);\n"
+         "   }\n"
          "   if (uDraw == 1) {\n"
          "      vec4 n = uInv * vec4(vUv * 2.0 - 1.0, -1.0, 1.0);\n"
          "      vec4 f = uInv * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);\n"
@@ -827,14 +1063,54 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "         a = a + g * (1.0 - a);\n"
          "      }\n"
          "   }\n"
+         "   if (uPictureOn == 2) {\n"
+         "      vec4 p = picture();\n"
+         "      rgb = mix(rgb, p.rgb, p.a);\n"
+         "      a = a + p.a * (1.0 - a);\n"
+         "   }\n"
          "   fragColor = a > 1e-4 ? vec4(rgb / a, a) : vec4(0.0);\n"
          "}\n");
    if (mGridProgram == 0 || !GLUtil::EnsureFbo(mGridFbo, w, h))
       return sceneTex;
    const Mat4 viewProj = Mat4::Multiply(v.proj, v.view);
    const Mat4 inv = Mat4::Inverse(viewProj);
+   const Item* camera = v.camera != 0 ? FindConst(v.camera) : nullptr;
+   const Backdrop* back = camera != nullptr && camera->backdrop.show && !camera->backdrop.path.empty() ? &camera->backdrop : nullptr;
+   const Picture& pic = back != nullptr ? LoadPicture(back->path) : Picture();
+   const bool wire = v.shading == Shading::Wire;
    GLUtil::RunShaderPass(mGridFbo, mGridProgram, [&]
    {
+      int on = 0;
+      if (pic.tex != 0)
+      {
+         // The frame's shape against the picture's picks how it covers: stretch fills,
+         // fit shows all of it, crop fills and cuts the overhang.
+         const float frameW = (v.frame[2] - v.frame[0]) * w, frameH = (v.frame[3] - v.frame[1]) * h;
+         const float fa = frameH > 0 ? frameW / frameH : 1.0f;
+         const float ia = (float)pic.w / (float)std::max(1, pic.h);
+         float hx = 0.5f, hy = 0.5f / fa;
+         if (back->fit == 1)
+         {
+            if (ia > fa) hy = 0.5f / ia;
+            else hx = 0.5f * ia / fa;
+         }
+         else if (back->fit == 2)
+         {
+            if (ia > fa) hx = 0.5f * ia / fa;
+            else hy = 0.5f / ia;
+         }
+         on = back->front ? 2 : 1;
+         glActiveTexture(GL_TEXTURE2);
+         glBindTexture(GL_TEXTURE_2D, pic.tex);
+         glUniform1i(glGetUniformLocation(mGridProgram, "uPicture"), 2);
+         glUniform4fv(glGetUniformLocation(mGridProgram, "uFrame"), 1, v.frame);
+         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureHalf"), hx, hy, 1.0f / fa, std::clamp(back->alpha, 0.0f, 1.0f));
+         glUniform4f(glGetUniformLocation(mGridProgram, "uPictureMove"), back->offset[0], back->offset[1],
+                     back->rotation * 3.14159265f / 180.0f, back->scale);
+         glUniform2f(glGetUniformLocation(mGridProgram, "uPictureFlip"), back->flipX ? 1.0f : 0.0f, back->flipY ? 1.0f : 0.0f);
+      }
+      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureOn"), on);
+      glUniform1i(glGetUniformLocation(mGridProgram, "uPictureWire"), wire || !mEditor->DepthValid() ? 1 : 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, mEditor->DepthTexture());
       glUniform1i(glGetUniformLocation(mGridProgram, "uDepth"), 1);

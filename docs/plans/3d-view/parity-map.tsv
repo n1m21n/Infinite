@@ -1,0 +1,1086 @@
+Struct.identifier	status	where
+SpaceView3D.show_region_tool_header	missing	View3D panel header: tool settings strip
+SpaceView3D.show_region_toolbar	missing	View3D panel: a tool column beside the view
+SpaceView3D.show_region_ui	done	View3DPanel.cpp:2966 Properties (N)
+SpaceView3D.show_region_hud	out	Adjust Last Operation: decided out in parity.md
+SpaceView3D.use_render_border	deferred	renderer crop region needed
+SpaceView3D.render_border_min_x	deferred	renderer crop region needed
+SpaceView3D.render_border_min_y	deferred	renderer crop region needed
+SpaceView3D.render_border_max_x	deferred	renderer crop region needed
+SpaceView3D.render_border_max_y	deferred	renderer crop region needed
+SpaceView3D.lock_cursor	missing	View tab > Navigation
+SpaceView3D.lens	missing	View tab: viewport lens (the view has a fixed lens)
+SpaceView3D.clip_start	missing	View tab: viewport clip (the camera has its own)
+SpaceView3D.clip_end	missing	View tab: viewport clip (the camera has its own)
+SpaceView3D.lock_camera	done	View3DPanel.cpp:2443 Lock camera to view
+SpaceView3D.show_gizmo	done	View3DPanel.cpp:4012 Gizmos card
+SpaceView3D.show_gizmo_navigate	done	View3DPanel.cpp:4014 Navigate
+SpaceView3D.show_gizmo_context	done	View3DPanel.cpp:4012 Gizmos card (move/rotate/scale handles)
+SpaceView3D.show_gizmo_tool	done	View3DPanel.cpp:4012 Gizmos card (move/rotate/scale handles)
+SpaceView3D.show_gizmo_object_translate	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_object_rotate	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_object_scale	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_empty_image	out	empty image objects are not in the scene
+SpaceView3D.show_gizmo_light_size	missing	light gizmo handles in the viewport
+SpaceView3D.show_gizmo_light_look_at	missing	light gizmo handles in the viewport
+SpaceView3D.show_gizmo_camera_lens	missing	camera gizmo handles in the viewport
+SpaceView3D.show_gizmo_camera_dof_distance	missing	camera gizmo handles in the viewport
+SpaceView3D.use_local_camera	out	one scene camera; no per-view cameras
+SpaceView3D.region_quadviews	deferred	quad view: new mode, needs approval
+SpaceView3D.show_reconstruction	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.tracks_display_size	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.tracks_display_type	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_camera_path	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_bundle_names	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.mirror_xr_session	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_object_viewport_surf	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_meta	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_pointcloud	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_volume	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_empty	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_camera	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_light	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_light_probe	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_select_surf	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_meta	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_pointcloud	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_volume	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_empty	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_camera	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_light	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_light_probe	missing	View tab: per-type selectability filter
+SpaceView3D.icon_from_show_object_viewport	out	UI icon helper
+SpaceView3D.show_viewer	out	movie tracking, VR and geometry nodes are outside the README
+RegionView3D.lock_rotation	deferred	quad view: new mode, needs approval
+RegionView3D.show_sync_view	deferred	quad view: new mode, needs approval
+RegionView3D.use_box_clip	deferred	quad view: new mode, needs approval
+RegionView3D.perspective_matrix	out	derived matrices, not a setting
+RegionView3D.window_matrix	out	derived matrices, not a setting
+RegionView3D.view_matrix	out	derived matrices, not a setting
+RegionView3D.view_perspective	done	View3DPanel.cpp:1504 Perspective/Orthographic and camera view
+RegionView3D.use_clip_planes	out	derived matrices, not a setting
+RegionView3D.clip_planes	out	derived matrices, not a setting
+RegionView3D.view_location	done	View3DPanel.cpp: orbit target (sTarget), Target X/Y/Z
+RegionView3D.view_rotation	done	View3DPanel.cpp: azimuth/elevation/roll of the view
+RegionView3D.view_distance	done	View3DPanel.cpp: orbit distance (zoom)
+RegionView3D.view_camera_zoom	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
+RegionView3D.view_camera_offset	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
+View3DCursor.location	done	View3DPanel.cpp:3981 3D Cursor card
+View3DCursor.rotation_quaternion	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_axis_angle	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_euler	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_mode	missing	3D Cursor card: cursor has a location only
+View3DCursor.matrix	out	derived matrix, not a setting
+View3DShading.type	done	View3DPanel.cpp:2926 Wireframe/Solid/Rendered chips
+View3DShading.light	deferred	studio lights and matcaps need shader work
+View3DShading.show_object_outline	missing	Overlays card: selection outline in Solid
+View3DShading.studio_light	deferred	studio lights and matcaps need shader work
+View3DShading.use_world_space_lighting	deferred	studio lights and matcaps need shader work
+View3DShading.show_backface_culling	deferred	renderer face culling option
+View3DShading.show_cavity	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_type	deferred	cavity needs a Render 3D shader pass
+View3DShading.curvature_ridge_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.curvature_valley_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_ridge_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_valley_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.selected_studio_light	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_rotate_z	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_intensity	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_background_alpha	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_background_blur	deferred	studio lights and matcaps need shader work
+View3DShading.use_studiolight_view_rotation	deferred	studio lights and matcaps need shader work
+View3DShading.color_type	deferred	Solid shader colour modes needed
+View3DShading.wireframe_color_type	deferred	Solid shader colour modes needed
+View3DShading.single_color	deferred	Solid shader colour modes needed
+View3DShading.background_type	missing	View tab: Solid view background
+View3DShading.background_color	missing	View tab: Solid view background
+View3DShading.show_shadows	deferred	Solid shader work, perf-gated
+View3DShading.show_xray	deferred	X-ray needs renderer work
+View3DShading.show_xray_wireframe	deferred	X-ray needs renderer work
+View3DShading.xray_alpha	deferred	X-ray needs renderer work
+View3DShading.xray_alpha_wireframe	deferred	X-ray needs renderer work
+View3DShading.use_dof	done	View3DPanel.cpp:3503 Depth of Field card drives Rendered view
+View3DShading.use_scene_lights	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_world	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_lights_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_world_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.show_specular_highlight	deferred	Solid shader work, perf-gated
+View3DShading.object_outline_color	missing	Overlays card: outline colour
+View3DShading.shadow_intensity	deferred	Solid shader work, perf-gated
+View3DShading.render_pass	deferred	render passes in the viewport need renderer work
+View3DShading.aov_name	deferred	render passes in the viewport need renderer work
+View3DOverlay.show_overlays	done	View3DPanel.cpp:2950 Overlays chip
+View3DOverlay.show_ortho_grid	missing	Overlays card: grid and axis options
+View3DOverlay.show_floor	done	View3DPanel.cpp:2948 Grid chip
+View3DOverlay.show_axis_x	missing	Overlays card: grid and axis options
+View3DOverlay.show_axis_y	missing	Overlays card: grid and axis options
+View3DOverlay.show_axis_z	missing	Overlays card: grid and axis options
+View3DOverlay.grid_scale	missing	Overlays card: grid and axis options
+View3DOverlay.grid_lines	missing	Overlays card: grid and axis options
+View3DOverlay.grid_scale_unit	missing	Overlays card: grid and axis options
+View3DOverlay.show_outline_selected	missing	Overlays card: selection outline
+View3DOverlay.show_object_origins	done	View3DPanel.cpp: origin dot of selected items
+View3DOverlay.show_object_origins_all	done	View3DPanel.cpp:4010 Origins (all)
+View3DOverlay.show_relationship_lines	out	no parenting in the scene, groups only
+View3DOverlay.show_cursor	missing	Overlays card: hide the 3D cursor
+View3DOverlay.show_stats	done	View3DPanel.cpp:4009 Statistics
+View3DOverlay.show_performance	missing	Overlays card: frame time line
+View3DOverlay.show_camera_guides	done	View3DPanel.cpp:4024 Composition Guides
+View3DOverlay.show_camera_passepartout	done	View3DPanel.cpp:4017 Passepartout
+View3DOverlay.show_extras	missing	Overlays card: hide camera and light markers
+View3DOverlay.show_light_colors	missing	Overlays card: tint light markers
+View3DOverlay.show_fade_inactive	out	edit mode, paint, curves or debug
+View3DOverlay.fade_inactive_alpha	out	edit mode, paint, curves or debug
+View3DOverlay.show_look_dev	out	edit mode, paint, curves or debug
+View3DOverlay.show_wireframes	deferred	wire overlay on solid needs renderer work
+View3DOverlay.wireframe_threshold	deferred	wire overlay on solid needs renderer work
+View3DOverlay.wireframe_opacity	deferred	wire overlay on solid needs renderer work
+View3DOverlay.show_viewer_attribute	out	edit mode, paint, curves or debug
+View3DOverlay.viewer_attribute_opacity	out	edit mode, paint, curves or debug
+View3DOverlay.show_wpaint_contours	out	edit mode, paint, curves or debug
+View3DOverlay.show_extra_indices	out	edit mode, paint, curves or debug
+View3DOverlay.display_handle	out	edit mode, paint, curves or debug
+View3DOverlay.use_debug_freeze_view_culling	out	edit mode, paint, curves or debug
+ToolSettings.lock_object_mode	out	object modes are an editing concept
+ToolSettings.use_proportional_projected	missing	Proportional Editing card: projected from view
+ToolSettings.use_proportional_connected	out	connected geometry; items are whole node outputs
+ToolSettings.proportional_size	done	View3DPanel.cpp Proportional Editing card (propSize)
+ToolSettings.proportional_distance	done	View3DPanel.cpp Proportional Editing card (propSize)
+ToolSettings.double_threshold	out	auto merge is mesh editing
+ToolSettings.transform_pivot_point	done	View3DPanel.cpp:3955 Pivot (median, individual, active, cursor)
+ToolSettings.use_transform_pivot_point_align	missing	Transform card: only locations toggle
+ToolSettings.use_transform_data_origin	out	origins are node outputs, not editable shape offsets
+ToolSettings.use_transform_skip_children	out	no parenting; groups move together
+ToolSettings.use_transform_correct_keep_connected	out	face attribute correction is mesh editing
+ToolSettings.use_snap	done	View3DPanel.cpp:3967 Snap card (Shift+Tab)
+ToolSettings.use_snap_align_rotation	missing	Snap card: align rotation to target
+ToolSettings.use_snap_grid_absolute	missing	Snap card: absolute increment mode
+ToolSettings.snap_angle_increment_2d	out	2D editors only
+ToolSettings.snap_angle_increment_2d_precision	out	2D editors only
+ToolSettings.snap_angle_increment_3d	done	View3DPanel.cpp:3967 Snap card rotation step (snapRot)
+ToolSettings.snap_angle_increment_3d_precision	missing	Snap card: precision step with Shift
+ToolSettings.snap_elements	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.snap_elements_base	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.snap_elements_individual	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.use_snap_to_same_target	out	face nearest snapping is mesh editing
+ToolSettings.use_snap_anim	out	timeline snapping, no keyframes in the panel
+ToolSettings.use_snap_time_absolute	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_anim_element	out	timeline snapping, no keyframes in the panel
+ToolSettings.use_snap_playhead	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_element	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_frame_step	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_playhead_second_step	out	timeline snapping, no keyframes in the panel
+ToolSettings.playhead_snap_distance	out	timeline snapping, no keyframes in the panel
+ToolSettings.snap_target	missing	Snap card: closest, centre, median, active
+ToolSettings.use_snap_peel_object	out	surface snapping needs mesh targets
+ToolSettings.use_snap_backface_culling	out	surface snapping needs mesh targets
+ToolSettings.use_snap_self	out	surface snapping needs mesh targets
+ToolSettings.use_snap_nonedit	out	surface snapping needs mesh targets
+ToolSettings.use_snap_selectable	missing	Snap card: only onto selectable items
+ToolSettings.use_snap_translate	missing	Snap card: snap per tool toggles
+ToolSettings.use_snap_rotate	missing	Snap card: snap per tool toggles
+ToolSettings.use_snap_scale	missing	Snap card: snap per tool toggles
+ToolSettings.plane_axis	missing	Add menu: placement plane for new items
+ToolSettings.plane_axis_auto	missing	Add menu: placement plane for new items
+ToolSettings.plane_depth	missing	Add menu: placement plane for new items
+ToolSettings.plane_orientation	missing	Add menu: placement plane for new items
+ToolSettings.snap_elements_tool	done	View3DPanel.cpp:3973 Snap card: grid and other origins
+ToolSettings.anim_fix_to_cam_use_loc	out	keyframes are not made in the panel
+ToolSettings.anim_fix_to_cam_use_rot	out	keyframes are not made in the panel
+ToolSettings.anim_fix_to_cam_use_scale	out	keyframes are not made in the panel
+ToolSettings.custom_bevel_profile_preset	out	bevel is modelling
+TransformOrientationSlot.type	done	View3DPanel.cpp:3949 Orientation Global/Local/View
+TransformOrientationSlot.custom_orientation	missing	Transform card: custom orientations
+TransformOrientationSlot.use	out	scene vs custom orientation switch, one scene setting
+TRANSFORM_OT_bbone_resize	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_bend	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_create_orientation	missing	Transform card: save a custom orientation
+TRANSFORM_OT_delete_orientation	missing	Transform card: delete a custom orientation
+TRANSFORM_OT_from_gizmo	done	View3DPanel.cpp:776 BeginOp gizmo=true handles
+TRANSFORM_OT_mirror	done	View3DPanel.cpp:1441 MirrorSelected (Mirror X/Y/Z)
+TRANSFORM_OT_push_pull	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_resize	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (S)
+TRANSFORM_OT_rotate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (R)
+TRANSFORM_OT_select_orientation	done	View3DPanel.cpp:3949 Orientation combo
+TRANSFORM_OT_seq_slide	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_shear	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_shrink_fatten	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_tilt	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_tosphere	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_trackball	missing	Rotate: trackball mode (R twice)
+TRANSFORM_OT_transform	done	View3DPanel.cpp:776 BeginOp transform tool
+TRANSFORM_OT_translate	done	View3DPanel.cpp:776 BeginOp / :841 ApplyOp (G)
+TRANSFORM_OT_vert_crease	out	deform, mesh, bone or sequencer editing
+TRANSFORM_OT_vert_slide	out	deform, mesh, bone or sequencer editing
+Object.type	done	Scene3DNode.h Kind (geometry, camera, light)
+Object.mode	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.bound_box	done	View3DPanel.cpp:3609 Dimensions via ItemBounds
+Object.parent_type	out	no parenting; groups only
+Object.parent_vertices	out	no parenting; groups only
+Object.use_parent_final_indices	out	no parenting; groups only
+Object.use_camera_lock_parent	out	no parenting; groups only
+Object.track_axis	missing	Camera and light Data tab: Look at axes
+Object.up_axis	missing	Camera and light Data tab: Look at axes
+Object.location	done	View3DPanel.cpp:3581 Location
+Object.rotation_quaternion	deferred	rotation modes need new Item fields
+Object.rotation_axis_angle	deferred	rotation modes need new Item fields
+Object.rotation_euler	done	View3DPanel.cpp:3589 Rotation
+Object.rotation_mode	deferred	rotation modes need new Item fields
+Object.scale	done	View3DPanel.cpp:3596 Scale
+Object.dimensions	done	View3DPanel.cpp:3609 Dimensions
+Object.delta_location	deferred	delta transform needs new Item fields
+Object.delta_rotation_euler	deferred	delta transform needs new Item fields
+Object.delta_rotation_quaternion	deferred	delta transform needs new Item fields
+Object.delta_scale	deferred	delta transform needs new Item fields
+Object.lock_location	done	View3DPanel.cpp:3636 Lock card
+Object.lock_rotation	done	View3DPanel.cpp:3636 Lock card
+Object.lock_rotation_w	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.lock_rotations_4d	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.lock_scale	done	View3DPanel.cpp:3636 Lock card
+Object.matrix_world	out	derived matrix, not a setting
+Object.matrix_local	out	no parenting; groups only
+Object.matrix_basis	out	derived matrix, not a setting
+Object.matrix_parent_inverse	out	no parenting; groups only
+Object.shader_effects	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.constraints	out	constraint stack: Look at only (parity.md)
+Object.empty_display_type	out	no empty objects in the scene
+Object.empty_display_size	out	no empty objects in the scene
+Object.empty_image_offset	out	no empty objects in the scene
+Object.image_user	out	no empty objects in the scene
+Object.empty_image_depth	out	no empty objects in the scene
+Object.show_empty_image_perspective	out	no empty objects in the scene
+Object.show_empty_image_orthographic	out	no empty objects in the scene
+Object.show_empty_image_only_axis_aligned	out	no empty objects in the scene
+Object.use_empty_image_alpha	out	no empty objects in the scene
+Object.empty_image_side	out	no empty objects in the scene
+Object.add_rest_position_attribute	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.pass_index	deferred	object index pass needs renderer work
+Object.color	deferred	object colour needs Solid shader work
+Object.use_simulation_cache	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.hide_viewport	done	View3DPanel.cpp Hide (H) sets Item.visible
+Object.hide_select	missing	Item tab: disable selection toggle
+Object.hide_render	done	View3DPanel.cpp:3663 Show in renders
+Object.hide_probe_volume	deferred	light probes need renderer work
+Object.hide_probe_sphere	deferred	light probes need renderer work
+Object.hide_probe_plane	deferred	light probes need renderer work
+Object.hide_surface_pick	out	surface picking is mesh snapping
+Object.show_instancer_for_render	out	instancing is geometry
+Object.show_instancer_for_viewport	out	instancing is geometry
+Object.visible_camera	deferred	ray visibility needs renderer work
+Object.visible_diffuse	deferred	ray visibility needs renderer work
+Object.visible_glossy	deferred	ray visibility needs renderer work
+Object.visible_transmission	deferred	ray visibility needs renderer work
+Object.visible_volume_scatter	deferred	ray visibility needs renderer work
+Object.visible_shadow	deferred	per-item shadow casting needs renderer work
+Object.instance_type	out	instancing is geometry
+Object.use_instance_vertices_rotation	out	instancing is geometry
+Object.display_type	deferred	display-as needs render changes
+Object.show_bounds	missing	Item tab: show bounds
+Object.display_bounds_type	missing	Item tab: show bounds
+Object.show_name	missing	Item tab: show name and axes in the view
+Object.show_axis	missing	Item tab: show name and axes in the view
+Object.show_wire	deferred	needs Solid shader work
+Object.show_transparent	out	materials
+Object.show_in_front	deferred	needs Solid shader work
+Object.display	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.shadow_terminator_geometry_offset	deferred	shadow terminator needs renderer work
+Object.shadow_terminator_shading_offset	deferred	shadow terminator needs renderer work
+Object.animation_visualization	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.selection_sets	out	editing modes, 4D rotation, materials, rigging or simulation
+Object.active_selection_set	out	editing modes, 4D rotation, materials, rigging or simulation
+OBJECT_OT_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_add_named	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_align	missing	Object menu: Align
+OBJECT_OT_anim_transforms_to_deltas	deferred	delta transform needs new Item fields
+OBJECT_OT_camera_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_constraint_add	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraint_add_with_targets	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraints_clear	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_constraints_copy	out	constraint stack: Look at only (parity.md)
+OBJECT_OT_convert	out	geometry or mode editing
+OBJECT_OT_copy_global_transform	missing	Object menu: copy transform to clipboard
+OBJECT_OT_copy_relative_transform	out	relative to parent; no parenting
+OBJECT_OT_correctivesmooth_bind	out	geometry or mode editing
+OBJECT_OT_delete	done	View3DPanel.cpp:1183 DeleteSelected
+OBJECT_OT_duplicate	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicate_move	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicate_move_linked	done	View3DPanel.cpp:1226 DuplicateSelected (items reference the node)
+OBJECT_OT_duplicates_make_real	out	geometry or mode editing
+OBJECT_OT_editmode_toggle	out	geometry or mode editing
+OBJECT_OT_empty_add	out	object types outside the scene
+OBJECT_OT_empty_image_add	out	object types outside the scene
+OBJECT_OT_forcefield_toggle	out	object types outside the scene
+OBJECT_OT_hide_render_clear_all	missing	Object menu: show all in renders
+OBJECT_OT_hide_view_clear	done	View3DPanel.cpp:3283 Show (Alt+H shows everything)
+OBJECT_OT_hide_view_set	done	View3DPanel.cpp:1608 HideSelected
+OBJECT_OT_instance_offset_from_cursor	out	instancing is geometry
+OBJECT_OT_instance_offset_from_object	out	instancing is geometry
+OBJECT_OT_instance_offset_to_cursor	out	instancing is geometry
+OBJECT_OT_isolate_type_render	missing	Object menu: render only one type
+OBJECT_OT_join	out	geometry or mode editing
+OBJECT_OT_join_shapes	out	geometry or mode editing
+OBJECT_OT_laplaciandeform_bind	out	geometry or mode editing
+OBJECT_OT_light_add	done	View3DPanel.cpp:2904 Add chip (Shift+A)
+OBJECT_OT_lightprobe_add	deferred	light probes need renderer work
+OBJECT_OT_lightprobe_cache_free	deferred	light probes need renderer work
+OBJECT_OT_location_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_make_links_data	out	data-block linking
+OBJECT_OT_make_links_scene	out	data-block linking
+OBJECT_OT_meshdeform_bind	out	geometry or mode editing
+OBJECT_OT_multires_base_apply	out	geometry or mode editing
+OBJECT_OT_multires_external_pack	out	geometry or mode editing
+OBJECT_OT_multires_external_save	out	geometry or mode editing
+OBJECT_OT_multires_higher_levels_delete	out	geometry or mode editing
+OBJECT_OT_multires_rebuild_subdiv	out	geometry or mode editing
+OBJECT_OT_multires_reshape	out	geometry or mode editing
+OBJECT_OT_multires_subdivide	out	geometry or mode editing
+OBJECT_OT_multires_unsubdivide	out	geometry or mode editing
+OBJECT_OT_origin_clear	out	applies to mesh data; origins are node outputs
+OBJECT_OT_origin_set	out	applies to mesh data; origins are node outputs
+OBJECT_OT_parent_clear	out	no parenting; groups only
+OBJECT_OT_parent_inverse_apply	out	no parenting; groups only
+OBJECT_OT_parent_no_inverse_set	out	no parenting; groups only
+OBJECT_OT_parent_set	out	no parenting; groups only
+OBJECT_OT_paste_transform	missing	Object menu: paste transform from clipboard
+OBJECT_OT_pointcloud_random_add	out	object types outside the scene
+OBJECT_OT_posemode_toggle	out	geometry or mode editing
+OBJECT_OT_quadriflow_remesh	out	geometry or mode editing
+OBJECT_OT_randomize_transform	missing	Object menu: randomize transform
+OBJECT_OT_rotation_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_scale_clear	missing	Object menu: Clear Location, Rotation, Scale
+OBJECT_OT_select_all	done	View3DPanel.cpp: Select menu All/None/Invert
+OBJECT_OT_select_by_type	done	View3DPanel.cpp:1328 SelectSameType
+OBJECT_OT_select_camera	missing	Select menu: select the active camera
+OBJECT_OT_select_grouped	done	View3DPanel.cpp:1315 SelectLinked (group)
+OBJECT_OT_select_hierarchy	out	no hierarchy
+OBJECT_OT_select_less	out	no hierarchy
+OBJECT_OT_select_linked	done	View3DPanel.cpp:1315 SelectLinked (group)
+OBJECT_OT_select_more	out	no hierarchy
+OBJECT_OT_select_pattern	missing	Select menu: select by name pattern
+OBJECT_OT_select_random	done	View3DPanel.cpp:1290 SelectRandom
+OBJECT_OT_shade_auto_smooth	out	geometry or mode editing
+OBJECT_OT_shade_flat	out	geometry or mode editing
+OBJECT_OT_shade_smooth	out	geometry or mode editing
+OBJECT_OT_shade_smooth_by_angle	out	geometry or mode editing
+OBJECT_OT_surfacedeform_bind	out	geometry or mode editing
+OBJECT_OT_track_clear	done	View3DPanel.cpp Look at card (lookAt)
+OBJECT_OT_track_set	done	View3DPanel.cpp Look at card (lookAt)
+OBJECT_OT_transform_apply	out	applies to mesh data; origins are node outputs
+OBJECT_OT_transform_axis_target	out	applies to mesh data; origins are node outputs
+OBJECT_OT_transform_to_mouse	missing	Object menu: move to mouse
+OBJECT_OT_transforms_to_deltas	deferred	delta transform needs new Item fields
+OBJECT_OT_unlink_data	out	data-block linking
+OBJECT_OT_visual_transform_apply	out	applies to mesh data; origins are node outputs
+OBJECT_OT_volume_import	out	object types outside the scene
+Camera.type	done	View3DPanel.cpp:3453 Type Perspective/Orthographic
+Camera.sensor_fit	missing	Camera Data tab: sensor fit
+Camera.passepartout_alpha	done	View3DPanel.cpp:4018 Passepartout Opacity
+Camera.angle_x	done	View3DPanel.cpp:3463 Field of view
+Camera.angle_y	done	View3DPanel.cpp:3463 Field of view
+Camera.angle	done	View3DPanel.cpp:3463 Field of view
+Camera.clip_start	done	View3DPanel.cpp:3474 Clip start
+Camera.clip_end	done	View3DPanel.cpp:3475 Clip end
+Camera.lens	done	View3DPanel.cpp:3459 Focal length
+Camera.sensor_width	done	View3DPanel.cpp:3480 Sensor
+Camera.sensor_height	missing	Camera Data tab: sensor height
+Camera.ortho_scale	done	View3DPanel.cpp:3471 Scale (orthoHeight)
+Camera.display_size	missing	Camera Data tab: marker size
+Camera.shift_x	done	View3DPanel.cpp:3472 Shift X / Shift Y
+Camera.shift_y	done	View3DPanel.cpp:3472 Shift X / Shift Y
+Camera.show_limits	missing	Camera Data tab: show clip range and focus
+Camera.show_mist	deferred	mist needs a World pass
+Camera.show_passepartout	done	View3DPanel.cpp:4017 Passepartout card
+Camera.show_safe_areas	done	View3DPanel.cpp:4019 Safe Areas
+Camera.show_safe_center	missing	Safe Areas card: centre-cut areas
+Camera.show_name	missing	Overlays card: show camera name
+Camera.show_sensor	missing	Overlays card: sensor gate
+Camera.show_background_images	deferred	camera background image: new camera mode
+Camera.lens_unit	done	View3DPanel.cpp:3468 Lens unit
+Camera.composition_guide_color	missing	Composition Guides card: colour
+Camera.show_composition_center	done	View3DPanel.cpp:4027 Centre guide
+Camera.show_composition_center_diagonal	missing	Composition Guides card: diagonals
+Camera.show_composition_thirds	done	View3DPanel.cpp:4026 Thirds
+Camera.show_composition_golden	done	View3DPanel.cpp:4028 Golden
+Camera.show_composition_golden_tria_a	missing	Composition Guides card: triangles
+Camera.show_composition_golden_tria_b	missing	Composition Guides card: triangles
+Camera.show_composition_harmony_tri_a	missing	Composition Guides card: triangles
+Camera.show_composition_harmony_tri_b	missing	Composition Guides card: triangles
+Camera.panorama_type	done	Render3DPano.cpp: equirect, cubemap, fisheye dome (Render tab)
+Camera.fisheye_fov	done	Render3DPano.cpp: fisheye dome angle
+Camera.fisheye_lens	done	Render3DPano.cpp: fisheye dome angle
+Camera.latitude_min	missing	Render tab: panorama range
+Camera.latitude_max	missing	Render tab: panorama range
+Camera.longitude_min	missing	Render tab: panorama range
+Camera.longitude_max	missing	Render tab: panorama range
+Camera.fisheye_polynomial_k0	out	custom lens polynomial
+Camera.fisheye_polynomial_k1	out	custom lens polynomial
+Camera.fisheye_polynomial_k2	out	custom lens polynomial
+Camera.fisheye_polynomial_k3	out	custom lens polynomial
+Camera.fisheye_polynomial_k4	out	custom lens polynomial
+Camera.central_cylindrical_range_u_min	out	cylindrical panorama
+Camera.central_cylindrical_range_u_max	out	cylindrical panorama
+Camera.central_cylindrical_range_v_min	out	cylindrical panorama
+Camera.central_cylindrical_range_v_max	out	cylindrical panorama
+Camera.central_cylindrical_radius	out	cylindrical panorama
+Camera.custom_filepath	out	custom shader cameras
+Camera.custom_shader	out	custom shader cameras
+Camera.custom_mode	out	custom shader cameras
+Camera.custom_bytecode	out	custom shader cameras
+Camera.custom_bytecode_hash	out	custom shader cameras
+Camera.background_images	deferred	camera background image: new camera mode
+CameraDOFSettings.use_dof	done	View3DPanel.cpp:3503 Depth of Field
+CameraDOFSettings.focus_subtarget	out	armature bones
+CameraDOFSettings.focus_distance	done	View3DPanel.cpp:3529 Distance
+CameraDOFSettings.aperture_fstop	done	View3DPanel.cpp:3532 F-Stop
+CameraDOFSettings.aperture_blades	missing	Depth of Field card: bokeh shape
+CameraDOFSettings.aperture_rotation	missing	Depth of Field card: bokeh shape
+CameraDOFSettings.aperture_ratio	missing	Depth of Field card: bokeh shape
+CameraBackgroundImage.source	deferred	camera background image: new camera mode
+CameraBackgroundImage.image	deferred	camera background image: new camera mode
+CameraBackgroundImage.clip	deferred	camera background image: new camera mode
+CameraBackgroundImage.image_user	deferred	camera background image: new camera mode
+CameraBackgroundImage.clip_user	deferred	camera background image: new camera mode
+CameraBackgroundImage.offset	deferred	camera background image: new camera mode
+CameraBackgroundImage.scale	deferred	camera background image: new camera mode
+CameraBackgroundImage.rotation	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_flip_x	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_flip_y	deferred	camera background image: new camera mode
+CameraBackgroundImage.alpha	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_expanded	deferred	camera background image: new camera mode
+CameraBackgroundImage.use_camera_clip	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_background_image	deferred	camera background image: new camera mode
+CameraBackgroundImage.show_on_foreground	deferred	camera background image: new camera mode
+CameraBackgroundImage.display_depth	deferred	camera background image: new camera mode
+CameraBackgroundImage.frame_method	deferred	camera background image: new camera mode
+CameraStereoData.convergence_mode	out	stereo 3D is outside the README
+CameraStereoData.pivot	out	stereo 3D is outside the README
+CameraStereoData.interocular_distance	out	stereo 3D is outside the README
+CameraStereoData.convergence_distance	out	stereo 3D is outside the README
+CameraStereoData.use_pole_merge	out	stereo 3D is outside the README
+CameraStereoData.pole_merge_angle_from	out	stereo 3D is outside the README
+CameraStereoData.pole_merge_angle_to	out	stereo 3D is outside the README
+CAMERA_OT_preset_add	missing	Camera Data tab: camera presets
+CAMERA_OT_safe_areas_preset_add	out	preset UI; safe areas are two numbers
+ED_OT_lib_id_unlink	out	data-block linking
+ED_OT_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_history	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_push	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+ED_OT_undo_redo	done	View3DPanel.cpp PushUndoCheckpoint feeds the canvas undo stack
+RENDER_OT_color_management_white_balance_preset_add	out	preset list UI
+RENDER_OT_eevee_raytracing_preset_add	out	preset list UI
+RENDER_OT_opengl	missing	Render tab: render the viewport as a still
+RENDER_OT_play_rendered_anim	out	external player
+RENDER_OT_preset_add	out	preset list UI
+RENDER_OT_render	done	View3DPanel.cpp:3803 RenderStill, Render Image / Render Animation
+RENDER_OT_view_cancel	missing	Render tab: cancel a running render
+RENDER_OT_view_show	done	View3DPanel.cpp:3828 DrawRenderResult
+SCENE_OT_delete	done	View3DPanel.cpp:4159 Delete scene
+SCENE_OT_new	done	View3DPanel.cpp:4151 New scene
+SCENE_OT_render_view_add	out	one view layer per scene; stereo views out
+SCENE_OT_render_view_remove	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_add	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_add_aov	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_remove	out	one view layer per scene; stereo views out
+SCENE_OT_view_layer_remove_aov	out	one view layer per scene; stereo views out
+SCREEN_OT_animation_play	out	transport belongs to the app, not the panel
+SCREEN_OT_frame_jump	out	transport belongs to the app, not the panel
+SCREEN_OT_frame_offset	out	transport belongs to the app, not the panel
+SCREEN_OT_redo_last	out	Adjust Last decided out in parity.md
+SCREEN_OT_region_toggle	done	View3DPanel.cpp:2966 Properties (N)
+SCREEN_OT_repeat_history	out	Adjust Last decided out in parity.md
+SCREEN_OT_repeat_last	done	View3DPanel.cpp:1127 RepeatLast
+SCREEN_OT_screen_full_area	out	panel layout belongs to the app
+WORLD_OT_new	done	View3DPanel.cpp:4089 World tab (Load HDRI)
+Light.type	done	View3DPanel.cpp:3346 Light Type
+Light.use_temperature	missing	Light card: colour temperature
+Light.color	done	View3DPanel.cpp:3347 Colour
+Light.temperature	missing	Light card: colour temperature
+Light.temperature_color	missing	Light card: colour temperature
+Light.specular_factor	deferred	per-light shading terms need renderer work
+Light.diffuse_factor	deferred	per-light shading terms need renderer work
+Light.transmission_factor	deferred	per-light shading terms need renderer work
+Light.volume_factor	deferred	per-light shading terms need renderer work
+Light.use_custom_distance	missing	Light card: cutoff distance
+Light.cutoff_distance	missing	Light card: cutoff distance
+Light.use_shadow	done	View3DPanel.cpp:3369 Casts shadow
+Light.exposure	missing	Light card: exposure
+Light.normalize	deferred	per-light shading terms need renderer work
+PointLight.use_soft_falloff	deferred	per-light shading terms need renderer work
+PointLight.energy	done	View3DPanel.cpp:3348 Strength
+PointLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+PointLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.angle	deferred	sun angle needs a Render 3D parameter
+SunLight.energy	done	View3DPanel.cpp:3348 Strength
+SunLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_max_distance	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_count	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_exponent	deferred	per-light shadow tuning needs Render 3D parameters
+SunLight.shadow_cascade_fade	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.energy	done	View3DPanel.cpp:3348 Strength
+SpotLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+SpotLight.use_square	deferred	square spot needs a shader change
+SpotLight.spot_blend	done	View3DPanel.cpp:3359 Blend
+SpotLight.spot_size	done	View3DPanel.cpp:3358 Cone
+SpotLight.show_cone	missing	Overlays card: spot cone in the view
+SpotLight.use_soft_falloff	deferred	per-light shading terms need renderer work
+AreaLight.energy	done	View3DPanel.cpp:3348 Strength
+AreaLight.shadow_buffer_clip_start	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_soft_size	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_filter_radius	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_maximum_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.use_shadow_jitter	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shadow_jitter_overblur	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.use_absolute_resolution	deferred	per-light shadow tuning needs Render 3D parameters
+AreaLight.shape	deferred	only rectangles are rendered
+AreaLight.size	done	View3DPanel.cpp:3363 Width
+AreaLight.size_y	done	View3DPanel.cpp:3364 Height
+AreaLight.spread	deferred	area spread needs a shader change
+LightProbe.type	deferred	light probes need renderer work
+LightProbe.clip_start	deferred	light probes need renderer work
+LightProbe.show_clip	deferred	light probes need renderer work
+LightProbe.show_influence	deferred	light probes need renderer work
+LightProbe.influence_distance	deferred	light probes need renderer work
+LightProbe.visibility_buffer_bias	deferred	light probes need renderer work
+LightProbe.visibility_bleed_bias	deferred	light probes need renderer work
+LightProbe.visibility_blur	deferred	light probes need renderer work
+LightProbe.show_data	deferred	light probes need renderer work
+LightProbe.use_data_display	deferred	light probes need renderer work
+LightProbe.data_display_size	deferred	light probes need renderer work
+LightProbeSphere.influence_type	deferred	light probes need renderer work
+LightProbeSphere.falloff	deferred	light probes need renderer work
+LightProbeSphere.clip_end	deferred	light probes need renderer work
+LightProbeSphere.use_custom_parallax	deferred	light probes need renderer work
+LightProbeSphere.show_parallax	deferred	light probes need renderer work
+LightProbeSphere.parallax_type	deferred	light probes need renderer work
+LightProbeSphere.parallax_distance	deferred	light probes need renderer work
+LightProbeVolume.intensity	deferred	light probes need renderer work
+LightProbeVolume.resolution_x	deferred	light probes need renderer work
+LightProbeVolume.resolution_y	deferred	light probes need renderer work
+LightProbeVolume.resolution_z	deferred	light probes need renderer work
+LightProbeVolume.capture_distance	deferred	light probes need renderer work
+LightProbeVolume.view_bias	deferred	light probes need renderer work
+LightProbeVolume.facing_bias	deferred	light probes need renderer work
+LightProbeVolume.surface_bias	deferred	light probes need renderer work
+LightProbeVolume.escape_bias	deferred	light probes need renderer work
+LightProbeVolume.surfel_density	deferred	light probes need renderer work
+LightProbeVolume.validity_threshold	deferred	light probes need renderer work
+LightProbeVolume.dilation_threshold	deferred	light probes need renderer work
+LightProbeVolume.dilation_radius	deferred	light probes need renderer work
+LightProbeVolume.capture_world	deferred	light probes need renderer work
+LightProbeVolume.capture_indirect	deferred	light probes need renderer work
+LightProbeVolume.capture_emission	deferred	light probes need renderer work
+LightProbeVolume.clamp_direct	deferred	light probes need renderer work
+LightProbeVolume.clamp_indirect	deferred	light probes need renderer work
+Constraint.owner_space	out	no spaces; Look at aims in world space
+Constraint.target_space	out	no spaces; Look at aims in world space
+Constraint.mute	done	View3DPanel.cpp Look at None switches it off
+Constraint.enabled	done	View3DPanel.cpp Look at None switches it off
+Constraint.influence	missing	Camera and light Data tab: Look at influence
+TrackToConstraint.head_tail	out	armature bones
+TrackToConstraint.use_bbone_shape	out	armature bones
+TrackToConstraint.subtarget	out	armature bones
+TrackToConstraint.track_axis	missing	Camera and light Data tab: Look at axes
+TrackToConstraint.up_axis	missing	Camera and light Data tab: Look at axes
+TrackToConstraint.use_target_z	missing	Camera and light Data tab: Look at target Z up
+DampedTrackConstraint.head_tail	out	armature bones
+DampedTrackConstraint.use_bbone_shape	out	armature bones
+DampedTrackConstraint.subtarget	out	armature bones
+DampedTrackConstraint.track_axis	missing	Camera and light Data tab: Look at axes
+World.use_eevee_finite_volume	out	volumes
+World.color	done	View3DPanel.cpp:3718 Background colour
+World.probe_resolution	deferred	world baking needs renderer work
+World.sun_threshold	deferred	world sun extraction needs renderer work
+World.sun_angle	deferred	world sun extraction needs renderer work
+World.use_sun_shadow	deferred	world sun extraction needs renderer work
+World.sun_shadow_maximum_resolution	deferred	world sun extraction needs renderer work
+World.sun_shadow_filter_radius	deferred	world sun extraction needs renderer work
+World.use_sun_shadow_jitter	deferred	world sun extraction needs renderer work
+World.sun_shadow_jitter_overblur	deferred	world sun extraction needs renderer work
+WorldMistSettings.use_mist	deferred	mist needs a Render 3D pass
+WorldMistSettings.intensity	deferred	mist needs a Render 3D pass
+WorldMistSettings.start	deferred	mist needs a Render 3D pass
+WorldMistSettings.depth	deferred	mist needs a Render 3D pass
+WorldMistSettings.height	deferred	mist needs a Render 3D pass
+WorldMistSettings.falloff	deferred	mist needs a Render 3D pass
+WorldLighting.ao_factor	done	View3DPanel.cpp:3874 Ambient Occlusion Strength
+WorldLighting.distance	done	View3DPanel.cpp:3875 Ambient Occlusion Distance
+RenderSettings.resolution_x	done	View3DPanel.cpp:3899 Resolution X
+RenderSettings.resolution_y	done	View3DPanel.cpp:3901 Y
+RenderSettings.resolution_percentage	done	View3DPanel.cpp:3903 Resolution %
+RenderSettings.pixel_aspect_x	missing	Render tab > Format: pixel aspect
+RenderSettings.pixel_aspect_y	missing	Render tab > Format: pixel aspect
+RenderSettings.ppm_factor	out	image metadata
+RenderSettings.ppm_base	out	image metadata
+RenderSettings.fps	done	View3DPanel.cpp:3911 Frame rate
+RenderSettings.fps_base	missing	Render tab > Format: 23.976 / 29.97 rates
+RenderSettings.frame_map_old	out	time remap belongs to Timeline and Shots
+RenderSettings.frame_map_new	out	time remap belongs to Timeline and Shots
+RenderSettings.dither_intensity	missing	Render tab > Output: dither
+RenderSettings.filter_size	missing	Render tab > Sampling: pixel filter width
+RenderSettings.film_transparent	done	View3DPanel.cpp:3884 Transparent
+RenderSettings.threads	out	app-wide performance, not per scene
+RenderSettings.threads_mode	out	app-wide performance, not per scene
+RenderSettings.use_motion_blur	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_shutter	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_position	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.motion_blur_shutter_curve	deferred	3D motion blur needs a Render 3D pass
+RenderSettings.use_border	deferred	renderer crop region needed
+RenderSettings.border_min_x	deferred	renderer crop region needed
+RenderSettings.border_min_y	deferred	renderer crop region needed
+RenderSettings.border_max_x	deferred	renderer crop region needed
+RenderSettings.border_max_y	deferred	renderer crop region needed
+RenderSettings.use_crop_to_border	deferred	renderer crop region needed
+RenderSettings.use_placeholder	out	the Output node owns file naming
+RenderSettings.use_overwrite	out	the Output node owns file naming
+RenderSettings.use_file_extension	out	the Output node owns file naming
+RenderSettings.file_extension	out	the Output node owns file naming
+RenderSettings.use_lock_interface	out	app-wide performance, not per scene
+RenderSettings.filepath	done	Output node path; Render Image writes there (View3DPanel.cpp:3937)
+RenderSettings.use_render_cache	out	app-wide performance, not per scene
+RenderSettings.use_stamp_time	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_date	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_frame	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_frame_range	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_camera	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_lens	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_scene	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_note	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp_marker	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_filename	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_sequencer_strip	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_render_time	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_note_text	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_stamp	missing	Render tab > Output: burn-in stamp
+RenderSettings.use_stamp_labels	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.metadata_input	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_memory	out	metadata of the .blend, sequencer or machine
+RenderSettings.use_stamp_hostname	out	metadata of the .blend, sequencer or machine
+RenderSettings.stamp_font_size	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_foreground	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.stamp_background	missing	Render tab > Output: burn-in stamp fields
+RenderSettings.use_single_layer	out	one view layer, no stereo views
+RenderSettings.views	out	one view layer, no stereo views
+RenderSettings.engine	out	Render 3D is the only renderer
+RenderSettings.has_multiple_engines	out	one view layer, no stereo views
+RenderSettings.use_simplify	missing	Render tab > Sampling: simplify for preview
+RenderSettings.simplify_volumes	out	volumes and Freestyle lines
+RenderSettings.use_persistent_data	out	app-wide performance, not per scene
+RenderSettings.line_thickness_mode	out	volumes and Freestyle lines
+RenderSettings.line_thickness	out	volumes and Freestyle lines
+SceneEEVEE.gi_diffuse_bounces	deferred	global illumination needs renderer work
+SceneEEVEE.gi_cubemap_resolution	deferred	global illumination needs renderer work
+SceneEEVEE.gi_visibility_resolution	deferred	global illumination needs renderer work
+SceneEEVEE.gi_glossy_clamp	deferred	global illumination needs renderer work
+SceneEEVEE.gi_irradiance_pool_size	deferred	global illumination needs renderer work
+SceneEEVEE.taa_samples	done	View3DPanel.cpp:3854 Sampling Viewport
+SceneEEVEE.taa_render_samples	done	View3DPanel.cpp:3857 Sampling Render
+SceneEEVEE.use_taa_reprojection	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.ray_tracing_method	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_shadow_jitter_viewport	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_surface_direct	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_surface_indirect	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_volume_direct	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.clamp_volume_indirect	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.direct_light_intensity	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.indirect_light_intensity	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.volumetric_start	out	volumes are outside the README
+SceneEEVEE.volumetric_end	out	volumes are outside the README
+SceneEEVEE.volumetric_tile_size	out	volumes are outside the README
+SceneEEVEE.volumetric_samples	out	volumes are outside the README
+SceneEEVEE.volumetric_sample_distribution	out	volumes are outside the README
+SceneEEVEE.volumetric_ray_depth	out	volumes are outside the README
+SceneEEVEE.volumetric_light_clamp	out	volumes are outside the README
+SceneEEVEE.use_volumetric_shadows	out	volumes are outside the README
+SceneEEVEE.volumetric_shadow_samples	out	volumes are outside the README
+SceneEEVEE.use_volume_custom_range	out	volumes are outside the README
+SceneEEVEE.use_fast_gi	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_thickness_near	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_thickness_far	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_quality	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_step_count	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_ray_count	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_method	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_distance	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_bias	deferred	fast GI needs renderer work
+SceneEEVEE.fast_gi_resolution	deferred	fast GI needs renderer work
+SceneEEVEE.bokeh_max_size	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_threshold	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_neighbor_max	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.use_bokeh_jittered	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.bokeh_overblur	deferred	bokeh shape needs a Render 3D pass
+SceneEEVEE.motion_blur_depth_scale	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.motion_blur_max	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.motion_blur_steps	deferred	3D motion blur needs a Render 3D pass
+SceneEEVEE.use_shadows	done	View3DPanel.cpp:3862 Shadows card toggle
+SceneEEVEE.shadow_pool_size	deferred	shadow internals need renderer work
+SceneEEVEE.shadow_ray_count	deferred	shadow internals need renderer work
+SceneEEVEE.shadow_step_count	deferred	shadow internals need renderer work
+SceneEEVEE.light_threshold	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_overscan	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.overscan_size	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.ray_tracing_options	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.use_raytracing	deferred	EEVEE-only terms need renderer work
+SceneEEVEE.shadow_resolution_scale	done	View3DPanel.cpp:3865 Shadows Quality
+SceneDisplay.light_direction	deferred	Solid shader work, perf-gated
+SceneDisplay.shadow_shift	deferred	Solid shader work, perf-gated
+SceneDisplay.shadow_focus	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_distance	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_attenuation	deferred	Solid shader work, perf-gated
+SceneDisplay.matcap_ssao_samples	deferred	Solid shader work, perf-gated
+SceneDisplay.render_aa	done	View3DPanel.cpp:3857 Sampling Render supersample
+SceneDisplay.viewport_aa	done	View3DPanel.cpp:3854 Sampling Viewport
+ColorManagedViewSettings.look	missing	Render tab > Color Management
+ColorManagedViewSettings.view_transform	done	View3DPanel.cpp:3887 Color Management View
+ColorManagedViewSettings.exposure	done	View3DPanel.cpp:3888 Exposure
+ColorManagedViewSettings.gamma	missing	Render tab > Color Management
+ColorManagedViewSettings.curve_mapping	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.use_curve_mapping	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.use_white_balance	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_temperature	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_tint	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.white_balance_whitepoint	out	grading belongs to Color nodes after Output
+ColorManagedViewSettings.support_emulation	out	display emulation is app-wide
+ColorManagedDisplaySettings.display_device	out	display device is app-wide
+ColorManagedDisplaySettings.emulation	out	display device is app-wide
+ImageFormatSettings.media_type	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.file_format	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.color_mode	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.color_depth	done	View3DPanel.cpp:3926 Color depth (8 or 16)
+ImageFormatSettings.quality	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.compression	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.exr_codec	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.use_exr_interleave	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.use_jpeg2k_ycc	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.use_jpeg2k_cinema_preset	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.use_jpeg2k_cinema_48	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.jpeg2k_codec	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.tiff_codec	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.use_cineon_log	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.cineon_black	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.cineon_white	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.cineon_gamma	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.color_management	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.linear_colorspace_settings	out	file formats belong to the app's Export dialog and Output node
+ImageFormatSettings.has_linear_colorspace	out	file formats belong to the app's Export dialog and Output node
+FFmpegSettings.format	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.codec	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.video_bitrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.minrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.maxrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.muxrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.gopsize	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.max_b_frames	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.use_max_b_frames	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.buffersize	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.packetsize	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.constant_rate_factor	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.custom_constant_rate_factor	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.ffmpeg_preset	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.ffmpeg_prores_profile	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.use_autosplit	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.use_lossless_output	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.audio_codec	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.audio_bitrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.audio_volume	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.audio_mixrate	out	video encoding belongs to the app's Export dialog
+FFmpegSettings.audio_channels	out	video encoding belongs to the app's Export dialog
+Scene.objects	done	View3DPanel.cpp:3159 Scene tab outliner
+Scene.frame_current	out	transport and timeline belong to the app
+Scene.frame_subframe	out	transport and timeline belong to the app
+Scene.frame_float	out	transport and timeline belong to the app
+Scene.frame_start	missing	Render tab > Frame Range: start and step
+Scene.frame_end	done	View3DPanel.cpp:3917 Seconds sets the render length
+Scene.frame_step	missing	Render tab > Frame Range: start and step
+Scene.time_jump_unit	out	transport and timeline belong to the app
+Scene.time_jump_delta	out	transport and timeline belong to the app
+Scene.frame_current_final	out	transport and timeline belong to the app
+Scene.lock_frame_selection_to_range	out	transport and timeline belong to the app
+Scene.show_subframe	out	transport and timeline belong to the app
+Scene.show_keys_from_selected_only	out	transport and timeline belong to the app
+Scene.use_stamp_note	missing	Render tab > Output: stamp note
+Scene.use_custom_simulation_range	out	simulation and physics
+Scene.simulation_frame_start	out	simulation and physics
+Scene.simulation_frame_end	out	simulation and physics
+Scene.sync_mode	out	transport and timeline belong to the app
+Scene.rigidbody_world	out	simulation and physics
+Scene.gravity	out	simulation and physics
+Scene.use_gravity	out	simulation and physics
+Scene.safe_areas	done	View3DPanel.cpp:4019 Safe Areas
+Scene.transform_orientation_slots	done	View3DPanel.cpp:3949 Orientation
+Scene.audio_volume	out	audio, tracking, layers and Hydra are outside the 3D View
+Scene.active_clip	out	audio, tracking, layers and Hydra are outside the 3D View
+Scene.view_layers	out	audio, tracking, layers and Hydra are outside the 3D View
+Scene.hydra	out	audio, tracking, layers and Hydra are outside the 3D View
+UnitSettings.system	missing	View tab: scene units
+UnitSettings.system_rotation	missing	View tab: scene units
+UnitSettings.scale_length	missing	View tab: scene units
+UnitSettings.use_separate	out	display-only units for physics and time
+UnitSettings.length_unit	missing	View tab: scene units
+UnitSettings.mass_unit	out	display-only units for physics and time
+UnitSettings.time_unit	out	display-only units for physics and time
+UnitSettings.temperature_unit	out	display-only units for physics and time
+ViewLayer.name	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.samples	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.pass_alpha_threshold	deferred	extra render passes need renderer work
+ViewLayer.aovs	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.active_aov	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.active_aov_index	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_pass_cryptomatte_object	deferred	cryptomatte needs renderer work
+ViewLayer.pass_cryptomatte_depth	deferred	cryptomatte needs renderer work
+ViewLayer.use_pass_cryptomatte_accurate	deferred	cryptomatte needs renderer work
+ViewLayer.use_solid	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_sky	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_ao	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_strand	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_volumes	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_motion_blur	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use_pass_combined	done	View3DPanel.cpp:3928 Pass: Color
+ViewLayer.use_pass_z	done	View3DPanel.cpp:3928 Pass: Depth (Linear / Raw Z)
+ViewLayer.use_pass_vector	deferred	extra render passes need renderer work
+ViewLayer.use_pass_position	done	View3DPanel.cpp:3928 Pass: Position
+ViewLayer.use_pass_mist	deferred	extra render passes need renderer work
+ViewLayer.use_pass_object_index	deferred	extra render passes need renderer work
+ViewLayer.use_pass_shadow	deferred	extra render passes need renderer work
+ViewLayer.use_pass_ambient_occlusion	deferred	extra render passes need renderer work
+ViewLayer.use_pass_emit	deferred	extra render passes need renderer work
+ViewLayer.use_pass_environment	deferred	extra render passes need renderer work
+ViewLayer.use_pass_diffuse_direct	out	material shading passes
+ViewLayer.use_pass_diffuse_indirect	out	material shading passes
+ViewLayer.use_pass_diffuse_color	out	material shading passes
+ViewLayer.use_pass_glossy_direct	out	material shading passes
+ViewLayer.use_pass_glossy_indirect	out	material shading passes
+ViewLayer.use_pass_glossy_color	out	material shading passes
+ViewLayer.use_pass_transmission_direct	out	material shading passes
+ViewLayer.use_pass_transmission_indirect	out	material shading passes
+ViewLayer.use_pass_transmission_color	out	material shading passes
+ViewLayer.use_pass_subsurface_direct	out	material shading passes
+ViewLayer.use_pass_subsurface_indirect	out	material shading passes
+ViewLayer.use_pass_subsurface_color	out	material shading passes
+ViewLayer.objects	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.use	out	one view layer per scene; layers are outside the 3D View
+ViewLayer.depsgraph	out	one view layer per scene; layers are outside the 3D View
+ViewLayerEEVEE.use_pass_volume_direct	deferred	EEVEE layer terms need renderer work
+ViewLayerEEVEE.use_pass_bloom	deferred	EEVEE layer terms need renderer work
+ViewLayerEEVEE.use_pass_transparent	deferred	EEVEE layer terms need renderer work
+ViewLayerEEVEE.ambient_occlusion_distance	deferred	EEVEE layer terms need renderer work
+SpaceOutliner.display_mode	out	one flat list of scene items
+SpaceOutliner.use_filter_case_sensitive	missing	Scene tab: search and sort options
+SpaceOutliner.use_filter_complete	missing	Scene tab: search and sort options
+SpaceOutliner.use_sort_alpha	missing	Scene tab: search and sort options
+SpaceOutliner.use_sync_select	done	View3DPanel.cpp:201 FollowCanvasSelection: selection syncs with the canvas
+SpaceOutliner.show_mode_column	out	modes, view layers, holdout
+SpaceOutliner.show_restrict_column_enable	out	modes, view layers, holdout
+SpaceOutliner.show_restrict_column_select	missing	Scene tab: selectable column
+SpaceOutliner.show_restrict_column_hide	done	View3DPanel.cpp:3283 eye toggle per row
+SpaceOutliner.show_restrict_column_viewport	out	modes, view layers, holdout
+SpaceOutliner.show_restrict_column_render	missing	Scene tab: render toggle column
+SpaceOutliner.show_restrict_column_holdout	out	modes, view layers, holdout
+SpaceOutliner.show_restrict_column_indirect_only	out	modes, view layers, holdout
+SpaceOutliner.use_filter_object	missing	Scene tab: filter by object
+SpaceOutliner.use_filter_object_content	out	no contents, children, layers or empties
+SpaceOutliner.use_filter_children	out	no contents, children, layers or empties
+SpaceOutliner.use_filter_view_layers	out	no contents, children, layers or empties
+SpaceOutliner.filter_state	missing	Scene tab: state filter
+SpaceOutliner.filter_invert	missing	Scene tab: state filter
+SpaceOutliner.use_filter_object_empty	out	no contents, children, layers or empties
+SpaceOutliner.use_filter_object_light	missing	Scene tab: type filter
+SpaceOutliner.use_filter_object_camera	missing	Scene tab: type filter
+SpaceOutliner.use_filter_object_others	out	no contents, children, layers or empties
+OUTLINER_OT_animdata_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_clear_filter	done	View3DPanel.cpp:3185 Search field
+OUTLINER_OT_constraint_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_data_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_datastack_drop	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_delete	done	View3DPanel.cpp:1183 DeleteSelected (Remove from scene)
+OUTLINER_OT_expanded_toggle	out	flat list, no tree
+OUTLINER_OT_hide	done	View3DPanel.cpp:3283 eye toggle and Alt+H
+OUTLINER_OT_highlight_update	out	flat list, no tree
+OUTLINER_OT_id_copy	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_id_delete	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_id_linked_relocate	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_id_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_id_paste	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_id_remap	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_item_activate	done	View3DPanel.cpp:3159 DrawOutliner row click selects
+OUTLINER_OT_item_drag_drop	missing	Scene tab: drag to reorder or drop into a scene
+OUTLINER_OT_item_openclose	out	flat list, no tree
+OUTLINER_OT_item_rename	done	View3DPanel.cpp Rename in the Scene tab list
+OUTLINER_OT_keyingset_add_selected	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_keyingset_remove_selected	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_lib_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_lib_relocate	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_liboverride_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_liboverride_troubleshoot_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_object_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_orphans_manage	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_orphans_purge	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_parent_clear	out	no parenting; groups only
+OUTLINER_OT_parent_drop	out	no parenting; groups only
+OUTLINER_OT_scene_drop	missing	Scene tab: drag to reorder or drop into a scene
+OUTLINER_OT_scene_operation	out	data-blocks, libraries, overrides, keying sets or orphans
+OUTLINER_OT_scroll_page	out	flat list, no tree
+OUTLINER_OT_select_all	done	View3DPanel.cpp Select menu All / None
+OUTLINER_OT_select_box	missing	Scene tab: drag a box over rows
+OUTLINER_OT_select_walk	missing	Scene tab: arrow keys walk the list
+OUTLINER_OT_show_active	missing	Scene tab: scroll to the active item
+OUTLINER_OT_show_hierarchy	out	flat list, no tree
+OUTLINER_OT_show_one_level	out	flat list, no tree
+OUTLINER_OT_start_filter	done	View3DPanel.cpp:3185 Search field
+OUTLINER_OT_unhide_all	done	View3DPanel.cpp:3283 eye toggle and Alt+H
+PreferencesInput.view_zoom_method	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.view_zoom_axis	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_multitouch_gestures	out	trackpad gestures are handled by the app's input layer
+PreferencesInput.invert_mouse_zoom	done	View3DPanel.cpp:4004 Invert zoom direction
+PreferencesInput.use_mouse_depth_navigate	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_zoom_to_mouse	done	View3DPanel.cpp:4002 Zoom to mouse
+PreferencesInput.use_auto_perspective	missing	View tab > Navigation: auto perspective
+PreferencesInput.use_rotate_around_active	done	View3DPanel.cpp:4003 Orbit around selection
+PreferencesInput.view_rotate_method	out	decided out in parity.md: turntable and zoom to pointer cover them
+PreferencesInput.use_mouse_continuous	missing	View tab > Navigation: wrap the pointer while dragging
+PreferencesInput.use_drag_immediately	out	app-wide input settings, not the 3D View
+PreferencesInput.use_numeric_input_advanced	out	app-wide input settings, not the 3D View
+PreferencesInput.navigation_mode	deferred	walk and fly navigation: new mode, needs approval
+PreferencesInput.walk_navigation	deferred	walk and fly navigation: new mode, needs approval
+PreferencesInput.view_rotate_sensitivity_turntable	missing	View tab > Navigation: orbit sensitivity
+PreferencesInput.view_rotate_sensitivity_trackball	missing	View tab > Navigation: orbit sensitivity
+PreferencesInput.drag_threshold_mouse	out	app-wide input settings, not the 3D View
+PreferencesInput.drag_threshold_tablet	out	app-wide input settings, not the 3D View
+PreferencesInput.drag_threshold	out	app-wide input settings, not the 3D View
+PreferencesInput.move_threshold	out	app-wide input settings, not the 3D View
+PreferencesInput.pressure_threshold_max	out	app-wide input settings, not the 3D View
+PreferencesInput.pressure_softness	out	app-wide input settings, not the 3D View
+PreferencesInput.tablet_api	out	app-wide input settings, not the 3D View
+PreferencesInput.show_tablet_debug_values	out	app-wide input settings, not the 3D View
+PreferencesInput.xr_navigation	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_translation_sensitivity	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotation_sensitivity	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_deadzone	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_zoom_direction	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_show_guide_orbit_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_show_guide_orbit_center	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_navigation_mode	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_lock_horizon	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_fly_speed_auto	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_orbit_center_auto	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_orbit_center_selected	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotx_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_roty_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_rotz_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_panx_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_pany_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_panz_invert_axis	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_fly_helicopter	out	3D mouse and XR are out (parity.md)
+PreferencesInput.ndof_lock_camera_pan_zoom	out	3D mouse and XR are out (parity.md)
+PreferencesInput.mouse_double_click_time	out	app-wide input settings, not the 3D View
+PreferencesInput.use_mouse_emulate_3_button	out	trackpad and Alt-drag cover it
+PreferencesInput.mouse_emulate_3_button_modifier	out	trackpad and Alt-drag cover it
+PreferencesInput.use_emulate_numpad	deferred	laptop-only, cosmetic (parity.md)
+PreferencesInput.invert_zoom_wheel	done	View3DPanel.cpp:4004 Invert zoom direction
+PreferencesInput.touchpad_scroll_direction	out	trackpad gestures are handled by the app's input layer
+PreferencesView.show_tooltips	out	app-wide UI preferences
+PreferencesView.show_tooltips_python	out	app-wide UI preferences
+PreferencesView.show_object_info	done	View3DPanel.cpp:4008 Text info
+PreferencesView.show_view_name	done	View3DPanel.cpp:4008 Text info
+PreferencesView.show_splash	out	app-wide UI preferences
+PreferencesView.show_playback_fps	missing	Overlays card: frame rate
+PreferencesView.show_navigate_ui	done	View3DPanel.cpp:4014 Navigate gizmo
+PreferencesView.use_mouse_over_open	out	app-wide UI preferences
+PreferencesView.mini_axis_type	missing	View tab: navigation gizmo size and brightness
+PreferencesView.mini_axis_size	missing	View tab: navigation gizmo size and brightness
+PreferencesView.mini_axis_brightness	missing	View tab: navigation gizmo size and brightness
+PreferencesView.smooth_view	missing	View tab > Navigation: smooth view time
+PreferencesView.rotation_angle	missing	View tab > Navigation: numpad step angle
+PreferencesView.show_gizmo	done	View3DPanel.cpp:4012 Gizmos
+PreferencesView.gizmo_size	missing	View tab: gizmo size
+PreferencesView.gizmo_size_navigate_v3d	missing	View tab: gizmo size
+PreferencesView.lookdev_sphere_size	out	reference spheres belong to look dev, outside the README
+PreferencesEdit.object_align	missing	Add menu: align new items to world, view or cursor
+PreferencesEdit.undo_steps	out	the canvas owns undo
+PreferencesEdit.undo_memory_limit	out	the canvas owns undo
+PreferencesEdit.use_global_undo	out	the canvas owns undo
+PreferencesEdit.use_duplicate_surface	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_camera	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_light	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_lightprobe	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_pointcloud	out	items reference nodes; no data is copied
+PreferencesEdit.use_duplicate_volume	out	items reference nodes; no data is copied
+VIEW3D_OT_camera_background_image_add	deferred	camera background image: new camera mode
+VIEW3D_OT_camera_background_image_remove	deferred	camera background image: new camera mode
+VIEW3D_OT_camera_to_view	done	View3DPanel.cpp:1594 CameraToView
+VIEW3D_OT_camera_to_view_selected	done	View3DPanel.cpp:1516 Align Active Camera to Selected
+VIEW3D_OT_clear_render_border	deferred	renderer crop region needed
+VIEW3D_OT_clip_border	deferred	renderer crop region needed
+VIEW3D_OT_copybuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_cursor3d	done	View3DPanel.cpp:2680 Cursor mode of the Select chip
+VIEW3D_OT_dolly	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_drop_world	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_fly	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_interactive_add	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_localview	done	View3DPanel.cpp:1565 ToggleLocal
+VIEW3D_OT_localview_remove_from	missing	View menu: remove selected from local view
+VIEW3D_OT_move	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_navigate	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_ndof_all	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_orbit	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_orbit_zoom	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_ndof_pan	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_object_as_camera	done	View3DPanel.cpp Render through this camera
+VIEW3D_OT_object_mode_pie_or_toggle	out	3D mouse, modes, file drops or drag-to-create are out (parity.md)
+VIEW3D_OT_pastebuffer	missing	Object menu: copy and paste items between scenes
+VIEW3D_OT_render_border	deferred	renderer crop region needed
+VIEW3D_OT_rotate	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_ruler_add	missing	Select chip: persistent ruler beside Measure
+VIEW3D_OT_ruler_remove	missing	Select chip: persistent ruler beside Measure
+VIEW3D_OT_select	done	View3DPanel.cpp:2278 Pick
+VIEW3D_OT_select_box	done	View3DPanel.cpp:2694 box select
+VIEW3D_OT_select_circle	missing	Select chip: circle select
+VIEW3D_OT_select_lasso	done	View3DPanel.cpp:2670 lasso select
+VIEW3D_OT_select_menu	out	click-cycle covers the overlapping list (parity.md)
+VIEW3D_OT_smoothview	done	View3DPanel.cpp:404 GlideTo
+VIEW3D_OT_snap_cursor_to_active	done	View3DPanel.cpp:1431 CursorToActive
+VIEW3D_OT_snap_cursor_to_center	done	View3DPanel.cpp:1425 CursorToOrigin
+VIEW3D_OT_snap_cursor_to_grid	missing	Snap menu: cursor to grid
+VIEW3D_OT_snap_cursor_to_selected	done	View3DPanel.cpp:1261 CursorToSelected
+VIEW3D_OT_snap_selected_to_active	done	View3DPanel.cpp:1400 SelectionToActive
+VIEW3D_OT_snap_selected_to_cursor	done	View3DPanel.cpp:1353 SelectionToCursor
+VIEW3D_OT_snap_selected_to_grid	done	View3DPanel.cpp:1391 SelectionToGrid
+VIEW3D_OT_toggle_matcap_flip	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_toggle_shading	done	View3DPanel.cpp:2926 shading chips (Shift+Z, Z)
+VIEW3D_OT_toggle_xray	deferred	matcap and X-ray need renderer work
+VIEW3D_OT_transform_gizmo_set	done	View3DPanel.cpp:4012 Gizmos card and Shift+Space tool pick
+VIEW3D_OT_view_all	done	View3DPanel.cpp:1510 Frame All
+VIEW3D_OT_view_axis	done	View3DPanel.cpp:472 ViewAxisNow
+VIEW3D_OT_view_camera	done	View3DPanel.cpp:2442 Camera view (0)
+VIEW3D_OT_view_center_camera	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_center_cursor	done	View3DPanel.cpp:1527 Center Cursor and Frame All
+VIEW3D_OT_view_center_lock	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_center_pick	missing	View menu: centre on camera or on the pointer
+VIEW3D_OT_view_lock_clear	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_lock_to_active	missing	View tab: lock the view to the active item
+VIEW3D_OT_view_orbit	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_view_pan	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_view_persportho	done	View3DPanel.cpp:1504 Perspective/Orthographic
+VIEW3D_OT_view_roll	done	View3DPanel.cpp:1532 Roll Left / Right
+VIEW3D_OT_view_selected	done	View3DPanel.cpp:1509 Frame Selected
+VIEW3D_OT_walk	deferred	walk and fly navigation: new mode, needs approval
+VIEW3D_OT_zoom	done	View3DPanel.cpp:1854 HandleNavigation drag, wheel, trackpad
+VIEW3D_OT_zoom_border	done	View3DPanel.cpp:2872 Drag a box to zoom into
+VIEW3D_OT_zoom_camera_1_to_1	done	View3DPanel.cpp:1534 Zoom Camera 1:1

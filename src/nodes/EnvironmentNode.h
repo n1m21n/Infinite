@@ -67,6 +67,18 @@ public:
    float intensity = 1.0f;
    float rotation = 0.0f; // degrees, about the world Y axis
 
+   // Sun extraction: the image's light above `sunThreshold` is taken out of the sky and handed to
+   // Render 3D as one sun light, so a bright HDRI sun casts a real shadow. 0 = off, so a scene
+   // made before this lights the same; Blender's own default is 10.
+   float sunThreshold = 0.0f;
+   float sunAngle = 0.526f;      // degrees across the sun disc; a wider sun softens its shadow
+   bool sunShadow = true;
+   int sunShadowRes = 0;         // 0 = the look's quality, 1 / 2 / 3 = 1024 / 2048 / 4096
+   float sunShadowFilter = 1.0f;
+   // The extracted sun, before `rotation`: direction toward it, and its light as a linear colour.
+   // False when nothing in the image crosses the threshold.
+   bool Sun(float dir[3], float light[3]) const;
+
    std::string pathInput; // bound to the ImGui text field
 
    void VisitParams(ParamVisitor& v) override
@@ -74,6 +86,9 @@ public:
       v.Text("path", mLoadedPath);
       v.Float("intensity", intensity);
       v.Float("rotation", rotation);
+      v.Float("sunThreshold", sunThreshold); v.Float("sunAngle", sunAngle);
+      v.Bool("sunShadow", sunShadow); v.Int("sunShadowRes", sunShadowRes);
+      v.Float("sunShadowFilter", sunShadowFilter);
    }
 
 private:
@@ -88,4 +103,8 @@ private:
    std::string mLoadedPath;
    std::string mLastError;
    unsigned long long mRevision = 0;
+   float mUploadedThreshold = -1.0f;   // the threshold the texture was cut at
+   bool mHasSun = false;
+   float mSunDir[3] = { 0, 1, 0 };
+   float mSunLight[3] = { 0, 0, 0 };
 };

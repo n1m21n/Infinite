@@ -1828,6 +1828,11 @@ namespace app
       ImGui::EndDisabled();
       ColorSwatch("colour", n->color, n);
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
+      ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
+      ModSlider("falloff", &n->falloff, 0.0f, 4.0f);
+      ImGui::EndDisabled();
+      ModSlider("diffuse", &n->diffuse, 0.0f, 2.0f);
+      ModSlider("specular", &n->specular, 0.0f, 2.0f);
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
    }
 
@@ -1983,6 +1988,17 @@ namespace app
       NodeSeparator("output", colW);
       DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
                      [n](int i) { n->renderPass = i; }, colW);
+      if (n->renderPass >= 1 && n->renderPass <= 9)
+         ModSlider("pass alpha threshold", &n->passThreshold, 0.0f, 1.0f, "%.2f", colW);
+      if (n->renderPass == 5)
+      {
+         ModSlider("mist start", &n->mistStart, 0.0f, 100.0f, "%.2f", colW);
+         ModSlider("mist depth", &n->mistDepth, 0.01f, 200.0f, "%.2f", colW);
+         DropdownButton("mist falloff", Render3DNode::MistFalloffNames(), n->mistFalloff,
+                        [n](int i) { n->mistFalloff = i; }, colW);
+         ModSlider("mist intensity", &n->mistIntensity, 0.0f, 1.0f, "%.2f", colW);
+         ModSlider("mist height", &n->mistHeight, 0.0f, 100.0f, "%.2f", colW);
+      }
       // This is the export resolution: Output sizes its own buffer from whatever
       // its input hands it, so a 4000px PNG needs 4000 set here or it is an
       // upscale of a smaller render.
@@ -2097,6 +2113,38 @@ namespace app
       ImGui::BeginDisabled(n->aoStrength <= 0.0f);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      DropdownButton("shading", Render3DNode::ViewShadingNames(), n->viewShading,
+                     [n](int i) { n->viewShading = i; }, colW);
+      if (n->viewShading == 1)
+      {
+         DropdownButton("solid lighting", Render3DNode::SolidLightingNames(), n->solidLighting,
+                        [n](int i) { n->solidLighting = i; }, colW);
+         if (n->solidLighting == 1)
+            DropdownButton("matcap", Render3DNode::MatcapNames(), n->matcap,
+                           [n](int i) { n->matcap = i; }, colW);
+         if (n->solidLighting == 0)
+         {
+            ModCheckbox("studio world space", &n->studioWorld);
+            ImGui::BeginDisabled(!n->studioWorld);
+            ModSlider("studio rotation", &n->studioRotation, -180.0f, 180.0f, "%.0f", colW);
+            ImGui::EndDisabled();
+            ModCheckbox("solid specular", &n->solidSpecular);
+         }
+         DropdownButton("solid color", Render3DNode::SolidColorNames(), n->solidColor,
+                        [n](int i) { n->solidColor = i; }, colW);
+         if (n->solidColor == 2)
+            ColorSwatch("single color", n->solidSingle, n);
+      }
+      ModCheckbox("cavity", &n->cavity);
+      ImGui::BeginDisabled(!n->cavity);
+      DropdownButton("cavity type", Render3DNode::CavityTypeNames(), n->cavityType,
+                     [n](int i) { n->cavityType = i; }, colW);
+      ModSlider("cavity ridge", &n->cavityRidge, 0.0f, 2.5f, "%.2f", colW);
+      ModSlider("cavity valley", &n->cavityValley, 0.0f, 2.5f, "%.2f", colW);
+      ModSlider("cavity distance", &n->cavityDistance, 0.01f, 2.0f, "%.2f", colW);
+      ModSlider("curvature ridge", &n->curvatureRidge, 0.0f, 2.0f, "%.2f", colW);
+      ModSlider("curvature valley", &n->curvatureValley, 0.0f, 2.0f, "%.2f", colW);
+      ImGui::EndDisabled();
       ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
       ImGui::EndDisabled();
@@ -2109,6 +2157,15 @@ namespace app
       ImGui::BeginDisabled(n->bloom <= 0.0f);
       ModSlider("bloom threshold", &n->bloomThreshold, 0.5f, 8.0f, "%.2f", colW);
       ModSlider("bloom radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(n->PanoActive()); // a panorama has no previous frame to smear from
+      ModCheckbox("motion blur", &n->motionBlur);
+      ImGui::BeginDisabled(!n->motionBlur);
+      DropdownButton("motion position", Render3DNode::MotionPositionNames(), n->motionPosition,
+                     [n](int i) { n->motionPosition = i; }, colW);
+      ModSlider("motion shutter", &n->motionShutter, 0.0f, 2.0f, "%.2f", colW);
+      ModSlider("motion max blur", &n->motionMax, 1.0f, 256.0f, "%.0f", colW);
       ImGui::EndDisabled();
       ImGui::EndDisabled();
 

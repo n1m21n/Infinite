@@ -27,6 +27,20 @@ public:
 
    enum class Kind { Missing, Geometry, Camera, Light };
 
+   // Camera only: a picture seen through the camera in the view, never in the render.
+   struct Backdrop
+   {
+      std::string path;             // empty: none
+      bool show = false;
+      float alpha = 0.5f;
+      bool front = false;           // false: behind the objects, true: over them
+      int fit = 0;                  // 0 stretch, 1 fit, 2 crop
+      float offset[2] = { 0, 0 };   // in frame widths
+      float rotation = 0.0f;        // degrees
+      float scale = 1.0f;
+      bool flipX = false, flipY = false;
+   };
+
    struct Item
    {
       int id = 0;
@@ -34,9 +48,18 @@ public:
       float pos[3] = { 0, 0, 0 };
       float rot[3] = { 0, 0, 0 };   // degrees, X then Y then Z
       float scale[3] = { 1, 1, 1 };
+      // Delta transform: a second offset on top of the one above. Location adds, rotation turns
+      // after it, scale multiplies; the tools move only the main one.
+      float dpos[3] = { 0, 0, 0 };
+      float drot[3] = { 0, 0, 0 };
+      float dscale[3] = { 1, 1, 1 };
       bool visible = true;
       bool render = true;           // false: seen in the view, left out of the picture
+      int lookAt = 0;               // camera or light only: item id it keeps facing, 0 = none
+      unsigned lock = 0;            // bits 0-2 location, 3-5 rotation, 6-8 scale (engine axes): the transform tools leave them alone
       int group = 0;                // items with the same number select and move together; 0 = none
+      int passIndex = 0;            // written by Render 3D's Object Index pass
+      Backdrop backdrop;
       std::string name;             // empty: the node's own name
       std::vector<uint64_t> unlit;  // light nodes this item ignores
    };
@@ -56,16 +79,32 @@ public:
       int orientation = 0;          // 0 global, 1 local, 2 view
       int pivot = 0;                // 0 median, 1 individual, 2 active, 3 3D cursor
       float cursor[3] = { 0, 0, 0 };
-      bool zoomToMouse = true;
-      bool orbitSelection = true;
+      bool zoomToMouse = false;   // Blender's default: zooming never moves the orbit pivot
+      bool orbitSelection = false;   // Blender's default: the view turns about its own centre
       int shadowItem = 0;           // the light that casts; 0 = the first one
       float fStop = 0.0f;           // 0 leaves the look's own aperture
+      bool proportional = false;    // moving, turning or scaling also pulls the items near the selection
+      float propSize = 2.0f;        // how far the pull reaches, in scene units
+      bool snapObjects = false;     // a free move that comes near another item's origin jumps onto it
+      bool invertZoom = false;      // the wheel zooms the other way
+      bool textInfo = true, stats = false, originsAll = false;   // overlay texts and every item's origin
+      bool gizmoMove = true, gizmoNav = true;   // the transform handles with the tool pad, and the view gizmo
+      int propFalloff = 0;          // 0 smooth, 1 sphere, 2 root, 3 linear, 4 sharp, 5 constant
+      // Render region, as fractions of the frame from the bottom left. Outside it the picture is
+      // clear; crop makes the picture just the region.
+      bool border = false, crop = false;
+      float borderMin[2] = { 0, 0 }, borderMax[2] = { 1, 1 };
    };
 
    // Set once by the app: the live node for a uid, nullptr when it is gone.
    static std::function<INode*(uint64_t)> ResolveUid;
 
    static Mat4 Placement(const Item& item);
+   // Sets the item's rotation so its whole turn, delta included, is `r` (rows of a rotation).
+   static void SetTurn(Item& item, const float r[3][3]);
+   // Moves the main transform into the delta and resets the main one (Blender's "Transforms to
+   // Deltas"); the item stays where it is.
+   static void TransformsToDeltas(Item& item);
    static Kind KindOf(const INode* node);
 
    // The model. Edits go through these so the saved text follows.
@@ -97,8 +136,8 @@ public:
 
    // INode
    unsigned int GetOutputTexture() override;
-   int GetOutputWidth() const override { return mRender.GetOutputWidth(); }
-   int GetOutputHeight() const override { return mRender.GetOutputHeight(); }
+   int GetOutputWidth() const override { return mOutW > 0 ? mOutW : mRender.GetOutputWidth(); }
+   int GetOutputHeight() const override { return mOutH > 0 ? mOutH : mRender.GetOutputHeight(); }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
    void VisitParams(ParamVisitor& v) override;
@@ -116,6 +155,8 @@ public:
       int gridAxis = 1;       // the axis the grid plane faces
       float gridDist = 6.0f;  // how far the view stands back, which picks the grid's scale
       std::vector<int> only;  // local view: just these items
+      int camera = 0;            // looking through this camera item: its backdrop shows
+      float frame[4] = { 0, 0, 1, 1 };  // the camera's frame in the picture, 0-1 from bottom left
    };
    unsigned int RenderView(int w, int h, const View& v);
    // The active camera's view as the output sees it.
@@ -148,6 +189,13 @@ private:
    void ApplyWorld(Render3DNode& render, bool show, bool background);
    unsigned int Composite(unsigned int sceneTex, int w, int h, unsigned int backdrop, GLUtil::Fbo& out);
    unsigned int GridPass(unsigned int sceneTex, int w, int h, const View& v);
+   struct Picture
+   {
+      unsigned int tex = 0;
+      int w = 0, h = 0;
+   };
+   const Picture& LoadPicture(const std::string& path);
+   std::map<std::string, Picture> mPictures;
 
    std::vector<Item> mItems;
    int mNextId = 1;
@@ -166,6 +214,10 @@ private:
    INode* mWorldNode = nullptr;
    GLUtil::Fbo mOutFbo, mEditorFbo, mGridFbo;
    unsigned int mCompositeProgram = 0;
+   GLUtil::Fbo mBorderFbo;
+   unsigned int mBorderProgram = 0;
+   int mOutW = 0, mOutH = 0;         // the picture's size after a crop; 0 = the render's
+   unsigned int Border(unsigned int sceneTex, int w, int h);
    unsigned int mGridProgram = 0;
    unsigned int mOutTex = 0;
    unsigned long long mRevision = 0;
