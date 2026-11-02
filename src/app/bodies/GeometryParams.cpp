@@ -2157,6 +2157,15 @@ namespace app
       ModSlider("bloom radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
       ImGui::EndDisabled();
+      ImGui::BeginDisabled(n->PanoActive()); // a panorama has no previous frame to smear from
+      ModCheckbox("motion blur", &n->motionBlur);
+      ImGui::BeginDisabled(!n->motionBlur);
+      DropdownButton("motion position", Render3DNode::MotionPositionNames(), n->motionPosition,
+                     [n](int i) { n->motionPosition = i; }, colW);
+      ModSlider("motion shutter", &n->motionShutter, 0.0f, 2.0f, "%.2f", colW);
+      ModSlider("motion max blur", &n->motionMax, 1.0f, 256.0f, "%.0f", colW);
+      ImGui::EndDisabled();
+      ImGui::EndDisabled();
 
       ImGui::EndGroup();
    }

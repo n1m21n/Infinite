@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -805,6 +806,15 @@ public:
    {
       return renderPass == 9 || (renderPass == 0 && (aoStrength > 0.0f || dofAperture > 0.0f || cavity));
    }
+   // Motion blur: each pixel smeared along how far it moved since the last frame,
+   // for `motionShutter` of a frame, before, around or after the frame's moment.
+   // Object and camera motion; a shape that changes in place does not blur.
+   static const std::vector<std::string>& MotionPositionNames();
+   bool motionBlur = false;
+   float motionShutter = 0.5f;  // fraction of a frame
+   int motionPosition = 1;      // start / center / end
+   float motionMax = 32.0f;     // longest smear, pixels at 1080 high
+   bool MotionActive() const { return motionBlur && motionShutter > 0.0f && renderPass == 0 && !PanoActive(); }
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -823,6 +833,8 @@ public:
       v.Float("cavityRidge", cavityRidge); v.Float("cavityValley", cavityValley);
       v.Float("curvatureRidge", curvatureRidge); v.Float("curvatureValley", curvatureValley);
       v.Float("cavityDistance", cavityDistance);
+      v.Bool("motionBlur", motionBlur); v.Float("motionShutter", motionShutter);
+      v.Int("motionPosition", motionPosition); v.Float("motionMax", motionMax);
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
@@ -1040,6 +1052,16 @@ private:
    bool mInAccumulate = false;
    bool EnsurePostShaders();
    void RunPost(const Mat4& proj, bool ortho, int w, int h);
+   // Motion blur state: last frame's matrices per source, and this frame's as they are drawn.
+   std::map<const void*, Mat4> mPrevModel, mCurModel;
+   Mat4 mPrevViewProj, mCurViewProj;
+   bool mHasPrev = false;
+   int mMotionFrame = -1;
+   bool mVelocityPass = false;     // this cook draws screen motion instead of colour
+   GLUtil::Fbo mVelocity, mMotionOut;
+   unsigned int mProgMotion = 0;
+   Mat4 MotionDelta(const void* source, const Mat4& model);
+   void RunMotionBlur(const Mat4& proj, const Mat4& viewProj, int w, int h);
    void ReleasePost();
    // HDR finish (Render3DHdr.cpp): bloom chain, then tonemap, back into mColorTex.
    static constexpr int kBloomLevels = 6;

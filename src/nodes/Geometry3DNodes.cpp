@@ -34,6 +34,7 @@ namespace
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kMistFalloffNames = { "Quadratic", "Linear", "Inverse Quadratic" };
    const std::vector<std::string> kCavityTypeNames = { "World", "Screen", "Both" };
+   const std::vector<std::string> kMotionPositionNames = { "Start on Frame", "Center on Frame", "End on Frame" };
    const std::vector<std::string> kViewShadingNames = { "Rendered", "Solid" };
    const std::vector<std::string> kSolidLightingNames = { "Studio", "MatCap", "Flat" };
    const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture" };
@@ -355,6 +356,13 @@ namespace
       "out vec2 vUv;\n"
       "out vec3 vInstanceColor;\n"
       "out vec3 vVertexColor;\n"
+      // Motion blur's velocity cook: where this point was last frame, through last
+      // frame's camera. uMotionDelta takes this frame's world to last frame's.
+      "uniform int uVelocity;\n"
+      "uniform mat4 uPrevViewProj;\n"
+      "uniform mat4 uMotionDelta;\n"
+      "out vec4 vCurClip;\n"
+      "out vec4 vPrevClip;\n"
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
@@ -405,6 +413,8 @@ namespace
       "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
       "   vLightSpacePos = uLightViewProj * vec4(worldPos, 1.0);\n"
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
+      "   vCurClip = gl_Position;\n"
+      "   vPrevClip = uVelocity == 1 ? uPrevViewProj * (uMotionDelta * vec4(worldPos, 1.0)) : gl_Position;\n"
       "}\n";
 
    // Linked twice (EnsureShader): once as is, and once with INF_NO_DISCARD
@@ -426,7 +436,11 @@ namespace
       "in vec3 vInstanceColor;\n"
       "in vec3 vVertexColor;\n"
       "in vec4 vLightSpacePos;\n"
+      "in vec4 vCurClip;\n"
+      "in vec4 vPrevClip;\n"
       "out vec4 fragColor;\n"
+      "uniform int uVelocity;\n"
+      "uniform vec2 uVelocityScale;\n"   // NDC to encoded: half the size over twice the longest smear
       "uniform mat4 uViewProj;\n"
       "uniform vec3 uBaseColor;\n"
       "uniform float uMetallic;\n"
@@ -799,6 +813,15 @@ namespace
       "   float alpha = uOpacity;\n"
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
       "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
+      // How far this pixel moved since the last frame, 0.5 = still; alpha 1 marks the scene.
+      "   if (uVelocity == 1) {\n"
+      "      vec2 d = (vCurClip.xy / vCurClip.w - vPrevClip.xy / max(vPrevClip.w, 1e-4)) * uVelocityScale;\n"
+      "      if (vPrevClip.w <= 1e-4) d = vec2(0.0);\n"
+      "      float l = length(d);\n"
+      "      if (l > 0.5) d *= 0.5 / l;\n"
+      "      fragColor = vec4(d + 0.5, 0.0, 1.0);\n"
+      "      return;\n"
+      "   }\n"
       "   vec3 n = normalize(vNormal);\n"
       // Data passes leave out what is more see-through than the threshold, the way a
       // depth or index pass cannot hold half a value.
@@ -1222,6 +1245,7 @@ const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjec
 const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
 const std::vector<std::string>& Render3DNode::MistFalloffNames() { return kMistFalloffNames; }
 const std::vector<std::string>& Render3DNode::CavityTypeNames() { return kCavityTypeNames; }
+const std::vector<std::string>& Render3DNode::MotionPositionNames() { return kMotionPositionNames; }
 const std::vector<std::string>& Render3DNode::ViewShadingNames() { return kViewShadingNames; }
 const std::vector<std::string>& Render3DNode::SolidLightingNames() { return kSolidLightingNames; }
 const std::vector<std::string>& Render3DNode::SolidColorNames() { return kSolidColorNames; }
@@ -1928,11 +1952,39 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (mCubeColor != 0 || mPano.tex != 0)   // projection went back to Perspective: give the cube memory back
       ReleasePanoTargets();
    mPanoValid = false;
+   // Motion blur needs the frame before this one; after a jump or a gap there is none, and nothing smears.
+   if (MotionActive())
+   {
+      mHasPrev = mMotionFrame >= 0 && frameId == mMotionFrame + 1 && !mCurModel.empty();
+      if (mHasPrev)
+      {
+         mPrevModel.swap(mCurModel);
+         mPrevViewProj = mCurViewProj;
+      }
+      mCurModel.clear();
+      mMotionFrame = frameId;
+   }
+   else
+   {
+      mHasPrev = false;
+      mMotionFrame = -1;
+      mCurModel.clear();
+      mPrevModel.clear();
+   }
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
       return;
    CookOnce(frameId);
+}
+
+// This frame's world to last frame's for one source; still when it was not drawn last frame.
+Mat4 Render3DNode::MotionDelta(const void* source, const Mat4& model)
+{
+   if (!mVelocityPass)
+      mCurModel[source] = model;
+   auto found = mPrevModel.find(source);
+   return found != mPrevModel.end() ? Mat4::Multiply(found->second, Mat4::Inverse(model)) : Mat4::Identity();
 }
 
 void Render3DNode::CookOnce(int frameId)
@@ -1946,6 +1998,20 @@ void Render3DNode::CookOnce(int frameId)
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
       return;
+
+   // Motion blur: the same scene first, drawn as how far each pixel moved, kept for the blur at the end.
+   if (MotionActive() && mHasPrev && !mVelocityPass && mFaceOverride < 0 &&
+       GLUtil::EnsureFbo(mVelocity, w, h, GL_RGBA8, "Render3D_Velocity"))
+   {
+      mVelocityPass = true;
+      CookOnce(frameId);
+      mVelocityPass = false;
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, mFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mVelocity.fbo);
+      glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+   }
 
    // Pull any textures the geometry wants before we start drawing.
    CollectDraw();
@@ -2077,6 +2143,8 @@ void Render3DNode::CookOnce(int frameId)
       else { proj.m[12] += jx; proj.m[13] += jy; }
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
+   if (MotionActive() && !mVelocityPass)
+      mCurViewProj = viewProj;
    // Camera basis in world space for billboarding point-cloud sprites - rows
    // of the view matrix's rotation part (see Mat4::LookAt), not columns.
    const float camRight[3] = { view.m[0], view.m[4], view.m[8] };
@@ -2202,7 +2270,7 @@ void Render3DNode::CookOnce(int frameId)
    bool shadowsActive = false;
    float shadowBiasDepth = shadowBias;
    const float casterSoftness = shadowSoftness * caster.shadowSoft;
-   if (shadowsEnabled && caster.castShadow && lightTypes[ci] != 1 && EnsureShadowShader())
+   if (shadowsEnabled && !mVelocityPass && caster.castShadow && lightTypes[ci] != 1 && EnsureShadowShader())
    {
       const int quality = caster.shadowRes > 0 ? caster.shadowRes - 1 : shadowQuality;
       const int wantSize = kShadowSizes[std::max(0, std::min(quality, 2))];
@@ -2341,7 +2409,9 @@ void Render3DNode::CookOnce(int frameId)
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
-   if (renderPass == 1 || renderPass == 2 || renderPass == 5 || renderPass == 8 || renderPass == 9)
+   if (mVelocityPass)
+      glClearColor(0.5f, 0.5f, 0.0f, 0.0f);
+   else if (renderPass == 1 || renderPass == 2 || renderPass == 5 || renderPass == 8 || renderPass == 9)
       glClearColor(1.0f, 1.0f, 1.0f, bgOpacity);
    else if (renderPass == 3)
       glClearColor(0.5f, 0.5f, 0.5f, bgOpacity);
@@ -2357,7 +2427,7 @@ void Render3DNode::CookOnce(int frameId)
    // follows simply paints over it in the usual way.
    // A data pass keeps its own clear value; the Environment pass always shows the world,
    // the gradient one when no HDRI is patched in.
-   mEnvBgDrawn = (hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10;
+   mEnvBgDrawn = ((hasEnvMap && envAsBackground && renderPass == 0) || renderPass == 10) && !mVelocityPass;
    if (mEnvBgDrawn && EnsureEnvBgShader())
    {
       if (mEnvBgVao == 0)
@@ -2457,6 +2527,14 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
       glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1i(glGetUniformLocation(mProgram, "uVelocity"), mVelocityPass ? 1 : 0);
+      if (mVelocityPass)
+      {
+         const float reach = std::max(1.0f, motionMax * (float)h / 1080.0f);
+         glUniform2f(glGetUniformLocation(mProgram, "uVelocityScale"), 0.5f * (float)w / (2.0f * reach),
+                     0.5f * (float)h / (2.0f * reach));
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPrevViewProj"), 1, GL_FALSE, mPrevViewProj.m);
+      }
       glUniform1f(glGetUniformLocation(mProgram, "uMistStart"), mistStart);
       glUniform1f(glGetUniformLocation(mProgram, "uMistDepth"), mistDepth);
       glUniform1f(glGetUniformLocation(mProgram, "uMistFalloff"), mistFalloff == 1 ? 1.0f : mistFalloff == 2 ? 0.5f : 2.0f);
@@ -2764,6 +2842,8 @@ void Render3DNode::CookOnce(int frameId)
          glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, Mat4::Identity().m);
+      if (MotionActive())
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(cloud, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)cloud->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), cloud->PassIndex());
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
@@ -3178,6 +3258,8 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), gpu.hasVertexColor ? 1 : 0);
 
       glUniformMatrix4fv(glGetUniformLocation(mProgram, "uModel"), 1, GL_FALSE, model.m);
+      if (MotionActive())
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMotionDelta"), 1, GL_FALSE, MotionDelta(source, model).m);
       glUniform1i(glGetUniformLocation(mProgram, "uLightMask"), (int)source->LightMask());
       glUniform1i(glGetUniformLocation(mProgram, "uObjectIndex"), source->PassIndex());
       glUniform1f(glGetUniformLocation(mProgram, "uDrawRandom"), std::fmod((float)i * 0.618034f, 1.0f));
@@ -3424,18 +3506,20 @@ void Render3DNode::CookOnce(int frameId)
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       // Depth comes along only when the post stage or a Volume node will read it.
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
-                        GL_COLOR_BUFFER_BIT | ((PostActive() || HdrActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
+                        GL_COLOR_BUFFER_BIT | ((PostActive() || HdrActive() || MotionActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
 
-   mDepthResolved = !multisampling || PostActive() || HdrActive() || mDepthWanted;
-   if (PostActive())
+   mDepthResolved = !multisampling || PostActive() || HdrActive() || MotionActive() || mDepthWanted;
+   if (PostActive() && !mVelocityPass)
    {
       Bench::ConditionalGpuStageTimer benchPost(benchPassRing, "r3d_post", frameId);
       RunPost(proj, proj.m[11] == 0.0f, w, h);
    }
-   if (HdrActive() && mFaceOverride < 0) // a panorama runs the finish once, on the unwrapped picture
+   if (MotionActive() && mHasPrev && !mVelocityPass && mVelocity.fbo != 0)
+      RunMotionBlur(proj, viewProj, w, h);
+   if (HdrActive() && mFaceOverride < 0 && !mVelocityPass) // a panorama runs the finish once, on the unwrapped picture
    {
       Bench::ConditionalGpuStageTimer benchHdr(benchPassRing, "r3d_hdr", frameId);
       RunHdr(mColorTex, mDepthTex, w, h, mFbo);

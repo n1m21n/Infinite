@@ -245,6 +245,66 @@ namespace
       glBindTexture(GL_TEXTURE_2D, tex);
       glUniform1i(glGetUniformLocation(prog, name), unit);
    }
+
+   // Motion blur (after McGuire et al. 2012, reduced to one pass): find the fastest motion
+   // near the pixel, walk back along it over the shutter, and keep each tap that this
+   // pixel's or the tap's own smear reaches, with the nearer one in front.
+   const char* kMotionBody =
+      "uniform sampler2D uColor;\n"
+      "uniform sampler2D uVel;\n"
+      "uniform vec2 uSize;\n"
+      "uniform float uReach;\n"      // the longest smear, pixels
+      "uniform vec2 uShutter;\n"     // the open interval, in frames from the frame's moment
+      "uniform mat4 uReproj;\n"      // this frame's clip space to last frame's, for the sky
+      "vec2 velAt(vec2 uv) {\n"
+      "   vec4 e = texture(uVel, uv);\n"
+      "   if (e.a > 0.5) return (e.xy - 0.5) * 2.0 * uReach;\n"
+      "   vec2 ndc = uv * 2.0 - 1.0;\n"
+      "   vec4 p = uReproj * vec4(ndc, 1.0, 1.0);\n"
+      "   if (p.w <= 1e-4) return vec2(0.0);\n"
+      "   vec2 d = (ndc - p.xy / p.w) * 0.5 * uSize;\n"
+      "   float l = length(d);\n"
+      "   return l > uReach ? d * (uReach / l) : d;\n"
+      "}\n"
+      "float cone(float d, float l) { return clamp(1.0 - d / max(l, 1e-3), 0.0, 1.0); }\n"
+      "float cylinder(float d, float l) { return 1.0 - smoothstep(0.95 * l, 1.05 * l, d); }\n"
+      "void main() {\n"
+      "   vec4 c0 = texture(uColor, vUv);\n"
+      "   vec2 vc = velAt(vUv);\n"
+      "   vec2 vm = vc;\n"
+      "   for (int i = 0; i < 8; i++) {\n"
+      "      float a = float(i) * 0.7853982;\n"
+      "      for (int r = 1; r <= 2; r++) {\n"
+      "         vec2 v = velAt(vUv + vec2(cos(a), sin(a)) * (uReach * 0.5 * float(r)) / uSize);\n"
+      "         if (dot(v, v) > dot(vm, vm)) vm = v;\n"
+      "      }\n"
+      "   }\n"
+      "   float span = max(abs(uShutter.x), abs(uShutter.y));\n"
+      "   if (length(vm) * (uShutter.y - uShutter.x) < 0.5) { fragColor = c0; return; }\n"
+      "   float zc = viewDist(texture(uDepth, vUv).r);\n"
+      "   float lc = max(length(vc) * span, 0.5);\n"
+      "   float wc = 1.0 / lc;\n"
+      "   vec4 sum = c0 * wc;\n"
+      "   float wsum = wc;\n"
+      "   float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "   for (int k = 0; k < 16; k++) {\n"
+      "      float t = mix(uShutter.x, uShutter.y, (float(k) + jitter) / 16.0);\n"
+      "      vec2 off = -t * vm;\n"
+      "      float d = length(off);\n"
+      "      if (d < 0.5) continue;\n"
+      "      vec2 uv = vUv + off / uSize;\n"
+      "      if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) continue;\n"
+      "      float zs = viewDist(texture(uDepth, uv).r);\n"
+      "      float ls = max(length(velAt(uv)) * span, 0.5);\n"
+      "      float soft = 0.05 * min(zc, zs) + 1e-3;\n"
+      "      float fore = clamp(1.0 - (zs - zc) / soft, 0.0, 1.0);\n"
+      "      float back = clamp(1.0 - (zc - zs) / soft, 0.0, 1.0);\n"
+      "      float w = fore * cone(d, ls) + back * cone(d, lc) + cylinder(d, ls) * cylinder(d, lc) * 2.0;\n"
+      "      sum += texture(uColor, uv) * w;\n"
+      "      wsum += w;\n"
+      "   }\n"
+      "   fragColor = sum / wsum;\n"
+      "}\n";
 }
 
 bool Render3DNode::EnsurePostShaders()
@@ -261,16 +321,18 @@ bool Render3DNode::EnsurePostShaders()
    mProgPost = GLUtil::CompileProgram(post.c_str());
    mProgAccum = GLUtil::CompileProgram(kAccumFrag);
    mProgAccumDone = GLUtil::CompileProgram(kAccumDoneFrag);
-   if (!(mProgAo && mProgAoBlur && mProgPost && mProgAccum && mProgAccumDone))
+   const std::string motion = head + kViewSpaceGlsl + kMotionBody;
+   mProgMotion = GLUtil::CompileProgram(motion.c_str());
+   if (!(mProgAo && mProgAoBlur && mProgPost && mProgAccum && mProgAccumDone && mProgMotion))
       mProgPost = 0;
    return mProgPost != 0;
 }
 
 void Render3DNode::ReleasePost()
 {
-   for (GLUtil::Fbo* f : { &mPostAo[0], &mPostAo[1], &mPostOut, &mAccum[0], &mAccum[1] })
+   for (GLUtil::Fbo* f : { &mPostAo[0], &mPostAo[1], &mPostOut, &mAccum[0], &mAccum[1], &mVelocity, &mMotionOut })
       GLUtil::DestroyFbo(*f);
-   for (unsigned int* p : { &mProgAo, &mProgAoBlur, &mProgPost, &mProgAccum, &mProgAccumDone })
+   for (unsigned int* p : { &mProgAo, &mProgAoBlur, &mProgPost, &mProgAccum, &mProgAccumDone, &mProgMotion })
       if (*p != 0) { glDeleteProgram(*p); *p = 0; }
 }
 
@@ -357,6 +419,49 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
    glDepthMask(GL_TRUE);
    if (wasDepth) glEnable(GL_DEPTH_TEST);
    if (wasCull) glEnable(GL_CULL_FACE);
+}
+
+// Motion blur: the picture smeared along the velocity cook's motion, back into the output.
+void Render3DNode::RunMotionBlur(const Mat4& proj, const Mat4& viewProj, int w, int h)
+{
+   if (!EnsurePostShaders() || mDepthTex == 0 ||
+       !GLUtil::EnsureFbo(mMotionOut, w, h, mFloatTarget ? GL_RGBA16F : GL_RGBA8, "Render3D_Motion"))
+      return;
+   const GLboolean wasDepth = glIsEnabled(GL_DEPTH_TEST);
+   const GLboolean wasCull = glIsEnabled(GL_CULL_FACE);
+   const GLboolean wasBlend = glIsEnabled(GL_BLEND);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_CULL_FACE);
+   glDisable(GL_BLEND);
+   glDepthMask(GL_FALSE);
+
+   const float s = std::clamp(motionShutter, 0.0f, 2.0f);
+   const float open = motionPosition == 0 ? 0.0f : motionPosition == 2 ? -s : -0.5f * s;
+   const Mat4 reproj = Mat4::Multiply(mPrevViewProj, Mat4::Inverse(viewProj));
+   const float projVec[4] = { proj.m[0], proj.m[5], proj.m[10], proj.m[14] };
+   GLUtil::RunShaderPass(mMotionOut, mProgMotion, [&]() {
+      Bind(mProgMotion, 0, mColorTex, "uColor");
+      Bind(mProgMotion, 1, mDepthTex, "uDepth");
+      Bind(mProgMotion, 2, GLUtil::FboTexture(mVelocity), "uVel");
+      glUniform4fv(glGetUniformLocation(mProgMotion, "uProj"), 1, projVec);
+      glUniform1i(glGetUniformLocation(mProgMotion, "uOrtho"), proj.m[11] == 0.0f ? 1 : 0);
+      glUniform2f(glGetUniformLocation(mProgMotion, "uSize"), (float)w, (float)h);
+      glUniform1f(glGetUniformLocation(mProgMotion, "uReach"), std::max(1.0f, motionMax * (float)h / 1080.0f));
+      glUniform2f(glGetUniformLocation(mProgMotion, "uShutter"), open, open + s);
+      glUniformMatrix4fv(glGetUniformLocation(mProgMotion, "uReproj"), 1, GL_FALSE, reproj.m);
+   });
+   glActiveTexture(GL_TEXTURE0);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, mMotionOut.fbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
+   glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+   glDepthMask(GL_TRUE);
+   if (wasDepth) glEnable(GL_DEPTH_TEST);
+   if (wasCull) glEnable(GL_CULL_FACE);
+   if (wasBlend) glEnable(GL_BLEND);
 }
 
 // Offline supersampling: cook the scene `supersample` times with the camera

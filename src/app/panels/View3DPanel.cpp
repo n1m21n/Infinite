@@ -4058,6 +4058,15 @@ namespace
          FloatRow(T("Threshold"), &look.bloomThreshold, 0.5f, 8.0f, "%.2f");
          FloatRow(T("Radius"), &look.bloomRadius, 0.0f, 1.0f, "%.2f");
       }
+      if (Card(T("Motion Blur"), &look.motionBlur))
+      {
+         ImGui::BeginDisabled(!look.motionBlur);
+         ComboRow(T("Position"), &look.motionPosition, Render3DNode::MotionPositionNames());
+         FloatRow(T("Shutter"), &look.motionShutter, 0.0f, 2.0f, "%.2f");
+         FloatRow(T("Max blur"), &look.motionMax, 1.0f, 256.0f, "%.0f px");
+         ImGui::EndDisabled();
+         Hint(T("Smears what moved since the last frame. Shown in the render, not the editor views."));
+      }
       if (Card(T("Film")))
          BoolRow(T("Transparent"), &sSet->transparent);
       if (Card(T("Render Region")))
