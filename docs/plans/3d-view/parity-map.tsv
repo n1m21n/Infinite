@@ -1,1 +1,143 @@
 Struct.identifier	status	where
+SpaceView3D.show_region_tool_header	missing	View3D panel header: tool settings strip
+SpaceView3D.show_region_toolbar	missing	View3D panel: a tool column beside the view
+SpaceView3D.show_region_ui	done	View3DPanel.cpp:2966 Properties (N)
+SpaceView3D.show_region_hud	out	Adjust Last Operation: decided out in parity.md
+SpaceView3D.use_render_border	deferred	renderer crop region needed
+SpaceView3D.render_border_min_x	deferred	renderer crop region needed
+SpaceView3D.render_border_min_y	deferred	renderer crop region needed
+SpaceView3D.render_border_max_x	deferred	renderer crop region needed
+SpaceView3D.render_border_max_y	deferred	renderer crop region needed
+SpaceView3D.lock_cursor	missing	View tab > Navigation
+SpaceView3D.lens	missing	View tab: viewport lens (the view has a fixed lens)
+SpaceView3D.clip_start	missing	View tab: viewport clip (the camera has its own)
+SpaceView3D.clip_end	missing	View tab: viewport clip (the camera has its own)
+SpaceView3D.lock_camera	done	View3DPanel.cpp:2443 Lock camera to view
+SpaceView3D.show_gizmo	done	View3DPanel.cpp:4012 Gizmos card
+SpaceView3D.show_gizmo_navigate	done	View3DPanel.cpp:4014 Navigate
+SpaceView3D.show_gizmo_context	done	View3DPanel.cpp:4012 Gizmos card (move/rotate/scale handles)
+SpaceView3D.show_gizmo_tool	done	View3DPanel.cpp:4012 Gizmos card (move/rotate/scale handles)
+SpaceView3D.show_gizmo_object_translate	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_object_rotate	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_object_scale	done	View3DPanel.cpp:4012 Gizmos card move/rotate/scale
+SpaceView3D.show_gizmo_empty_image	out	empty image objects are not in the scene
+SpaceView3D.show_gizmo_light_size	missing	light gizmo handles in the viewport
+SpaceView3D.show_gizmo_light_look_at	missing	light gizmo handles in the viewport
+SpaceView3D.show_gizmo_camera_lens	missing	camera gizmo handles in the viewport
+SpaceView3D.show_gizmo_camera_dof_distance	missing	camera gizmo handles in the viewport
+SpaceView3D.use_local_camera	out	one scene camera; no per-view cameras
+SpaceView3D.region_quadviews	deferred	quad view: new mode, needs approval
+SpaceView3D.show_reconstruction	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.tracks_display_size	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.tracks_display_type	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_camera_path	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_bundle_names	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.mirror_xr_session	out	movie tracking, VR and geometry nodes are outside the README
+SpaceView3D.show_object_viewport_surf	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_meta	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_pointcloud	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_volume	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_empty	out	object type Infinite has no scene item for
+SpaceView3D.show_object_viewport_camera	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_light	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_viewport_light_probe	missing	View tab: per-type visibility filter
+SpaceView3D.show_object_select_surf	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_meta	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_pointcloud	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_volume	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_empty	out	object type Infinite has no scene item for
+SpaceView3D.show_object_select_camera	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_light	missing	View tab: per-type selectability filter
+SpaceView3D.show_object_select_light_probe	missing	View tab: per-type selectability filter
+SpaceView3D.icon_from_show_object_viewport	out	UI icon helper
+SpaceView3D.show_viewer	out	movie tracking, VR and geometry nodes are outside the README
+RegionView3D.lock_rotation	deferred	quad view: new mode, needs approval
+RegionView3D.show_sync_view	deferred	quad view: new mode, needs approval
+RegionView3D.use_box_clip	deferred	quad view: new mode, needs approval
+RegionView3D.perspective_matrix	out	derived matrices, not a setting
+RegionView3D.window_matrix	out	derived matrices, not a setting
+RegionView3D.view_matrix	out	derived matrices, not a setting
+RegionView3D.view_perspective	done	View3DPanel.cpp:1504 Perspective/Orthographic and camera view
+RegionView3D.use_clip_planes	out	derived matrices, not a setting
+RegionView3D.clip_planes	out	derived matrices, not a setting
+RegionView3D.view_location	done	View3DPanel.cpp: orbit target (sTarget), Target X/Y/Z
+RegionView3D.view_rotation	done	View3DPanel.cpp: azimuth/elevation/roll of the view
+RegionView3D.view_distance	done	View3DPanel.cpp: orbit distance (zoom)
+RegionView3D.view_camera_zoom	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
+RegionView3D.view_camera_offset	done	View3DPanel.cpp: sCamZoom/sCamPan in camera view
+View3DCursor.location	done	View3DPanel.cpp:3981 3D Cursor card
+View3DCursor.rotation_quaternion	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_axis_angle	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_euler	missing	3D Cursor card: cursor has a location only
+View3DCursor.rotation_mode	missing	3D Cursor card: cursor has a location only
+View3DCursor.matrix	out	derived matrix, not a setting
+View3DShading.type	done	View3DPanel.cpp:2926 Wireframe/Solid/Rendered chips
+View3DShading.light	deferred	studio lights and matcaps need shader work
+View3DShading.show_object_outline	missing	Overlays card: selection outline in Solid
+View3DShading.studio_light	deferred	studio lights and matcaps need shader work
+View3DShading.use_world_space_lighting	deferred	studio lights and matcaps need shader work
+View3DShading.show_backface_culling	deferred	renderer face culling option
+View3DShading.show_cavity	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_type	deferred	cavity needs a Render 3D shader pass
+View3DShading.curvature_ridge_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.curvature_valley_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_ridge_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.cavity_valley_factor	deferred	cavity needs a Render 3D shader pass
+View3DShading.selected_studio_light	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_rotate_z	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_intensity	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_background_alpha	deferred	studio lights and matcaps need shader work
+View3DShading.studiolight_background_blur	deferred	studio lights and matcaps need shader work
+View3DShading.use_studiolight_view_rotation	deferred	studio lights and matcaps need shader work
+View3DShading.color_type	deferred	Solid shader colour modes needed
+View3DShading.wireframe_color_type	deferred	Solid shader colour modes needed
+View3DShading.single_color	deferred	Solid shader colour modes needed
+View3DShading.background_type	missing	View tab: Solid view background
+View3DShading.background_color	missing	View tab: Solid view background
+View3DShading.show_shadows	deferred	Solid shader work, perf-gated
+View3DShading.show_xray	deferred	X-ray needs renderer work
+View3DShading.show_xray_wireframe	deferred	X-ray needs renderer work
+View3DShading.xray_alpha	deferred	X-ray needs renderer work
+View3DShading.xray_alpha_wireframe	deferred	X-ray needs renderer work
+View3DShading.use_dof	done	View3DPanel.cpp:3503 Depth of Field card drives Rendered view
+View3DShading.use_scene_lights	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_world	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_lights_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.use_scene_world_render	done	View3DPanel.cpp:2930 Rendered uses scene lights and world
+View3DShading.show_specular_highlight	deferred	Solid shader work, perf-gated
+View3DShading.object_outline_color	missing	Overlays card: outline colour
+View3DShading.shadow_intensity	deferred	Solid shader work, perf-gated
+View3DShading.render_pass	deferred	render passes in the viewport need renderer work
+View3DShading.aov_name	deferred	render passes in the viewport need renderer work
+View3DOverlay.show_overlays	done	View3DPanel.cpp:2950 Overlays chip
+View3DOverlay.show_ortho_grid	missing	Overlays card: grid and axis options
+View3DOverlay.show_floor	done	View3DPanel.cpp:2948 Grid chip
+View3DOverlay.show_axis_x	missing	Overlays card: grid and axis options
+View3DOverlay.show_axis_y	missing	Overlays card: grid and axis options
+View3DOverlay.show_axis_z	missing	Overlays card: grid and axis options
+View3DOverlay.grid_scale	missing	Overlays card: grid and axis options
+View3DOverlay.grid_lines	missing	Overlays card: grid and axis options
+View3DOverlay.grid_scale_unit	missing	Overlays card: grid and axis options
+View3DOverlay.show_outline_selected	missing	Overlays card: selection outline
+View3DOverlay.show_object_origins	done	View3DPanel.cpp: origin dot of selected items
+View3DOverlay.show_object_origins_all	done	View3DPanel.cpp:4010 Origins (all)
+View3DOverlay.show_relationship_lines	out	no parenting in the scene, groups only
+View3DOverlay.show_cursor	missing	Overlays card: hide the 3D cursor
+View3DOverlay.show_stats	done	View3DPanel.cpp:4009 Statistics
+View3DOverlay.show_performance	missing	Overlays card: frame time line
+View3DOverlay.show_camera_guides	done	View3DPanel.cpp:4024 Composition Guides
+View3DOverlay.show_camera_passepartout	done	View3DPanel.cpp:4017 Passepartout
+View3DOverlay.show_extras	missing	Overlays card: hide camera and light markers
+View3DOverlay.show_light_colors	missing	Overlays card: tint light markers
+View3DOverlay.show_fade_inactive	out	edit mode, paint, curves or debug
+View3DOverlay.fade_inactive_alpha	out	edit mode, paint, curves or debug
+View3DOverlay.show_look_dev	out	edit mode, paint, curves or debug
+View3DOverlay.show_wireframes	deferred	wire overlay on solid needs renderer work
+View3DOverlay.wireframe_threshold	deferred	wire overlay on solid needs renderer work
+View3DOverlay.wireframe_opacity	deferred	wire overlay on solid needs renderer work
+View3DOverlay.show_viewer_attribute	out	edit mode, paint, curves or debug
+View3DOverlay.viewer_attribute_opacity	out	edit mode, paint, curves or debug
+View3DOverlay.show_wpaint_contours	out	edit mode, paint, curves or debug
+View3DOverlay.show_extra_indices	out	edit mode, paint, curves or debug
+View3DOverlay.display_handle	out	edit mode, paint, curves or debug
+View3DOverlay.use_debug_freeze_view_culling	out	edit mode, paint, curves or debug

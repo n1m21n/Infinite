@@ -12,10 +12,10 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 
 | Area | In scope: present / all | Options present (in scope) | Out of scope |
 |---|---|---|---|
-| Viewport: View tab and header | 18/66 | 8/10 | 28 |
-| Viewport: 3D cursor | 2/6 | 0/8 | 0 |
-| Viewport: shading | 10/38 | 24/41 | 2 |
-| Viewport: overlays | 2/32 | 3/3 | 64 |
+| Viewport: View tab and header | 15/31 | 3/3 | 63 |
+| Viewport: 3D cursor | 1/5 | 0/8 | 1 |
+| Viewport: shading | 6/10 | 5/7 | 30 |
+| Viewport: overlays | 7/19 | 0/0 | 77 |
 | Transform, snap, pivot | 7/51 | 36/56 | 82 |
 | Object | 8/76 | 30/80 | 33 |
 | Camera | 27/87 | 16/31 | 2 |
@@ -30,7 +30,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Outliner | 2/23 | 6/12 | 5 |
 | Preferences: navigation and input | 6/50 | 9/21 | 0 |
 | Preferences: viewport | 2/27 | 4/6 | 20 |
-| **All settings** | **171/844** | **189/504** | **315** |
+| **All settings** | **168/767** | **162/460** | **392** |
 | **Operators (features)** | **32/241** | | **253** |
 | **Keymap entries** | not probed (457 in scope) | | **49** |
 
@@ -39,75 +39,54 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
 | Tool Settings | SpaceView3D.show_region_tool_header | boolean |  | in | - |
-| Toolbar | SpaceView3D.show_region_toolbar | boolean |  | in | yes |
-| Sidebar | SpaceView3D.show_region_ui | boolean |  | in | - |
-| Adjust Last Operation | SpaceView3D.show_region_hud | boolean |  | in | - |
-| Render Region | SpaceView3D.use_render_border | boolean |  | in | - |
-| Region Minimum X | SpaceView3D.render_border_min_x | float |  | in | - |
-| Region Minimum Y | SpaceView3D.render_border_min_y | float |  | in | - |
-| Region Maximum X | SpaceView3D.render_border_max_x | float |  | in | - |
-| Region Maximum Y | SpaceView3D.render_border_max_y | float |  | in | - |
+| Toolbar | SpaceView3D.show_region_toolbar | boolean |  | in | - |
+| Sidebar | SpaceView3D.show_region_ui | boolean |  | in | yes |
 | Lock to Cursor | SpaceView3D.lock_cursor | boolean |  | in | - |
-| Lens | SpaceView3D.lens | float |  | in | yes |
-| Clip Start | SpaceView3D.clip_start | float |  | in | yes |
-| Clip End | SpaceView3D.clip_end | float |  | in | yes |
+| Lens | SpaceView3D.lens | float |  | in | - |
+| Clip Start | SpaceView3D.clip_start | float |  | in | - |
+| Clip End | SpaceView3D.clip_end | float |  | in | - |
 | Lock Camera to View | SpaceView3D.lock_camera | boolean |  | in | yes |
-| Show Gizmo | SpaceView3D.show_gizmo | boolean |  | in | - |
-| Navigate Gizmo | SpaceView3D.show_gizmo_navigate | boolean |  | in | - |
-| Context Gizmo | SpaceView3D.show_gizmo_context | boolean |  | in | - |
-| Tool Gizmo | SpaceView3D.show_gizmo_tool | boolean |  | in | - |
-| Show Object Location | SpaceView3D.show_gizmo_object_translate | boolean |  | in | - |
-| Show Object Rotation | SpaceView3D.show_gizmo_object_rotate | boolean |  | in | - |
-| Show Object Scale | SpaceView3D.show_gizmo_object_scale | boolean |  | in | - |
-| Show Empty Image | SpaceView3D.show_gizmo_empty_image | boolean |  | in | - |
+| Show Gizmo | SpaceView3D.show_gizmo | boolean |  | in | yes |
+| Navigate Gizmo | SpaceView3D.show_gizmo_navigate | boolean |  | in | yes |
+| Context Gizmo | SpaceView3D.show_gizmo_context | boolean |  | in | yes |
+| Tool Gizmo | SpaceView3D.show_gizmo_tool | boolean |  | in | yes |
+| Show Object Location | SpaceView3D.show_gizmo_object_translate | boolean |  | in | yes |
+| Show Object Rotation | SpaceView3D.show_gizmo_object_rotate | boolean |  | in | yes |
+| Show Object Scale | SpaceView3D.show_gizmo_object_scale | boolean |  | in | yes |
 | Show Light Size | SpaceView3D.show_gizmo_light_size | boolean |  | in | - |
 | Show Light Look-At | SpaceView3D.show_gizmo_light_look_at | boolean |  | in | - |
 | Show Camera Lens | SpaceView3D.show_gizmo_camera_lens | boolean |  | in | - |
 | Show Camera Focus Distance | SpaceView3D.show_gizmo_camera_dof_distance | boolean |  | in | - |
-| Use Local Camera | SpaceView3D.use_local_camera | boolean |  | in | - |
-| Quad View Regions | SpaceView3D.region_quadviews | collection |  | in | - |
-| Show Reconstruction | SpaceView3D.show_reconstruction | boolean |  | in | - |
-| Tracks Size | SpaceView3D.tracks_display_size | float |  | in | - |
-| Tracks Display Type | SpaceView3D.tracks_display_type | enum | Plain Axes, **Arrows**, Single Arrow, **Circle**, **Cube**, **Sphere**, **Cone** | in | - |
-| Show Camera Path | SpaceView3D.show_camera_path | boolean |  | in | - |
-| Show 3D Marker Names | SpaceView3D.show_bundle_names | boolean |  | in | - |
-| Mirror VR Session | SpaceView3D.mirror_xr_session | boolean |  | in | - |
-| Surface | SpaceView3D.show_object_viewport_surf | boolean |  | in | yes |
-| Meta | SpaceView3D.show_object_viewport_meta | boolean |  | in | - |
-| Point Cloud | SpaceView3D.show_object_viewport_pointcloud | boolean |  | in | - |
-| Volume | SpaceView3D.show_object_viewport_volume | boolean |  | in | yes |
-| Empty | SpaceView3D.show_object_viewport_empty | boolean |  | in | yes |
-| Camera | SpaceView3D.show_object_viewport_camera | boolean |  | in | yes |
-| Light | SpaceView3D.show_object_viewport_light | boolean |  | in | yes |
+| Camera | SpaceView3D.show_object_viewport_camera | boolean |  | in | - |
+| Light | SpaceView3D.show_object_viewport_light | boolean |  | in | - |
 | Light Probe | SpaceView3D.show_object_viewport_light_probe | boolean |  | in | - |
-| Surface | SpaceView3D.show_object_select_surf | boolean |  | in | yes |
-| Meta | SpaceView3D.show_object_select_meta | boolean |  | in | - |
-| Point Cloud | SpaceView3D.show_object_select_pointcloud | boolean |  | in | - |
-| Volume | SpaceView3D.show_object_select_volume | boolean |  | in | yes |
-| Empty | SpaceView3D.show_object_select_empty | boolean |  | in | yes |
-| Camera | SpaceView3D.show_object_select_camera | boolean |  | in | yes |
-| Light | SpaceView3D.show_object_select_light | boolean |  | in | yes |
+| Camera | SpaceView3D.show_object_select_camera | boolean |  | in | - |
+| Light | SpaceView3D.show_object_select_light | boolean |  | in | - |
 | Light Probe | SpaceView3D.show_object_select_light_probe | boolean |  | in | - |
-| Visibility Icon | SpaceView3D.icon_from_show_object_viewport | int |  | in | - |
-| Show Viewer | SpaceView3D.show_viewer | boolean |  | in | - |
-| Lock Rotation | RegionView3D.lock_rotation | boolean |  | in | - |
-| Sync Zoom/Pan | RegionView3D.show_sync_view | boolean |  | in | - |
-| Clip Contents | RegionView3D.use_box_clip | boolean |  | in | - |
-| Perspective Matrix | RegionView3D.perspective_matrix | float |  | in | - |
-| Window Matrix | RegionView3D.window_matrix | float |  | in | - |
-| View Matrix | RegionView3D.view_matrix | float |  | in | yes |
 | Perspective | RegionView3D.view_perspective | enum | **Perspective**, **Orthographic**, **Camera** | in | yes |
-| Use Clip Planes | RegionView3D.use_clip_planes | boolean |  | in | - |
-| Clip Planes | RegionView3D.clip_planes | float |  | in | - |
-| View Location | RegionView3D.view_location | float |  | in | - |
-| View Rotation | RegionView3D.view_rotation | float |  | in | - |
+| View Location | RegionView3D.view_location | float |  | in | yes |
+| View Rotation | RegionView3D.view_rotation | float |  | in | yes |
 | Distance | RegionView3D.view_distance | float |  | in | yes |
-| Camera Zoom | RegionView3D.view_camera_zoom | float |  | in | - |
-| Camera Offset | RegionView3D.view_camera_offset | float |  | in | - |
+| Camera Zoom | RegionView3D.view_camera_zoom | float |  | in | yes |
+| Camera Offset | RegionView3D.view_camera_offset | float |  | in | yes |
+| Adjust Last Operation | SpaceView3D.show_region_hud | boolean |  | out: Adjust Last Operation: decided out in parity.md | - |
 | Asset Shelf | SpaceView3D.show_region_asset_shelf | boolean |  | out: asset | - |
+| Render Region | SpaceView3D.use_render_border | boolean |  | deferred: renderer crop region needed | - |
+| Region Minimum X | SpaceView3D.render_border_min_x | float |  | deferred: renderer crop region needed | - |
+| Region Minimum Y | SpaceView3D.render_border_min_y | float |  | deferred: renderer crop region needed | - |
+| Region Maximum X | SpaceView3D.render_border_max_x | float |  | deferred: renderer crop region needed | - |
+| Region Maximum Y | SpaceView3D.render_border_max_y | float |  | deferred: renderer crop region needed | - |
 | Lock to Bone | SpaceView3D.lock_bone | string |  | out: bone | - |
 | Modifier Gizmo | SpaceView3D.show_gizmo_modifier | boolean |  | out: modifier | - |
+| Show Empty Image | SpaceView3D.show_gizmo_empty_image | boolean |  | out: empty image objects are not in the scene | - |
 | Show Empty Force Field | SpaceView3D.show_gizmo_empty_force_field | boolean |  | out: force | - |
+| Use Local Camera | SpaceView3D.use_local_camera | boolean |  | out: one scene camera; no per-view cameras | - |
+| Quad View Regions | SpaceView3D.region_quadviews | collection |  | deferred: quad view: new mode, needs approval | - |
+| Show Reconstruction | SpaceView3D.show_reconstruction | boolean |  | out: movie tracking, VR and geometry nodes are outside the README | - |
+| Tracks Size | SpaceView3D.tracks_display_size | float |  | out: movie tracking, VR and geometry nodes are outside the README | - |
+| Tracks Display Type | SpaceView3D.tracks_display_type | enum | Plain Axes, **Arrows**, Single Arrow, **Circle**, **Cube**, **Sphere**, **Cone** | out: movie tracking, VR and geometry nodes are outside the README | - |
+| Show Camera Path | SpaceView3D.show_camera_path | boolean |  | out: movie tracking, VR and geometry nodes are outside the README | - |
+| Show 3D Marker Names | SpaceView3D.show_bundle_names | boolean |  | out: movie tracking, VR and geometry nodes are outside the README | - |
 | Local Collections | SpaceView3D.use_local_collections | boolean |  | out: collection | - |
 | Stereo Eye | SpaceView3D.stereo_3d_eye | enum | Left Eye, Right Eye | out: stereo | - |
 | Camera | SpaceView3D.stereo_3d_camera | enum | **Left**, **Right**, 3D | out: stereo | yes |
@@ -116,22 +95,43 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Plane Alpha | SpaceView3D.stereo_3d_convergence_plane_alpha | float |  | out: stereo | - |
 | Volume | SpaceView3D.show_stereo_3d_volume | boolean |  | out: stereo | yes |
 | Volume Alpha | SpaceView3D.stereo_3d_volume_alpha | float |  | out: stereo | - |
+| Mirror VR Session | SpaceView3D.mirror_xr_session | boolean |  | out: movie tracking, VR and geometry nodes are outside the README | - |
 | Mesh | SpaceView3D.show_object_viewport_mesh | boolean |  | out: mesh | yes |
 | Curve | SpaceView3D.show_object_viewport_curve | boolean |  | out: curve | yes |
+| Surface | SpaceView3D.show_object_viewport_surf | boolean |  | out: object type Infinite has no scene item for | - |
+| Meta | SpaceView3D.show_object_viewport_meta | boolean |  | out: object type Infinite has no scene item for | - |
 | Font | SpaceView3D.show_object_viewport_font | boolean |  | out: font | - |
 | Hair Curves | SpaceView3D.show_object_viewport_curves | boolean |  | out: curve | - |
+| Point Cloud | SpaceView3D.show_object_viewport_pointcloud | boolean |  | out: object type Infinite has no scene item for | - |
+| Volume | SpaceView3D.show_object_viewport_volume | boolean |  | out: object type Infinite has no scene item for | - |
 | Armature | SpaceView3D.show_object_viewport_armature | boolean |  | out: armature | - |
 | Lattice | SpaceView3D.show_object_viewport_lattice | boolean |  | out: lattice | - |
+| Empty | SpaceView3D.show_object_viewport_empty | boolean |  | out: object type Infinite has no scene item for | - |
 | Grease Pencil | SpaceView3D.show_object_viewport_grease_pencil | boolean |  | out: grease | - |
 | Speaker | SpaceView3D.show_object_viewport_speaker | boolean |  | out: speaker | - |
 | Mesh | SpaceView3D.show_object_select_mesh | boolean |  | out: mesh | yes |
 | Curve | SpaceView3D.show_object_select_curve | boolean |  | out: curve | yes |
+| Surface | SpaceView3D.show_object_select_surf | boolean |  | out: object type Infinite has no scene item for | - |
+| Meta | SpaceView3D.show_object_select_meta | boolean |  | out: object type Infinite has no scene item for | - |
 | Font | SpaceView3D.show_object_select_font | boolean |  | out: font | - |
 | Hair Curves | SpaceView3D.show_object_select_curves | boolean |  | out: curve | - |
+| Point Cloud | SpaceView3D.show_object_select_pointcloud | boolean |  | out: object type Infinite has no scene item for | - |
+| Volume | SpaceView3D.show_object_select_volume | boolean |  | out: object type Infinite has no scene item for | - |
 | Armature | SpaceView3D.show_object_select_armature | boolean |  | out: armature | - |
 | Lattice | SpaceView3D.show_object_select_lattice | boolean |  | out: lattice | - |
+| Empty | SpaceView3D.show_object_select_empty | boolean |  | out: object type Infinite has no scene item for | - |
 | Grease Pencil | SpaceView3D.show_object_select_grease_pencil | boolean |  | out: grease | - |
 | Speaker | SpaceView3D.show_object_select_speaker | boolean |  | out: speaker | - |
+| Visibility Icon | SpaceView3D.icon_from_show_object_viewport | int |  | out: UI icon helper | - |
+| Show Viewer | SpaceView3D.show_viewer | boolean |  | out: movie tracking, VR and geometry nodes are outside the README | - |
+| Lock Rotation | RegionView3D.lock_rotation | boolean |  | deferred: quad view: new mode, needs approval | - |
+| Sync Zoom/Pan | RegionView3D.show_sync_view | boolean |  | deferred: quad view: new mode, needs approval | - |
+| Clip Contents | RegionView3D.use_box_clip | boolean |  | deferred: quad view: new mode, needs approval | - |
+| Perspective Matrix | RegionView3D.perspective_matrix | float |  | out: derived matrices, not a setting | - |
+| Window Matrix | RegionView3D.window_matrix | float |  | out: derived matrices, not a setting | - |
+| View Matrix | RegionView3D.view_matrix | float |  | out: derived matrices, not a setting | - |
+| Use Clip Planes | RegionView3D.use_clip_planes | boolean |  | out: derived matrices, not a setting | - |
+| Clip Planes | RegionView3D.clip_planes | float |  | out: derived matrices, not a setting | - |
 
 ## Viewport: 3D cursor
 
@@ -142,50 +142,50 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Axis-Angle Rotation | View3DCursor.rotation_axis_angle | float |  | in | - |
 | Euler Rotation | View3DCursor.rotation_euler | float |  | in | - |
 | Rotation Mode | View3DCursor.rotation_mode | enum | Quaternion (WXYZ), XYZ Euler, XZY Euler, YXZ Euler, YZX Euler, ZXY Euler, ZYX Euler, Axis Angle | in | - |
-| Transform Matrix | View3DCursor.matrix | float |  | in | yes |
+| Transform Matrix | View3DCursor.matrix | float |  | out: derived matrix, not a setting | - |
 
 ## Viewport: shading
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
 | Viewport Shading | View3DShading.type | enum | **Wireframe**, **Solid**, Material Preview, **Rendered** | in | yes |
-| Lighting | View3DShading.light | enum | **Studio**, MatCap, **Flat** | in | yes |
-| Outline | View3DShading.show_object_outline | boolean |  | in | yes |
-| Studiolight | View3DShading.studio_light | enum | **Default** | in | - |
-| World Space Lighting | View3DShading.use_world_space_lighting | boolean |  | in | - |
-| Backface Culling | View3DShading.show_backface_culling | boolean |  | in | - |
-| Cavity | View3DShading.show_cavity | boolean |  | in | - |
-| Cavity Type | View3DShading.cavity_type | enum | **World**, **Screen**, **Both** | in | - |
-| Curvature Ridge | View3DShading.curvature_ridge_factor | float |  | in | - |
-| Curvature Valley | View3DShading.curvature_valley_factor | float |  | in | - |
-| Cavity Ridge | View3DShading.cavity_ridge_factor | float |  | in | - |
-| Cavity Valley | View3DShading.cavity_valley_factor | float |  | in | - |
-| Studio Light | View3DShading.selected_studio_light | pointer |  | in | - |
-| Studiolight Rotation | View3DShading.studiolight_rotate_z | float |  | in | - |
-| Strength | View3DShading.studiolight_intensity | float |  | in | yes |
-| World Opacity | View3DShading.studiolight_background_alpha | float |  | in | - |
-| Blur | View3DShading.studiolight_background_blur | float |  | in | yes |
-| World Space Lighting | View3DShading.use_studiolight_view_rotation | boolean |  | in | - |
-| Color | View3DShading.color_type | enum | **Material**, **Object**, **Random**, Attribute, **Texture**, Custom | in | yes |
-| Wire Color | View3DShading.wireframe_color_type | enum | **Theme**, **Object**, **Random** | in | - |
-| Color | View3DShading.single_color | float |  | in | yes |
-| Background | View3DShading.background_type | enum | **Theme**, **World**, Custom | in | yes |
+| Outline | View3DShading.show_object_outline | boolean |  | in | - |
+| Background | View3DShading.background_type | enum | **Theme**, **World**, Custom | in | - |
 | Background Color | View3DShading.background_color | float |  | in | - |
-| Shadow | View3DShading.show_shadows | boolean |  | in | yes |
-| Show X-Ray | View3DShading.show_xray | boolean |  | in | - |
-| Show X-Ray | View3DShading.show_xray_wireframe | boolean |  | in | - |
-| X-Ray Opacity | View3DShading.xray_alpha | float |  | in | - |
-| X-Ray Opacity | View3DShading.xray_alpha_wireframe | float |  | in | - |
 | Depth Of Field | View3DShading.use_dof | boolean |  | in | yes |
-| Scene Lights | View3DShading.use_scene_lights | boolean |  | in | - |
-| Scene World | View3DShading.use_scene_world | boolean |  | in | - |
-| Scene Lights | View3DShading.use_scene_lights_render | boolean |  | in | - |
-| Scene World | View3DShading.use_scene_world_render | boolean |  | in | - |
-| Specular Highlights | View3DShading.show_specular_highlight | boolean |  | in | - |
+| Scene Lights | View3DShading.use_scene_lights | boolean |  | in | yes |
+| Scene World | View3DShading.use_scene_world | boolean |  | in | yes |
+| Scene Lights | View3DShading.use_scene_lights_render | boolean |  | in | yes |
+| Scene World | View3DShading.use_scene_world_render | boolean |  | in | yes |
 | Outline Color | View3DShading.object_outline_color | float |  | in | - |
-| Shadow Intensity | View3DShading.shadow_intensity | float |  | in | - |
-| Render Pass | View3DShading.render_pass | enum | Combined, Emission, **Environment**, **Ambient Occlusion**, **Shadow**, **Transparent**, Diffuse Light, Diffuse Color, Specular Light, Specular Color, Volume Light, **Position**, **Normal**, Mist, CryptoObject, CryptoAsset, CryptoMaterial, AOV | in | - |
-| Shader AOV Name | View3DShading.aov_name | string |  | in | - |
+| Lighting | View3DShading.light | enum | **Studio**, MatCap, **Flat** | deferred: studio lights and matcaps need shader work | - |
+| Studiolight | View3DShading.studio_light | enum | **Default** | deferred: studio lights and matcaps need shader work | - |
+| World Space Lighting | View3DShading.use_world_space_lighting | boolean |  | deferred: studio lights and matcaps need shader work | - |
+| Backface Culling | View3DShading.show_backface_culling | boolean |  | deferred: renderer face culling option | - |
+| Cavity | View3DShading.show_cavity | boolean |  | deferred: cavity needs a Render 3D shader pass | - |
+| Cavity Type | View3DShading.cavity_type | enum | **World**, **Screen**, **Both** | deferred: cavity needs a Render 3D shader pass | - |
+| Curvature Ridge | View3DShading.curvature_ridge_factor | float |  | deferred: cavity needs a Render 3D shader pass | - |
+| Curvature Valley | View3DShading.curvature_valley_factor | float |  | deferred: cavity needs a Render 3D shader pass | - |
+| Cavity Ridge | View3DShading.cavity_ridge_factor | float |  | deferred: cavity needs a Render 3D shader pass | - |
+| Cavity Valley | View3DShading.cavity_valley_factor | float |  | deferred: cavity needs a Render 3D shader pass | - |
+| Studio Light | View3DShading.selected_studio_light | pointer |  | deferred: studio lights and matcaps need shader work | - |
+| Studiolight Rotation | View3DShading.studiolight_rotate_z | float |  | deferred: studio lights and matcaps need shader work | - |
+| Strength | View3DShading.studiolight_intensity | float |  | deferred: studio lights and matcaps need shader work | - |
+| World Opacity | View3DShading.studiolight_background_alpha | float |  | deferred: studio lights and matcaps need shader work | - |
+| Blur | View3DShading.studiolight_background_blur | float |  | deferred: studio lights and matcaps need shader work | - |
+| World Space Lighting | View3DShading.use_studiolight_view_rotation | boolean |  | deferred: studio lights and matcaps need shader work | - |
+| Color | View3DShading.color_type | enum | **Material**, **Object**, **Random**, Attribute, **Texture**, Custom | deferred: Solid shader colour modes needed | - |
+| Wire Color | View3DShading.wireframe_color_type | enum | **Theme**, **Object**, **Random** | deferred: Solid shader colour modes needed | - |
+| Color | View3DShading.single_color | float |  | deferred: Solid shader colour modes needed | - |
+| Shadow | View3DShading.show_shadows | boolean |  | deferred: Solid shader work, perf-gated | - |
+| Show X-Ray | View3DShading.show_xray | boolean |  | deferred: X-ray needs renderer work | - |
+| Show X-Ray | View3DShading.show_xray_wireframe | boolean |  | deferred: X-ray needs renderer work | - |
+| X-Ray Opacity | View3DShading.xray_alpha | float |  | deferred: X-ray needs renderer work | - |
+| X-Ray Opacity | View3DShading.xray_alpha_wireframe | float |  | deferred: X-ray needs renderer work | - |
+| Specular Highlights | View3DShading.show_specular_highlight | boolean |  | deferred: Solid shader work, perf-gated | - |
+| Shadow Intensity | View3DShading.shadow_intensity | float |  | deferred: Solid shader work, perf-gated | - |
+| Render Pass | View3DShading.render_pass | enum | Combined, Emission, **Environment**, **Ambient Occlusion**, **Shadow**, **Transparent**, Diffuse Light, Diffuse Color, Specular Light, Specular Color, Volume Light, **Position**, **Normal**, Mist, CryptoObject, CryptoAsset, CryptoMaterial, AOV | deferred: render passes in the viewport need renderer work | - |
+| Shader AOV Name | View3DShading.aov_name | string |  | deferred: render passes in the viewport need renderer work | - |
 | Compositor | View3DShading.use_compositor | enum | **Disabled**, **Camera**, **Always** | out: compositor | - |
 | Cycles Settings | View3DShading.cycles | pointer |  | out: cycles | yes |
 
@@ -193,9 +193,9 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 
 | Setting | Struct.identifier | Type | Options (found in **bold**) | Scope | Infinite |
 |---|---|---|---|---|---|
-| Show Overlays | View3DOverlay.show_overlays | boolean |  | in | - |
+| Show Overlays | View3DOverlay.show_overlays | boolean |  | in | yes |
 | Display Grid | View3DOverlay.show_ortho_grid | boolean |  | in | - |
-| Display Grid Floor | View3DOverlay.show_floor | boolean |  | in | - |
+| Display Grid Floor | View3DOverlay.show_floor | boolean |  | in | yes |
 | Display X Axis | View3DOverlay.show_axis_x | boolean |  | in | - |
 | Display Y Axis | View3DOverlay.show_axis_y | boolean |  | in | - |
 | Display Z Axis | View3DOverlay.show_axis_z | boolean |  | in | - |
@@ -203,39 +203,36 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Grid Lines | View3DOverlay.grid_lines | int |  | in | - |
 | Grid Scale Unit | View3DOverlay.grid_scale_unit | float |  | in | - |
 | Outline Selected | View3DOverlay.show_outline_selected | boolean |  | in | - |
-| Object Origins | View3DOverlay.show_object_origins | boolean |  | in | - |
-| All Object Origins | View3DOverlay.show_object_origins_all | boolean |  | in | - |
-| Relationship Lines | View3DOverlay.show_relationship_lines | boolean |  | in | - |
+| Object Origins | View3DOverlay.show_object_origins | boolean |  | in | yes |
+| All Object Origins | View3DOverlay.show_object_origins_all | boolean |  | in | yes |
 | Show 3D Cursor | View3DOverlay.show_cursor | boolean |  | in | - |
-| Show Statistics | View3DOverlay.show_stats | boolean |  | in | - |
+| Show Statistics | View3DOverlay.show_stats | boolean |  | in | yes |
 | Show Performance | View3DOverlay.show_performance | boolean |  | in | - |
-| Show Camera Guides | View3DOverlay.show_camera_guides | boolean |  | in | - |
-| Show Passepartout | View3DOverlay.show_camera_passepartout | boolean |  | in | - |
+| Show Camera Guides | View3DOverlay.show_camera_guides | boolean |  | in | yes |
+| Show Passepartout | View3DOverlay.show_camera_passepartout | boolean |  | in | yes |
 | Extras | View3DOverlay.show_extras | boolean |  | in | - |
 | Light Colors | View3DOverlay.show_light_colors | boolean |  | in | - |
-| Fade Inactive Objects | View3DOverlay.show_fade_inactive | boolean |  | in | - |
-| Opacity | View3DOverlay.fade_inactive_alpha | float |  | in | yes |
-| Reference Spheres | View3DOverlay.show_look_dev | boolean |  | in | - |
-| Wireframe | View3DOverlay.show_wireframes | boolean |  | in | yes |
-| Wireframe Threshold | View3DOverlay.wireframe_threshold | float |  | in | - |
-| Wireframe Opacity | View3DOverlay.wireframe_opacity | float |  | in | - |
-| Viewer Node | View3DOverlay.show_viewer_attribute | boolean |  | in | - |
-| Viewer Attribute Opacity | View3DOverlay.viewer_attribute_opacity | float |  | in | - |
-| Show Weight Contours | View3DOverlay.show_wpaint_contours | boolean |  | in | - |
-| Indices | View3DOverlay.show_extra_indices | boolean |  | in | - |
-| Display Handles | View3DOverlay.display_handle | enum | **None**, **Selected**, **All** | in | - |
-| Freeze Culling | View3DOverlay.use_debug_freeze_view_culling | boolean |  | in | - |
 | Grid Subdivisions | View3DOverlay.grid_subdivisions | int |  | out: subdivision | - |
+| Relationship Lines | View3DOverlay.show_relationship_lines | boolean |  | out: no parenting in the scene, groups only | - |
 | Show Text | View3DOverlay.show_text | boolean |  | out: text | - |
 | Show Bones | View3DOverlay.show_bones | boolean |  | out: bone | - |
 | Face Orientation | View3DOverlay.show_face_orientation | boolean |  | out: face | - |
+| Fade Inactive Objects | View3DOverlay.show_fade_inactive | boolean |  | out: edit mode, paint, curves or debug | - |
+| Opacity | View3DOverlay.fade_inactive_alpha | float |  | out: edit mode, paint, curves or debug | - |
 | Show Bone X-Ray | View3DOverlay.show_xray_bone | boolean |  | out: bone | - |
 | Opacity | View3DOverlay.xray_alpha_bone | float |  | out: bone | yes |
 | Bone Wireframe Opacity | View3DOverlay.bone_wire_alpha | float |  | out: bone | - |
 | Motion Paths | View3DOverlay.show_motion_paths | boolean |  | out: motion_path | - |
 | Onion Skins | View3DOverlay.show_onion_skins | boolean |  | out: skin | - |
+| Reference Spheres | View3DOverlay.show_look_dev | boolean |  | out: edit mode, paint, curves or debug | - |
+| Wireframe | View3DOverlay.show_wireframes | boolean |  | deferred: wire overlay on solid needs renderer work | - |
+| Wireframe Threshold | View3DOverlay.wireframe_threshold | float |  | deferred: wire overlay on solid needs renderer work | - |
+| Wireframe Opacity | View3DOverlay.wireframe_opacity | float |  | deferred: wire overlay on solid needs renderer work | - |
+| Viewer Node | View3DOverlay.show_viewer_attribute | boolean |  | out: edit mode, paint, curves or debug | - |
+| Viewer Attribute Opacity | View3DOverlay.viewer_attribute_opacity | float |  | out: edit mode, paint, curves or debug | - |
 | View Attribute Text | View3DOverlay.show_viewer_text | boolean |  | out: text | - |
 | Show Wire | View3DOverlay.show_paint_wire | boolean |  | out: paint | - |
+| Show Weight Contours | View3DOverlay.show_wpaint_contours | boolean |  | out: edit mode, paint, curves or debug | - |
 | Show Weights | View3DOverlay.show_weight | boolean |  | out: weight | - |
 | Retopology | View3DOverlay.show_retopology | boolean |  | out: retopology | - |
 | Retopology Offset | View3DOverlay.retopology_offset | float |  | out: retopology | - |
@@ -255,6 +252,8 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Edge Angle | View3DOverlay.show_extra_edge_angle | boolean |  | out: edge | - |
 | Face Angles | View3DOverlay.show_extra_face_angle | boolean |  | out: face | - |
 | Face Area | View3DOverlay.show_extra_face_area | boolean |  | out: face | - |
+| Indices | View3DOverlay.show_extra_indices | boolean |  | out: edit mode, paint, curves or debug | - |
+| Display Handles | View3DOverlay.display_handle | enum | **None**, **Selected**, **All** | out: edit mode, paint, curves or debug | - |
 | Draw Normals | View3DOverlay.show_curve_normals | boolean |  | out: curve | - |
 | Normal Size | View3DOverlay.normals_length | float |  | out: normal | - |
 | Normal Screen Size | View3DOverlay.normals_constant_screen_size | float |  | out: normal | - |
@@ -289,6 +288,7 @@ out (that word matched); listed so nothing is missed, not counted in the in-scop
 | Active Object Only | View3DOverlay.use_gpencil_onion_skin_active_object | boolean |  | out: gpencil | - |
 | Vertex Opacity | View3DOverlay.vertex_opacity | float |  | out: vertex | - |
 | Opacity | View3DOverlay.gpencil_vertex_paint_opacity | float |  | out: gpencil | yes |
+| Freeze Culling | View3DOverlay.use_debug_freeze_view_culling | boolean |  | out: edit mode, paint, curves or debug | - |
 
 ## Transform, snap, pivot
 
