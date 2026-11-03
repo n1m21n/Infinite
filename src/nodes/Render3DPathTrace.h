@@ -37,6 +37,20 @@ public:
       float sheenRoughness = 0.5f;
       float sheenColor[3] = { 1.0f, 1.0f, 1.0f }; // linear RGB
 
+      // Texture maps (GL handles, 0 none), read the way Render 3D reads them: albedo and emission
+      // are sRGB and multiply their colours, the rest multiply their values by the red channel.
+      enum { kAlbedo, kRoughness, kMetallic, kNormal, kEmission, kClearcoat, kSheen, kTransmission, kMapSlots };
+      unsigned int maps[kMapSlots] = {};
+      int wrap = 0;                   // 0 clamp, 1 repeat, 2 mirror
+      int mapSpace = 0;               // MappingTransform::space: 0 UV, 1 generated, 2 object
+      float mapScale[3] = { 1.0f, 1.0f, 1.0f };
+      float mapRotate[3] = {};        // radians
+      float mapTranslate[3] = {};
+      float objLo[3] = { -1.0f, -1.0f, -1.0f };   // the mesh's own box, for generated space
+      float objHi[3] = { 1.0f, 1.0f, 1.0f };
+      float normalStrength = 1.0f;
+      int normalBump = 0;             // 1: the normal map is a grayscale height
+
       static PtMaterial FromLinear(float r, float g, float b, float rough = 0.5f, float metal = 0.0f,
                                    float emR = 0.0f, float emG = 0.0f, float emB = 0.0f);
       static PtMaterial FromMaterial(const Material& m);
@@ -150,6 +164,9 @@ private:
    void UploadBufferTex(BufferTex& bt, const std::vector<float>& data, const char* label);
    void DestroyBufferTex(BufferTex& bt);
    void ResolveDisplay();
+   // Packs the materials' maps into mAtlas; rects[i * kMapSlots + k] is material i's map k as
+   // (x, y, w, h) in atlas UV, w = 0 for none.
+   void BuildAtlas(const std::vector<PtMaterial>& materials, std::vector<float>& rects);
 
    BufferTex mTlasNodesBuf;
    BufferTex mTlasInstBuf;
@@ -157,6 +174,9 @@ private:
    BufferTex mBlasTrisBuf;
    BufferTex mBlasNormalsBuf;
    BufferTex mMaterialsBuf;
+   BufferTex mBlasUvsBuf;          // 2 texels per triangle slot: its three UVs
+   GLUtil::Fbo mAtlas;             // every map the scene uses, scaled into one texture
+   unsigned int mAtlasReadFbo = 0;
 
    GLUtil::Fbo mAccum[2];
    GLUtil::Fbo mDisplay;

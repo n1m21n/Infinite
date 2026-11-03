@@ -348,6 +348,77 @@ bool RunPathTraceTest()
       allPassed = allPassed && same;
    }
 
+   // Texture maps reach the surface through the atlas: a quad with a red | blue albedo map under
+   // a white sky reads red on its left and blue on its right, and a repeat mapping at 2x tiles it.
+   if (!benchOnly)
+   {
+      Mesh quad;
+      const float qv[4][4] = { { -1, -1, 0, 0 }, { 1, -1, 1, 0 }, { 1, 1, 1, 1 }, { -1, 1, 0, 1 } };
+      for (const auto& q : qv)
+      {
+         Vertex v;
+         v.px = q[0];
+         v.py = q[1];
+         v.u = q[2];
+         v.v = q[3];
+         quad.vertices.push_back(v);
+      }
+      quad.indices = { 0, 1, 2, 0, 2, 3 };
+      // eight texels, four red then four blue, so filtering only blends at the seam
+      unsigned char texels[8 * 4] = {};
+      for (int i = 0; i < 8; i++)
+      {
+         texels[i * 4 + (i < 4 ? 0 : 2)] = 255;
+         texels[i * 4 + 3] = 255;
+      }
+      GLuint tex = 0;
+      glGenTextures(1, &tex);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 8, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texels);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glBindTexture(GL_TEXTURE_2D, 0);
+
+      auto sideColours = [&](int wrap, float scale, float out[2][3]) {
+         Render3DPathTrace mapPt;
+         auto mat = Render3DPathTrace::PtMaterial::FromLinear(1.0f, 1.0f, 1.0f, 1.0f, 0.0f);
+         mat.maps[Render3DPathTrace::PtMaterial::kAlbedo] = tex;
+         mat.wrap = wrap;
+         mat.mapScale[0] = mat.mapScale[1] = scale;
+         Bvh::Instance inst;
+         std::vector<float> px;
+         int w = 0, h = 0;
+         const float eye[3] = { 0, 0, 3 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
+         bool ok = mapPt.UploadScene({ quad }, { inst }, { mat });
+         mapPt.SetCameraLookAt(eye, target, up, 40.0f, 1.0f);
+         mapPt.SetWorldColorLinear(1.0f, 1.0f, 1.0f);
+         ok = ok && mapPt.RenderToSpp(64, 64, 4) && mapPt.ReadLinearRGBA32F(px, w, h);
+         for (int s = 0; s < 2; s++)
+         {
+            // quarter and three-quarter of the quad's width, mid height
+            const int x = s == 0 ? 20 : 44;
+            for (int c = 0; c < 3; c++)
+               out[s][c] = ok ? px[((size_t)32 * w + x) * 4 + c] : 0.0f;
+         }
+         mapPt.Release();
+         return ok;
+      };
+      float clampCol[2][3] = {}, repeatCol[2][3] = {};
+      const bool ranOk = sideColours(0, 1.0f, clampCol) && sideColours(1, 2.0f, repeatCol);
+      glDeleteTextures(1, &tex);
+      const bool clampOk = ranOk && clampCol[0][0] > 4.0f * clampCol[0][2] && clampCol[1][2] > 4.0f * clampCol[1][0];
+      // at 2x repeat u 0.30 -> 0.61 (blue) and u 0.71 -> 1.43 -> 0.43 (red)
+      const bool repeatOk =
+         ranOk && repeatCol[0][2] > 4.0f * repeatCol[0][0] && repeatCol[1][0] > 4.0f * repeatCol[1][2];
+      std::printf("  [%s] albedo map: left (%.2f, %.2f, %.2f) right (%.2f, %.2f, %.2f)\n",
+                  clampOk ? "PASS" : "FAIL", clampCol[0][0], clampCol[0][1], clampCol[0][2], clampCol[1][0],
+                  clampCol[1][1], clampCol[1][2]);
+      std::printf("  [%s] albedo map, repeat 2x: left (%.2f, %.2f, %.2f) right (%.2f, %.2f, %.2f)\n",
+                  repeatOk ? "PASS" : "FAIL", repeatCol[0][0], repeatCol[0][1], repeatCol[0][2], repeatCol[1][0],
+                  repeatCol[1][1], repeatCol[1][2]);
+      allPassed = allPassed && clampOk && repeatOk;
+   }
+
    // Benchmark ms_per_sample at 512x512 for cornell and Fox.
    const double cornellMs = BenchmarkMsPerSample(pt, 512, 512, 4, 32);
    std::printf("{\"scene\":\"cornell\",\"resolution\":\"512x512\",\"tris\":%d,\"ms_per_sample\":%.3f}\n",

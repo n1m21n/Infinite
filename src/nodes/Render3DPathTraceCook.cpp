@@ -13,12 +13,55 @@
 #include "Transport.h"
 #include "GeometryOpNodes.h"
 #include "EnvironmentNode.h"
+#include "UtilityNodes.h"
 
 namespace
 {
    // One stashed light: type, vec[3], aim[3], colour (sRGB)[3], power, spot angle, penumbra,
    // area w, area h, falloff k (< 0 hard), cutoff.
    constexpr int kPtLightFloats = 17;
+}
+
+namespace
+{
+   // The source's material with its maps, mapping, wrap and own box, as Render 3D binds them.
+   Render3DPathTrace::PtMaterial PtMaterialWithMaps(IGeometrySource* source, const Mesh& mesh)
+   {
+      using PtMaterial = Render3DPathTrace::PtMaterial;
+      const Material mat = source->GetMaterial();
+      PtMaterial m = PtMaterial::FromMaterial(mat);
+      static const int kSlotMap[PtMaterial::kMapSlots] = { kMapAlbedo,   kMapRoughness, kMapMetallic, kMapNormal,
+                                                          kMapEmission, kMapClearcoat, kMapSheen,    kMapTransmission };
+      for (int k = 0; k < PtMaterial::kMapSlots; k++)
+         m.maps[k] = source->GetMaterialTexture(kSlotMap[k]);
+      if (auto* matNode = dynamic_cast<MaterialNode*>(source))
+         m.wrap = matNode->wrapMode;
+      m.normalStrength = mat.normalStrength;
+      m.normalBump = mat.normalBump;
+      const MappingTransform mapping = source->GetMappingTransform();
+      m.mapSpace = mapping.space;
+      std::memcpy(m.mapScale, mapping.scale, sizeof(m.mapScale));
+      std::memcpy(m.mapRotate, mapping.rotate, sizeof(m.mapRotate));
+      std::memcpy(m.mapTranslate, mapping.translate, sizeof(m.mapTranslate));
+      if (!mesh.vertices.empty())
+      {
+         for (int a = 0; a < 3; a++)
+         {
+            m.objLo[a] = 1e30f;
+            m.objHi[a] = -1e30f;
+         }
+         for (const Vertex& v : mesh.vertices)
+         {
+            const float p[3] = { v.px, v.py, v.pz };
+            for (int a = 0; a < 3; a++)
+            {
+               m.objLo[a] = std::min(m.objLo[a], p[a]);
+               m.objHi[a] = std::max(m.objHi[a], p[a]);
+            }
+         }
+      }
+      return m;
+   }
 }
 
 // What the BVH is built from: the drawn sources, their meshes, placement and materials.
@@ -34,6 +77,9 @@ bool Render3DNode::PtSameGeometry(const SceneSignature& a, const SceneSignature&
          return false;
       if (!a.hasGeom[i])
          continue;
+      if (a.surfaceTexRev[i] != b.surfaceTexRev[i] ||
+          std::memcmp(&a.mapping[i], &b.mapping[i], sizeof(MappingTransform)) != 0)
+         return false;
       if (std::memcmp(&a.material[i], &b.material[i], sizeof(Material)) != 0 ||
           !(a.modelMatrix[i] == b.modelMatrix[i]) || !(a.instanceGroupMatrix[i] == b.instanceGroupMatrix[i]))
          return false;
@@ -145,7 +191,7 @@ bool Render3DNode::CookPathTrace(int frameId)
             const int blas = (int)meshes.size();
             const int mat = (int)materials.size();
             meshes.push_back(mesh);
-            materials.push_back(Render3DPathTrace::PtMaterial::FromMaterial(source->GetMaterial()));
+            materials.push_back(PtMaterialWithMaps(source, mesh));
             Bvh::Instance inst;
             inst.blasIndex = blas;
             inst.materialId = mat;

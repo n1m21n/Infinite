@@ -39,6 +39,8 @@ namespace
       "uniform samplerBuffer uBlasTris;\n"
       "uniform samplerBuffer uBlasNormals;\n"
       "uniform samplerBuffer uMaterials;\n"
+      "uniform samplerBuffer uBlasUvs;\n"
+      "uniform sampler2D uAtlas;\n"
       "\n"
       "uniform int uSampleIndex;\n"
       "uniform int uMaxBounces;\n"
@@ -522,6 +524,31 @@ namespace
       "   float rp = (cosI - eta * cosT) / (cosI + eta * cosT);\n"
       "   return 0.5 * (rs * rs + rp * rp);\n"
       "}\n"
+      "// Texture maps, all in one atlas: rect is the map's place in it (xy, wh), w = 0 for none.\n"
+      "vec2 wrapUv(vec2 uv, int wrap) {\n"
+      "   if (wrap == 1) return fract(uv);\n"
+      "   if (wrap == 2) return 1.0 - abs(mod(uv, 2.0) - 1.0);\n"
+      "   return clamp(uv, 0.0, 1.0);\n"
+      "}\n"
+      "\n"
+      "vec4 atlasTap(vec4 rect, vec2 uv, int wrap) {\n"
+      "   vec2 hp = 0.5 / max(rect.zw * vec2(textureSize(uAtlas, 0)), vec2(1.0));\n"
+      "   return textureLod(uAtlas, rect.xy + clamp(wrapUv(uv, wrap), hp, 1.0 - hp) * rect.zw, 0.0);\n"
+      "}\n"
+      "\n"
+      "vec3 mapRotate(vec3 p, vec3 r) {\n"
+      "   float cx = cos(r.x), sx = sin(r.x);\n"
+      "   float cy = cos(r.y), sy = sin(r.y);\n"
+      "   float cz = cos(r.z), sz = sin(r.z);\n"
+      "   p = vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);\n"
+      "   p = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);\n"
+      "   p = vec3(cz * p.x - sz * p.y, sz * p.x + cz * p.y, p.z);\n"
+      "   return p;\n"
+      "}\n"
+      "\n"
+      "vec3 srgbToLinear(vec3 c) {\n"
+      "   return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));\n"
+      "}\n"
       "vec3 envRadiance(vec3 d) {\n"
       "   if (uEnvMode == 2) {\n"
       "      float phi = atan(d.z, d.x) + uEnvRotation;\n"
@@ -644,7 +671,7 @@ namespace
       "      if (dot(N, -rayDir) <= 1e-4)\n"
       "         N = Ng;\n"
       "\n"
-      "      int mb = hit.matId * 5;\n"
+      "      int mb = hit.matId * 19;\n"
       "      vec4 mt0 = texelFetch(uMaterials, mb + 0);\n"
       "      vec4 mt1 = texelFetch(uMaterials, mb + 1);\n"
       "      vec4 mt2 = texelFetch(uMaterials, mb + 2);\n"
@@ -665,6 +692,88 @@ namespace
       "      s.sh = max(mt3.z, 0.0);\n"
       "      s.shRough = clamp(mt3.w, 0.0, 1.0);\n"
       "      s.shCol = max(mt4.rgb, vec3(0.0));\n"
+      "      vec4 mt6 = texelFetch(uMaterials, mb + 6);\n"
+      "      if (mt6.w > 0.0) {\n"
+      "         // Render 3D's computeMapUv: the mesh UV, or its generated / object position, scaled,\n"
+      "         // turned and moved, then for a position the face the normal points along.\n"
+      "         vec4 mt5 = texelFetch(uMaterials, mb + 5);\n"
+      "         int wrap = int(mt5.y + 0.5);\n"
+      "         vec4 t0 = texelFetch(uBlasTris, hit.triSlot * 3 + 0);\n"
+      "         vec4 uvA = texelFetch(uBlasUvs, hit.triSlot * 2 + 0);\n"
+      "         vec4 uvB = texelFetch(uBlasUvs, hit.triSlot * 2 + 1);\n"
+      "         float bw = 1.0 - hit.u - hit.v;\n"
+      "         vec3 mapBase;\n"
+      "         int space = int(mt5.x + 0.5);\n"
+      "         if (space == 0) {\n"
+      "            mapBase = vec3(bw * uvA.xy + hit.u * uvA.zw + hit.v * uvB.xy, 0.0);\n"
+      "         } else {\n"
+      "            vec3 lp = t0.xyz + hit.u * t1.xyz + hit.v * t2.xyz;\n"
+      "            if (space == 1) {\n"
+      "               vec3 lo = texelFetch(uMaterials, mb + 9).xyz;\n"
+      "               mapBase = (lp - lo) / max(texelFetch(uMaterials, mb + 10).xyz - lo, vec3(1e-5));\n"
+      "            } else {\n"
+      "               mapBase = lp;\n"
+      "            }\n"
+      "         }\n"
+      "         mapBase = mapRotate(mapBase * mt6.xyz, texelFetch(uMaterials, mb + 7).xyz) + texelFetch(uMaterials, mb + 8).xyz;\n"
+      "         vec2 mapUv = mapBase.xy;\n"
+      "         if (space != 0) {\n"
+      "            vec3 an = abs(N);\n"
+      "            mapUv = (an.x >= an.y && an.x >= an.z) ? mapBase.yz : (an.y >= an.x && an.y >= an.z) ? mapBase.xz : mapBase.xy;\n"
+      "         }\n"
+      "\n"
+      "         vec4 r;\n"
+      "         r = texelFetch(uMaterials, mb + 11);\n"
+      "         if (r.z > 0.0) s.base *= srgbToLinear(atlasTap(r, mapUv, wrap).rgb);\n"
+      "         r = texelFetch(uMaterials, mb + 12);\n"
+      "         if (r.z > 0.0) s.rough = clamp(s.rough * atlasTap(r, mapUv, wrap).r, 0.045, 1.0);\n"
+      "         r = texelFetch(uMaterials, mb + 13);\n"
+      "         if (r.z > 0.0) s.metal = clamp(s.metal * atlasTap(r, mapUv, wrap).r, 0.0, 1.0);\n"
+      "         r = texelFetch(uMaterials, mb + 15);\n"
+      "         if (r.z > 0.0) emission *= srgbToLinear(atlasTap(r, mapUv, wrap).rgb);\n"
+      "         r = texelFetch(uMaterials, mb + 16);\n"
+      "         if (r.z > 0.0) s.cc *= atlasTap(r, mapUv, wrap).r;\n"
+      "         r = texelFetch(uMaterials, mb + 17);\n"
+      "         if (r.z > 0.0) s.sh *= atlasTap(r, mapUv, wrap).r;\n"
+      "         r = texelFetch(uMaterials, mb + 18);\n"
+      "         s.trans = clamp(mt2.z * (r.z > 0.0 ? atlasTap(r, mapUv, wrap).r : 1.0), 0.0, 1.0) * (1.0 - s.metal);\n"
+      "         s.f0 = mix(vec3(clamp(iorF0 * iorF0 * 2.0 * mt2.y, 0.0, 1.0)), s.base, s.metal);\n"
+      "\n"
+      "         // Normal map: the tangent frame from the triangle's own UV edges, carried to world\n"
+      "         // space like the normal (exact for rotation and even scale).\n"
+      "         r = texelFetch(uMaterials, mb + 14);\n"
+      "         if (r.z > 0.0 && space == 0) {\n"
+      "            vec2 d1 = uvA.zw - uvA.xy, d2 = uvB.xy - uvA.xy;\n"
+      "            float det = d1.x * d2.y - d1.y * d2.x;\n"
+      "            if (abs(det) > 1e-12) {\n"
+      "               vec3 lt = (t1.xyz * d2.y - t2.xyz * d1.y) / det;\n"
+      "               vec3 lb = (t2.xyz * d1.x - t1.xyz * d2.x) / det;\n"
+      "               vec3 T = m0.xyz * lt.x + m1.xyz * lt.y + m2.xyz * lt.z;\n"
+      "               vec3 B = m0.xyz * lb.x + m1.xyz * lb.y + m2.xyz * lb.z;\n"
+      "               T = T - N * dot(N, T);\n"
+      "               if (dot(T, T) > 1e-12) {\n"
+      "                  T = normalize(T);\n"
+      "                  vec3 Bo = cross(N, T) * (dot(cross(N, T), B) < 0.0 ? -1.0 : 1.0);\n"
+      "                  vec3 tn;\n"
+      "                  if (mt5.w > 0.5) {\n"
+      "                     vec2 px = 1.0 / max(r.zw * vec2(textureSize(uAtlas, 0)), vec2(1.0));\n"
+      "                     const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
+      "                     float hl = dot(atlasTap(r, mapUv - vec2(px.x, 0.0), wrap).rgb, lum);\n"
+      "                     float hr = dot(atlasTap(r, mapUv + vec2(px.x, 0.0), wrap).rgb, lum);\n"
+      "                     float hd = dot(atlasTap(r, mapUv - vec2(0.0, px.y), wrap).rgb, lum);\n"
+      "                     float hu = dot(atlasTap(r, mapUv + vec2(0.0, px.y), wrap).rgb, lum);\n"
+      "                     tn = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
+      "                  } else {\n"
+      "                     tn = atlasTap(r, mapUv, wrap).rgb * 2.0 - 1.0;\n"
+      "                  }\n"
+      "                  tn.xy *= mt5.z;\n"
+      "                  vec3 Nm = normalize(T * tn.x + Bo * tn.y + N * tn.z);\n"
+      "                  if (dot(Nm, -rayDir) > 1e-4)\n"
+      "                     N = Nm;\n"
+      "               }\n"
+      "            }\n"
+      "         }\n"
+      "      }\n"
       "      float opaqueW = 1.0 - s.trans;\n"
       "      radiance += throughput * emission;\n"
       "\n"
@@ -1059,6 +1168,13 @@ void Render3DPathTrace::Release()
    DestroyBufferTex(mBlasTrisBuf);
    DestroyBufferTex(mBlasNormalsBuf);
    DestroyBufferTex(mMaterialsBuf);
+   DestroyBufferTex(mBlasUvsBuf);
+   GLUtil::DestroyFbo(mAtlas);
+   if (mAtlasReadFbo != 0)
+   {
+      glDeleteFramebuffers(1, &mAtlasReadFbo);
+      mAtlasReadFbo = 0;
+   }
 
    GLUtil::DestroyFbo(mAccum[0]);
    GLUtil::DestroyFbo(mAccum[1]);
@@ -1107,6 +1223,113 @@ bool Render3DPathTrace::EnsureTargets(int w, int h)
           GLUtil::EnsureFbo(mDisplay, w, h, GL_RGBA8, "PtDisplay");
 }
 
+void Render3DPathTrace::BuildAtlas(const std::vector<PtMaterial>& materials, std::vector<float>& rects)
+{
+   rects.assign(materials.size() * PtMaterial::kMapSlots * 4, 0.0f);
+   struct Entry
+   {
+      unsigned int tex = 0;
+      int w = 0, h = 0;   // source size
+      int aw = 0, ah = 0; // size in the atlas
+      int x = 0, y = 0;
+   };
+   std::vector<Entry> entries;
+   for (const PtMaterial& m : materials)
+      for (unsigned int tex : m.maps)
+      {
+         if (tex == 0 || std::any_of(entries.begin(), entries.end(), [&](const Entry& e) { return e.tex == tex; }))
+            continue;
+         Entry e;
+         e.tex = tex;
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &e.w);
+         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &e.h);
+         if (e.w > 0 && e.h > 0)
+            entries.push_back(e);
+      }
+   glBindTexture(GL_TEXTURE_2D, 0);
+   if (entries.empty())
+   {
+      GLUtil::EnsureFbo(mAtlas, 1, 1, GL_RGBA8, "PtAtlas");   // a real texture for the sampler
+      return;
+   }
+
+   // Shelf packing, tallest first, into the smallest square up to 4096 that holds every map at
+   // up to 2048 px a side; when they don't fit, every map halves and it tries again.
+   std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.h > b.h; });
+   int side = 0;
+   for (int cap = 2048; cap >= 16 && side == 0; cap /= 2)
+      for (int s = 256; s <= 4096 && side == 0; s *= 2)
+      {
+         int x = 0, y = 0, shelf = 0;
+         bool fits = true;
+         for (Entry& e : entries)
+         {
+            const float k = std::min(1.0f, (float)cap / (float)std::max(e.w, e.h));
+            e.aw = std::max(1, (int)(e.w * k));
+            e.ah = std::max(1, (int)(e.h * k));
+            if (x + e.aw > s)
+            {
+               x = 0;
+               y += shelf;
+               shelf = 0;
+            }
+            if (e.aw > s || y + e.ah > s)
+            {
+               fits = false;
+               break;
+            }
+            e.x = x;
+            e.y = y;
+            x += e.aw;
+            shelf = std::max(shelf, e.ah);
+         }
+         if (fits)
+            side = s;
+      }
+   if (side == 0 || !GLUtil::EnsureFbo(mAtlas, side, side, GL_RGBA8, "PtAtlas"))
+      return;
+
+   GLint prevRead = 0, prevDraw = 0;
+   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
+   const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+   glDisable(GL_SCISSOR_TEST);
+   if (mAtlasReadFbo == 0)
+      glGenFramebuffers(1, &mAtlasReadFbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mAtlas.fbo);
+   glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+   glClear(GL_COLOR_BUFFER_BIT);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, mAtlasReadFbo);
+   for (const Entry& e : entries)
+   {
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, e.tex, 0);
+      if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+         glBlitFramebuffer(0, 0, e.w, e.h, e.x, e.y, e.x + e.aw, e.y + e.ah, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+   }
+   glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDraw);
+   if (scissor)
+      glEnable(GL_SCISSOR_TEST);
+   glBindTexture(GL_TEXTURE_2D, mAtlas.tex);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   for (size_t i = 0; i < materials.size(); i++)
+      for (int k = 0; k < PtMaterial::kMapSlots; k++)
+         for (const Entry& e : entries)
+            if (e.tex == materials[i].maps[k])
+            {
+               float* r = &rects[(i * PtMaterial::kMapSlots + k) * 4];
+               r[0] = (float)e.x / side;
+               r[1] = (float)e.y / side;
+               r[2] = (float)e.aw / side;
+               r[3] = (float)e.ah / side;
+            }
+}
+
 bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
                                     const std::vector<Bvh::Instance>& instances,
                                     const std::vector<PtMaterial>& materials)
@@ -1118,6 +1341,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
    std::vector<float> allBlasNodes;
    std::vector<float> allBlasTris;
    std::vector<float> allBlasNormals;
+   std::vector<float> allBlasUvs;
 
    for (size_t m = 0; m < meshes.size(); m++)
    {
@@ -1169,6 +1393,8 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
          pushNormal(v0);
          pushNormal(v1);
          pushNormal(v2);
+         const float uvs[8] = { v0.u, v0.v, v1.u, v1.v, v2.u, v2.v, 0.0f, 0.0f };
+         allBlasUvs.insert(allBlasUvs.end(), uvs, uvs + 8);
       }
    }
 
@@ -1193,21 +1419,37 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       dst[15] = 0.0f;
    }
 
-   // Five texels per material: base + metallic; roughness + emission; ior, specular, transmission,
-   // its roughness; clear coat, its roughness, sheen, its roughness; sheen colour.
+   // 19 texels per material: base + metallic; roughness + emission; ior, specular, transmission,
+   // its roughness; clear coat, its roughness, sheen, its roughness; sheen colour; then the maps:
+   // (space, wrap, normal strength, bump); (scale, any map); rotate; translate; box lo; box hi;
+   // and the eight map rects in the atlas.
    std::vector<PtMaterial> mats = materials;
    if (mats.empty())
       mats.push_back(PtMaterial());
-   std::vector<float> matTexels(mats.size() * 20, 0.0f);
+   std::vector<float> rects;
+   BuildAtlas(mats, rects);
+   constexpr size_t kMatFloats = 19 * 4;
+   std::vector<float> matTexels(mats.size() * kMatFloats, 0.0f);
    for (size_t i = 0; i < mats.size(); i++)
    {
       const PtMaterial& m = mats[i];
-      const float t[20] = { m.baseColor[0], m.baseColor[1], m.baseColor[2], m.metallic,
+      float anyMap = 0.0f;
+      for (int k = 0; k < PtMaterial::kMapSlots; k++)
+         anyMap = std::max(anyMap, rects[i * PtMaterial::kMapSlots + k * 4 + 2] > 0.0f ? 1.0f : 0.0f);
+      const float t[44] = { m.baseColor[0], m.baseColor[1], m.baseColor[2], m.metallic,
                             m.roughness, m.emission[0], m.emission[1], m.emission[2],
                             m.ior, m.specular, m.transmission, m.transmissionRoughness,
                             m.clearcoat, m.clearcoatRoughness, m.sheen, m.sheenRoughness,
-                            m.sheenColor[0], m.sheenColor[1], m.sheenColor[2], 0.0f };
-      std::memcpy(&matTexels[i * 20], t, sizeof(t));
+                            m.sheenColor[0], m.sheenColor[1], m.sheenColor[2], 0.0f,
+                            (float)m.mapSpace, (float)m.wrap, m.normalStrength, (float)m.normalBump,
+                            m.mapScale[0], m.mapScale[1], m.mapScale[2], anyMap,
+                            m.mapRotate[0], m.mapRotate[1], m.mapRotate[2], 0.0f,
+                            m.mapTranslate[0], m.mapTranslate[1], m.mapTranslate[2], 0.0f,
+                            m.objLo[0], m.objLo[1], m.objLo[2], 0.0f,
+                            m.objHi[0], m.objHi[1], m.objHi[2], 0.0f };
+      float* dst = &matTexels[i * kMatFloats];
+      std::memcpy(dst, t, sizeof(t));
+      std::memcpy(dst + 44, &rects[i * PtMaterial::kMapSlots * 4], PtMaterial::kMapSlots * 4 * sizeof(float));
    }
 
    UploadBufferTex(mTlasNodesBuf, tlas.nodeTexels, "PtTlasNodes");
@@ -1216,6 +1458,9 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
    UploadBufferTex(mBlasTrisBuf, allBlasTris, "PtBlasTris");
    UploadBufferTex(mBlasNormalsBuf, allBlasNormals, "PtBlasNormals");
    UploadBufferTex(mMaterialsBuf, matTexels, "PtMaterials");
+   if (allBlasUvs.empty())
+      allBlasUvs.assign(8, 0.0f);
+   UploadBufferTex(mBlasUvsBuf, allBlasUvs, "PtBlasUvs");
 
    mSceneUploaded = !tlas.Empty();
    ResetAccumulation();
@@ -1391,6 +1636,10 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          bindBuf(4, mBlasTrisBuf.tex, "uBlasTris");
          bindBuf(5, mBlasNormalsBuf.tex, "uBlasNormals");
          bindBuf(6, mMaterialsBuf.tex, "uMaterials");
+         bindBuf(8, mBlasUvsBuf.tex, "uBlasUvs");
+         glActiveTexture(GL_TEXTURE9);
+         glBindTexture(GL_TEXTURE_2D, mAtlas.tex);
+         glUniform1i(glGetUniformLocation(mProgTrace, "uAtlas"), 9);
 
          glUniform1i(glGetUniformLocation(mProgTrace, "uSampleIndex"), curSample);
          glUniform1i(glGetUniformLocation(mProgTrace, "uMaxBounces"), maxBounces);
@@ -1451,6 +1700,10 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
    if (strip)
       glDisable(GL_SCISSOR_TEST);
 
+   glActiveTexture(GL_TEXTURE9);
+   glBindTexture(GL_TEXTURE_2D, 0);
+   glActiveTexture(GL_TEXTURE8);
+   glBindTexture(GL_TEXTURE_BUFFER, 0);
    glActiveTexture(GL_TEXTURE7);
    glBindTexture(GL_TEXTURE_2D, 0);
    for (int u = 6; u >= 1; u--)
