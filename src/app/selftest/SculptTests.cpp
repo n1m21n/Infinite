@@ -5,11 +5,15 @@
 //
 // INFINITE_SCULPTTEST_MODEL=<glb> also sculpts that model (level 2, a few
 // scripted strokes) and writes the node's data text to
-// INFINITE_SCULPTTEST_OUT, for before/after renders.
+// INFINITE_SCULPTTEST_OUT, for before/after renders. With
+// INFINITE_SCULPTTEST_STROKES=<file> (one dab per line: brush x y z radius
+// strength invert) it runs those dabs on the model's own points instead and
+// writes them before and after to OUT, for the Blender sculpt A/B.
 #include "app/AppShared.h"
 
 #include <cmath>
 #include <fstream>
+#include <sstream>
 
 #include "nodes/ModelSourceNode.h"
 #include "nodes/SculptNode.h"
@@ -150,6 +154,43 @@ namespace
       n.VisitParams(out);
       std::ofstream(outPath) << out.data;
       return !out.data.empty();
+   }
+
+   // The dabs in `strokes` on the model's own points (level 0); OUT gets "before" then "after", one point a line.
+   bool SculptStrokes(const std::string& path, const char* strokes, const char* outPath)
+   {
+      ModelSourceNode model;
+      model.normalizeScale = false;   // the file's own units, as Blender has them
+      model.recenter = false;
+      if (!model.Load(path))
+         return false;
+      SculptNode n;
+      n.input = &model;
+      n.CookIfNeeded(1);
+      std::ofstream out(outPath);
+      auto points = [&](const char* tag) {
+         std::vector<float> pos, nrm;
+         Sculpt::PointFrame(n.Shaped(), n.Topology(), pos, nrm);
+         out << tag << " " << n.Topology().points << "\n";
+         for (size_t i = 0; i < pos.size(); i += 3)
+            out << pos[i] << " " << pos[i + 1] << " " << pos[i + 2] << "\n";
+      };
+      points("before");
+      std::ifstream in(strokes);
+      std::string line;
+      int dabs = 0;
+      while (std::getline(in, line))
+      {
+         std::istringstream ls(line);
+         int brush = 0, invert = 0;
+         float c[3], radius = 0.0f, strength = 0.0f;
+         if (!(ls >> brush >> c[0] >> c[1] >> c[2] >> radius >> strength >> invert))
+            continue;
+         Dab(n, brush, c, radius, strength, invert != 0, 0);
+         n.CookIfNeeded(2 + dabs++);
+      }
+      points("after");
+      return dabs > 0;
    }
 }
 
@@ -411,7 +452,10 @@ bool RunSculptTest()
    if (const char* model = getenv("INFINITE_SCULPTTEST_MODEL"))
    {
       const char* out = getenv("INFINITE_SCULPTTEST_OUT");
-      check(out != nullptr && SculptModel(model, out), "scripted strokes on the model", 1, 1);
+      if (const char* strokes = getenv("INFINITE_SCULPTTEST_STROKES"))
+         check(out != nullptr && SculptStrokes(model, strokes, out), "the stroke file's dabs on the model", 1, 1);
+      else
+         check(out != nullptr && SculptModel(model, out), "scripted strokes on the model", 1, 1);
    }
 
    printf("SCULPT TEST: %s (%d failure%s)\n", failures == 0 ? "OK" : "FAILED", failures, failures == 1 ? "" : "s");
