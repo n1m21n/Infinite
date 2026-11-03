@@ -5631,7 +5631,8 @@ namespace
          }
          float lo[3], hi[3];
          const bool turned = std::fabs(item->rot[0]) + std::fabs(item->rot[1]) + std::fabs(item->rot[2]) > 0.01f;
-         if (scene->ItemKind(*item) == Kind::Geometry && scene->ItemBounds(item->id, lo, hi))
+         const Kind boxKind = scene->ItemKind(*item);
+         if ((boxKind == Kind::Geometry || boxKind == Kind::Picture) && scene->ItemBounds(item->id, lo, hi))
          {
             // The box the item fills; editing it rescales. Only exact while the item is not turned.
             float dim[3] = { hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1] };
@@ -5750,6 +5751,11 @@ namespace
          if (changed)
             scene->Commit();
       }
+      if (scene->ItemKind(*item) == Kind::Picture && Card(T("Picture")))
+      {
+         if (BoolRow(T("Lit"), &item->pictureLit, "Picture lit"))
+            scene->Commit();
+      }
       if (scene->ItemKind(*item) == Kind::Geometry && Card(T("Viewport Display")))
       {
          if (ColorRow(T("Color"), item->color, "Edit in 3D View"))
@@ -5815,7 +5821,7 @@ namespace
             scene->Commit();
       }
       GraphNode* gn = FindNodeByUid(item->uid);
-      if (scene->ItemKind(*item) == Kind::Geometry)
+      if (scene->ItemKind(*item) == Kind::Geometry || (scene->ItemKind(*item) == Kind::Picture && item->pictureLit))
          DrawLitBy(scene, item);
       if (gn != nullptr && ActionButton::Draw(L("Go to node"), ImVec2(availW, 0)))
       {

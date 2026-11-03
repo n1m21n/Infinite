@@ -15,6 +15,7 @@
 #include "GeometryOpNodes.h"
 #include "SceneNodes.h"
 #include "RigPose.h"
+#include "Modulation.h"
 
 std::function<INode*(uint64_t)> Scene3DNode::ResolveUid;
 
@@ -168,6 +169,68 @@ public:
    const GpuPoints* GetGpuPoints() override { return src->GetGpuPoints(); }
    const Polyline* GetCurve() override { return src->GetCurve(); }
    unsigned long long CurveStamp() override { return src->CurveStamp(); }
+};
+
+// A node with a 2D output as a plane: a unit-high quad at the picture's aspect, facing +Z,
+// sampling the node's live texture each frame. Unlit, the picture is the emission over a black,
+// non-reflective surface, so it shows as it is; lit, it is the albedo. The albedo map always
+// carries it, so its alpha cuts the plane in both renderers.
+class Scene3DNode::PictureSource : public IGeometrySource
+{
+public:
+   INode* node = nullptr;
+   bool lit = false;
+   Mesh quad;
+   float aspect = 0.0f;
+   unsigned long long meshRev = 0;
+
+   void Update(INode* n, bool litOn)
+   {
+      node = n;
+      lit = litOn;
+      const int w = n->GetOutputWidth(), h = n->GetOutputHeight();
+      const float a = (w > 0 && h > 0) ? (float)w / (float)h : 1.0f;
+      if (a != aspect || quad.vertices.empty())
+      {
+         aspect = a;
+         quad = Primitives::Plane(1);
+         for (Vertex& v : quad.vertices)
+            v.px *= a;
+         meshRev++;
+      }
+   }
+
+   const Mesh& GetMesh() override { return quad; }
+   unsigned long long MeshRevision() override { return meshRev; }
+   Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+   Material GetMaterial() const override
+   {
+      Material m;
+      m.metallic = 0.0f;
+      m.textureAlpha = true;
+      if (lit)
+      {
+         m.color[0] = m.color[1] = m.color[2] = 1.0f;
+         m.roughness = 0.5f;
+      }
+      else
+      {
+         m.color[0] = m.color[1] = m.color[2] = 0.0f;
+         m.specular = 0.0f;
+         m.roughness = 1.0f;
+         m.emission = 1.0f;
+      }
+      return m;
+   }
+   unsigned long long MaterialRevision() const override { return lit ? 2 : 1; }
+   unsigned int GetSurfaceTexture() override { return node->GetOutputTexture(); }
+   unsigned int GetMaterialTexture(int map) override
+   {
+      if (map == kMapAlbedo || (map == kMapEmission && !lit))
+         return node->GetOutputTexture();
+      return 0;
+   }
+   unsigned long long SurfaceTextureRevision() const override { return node->TextureRevision(); }
 };
 
 class Scene3DNode::Root : public IGeometrySource
@@ -331,7 +394,16 @@ Scene3DNode::Kind Scene3DNode::KindOf(const INode* node)
       return Kind::Camera;
    if (dynamic_cast<const LightNode*>(node) != nullptr)
       return Kind::Light;
-   return dynamic_cast<const IGeometrySource*>(node) != nullptr ? Kind::Geometry : Kind::Missing;
+   if (dynamic_cast<const IGeometrySource*>(node) != nullptr)
+      return Kind::Geometry;
+   // Anything else that makes a picture: not sound, notes, control values, a world or a scene.
+   auto* audio = dynamic_cast<const IAudioSource*>(node);
+   if ((audio != nullptr && audio->IsAudioOutputIndex(0)) || dynamic_cast<const INoteSource*>(node) != nullptr ||
+       dynamic_cast<const IModulator*>(node) != nullptr || dynamic_cast<const IPredictor*>(node) != nullptr ||
+       dynamic_cast<const EnvironmentNode*>(node) != nullptr || dynamic_cast<const Scene3DNode*>(node) != nullptr ||
+       dynamic_cast<const Render3DNode*>(node) != nullptr)
+      return Kind::Missing;
+   return node->GetOutputWidth() > 0 && node->GetOutputHeight() > 0 ? Kind::Picture : Kind::Missing;
 }
 
 const Scene3DNode::Item* Scene3DNode::FindConst(int id) const
@@ -544,6 +616,8 @@ void Scene3DNode::Serialize()
          o << "ocolor " << it.id << " " << it.color[0] << " " << it.color[1] << " " << it.color[2] << "\n";
       if (!it.castShadow)
          o << "shadowoff " << it.id << "\n";
+      if (it.pictureLit)
+         o << "picturelit " << it.id << "\n";
       if (it.passIndex != 0)
          o << "pass " << it.id << " " << it.passIndex << "\n";
       if (it.trackAxis != 5 || it.upAxis != 1 || it.lookInfluence != 1.0f || it.lookTargetZ)
@@ -635,7 +709,7 @@ void Scene3DNode::Parse()
          });
       else if (key == "label" || key == "itemx" || key == "group" || key == "lock" || key == "look" ||
                key == "delta" || key == "pass" || key == "ocolor" || key == "shadowoff" || key == "backdrop" || key == "lookx" || key == "show" ||
-               key == "motion" || key == "follow" || key == "ik")
+               key == "motion" || key == "follow" || key == "ik" || key == "picturelit")
       {
          int id = 0;
          l >> id;
@@ -675,6 +749,8 @@ void Scene3DNode::Parse()
             l >> it->passIndex;
          else if (key == "shadowoff")
             it->castShadow = false;
+         else if (key == "picturelit")
+            it->pictureLit = true;
          else if (key == "ocolor")
             l >> it->color[0] >> it->color[1] >> it->color[2];
          else if (key == "lookx")
@@ -1066,6 +1142,15 @@ void Scene3DNode::Sync(int frameId)
    {
       INode* node = ResolveUid ? ResolveUid(it.uid) : nullptr;
       auto* source = dynamic_cast<IGeometrySource*>(node);
+      if (source == nullptr && KindOf(node) == Kind::Picture)
+      {
+         std::unique_ptr<PictureSource>& pic = mPictureSources[it.id];
+         if (!pic)
+            pic = std::make_unique<PictureSource>();
+         source = pic.get();
+      }
+      else
+         mPictureSources.erase(it.id);
       if (source == nullptr)
       {
          mPlaced.erase(it.id);   // deleted or replaced: nothing may keep its pointer
@@ -1077,6 +1162,10 @@ void Scene3DNode::Sync(int frameId)
          continue;
       }
       node->CookIfNeeded(frameId);
+      // After the cook, so the plane takes the picture's size from this frame. A node that reads
+      // this scene's own output gets last frame's (the cook is stamped before it syncs), never a loop.
+      if (auto it2 = mPictureSources.find(it.id); it2 != mPictureSources.end())
+         it2->second->Update(node, it.pictureLit);
       unsigned int mask = ~0u;
       for (size_t i = 0; i < lightOrder.size(); i++)
          if (std::find(it.unlit.begin(), it.unlit.end(), lightOrder[i]) != it.unlit.end())

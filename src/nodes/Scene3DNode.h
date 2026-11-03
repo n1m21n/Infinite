@@ -26,7 +26,7 @@ public:
    Scene3DNode();
    ~Scene3DNode() override;
 
-   enum class Kind { Missing, Geometry, Camera, Light };
+   enum class Kind { Missing, Geometry, Camera, Light, Picture };   // Picture: any node with a 2D output, shown on a plane
 
    // Camera only: a picture seen through the camera in the view, never in the render.
    struct Backdrop
@@ -57,6 +57,7 @@ public:
       bool visible = true;
       bool render = true;           // false: seen in the view, left out of the picture
    bool castShadow = true;       // false: drawn, but leaves no shadow
+      bool pictureLit = false;      // Picture only: false shows the picture as it is, true lets the scene light it
       int lookAt = 0;               // camera or light only: item id it keeps facing, 0 = none
       unsigned lock = 0;            // bits 0-2 location, 3-5 rotation, 6-8 scale (engine axes): the transform tools leave them alone
       int group = 0;                // items with the same number select and move together; 0 = none
@@ -283,6 +284,8 @@ public:
 
 private:
    class Placed;
+   class PictureSource;
+   std::map<int, std::unique_ptr<PictureSource>> mPictureSources;
    void Parse();
    const Item* FindConst(int id) const;
    void Serialize();
