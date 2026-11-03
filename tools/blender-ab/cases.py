@@ -75,7 +75,7 @@ FOX_CLIP, FOX_PHASES = 3, [0.10, 0.45, 0.80]
 def _scatter(n=50, seed=7):
     """n floor positions for the small spheres: deterministic, clear of the big objects and each other."""
     import random
-    rng, keep_out = random.Random(seed), [(-1.5, 0.6, 0.75), (1.9, 0.9, 0.55), (0.2, 0.4, 0.95),
+    rng, keep_out = random.Random(seed), [(-1.5, 0.6, 0.75), (1.9, 0.9, 0.55), (0.2, 0.7, 1.1),
                                           (-0.9, -0.8, 0.45), (0.0, -0.8, 0.45), (0.9, -0.8, 0.45)]
     pts = []
     while len(pts) < n:
@@ -105,8 +105,8 @@ def _hero():
         {"region": "velvet", "shape": "sphere", "scale": 0.35, "location": [0.9, -0.8, 0.35],
          "material": {"base_color": [0.35, 0.06, 0.25], "roughness": 0.8, "sheen": 1.0}},
         # Skinned, glTF material; animation frame set per frame below. Faces +Z of the file = toward the camera.
-        {"region": "fox", "shape": "model", "asset": "Fox.glb", "env": "INFINITE_3DBENCH_FOX", "scale": 0.0075,
-         "location": [0.2, 0.4, 0], "clip": FOX_CLIP},
+        {"region": "fox", "shape": "model", "asset": "Fox.glb", "env": "INFINITE_3DBENCH_FOX", "scale": 0.0095,
+         "location": [0.2, 0.7, 0], "clip": FOX_CLIP},
         {"region": "instances", "shape": "sphere", "scale": 0.05, "location": [0, 0, 0], "instances": _scatter(),
          "material": {"base_color": [0.9, 0.55, 0.1], "metallic": 0.0, "roughness": 0.35}},
     ]

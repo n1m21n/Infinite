@@ -4,11 +4,34 @@
 # with Cycles and writes each object as <case>/obj_<i>.glb for Infinite. The
 # objects' transforms are baked into their meshes first, so both apps get the
 # same world-space vertices and the glTF needs no node transforms.
-import bpy, sys, os, json, math
+# Hero additions: shape "model" (a glTF/glb asset kept with its own material, optionally skinned
+# and posed per frame), "instances" (one shape at many points; the points go out as a vertex-only
+# glb), an HDRI world, per-region object indices, and a mask_<k>.png per frame (1 spp, no filter,
+# no depth of field: the value in each pixel is the object index, 0 = sky).
+import bpy, sys, os, json, math, struct
 from mathutils import Vector, Matrix
 
 case = sys.argv[sys.argv.index("--") + 1]
 scene = json.load(open(os.path.join(case, "scene.json")))
+HERE = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(HERE, "assets")
+REGIONS = scene.get("regions", [])
+FRAMES = scene.get("frames")
+
+
+def region_index(o):
+    return REGIONS.index(o["region"]) + 1 if o.get("region") in REGIONS else 0
+
+
+def asset_path(o):
+    # The Fox's path comes from the environment, as in the 3D bench; assets/ holds a copy.
+    env = os.environ.get(o.get("env", ""), "")
+    return env if env and os.path.exists(env) else os.path.join(ASSETS, o["asset"])
+
+
+def glb_json(path):
+    f = open(path, "rb").read()
+    return json.loads(f[20:20 + struct.unpack("<I", f[12:16])[0]])
 
 
 def spherical(az, el, dist, target=(0, 0, 0)):
@@ -25,8 +48,39 @@ def aim(ob, at):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 
+def import_model(o, i):
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=asset_path(o))
+    new = [x for x in bpy.data.objects if x not in before]
+    root = bpy.data.objects.new("model%d" % i, None)
+    sc.collection.objects.link(root)
+    s = o.get("scale", 1.0)
+    root.scale = (s, s, s)
+    root.location = o.get("location", (0, 0, 0))
+    for x in new:
+        x.pass_index = region_index(o)
+        if x.parent is None:
+            x.parent = root
+    if o.get("clip"):
+        name = glb_json(asset_path(o))["animations"][o["clip"] - 1]["name"]
+        arm = next(x for x in new if x.type == 'ARMATURE')
+        act = bpy.data.actions[name]
+        ad = arm.animation_data_create()
+        for t in list(ad.nla_tracks):
+            ad.nla_tracks.remove(t)
+        ad.action = act
+        if hasattr(ad, "action_slot") and len(act.slots):
+            ad.action_slot = act.slots[0]
+        posed.append((arm, act, o))
+
+
+posed = []   # (armature, action, object) set to each frame's phase before it renders
+
 for i, o in enumerate(scene["objects"]):
     shape = o["shape"]
+    if shape == "model":
+        import_model(o, i)
+        continue
     if shape == "sphere":
         bpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32, radius=1)
         bpy.ops.object.shade_smooth()
@@ -62,12 +116,35 @@ for i, o in enumerate(scene["objects"]):
     p.inputs["Emission Color"].default_value = (*m.get("emission", (0, 0, 0)), 1)
     p.inputs["Emission Strength"].default_value = m.get("emission_strength", 0.0)
     ob.data.materials.append(mat)
+    ob.pass_index = region_index(o)
 
     for x in bpy.context.scene.objects:
         x.select_set(x == ob)
     bpy.context.view_layer.objects.active = ob
     bpy.ops.export_scene.gltf(filepath=os.path.join(case, "obj_%d.glb" % i), export_format='GLB',
                               use_selection=True, export_materials='NONE', export_animations=False)
+
+    if o.get("instances"):
+        # Many copies of this shape. The shape stays at the origin (Infinite stamps it on the points);
+        # the points leave as a mesh whose vertices are the positions (triangles only keep them all used).
+        pts = o["instances"]
+        ob.hide_render = True
+        for k, pt in enumerate(pts):
+            c = bpy.data.objects.new("inst%d_%d" % (i, k), ob.data)
+            c.location = pt
+            c.pass_index = region_index(o)
+            sc.collection.objects.link(c)
+        me = bpy.data.meshes.new("pts%d" % i)
+        me.from_pydata(pts, [], [(j, j + 1, j + 2) for j in range(len(pts) - 2)])
+        po = bpy.data.objects.new("pts%d" % i, me)
+        sc.collection.objects.link(po)
+        po.hide_render = True
+        for x in bpy.context.scene.objects:
+            x.select_set(x == po)
+        bpy.context.view_layer.objects.active = po
+        bpy.ops.export_scene.gltf(filepath=os.path.join(case, "pts_%d.glb" % i), export_format='GLB',
+                                  use_selection=True, export_materials='NONE', export_animations=False,
+                                  export_normals=False)
 
 cam = scene["camera"]
 camd = bpy.data.cameras.new("c")
@@ -103,9 +180,19 @@ for i, l in enumerate(scene.get("lights", [])):
 
 w = scene.get("world", {})
 sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
-bg = next(n for n in sc.world.node_tree.nodes if n.type == "BACKGROUND")
+wt = sc.world.node_tree
+bg = next(n for n in wt.nodes if n.type == "BACKGROUND")
 bg.inputs["Color"].default_value = (*w.get("color", (0, 0, 0)), 1)
 bg.inputs["Strength"].default_value = w.get("strength", 1.0)
+if w.get("hdri"):
+    # Equirect HDRI; its sun lights the scene here, and Infinite's Environment lifts it out as a light.
+    tex = wt.nodes.new("ShaderNodeTexEnvironment")
+    tex.image = bpy.data.images.load(os.path.join(ASSETS, w["hdri"]))
+    mp = wt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Rotation"].default_value[2] = math.radians(w.get("rotation", 0.0))
+    wt.links.new(wt.nodes.new("ShaderNodeTexCoord").outputs["Generated"], mp.inputs["Vector"])
+    wt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
+    wt.links.new(tex.outputs["Color"], bg.inputs["Color"])
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
 sc.cycles.samples = scene.get("samples", 256)
@@ -115,6 +202,47 @@ sc.view_settings.look = 'None'
 sc.render.resolution_x, sc.render.resolution_y = scene.get("size", (512, 512))
 sc.render.resolution_percentage = 100
 sc.render.image_settings.file_format = 'PNG'
-sc.render.filepath = os.path.join(case, "truth.png")
-bpy.ops.render.render(write_still=True)
+
+
+def pose(frame):
+    for arm, act, o in posed:
+        a, b = act.frame_range
+        f = a + frame["phase"] * (b - a)
+        sc.frame_set(int(f), subframe=f - int(f))
+
+
+def render_mask(path):
+    """Object index per pixel as an 8-bit PNG: one sample, no filter, no depth of field."""
+    sc.view_layers[0].use_pass_object_index = True
+    sc.render.dither_intensity = 0.0   # the 8-bit PNG would otherwise dither the index by +-1
+    tree = bpy.data.node_groups.new("mask", 'CompositorNodeTree')
+    rl = tree.nodes.new('CompositorNodeRLayers')
+    div = tree.nodes.new('ShaderNodeMath'); div.operation = 'DIVIDE'; div.inputs[1].default_value = 255.0
+    out = tree.nodes.new('NodeGroupOutput')
+    tree.interface.new_socket("Image", in_out='OUTPUT', socket_type='NodeSocketColor')
+    tree.links.new(rl.outputs['Object Index'], div.inputs[0])
+    tree.links.new(div.outputs[0], out.inputs[0])
+    keep = (sc.cycles.samples, sc.cycles.use_denoising, sc.cycles.filter_width, sc.view_settings.view_transform,
+            sc.render.image_settings.color_mode, sc.render.image_settings.color_depth, camd.dof.use_dof)
+    sc.cycles.samples, sc.cycles.use_denoising, sc.cycles.filter_width = 1, False, 0.01
+    sc.view_settings.view_transform = 'Raw'
+    sc.render.image_settings.color_mode, sc.render.image_settings.color_depth = 'BW', '8'
+    camd.dof.use_dof = False
+    sc.compositing_node_group = tree
+    sc.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+    sc.compositing_node_group = None
+    sc.render.dither_intensity = 1.0
+    (sc.cycles.samples, sc.cycles.use_denoising, sc.cycles.filter_width, sc.view_settings.view_transform,
+     sc.render.image_settings.color_mode, sc.render.image_settings.color_depth, camd.dof.use_dof) = keep
+
+
+for k, fr in enumerate(FRAMES or [None]):
+    tag = "" if FRAMES is None else "_%d" % k
+    if fr is not None:
+        pose(fr)
+    sc.render.filepath = os.path.join(case, "truth%s.png" % tag)
+    bpy.ops.render.render(write_still=True)
+    if REGIONS:
+        render_mask(os.path.join(case, "mask%s.png" % tag))
 print("SCENEDONE", len(scene["objects"]))

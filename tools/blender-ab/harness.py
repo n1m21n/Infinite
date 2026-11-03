@@ -21,10 +21,11 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
-from cases import CASES  # noqa: E402
+from cases import CASES, REGIONS  # noqa: E402
 
 BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
 INFINITE = os.path.join(REPO, "build-dev/Infinite.app/Contents/MacOS/Infinite")
+ASSETS = os.path.join(HERE, "assets")
 BASELINE = os.path.join(HERE, "baseline.json")
 # A case passes while its FLIP stays within this much of its baseline.
 FLIP_SLACK = 0.01
@@ -60,7 +61,37 @@ def light_lines(l):
     return out
 
 
-def to_patch(scene, case):
+def asset_file(o):
+    """A model's file: the environment variable it names when that file exists (the Fox), else assets/."""
+    env = os.environ.get(o.get("env", ""), "")
+    return env if env and os.path.exists(env) else os.path.join(ASSETS, o["asset"])
+
+
+def material_lines(m):
+    trans = m.get("transmission", 0.0)
+    trough = m.get("transmission_roughness", m.get("roughness", 0.0) if trans > 0 else 0.0)
+    return [
+        "  c color %g %g %g" % tuple(srgb(m.get("base_color", (0.8, 0.8, 0.8)))),
+        "  f metallic %g" % m.get("metallic", 0.0), "  f roughness %g" % m.get("roughness", 0.5),
+        "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % trans,
+        "  f transmissionRoughness %g" % trough,
+        "  f clearcoat %g" % m.get("coat", 0.0), "  f clearcoatRoughness %g" % m.get("coat_roughness", 0.03),
+        "  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5),
+        "  f specular 0.5",
+        "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
+        "  f emission %g" % m.get("emission_strength", 0.0)]
+
+
+def dof_aperture(cam, aspect):
+    """Render 3D's dofAperture for a Blender f-stop: the thin-lens formula Scene3DNode uses for a real
+    camera (blur circle over the sensor span, times 45), with Blender's 36 mm horizontal sensor."""
+    span = 36.0
+    mm = span / (2.0 * math.tan(math.radians(cam["fov"]) * 0.5))
+    focus_mm = max(cam.get("focus", cam["distance"]) * 1000.0, mm * 1.01)
+    return mm * mm / (cam["fstop"] * (focus_mm - mm)) / span * 45.0
+
+
+def to_patch(scene, case, frame=None):
     """The scene as an Infinite patch: Model 3D + Material per object (the glbs Blender wrote),
     Group 3D when there are more than four, Camera, Lights, Render 3D."""
     lines, n = ["infinite-patch 1"], [0]
@@ -76,20 +107,28 @@ def to_patch(scene, case):
     geos = []
     for i, o in enumerate(scene["objects"]):
         m = o.get("material", {})
+        if o["shape"] == "model":
+            # Kept with its glTF material; location is Blender's Z-up, Infinite's (x, z, -y).
+            x, y, z = o.get("location", (0, 0, 0))
+            lines_ = ["  s path %s" % asset_file(o), "  b normalize 0", "  b recenter 0",
+                      "  f posX %g" % x, "  f posY %g" % z, "  f posZ %g" % -y, "  f scale %g" % o.get("scale", 1.0)]
+            if o.get("clip"):
+                lines_ += ["  i clip %d" % o["clip"], "  f clipSpeed 0", "  f clipPhase %g" % (frame or {}).get("phase", 0.0)]
+            geos.append(node("3D", "Model 3D", lines_))
+            continue
         model = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "obj_%d.glb" % i),
                                         "  b normalize 0", "  b recenter 0"])
-        trans = m.get("transmission", 0.0)
-        trough = m.get("transmission_roughness", m.get("roughness", 0.0) if trans > 0 else 0.0)
-        mat = node("3D", "Material", [
-            "  c color %g %g %g" % tuple(srgb(m.get("base_color", (0.8, 0.8, 0.8)))),
-            "  f metallic %g" % m.get("metallic", 0.0), "  f roughness %g" % m.get("roughness", 0.5),
-            "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % trans,
-            "  f transmissionRoughness %g" % trough,
-            "  f clearcoat %g" % m.get("coat", 0.0), "  f clearcoatRoughness %g" % m.get("coat_roughness", 0.03),
-            "  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5),
-            "  f specular 0.5",
-            "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
-            "  f emission %g" % m.get("emission_strength", 0.0)])
+        if o.get("instances"):
+            # The shape at the origin, stamped on the vertices of the points mesh (one instance per vertex).
+            pts = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "pts_%d.glb" % i),
+                                          "  b normalize 0", "  b recenter 0"])
+            inst = node("3D", "Instance on Points", ["  i pointMode 0", "  i maxPoints %d" % len(o["instances"]),
+                                                      "  f instanceScale 1", "  b inheritMaterial 0"] + material_lines(m))
+            wires.append("geo %d points %d" % (inst, pts))
+            wires.append("geo %d shape %d" % (inst, model))
+            geos.append(inst)
+            continue
+        mat = node("3D", "Material", material_lines(m))
         wires.append("geo %d 0 %d" % (mat, model))
         geos.append(mat)
     if len(geos) > 4:  # Render 3D takes four; group the rest eight at a time
@@ -110,6 +149,7 @@ def to_patch(scene, case):
                                    "  f targetX %g" % tx, "  f targetY %g" % tz, "  f targetZ %g" % -ty])
     lights = [node("3D", "Light", light_lines(l)) for l in scene.get("lights", [])]
     if len(lights) > 3:
+        # Render 3D has three light pins (light_1..3); a fourth light would have to be the HDRI's sun.
         sys.exit("too many lights (max 3)")
 
     w = scene.get("world", {})
@@ -117,7 +157,18 @@ def to_patch(scene, case):
     peak = max(col + [1e-6])
     sky = srgb([c / peak for c in col]) if peak > 1 else srgb(col)
     width, height = scene.get("size", (512, 512))
-    render = node("3D", "Render 3D", [
+    extra = []
+    if cam.get("fstop"):
+        extra = ["  f dofAperture %g" % dof_aperture(cam, width / height),
+                 "  f focusDistance %g" % cam.get("focus", cam["distance"])]
+    hdri = None
+    if w.get("hdri"):
+        # The HDRI lights, reflects and fills the background; its sun above the threshold becomes a light.
+        hdri = node("3D", "HDRI", ["  s path %s" % os.path.join(ASSETS, w["hdri"]),
+                                   "  f intensity %g" % w.get("strength", 1.0),
+                                   "  f rotation %g" % w.get("rotation", 0.0),
+                                   "  f sunThreshold %g" % w.get("sun_threshold", 0.0)])
+    render = node("3D", "Render 3D", extra + [
         "  f width %d" % width, "  f height %d" % height,
         "  i tonemap %s" % ("AgX" if scene.get("view") == "AgX" else "None"), "  f exposure 1",
         "  b shadows 1", "  i shadowQuality 1", "  f shadowStrength 1", "  i supersample 2", "  f ao 0",
@@ -133,6 +184,8 @@ def to_patch(scene, case):
     wires.append("geo %d camera %d" % (render, camera))
     for j, l in enumerate(lights):
         wires.append("geo %d light_%d %d" % (render, j + 1, l))
+    if hdri:
+        wires.append("cable %d env %d" % (render, hdri))
     wires.append("cable %d 0 %d" % (out, render))
     return "\n".join(lines + wires) + "\n"
 
@@ -198,11 +251,90 @@ def score(case_dir, name="", scene=None):
     return out
 
 
+REGION_COLORS = [(0, 0, 0), (110, 110, 120), (230, 140, 40), (70, 200, 255), (255, 50, 70), (210, 70, 210),
+                 (255, 210, 0), (70, 255, 110), (255, 255, 255)]
+
+
+def region_masks(path):
+    """Region name -> boolean mask from the Blender object-index PNG (value = index, 0 = sky). Each mask
+    is eroded one pixel so an edge pixel, which both apps blend differently, counts for no region."""
+    ids = np.asarray(Image.open(path).convert("L"))
+    out = {}
+    for k, name in enumerate(["sky"] + REGIONS):
+        m = ids == k
+        e = m.copy()
+        e[1:] &= m[:-1]; e[:-1] &= m[1:]; e[:, 1:] &= m[:, :-1]; e[:, :-1] &= m[:, 1:]
+        out[name] = e
+    return ids, out
+
+
+def score_hero(d, k):
+    """Whole-frame and per-region FLIP and brightness ratio for frame k, same mask on both pictures."""
+    import flip_evaluator as flip
+    truth, inf = load(os.path.join(d, "truth_%d.png" % k)), load(os.path.join(d, "inf_%d.png" % k))
+    if truth.shape != inf.shape:
+        sys.exit("size mismatch in %s frame %d: %s vs %s" % (d, k, truth.shape, inf.shape))
+    err, mean, _ = flip.evaluate(truth, inf, "LDR", applyMagma=True)
+    Image.fromarray((np.clip(err, 0, 1) * 255).astype(np.uint8)).save(os.path.join(d, "flip_%d.png" % k))
+    lt, li = luma(truth), luma(inf)
+    ids, masks = region_masks(os.path.join(d, "mask_%d.png" % k))
+    Image.fromarray(np.array(REGION_COLORS, np.uint8)[np.minimum(ids, len(REGION_COLORS) - 1)]).save(
+        os.path.join(d, "mask_color_%d.png" % k))
+    res = {"all": {"flip": round(float(mean), 4), "brightness_ratio": round(float(li.mean() / max(lt.mean(), 1e-6)), 3)}}
+    for name, m in masks.items():
+        if m.sum() < 30:   # too few pixels to say anything (the sky is behind the wall in this camera)
+            continue
+        res[name] = {"flip": round(float(err[m].mean()), 4),
+                     "brightness_ratio": round(float(li[m].mean() / max(lt[m].mean(), 1e-6)), 3), "px": int(m.sum())}
+    return res
+
+
+def hero_board(out, d, frames):
+    """One board per frame: Blender | Infinite | FLIP | region mask, the per-region table underneath."""
+    paths = []
+    for k, res in enumerate(frames):
+        tiles = [Image.open(os.path.join(d, f % k)).convert("RGB").resize((384, 256))
+                 for f in ("truth_%d.png", "inf_%d.png", "flip_%d.png", "mask_color_%d.png")]
+        rows = ["%-10s %7s %8s" % ("region", "FLIP", "bright x")]
+        rows += ["%-10s %7.3f %8.2f" % (n, v["flip"], v["brightness_ratio"]) for n, v in res.items()]
+        sheet = Image.new("RGB", (384 * 4, 22 + 256 + 14 * len(rows) + 8), (20, 20, 24))
+        dr = ImageDraw.Draw(sheet)
+        dr.text((6, 5), "hero frame %d   (Blender | Infinite | FLIP | regions: %s)" % (k, ", ".join(
+            "%s=%d" % (n, i + 1) for i, n in enumerate(REGIONS))), fill=(230, 230, 230))
+        for j, t in enumerate(tiles):
+            sheet.paste(t, (384 * j, 22))
+        for j, r in enumerate(rows):
+            dr.text((8, 22 + 256 + 6 + 14 * j), r, fill=(230, 230, 230))
+        p = os.path.join(out, "hero_board_%d.png" % k)
+        sheet.save(p)
+        paths.append(p)
+    return paths
+
+
+def hero_baseline(frames):
+    names = [n for n in frames[0]]
+    return {n: [f[n]["flip"] for f in frames if n in f] for n in names}
+
+
+def hero_pass(frames, base):
+    """The gate: every region (and the whole frame) holds its own baseline on every frame."""
+    if not base:
+        return True, []
+    worse = []
+    for name, vals in hero_baseline(frames).items():
+        for k, v in enumerate(vals):
+            ref = base.get(name, [None] * len(vals))[k] if k < len(base.get(name, [])) else None
+            if ref is not None and v > ref + FLIP_SLACK:
+                worse.append("%s f%d %.3f>%.3f" % (name, k, v, ref))
+    return not worse, worse
+
+
 def board(out, rows):
     tiles = []
     for r in rows:
         d = os.path.join(out, r["case"])
-        ims = [Image.open(os.path.join(d, f)).convert("RGB").resize((256, 256)) for f in ("truth.png", "inf.png", "flip.png")]
+        files = ("truth_0.png", "inf_0.png", "flip_0.png") if "frames" in r else ("truth.png", "inf.png", "flip.png")
+        ims = [Image.open(os.path.join(d, f)).convert("RGB").resize((256, 256)) for f in files]
         t = Image.new("RGB", (256 * 3, 256 + 22), (20, 20, 24))
         for k, im in enumerate(ims):
             t.paste(im, (256 * k, 22))
@@ -234,27 +366,44 @@ def main():
     for name in names:
         scene = dict(CASES[name]); d = os.path.join(os.path.abspath(a.out), name)
         os.makedirs(d, exist_ok=True)
+        if any(o.get("region") for o in scene["objects"]):
+            scene["regions"] = REGIONS
         text = json.dumps(scene, sort_keys=True, indent=1)
-        h = hashlib.sha1(text.encode()).hexdigest()
+        # The truth is reused while the scene, Blender's script and the asset files are unchanged.
+        h = hashlib.sha1((text + open(os.path.join(HERE, "blender_scene.py")).read()).encode()).hexdigest()
         hp = os.path.join(d, "scene.hash")
-        if not (os.path.exists(hp) and open(hp).read() == h and os.path.exists(os.path.join(d, "truth.png"))):
+        frames = scene.get("frames")
+        tags = ["_%d" % k for k in range(len(frames))] if frames else [""]
+        if not (os.path.exists(hp) and open(hp).read() == h and all(os.path.exists(os.path.join(d, "truth%s.png" % t)) for t in tags)):
             open(os.path.join(d, "scene.json"), "w").write(text)
             _, log = run([BLENDER, "-b", "--factory-startup", "--python", os.path.join(HERE, "blender_scene.py"), "--", d])
             if "SCENEDONE" not in log:
                 sys.exit("blender failed on %s:\n%s" % (name, log[-3000:]))
             open(hp, "w").write(h)
-        patch = os.path.join(d, "inf.inf")
-        open(patch, "w").write(to_patch(scene, d))
         w, hgt = scene.get("size", (512, 512))
-        stdout, log = run([INFINITE, "--frame", patch, "0", d + "/f/", "--size", "%dx%d" % (w, hgt)], 600)
-        last = stdout.strip().splitlines()[-1] if stdout.strip() else ""
-        status = json.loads(last) if last.startswith("{") else {}
-        if not status.get("ok"):
-            sys.exit("infinite failed on %s:\n%s" % (name, log[-3000:]))
-        os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf.png"))
-        r = {"case": name, **score(d, name, scene)}
-        r["baseline"] = base.get(name)
-        r["pass"] = r["baseline"] is None or r["flip"] <= r["baseline"] + FLIP_SLACK
+        results = []
+        for k, tag in enumerate(tags):
+            patch = os.path.join(d, "inf%s.inf" % tag)
+            open(patch, "w").write(to_patch(scene, d, frames[k] if frames else None))
+            stdout, log = run([INFINITE, "--frame", patch, "0", d + "/f/", "--size", "%dx%d" % (w, hgt)], 600)
+            last = stdout.strip().splitlines()[-1] if stdout.strip() else ""
+            status = json.loads(last) if last.startswith("{") else {}
+            if not status.get("ok"):
+                sys.exit("infinite failed on %s%s:\n%s" % (name, tag, log[-3000:]))
+            os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf%s.png" % tag))
+            if frames:
+                results.append(score_hero(d, k))
+        if frames:
+            ok, worse = hero_pass(results, base.get(name))
+            r = {"case": name, "flip": round(float(np.mean([f["all"]["flip"] for f in results])), 4),
+                 "brightness_ratio": round(float(np.mean([f["all"]["brightness_ratio"] for f in results])), 3),
+                 "frames": results, "baseline": base.get(name), "pass": ok, "worse": worse}
+            r["boards"] = hero_board(os.path.abspath(a.out), d, results)
+            r["hero_baseline"] = hero_baseline(results)
+        else:
+            r = {"case": name, **score(d, name, scene)}
+            r["baseline"] = base.get(name)
+            r["pass"] = r["baseline"] is None or r["flip"] <= r["baseline"] + FLIP_SLACK
         rows.append(r)
         print("ABRESULT " + json.dumps(r), flush=True)
     with open(os.path.join(a.out, "results.jsonl"), "w") as f:
@@ -262,7 +411,7 @@ def main():
             f.write(json.dumps(r) + "\n")
     board(a.out, rows)
     if a.set_baseline:
-        base.update({r["case"]: r["flip"] for r in rows})
+        base.update({r["case"]: r["hero_baseline"] if "frames" in r else r["flip"] for r in rows})
         json.dump(base, open(BASELINE, "w"), indent=1, sort_keys=True)
     if a.ao:
         _, log = run([sys.executable, os.path.join(HERE, "ab.py"), "--gen", "--out", os.path.join(a.out, "ao")], 3600)
