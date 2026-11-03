@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "EditMesh.h"
 #include "Geometry3DNodes.h"
 
 // Holds an Edit Mode session: a list of ops (select, move, rotate, scale,
@@ -63,9 +64,9 @@ public:
 
    void VisitParams(ParamVisitor& v) override { v.Text("ops", ops); }
 
-   // The input as it is before the ops, for the 3D View to pick on.
-   const Mesh& InputMesh();
    int OpCount() const;
+   // What the trailing sel line picks on the output, for Edit Mode.
+   const EditMesh::Selection& Selected() { Update(); return mSelection; }
 
 private:
    void Update();
@@ -73,6 +74,7 @@ private:
    std::string mCookWarning;
    int mLastCookFrame = -1;
    Mesh mMesh;
+   EditMesh::Selection mSelection;
    const void* mKeyInput = nullptr;
    unsigned long long mKeyRevision = 0, mMeshRevision = 0;
    std::string mKeyOps;

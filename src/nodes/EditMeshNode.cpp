@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include "EditMesh.h"
 
 namespace
 {
@@ -23,6 +22,7 @@ void EditMeshNode::Update()
    {
       mCookWarning.clear();
       mMesh = Mesh();
+      mSelection = EditMesh::Selection();
       mKeyInput = nullptr;
       mBuilt = false;
       return;
@@ -35,7 +35,7 @@ void EditMeshNode::Update()
    mKeyRevision = rev;
    mKeyOps = ops;
    int missed = 0;
-   mMesh = EditMesh::Apply(input->GetMesh(), ops, &missed);
+   mMesh = EditMesh::Apply(input->GetMesh(), ops, &missed, &mSelection);
    mCookWarning = missed > 0 ? std::to_string(missed) + (missed == 1 ? " selection" : " selections") + " not found"
                              : std::string();
    mMeshRevision = NextMeshRevision();
@@ -55,11 +55,6 @@ unsigned long long EditMeshNode::MeshRevision()
       return 0;
    Update();
    return mMeshRevision;
-}
-
-const Mesh& EditMeshNode::InputMesh()
-{
-   return input ? input->GetMesh() : kEmpty;
 }
 
 int EditMeshNode::OpCount() const

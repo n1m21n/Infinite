@@ -11,6 +11,8 @@
 
 namespace EditMesh
 {
+std::vector<int> PointIds(const Mesh& m, int* count);
+
 namespace
 {
    using Key = std::tuple<long long, long long, long long>;
@@ -19,18 +21,6 @@ namespace
    {
       // Welded by position: a cube's split corners are one point.
       return Key(std::llround(v.px * 1e5), std::llround(v.py * 1e5), std::llround(v.pz * 1e5));
-   }
-
-   // A point id per vertex, shared by coincident vertices.
-   std::vector<int> PointIds(const Mesh& m, int* count = nullptr)
-   {
-      std::map<Key, int> ids;
-      std::vector<int> out(m.vertices.size());
-      for (size_t i = 0; i < m.vertices.size(); i++)
-         out[i] = ids.emplace(KeyOf(m.vertices[i]), (int)ids.size()).first->second;
-      if (count)
-         *count = (int)ids.size();
-      return out;
    }
 
    void FaceData(const Mesh& m, size_t f, float c[3], float n[3], float* area = nullptr)
@@ -183,6 +173,17 @@ namespace
       for (int k = 0; k < 3; k++)
          c[k] = n ? (float)(sum[k] / n) : 0.0f;
    }
+}
+
+std::vector<int> PointIds(const Mesh& m, int* count)
+{
+   std::map<Key, int> ids;
+   std::vector<int> out(m.vertices.size());
+   for (size_t i = 0; i < m.vertices.size(); i++)
+      out[i] = ids.emplace(KeyOf(m.vertices[i]), (int)ids.size()).first->second;
+   if (count)
+      *count = (int)ids.size();
+   return out;
 }
 
 std::string FaceSelector(const Mesh& m, size_t face)
@@ -421,7 +422,7 @@ Mesh ExtrudeRegion(const Mesh& in, float distance)
    return out;
 }
 
-Mesh Apply(const Mesh& in, const std::string& ops, int* missed)
+Mesh Apply(const Mesh& in, const std::string& ops, int* missed, Selection* selection)
 {
    Mesh cur = in;
    if (ops.empty())
@@ -451,10 +452,16 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed)
             continue;
          float c[3];
          Median(cur, sel, c);
-         const float r = 3.14159265f / 180.0f;
-         const float cx = std::cos(a[0] * r), sx = std::sin(a[0] * r);
-         const float cy = std::cos(a[1] * r), sy = std::sin(a[1] * r);
-         const float cz = std::cos(a[2] * r), sz = std::sin(a[2] * r);
+         float deg = 0.0f;
+         in >> deg;
+         // Rodrigues: the turn about the unit axis.
+         float ax[3] = { a[0], a[1], a[2] };
+         const float alen = std::sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+         if (op == "rotate" && alen < 1e-9f)
+            continue;
+         for (int k = 0; k < 3 && op == "rotate"; k++)
+            ax[k] /= alen;
+         const float th = deg * 3.14159265f / 180.0f, ct = std::cos(th), st = std::sin(th);
          for (size_t i = 0; i < cur.vertices.size(); i++)
          {
             if (!sel.point[i])
@@ -473,17 +480,10 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed)
                   p[k] *= a[k];
             else
             {
-               float y = p[1] * cx - p[2] * sx, z = p[1] * sx + p[2] * cx;
-               p[1] = y;
-               p[2] = z;
-               float x = p[0] * cy + p[2] * sy;
-               z = -p[0] * sy + p[2] * cy;
-               p[0] = x;
-               p[2] = z;
-               x = p[0] * cz - p[1] * sz;
-               y = p[0] * sz + p[1] * cz;
-               p[0] = x;
-               p[1] = y;
+               const float d = ax[0] * p[0] + ax[1] * p[1] + ax[2] * p[2];
+               const float x[3] = { ax[1] * p[2] - ax[2] * p[1], ax[2] * p[0] - ax[0] * p[2], ax[0] * p[1] - ax[1] * p[0] };
+               for (int k = 0; k < 3; k++)
+                  p[k] = p[k] * ct + x[k] * st + ax[k] * d * (1.0f - ct);
             }
             v.px = p[0] + c[0];
             v.py = p[1] + c[1];
@@ -517,6 +517,8 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed)
    if (moved)
       IndexNormals(cur);
    cur.faceMask.clear();
+   if (selection)
+      *selection = std::move(sel);
    return cur;
 }
 }

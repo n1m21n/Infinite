@@ -14,6 +14,8 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
+#include "core/EditMesh.h"
+#include "nodes/EditMeshNode.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/OutputNode.h"
 #include "nodes/Scene3DNode.h"
@@ -24,6 +26,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <cctype>
 #include <cmath>
 #include <cstring>
@@ -142,6 +145,30 @@ namespace
       Sculpt::GrabHold grab;
       float grabWorld[3] = { 0, 0, 0 };
    } sSculpt;
+   void ToggleEdit(Scene3DNode* scene);
+   // Edit Mode's state; the mode itself is drawn by DrawEdit.
+   struct EditState
+   {
+      bool on = false;
+      int item = 0;
+      int mode = 3;                // 1 points, 2 edges, 3 faces (Blender's 1 2 3)
+      char op = 0;                 // 'g' 'r' 's' 'e' 'i' while one runs
+      int axis = -1;
+      ImVec2 start;
+      float pivot[3] = { 0, 0, 0 };    // world
+      float normal[3] = { 0, 1, 0 };   // world, the selected faces' (extrude)
+      std::string before;              // the ops when the op began
+      bool pressed = false;
+      ImVec2 pressAt;
+      // The shown mesh's edges that are not inside a flat patch, with the
+      // faces on each side, rebuilt when the mesh changes.
+      unsigned long long rev = ~0ull;
+      std::vector<unsigned int> edges;   // two vertices per edge
+      std::vector<int> edgeFaces;        // two faces per edge (-1: none)
+      std::vector<int> point;            // point id per vertex
+      std::vector<float> pos;            // world, per vertex, this frame
+      std::vector<unsigned char> front;  // per face: faces the camera
+   } sEdit;
    float sDist = 6.0f, sAz = 0.7f, sEl = 0.4f;
 
    bool sLasso = false;
@@ -154,7 +181,7 @@ namespace
    // drawing has let go of it.
    struct Pending
    {
-      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene, Sculpt } what = None;
+      enum What { None, Camera, Light, Hdri, PickHdri, Node, Scene, DuplicateScene, PasteScene, DeleteScene, ConvertScene, Sculpt, EditMesh } what = None;
       int lightType = 1;
       int item = 0;
       uint64_t uid = 0;
@@ -2098,6 +2125,7 @@ namespace
       if (MenuParts::Item(T("Clear Follow"), "Alt+P", false, any)) FollowActive(scene, true);
       if (MenuParts::Item(T("Pose Mode"), "Ctrl+Tab", sPose.on, any || sPose.on)) TogglePose(scene);
       if (MenuParts::Item(T("Sculpt Mode"), "Ctrl+Tab", sSculpt.on, any || sSculpt.on)) ToggleSculpt(scene);
+      if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
@@ -2287,6 +2315,8 @@ namespace
          else
             ToggleSculpt(scene);
       }
+      if (!io.KeyShift && !command && !io.KeyAlt && pressed(ImGuiKey_Tab))
+         ToggleEdit(scene);
       if (io.KeyShift && !command && pressed(ImGuiKey_Tab))
       {
          PushUndoCheckpoint("Snap in 3D View");
@@ -3157,6 +3187,8 @@ namespace
       if (gn == nullptr || dynamic_cast<IGeometrySource*>(gn->node.get()) == nullptr)
          return;
       sPose = {};
+      sEdit.on = false;
+      sEdit.op = 0;
       if (SculptOf(*it, world) != nullptr)
       {
          sSculpt.on = true;
@@ -3393,6 +3425,696 @@ namespace
       }
       else
          SculptDab(node, world, mouse);
+      return true;
+   }
+
+   // Edit Mode (Tab on an item, or the chip): the item's Edit Mesh node (one
+   // is added after the item's node if it has none) holds the edits as ops.
+   // Blender's keys: 1 2 3 points, edges, faces; click, Shift+click, drag a
+   // box (Ctrl drags one off); A all, Alt+A none. G R S move, rotate, scale;
+   // E extrude, I inset, X delete; X Y Z lock an axis while one runs. Click or
+   // Enter keeps it, Esc or right-click cancels. Each op is one undo step.
+
+   // The Edit Mesh node under an item (the one nearest the view) and the
+   // matrix from its mesh space to the view's world.
+   EditMeshNode* EditOf(const Item& it, Mat4& world)
+   {
+      GraphNode* gn = FindNodeByUid(it.uid);
+      auto* top = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
+      EditMeshNode* node = nullptr;
+      for (IGeometrySource* s = top; s != nullptr && node == nullptr; s = s->PassthroughSource())
+         node = dynamic_cast<EditMeshNode*>(s);
+      if (node == nullptr)
+         return nullptr;
+      world = Mat4::Multiply(Scene3DNode::Placement(it), top->GetModelMatrix());
+      return node;
+   }
+
+   EditMeshNode* EditTarget(Scene3DNode* scene, Mat4& world)
+   {
+      if (!sEdit.on)
+         return nullptr;
+      const Item* it = scene->FindItem(sEdit.item);
+      EditMeshNode* node = it != nullptr && it->visible ? EditOf(*it, world) : nullptr;
+      if (node == nullptr)
+      {
+         sEdit.on = false;
+         sEdit.op = 0;
+         sEdit.pressed = false;
+      }
+      return node;
+   }
+
+   void ToggleEdit(Scene3DNode* scene)
+   {
+      if (sEdit.on)
+      {
+         Mat4 world;
+         if (EditMeshNode* node = sEdit.op != 0 ? EditTarget(scene, world) : nullptr)
+            node->ops = sEdit.before;
+         sEdit.on = false;
+         sEdit.op = 0;
+         sEdit.pressed = false;
+         return;
+      }
+      Mat4 world;
+      const Item* it = sSel.empty() ? nullptr : scene->FindItem(sSel.back());
+      GraphNode* gn = it != nullptr ? FindNodeByUid(it->uid) : nullptr;
+      if (gn == nullptr || dynamic_cast<IGeometrySource*>(gn->node.get()) == nullptr)
+         return;
+      if (sSculpt.on)
+         ToggleSculpt(scene);
+      sPose = {};
+      sEdit.rev = ~0ull;
+      if (EditOf(*it, world) != nullptr)
+      {
+         sEdit.on = true;
+         sEdit.item = it->id;
+         return;
+      }
+      sPending.what = Pending::EditMesh;
+      sPending.item = it->id;
+   }
+
+   // A new Edit Mesh between the item's node and the view, then Edit Mode on it.
+   void AddEditMesh(Scene3DNode* scene, int itemId)
+   {
+      Item* item = scene->FindItem(itemId);
+      GraphNode* src = item != nullptr ? FindNodeByUid(item->uid) : nullptr;
+      if (src == nullptr || dynamic_cast<IGeometrySource*>(src->node.get()) == nullptr)
+         return;
+      PushUndoCheckpoint("Add Edit Mesh");
+      const int srcIndex = src->index;
+      const ImVec2 at = NodePos(*src);
+      GraphNode* made = SpawnNode("Edit Mesh", "3D", at.x + 320.0f, at.y);   // can move gNodes: src is stale after this
+      std::string error;
+      if (made == nullptr || dynamic_cast<EditMeshNode*>(made->node.get()) == nullptr ||
+          !ConnectNodes(srcIndex, 0, made->index, 0, error))
+         return;
+      item->uid = made->uid;
+      scene->Commit();
+      sEdit.on = true;
+      sEdit.item = itemId;
+      sEdit.rev = ~0ull;
+   }
+
+   // The ops with their trailing sel line (if any) replaced by `sel`.
+   std::string WithSelection(const std::string& ops, const std::string& sel)
+   {
+      std::string out = ops;
+      while (!out.empty() && out.back() == '\n')
+         out.pop_back();
+      const size_t last = out.rfind('\n');
+      const size_t from = last == std::string::npos ? 0 : last + 1;
+      if (out.compare(from, 4, "sel ") == 0)
+         out.erase(from);
+      else if (!out.empty())
+         out += '\n';
+      return out + sel;
+   }
+
+   std::string WithOp(const std::string& ops, const std::string& op)
+   {
+      std::string out = ops;
+      while (!out.empty() && out.back() == '\n')
+         out.pop_back();
+      return out.empty() ? op : out + '\n' + op;
+   }
+
+   // The selection as a sel line: faces in face mode, else their points.
+   std::string SelectionLine(const Mesh& m, const std::vector<unsigned char>& face, const std::vector<unsigned char>& point)
+   {
+      std::string line = sEdit.mode == 3 ? "sel f" : "sel v";
+      if (sEdit.mode == 3)
+      {
+         for (size_t f = 0; f < face.size(); f++)
+            if (face[f])
+               line += EditMesh::FaceSelector(m, f);
+         return line;
+      }
+      std::vector<unsigned char> seen(sEdit.point.empty() ? 0 : *std::max_element(sEdit.point.begin(), sEdit.point.end()) + 1, 0);
+      for (size_t v = 0; v < point.size() && v < sEdit.point.size(); v++)
+         if (point[v] && !seen[sEdit.point[v]])
+         {
+            seen[sEdit.point[v]] = 1;
+            line += EditMesh::PointSelector(m, (unsigned int)v);
+         }
+      return line;
+   }
+
+   void EditRebuild(const Mesh& m)
+   {
+      sEdit.point = EditMesh::PointIds(m);
+      sEdit.edges.clear();
+      sEdit.edgeFaces.clear();
+      const size_t faces = m.FaceCount();
+      std::vector<float> fn(faces * 3);
+      for (size_t f = 0; f < faces; f++)
+      {
+         const Vertex &a = m.vertices[m.indices[f * 3]], &b = m.vertices[m.indices[f * 3 + 1]], &c = m.vertices[m.indices[f * 3 + 2]];
+         const float u[3] = { b.px - a.px, b.py - a.py, b.pz - a.pz }, w[3] = { c.px - a.px, c.py - a.py, c.pz - a.pz };
+         float n[3] = { u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0] };
+         Normalize(n);
+         std::copy(n, n + 3, &fn[f * 3]);
+      }
+      std::map<std::pair<int, int>, size_t> at;
+      for (size_t f = 0; f < faces; f++)
+         for (int k = 0; k < 3; k++)
+         {
+            const unsigned int va = m.indices[f * 3 + k], vb = m.indices[f * 3 + (k + 1) % 3];
+            const int pa = sEdit.point[va], pb = sEdit.point[vb];
+            const std::pair<int, int> key(std::min(pa, pb), std::max(pa, pb));
+            auto it = at.find(key);
+            if (it == at.end())
+            {
+               at.emplace(key, sEdit.edgeFaces.size() / 2);
+               sEdit.edges.push_back(va);
+               sEdit.edges.push_back(vb);
+               sEdit.edgeFaces.push_back((int)f);
+               sEdit.edgeFaces.push_back(-1);
+            }
+            else if (sEdit.edgeFaces[it->second * 2 + 1] < 0)
+               sEdit.edgeFaces[it->second * 2 + 1] = (int)f;
+         }
+      // A diagonal inside a flat patch is not an edge Blender would show.
+      size_t keep = 0;
+      for (size_t e = 0; e * 2 < sEdit.edgeFaces.size(); e++)
+      {
+         const int f0 = sEdit.edgeFaces[e * 2], f1 = sEdit.edgeFaces[e * 2 + 1];
+         if (f1 >= 0 && Dot(&fn[f0 * 3], &fn[f1 * 3]) > 0.9995f)
+            continue;
+         sEdit.edges[keep * 2] = sEdit.edges[e * 2];
+         sEdit.edges[keep * 2 + 1] = sEdit.edges[e * 2 + 1];
+         sEdit.edgeFaces[keep * 2] = f0;
+         sEdit.edgeFaces[keep * 2 + 1] = f1;
+         keep++;
+      }
+      sEdit.edges.resize(keep * 2);
+      sEdit.edgeFaces.resize(keep * 2);
+   }
+
+   // World positions and which faces face the camera, for this frame.
+   void EditFrame(const Mesh& m, const Mat4& world)
+   {
+      sEdit.pos.resize(m.vertices.size() * 3);
+      for (size_t v = 0; v < m.vertices.size(); v++)
+      {
+         const float p[3] = { m.vertices[v].px, m.vertices[v].py, m.vertices[v].pz };
+         TransformBy(world, p, &sEdit.pos[v * 3]);
+      }
+      const size_t faces = m.FaceCount();
+      sEdit.front.assign(faces, 0);
+      for (size_t f = 0; f < faces; f++)
+      {
+         const float* a = &sEdit.pos[m.indices[f * 3] * 3];
+         const float* b = &sEdit.pos[m.indices[f * 3 + 1] * 3];
+         const float* c = &sEdit.pos[m.indices[f * 3 + 2] * 3];
+         const float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, w[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+         const float n[3] = { u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0] };
+         const float view[3] = { a[0] - sCam.eye[0], a[1] - sCam.eye[1], a[2] - sCam.eye[2] };
+         sEdit.front[f] = (sCam.ortho ? Dot(n, sCam.fwd) : Dot(n, view)) < 0.0f;
+      }
+   }
+
+   // The face under the mouse (nearest along the ray), or -1.
+   int EditPickFace(const Mesh& m, ImVec2 mouse)
+   {
+      float o[3], d[3];
+      MouseRay(mouse, o, d);
+      int best = -1;
+      float bestT = 1e30f;
+      for (size_t f = 0; f < m.FaceCount(); f++)
+      {
+         const float* a = &sEdit.pos[m.indices[f * 3] * 3];
+         const float* b = &sEdit.pos[m.indices[f * 3 + 1] * 3];
+         const float* c = &sEdit.pos[m.indices[f * 3 + 2] * 3];
+         const float e1[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, e2[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+         const float pv[3] = { d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0] };
+         const float det = Dot(e1, pv);
+         if (std::fabs(det) < 1e-12f)
+            continue;
+         const float tv[3] = { o[0] - a[0], o[1] - a[1], o[2] - a[2] };
+         const float u = Dot(tv, pv) / det;
+         if (u < 0.0f || u > 1.0f)
+            continue;
+         const float qv[3] = { tv[1] * e1[2] - tv[2] * e1[1], tv[2] * e1[0] - tv[0] * e1[2], tv[0] * e1[1] - tv[1] * e1[0] };
+         const float v = Dot(d, qv) / det;
+         if (v < 0.0f || u + v > 1.0f)
+            continue;
+         const float t = Dot(e2, qv) / det;
+         if (t > 1e-5f && t < bestT)
+         {
+            bestT = t;
+            best = (int)f;
+         }
+      }
+      return best;
+   }
+
+   float SegmentDistance(ImVec2 p, ImVec2 a, ImVec2 b)
+   {
+      const float dx = b.x - a.x, dy = b.y - a.y, len = dx * dx + dy * dy;
+      const float t = len > 0.0f ? std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / len, 0.0f, 1.0f) : 0.0f;
+      return std::hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
+   }
+
+   // A vertex can be picked when a face that faces the camera uses it.
+   std::vector<unsigned char> EditVisiblePoints(const Mesh& m)
+   {
+      std::vector<unsigned char> vis(m.vertices.size(), 0);
+      for (size_t f = 0; f < sEdit.front.size(); f++)
+         if (sEdit.front[f])
+            for (int k = 0; k < 3; k++)
+               vis[m.indices[f * 3 + k]] = 1;
+      return vis;
+   }
+
+   bool EditEdgeVisible(size_t e)
+   {
+      const int f0 = sEdit.edgeFaces[e * 2], f1 = sEdit.edgeFaces[e * 2 + 1];
+      return (f0 >= 0 && sEdit.front[f0]) || (f1 >= 0 && sEdit.front[f1]);
+   }
+
+   // Selects what is under a click (or in a box), adding with Shift, taking
+   // away with Ctrl (a box) or a Shift+click on something already selected.
+   void EditSelect(EditMeshNode* node, const Mesh& m, ImVec2 a, ImVec2 b, bool box)
+   {
+      const ImGuiIO& io = ImGui::GetIO();
+      const EditMesh::Selection& cur = node->Selected();
+      std::vector<unsigned char> face(m.FaceCount(), 0), point(m.vertices.size(), 0);
+      const bool keep = io.KeyShift || (box && io.KeyCtrl);
+      if (keep)
+      {
+         if (cur.face.size() == face.size())
+            face = cur.face;
+         if (cur.point.size() == point.size())
+            point = cur.point;
+      }
+      const ImVec2 lo(std::min(a.x, b.x), std::min(a.y, b.y)), hi(std::max(a.x, b.x), std::max(a.y, b.y));
+      auto inBox = [&](const float* w) {
+         ImVec2 s;
+         return Project(w, s) && s.x >= lo.x && s.x <= hi.x && s.y >= lo.y && s.y <= hi.y;
+      };
+      // What the click or box hits: faces in face mode, else points.
+      std::vector<unsigned char> hitFace(face.size(), 0), hitPoint(point.size(), 0);
+      const std::vector<unsigned char> vis = EditVisiblePoints(m);
+      if (sEdit.mode == 3)
+      {
+         if (box)
+         {
+            for (size_t f = 0; f < face.size(); f++)
+            {
+               if (!sEdit.front[f])
+                  continue;
+               float c[3];
+               for (int k = 0; k < 3; k++)
+                  c[k] = (sEdit.pos[m.indices[f * 3] * 3 + k] + sEdit.pos[m.indices[f * 3 + 1] * 3 + k] + sEdit.pos[m.indices[f * 3 + 2] * 3 + k]) / 3.0f;
+               hitFace[f] = inBox(c);
+            }
+         }
+         else if (const int f = EditPickFace(m, a); f >= 0)
+            for (size_t g : EditMesh::FlatPatch(m, (size_t)f))
+               hitFace[g] = 1;
+      }
+      else if (box)
+      {
+         for (size_t v = 0; v < point.size(); v++)
+            hitPoint[v] = vis[v] && inBox(&sEdit.pos[v * 3]);
+         if (sEdit.mode == 2)
+         {
+            // An edge is in the box when both its ends are.
+            std::vector<unsigned char> ends(point.size(), 0);
+            for (size_t e = 0; e * 2 < sEdit.edges.size(); e++)
+               if (hitPoint[sEdit.edges[e * 2]] && hitPoint[sEdit.edges[e * 2 + 1]])
+                  ends[sEdit.edges[e * 2]] = ends[sEdit.edges[e * 2 + 1]] = 1;
+            hitPoint.swap(ends);
+         }
+      }
+      else if (sEdit.mode == 1)
+      {
+         int best = -1;
+         float bestD = 14.0f;
+         for (size_t v = 0; v < point.size(); v++)
+         {
+            ImVec2 s;
+            if (!vis[v] || !Project(&sEdit.pos[v * 3], s))
+               continue;
+            const float d = std::hypot(s.x - a.x, s.y - a.y);
+            if (d < bestD)
+            {
+               bestD = d;
+               best = (int)v;
+            }
+         }
+         if (best >= 0)
+            hitPoint[best] = 1;
+      }
+      else
+      {
+         int best = -1;
+         float bestD = 10.0f;
+         for (size_t e = 0; e * 2 < sEdit.edges.size(); e++)
+         {
+            ImVec2 sa, sb;
+            if (!EditEdgeVisible(e) || !Project(&sEdit.pos[sEdit.edges[e * 2] * 3], sa) || !Project(&sEdit.pos[sEdit.edges[e * 2 + 1] * 3], sb))
+               continue;
+            const float d = SegmentDistance(a, sa, sb);
+            if (d < bestD)
+            {
+               bestD = d;
+               best = (int)e;
+            }
+         }
+         if (best >= 0)
+            hitPoint[sEdit.edges[best * 2]] = hitPoint[sEdit.edges[best * 2 + 1]] = 1;
+      }
+      // Every vertex of a hit point, so split corners go together.
+      std::vector<unsigned char> hitIds(sEdit.point.empty() ? 0 : *std::max_element(sEdit.point.begin(), sEdit.point.end()) + 1, 0);
+      for (size_t v = 0; v < point.size(); v++)
+         if (hitPoint[v])
+            hitIds[sEdit.point[v]] = 1;
+      bool all = true, any = false;
+      for (size_t f = 0; f < face.size(); f++)
+         if (hitFace[f])
+         {
+            any = true;
+            all = all && face[f];
+         }
+      for (size_t v = 0; v < point.size(); v++)
+         if (hitIds[sEdit.point[v]])
+         {
+            any = true;
+            all = all && point[v];
+         }
+      const bool off = (box && io.KeyCtrl) || (!box && io.KeyShift && any && all);
+      for (size_t f = 0; f < face.size(); f++)
+         if (hitFace[f])
+            face[f] = !off;
+      for (size_t v = 0; v < point.size(); v++)
+         if (hitIds[sEdit.point[v]])
+            point[v] = !off;
+      PushUndoCheckpoint("Select in Edit Mode");
+      node->ops = WithSelection(node->ops, SelectionLine(m, face, point));
+   }
+
+   // Starts G R S E I on the selection.
+   void EditBegin(EditMeshNode* node, const Mesh& m, char op, ImVec2 mouse)
+   {
+      const EditMesh::Selection& sel = node->Selected();
+      const bool needFaces = op == 'e' || op == 'i';
+      bool any = false;
+      float c[3] = { 0, 0, 0 }, n[3] = { 0, 0, 0 };
+      std::vector<unsigned char> seen;
+      int count = 0;
+      for (size_t v = 0; v < sel.point.size() && v < sEdit.point.size(); v++)
+         if (sel.point[v])
+         {
+            if (seen.size() <= (size_t)sEdit.point[v])
+               seen.resize(sEdit.point[v] + 1, 0);
+            if (seen[sEdit.point[v]])
+               continue;
+            seen[sEdit.point[v]] = 1;
+            for (int k = 0; k < 3; k++)
+               c[k] += sEdit.pos[v * 3 + k];
+            count++;
+         }
+      for (size_t f = 0; f < sel.face.size(); f++)
+         if (sel.face[f])
+         {
+            any = true;
+            const float* a = &sEdit.pos[m.indices[f * 3] * 3];
+            const float* b = &sEdit.pos[m.indices[f * 3 + 1] * 3];
+            const float* d = &sEdit.pos[m.indices[f * 3 + 2] * 3];
+            const float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, w[3] = { d[0] - a[0], d[1] - a[1], d[2] - a[2] };
+            n[0] += u[1] * w[2] - u[2] * w[1];
+            n[1] += u[2] * w[0] - u[0] * w[2];
+            n[2] += u[0] * w[1] - u[1] * w[0];
+         }
+      if (count == 0 || (needFaces && !any))
+         return;
+      for (int k = 0; k < 3; k++)
+         sEdit.pivot[k] = c[k] / (float)count;
+      Normalize(n);
+      std::copy(n, n + 3, sEdit.normal);
+      static const char* labels[] = { "Move in Edit Mode", "Rotate in Edit Mode", "Scale in Edit Mode", "Extrude in Edit Mode",
+                                      "Inset in Edit Mode" };
+      PushUndoCheckpoint(labels[op == 'g' ? 0 : op == 'r' ? 1 : op == 's' ? 2 : op == 'e' ? 3 : 4]);
+      sEdit.op = op;
+      sEdit.axis = -1;
+      sEdit.start = mouse;
+      sEdit.before = node->ops;
+   }
+
+   // Pixels per world unit along `dir` at the pivot, and that direction on screen.
+   float ScreenAlong(const float dir[3], ImVec2& unit)
+   {
+      ImVec2 a, b;
+      const float tip[3] = { sEdit.pivot[0] + dir[0], sEdit.pivot[1] + dir[1], sEdit.pivot[2] + dir[2] };
+      if (!Project(sEdit.pivot, a) || !Project(tip, b))
+         return 0.0f;
+      const float len = std::hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-3f)
+         return 0.0f;
+      unit = ImVec2((b.x - a.x) / len, (b.y - a.y) / len);
+      return len;
+   }
+
+   // The running op's line for the mouse where it is.
+   void EditUpdate(EditMeshNode* node, const Mat4& world, ImVec2 mouse)
+   {
+      const Mat4 inv = Mat4::Inverse(world);
+      const float unit = UnitAt(sEdit.pivot);
+      const ImVec2 md(mouse.x - sEdit.start.x, mouse.y - sEdit.start.y);
+      ImVec2 pc;
+      Project(sEdit.pivot, pc);
+      const float axes[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+      char line[160] = "";
+      if (sEdit.op == 'g')
+      {
+         float w[3];
+         if (sEdit.axis >= 0)
+         {
+            ImVec2 dir;
+            const float px = ScreenAlong(axes[sEdit.axis], dir);
+            const float t = px > 0.0f ? (md.x * dir.x + md.y * dir.y) / px : 0.0f;
+            for (int k = 0; k < 3; k++)
+               w[k] = axes[sEdit.axis][k] * t;
+         }
+         else
+            for (int k = 0; k < 3; k++)
+               w[k] = (sCam.right[k] * md.x - sCam.up[k] * md.y) * unit;
+         float m[3];
+         LinearBy(inv, w, m);
+         snprintf(line, sizeof(line), "move %.5g %.5g %.5g", m[0], m[1], m[2]);
+      }
+      else if (sEdit.op == 'r')
+      {
+         const float a0 = std::atan2(-(sEdit.start.y - pc.y), sEdit.start.x - pc.x);
+         const float a1 = std::atan2(-(mouse.y - pc.y), mouse.x - pc.x);
+         float deg = (a1 - a0) * 180.0f / kPi;
+         // About the view axis toward the eye, or the locked axis turned to face it.
+         float w[3] = { -sCam.fwd[0], -sCam.fwd[1], -sCam.fwd[2] };
+         if (sEdit.axis >= 0)
+         {
+            std::copy(axes[sEdit.axis], axes[sEdit.axis] + 3, w);
+            if (Dot(w, sCam.fwd) > 0.0f)
+               deg = -deg;
+         }
+         float m[3];
+         LinearBy(inv, w, m);
+         Normalize(m);
+         snprintf(line, sizeof(line), "rotate %.5g %.5g %.5g %.5g", m[0], m[1], m[2], deg);
+      }
+      else if (sEdit.op == 's')
+      {
+         const float d0 = std::max(1.0f, std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y));
+         const float f = std::hypot(mouse.x - pc.x, mouse.y - pc.y) / d0;
+         float s[3] = { f, f, f };
+         if (sEdit.axis >= 0)
+            for (int k = 0; k < 3; k++)
+               s[k] = k == sEdit.axis ? f : 1.0f;
+         snprintf(line, sizeof(line), "scale %.5g %.5g %.5g", s[0], s[1], s[2]);
+      }
+      else if (sEdit.op == 'e')
+      {
+         ImVec2 dir;
+         const float px = ScreenAlong(sEdit.normal, dir);
+         const float t = px > 2.0f ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
+         snprintf(line, sizeof(line), "extrude %.5g", t / WorldScale(world));
+      }
+      else if (sEdit.op == 'i')
+      {
+         const float d0 = std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y);
+         const float d = std::hypot(mouse.x - pc.x, mouse.y - pc.y);
+         snprintf(line, sizeof(line), "inset %.5g", std::max(0.0f, d0 - d) * unit / WorldScale(world));
+      }
+      node->ops = WithOp(sEdit.before, line);
+   }
+
+   // Draws the mesh's points, edges and selected faces, runs selection and
+   // ops. Returns true while the mode owns the mouse and keys (navigation
+   // still runs).
+   bool DrawEdit(ImDrawList* dl, Scene3DNode* scene, ImVec2 mouse, bool hovered)
+   {
+      Mat4 world;
+      EditMeshNode* node = EditTarget(scene, world);
+      if (node == nullptr)
+         return false;
+      const ImGuiIO& io = ImGui::GetIO();
+      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      const Mesh& m = node->GetMesh();
+      if (node->MeshRevision() != sEdit.rev)
+      {
+         sEdit.rev = node->MeshRevision();
+         EditRebuild(m);
+      }
+      EditFrame(m, world);
+      const EditMesh::Selection& sel = node->Selected();
+      const bool fits = sel.face.size() == m.FaceCount() && sel.point.size() == m.vertices.size();
+
+      // Selected faces, then edges, then points (point mode).
+      for (size_t f = 0; fits && f < sel.face.size(); f++)
+      {
+         ImVec2 a, b, c;
+         if (sel.face[f] && sEdit.front[f] && Project(&sEdit.pos[m.indices[f * 3] * 3], a) &&
+             Project(&sEdit.pos[m.indices[f * 3 + 1] * 3], b) && Project(&sEdit.pos[m.indices[f * 3 + 2] * 3], c))
+            dl->AddTriangleFilled(a, b, c, Hex(kSelected, 0.22f));
+      }
+      for (size_t e = 0; e * 2 < sEdit.edges.size(); e++)
+      {
+         if (!EditEdgeVisible(e))
+            continue;
+         const unsigned int va = sEdit.edges[e * 2], vb = sEdit.edges[e * 2 + 1];
+         const bool on = fits && sel.point[va] && sel.point[vb];
+         Line3D(dl, &sEdit.pos[va * 3], &sEdit.pos[vb * 3], on ? Hex(kSelected) : Hex(0x000000, 0.8f), on ? 2.0f : 1.0f);
+      }
+      if (sEdit.mode == 1)
+      {
+         const std::vector<unsigned char> vis = EditVisiblePoints(m);
+         for (size_t v = 0; v < m.vertices.size(); v++)
+         {
+            ImVec2 s;
+            if (vis[v] && Project(&sEdit.pos[v * 3], s))
+               dl->AddCircleFilled(s, 3.0f, fits && sel.point[v] ? Hex(kSelected) : Hex(0x000000, 0.9f));
+         }
+      }
+
+      // The bar: Points Edges Faces, bottom left.
+      bool onBar = false;
+      {
+         float x = sCam.mn.x + 12.0f;
+         const float y = sCam.mx.y - 54.0f, h = ImGui::GetFontSize() + 8.0f;
+         const char* names[3] = { T("Points"), T("Edges"), T("Faces") };
+         for (int i = 0; i < 3; i++)
+         {
+            const ImVec2 ts = ImGui::CalcTextSize(names[i]);
+            const ImVec2 a(x, y), b(x + ts.x + 14.0f, y + h);
+            const bool hot = hovered && mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
+            const bool on = sEdit.mode == i + 1;
+            dl->AddRectFilled(a, b, Hex(on ? kSelected : 0x000000, hot || on ? 0.85f : 0.45f), h * 0.5f);
+            dl->AddText(ImVec2(a.x + 7.0f, a.y + 4.0f), Hex(0xFFFFFF), names[i]);
+            x = b.x + 4.0f;
+            onBar = onBar || hot;
+            if (hot && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && sEdit.op == 0 && !on)
+            {
+               sEdit.mode = i + 1;
+               if (fits)
+                  node->ops = WithSelection(node->ops, SelectionLine(m, sel.face, sel.point));
+            }
+         }
+      }
+      int count = 0;
+      for (unsigned char f : sel.face)
+         count += f;
+      char label[96];
+      snprintf(label, sizeof(label), "Edit Mode   %d ops   %d faces", node->OpCount(), count);
+      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
+
+      if (sEdit.op != 0)
+      {
+         if (pressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         {
+            node->ops = sEdit.before;
+            sEdit.op = 0;
+            return true;
+         }
+         const ImGuiKey axisKeys[3] = { ImGuiKey_X, ImGuiKey_Y, ImGuiKey_Z };
+         for (int k = 0; k < 3 && sEdit.op != 'e' && sEdit.op != 'i'; k++)
+            if (pressed(axisKeys[k]))
+               sEdit.axis = sEdit.axis == k ? -1 : k;
+         EditUpdate(node, world, mouse);
+         ImVec2 pc;
+         if (sEdit.op != 'g' && Project(sEdit.pivot, pc))
+            dl->AddLine(pc, mouse, Hex(kWire, 0.7f));
+         if (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            sEdit.op = 0;
+         return true;
+      }
+
+      // A press becomes a click or, dragged past a few pixels, a box.
+      if (sEdit.pressed)
+      {
+         const bool boxing = std::hypot(mouse.x - sEdit.pressAt.x, mouse.y - sEdit.pressAt.y) > 4.0f;
+         if (boxing)
+         {
+            const ImVec2 lo(std::min(mouse.x, sEdit.pressAt.x), std::min(mouse.y, sEdit.pressAt.y));
+            const ImVec2 hi(std::max(mouse.x, sEdit.pressAt.x), std::max(mouse.y, sEdit.pressAt.y));
+            dl->AddRectFilled(lo, hi, Hex(0xFFFFFF, 0.06f));
+            dl->AddRect(lo, hi, Hex(0xFFFFFF, 0.6f));
+         }
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            sEdit.pressed = false;
+            EditSelect(node, m, sEdit.pressAt, mouse, boxing);
+         }
+         return true;
+      }
+      if (!hovered || io.WantTextInput)
+         return true;
+      const bool command = io.KeyCtrl || io.KeySuper;
+      if ((!command && !io.KeyShift && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
+      {
+         sEdit.on = false;
+         return true;
+      }
+      if (!command && !io.KeyShift)
+      {
+         const ImGuiKey modes[3] = { ImGuiKey_1, ImGuiKey_2, ImGuiKey_3 };
+         for (int i = 0; i < 3 && !io.KeyAlt; i++)
+            if (pressed(modes[i]) && sEdit.mode != i + 1)
+            {
+               sEdit.mode = i + 1;
+               if (fits)
+                  node->ops = WithSelection(node->ops, SelectionLine(m, sel.face, sel.point));
+            }
+         if (pressed(ImGuiKey_A))
+         {
+            PushUndoCheckpoint("Select in Edit Mode");
+            node->ops = WithSelection(node->ops, io.KeyAlt ? std::string(sEdit.mode == 3 ? "sel f" : "sel v") : std::string("sel all"));
+         }
+         if (!io.KeyAlt)
+         {
+            const struct { ImGuiKey key; char op; } ops[] = { { ImGuiKey_G, 'g' }, { ImGuiKey_R, 'r' }, { ImGuiKey_S, 's' },
+                                                              { ImGuiKey_E, 'e' }, { ImGuiKey_I, 'i' } };
+            for (const auto& o : ops)
+               if (pressed(o.key))
+               {
+                  EditBegin(node, m, o.op, mouse);
+                  return true;
+               }
+            if ((pressed(ImGuiKey_X) || pressed(ImGuiKey_Delete)) && fits &&
+                std::find(sel.face.begin(), sel.face.end(), 1) != sel.face.end())
+            {
+               PushUndoCheckpoint("Delete in Edit Mode");
+               node->ops = WithOp(node->ops, "delete");
+            }
+         }
+      }
+      if (!onBar && !io.KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      {
+         sEdit.pressed = true;
+         sEdit.pressAt = mouse;
+      }
       return true;
    }
 
@@ -4248,7 +4970,7 @@ namespace
          DrawToolpad(dl, scene, mn, mx, mouse, hovered && sOp.mode == 0, onPad);
       onNav = onNav || onPad;
       int hot = -1;
-      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove && !sPose.on && !sSculpt.on)
+      if (selCount > 0 && sOp.mode == 0 && !cameraSelected && sOverlays && sSet->gizmoMove && !sPose.on && !sSculpt.on && !sEdit.on)
       {
          float center[3];
          PivotPoint(scene, center);
@@ -4275,8 +4997,9 @@ namespace
             dl->AddLine(c, mouse, Hex(kWire, 0.7f));
       }
 
-      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered));
-      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sSculpt.stroking || sSculpt.adjust != 0;
+      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered) ||
+                                            DrawEdit(dl, scene, mouse, hovered));
+      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sRightOk = sOp.mode == 0 && !posing;
       if (!posing)
@@ -4662,6 +5385,8 @@ namespace
       if (IconChip("##v3dscale", IconsInfinite::ToolScale, sTool == 3, T("Scale tool (Shift+Space, S). S scales at once"))) sTool = 3;
       next();
       if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
+      next();
+      if (IconChip("##v3dedit", IconsInfinite::GridDots, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
       gap();
       if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
       next();
@@ -7094,6 +7819,8 @@ namespace
          DeleteScene(scene);
       else if (todo.what == Pending::Sculpt)
          AddSculpt(scene, todo.item);
+      else if (todo.what == Pending::EditMesh)
+         AddEditMesh(scene, todo.item);
       else if (todo.what == Pending::Node)
          if (GraphNode* gn = FindNodeByUid(todo.uid))
             View3DAddNode(*gn);
