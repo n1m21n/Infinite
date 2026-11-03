@@ -178,6 +178,11 @@ bool Render3DNode::CookPathTrace(int frameId)
       const bool ortho = proj.m[11] == 0.0f;
       const float invFy = 1.0f / std::max(1e-6f, std::fabs(proj.m[5]));
       pt.SetCameraBasis(mLastCamera.eye, right, up, fwd, invFy, (float)w / (float)h, ortho ? invFy : 0.0f);
+      // Depth of field as a real lens, the same blur raster's pass gives: its circle is dofAperture x 24 px
+      // across a 1080 frame at |d - focus| / d, so the aperture radius is that share of the focus plane's
+      // full height, 2 x focus x tan(fov / 2).
+      const float lens = ortho || dofAperture <= 0.0f ? 0.0f : dofAperture * (24.0f / 1080.0f) * 2.0f * focusDistance * invFy;
+      pt.SetLens(lens, focusDistance, dofBlades, dofRotation * 3.14159265f / 180.0f, dofRatio);
 
       // Lights, in raster's units: radiance = linear colour x power x falloff. A hard falloff k is
       // 1 / (d^2 * -k), so the tracer's inverse square takes 1 / -k into the colour.

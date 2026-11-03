@@ -27,6 +27,15 @@ public:
       float metallic = 0.0f;
       float roughness = 0.5f;
       float emission[3] = { 0.0f, 0.0f, 0.0f };  // linear RGB radiance
+      float ior = 1.5f;
+      float specular = 0.5f;          // dielectric reflectance level, as Material's
+      float transmission = 0.0f;      // glass share (metallic takes it back)
+      float transmissionRoughness = 0.0f;
+      float clearcoat = 0.0f;
+      float clearcoatRoughness = 0.03f;
+      float sheen = 0.0f;
+      float sheenRoughness = 0.5f;
+      float sheenColor[3] = { 1.0f, 1.0f, 1.0f }; // linear RGB
 
       static PtMaterial FromLinear(float r, float g, float b, float rough = 0.5f, float metal = 0.0f,
                                    float emR = 0.0f, float emG = 0.0f, float emB = 0.0f);
@@ -87,6 +96,9 @@ public:
    // worldAsBackground false: a camera ray that misses shows `srgb` at `opacity`, as Render 3D's
    // clear colour does, instead of the world. Display only; the samples are kept.
    void SetBackground(bool worldAsBackground, const float srgb[3], float opacity);
+   // A thin lens: radius in world units (0 a pinhole), the distance that stays sharp, and the
+   // aperture as Render 3D's bokeh: blades (below 3 round), their turn in radians, the tall/wide ratio.
+   void SetLens(float radius, float focusDistance, int blades, float rotationRad, float ratio);
 
    // Resets progressive accumulation without re-uploading the scene BVH.
    void ResetAccumulation();
@@ -163,6 +175,9 @@ private:
    float mTanHalfFovY = 0.36397023f;
    float mAspect = 1.0f;
    float mOrthoHalfH = 0.0f;
+   float mLensRadius = 0.0f;
+   float mFocusDist = 4.0f;
+   float mBokeh[3] = { 0.0f, 0.0f, 1.0f };
    float mWorldColor[3] = { 0.0f, 0.0f, 0.0f };
    unsigned int mEnvTex = 0;
    bool mEnvGradient = false;
