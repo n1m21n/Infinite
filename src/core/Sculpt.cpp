@@ -639,11 +639,11 @@ namespace Sculpt
             {
                case kDraw:
                   for (int k = 0; k < 3; k++)
-                     move[k] = a.normal[k] * d.radius * 0.15f * f * sign;
+                     move[k] = a.normal[k] * d.radius * 0.375f * f * sign;
                   break;
                case kInflate:
                   for (int k = 0; k < 3; k++)
-                     move[k] = n[k] * d.radius * 0.15f * f * sign;
+                     move[k] = n[k] * d.radius * 0.33f * f * sign;
                   break;
                case kSmooth:
                {
@@ -654,7 +654,7 @@ namespace Sculpt
                   for (unsigned int b = b0; b < b1; b++)
                      for (int k = 0; k < 3; k++)
                         avg[k] += pos[(size_t)t.nbr[b] * 3 + k];
-                  const float w = std::min(1.0f, f * std::clamp(d.strength, 0.0f, 1.0f));
+                  const float w = std::min(1.0f, f * std::clamp(d.strength, 0.0f, 1.0f) * 3.3f);
                   for (int k = 0; k < 3; k++)
                      move[k] = (avg[k] / (float)(b1 - b0) - p[k]) * w;
                   break;
@@ -666,12 +666,12 @@ namespace Sculpt
                   const float along = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
                   for (int k = 0; k < 3; k++)
                      to[k] -= a.normal[k] * along;
-                  const float pull = d.brush == kPinch ? 0.2f : 0.25f;
+                  const float pull = d.brush == kPinch ? 0.5f : 0.8f;
                   for (int k = 0; k < 3; k++)
                      move[k] = to[k] * pull * f * (d.brush == kPinch ? sign : 1.0f);
                   if (d.brush == kCrease)
                      for (int k = 0; k < 3; k++)
-                        move[k] -= a.normal[k] * d.radius * 0.15f * f * sign;
+                        move[k] -= a.normal[k] * d.radius * 0.48f * f * sign;
                   break;
                }
                case kFlatten:
@@ -679,7 +679,7 @@ namespace Sculpt
                   const float h = (p[0] - a.center[0]) * a.normal[0] + (p[1] - a.center[1]) * a.normal[1] +
                                   (p[2] - a.center[2]) * a.normal[2];
                   for (int k = 0; k < 3; k++)
-                     move[k] = -a.normal[k] * h * 0.3f * f * sign;
+                     move[k] = -a.normal[k] * h * 0.6f * f * sign;
                   break;
                }
                default:
