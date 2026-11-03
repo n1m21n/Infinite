@@ -91,6 +91,29 @@ def dof_aperture(cam, aspect):
     return mm * mm / (cam["fstop"] * (focus_mm - mm)) / span * 45.0
 
 
+def gltf_material(path):
+    """What SpawnGltfParts (a glTF dropped on the canvas) builds for part 0: the file's factors and which
+    maps exist, as (Material params, {Material slot: Image Source slot})."""
+    import struct
+    b = open(path, "rb").read()
+    j = json.loads(b[20:20 + struct.unpack("<I", b[12:16])[0]])
+    mat = j["materials"][0]
+    pbr = mat.get("pbrMetallicRoughness", {})
+    base = pbr.get("baseColorFactor", [1, 1, 1, 1])
+    lines = ["  c color %g %g %g" % tuple(base[:3]), "  f opacity %g" % base[3],
+             "  f metallic %g" % pbr.get("metallicFactor", 1.0), "  f roughness %g" % pbr.get("roughnessFactor", 1.0)]
+    em = mat.get("emissiveFactor", [0, 0, 0])
+    if any(em):
+        lines += ["  c emissionColor %g %g %g" % tuple(em), "  f emission 1"]
+    maps = {}
+    if "baseColorTexture" in pbr: maps["albedo"] = "albedo"
+    if "metallicRoughnessTexture" in pbr: maps["roughness"] = "roughness"; maps["metallic"] = "metallic"
+    if "normalTexture" in mat: maps["normal"] = "normal"
+    if "occlusionTexture" in mat: maps["ao"] = "ao"
+    if "emissiveTexture" in mat: maps["emission"] = "emission"
+    return lines, maps
+
+
 def to_patch(scene, case, frame=None):
     """The scene as an Infinite patch: Model 3D + Material per object (the glbs Blender wrote),
     Group 3D when there are more than four, Camera, Lights, Render 3D."""
@@ -114,7 +137,15 @@ def to_patch(scene, case, frame=None):
                       "  f posX %g" % x, "  f posY %g" % z, "  f posZ %g" % -y, "  f scale %g" % o.get("scale", 1.0)]
             if o.get("clip"):
                 lines_ += ["  i clip %d" % o["clip"], "  f clipSpeed 0", "  f clipPhase %g" % (frame or {}).get("phase", 0.0)]
-            geos.append(node("3D", "Model 3D", lines_))
+            path = asset_file(o)
+            mlines, maps = gltf_material(path)
+            model = node("3D", "Model 3D", lines_)
+            mat = node("3D", "Material", mlines)
+            wires.append("geo %d 0 %d" % (mat, model))
+            for slot in maps:
+                tex = node("Source", "Image Source", ["  s path gltf://%s#%s" % (path, slot)])
+                wires.append("cable %d %s %d" % (mat, slot, tex))
+            geos.append(mat)
             continue
         model = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "obj_%d.glb" % i),
                                         "  b normalize 0", "  b recenter 0"])
