@@ -3618,6 +3618,48 @@ void RunView3DTest()
       Check("the grid draws on the ground", ground > 0);
       Check("the grid stays behind the sphere", covered > 0 && through == 0);
    }
+   // The mesh wins where it meets the floor: a cube standing half below the ground, seen from the
+   // front, must not show grid colour on its face along the height of the ground plane.
+   for (float height : { 0.4f, 1.5f, 30.0f })
+   {
+      const float eye[3] = { 0.0f, height, 4.0f * height }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
+      Scene3DNode::View view;
+      view.view = Mat4::LookAt(eye, target, up);
+      view.proj = Mat4::Perspective((height > 2.0f ? 12.0f : 40.0f) * 3.14159265f / 180.0f, 1.0f, 0.01f, 1000.0f);
+      std::copy(eye, eye + 3, view.eye);
+      view.shading = Scene3DNode::Shading::Solid;
+      view.gridDist = 4.0f * height;
+      std::vector<float> off, on;
+      for (int g = 0; g < 2; g++)
+      {
+         view.grid = g == 1;
+         Scene()->CookIfNeeded(++sCookFrame);
+         Scene()->RenderView(256, 256, view);
+         const unsigned int tex = Scene()->RenderView(256, 256, view);
+         std::vector<float>& px = g == 1 ? on : off;
+         px.assign(256 * 256 * 4, 0.0f);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+      }
+      // Rows of the cube front face from one below to a few above where the ground plane crosses it (z = 0.5, y = 0).
+      const Mat4 vp = Mat4::Multiply(view.proj, view.view);
+      const float cy = vp.m[9] * 0.5f + vp.m[13], cw = vp.m[11] * 0.5f + vp.m[15];
+      const int seam = (int)((cy / cw * 0.5f + 0.5f) * 256.0f);
+      int band = 0, bad = 0;
+      for (int row = seam - 1; row <= seam + 5; row++)
+         for (int col = 112; col < 144; col++)
+         {
+            const size_t i = ((size_t)row * 256 + col) * 4;
+            if (off[i + 3] < 0.99f)
+               continue;
+            band++;
+            const bool hit = std::abs(on[i] - off[i]) + std::abs(on[i + 1] - off[i + 1]) + std::abs(on[i + 2] - off[i + 2]) > 0.02f;
+            bad += hit ? 1 : 0;
+         }
+      printf("  floor seam from %.1f: %d face px above the floor line, %d with grid on them\n", height, band, bad);
+      Check("the cube face is clear of the grid at floor height", band > 0 && bad == 0);
+   }
    shown->worldColorOn = true;
    // A camera's background image: behind the objects, over them, and only in the view.
    {
