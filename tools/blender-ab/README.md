@@ -146,3 +146,40 @@ Unit mapping (`physics.patch` holds it):
 skipped without it. `INFINITE_BIN` points the run at another build.
 
 A case fails when its error rises more than 10% over `baseline_physics.json`.
+
+## Sculpt cases (brush moves, not pictures)
+
+```
+python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt                  # every sculpt case
+python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt drag_draw        # one case
+python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt --set-baseline
+```
+
+```
+sculpt.py CASES ──case.json──> blender_sculpt.py prep (-b) ──> base.glb, base.blend, dabs.json
+   dabs.json ──> blender_sculpt.py sculpt (a window, a few seconds) ──> truth.txt (points before/after)
+   dabs.txt  ──> Infinite INFINITE_SCULPTTEST_STROKES ──> inf.txt (points before/after)
+truth.txt + inf.txt ──> per-point move compared ──> err, gain; Workbench renders ──> board.png
+```
+
+Blender's brushes need a 3D view, so the sculpt step opens a Blender window. Each dab activates the
+Essentials brush of the same kind, with radius and strength set on the brush (unified size off).
+
+| Case | What it tests |
+|---|---|
+| `sculpt_<brush>` | one dab on a sphere (on a starting bump for Smooth, Pinch and Flatten) |
+| `drag_<brush>` | one drag across the top: Blender spaces its own dabs, Infinite one per 0.15 radius as the 3D View does |
+| `sculpt_deer` | drags on the owner's deer (`DEER_GLB`; skipped without it) |
+
+| Number | Meaning |
+|---|---|
+| `err` | rms of (Infinite move − Blender move) / rms of Blender's move (0 = the same) |
+| `gain` | Infinite's total move / Blender's (1 = as strong) |
+
+Things Blender 5 needs that are easy to miss: `unprojected_size` is a diameter; the view matrices
+must be refreshed (`rv3d.update()`) before the mouse is projected; Pinch and Flatten skip a stroke's
+first sample, so a single dab gets a lead-in sample.
+
+Infinite's brush strengths are fitted to the drags (what a user does). The cross-section still differs:
+Blender's drag ridge has a flat top, Infinite's is peaked. A case fails when its error rises more than
+10% over `baseline_sculpt.json`.
