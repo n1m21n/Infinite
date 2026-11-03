@@ -183,6 +183,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Deep House Organ Bass Synth](https://infinitedevices.org/library/deep-house-organ-bass-synth.html): Classic Chicago deep house organ bass synthesizer with punchy percussive transient click, sub-harmonic octave warmth, and tight saturated decay. (file: https://infinitedevices.org/assets/templates/deep-house-organ-bass-synth.inf)
 - [Jungle Amen Tape Delay FX](https://infinitedevices.org/library/jungle-amen-tape-delay-fx.html): Vintage sound system tape delay processor with 16th-sync ping-pong repeats, high-frequency tape saturation damping, and analog flutter modulation. (file: https://infinitedevices.org/assets/templates/jungle-amen-tape-delay-fx.inf)
 - [Jungle Sub Bass Resonator FX](https://infinitedevices.org/library/jungle-sub-bass-resonator-fx.html): Heavy sound system sub-bass filter and harmonic resonator with tuned low-end boost, asymmetric saturation drive, and transient preservation. (file: https://infinitedevices.org/assets/templates/jungle-sub-bass-resonator-fx.inf)
+- [Industrial Techno Warehouse Rumble Synth](https://infinitedevices.org/library/industrial-techno-warehouse-rumble-synth.html): Heavily saturated industrial warehouse techno kick-rumble synthesizer with pitch-decay transient thump, wavefolded low-end resonance, and asymmetric drive. (file: https://infinitedevices.org/assets/templates/industrial-techno-warehouse-rumble-synth.inf)
+- [Industrial Techno Metallic FM Synth](https://infinitedevices.org/library/industrial-techno-metallic-fm-synth.html): Raw industrial FM percussion synthesizer with metallic inharmonic operator modulation, snappy noise-burst transient, and gritty wavefolded decay. (file: https://infinitedevices.org/assets/templates/industrial-techno-metallic-fm-synth.inf)
+- [Classic Trance Euphoric Delay FX](https://infinitedevices.org/library/classic-trance-euphoric-delay-fx.html): Anthemic trance stereo delay line with synchronized 16th-note repeats, progressive high-frequency damping, gentle flutter modulation, and lush stereo width. (file: https://infinitedevices.org/assets/templates/classic-trance-euphoric-delay-fx.inf)
+- [Classic Trance Resonant Sweep FX](https://infinitedevices.org/library/classic-trance-resonant-sweep-fx.html): Euphoric trance resonant state-variable filter and harmonic exciter with modulated peak sweep, warm analog saturation, and dynamic stereo presence. (file: https://infinitedevices.org/assets/templates/classic-trance-resonant-sweep-fx.inf)
 
 ## Library: Community
 
@@ -543,7 +547,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 66 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 68 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -560,4 +564,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 51 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 53 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

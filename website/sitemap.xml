@@ -104,6 +104,8 @@
   <url><loc>https://infinitedevices.org/embeds/holographic-iridescent-prismatic-flux.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/glitch-datamosh-buffer-tear.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/glitch-datamosh-pixel-displace.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cyberpunk-neon-rain-reflections.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cyberpunk-neon-hologram-grid.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-11-03</lastmod><priority>0.7</priority></url>
@@ -207,6 +209,10 @@
   <url><loc>https://infinitedevices.org/library/deep-house-organ-bass-synth.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/jungle-amen-tape-delay-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/jungle-sub-bass-resonator-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-rumble-synth.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-metallic-fm-synth.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-euphoric-delay-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-resonant-sweep-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
@@ -581,6 +587,16 @@
   <url><loc>https://infinitedevices.org/library/jungle-sub-bass-resonator-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-buffer-tear.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-datamosh-pixel-displace.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/thundr-brutalist-hazard-crosshair.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/thundr-brutalist-technical-slab.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-grid-perspective-horizon-3d.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/synthwave-grid-neon-monolith-3d.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-warehouse-rumble-synth.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/industrial-techno-metallic-fm-synth.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-euphoric-delay-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/classic-trance-resonant-sweep-fx.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cyberpunk-neon-rain-reflections.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cyberpunk-neon-hologram-grid.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-03</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-03</lastmod><priority>0.5</priority></url>

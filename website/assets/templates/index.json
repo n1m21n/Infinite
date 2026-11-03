@@ -1443,6 +1443,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "industrial-techno-warehouse-rumble-synth",
+      "name": "Industrial Techno Warehouse Rumble Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Heavily saturated industrial warehouse techno kick-rumble synthesizer with pitch-decay transient thump, wavefolded low-end resonance, and asymmetric drive.",
+      "price": 0,
+      "preview": "assets/templates/industrial-techno-warehouse-rumble-synth.webp",
+      "file": "assets/templates/industrial-techno-warehouse-rumble-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "industrial-techno-metallic-fm-synth",
+      "name": "Industrial Techno Metallic FM Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Raw industrial FM percussion synthesizer with metallic inharmonic operator modulation, snappy noise-burst transient, and gritty wavefolded decay.",
+      "price": 0,
+      "preview": "assets/templates/industrial-techno-metallic-fm-synth.webp",
+      "file": "assets/templates/industrial-techno-metallic-fm-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "classic-trance-euphoric-delay-fx",
+      "name": "Classic Trance Euphoric Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Anthemic trance stereo delay line with synchronized 16th-note repeats, progressive high-frequency damping, gentle flutter modulation, and lush stereo width.",
+      "price": 0,
+      "preview": "assets/templates/classic-trance-euphoric-delay-fx.webp",
+      "file": "assets/templates/classic-trance-euphoric-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "classic-trance-resonant-sweep-fx",
+      "name": "Classic Trance Resonant Sweep FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Euphoric trance resonant state-variable filter and harmonic exciter with modulated peak sweep, warm analog saturation, and dynamic stereo presence.",
+      "price": 0,
+      "preview": "assets/templates/classic-trance-resonant-sweep-fx.webp",
+      "file": "assets/templates/classic-trance-resonant-sweep-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

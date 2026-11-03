@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Classic Trance Resonant Sweep FX",
+    "author": "Infinite",
+    "description": "Euphoric trance resonant state-variable filter and harmonic exciter with modulated peak sweep, warm analog saturation, and dynamic stereo presence.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float centerFreq = 1600.0 [300.0, 4500.0]\nparam float resonance = 0.48 [0.1, 0.88]\nparam float sweepDepth = 0.65 [0.0, 1.0]\nparam float sweepRate = 0.28 [0.05, 1.5]\nparam float mix = 0.65 [0.0, 1.0]\nstate float lp1 = 0\nstate float lp2 = 0\nstate float lfo = 0\n\nlfo = (lfo + sweepRate / sr) % 1.0\nmod = (sin(lfo * 6.2831853) * 0.5 + 0.5) * sweepDepth\n\nfMod = centerFreq * (1.0 + mod * 1.8)\nfCut = clamp(fMod / sr * 2.4, 0.012, 0.45)\n\nlp1 = lp1 + fCut * (in - lp1 - resonance * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * 1.45\nsat = clamp(u - 0.22 * u * u * u, -0.95, 0.95)\n\nout = (in * (1.0 - mix) + sat * mix) * 1.32\n",
+    "params": {
+      "centerFreq": 1600.0,
+      "resonance": 0.48,
+      "sweepDepth": 0.65,
+      "sweepRate": 0.28,
+      "mix": 0.65
+    }
+  }
+}

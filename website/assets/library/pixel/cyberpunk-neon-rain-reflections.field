@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cyberpunk Neon Rain Reflections",
+    "author": "Infinite",
+    "description": "Wet asphalt neon reflection shader with vertical rain streak refraction, glowing magenta-cyan billboard bloom, and dynamic chromatic aberration.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float rainSpeed = 1.2 [0.2, 3.0]\nparam float puddleRipple = 0.85 [0.1, 2.0]\nparam float neonIntensity = 1.4 [0.5, 3.0]\nparam float chromaticOffset = 0.06 [0.01, 0.2]\nparam float scanlineDarkness = 0.3 [0.0, 0.8]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * 0.8\n\nrain = sin(p.x * 32.0 + time * 14.0 * rainSpeed) * 0.05\npuddle = sin(length(p) * 14.0 - time * 3.0) * 0.08 * puddleRipple\npDist = vec2(p.x + rain * (p.y + 1.0), p.y + puddle)\n\nbeamM = clamp(sin(pDist.x * 4.0 - time * 1.2) * 0.5 + 0.5, 0.0, 1.0)\nbeamC = clamp(cos(pDist.x * 4.0 + time * 1.5) * 0.5 + 0.5, 0.0, 1.0)\nbloom = clamp(1.0 - length(pDist) * 0.55, 0.0, 1.0)\n\nground = clamp((0.1 - p.y) * 2.0, 0.0, 1.0)\n\ncBg = vec3(0.04, 0.01, 0.08)\ncMagenta = vec3(1.0, 0.05, 0.56)\ncCyan = vec3(0.0, 0.94, 1.0)\ncYellow = vec3(0.99, 0.93, 0.04)\n\ncol = cBg + cMagenta * beamM * 0.65 * neonIntensity + cCyan * beamC * 0.65 * neonIntensity\ncol = col + cYellow * bloom * ground * 0.45\n\nscan = clamp(sin(uv.y * 520.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = col * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "rainSpeed": 1.2,
+      "puddleRipple": 0.85,
+      "neonIntensity": 1.4,
+      "chromaticOffset": 0.06,
+      "scanlineDarkness": 0.3
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

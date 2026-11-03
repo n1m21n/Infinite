@@ -330,6 +330,16 @@
       "slug": "glitch-datamosh-pixel-displace",
       "title": "Glitch Datamosh Pixel Displace",
       "description": "Digital compression artifact displacement shader with quantized mosaic buffer slices, feedback edge bleeding, and dynamic scanline wave distortion. Bass modulates quantized pixel block fragmentation, mids warp scanline wave shearing, highs trigger phosphor edge luminance flares."
+    },
+    {
+      "slug": "cyberpunk-neon-rain-reflections",
+      "title": "Cyberpunk Neon Rain Reflections",
+      "description": "Wet asphalt neon reflection shader with vertical rain streak refraction, glowing magenta-cyan billboard bloom, and dynamic chromatic aberration. Bass pulses ground-level wet reflection waves, mids shift holographic sign distortions, highs spark luminous rain droplet flares."
+    },
+    {
+      "slug": "cyberpunk-neon-hologram-grid",
+      "title": "Cyberpunk Neon Hologram Grid",
+      "description": "Volumetric neon city hologram shader with segmented cyberpunk signage matrices, phosphor scanline bleeding, and radiant chromatic light corridors. Bass triggers volumetric hologram grid surges, mids warp matrix column alignment, highs trigger phosphor beam luminance spikes."
     }
   ]
 }
