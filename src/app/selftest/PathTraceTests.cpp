@@ -389,7 +389,9 @@ bool RunPathTraceTest()
          std::vector<float> px;
          int w = 0, h = 0;
          const float eye[3] = { 0, 0, 3 }, target[3] = { 0, 0, 0 }, up[3] = { 0, 1, 0 };
-         bool ok = mapPt.UploadScene({ quad }, { inst }, { mat });
+         // the mapped material is the second one, so its maps are found past material 0's
+         inst.materialId = 1;
+         bool ok = mapPt.UploadScene({ quad }, { inst }, { Render3DPathTrace::PtMaterial(), mat });
          mapPt.SetCameraLookAt(eye, target, up, 40.0f, 1.0f);
          mapPt.SetWorldColorLinear(1.0f, 1.0f, 1.0f);
          ok = ok && mapPt.RenderToSpp(64, 64, 4) && mapPt.ReadLinearRGBA32F(px, w, h);

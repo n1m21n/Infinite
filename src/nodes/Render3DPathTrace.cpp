@@ -1435,7 +1435,7 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       const PtMaterial& m = mats[i];
       float anyMap = 0.0f;
       for (int k = 0; k < PtMaterial::kMapSlots; k++)
-         anyMap = std::max(anyMap, rects[i * PtMaterial::kMapSlots + k * 4 + 2] > 0.0f ? 1.0f : 0.0f);
+         anyMap = std::max(anyMap, rects[(i * PtMaterial::kMapSlots + k) * 4 + 2] > 0.0f ? 1.0f : 0.0f);
       const float t[44] = { m.baseColor[0], m.baseColor[1], m.baseColor[2], m.metallic,
                             m.roughness, m.emission[0], m.emission[1], m.emission[2],
                             m.ior, m.specular, m.transmission, m.transmissionRoughness,
