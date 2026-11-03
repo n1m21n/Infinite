@@ -196,6 +196,19 @@ namespace
       sFindings.push_back({ check, state, win, r.label.empty() ? "(no label)" : r.label, buf });
    }
 
+   // UiInteract items carry a key ("lib.modules", "##grip") as their ImGui label; it is never drawn.
+   bool IdLike(const std::string& l) { return l.rfind("##", 0) == 0 || (l.find('.') != std::string::npos && l.find(' ') == std::string::npos); }
+
+   // A control in an AudioKnobRow cell: its caption is drawn by the row and cut with an ellipsis, never spilled.
+   bool InRow(const Rec& r)
+   {
+      const ImVec2 c = r.bb.GetCenter();
+      for (const RowBox& row : sRowsLast)
+         if (c.y >= row.y0 && c.y <= row.y0 + row.rowH && c.x >= row.x0 && c.x <= row.x0 + row.cellW * row.count)
+            return true;
+      return false;
+   }
+
    bool Visible(const Rec& r) { return r.bb.Overlaps(r.clip) && r.bb.GetWidth() > 0 && r.bb.GetHeight() > 0; }
    bool FullyShown(const Rec& r) { return r.clip.Contains(r.bb); }
 
@@ -207,6 +220,14 @@ namespace
    float Ratio(const ImVec4& a, const ImVec4& b)
    {
       return CategoryColors::ContrastRatio({ a.x, a.y, a.z }, { b.x, b.y, b.z });
+   }
+
+   // The canvas window also holds the app's own menu bar and transport: only what sits on the node counts.
+   bool InsideNode(const Rec& r, const ImRect& box)
+   {
+      ImRect b = box;
+      b.Expand(30.0f);
+      return b.Contains(r.bb.GetCenter());
    }
 
    // Layer 2: every item of one frame, no input. `scope` is a node type name while one node sits alone on the
@@ -230,7 +251,7 @@ namespace
             if (n > best) { best = n; canvas = w; }
          std::vector<Rec> keep;
          for (Rec& r : recs)
-            if (r.window == canvas)
+            if (r.window == canvas && InsideNode(r, nb->box))
             {
                r.window = "node " + scope;
                keep.push_back(std::move(r));
@@ -276,7 +297,7 @@ namespace
             Add("text overflow", state, r, "%.0f px of text in %.0f", in->textW, in->availW);
          else if (sn != nullptr && sn->textW > r.bb.GetWidth() - 4.0f)
             Add("text overflow", state, r, "value %.0f px in %.0f", sn->textW, r.bb.GetWidth());
-         else if (in == nullptr && sn == nullptr && !r.checkable && r.labelW > r.bb.GetWidth() + 0.5f)
+         else if (in == nullptr && sn == nullptr && !r.checkable && !IdLike(r.label) && !InRow(r) && r.labelW > r.bb.GetWidth() + 0.5f)
             Add("text overflow", state, r, "label %.0f px in %.0f", r.labelW, r.bb.GetWidth());
          // ... or past the node's own edge.
          if (nb != nullptr)
@@ -428,6 +449,20 @@ namespace
       return PatchJson::ToJson(d).dump();
    }
 
+   // Where two fingerprints first differ, as a short quote of the new text.
+   std::string FirstDiff(const std::string& a, const std::string& b)
+   {
+      size_t i = 0;
+      while (i < a.size() && i < b.size() && a[i] == b[i])
+         i++;
+      const size_t from = i > 30 ? i - 30 : 0;
+      std::string q = b.substr(from, 60);
+      for (char& c : q)
+         if (c == '\t' || c == '\n')
+            c = ' ';
+      return q;
+   }
+
    // Layer 3. Kinds: slider (press at 25%, drag to each end, release, undo), hover (wheel over it, nothing changes),
    // popup (dropdown, colour dot: one popup opens, Esc closes it, nothing changes), toggle (click twice).
    enum class Kind { Slider, Hover, Popup, Toggle };
@@ -480,7 +515,7 @@ namespace
       if (k.kind == Kind::Hover)
       {
          if (Fingerprint() != k.fp0)
-            Add("hover/scroll changes value", k.state, r, "hover + wheel altered the patch");
+            Add("hover/scroll changes value", k.state, r, "near: %s", FirstDiff(k.fp0, Fingerprint()).c_str());
          return;
       }
       if (k.kind == Kind::Popup)
@@ -492,7 +527,7 @@ namespace
          if (k.popupsAfter > 0)
             Add("Esc does not close", k.state, r, "%d popups still open after Esc", k.popupsAfter);
          if (Fingerprint() != k.fp0)
-            Add("popup changes value", k.state, r, "open + Esc altered the patch");
+            Add("popup changes value", k.state, r, "near: %s", FirstDiff(k.fp0, Fingerprint()).c_str());
          return;
       }
       if (k.kind == Kind::Toggle)
@@ -502,7 +537,7 @@ namespace
          if (k.popups > 0)
             Add("more than one popup", k.state, r, "a checkbox click opened %d popups", k.popups);
          if (Fingerprint() != k.fp0)
-            Add("toggle does not return", k.state, r, "two clicks left a different value");
+            Add("toggle does not return", k.state, r, "near: %s", FirstDiff(k.fp0, Fingerprint()).c_str());
          return;
       }
       if (!k.took)
@@ -655,7 +690,7 @@ namespace
          if (!r.widget || r.disabled || !FullyShown(r) || !Visible(r) || !seen.insert(r.id).second)
             continue;
          const bool inNode = !scope.empty();
-         if (inNode && r.window != canvas)
+         if (inNode && (r.window != canvas || !InsideNode(r, sNodesLast.back().box)))
             continue;
          Poke k;
          k.id = r.id;
