@@ -2206,9 +2206,17 @@ namespace app
       const int wantedAa = (aaIndex == 0) ? 0 : (1 << aaIndex);
 
       std::vector<std::function<void()>> sections;
+      // Path trace replaces the raster lighting tricks below with real light transport, so the rows it
+      // has no use for (shadow maps, AO, rim, bloom, motion blur, antialias) grey while it is on.
+      const bool pt = n->PathTraceActive();
 
       sections.push_back([&]() {
       NodeSeparator("output", colW);
+      // Path trace renders the beauty pass of a perspective or orthographic camera only.
+      ImGui::BeginDisabled(n->renderPass != 0 || n->SolidActive() || n->PanoActive());
+      DropdownButton("engine", Render3DNode::EngineNames(), n->engine,
+                     [n](int i) { n->engine = i; }, colW);
+      ImGui::EndDisabled();
       DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
                      [n](int i) { n->renderPass = i; }, colW);
       if (n->renderPass >= 1 && n->renderPass <= 9)
@@ -2227,8 +2235,10 @@ namespace app
       // upscale of a smaller render.
       ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f", colW);
       ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f", colW);
+      ImGui::BeginDisabled(pt);
       DropdownButton("antialias", Render3DNode::SampleNames(), n->samples,
                      [n](int i) { n->samples = i; }, colW);
+      ImGui::EndDisabled();
       // The requested sample count is clamped by both the driver and a memory
       // budget, so say what actually happened when they disagree.
       if (n->ActiveSamples() != wantedAa && ImGui::IsItemHovered())
@@ -2238,7 +2248,7 @@ namespace app
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
       // HDR lights the scene in float and tonemaps once at the end, so bloom
       // sees light above white. Only the beauty pass has light to keep.
-      ImGui::BeginDisabled(n->renderPass != 0);
+      ImGui::BeginDisabled(n->renderPass != 0 || pt);
       ModCheckbox("hdr", &n->hdr);
       ImGui::EndDisabled();
       ColorSwatch("background", n->bgColor, n);
@@ -2310,8 +2320,10 @@ namespace app
 
       sections.push_back([&]() {
       NodeSeparator("raster", colW);
+      ImGui::BeginDisabled(pt);
       ModCheckbox("depth test", &n->depthTest);
       ModCheckbox("cull backfaces", &n->backfaceCull);
+      ImGui::EndDisabled();
       });
 
       sections.push_back([&]() {
@@ -2327,12 +2339,15 @@ namespace app
       ColorSwatch("light", n->lightColor, n);
       ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      ImGui::BeginDisabled(pt);
       ColorSwatch("ambient", n->ambientColor, n);
       ModSlider("rim", &n->rimIntensity, 0.0f, 2.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       });
 
       sections.push_back([&]() {
       NodeSeparator("shadows", colW);
+      ImGui::BeginDisabled(pt);   // every traced light casts its own shadow
       ModCheckbox("cast shadows", &n->shadowsEnabled);
       ImGui::BeginDisabled(!n->shadowsEnabled);
       hideBegin(0, 0, {"resolution"});
@@ -2344,6 +2359,7 @@ namespace app
       ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f, "%.3f", colW);
       ModSlider("bias", &n->shadowBias, 0.0002f, 0.02f, "%.4f", colW);
       hideEnd();
+      ImGui::EndDisabled();
       ImGui::EndDisabled();
       });
 
@@ -2361,9 +2377,11 @@ namespace app
 
       sections.push_back([&]() {
       NodeSeparator("quality", colW);
+      ImGui::BeginDisabled(pt);
       ModSlider("ambient occlusion", &n->aoStrength, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       hideBegin(1, 0, {});
-      ImGui::BeginDisabled(n->aoStrength <= 0.0f);
+      ImGui::BeginDisabled(n->aoStrength <= 0.0f || pt);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
       ImGui::EndDisabled();
       hideEnd();
@@ -2411,9 +2429,11 @@ namespace app
       ModSlider("aperture rotation", &n->dofRotation, -180.0f, 180.0f, "%.0f\xC2\xB0", colW);
       ModSlider("aperture ratio", &n->dofRatio, 0.01f, 2.0f, "%.2f", colW);
       ImGui::EndDisabled();
+      ImGui::BeginDisabled(pt);   // path trace takes its samples from the path trace section
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
+      ImGui::EndDisabled();
       hideEnd();
-      ImGui::BeginDisabled(!n->HdrActive());
+      ImGui::BeginDisabled(!n->HdrActive() || pt);
       ModSlider("bloom", &n->bloom, 0.0f, 1.0f, "%.3f", colW);
       hideBegin(2, 0, {});
       ImGui::BeginDisabled(n->bloom <= 0.0f);
@@ -2422,7 +2442,7 @@ namespace app
       ImGui::EndDisabled();
       hideEnd();
       ImGui::EndDisabled();
-      ImGui::BeginDisabled(n->PanoActive()); // a panorama has no previous frame to smear from
+      ImGui::BeginDisabled(n->PanoActive() || pt); // a panorama has no previous frame to smear from
       ModCheckbox("motion blur", &n->motionBlur);
       ImGui::BeginDisabled(!n->motionBlur);
       hideBegin(2, 0, {"motion position"});
@@ -2432,6 +2452,15 @@ namespace app
       ModSlider("motion max blur", &n->motionMax, 1.0f, 256.0f, "%.0f", colW);
       hideEnd();
       ImGui::EndDisabled();
+      ImGui::EndDisabled();
+      });
+
+      // Last, so the two new sliders take the next ordinals and no earlier one moves.
+      sections.push_back([&]() {
+      NodeSeparator("path trace", colW);
+      ImGui::BeginDisabled(!pt);
+      ModSliderInt("samples", &n->ptSamples, 1, 4096, colW);
+      ModSliderInt("bounces", &n->ptBounces, 1, 16, colW);
       ImGui::EndDisabled();
       });
 

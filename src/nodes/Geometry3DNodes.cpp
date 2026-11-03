@@ -42,6 +42,7 @@ namespace
    const std::vector<std::string> kSolidColorNames = { "Material", "Attribute", "Single", "Random", "Texture", "Object" };
    const std::vector<std::string> kMatcapNames = { "Clay", "Metal", "Toon", "Gloss" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
+   const std::vector<std::string> kEngineNames = { "Raster", "Path trace" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
    const Mesh kEmptyMesh;
@@ -1277,6 +1278,8 @@ const std::vector<std::string>& Render3DNode::SolidColorNames() { return kSolidC
 const std::vector<std::string>& Render3DNode::MatcapNames() { return kMatcapNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
+const std::vector<std::string>& Render3DNode::EngineNames() { return kEngineNames; }
+int Render3DNode::PathTraceSampleCount() const { return std::clamp(ptSamples, 1, 4096); }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
 
 void Render3DNode::RigLight::From(const LightNode& n)

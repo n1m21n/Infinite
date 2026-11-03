@@ -835,8 +835,21 @@ public:
    float motionMax = 32.0f;     // longest smear, pixels at 1080 high
    bool MotionActive() const { return motionBlur && motionShutter > 0.0f && renderPass == 0 && !PanoActive(); }
 
+   // Engine: raster (the live shader) or path trace (Render3DPathTrace: bounced light, a shadow from
+   // every light, real refraction). Path trace renders the beauty pass of a perspective or
+   // orthographic camera; every other case stays raster. Live, it shows the raster frame while
+   // anything moves and refines toward `ptSamples` once the view is still; an offline render
+   // traces all `ptSamples` for every frame.
+   static const std::vector<std::string>& EngineNames();
+   int engine = 0;
+   int ptSamples = 128;
+   int ptBounces = 6;
+   bool PathTraceActive() const { return engine == 1 && renderPass == 0 && !SolidActive() && !PanoActive(); }
+   int PathTraceSampleCount() const;
+
    void VisitParams(ParamVisitor& v) override
    {
+      v.Int("engine", engine); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
       v.Float("ao", aoStrength); v.Float("aoRadius", aoRadius);
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
@@ -1113,6 +1126,18 @@ private:
    bool mPanoShadersTried = false;
    void CookOnce(int frameId);
    bool Accumulate(int frameId);
+
+   // Path trace engine (Render3DPathTraceCook.cpp). CookPathTrace runs after the raster cook of the
+   // same frame and, once the view has been still for a frame, replaces mColorTex with the traced
+   // image. mPtSceneSig is the geometry and materials the BVH was built from (a change rebuilds it);
+   // mPtViewSig is the camera, lights, world and engine settings (a change only restarts the samples).
+   void CookPathTrace(int frameId, bool sceneChanged);
+   void ReleasePathTrace();
+   class Render3DPathTrace* mPathTrace = nullptr;
+   std::vector<double> mPtSceneSig;
+   std::vector<float> mPtViewSig;
+   bool mPtSceneBuilt = false;
+   bool mPtShown = false;
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
    unsigned int mMsFbo = 0;
    unsigned int mMsColor = 0;
