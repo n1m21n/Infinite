@@ -148,7 +148,9 @@ for i, o in enumerate(scene["objects"]):
 
 cam = scene["camera"]
 camd = bpy.data.cameras.new("c")
-camd.sensor_fit = 'HORIZONTAL'; camd.sensor_width = 36
+# fov is the VERTICAL angle on both sides (Render 3D's Mat4::Perspective); a 36 mm span keeps harness.dof_aperture's
+# sensor span the same as before. Square frames are unchanged.
+camd.sensor_fit = 'VERTICAL'; camd.sensor_height = 36
 camd.angle = math.radians(cam["fov"])
 co = bpy.data.objects.new("c", camd); sc.collection.objects.link(co); sc.camera = co
 target = cam.get("target", (0, 0, 0))
