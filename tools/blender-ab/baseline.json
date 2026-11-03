@@ -1,7 +1,7 @@
 {
  "cornell": 0.5837,
- "furnace_dielectric": 0.0142,
- "furnace_metal": 0.0146,
+ "furnace_dielectric": 0.0192,
+ "furnace_metal": 0.0167,
  "light_area": 0.0906,
  "light_point": 0.0855,
  "light_spot": 0.1472,
