@@ -1,6 +1,24 @@
 check	state	window	label	detail
-tiny target	Scene	Infinite/##view3d_bottom	##view3dgrip	1396 x 8
-clipped	Scene	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops_471F617D/##v3dlist	##row	6 px of 248 cut
-overlap	Scene	Infinite	Edit###Edit	with File###File, 6 x 28
-overlap	Scene	Infinite	Menu###Menu	with Edit###Edit, 6 x 28
-press lands off	Viewport p8	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Safe Areas/Action	press at 25% of the bar gave 17%
+tiny target	dark Scene	Infinite/##view3d_bottom	##view3dgrip	1396 x 8
+clipped	dark Scene	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops_471F617D/##v3dlist	##row	6 px of 248 cut
+overlap	dark Scene	Infinite	Edit###Edit	with File###File, 6 x 28
+overlap	dark Scene	Infinite	Menu###Menu	with Edit###Edit, 6 x 28
+toggle does not return	dark Render	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##on	near: Cube","uid":1002,"x":0.0,"y":440.0},{"bypassed":false,"categ
+toggle does not return	dark Render p4	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Film/Transparent	near: 0 0.035 0.05 0 0 0 0 0 1 1 8 0 0 2 0 0 1 0 0 1 1 0 0 0 0 0 1
+toggle does not return	dark Light p2	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Light/Casts shadow	near:  0 0 0.035 0.05 0 0 0 0 0 1 1 0 0 0 2 0 0 1 0 0 1 1 0 0 0 0 
+press lands off	dark Material	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Surface/Metallic	press at 25% of the bar gave 0%
+drag misses max	dark Material	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Surface/Metallic	right end gave 0%
+no undo step	dark Material p2	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Surface/Metallic	the drag pushed no undo checkpoint
+press lands off	dark Viewport p8	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Safe Areas/Action	press at 25% of the bar gave 17%
+tiny target	dark History	Infinite/##historypanel_right	##historygrip	8 x 706
+tiny target	dark Piano Roll	Infinite/##pianoroll_top	##pianogrip	1396 x 8
+tiny target	dark Sample Studio	Infinite/##samplestudio_bottom	##studiogrip	1396 x 8
+tiny target	dark Viewport	Infinite/##viewportpanel_right	##viewportgrip	8 x 706
+hover/scroll changes value	dark node Field Graph	node Field Graph	##eye	near: "s ownershipText":"","s uid":"0e1a014942f41b95"},"showAdvanc
+hover/scroll changes value	dark node Render 3D	node Render 3D	##viewport	near: "34.3774986","f camDistance":"2.96634531","f camElevation":"
+hover/scroll changes value	dark node Moves	node Moves	##eye	near: ","f fader4":"0","f gesture":"0.0191438198"},"showAdvancedPa
+hover/scroll changes value	dark node Moves	node Moves	##bypass	near: f fader4":"0","f gesture":"0.0514396429"},"showAdvancedParam
+text overflow	dark node Macro Slider	node Macro Slider	Slider	label 34 px in 22
+text overflow	dark node Macro Bipolar Knob	node Macro Bipolar Knob	Pan/Detent	label 66 px in 56
+popup did not open	dark node Drum Sequencer	node Drum Sequencer	off	click opened nothing
+popup changes value	dark node Drum Sequencer	node Drum Sequencer	off	near: 0.800000012","i lane0_choke":"1","i lane1_choke":"0","i lane
