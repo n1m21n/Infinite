@@ -51,7 +51,19 @@ namespace
       "uniform vec3 uCamUp;\n"
       "uniform float uTanHalfFovY;\n"
       "uniform float uAspect;\n"
+      "uniform float uOrthoHalfH;\n"   // > 0: orthographic, the view's half height
       "uniform vec3 uWorldColor;\n"
+      // The world a ray that leaves the scene sees: 0 the uniform colour, 1 Render 3D's sky/horizon/ground
+      // gradient, 2 an equirect HDRI (Environment node), rotated about Y like Render 3D's dirToEquirect.
+      "uniform int uEnvMode;\n"
+      "uniform sampler2D uEnvMap;\n"
+      "uniform float uEnvRotation;\n"
+      "uniform float uEnvIntensity;\n"
+      "uniform vec3 uEnvSky;\n"
+      "uniform vec3 uEnvHorizon;\n"
+      "uniform vec3 uEnvGround;\n"
+      // 0: a camera ray that misses shows the background colour instead of the world (coverage 0).
+      "uniform int uEnvAsBg;\n"
       "\n"
       "uniform int uLightCount;\n"
       "uniform int uLightType[8];\n"
@@ -449,6 +461,20 @@ namespace
       "   return (diff + spec) * nDotL;\n"
       "}\n"
       "\n"
+      "vec3 envRadiance(vec3 d) {\n"
+      "   if (uEnvMode == 2) {\n"
+      "      float phi = atan(d.z, d.x) + uEnvRotation;\n"
+      "      float theta = acos(clamp(d.y, -1.0, 1.0));\n"
+      "      return textureLod(uEnvMap, vec2(phi / (2.0 * PI) + 0.5, theta / PI), 0.0).rgb * uEnvIntensity;\n"
+      "   }\n"
+      "   if (uEnvMode == 1) {\n"
+      "      float t = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);\n"
+      "      vec3 lower = mix(uEnvGround, uEnvHorizon, smoothstep(0.0, 0.5, t));\n"
+      "      return mix(lower, uEnvSky, smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
+      "   }\n"
+      "   return uWorldColor;\n"
+      "}\n"
+      "\n"
       "void areaBasis(vec3 fwd, out vec3 rgt, out vec3 upv) {\n"
       "   rgt = cross(vec3(0.0, 1.0, 0.0), fwd);\n"
       "   rgt = (dot(rgt, rgt) < 1e-4) ? vec3(1.0, 0.0, 0.0) : normalize(rgt);\n"
@@ -469,12 +495,17 @@ namespace
       "   vec2 ndc = uv * 2.0 - 1.0;\n"
       "   vec3 rayOrigin = uCamEye;\n"
       "   vec3 rayDir = normalize(uCamForward + ndc.x * uAspect * uTanHalfFovY * uCamRight + ndc.y * uTanHalfFovY * uCamUp);\n"
+      "   if (uOrthoHalfH > 0.0) {\n"
+      "      rayOrigin = uCamEye + (ndc.x * uAspect * uCamRight + ndc.y * uCamUp) * uOrthoHalfH;\n"
+      "      rayDir = uCamForward;\n"
+      "   }\n"
+      "   float coverage = 1.0;\n"
       "\n"
       "   vec3 radiance = vec3(0.0);\n"
       "   vec3 throughput = vec3(1.0);\n"
       "   float prevPdfBsdf = 0.0;\n"
       "\n"
-      "   int maxB = clamp(uMaxBounces, 1, 8);\n"
+      "   int maxB = clamp(uMaxBounces, 1, 16);\n"
       "   for (int bounce = 0; bounce < maxB; bounce++) {\n"
       "      HitInfo hit = traceClosest(rayOrigin, rayDir, 1e-4, 1e30);\n"
       "\n"
@@ -506,7 +537,8 @@ namespace
       "      }\n"
       "\n"
       "      if (hit.triSlot < 0) {\n"
-      "         vec3 envContrib = throughput * uWorldColor;\n"
+      "         if (bounce == 0 && uEnvAsBg == 0) { coverage = 0.0; break; }\n"
+      "         vec3 envContrib = throughput * envRadiance(rayDir);\n"
       "         radiance += (bounce > 0) ? min(envContrib, vec3(10.0)) : envContrib;\n"
       "         break;\n"
       "      }\n"
@@ -649,12 +681,12 @@ namespace
       "   if (any(isnan(radiance)) || any(isinf(radiance)))\n"
       "      radiance = vec3(0.0);\n"
       "\n"
+      // Alpha keeps the share of samples that hit something (or the world shown as background).
       "   if (uSampleIndex <= 0) {\n"
-      "      fragColor = vec4(radiance, 1.0);\n"
+      "      fragColor = vec4(radiance, coverage);\n"
       "   } else {\n"
-      "      vec3 prev = texelFetch(uPrevAccum, ivec2(gl_FragCoord.xy), 0).rgb;\n"
-      "      vec3 avg = mix(prev, radiance, 1.0 / float(uSampleIndex + 1));\n"
-      "      fragColor = vec4(avg, 1.0);\n"
+      "      vec4 prev = texelFetch(uPrevAccum, ivec2(gl_FragCoord.xy), 0);\n"
+      "      fragColor = mix(prev, vec4(radiance, coverage), 1.0 / float(uSampleIndex + 1));\n"
       "   }\n"
       "}\n";
 
@@ -668,6 +700,8 @@ namespace
       "uniform sampler2D uAccum;\n"
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
+      "uniform vec3 uBgColor;\n"   // sRGB, shown as is where no sample hit, like Render 3D's clear colour
+      "uniform float uBgOpacity;\n"
       "\n"
       "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
       "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
@@ -686,10 +720,11 @@ namespace
       "}\n"
       "\n"
       "void main() {\n"
-      "   vec3 lin = texelFetch(uAccum, ivec2(gl_FragCoord.xy), 0).rgb;\n"
-      "   vec3 mapped = toneDisplay(lin * uExposure);\n"
-      "   vec3 srgb = clamp(toSrgb(mapped), 0.0, 1.0);\n"
-      "   fragColor = vec4(srgb, 1.0);\n"
+      "   vec4 acc = texelFetch(uAccum, ivec2(gl_FragCoord.xy), 0);\n"
+      "   float cov = clamp(acc.a, 0.0, 1.0);\n"
+      "   vec3 lin = acc.rgb / max(cov, 1e-4);\n"
+      "   vec3 srgb = clamp(toSrgb(toneDisplay(lin * uExposure)), 0.0, 1.0);\n"
+      "   fragColor = vec4(mix(uBgColor, srgb, cov), mix(uBgOpacity, 1.0, cov));\n"
       "}\n";
 
    unsigned int CompileStage330(GLenum stage, const char* src)
@@ -1073,6 +1108,8 @@ void Render3DPathTrace::SetWorldColorLinear(float r, float g, float b)
    mWorldColor[0] = r;
    mWorldColor[1] = g;
    mWorldColor[2] = b;
+   mEnvTex = 0;
+   mEnvGradient = false;
    ResetAccumulation();
 }
 
@@ -1104,7 +1141,41 @@ void Render3DPathTrace::SetCameraLookAt(const float eye[3], const float target[3
 
    mAspect = std::max(1e-3f, aspect);
    mTanHalfFovY = std::tan(fovDegrees * 0.5f * kPi / 180.0f);
+   mOrthoHalfH = 0.0f;
    ResetAccumulation();
+}
+
+void Render3DPathTrace::SetCameraBasis(const float eye[3], const float right[3], const float up[3],
+                                       const float forward[3], float tanHalfFovY, float aspect, float orthoHalfH)
+{
+   std::memcpy(mCamEye, eye, sizeof(mCamEye));
+   std::memcpy(mCamRight, right, sizeof(mCamRight));
+   std::memcpy(mCamUp, up, sizeof(mCamUp));
+   std::memcpy(mCamForward, forward, sizeof(mCamForward));
+   mTanHalfFovY = tanHalfFovY;
+   mAspect = std::max(1e-3f, aspect);
+   mOrthoHalfH = std::max(0.0f, orthoHalfH);
+   ResetAccumulation();
+}
+
+void Render3DPathTrace::SetEnvironment(unsigned int equirectTex, float rotationRad, float intensity,
+                                       const float skyLin[3], const float horizonLin[3], const float groundLin[3])
+{
+   mEnvTex = equirectTex;
+   mEnvGradient = true;
+   mEnvRotation = rotationRad;
+   mEnvIntensity = intensity;
+   std::memcpy(mEnvSky, skyLin, sizeof(mEnvSky));
+   std::memcpy(mEnvHorizon, horizonLin, sizeof(mEnvHorizon));
+   std::memcpy(mEnvGround, groundLin, sizeof(mEnvGround));
+   ResetAccumulation();
+}
+
+void Render3DPathTrace::SetBackground(bool worldAsBackground, const float srgb[3], float opacity)
+{
+   mEnvAsBg = worldAsBackground;
+   std::memcpy(mBgColor, srgb, sizeof(mBgColor));
+   mBgOpacity = opacity;
 }
 
 void Render3DPathTrace::SetCameraFromNode(const CameraNode& cam, float aspect)
@@ -1187,7 +1258,18 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          glUniform3fv(glGetUniformLocation(mProgTrace, "uCamUp"), 1, mCamUp);
          glUniform1f(glGetUniformLocation(mProgTrace, "uTanHalfFovY"), mTanHalfFovY);
          glUniform1f(glGetUniformLocation(mProgTrace, "uAspect"), mAspect);
+         glUniform1f(glGetUniformLocation(mProgTrace, "uOrthoHalfH"), mOrthoHalfH);
          glUniform3fv(glGetUniformLocation(mProgTrace, "uWorldColor"), 1, mWorldColor);
+         glActiveTexture(GL_TEXTURE7);
+         glBindTexture(GL_TEXTURE_2D, mEnvTex);
+         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvMap"), 7);
+         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvMode"), mEnvTex != 0 ? 2 : mEnvGradient ? 1 : 0);
+         glUniform1f(glGetUniformLocation(mProgTrace, "uEnvRotation"), mEnvRotation);
+         glUniform1f(glGetUniformLocation(mProgTrace, "uEnvIntensity"), mEnvIntensity);
+         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvSky"), 1, mEnvSky);
+         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvHorizon"), 1, mEnvHorizon);
+         glUniform3fv(glGetUniformLocation(mProgTrace, "uEnvGround"), 1, mEnvGround);
+         glUniform1i(glGetUniformLocation(mProgTrace, "uEnvAsBg"), mEnvAsBg ? 1 : 0);
 
          glUniform1i(glGetUniformLocation(mProgTrace, "uLightCount"), lightCount);
          if (lightCount > 0)
@@ -1205,6 +1287,8 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
       mSampleIndex++;
    }
 
+   glActiveTexture(GL_TEXTURE7);
+   glBindTexture(GL_TEXTURE_2D, 0);
    for (int u = 6; u >= 1; u--)
    {
       glActiveTexture(GL_TEXTURE0 + u);
@@ -1263,6 +1347,8 @@ void Render3DPathTrace::ResolveDisplay()
       glUniform1i(glGetUniformLocation(mProgDisplay, "uAccum"), 0);
       glUniform1f(glGetUniformLocation(mProgDisplay, "uExposure"), exposure);
       glUniform1i(glGetUniformLocation(mProgDisplay, "uTonemap"), tonemap);
+      glUniform3fv(glGetUniformLocation(mProgDisplay, "uBgColor"), 1, mBgColor);
+      glUniform1f(glGetUniformLocation(mProgDisplay, "uBgOpacity"), mBgOpacity);
    });
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, 0);

@@ -1559,6 +1559,7 @@ Render3DNode::~Render3DNode()
    ReleasePost();
    ReleaseHdr();
    ReleasePano();
+   ReleasePathTrace();
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
@@ -2008,6 +2009,14 @@ void Render3DNode::CookIfNeeded(int frameId)
       mCurModel.clear();
       mPrevModel.clear();
    }
+   // Path trace: the traced image once the view is still, otherwise this frame is raster's.
+   if (PathTraceActive())
+   {
+      if (CookPathTrace(frameId))
+         return;
+   }
+   else if (mPathTrace != nullptr)
+      ReleasePathTrace();
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
@@ -2302,6 +2311,9 @@ void Render3DNode::CookOnce(int frameId)
       lightTypes[0] = 0;
       lightCount = 1;
    }
+   if (!mVelocityPass && mFaceOverride < 0)
+      StashPathTraceLights(lightCount, lightTypes, lightDirs, lightAims, lightCols, lightPower, lightSpotAngle,
+                           lightSpotPenumbra, lightArea, lightTerms, lightCutoff);
 
    // --- shadow pass ---------------------------------------------------
    // Depth from the light's point of view, rendered before the main pass and

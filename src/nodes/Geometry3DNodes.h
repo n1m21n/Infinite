@@ -1127,17 +1127,26 @@ private:
    void CookOnce(int frameId);
    bool Accumulate(int frameId);
 
-   // Path trace engine (Render3DPathTraceCook.cpp). CookPathTrace runs after the raster cook of the
-   // same frame and, once the view has been still for a frame, replaces mColorTex with the traced
-   // image. mPtSceneSig is the geometry and materials the BVH was built from (a change rebuilds it);
-   // mPtViewSig is the camera, lights, world and engine settings (a change only restarts the samples).
-   void CookPathTrace(int frameId, bool sceneChanged);
+   // Path trace engine (Render3DPathTraceCook.cpp). CookPathTrace runs before the raster cook and
+   // returns true when this frame's mColorTex is the traced image (raster skipped). Live, any change
+   // since the last frame hands the frame to raster; once a frame is the same as the one before, the
+   // BVH is rebuilt if the geometry or materials differ from mPtBuiltSig and the samples restart.
+   // The camera and lights come from the last raster cook (mLastCamera, mPtLights), which drew the
+   // same scene; an offline render runs one raster cook first for that.
+   bool CookPathTrace(int frameId);
    void ReleasePathTrace();
+   static bool PtSameGeometry(const SceneSignature& a, const SceneSignature& b);
+   static bool PtSameView(const SceneSignature& a, const SceneSignature& b);
+   void StashPathTraceLights(int count, const int* types, const float* dirs, const float* aims, const float* colsSrgb,
+                             const float* power, const float* spotAngle, const float* spotPenumbra,
+                             const float* area, const float* terms, const float* cutoff);
    class Render3DPathTrace* mPathTrace = nullptr;
-   std::vector<double> mPtSceneSig;
-   std::vector<float> mPtViewSig;
+   std::vector<float> mPtLights;   // kPtLightFloats per light, packed by StashPathTraceLights
+   SceneSignature mPtLastSig;
+   SceneSignature mPtBuiltSig;
+   bool mPtHasLastSig = false;
    bool mPtSceneBuilt = false;
-   bool mPtShown = false;
+   bool mPtStill = false;
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
    unsigned int mMsFbo = 0;
    unsigned int mMsColor = 0;

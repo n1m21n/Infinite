@@ -767,6 +767,7 @@ set(COMMON_SOURCES
     src/nodes/Render3DHdr.cpp
     src/nodes/Render3DPano.cpp
     src/nodes/Render3DPathTrace.cpp
+    src/nodes/Render3DPathTraceCook.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp

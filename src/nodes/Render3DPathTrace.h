@@ -75,6 +75,18 @@ public:
    void SetCameraLookAt(const float eye[3], const float target[3], const float up[3],
                         float fovDegrees, float aspect);
    void SetCameraFromNode(const CameraNode& cam, float aspect);
+   // A camera given as its world basis (Render 3D's own view matrix rows). orthoHalfH > 0 makes it
+   // orthographic with that half height; tanHalfFovY is then unused.
+   void SetCameraBasis(const float eye[3], const float right[3], const float up[3], const float forward[3],
+                       float tanHalfFovY, float aspect, float orthoHalfH);
+   // The world rays see when they leave the scene: an equirect HDRI (Environment node's texture), or
+   // with equirectTex 0 Render 3D's sky/horizon/ground gradient (linear colours). Replaces the
+   // uniform world colour until the next SetWorldColorLinear.
+   void SetEnvironment(unsigned int equirectTex, float rotationRad, float intensity,
+                       const float skyLin[3], const float horizonLin[3], const float groundLin[3]);
+   // worldAsBackground false: a camera ray that misses shows `srgb` at `opacity`, as Render 3D's
+   // clear colour does, instead of the world. Display only; the samples are kept.
+   void SetBackground(bool worldAsBackground, const float srgb[3], float opacity);
 
    // Resets progressive accumulation without re-uploading the scene BVH.
    void ResetAccumulation();
@@ -100,6 +112,7 @@ public:
    bool ReadLinearRGBA32F(std::vector<float>& outRgba, int& outW, int& outH) const;
 
    unsigned int GetDisplayTexture() const { return mDisplay.tex; }
+   unsigned int GetDisplayFbo() const { return mDisplay.fbo; }
    unsigned int GetAccumTexture() const { return mAccum[mAccumReadIdx].tex; }
    int SampleCount() const { return mSampleIndex; }
 
@@ -149,7 +162,18 @@ private:
    float mCamUp[3] = { 0.0f, 1.0f, 0.0f };
    float mTanHalfFovY = 0.36397023f;
    float mAspect = 1.0f;
+   float mOrthoHalfH = 0.0f;
    float mWorldColor[3] = { 0.0f, 0.0f, 0.0f };
+   unsigned int mEnvTex = 0;
+   bool mEnvGradient = false;
+   float mEnvRotation = 0.0f;
+   float mEnvIntensity = 1.0f;
+   float mEnvSky[3] = {};
+   float mEnvHorizon[3] = {};
+   float mEnvGround[3] = {};
+   bool mEnvAsBg = true;
+   float mBgColor[3] = {};
+   float mBgOpacity = 1.0f;
 
    std::vector<PtLight> mLights;
 };
