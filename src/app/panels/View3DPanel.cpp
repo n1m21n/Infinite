@@ -4734,6 +4734,9 @@ namespace
    }
 
    float sFieldW = 180.0f;
+   std::string sCard;   // the open card: rows share labels across cards ("Strength" in Shadows and AO)
+
+   std::string RowId(const char* label) { return FormParts::Id((sCard + "/" + label).c_str()); }
    constexpr float kFieldLabelW = 100.0f;   // the shared column is too narrow for Resolution X or Field of view
 
    void FieldLabel(const char* text)
@@ -4761,12 +4764,25 @@ namespace
          PushUndoCheckpoint(what);
    }
 
+   // For a slider: its press has already moved the value, so the checkpoint must hold the one from before it.
+   template <class V>
+   void UndoableFrom(V* v, V was, const char* what)
+   {
+      if (!ImGui::IsItemActivated())
+         return;
+      const V now = *v;
+      *v = was;
+      PushUndoCheckpoint(what);
+      *v = now;
+   }
+
    bool FloatRow(const char* label, float* v, float lo, float hi, const char* fmt, const char* undo = "Edit in 3D View")
    {
       FieldLabel(label);
       ImGui::SetNextItemWidth(sFieldW);
-      const bool changed = FieldWell::Slider(FormParts::Id(label).c_str(), v, lo, hi, fmt);
-      Undoable(undo);
+      const float was = *v;
+      const bool changed = FieldWell::Slider(RowId(label).c_str(), v, lo, hi, fmt);
+      UndoableFrom(v, was, undo);
       return changed;
    }
 
@@ -4775,7 +4791,7 @@ namespace
       FieldLabel(label);
       ImGui::SetNextItemWidth(sFieldW);
       FieldWell::PushStyle();
-      const bool changed = FieldWell::InputInt(FormParts::Id(label).c_str(), v);
+      const bool changed = FieldWell::InputInt(RowId(label).c_str(), v);
       FieldWell::PopStyle();
       Undoable("Edit in 3D View");
       return changed;
@@ -4787,7 +4803,7 @@ namespace
       ImGui::SetNextItemWidth(sFieldW);
       const int shown = std::clamp(*v, 0, (int)names.size() - 1);
       bool changed = false;
-      if (MenuParts::BeginCombo(FormParts::Id(label).c_str(), names[shown].c_str()))
+      if (MenuParts::BeginCombo(RowId(label).c_str(), names[shown].c_str()))
       {
          for (int i = 0; i < (int)names.size(); i++)
             if (MenuParts::Choice(names[i].c_str(), i == *v) && i != *v)
@@ -4807,7 +4823,7 @@ namespace
       const float rowY = ImGui::GetCursorPosY();
       ImGui::SetCursorPosY(rowY + (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f);
       bool on = *v;
-      bool hit = CheckBox::Box(FormParts::Id(label).c_str(), &on);
+      bool hit = CheckBox::Box(RowId(label).c_str(), &on);
       FormParts::Inline(0.0f, tok::space_2);
       ImGui::SetCursorPosY(rowY);
       ImGui::AlignTextToFramePadding();
@@ -4828,10 +4844,7 @@ namespace
    bool ColorRow(const char* label, float* rgb, const char* undo = "Edit in 3D View")
    {
       FieldLabel(label);
-      // Rows share labels ("Colour" in Surface and Emission): scope the id so one click opens one picker.
-      ImGui::PushID(undo);
-      const bool changed = FormParts::ColorDot(FormParts::Id(label).c_str(), rgb, 15.0f, ImGui::GetFrameHeight());
-      ImGui::PopID();
+      const bool changed = FormParts::ColorDot(RowId(label).c_str(), rgb, 15.0f, ImGui::GetFrameHeight());
       static float sLast = -1.0f;
       if (changed && ImGui::GetTime() - sLast > 1.0f)   // one drag across the picker, one undo
          PushUndoCheckpoint(undo);
@@ -4847,6 +4860,7 @@ namespace
       auto found = sOpen.find(title);
       bool open = found != sOpen.end() ? found->second : startOpen;
       SectionCard::Begin();
+      sCard = title;
       ImGui::PushID(title);
       const float h = ImGui::GetTextLineHeight() + 2.0f;
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -5540,7 +5554,7 @@ namespace
          {
             FieldLabel(label);
             ImGui::SetNextItemWidth(sFieldW);
-            const bool changed = ImGui::DragFloat3(FormParts::Id(label).c_str(), v, speed, 0.0f, 0.0f, fmt);
+            const bool changed = ImGui::DragFloat3(RowId(label).c_str(), v, speed, 0.0f, 0.0f, fmt);
             Undoable("Edit in 3D View");
             return changed;
          };
@@ -5776,7 +5790,7 @@ namespace
          {
             FieldLabel(label);
             ImGui::SetNextItemWidth(sFieldW);
-            const bool changed = ImGui::DragFloat3(FormParts::Id(label).c_str(), v, speed, 0.0f, 0.0f, "%.2f");
+            const bool changed = ImGui::DragFloat3(RowId(label).c_str(), v, speed, 0.0f, 0.0f, "%.2f");
             Undoable("Edit motion in 3D View");
             return changed;
          };
@@ -6218,8 +6232,9 @@ namespace
          ComboRow(T("Viewport"), &look.samples, Render3DNode::SampleNames());
          FieldLabel(T("Render"));
          ImGui::SetNextItemWidth(sFieldW);
+         const int was = look.supersample;
          FieldWell::Slider("##v3dsuper", &look.supersample, 1, 64, "%d");
-         Undoable("Edit in 3D View");
+         UndoableFrom(&look.supersample, was, "Edit in 3D View");
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Samples per frame when rendering out."));
       }
@@ -6726,6 +6741,7 @@ namespace
       BeginCardColumn("##v3dprops", ImGuiChildFlags_None);
       availW = ImGui::GetContentRegionAvail().x;
       sFieldW = std::max(70.0f, availW - kFieldLabelW);
+      sCard.clear();
       if (sTab == kSceneTab) DrawOutliner(scene, availW, ImGui::GetContentRegionAvail().y);
       else if (sTab == 0) DrawRenderTab(scene);
       else if (sTab == 1) DrawOutputTab(scene, availW);
