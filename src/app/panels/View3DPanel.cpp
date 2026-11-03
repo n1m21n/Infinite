@@ -2241,7 +2241,8 @@ namespace
    void HandleKeys(Scene3DNode* scene, ImVec2 mouse, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
-      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      // Tab is locked to the node keyboard owner whenever nothing else uses it; the 3D View asks as that owner.
+      auto pressed = [](ImGuiKey k) { return k == ImGuiKey_Tab ? ImGui::IsKeyPressed(k, ImGuiInputFlags_None, kKbTabOwner) : ImGui::IsKeyPressed(k, false); };
       auto digit = [&](int i) { return pressed((ImGuiKey)(ImGuiKey_0 + i)) || pressed((ImGuiKey)(ImGuiKey_Keypad0 + i)); };
       if (sOp.mode != 0)
       {
@@ -3074,7 +3075,8 @@ namespace
       if (model == nullptr)
          return false;
       const ImGuiIO& io = ImGui::GetIO();
-      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      // Tab is locked to the node keyboard owner whenever nothing else uses it; the 3D View asks as that owner.
+      auto pressed = [](ImGuiKey k) { return k == ImGuiKey_Tab ? ImGui::IsKeyPressed(k, ImGuiInputFlags_None, kKbTabOwner) : ImGui::IsKeyPressed(k, false); };
 
       // Bones: parent head to child head belongs to the parent (turning the
       // parent swings it); a joint with no children gets a short tail along
@@ -3433,7 +3435,8 @@ namespace
       if (node == nullptr)
          return false;
       const ImGuiIO& io = ImGui::GetIO();
-      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      // Tab is locked to the node keyboard owner whenever nothing else uses it; the 3D View asks as that owner.
+      auto pressed = [](ImGuiKey k) { return k == ImGuiKey_Tab ? ImGui::IsKeyPressed(k, ImGuiInputFlags_None, kKbTabOwner) : ImGui::IsKeyPressed(k, false); };
       const bool ok = node->Sculptable();
 
       // The bar: brushes, then X Y Z symmetry, bottom left.
@@ -4114,7 +4117,8 @@ namespace
       if (node == nullptr)
          return false;
       const ImGuiIO& io = ImGui::GetIO();
-      auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+      // Tab is locked to the node keyboard owner whenever nothing else uses it; the 3D View asks as that owner.
+      auto pressed = [](ImGuiKey k) { return k == ImGuiKey_Tab ? ImGui::IsKeyPressed(k, ImGuiInputFlags_None, kKbTabOwner) : ImGui::IsKeyPressed(k, false); };
       const Mesh& m = node->GetMesh();
       if (node->MeshRevision() != sEdit.rev)
       {
