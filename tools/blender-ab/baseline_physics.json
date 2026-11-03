@@ -1,4 +1,7 @@
 {
+ "cloth_box": 0.0866,
+ "cloth_drape": 0.0906,
+ "cloth_drape_stiff": 0.1042,
  "cloth_drop": 0.0351,
  "cloth_hammock": 0.0151,
  "cloth_swing": 0.0667,

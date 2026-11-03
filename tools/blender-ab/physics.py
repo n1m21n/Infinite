@@ -35,6 +35,9 @@ def tilted(deg):
     return (9.8 * math.sin(a), 0, -9.8 * math.cos(a))
 
 
+# Blender cloth bending b -> Infinite bending sqrt(b * BEND_SCALE) (Infinite squares
+# its knob). Fitted on the drape cases.
+BEND_SCALE = float(os.environ.get("BEND_SCALE", "0.02"))
 BODY = {"friction": 0.5, "bounce": 0.5, "linear_damping": 0.04, "angular_damping": 0.1}
 CASES = {
     # A cube dropped from 2 m: fall time, bounce heights, rest.
@@ -81,6 +84,21 @@ CASES = {
     "cloth_drop": {"kind": "cloth", "duration": 2, "gravity": G, "ground": 0,
                    "objects": [{"shape": "grid", "size": 2, "subdivisions": 20, "location": (0, 0, 1)}],
                    "cloth": {"pin": "none"}},
+    # A 2 m sheet falls onto a 1 m ball resting on the ground and drapes over it.
+    "cloth_drape": {"kind": "cloth", "duration": 3, "gravity": G, "ground": 0,
+                    "objects": [{"shape": "grid", "size": 2, "subdivisions": 30, "location": (0, 0, 1.3)}],
+                    "colliders": [{"shape": "sphere", "size": 1.0, "location": (0, 0, 0.5)}],
+                    "cloth": {"pin": "none"}},
+    # The same drape in a stiff fabric: wider, rounder folds.
+    "cloth_drape_stiff": {"kind": "cloth", "duration": 3, "gravity": G, "ground": 0,
+                          "objects": [{"shape": "grid", "size": 2, "subdivisions": 30, "location": (0, 0, 1.3)}],
+                          "colliders": [{"shape": "sphere", "size": 1.0, "location": (0, 0, 0.5)}],
+                          "cloth": {"pin": "none", "bending": 10.0}},
+    # A sheet pinned along its high edge over a box edge: it folds down over the side.
+    "cloth_box": {"kind": "cloth", "duration": 3, "gravity": G, "ground": 0,
+                  "objects": [{"shape": "grid", "size": 1.6, "subdivisions": 24, "location": (0, 0, 1.1)}],
+                  "colliders": [{"shape": "cube", "size": 0.8, "location": (0, 0, 0.4)}],
+                  "cloth": {"pin": "none"}},
     # A straight-up stream at 6 m/s, 100 a second: the column rises to v^2 / 2g = 1.84 m.
     "pt_stream": {"kind": "particles", "duration": 2, "gravity": G,
                   "particles": {"rate": 100, "velocity": (0, 0, 6), "location": (0, 0, 0)}},
@@ -121,10 +139,12 @@ def patch(scene, case):
     elif kind == "cloth":
         c = scene["cloth"]
         drag = 0.01 * c.get("air_damping", 1.0) * scene.get("fps", 30) / c.get("vertex_mass", 0.3)
+        bend = min(1.0, math.sqrt(c.get("bending", 0.5) * BEND_SCALE))
         lines += ["node 1 3D Cloth",
                   "  i pinMode %d" % {"none": 0, "top": 1, "corners": 2, "edges": 3}[c.get("pin", "none")],
                   "  f stiffness 1", "  i iterations 20", "  f mass 1",
-                  "  f damping %g" % (1 - math.exp(-drag / 120)),
+                  "  f damping %g" % (1 - math.exp(-drag / 120)), "  f bending %g" % bend,
+                  "  f colliderDistance %g" % (0.015 + 0.02), "  f colliderFriction 0.5",
                   "  f gravityX %g" % gx, "  f gravityY %g" % gy, "  f gravityZ %g" % gz,
                   "  b groundEnabled %d" % (scene.get("ground") is not None),
                   "  f groundHeight %g" % (scene.get("ground") or 0.0), "end"]
@@ -142,6 +162,9 @@ def patch(scene, case):
         return "\n".join(lines) + "\n"
     lines += ["node 2 3D Model 3D", "  s path %s" % os.path.join(case, "geo.glb"),
               "  b normalize 0", "  b recenter 0", "end", "geo 1 0 2"]
+    if scene.get("colliders"):
+        lines += ["node 3 3D Model 3D", "  s path %s" % os.path.join(case, "collider.glb"),
+                  "  b normalize 0", "  b recenter 0", "end", "geo 1 1 3"]
     return "\n".join(lines) + "\n"
 
 

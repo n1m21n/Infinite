@@ -731,7 +731,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Bevel` | geo:geometry | out:geometry | 76 | bypass |
 | `Camera` | none | out:camera | 23 | bypass |
 | `Capsule` | texture:image | out:geometry | 51 | bypass |
-| `Cloth` | geo:geometry | out:geometry | 38 | bypass |
+| `Cloth` | geo:geometry, collider:geometry | out:geometry | 41 |  |
 | `Cone` | texture:image | out:geometry | 51 | bypass |
 | `Cube` | texture:image | out:geometry | 51 | bypass |
 | `Curve` | none | out:geometry | 32 | bypass |
@@ -768,9 +768,9 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
 | `Light` | none | out:light | 28 | bypass |
-| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 )AISKILL"
-R"AISKILL(| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
+R"AISKILL(| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
@@ -790,7 +790,7 @@ R"AISKILL(| `Material` | geo:geometry, albedo:image, roughness:image, metallic:i
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 84 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 87 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -967,9 +967,9 @@ R"AISKILL(| `Material` | geo:geometry, albedo:image, roughness:image, metallic:i
 | `Geometry Table` | geo:geometry | cx:modulator, cy:modulator, cz:modulator, spread:modulator, x1:modulator, y1:modulator, z1:modulator, x2:modulator, y2:modulator, z2:modulator, x3:modulator, y3:modulator, z3:modulator, x4:modulator, y4:modulator, z4:modulator | 10 | bypass |
 | `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator, fist:modulator, point:modulator, peace:modulator, thumbs up:modulator, ok:modulator, rock:modulator | 3 | bypass |
 | `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
-| `Invert` | in:modulator | out:modulator | 3 | bypass |
 )AISKILL"
-R"AISKILL(| `LFO` | trig:modulator | out:modulator | 11 | bypass |
+R"AISKILL(| `Invert` | in:modulator | out:modulator | 3 | bypass |
+| `LFO` | trig:modulator | out:modulator | 11 | bypass |
 | `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
 | `MIDI Trigger` | none | out:modulator | 6 | hardware: refused headless, bypass |
 | `MSEG` | trig:modulator | out:modulator | 8 | bypass |
