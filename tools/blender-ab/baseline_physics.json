@@ -1,14 +1,14 @@
 {
- "cloth_drop": 0.0433,
- "cloth_hammock": 0.0183,
- "cloth_swing": 0.3839,
+ "cloth_drop": 0.0351,
+ "cloth_hammock": 0.0151,
+ "cloth_swing": 0.0667,
  "pt_stream": 0.0141,
- "rb_drop": 0.1374,
+ "rb_drop": 0.1373,
  "rb_roll": 0.0064,
  "rb_slide": 0.0057,
- "rb_stack": 0.021,
+ "rb_stack": 0.004,
  "rb_stick": 0.0007,
- "rb_tilted": 0.1888,
- "rb_tilted_hull": 0.1669,
- "rb_topple": 0.0985
+ "rb_tilted": 0.153,
+ "rb_tilted_hull": 0.2147,
+ "rb_topple": 0.0864
 }

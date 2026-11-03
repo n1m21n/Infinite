@@ -99,9 +99,9 @@ def patch(scene, case):
       rigid damping d (Bullet: v *= (1 - d) per second) -> d' with exp(-10 d') = 1 - d, since
         Infinite multiplies by 1 / (1 + 10 d' dt) every 1/120 s step;
       friction and bounce as they are (the Blender ground is 1, and Bullet multiplies);
-      cloth air damping a (Blender: drag force 0.01 a v on each vertex of mass m) ->
-        damping (1 - exp(-0.01 a / m / 120)) per 1/120 s step, Infinite mass 1 (its gravity
-        is divided by mass);
+      cloth air damping a (Blender: drag force 0.01 a v on each vertex of mass m, with time
+        counted in frames, so 0.01 a fps / m per second) -> damping
+        (1 - exp(-0.01 a fps / m / 120)) per 1/120 s step, Infinite mass 1;
       particles: speed along the launch direction, no randomness."""
     gx, gy, gz = yup(scene.get("gravity", G))
     kind = scene["kind"]
@@ -120,7 +120,7 @@ def patch(scene, case):
                   "  f groundHeight %g" % (scene.get("ground") or 0.0), "end"]
     elif kind == "cloth":
         c = scene["cloth"]
-        drag = 0.01 * c.get("air_damping", 1.0) / c.get("vertex_mass", 0.3)
+        drag = 0.01 * c.get("air_damping", 1.0) * scene.get("fps", 30) / c.get("vertex_mass", 0.3)
         lines += ["node 1 3D Cloth",
                   "  i pinMode %d" % {"none": 0, "top": 1, "corners": 2, "edges": 3}[c.get("pin", "none")],
                   "  f stiffness 1", "  i iterations 20", "  f mass 1",

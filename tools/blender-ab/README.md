@@ -134,7 +134,7 @@ Unit mapping (`physics.patch` holds it):
 |---|---|
 | Rigid damping d (Bullet: v × (1 − d) per second) | damping d' with e^(−10 d') = 1 − d |
 | Rigid friction, restitution (ground = 1, Bullet multiplies) | friction, bounce |
-| Cloth air damping a, vertex mass m (drag 0.01 a v) | damping 1 − e^(−0.01 a / m / 120) per step, mass 1 |
+| Cloth air damping a, vertex mass m (drag 0.01 a v, time in frames) | damping 1 − e^(−0.01 a fps / m / 120) per step, mass 1 |
 | Cloth pin group | the same rule as Cloth's pin mode, on the rest bounds |
 
 A case fails when its error rises more than 10% over `baseline_physics.json`.
