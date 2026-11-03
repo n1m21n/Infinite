@@ -604,6 +604,7 @@ set(COMMON_SOURCES
     src/core/BevelInset.cpp
     src/core/UVProject.cpp
     src/core/Sculpt.cpp
+    src/core/EditMesh.cpp
     src/core/MeshDecimate.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
@@ -798,6 +799,7 @@ set(COMMON_SOURCES
     src/nodes/ArmatureNode.cpp
     src/nodes/BakeNode.cpp
     src/nodes/SculptNode.cpp
+    src/nodes/EditMeshNode.cpp
     src/nodes/SweepRevolveNodes.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp

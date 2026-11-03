@@ -1044,6 +1044,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawBakeParams(n);
                else if (auto* n = dynamic_cast<SculptNode*>(gn.node.get()))
                   DrawSculptParams(n);
+               else if (auto* n = dynamic_cast<EditMeshNode*>(gn.node.get()))
+                  DrawEditMeshParams(n);
                else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                   DrawSwitcher3DParams(n);
                else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))

@@ -212,6 +212,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/ArmatureNode.h"
 #include "nodes/BakeNode.h"
 #include "nodes/SculptNode.h"
+#include "nodes/EditMeshNode.h"
 #include "nodes/SweepRevolveNodes.h"
 #include "nodes/DepthProjectionNode.h"
 #include "nodes/PathNode.h"

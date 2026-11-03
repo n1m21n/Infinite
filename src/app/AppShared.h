@@ -4141,6 +4141,7 @@ void DrawDistributePointsInGridParams(DistributePointsInGridNode* n);
 void DrawMergeByDistanceParams(MergeByDistanceNode* n);
 void DrawBakeParams(BakeNode* n);
 void DrawSculptParams(SculptNode* n);
+void DrawEditMeshParams(EditMeshNode* n);
 
 void DrawText3DParams(Text3DNode* n);
 

@@ -1263,6 +1263,19 @@ namespace app
    }
 
 
+   void DrawEditMeshParams(EditMeshNode* n)
+   {
+      if (gParamRegisterOnly)
+         return;
+      ImGui::TextDisabled("%d ops", n->OpCount());
+      if (!n->ops.empty() && ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
+      {
+         PushUndoCheckpoint("Clear edits");
+         n->ops.clear();
+      }
+   }
+
+
    void DrawText3DParams(Text3DNode* n)
    {
       char buf[256];
