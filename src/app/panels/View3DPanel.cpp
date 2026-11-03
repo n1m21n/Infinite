@@ -6242,6 +6242,20 @@ namespace
    void DrawRenderTab(Scene3DNode* scene)
    {
       Render3DNode& look = scene->Look();
+      ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
+      if (look.engine == 1 && Card(T("Path Tracing")))
+      {
+         struct { const char* label; const char* id; int* v; int hi; } rows[] = {
+            { T("Samples"), "##v3dptsamples", &look.ptSamples, 4096 }, { T("Bounces"), "##v3dptbounces", &look.ptBounces, 16 } };
+         for (const auto& r : rows)
+         {
+            FieldLabel(r.label);
+            ImGui::SetNextItemWidth(sFieldW);
+            const int was = *r.v;
+            FieldWell::Slider(r.id, r.v, 1, r.hi, "%d");
+            UndoableFrom(r.v, was, "Edit in 3D View");
+         }
+      }
       if (Card(T("Sampling")))
       {
          ComboRow(T("Viewport"), &look.samples, Render3DNode::SampleNames());

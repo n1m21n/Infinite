@@ -858,6 +858,9 @@ void Scene3DNode::VisitParams(ParamVisitor& v)
    v.Float("latMax", mRender.latMax);
    v.Float("lonMin", mRender.lonMin);
    v.Float("lonMax", mRender.lonMax);
+   v.Int("engine", mRender.engine);
+   v.Int("ptSamples", mRender.ptSamples);
+   v.Int("ptBounces", mRender.ptBounces);
    v.Text("scene", mText);
 }
 
