@@ -450,6 +450,7 @@ namespace
       "uniform float uRoughness;\n"
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
+      "uniform int uTwoSided;\n"
       "uniform int uRenderPass;\n"
       "uniform float uMistStart;\n"
       "uniform float uMistDepth;\n"
@@ -877,6 +878,7 @@ namespace
       "      return;\n"
       "   }\n"
       "   vec3 n = normalize(vNormal);\n"
+      "   if (uTwoSided == 1 && !gl_FrontFacing) n = -n;\n"
       // Data passes leave out what is more see-through than the threshold, the way a
       // depth or index pass cannot hold half a value.
       "   if (uRenderPass >= 1 && uRenderPass <= 9 && alpha < uPassThreshold) KILL_FRAGMENT;\n"
@@ -3426,6 +3428,19 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
+      // A flat mesh (a Plane) has no inside, so culling its back makes it vanish
+      // when the camera passes under it: draw both sides, lit from the side seen.
+      float extentMin = 1e30f, extentMax = 0.0f;
+      for (int k = 0; k < 3; k++)
+      {
+         extentMin = std::min(extentMin, gpu.hi[k] - gpu.lo[k]);
+         extentMax = std::max(extentMax, gpu.hi[k] - gpu.lo[k]);
+      }
+      const bool twoSided = backfaceCull && gpu.hasBounds && extentMax > 0.0f && extentMin <= extentMax * 1e-4f;
+      glUniform1i(glGetUniformLocation(mProgram, "uTwoSided"), twoSided ? 1 : 0);
+      if (twoSided)
+         glDisable(GL_CULL_FACE);
+
       if (gpu.indexCount == 0)
       {
          // Vertices-only mesh (Points to Vertices, with nothing after it that
@@ -3452,6 +3467,8 @@ void Render3DNode::CookOnce(int frameId)
          mLastTriangles += gpu.indexCount / 3;
       }
       mLastDrawCalls++;
+      if (twoSided)
+         glEnable(GL_CULL_FACE);
 
       // Put the secondary maps' wrap mode back to the FBO default they were
       // created with - same reasoning as RestoreSurfaceTexture below: these
