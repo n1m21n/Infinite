@@ -566,9 +566,13 @@ namespace
       "uniform float uShadowSoftness;\n"
       "uniform float uShadowStrength;\n"
       "uniform float uShadowTexel;\n"
+      "uniform sampler2D uShadowDepth;\n"   // the same map read as plain depth, for the blocker search
+      "uniform float uPenumbraScale;\n"     // area light: penumbra radius in texels per unit of map depth; 0 = fixed kernel
+
       "uniform int uIsSprite;\n"
       "uniform int uSpriteShape;\n" // 0 circle, 1 square
       "\n"
+      "vec2 gShadowDzDuv = vec2(0.0);\n"   // set at the top of main(), where derivatives are defined
       "float shadowFactor(vec3 normal, vec3 lightDir) {\n"
       "   if (uShadowsOn == 0) return 1.0;\n"
       "   vec3 proj = vLightSpacePos.xyz / max(vLightSpacePos.w, 1e-6);\n"
@@ -579,14 +583,43 @@ namespace
       "   float cosL = clamp(dot(normal, lightDir), 0.05, 1.0);\n"
       "   float bias = uShadowBias * (1.0 + min(sqrt(1.0 - cosL * cosL) / cosL, 10.0));\n"
       "   float lit = 0.0;\n"
-      "   for (int x = -1; x <= 1; x++) {\n"
-      "      for (int y = -1; y <= 1; y++) {\n"
-      "         vec2 offset = vec2(float(x), float(y)) * uShadowTexel * uShadowSoftness;\n"
-      "         lit += texture(uShadowMap, vec3(proj.xy + offset, proj.z - bias));\n"
+      "   if (uShadowSoftness <= 2.0) {\n"
+      "      for (int x = -1; x <= 1; x++) {\n"
+      "         for (int y = -1; y <= 1; y++) {\n"
+      "            vec2 offset = vec2(float(x), float(y)) * uShadowTexel * uShadowSoftness;\n"
+      "            lit += texture(uShadowMap, vec3(proj.xy + offset, proj.z - bias));\n"
+      "         }\n"
       "      }\n"
+      "      return mix(1.0, lit / 9.0, uShadowStrength);\n"
       "   }\n"
-      "   lit /= 9.0;\n"
-      "   return mix(1.0, lit, uShadowStrength);\n"
+      // A wide kernel (an area light) takes a rotated 16-tap spiral instead of a stretched 3x3, which
+      // would show nine copies of the edge. Each tap's depth follows the receiver's plane, so a
+      // kernel tens of texels wide does not shadow the surface it lies on.
+      "   float spin = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+      "   float kernel = uShadowSoftness;\n"
+      // An area light (PCSS): find the average depth of what blocks this point, then widen the
+      // kernel by how far the receiver sits behind it, so contact stays sharp and the tail goes soft.
+      "   if (uPenumbraScale > 0.0) {\n"
+      "      float sum = 0.0, count = 0.0;\n"
+      "      for (int k = 0; k < 16; k++) {\n"
+      "         float r = sqrt((float(k) + 0.5) / 16.0);\n"
+      "         float a = float(k) * 2.3999632 + spin + 1.3;\n"
+      "         vec2 offset = vec2(cos(a), sin(a)) * r * uShadowTexel * uShadowSoftness;\n"
+      "         float ref = proj.z - bias + clamp(dot(gShadowDzDuv, offset), -0.02, 0.02);\n"
+      "         float d = texture(uShadowDepth, proj.xy + offset).r;\n"
+      "         if (d < ref) { sum += d; count += 1.0; }\n"
+      "      }\n"
+      "      if (count == 0.0) return 1.0;\n"
+      "      kernel = clamp((proj.z - sum / count) * uPenumbraScale, 1.0, uShadowSoftness);\n"
+      "   }\n"
+      "   for (int k = 0; k < 16; k++) {\n"
+      "      float r = sqrt((float(k) + 0.5) / 16.0);\n"
+      "      float a = float(k) * 2.3999632 + spin;\n"
+      "      vec2 offset = vec2(cos(a), sin(a)) * r * uShadowTexel * kernel;\n"
+      "      float dz = clamp(dot(gShadowDzDuv, offset), -0.02, 0.02);\n"
+      "      lit += texture(uShadowMap, vec3(proj.xy + offset, proj.z - bias + dz));\n"
+      "   }\n"
+      "   return mix(1.0, lit / 16.0, uShadowStrength);\n"
       "}\n"
       "\n"
       "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
@@ -814,6 +847,13 @@ namespace
       "}\n"
       "\n"
       "void main() {\n"
+      "   if (uShadowsOn == 1) {\n"
+      "      vec3 sp = vLightSpacePos.xyz / max(vLightSpacePos.w, 1e-6) * 0.5;\n"
+      "      vec3 sx = dFdx(sp), sy = dFdy(sp);\n"
+      "      float det = sx.x * sy.y - sx.y * sy.x;\n"
+      "      if (abs(det) > 1e-12)\n"
+      "         gShadowDzDuv = vec2(sy.y * sx.z - sx.y * sy.z, sx.x * sy.z - sy.x * sx.z) / det;\n"
+      "   }\n"
       "   if (uIsSprite == 1) {\n"
       "      vec2 uv0 = computeMapUv(normalize(vNormal));\n"
       "      gSpriteDx = dFdx(uv0);\n"
@@ -2326,6 +2366,9 @@ void Render3DNode::CookOnce(int frameId)
    bool shadowsActive = false;
    float shadowBiasDepth = shadowBias;
    const float casterSoftness = shadowSoftness * caster.shadowSoft;
+   float shadowKernel = casterSoftness;   // filter radius in shadow texels (an area light's widest)
+   float penumbraScale = 0.0f;
+   constexpr float kMaxShadowKernel = 48.0f;
    if (shadowsEnabled && !mVelocityPass && caster.castShadow && lightTypes[ci] != 1 && EnsureShadowShader())
    {
       const int quality = caster.shadowRes > 0 ? caster.shadowRes - 1 : shadowQuality;
@@ -2381,7 +2424,20 @@ void Render3DNode::CookOnce(int frameId)
          // The depth map spans the whole scene, so a bias in depth units grew with the floor and
          // lifted shadows off whatever cast them.
          const float shadowTexelWorld = 2.4f * radius / (float)mShadowSize;
-         shadowBiasDepth = (shadowBias + 2.5f * shadowTexelWorld * std::max(1.0f, casterSoftness)) /
+         // An area light's penumbra is a share of its size in the scene, not a fixed number of texels:
+         // a 5 m panel blurs as far on a 1 m scene as on a 100 m one (item 13 of the param audit).
+         if (lightTypes[ci] == 5)
+         {
+            // Penumbra width = light size x (receiver - blocker) / (light - blocker); the light-to-blocker
+            // distance is taken as the light's distance to the scene centre.
+            const float toLight = std::max(0.05f, std::sqrt((casterVec[0] - centre[0]) * (casterVec[0] - centre[0]) +
+                                                            (casterVec[1] - centre[1]) * (casterVec[1] - centre[1]) +
+                                                            (casterVec[2] - centre[2]) * (casterVec[2] - centre[2])));
+            const float size = std::max(lightArea[ci * 2], lightArea[ci * 2 + 1]);
+            penumbraScale = 0.5f * size * (radius * 5.0f - clipNear) / (toLight * shadowTexelWorld);
+            shadowKernel = std::max(2.5f, std::min(kMaxShadowKernel, casterSoftness + size / shadowTexelWorld));
+         }
+         shadowBiasDepth = (shadowBias + 2.5f * shadowTexelWorld * std::max(1.0f, std::min(casterSoftness, 2.0f))) /
                            (radius * 5.0f - clipNear);
 
          GLint prevFboShadow = 0, prevViewportShadow[4];
@@ -2611,11 +2667,27 @@ void Render3DNode::CookOnce(int frameId)
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
       glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
+      {
+         static GLuint sRawDepth = 0;   // reads the shadow map without the depth compare
+         if (sRawDepth == 0)
+         {
+            glGenSamplers(1, &sRawDepth);
+            glSamplerParameteri(sRawDepth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glSamplerParameteri(sRawDepth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glSamplerParameteri(sRawDepth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(sRawDepth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(sRawDepth, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+         }
+         glActiveTexture(GL_TEXTURE15);
+         glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
+         glBindSampler(15, sRawDepth);
+         glUniform1i(glGetUniformLocation(mProgram, "uShadowDepth"), 15);
+         glUniform1f(glGetUniformLocation(mProgram, "uPenumbraScale"), shadowsActive ? penumbraScale : 0.0f);
+      }
       glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBiasDepth);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
-                  lightTypes[ci] == 5 ? casterSoftness * (1.0f + 1.5f * std::max(lightArea[ci * 2], lightArea[ci * 2 + 1]))
-                                      : casterSoftness);
+                  shadowKernel);
       glUniform1i(glGetUniformLocation(mProgram, "uShadowLight"), ci);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
       glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
@@ -3589,6 +3661,7 @@ void Render3DNode::CookOnce(int frameId)
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);
+   glBindSampler(15, 0);
    if (!prevCull) glDisable(GL_CULL_FACE);
    if (rig != nullptr && rig->wireframe)
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
