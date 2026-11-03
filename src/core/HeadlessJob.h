@@ -23,6 +23,9 @@
 //            process (the app starts once); every out.json then carries its own "plugins" block. One status line at the end.
 //   --size WxH rescales --frame / --frames-dir / --render --node output; --codec h264|prores4444 is for --render; --render --node tapped-node video needs --duration.
 //   --set also applies to --render, --frame and --audio-summary.
+//   --geometry <file.jsonl> (--frame, --frames-dir, with --node on a 3D node): one JSON line per exported time with that
+//            node's world-space vertices ("v", flat x,y,z), its triangles ("i", first line only) and its point cloud ("p");
+//            a node with no image skips the PNG. Used by tools/blender-ab physics cases to score motion.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
 //            [--wav <out.wav>] [--notes <events.json> --note-map <map.json>]
 //            [--stems <id>,<id> --stems-dir <dir>] [--output <index>] [--fps N] [--sample-rate HZ]
@@ -67,6 +70,7 @@ namespace Headless
       std::string contactSheet;  // --frame --contact-sheet: every requested time on one PNG
       std::string output;        // --output: node index or name; empty = the only Output
       std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's
+      std::string geometry;      // --geometry <file.jsonl>: per-time dump of the --node's geometry
       std::vector<std::string> sets; // --set <node>.<param>=<value>, repeatable; applied after load, before the first frame
       bool alpha = false;        // --frames-dir --alpha: write straight alpha instead of opaque PNGs
       int sizeW = 0, sizeH = 0;  // --size WxH: rescale the captured image (0 = the node's own size)

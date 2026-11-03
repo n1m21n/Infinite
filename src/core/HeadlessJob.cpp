@@ -383,6 +383,13 @@ namespace Headless
                return true;
             job.node = v;
          }
+         else if (a == "--geometry" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         {
+            const char* v = next("--geometry");
+            if (v == nullptr)
+               return true;
+            job.geometry = v;
+         }
          else if (a == "--set")
          {
             const char* v = next("--set");
@@ -514,6 +521,11 @@ namespace Headless
       if (job.mode == Mode::Render && !job.node.empty() && job.duration <= 0.0)
       {
          usageError = "--render --node needs --duration S (there is no Output to take the length from)";
+         return true;
+      }
+      if (!job.geometry.empty() && job.node.empty())
+      {
+         usageError = "--geometry needs --node <index>: the 3D node whose geometry to write";
          return true;
       }
       if (job.mode == Mode::Render && job.sizeW > 0 && job.node.empty())
