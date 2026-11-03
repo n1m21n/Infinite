@@ -31,7 +31,7 @@ def _furnace(metallic):
     objs = [_ball((i - 2) * 0.9, 0.0, 0.35, base_color=[1.0, 1.0, 1.0], metallic=metallic, roughness=r)
             for i, r in enumerate([0.0, 0.25, 0.5, 0.75, 1.0])]
     return {"camera": {"fov": 40, "azimuth": 90, "elevation": 0, "distance": 6.0, "target": [0, 0, 0.35]},
-            "lights": [], "world": {"color": [1.0, 1.0, 1.0]}, "view": "Standard", "objects": objs}
+            "lights": [], "world": {"color": [0.5, 0.5, 0.5]}, "view": "Standard", "objects": objs}  # 0.5, not 1.0: a white world clips at 255 in the PNG and hides energy gain
 
 
 def _lineup():
