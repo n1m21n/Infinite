@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
-INFINITE = os.path.join(REPO, "build-dev/Infinite.app/Contents/MacOS/Infinite")
+INFINITE = os.environ.get("INFINITE_BIN", os.path.join(REPO, "build-dev/Infinite.app/Contents/MacOS/Infinite"))
 BASELINE = os.path.join(HERE, "baseline_physics.json")
 # A case passes while its error stays within this much (relative) of its baseline.
 SLACK = 0.10
@@ -99,6 +99,13 @@ CASES = {
                   "objects": [{"shape": "grid", "size": 1.6, "subdivisions": 24, "location": (0, 0, 1.1)}],
                   "colliders": [{"shape": "cube", "size": 0.8, "location": (0, 0, 0.4)}],
                   "cloth": {"pin": "none"}},
+    # A 2.4 m sheet over a scanned deer (16k faces, 1.2 m tall): a real mesh as the collider.
+    # The model is not in git; DEER_GLB names it (default ~/Downloads/Assets/deer.glb).
+    "cloth_deer": {"kind": "cloth", "duration": 3, "gravity": G, "ground": 0,
+                   "objects": [{"shape": "grid", "size": 2.4, "subdivisions": 48, "location": (0, 0, 1.5)}],
+                   "colliders": [{"shape": "model", "asset": os.environ.get("DEER_GLB", "~/Downloads/Assets/deer.glb"),
+                                  "size": 1.2, "location": (0, 0, 0)}],
+                   "cloth": {"pin": "none"}},
     # A straight-up stream at 6 m/s, 100 a second: the column rises to v^2 / 2g = 1.84 m.
     "pt_stream": {"kind": "particles", "duration": 2, "gravity": G,
                   "particles": {"rate": 100, "velocity": (0, 0, 6), "location": (0, 0, 0)}},
@@ -332,6 +339,10 @@ def main():
     results, boards, failed = [], [], []
     for name in names:
         scene = dict(CASES[name], fps=CASES[name].get("fps", 30))
+        missing = [c["asset"] for c in scene.get("colliders", []) if "asset" in c and not os.path.exists(os.path.expanduser(c["asset"]))]
+        if missing:
+            print("%s: skipped, no %s" % (name, missing[0]))
+            continue
         case = os.path.join(a.out, name)
         os.makedirs(case, exist_ok=True)
         run_blender(case, scene)

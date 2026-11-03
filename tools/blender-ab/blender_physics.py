@@ -39,6 +39,33 @@ def add_shape(o, name):
     elif shape == "grid":
         n = o.get("subdivisions", 20)
         bpy.ops.mesh.primitive_grid_add(x_subdivisions=n, y_subdivisions=n, size=s)
+    elif shape == "model":
+        # A glb from disk, joined into one mesh, its tallest side scaled to `size`, its base on `location`.
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=os.path.expanduser(o["asset"]))
+        new = [x for x in bpy.data.objects if x not in before]
+        meshes = [x for x in new if x.type == "MESH"]
+        bpy.ops.object.select_all(action="DESELECT")
+        for x in meshes:
+            x.select_set(True)
+        bpy.context.view_layer.objects.active = meshes[0]
+        bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+        for x in new:
+            if x.type != "MESH":
+                bpy.data.objects.remove(x, do_unlink=True)
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        if len(meshes) > 1:
+            bpy.ops.object.join()
+        ob = bpy.context.object
+        co = [v.co for v in ob.data.vertices]
+        lo = [min(c[k] for c in co) for k in range(3)]
+        hi = [max(c[k] for c in co) for k in range(3)]
+        k = s / max(hi[i] - lo[i] for i in range(3))
+        ob.data.transform(Matrix.Translation((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])))
+        ob.data.transform(Matrix.Scale(k, 4))
+        ob.name = name
+        ob.location = o.get("location", (0, 0, 0))
+        return ob
     ob = bpy.context.object
     ob.name = name
     ob.location = o.get("location", (0, 0, 0))

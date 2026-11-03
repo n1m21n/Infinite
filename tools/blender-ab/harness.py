@@ -24,7 +24,7 @@ sys.path.insert(0, HERE)
 from cases import CASES, REGIONS  # noqa: E402
 
 BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
-INFINITE = os.path.join(REPO, "build-dev/Infinite.app/Contents/MacOS/Infinite")
+INFINITE = os.environ.get("INFINITE_BIN", os.path.join(REPO, "build-dev/Infinite.app/Contents/MacOS/Infinite"))
 ASSETS = os.path.join(HERE, "assets")
 BASELINE = os.path.join(HERE, "baseline.json")
 # A case passes while its FLIP stays within this much of its baseline.
@@ -99,6 +99,11 @@ def gltf_material(path):
     j = json.loads(b[20:20 + struct.unpack("<I", b[12:16])[0]])
     mat = j["materials"][0]
     pbr = mat.get("pbrMetallicRoughness", {})
+    sg = mat.get("extensions", {}).get("KHR_materials_pbrSpecularGlossiness")
+    if sg and not pbr:   # read as GltfImport does: diffuse = base colour, roughness = 1 - glossiness, non-metal
+        pbr = {"baseColorFactor": sg.get("diffuseFactor", [1, 1, 1, 1]), "metallicFactor": 0.0,
+               "roughnessFactor": 1.0 if "specularGlossinessTexture" in sg else 1.0 - sg.get("glossinessFactor", 1.0)}
+        if "diffuseTexture" in sg: pbr["baseColorTexture"] = sg["diffuseTexture"]
     base = pbr.get("baseColorFactor", [1, 1, 1, 1])
     lines = ["  c color %g %g %g" % tuple(base[:3]), "  f opacity %g" % base[3],
              "  f metallic %g" % pbr.get("metallicFactor", 1.0), "  f roughness %g" % pbr.get("roughnessFactor", 1.0)]
@@ -108,6 +113,18 @@ def gltf_material(path):
     maps = {}
     if "baseColorTexture" in pbr: maps["albedo"] = "albedo"
     if "metallicRoughnessTexture" in pbr: maps["roughness"] = "roughness"; maps["metallic"] = "metallic"
+    if sg:   # specular colour -> Material specular (F0 = 0.08 x specular), from the map's mean as GltfImport does
+        f0 = sum(sg.get("specularFactor", [1, 1, 1])) / 3
+        if "specularGlossinessTexture" in sg:
+            import io
+            from PIL import Image, ImageStat
+            im = j["images"][j["textures"][sg["specularGlossinessTexture"]["index"]]["source"]]
+            bv = j["bufferViews"][im["bufferView"]]; o = 20 + struct.unpack("<I", b[12:16])[0] + 8 + bv.get("byteOffset", 0)
+            px = Image.open(io.BytesIO(b[o:o + bv["byteLength"]])).convert("RGB").getdata()
+            lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+            f0 *= sum(lin(sum(p) / 765.0) for p in px) / len(px)
+            maps["roughness"] = "roughness"
+        lines.append("  f specular %g" % min(1.0, f0 / 0.08))
     if "normalTexture" in mat: maps["normal"] = "normal"
     if "occlusionTexture" in mat: maps["ao"] = "ao"
     if "emissiveTexture" in mat: maps["emission"] = "emission"
@@ -407,8 +424,12 @@ def main():
     sfx = "_pt" if a.engine == "pt" else ""
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     rows = []
+    os.environ.setdefault("DEER_GLB", os.path.expanduser("~/Downloads/Assets/deer.glb"))
     for name in names:
         scene = dict(CASES[name]); d = os.path.join(os.path.abspath(a.out), name)
+        if any(o["shape"] == "model" and not os.path.exists(asset_file(o)) for o in scene["objects"]):
+            print("skip %s: model file missing" % name)
+            continue
         os.makedirs(d, exist_ok=True)
         if any(o.get("region") for o in scene["objects"]):
             scene["regions"] = REGIONS

@@ -123,7 +123,8 @@ frame is stepped in order and the node's world-space vertices (or points) are wr
 | `particles` | Particle System | RMS of the cloud's mean height, metres | peak height, alive count |
 
 Scene keys: `kind`, `duration`, `gravity` (Blender Z-up vector; leaning gravity stands in for a
-slope), `ground` (height or null), `objects[]` (`cube`, `sphere`, `grid`, with `size`, `location`,
+slope), `ground` (height or null), `objects[]` (`cube`, `sphere`, `grid`, or `model` with an `asset` glb
+scaled so its tallest side is `size`, base on `location`; with `size`, `location`,
 `rotation` in degrees, `subdivisions`), `colliders[]` (cloth: still shapes the sheet drapes over,
 sent to Infinite as `collider.glb` into Cloth's collider pin), and `body` (rigid: `friction`, `bounce`,
 `linear_damping`, `angular_damping`, `collider`), `cloth` (`pin` none/top/corners/edges,
@@ -140,5 +141,8 @@ Unit mapping (`physics.patch` holds it):
 | Cloth bending b | bending √(0.02 b), so Blender's default 0.5 is Infinite's default 0.1 |
 | Cloth collision distance 0.015 + collider outer thickness 0.02 | collider distance 0.035 |
 | Collision cloth friction 5 (default) | collider friction 0.5 (default) |
+
+`cloth_deer` needs a glb not kept in git (`DEER_GLB`, default `~/Downloads/Assets/deer.glb`) and is
+skipped without it. `INFINITE_BIN` points the run at another build.
 
 A case fails when its error rises more than 10% over `baseline_physics.json`.

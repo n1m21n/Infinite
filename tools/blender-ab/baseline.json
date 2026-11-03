@@ -1,5 +1,7 @@
 {
  "cornell": 0.583,
+ "deer": 0.1186,
+ "deer_pt": 0.0897,
  "furnace_dielectric": 0.0176,
  "furnace_metal": 0.0182,
  "hero": {

@@ -126,6 +126,18 @@ def _hero():
     }
 
 
+def _deer():
+    # A real scanned-style asset (the owner's ~/Downloads/Assets/deer.glb, not in git; DEER_GLB overrides):
+    # 0.51 m tall in the file, spec-gloss material with diffuse + glossiness maps. Scaled to 1.2 m, feet on the floor.
+    deer = {"region": "models", "shape": "model", "asset": "deer.glb", "env": "DEER_GLB", "scale": 2.344,
+            "location": [0.0, 0.6, 0.6]}
+    return {"size": [768, 512], "view": "AgX",
+            "camera": {"fov": 40, "azimuth": 35, "elevation": 15, "distance": 3.6, "target": [0, 0, 0.6]},
+            "lights": [{"type": "sun", "power": 4, "azimuth": 40, "elevation": 50},
+                       {"type": "area", "power": 150, "azimuth": 220, "elevation": 30, "distance": 3.0, "size": [1.5, 1.5]}],
+            "world": {"color": [0.25, 0.27, 0.3]}, "objects": [GREY_FLOOR, deer]}
+
+
 CASES = {
     # One light each on a grey floor and a white ball: units, falloff, cone, shadow.
     "light_sun": _lit({"type": "sun", "power": 3, "azimuth": 30, "elevation": 45}),
@@ -150,4 +162,6 @@ CASES = {
     "cornell": _cornell(),
     # Every 3D aspect in one picture, 3 Fox frames, scored per region (harness.py hero_*).
     "hero": _hero(),
+    # Owner-supplied deer: textured spec-gloss material, two lights, AgX. Skipped when the file is missing.
+    "deer": _deer(),
 }
