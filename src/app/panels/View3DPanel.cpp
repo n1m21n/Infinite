@@ -8008,6 +8008,55 @@ namespace
             View3DAddNode(*gn);
    }
 
+   // A card's Open in 3D View: the item whose chain holds the node, then its mode.
+   struct OpenRequest
+   {
+      uint64_t uid = 0;
+      int mode = 0; // 1 edit, 2 sculpt, 3 pose
+   } sOpenReq;
+
+   void RunOpenRequest(Scene3DNode* scene)
+   {
+      const OpenRequest req = sOpenReq;
+      sOpenReq = {};
+      GraphNode* target = FindNodeByUid(req.uid);
+      if (target == nullptr)
+         return;
+      auto find = [&]() -> int
+      {
+         for (const Item& it : scene->Items())
+         {
+            GraphNode* gn = FindNodeByUid(it.uid);
+            auto* top = gn != nullptr ? dynamic_cast<IGeometrySource*>(gn->node.get()) : nullptr;
+            for (IGeometrySource* s = top; s != nullptr; s = s->PassthroughSource())
+               if (dynamic_cast<INode*>(s) == target->node.get())
+                  return it.id;
+         }
+         return -1;
+      };
+      int id = find();
+      if (id < 0)
+      {
+         View3DAddNode(*target);
+         id = find();
+      }
+      if (id < 0)
+         return;
+      sSel = { id };
+      if (sEdit.on)
+         ToggleEdit(scene);
+      if (sSculpt.on)
+         ToggleSculpt(scene);
+      if (sPose.on)
+         TogglePose(scene);
+      if (req.mode == 1)
+         ToggleEdit(scene);
+      else if (req.mode == 2)
+         ToggleSculpt(scene);
+      else if (req.mode == 3)
+         TogglePose(scene);
+   }
+
    void DrawPanel()
    {
       FollowCanvasSelection();
@@ -8036,6 +8085,8 @@ namespace
          if (scene->FindItem(id) != nullptr)
             live.push_back(id);
       sSel.swap(live);
+      if (sOpenReq.uid != 0)
+         RunOpenRequest(scene);
       if (scene->FindItem(sPickItem) == nullptr)
          sPickItem = -1;
       if (sPickedUid != 0 && sPickItem >= 0)
@@ -8135,6 +8186,12 @@ void View3DAddLight(int type)
 {
    if (Scene3DNode* scene = FindScene())
       AddLightNow(scene, type);
+}
+
+void View3DOpenNode(const GraphNode& gn, int mode)
+{
+   sOpenReq = { gn.uid, mode };
+   gView3DOpen = true;
 }
 
 bool View3DCanAdd(const GraphNode& gn)

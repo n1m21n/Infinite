@@ -1182,6 +1182,14 @@ namespace app
    }
 
 
+   void OpenIn3DViewButton(int mode)
+   {
+      if (gParamRegisterOnly || !ActionButton::Draw("Open in 3D View", ImVec2(kPreviewSize, 0)))
+         return;
+      if (const GraphNode* gn = FindNodeByIndex(gCurrentNodeIndex))
+         View3DOpenNode(*gn, mode);
+   }
+
    void DrawArmatureParams(ArmatureNode* n)
    {
       PushTextWrapWidth(kPreviewSize);
@@ -1201,6 +1209,7 @@ namespace app
       ModSlider("wave speed", &n->waveSpeed, -4.0f, 4.0f);
       ModSlider("wave phase", &n->wavePhase, 0.0f, 1.0f);
       DrawRigPoseParams(n);
+      OpenIn3DViewButton(3);
    }
 
    void DrawDelaunayParams(DelaunayMeshNode* n)
@@ -1260,6 +1269,7 @@ namespace app
          PushUndoCheckpoint("Clear sculpt");
          n->Clear();
       }
+      OpenIn3DViewButton(2);
    }
 
 
@@ -1273,6 +1283,7 @@ namespace app
          PushUndoCheckpoint("Clear edits");
          n->ops.clear();
       }
+      OpenIn3DViewButton(1);
    }
 
 

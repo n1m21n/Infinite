@@ -5804,6 +5804,8 @@ extern bool gView3DClaimedKeys;
 extern ImVec2 gView3DRectMin, gView3DRectMax;
 void DrawView3DDocked(const char* id, const ImVec2& size);
 bool View3DCanAdd(const GraphNode& gn);
+// Opens the 3D View on the item holding this node and enters a mode (1 edit, 2 sculpt, 3 pose).
+void View3DOpenNode(const GraphNode& gn, int mode);
 OutputNode* View3DEnsureOutput();
 void View3DAddNode(GraphNode& gn);
 GraphNode* View3DMaterialOf(Scene3DNode* scene, int itemId);
