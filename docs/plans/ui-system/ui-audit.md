@@ -107,7 +107,7 @@ counting the app's menu bar as part of every node (fixed in the audit). What was
 | contrast text, off grid, contrast fill | 0 | none found on node bodies in either theme | clean |
 
 Nothing needed a change in `DrawMaterialParams`; the Metallic slider finding is the closest and is in the 3D View
-Material tab, light theme (checked on the build before the "load map" row; rerun to confirm).
+Material tab, light theme.
 
 The 23 that remain are in `tools/ui-audit/baseline.tsv`; a new finding fails the run.
 
