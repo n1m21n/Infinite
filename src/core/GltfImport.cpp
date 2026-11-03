@@ -649,6 +649,36 @@ namespace GltfImport
                   SplitMetallicRoughness(combined, pkg.roughness, pkg.metallic);
             }
          }
+         else if (mat.has_pbr_specular_glossiness)
+         {
+            // Older (often Sketchfab) files: diffuse is the base colour, roughness is 1 - glossiness
+            // (the map's alpha), and the material is read as non-metal.
+            const cgltf_pbr_specular_glossiness& sg = mat.pbr_specular_glossiness;
+            std::copy(sg.diffuse_factor, sg.diffuse_factor + 4, pkg.baseColor);
+            pkg.metallicFactor = 0.0f;
+            pkg.roughnessFactor = 1.0f - sg.glossiness_factor;
+            if (sg.diffuse_texture.texture != nullptr)
+               DecodeCgltfImage(sg.diffuse_texture.texture->image, dir, "albedo", pkg.albedo, err);
+            // The specular colour is F0; Material has no map for it, so its mean sets specular (F0 = 0.08 x specular).
+            float f0 = (sg.specular_factor[0] + sg.specular_factor[1] + sg.specular_factor[2]) / 3.0f;
+            if (sg.specular_glossiness_texture.texture != nullptr &&
+                DecodeCgltfImage(sg.specular_glossiness_texture.texture->image, dir, "roughness", pkg.roughness, err))
+            {
+               pkg.roughnessFactor = 1.0f;
+               double sum = 0.0;
+               for (size_t i = 0; i < pkg.roughness.pixels.size(); i += 4)
+               {
+                  const float c = (pkg.roughness.pixels[i] + pkg.roughness.pixels[i + 1] + pkg.roughness.pixels[i + 2]) / (3.0f * 255.0f);
+                  sum += c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
+                  const unsigned char r = (unsigned char)(255 - (int)(pkg.roughness.pixels[i + 3] * sg.glossiness_factor));
+                  pkg.roughness.pixels[i + 0] = pkg.roughness.pixels[i + 1] = pkg.roughness.pixels[i + 2] = r;
+                  pkg.roughness.pixels[i + 3] = 255;
+               }
+               if (!pkg.roughness.pixels.empty())
+                  f0 *= (float)(sum / (pkg.roughness.pixels.size() / 4));
+            }
+            pkg.specular = std::min(1.0f, f0 / 0.08f);
+         }
          if (mat.normal_texture.texture != nullptr)
             DecodeCgltfImage(mat.normal_texture.texture->image, dir, "normal", pkg.normalMap, err);
          if (mat.occlusion_texture.texture != nullptr)

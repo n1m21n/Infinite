@@ -90,6 +90,7 @@ namespace GltfImport
       float baseColor[4] = { 1, 1, 1, 1 };
       float metallicFactor = 1.0f;
       float roughnessFactor = 1.0f;
+      float specular = 0.5f;   // Material's specular (0.5 = F0 0.04); spec-gloss files set it from their specular colour
       float emissiveFactor[3] = { 0, 0, 0 };
 
       bool hadMultipleUVSets = false;

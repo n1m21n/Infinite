@@ -42,6 +42,7 @@ std::vector<int> SpawnGltfParts(const std::string& path, float x, float y)
          mat->opacity = pkg->baseColor[3];
          mat->metallic = pkg->metallicFactor;
          mat->roughness = pkg->roughnessFactor;
+         mat->specular = pkg->specular;
          const float* e = pkg->emissiveFactor;
          if (e[0] > 0.0f || e[1] > 0.0f || e[2] > 0.0f)
          {
