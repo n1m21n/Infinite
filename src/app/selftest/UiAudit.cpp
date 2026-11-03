@@ -415,6 +415,10 @@ namespace
              q[i].Type == ImGuiInputEventType_MouseWheel)
             q.erase(q.Data + i);
       ctx->IO.AddMousePosEvent(sMouse.x, sMouse.y);
+      // Every press is a single click: pokes come frames apart, and a press near the last one would count as a
+      // double-click (a slider then opens its number field instead of dragging).
+      if (sButton == 1)
+         ctx->IO.MouseClickedTime[0] = -FLT_MAX;
       if (sButton >= 0)
          ctx->IO.AddMouseButtonEvent(0, sButton == 1);
       if (sWheel != 0.0f)
@@ -449,18 +453,21 @@ namespace
       return PatchJson::ToJson(d).dump();
    }
 
-   // Where two fingerprints first differ, as a short quote of the new text.
+   // Where two fingerprints first differ, as a short quote of the old and the new text.
    std::string FirstDiff(const std::string& a, const std::string& b)
    {
       size_t i = 0;
       while (i < a.size() && i < b.size() && a[i] == b[i])
          i++;
-      const size_t from = i > 30 ? i - 30 : 0;
-      std::string q = b.substr(from, 60);
-      for (char& c : q)
-         if (c == '\t' || c == '\n')
-            c = ' ';
-      return q;
+      const size_t from = i > 20 ? i - 20 : 0;
+      auto quote = [&](const std::string& s) {
+         std::string q = from < s.size() ? s.substr(from, 48) : std::string();
+         for (char& c : q)
+            if (c == '\t' || c == '\n' || c == '|')
+               c = ' ';
+         return q;
+      };
+      return quote(a) + " -> " + quote(b);
    }
 
    // Layer 3. Kinds: slider (press at 25%, drag to each end, release, undo), hover (wheel over it, nothing changes),

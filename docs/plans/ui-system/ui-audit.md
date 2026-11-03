@@ -102,14 +102,13 @@ counting the app's menu bar as part of every node (fixed in the audit). What was
 | clipped | 1 | 3D View list row 6 px past its child | left, cosmetic |
 | hover/scroll changes value | 4 | Moves (live gesture input moves with the pointer), Field Graph (same), Render 3D viewport (wheel zooms the orbit camera) | by design |
 | popup did not open / changes value | 2 | Drum Sequencer step cell reported as a dropdown | audit misclassifies; not a bug |
-| toggle does not return | 3 | 3D View Render "on", Film/Transparent, Light/Casts shadow | not resolved: patch text differs after two clicks (scene arrangement, bake values); needs a narrower fingerprint |
-| press lands off / drag misses | 4 | Safe Areas/Action (17% at 25%: integer range); Surface/Metallic in the light theme only: press lands at 0%, no undo step | Metallic open: a control that does not take the press; Safe Areas by design |
+| toggle does not return | 3 | 3D View Render "on", Film/Transparent, Light/Casts shadow | fixed: a mouse release anywhere snapped every node to the grid (now only dragged nodes, after a drag); an older 3D View settings line was rewritten on the first edit (now on load); "Casts shadow" could not be cleared on the first light (the caster's box is now fixed on, checking another light moves it) |
+| press lands off / drag misses | 4 | Safe Areas/Action (17% at 25%: integer range); Surface/Metallic: press lands at 0%, no undo step | Metallic: the audit's press came within ImGui's double-click time and distance of its last click, so the slider opened its number field (fixed in the audit: every press is a single click); Safe Areas by design |
 | contrast text, off grid, contrast fill | 0 | none found on node bodies in either theme | clean |
 
-Nothing needed a change in `DrawMaterialParams`; the Metallic slider finding is the closest and is in the 3D View
-Material tab, light theme.
+Nothing needed a change in `DrawMaterialParams`. Findings now quote the old and the new text where a patch differs.
 
-The 23 that remain are in `tools/ui-audit/baseline.tsv`; a new finding fails the run.
+The 17 that remain (all by design or cosmetic) are in `tools/ui-audit/baseline.tsv`; a new finding fails the run.
 
 ## Done when
 
