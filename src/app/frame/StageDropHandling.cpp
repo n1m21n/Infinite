@@ -138,6 +138,7 @@ void DrawDropHandling(FrameCtx& fc)
          VmpcNode* dropTargetVmpc = FindNodeUnderCanvasPoint<VmpcNode>(canvasPos);
          std::vector<std::string> vmpcDropPaths;
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
+         MaterialNode* dropTargetMaterial = FindNodeUnderCanvasPoint<MaterialNode>(canvasPos);
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
          FieldPrimitiveNode* dropTargetFieldPrimitive = FindNodeUnderCanvasPoint<FieldPrimitiveNode>(canvasPos);
          FieldPixelNode* dropTargetFieldPixel = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasPos);
@@ -543,6 +544,15 @@ void DrawDropHandling(FrameCtx& fc)
             }
             else
             {
+               // An image on a Material cables into the free map its name points at, so a whole PBR set
+               // dropped at once wires itself.
+               if (const int map = dropTargetMaterial != nullptr ? MaterialMapForFile(dropTargetMaterial, path) : -1;
+                   map >= 0)
+               {
+                  ensureDroppedCheckpoint();
+                  LoadMaterialMap(dropTargetMaterial, map, path, false);
+                  continue;
+               }
                if (dropTargetImage != nullptr)
                {
                   ensureDroppedCheckpoint();

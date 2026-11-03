@@ -1512,6 +1512,10 @@ extern FieldGraphNode* gFieldGraphPendingUnpack;
 extern PendingMapLoad gPendingMapLoad;
 
 void RunPendingMapLoad();
+// Spawn an Image Source left of `material`, loaded with `path`, cabled into `map`.
+void LoadMaterialMap(INode* material, int map, const std::string& path, bool checkpoint);
+// The free map a dropped file belongs in (by its name), or -1 when every map is cabled.
+int MaterialMapForFile(class MaterialNode* n, const std::string& path);
 
 
 

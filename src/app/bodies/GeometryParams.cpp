@@ -689,32 +689,109 @@ namespace app
    }
 
 
-   void RunPendingMapLoad()
+   void LoadMaterialMap(INode* material, int map, const std::string& path, bool checkpoint)
    {
-      if (gPendingMapLoad.material == nullptr)
-         return;
-      const PendingMapLoad req = gPendingMapLoad;
-      gPendingMapLoad = PendingMapLoad();
       int matIndex = -1;
       ImVec2 pos;
       for (GraphNode& gn : gNodes)
-         if (gn.node.get() == req.material)
+         if (gn.node.get() == material)
          {
             matIndex = gn.index;
             pos = ed::GetNodePosition(gn.NodeId());
          }
       if (matIndex < 0)
          return;
-      PushUndoCheckpoint("Load map image");
+      if (checkpoint)
+         PushUndoCheckpoint("Load map image");
       // Left of the Material, one rung per map, so several loads don't land on each other.
-      GraphNode* img = SpawnNode("Image Source", "Source", pos.x - 420.0f, pos.y + req.map * 120.0f);
+      GraphNode* img = SpawnNode("Image Source", "Source", pos.x - 420.0f, pos.y + map * 120.0f);
       if (img == nullptr)
          return;
       if (auto* src = dynamic_cast<ImageSourceNode*>(img->node.get()))
-         src->Load(req.path);
+         src->Load(path);
       std::string err;
-      ConnectNodes(img->index, 0, matIndex, 1 + req.map, err);
+      ConnectNodes(img->index, 0, matIndex, 1 + map, err);
       gPatchDirty = true;
+   }
+
+
+   void RunPendingMapLoad()
+   {
+      if (gPendingMapLoad.material == nullptr)
+         return;
+      const PendingMapLoad req = gPendingMapLoad;
+      gPendingMapLoad = PendingMapLoad();
+      LoadMaterialMap(req.material, req.map, req.path, true);
+   }
+
+
+   int MaterialMapForFile(MaterialNode* n, const std::string& path)
+   {
+      // The usual PBR set names (wood_Roughness.png, brick_nrm.jpg); anything else is the albedo.
+      std::string name = path.substr(path.find_last_of("/\\") + 1);
+      for (char& c : name)
+         c = (char)std::tolower((unsigned char)c);
+      static const std::pair<const char*, int> kHints[] = {
+         { "normal", kMapNormal }, { "nrm", kMapNormal }, { "_nor", kMapNormal }, { "rough", kMapRoughness },
+         { "metal", kMapMetallic }, { "occlusion", kMapAmbientOcclusion }, { "_ao", kMapAmbientOcclusion },
+         { "emis", kMapEmission }, { "emit", kMapEmission }, { "opacity", kMapOpacity }, { "alpha", kMapOpacity },
+         { "transm", kMapTransmission }, { "coat", kMapClearcoat }, { "sheen", kMapSheen },
+      };
+      int want = kMapAlbedo;
+      for (const auto& [key, map] : kHints)
+         if (name.find(key) != std::string::npos)
+         {
+            want = map;
+            break;
+         }
+      if (!n->MapInput(want).IsConnected())
+         return want;
+      for (int m = 0; m < kMapCount; ++m)
+         if (!n->MapInput(m).IsConnected())
+            return m;
+      return -1;
+   }
+
+
+   // True when every Render 3D downstream of `node` path traces (and there is at least one), so the
+   // Material can grey what the path tracer ignores. A raster view anywhere downstream keeps them live.
+   static bool FeedsOnlyPathTracer(const INode* node)
+   {
+      int start = -1;
+      for (const GraphNode& gn : gNodes)
+         if (gn.node.get() == node)
+            start = gn.index;
+      if (start < 0)
+         return false;
+      std::vector<int> stack{ start }, seen{ start };
+      bool anyPt = false;
+      while (!stack.empty())
+      {
+         const int at = stack.back();
+         stack.pop_back();
+         for (const LinkInfo& link : gLinks)
+         {
+            if (!GraphNode::IsOutputPin(link.srcPin) || GraphNode::NodeIndexFromPin(link.srcPin) != at)
+               continue;
+            const int to = GraphNode::NodeIndexFromPin(link.dstPin);
+            if (std::find(seen.begin(), seen.end(), to) != seen.end())
+               continue;
+            seen.push_back(to);
+            for (const GraphNode& gn : gNodes)
+               if (gn.index == to)
+               {
+                  if (auto* r = dynamic_cast<const Render3DNode*>(gn.node.get()))
+                  {
+                     if (r->engine != 1)
+                        return false;
+                     anyPt = true;
+                  }
+                  else
+                     stack.push_back(to);
+               }
+         }
+      }
+      return anyPt;
    }
 
 
@@ -731,6 +808,8 @@ namespace app
       // keep their registration order (the left column, then the right), which is what saved
       // modulation is keyed on. Left: normal map, surface, emission (17). Right: coat & sheen, optics (18).
       const bool pbrUnused = n->shading != 0 && !gParamRegisterOnly;   // Normals/UV/Flat ignore the lighting model
+      // The path tracer has no anisotropy, iridescence, dispersion, subsurface or non-Lit shading.
+      const bool ptOnly = !gParamRegisterOnly && FeedsOnlyPathTracer(n);
 
       // --- Left Column ---
       ImGui::BeginGroup();
@@ -742,7 +821,9 @@ namespace app
       ImGui::EndDisabled();
 
       NodeSeparator("surface", colW);
+      ImGui::BeginDisabled(ptOnly);
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; }, colW);
+      ImGui::EndDisabled();
       DropdownButton("wrap", MaterialNode::WrapModeNames(), n->wrapMode, [n](int i) { n->wrapMode = i; }, colW);
       ColorSwatch("colour", n->color, n);
       ImGui::BeginDisabled(pbrUnused);
@@ -783,6 +864,7 @@ namespace app
       ImGui::EndDisabled();
 
       NodeSeparator("optics", colW);
+      ImGui::BeginDisabled(ptOnly);
       ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f, "%.3f", colW);
       ImGui::BeginDisabled(n->anisotropy == 0.0f);
       ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f, "%.3f", colW);
@@ -792,15 +874,20 @@ namespace app
       ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f, "%.3f", colW);
       ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm", colW);
       ImGui::EndDisabled();
+      ImGui::EndDisabled();
       ModSlider("transmission", &n->transmission, 0.0f, 1.0f, "%.3f", colW);
       ImGui::BeginDisabled(n->transmission <= 0.0f);
       ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::BeginDisabled(ptOnly);
       ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(ptOnly);
       ModSlider("subsurface", &n->subsurface, 0.0f, 1.0f, "%.3f", colW);
       ImGui::BeginDisabled(n->subsurface <= 0.0f);
       ColorSwatch("sss colour", n->subsurfaceColor, n);
       ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ImGui::EndDisabled();
       ImGui::EndDisabled();
 
