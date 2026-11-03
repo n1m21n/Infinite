@@ -794,6 +794,8 @@ void Scene3DNode::Parse()
       std::copy(it.rot, it.rot + 3, it.followed + 3);
       std::copy(it.scale, it.scale + 3, it.followed + 6);
    }
+   // The text in the current form at once, so the first edit does not also rewrite an older patch's lines.
+   Serialize();
 }
 
 void Scene3DNode::VisitParams(ParamVisitor& v)

@@ -5269,9 +5269,13 @@ namespace
       }
       if (light->type != 1 && light->type != 3)
       {
+         // One light casts (0 = the first), so the caster's box cannot be cleared: checking another light moves it.
          bool casts = ShadowCaster(scene) == item;
-         if (BoolRow(T("Casts shadow"), &casts, "Shadow light"))
-            sSet->shadowItem = casts ? item->id : 0;
+         const bool wasCaster = casts;
+         ImGui::BeginDisabled(wasCaster);
+         if (BoolRow(T("Casts shadow"), &casts, "Shadow light") && casts)
+            sSet->shadowItem = item->id;
+         ImGui::EndDisabled();
          if (casts)
          {
             BoolRow(T("Shadow"), &light->castShadow);
