@@ -318,6 +318,7 @@ void DrawSidePanels(FrameCtx& fc)
       }
       RunFieldGraphUnpackPhase2Tick();
       RunAutoLayoutTick();
+      RunPendingMapLoad();
 
       // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
       // detection for every FieldGraphNode, polled once per frame right

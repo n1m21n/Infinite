@@ -1499,6 +1499,19 @@ extern FieldGraphNode* gFieldGraphPendingRegenerate;
 
 extern FieldGraphNode* gFieldGraphPendingUnpack;
 
+   // A Material body's "load map" pick: spawning mid-draw would move gNodes, so the Image Source
+   // is made and cabled after the canvas pass (RunPendingMapLoad, next to RunAutoLayoutTick).
+   struct PendingMapLoad
+   {
+      INode* material = nullptr;
+      int map = -1;
+      std::string path;
+   };
+
+extern PendingMapLoad gPendingMapLoad;
+
+void RunPendingMapLoad();
+
 
 
    // Phase 2 of the unpack operation: a poll-and-validate tick driven once

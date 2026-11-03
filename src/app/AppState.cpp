@@ -1005,6 +1005,7 @@ bool gHeadlessNeedProbe = false;
    // ed::End()), drained once after ed::End() returns by
    // RunFieldGraphUnpackPhase1 - see that function's comment.
    FieldGraphNode* gFieldGraphPendingUnpack = nullptr;
+   PendingMapLoad gPendingMapLoad;
 
    FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
 

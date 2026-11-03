@@ -689,6 +689,35 @@ namespace app
    }
 
 
+   void RunPendingMapLoad()
+   {
+      if (gPendingMapLoad.material == nullptr)
+         return;
+      const PendingMapLoad req = gPendingMapLoad;
+      gPendingMapLoad = PendingMapLoad();
+      int matIndex = -1;
+      ImVec2 pos;
+      for (GraphNode& gn : gNodes)
+         if (gn.node.get() == req.material)
+         {
+            matIndex = gn.index;
+            pos = ed::GetNodePosition(gn.NodeId());
+         }
+      if (matIndex < 0)
+         return;
+      PushUndoCheckpoint("Load map image");
+      // Left of the Material, one rung per map, so several loads don't land on each other.
+      GraphNode* img = SpawnNode("Image Source", "Source", pos.x - 420.0f, pos.y + req.map * 120.0f);
+      if (img == nullptr)
+         return;
+      if (auto* src = dynamic_cast<ImageSourceNode*>(img->node.get()))
+         src->Load(req.path);
+      std::string err;
+      ConnectNodes(img->index, 0, matIndex, 1 + req.map, err);
+      gPatchDirty = true;
+   }
+
+
    void DrawMaterialParams(MaterialNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -776,6 +805,37 @@ namespace app
       ImGui::EndDisabled();
 
       ImGui::EndGroup();
+
+      // Load map: pick a free map, then a file; an Image Source lands left of the node, cabled in.
+      // Not a registered param (nothing to modulate) and drawn last, so the rows' keys stay put.
+      if (gParamRegisterOnly)
+         return;
+      std::vector<std::string> names;
+      std::vector<int> maps;
+      for (int m = 0; m < kMapCount; ++m)
+         if (!n->MapInput(m).IsConnected())
+         {
+            names.push_back(n->InputLabel(1 + m));
+            maps.push_back(m);
+         }
+      if (names.empty())
+         return;
+      PushDropdownStyle();
+      if (NodeDropdownField("image##matLoadMap", ImVec2(colW * 2.0f + gutter, 0), "load map"))
+      {
+         gDropdown.options = names;
+         gDropdown.categories.clear();
+         gDropdown.current = -1;
+         gDropdown.justOpened = true;
+         gDropdown.focusSearch = false;
+         gDropdown.onSelect = [n, maps](int i)
+         {
+            const std::string path = Platform::OpenImageDialog();
+            if (!path.empty())
+               gPendingMapLoad = { n, maps[i], path };
+         };
+      }
+      PopDropdownStyle();
    }
 
 
