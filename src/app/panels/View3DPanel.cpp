@@ -4828,7 +4828,10 @@ namespace
    bool ColorRow(const char* label, float* rgb, const char* undo = "Edit in 3D View")
    {
       FieldLabel(label);
+      // Rows share labels ("Colour" in Surface and Emission): scope the id so one click opens one picker.
+      ImGui::PushID(undo);
       const bool changed = FormParts::ColorDot(FormParts::Id(label).c_str(), rgb, 15.0f, ImGui::GetFrameHeight());
+      ImGui::PopID();
       static float sLast = -1.0f;
       if (changed && ImGui::GetTime() - sLast > 1.0f)   // one drag across the picker, one undo
          PushUndoCheckpoint(undo);
