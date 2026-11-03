@@ -1,5 +1,14 @@
 [
  {
+  "slug": "granular-synthesis-modular-audio-sound-design",
+  "title": "Granular synthesis in modular audio: soundscapes and grain clouds",
+  "description": "Explore granular synthesis in modular audio: grain clouds, window functions, time-stretching, stochastic spray, and feature sorting in Infinite.",
+  "date": "2026-11-03",
+  "updated": "2026-11-03",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/granular-synthesis-modular-audio-sound-design.html"
+ },
+ {
   "slug": "modular-vst3-host-audio-routing-and-modulation",
   "title": "Modular VST3 host: route plugins, MIDI and CV on an open canvas",
   "description": "Explore modular VST3 host architecture in Infinite: patch audio and MIDI between plugins, route CV automation across an open canvas, and isolate plugin crashes.",

@@ -15,7 +15,8 @@
     {"q": "per sample dsp kernel register machine", "track": "B", "persona": "engineering", "match": ["dsp", "kernel", "audio"]},
     {"q": "euclidean rhythm sequencer algorithm", "track": "B", "persona": "electronic_musicians", "match": ["euclidean", "sequencer", "rhythm"]},
     {"q": "automatic visuals for dj set", "track": "B", "persona": "dj", "match": ["dj", "visuals", "set"]},
-    {"q": "lorenz attractor interactive simulation", "track": "B", "persona": "science", "match": ["lorenz", "attractor", "simulation"]}
+    {"q": "lorenz attractor interactive simulation", "track": "B", "persona": "science", "match": ["lorenz", "attractor", "simulation"]},
+    {"q": "granular synthesis modular audio", "track": "B", "persona": "sound_design", "match": ["granular", "synthesis", "modular"]}
   ]
 }
 
