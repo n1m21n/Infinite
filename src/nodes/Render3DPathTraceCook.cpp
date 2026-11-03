@@ -19,7 +19,7 @@ namespace
 {
    // One stashed light: type, vec[3], aim[3], colour (sRGB)[3], power, spot angle, penumbra,
    // area w, area h, falloff k (< 0 hard), cutoff.
-   constexpr int kPtLightFloats = 17;
+   constexpr int kPtLightFloats = 19;
 }
 
 namespace
@@ -31,7 +31,7 @@ namespace
       const Material mat = source->GetMaterial();
       PtMaterial m = PtMaterial::FromMaterial(mat);
       static const int kSlotMap[PtMaterial::kMapSlots] = { kMapAlbedo,   kMapRoughness, kMapMetallic, kMapNormal,
-                                                          kMapEmission, kMapClearcoat, kMapSheen,    kMapTransmission };
+                                                          kMapEmission, kMapClearcoat, kMapSheen,    kMapTransmission, kMapOpacity };
       for (int k = 0; k < PtMaterial::kMapSlots; k++)
          m.maps[k] = source->GetMaterialTexture(kSlotMap[k]);
       if (auto* matNode = dynamic_cast<MaterialNode*>(source))
@@ -125,6 +125,8 @@ void Render3DNode::StashPathTraceLights(int count, const int* types, const float
       d[14] = area[i * 2 + 1];
       d[15] = terms[i * 4 + 3];
       d[16] = cutoff[i];
+      d[17] = terms[i * 4 + 0];
+      d[18] = terms[i * 4 + 1];
    }
 }
 
@@ -230,21 +232,19 @@ bool Render3DNode::CookPathTrace(int frameId)
       const float lens = ortho || dofAperture <= 0.0f ? 0.0f : dofAperture * (24.0f / 1080.0f) * 2.0f * focusDistance * invFy;
       pt.SetLens(lens, focusDistance, dofBlades, dofRotation * 3.14159265f / 180.0f, dofRatio);
 
-      // Lights, in raster's units: radiance = linear colour x power x falloff. A hard falloff k is
-      // 1 / (d^2 * -k), so the tracer's inverse square takes 1 / -k into the colour.
+      // Lights, in raster's units: radiance = linear colour x power x raster's own falloff, per hit.
       std::vector<Render3DPathTrace::PtLight> lights;
       for (size_t i = 0; i + kPtLightFloats <= mPtLights.size(); i += kPtLightFloats)
       {
          const float* d = &mPtLights[i];
          Render3DPathTrace::PtLight l;
          l.type = (int)d[0];
-         if (l.type == 3)
-            continue;   // raster's flat ambient term; the traced world lights the scene instead
          std::memcpy(l.posOrDir, d + 1, sizeof(l.posOrDir));
          std::memcpy(l.aim, d + 4, sizeof(l.aim));
-         float scale = d[10];
-         if (l.type == 1 || l.type == 4 || l.type == 5)
-            scale *= d[15] < 0.0f ? 1.0f / -d[15] : d[15] > 0.0f ? 1.0f / d[15] : 1.0f;
+         const float scale = d[10];
+         l.falloff = d[15];
+         l.diffuse = d[17];
+         l.specular = d[18];
          for (int k = 0; k < 3; k++)
             l.color[k] = ColorSpace::SrgbToLinear(std::max(0.0f, d[7 + k])) * scale;
          const float cosOuter = std::cos(d[11] * 3.14159265f / 180.0f);

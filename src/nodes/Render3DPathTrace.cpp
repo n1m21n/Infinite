@@ -74,6 +74,7 @@ namespace
       "uniform vec3 uLightColor[8];\n"
       "uniform vec2 uLightArea[8];\n"
       "uniform vec3 uLightSpot[8];\n" // x = cosOuter, y = smoothW, z = cutoff
+      "uniform vec3 uLightTerms[8];\n" // x = diffuse, y = specular, z = falloff k (raster's lightFalloff)
       // A thin lens: radius in world units, focus distance along the view, aperture (blades, turn, ratio).
       "uniform float uLensRadius;\n"
       "uniform float uFocusDist;\n"
@@ -90,6 +91,12 @@ namespace
       "\n"
       "float rand(inout uint state) {\n"
       "   return float(pcgHash(state) >> 8u) * (1.0 / 16777216.0);\n"
+      "}\n"
+      "\n"
+      "// Raster's lightFalloff: k >= 0 soft, k < 0 hard inverse square (k = -1 is physical).\n"
+      "float lightFalloff(float dist2, float k) {\n"
+      "   if (k >= 0.0) return 1.0 / (1.0 + dist2 * k);\n"
+      "   return 1.0 / max(dist2 * -k, 1e-4);\n"
       "}\n"
       "\n"
       "vec3 safeInvDir(vec3 d) {\n"
@@ -477,7 +484,13 @@ namespace
       "\n"
       "// The opaque layers, f_r(V, L) * cosThetaL, and the pdf of sampling L by lobeProbs.\n"
       "// The clear coat sits on top: what it reflects at this view never reaches the layers below.\n"
+      "vec3 evalOpaqueTerms(vec3 N, vec3 V, vec3 L, Surf s, vec2 w, out float outPdf);\n"
       "vec3 evalOpaque(vec3 N, vec3 V, vec3 L, Surf s, out float outPdf) {\n"
+      "   return evalOpaqueTerms(N, V, L, s, vec2(1.0), outPdf);\n"
+      "}\n"
+      "\n"
+      "// w: a light's diffuse and specular terms, as raster scales the two halves.\n"
+      "vec3 evalOpaqueTerms(vec3 N, vec3 V, vec3 L, Surf s, vec2 w, out float outPdf) {\n"
       "   float nDotL = dot(N, L);\n"
       "   if (nDotL <= 1e-6) {\n"
       "      outPdf = 0.0;\n"
@@ -492,20 +505,20 @@ namespace
       "   float D = ggxD(nDotH, alpha);\n"
       "   vec3 F = s.f0 + (vec3(1.0) - s.f0) * schlick5(vDotH);\n"
       "   float ccAtten = 1.0 - s.cc * (0.04 + 0.96 * schlick5(nDotV));\n"
-      "   vec3 f = (D * ggxVis(nDotV, nDotL, alpha) * F + (vec3(1.0) - F) * (1.0 - s.metal) * s.base * (1.0 / PI)) * ccAtten;\n"
+      "   vec3 f = (D * ggxVis(nDotV, nDotL, alpha) * F * w.y + (vec3(1.0) - F) * (1.0 - s.metal) * s.base * (1.0 / PI) * w.x) * ccAtten;\n"
       "\n"
       "   float ccAlpha = max(0.002, s.ccRough * s.ccRough);\n"
       "   float Dc = 0.0;\n"
       "   if (s.cc > 0.0) {\n"
       "      Dc = ggxD(nDotH, ccAlpha);\n"
-      "      f += vec3(Dc * ggxVis(nDotV, nDotL, ccAlpha) * (0.04 + 0.96 * schlick5(vDotH)) * s.cc);\n"
+      "      f += vec3(Dc * ggxVis(nDotV, nDotL, ccAlpha) * (0.04 + 0.96 * schlick5(vDotH)) * s.cc * w.y);\n"
       "   }\n"
       "   // Sheen: Charlie distribution with the Neubelt visibility, as Render 3D draws it.\n"
       "   if (s.sh > 0.0) {\n"
       "      float invR = 1.0 / max(s.shRough, 0.01);\n"
       "      float sin2h = max(1.0 - nDotH * nDotH, 0.0078125);\n"
       "      float Dsh = (2.0 + invR) * pow(sin2h, invR * 0.5) / (2.0 * PI);\n"
-      "      f += s.shCol * (Dsh / max(4.0 * (nDotL + nDotV - nDotL * nDotV), 1e-4) * s.sh);\n"
+      "      f += s.shCol * (Dsh / max(4.0 * (nDotL + nDotV - nDotL * nDotV), 1e-4) * s.sh * w.y);\n"
       "   }\n"
       "\n"
       "   vec3 p = lobeProbs(s, nDotV);\n"
@@ -611,6 +624,7 @@ namespace
       "   float prevPdfBsdf = 0.0;\n"
       "\n"
       "   int maxB = clamp(uMaxBounces, 1, 16);\n"
+      "   int passes = 0;\n"
       "   for (int bounce = 0; bounce < maxB; bounce++) {\n"
       "      HitInfo hit = traceClosest(rayOrigin, rayDir, 1e-4, 1e30);\n"
       "\n"
@@ -671,7 +685,7 @@ namespace
       "      if (dot(N, -rayDir) <= 1e-4)\n"
       "         N = Ng;\n"
       "\n"
-      "      int mb = hit.matId * 19;\n"
+      "      int mb = hit.matId * 20;\n"
       "      vec4 mt0 = texelFetch(uMaterials, mb + 0);\n"
       "      vec4 mt1 = texelFetch(uMaterials, mb + 1);\n"
       "      vec4 mt2 = texelFetch(uMaterials, mb + 2);\n"
@@ -692,6 +706,7 @@ namespace
       "      s.sh = max(mt3.z, 0.0);\n"
       "      s.shRough = clamp(mt3.w, 0.0, 1.0);\n"
       "      s.shCol = max(mt4.rgb, vec3(0.0));\n"
+      "      float alpha = mt4.w;\n"
       "      vec4 mt6 = texelFetch(uMaterials, mb + 6);\n"
       "      if (mt6.w > 0.0) {\n"
       "         // Render 3D's computeMapUv: the mesh UV, or its generated / object position, scaled,\n"
@@ -738,6 +753,10 @@ namespace
       "         r = texelFetch(uMaterials, mb + 18);\n"
       "         s.trans = clamp(mt2.z * (r.z > 0.0 ? atlasTap(r, mapUv, wrap).r : 1.0), 0.0, 1.0) * (1.0 - s.metal);\n"
       "         s.f0 = mix(vec3(clamp(iorF0 * iorF0 * 2.0 * mt2.y, 0.0, 1.0)), s.base, s.metal);\n"
+      "         r = texelFetch(uMaterials, mb + 11);\n"
+      "         if (r.z > 0.0 && texelFetch(uMaterials, mb + 8).w > 0.5) alpha *= atlasTap(r, mapUv, wrap).a;\n"
+      "         r = texelFetch(uMaterials, mb + 19);\n"
+      "         if (r.z > 0.0) alpha *= atlasTap(r, mapUv, wrap).r;\n"
       "\n"
       "         // Normal map: the tangent frame from the triangle's own UV edges, carried to world\n"
       "         // space like the normal (exact for rotation and even scale).\n"
@@ -774,6 +793,15 @@ namespace
       "            }\n"
       "         }\n"
       "      }\n"
+      // See-through as raster blends: pass on with chance 1 - alpha (always under the cutoff),
+      // without spending a bounce, up to 16 layers.
+      "      float cut = texelFetch(uMaterials, mb + 7).w;\n"
+      "      if (alpha < 1.0 && passes < 16 && ((cut > 0.0 && alpha < cut) || rand(rng) >= alpha)) {\n"
+      "         passes++;\n"
+      "         rayOrigin = hitPos;\n"
+      "         bounce--;\n"
+      "         continue;\n"
+      "      }\n"
       "      float opaqueW = 1.0 - s.trans;\n"
       "      radiance += throughput * emission;\n"
       "\n"
@@ -785,6 +813,12 @@ namespace
       "         if (li >= uLightCount || opaqueW <= 0.0) break;\n"
       "         int ltype = uLightType[li];\n"
       "         float cutoff = uLightSpot[li].z;\n"
+      // Ambient: raster's flat term, base x (1 - metal) x colour x diffuse, no shadow.
+      "         if (ltype == 3) {\n"
+      "            vec3 contrib = throughput * s.base * (1.0 - s.metal) * opaqueW * uLightColor[li] * uLightTerms[li].x;\n"
+      "            radiance += (bounce > 0) ? min(contrib, vec3(10.0)) : contrib;\n"
+      "            continue;\n"
+      "         }\n"
       "         if (ltype == 5) {\n"
       "            vec3 lp = uLightPos[li];\n"
       "            vec3 fwd = uLightAim[li];\n"
@@ -804,10 +838,10 @@ namespace
       "                  float area = max(sz.x * sz.y, 1e-6);\n"
       "                  float pdfLight = dist2 / (area * cosLight);\n"
       "                  float pdfBsdf = 0.0;\n"
-      "                  vec3 bsdfCos = evalOpaque(N, V, L, s, pdfBsdf) * opaqueW;\n"
+      "                  vec3 bsdfCos = evalOpaqueTerms(N, V, L, s, uLightTerms[li].xy, pdfBsdf) * opaqueW;\n"
       "                  pdfBsdf *= opaqueW;\n"
       "                  float wMis = (pdfLight * pdfLight) / max(pdfLight * pdfLight + pdfBsdf * pdfBsdf, 1e-12);\n"
-      "                  vec3 contrib = throughput * bsdfCos * uLightColor[li] * (cosLight / dist2) * wMis;\n"
+      "                  vec3 contrib = throughput * bsdfCos * uLightColor[li] * (cosLight * lightFalloff(dist2, uLightTerms[li].z)) * wMis;\n"
       "                  radiance += (bounce > 0) ? min(contrib, vec3(10.0)) : contrib;\n"
       "               }\n"
       "            }\n"
@@ -818,7 +852,7 @@ namespace
       "            if (cutoff > 0.0 && dist > cutoff) continue;\n"
       "            vec3 L = toLight / dist;\n"
       "            if (dot(N, L) > 1e-5 && dot(Ng, L) > 0.0) {\n"
-      "               float atten = 1.0 / max(dist2, 1e-4);\n"
+      "               float atten = lightFalloff(dist2, uLightTerms[li].z);\n"
       "               if (ltype == 4) {\n"
       "                  float cosCur = dot(-L, uLightAim[li]);\n"
       "                  float cosOuter = uLightSpot[li].x;\n"
@@ -829,7 +863,7 @@ namespace
       "               }\n"
       "               if (atten > 0.0 && !occludedScene(shadowOrigin, L, 1e-4, dist - 2e-4)) {\n"
       "                  float pdfBsdf = 0.0;\n"
-      "                  vec3 bsdfCos = evalOpaque(N, V, L, s, pdfBsdf) * opaqueW;\n"
+      "                  vec3 bsdfCos = evalOpaqueTerms(N, V, L, s, uLightTerms[li].xy, pdfBsdf) * opaqueW;\n"
       "                  pdfBsdf *= opaqueW;\n"
       "                  vec3 contrib = throughput * bsdfCos * uLightColor[li] * atten;\n"
       "                  radiance += (bounce > 0) ? min(contrib, vec3(10.0)) : contrib;\n"
@@ -840,7 +874,7 @@ namespace
       "            if (dot(N, L) > 1e-5 && dot(Ng, L) > 0.0) {\n"
       "               if (!occludedScene(shadowOrigin, L, 1e-4, 1e30)) {\n"
       "                  float pdfBsdf = 0.0;\n"
-      "                  vec3 bsdfCos = evalOpaque(N, V, L, s, pdfBsdf) * opaqueW;\n"
+      "                  vec3 bsdfCos = evalOpaqueTerms(N, V, L, s, uLightTerms[li].xy, pdfBsdf) * opaqueW;\n"
       "                  pdfBsdf *= opaqueW;\n"
       "                  vec3 contrib = throughput * bsdfCos * uLightColor[li];\n"
       "                  radiance += (bounce > 0) ? min(contrib, vec3(10.0)) : contrib;\n"
@@ -1041,6 +1075,9 @@ Render3DPathTrace::PtMaterial Render3DPathTrace::PtMaterial::FromMaterial(const 
    m.sheenRoughness = std::clamp(mat.sheenRoughness, 0.0f, 1.0f);
    for (int k = 0; k < 3; k++)
       m.sheenColor[k] = ColorSpace::SrgbToLinear(std::max(0.0f, mat.sheenColor[k]));
+   m.opacity = std::clamp(mat.opacity, 0.0f, 1.0f);
+   m.alphaCutoff = std::clamp(mat.alphaCutoff, 0.0f, 1.0f);
+   m.textureAlpha = mat.textureAlpha ? 1 : 0;
    return m;
 }
 
@@ -1419,16 +1456,16 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
       dst[15] = 0.0f;
    }
 
-   // 19 texels per material: base + metallic; roughness + emission; ior, specular, transmission,
+   // 20 texels per material: base + metallic; roughness + emission; ior, specular, transmission,
    // its roughness; clear coat, its roughness, sheen, its roughness; sheen colour; then the maps:
    // (space, wrap, normal strength, bump); (scale, any map); rotate; translate; box lo; box hi;
-   // and the eight map rects in the atlas.
+   // and the nine map rects in the atlas. Opacity, alpha cutoff and texture alpha ride in the spare w slots.
    std::vector<PtMaterial> mats = materials;
    if (mats.empty())
       mats.push_back(PtMaterial());
    std::vector<float> rects;
    BuildAtlas(mats, rects);
-   constexpr size_t kMatFloats = 19 * 4;
+   constexpr size_t kMatFloats = 20 * 4;
    std::vector<float> matTexels(mats.size() * kMatFloats, 0.0f);
    for (size_t i = 0; i < mats.size(); i++)
    {
@@ -1440,11 +1477,11 @@ bool Render3DPathTrace::UploadScene(const std::vector<Mesh>& meshes,
                             m.roughness, m.emission[0], m.emission[1], m.emission[2],
                             m.ior, m.specular, m.transmission, m.transmissionRoughness,
                             m.clearcoat, m.clearcoatRoughness, m.sheen, m.sheenRoughness,
-                            m.sheenColor[0], m.sheenColor[1], m.sheenColor[2], 0.0f,
+                            m.sheenColor[0], m.sheenColor[1], m.sheenColor[2], m.opacity,
                             (float)m.mapSpace, (float)m.wrap, m.normalStrength, (float)m.normalBump,
                             m.mapScale[0], m.mapScale[1], m.mapScale[2], anyMap,
-                            m.mapRotate[0], m.mapRotate[1], m.mapRotate[2], 0.0f,
-                            m.mapTranslate[0], m.mapTranslate[1], m.mapTranslate[2], 0.0f,
+                            m.mapRotate[0], m.mapRotate[1], m.mapRotate[2], m.alphaCutoff,
+                            m.mapTranslate[0], m.mapTranslate[1], m.mapTranslate[2], (float)m.textureAlpha,
                             m.objLo[0], m.objLo[1], m.objLo[2], 0.0f,
                             m.objHi[0], m.objHi[1], m.objHi[2], 0.0f };
       float* dst = &matTexels[i * kMatFloats];
@@ -1590,6 +1627,7 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
    float lCol[Render3DNode::kMaxLights * 3] = {};
    float lArea[Render3DNode::kMaxLights * 2] = {};
    float lSpot[Render3DNode::kMaxLights * 3] = {};
+   float lTerms[Render3DNode::kMaxLights * 3] = {};
    for (int i = 0; i < lightCount; i++)
    {
       const PtLight& l = mLights[(size_t)i];
@@ -1602,6 +1640,9 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
       lSpot[i * 3 + 0] = l.spotCosOuter;
       lSpot[i * 3 + 1] = l.spotSmoothW;
       lSpot[i * 3 + 2] = l.cutoff;
+      lTerms[i * 3 + 0] = l.diffuse;
+      lTerms[i * 3 + 1] = l.specular;
+      lTerms[i * 3 + 2] = l.falloff;
    }
 
    // A strip (rows < height) traces only rows y0.. into the other target and copies them back, so
@@ -1677,6 +1718,7 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
             glUniform3fv(glGetUniformLocation(mProgTrace, "uLightColor"), lightCount, lCol);
             glUniform2fv(glGetUniformLocation(mProgTrace, "uLightArea"), lightCount, lArea);
             glUniform3fv(glGetUniformLocation(mProgTrace, "uLightSpot"), lightCount, lSpot);
+            glUniform3fv(glGetUniformLocation(mProgTrace, "uLightTerms"), lightCount, lTerms);
          }
       });
 

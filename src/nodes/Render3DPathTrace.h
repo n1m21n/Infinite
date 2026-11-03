@@ -36,10 +36,13 @@ public:
       float sheen = 0.0f;
       float sheenRoughness = 0.5f;
       float sheenColor[3] = { 1.0f, 1.0f, 1.0f }; // linear RGB
+      float opacity = 1.0f;           // a hit passes through with chance 1 - alpha, as raster blends
+      float alphaCutoff = 0.0f;       // alpha under this always passes, as raster discards
+      int textureAlpha = 0;           // 1: the albedo map's alpha multiplies opacity
 
       // Texture maps (GL handles, 0 none), read the way Render 3D reads them: albedo and emission
       // are sRGB and multiply their colours, the rest multiply their values by the red channel.
-      enum { kAlbedo, kRoughness, kMetallic, kNormal, kEmission, kClearcoat, kSheen, kTransmission, kMapSlots };
+      enum { kAlbedo, kRoughness, kMetallic, kNormal, kEmission, kClearcoat, kSheen, kTransmission, kOpacity, kMapSlots };
       unsigned int maps[kMapSlots] = {};
       int wrap = 0;                   // 0 clamp, 1 repeat, 2 mirror
       int mapSpace = 0;               // MappingTransform::space: 0 UV, 1 generated, 2 object
@@ -67,6 +70,9 @@ public:
       float spotCosOuter = 0.70710678f;
       float spotSmoothW = 0.05f;
       float cutoff = 0.0f;
+      float falloff = -1.0f;   // raster's k: >= 0 soft 1 / (1 + d^2 k), < 0 hard 1 / (d^2 -k); -1 is physical
+      float diffuse = 1.0f;    // raster's per-light diffuse and specular terms
+      float specular = 1.0f;
 
       static PtLight FromRigLight(const Render3DNode::RigLight& rl);
       static PtLight FromLightNode(const LightNode& n);
