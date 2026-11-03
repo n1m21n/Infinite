@@ -15,6 +15,7 @@
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "core/EditMesh.h"
+#include "nodes/ArmatureNode.h"
 #include "nodes/EditMeshNode.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/OutputNode.h"
@@ -126,9 +127,16 @@ namespace
       float axis[3] = { 0, 0, 1 };  // the turn's axis in the joint's own frame
       float q0[4] = { 0, 0, 0, 1 };
       float before[3] = { 0, 0, 0 };
+      // Weight paint (W, on an Armature): the picked bone's weights, a
+      // circle of this many pixels, one undo step per stroke.
+      bool paint = false;
+      bool stroking = false;
+      float radius = 40.0f;
+      ImVec2 lastDab;
    } sPose;
    void ToggleSculpt(Scene3DNode* scene);
    IRigged* PoseModel(const Item& it, Mat4& world);
+   ArmatureNode* PoseArmature(Scene3DNode* scene);
    // Sculpt mode's state; the mode itself is drawn by DrawSculpt.
    struct SculptState
    {
@@ -2150,6 +2158,12 @@ namespace
       if (MenuParts::Item(T("Edit Mode"), "Tab", sEdit.on, any || sEdit.on)) ToggleEdit(scene);
       if (MenuParts::Item(T("Add IK to Bone"), "Shift+I", false, sPose.on && sPose.joint >= 0)) PoseIk(scene, false);
       if (MenuParts::Item(T("Clear IK"), "Alt+I", false, sPose.on)) PoseIk(scene, true);
+      if (MenuParts::Item(T("Weight Paint"), "W", sPose.paint, PoseArmature(scene) != nullptr)) sPose.paint = !sPose.paint;
+      if (MenuParts::Item(T("Clear Weight Paint"), nullptr, false, PoseArmature(scene) != nullptr && PoseArmature(scene)->HasPaint()))
+      {
+         PushUndoCheckpoint("Clear weight paint");
+         PoseArmature(scene)->ClearPaint();
+      }
       if (MenuParts::Item(T("Copy Transform"), nullptr, false, any)) CopyGlobalTransform(scene);
       if (MenuParts::Item(T("Paste Transform"), nullptr, false, any)) PasteGlobalTransform(scene);
       if (MenuParts::Item(T("Randomize Transform"), nullptr, false, any)) RandomizeTransform(scene);
@@ -2909,6 +2923,68 @@ namespace
       return model;
    }
 
+   ArmatureNode* PoseArmature(Scene3DNode* scene)
+   {
+      Mat4 world;
+      return dynamic_cast<ArmatureNode*>(PoseTarget(scene, world));
+   }
+
+   // Only one Armature is tinted by its weights at a time, and none outside
+   // weight paint. Found by uid, so a removed node is never touched.
+   uint64_t sTintUid = 0;
+   void SetWeightTint(ArmatureNode* arm, int bone)
+   {
+      uint64_t uid = 0;
+      if (arm != nullptr)
+         for (GraphNode& gn : gNodes)
+            if (gn.node.get() == arm)
+               uid = gn.uid;
+      if (sTintUid != 0 && sTintUid != uid)
+         if (GraphNode* old = FindNodeByUid(sTintUid))
+            if (auto* a = dynamic_cast<ArmatureNode*>(old->node.get()))
+               a->paintBone = -1;
+      sTintUid = uid;
+      if (arm != nullptr)
+         arm->paintBone = bone;
+   }
+
+   // One dab: the front-facing points inside the circle move toward the
+   // target, most at the middle.
+   void PaintWeights(ArmatureNode* arm, const Mat4& world, ImVec2 mouse, int bone, float target)
+   {
+      const std::vector<float>& pts = arm->PosedPoints();
+      const std::vector<float>& nrm = arm->PosedNormals();
+      const float r = sPose.radius;
+      std::vector<std::pair<unsigned int, float>> hits;
+      for (size_t i = 0; i * 3 + 2 < pts.size() && i * 3 + 2 < nrm.size(); i++)
+      {
+         float w[3];
+         ImVec2 at;
+         TransformBy(world, &pts[i * 3], w);
+         if (!Project(w, at))
+            continue;
+         const float d = std::hypot(at.x - mouse.x, at.y - mouse.y);
+         if (d >= r)
+            continue;
+         const float* n = &nrm[i * 3];
+         if (n[0] != 0.0f || n[1] != 0.0f || n[2] != 0.0f)
+         {
+            float wn[3];
+            for (int k = 0; k < 3; k++)
+               wn[k] = world.m[k] * n[0] + world.m[4 + k] * n[1] + world.m[8 + k] * n[2];
+            float toEye[3];
+            for (int k = 0; k < 3; k++)
+               toEye[k] = sCam.ortho ? -sCam.fwd[k] : sCam.eye[k] - w[k];
+            if (wn[0] * toEye[0] + wn[1] * toEye[1] + wn[2] * toEye[2] <= 0.0f)
+               continue;
+         }
+         const float x = 1.0f - d / r;
+         hits.push_back({ (unsigned int)i, 0.15f * x * x * (3.0f - 2.0f * x) });
+      }
+      arm->Paint(hits, bone, target);
+      sPose.lastDab = mouse;
+   }
+
    void TogglePose(Scene3DNode* scene)
    {
       if (sPose.on)
@@ -2988,11 +3064,17 @@ namespace
    {
       Mat4 world;
       IRigged* model = PoseTarget(scene, world);
+      ArmatureNode* arm = dynamic_cast<ArmatureNode*>(model);
+      if (arm == nullptr || !arm->Paintable())
+         sPose.paint = sPose.stroking = false;
+      const int count = model != nullptr ? model->JointCount() : 0;
+      // The last joint is the chain's tip, which carries no weight.
+      const int paintBone = sPose.paint && sPose.joint >= 0 && sPose.joint < count - 1 ? sPose.joint : -1;
+      SetWeightTint(sPose.paint ? arm : nullptr, paintBone);
       if (model == nullptr)
          return false;
       const ImGuiIO& io = ImGui::GetIO();
       auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
-      const int count = model->JointCount();
 
       // Bones: parent head to child head belongs to the parent (turning the
       // parent swings it); a joint with no children gets a short tail along
@@ -3069,7 +3151,18 @@ namespace
             dl->AddCircle(tp, 6.0f, Hex(kHotHandle), 16, 1.5f);
          }
       }
-      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), "Pose Mode");
+      dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), sPose.paint ? "Weight Paint" : "Pose Mode");
+      if (sPose.paint && hovered)
+         dl->AddCircle(mouse, sPose.radius, Hex(kWire, 0.9f), 48, 1.5f);
+
+      if (sPose.stroking)
+      {
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || paintBone < 0)
+            sPose.stroking = false;
+         else if (std::hypot(mouse.x - sPose.lastDab.x, mouse.y - sPose.lastDab.y) >= 2.0f)
+            PaintWeights(arm, world, mouse, paintBone, (io.KeyCtrl || io.KeySuper) ? 0.0f : 1.0f);
+         return true;
+      }
 
       if (sPose.turning)
       {
@@ -3100,6 +3193,29 @@ namespace
       if ((command && pressed(ImGuiKey_Tab)) || pressed(ImGuiKey_Escape))
       {
          sPose = {};
+         return true;
+      }
+      if (arm != nullptr && !command && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_W) && arm->Paintable())
+         sPose.paint = !sPose.paint;
+      if (sPose.paint)
+      {
+         // [ and ] size the brush; a click on a bone picks it, anywhere else paints
+         // (Ctrl takes weight away).
+         if (pressed(ImGuiKey_LeftBracket))
+            sPose.radius = std::max(4.0f, sPose.radius / 1.15f);
+         if (pressed(ImGuiKey_RightBracket))
+            sPose.radius = std::min(400.0f, sPose.radius * 1.15f);
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+         {
+            if (hotJoint >= 0)
+               sPose.joint = hotJoint;
+            else if (paintBone >= 0)
+            {
+               PushUndoCheckpoint("Weight paint");
+               sPose.stroking = true;
+               PaintWeights(arm, world, mouse, paintBone, command ? 0.0f : 1.0f);
+            }
+         }
          return true;
       }
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
@@ -5036,7 +5152,7 @@ namespace
 
       const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered) ||
                                             DrawEdit(dl, scene, mouse, hovered));
-      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
+      gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sPose.stroking || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sRightOk = sOp.mode == 0 && !posing;
       if (!posing)

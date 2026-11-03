@@ -262,6 +262,50 @@ bool RunArmatureTest()
    check(near(m->vertices[kTop].pz, 1.0f) && near(m->vertices[kTop].py, 0.0f), "a pose slot turns a bone",
          m->vertices[kTop].py, m->vertices[kTop].pz);
 
+   // Weight paint: the base points belong to bone 1 only; painting bone 3
+   // onto them makes them follow its turn, and the paint saves and loads.
+   const float baseZ = m->vertices[kBase].pz;
+   std::vector<std::pair<unsigned int, float>> hits = { { (unsigned)kBase, 1.0f }, { (unsigned)kBase + 1, 1.0f } };
+   n.Paint(hits, 2, 1.0f);
+   m = &n.GetMesh();
+   check(n.HasPaint() && std::fabs(m->vertices[kBase].pz - baseZ) > 0.1f, "painted points follow the painted bone",
+         m->vertices[kBase].pz, baseZ);
+   const float paintedZ = m->vertices[kBase].pz;
+   n.paintBone = 2;
+   m = &n.GetMesh();
+   check(m->vertexColor.size() == m->vertices.size() * 3 && m->vertexColor[kBase * 3 + 1] > 0.9f &&
+         m->vertexColor[kTop * 3 + 2] > 0.5f, "the tint shows the bone's weight", m->vertexColor.empty() ? 0 : m->vertexColor[kBase * 3], 0);
+   n.paintBone = -1;
+   ParamSnapshot saved;
+   n.VisitParams(saved);
+   struct Load : ParamVisitor
+   {
+      std::string weights;
+      void Float(const char*, float&) override {}
+      void Int(const char*, int&) override {}
+      void Bool(const char*, bool&) override {}
+      void Color(const char*, float*) override {}
+      void Text(const char* name, std::string& v) override { if (std::string(name) == "weights") v = weights; }
+   } load;
+   load.weights = saved.texts.empty() ? std::string() : saved.texts.back();
+   ArmatureNode copy;
+   copy.input = &col;
+   copy.bones = 4;
+   copy.pose = n.pose;
+   copy.VisitParams(load);
+   const Mesh& cm = copy.GetMesh();
+   check(!load.weights.empty() && near(cm.vertices[kBase].pz, paintedZ, 1e-3f), "the paint saves and loads",
+         cm.vertices[kBase].pz, paintedZ);
+   n.bones = 5;
+   n.GetMesh();
+   check(!n.Paintable() && n.CookWarning().rfind("weight paint", 0) == 0, "another bone count warns and paints nothing",
+         n.Paintable(), 0);
+   n.bones = 4;
+   n.ClearPaint();
+   m = &n.GetMesh();
+   check(!n.HasPaint() && near(m->vertices[kBase].pz, baseZ) && n.CookWarning().empty(), "clearing brings the envelope back",
+         m->vertices[kBase].pz, baseZ);
+
    printf(failures == 0 ? "ARMTEST OK\n" : "ARMTEST FAIL (%d)\n", failures);
    return failures == 0;
 }

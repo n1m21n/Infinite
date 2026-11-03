@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -102,7 +103,31 @@ public:
       v.Float("waveAmount", waveAmount); v.Float("waveLength", waveLength);
       v.Float("waveSpeed", waveSpeed); v.Float("wavePhase", wavePhase);
       pose.Visit(v);
+      // Encoded only when something reads or writes it, as Sculpt's data.
+      if (!mPaintEncoded)
+      {
+         mPaintData = EncodePaint();
+         mPaintDecodedFrom = mPaintData;
+         mPaintEncoded = true;
+      }
+      v.Text("weights", mPaintData);
    }
+
+   // Weight paint (the 3D View's Pose mode, W): painted amounts add to the
+   // envelope's, per point and bone, before the four strongest are kept. Made
+   // for one point and bone count; a change warns and paints nothing until
+   // it comes back or the paint is cleared.
+   int paintBone = -1;   // not saved: tint the mesh by this bone's weight
+   size_t PointCount() { Update(); return mEnv.size() / (size_t)std::max(1, mEnvBones); }
+   // The posed points, mesh space, and their normals (zero for curve points
+   // and instance origins).
+   const std::vector<float>& PosedPoints() { Update(); return mPosed; }
+   const std::vector<float>& PosedNormals() { Update(); return mPosedN; }
+   bool Paintable();
+   // Moves each point's weight for the bone toward target (0 or 1) by its amount.
+   void Paint(const std::vector<std::pair<unsigned int, float>>& hits, int bone, float target);
+   bool HasPaint() const;
+   void ClearPaint();
 
 private:
    // Rebuilds the bones and weights when the input or the chain changed, then
@@ -110,6 +135,9 @@ private:
    void Update();
    void BuildRest();
    void ApplySkin(const std::vector<float>& skin);
+   void Reweight();
+   std::string EncodePaint() const;
+   void DecodePaint();
 
    std::string mCookWarning, mStatus;
    int mLastCookFrame = -1;
@@ -124,6 +152,18 @@ private:
    // instance's origin.
    std::vector<unsigned short> mJoints;
    std::vector<float> mWeights;
+   // The envelope's weight per point and bone (before the paint), each
+   // point's nearest bone, and where the points are after the pose.
+   std::vector<float> mEnv;
+   std::vector<unsigned short> mNearest;
+   int mEnvBones = 0;
+   std::vector<float> mPosed, mPosedN;
+   // The paint, per point and bone, for mPaintPoints x mPaintBones (0: none).
+   std::vector<float> mPaint;
+   int mPaintPoints = 0, mPaintBones = 0;
+   unsigned long long mPaintRevision = 0, mWeightedRevision = 0;
+   std::string mPaintData, mPaintDecodedFrom;
+   bool mPaintEncoded = true;
    size_t mMeshCount = 0, mCloudCount = 0, mCurveCount = 0, mInstanceCount = 0;
 
    Mesh mMesh;
