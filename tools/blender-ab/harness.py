@@ -60,7 +60,7 @@ def light_lines(l):
     return out
 
 
-def to_patch(scene, case):
+def to_patch(scene, case, engine="raster", pt_samples=256, pt_bounces=8):
     """The scene as an Infinite patch: Model 3D + Material per object (the glbs Blender wrote),
     Group 3D when there are more than four, Camera, Lights, Render 3D."""
     lines, n = ["infinite-patch 1"], [0]
@@ -126,7 +126,8 @@ def to_patch(scene, case):
         "  c envSky %g %g %g" % tuple(sky), "  c envHorizon %g %g %g" % tuple(sky),
         "  c envGround %g %g %g" % tuple(sky), "  f envIntensity %g" % max(peak, 1.0),
         "  c ambient %g %g %g" % tuple(srgb([1 / 3] * 3)), "  f rim 0", "  f lightIntensity 0",
-        "  c bg %g %g %g" % tuple(sky)])
+        "  c bg %g %g %g" % tuple(sky)] + (
+        ["  i engine 1", "  i ptSamples %d" % pt_samples, "  i ptBounces %d" % pt_bounces] if engine == "pt" else []))
     out = node("Utility", "Output", [])
     for j, g in enumerate(geos):
         wires.append("geo %d %d %d" % (render, j, g))
@@ -181,13 +182,13 @@ def furnace_metric(scene, lt, li):
                          "infinite": round(float(li[m].mean()) / bg_i, 4)} for rough, m in masks}
 
 
-def score(case_dir, name="", scene=None):
+def score(case_dir, name="", scene=None, sfx=""):
     import flip_evaluator as flip
-    truth, inf = load(os.path.join(case_dir, "truth.png")), load(os.path.join(case_dir, "inf.png"))
+    truth, inf = load(os.path.join(case_dir, "truth.png")), load(os.path.join(case_dir, "inf%s.png" % sfx))
     if truth.shape != inf.shape:
         sys.exit("size mismatch in %s: %s vs %s" % (case_dir, truth.shape, inf.shape))
     err, mean, _ = flip.evaluate(truth, inf, "LDR", applyMagma=True)
-    Image.fromarray((np.clip(err, 0, 1) * 255).astype(np.uint8)).save(os.path.join(case_dir, "flip.png"))
+    Image.fromarray((np.clip(err, 0, 1) * 255).astype(np.uint8)).save(os.path.join(case_dir, "flip%s.png" % sfx))
     lt, li = luma(truth), luma(inf)
     out = {"flip": round(float(mean), 4),
            # Infinite's mean linear brightness over Blender's: a units or energy mismatch shows here first.
@@ -198,22 +199,26 @@ def score(case_dir, name="", scene=None):
     return out
 
 
-def board(out, rows):
+def board(out, rows, sfx=""):
+    # Path trace rows also show the raster picture when the case has one: Blender | raster | path trace | FLIP.
     tiles = []
     for r in rows:
         d = os.path.join(out, r["case"])
-        ims = [Image.open(os.path.join(d, f)).convert("RGB").resize((256, 256)) for f in ("truth.png", "inf.png", "flip.png")]
-        t = Image.new("RGB", (256 * 3, 256 + 22), (20, 20, 24))
+        files = ["truth.png", "inf.png", "inf%s.png" % sfx, "flip%s.png" % sfx] if sfx else ["truth.png", "inf.png", "flip.png"]
+        files = [f for f in files if os.path.exists(os.path.join(d, f))]
+        ims = [Image.open(os.path.join(d, f)).convert("RGB").resize((256, 256)) for f in files]
+        t = Image.new("RGB", (256 * len(ims), 256 + 22), (20, 20, 24))
         for k, im in enumerate(ims):
             t.paste(im, (256 * k, 22))
-        ImageDraw.Draw(t).text((6, 5), "%s   FLIP %.3f   bright x%.2f   %s   (Blender | Infinite | FLIP)" % (
-            r["case"], r["flip"], r["brightness_ratio"], "ok" if r["pass"] else "WORSE"), fill=(230, 230, 230))
+        raster = "   raster FLIP %.3f" % r["raster_flip"] if r.get("raster_flip") is not None else ""
+        ImageDraw.Draw(t).text((6, 5), "%s   FLIP %.3f   bright x%.2f   %s%s" % (
+            r["case"], r["flip"], r["brightness_ratio"], "ok" if r["pass"] else "WORSE", raster), fill=(230, 230, 230))
         tiles.append(t)
-    sheet = Image.new("RGB", (256 * 3, sum(t.height for t in tiles)), (0, 0, 0))
+    sheet = Image.new("RGB", (max(t.width for t in tiles), sum(t.height for t in tiles)), (0, 0, 0))
     y = 0
     for t in tiles:
         sheet.paste(t, (0, y)); y += t.height
-    sheet.save(os.path.join(out, "board.png"))
+    sheet.save(os.path.join(out, "board%s.png" % sfx))
 
 
 def main():
@@ -223,12 +228,17 @@ def main():
     ap.add_argument("--set-baseline", action="store_true")
     ap.add_argument("--ao", action="store_true", help="also run the AO bake A/B (ab.py --gen)")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--engine", choices=("raster", "pt"), default="raster",
+                    help="pt renders with Render 3D's path tracer; its files, board and baseline carry _pt")
+    ap.add_argument("--pt-samples", type=int, default=256)
+    ap.add_argument("--pt-bounces", type=int, default=8)
     a = ap.parse_args()
     if a.list:
         for k, v in CASES.items():
             print("%-12s %d objects, %d lights, %s" % (k, len(v["objects"]), len(v.get("lights", [])), v.get("view", "Standard")))
         return 0
     names = a.cases or list(CASES)
+    sfx = "_pt" if a.engine == "pt" else ""
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     rows = []
     for name in names:
@@ -243,26 +253,30 @@ def main():
             if "SCENEDONE" not in log:
                 sys.exit("blender failed on %s:\n%s" % (name, log[-3000:]))
             open(hp, "w").write(h)
-        patch = os.path.join(d, "inf.inf")
-        open(patch, "w").write(to_patch(scene, d))
+        patch = os.path.join(d, "inf%s.inf" % sfx)
+        open(patch, "w").write(to_patch(scene, d, a.engine, a.pt_samples, a.pt_bounces))
         w, hgt = scene.get("size", (512, 512))
         stdout, log = run([INFINITE, "--frame", patch, "0", d + "/f/", "--size", "%dx%d" % (w, hgt)], 600)
         last = stdout.strip().splitlines()[-1] if stdout.strip() else ""
         status = json.loads(last) if last.startswith("{") else {}
         if not status.get("ok"):
             sys.exit("infinite failed on %s:\n%s" % (name, log[-3000:]))
-        os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf.png"))
-        r = {"case": name, **score(d, name, scene)}
-        r["baseline"] = base.get(name)
+        os.replace(os.path.join(d, "f", "frame_00000.png"), os.path.join(d, "inf%s.png" % sfx))
+        r = {"case": name, **score(d, name, scene, sfx)}
+        if sfx:
+            r["engine"] = a.engine
+            if os.path.exists(os.path.join(d, "inf.png")):
+                r["raster_flip"] = score(d)["flip"]
+        r["baseline"] = base.get(name + sfx)
         r["pass"] = r["baseline"] is None or r["flip"] <= r["baseline"] + FLIP_SLACK
         rows.append(r)
         print("ABRESULT " + json.dumps(r), flush=True)
-    with open(os.path.join(a.out, "results.jsonl"), "w") as f:
+    with open(os.path.join(a.out, "results%s.jsonl" % sfx), "w") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
-    board(a.out, rows)
+    board(a.out, rows, sfx)
     if a.set_baseline:
-        base.update({r["case"]: r["flip"] for r in rows})
+        base.update({r["case"] + sfx: r["flip"] for r in rows})
         json.dump(base, open(BASELINE, "w"), indent=1, sort_keys=True)
     if a.ao:
         _, log = run([sys.executable, os.path.join(HERE, "ab.py"), "--gen", "--out", os.path.join(a.out, "ao")], 3600)

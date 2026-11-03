@@ -8,7 +8,13 @@ python3 tools/blender-ab/harness.py --out /tmp/blender-ab            # every pic
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab light_spot # one case
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab --set-baseline
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab --ao       # also the AO bake A/B
+python3 tools/blender-ab/harness.py --out /tmp/blender-ab --engine pt # Render 3D's path tracer
 ```
+
+`--engine pt` (with `--pt-samples`, default 256, and `--pt-bounces`, default 8) renders
+with the path tracer. Its files carry `_pt` (`inf_pt.png`, `flip_pt.png`, `board_pt.png`,
+`results_pt.jsonl`, baseline key `case_pt`) beside the raster ones, and the board shows
+Blender | raster | path trace | FLIP.
 
 Needs `/Applications/Blender.app`, `build-dev/Infinite.app`, and numpy, Pillow and
 `flip-evaluator` (`pip install --user flip-evaluator`).
