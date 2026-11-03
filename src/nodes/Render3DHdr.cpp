@@ -25,8 +25,8 @@ namespace
       "#version 150\n"
       "in vec2 vUv;\n"
       "out vec4 fragColor;\n"
-      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
-      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
+      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
       "float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n";
 
    // 13 taps around vUv, `t` = one source texel. Shared by the prefilter

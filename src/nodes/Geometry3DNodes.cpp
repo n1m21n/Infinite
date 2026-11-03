@@ -1,5 +1,6 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
+#include "ColorSpace.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -257,8 +258,8 @@ namespace
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform float uBgOpacity;\n"
-      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
-      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
+      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
@@ -587,8 +588,8 @@ namespace
       "   return mix(1.0, lit, uShadowStrength);\n"
       "}\n"
       "\n"
-      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
-      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
+      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
       "\n"
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
@@ -918,6 +919,11 @@ namespace
       "   vec3 col = vec3(0.0);\n"
       "   vec3 glassSpec = vec3(0.0);\n"
       "\n"
+      // The clearcoat is a layer on top: what it reflects at this angle never reaches the base,
+      // so the base is dimmed by that much (not by a fixed half), and the coat mirrors the world too.
+      "   float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
+      "   float ccFv = 0.04 + 0.96 * pow(1.0 - nDotV, 5.0);\n"
+      "   float ccAtten = 1.0 - cc * ccFv;\n"
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(n, vWorldPos, mapUv, tangent, bitangent);\n"
       "   if (abs(uAnisotropy) > 0.001) {\n"
@@ -974,9 +980,12 @@ namespace
       "            vec3 spotDir = uLightAim[i];\n"
       "            float cosCur = dot(-lightDir, spotDir);\n"
       "            float cosOuter = cos(radians(uLightSpotAngle[i]));\n"
-      "            float cosInner = cos(radians(uLightSpotAngle[i] * (1.0 - uLightSpotPenumbra[i])));\n"
-      "            float spotAtten = clamp((cosCur - cosOuter) / max(cosInner - cosOuter, 1e-4), 0.0, 1.0);\n"
-      "            attenuation *= spotAtten * spotAtten;\n"
+      // Blender's spot: the cosine to the axis inside the cone, and the blend a smoothstep over the
+      // last blend * (1 - cos half-angle) of that cosine (Cycles' spot_attenuation).
+      "            float smoothW = (1.0 - cosOuter) * uLightSpotPenumbra[i];\n"
+      "            float spotAtten = cosCur > cosOuter ? cosCur : 0.0;\n"
+      "            if (smoothW > 0.0) spotAtten *= smoothstep(0.0, smoothW, cosCur - cosOuter);\n"
+      "            attenuation *= spotAtten;\n"
       "         }\n"
       "      } else {\n"
       "         lightDir = normalize(uLightDir[i]);\n"
@@ -1016,7 +1025,6 @@ namespace
       // Schlicks and a pow per light per pixel on every draw otherwise.
       "      float clearcoatSpec = 0.0;\n"
       "      if (cc != 0.0) {\n"
-      "         float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
       "         float ccD = distributionGGX(nDotH, ccRough);\n"
       "         float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
       "         float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
@@ -1026,13 +1034,15 @@ namespace
       "      vec3 sheenSpec = vec3(0.0);\n"
       "      if (sh > 0.0) {\n"
       "         float shD = distributionCharlie(nDotH, uSheenRoughness);\n"
-      "         sheenSpec = uSheenColor * shD * sh;\n"
+      // Charlie D with the Neubelt visibility term; without it the lobe was about 4x too bright.
+      "         float shV = 1.0 / max(4.0 * (nDotL + nDotV - nDotL * nDotV), 1e-4);\n"
+      "         sheenSpec = uSheenColor * shD * shV * sh;\n"
       "      }\n"
       "\n"
-      "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * (1.0 - cc * 0.5);\n"
+      "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * ccAtten;\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
       "      float shadow = (i == uShadowLight) ? shadowFactor(n, shadeDir) : 1.0;\n"
-      "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
+      "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular * ccAtten + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
       "      if (trans > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
@@ -1044,8 +1054,9 @@ namespace
       "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
       "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
       "   }\n"
-      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
-      "   col += reflection * fAmbient * ao;\n"
+      "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao * ccAtten;\n"
+      "   col += reflection * fAmbient * ao * ccAtten;\n"
+      "   if (cc != 0.0) col += sampleEnv(reflectDir, ccRough) * (cc * ccFv) * ao;\n"
       "   glassSpec += reflection * fAmbient * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
@@ -1276,7 +1287,7 @@ void Render3DNode::RigLight::From(const LightNode& n)
       float tint[3];
       LightNode::TemperatureColor(n.temperature, tint);
       for (int k = 0; k < 3; k++)
-         color[k] = std::pow(std::pow(std::max(0.0f, color[k]), 2.2f) * tint[k], 1.0f / 2.2f);
+         color[k] = ColorSpace::LinearToSrgb(ColorSpace::SrgbToLinear(std::max(0.0f, color[k])) * tint[k]);
    }
    type = n.type;
    // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
@@ -2262,7 +2273,7 @@ void Render3DNode::CookOnce(int frameId)
          lightDirs[lightCount * 3 + 2] = -sunDir[0] * sn + sunDir[2] * c;
          const float peak = std::max({ sunLight[0], sunLight[1], sunLight[2], 1e-6f });
          for (int k = 0; k < 3; k++)   // the shader takes colours in sRGB
-            lightCols[lightCount * 3 + k] = std::pow(sunLight[k] / peak, 1.0f / 2.2f);
+            lightCols[lightCount * 3 + k] = ColorSpace::LinearToSrgb(sunLight[k] / peak);
          lightPower[lightCount] = peak * envHdriIntensity;
          lightTypes[lightCount] = 0;
          if (env->sunShadow && (lightCount == 0 || !caster.castShadow))
