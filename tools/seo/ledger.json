@@ -3131,6 +3131,366 @@
         "status": "open",
         "found": "2026-11-02",
         "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://github.com/anorthernman-developer/manifesto-machines/issues/9": {
+        "id": "311",
+        "src": "github",
+        "title": "Feedback: 2 Nov deep instruments (82 to 86)",
+        "created": "2026-11-02T10:36:06",
+        "query": "audio reactive visuals",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50312408": {
+        "id": "312",
+        "src": "hn",
+        "title": "Postgres 19 is late because so many more bugs are being found now",
+        "created": "2026-11-02T08:32:14",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50330796": {
+        "id": "313",
+        "src": "hn",
+        "title": "Show HN: A faster Python 3 interpreter implemented in C11, one week",
+        "created": "2026-11-01T23:00:12",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50290652": {
+        "id": "314",
+        "src": "hn",
+        "title": "AI, Lean, and the Future of Formal Verification, with Lean Creator Leo de Moura",
+        "created": "2026-11-01T18:18:16",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://github.com/kinoko34077/MViser/issues/62": {
+        "id": "315",
+        "src": "github",
+        "title": "[VARIANT / RESEARCH] \u97f3\u697d\u60c5\u5831\u53ef\u8996\u5316\u578bMV \u2014 \u672c\u683cMV\u5236\u4f5c\u3068\u306f\u5225\u30d0\u30fc\u30b8\u30e7\u30f3\uff08\u5c02\u7528\u30d6\u30e9\u30f3\u30c1\u30fb\u8efd\u91cf\u5316\u8abf\u67fb\uff09",
+        "created": "2026-11-02T10:31:29",
+        "query": "realtime glsl audio",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://github.com/TGrozner/superhot-web/issues/5": {
+        "id": "316",
+        "src": "github",
+        "title": "[SH-05] Int\u00e9gration continue, revue PR, mesure de parit\u00e9",
+        "created": "2026-11-02T00:34:43",
+        "query": "realtime glsl audio",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50334038": {
+        "id": "317",
+        "src": "hn",
+        "title": "China's First Frontier AI Export Controls: Mofcom Announcement No. 48",
+        "created": "2026-11-02T12:55:50",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50332163": {
+        "id": "318",
+        "src": "hn",
+        "title": "F/OSS Comics #13: BSD Unix, Part 3 \u2013 The Beginning of BSD Unix",
+        "created": "2026-11-02T12:18:01",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50331784": {
+        "id": "319",
+        "src": "hn",
+        "title": "Trigger.dev customer environment variables exposed",
+        "created": "2026-11-02T14:28:52",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50328896": {
+        "id": "320",
+        "src": "hn",
+        "title": "Ask HN: Which TV do you recommend for privacy?",
+        "created": "2026-11-02T14:23:33",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50335659": {
+        "id": "321",
+        "src": "hn",
+        "title": "Never Complain, Never Explain",
+        "created": "2026-11-02T14:23:16",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50336496": {
+        "id": "322",
+        "src": "hn",
+        "title": "Ask HN: Isn't anyone worried about this flood of HackerTube-but-for apps?",
+        "created": "2026-11-02T14:44:50",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://github.com/danipl/wvzz-vst-bundle/issues/1": {
+        "id": "323",
+        "src": "github",
+        "title": "[Architecture] Foundational WvZz Modular VST3 Architecture & Rebrand",
+        "created": "2026-11-02T15:10:22",
+        "query": "vst3 host modular",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50337608": {
+        "id": "324",
+        "src": "hn",
+        "title": "WTF Ubuntu?",
+        "created": "2026-11-02T15:53:47",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50338726": {
+        "id": "325",
+        "src": "hn",
+        "title": "Ask HN: Who wants to be hired? (November 2026)",
+        "created": "2026-11-02T16:29:42",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50339026": {
+        "id": "326",
+        "src": "hn",
+        "title": "Ginux Replacing Linux",
+        "created": "2026-11-02T16:15:44",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50339913": {
+        "id": "327",
+        "src": "hn",
+        "title": "Launch HN: Momentic (YC W24) \u2013 Agents that catch bugs by using your app",
+        "created": "2026-11-02T17:05:25",
+        "query": "audio reactive visuals",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50321130": {
+        "id": "328",
+        "src": "hn",
+        "title": "When electric cars were for women",
+        "created": "2026-11-02T17:01:16",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50330939": {
+        "id": "329",
+        "src": "hn",
+        "title": "U.S. workers took home their smallest share of capital since at least 1947",
+        "created": "2026-11-02T17:29:22",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50328251": {
+        "id": "330",
+        "src": "hn",
+        "title": "Mathematics has changed. Let's act like it",
+        "created": "2026-11-02T17:45:44",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-02",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50336518": {
+        "id": "331",
+        "src": "hn",
+        "title": "If you love a website, back it up",
+        "created": "2026-11-02T18:18:34",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50339397": {
+        "id": "332",
+        "src": "hn",
+        "title": "US boy names that became girl names and vice versa",
+        "created": "2026-11-02T19:02:49",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50340200": {
+        "id": "333",
+        "src": "hn",
+        "title": "Economists studied California's billionaire tax, reached different conclusions",
+        "created": "2026-11-02T21:01:51",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50343418": {
+        "id": "334",
+        "src": "hn",
+        "title": "Valve \"played capitalism so well they broke it\" and now Steam can't be replaced",
+        "created": "2026-11-02T21:22:50",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50341462": {
+        "id": "335",
+        "src": "hn",
+        "title": "Ubuntu still has not released patch for Linux 0day RCE in almost 3 weeks",
+        "created": "2026-11-02T21:19:14",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50344247": {
+        "id": "336",
+        "src": "hn",
+        "title": "Show HN: HN Atlas \u2013 Discover tools to better engage with Hacker News",
+        "created": "2026-11-02T21:43:40",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=45407617": {
+        "id": "337",
+        "src": "hn",
+        "title": "Linus Learns Analog Circuits",
+        "created": "2025-09-29T00:27:42",
+        "query": "vst3 host modular",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=45002888": {
+        "id": "338",
+        "src": "hn",
+        "title": "A bug saved the company",
+        "created": "2025-08-26T10:58:51",
+        "query": "vst3 host modular",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50344222": {
+        "id": "339",
+        "src": "hn",
+        "title": "Can\u2019t fish Ethernet? Use \u201cinvisible\u201d fiber instead",
+        "created": "2026-11-02T23:02:33",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50342284": {
+        "id": "340",
+        "src": "hn",
+        "title": "Oracle files to sell $20B in new stock, bonds to finance AI buildout",
+        "created": "2026-11-02T23:12:40",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50344181": {
+        "id": "341",
+        "src": "hn",
+        "title": "BYD sold more EVs last month than the US did all quarter",
+        "created": "2026-11-03T00:07:44",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50340088": {
+        "id": "342",
+        "src": "hn",
+        "title": "Show HN: Subvocal \u2013 Talk to your computer without making noise",
+        "created": "2026-11-02T23:55:00",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50344158": {
+        "id": "343",
+        "src": "hn",
+        "title": "The Ford Privacy Promise: You're in Control of Your Data",
+        "created": "2026-11-03T00:59:38",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50346447": {
+        "id": "344",
+        "src": "hn",
+        "title": "Blades CSS v3.1.0 released \u2013 a modern drop\u2011in successor to Pico CSS",
+        "created": "2026-11-03T00:44:32",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50346910": {
+        "id": "345",
+        "src": "hn",
+        "title": "Musk is throttling Grok because its cost is 'unsustainably high'",
+        "created": "2026-11-03T02:39:41",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
+      },
+      "https://news.ycombinator.com/item?id=50340159": {
+        "id": "346",
+        "src": "hn",
+        "title": "Polyend releases the Tracker firmware source code",
+        "created": "2026-11-03T02:40:18",
+        "query": "modular daw",
+        "status": "open",
+        "found": "2026-11-03",
+        "draft": "if you are looking for a modular node environment that can host native au/vst3 plugins while generating live visuals, take a look at infinite (https://infinitedevices.org).\n\nit provides a sample-accurate audio graph, multi-format plugin hosting, and visual canvas nodes (glsl and 2d javascript) that can be modulated by lfos, envelopes, and audio peaks.\n\nit is completely free and open-source (c++20). limitation: no aax plugin format support."
       }
     }
   },
