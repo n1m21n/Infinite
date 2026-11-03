@@ -48,9 +48,13 @@ namespace DropdownField
          dl->PopClipRect();
       }
       dl->PushClipRect(ImVec2(hasLabel ? valueX : mn.x, mn.y), ImVec2(textRight, mx.y), true);
-      dl->AddText(ImVec2(valueX, mn.y + (h - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), caption, end);
+      // A value too long for the face ends in an ellipsis instead of being cut mid-letter.
+      std::string shown(caption, end);
+      if (ts.x > textRight - valueX)
+         shown = app::TruncateWithEllipsis(shown, textRight - valueX);
+      dl->AddText(ImVec2(valueX, mn.y + (h - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), shown.c_str());
       dl->PopClipRect();
-      UiAudit::NoteKind("dropdown", caption, ts.x, hasLabel ? textRight - valueX : textRight - mn.x - pad);
+      UiAudit::NoteKind("dropdown", caption, ImGui::CalcTextSize(shown.c_str()).x, hasLabel ? textRight - valueX : textRight - mn.x - pad);
       return clicked;
    }
 

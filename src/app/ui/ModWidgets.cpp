@@ -1,4 +1,5 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/selftest/UiAudit.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -949,9 +950,9 @@ namespace app
          }
          else
          {
-            dl->PushClipRect(ImVec2(p.x, capY), ImVec2(p.x + cell, capY + textH), true);
-            dl->AddText(ImVec2(p.x, capY), capCol, caption);
-            dl->PopClipRect();
+            const std::string cut = app::TruncateWithEllipsis(caption, cell);
+            dl->AddText(ImVec2(center.x - ImGui::CalcTextSize(cut.c_str()).x * 0.5f, capY), capCol, cut.c_str());
+            UiAudit::NoteKind("knob", caption, ImGui::CalcTextSize(cut.c_str()).x, cell);
          }
       }
 
@@ -1155,9 +1156,9 @@ namespace app
          }
          else
          {
-            dl->PushClipRect(ImVec2(p.x, capY), ImVec2(p.x + cell, capY + textH), true);
-            dl->AddText(ImVec2(p.x, capY), capCol, caption);
-            dl->PopClipRect();
+            const std::string cut = app::TruncateWithEllipsis(caption, cell);
+            dl->AddText(ImVec2(center.x - ImGui::CalcTextSize(cut.c_str()).x * 0.5f, capY), capCol, cut.c_str());
+            UiAudit::NoteKind("knob", caption, ImGui::CalcTextSize(cut.c_str()).x, cell);
          }
       }
 
