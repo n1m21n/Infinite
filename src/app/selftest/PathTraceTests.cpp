@@ -18,6 +18,17 @@ namespace app
 {
 namespace
 {
+   std::string ResolveOutDir()
+   {
+      if (const char* envOut = getenv("INFINITE_PTTEST_OUT"))
+         if (envOut[0] != '\0')
+            return envOut;
+      if (const char* envDir = getenv("INFINITE_PTTEST_DIR"))
+         if (envDir[0] != '\0')
+            return envDir;
+      return TmpPath("infinite-pt-test");
+   }
+
    Mesh MakeBoxMesh(float sx, float sy, float sz, float tx, float ty, float tz)
    {
       Mesh m = Primitives::Cube(1);
@@ -77,12 +88,13 @@ namespace
       return true;
    }
 
-   void BuildCornellScene(std::vector<Mesh>& meshes,
+   void BuildCornellScene(const std::string& outDir,
+                          std::vector<Mesh>& meshes,
                           std::vector<Bvh::Instance>& instances,
                           std::vector<Render3DPathTrace::PtMaterial>& materials)
    {
       meshes.resize(7);
-      const std::string dir = "/tmp/realism-ab/cornell";
+      const std::string dir = outDir + "/cornell";
       bool loadedAll = true;
       for (int i = 0; i < 7; i++)
       {
@@ -144,17 +156,32 @@ namespace
       const double totalMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
       return totalMs / (double)std::max(1, timedSpp);
    }
+
+   std::string ShellQuote(const std::string& s)
+   {
+      std::string out = "'";
+      for (char c : s)
+      {
+         if (c == '\'')
+            out += "'\\''";
+         else
+            out += c;
+      }
+      out += "'";
+      return out;
+   }
 } // namespace
 
 bool RunPathTraceTest()
 {
    const bool benchOnly = getenv("INFINITE_PTBENCH") != nullptr && getenv("INFINITE_PTTEST") == nullptr;
+   const std::string outDir = ResolveOutDir();
 
    Render3DPathTrace pt;
    std::vector<Mesh> cornellMeshes;
    std::vector<Bvh::Instance> cornellInstances;
    std::vector<Render3DPathTrace::PtMaterial> cornellMats;
-   BuildCornellScene(cornellMeshes, cornellInstances, cornellMats);
+   BuildCornellScene(outDir, cornellMeshes, cornellInstances, cornellMats);
 
    if (!pt.UploadScene(cornellMeshes, cornellInstances, cornellMats))
    {
@@ -203,9 +230,12 @@ bool RunPathTraceTest()
       }
 
       std::error_code ec;
-      std::filesystem::create_directories("/tmp/realism-ab/cornell", ec);
-      const std::string ptPngPath = "/tmp/realism-ab/cornell/pt.png";
-      const std::string boardPngPath = "/tmp/realism-ab/cornell_pt_board.png";
+      const std::string caseDir = outDir + "/cornell";
+      std::filesystem::create_directories(caseDir, ec);
+      const std::string ptPngPath = caseDir + "/pt.png";
+      const std::string boardPngPath = outDir + "/cornell_pt_board.png";
+      const std::string metricsPath = caseDir + "/pt_metrics.txt";
+      std::filesystem::remove(metricsPath, ec);
       if (!stbi_write_png(ptPngPath.c_str(), w, h, 4, rgba.data(), w * 4))
       {
          std::printf("[PT TEST] FAIL: could not write %s\n", ptPngPath.c_str());
@@ -255,78 +285,42 @@ bool RunPathTraceTest()
       if (!redBleedOk || !greenBleedOk || !ceilingBounceOk)
          allPassed = false;
 
-      // Run the exact FLIP + brightness ratio comparison from tools/blender-ab/harness.py
-      // against the regenerated Cycles truth (/tmp/realism-ab/cornell/truth.png) and write
-      // the comparison board PNG.
-      const std::string metricsPath = "/tmp/realism-ab/cornell/pt_metrics.txt";
-      const std::string pyScriptPath = "/tmp/realism-ab/cornell/eval_pt.py";
-      {
-         std::ofstream pyOut(pyScriptPath);
-         pyOut << R"PY(import json, os, subprocess, sys
-import numpy as np
-from PIL import Image, ImageDraw
-import flip_evaluator as flip
-
-case_dir = '/tmp/realism-ab/cornell'
-truth_p = os.path.join(case_dir, 'truth.png')
-pt_p = os.path.join(case_dir, 'pt.png')
-board_p = '/tmp/realism-ab/cornell_pt_board.png'
-metrics_p = os.path.join(case_dir, 'pt_metrics.txt')
-
-if not os.path.exists(truth_p):
-    sys.path.insert(0, 'tools/blender-ab')
-    import cases as c
-    spec = dict(c.CASES['cornell'])
-    spec['name'] = 'cornell'
-    with open(os.path.join(case_dir, 'spec.json'), 'w') as f:
-        f.write(json.dumps(spec, indent=2))
-    subprocess.run([
-        '/Applications/Blender.app/Contents/MacOS/Blender',
-        '-b', '--factory-startup',
-        '--python', 'tools/blender-ab/blender_scene.py',
-        '--', case_dir
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-ref = np.asarray(Image.open(truth_p).convert('RGB'), dtype=np.float32) / 255.0
-test = np.asarray(Image.open(pt_p).convert('RGB'), dtype=np.float32) / 255.0
-err_map, mean_flip, _ = flip.evaluate(ref, test, 'LDR', applyMagma=True)
-lin = lambda s: np.where(s <= 0.04045, s / 12.92, ((s + 0.055) / 1.055) ** 2.4)
-luma = lambda a: 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
-lr = luma(lin(ref))
-lt = luma(lin(test))
-luma_err = float(np.mean(np.abs(lr - lt)))
-ratio = float(np.mean(lt) / max(float(np.mean(lr)), 1e-6))
-
-h, w, _ = ref.shape
-heat_im = Image.fromarray((np.clip(err_map, 0.0, 1.0) * 255.0).astype(np.uint8))
-board = Image.new('RGB', (w * 3, h + 32), (18, 18, 20))
-board.paste(Image.open(truth_p).convert('RGB'), (0, 32))
-board.paste(Image.open(pt_p).convert('RGB'), (w, 32))
-board.paste(heat_im, (w * 2, 32))
-draw = ImageDraw.Draw(board)
-draw.text((10, 8), 'Cycles Truth (64 spp)', fill=(230, 230, 230))
-draw.text((w + 10, 8), f'Infinite Path Trace (256 spp)  ratio={ratio:.2f}x', fill=(230, 230, 230))
-draw.text((w * 2 + 10, 8), f'FLIP={mean_flip:.3f} (raster=0.583)', fill=(230, 230, 230))
-board.save(board_p)
-with open(metrics_p, 'w') as f:
-    f.write(f'{mean_flip:.6f} {ratio:.6f} {luma_err:.6f}\n')
-)PY";
-      }
-      const std::string pyCmd = "python3 " + pyScriptPath;
+      // Score against Cycles truth via committed tools/blender-ab/score_pt.py.
+      const std::filesystem::path repoRoot =
+         std::filesystem::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
+      const std::string scoreScript = (repoRoot / "tools" / "blender-ab" / "score_pt.py").string();
+      const std::string pyCmd =
+         "python3 " + ShellQuote(scoreScript) +
+         " --out " + ShellQuote(outDir) +
+         " --case cornell"
+         " --image " + ShellQuote(ptPngPath) +
+         " --board " + ShellQuote(boardPngPath) +
+         " --metrics " + ShellQuote(metricsPath);
       const int pyRc = std::system(pyCmd.c_str());
-      double flipScore = 1.0, brightnessRatio = 0.0, lumaErr = 1.0;
-      if (pyRc == 0)
+
+      std::ifstream mf(metricsPath);
+      std::string statusTag;
+      mf >> statusTag;
+      if (statusTag == "SKIP")
       {
-         std::ifstream mf(metricsPath);
-         mf >> flipScore >> brightnessRatio >> lumaErr;
+         std::printf("  [SKIP] cornell FLIP comparison: skipped (blender not found) (pt PNG: %s)\n", ptPngPath.c_str());
       }
-      const double rasterFlip = 0.583;
-      const bool flipOk = (pyRc == 0) && (flipScore < rasterFlip);
-      std::printf("  [%s] cornell FLIP=%.3f vs raster=%.3f | brightness_ratio=%.2fx | luma_err=%.3f | render=%.2fs\n",
-                  flipOk ? "PASS" : "FAIL", flipScore, rasterFlip, brightnessRatio, lumaErr, renderSec);
-      std::printf("  board PNG: %s (pt PNG: %s)\n", boardPngPath.c_str(), ptPngPath.c_str());
-      if (!flipOk)
+      else if (pyRc == 0 && statusTag == "OK")
+      {
+         double flipScore = 1.0, brightnessRatio = 0.0, lumaErr = 1.0, rasterFlip = 0.583;
+         mf >> flipScore >> brightnessRatio >> lumaErr >> rasterFlip;
+         const bool flipOk = flipScore < rasterFlip;
+         std::printf("  [%s] cornell FLIP=%.3f vs raster=%.3f | brightness_ratio=%.2fx | luma_err=%.3f | render=%.2fs\n",
+                     flipOk ? "PASS" : "FAIL", flipScore, rasterFlip, brightnessRatio, lumaErr, renderSec);
+         std::printf("  board PNG: %s (pt PNG: %s)\n", boardPngPath.c_str(), ptPngPath.c_str());
+         if (!flipOk)
+            allPassed = false;
+      }
+      else
+      {
+         std::printf("  [FAIL] cornell FLIP script failed (rc=%d)\n", pyRc);
          allPassed = false;
+      }
    }
 
    // Benchmark ms_per_sample at 512x512 for cornell and Fox.
