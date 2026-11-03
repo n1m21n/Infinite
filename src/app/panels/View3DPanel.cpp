@@ -3252,6 +3252,19 @@ namespace
       return std::max(1e-6f, s / 3.0f);
    }
 
+   // The node's brush image, laid on the view: the view's axes in mesh space.
+   void SculptAlpha(SculptNode* node, const Mat4& world, Sculpt::Dab& d)
+   {
+      d.alpha = node->BrushAlpha();
+      if (d.alpha == nullptr)
+         return;
+      const Mat4 inv = Mat4::Inverse(world);
+      LinearBy(inv, sCam.right, d.right);
+      LinearBy(inv, sCam.up, d.up);
+      Normalize(d.right);
+      Normalize(d.up);
+   }
+
    void SculptDab(SculptNode* node, const Mat4& world, ImVec2 at)
    {
       float c[3], w[3];
@@ -3264,6 +3277,7 @@ namespace
       d.strength = sSculpt.strength;
       d.invert = ImGui::GetIO().KeyCtrl;
       d.symmetry = sSculpt.symmetry;
+      SculptAlpha(node, world, d);
       static std::vector<unsigned int> touched;
       touched.clear();
       const Sculpt::Grid* grid = node->PointGrid(d.radius);
@@ -3420,6 +3434,7 @@ namespace
          d.radius = sSculpt.radius * UnitAt(w) / WorldScale(world);
          d.strength = sSculpt.strength;
          d.symmetry = sSculpt.symmetry;
+         SculptAlpha(node, world, d);
          Sculpt::GrabBegin(d, node->PointPos(), node->Topology(), node->Offsets(), sSculpt.grab);
          std::copy(w, w + 3, sSculpt.grabWorld);
       }

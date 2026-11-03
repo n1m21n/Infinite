@@ -459,6 +459,32 @@ bool RunSculptTest()
       check(!movedBelow, "unselected faces hold still", movedBelow, 0);
    }
 
+   // A brush image: its dark half holds, its bright half moves.
+   {
+      Sculpt::Topology topo2;
+      Sculpt::Build(base, topo2);
+      std::vector<float> pos, nrm, off((size_t)topo2.points * 3, 0.0f);
+      Sculpt::PointFrame(base, topo2, pos, nrm);
+      Sculpt::Alpha alpha;
+      alpha.w = 8;
+      alpha.h = 1;
+      alpha.lum = { 0, 0, 0, 0, 1, 1, 1, 1 };
+      Sculpt::Dab d;
+      d.center[2] = 0.5f;
+      d.radius = 0.4f;
+      d.alpha = &alpha;
+      Sculpt::Stroke(d, pos, nrm, topo2, 1.0f, off);
+      bool darkMoved = false, brightMoved = false;
+      for (int i = 0; i < topo2.points; i++)
+      {
+         const float moved = Len(&off[(size_t)i * 3]);
+         const float x = pos[(size_t)i * 3];
+         darkMoved = darkMoved || (x < -0.1f && moved > 0.0f);
+         brightMoved = brightMoved || (x > 0.1f && moved > 1e-4f);
+      }
+      check(!darkMoved && brightMoved, "a brush image moves its bright half only", brightMoved, darkMoved);
+   }
+
    // Topology change: level 1 has other points; the sculpt waits, then clears.
    n.level = 1;
    n.CookIfNeeded(5);

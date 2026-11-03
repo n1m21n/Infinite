@@ -16,6 +16,33 @@ void SculptNode::CookIfNeeded(int frameId)
    Update();
 }
 
+const Sculpt::Alpha* SculptNode::BrushAlpha()
+{
+   if (!mBrush.IsConnected())
+      return nullptr;
+   // Once a frame: the brush may be a live source.
+   if (mAlphaFrame != mLastCookFrame || mAlpha.lum.empty())
+   {
+      mAlphaFrame = mLastCookFrame;
+      const unsigned int tex = mBrush.Pull(mLastCookFrame);
+      const unsigned long long rev = mBrush.Revision();
+      const int w = mBrush.Width(), h = mBrush.Height();
+      std::vector<float> px;
+      if (tex != 0 && (tex != mAlphaTexture || rev != mAlphaRevision || w != mAlpha.w || h != mAlpha.h) &&
+          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, px))
+      {
+         mAlphaTexture = tex;
+         mAlphaRevision = rev;
+         mAlpha.w = w;
+         mAlpha.h = h;
+         mAlpha.lum.resize((size_t)w * h);
+         for (size_t i = 0; i < mAlpha.lum.size(); i++)
+            mAlpha.lum[i] = std::clamp(px[i * 4] * 0.2126f + px[i * 4 + 1] * 0.7152f + px[i * 4 + 2] * 0.0722f, 0.0f, 1.0f);
+      }
+   }
+   return mAlpha.lum.empty() ? nullptr : &mAlpha;
+}
+
 void SculptNode::Update()
 {
    if (mData != mDecodedFrom)

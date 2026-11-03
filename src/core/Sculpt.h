@@ -70,6 +70,15 @@ namespace Sculpt
    bool Raycast(const Mesh& m, const float o[3], const float d[3], float& t, const Topology* topo = nullptr,
                 const Grid* grid = nullptr);
 
+   // A brush image: brightness per pixel, rows from the bottom.
+   struct Alpha
+   {
+      int w = 0, h = 0;
+      std::vector<float> lum;
+      // Bilinear at (u, v) in 0-1; 0 outside.
+      float Sample(float u, float v) const;
+   };
+
    struct Dab
    {
       int brush = kDraw;
@@ -78,6 +87,11 @@ namespace Sculpt
       float strength = 0.5f;
       bool invert = false;
       int symmetry = 0;   // bits: 1 X, 2 Y, 4 Z (mirrored through the mesh's origin)
+      // An image laid on the view plane over the brush (Blender's texture
+      // brush, View mapping): each point's touch is scaled by the image's
+      // brightness under it. right/up: the view's axes in mesh space.
+      const Alpha* alpha = nullptr;
+      float right[3] = { 1, 0, 0 }, up[3] = { 0, 1, 0 };
    };
    // Adds one dab to `offsets` (per point, xyz), measured on the shaped
    // mesh's points. Offsets are in the sculpt's own units: a dab moves the

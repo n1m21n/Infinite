@@ -478,7 +478,7 @@ namespace app
       if (dynamic_cast<BakeNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<SculptNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 2; // geo, then the brush image
       if (dynamic_cast<EditMeshNode*>(gn.node.get()) != nullptr)
          return 1;
       // DistributePointsInGridNode has no inputs - falls through to 0 below.
@@ -625,6 +625,8 @@ namespace app
       // slot 1 is the height/vector displacement texture.
       if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
          return slot == 1 ? &disp->TextureInput() : nullptr;
+      if (auto* sculpt = dynamic_cast<SculptNode*>(gn.node.get()))
+         return slot == 1 ? &sculpt->BrushInput() : nullptr;
       // Slot 0 is the geometry pin, wired by pointer in ConnectGeometrySlot;
       // slot 1 is the colour source texture; slot 2 (palette) is a raw
       // IPaletteSource* pointer, also wired in ConnectGeometrySlot.

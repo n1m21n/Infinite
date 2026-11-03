@@ -43,6 +43,19 @@ namespace Sculpt
             out[k] = (m >> k & 1) ? -in[k] : in[k];
       }
 
+      // The brush image's brightness under point p for a dab centred at c
+      // (symmetry pass m: the offset is mirrored back first), 1 without one.
+      float AlphaAt(const Dab& d, const float p[3], const float c[3], int m)
+      {
+         if (d.alpha == nullptr || d.alpha->lum.empty())
+            return 1.0f;
+         float off[3] = { p[0] - c[0], p[1] - c[1], p[2] - c[2] };
+         Flip(off, m, off);
+         const float x = off[0] * d.right[0] + off[1] * d.right[1] + off[2] * d.right[2];
+         const float y = off[0] * d.up[0] + off[1] * d.up[1] + off[2] * d.up[2];
+         return d.alpha->Sample(0.5f + 0.5f * x / d.radius, 0.5f + 0.5f * y / d.radius);
+      }
+
       // The points under a brush, with how strongly each is touched, and the
       // surface's average normal and centre there (Blender's "area" plane).
       struct Area
@@ -128,6 +141,18 @@ namespace Sculpt
                a.center[k] /= wsum;
          return a;
       }
+   }
+
+   float Alpha::Sample(float u, float v) const
+   {
+      if (w <= 0 || h <= 0 || u < 0.0f || v < 0.0f || u > 1.0f || v > 1.0f)
+         return 0.0f;
+      const float x = std::clamp(u * w - 0.5f, 0.0f, (float)(w - 1)), y = std::clamp(v * h - 0.5f, 0.0f, (float)(h - 1));
+      const int x0 = (int)x, y0 = (int)y, x1 = std::min(x0 + 1, w - 1), y1 = std::min(y0 + 1, h - 1);
+      const float fx = x - x0, fy = y - y0;
+      const float a = lum[(size_t)y0 * w + x0] * (1 - fx) + lum[(size_t)y0 * w + x1] * fx;
+      const float b = lum[(size_t)y1 * w + x0] * (1 - fx) + lum[(size_t)y1 * w + x1] * fx;
+      return a * (1 - fy) + b * fy;
    }
 
    const char* BrushName(int brush)
@@ -626,7 +651,10 @@ namespace Sculpt
       {
          float c[3];
          Flip(d.center, m, c);
-         const Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid);
+         Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid);
+         if (d.alpha != nullptr)
+            for (size_t e = 0; e < a.idx.size(); e++)
+               a.f[e] *= AlphaAt(d, &pos[(size_t)a.idx[e] * 3], c, m);
          if (touched != nullptr)
             touched->insert(touched->end(), a.idx.begin(), a.idx.end());
          for (size_t e = 0; e < a.idx.size(); e++)
@@ -716,7 +744,8 @@ namespace Sculpt
             if (dd >= r2)
                continue;
             hold.idx.push_back((unsigned int)i);
-            hold.weight.push_back(Falloff(std::sqrt(dd) / d.radius) * std::clamp(d.strength * 2.0f, 0.0f, 1.0f));
+            hold.weight.push_back(Falloff(std::sqrt(dd) / d.radius) * std::clamp(d.strength * 2.0f, 0.0f, 1.0f) *
+                                  AlphaAt(d, p, c, m));
             hold.flip.push_back(m);
          }
       }

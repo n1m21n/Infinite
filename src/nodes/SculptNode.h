@@ -10,6 +10,8 @@
 // in the 3D View's Sculpt mode (core/Sculpt). Amount blends it in like a shape
 // key, so audio or an LFO can drive it; chain Sculpt nodes to layer sculpts.
 // Level subdivides the input first so a coarse mesh has points to move.
+// Any 2D node patched into "brush" shapes each dab: its brightness, laid on
+// the view over the brush, scales how much each point moves.
 //
 // The offsets follow point numbers. If the input's points change (another
 // subdivide, a different model), they stop applying, stay saved, and the node
@@ -61,7 +63,10 @@ public:
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
-   const char* InputLabel(int) const override { return "geo"; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "geo" : "brush"; }
+   ImageCable& BrushInput() { return mBrush; }
+   // The brush image as brightness (read back when it changes), or null.
+   const Sculpt::Alpha* BrushAlpha();
    const std::string& CookWarning() const override { return mCookWarning; }
 
    float amount = 1.0f;   // 0..2
@@ -85,6 +90,7 @@ public:
    // For Sculpt mode. Sculptable: the offsets fit the mesh.
    bool Sculptable();
    const Mesh& Shaped() { Update(); return mMesh; }
+   const Mesh& Base() { Update(); return mBase; }   // the input, after level
    const Sculpt::Topology& Topology() const { return mTopo; }
    // The shaped mesh's points (position, normal), kept up to date by
    // OffsetsChanged, and a grid over them for a brush of this radius.
@@ -110,6 +116,11 @@ private:
 
    std::string mCookWarning;
    int mLastCookFrame = -1;
+   ImageCable mBrush;
+   Sculpt::Alpha mAlpha;
+   unsigned long long mAlphaRevision = 0;
+   unsigned int mAlphaTexture = 0, mReadFbo = 0;
+   int mAlphaFrame = -1;
    std::string mData, mDecodedFrom;
    bool mEncoded = true;
 
