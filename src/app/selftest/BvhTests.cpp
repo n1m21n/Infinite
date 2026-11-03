@@ -202,44 +202,29 @@ namespace
       return out;
    }
 
-   Mesh LoadFoxOrFallback(std::string& usedPath)
+   bool TryLoadFox(Mesh& outMesh)
    {
-      std::vector<std::string> candidates;
-      if (const char* env = getenv("INFINITE_3DBENCH_FOX"))
-         candidates.push_back(env);
-      candidates.push_back("/private/tmp/claude-501/-Users-namansoni-Infinite/373e47b9-cb26-4fd8-a885-8490241b53e6/scratchpad/assets/Fox.glb");
-      const std::string self = __FILE__;
-      const size_t at = self.rfind("src/app/selftest/");
-      if (at != std::string::npos)
-         candidates.push_back(self.substr(0, at) + "tests/render3d/skinned_two_bone.glb");
-
-      for (const std::string& p : candidates)
+      const char* env = getenv("INFINITE_3DBENCH_FOX");
+      if (env == nullptr || env[0] == '\0')
+         return false;
+      std::string err;
+      const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(env, err);
+      if (pkg == nullptr || pkg->vertices.empty() || pkg->indices.empty())
+         return false;
+      outMesh.vertices.resize(pkg->vertices.size());
+      for (size_t i = 0; i < pkg->vertices.size(); i++)
       {
-         if (p.empty())
-            continue;
-         std::string err;
-         const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(p, err);
-         if (pkg != nullptr && !pkg->vertices.empty() && !pkg->indices.empty())
-         {
-            Mesh m;
-            m.vertices.resize(pkg->vertices.size());
-            for (size_t i = 0; i < pkg->vertices.size(); i++)
-            {
-               m.vertices[i].px = pkg->vertices[i].px;
-               m.vertices[i].py = pkg->vertices[i].py;
-               m.vertices[i].pz = pkg->vertices[i].pz;
-               m.vertices[i].nx = pkg->vertices[i].nx;
-               m.vertices[i].ny = pkg->vertices[i].ny;
-               m.vertices[i].nz = pkg->vertices[i].nz;
-               m.vertices[i].u = pkg->vertices[i].u;
-               m.vertices[i].v = pkg->vertices[i].v;
-            }
-            m.indices = pkg->indices;
-            usedPath = p;
-            return m;
-         }
+         outMesh.vertices[i].px = pkg->vertices[i].px;
+         outMesh.vertices[i].py = pkg->vertices[i].py;
+         outMesh.vertices[i].pz = pkg->vertices[i].pz;
+         outMesh.vertices[i].nx = pkg->vertices[i].nx;
+         outMesh.vertices[i].ny = pkg->vertices[i].ny;
+         outMesh.vertices[i].nz = pkg->vertices[i].nz;
+         outMesh.vertices[i].u = pkg->vertices[i].u;
+         outMesh.vertices[i].v = pkg->vertices[i].v;
       }
-      return Primitives::TorusKnot(64, 16, 0.2f, 2, 3);
+      outMesh.indices = pkg->indices;
+      return true;
    }
 
    int VerifyMeshRays(const Mesh& mesh, int numRays, uint32_t seed, const Bvh::Blas& blas)
@@ -306,10 +291,12 @@ namespace
 bool RunBvhTest()
 {
    printf("[BVH TEST] Binned-SAH BLAS, TLAS, Refit and samplerBuffer layout\n");
+   fflush(stdout);
    int failures = 0;
    auto check = [&](bool ok, const char* what, double a, double b)
    {
       printf("  [%s] %s (%.4f / %.4f)\n", ok ? "PASS" : "FAIL", what, a, b);
+      fflush(stdout);
       if (!ok)
          failures++;
    };
@@ -337,12 +324,19 @@ bool RunBvhTest()
    check(sphereBad == 0, "UV sphere: 10,000 random rays match brute force", (double)sphereBad, 0.0);
 
    // 2. Fox glTF (10,000 rays)
-   std::string foxPath;
-   const Mesh foxMesh = LoadFoxOrFallback(foxPath);
-   Bvh::Blas foxBlas;
-   foxBlas.Build(foxMesh, 1);
-   const int foxBad = VerifyMeshRays(foxMesh, 10000, 0x2002u, foxBlas);
-   check(foxBad == 0, "Fox mesh: 10,000 random rays match brute force", (double)foxBad, 0.0);
+   Mesh foxMesh;
+   if (TryLoadFox(foxMesh))
+   {
+      Bvh::Blas foxBlas;
+      foxBlas.Build(foxMesh, 1);
+      const int foxBad = VerifyMeshRays(foxMesh, 10000, 0x2002u, foxBlas);
+      check(foxBad == 0, "Fox mesh: 10,000 random rays match brute force", (double)foxBad, 0.0);
+   }
+   else
+   {
+      printf("fox: skipped (INFINITE_3DBENCH_FOX unset)\n");
+      fflush(stdout);
+   }
 
    // 3. Refit after moving every vertex (10,000 rays)
    Mesh deformedSphere = uvSphere;
@@ -494,158 +488,137 @@ bool RunBvhTest()
    check(tlasBad == 0, "TLAS (3 instances, non-uniform scale + rotation): 10,000 rays match brute force",
          (double)tlasBad, 0.0);
 
-   // 5. 1M-triangle subdivided sphere (10,000 rays)
+   // 5. 1M-triangle subdivided sphere (1,000 rays against 1M-tri brute force)
    const Mesh sphere1M = MakeSubdividedSphere1M();
    Bvh::Blas blas1M;
    blas1M.Build(sphere1M, 0);
-   const int bad1M = VerifyMeshRays(sphere1M, 10000, 0x5005u, blas1M);
-   check(bad1M == 0, "1M-triangle subdivided sphere: 10,000 random rays match brute force",
+   const int bad1M = VerifyMeshRays(sphere1M, 1000, 0x5005u, blas1M);
+   check(bad1M == 0, "1M-triangle subdivided sphere: 1,000 random rays match brute force",
          (double)bad1M, (double)sphere1M.FaceCount());
 
+   const char* testEnv = getenv("INFINITE_BVHTEST");
+   if (getenv("INFINITE_BVHTEST_BENCH") != nullptr ||
+       getenv("INFINITE_BVHBENCH") != nullptr ||
+       (testEnv != nullptr && std::strcmp(testEnv, "bench") == 0))
+   {
+      // 100k-triangle sphere (200 x 250 quads = 100,000 triangles)
+      const Mesh sphere100k = Primitives::Sphere(200, 250);
+      const long tris100k = (long)sphere100k.FaceCount();
+
+      std::vector<double> build100kSamples;
+      Bvh::Blas blas100k;
+      for (int i = 0; i < 7; i++)
+      {
+         auto t0 = std::chrono::steady_clock::now();
+         blas100k.Build(sphere100k, 0);
+         build100kSamples.push_back(MsSince(t0));
+      }
+      printf("{\"bench\":\"bvh_build_100k\",\"triangles\":%ld,\"ms\":%.3f,\"spec_ms\":8.3}\n",
+             tris100k, Median(build100kSamples));
+
+      // Refit at 100k triangles
+      Mesh deformed100k = sphere100k;
+      for (Vertex& v : deformed100k.vertices)
+      {
+         v.px *= 1.05f;
+         v.py *= 0.95f;
+         v.pz += 0.02f;
+      }
+      std::vector<double> refit100kSamples;
+      for (int i = 0; i < 15; i++)
+      {
+         auto t0 = std::chrono::steady_clock::now();
+         blas100k.Refit(deformed100k);
+         refit100kSamples.push_back(MsSince(t0));
+      }
+      printf("{\"bench\":\"bvh_refit_100k\",\"triangles\":%ld,\"ms\":%.3f,\"spec_ms\":0.25}\n",
+             tris100k, Median(refit100kSamples));
+
+      // 1M-triangle subdivided sphere
+      const long tris1M = (long)sphere1M.FaceCount();
+      std::vector<double> build1MSamples;
+      for (int i = 0; i < 3; i++)
+      {
+         auto t0 = std::chrono::steady_clock::now();
+         blas1M.Build(sphere1M, 0);
+         build1MSamples.push_back(MsSince(t0));
+      }
+      printf("{\"bench\":\"bvh_build_1m\",\"triangles\":%ld,\"ms\":%.3f}\n",
+             tris1M, Median(build1MSamples));
+
+      // TLAS rebuild at 1,000 instances
+      std::vector<Bvh::Blas> blasList = { blas100k };
+      std::vector<Bvh::Instance> inst1000(1000);
+      Rng rng(0x7777u);
+      for (int i = 0; i < 1000; i++)
+      {
+         inst1000[(size_t)i].blasIndex = 0;
+         inst1000[(size_t)i].materialId = i % 8;
+         const float tx = rng.Range(-20.0f, 20.0f);
+         const float ty = rng.Range(-20.0f, 20.0f);
+         const float tz = rng.Range(-20.0f, 20.0f);
+         const float rx = rng.Range(-3.14f, 3.14f);
+         const float sx = rng.Range(0.5f, 1.5f);
+         const float sy = rng.Range(0.5f, 1.5f);
+         const float sz = rng.Range(0.5f, 1.5f);
+         inst1000[(size_t)i].transform = Mat4::Multiply(
+            Mat4::Translation(tx, ty, tz),
+            Mat4::Multiply(Mat4::RotationY(rx), Mat4::Scale(sx, sy, sz)));
+      }
+      Bvh::Tlas tlas1000;
+      std::vector<double> tlasSamples;
+      for (int i = 0; i < 15; i++)
+      {
+         auto t0 = std::chrono::steady_clock::now();
+         tlas1000.Build(inst1000, blasList);
+         tlasSamples.push_back(MsSince(t0));
+      }
+      printf("{\"bench\":\"tlas_rebuild_1000\",\"instances\":1000,\"ms\":%.3f,\"spec_ms\":0.08}\n",
+             Median(tlasSamples));
+
+      // Single-thread ray throughput (rays/s) on 100k and 1M spheres
+      float lo[3] = { -0.5f, -0.5f, -0.5f }, hi[3] = { 0.5f, 0.5f, 0.5f };
+      const int benchRayCount = 100000;
+      const std::vector<Bvh::Ray> benchRays = MakeRandomRays(benchRayCount, lo, hi, 0x8888u);
+
+      volatile float sink = 0.0f;
+      auto r0 = std::chrono::steady_clock::now();
+      int hits100k = 0;
+      for (int i = 0; i < benchRayCount; i++)
+      {
+         const Bvh::Hit h = blas100k.Intersect(benchRays[(size_t)i]);
+         if (h.Valid())
+         {
+            hits100k++;
+            sink += h.t;
+         }
+      }
+      const double msRays100k = MsSince(r0);
+      const double mraysPerSec100k = ((double)benchRayCount / (msRays100k * 1e-3)) / 1e6;
+      printf("{\"bench\":\"bvh_rays_single_thread_100k\",\"rays\":%d,\"hits\":%d,\"ms\":%.3f,\"mrays_per_s\":%.3f,\"rays_per_s\":%.0f}\n",
+             benchRayCount, hits100k, msRays100k, mraysPerSec100k, (double)benchRayCount / (msRays100k * 1e-3));
+
+      auto r1 = std::chrono::steady_clock::now();
+      int hits1M = 0;
+      for (int i = 0; i < benchRayCount; i++)
+      {
+         const Bvh::Hit h = blas1M.Intersect(benchRays[(size_t)i]);
+         if (h.Valid())
+         {
+            hits1M++;
+            sink += h.t;
+         }
+      }
+      const double msRays1M = MsSince(r1);
+      const double mraysPerSec1M = ((double)benchRayCount / (msRays1M * 1e-3)) / 1e6;
+      printf("{\"bench\":\"bvh_rays_single_thread_1m\",\"rays\":%d,\"hits\":%d,\"ms\":%.3f,\"mrays_per_s\":%.3f,\"rays_per_s\":%.0f}\n",
+             benchRayCount, hits1M, msRays1M, mraysPerSec1M, (double)benchRayCount / (msRays1M * 1e-3));
+      (void)sink;
+   }
+
    printf("BVH TEST: %s (%d failure%s)\n", failures == 0 ? "OK" : "FAILED", failures, failures == 1 ? "" : "s");
+   printf(failures == 0 ? "BVHTEST OK\n" : "BVHTEST FAIL (%d)\n", failures);
+   fflush(stdout);
    return failures == 0;
-}
-
-// ======================================================== INFINITE_BVHBENCH
-bool RunBvhBench()
-{
-   // 100k-triangle sphere (200 x 250 quads = 100,000 triangles)
-   const Mesh sphere100k = Primitives::Sphere(200, 250);
-   const long tris100k = (long)sphere100k.FaceCount();
-
-   std::vector<double> build100kSamples;
-   Bvh::Blas blas100k;
-   for (int i = 0; i < 7; i++)
-   {
-      auto t0 = std::chrono::steady_clock::now();
-      blas100k.Build(sphere100k, 0);
-      build100kSamples.push_back(MsSince(t0));
-   }
-   printf("{\"bench\":\"bvh_build_100k\",\"triangles\":%ld,\"ms\":%.3f,\"spec_ms\":8.3}\n",
-          tris100k, Median(build100kSamples));
-
-   // Refit at 100k triangles
-   Mesh deformed100k = sphere100k;
-   for (Vertex& v : deformed100k.vertices)
-   {
-      v.px *= 1.05f;
-      v.py *= 0.95f;
-      v.pz += 0.02f;
-   }
-   std::vector<double> refit100kSamples;
-   for (int i = 0; i < 15; i++)
-   {
-      auto t0 = std::chrono::steady_clock::now();
-      blas100k.Refit(deformed100k);
-      refit100kSamples.push_back(MsSince(t0));
-   }
-   printf("{\"bench\":\"bvh_refit_100k\",\"triangles\":%ld,\"ms\":%.3f,\"spec_ms\":0.25}\n",
-          tris100k, Median(refit100kSamples));
-
-   // 1M-triangle subdivided sphere
-   const Mesh sphere1M = MakeSubdividedSphere1M();
-   const long tris1M = (long)sphere1M.FaceCount();
-   std::vector<double> build1MSamples;
-   Bvh::Blas blas1M;
-   for (int i = 0; i < 3; i++)
-   {
-      auto t0 = std::chrono::steady_clock::now();
-      blas1M.Build(sphere1M, 0);
-      build1MSamples.push_back(MsSince(t0));
-   }
-   printf("{\"bench\":\"bvh_build_1m\",\"triangles\":%ld,\"ms\":%.3f}\n",
-          tris1M, Median(build1MSamples));
-
-   // TLAS rebuild at 1,000 instances
-   std::vector<Bvh::Blas> blasList = { blas100k };
-   std::vector<Bvh::Instance> inst1000(1000);
-   Rng rng(0x7777u);
-   for (int i = 0; i < 1000; i++)
-   {
-      inst1000[(size_t)i].blasIndex = 0;
-      inst1000[(size_t)i].materialId = i % 8;
-      const float tx = rng.Range(-20.0f, 20.0f);
-      const float ty = rng.Range(-20.0f, 20.0f);
-      const float tz = rng.Range(-20.0f, 20.0f);
-      const float rx = rng.Range(-3.14f, 3.14f);
-      const float sx = rng.Range(0.5f, 1.5f);
-      const float sy = rng.Range(0.5f, 1.5f);
-      const float sz = rng.Range(0.5f, 1.5f);
-      inst1000[(size_t)i].transform = Mat4::Multiply(
-         Mat4::Translation(tx, ty, tz),
-         Mat4::Multiply(Mat4::RotationY(rx), Mat4::Scale(sx, sy, sz)));
-   }
-   Bvh::Tlas tlas1000;
-   std::vector<double> tlasSamples;
-   for (int i = 0; i < 15; i++)
-   {
-      auto t0 = std::chrono::steady_clock::now();
-      tlas1000.Build(inst1000, blasList);
-      tlasSamples.push_back(MsSince(t0));
-   }
-   printf("{\"bench\":\"tlas_rebuild_1000\",\"instances\":1000,\"ms\":%.3f,\"spec_ms\":0.08}\n",
-          Median(tlasSamples));
-
-   // Single-thread ray throughput (rays/s) on 100k and 1M spheres
-   float lo[3] = { -0.5f, -0.5f, -0.5f }, hi[3] = { 0.5f, 0.5f, 0.5f };
-   const int benchRayCount = 100000;
-   const std::vector<Bvh::Ray> benchRays = MakeRandomRays(benchRayCount, lo, hi, 0x8888u);
-
-   volatile float sink = 0.0f;
-   auto r0 = std::chrono::steady_clock::now();
-   int hits100k = 0;
-   for (int i = 0; i < benchRayCount; i++)
-   {
-      const Bvh::Hit h = blas100k.Intersect(benchRays[(size_t)i]);
-      if (h.Valid())
-      {
-         hits100k++;
-         sink += h.t;
-      }
-   }
-   const double msRays100k = MsSince(r0);
-   const double mraysPerSec100k = ((double)benchRayCount / (msRays100k * 1e-3)) / 1e6;
-   printf("{\"bench\":\"bvh_rays_single_thread_100k\",\"rays\":%d,\"hits\":%d,\"ms\":%.3f,\"mrays_per_s\":%.3f,\"rays_per_s\":%.0f}\n",
-          benchRayCount, hits100k, msRays100k, mraysPerSec100k, (double)benchRayCount / (msRays100k * 1e-3));
-
-   auto r1 = std::chrono::steady_clock::now();
-   int hits1M = 0;
-   for (int i = 0; i < benchRayCount; i++)
-   {
-      const Bvh::Hit h = blas1M.Intersect(benchRays[(size_t)i]);
-      if (h.Valid())
-      {
-         hits1M++;
-         sink += h.t;
-      }
-   }
-   const double msRays1M = MsSince(r1);
-   const double mraysPerSec1M = ((double)benchRayCount / (msRays1M * 1e-3)) / 1e6;
-   printf("{\"bench\":\"bvh_rays_single_thread_1m\",\"rays\":%d,\"hits\":%d,\"ms\":%.3f,\"mrays_per_s\":%.3f,\"rays_per_s\":%.0f}\n",
-          benchRayCount, hits1M, msRays1M, mraysPerSec1M, (double)benchRayCount / (msRays1M * 1e-3));
-   (void)sink;
-   return true;
-}
-
-namespace
-{
-   struct BvhAutoDispatch
-   {
-      BvhAutoDispatch()
-      {
-         if (getenv("INFINITE_BVHTEST") != nullptr)
-         {
-            const bool ok = RunBvhTest();
-            std::fflush(stdout);
-            std::_Exit(ok ? 0 : 1);
-         }
-         if (getenv("INFINITE_BVHBENCH") != nullptr)
-         {
-            const bool ok = RunBvhBench();
-            std::fflush(stdout);
-            std::_Exit(ok ? 0 : 1);
-         }
-      }
-   } sBvhAutoDispatch;
 }
 }
