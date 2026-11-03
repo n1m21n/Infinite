@@ -1,5 +1,6 @@
 #include "Geometry3DNodes.h"
 #include "Render3DTonemap.h"
+#include "ColorSpace.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -257,8 +258,8 @@ namespace
       "uniform float uExposure;\n"
       "uniform int uTonemap;\n"
       "uniform float uBgOpacity;\n"
-      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
-      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
+      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
@@ -587,8 +588,8 @@ namespace
       "   return mix(1.0, lit, uShadowStrength);\n"
       "}\n"
       "\n"
-      "vec3 toLinear(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }\n"
-      "vec3 toSrgb(vec3 c) { return pow(max(c, vec3(0.0)), vec3(1.0 / 2.2)); }\n"
+      "vec3 toLinear(vec3 c) { c = max(c, vec3(0.0)); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }\n"
+      "vec3 toSrgb(vec3 c) { c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }\n"
       "\n"
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
@@ -1279,7 +1280,7 @@ void Render3DNode::RigLight::From(const LightNode& n)
       float tint[3];
       LightNode::TemperatureColor(n.temperature, tint);
       for (int k = 0; k < 3; k++)
-         color[k] = std::pow(std::pow(std::max(0.0f, color[k]), 2.2f) * tint[k], 1.0f / 2.2f);
+         color[k] = ColorSpace::LinearToSrgb(ColorSpace::SrgbToLinear(std::max(0.0f, color[k])) * tint[k]);
    }
    type = n.type;
    // Unnormalized, an area light gives out more the bigger it is (1 x 1 = as normalized).
@@ -2265,7 +2266,7 @@ void Render3DNode::CookOnce(int frameId)
          lightDirs[lightCount * 3 + 2] = -sunDir[0] * sn + sunDir[2] * c;
          const float peak = std::max({ sunLight[0], sunLight[1], sunLight[2], 1e-6f });
          for (int k = 0; k < 3; k++)   // the shader takes colours in sRGB
-            lightCols[lightCount * 3 + k] = std::pow(sunLight[k] / peak, 1.0f / 2.2f);
+            lightCols[lightCount * 3 + k] = ColorSpace::LinearToSrgb(sunLight[k] / peak);
          lightPower[lightCount] = peak * envHdriIntensity;
          lightTypes[lightCount] = 0;
          if (env->sunShadow && (lightCount == 0 || !caster.castShadow))
