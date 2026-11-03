@@ -50,6 +50,7 @@ namespace DropdownField
       dl->PushClipRect(ImVec2(hasLabel ? valueX : mn.x, mn.y), ImVec2(textRight, mx.y), true);
       dl->AddText(ImVec2(valueX, mn.y + (h - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), caption, end);
       dl->PopClipRect();
+      UiAudit::NoteKind("dropdown", caption, ts.x, hasLabel ? textRight - valueX : textRight - mn.x - pad);
       return clicked;
    }
 

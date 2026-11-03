@@ -15,6 +15,7 @@ namespace FieldWell
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const float a = active ? 0.12f : hovered ? 0.10f : 0.06f;
+      UiAudit::NoteFill(ImVec4(t.x, t.y, t.z, 0.06f));
       dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_tile);
       dl->AddRect(mn, mx, ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
                   tok::radius_tile);
@@ -140,7 +141,11 @@ namespace FieldWell
          ImGui::PushStyleColor(ImGuiCol_Border, ac);
       }
       const bool r = ImGui::SliderScalar(label, dt, v, &lo, &hi, fmt, fl | ImGuiSliderFlags_AlwaysClamp);
-      UiAudit::NoteSlider(id, hi != lo ? (float)(*v - lo) / (float)(hi - lo) : 0.0f, mn, mx);
+      {
+         char vb[64];
+         ImGui::DataTypeFormatString(vb, sizeof vb, dt, v, fmt);
+         UiAudit::NoteSlider(id, hi != lo ? (float)(*v - lo) / (float)(hi - lo) : 0.0f, mn, mx, ImGui::CalcTextSize(vb).x);
+      }
       if (typing)
          ImGui::PopStyleColor(2);
       ImGui::PopStyleColor(2);

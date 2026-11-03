@@ -787,6 +787,7 @@ namespace app
       const bool clicked = ImGui::InvisibleButton(label, ImVec2(box + (textW > 0.0f ? st.ItemInnerSpacing.x + textW : 0.0f), box));
       const bool hovered = ImGui::IsItemHovered();
       const ImGuiID iid = ImGui::GetItemID();
+      UiAudit::NoteKind("checkbox", label);
       if (clicked)
          *value = !*value;
       const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);

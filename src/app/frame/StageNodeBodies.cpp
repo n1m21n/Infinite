@@ -2,6 +2,7 @@
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/selftest/UiAudit.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/NodeHeader.h"
 #include "app/frame/FrameCtx.h"
@@ -1492,6 +1493,11 @@ void DrawNodeBodies(FrameCtx& fc)
          ImGui::PopID();
          gInsideNodeCanvas = false;
          ed::EndNode();
+         {
+            const ImVec2 np = ed::GetNodePosition(gn.NodeId()), ns = ed::GetNodeSize(gn.NodeId());
+            const ImVec4 bg = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
+            UiAudit::NoteNode(np, ImVec2(np.x + ns.x, np.y + ns.y), bg);
+         }
          CacheNodeWidth(gn.node.get(), ed::GetNodeSize(gn.NodeId()).x);
          if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
             gNodeHoverTip = warnSrc->CookWarning(); // a real fault, so shown even with Help tooltips off

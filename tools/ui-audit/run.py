@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BIN = os.path.join(ROOT, "build-dev/Infinite.app/Contents/MacOS/Infinite")
 PATCH = os.path.join(ROOT, "tests/render3d/shadows.inf")
 BASELINE = os.path.join(ROOT, "tools/ui-audit/baseline.tsv")
-CANARY = {"duplicate id", "clipped", "tiny target", "overlap", "hit smaller than drawn"}
+CANARY = {"duplicate id", "clipped", "tiny target", "overlap", "hit smaller than drawn", "text overflow", "contrast text"}
 
 
 def key(row):
@@ -34,6 +34,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(ROOT, "ui-audit"))
     ap.add_argument("--budget", type=int, default=300, help="seconds before the run is killed")
+    ap.add_argument("--nodes", default="", help="comma list of node types to cover, or none (default: every registered type)")
+    ap.add_argument("--dark-only", action="store_true")
     ap.add_argument("--rebaseline", action="store_true")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
@@ -43,6 +45,10 @@ def main():
     log = os.path.join(a.out, "run.log")
     env = dict(os.environ, INFINITE_UIAUDIT="1", INFINITE_UIAUDIT_PATCH=PATCH, INFINITE_UIAUDIT_OUT=a.out,
                HOME=tempfile.mkdtemp(prefix="uiaudit-home-"))
+    if a.nodes:
+        env["INFINITE_UIAUDIT_NODES"] = a.nodes
+    if a.dark_only:
+        env["INFINITE_UIAUDIT_DARK_ONLY"] = "1"
     t0 = time.time()
     # Under a pty: redirected output is lost if the run is killed.
     p = subprocess.Popen(["script", "-q", log, BIN], env=env, stdin=subprocess.DEVNULL,

@@ -43,6 +43,7 @@ namespace ColourChip
       dl->PushClipRect(mn, ImVec2(sMin.x - pad, mx.y), true);
       dl->AddText(ImVec2(mn.x + pad, mn.y + (h - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(dim), caption);
       dl->PopClipRect();
+      UiAudit::NoteKind("colour", id, ImGui::CalcTextSize(caption).x, sMin.x - pad - (mn.x + pad));
       return clicked;
    }
 }

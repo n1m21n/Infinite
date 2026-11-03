@@ -1,5 +1,6 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
+#include "app/selftest/UiAudit.h"
 #include <optional>
 #include "core/ModShapes.h"
 #include "core/Provenance.h"
@@ -3067,6 +3068,8 @@ void EndAudioSection();
          cellW = gAudioContentW / (float)count;
          index = 0;
          rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (kKnobCaptionGap + ImGui::GetTextLineHeight()) : 0.0f);
+         if (!gParamRegisterOnly)
+            UiAudit::NoteRow(x0, y0, rowH, cellW, count);
       }
 
       void Place(float dia) const
