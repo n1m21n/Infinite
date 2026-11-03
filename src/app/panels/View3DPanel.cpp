@@ -89,6 +89,7 @@ namespace
    int sHot = -1;                  // last frame's handle: 0-2 axes, 3 centre, 4-6 planes
    std::vector<int> sSel;
    std::string sCopiedScene;
+   std::vector<Item> sCopiedItems;   // the list's Copy, for Paste
    std::vector<int> sLocal;        // local view: only these, empty when off
    bool sOverlays = true;
    bool sZoomArmed = false, sBoxZoom = false;   // Shift+B, then a box to zoom into
@@ -1469,19 +1470,13 @@ namespace
             sSel.insert(sSel.begin(), it.id);
    }
 
-   void DuplicateSelected(Scene3DNode* scene, ImVec2 mouse)
+   // Adds copies of the items and selects them.
+   void AddCopies(Scene3DNode* scene, const std::vector<Item>& from)
    {
-      if (sSel.empty())
-         return;
-      PushUndoCheckpoint("Duplicate in 3D View");
       std::vector<int> made;
       std::map<int, int> groups;
-      for (int id : std::vector<int>(sSel))
+      for (Item copy : from)
       {
-         Item* it = scene->FindItem(id);
-         if (it == nullptr)
-            continue;
-         Item copy = *it;
          if (copy.group != 0)
          {
             // A copied group is a new group, not more of the old one.
@@ -1498,7 +1493,34 @@ namespace
       }
       scene->Commit();
       sSel = made;
-      BeginOp('g', scene, mouse);
+   }
+
+   std::vector<Item> SelectedItems(Scene3DNode* scene)
+   {
+      std::vector<Item> out;
+      for (int id : sSel)
+         if (const Item* it = scene->FindItem(id))
+            out.push_back(*it);
+      return out;
+   }
+
+   // From the viewport the copies follow the mouse; from the list they stay put.
+   void DuplicateSelected(Scene3DNode* scene, ImVec2 mouse, bool grab = true)
+   {
+      if (sSel.empty())
+         return;
+      PushUndoCheckpoint("Duplicate in 3D View");
+      AddCopies(scene, SelectedItems(scene));
+      if (grab)
+         BeginOp('g', scene, mouse);
+   }
+
+   void PasteItems(Scene3DNode* scene)
+   {
+      if (sCopiedItems.empty())
+         return;
+      PushUndoCheckpoint("Paste in 3D View");
+      AddCopies(scene, sCopiedItems);
    }
 
    void StartRender(Scene3DNode* scene);
@@ -5727,7 +5749,8 @@ namespace
       // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f) / step)));
+      const float actionsH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
+      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f - actionsH) / step)));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
@@ -5881,6 +5904,30 @@ namespace
       }
       if (count > 0)
          ImGui::EndChild();
+      if (!sSel.empty() || !sCopiedItems.empty())
+      {
+         // What to do with the picked rows, without hunting for the right-click menu.
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const ImVec2 size((availW - gap * 3.0f) / 4.0f, 0.0f);
+         const bool any = !sSel.empty();
+         ImGui::BeginDisabled(!any);
+         if (ActionButton::Draw(L("Duplicate"), size))
+            DuplicateSelected(scene, io.MousePos, false);
+         ImGui::SameLine();
+         if (ActionButton::Draw(L("Copy"), size))
+            sCopiedItems = SelectedItems(scene);
+         ImGui::EndDisabled();
+         ImGui::SameLine();
+         ImGui::BeginDisabled(sCopiedItems.empty());
+         if (ActionButton::Draw(L("Paste"), size))
+            PasteItems(scene);
+         ImGui::EndDisabled();
+         ImGui::SameLine();
+         ImGui::BeginDisabled(!any);
+         if (ActionButton::Draw(L("Delete"), size))
+            DeleteSelected(scene);
+         ImGui::EndDisabled();
+      }
       static float sBoxY0 = 0.0f;
       static bool sBoxing = false;
       if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -6679,11 +6726,11 @@ namespace
       for (GraphNode& gn : gNodes)
       {
          INode* n = gn.node.get();
-         if (&gn == &self || gn.hiddenFromCanvas || dynamic_cast<IModulator*>(n) || dynamic_cast<IGeometrySource*>(n) ||
-             dynamic_cast<CameraNode*>(n) || dynamic_cast<LightNode*>(n) || dynamic_cast<EnvironmentNode*>(n) ||
-             dynamic_cast<IAudioSource*>(n) || dynamic_cast<INoteSource*>(n) || dynamic_cast<IPredictor*>(n) ||
-             dynamic_cast<IPaletteSource*>(n) || dynamic_cast<OutputNode*>(n) || dynamic_cast<Scene3DNode*>(n) ||
-             dynamic_cast<CommentNode*>(n))
+         // Only nodes that make pixels (the viewport panel's test: no audio
+         // sinks like Audio Out, no meters), and none of the 3D ones.
+         if (&gn == &self || gn.hiddenFromCanvas || dynamic_cast<IGeometrySource*>(n) || dynamic_cast<EnvironmentNode*>(n) ||
+             dynamic_cast<IPredictor*>(n) || dynamic_cast<IPaletteSource*>(n) || dynamic_cast<OutputNode*>(n) ||
+             dynamic_cast<Scene3DNode*>(n) || !CanShowInViewportPanel(gn))
             continue;
          out.push_back(&gn);
       }
@@ -6762,6 +6809,8 @@ namespace
       auto* mat = gn != nullptr ? dynamic_cast<MaterialNode*>(gn->node.get()) : nullptr;
       if (mat == nullptr)
       {
+         // The column starts a spacing high for a card; a bare button needs it back.
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y);
          if (ActionButton::Draw(L("Add Material"), ImVec2(availW, 0)))
             AddMaterial(scene, *item);
          return;
@@ -7617,6 +7666,8 @@ namespace
          if (sMenuOnItem && any)
          {
             if (MenuParts::Item(T("Duplicate"), "Shift+D")) DuplicateSelected(scene, ImGui::GetIO().MousePos);
+            if (MenuParts::Item(T("Copy"))) sCopiedItems = SelectedItems(scene);
+            if (MenuParts::Item(T("Paste"), nullptr, false, !sCopiedItems.empty())) PasteItems(scene);
             if (one != nullptr && MenuParts::Item(T("Rename"), "F2")) StartRename(*one);
             if (MenuParts::Item(T("Hide"), "H")) HideSelected(scene);
             if (MenuParts::Item(T("Remove"), "X")) DeleteSelected(scene);
