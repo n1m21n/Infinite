@@ -1599,7 +1599,11 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          "      float graze = abs(normalize(d)[uAxis]);\n"
          "      float range = (uDist * 14.0 + 12.0) * uGridOpt.z;\n"
          "      float fade = (1.0 - smoothstep(range * 0.35, range, length(p - uEye))) * smoothstep(0.0, 0.06, graze);\n"
-         "      if (t > 0.0 && t <= 1.0 && (uWireMode == 2 || pd <= texture(uDepth, vUv).r + 1e-6) && fade > 0.0) {\n"
+         // In front of the scene in linear depth, by a margin the depth buffer can resolve:
+         // a fixed slack in stored depth grows with distance and let the grid through meshes.
+         "      float sd = texture(uDepth, vUv).r;\n"
+         "      bool open = sd >= 0.999999 || linDepth(pd) < linDepth(sd) - (uNearFar.z > 0.5 ? 2e-5 : 0.002 * linDepth(sd));\n"
+         "      if (t > 0.0 && t <= 1.0 && (uWireMode == 2 || open) && fade > 0.0) {\n"
          "         float sub = max(uGridOpt.y, 2.0);\n"
          "         float level = log(max(uDist, 1e-3) * 0.25 / uGridOpt.x) / log(sub);\n"
          "         float scale = pow(sub, floor(level)) * uGridOpt.x;\n"

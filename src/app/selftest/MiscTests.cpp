@@ -3575,6 +3575,50 @@ void RunView3DTest()
    shown->worldColor[0] = 0.05f; shown->worldColor[1] = 0.12f; shown->worldColor[2] = 0.22f;
    View3DAddNode(*FindNodeByIndex(sphere));
    shown->Commit();
+   // The grid hides behind the scene: seen from above, every pixel of the sphere lies above
+   // the ground plane, so turning the grid on may not touch one of them, near or far.
+   auto Top = [&](float height, bool grid, std::vector<float>& px)
+   {
+      const float eye[3] = { 0.0f, height, 0.001f }, target[3] = { 0, 0, 0 }, up[3] = { 0, 0, -1 };
+      Scene3DNode::View view;
+      view.view = Mat4::LookAt(eye, target, up);
+      view.proj = Mat4::Perspective(45.0f * 4.0f / height * 3.14159265f / 180.0f, 1.0f, 0.01f, 1000.0f);
+      std::copy(eye, eye + 3, view.eye);
+      view.shading = Scene3DNode::Shading::Solid;
+      view.grid = grid;
+      view.gridDist = height;
+      FindNodeByIndex(sphere)->node->CookIfNeeded(++sCookFrame);
+      Scene()->CookIfNeeded(++sCookFrame);
+      Scene()->RenderView(64, 64, view);
+      const unsigned int tex = Scene()->RenderView(64, 64, view);
+      px.assign(64 * 64 * 4, 0.0f);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+   };
+   shown->worldColorOn = false;
+   for (float height : { 4.0f, 40.0f, 200.0f })
+   {
+      std::vector<float> off, on;
+      Top(height, false, off);
+      Top(height, true, on);
+      int covered = 0, through = 0, ground = 0;
+      for (size_t i = 0; i < off.size(); i += 4)
+      {
+         const float d = std::abs(on[i] - off[i]) + std::abs(on[i + 1] - off[i + 1]) + std::abs(on[i + 2] - off[i + 2]);
+         if (off[i + 3] > 0.99f)
+         {
+            covered++;
+            through += d > 0.02f ? 1 : 0;
+         }
+         else if (on[i + 3] > 0.05f)
+            ground++;
+      }
+      printf("  grid at %.0f: %d sphere px, %d with grid through, %d ground px with grid\n", height, covered, through, ground);
+      Check("the grid draws on the ground", ground > 0);
+      Check("the grid stays behind the sphere", covered > 0 && through == 0);
+   }
+   shown->worldColorOn = true;
    // A camera's background image: behind the objects, over them, and only in the view.
    {
       const std::string picPath = AppPaths::TempDir() + "/infinite-backdrop.png";
