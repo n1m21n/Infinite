@@ -5,7 +5,8 @@
 // Both take and return linear light.
 //   agxTone     - AgX (Troy Sobotka's display transform) in its widely published
 //                 minimal form: inset matrix, log2 encoding over -12.47..+4.03
-//                 stops, a 6th-order fit of the contrast curve, outset matrix.
+//                 stops, a 6th-order fit of the contrast curve, outset matrix, and the
+//                 curve's sRGB-encoded result decoded back to linear.
 //   neutralTone - Khronos PBR Neutral (Khronos Group, 2024): colours below 0.76
 //                 pass unchanged, highlights compress toward white.
 #define R3D_TONEMAP_GLSL \
@@ -19,7 +20,8 @@
    "   vec3 x = clamp((log2(max(inset * c, vec3(1e-10))) + 12.47393) / 16.5, 0.0, 1.0);\n" \
    "   vec3 x2 = x * x, x4 = x2 * x2;\n" \
    "   x = 15.5 * x4 * x2 - 40.14 * x4 * x + 31.96 * x4 - 6.868 * x2 * x + 0.4298 * x2 + 0.1191 * x - 0.00232;\n" \
-   "   return pow(max(outset * x, vec3(0.0)), vec3(2.2));\n" \
+   "   x = max(outset * x, vec3(0.0));\n" \
+   "   return mix(x / 12.92, pow((x + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), x));\n" \
    "}\n" \
    "vec3 neutralTone(vec3 c) {\n" \
    "   float x = min(c.r, min(c.g, c.b));\n" \
