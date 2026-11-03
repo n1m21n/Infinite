@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Deep House Rhodes Electric Synth",
+    "author": "Infinite",
+    "description": "Soulful deep house polyphonic synthesizer with detuned sine-saw blend, velocity-controlled resonant lowpass warmth, and lush harmonic decay.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 1600.0 [300.0, 6000.0]\nparam float resonance = 0.28 [0.0, 0.85]\nparam float detune = 0.008 [0.001, 0.03]\nparam float decay = 0.55 [0.1, 2.0]\nparam float warmth = 0.45 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00004, 0.02)\nenv = if(target > env, env + (target - env) * 0.25, env - env * decayRate)\n\nfBase = clamp(freq, 35.0, 3500.0)\np1 = (p1 + fBase * (1.0 - detune) / sr) % 1.0\np2 = (p2 + fBase * (1.0 + detune) / sr) % 1.0\n\ns1 = sin(p1 * 6.2831853)\ns2 = (p2 * 2.0 - 1.0)\nraw = (s1 * (1.0 - warmth * 0.5) + s2 * (0.3 + warmth * 0.5)) * env\n\nfCut = clamp((cutoff + env * 2200.0) / sr * 2.2, 0.01, 0.45)\nlp1 = lp1 + fCut * (raw - lp1 - resonance * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nu = lp2 * 1.35\nsat = clamp(u - 0.2 * u * u * u, -0.92, 0.92)\nout = sat * 0.36\n",
+    "params": {
+      "cutoff": 1600.0,
+      "resonance": 0.28,
+      "detune": 0.008,
+      "decay": 0.55,
+      "warmth": 0.45
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

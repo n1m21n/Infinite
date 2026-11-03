@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cyberpunk Neon Hologram Grid",
+    "author": "Infinite",
+    "description": "Volumetric neon city hologram shader with segmented cyberpunk signage matrices, phosphor scanline bleeding, and radiant chromatic light corridors.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridDensity = 18.0 [8.0, 36.0]\nparam float glitchSpeed = 1.1 [0.2, 3.0]\nparam float bloomSpread = 1.2 [0.4, 2.5]\nparam float phosphorGlow = 0.75 [0.1, 1.8]\nparam float scanlineDarkness = 0.35 [0.0, 0.8]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * 0.75\n\ngridP = floor(p * gridDensity) / gridDensity\nwave = sin(gridP.y * 10.0 + time * 2.5 * glitchSpeed)\n\ngate = sin(gridP.x * 12.0 + floor(time * 6.0))\ndisp = if(gate > 0.4, 0.14, 0.0)\npG = vec2(gridP.x + disp, gridP.y + wave * 0.06)\n\nr = length(pG)\nang = atan2(pG.y, pG.x)\n\nf1 = clamp(sin(r * 12.0 - time * 2.2 + ang * 2.0) * 0.5 + 0.5, 0.0, 1.0)\nf2 = clamp(cos(pG.x * 8.0 + pG.y * 6.0 + time) * 0.5 + 0.5, 0.0, 1.0)\nf3 = clamp(sin(r * 20.0 - time * 3.5) * 0.5 + 0.5, 0.0, 1.0)\n\ncDark = vec3(0.03, 0.01, 0.07)\ncMagenta = vec3(1.0, 0.02, 0.55)\ncCyan = vec3(0.0, 0.95, 0.98)\ncYellow = vec3(1.0, 0.90, 0.08)\n\nbase = mix(cDark, cMagenta, f1 * 0.75)\nbase = mix(base, cCyan, f2 * 0.65)\nbase = mix(base, cYellow, f3 * 0.45 * phosphorGlow)\n\nscan = clamp(sin(uv.y * 480.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = base * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "gridDensity": 18.0,
+      "glitchSpeed": 1.1,
+      "bloomSpread": 1.2,
+      "phosphorGlow": 0.75,
+      "scanlineDarkness": 0.35
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

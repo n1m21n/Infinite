@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Glitch Datamosh Pixel Displace",
+    "author": "Infinite",
+    "description": "Digital compression artifact displacement shader with quantized mosaic buffer slices, feedback edge bleeding, and dynamic scanline wave distortion.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float mosaicScale = 28.0 [10.0, 50.0]\nparam float waveSpeed = 0.6 [0.1, 2.0]\nparam float bleedAmount = 0.7 [0.1, 1.5]\nparam float scanlineDarkness = 0.35 [0.0, 0.8]\nparam float contrast = 1.25 [0.5, 2.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * waveSpeed\n\nmosaic = floor(p * mosaicScale) / mosaicScale\nwave = sin(mosaic.y * 8.0 + time * 2.0)\ngate = sin(mosaic.y * 14.0 + floor(time * 6.0))\ndisp = if(gate > 0.4, 0.18, 0.0)\npDisp = vec2(mosaic.x + disp, mosaic.y + wave * 0.08)\n\nr = length(pDisp)\nang = atan2(pDisp.y, pDisp.x)\n\nf1 = clamp(sin(r * 14.0 - time * 2.5 + ang * 3.0) * 0.5 + 0.5, 0.0, 1.0)\nf2 = clamp(cos(pDisp.x * 10.0 + pDisp.y * 8.0 + time) * 0.5 + 0.5, 0.0, 1.0)\nf3 = clamp(sin(r * 22.0 - time * 4.0) * 0.5 + 0.5, 0.0, 1.0)\n\ncDark = vec3(0.04, 0.05, 0.09)\ncCyan = vec3(0.0, 0.92, 0.98)\ncYellow = vec3(1.0, 0.92, 0.15)\ncViolet = vec3(0.85, 0.15, 0.95)\n\nbase = mix(cDark, cCyan, f1 * 0.7)\nbase = mix(base, cYellow, f2 * 0.6)\nbase = mix(base, cViolet, f3 * 0.5)\n\nscan = clamp(sin(uv.y * 480.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = base * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "mosaicScale": 28.0,
+      "waveSpeed": 0.6,
+      "bleedAmount": 0.7,
+      "scanlineDarkness": 0.35,
+      "contrast": 1.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

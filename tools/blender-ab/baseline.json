@@ -1,9 +1,13 @@
 {
- "light_area": 0.0906,
- "light_point": 0.0855,
- "light_spot": 0.1472,
- "light_sun": 0.0708,
- "materials": 0.1245,
- "view_agx": 0.0766,
- "world_grey": 0.1062
+ "cornell": 0.583,
+ "furnace_dielectric": 0.0176,
+ "furnace_metal": 0.0182,
+ "light_area": 0.0876,
+ "light_point": 0.0711,
+ "light_spot": 0.1496,
+ "light_sun": 0.0703,
+ "lineup": 0.0764,
+ "materials": 0.1172,
+ "view_agx": 0.0705,
+ "world_grey": 0.0851
 }

@@ -4837,6 +4837,426 @@
       "file": "assets/library/pixel/holographic-iridescent-prismatic-flux.field",
       "preview": "assets/library/previews/holographic-iridescent-prismatic-flux.jpg",
       "bytes": 1603
+    },
+    {
+      "id": "acid-graphics-starburst-lattice",
+      "name": "Acid Graphics Starburst Lattice",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "typography",
+        "starburst",
+        "vector",
+        "drawing",
+        "rave"
+      ],
+      "description": "Procedural rave-era acid graphics with concentric warped starburst contours, high-contrast chartreuse vector frames, and dense technical alignment ticks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/acid-graphics-starburst-lattice.js",
+      "preview": "assets/library/previews/acid-graphics-starburst-lattice.jpg",
+      "bytes": 2642
+    },
+    {
+      "id": "acid-graphics-warp-typography",
+      "name": "Acid Graphics Warp Typography",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "typography",
+        "warp",
+        "layout",
+        "procedural",
+        "drawing"
+      ],
+      "description": "Algorithmic Warp-era typographic layout with curvilinear sine-distorted letterforms, bold chromatic contrast rules, and geometric registration marks.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/acid-graphics-warp-typography.js",
+      "preview": "assets/library/previews/acid-graphics-warp-typography.jpg",
+      "bytes": 1893
+    },
+    {
+      "id": "vaporwave-collage-ionic-colonnade-3d",
+      "name": "Vaporwave Collage Ionic Colonnade 3D",
+      "kind": "Generator",
+      "tags": [
+        "vaporwave",
+        "neoclassical",
+        "colonnade",
+        "architecture",
+        "marble",
+        "3d"
+      ],
+      "description": "Neoclassical postmodern architectural colonnade with fluted marble columns, tiered stepped podiums, floating platonic spheres, and pastel aesthetic volumes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vaporwave-collage-ionic-colonnade-3d.js",
+      "preview": "assets/library/previews/vaporwave-collage-ionic-colonnade-3d.jpg",
+      "bytes": 1907
+    },
+    {
+      "id": "vaporwave-collage-pedestal-temple-3d",
+      "name": "Vaporwave Collage Pedestal Temple 3D",
+      "kind": "Generator",
+      "tags": [
+        "vaporwave",
+        "temple",
+        "pedestal",
+        "architecture",
+        "geometry",
+        "3d"
+      ],
+      "description": "Monumental stepped temple pavilion with cantilevered entablature beams, hollow archways, tiered ceremonial plinths, and geometric sun disc accents.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vaporwave-collage-pedestal-temple-3d.js",
+      "preview": "assets/library/previews/vaporwave-collage-pedestal-temple-3d.jpg",
+      "bytes": 2008
+    },
+    {
+      "id": "deep-house-rhodes-electric-synth",
+      "name": "Deep House Rhodes Electric Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "deep-house",
+        "chords",
+        "polyphonic",
+        "analog",
+        "audio"
+      ],
+      "description": "Soulful deep house polyphonic synthesizer with detuned sine-saw blend, velocity-controlled resonant lowpass warmth, and lush harmonic decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/deep-house-rhodes-electric-synth.inf",
+      "preview": "assets/library/previews/deep-house-rhodes-electric-synth.jpg",
+      "bytes": 2195
+    },
+    {
+      "id": "deep-house-organ-bass-synth",
+      "name": "Deep House Organ Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "deep-house",
+        "bass",
+        "organ",
+        "sub",
+        "audio"
+      ],
+      "description": "Classic Chicago deep house organ bass synthesizer with punchy percussive transient click, sub-harmonic octave warmth, and tight saturated decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/deep-house-organ-bass-synth.inf",
+      "preview": "assets/library/previews/deep-house-organ-bass-synth.jpg",
+      "bytes": 2328
+    },
+    {
+      "id": "jungle-amen-tape-delay-fx",
+      "name": "Jungle Amen Tape Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "jungle",
+        "delay",
+        "tape",
+        "echo",
+        "audio"
+      ],
+      "description": "Vintage sound system tape delay processor with 16th-sync ping-pong repeats, high-frequency tape saturation damping, and analog flutter modulation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/jungle-amen-tape-delay-fx.inf",
+      "preview": "assets/library/previews/jungle-amen-tape-delay-fx.jpg",
+      "bytes": 2144
+    },
+    {
+      "id": "jungle-sub-bass-resonator-fx",
+      "name": "Jungle Sub Bass Resonator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "jungle",
+        "sub",
+        "resonator",
+        "filter",
+        "audio"
+      ],
+      "description": "Heavy sound system sub-bass filter and harmonic resonator with tuned low-end boost, asymmetric saturation drive, and transient preservation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/jungle-sub-bass-resonator-fx.inf",
+      "preview": "assets/library/previews/jungle-sub-bass-resonator-fx.jpg",
+      "bytes": 2079
+    },
+    {
+      "id": "glitch-datamosh-buffer-tear",
+      "name": "Glitch Datamosh Buffer Tear",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "glitch",
+        "datamosh",
+        "rgb",
+        "compression",
+        "shader"
+      ],
+      "description": "Algorithmic video datamosh compression tearing shader with chromatic RGB channel separation, horizontal block motion vectors, and scanline glitch persistence.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-buffer-tear.field",
+      "preview": "assets/library/previews/glitch-datamosh-buffer-tear.jpg",
+      "bytes": 1836
+    },
+    {
+      "id": "glitch-datamosh-pixel-displace",
+      "name": "Glitch Datamosh Pixel Displace",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "glitch",
+        "displace",
+        "mosaic",
+        "feedback",
+        "shader"
+      ],
+      "description": "Digital compression artifact displacement shader with quantized mosaic buffer slices, feedback edge bleeding, and dynamic scanline wave distortion.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/glitch-datamosh-pixel-displace.field",
+      "preview": "assets/library/previews/glitch-datamosh-pixel-displace.jpg",
+      "bytes": 1754
+    },
+    {
+      "id": "thundr-brutalist-hazard-crosshair",
+      "name": "Thundr Brutalist Hazard Crosshair",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "poster",
+        "hazard",
+        "typography",
+        "technical",
+        "drawing"
+      ],
+      "description": "Postmodern brutalist technical poster with high-contrast diagonal hazard stripes, bold black monolithic slabs, neon warning accents, and precision reticle crosshairs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/thundr-brutalist-hazard-crosshair.js",
+      "preview": "assets/library/previews/thundr-brutalist-hazard-crosshair.jpg",
+      "bytes": 3546
+    },
+    {
+      "id": "thundr-brutalist-technical-slab",
+      "name": "Thundr Brutalist Technical Slab",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "techwear",
+        "constructivist",
+        "grid",
+        "geometric",
+        "drawing"
+      ],
+      "description": "Asymmetric constructivist techwear layout with segmented monolithic bars, stark warning red callouts, dense coordinate matrix rules, and calibrated technical markings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/thundr-brutalist-technical-slab.js",
+      "preview": "assets/library/previews/thundr-brutalist-technical-slab.jpg",
+      "bytes": 2985
+    },
+    {
+      "id": "synthwave-grid-perspective-horizon-3d",
+      "name": "Synthwave Grid Perspective Horizon 3D",
+      "kind": "Generator",
+      "tags": [
+        "synthwave",
+        "grid",
+        "retro",
+        "horizon",
+        "wireframe",
+        "3d"
+      ],
+      "description": "Retro-futuristic 3D perspective grid terrain with segmented glowing sun discs, neon geometric pylons, wireframe horizon mesh, and floating platonic octahedra.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/synthwave-grid-perspective-horizon-3d.js",
+      "preview": "assets/library/previews/synthwave-grid-perspective-horizon-3d.jpg",
+      "bytes": 2508
+    },
+    {
+      "id": "synthwave-grid-neon-monolith-3d",
+      "name": "Synthwave Grid Neon Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "synthwave",
+        "monolith",
+        "obelisk",
+        "cyberpunk",
+        "retro",
+        "3d"
+      ],
+      "description": "Low-poly synthwave cyber-temple with fluted neon obelisks, stepped luminous plinths, floating concentric rings, and vibrant chrome retro-futuristic volumes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/synthwave-grid-neon-monolith-3d.js",
+      "preview": "assets/library/previews/synthwave-grid-neon-monolith-3d.jpg",
+      "bytes": 2471
+    },
+    {
+      "id": "industrial-techno-warehouse-rumble-synth",
+      "name": "Industrial Techno Warehouse Rumble Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "industrial-techno",
+        "kick",
+        "rumble",
+        "distortion",
+        "audio"
+      ],
+      "description": "Heavily saturated industrial warehouse techno kick-rumble synthesizer with pitch-decay transient thump, wavefolded low-end resonance, and asymmetric drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/industrial-techno-warehouse-rumble-synth.inf",
+      "preview": "assets/library/previews/industrial-techno-warehouse-rumble-synth.jpg",
+      "bytes": 2360
+    },
+    {
+      "id": "industrial-techno-metallic-fm-synth",
+      "name": "Industrial Techno Metallic FM Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "industrial-techno",
+        "fm",
+        "metallic",
+        "percussion",
+        "audio"
+      ],
+      "description": "Raw industrial FM percussion synthesizer with metallic inharmonic operator modulation, snappy noise-burst transient, and gritty wavefolded decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/industrial-techno-metallic-fm-synth.inf",
+      "preview": "assets/library/previews/industrial-techno-metallic-fm-synth.jpg",
+      "bytes": 2338
+    },
+    {
+      "id": "classic-trance-euphoric-delay-fx",
+      "name": "Classic Trance Euphoric Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "classic-trance",
+        "delay",
+        "echo",
+        "euphoric",
+        "audio"
+      ],
+      "description": "Anthemic trance stereo delay line with synchronized 16th-note repeats, progressive high-frequency damping, gentle flutter modulation, and lush stereo width.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/classic-trance-euphoric-delay-fx.inf",
+      "preview": "assets/library/previews/classic-trance-euphoric-delay-fx.jpg",
+      "bytes": 2171
+    },
+    {
+      "id": "classic-trance-resonant-sweep-fx",
+      "name": "Classic Trance Resonant Sweep FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "classic-trance",
+        "filter",
+        "sweep",
+        "resonance",
+        "audio"
+      ],
+      "description": "Euphoric trance resonant state-variable filter and harmonic exciter with modulated peak sweep, warm analog saturation, and dynamic stereo presence.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/classic-trance-resonant-sweep-fx.inf",
+      "preview": "assets/library/previews/classic-trance-resonant-sweep-fx.jpg",
+      "bytes": 2021
+    },
+    {
+      "id": "cyberpunk-neon-rain-reflections",
+      "name": "Cyberpunk Neon Rain Reflections",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cyberpunk",
+        "neon",
+        "rain",
+        "reflections",
+        "shader"
+      ],
+      "description": "Wet asphalt neon reflection shader with vertical rain streak refraction, glowing magenta-cyan billboard bloom, and dynamic chromatic aberration.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cyberpunk-neon-rain-reflections.field",
+      "preview": "assets/library/previews/cyberpunk-neon-rain-reflections.jpg",
+      "bytes": 1713
+    },
+    {
+      "id": "cyberpunk-neon-hologram-grid",
+      "name": "Cyberpunk Neon Hologram Grid",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cyberpunk",
+        "hologram",
+        "matrix",
+        "neon",
+        "shader"
+      ],
+      "description": "Volumetric neon city hologram shader with segmented cyberpunk signage matrices, phosphor scanline bleeding, and radiant chromatic light corridors.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cyberpunk-neon-hologram-grid.field",
+      "preview": "assets/library/previews/cyberpunk-neon-hologram-grid.jpg",
+      "bytes": 1769
     }
   ]
 }
