@@ -5865,8 +5865,7 @@ namespace
       // Fills the tab below the search box, then scrolls.
       const int count = (int)scene->Items().size();
       const float step = rowH + ImGui::GetStyle().ItemSpacing.y;
-      const float actionsH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
-      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f - actionsH) / step)));
+      const int shown = std::min(count, std::max(2, (int)((roomH - 90.0f) / step)));
       const bool scrolls = count > shown;
       if (count > 0)
          ImGui::BeginChild("##v3dlist", ImVec2(availW, step * (float)shown));
@@ -6018,32 +6017,26 @@ namespace
          ImGui::Dummy(ImVec2(0.0f, 0.0f));
          ImGui::PopID();
       }
+      // Item keys act on the picked rows while the list is hovered or was the last thing clicked.
+      static bool sListActive = false;
+      const bool listHovered = count > 0 && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         sListActive = listHovered;
       if (count > 0)
          ImGui::EndChild();
-      if (!sSel.empty() || !sCopiedItems.empty())
+      if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sSel.empty())
       {
-         // What to do with the picked rows, without hunting for the right-click menu.
-         const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const ImVec2 size((availW - gap * 3.0f) / 4.0f, 0.0f);
-         const bool any = !sSel.empty();
-         ImGui::BeginDisabled(!any);
-         if (ActionButton::Draw(L("Duplicate"), size))
-            DuplicateSelected(scene, io.MousePos, false);
-         ImGui::SameLine();
-         if (ActionButton::Draw(L("Copy"), size))
-            sCopiedItems = SelectedItems(scene);
-         ImGui::EndDisabled();
-         ImGui::SameLine();
-         ImGui::BeginDisabled(sCopiedItems.empty());
-         if (ActionButton::Draw(L("Paste"), size))
-            PasteItems(scene);
-         ImGui::EndDisabled();
-         ImGui::SameLine();
-         ImGui::BeginDisabled(!any);
-         if (ActionButton::Draw(L("Delete"), size))
+         const bool command = io.KeyCtrl || io.KeySuper;
+         if (!command && (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace) || ImGui::IsKeyPressed(ImGuiKey_X)))
             DeleteSelected(scene);
-         ImGui::EndDisabled();
+         else if (command && ImGui::IsKeyPressed(ImGuiKey_C))
+            sCopiedItems = SelectedItems(scene);
+         else if ((command && ImGui::IsKeyPressed(ImGuiKey_D)) || (io.KeyShift && !command && ImGui::IsKeyPressed(ImGuiKey_D)))
+            DuplicateSelected(scene, io.MousePos, false);
       }
+      if ((listHovered || sListActive) && sRename == 0 && !io.WantTextInput && !sCopiedItems.empty() &&
+          (io.KeyCtrl || io.KeySuper) && ImGui::IsKeyPressed(ImGuiKey_V))
+         PasteItems(scene);
       static float sBoxY0 = 0.0f;
       static bool sBoxing = false;
       if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
