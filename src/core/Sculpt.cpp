@@ -643,7 +643,7 @@ namespace Sculpt
                   break;
                case kInflate:
                   for (int k = 0; k < 3; k++)
-                     move[k] = n[k] * d.radius * 0.33f * f * sign;
+                     move[k] = n[k] * d.radius * 0.22f * f * sign;
                   break;
                case kSmooth:
                {

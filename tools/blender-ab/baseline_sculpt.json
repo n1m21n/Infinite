@@ -2,14 +2,14 @@
  "drag_crease": 0.7522,
  "drag_draw": 0.6485,
  "drag_flatten": 0.8773,
- "drag_inflate": 0.5865,
+ "drag_inflate": 0.5741,
  "drag_pinch": 0.8966,
  "drag_smooth": 0.5915,
  "sculpt_crease": 0.3142,
- "sculpt_deer": 0.5525,
+ "sculpt_deer": 0.6047,
  "sculpt_draw": 0.25,
  "sculpt_flatten": 0.2311,
- "sculpt_inflate": 1.64,
+ "sculpt_inflate": 0.7601,
  "sculpt_pinch": 1.0,
  "sculpt_smooth": 0.2745
 }
