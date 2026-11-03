@@ -103,16 +103,16 @@ public:
    // Resets progressive accumulation without re-uploading the scene BVH.
    void ResetAccumulation();
 
-   // Renders up to `sampleBudgetPerFrame` progressive samples into the
-   // ping-pong RGBA32F target while staying within `frameBudgetMs` (default
-   // <= 12 ms so the UI never blocks > 16 ms on an 8 GB M2). Resolves the
-   // running average into the display FBO and returns the number of samples
-   // added this call.
+   // Live refinement: traces horizontal strips of the next sample, sized from the last strips'
+   // speed so a call stays within `frameBudgetMs` (12 ms, so the UI never blocks > 16 ms on an
+   // 8 GB M2), and at most `sampleBudgetPerFrame` whole samples. Resolves the running average into
+   // the display FBO. Returns 0 once `targetSpp` samples are in (nothing traced), else 1.
    int StepFrame(int width, int height, int targetSpp = 0);
 
    // Renders `numSamples` additional samples into the accumulation target and
-   // resolves to the display FBO.
-   bool StepSamples(int width, int height, int numSamples, bool resolveDisplay = true);
+   // resolves to the display FBO. rows > 0 traces only rows y0 .. y0 + rows - 1 of each, and the
+   // sample counts once a strip reaches the top row.
+   bool StepSamples(int width, int height, int numSamples, bool resolveDisplay = true, int y0 = 0, int rows = 0);
 
    // Renders from 0 up to `totalSpp` samples and resolves the final image.
    bool RenderToSpp(int width, int height, int totalSpp);
@@ -127,6 +127,8 @@ public:
    unsigned int GetDisplayFbo() const { return mDisplay.fbo; }
    unsigned int GetAccumTexture() const { return mAccum[mAccumReadIdx].tex; }
    int SampleCount() const { return mSampleIndex; }
+   // Rows of the display that hold traced samples: all of them once the first sample is whole.
+   int CoveredRows() const { return mSampleIndex > 0 ? mHeight : mStripY; }
 
    // Live frame budget controls (Spec section G.3).
    int sampleBudgetPerFrame = 4;
@@ -160,6 +162,8 @@ private:
    GLUtil::Fbo mDisplay;
    int mAccumReadIdx = 0;
    int mSampleIndex = 0;
+   int mStripY = 0;      // the next row StepFrame traces
+   int mStripRows = 0;   // strip height that fits the frame budget, learned as it runs
    int mWidth = 0;
    int mHeight = 0;
 

@@ -1099,6 +1099,8 @@ bool Render3DPathTrace::EnsureTargets(int w, int h)
       mHeight = h;
       mSampleIndex = 0;
       mAccumReadIdx = 0;
+      mStripY = 0;
+      mStripRows = 0;
    }
    return GLUtil::EnsureFbo(mAccum[0], w, h, GL_RGBA32F, "PtAccum0") &&
           GLUtil::EnsureFbo(mAccum[1], w, h, GL_RGBA32F, "PtAccum1") &&
@@ -1326,9 +1328,10 @@ void Render3DPathTrace::ResetAccumulation()
 {
    mSampleIndex = 0;
    mAccumReadIdx = 0;
+   mStripY = 0;
 }
 
-bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool resolveDisplay)
+bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool resolveDisplay, int y0, int rows)
 {
    if (numSamples <= 0)
       return true;
@@ -1356,6 +1359,14 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
       lSpot[i * 3 + 2] = l.cutoff;
    }
 
+   // A strip (rows < height) traces only rows y0.. into the other target and copies them back, so
+   // the read target keeps the whole running mean; the sample counts once its last strip is in.
+   const bool strip = rows > 0 && rows < height;
+   if (strip)
+   {
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(0, y0, width, rows);
+   }
    for (int s = 0; s < numSamples; s++)
    {
       const int writeIdx = (mAccumReadIdx + 1) & 1;
@@ -1420,9 +1431,25 @@ bool Render3DPathTrace::StepSamples(int width, int height, int numSamples, bool 
          }
       });
 
+      if (strip)
+      {
+         GLint prevRead = 0, prevDraw = 0;
+         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, mAccum[writeIdx].fbo);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mAccum[mAccumReadIdx].fbo);
+         glBlitFramebuffer(0, y0, width, y0 + rows, 0, y0, width, y0 + rows, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDraw);
+         if (y0 + rows >= height)
+            mSampleIndex++;
+         continue;
+      }
       mAccumReadIdx = writeIdx;
       mSampleIndex++;
    }
+   if (strip)
+      glDisable(GL_SCISSOR_TEST);
 
    glActiveTexture(GL_TEXTURE7);
    glBindTexture(GL_TEXTURE_2D, 0);
@@ -1443,27 +1470,38 @@ int Render3DPathTrace::StepFrame(int width, int height, int targetSpp)
 {
    if (targetSpp > 0 && mSampleIndex >= targetSpp)
       return 0;
-   const int budgetSamples = std::max(1, sampleBudgetPerFrame);
-   const int maxToRun = (targetSpp > 0) ? std::min(budgetSamples, targetSpp - mSampleIndex) : budgetSamples;
+   if (!EnsureShaders() || !EnsureTargets(width, height))
+      return 0;
+   // Strips as tall as the last ones' speed says fit in the budget; each is waited on, so the
+   // GPU work a frame queues stays near frameBudgetMs however heavy the scene.
+   if (mStripRows <= 0)
+      mStripRows = std::max(8, height / 16);
    const auto tStart = std::chrono::steady_clock::now();
-   int done = 0;
-   for (int i = 0; i < maxToRun; i++)
+   const int maxSamples = std::max(1, sampleBudgetPerFrame);
+   const int startSample = mSampleIndex;
+   int traced = 0;
+   while (targetSpp <= 0 || mSampleIndex < targetSpp)
    {
-      if (!StepSamples(width, height, 1, false))
+      const int rows = std::min(mStripRows, height - mStripY);
+      const auto t0 = std::chrono::steady_clock::now();
+      if (!StepSamples(width, height, 1, false, mStripY, rows))
          break;
-      done++;
-      if (i + 1 < maxToRun)
-      {
-         glFlush();
-         const double elapsedMs = std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - tStart).count();
-         if (elapsedMs >= (double)frameBudgetMs)
-            break;
-      }
+      glFinish();
+      const auto t1 = std::chrono::steady_clock::now();
+      traced += rows;
+      mStripY += rows;
+      if (mStripY >= height)
+         mStripY = 0;
+      const double stripMs = std::max(0.05, std::chrono::duration<double, std::milli>(t1 - t0).count());
+      const double rowsPerMs = (double)rows / stripMs;
+      mStripRows = std::clamp((int)(rowsPerMs * frameBudgetMs * 0.8), 8, height);
+      const double elapsedMs = std::chrono::duration<double, std::milli>(t1 - tStart).count();
+      if (mSampleIndex - startSample >= maxSamples || elapsedMs + (double)mStripRows / rowsPerMs > frameBudgetMs)
+         break;
    }
-   if (done > 0)
+   if (traced > 0)
       ResolveDisplay();
-   return done;
+   return traced > 0 ? 1 : 0;
 }
 
 bool Render3DPathTrace::RenderToSpp(int width, int height, int totalSpp)

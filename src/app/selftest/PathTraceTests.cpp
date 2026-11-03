@@ -323,6 +323,31 @@ bool RunPathTraceTest()
       }
    }
 
+   // Live strips trace the same samples a whole frame does: Render 3D's preview refines in
+   // budget-sized strips, and the image it settles on must be the export's, pixel for pixel.
+   if (!benchOnly)
+   {
+      std::vector<float> whole, strips;
+      int ww = 0, wh = 0, sw = 0, sh = 0;
+      const bool wholeOk = pt.RenderToSpp(256, 256, 8) && pt.ReadLinearRGBA32F(whole, ww, wh);
+      pt.ResetAccumulation();
+      pt.frameBudgetMs = 0.5f;   // forces many short strips
+      pt.sampleBudgetPerFrame = 1;
+      int calls = 0;
+      while (pt.StepFrame(256, 256, 8) != 0 && calls < 10000)
+         calls++;
+      pt.frameBudgetMs = 12.0f;
+      pt.sampleBudgetPerFrame = 4;
+      const bool stripOk = pt.ReadLinearRGBA32F(strips, sw, sh) && pt.SampleCount() == 8;
+      double maxDiff = (wholeOk && stripOk && whole.size() == strips.size()) ? 0.0 : 1e9;
+      for (size_t i = 0; maxDiff < 1e9 && i < whole.size(); i++)
+         maxDiff = std::max(maxDiff, (double)std::fabs(whole[i] - strips[i]));
+      const bool same = maxDiff < 1e-5;
+      std::printf("  [%s] live strips match a whole render: %d calls, max diff %.2e\n", same ? "PASS" : "FAIL",
+                  calls, maxDiff);
+      allPassed = allPassed && same;
+   }
+
    // Benchmark ms_per_sample at 512x512 for cornell and Fox.
    const double cornellMs = BenchmarkMsPerSample(pt, 512, 512, 4, 32);
    std::printf("{\"scene\":\"cornell\",\"resolution\":\"512x512\",\"tris\":%d,\"ms_per_sample\":%.3f}\n",

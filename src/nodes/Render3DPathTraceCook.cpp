@@ -236,7 +236,7 @@ bool Render3DNode::CookPathTrace(int frameId)
       pt.RenderToSpp(w, h, target);
    else
    {
-      pt.sampleBudgetPerFrame = 1;
+      pt.sampleBudgetPerFrame = 4;   // a small view fits several whole samples in the budget
       if (pt.StepFrame(w, h, target) == 0)
          return true;   // done: mColorTex already holds the finished image
    }
@@ -248,7 +248,9 @@ bool Render3DNode::CookPathTrace(int frameId)
    glDisable(GL_SCISSOR_TEST);
    glBindFramebuffer(GL_READ_FRAMEBUFFER, pt.GetDisplayFbo());
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
-   glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   // Until the first sample is whole, only its traced rows go up: raster's frame stays under the rest.
+   const int rows = pt.CoveredRows();
+   glBlitFramebuffer(0, 0, w, rows, 0, 0, w, rows, GL_COLOR_BUFFER_BIT, GL_NEAREST);
    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDraw);
    if (scissor)
