@@ -10,6 +10,9 @@
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
+#include <map>
+#include <tuple>
+
 namespace app
 {
 
@@ -1335,6 +1338,36 @@ void FrameTest_TEXT3DTEST(int frameId, GLFWwindow* window)
             printf("  %-10s %6zu tris  width %.2f height %.2f  %s\n", sample,
                    mesh.indices.size() / 3, hi[0] - lo[0], hi[1] - lo[1], ok ? "OK" : "FAIL");
             printf("     %s\n", t->Status().c_str());
+
+            // Closed and even, so a sculpt or a modifier has points to move: welded by
+            // position, every edge has two faces, and no edge spans much of the letter.
+            std::map<std::tuple<long, long, long>, unsigned int> weld;
+            std::vector<unsigned int> point(mesh.vertices.size());
+            for (size_t i = 0; i < mesh.vertices.size(); i++)
+            {
+               const Vertex& v = mesh.vertices[i];
+               const auto key = std::make_tuple(std::lround(v.px * 1e5), std::lround(v.py * 1e5), std::lround(v.pz * 1e5));
+               point[i] = weld.emplace(key, (unsigned int)weld.size()).first->second;
+            }
+            std::map<std::pair<unsigned int, unsigned int>, int> edges;
+            float longest = 0.0f;
+            for (size_t i = 0; i + 2 < mesh.indices.size(); i += 3)
+               for (int k = 0; k < 3; k++)
+               {
+                  const unsigned int a = point[mesh.indices[i + k]], b = point[mesh.indices[i + (k + 1) % 3]];
+                  if (a != b)
+                     edges[{ std::min(a, b), std::max(a, b) }]++;
+                  const Vertex& va = mesh.vertices[mesh.indices[i + k]];
+                  const Vertex& vb = mesh.vertices[mesh.indices[i + (k + 1) % 3]];
+                  longest = std::max(longest, std::hypot(va.px - vb.px, va.py - vb.py, va.pz - vb.pz));
+               }
+            int open = 0;
+            for (const auto& e : edges)
+               open += e.second != 2 ? 1 : 0;
+            const bool even = open == 0 && longest < (hi[1] - lo[1]) * 0.12f;
+            all &= even;
+            printf("     %d edges without two faces, longest edge %.3f of height %.3f  %s\n", open, longest,
+                   hi[1] - lo[1], even ? "OK" : "FAIL");
          }
 
          t->text = "Infinite";

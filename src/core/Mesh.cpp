@@ -1,5 +1,6 @@
 #include <cmath>
 #include "Mesh.h"
+#include "Delaunay.h"
 
 #include <algorithm>
 #include <array>
@@ -1290,6 +1291,124 @@ namespace MeshOps
          return inside;
       }
 
+      // A closed contour with every edge split into pieces no longer than step.
+      std::vector<P2> Resample(const std::vector<P2>& poly, float step)
+      {
+         std::vector<P2> out;
+         for (size_t i = 0, n = poly.size(); i < n; i++)
+         {
+            const P2& a = poly[i];
+            const P2& b = poly[(i + 1) % n];
+            const float len = std::hypot(b.x - a.x, b.y - a.y);
+            if (len < 1e-7f)
+               continue;
+            const int pieces = std::max(1, (int)std::ceil(len / step - 1e-3f));
+            for (int k = 0; k < pieces; k++)
+            {
+               const float t = (float)k / (float)pieces;
+               out.push_back({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            }
+         }
+         return out;
+      }
+
+      float SegmentDistance(const P2& p, const P2& a, const P2& b)
+      {
+         const float dx = b.x - a.x, dy = b.y - a.y;
+         const float len2 = dx * dx + dy * dy;
+         const float t = len2 > 0.0f ? std::clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / len2, 0.0f, 1.0f) : 0.0f;
+         return std::hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+      }
+
+      // Fills rings[0] minus the holes rings[1..] with near-even triangles: the ring
+      // points plus a triangular lattice of inner points, Delaunay triangulated, and
+      // the triangles outside the shape dropped. False when the result does not keep
+      // every ring edge or the shape's area (a ring too thin for the lattice).
+      bool FillCap(const std::vector<std::vector<P2>>& rings, float step,
+                   std::vector<P2>& points, std::vector<unsigned int>& tris)
+      {
+         points.clear();
+         tris.clear();
+         std::vector<std::pair<unsigned int, unsigned int>> ringEdges;
+         float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+         double want = 0.0;
+         for (size_t r = 0; r < rings.size(); r++)
+         {
+            const unsigned int first = (unsigned int)points.size();
+            const size_t n = rings[r].size();
+            if (n < 3)
+               return false;
+            for (size_t i = 0; i < n; i++)
+            {
+               points.push_back(rings[r][i]);
+               ringEdges.push_back({ first + (unsigned int)i, first + (unsigned int)((i + 1) % n) });
+            }
+            want += (r == 0 ? 1.0 : -1.0) * std::abs((double)SignedArea(rings[r]));
+            if (r == 0)
+               for (const P2& p : rings[0])
+               {
+                  lo[0] = std::min(lo[0], p.x); hi[0] = std::max(hi[0], p.x);
+                  lo[1] = std::min(lo[1], p.y); hi[1] = std::max(hi[1], p.y);
+               }
+         }
+         const size_t onRings = points.size();
+         auto inside = [&](const P2& p) {
+            if (!PointInPolygon(p, rings[0]))
+               return false;
+            for (size_t r = 1; r < rings.size(); r++)
+               if (PointInPolygon(p, rings[r]))
+                  return false;
+            return true;
+         };
+         const float rowH = step * 0.8660254f;
+         int row = 0;
+         for (float y = lo[1] + rowH * 0.5f; y < hi[1]; y += rowH, row++)
+            for (float x = lo[0] + ((row & 1) ? step : step * 0.5f); x < hi[0]; x += step)
+            {
+               const P2 p{ x, y };
+               if (!inside(p))
+                  continue;
+               bool clear = true;
+               for (size_t e = 0; e < ringEdges.size() && clear; e++)
+                  clear = SegmentDistance(p, points[ringEdges[e].first], points[ringEdges[e].second]) > step * 0.55f;
+               if (clear)
+                  points.push_back(p);
+            }
+
+         std::vector<double> xy;
+         xy.reserve(points.size() * 2);
+         for (const P2& p : points)
+         {
+            xy.push_back(p.x);
+            xy.push_back(p.y);
+         }
+         const std::vector<unsigned int> all = Delaunay::Triangulate(xy);
+         double got = 0.0;
+         std::set<std::pair<unsigned int, unsigned int>> used;
+         for (size_t i = 0; i + 2 < all.size(); i += 3)
+         {
+            const P2& a = points[all[i]];
+            const P2& b = points[all[i + 1]];
+            const P2& c = points[all[i + 2]];
+            const P2 mid{ (a.x + b.x + c.x) / 3.0f, (a.y + b.y + c.y) / 3.0f };
+            if (!inside(mid))
+               continue;
+            for (int k = 0; k < 3; k++)
+               tris.push_back(all[i + k]);
+            got += 0.5 * ((double)(b.x - a.x) * (c.y - a.y) - (double)(c.x - a.x) * (b.y - a.y));
+            for (int k = 0; k < 3; k++)
+            {
+               const unsigned int u = all[i + k], v = all[i + (k + 1) % 3];
+               if (u < onRings && v < onRings)
+                  used.insert({ std::min(u, v), std::max(u, v) });
+            }
+         }
+         for (const auto& e : ringEdges)
+            if (used.count({ std::min(e.first, e.second), std::max(e.first, e.second) }) == 0)
+               return false;
+         return want > 0.0 && std::abs(got - want) <= want * 1e-3;
+      }
+
       // Ear clipping over a simple anticlockwise polygon. O(n^2), which is fine
       // for glyph outlines - a few hundred points at most after flattening.
       void EarClip(const std::vector<P2>& poly, const std::vector<unsigned int>& ids,
@@ -1553,6 +1672,27 @@ namespace MeshOps
       // geometry: a real chamfer would need offset curves, and this reads the
       // same at the sizes text is used at.
       const float shrink = std::max(0.0f, std::min(bevel, 0.45f));
+      // One step for the whole text, from its tallest contour: about 24 across a capital,
+      // coarser when the text is long, so a paragraph stays near 30000 cap points.
+      float tallest = 0.0f, area = 0.0f, length = 0.0f;
+      for (const std::vector<P2>& ring : holes)
+         for (size_t i = 0; i < ring.size(); i++)
+            length += std::hypot(ring[(i + 1) % ring.size()].x - ring[i].x, ring[(i + 1) % ring.size()].y - ring[i].y);
+      for (const std::vector<P2>& outline : outlines)
+      {
+         area += std::abs(SignedArea(outline));
+         for (size_t i = 0; i < outline.size(); i++)
+            length += std::hypot(outline[(i + 1) % outline.size()].x - outline[i].x,
+                                 outline[(i + 1) % outline.size()].y - outline[i].y);
+         float ylo = 1e30f, yhi = -1e30f, xlo = 1e30f, xhi = -1e30f;
+         for (const P2& p : outline)
+         {
+            ylo = std::min(ylo, p.y); yhi = std::max(yhi, p.y);
+            xlo = std::min(xlo, p.x); xhi = std::max(xhi, p.x);
+         }
+         tallest = std::max(tallest, std::max(yhi - ylo, xhi - xlo));
+      }
+      const float step = std::max({ 1e-4f, tallest / 24.0f, std::sqrt(area / (0.866f * 30000.0f)), length / 20000.0f });
 
       for (std::vector<P2>& outline : outlines)
       {
@@ -1570,68 +1710,88 @@ namespace MeshOps
             }
          }
 
-         std::vector<P2> merged = outline;
-         MergeHoles(merged, mine);
-
-         const unsigned int base = (unsigned int)out.vertices.size();
-         const size_t count = merged.size();
+         // Every contour of this letter, resampled so no edge is longer than a step.
+         std::vector<std::vector<P2>> rings;
+         rings.push_back(Resample(outline, step));
+         for (const std::vector<P2>& h : mine)
+            rings.push_back(Resample(h, step));
 
          float lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
-         for (const P2& p : merged)
+         for (const P2& p : rings[0])
          {
             lo[0] = std::min(lo[0], p.x); hi[0] = std::max(hi[0], p.x);
             lo[1] = std::min(lo[1], p.y); hi[1] = std::max(hi[1], p.y);
          }
          const float spanX = std::max(1e-5f, hi[0] - lo[0]);
          const float spanY = std::max(1e-5f, hi[1] - lo[1]);
-
-         // Front face, then back face, then the wall between them.
-         for (int side = 0; side < 2; side++)
+         auto vertex = [&](const P2& p, float z, float nz, float inset)
          {
-            const float z = (side == 0) ? half : -half;
-            const float nz = (side == 0) ? 1.0f : -1.0f;
-            const float inset = (side == 1) ? shrink * 0.02f : 0.0f;
-            for (const P2& p : merged)
+            Vertex v;
+            v.px = p.x - (p.x > 0 ? inset : -inset);
+            v.py = p.y - (p.y > 0 ? inset : -inset);
+            v.pz = z;
+            v.nx = 0; v.ny = 0; v.nz = nz;
+            v.u = (p.x - lo[0]) / spanX;
+            v.v = (p.y - lo[1]) / spanY;
+            return v;
+         };
+         const float backInset = shrink * 0.02f;
+
+         // The caps: even triangles over the letter, so a sculpt or a modifier has
+         // points to move. Ear clipping the outline alone made slivers that spanned
+         // the whole letter and tore into shards once any one point moved.
+         std::vector<P2> capPoints;
+         std::vector<unsigned int> capTris;
+         if (!FillCap(rings, step, capPoints, capTris))
+         {
+            // The even fill could not keep to the outline: ear clip it instead.
+            capPoints = rings[0];
+            std::vector<std::vector<P2>> holesOnly(rings.begin() + 1, rings.end());
+            MergeHoles(capPoints, holesOnly);
+            std::vector<unsigned int> ids(capPoints.size());
+            for (size_t i = 0; i < ids.size(); i++)
+               ids[i] = (unsigned int)i;
+            capTris.clear();
+            EarClip(capPoints, ids, capTris);
+         }
+         const unsigned int front = (unsigned int)out.vertices.size();
+         for (const P2& p : capPoints)
+            out.vertices.push_back(vertex(p, half, 1.0f, 0.0f));
+         const unsigned int back = (unsigned int)out.vertices.size();
+         for (const P2& p : capPoints)
+            out.vertices.push_back(vertex(p, -half, -1.0f, backInset));
+         for (size_t i = 0; i + 2 < capTris.size(); i += 3)
+         {
+            out.indices.push_back(front + capTris[i]);
+            out.indices.push_back(front + capTris[i + 1]);
+            out.indices.push_back(front + capTris[i + 2]);
+            out.indices.push_back(back + capTris[i + 2]);
+            out.indices.push_back(back + capTris[i + 1]);
+            out.indices.push_back(back + capTris[i]);
+         }
+
+         // The walls, one band of quads per step of depth.
+         const int bands = std::max(1, std::min(64, (int)std::ceil(depth / step - 1e-3f)));
+         for (const std::vector<P2>& ring : rings)
+         {
+            const size_t count = ring.size();
+            const unsigned int wall = (unsigned int)out.vertices.size();
+            for (int k = 0; k <= bands; k++)
             {
-               Vertex v;
-               v.px = p.x - (p.x > 0 ? inset : -inset);
-               v.py = p.y - (p.y > 0 ? inset : -inset);
-               v.pz = z;
-               v.nx = 0; v.ny = 0; v.nz = nz;
-               v.u = (p.x - lo[0]) / spanX;
-               v.v = (p.y - lo[1]) / spanY;
-               out.vertices.push_back(v);
+               const float f = (float)k / (float)bands;
+               for (const P2& p : ring)
+                  out.vertices.push_back(vertex(p, half - depth * f, 0.0f, backInset * f));
             }
-         }
-
-         std::vector<unsigned int> ids(count);
-         for (size_t i = 0; i < count; i++)
-            ids[i] = (unsigned int)i;
-         std::vector<unsigned int> faceIndices;
-         EarClip(merged, ids, faceIndices);
-
-         for (size_t i = 0; i + 2 < faceIndices.size(); i += 3)
-         {
-            // Front, as clipped.
-            out.indices.push_back(base + faceIndices[i]);
-            out.indices.push_back(base + faceIndices[i + 1]);
-            out.indices.push_back(base + faceIndices[i + 2]);
-            // Back, reversed so it faces the other way.
-            const unsigned int backBase = base + (unsigned int)count;
-            out.indices.push_back(backBase + faceIndices[i + 2]);
-            out.indices.push_back(backBase + faceIndices[i + 1]);
-            out.indices.push_back(backBase + faceIndices[i]);
-         }
-
-         // Side wall, one quad per contour edge, joining front to back.
-         for (size_t i = 0; i < count; i++)
-         {
-            const size_t next = (i + 1) % count;
-            const unsigned int f0 = base + (unsigned int)i;
-            const unsigned int f1 = base + (unsigned int)next;
-            const unsigned int b0 = base + (unsigned int)count + (unsigned int)i;
-            const unsigned int b1 = base + (unsigned int)count + (unsigned int)next;
-            PushQuad(out, f0, b0, b1, f1);
+            for (int k = 0; k < bands; k++)
+               for (size_t i = 0; i < count; i++)
+               {
+                  const size_t next = (i + 1) % count;
+                  const unsigned int f0 = wall + (unsigned int)(k * count + i);
+                  const unsigned int f1 = wall + (unsigned int)(k * count + next);
+                  const unsigned int b0 = f0 + (unsigned int)count;
+                  const unsigned int b1 = f1 + (unsigned int)count;
+                  PushQuad(out, f0, b0, b1, f1);
+               }
          }
       }
 
