@@ -92,7 +92,12 @@ public:
    const std::vector<float>& PointNrm();
    const Sculpt::Grid* PointGrid(float radius);
    // The nearest hit on the shaped mesh (mesh space, d need not be unit).
+   // During a stroke, on the mesh as the stroke began, as Blender lands a
+   // drag's dabs: a ridge rises out of the brush and levels off instead of
+   // climbing after it.
    bool Raycast(const float o[3], const float d[3], float& t);
+   void BeginStroke();
+   void EndStroke();
    std::vector<float>& Offsets() { return mOffsets; }
    // After editing Offsets(). With the points a dab touched, only the mesh
    // around them is re-shaped.
@@ -126,4 +131,6 @@ private:
    bool mFrameStale = true;
    Sculpt::Grid mGrid;
    std::vector<unsigned int> mChanged;
+   Mesh mStrokeMesh;
+   Sculpt::Grid mStrokeGrid;
 };

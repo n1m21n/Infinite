@@ -178,7 +178,7 @@ namespace
       points("before");
       std::ifstream in(strokes);
       std::string line;
-      int dabs = 0;
+      int dabs = 0, stroke = -1;
       while (std::getline(in, line))
       {
          std::istringstream ls(line);
@@ -186,9 +186,27 @@ namespace
          float c[3], radius = 0.0f, strength = 0.0f;
          if (!(ls >> brush >> c[0] >> c[1] >> c[2] >> radius >> strength >> invert))
             continue;
+         // A view direction and stroke number: the dab lands where the 3D View's mouse ray would, on the
+         // surface as its stroke began.
+         float v[3], o[3], t = 0.0f;
+         int s = 0;
+         if (ls >> v[0] >> v[1] >> v[2] >> s)
+         {
+            if (s != stroke)
+            {
+               n.BeginStroke();
+               stroke = s;
+            }
+            for (int k = 0; k < 3; k++)
+               o[k] = c[k] - v[k] * radius * 4.0f;
+            if (n.Raycast(o, v, t))
+               for (int k = 0; k < 3; k++)
+                  c[k] = o[k] + v[k] * t;
+         }
          Dab(n, brush, c, radius, strength, invert != 0, 0);
          n.CookIfNeeded(2 + dabs++);
       }
+      n.EndStroke();
       points("after");
       return dabs > 0;
    }

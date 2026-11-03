@@ -155,9 +155,24 @@ const Sculpt::Grid* SculptNode::PointGrid(float radius)
    return &mGrid;
 }
 
+void SculptNode::BeginStroke()
+{
+   Update();
+   mStrokeMesh = mMesh;
+   mStrokeGrid = *PointGrid(mGrid.cell * 6.0f);
+}
+
+void SculptNode::EndStroke()
+{
+   mStrokeMesh = Mesh();
+   mStrokeGrid = Sculpt::Grid();
+}
+
 bool SculptNode::Raycast(const float o[3], const float d[3], float& t)
 {
    Update();
+   if (!mStrokeMesh.vertices.empty() && mStrokeMesh.vertices.size() == mTopo.point.size())
+      return Sculpt::Raycast(mStrokeMesh, o, d, t, &mTopo, &mStrokeGrid) || Sculpt::Raycast(mStrokeMesh, o, d, t);
    if (mTopo.point.size() != mMesh.vertices.size())
       return Sculpt::Raycast(mMesh, o, d, t);
    // The walk needs faces no wider than the grid allows; a stretched sculpt

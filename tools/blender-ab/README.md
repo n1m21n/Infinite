@@ -153,6 +153,7 @@ A case fails when its error rises more than 10% over `baseline_physics.json`.
 python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt                  # every sculpt case
 python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt drag_draw        # one case
 python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt --set-baseline
+python3 tools/blender-ab/sculpt.py --out /tmp/blender-ab-sculpt --reuse   # Blender's result kept, Infinite rerun
 ```
 
 ```
@@ -168,7 +169,7 @@ Essentials brush of the same kind, with radius and strength set on the brush (un
 | Case | What it tests |
 |---|---|
 | `sculpt_<brush>` | one dab on a sphere (on a starting bump for Smooth, Pinch and Flatten) |
-| `drag_<brush>` | one drag across the top: Blender spaces its own dabs, Infinite one per 0.15 radius as the 3D View does |
+| `drag_<brush>` | one drag across the top: Blender a dab per its brush spacing, Infinite one per 0.15 radius as the 3D View does |
 | `sculpt_deer` | drags on the owner's deer (`DEER_GLB`; skipped without it) |
 
 | Number | Meaning |
@@ -178,8 +179,10 @@ Essentials brush of the same kind, with radius and strength set on the brush (un
 
 Things Blender 5 needs that are easy to miss: `unprojected_size` is a diameter; the view matrices
 must be refreshed (`rv3d.update()`) before the mouse is projected; Pinch and Flatten skip a stroke's
-first sample, so a single dab gets a lead-in sample.
+first sample, so a single dab gets a lead-in sample; a replayed stroke (`brush_stroke` exec) dabs at every
+sample it is given and skips the brush's spacing, so the drag's samples are spaced by `brush.spacing` first.
 
-Infinite's brush strengths are fitted to the drags (what a user does). The cross-section still differs:
-Blender's drag ridge has a flat top, Infinite's is peaked. A case fails when its error rises more than
-10% over `baseline_sculpt.json`.
+Each drag is one stroke on the Infinite side too: its dabs land on the surface as the stroke began
+(`SculptNode::BeginStroke`), as Blender's do, so a ridge rises out of the brush and levels off.
+Infinite's brush strengths are fitted to the drags (what a user does). A case fails when its error
+rises more than 10% over `baseline_sculpt.json`.

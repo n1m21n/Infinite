@@ -123,11 +123,20 @@ def sculpt():
             rv3d.view_location = at
             rv3d.view_rotation = n.to_track_quat('Z', 'Y')
             path = [Vector(p) for p in k.get("path", [])]
+            # A replayed stroke dabs at every sample (exec skips the spacing a live drag gets): keep the
+            # samples the brush's own spacing (a percent of its diameter) apart, as a live drag would.
+            if path:
+                gap, kept, left = br.spacing / 100.0 * 2 * k["radius"], [path[0]], 0.0
+                for a, b in zip(path, path[1:]):
+                    left += (b - a).length
+                    if left >= gap:
+                        kept.append(b); left -= gap
+                path = kept
             span = max(((p - at).length for p in path), default=0)
             rv3d.view_distance = max(k["radius"] * 8, span * 4)
             rv3d.update()   # the view matrices only follow on a redraw otherwise
             mxy = view3d_utils.location_3d_to_region_2d(region, rv3d, at)
-            if path:   # a drag: Blender spaces its own dabs along the samples
+            if path:   # a drag: one dab per sample
                 pts = [(p, view3d_utils.location_3d_to_region_2d(region, rv3d, p)) for p in path]
             else:      # Pinch and Flatten skip a stroke's first sample (the rest apply each one): give them a lead-in.
                 pts = [(at, mxy + Vector((i * 0.5, 0))) for i in range(2 if k["brush"] in LEAD_IN else 1)]

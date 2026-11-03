@@ -3144,6 +3144,9 @@ namespace
    {
       if (sSculpt.on)
       {
+         Mat4 world;
+         if (SculptNode* node = sSculpt.stroking ? SculptTarget(scene, world) : nullptr)
+            node->EndStroke();
          sSculpt.on = sSculpt.stroking = false;
          sSculpt.adjust = 0;
          return;
@@ -3302,6 +3305,7 @@ namespace
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || !ok)
          {
             sSculpt.stroking = false;
+            node->EndStroke();
             return true;
          }
          const float amount = std::clamp(node->amount, 0.0f, 2.0f);
@@ -3376,6 +3380,7 @@ namespace
       PushUndoCheckpoint(undoLabel.c_str());
       sSculpt.stroking = true;
       sSculpt.last = mouse;
+      node->BeginStroke();
       if (sSculpt.brush == Sculpt::kGrab && !io.KeyShift)
       {
          Sculpt::Dab d;

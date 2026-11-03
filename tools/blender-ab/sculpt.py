@@ -168,6 +168,7 @@ def main():
     ap.add_argument("cases", nargs="*")
     ap.add_argument("--out", default="/tmp/blender-ab-sculpt")
     ap.add_argument("--set-baseline", action="store_true")
+    ap.add_argument("--reuse", action="store_true", help="keep Blender's result already in --out; rerun Infinite only")
     a = ap.parse_args()
     base = json.load(open(BASELINE)) if os.path.exists(BASELINE) else {}
     failed = []
@@ -179,18 +180,23 @@ def main():
             continue
         d = os.path.join(os.path.abspath(a.out), name)
         os.makedirs(d, exist_ok=True)
+        reuse = a.reuse and os.path.exists(os.path.join(d, "truth.txt"))
         json.dump(case, open(os.path.join(d, "case.json"), "w"), indent=1)
-        log = run([BLENDER, "-b", "--factory-startup", "--python", script, "--", "prep", d])
-        if "SCULPTPREP" not in log:
-            print(log[-3000:]); sys.exit("Blender prep failed: " + name)
+        if not reuse:
+            log = run([BLENDER, "-b", "--factory-startup", "--python", script, "--", "prep", d])
+            if "SCULPTPREP" not in log:
+                print(log[-3000:]); sys.exit("Blender prep failed: " + name)
         dabs = json.load(open(os.path.join(d, "dabs.json")))
         with open(os.path.join(d, "dabs.txt"), "w") as f:
-            for k in dabs:
+            for stroke, k in enumerate(dabs):
+                vx, vy, vz = (-c for c in k["normal"])   # Blender looks down the dab's normal
                 for x, y, z in inf_dabs(k):
-                    f.write("%d %g %g %g %g %g %d\n" % (k["brush"], x, z, -y, k["radius"], k["strength"], k.get("invert", 0)))
-        log = run([BLENDER, os.path.join(d, "base.blend"), "--python", script, "--", "sculpt", d])
-        if "SCULPTDONE" not in log:
-            print(log[-3000:]); sys.exit("Blender sculpt failed: " + name)
+                    f.write("%d %g %g %g %g %g %d %g %g %g %d\n" % (k["brush"], x, z, -y, k["radius"], k["strength"],
+                                                                   k.get("invert", 0), vx, vz, -vy, stroke))
+        if not reuse:
+            log = run([BLENDER, os.path.join(d, "base.blend"), "--python", script, "--", "sculpt", d])
+            if "SCULPTDONE" not in log:
+                print(log[-3000:]); sys.exit("Blender sculpt failed: " + name)
         env = dict(os.environ, INFINITE_SCULPTTEST="1", INFINITE_EXITAFTER="10",
                    INFINITE_SCULPTTEST_MODEL=os.path.join(d, "base.glb"),
                    INFINITE_SCULPTTEST_STROKES=os.path.join(d, "dabs.txt"), INFINITE_SCULPTTEST_OUT=os.path.join(d, "inf.txt"))
@@ -205,7 +211,7 @@ def main():
         else:
             print(log[-3000:]); sys.exit("Infinite sculpt failed: " + name)
         r = score(d)
-        for tag, pts in (("truth", "truth.txt"), ("inf", "inf_mapped.txt")):
+        for tag, pts in (("inf", "inf_mapped.txt"),) if reuse else (("truth", "truth.txt"), ("inf", "inf_mapped.txt")):
             run([BLENDER, "-b", os.path.join(d, "base.blend"), "--python", script, "--", "render", d,
                  os.path.join(d, pts), os.path.join(d, tag + ".png")])
         board(d)

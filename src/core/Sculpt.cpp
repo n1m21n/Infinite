@@ -641,11 +641,11 @@ namespace Sculpt
             {
                case kDraw:
                   for (int k = 0; k < 3; k++)
-                     move[k] = a.normal[k] * d.radius * 0.375f * f * sign;
+                     move[k] = a.normal[k] * d.radius * 0.36f * f * sign;
                   break;
                case kInflate:
                   for (int k = 0; k < 3; k++)
-                     move[k] = n[k] * d.radius * 0.22f * f * sign;
+                     move[k] = n[k] * d.radius * 0.1f * f * sign;
                   break;
                case kSmooth:
                {
@@ -668,7 +668,7 @@ namespace Sculpt
                   const float along = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
                   for (int k = 0; k < 3; k++)
                      to[k] -= a.normal[k] * along;
-                  const float pull = d.brush == kPinch ? 0.5f : 0.8f;
+                  const float pull = d.brush == kPinch ? 0.27f : 0.8f;
                   for (int k = 0; k < 3; k++)
                      move[k] = to[k] * pull * f * (d.brush == kPinch ? sign : 1.0f);
                   if (d.brush == kCrease)
@@ -681,7 +681,7 @@ namespace Sculpt
                   const float h = (p[0] - a.center[0]) * a.normal[0] + (p[1] - a.center[1]) * a.normal[1] +
                                   (p[2] - a.center[2]) * a.normal[2];
                   for (int k = 0; k < 3; k++)
-                     move[k] = -a.normal[k] * h * 0.6f * f * sign;
+                     move[k] = -a.normal[k] * h * 0.56f * f * sign;
                   break;
                }
                default:
