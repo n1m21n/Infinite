@@ -464,6 +464,9 @@ void DrawPopupsB(FrameCtx& fc)
             }
             LibraryParts::SearchField("ddsearch", T("search..."), gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
             MenuParts::Separator();
+            // The focused search field takes the first Esc for itself; the list should close on it.
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+               ImGui::CloseCurrentPopup();
          }
 
          const std::string q = showSearch ? FoldForSearch(gDropdown.filterBuf) : std::string();
