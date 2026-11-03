@@ -6,6 +6,7 @@
 #include <type_traits>
 #include "imgui_internal.h"
 #include "app/AppShared.h"
+#include "app/selftest/UiAudit.h"
 
 namespace FieldWell
 {
@@ -139,6 +140,7 @@ namespace FieldWell
          ImGui::PushStyleColor(ImGuiCol_Border, ac);
       }
       const bool r = ImGui::SliderScalar(label, dt, v, &lo, &hi, fmt, fl | ImGuiSliderFlags_AlwaysClamp);
+      UiAudit::NoteSlider(id, hi != lo ? (float)(*v - lo) / (float)(hi - lo) : 0.0f, mn, mx);
       if (typing)
          ImGui::PopStyleColor(2);
       ImGui::PopStyleColor(2);

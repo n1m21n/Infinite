@@ -2467,6 +2467,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // no overlapping boxes, the picture chain ordered by wiring depth.
       FrameTest_PATCHLAYOUTLIVETEST(frameId, window);
 
+      // Debug builds: every item of every audited state checked, sliders dragged (docs/plans/ui-system/ui-audit.md).
+      FrameTest_UIAUDIT(frameId, window);
+
       // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
       FrameTest_KEYEDSTARTEST(frameId, window);
 

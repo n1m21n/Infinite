@@ -54,3 +54,4 @@ test-output/
 collect_check.md
 glyph-sheet.png
 .media_scratch_*
+/ui-audit/

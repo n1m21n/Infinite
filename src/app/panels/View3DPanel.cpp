@@ -7152,6 +7152,31 @@ void View3DShotState(int state)
    }
 }
 
+#ifdef IMGUI_ENABLE_TEST_ENGINE
+// UI audit: one side tab, with the item it needs picked (an object for Object and Material, a light for Light).
+bool View3DAuditState(int tab)
+{
+   Scene3DNode* scene = FindScene();
+   if (scene == nullptr)
+      return false;
+   const Kind want = tab == 3 || tab == kMaterialTab ? Kind::Geometry : tab == 4 ? Kind::Light : Kind::Missing;
+   sSel.clear();
+   if (want != Kind::Missing)
+      for (Item& it : scene->Items())
+         if (scene->ItemKind(it) == want)
+         {
+            sSel = { it.id };
+            if (tab == kMaterialTab && MaterialOf(it) == nullptr)
+               AddMaterial(scene, it);
+            break;
+         }
+   sTab = tab;
+   sSideOpen = true;
+   sShading = Shading::Solid;
+   return want == Kind::Missing || !sSel.empty();
+}
+#endif
+
 void View3DAddLight(int type)
 {
    if (Scene3DNode* scene = FindScene())

@@ -539,6 +539,7 @@ set(COMMON_SOURCES
     src/app/selftest/AudioSweepTests.cpp
     src/app/selftest/AvRecTests.cpp
     src/app/selftest/ImgAudit.cpp
+    src/app/selftest/UiAudit.cpp
     src/app/selftest/MidiOutTests.cpp
     src/app/selftest/CliSetupTests.cpp
     src/app/selftest/BenchScenes.cpp
@@ -1171,6 +1172,8 @@ add_executable(Infinite ${COMMON_SOURCES})
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
 # User-Agent header, etc.).
 target_compile_definitions(Infinite PRIVATE INFINITE_VERSION_STRING="${INFINITE_VERSION}")
+# Debug only: Dear ImGui item hooks for the UI audit (src/app/selftest/UiAudit.cpp). Never in a release.
+target_compile_definitions(Infinite PRIVATE $<$<CONFIG:Debug>:IMGUI_ENABLE_TEST_ENGINE>)
 
 if(APPLE)
     target_sources(Infinite PRIVATE ${APPLE_SOURCES})

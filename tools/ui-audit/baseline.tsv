@@ -1,0 +1,6 @@
+check	state	window	label	detail
+tiny target	Scene	Infinite/##view3d_bottom	##view3dgrip	1396 x 8
+clipped	Scene	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops_471F617D/##v3dlist	##row	6 px of 248 cut
+overlap	Scene	Infinite	Edit###Edit	with File###File, 6 x 28
+overlap	Scene	Infinite	Menu###Menu	with Edit###Edit, 6 x 28
+press lands off	Viewport p8	Infinite/##view3d_bottom_275E1D09/##view3dcontent_358D50D7/##v3dside_3C8850FE/##v3dprops	##Safe Areas/Action	press at 25% of the bar gave 17%

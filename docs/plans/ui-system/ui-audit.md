@@ -66,6 +66,24 @@ Pokes run on a copy of the state and are reset after each control, so one bad co
 pass count per check. Exit code non-zero when any finding is new against `tools/ui-audit/baseline.tsv`,
 so it can join the hygiene routes. Every fix after that is held by the baseline.
 
+## Built (2026-11-03)
+
+`python3 tools/ui-audit/run.py` (debug build) runs it in ~15 s: the 3D View's eight side tabs, each paged
+down, ~2400 item checks and 55 slider pokes. It opens `tests/render3d/shadows.inf` with a clean HOME and
+dismisses notices first (they float over the panel's lower rows).
+
+- Listener: `src/app/selftest/UiAudit.cpp`; `IMGUI_ENABLE_TEST_ENGINE` is set for Debug only (CMakeLists.txt).
+- Its mouse is the only mouse while it runs: the backend's events (the real cursor) are dropped each frame.
+- Canary window: one known-bad control per layer-2 check; the run fails if any check stays silent.
+- Built checks: duplicate id, clipped (horizontal), tiny target (<12 px), overlap (skips AllowOverlap items),
+  hit smaller than drawn, and the slider pokes (press lands, max, min, undo step, undo restores).
+- Not yet: text overflow, off grid, contrast, dropdown/checkbox/colour pokes, hover + scroll, node bodies,
+  other panels, dark theme.
+
+First run found and fixed: Shadows and Ambient Occlusion "Strength" sharing one id (the second could not
+be dragged); every 3D View slider's undo returned to the clicked value, not the one before the press.
+The five that remain are in `tools/ui-audit/baseline.tsv`.
+
 ## Done when
 
 - One command runs both layers and writes the report.
