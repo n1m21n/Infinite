@@ -5543,7 +5543,7 @@ namespace
       next();
       if (IconChip("##v3dsculpt", IconsInfinite::Pencil, sSculpt.on, T("Sculpt (Ctrl+Tab)"))) ToggleSculpt(scene);
       next();
-      if (IconChip("##v3dedit", IconsInfinite::GridDots, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
+      if (IconChip("##v3dedit", IconsInfinite::EditMesh, sEdit.on, T("Edit Mode (Tab)"))) ToggleEdit(scene);
       gap();
       if (IconChip("##v3dwire", IconsInfinite::ShadeWire, sShading == Shading::Wire, T("Wireframe (Shift+Z)"))) sShading = Shading::Wire;
       next();
@@ -6970,6 +6970,7 @@ namespace
          std::vector<std::string> names = { T("None") };
          for (GraphNode* c : choices)
             names.push_back(NodeTitle(*c));
+         names.push_back(T("Load image..."));
          const int matIndex = gn->index;
          for (int map = 0; map < kMapCount; map++)
          {
@@ -6980,7 +6981,13 @@ namespace
                   pick = (int)i + 1;
             if (ComboRow(T(kMaps[map]), &pick, names, "Material map"))
             {
-               if (pick == 0)
+               if (pick > (int)choices.size())
+               {
+                  const std::string path = Platform::OpenImageDialog();
+                  if (!path.empty())
+                     gPendingMapLoad = { mat, map, path };
+               }
+               else if (pick == 0)
                   DisconnectDstPin(gn->InputPinId(1 + map));
                else
                {
