@@ -8,7 +8,10 @@
 
 // Geometry in, image out: the mesh rendered in its own UV space (Blender's
 // bake, written fresh). AO, curvature, position, normal or thickness, so the
-// image can go through any 2D chain and back into a Material map.
+// image can go through any 2D chain and back into a Material map. Sculpt
+// bakes the nearest upstream Sculpt node's detail as a tangent-space normal
+// map for the unsculpted mesh (Blender's bake from high to low, where both
+// share the triangles).
 //
 // Baked on the CPU by ray casts against a BVH of the mesh, in object space.
 // The first bake runs in the cook so the image is there at once; later ones
@@ -20,7 +23,7 @@ public:
    static INode* Create() { return new BakeNode(); }
    ~BakeNode() override;
 
-   enum Mode { kAO = 0, kCurvature, kPosition, kNormal, kThickness };
+   enum Mode { kAO = 0, kCurvature, kPosition, kNormal, kThickness, kSculpt };
    static const std::vector<std::string>& ModeNames();
    static const std::vector<std::string>& SizeNames();
 
@@ -50,6 +53,7 @@ public:
    struct Request
    {
       Mesh mesh;
+      Mesh high;   // kSculpt: the sculpted mesh, same triangles as `mesh`
       int mode = 0, res = 512, samples = 16;
       float distance = 0.25f;
       bool background = false;   // a live edit: every bake thread steps aside for the frame

@@ -80,6 +80,40 @@ bool RunBakeTest()
    covered(bake(BakeNode::kThickness), 0, mean, lo, hi);
    check(mean > 0.0 && hi <= 1.0001f, "thickness inside 0-1", mean, hi);
 
+   // Sculpt: the same mesh bakes flat; normals tipped toward +u read as red.
+   {
+      BakeNode::Request r;
+      r.mesh = smart;
+      r.high = smart;
+      r.mode = BakeNode::kSculpt;
+      r.res = 128;
+      covered(BakeNode::Bake(r), 2, mean, lo, hi);
+      check(lo > 0.99f, "sculpt: an unsculpted mesh bakes flat (blue 1)", mean, lo);
+      for (size_t f = 0; f < smart.FaceCount(); f++)
+      {
+         const unsigned* c = &smart.indices[f * 3];
+         const Vertex &a = smart.vertices[c[0]], &b = smart.vertices[c[1]], &d = smart.vertices[c[2]];
+         const float det = (b.u - a.u) * (d.v - a.v) - (d.u - a.u) * (b.v - a.v);
+         float t[3];
+         for (int k = 0; k < 3; k++)
+         {
+            const float pa = (&a.px)[k], pb = (&b.px)[k], pd = (&d.px)[k];
+            t[k] = ((pb - pa) * (d.v - a.v) - (pd - pa) * (b.v - a.v)) / det;
+         }
+         const float len = std::sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]);
+         for (int k = 0; k < 3; k++)
+         {
+            Vertex& v = r.high.vertices[c[k]];
+            v.nx += 0.5f * t[0] / len; v.ny += 0.5f * t[1] / len; v.nz += 0.5f * t[2] / len;
+         }
+      }
+      const std::vector<float> px = BakeNode::Bake(r);
+      covered(px, 0, mean, lo, hi);
+      check(lo > 0.6f, "sculpt: normals tipped toward +u read red above 0.5", mean, lo);
+      covered(px, 1, mean, lo, hi);
+      check(std::fabs(mean - 0.5) < 0.02, "sculpt: and leave green at 0.5", mean, 0.5);
+   }
+
    printf("BAKE TEST: %s (%d failure%s)\n", failures == 0 ? "OK" : "FAILED", failures, failures == 1 ? "" : "s");
    return failures == 0;
 }

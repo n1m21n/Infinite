@@ -1,4 +1,5 @@
 #include "BakeNode.h"
+#include "SculptNode.h"
 #include "platform/Platform.h"
 
 #include "gl3.h"
@@ -13,7 +14,7 @@
 
 namespace
 {
-   const std::vector<std::string> kModeNames = { "AO", "Curvature", "Position", "Normal", "Thickness" };
+   const std::vector<std::string> kModeNames = { "AO", "Curvature", "Position", "Normal", "Thickness", "Sculpt" };
    const std::vector<std::string> kSizeNames = { "256", "512", "1024", "2048" };
 
    struct V3
@@ -276,6 +277,26 @@ std::vector<float> BakeNode::Bake(const Request& r)
    std::vector<float> curv;
    if (r.mode == kCurvature)
       curv = VertexCurvature(m, size);
+   // Sculpt: each triangle's dP/du and dP/dv, the frame the renderer's
+   // cotangent normal mapping uses.
+   const bool sculpt = r.mode == kSculpt && r.high.vertices.size() == m.vertices.size() && r.high.indices == m.indices;
+   std::vector<V3> tanU, tanV;
+   if (sculpt)
+   {
+      tanU.resize(m.FaceCount());
+      tanV.resize(m.FaceCount());
+      for (size_t f = 0; f < m.FaceCount(); f++)
+      {
+         const Vertex &a = m.vertices[m.indices[f * 3]], &b = m.vertices[m.indices[f * 3 + 1]], &c = m.vertices[m.indices[f * 3 + 2]];
+         const V3 e1 = Pos(b) - Pos(a), e2 = Pos(c) - Pos(a);
+         const float du1 = b.u - a.u, dv1 = b.v - a.v, du2 = c.u - a.u, dv2 = c.v - a.v;
+         const float det = du1 * dv2 - du2 * dv1;
+         if (std::fabs(det) < 1e-12f)
+            continue;
+         tanU[f] = (e1 * dv2 - e2 * dv1) * (1.0f / det);
+         tanV[f] = (e2 * du1 - e1 * du2) * (1.0f / det);
+      }
+   }
 
    // Pass 1 (cheap): which triangle and weights each texel takes. Weights
    // are clamped into the triangle, so a texel past an edge reads the
@@ -399,6 +420,19 @@ std::vector<float> BakeNode::Bake(const Request& r)
                   rgb[0] = rgb[1] = rgb[2] = std::clamp(0.5f + k * curvGain, 0.0f, 1.0f);
                   break;
                }
+               case kSculpt:
+               {
+                  if (!sculpt)
+                  {
+                     rgb[0] = rgb[1] = 0.5f; rgb[2] = 1.0f;
+                     break;
+                  }
+                  const std::vector<Vertex>& hv = r.high.vertices;
+                  const V3 nh = Norm(Nrm(hv[c[0]]) * t.w[0] + Nrm(hv[c[1]]) * t.w[1] + Nrm(hv[c[2]]) * t.w[2]);
+                  const V3 tu = Norm(tanU[t.f] - n * Dot(n, tanU[t.f])), tv = Norm(tanV[t.f] - n * Dot(n, tanV[t.f]));
+                  rgb[0] = Dot(nh, tu) * 0.5f + 0.5f; rgb[1] = Dot(nh, tv) * 0.5f + 0.5f; rgb[2] = Dot(nh, n) * 0.5f + 0.5f;
+                  break;
+               }
                case kPosition:
                   rgb[0] = (p.x - lo.x) / size; rgb[1] = (p.y - lo.y) / size; rgb[2] = (p.z - lo.z) / size;
                   break;
@@ -508,14 +542,23 @@ void BakeNode::CookIfNeeded(int frameId)
       return;
    }
 
-   const Mesh& mesh = input->GetMesh();
+   // Sculpt bakes from the Sculpt node nearest upstream: its input (low) and
+   // its sculpted mesh (high).
+   SculptNode* sculpt = nullptr;
+   for (IGeometrySource* s = input; s != nullptr && sculpt == nullptr && mode == kSculpt; s = s->PassthroughSource())
+      sculpt = dynamic_cast<SculptNode*>(s);
+   const Mesh& mesh = sculpt != nullptr ? sculpt->Base() : input->GetMesh();
    mCookWarning = (!mesh.Empty() && !HasUVs(mesh)) ? "No UVs: add a UV Project before Bake" : "";
+   if (mode == kSculpt && sculpt == nullptr)
+      mCookWarning = "No Sculpt node upstream";
    mKeyMesh = rev; mKeyMode = mode; mKeySize = size; mKeySamples = samples;
    mKeyDistance = distance; mKeyInput = input;
    mDirty = false;
 
    Request req;
    req.mesh = mesh;
+   if (sculpt != nullptr)
+      req.high = sculpt->Shaped();
    req.mode = mode; req.res = res; req.samples = samples; req.distance = distance;
    // The first image, and every image of an offline render, is baked here so
    // the frame that asks for it has it; live edits bake off the main thread.
