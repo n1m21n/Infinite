@@ -1240,7 +1240,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
-#if defined(INFINITE_HAS_PT_PROTOTYPE)
    if (getenv("INFINITE_PTTEST") != nullptr || getenv("INFINITE_PTBENCH") != nullptr)
    {
       const bool ok = RunPathTraceTest();
@@ -1248,7 +1247,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       glfwTerminate();
       return ok ? 0 : 1;
    }
-#endif
 
    if (getenv("INFINITE_R3DPANOTEST") != nullptr)
    {
