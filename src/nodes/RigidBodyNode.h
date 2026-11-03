@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Geometry3DNodes.h"
@@ -147,6 +148,7 @@ private:
    std::string mCookWarning;
    Mesh mMesh;
    std::vector<Body> mBodies;
+   std::unordered_map<unsigned long long, Vec3> mWarm;   // last step's contact impulses: normal, tangent 1, tangent 2
    unsigned long long mRevision = 0;
    mutable unsigned long long mMappingRevision = 0;
    mutable size_t mLastMappingHash = 0;
