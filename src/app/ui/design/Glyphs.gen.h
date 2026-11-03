@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE964;
+   inline constexpr unsigned kLast = 0xE965;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -105,4 +105,5 @@ namespace IconsInfinite
    inline constexpr const char* World = "\xee\xa5\xa2"; // U+E962 world
    inline constexpr const char* Lock = "\xee\xa5\xa3"; // U+E963 lock
    inline constexpr const char* View3d = "\xee\xa5\xa4"; // U+E964 view-3d
+   inline constexpr const char* EditMesh = "\xee\xa5\xa5"; // U+E965 edit-mesh
 }
