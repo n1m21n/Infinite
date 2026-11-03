@@ -879,6 +879,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_PREDV2TEST") != nullptr)
       return PredictionNodes::RunPredV2Test() ? 0 : 1;
 
+   if (getenv("INFINITE_BVHTEST") != nullptr || getenv("INFINITE_BVHBENCH") != nullptr)
+      return RunBvhTest() ? 0 : 1;
+
    {
       std::string usageError;
       if (Headless::ParseArgs(argc, argv, gHeadlessJob, usageError))
@@ -1232,6 +1235,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_ARMTEST") != nullptr)
    {
       const bool ok = RunArmatureTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
+   if (getenv("INFINITE_PTTEST") != nullptr || getenv("INFINITE_PTBENCH") != nullptr)
+   {
+      const bool ok = RunPathTraceTest();
       glfwDestroyWindow(window);
       glfwTerminate();
       return ok ? 0 : 1;

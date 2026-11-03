@@ -835,8 +835,21 @@ public:
    float motionMax = 32.0f;     // longest smear, pixels at 1080 high
    bool MotionActive() const { return motionBlur && motionShutter > 0.0f && renderPass == 0 && !PanoActive(); }
 
+   // Engine: raster (the live shader) or path trace (Render3DPathTrace: bounced light, a shadow from
+   // every light, real refraction). Path trace renders the beauty pass of a perspective or
+   // orthographic camera; every other case stays raster. Live, it shows the raster frame while
+   // anything moves and refines toward `ptSamples` once the view is still; an offline render
+   // traces all `ptSamples` for every frame.
+   static const std::vector<std::string>& EngineNames();
+   int engine = 0;
+   int ptSamples = 128;
+   int ptBounces = 6;
+   bool PathTraceActive() const { return engine == 1 && renderPass == 0 && !SolidActive() && !PanoActive(); }
+   int PathTraceSampleCount() const;
+
    void VisitParams(ParamVisitor& v) override
    {
+      v.Int("engine", engine); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
       v.Float("ao", aoStrength); v.Float("aoRadius", aoRadius);
       v.Float("dofAperture", dofAperture); v.Float("focusDistance", focusDistance);
       v.Int("dofBlades", dofBlades); v.Float("dofRotation", dofRotation); v.Float("dofRatio", dofRatio);
@@ -1113,6 +1126,27 @@ private:
    bool mPanoShadersTried = false;
    void CookOnce(int frameId);
    bool Accumulate(int frameId);
+
+   // Path trace engine (Render3DPathTraceCook.cpp). CookPathTrace runs before the raster cook and
+   // returns true when this frame's mColorTex is the traced image (raster skipped). Live, any change
+   // since the last frame hands the frame to raster; once a frame is the same as the one before, the
+   // BVH is rebuilt if the geometry or materials differ from mPtBuiltSig and the samples restart.
+   // The camera and lights come from the last raster cook (mLastCamera, mPtLights), which drew the
+   // same scene; an offline render runs one raster cook first for that.
+   bool CookPathTrace(int frameId);
+   void ReleasePathTrace();
+   static bool PtSameGeometry(const SceneSignature& a, const SceneSignature& b);
+   static bool PtSameView(const SceneSignature& a, const SceneSignature& b);
+   void StashPathTraceLights(int count, const int* types, const float* dirs, const float* aims, const float* colsSrgb,
+                             const float* power, const float* spotAngle, const float* spotPenumbra,
+                             const float* area, const float* terms, const float* cutoff);
+   class Render3DPathTrace* mPathTrace = nullptr;
+   std::vector<float> mPtLights;   // kPtLightFloats per light, packed by StashPathTraceLights
+   SceneSignature mPtLastSig;
+   SceneSignature mPtBuiltSig;
+   bool mPtHasLastSig = false;
+   bool mPtSceneBuilt = false;
+   bool mPtStill = false;
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
    unsigned int mMsFbo = 0;
    unsigned int mMsColor = 0;

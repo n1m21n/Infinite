@@ -5938,6 +5938,8 @@ bool RunBakeTest();
 bool RunSculptTest();
 bool RunThreeDBench();
 bool RunThreeDFlowTest();
+bool RunBvhTest();
+bool RunPathTraceTest();
 bool RunArmatureTest();
 bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;

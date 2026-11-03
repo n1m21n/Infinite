@@ -8,7 +8,13 @@ python3 tools/blender-ab/harness.py --out /tmp/blender-ab            # every pic
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab light_spot # one case
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab --set-baseline
 python3 tools/blender-ab/harness.py --out /tmp/blender-ab --ao       # also the AO bake A/B
+python3 tools/blender-ab/harness.py --out /tmp/blender-ab --engine pt # Render 3D's path tracer
 ```
+
+`--engine pt` (with `--pt-samples`, default 256, and `--pt-bounces`, default 8) renders
+with the path tracer. Its files carry `_pt` (`inf_pt.png`, `flip_pt.png`, `board_pt.png`,
+`results_pt.jsonl`, baseline key `case_pt`) beside the raster ones, and the board shows
+Blender | raster | path trace | FLIP.
 
 Needs `/Applications/Blender.app`, `build-dev/Infinite.app`, and numpy, Pillow and
 `flip-evaluator` (`pip install --user flip-evaluator`).
@@ -69,3 +75,26 @@ real improvement, run `--set-baseline` so the gate locks in the gain.
 Add a scene to `CASES` in `cases.py`, run it, look at the board, then set its
 baseline. A new kind of input (a new light type, material input or shape) needs
 both `blender_scene.py` and `to_patch` to learn it.
+
+## The hero case (regions and frames)
+
+`hero` is a room scene (bounced light, HDRI world and its sun, point/spot/area lights,
+two textured Poly Haven models, glass/clearcoat/velvet spheres, the skinned Fox at three
+animation phases, 50 instances, an emissive panel, DOF, AgX). Extra scene keys it uses:
+
+- object `shape: "model"` with `asset` (a file in `assets/`, or `env` naming an
+  environment variable that points at one) and `scale`, `location`, `clip`.
+- object `instances`: a list of positions; the shape is stamped on each (Instance on Points).
+- object `region`: one of `REGIONS` in `cases.py`. Blender writes an object-index pass
+  (`mask_k.png`, 1 sample, no denoise); the same mask, eroded 1 px, scores both images.
+- scene `frames`: a list of `{phase}` entries (Fox clip phase 0-1). One render per frame.
+- `world.hdri` (+ `strength`, `rotation`, `sun_threshold`): an HDRI file from `assets/`.
+
+Output: `hero_board_<k>.png` per frame (Blender | Infinite | FLIP | region mask, then a
+per-region table) and `hero/mask_color_<k>.png`. The baseline for hero is a dict of
+region to a per-frame list of FLIP; the gate fails if ANY region on any frame is more
+than 0.01 over its baseline. `--set-baseline hero` leaves other cases untouched.
+
+Render 3D has three light pins, so the hero uses point, spot and area plus the HDRI's
+extracted sun as the fourth light. Asset sources and licences: `assets/SOURCES.md`
+(`assets/fetch.py` re-downloads them).
