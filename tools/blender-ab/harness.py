@@ -67,7 +67,7 @@ def asset_file(o):
     return env if env and os.path.exists(env) else os.path.join(ASSETS, o["asset"])
 
 
-def material_lines(m):
+def material_lines(m, sheen=True):
     trans = m.get("transmission", 0.0)
     trough = m.get("transmission_roughness", m.get("roughness", 0.0) if trans > 0 else 0.0)
     return [
@@ -76,7 +76,7 @@ def material_lines(m):
         "  f ior %g" % m.get("ior", 1.5), "  f transmission %g" % trans,
         "  f transmissionRoughness %g" % trough,
         "  f clearcoat %g" % m.get("coat", 0.0), "  f clearcoatRoughness %g" % m.get("coat_roughness", 0.03),
-        "  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5),
+        ] + (["  f sheen %g" % m.get("sheen", 0.0), "  f sheenRoughness %g" % m.get("sheen_roughness", 0.5)] if sheen else []) + [
         "  f specular 0.5",
         "  c emissionColor %g %g %g" % tuple(srgb(m.get("emission", (0, 0, 0)))),
         "  f emission %g" % m.get("emission_strength", 0.0)]
@@ -123,7 +123,7 @@ def to_patch(scene, case, frame=None):
             pts = node("3D", "Model 3D", ["  s path %s" % os.path.join(case, "pts_%d.glb" % i),
                                           "  b normalize 0", "  b recenter 0"])
             inst = node("3D", "Instance on Points", ["  i pointMode 0", "  i maxPoints %d" % len(o["instances"]),
-                                                      "  f instanceScale 1", "  b inheritMaterial 0"] + material_lines(m))
+                                                      "  f instanceScale 1", "  b inheritMaterial 0"] + material_lines(m, sheen=False))
             wires.append("geo %d points %d" % (inst, pts))
             wires.append("geo %d shape %d" % (inst, model))
             geos.append(inst)
