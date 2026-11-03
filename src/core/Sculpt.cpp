@@ -505,11 +505,13 @@ namespace Sculpt
          const float inv = 1.0f / det;
          const float s[3] = { o[0] - a.px, o[1] - a.py, o[2] - a.pz };
          const float u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) * inv;
-         if (u < 0.0f || u > 1.0f)
+         // A little slack, so a ray through a shared corner or edge hits one of its faces.
+         const float e = 1e-5f;
+         if (u < -e || u > 1.0f + e)
             return false;
          const float q[3] = { s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0] };
          const float v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv;
-         if (v < 0.0f || u + v > 1.0f)
+         if (v < -e || u + v > 1.0f + e)
             return false;
          t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
          return t > 0.0f;
