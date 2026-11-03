@@ -1721,8 +1721,9 @@ namespace
             y1 += v.py;
          y1 /= (double)std::max<size_t>(1, c.GetMesh().vertices.size());
          const double fell = y0 - y1;
-         const double want = 0.5 * 4.0 * 0.5 * 0.5; // g = 4 (default gravityY), t = 0.5 s
-         printf("GEOAUDIT CLOTH  free fall 0.5 s at g 4: dropped %.4f | g t^2 / 2 = %.4f\n", fell, want);
+         const double g = -c.gravityY;
+         const double want = 0.5 * g * 0.5 * 0.5; // t = 0.5 s
+         printf("GEOAUDIT CLOTH  free fall 0.5 s at g %.1f: dropped %.4f | g t^2 / 2 = %.4f\n", g, fell, want);
          if (std::fabs(fell / want - 1.0) > 0.10)
             f.Flag("CLOTH", "free fall", "drop differs from g t^2 / 2, %", (fell / want - 1.0) * 100.0);
       }
@@ -1836,6 +1837,63 @@ namespace
             f.Flag("CLOTH", "jump", "non-finite after a long time jump", sj.nonFinite);
             ok = false;
          }
+      }
+
+      // A sheet dropped onto a ball: nothing ends up inside it, the top rests the
+      // collider distance above it, and a stiffer cloth spreads wider around it.
+      {
+         GeometryNode ball;
+         ball.shape = 2; // Sphere
+         ball.detail = 32;
+         const Mesh& bm = Build(ball);
+         float radius = 0.0f;
+         for (const Vertex& v : bm.vertices)
+            radius = std::max(radius, std::sqrt(v.px * v.px + v.py * v.py + v.pz * v.pz));
+         ball.posY = -(radius + 0.2f);
+         const float cy = ball.posY;
+         double spread[2] = { 0.0, 0.0 };
+         for (int stiff = 0; stiff < 2; stiff++)
+         {
+            double beat = 0.0;
+            tr.SeekBeats(0.0);
+            GeometryNode plane;
+            ClothNode c;
+            makeCloth(plane, c);
+            plane.uniformScale = 2.5f; // wider than the ball, so it drapes instead of sliding off
+            plane.rotX = -1.5707963f;  // lying flat over it
+            c.collider = &ball;
+            c.groundEnabled = true; // the ball sits on the floor
+            c.groundHeight = cy - radius;
+            c.pinMode = ClothNode::kPinNone;
+            c.bending = stiff ? 0.6f : 0.0f;
+            c.CookIfNeeded(gFrame++);
+            advance({ &c }, 32, 0.25, beat); // 4 s
+            const Mesh& m = c.GetMesh();
+            float inside = 0.0f, top = -1e30f;
+            double r = 0.0;
+            for (const Vertex& v : m.vertices)
+            {
+               const float d = std::sqrt(v.px * v.px + (v.py - cy) * (v.py - cy) + v.pz * v.pz);
+               inside = std::max(inside, radius * 0.97f - d);
+               top = std::max(top, v.py - cy);
+               r += std::sqrt(v.px * v.px + v.pz * v.pz);
+            }
+            spread[stiff] = r / (double)std::max<size_t>(1, m.vertices.size());
+            const Stats st = Measure(m);
+            printf("GEOAUDIT CLOTH  over a ball r %.3f, bending %.1f: %zu collider tris | deepest inside %.4f | top %.4f above centre | mean spread %.4f\n",
+                   radius, c.bending, c.ColliderTriangleCount(), std::max(0.0f, inside), top, spread[stiff]);
+            if (st.nonFinite > 0)
+            {
+               f.Flag("CLOTH", "collider", "non-finite vertices", st.nonFinite);
+               ok = false;
+            }
+            if (inside > 0.0f)
+               f.Flag("CLOTH", "collider", "cloth inside the ball by", inside);
+            if (top < radius || top > radius + c.colliderDistance + 0.05f)
+               f.Flag("CLOTH", "collider", "top not resting on the ball, height above centre", top);
+         }
+         if (spread[1] <= spread[0])
+            f.Flag("CLOTH", "bending", "a stiffer cloth did not spread wider, spread", spread[1] - spread[0]);
       }
 
       // Bypass: the cloth hands its input's mesh through.

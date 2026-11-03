@@ -124,7 +124,8 @@ frame is stepped in order and the node's world-space vertices (or points) are wr
 
 Scene keys: `kind`, `duration`, `gravity` (Blender Z-up vector; leaning gravity stands in for a
 slope), `ground` (height or null), `objects[]` (`cube`, `sphere`, `grid`, with `size`, `location`,
-`rotation` in degrees, `subdivisions`), and `body` (rigid: `friction`, `bounce`,
+`rotation` in degrees, `subdivisions`), `colliders[]` (cloth: still shapes the sheet drapes over,
+sent to Infinite as `collider.glb` into Cloth's collider pin), and `body` (rigid: `friction`, `bounce`,
 `linear_damping`, `angular_damping`, `collider`), `cloth` (`pin` none/top/corners/edges,
 `air_damping`, `vertex_mass`, `tension`, `shear`, `bending`) or `particles` (`rate`, `velocity`).
 
@@ -136,5 +137,8 @@ Unit mapping (`physics.patch` holds it):
 | Rigid friction, restitution (ground = 1, Bullet multiplies) | friction, bounce |
 | Cloth air damping a, vertex mass m (drag 0.01 a v, time in frames) | damping 1 − e^(−0.01 a fps / m / 120) per step, mass 1 |
 | Cloth pin group | the same rule as Cloth's pin mode, on the rest bounds |
+| Cloth bending b | bending √(0.02 b), so Blender's default 0.5 is Infinite's default 0.1 |
+| Cloth collision distance 0.015 + collider outer thickness 0.02 | collider distance 0.035 |
+| Collision cloth friction 5 (default) | collider friction 0.5 (default) |
 
 A case fails when its error rises more than 10% over `baseline_physics.json`.

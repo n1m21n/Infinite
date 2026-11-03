@@ -1479,6 +1479,7 @@ void ClothNode::RebuildFromInput()
    mMesh = Mesh();
    mRest = Mesh();
    mConstraints.clear();
+   mBends.clear();
    mWeld.clear();
    mPos.clear();
    mPrev.clear();
@@ -1561,6 +1562,37 @@ void ClothNode::RebuildFromInput()
       }
    }
 
+   // Bending: where two triangles share an edge, a soft link between their far
+   // corners resists the fold between them (the edge itself already holds).
+   std::map<std::pair<unsigned int, unsigned int>, unsigned int> firstFar;
+   std::set<std::pair<unsigned int, unsigned int>> bent;
+   for (size_t t = 0; t + 2 < src.indices.size(); t += 3)
+   {
+      const unsigned int v[3] = { mWeld[src.indices[t]], mWeld[src.indices[t + 1]],
+                                  mWeld[src.indices[t + 2]] };
+      if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0])
+         continue;
+      for (int e = 0; e < 3; e++)
+      {
+         const auto key = std::minmax(v[e], v[(e + 1) % 3]);
+         const unsigned int far = v[(e + 2) % 3];
+         const auto found = firstFar.find({ key.first, key.second });
+         if (found == firstFar.end())
+         {
+            firstFar[{ key.first, key.second }] = far;
+            continue;
+         }
+         const unsigned int a = found->second, b = far;
+         const auto pair = std::minmax(a, b);
+         if (a == b || !bent.insert({ pair.first, pair.second }).second)
+            continue;
+         const float dx = mPos[a * 3 + 0] - mPos[b * 3 + 0];
+         const float dy = mPos[a * 3 + 1] - mPos[b * 3 + 1];
+         const float dz = mPos[a * 3 + 2] - mPos[b * 3 + 2];
+         mBends.push_back({ a, b, std::sqrt(dx*dx + dy*dy + dz*dz) });
+      }
+   }
+
    // Pinning is expressed against the rest bounding box, so it means the same
    // thing whatever mesh is patched in.
    float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
@@ -1620,6 +1652,193 @@ void ClothNode::Reset()
    mRevision = NextMeshRevision();
 }
 
+namespace
+{
+   // The nearest point to p on triangle abc (Ericson, Real-Time Collision
+   // Detection, 5.1.5).
+   void ClosestOnTriangle(const float* p, const float* a, const float* b, const float* c, float* out)
+   {
+      float ab[3], ac[3], ap[3];
+      for (int k = 0; k < 3; k++) { ab[k] = b[k] - a[k]; ac[k] = c[k] - a[k]; ap[k] = p[k] - a[k]; }
+      auto dot = [](const float* x, const float* y) { return x[0] * y[0] + x[1] * y[1] + x[2] * y[2]; };
+      auto mix = [&](float v, float w)
+      {
+         for (int k = 0; k < 3; k++) out[k] = a[k] + ab[k] * v + ac[k] * w;
+      };
+      const float d1 = dot(ab, ap), d2 = dot(ac, ap);
+      if (d1 <= 0.0f && d2 <= 0.0f) { mix(0, 0); return; }
+      float bp[3];
+      for (int k = 0; k < 3; k++) bp[k] = p[k] - b[k];
+      const float d3 = dot(ab, bp), d4 = dot(ac, bp);
+      if (d3 >= 0.0f && d4 <= d3) { mix(1, 0); return; }
+      const float vc = d1 * d4 - d3 * d2;
+      if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) { mix(d1 / (d1 - d3), 0); return; }
+      float cp[3];
+      for (int k = 0; k < 3; k++) cp[k] = p[k] - c[k];
+      const float d5 = dot(ab, cp), d6 = dot(ac, cp);
+      if (d6 >= 0.0f && d5 <= d6) { mix(0, 1); return; }
+      const float vb = d5 * d2 - d1 * d6;
+      if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) { mix(0, d2 / (d2 - d6)); return; }
+      const float va = d3 * d6 - d5 * d4;
+      if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+      {
+         const float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+         mix(1.0f - w, w);
+         return;
+      }
+      const float denom = 1.0f / (va + vb + vc);
+      mix(vb * denom, vc * denom);
+   }
+
+   long long ColliderCellKey(int x, int y, int z)
+   {
+      return ((long long)(x & 0x1FFFFF) << 42) | ((long long)(y & 0x1FFFFF) << 21) | (long long)(z & 0x1FFFFF);
+   }
+}
+
+// The collider is held in the cloth's simulation space (the space mPos lives
+// in, before this node's own position and scale), so the two meet where they
+// are drawn. Rebuilt only when the collider's mesh, its transform or this
+// node's transform changes; an animated collider is followed every frame.
+void ClothNode::RefreshCollider()
+{
+   const Mat4 colModel = collider ? collider->GetModelMatrix() : Mat4::Identity();
+   const Mat4 simModel = GetModelMatrix();
+   const unsigned long long rev = collider ? collider->MeshRevision() : 0;
+   if (mColSource == (const void*)collider && mColRevision == rev && mColModel == colModel &&
+       mColSimModel == simModel)
+      return;
+   mColSource = collider;
+   mColRevision = rev;
+   mColModel = colModel;
+   mColSimModel = simModel;
+   mColTris.clear();
+   mColNormals.clear();
+   mColGrid.clear();
+   if (collider == nullptr)
+      return;
+
+   Mesh local;
+   if (InstanceOnPointsNode* instancer = FindInstancer(collider))
+      local = MeshOps::RealizeInstances(collider->GetMesh(), ResolveInstanceTransforms(collider, instancer), collider->GetInstanceGroupMatrix(), &instancer->InstanceColors(), 256);
+   else
+      local = collider->GetMesh();
+   if (local.Empty())
+      return;
+   const Mesh m = MeshOps::Transform(local, Mat4::Multiply(Mat4::Inverse(simModel), colModel));
+
+   float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+   double edgeSum = 0.0;
+   for (size_t t = 0; t + 2 < m.indices.size(); t += 3)
+   {
+      const Vertex* v[3] = { &m.vertices[m.indices[t]], &m.vertices[m.indices[t + 1]], &m.vertices[m.indices[t + 2]] };
+      float tri[9];
+      for (int i = 0; i < 3; i++)
+      {
+         tri[i * 3 + 0] = v[i]->px; tri[i * 3 + 1] = v[i]->py; tri[i * 3 + 2] = v[i]->pz;
+      }
+      const float e1[3] = { tri[3] - tri[0], tri[4] - tri[1], tri[5] - tri[2] };
+      const float e2[3] = { tri[6] - tri[0], tri[7] - tri[1], tri[8] - tri[2] };
+      float n[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0] };
+      const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+      if (len < 1e-12f)
+         continue;
+      for (int k = 0; k < 3; k++) n[k] /= len;
+      mColTris.insert(mColTris.end(), tri, tri + 9);
+      mColNormals.insert(mColNormals.end(), n, n + 3);
+      for (int i = 0; i < 9; i++)
+      {
+         lo[i % 3] = std::min(lo[i % 3], tri[i]);
+         hi[i % 3] = std::max(hi[i % 3], tri[i]);
+      }
+      edgeSum += std::sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2]);
+   }
+   const size_t triCount = mColTris.size() / 9;
+   if (triCount == 0)
+      return;
+   const float diag = std::sqrt((hi[0] - lo[0]) * (hi[0] - lo[0]) + (hi[1] - lo[1]) * (hi[1] - lo[1]) +
+                                (hi[2] - lo[2]) * (hi[2] - lo[2]));
+   // A point this far inside is still pushed out the near side; deeper than
+   // that it is more likely across a thin wall than through it.
+   mColReach = std::max(diag * 0.1f, std::max(0.0f, colliderDistance) * 4.0f);
+   mColCell = std::max(1e-4f, std::max((float)(edgeSum / (double)triCount) * 2.0f, mColReach));
+   for (size_t t = 0; t < triCount; t++)
+   {
+      const float* tri = &mColTris[t * 9];
+      int c0[3], c1[3];
+      for (int k = 0; k < 3; k++)
+      {
+         const float a = std::min(tri[k], std::min(tri[3 + k], tri[6 + k])) - mColReach;
+         const float b = std::max(tri[k], std::max(tri[3 + k], tri[6 + k])) + mColReach;
+         c0[k] = (int)std::floor(a / mColCell);
+         c1[k] = (int)std::floor(b / mColCell);
+      }
+      for (int x = c0[0]; x <= c1[0]; x++)
+         for (int y = c0[1]; y <= c1[1]; y++)
+            for (int z = c0[2]; z <= c1[2]; z++)
+               mColGrid[ColliderCellKey(x, y, z)].push_back((unsigned int)t);
+   }
+}
+
+// Each free point nearer the collider than the distance, or just inside it,
+// goes back out along the nearest triangle's side, and the contact's friction
+// holds back its sliding the way the ground's does.
+void ClothNode::Collide()
+{
+   if (mColTris.empty())
+      return;
+   const float gap = std::max(0.0f, colliderDistance);
+   const float slide = std::max(0.0f, 1.0f - std::max(0.0f, std::min(colliderFriction, 1.0f)));
+   const size_t pointCount = mPinned.size();
+   for (size_t p = 0; p < pointCount; p++)
+   {
+      if (mPinned[p])
+         continue;
+      float* pos = &mPos[p * 3];
+      const auto cell = mColGrid.find(ColliderCellKey((int)std::floor(pos[0] / mColCell), (int)std::floor(pos[1] / mColCell),
+                                                      (int)std::floor(pos[2] / mColCell)));
+      if (cell == mColGrid.end())
+         continue;
+      float best = 1e30f, bestPoint[3] = { 0, 0, 0 };
+      unsigned int bestTri = 0;
+      for (unsigned int t : cell->second)
+      {
+         const float* tri = &mColTris[(size_t)t * 9];
+         float q[3];
+         ClosestOnTriangle(pos, tri, tri + 3, tri + 6, q);
+         const float d2 = (pos[0] - q[0]) * (pos[0] - q[0]) + (pos[1] - q[1]) * (pos[1] - q[1]) + (pos[2] - q[2]) * (pos[2] - q[2]);
+         if (d2 < best)
+         {
+            best = d2;
+            bestTri = t;
+            bestPoint[0] = q[0]; bestPoint[1] = q[1]; bestPoint[2] = q[2];
+         }
+      }
+      if (best >= 1e30f)
+         continue;
+      const float* n = &mColNormals[(size_t)bestTri * 3];
+      const float side = (pos[0] - bestPoint[0]) * n[0] + (pos[1] - bestPoint[1]) * n[1] + (pos[2] - bestPoint[2]) * n[2];
+      const float dist = std::sqrt(best);
+      const bool inside = side < 0.0f;
+      if (inside ? dist > mColReach : dist >= gap)
+         continue;
+      // Out along the face normal to the surface, then the gap off it.
+      const float push = gap - side;
+      float* prev = &mPrev[p * 3];
+      for (int k = 0; k < 3; k++)
+         pos[k] += n[k] * push;
+      // Velocity is pos - prev: drop its inward part, keep a share of the slide.
+      float v[3] = { pos[0] - prev[0], pos[1] - prev[1], pos[2] - prev[2] };
+      const float vn = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];
+      for (int k = 0; k < 3; k++)
+      {
+         const float normal = n[k] * std::max(0.0f, vn);
+         const float tangent = (v[k] - n[k] * vn) * slide;
+         prev[k] = pos[k] - normal - tangent;
+      }
+   }
+}
+
 void ClothNode::Step(float dt, float elapsed)
 {
    const size_t pointCount = mPinned.size();
@@ -1671,11 +1890,18 @@ void ClothNode::Step(float dt, float elapsed)
    // Gauss-Seidel constraint projection. More iterations means a stiffer,
    // less stretchy cloth; this is the knob that actually controls stiffness.
    const int passes = std::max(1, std::min(iterations, 40));
-   const float k = std::max(0.0f, std::min(stiffness, 1.0f));
+   const float stretchK = std::max(0.0f, std::min(stiffness, 1.0f));
+   // Bending is far softer than stretch in real fabric; squaring the knob
+   // spreads the useful range (silk to felt) across its travel.
+   const float bendK = stretchK * std::pow(std::max(0.0f, std::min(bending, 1.0f)), 2.0f);
    for (int pass = 0; pass < passes; pass++)
    {
-      for (const Constraint& c : mConstraints)
+      for (int set = 0; set < 2; set++)
+      for (const Constraint& c : set == 0 ? mConstraints : mBends)
       {
+         const float k = set == 0 ? stretchK : bendK;
+         if (k <= 0.0f)
+            break;
          float dx = mPos[c.b * 3 + 0] - mPos[c.a * 3 + 0];
          float dy = mPos[c.b * 3 + 1] - mPos[c.a * 3 + 1];
          float dz = mPos[c.b * 3 + 2] - mPos[c.a * 3 + 2];
@@ -1714,6 +1940,8 @@ void ClothNode::Step(float dt, float elapsed)
          }
       }
    }
+
+   Collide();
 
    if (groundEnabled)
    {
@@ -1792,6 +2020,8 @@ void ClothNode::CookIfNeeded(int frameId)
 
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+   if (auto* upstream = dynamic_cast<INode*>(collider))
+      upstream->CookIfNeeded(frameId);
 
    // Bypassed: forward the upstream mesh untouched (see GetMesh()) and do not
    // step the solver - no point spending the CPU on a simulation nothing is
@@ -1855,6 +2085,7 @@ void ClothNode::CookIfNeeded(int frameId)
 
    if (mPinned.empty())
       return;
+   RefreshCollider();
 
    const double beats = Transport::Instance().Beats();
    const float bpm = std::max(1.0f, Transport::Instance().Tempo());

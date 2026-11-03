@@ -521,6 +521,7 @@ namespace app
       ModSlider("damping", &n->damping, 0.0f, 0.5f);
       ModSlider("mass", &n->mass, 0.05f, 10.0f);
       ModSlider("hold shape", &n->shapeRetention, 0.0f, 1.0f);
+      ModSlider("bending", &n->bending, 0.0f, 1.0f);
 
       NodeSeparator("forces");
       ModSlider("gravity x", &n->gravityX, -20.0f, 20.0f);
@@ -539,6 +540,12 @@ namespace app
          ModSlider("bounce", &n->bounce, 0.0f, 1.0f);
          ModSlider("friction", &n->friction, 0.0f, 1.0f);
       }
+
+      NodeSeparator("collider");
+      ImGui::BeginDisabled(n->collider == nullptr);
+      ModSlider("distance", &n->colliderDistance, 0.0f, 0.2f);
+      ModSlider("friction##collider", &n->colliderFriction, 0.0f, 1.0f);
+      ImGui::EndDisabled();
    }
 
 

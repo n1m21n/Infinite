@@ -82,6 +82,11 @@ def export_rest(path, sources):
 if objs:
     export_rest(os.path.join(case, "geo.glb"), objs)
 
+# Cloth colliders: still objects the sheet drapes over, out as <case>/collider.glb.
+cols = [add_shape(o, "col%d" % i) for i, o in enumerate(scene.get("colliders", []))]
+if cols:
+    export_rest(os.path.join(case, "collider.glb"), cols)
+
 lines = []
 
 if kind == "rigid":
@@ -172,6 +177,9 @@ elif kind == "cloth":
         gp = ground_plane()
         gp.modifiers.new("collision", "COLLISION")
         gp.collision.cloth_friction = c.get("friction", 5.0)
+    for col in cols:
+        col.modifiers.new("collision", "COLLISION")
+        col.collision.cloth_friction = c.get("friction", 5.0)
     for f in range(1, frames + 1):
         sc.frame_set(f)
         dg = bpy.context.evaluated_depsgraph_get()

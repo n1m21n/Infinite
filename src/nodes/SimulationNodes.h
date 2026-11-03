@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Geometry3DNodes.h"
@@ -316,10 +317,16 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
-   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
-   const char* InputLabel(int) const override { return "geo"; }
+   // Optional: a mesh the cloth drapes over and cannot pass through.
+   IGeometrySource* collider = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return slot == 0 ? &input : slot == 1 ? &collider : nullptr;
+   }
+   const char* InputLabel(int slot) const override { return slot == 1 ? "collider" : "geo"; }
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
-   size_t ConstraintCount() const { return mConstraints.size(); }
+   size_t ConstraintCount() const { return mConstraints.size() + mBends.size(); }
+   size_t ColliderTriangleCount() const { return mColTris.size() / 9; }
    void Reset();
 
    int pinMode = kPinTop;
@@ -328,7 +335,7 @@ public:
    float damping = 0.02f;
    float mass = 1.0f;
 
-   float gravityX = 0.0f, gravityY = -4.0f, gravityZ = 0.0f;
+   float gravityX = 0.0f, gravityY = -9.8f, gravityZ = 0.0f;
    float windX = 0.0f, windY = 0.0f, windZ = 0.0f;
    float windTurbulence = 0.0f;
 
@@ -337,9 +344,17 @@ public:
    float bounce = 0.0f;
    float friction = 0.5f;
 
+   // How far the cloth stays off the collider's surface, and how much that
+   // contact holds it from sliding.
+   float colliderDistance = 0.015f;
+   float colliderFriction = 0.5f;
+
    // Pulls every point back toward where it started. At 0 the mesh drapes
    // freely; turned up it behaves like a soft solid that remembers its shape.
    float shapeRetention = 0.0f;
+   // Resistance to folding: 0 creases like tissue, 1 holds a fold like felt.
+   // 0.1 folds like Blender's default cloth (tools/blender-ab, cloth_drape).
+   float bending = 0.1f;
 
    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
    float uniformScale = 1.0f;
@@ -385,6 +400,8 @@ public:
       v.Bool("groundEnabled", groundEnabled); v.Float("groundHeight", groundHeight);
       v.Float("bounce", bounce); v.Float("friction", friction);
       v.Float("shapeRetention", shapeRetention);
+      v.Float("bending", bending);
+      v.Float("colliderDistance", colliderDistance); v.Float("colliderFriction", colliderFriction);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("scale", uniformScale);
       v.Bool("inherit", inheritMaterial);
@@ -409,11 +426,26 @@ private:
    };
 
    void RebuildFromInput();
+   void RefreshCollider();
+   void Collide();
    void Step(float dt, float elapsed);
 
    Mesh mMesh;               // the deformed mesh handed downstream
    Mesh mRest;               // the input as it arrived, for reset and retention
    std::vector<Constraint> mConstraints;
+   // Across each edge two triangles share: their far corners, at rest distance.
+   std::vector<Constraint> mBends;
+
+   // The collider in the cloth's simulation space: 9 floats per triangle, its
+   // unit normal, and a uniform grid of triangle lists for the nearest search.
+   std::vector<float> mColTris, mColNormals;
+   std::unordered_map<long long, std::vector<unsigned int>> mColGrid;
+   float mColCell = 1.0f;
+   float mColReach = 0.0f;   // deepest a point may sit inside and still be pushed out
+   const void* mColSource = nullptr;
+   unsigned long long mColRevision = 0;
+   Mat4 mColModel;
+   Mat4 mColSimModel;
 
    // Simulation state lives on welded points, not mesh vertices: a UV seam
    // duplicates vertices, and simulating those independently tears the surface
