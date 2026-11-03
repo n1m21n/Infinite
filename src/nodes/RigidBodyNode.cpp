@@ -57,6 +57,102 @@ namespace
                a.m[2] * v.x + a.m[5] * v.y + a.m[8] * v.z);
    }
 
+   Quat FromMat(const Mat3& r)
+   {
+      Quat q;
+      const float* m = r.m;
+      const float tr = m[0] + m[4] + m[8];
+      if (tr > 0.0f)
+      {
+         const float s = std::sqrt(tr + 1.0f) * 2.0f;
+         q.w = 0.25f * s; q.x = (m[7] - m[5]) / s; q.y = (m[2] - m[6]) / s; q.z = (m[3] - m[1]) / s;
+      }
+      else if (m[0] > m[4] && m[0] > m[8])
+      {
+         const float s = std::sqrt(1.0f + m[0] - m[4] - m[8]) * 2.0f;
+         q.w = (m[7] - m[5]) / s; q.x = 0.25f * s; q.y = (m[1] + m[3]) / s; q.z = (m[2] + m[6]) / s;
+      }
+      else if (m[4] > m[8])
+      {
+         const float s = std::sqrt(1.0f + m[4] - m[0] - m[8]) * 2.0f;
+         q.w = (m[2] - m[6]) / s; q.x = (m[1] + m[3]) / s; q.y = 0.25f * s; q.z = (m[5] + m[7]) / s;
+      }
+      else
+      {
+         const float s = std::sqrt(1.0f + m[8] - m[0] - m[4]) * 2.0f;
+         q.w = (m[3] - m[1]) / s; q.x = (m[2] + m[6]) / s; q.y = (m[5] + m[7]) / s; q.z = 0.25f * s;
+      }
+      const float l = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+      q.w /= l; q.x /= l; q.y /= l; q.z /= l;
+      return q;
+   }
+
+   // The piece's own axes, from its faces: the direction with the most face
+   // area, then the most-area direction at right angles to it. Columns of the
+   // result are those axes in world space, ordered and signed to sit closest to
+   // x, y and z, so a piece that is already square to the world keeps the
+   // identity. False when the faces give no two perpendicular directions.
+   bool FaceFrame(const std::vector<Vec3>& p, const std::vector<unsigned int>& tris, Mat3& out)
+   {
+      struct Dir { Vec3 n; float area; };
+      std::vector<Dir> dirs;
+      for (size_t t = 0; t + 2 < tris.size(); t += 3)
+      {
+         Vec3 n = Cross(p[tris[t + 1]] - p[tris[t]], p[tris[t + 2]] - p[tris[t]]);
+         const float l = Len(n);
+         if (l < 1e-12f)
+            continue;
+         n = n * (1.0f / l);
+         bool merged = false;
+         for (Dir& d : dirs)
+         {
+            const float c = Dot(d.n, n);
+            if (std::fabs(c) > 0.995f)
+            {
+               d.area += l;
+               merged = true;
+               break;
+            }
+         }
+         if (!merged)
+            dirs.push_back({ n, l });
+      }
+      if (dirs.size() < 2)
+         return false;
+      std::stable_sort(dirs.begin(), dirs.end(), [](const Dir& a, const Dir& b) { return a.area > b.area; });
+      const Vec3 a1 = dirs[0].n;
+      int second = -1;
+      for (size_t i = 1; i < dirs.size(); i++)
+         if (std::fabs(Dot(dirs[i].n, a1)) < 0.05f) { second = (int)i; break; }
+      if (second < 0)
+         return false;
+      const Vec3 a3 = Norm(Cross(a1, dirs[(size_t)second].n));
+      const Vec3 a2 = Cross(a3, a1);
+      Vec3 cols[3] = { a1, a2, a3 };
+      // Greedy: world x, y, z each take the free axis most parallel to it.
+      const Vec3 world[3] = { V(1, 0, 0), V(0, 1, 0), V(0, 0, 1) };
+      bool used[3] = { false, false, false };
+      Vec3 picked[3];
+      for (int w = 0; w < 3; w++)
+      {
+         int best = -1;
+         float bestDot = -1.0f;
+         for (int c = 0; c < 3; c++)
+            if (!used[c] && std::fabs(Dot(cols[c], world[w])) > bestDot) { bestDot = std::fabs(Dot(cols[c], world[w])); best = c; }
+         used[best] = true;
+         picked[w] = Dot(cols[best], world[w]) < 0.0f ? cols[best] * -1.0f : cols[best];
+      }
+      if (Dot(Cross(picked[0], picked[1]), picked[2]) < 0.0f)
+         picked[2] = picked[2] * -1.0f;
+      for (int r = 0; r < 3; r++)
+      {
+         out.m[r * 3 + 0] = r == 0 ? picked[0].x : r == 1 ? picked[0].y : picked[0].z;
+         out.m[r * 3 + 1] = r == 0 ? picked[1].x : r == 1 ? picked[1].y : picked[1].z;
+         out.m[r * 3 + 2] = r == 0 ? picked[2].x : r == 1 ? picked[2].y : picked[2].z;
+      }
+      return true;
+   }
+
    // The inertia of a box or sphere, per unit mass, in the body frame (diagonal).
    Vec3 UnitInertia(const Body& b)
    {
@@ -78,6 +174,7 @@ namespace
       float depth = 0.0f;
       float vn0 = 0.0f;         // closing speed when the step began
       float jn = 0.0f, jt1 = 0.0f, jt2 = 0.0f;
+      unsigned long long key = 0;   // the same body pair and feature next step
       Vec3 t1, t2;
    };
 
@@ -204,6 +301,13 @@ namespace
       return true;
    }
 
+   // Body a, body b (-1 the world, with the plane in the feature's high bits)
+   // and the sample point: what makes a contact the same one from step to step.
+   unsigned long long ContactKey(int a, int b, unsigned int feature)
+   {
+      return ((unsigned long long)(unsigned int)a << 48) | ((unsigned long long)(unsigned int)(b + 1) << 32) | feature;
+   }
+
    void CollidePair(const std::vector<Body>& bodies, const std::vector<Pose>& poses, int ia, int ib,
                     std::vector<Contact>& out)
    {
@@ -215,9 +319,10 @@ namespace
       if (Len(pa.pos - pb.pos) > reach)
          return;
 
-      auto add = [&](int a, int b, Vec3 p, Vec3 n, float depth)
+      auto add = [&](int a, int b, Vec3 p, Vec3 n, float depth, unsigned int feature)
       {
          Contact c; c.a = a; c.b = b; c.p = p; c.n = n; c.depth = depth;
+         c.key = ContactKey(a, b, feature);
          out.push_back(c);
       };
 
@@ -229,7 +334,7 @@ namespace
          if (pen > 0.0f)
          {
             const Vec3 n = l > 1e-8f ? d * (1.0f / l) : V(0, 1, 0);
-            add(ia, ib, pb.pos + n * B.radius, n, pen);
+            add(ia, ib, pb.pos + n * B.radius, n, pen, 0);
          }
          return;
       }
@@ -249,33 +354,33 @@ namespace
          if (bestPlane >= 0 && best < S.radius)
          {
             const Vec3 n = Mul(pp.rot, P.planes[(size_t)bestPlane].n);
-            add(is, ip, ps.pos - n * S.radius, n, S.radius - best);
+            add(is, ip, ps.pos - n * S.radius, n, S.radius - best, 0);
          }
-         for (const Vec3& q : P.points)
+         for (size_t k = 0; k < P.points.size(); k++)
          {
-            const Vec3 w = pp.pos + Mul(pp.rot, q);
+            const Vec3 w = pp.pos + Mul(pp.rot, P.points[k]);
             const Vec3 d = w - ps.pos;
             const float dl = Len(d);
             if (dl < S.radius && dl > 1e-8f)
-               add(ip, is, w, d * (1.0f / dl), S.radius - dl);
+               add(ip, is, w, d * (1.0f / dl), S.radius - dl, (unsigned int)k);
          }
       };
       if (A.sphere) { sphereVsPoly(ia, A, pa, ib, B, pb); return; }
       if (B.sphere) { sphereVsPoly(ib, B, pb, ia, A, pa); return; }
 
-      for (const Vec3& q : A.points)
+      for (size_t k = 0; k < A.points.size(); k++)
       {
-         const Vec3 w = pa.pos + Mul(pa.rot, q);
+         const Vec3 w = pa.pos + Mul(pa.rot, A.points[k]);
          Vec3 n; float depth;
          if (PointInside(B, pb, w, n, depth))
-            add(ia, ib, w, n, depth);
+            add(ia, ib, w, n, depth, (unsigned int)k);
       }
-      for (const Vec3& q : B.points)
+      for (size_t k = 0; k < B.points.size(); k++)
       {
-         const Vec3 w = pb.pos + Mul(pb.rot, q);
+         const Vec3 w = pb.pos + Mul(pb.rot, B.points[k]);
          Vec3 n; float depth;
          if (PointInside(A, pa, w, n, depth))
-            add(ib, ia, w, n, depth);
+            add(ib, ia, w, n, depth, (unsigned int)k);
       }
    }
 }
@@ -342,17 +447,58 @@ void RigidBodyNode::RebuildFromInput()
       mBodies[index].verts.push_back((unsigned int)i);
    }
 
-   for (Body& b : mBodies)
+   // Each body's triangles, for its face frame.
+   std::vector<int> bodyOfVertex(src.vertices.size(), -1);
+   for (size_t bi = 0; bi < mBodies.size(); bi++)
+      for (unsigned int vi : mBodies[bi].verts)
+         bodyOfVertex[vi] = (int)bi;
+   std::vector<std::vector<unsigned int>> bodyTris(mBodies.size());
+   for (size_t t = 0; t + 2 < src.indices.size(); t += 3)
    {
-      Vec3 lo = V(1e30f, 1e30f, 1e30f), hi = V(-1e30f, -1e30f, -1e30f);
-      for (unsigned int vi : b.verts)
+      const int bi = bodyOfVertex[src.indices[t]];
+      if (bi >= 0)
+         for (int k = 0; k < 3; k++)
+            bodyTris[(size_t)bi].push_back(src.indices[t + (size_t)k]);
+   }
+   std::vector<Vec3> world(src.vertices.size());
+   for (size_t i = 0; i < src.vertices.size(); i++)
+      world[i] = V(src.vertices[i].px, src.vertices[i].py, src.vertices[i].pz);
+
+   for (size_t bi = 0; bi < mBodies.size(); bi++)
+   {
+      Body& b = mBodies[bi];
+      // The box (and the hull's frame and inertia) sits on the piece's own
+      // axes when that box is tighter than the world-aligned one, so a turned
+      // cube is a turned cube and not its larger axis-aligned bounds.
+      auto bounds = [&](const Mat3& r, Vec3& lo, Vec3& hi)
       {
-         const Vertex& v = src.vertices[vi];
-         lo = V(std::min(lo.x, v.px), std::min(lo.y, v.py), std::min(lo.z, v.pz));
-         hi = V(std::max(hi.x, v.px), std::max(hi.y, v.py), std::max(hi.z, v.pz));
+         lo = V(1e30f, 1e30f, 1e30f);
+         hi = V(-1e30f, -1e30f, -1e30f);
+         for (unsigned int vi : b.verts)
+         {
+            const Vec3 l = MulT(r, world[vi]);
+            lo = V(std::min(lo.x, l.x), std::min(lo.y, l.y), std::min(lo.z, l.z));
+            hi = V(std::max(hi.x, l.x), std::max(hi.y, l.y), std::max(hi.z, l.z));
+         }
+      };
+      Mat3 frame;
+      Vec3 lo, hi;
+      bounds(frame, lo, hi);
+      Mat3 faces;
+      if (collider != kSphere && FaceFrame(world, bodyTris[bi], faces))
+      {
+         Vec3 flo, fhi;
+         bounds(faces, flo, fhi);
+         const Vec3 e = hi - lo, fe = fhi - flo;
+         if (fe.x * fe.y * fe.z < e.x * e.y * e.z * 0.99f)
+         {
+            frame = faces;
+            lo = flo;
+            hi = fhi;
+         }
       }
-      b.pos = (lo + hi) * 0.5f;
-      b.rot = Quat();
+      b.pos = Mul(frame, (lo + hi) * 0.5f);
+      b.rot = FromMat(frame);
       b.half = V(std::max(0.005f, (hi.x - lo.x) * 0.5f), std::max(0.005f, (hi.y - lo.y) * 0.5f),
                  std::max(0.005f, (hi.z - lo.z) * 0.5f));
       b.local.reserve(b.verts.size());
@@ -360,8 +506,8 @@ void RigidBodyNode::RebuildFromInput()
       for (unsigned int vi : b.verts)
       {
          const Vertex& v = src.vertices[vi];
-         b.local.push_back(V(v.px, v.py, v.pz) - b.pos);
-         b.localNormal.push_back(V(v.nx, v.ny, v.nz));
+         b.local.push_back(MulT(frame, world[vi] - b.pos));
+         b.localNormal.push_back(MulT(frame, V(v.nx, v.ny, v.nz)));
       }
 
       b.sphere = (collider == kSphere);
@@ -395,6 +541,7 @@ void RigidBodyNode::Reset()
       b.vel = V(velX, velY, velZ);
       b.spin = V(spinX, spinY, spinZ);
    }
+   mWarm.clear();
    mAccumulator = 0.0f;
    mElapsed = 0.0f;
    mLastBeats = -1.0;
@@ -461,8 +608,9 @@ void RigidBodyNode::Step(float dt)
    for (size_t i = 0; i < n; i++)
    {
       const Body& b = mBodies[i];
-      for (const HalfSpace& h : world)
+      for (size_t hi = 0; hi < world.size(); hi++)
       {
+         const HalfSpace& h = world[hi];
          if (b.sphere)
          {
             const float pen = h.s - (Dot(h.n, b.pos) - b.radius);
@@ -470,19 +618,21 @@ void RigidBodyNode::Step(float dt)
             {
                Contact c; c.a = (int)i; c.b = -1; c.n = h.n; c.depth = pen;
                c.p = b.pos - h.n * b.radius;
+               c.key = ContactKey((int)i, -1, (unsigned int)hi << 16);
                contacts.push_back(c);
             }
             continue;
          }
          if (Dot(h.n, b.pos) - b.boundRadius > h.s)
             continue;
-         for (const Vec3& q : b.points)
+         for (size_t k = 0; k < b.points.size(); k++)
          {
-            const Vec3 w = b.pos + Mul(poses[i].rot, q);
+            const Vec3 w = b.pos + Mul(poses[i].rot, b.points[k]);
             const float pen = h.s - Dot(h.n, w);
             if (pen > 0.0f)
             {
                Contact c; c.a = (int)i; c.b = -1; c.n = h.n; c.depth = pen; c.p = w;
+               c.key = ContactKey((int)i, -1, ((unsigned int)hi << 16) | (unsigned int)k);
                contacts.push_back(c);
             }
          }
@@ -507,7 +657,7 @@ void RigidBodyNode::Step(float dt)
       c.t2 = Cross(c.n, c.t1);
    }
 
-   const float slop = 0.005f;
+   const float slop = 0.002f;
    const float beta = 0.2f / dt;
    const int iters = std::max(1, std::min(100, iterations));
    const float mu = std::max(0.0f, friction);
@@ -552,6 +702,21 @@ void RigidBodyNode::Step(float dt)
       }
    };
 
+   // Warm start: a contact that was there last step begins with last step's
+   // impulses, so a resting stack carries its weight from the first iteration
+   // instead of sinking a little and sliding a little every step.
+   for (Contact& c : contacts)
+   {
+      const auto it = mWarm.find(c.key);
+      if (it == mWarm.end())
+         continue;
+      c.jn = it->second.x;
+      const float limit = mu * c.jn;
+      c.jt1 = std::max(-limit, std::min(limit, it->second.y));
+      c.jt2 = std::max(-limit, std::min(limit, it->second.z));
+      apply(c, c.n * c.jn + c.t1 * c.jt1 + c.t2 * c.jt2);
+   }
+
    for (int it = 0; it < iters; it++)
    {
       for (Contact& c : contacts)
@@ -579,6 +744,9 @@ void RigidBodyNode::Step(float dt)
          apply(c, c.n * (c.jn - old));
       }
    }
+   mWarm.clear();
+   for (const Contact& c : contacts)
+      mWarm[c.key] = V(c.jn, c.jt1, c.jt2);
 
    for (size_t i = 0; i < n; i++)
    {

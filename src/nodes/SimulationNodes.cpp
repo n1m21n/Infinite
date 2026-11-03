@@ -1641,9 +1641,11 @@ void ClothNode::Step(float dt, float elapsed)
          continue;
       }
 
-      float ax = gravityX + windX;
-      float ay = gravityY + windY;
-      float az = gravityZ + windZ;
+      // Wind is a force, so a heavier cloth moves less; gravity is an
+      // acceleration and pulls every mass the same.
+      float ax = windX;
+      float ay = windY;
+      float az = windZ;
 
       if (windTurbulence > 0.0f)
       {
@@ -1652,6 +1654,9 @@ void ClothNode::Step(float dt, float elapsed)
          ay += Noise3(y, z + elapsed, x) * windTurbulence;
          az += Noise3(z, x, y + elapsed) * windTurbulence;
       }
+      ax = ax * invMass + gravityX;
+      ay = ay * invMass + gravityY;
+      az = az * invMass + gravityZ;
 
       for (int k = 0; k < 3; k++)
       {
@@ -1659,7 +1664,7 @@ void ClothNode::Step(float dt, float elapsed)
          const float current = mPos[p * 3 + k];
          const float velocity = (current - mPrev[p * 3 + k]) * retain;
          mPrev[p * 3 + k] = current;
-         mPos[p * 3 + k] = current + velocity + accel * invMass * dt * dt;
+         mPos[p * 3 + k] = current + velocity + accel * dt * dt;
       }
    }
 

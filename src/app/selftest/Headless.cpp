@@ -6,6 +6,50 @@
 #include <functional>
 #include <thread>
 
+namespace
+{
+   // --geometry: one JSON line per exported time. World-space vertices as a flat
+   // x,y,z list, triangles on the first line only (topology does not change
+   // under a sim), and the point cloud as x,y,z when there is one.
+   bool WriteGeometryLine(const std::string& path, double time, int frame, IGeometrySource& geo, bool first)
+   {
+      FILE* f = std::fopen(path.c_str(), first ? "wb" : "ab");
+      if (f == nullptr)
+         return false;
+      const Mesh& mesh = geo.GetMesh();
+      const Mat4 m = geo.GetModelMatrix();
+      std::fprintf(f, "{\"time\":%.6g,\"frame\":%d,\"v\":[", time, frame);
+      for (size_t k = 0; k < mesh.vertices.size(); k++)
+      {
+         const Vertex& v = mesh.vertices[k];
+         const float x = m.m[0] * v.px + m.m[4] * v.py + m.m[8] * v.pz + m.m[12];
+         const float y = m.m[1] * v.px + m.m[5] * v.py + m.m[9] * v.pz + m.m[13];
+         const float z = m.m[2] * v.px + m.m[6] * v.py + m.m[10] * v.pz + m.m[14];
+         std::fprintf(f, "%s%.6g,%.6g,%.6g", k ? "," : "", x, y, z);
+      }
+      std::fputs("]", f);
+      if (first)
+      {
+         std::fputs(",\"i\":[", f);
+         for (size_t k = 0; k < mesh.indices.size(); k++)
+            std::fprintf(f, "%s%u", k ? "," : "", mesh.indices[k]);
+         std::fputs("]", f);
+      }
+      if (const std::vector<Particle>* cloud = geo.GetPointCloud())
+      {
+         std::fputs(",\"p\":[", f);
+         for (size_t k = 0; k < cloud->size(); k++)
+         {
+            const Particle& p = (*cloud)[k];
+            std::fprintf(f, "%s%.6g,%.6g,%.6g", k ? "," : "", p.px, p.py, p.pz);
+         }
+         std::fputs("]", f);
+      }
+      std::fputs("}\n", f);
+      return std::fclose(f) == 0;
+   }
+}
+
 namespace app
 {
 // ---- headless jobs: the per-frame driver for --render / --frame ----
@@ -1828,6 +1872,20 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
             for (GraphNode& gn : gNodes)
                if (!gn.node->bypassed)
                   gn.node->CookIfNeeded(frameId);
+         }
+         if (sNextFrame == target && !job.geometry.empty())
+         {
+            auto* geo = dynamic_cast<IGeometrySource*>(sTap);
+            if (geo == nullptr)
+               return fail("E_USAGE", "--geometry: --node " + job.node + " is not a 3D node");
+            if (!WriteGeometryLine(job.geometry, sTimes[sNextTime], target, *geo, sNextTime == 0))
+               return fail("E_RENDER", "could not write " + job.geometry);
+            if (sTap->GetOutputWidth() <= 0 || sTap->GetOutputHeight() <= 0)
+            {
+               sStatus.frames++;
+               sNextTime++;
+               continue;
+            }
          }
          if (sNextFrame == target)
          {

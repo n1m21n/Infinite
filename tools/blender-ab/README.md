@@ -98,3 +98,43 @@ than 0.01 over its baseline. `--set-baseline hero` leaves other cases untouched.
 Render 3D has three light pins, so the hero uses point, spot and area plus the HDRI's
 extracted sun as the fourth light. Asset sources and licences: `assets/SOURCES.md`
 (`assets/fetch.py` re-downloads them).
+
+## Physics cases (motion, not pictures)
+
+```
+python3 tools/blender-ab/physics.py --out /tmp/blender-ab-physics            # every physics case
+python3 tools/blender-ab/physics.py --out /tmp/blender-ab-physics rb_drop    # one case
+python3 tools/blender-ab/physics.py --out /tmp/blender-ab-physics --set-baseline
+```
+
+```
+physics.py CASES ──scene.json──> blender_physics.py ──> truth.jsonl (per frame) + geo.glb
+                             └──> physics.patch ──> inf.inf ──> Infinite --frame --geometry ──> inf.jsonl
+truth.jsonl + inf.jsonl ──> error over time ──> results.jsonl, curve.png per case, board.png
+```
+
+Infinite's side is `--frame <patch> <t0,t1,...> <dir>/ --node 1 --geometry <file.jsonl>`: every
+frame is stepped in order and the node's world-space vertices (or points) are written per time.
+
+| Kind | Infinite node | Error (the gated number) | Also reported |
+|---|---|---|---|
+| `rigid` | Rigid Bodies | RMS distance of each body's centre from Blender's, metres | rotation error (deg), final positions |
+| `cloth` | Cloth | mean distance of each vertex from its Blender vertex, metres | lowest point curve |
+| `particles` | Particle System | RMS of the cloud's mean height, metres | peak height, alive count |
+
+Scene keys: `kind`, `duration`, `gravity` (Blender Z-up vector; leaning gravity stands in for a
+slope), `ground` (height or null), `objects[]` (`cube`, `sphere`, `grid`, with `size`, `location`,
+`rotation` in degrees, `subdivisions`), and `body` (rigid: `friction`, `bounce`,
+`linear_damping`, `angular_damping`, `collider`), `cloth` (`pin` none/top/corners/edges,
+`air_damping`, `vertex_mass`, `tension`, `shear`, `bending`) or `particles` (`rate`, `velocity`).
+
+Unit mapping (`physics.patch` holds it):
+
+| Blender | Infinite |
+|---|---|
+| Rigid damping d (Bullet: v × (1 − d) per second) | damping d' with e^(−10 d') = 1 − d |
+| Rigid friction, restitution (ground = 1, Bullet multiplies) | friction, bounce |
+| Cloth air damping a, vertex mass m (drag 0.01 a v, time in frames) | damping 1 − e^(−0.01 a fps / m / 120) per step, mass 1 |
+| Cloth pin group | the same rule as Cloth's pin mode, on the rest bounds |
+
+A case fails when its error rises more than 10% over `baseline_physics.json`.
