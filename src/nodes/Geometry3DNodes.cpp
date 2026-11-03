@@ -703,6 +703,9 @@ namespace
       "      sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
       "   }\n"
       "   sampled.xy *= uNormalStrength;\n"
+      // A texel with z <= 0 (any image that is not a normal map) would flip the surface, so
+      // strength 0 must land exactly on the plain normal.
+      "   sampled.z = max(sampled.z, 1e-3);\n"
       "   return normalize(tbn * sampled);\n"
       "}\n"
       "\n"
@@ -928,7 +931,7 @@ namespace
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(n, vWorldPos, mapUv, tangent, bitangent);\n"
       "   if (abs(uAnisotropy) > 0.001) {\n"
-      "      float rotRad = uAnisotropyRotation * 6.2831853;\n"
+      "      float rotRad = uAnisotropyRotation * 3.1415927;\n"   // the lobe repeats every half turn
       "      vec3 tRot = normalize(tangent * cos(rotRad) + bitangent * sin(rotRad));\n"
       "      bitangent = normalize(cross(n, tRot));\n"
       "      tangent = tRot;\n"
@@ -1000,7 +1003,7 @@ namespace
       "      } else {\n"
       "         nDotL = max(dot(n, shadeDir), 0.0);\n"
       "      }\n"
-      "      float sssWrap = uSubsurfaceRadius * 2.0;\n"
+      "      float sssWrap = uSubsurfaceRadius * 0.5;\n"   // was saturated by half the slider
       "      float sssNdotL = clamp((dot(n, lightDir) + sssWrap) / (1.0 + sssWrap), 0.0, 1.0);\n"
       "      vec3 sssRadiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
       "      col += base * uSubsurfaceColor * sssNdotL * uSubsurface * sssRadiance * uLightTerms[i].x;\n"
@@ -1074,10 +1077,11 @@ namespace
       "      vec2 bendDir = uvB - uvA;\n"
       "      float bendStrength = (uIor - 1.0) * 4.0 * trans;\n"
       "      vec2 refractUv = clamp(gl_FragCoord.xy / uScreenSize + bendDir * bendStrength, 0.0, 1.0);\n"
-      "      float lod = clamp(uTransmissionRoughness, 0.0, 1.0) * uSceneMaxLod;\n"
+      // sqrt: the blur is spread over the whole slider instead of its last quarter.
+      "      float lod = sqrt(clamp(uTransmissionRoughness, 0.0, 1.0)) * uSceneMaxLod;\n"
       "      vec3 refracted;\n"
       "      if (uDispersion > 0.001) {\n"
-      "         vec2 dispOffset = bendDir * (uDispersion * 0.04);\n"
+      "         vec2 dispOffset = bendDir * (uDispersion * 1.2);\n"   // a few pixels at full, not sub-pixel
       "         float r = textureLod(uSceneColor, clamp(refractUv - dispOffset, 0.0, 1.0), lod).r;\n"
       "         float g = textureLod(uSceneColor, refractUv, lod).g;\n"
       "         float b = textureLod(uSceneColor, clamp(refractUv + dispOffset, 0.0, 1.0), lod).b;\n"

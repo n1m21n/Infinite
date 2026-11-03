@@ -2084,7 +2084,7 @@ namespace app
       ModSlider("kelvin", &n->temperature, 800.0f, 20000.0f, "%.0f K");
       ImGui::EndDisabled();
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
-      ModSlider("exposure", &n->exposure, -10.0f, 10.0f, "%.2f");
+      ModSlider("exposure", &n->exposure, -6.0f, 6.0f, "%.2f");   // white by +3, black by -6
       ImGui::BeginDisabled(!(n->type == 1 || n->type == 4 || n->type == 5));
       ModSlider("falloff", &n->falloff, 0.0f, 4.0f);
       ModCheckbox("cutoff", &n->useCutoff);

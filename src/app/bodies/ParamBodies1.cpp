@@ -330,7 +330,10 @@ namespace app
 
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
-      ModSlider("sun threshold", &n->sunThreshold, 0.0f, 100.0f);
+      // Skewed so half the travel covers 0..5, where most skies' suns are cut; the rest reaches 100.
+      ModSlider("sun threshold", &n->sunThreshold, 0.0f, 100.0f, "%.3f", kParamWidth, false, 0.0f,
+                [](float p, float lo, float hi) { return SkewTaperMath::PosToValue(p, lo, hi, 5.0f); },
+                [](float v, float lo, float hi) { return SkewTaperMath::ValueToPos(v, lo, hi, 5.0f); });
    }
 
 
