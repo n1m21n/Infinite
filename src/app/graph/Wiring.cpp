@@ -421,7 +421,7 @@ namespace app
       if (dynamic_cast<DepthProjectionNode*>(gn.node.get()) != nullptr)
          return 2; // depth and optional color
       if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 2; // geo, optional collider
       if (dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr)
          return 1; // optional geometry to be born on
       if (dynamic_cast<RigidBodyNode*>(gn.node.get()) != nullptr)
