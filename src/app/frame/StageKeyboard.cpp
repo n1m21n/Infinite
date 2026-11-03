@@ -974,14 +974,23 @@ void DrawKeyboard(FrameCtx& fc)
             gDragSnapshotPushed = true;
          }
       }
+      // A release that ends a node drag; any other release (a panel click) leaves the layout alone.
+      const bool dragEnded = ImGui::IsMouseReleased(ImGuiMouseButton_Left) && gDragSnapshotValid && gDragSnapshotPushed;
       if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
          gDragSnapshotValid = false;
 
-      // ---- snap to grid once the drag finishes ----
-      if (gSnapToGrid && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+      // ---- snap the dragged (selected) nodes to the grid once the drag finishes ----
+      if (gSnapToGrid && dragEnded)
       {
-         for (GraphNode& gn : gNodes)
+         const int selCount = ed::GetSelectedObjectCount();
+         std::vector<ed::NodeId> selNodes(std::max(selCount, 0));
+         const int nSel = selCount > 0 ? ed::GetSelectedNodes(selNodes.data(), selCount) : 0;
+         for (int i = 0; i < nSel; ++i)
          {
+            GraphNode* gnp = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
+            if (gnp == nullptr)
+               continue;
+            GraphNode& gn = *gnp;
             ImVec2 p = ed::GetNodePosition(gn.NodeId());
             ImVec2 snapped(std::round(p.x / gGridSnap) * gGridSnap,
                            std::round(p.y / gGridSnap) * gGridSnap);
