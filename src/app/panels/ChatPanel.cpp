@@ -37,6 +37,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <random>
 #include <sstream>
 #include <unordered_map>
@@ -942,6 +943,106 @@ namespace app
          HandleRpcCommand("focus", { { "index", node } }, r, e);
       }
 
+      // The buttons an agent offers (`[label](verb:arg)`): each runs one RPC, and add, set and
+      // delete are one undo step like any edit.
+      std::set<std::string> sActed;  // buttons already pressed, by message and place
+
+      const char* ActionGlyph(const chat::Seg& s)
+      {
+         if (s.verb == "add")
+            return IconsInfinite::Plus;
+         if (s.verb == "set")
+            return IconsInfinite::Edit;
+         if (s.verb == "delete")
+            return IconsInfinite::Erase;
+         if (s.verb == "undo")
+            return IconsInfinite::History;
+         if (s.verb == "go")
+            return IconsInfinite::Zoom;
+         static const std::map<std::string, const char*> kPanels = {
+            { "viewport", IconsInfinite::Viewport }, { "modmatrix", IconsInfinite::ModMatrix }, { "perf", IconsInfinite::Perform },
+            { "timeline", IconsInfinite::Arrange }, { "session", IconsInfinite::Session }, { "samplestudio", IconsInfinite::Waveform },
+            { "pianoroll", IconsInfinite::Piano }, { "view3d", IconsInfinite::View3d }, { "terminal", IconsInfinite::Terminal },
+            { "history", IconsInfinite::History }, { "settings", IconsInfinite::Settings }, { "templates", IconsInfinite::Library },
+         };
+         const auto it = kPanels.find(s.arg);
+         return it != kPanels.end() ? it->second : IconsInfinite::Browser;
+      }
+
+      bool RunAction(const chat::Seg& s)
+      {
+         json r;
+         std::string err;
+         bool ok = false;
+         if (s.verb == "add")
+         {
+            std::string category;
+            if (HandleRpcCommand("list_node_types", json::object(), r, err))
+            {
+               const json& table = r.contains("categories") ? r["categories"] : r;
+               for (auto it = table.begin(); it != table.end(); ++it)
+                  if (it->is_array() && std::find(it->begin(), it->end(), json(s.arg)) != it->end())
+                     category = it.key();
+            }
+            json made;
+            ok = !category.empty() && HandleRpcCommand("create_node", { { "typeName", s.arg }, { "category", category } }, made, err);
+            if (ok && made.contains("index"))
+               Focus(made["index"].get<int>());
+         }
+         else if (s.verb == "set")
+            ok = HandleRpcCommand("set_param", { { "index", s.node }, { "name", s.key }, { "value", s.arg } }, r, err);
+         else if (s.verb == "delete")
+            ok = HandleRpcCommand("delete_node", { { "index", s.node } }, r, err);
+         else if (s.verb == "undo")
+            ok = HandleRpcCommand("undo", json::object(), r, err);
+         else if (s.verb == "go")
+         {
+            Focus(s.node);
+            ok = true;
+         }
+         else if (s.verb == "open")
+            ok = HandleRpcCommand("panel", { { "name", s.arg }, { "open", true } }, r, err) && err.empty();
+         RefreshCatalog(true);
+         return ok;
+      }
+
+      // A button chip: glyph and label in an outlined pill; it dims with a tick once pressed, except
+      // go and open, which stay pressable.
+      float ActionWidth(const chat::Seg& s) { return ImGui::CalcTextSize(s.text.c_str()).x + tok::icon_sm + 3.0f * tok::space_1 + 2.0f; }
+
+      void DrawAction(ImDrawList* dl, ImVec2 at, const chat::Seg& s, float lineH, const std::string& id)
+      {
+         const ImVec2 ts = ImGui::CalcTextSize(s.text.c_str());
+         const ImVec2 sz(ActionWidth(s), lineH);
+         const bool once = s.verb != "go" && s.verb != "open";
+         const bool done = once && sActed.count(id) != 0;
+         const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || sCat.Node(s.node) != nullptr;
+         ImGui::SetCursorScreenPos(at);
+         ImGui::PushID(id.c_str());
+         const bool clicked = ImGui::InvisibleButton("##act", sz) && !done && live;
+         ImGui::PopID();
+         const bool hovered = ImGui::IsItemHovered() && !done && live;
+         const float hv = UiAnim::Hover(ImGui::GetItemID(), hovered, tok::motion_hover_in, tok::motion_hover_out);
+         const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
+         const ImU32 ink = done || !live ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
+         dl->AddRectFilled(at, ImVec2(at.x + sz.x, at.y + sz.y), done || !live ? TextTint(0.05f) : WithAlpha(accent, 0.10f + 0.12f * hv), sz.y * 0.5f);
+         if (!done && live)
+            dl->AddRect(at, ImVec2(at.x + sz.x, at.y + sz.y), WithAlpha(accent, 0.45f + 0.35f * hv), sz.y * 0.5f);
+         glyph::Draw(dl, ImVec2(at.x + tok::space_1 + tok::icon_sm * 0.5f + 1.0f, at.y + sz.y * 0.5f), tok::icon_sm, done ? Dim() : accent,
+                     done ? IconsInfinite::Snap : ActionGlyph(s));
+         dl->AddText(ImVec2(at.x + 2.0f * tok::space_1 + tok::icon_sm + 1.0f, at.y + (lineH - ts.y) * 0.5f), ink, s.text.c_str());
+         if (hovered)
+         {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            if (s.verb == "set")
+               ImGui::SetTooltip("%s.%s = %s", sCat.Node(s.node)->title.c_str(), s.key.c_str(), s.arg.c_str());
+         }
+         else if (!live && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Not in the patch"));
+         if (clicked && RunAction(s) && once)
+            sActed.insert(id);
+      }
+
       // A link chip: a quiet well in the node's colour; click frames the node on the canvas.
       void DrawChip(ImDrawList* dl, ImVec2 at, const chat::Seg& s, float lineH, int id)
       {
@@ -989,6 +1090,15 @@ namespace app
          int chip = 0;
          for (const chat::Seg& s : segs)
          {
+            if (s.kind == chat::Seg::Kind::Action)
+            {
+               const float w = ActionWidth(s);
+               if (x > 0.0f && x + w > width)
+                  x = 0.0f, y += lineH;
+               DrawAction(dl, ImVec2(origin.x + x, origin.y + y + 1.0f), s, lineH - 2.0f, sThread.id + "/" + std::to_string(idBase) + "/" + std::to_string(chip++) + s.verb + s.arg);
+               x += w + tok::space_1;
+               continue;
+            }
             const bool link = s.kind == chat::Seg::Kind::Node || s.kind == chat::Seg::Kind::Param || s.kind == chat::Seg::Kind::Missing;
             if (link)
             {

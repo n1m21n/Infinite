@@ -177,6 +177,18 @@ namespace app
          for (const Seg& g : bare[0].segs)
             params += g.kind == Seg::Kind::Param;
          check(params == 2, "bare keys link when the node is named in the paragraph");
+         {
+            const auto acts = chat::ParseReply("[Add Bloom](add:Bloom) [Smaller](set:@cube#1.size=0.5) [Remove](delete:@cube#1) [Show](go:@cube#1) "
+                                               "[Timeline](open:timeline) [Undo](undo:) [x](rm -rf:/) [Gone](delete:@gone#99) [see](https://a.b)", cat);
+            std::vector<Seg> a;
+            if (acts.size() == 1)
+               for (const Seg& g : acts[0].segs)
+                  if (g.kind == Seg::Kind::Action)
+                     a.push_back(g);
+            check(a.size() == 6 && a[0].verb == "add" && a[0].arg == "Bloom" && a[1].verb == "set" && a[1].node == 1 && a[1].key == "size" &&
+                     a[1].arg == "0.5" && a[2].node == 1 && a[3].verb == "go" && a[4].arg == "timeline" && a[5].verb == "undo" && a[0].text == "Add Bloom",
+                  "actions: add, set, delete, go, open and undo buttons; unknown verbs, missing nodes and web links stay text");
+         }
          const auto prose = chat::ParseReply("More detail would help.", cat);
          check(prose[0].segs.size() == 1 && prose[0].segs[0].kind == Seg::Kind::Text, "bare words alone stay plain");
          const auto tick = chat::ParseReply("Look at `osc` and `out.png` and **this**", cat);

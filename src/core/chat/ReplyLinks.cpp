@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <iterator>
 #include <set>
 
 namespace chat
@@ -142,6 +143,48 @@ namespace chat
          return true;
       }
 
+      // `[label](verb:arg)` at line[i] (the '['): a button. Returns false when it is not one.
+      bool TryAction(const std::string& line, size_t& i, const Catalog& catalog, std::vector<Seg>& segs)
+      {
+         const size_t close = line.find("](", i + 1);
+         if (close == std::string::npos || close == i + 1)
+            return false;
+         const size_t end = line.find(')', close + 2);
+         const size_t colon = line.find(':', close + 2);
+         if (end == std::string::npos || colon == std::string::npos || colon > end)
+            return false;
+         Seg s;
+         s.kind = Seg::Kind::Action;
+         s.text = Trim(line.substr(i + 1, close - i - 1));
+         s.verb = Lower(Trim(line.substr(close + 2, colon - close - 2)));
+         s.arg = Trim(line.substr(colon + 1, end - colon - 1));
+         static const char* const kVerbs[] = { "add", "set", "delete", "undo", "go", "open" };
+         if (std::find(std::begin(kVerbs), std::end(kVerbs), s.verb) == std::end(kVerbs) || s.text.empty())
+            return false;
+         if (s.verb == "set" || s.verb == "delete" || s.verb == "go")
+         {
+            // The node (and key) the arg names, through the same reference rules as the text.
+            const std::string ref = s.verb == "set" ? s.arg.substr(0, s.arg.find('=')) : s.arg;
+            std::vector<Seg> linked;
+            std::vector<int> unused;
+            size_t at = 0;
+            if (ref.empty() || ref[0] != '@' || !TryRef(Trim(ref), at, catalog, linked, unused) || linked.empty() || linked.back().node < 0)
+               return false;
+            s.node = linked.back().node;
+            s.key = linked.back().key;
+            if (s.verb == "set")
+            {
+               const size_t eq = s.arg.find('=');
+               if (s.key.empty() || eq == std::string::npos)
+                  return false;
+               s.arg = Trim(s.arg.substr(eq + 1));
+            }
+         }
+         segs.push_back(s);
+         i = end + 1;
+         return true;
+      }
+
       std::vector<Seg> Inline(const std::string& line, const Catalog& catalog, std::vector<int>& named, std::vector<std::string>& images)
       {
          std::vector<Seg> segs;
@@ -159,6 +202,12 @@ namespace chat
                text += c;
                i++;
                continue;
+            }
+            if (c == '[')
+            {
+               flush();
+               if (TryAction(line, i, catalog, segs))
+                  continue;
             }
             if (c == '`')
             {
