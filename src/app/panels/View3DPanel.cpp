@@ -162,7 +162,9 @@ namespace
       int item = 0;
       int mode = 3;                // 1 points, 2 edges, 3 faces (Blender's 1 2 3)
       char op = 0;                 // 'g' 'r' 's' 'e' 'i' while one runs
-      int axis = -1;
+      int axis = -1;               // engine index; the Z key is 1, the vertical
+      bool plane = false;          // Shift + axis: the plane without that axis
+      std::string readout;         // the running op in the axes the user sees
       ImVec2 start;
       float pivot[3] = { 0, 0, 0 };    // world
       float normal[3] = { 0, 1, 0 };   // world, the selected faces' (extrude)
@@ -2489,6 +2491,32 @@ namespace
          sOpenAdd = true;
    }
 
+   enum class WheelUse { Orbit, Pan, Zoom };
+   struct WheelNav { WheelUse use; float dx, dy; };
+
+   // What one frame of wheel / two-finger scroll asks of the camera. Plain scroll orbits, Shift pans, Ctrl or Cmd zooms
+   // (everywhere but macOS the plain wheel zooms, as a mouse wheel does). macOS turns Shift + vertical scroll into a
+   // horizontal one before GLFW sees it (imgui.h, MouseWheelRequestAxisSwap: "on a Mac this is already enforced by the
+   // system"), so a Shift swipe up and down reached Pan as a sideways move only. A Shift scroll with no vertical part is
+   // that swap, and is turned back; a diagonal swipe arrives whole and is left alone.
+   WheelNav ClassifyWheel(float wheelH, float wheel, bool shift, bool ctrl, bool super_)
+   {
+#ifdef __APPLE__
+      const bool zoom = ctrl || super_;
+      if (shift && wheel == 0.0f)
+         std::swap(wheelH, wheel);
+#else
+      const bool zoom = !shift;
+      (void)ctrl; (void)super_;
+#endif
+      if (zoom)
+         return { WheelUse::Zoom, wheelH, wheel };
+      return { shift ? WheelUse::Pan : WheelUse::Orbit, wheelH, wheel };
+   }
+
+   // For the self-test: what the last drawn viewport saw.
+   struct NavProbe { bool hovered = false; ImGuiID active = 0; float scrollY = 0.0f; ImVec2 mid = ImVec2(0, 0); int frame = -1; } sNavProbe;
+
    void HandleNavigation(Scene3DNode* scene, bool hovered)
    {
       const ImGuiIO& io = ImGui::GetIO();
@@ -2524,17 +2552,13 @@ namespace
          sSet->propSize = std::clamp(sSet->propSize * std::pow(1.1f, -io.MouseWheel), 0.05f, 500.0f);
       else if (hovered && (io.MouseWheel != 0.0f || io.MouseWheelH != 0.0f))
       {
-#ifdef __APPLE__
-         const bool zoom = io.KeyCtrl || io.KeySuper;
-#else
-         const bool zoom = !io.KeyShift;
-#endif
-         if (zoom)
-            Zoom(std::pow(1.0f / 1.2f, sSet->invertZoom ? -io.MouseWheel : io.MouseWheel), &io.MousePos);   // a wheel notch is 1.2x
-         else if (io.KeyShift)
-            Pan(io.MouseWheelH * 10.0f, io.MouseWheel * 10.0f);   // GLFW hands a trackpad over as pixels / 10: the scene follows the fingers 1:1
+         const WheelNav nav = ClassifyWheel(io.MouseWheelH, io.MouseWheel, io.KeyShift, io.KeyCtrl, io.KeySuper);
+         if (nav.use == WheelUse::Zoom)
+            Zoom(std::pow(1.0f / 1.2f, sSet->invertZoom ? -nav.dy : nav.dy), &io.MousePos);   // a wheel notch is 1.2x
+         else if (nav.use == WheelUse::Pan)
+            Pan(nav.dx * 10.0f, nav.dy * 10.0f);   // GLFW hands a trackpad over as pixels / 10: the scene follows the fingers 1:1
          else
-            OrbitBy(scene, io.MouseWheelH * 10.0f * kOrbitPerPixel, io.MouseWheel * 10.0f * kOrbitPerPixel);
+            OrbitBy(scene, nav.dx * 10.0f * kOrbitPerPixel, nav.dy * 10.0f * kOrbitPerPixel);
       }
       // GLFW never forwards a trackpad pinch, so it comes from the platform, not the wheel.
       const double pinch = hovered ? TrackpadPinchThisFrame() : 0.0;
@@ -4020,6 +4044,8 @@ namespace
       PushUndoCheckpoint(labels[op == 'g' ? 0 : op == 'r' ? 1 : op == 's' ? 2 : op == 'e' ? 3 : 4]);
       sEdit.op = op;
       sEdit.axis = -1;
+      sEdit.plane = false;
+      sEdit.readout.clear();
       sEdit.start = mouse;
       sEdit.before = node->ops;
    }
@@ -4051,7 +4077,17 @@ namespace
       if (sEdit.op == 'g')
       {
          float w[3];
-         if (sEdit.axis >= 0)
+         if (sEdit.axis >= 0 && sEdit.plane)
+         {
+            // The plane through the pivot without the axis: the point under the pointer now less the one under it at the start.
+            float o0[3], d0[3], o1[3], d1[3], h0[3], h1[3];
+            MouseRay(sEdit.start, o0, d0);
+            MouseRay(mouse, o1, d1);
+            const bool ok = PlaneHit(sEdit.pivot, axes[sEdit.axis], o0, d0, h0) && PlaneHit(sEdit.pivot, axes[sEdit.axis], o1, d1, h1);
+            for (int k = 0; k < 3; k++)
+               w[k] = ok ? h1[k] - h0[k] : 0.0f;
+         }
+         else if (sEdit.axis >= 0)
          {
             ImVec2 dir;
             const float px = ScreenAlong(axes[sEdit.axis], dir);
@@ -4065,6 +4101,10 @@ namespace
          float m[3];
          LinearBy(inv, w, m);
          snprintf(line, sizeof(line), "move %.5g %.5g %.5g", m[0], m[1], m[2]);
+         // The op line stays in the engine's order (saved patches replay it); the readout is what the user sees.
+         char shown[96];
+         snprintf(shown, sizeof(shown), "Move   X %.3f   Y %.3f   Z %.3f", m[0], -m[2], m[1]);
+         sEdit.readout = shown;
       }
       else if (sEdit.op == 'r')
       {
@@ -4083,6 +4123,9 @@ namespace
          LinearBy(inv, w, m);
          Normalize(m);
          snprintf(line, sizeof(line), "rotate %.5g %.5g %.5g %.5g", m[0], m[1], m[2], deg);
+         char shown[96];
+         snprintf(shown, sizeof(shown), "Rotate   %.1f\xC2\xB0 about X %.2f  Y %.2f  Z %.2f", deg, m[0], -m[2], m[1]);
+         sEdit.readout = shown;
       }
       else if (sEdit.op == 's')
       {
@@ -4091,8 +4134,11 @@ namespace
          float s[3] = { f, f, f };
          if (sEdit.axis >= 0)
             for (int k = 0; k < 3; k++)
-               s[k] = k == sEdit.axis ? f : 1.0f;
+               s[k] = (k == sEdit.axis) != sEdit.plane ? f : 1.0f;
          snprintf(line, sizeof(line), "scale %.5g %.5g %.5g", s[0], s[1], s[2]);
+         char shown[96];
+         snprintf(shown, sizeof(shown), "Scale   X %.3f   Y %.3f   Z %.3f", s[0], s[2], s[1]);
+         sEdit.readout = shown;
       }
       else if (sEdit.op == 'e')
       {
@@ -4100,12 +4146,14 @@ namespace
          const float px = ScreenAlong(sEdit.normal, dir);
          const float t = px > 2.0f ? (md.x * dir.x + md.y * dir.y) / px : -md.y * unit;
          snprintf(line, sizeof(line), "extrude %.5g", t / WorldScale(world));
+         sEdit.readout = std::string("Extrude   ") + std::to_string(t / WorldScale(world));
       }
       else if (sEdit.op == 'i')
       {
          const float d0 = std::hypot(sEdit.start.x - pc.x, sEdit.start.y - pc.y);
          const float d = std::hypot(mouse.x - pc.x, mouse.y - pc.y);
          snprintf(line, sizeof(line), "inset %.5g", std::max(0.0f, d0 - d) * unit / WorldScale(world));
+         sEdit.readout = std::string("Inset   ") + std::to_string(std::max(0.0f, d0 - d) * unit / WorldScale(world));
       }
       node->ops = WithOp(sEdit.before, line);
    }
@@ -4186,8 +4234,14 @@ namespace
       int count = 0;
       for (unsigned char f : sel.face)
          count += f;
-      char label[96];
+      char label[160];
       snprintf(label, sizeof(label), "Edit Mode   %d ops   %d faces", node->OpCount(), count);
+      if (sEdit.op != 0 && !sEdit.readout.empty())
+      {
+         const char* axisName[3] = { "X", "Z", "Y" };   // by engine index
+         const std::string lock = sEdit.axis < 0 ? "" : std::string("   ") + (sEdit.plane ? "not " : "only ") + axisName[sEdit.axis];
+         snprintf(label, sizeof(label), "%s%s", sEdit.readout.c_str(), lock.c_str());
+      }
       dl->AddText(ImVec2(sCam.mn.x + 12.0f, sCam.mx.y - 26.0f), Hex(kActive), node->CookWarning().empty() ? label : node->CookWarning().c_str());
 
       if (sEdit.op != 0)
@@ -4202,7 +4256,12 @@ namespace
          const ImGuiKey axisKeys[3] = { ImGuiKey_X, ImGuiKey_Z, ImGuiKey_Y };
          for (int k = 0; k < 3 && sEdit.op != 'e' && sEdit.op != 'i'; k++)
             if (pressed(axisKeys[k]))
-               sEdit.axis = sEdit.axis == k ? -1 : k;
+            {
+               const bool asPlane = io.KeyShift && sEdit.op != 'r';
+               const bool again = sEdit.axis == k && sEdit.plane == asPlane;
+               sEdit.axis = again ? -1 : k;
+               sEdit.plane = !again && asPlane;
+            }
          EditUpdate(node, world, mouse);
          ImVec2 pc;
          if (sEdit.op != 'g' && Project(sEdit.pivot, pc))
@@ -5020,6 +5079,7 @@ namespace
                                 ImGuiButtonFlags_MouseButtonRight);
       const bool hovered = ImGui::IsItemHovered();
       const ImVec2 mx(mn.x + size.x, mn.y + size.y);
+      sNavProbe = { hovered, ImGui::GetActiveID(), ImGui::GetScrollY(), ImVec2((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f), ImGui::GetFrameCount() };
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->PushClipRect(mn, mx, true);
       unsigned backdrop = kBackdrop;
@@ -8133,6 +8193,35 @@ namespace
 }
 
 OutputNode* View3DEnsureOutput() { return EnsureOutputImpl(); }
+
+// Self-test hooks for Edit Mode: switch it, and read what the running op shows.
+void View3DTestEdit(bool on)
+{
+   if (Scene3DNode* scene = FindScene())
+      if (sEdit.on != on)
+         ToggleEdit(scene);
+}
+
+bool View3DEditProbe(std::string* readout, int* axis, bool* plane)
+{
+   *readout = sEdit.readout;
+   *axis = sEdit.axis;
+   *plane = sEdit.plane;
+   return sEdit.op != 0;
+}
+
+// Self-test read-out of the view and of what the viewport last saw. out: az, el, dist, target xyz, right xyz, up xyz,
+// viewport middle xy, scroll of the window holding it, hovered, active id, selected count, frame drawn.
+bool View3DNavProbe(float out[18])
+{
+   if (sNavProbe.frame < 0)
+      return false;
+   float v[18] = { sAz, sEl, sDist, sTarget[0], sTarget[1], sTarget[2], sCam.right[0], sCam.right[1], sCam.right[2],
+                   sCam.up[0], sCam.up[1], sCam.up[2], sNavProbe.mid.x, sNavProbe.mid.y, sNavProbe.scrollY,
+                   sNavProbe.hovered ? 1.0f : 0.0f, (float)sNavProbe.active, (float)sSel.size() };
+   std::copy(v, v + 18, out);
+   return ImGui::GetFrameCount() - sNavProbe.frame <= 2;
+}
 
 void View3DAddCamera()
 {
