@@ -42,11 +42,14 @@ namespace chat
    {
       std::string id, title, path;
       long long updated = 0;
+      std::vector<std::string> agents;  // who answered, in order of first reply
    };
 
    std::string ToJson(const Thread& t);
    bool FromJson(const std::string& text, Thread& t);
    std::string TitleFor(const std::string& firstMessage);
+   // A thread's row in the history list.
+   ThreadInfo InfoOf(const Thread& t, const std::string& path);
 
    // One file per chat in `dir`: <id>.json. Newest first.
    bool SaveThread(const std::string& dir, const Thread& t);

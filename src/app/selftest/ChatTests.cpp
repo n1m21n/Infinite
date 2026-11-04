@@ -377,6 +377,13 @@ namespace app
                   "thread: a saved chat reads back whole");
             check(t.title.size() <= 64 && t.title.find("…") != std::string::npos, "thread: a long first message makes a short title");
             check(!chat::FromJson("{\"version\":2}", back) && !chat::FromJson("not json", back), "thread: other files are not chats");
+            chat::Entry a1, a2, a3;
+            a1.kind = a2.kind = a3.kind = chat::Entry::Kind::Agent;
+            a1.agent = "codex", a2.agent = "claude", a3.agent = "codex";
+            t.entries.insert(t.entries.end(), { a1, a2, a3 });
+            const chat::ThreadInfo info = chat::InfoOf(t, "/x/t-test.json");
+            check(info.agents == std::vector<std::string>{ "codex", "claude" } && info.id == "t-test" && info.path == "/x/t-test.json",
+                  "thread: history lists who answered, first reply first");
          }
 
          // Attachments: every kind Infinite opens, its folder readable.

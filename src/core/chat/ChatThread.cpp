@@ -117,6 +117,15 @@ namespace chat
       return t;
    }
 
+   ThreadInfo InfoOf(const Thread& t, const std::string& path)
+   {
+      ThreadInfo info{ t.id, t.title, path, t.updated, {} };
+      for (const Entry& e : t.entries)
+         if (e.kind == Entry::Kind::Agent && !e.agent.empty() && std::find(info.agents.begin(), info.agents.end(), e.agent) == info.agents.end())
+            info.agents.push_back(e.agent);
+      return info;
+   }
+
    bool SaveThread(const std::string& dir, const Thread& t)
    {
       std::error_code ec;
@@ -153,7 +162,7 @@ namespace chat
          Thread t;
          if (!LoadThread(e.path().u8string(), t) || t.entries.empty())
             continue;
-         out.push_back({ t.id, t.title, e.path().u8string(), t.updated });
+         out.push_back(InfoOf(t, e.path().u8string()));
       }
       std::sort(out.begin(), out.end(), [](const ThreadInfo& a, const ThreadInfo& b) { return a.updated > b.updated; });
       return out;

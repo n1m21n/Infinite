@@ -12,6 +12,7 @@
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/GlyphToggle.h"
 #include "core/CategoryColors.h"
 #include "core/CliSetup.h"
@@ -30,6 +31,7 @@
 #include "stb_image.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -109,7 +111,9 @@ namespace app
       bool sScrollToEnd = false;
       bool sRefocus = false;
       bool sCursorToEnd = false;
-      std::vector<chat::ThreadInfo> sHistory;
+      std::vector<chat::ThreadInfo> sHistory;  // newest first; read from disk once, then kept by SaveNow
+      bool sHistoryLoaded = false;
+      char sHistoryFilter[96] = "";
       // Dropdown
       int sPick = 0;
       bool sPickByKey = false;
@@ -283,6 +287,26 @@ namespace app
          return a != nullptr ? a->name : id.c_str();
       }
 
+      // Each agent's own colour (a node family's, so it follows the theme) and initial, so a reply
+      // shows who wrote it at a glance when several agents answer in one chat.
+      ImU32 AgentTint(const std::string& id)
+      {
+         static const std::map<std::string, const char*> kFamily = { { "claude", "AudioEffects" }, { "codex", "3D" }, { "antigravity", "Notes" } };
+         const auto it = kFamily.find(id);
+         return CategoryU32(it != kFamily.end() ? it->second : "Utility");
+      }
+
+      void DrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& id)
+      {
+         const ImU32 tint = AgentTint(id);
+         dl->AddCircleFilled(centre, radius, WithAlpha(tint, 0.22f));
+         dl->AddCircle(centre, radius, WithAlpha(tint, 0.70f), 0, 1.0f);
+         const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
+         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
+         const ImVec2 ts = ImGui::CalcTextSize(name);
+         dl->AddText(ImVec2(std::floor(centre.x - ts.x * 0.5f), std::floor(centre.y - ts.y * 0.5f)), tint, name);
+      }
+
       bool Ready(const std::string& id)
       {
          auto it = sAgents.find(id);
@@ -391,6 +415,12 @@ namespace app
             return;
          sThread.updated = (long long)std::time(nullptr);
          chat::SaveThread(ChatsDir(), sThread);
+         // Keep the history list current without reading every chat again.
+         if (sHistoryLoaded)
+         {
+            sHistory.erase(std::remove_if(sHistory.begin(), sHistory.end(), [](const chat::ThreadInfo& t) { return t.id == sThread.id; }), sHistory.end());
+            sHistory.insert(sHistory.begin(), chat::InfoOf(sThread, ChatsDir() + "/" + sThread.id + ".json"));
+         }
       }
 
       void Push(Entry e)
@@ -1230,11 +1260,16 @@ namespace app
       // A small grey line above an agent's rows: its name, and Copy while the answer is hovered.
       void DrawAgentLabel(const Entry& e, float width, int id, bool copy)
       {
-         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddText(at, Dim(), AgentName(e.agent));
-         const float h = ImGui::GetTextLineHeight();
+         float h = 0.0f;
+         {
+            UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+            h = std::max(ImGui::GetTextLineHeight(), 16.0f);
+         }
+         DrawAvatar(dl, ImVec2(at.x + 8.0f, at.y + h * 0.5f), 8.0f, e.agent);
+         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+         dl->AddText(ImVec2(at.x + 22.0f, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f), AgentTint(e.agent), AgentName(e.agent));
          if (copy)
          {
             const char* label = T("Copy");
@@ -1247,7 +1282,7 @@ namespace app
             if (clicked)
                ImGui::SetClipboardText(e.text.c_str());
          }
-         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 2.0f));
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
 
       void DrawAgent(Entry& e, EntryUi& ui, float width, int id, bool label)
@@ -2000,7 +2035,9 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(at.x + width - 2.0f * 24.0f, at.y + (rowH - 22.0f) * 0.5f));
          if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, false))
          {
-            sHistory = chat::ListThreads(ChatsDir());
+            if (!sHistoryLoaded)
+               sHistory = chat::ListThreads(ChatsDir()), sHistoryLoaded = true;
+            sHistoryFilter[0] = '\0';
             ImGui::OpenPopup("##chathistorymenu");
          }
          if (ImGui::IsItemHovered())
@@ -2016,9 +2053,27 @@ namespace app
          {
             if (sHistory.empty())
                ImGui::TextDisabled("%s", T("No saved chats"));
+            if (sHistory.size() > 6)
+            {
+               if (ImGui::IsWindowAppearing())
+                  ImGui::SetKeyboardFocusHere();
+               FormParts::SearchInput("##chatfind", T("Search chats"), sHistoryFilter, sizeof sHistoryFilter, std::max(240.0f, ImGui::GetContentRegionAvail().x));
+            }
+            std::string needle = sHistoryFilter;
+            std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c) { return (char)std::tolower(c); });
             std::string removeId;
+            const chat::ThreadInfo* first = nullptr;
             for (const chat::ThreadInfo& t : sHistory)
             {
+               if (!needle.empty())
+               {
+                  std::string title = t.title;
+                  std::transform(title.begin(), title.end(), title.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+                  if (title.find(needle) == std::string::npos)
+                     continue;
+               }
+               if (first == nullptr)
+                  first = &t;
                ImGui::PushID(t.id.c_str());
                const ImVec2 p = ImGui::GetCursorScreenPos();
                const float w = std::max(240.0f, ImGui::GetContentRegionAvail().x);
@@ -2031,7 +2086,11 @@ namespace app
                const std::string age = Age(t.updated);
                const float aw = ImGui::CalcTextSize(age.c_str()).x;
                const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
-               const float tmax = p.x + w - aw - 22.0f - tok::space_2;
+               // who answered: one small avatar each, before the age
+               const float dots = (float)std::min<size_t>(t.agents.size(), 3) * 13.0f;
+               for (size_t k = 0; k < t.agents.size() && k < 3; k++)
+                  DrawAvatar(pd, ImVec2(p.x + w - aw - 22.0f - tok::space_2 - dots + 6.0f + 13.0f * (float)k, p.y + h * 0.5f), 5.5f, t.agents[k]);
+               const float tmax = p.x + w - aw - 22.0f - tok::space_2 - dots - (dots > 0.0f ? tok::space_1 : 0.0f);
                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
                ImGui::RenderTextEllipsis(pd, ImVec2(p.x + tok::space_1, ty), ImVec2(tmax, p.y + h), tmax, t.title.empty() ? "…" : t.title.c_str(), nullptr, nullptr);
                ImGui::PopStyleColor();
@@ -2050,12 +2109,18 @@ namespace app
                }
                ImGui::PopID();
             }
+            // Enter opens the first match.
+            if (first != nullptr && !needle.empty() && ImGui::IsKeyPressed(ImGuiKey_Enter) && sRuns.empty())
+            {
+               OpenThread(first->path);
+               ImGui::CloseCurrentPopup();
+            }
             if (!removeId.empty())
             {
                chat::DeleteThread(ChatsDir(), removeId);
+               sHistory.erase(std::remove_if(sHistory.begin(), sHistory.end(), [&](const chat::ThreadInfo& t) { return t.id == removeId; }), sHistory.end());
                if (removeId == sThread.id)
                   NewChat();
-               sHistory = chat::ListThreads(ChatsDir());
             }
             ImGui::EndPopup();
          }
