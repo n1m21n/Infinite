@@ -443,6 +443,80 @@ namespace app
 #endif
       }
       {
+         // Windows: what cmd.exe and then the C runtime make of WindowsCmdArgs must be the argv we meant.
+         auto afterCmd = [](const std::string& raw, bool* bare)
+         {
+            // `/d /s /c "X"` -> X, then cmd's caret pass; any metacharacter left bare would be acted on.
+            const std::string head = "/d /s /c \"";
+            std::string x = raw.rfind(head, 0) == 0 && raw.size() > head.size() && raw.back() == '"' ? raw.substr(head.size(), raw.size() - head.size() - 1) : std::string();
+            std::string out;
+            *bare = false;
+            for (size_t i = 0; i < x.size(); i++)
+            {
+               if (x[i] == '^' && i + 1 < x.size())
+               {
+                  out += x[++i];
+                  continue;
+               }
+               if (std::string("&|<>%\"").find(x[i]) != std::string::npos)
+                  *bare = true;
+               out += x[i];
+            }
+            return out;
+         };
+         auto crtSplit = [](const std::string& line)
+         {
+            std::vector<std::string> args;
+            size_t i = 0;
+            while (i < line.size())
+            {
+               while (i < line.size() && line[i] == ' ')
+                  i++;
+               if (i >= line.size())
+                  break;
+               std::string a;
+               bool quoted = false;
+               for (; i < line.size() && (quoted || line[i] != ' '); i++)
+               {
+                  size_t slashes = 0;
+                  while (i < line.size() && line[i] == '\\')
+                     slashes++, i++;
+                  if (i < line.size() && line[i] == '"')
+                  {
+                     a.append(slashes / 2, '\\');
+                     if (slashes % 2)
+                        a += '"';
+                     else
+                        quoted = !quoted;
+                     continue;
+                  }
+                  a.append(slashes, '\\');
+                  if (i >= line.size())
+                     break;
+                  if (!quoted && line[i] == ' ')
+                     break;
+                  a += line[i];
+               }
+               args.push_back(a);
+            }
+            return args;
+         };
+         const std::string json = "{\"permissions\":{\"allow\":[\"command(infinite)\"]}}";
+         const std::vector<std::string> argv = { "claude", "-p", "50% & more | x > y", "C:\\dir\\", json, "say \"hi\" & calc", "two\nlines" };
+         bool bare = true;
+         const std::vector<std::string> got = crtSplit(afterCmd(chat::WindowsCmdArgs(argv), &bare));
+         check(!bare, "windows: no cmd metacharacter is left unescaped");
+         check(got.size() == argv.size(), "windows: every argument arrives as one argument");
+         if (got.size() == argv.size())
+         {
+            check(got[2] == argv[2], "windows: & | > and % arrive as typed");
+            check(got[3] == argv[3], "windows: a trailing backslash survives");
+            check(got[4] == json, "windows: JSON settings keep their quotes");
+            check(got[5] == "say \xE2\x80\x9Dhi\xE2\x80\x9D & calc", "windows: quotes next to & become curly, so a .cmd shim cannot break out");
+            check(got[6] == "two lines", "windows: a line break becomes a space");
+         }
+      }
+      {
          // C8: sign-in, plain-words errors, models, sound blocks, per-turn options.
          check(chat::SignInArgs(chat::AgentKind::Claude) == std::vector<std::string>({ "claude", "auth", "login" }), "sign-in: claude uses its browser login");
          check(chat::SignInArgs(chat::AgentKind::Codex).size() == 2 && chat::SignInArgs(chat::AgentKind::Codex)[1] == "login", "sign-in: codex uses its browser login");

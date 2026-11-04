@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <thread>
 
@@ -37,16 +38,8 @@ namespace chat
       {
          term::PtySpawn spawn;
 #if defined(_WIN32)
-         std::string line;
-         for (const std::string& a : o.argv)
-         {
-            std::string q = "\"";
-            for (char c : a)
-               q += c == '"' ? std::string("\\\"") : std::string(1, c);
-            line += (line.empty() ? "" : " ") + q + "\"";
-         }
          spawn.shell = "cmd.exe";
-         spawn.args = { "/c", line };
+         spawn.rawArgs = WindowsCmdArgs(o.argv);
 #else
          // The login shell reads the user's profile (PATH), then becomes the agent with argv untouched.
          const char* shell = std::getenv("SHELL");
@@ -121,6 +114,56 @@ namespace chat
          finished = true;
       }
    };
+
+   std::string WindowsCmdArgs(const std::vector<std::string>& argv)
+   {
+      auto meta = [](char c) { return c != '\0' && std::strchr("&|<>^%!()\"", c) != nullptr; };
+      // What the shim's second read would act on outside quotes; ( ) and ! do nothing there.
+      auto shimMeta = [](char c) { return c != '\0' && std::strchr("&|<>^%", c) != nullptr; };
+      std::string line;
+      for (std::string a : argv)
+      {
+         for (char& c : a)
+            if (c == '\n' || c == '\r')
+               c = ' ';
+         bool risky = false;
+         for (char c : a)
+            risky = risky || shimMeta(c);
+         if (risky && a.find('"') != std::string::npos)
+         {
+            std::string curly;
+            for (char c : a)
+               curly += c == '"' ? std::string("\xE2\x80\x9D") : std::string(1, c);
+            a = curly;
+         }
+         // The C runtime's rules: backslashes double only before a quote.
+         std::string q = "\"";
+         size_t slashes = 0;
+         for (char c : a)
+         {
+            if (c == '\\')
+            {
+               slashes++;
+               continue;
+            }
+            q.append(c == '"' ? slashes * 2 + 1 : slashes, '\\');
+            slashes = 0;
+            q += c;
+         }
+         q.append(slashes * 2, '\\');
+         q += '"';
+         line += (line.empty() ? "" : " ") + q;
+      }
+      std::string escaped;
+      for (char c : line)
+      {
+         if (meta(c))
+            escaped += '^';
+         escaped += c;
+      }
+      // /s: cmd drops only the outer pair of quotes and keeps the rest exactly.
+      return "/d /s /c \"" + escaped + "\"";
+   }
 
    std::shared_ptr<AgentRun> AgentRun::Start(const Options& options)
    {

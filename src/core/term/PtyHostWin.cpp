@@ -127,7 +127,10 @@ public:
         }
 
         std::wstring commandLine = QuoteArg(spawn.shell.empty() ? DefaultShell() : Wide(spawn.shell));
-        for (const std::string& arg : spawn.args) commandLine += L" " + QuoteArg(Wide(arg));
+        if (!spawn.rawArgs.empty())
+            commandLine += L" " + Wide(spawn.rawArgs);  // cmd.exe has its own quoting; the caller built it
+        else
+            for (const std::string& arg : spawn.args) commandLine += L" " + QuoteArg(Wide(arg));
         std::wstring cwd = Wide(spawn.cwd);
         if (cwd.empty()) {
             if (const wchar_t* home = _wgetenv(L"USERPROFILE")) cwd = home;

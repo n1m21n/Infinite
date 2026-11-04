@@ -11,6 +11,14 @@
 
 namespace chat
 {
+   // The text after `cmd.exe` that runs `argv` with every character reaching the program as typed:
+   // `/d /s /c "..."`, each argument quoted the way the C runtime reads it, then every cmd metacharacter
+   // escaped with ^ so cmd never runs `&`, `|`, `<`, `>` or expands `%var%`. Line breaks become spaces (cmd
+   // ends a command at one). npm installs the agents as .cmd shims, which read their arguments a second time
+   // without the carets; an argument that has both a `"` and a metacharacter gets its quotes as ” so that
+   // second read stays inside quotes.
+   std::string WindowsCmdArgs(const std::vector<std::string>& argv);
+
    class AgentRun
    {
    public:
