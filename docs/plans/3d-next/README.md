@@ -156,3 +156,26 @@ reference, AO 512, 16 rays, reach 0.25:
 
 Mean error alone missed the banding (the bands average out), so read the
 sheet (truth, Blender bake, Infinite, diff x4) before the number.
+
+## Results: render gaps vs Blender (picture A/B, `fix/render-ab`)
+
+Measured with the harness against a dev build of main 4b123939. FLIP, lower is closer;
+path-trace numbers are at 128 samples (cornell, light_spot) and 64 (hero), so noise
+inflates them a little.
+
+| Case | Raster | Path tracer | Reading |
+|---|---|---|---|
+| cornell | 0.579 | 0.101 | raster has no bounce light (walls' colour bleed, lit shadows, ceiling fill); pt matches Blender, brightness x1.00 |
+| light_spot | 0.150 | 0.057 | cone and blend already follow Cycles' spot_attenuation; the raster remainder is the missing floor-to-sphere bounce and hard shadow fill |
+| hero (all) | 0.175 | 0.109 | raster worst regions: models 0.47 (brightness x0.61), coat 0.44 (x0.72), instances 0.41, fox 0.43; pt worst: velvet 0.29 (x1.17), instances 0.35, fox 0.28-0.33 |
+
+Findings:
+
+- The cornell raster gap is global illumination, not a bug. A raster fix would need a baked
+  or probe-based bounce; that is not live-speed-free, so no change was made. Use the path
+  tracer for GI scenes.
+- Spot light units and falloff already agree (brightness x0.93 raster, x0.98 pt).
+- Raster models, coat and velvet read dark because their undersides get no floor bounce
+  (the room floor is white in Blender). Same cause as cornell.
+- Open path-tracer item: velvet sheen is about 17% too bright.
+- Baselines added: `cornell_pt`, `hero_pt`. No shading code changed, so raster baselines stand.
