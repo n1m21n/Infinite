@@ -915,7 +915,10 @@ namespace
 
       DrawTabRow(snap.get());
       if (sTabs.empty())
+      {
+         ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the tab row moved the cursor
          return;
+      }
       tab = sTabs[(size_t)sActive].get();
       snap = tab->session->Latest();
       if (sSearchOpen)
