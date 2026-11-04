@@ -253,6 +253,7 @@ Selection Select(const Mesh& m, const std::string& selLine, int* missed)
    std::istringstream in(selLine);
    std::string word, mode;
    in >> word >> mode;
+   s.kind = mode == "all" ? 'a' : mode.empty() ? 'f' : mode[0];
    if (mode == "all")
    {
       std::fill(s.point.begin(), s.point.end(), 1);
@@ -301,13 +302,19 @@ Selection Select(const Mesh& m, const std::string& selLine, int* missed)
    {
       const size_t group = mode == "v" ? 3 : 6;
       for (size_t i = 0; i + group - 1 < nums.size(); i += group)
-         for (size_t j = 0; j < group; j += 3)
          {
-            const int v = NearestVertex(m, &nums[i + j], tol);
-            if (v < 0)
-               miss++;
-            else
-               s.point[v] = 1;
+            int ends[2] = { -1, -1 };
+            for (size_t j = 0; j < group; j += 3)
+            {
+               const int v = NearestVertex(m, &nums[i + j], tol);
+               ends[j / 3] = v;
+               if (v < 0)
+                  miss++;
+               else
+                  s.point[v] = 1;
+            }
+            if (group == 6 && ends[0] >= 0 && ends[1] >= 0)
+               s.edges.push_back({ (unsigned int)ends[0], (unsigned int)ends[1] });
          }
       WeldExpand(m, s);
       // A face is selected when all its points are, as in Blender.
@@ -494,6 +501,33 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed, Selection* selec
       }
       if (op != "extrude" && op != "inset" && op != "delete")
          continue;
+      if (op == "delete" && (sel.kind == 'v' || sel.kind == 'e'))
+      {
+         // Delete Vertices / Delete Edges take every face that uses them, a whole flat patch at a time.
+         const std::vector<int> ids = PointIds(cur);
+         std::set<int> edgeIds;
+         for (const auto& e : sel.edges)
+            edgeIds.insert(std::min(ids[e.first], ids[e.second]) * 1000003 + std::max(ids[e.first], ids[e.second]));
+         std::vector<unsigned char> hit(cur.FaceCount(), 0);
+         for (size_t f = 0; f < hit.size(); f++)
+         {
+            int p[3];
+            for (int k = 0; k < 3; k++)
+               p[k] = ids[cur.indices[f * 3 + k]];
+            bool use = false;
+            for (int k = 0; k < 3; k++)
+            {
+               if (sel.kind == 'v')
+                  use = use || sel.point[cur.indices[f * 3 + k]];
+               else
+                  use = use || edgeIds.count(std::min(p[k], p[(k + 1) % 3]) * 1000003 + std::max(p[k], p[(k + 1) % 3]));
+            }
+            if (use && !hit[f])
+               for (size_t g : FlatPatch(cur, f))
+                  hit[g] = 1;
+         }
+         sel.face = hit;
+      }
       if (!Any(sel.face))
          continue;
       if (moved)

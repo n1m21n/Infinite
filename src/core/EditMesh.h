@@ -16,7 +16,8 @@
 //   scale sx sy sz                about their median
 //   extrude d                     the selected region, along its normal; the cap stays selected
 //   inset w                       the selected faces; the inner faces stay selected
-//   delete                        the selected faces
+//   delete                        the selected faces; after sel v / sel e, the faces (whole quads or
+//                                 n-gons) that use the points or edges, as Blender's Delete does
 //
 // Elements are named by where they are, not by index, so the list still means
 // the same thing after an upstream change that keeps the shape roughly in
@@ -28,6 +29,8 @@ namespace EditMesh
    {
       std::vector<unsigned char> point;   // per vertex
       std::vector<unsigned char> face;    // per triangle
+      char kind = 'f';                    // what the sel line named: f faces, v points, e edges, a all
+      std::vector<std::pair<unsigned int, unsigned int>> edges;   // for 'e': the two points of each edge
    };
 
    Mesh Apply(const Mesh& in, const std::string& ops, int* missed = nullptr, Selection* selection = nullptr);
