@@ -147,6 +147,11 @@ def check_manuals():
     return [] if rc == 0 else [l for l in out.splitlines() if l.strip()][-6:]
 
 
+def check_parity():
+    rc, out = sh("python3 tools/terminal/parity.py")
+    return [] if rc == 0 else ["terminal parity (headless_smoke.sh runs it in Linux clang): " + out.strip().splitlines()[0][:200] + " ..."]
+
+
 def check_release_app(app):
     rc, out = sh(f'python3 scripts/check_release_binary.py "{app}"')
     return [] if rc == 0 else [out.strip()]
@@ -158,6 +163,7 @@ STATIC = {
     "nodeshots": ("node screenshots are the zoomed capture", check_node_shots),
     "i18n": ("translations complete, no format mismatches", check_i18n),
     "manuals": ("committed manual PDFs pass brand lint", check_manuals),
+    "parity": ("every clickable action has a terminal verb or a stated reason", check_parity),
 }
 
 

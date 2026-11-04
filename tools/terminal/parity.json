@@ -371,6 +371,21 @@
   "panels/SettingsWindow.cpp:8. Field Synth, Effect & Notes (sample domain)": "reference page; `code docs field` prints it",
   "panels/SettingsWindow.cpp:9. Field Graph (graph domain)": "reference page; `code docs field` prints it",
   "panels/SettingsWindow.cpp:Install All AI Skills": "`infinite context` and `guide` give an agent the same text",
-  "panels/SettingsWindow.cpp:free": "label inside a size readout"
+  "panels/SettingsWindow.cpp:free": "label inside a size readout",
+  "panels/SettingsWindow.cpp:Bare Names: Never use '@' sigils. Plain names are used everywhere (e.g. P.y += bass * 2, never @P.y).": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Inferred Rates: There is no @rate keyword. The compiler infers domain rates automatically from dependencies.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Live: press Apply in the node's editor (Revert goes back to the last applied text); compile errors name the line.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Nodes: Field Pixel (pixel), Field Modifier and Field Primitive (element), Field Synth, Field Effect and Field Notes (sample), Field Graph (graph).": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:One Primitive: A kernel is a body of code run once per element of its domain.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Rank Polymorphism: Scalars implicitly broadcast across all vector lanes when combined.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Real-Time Safe: Bounded loops, no dynamic heap allocation or recursion on execution threads.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Start MIDI": "starts the live MIDI input device; a headless run has no device",
+  "panels/SettingsWindow.cpp:Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:Types: float, int, bool, vec2, vec3, vec4.": "Field language reference text; `code docs field` prints it",
+  "panels/SettingsWindow.cpp:reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).": "Field language reference text; `code docs field` prints it",
+  "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app; the same steps are the shell script shown under Settings, Reference, Setup commands"
  }
 }

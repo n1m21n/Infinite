@@ -192,6 +192,9 @@ def showcase_text(sc):
         nid += 1
     return text[:end] + add + text[end:]
 
+STARTER_SHOWCASE = {"handheld"}   # built by a showcase script, shown with the Starters
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for t in T.all:
@@ -211,7 +214,11 @@ def main():
     with open(os.path.join(OUT, "index.txt"), "w") as f:
         f.write("# slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.\n")
         for sc in SHOWCASE:     # the Templates window lists groups in file order: Showcase first
-            f.write(f"{sc['slug']}|Showcase|{sc['title']}|{sc['blurb']}\n")
+            if sc["slug"] not in STARTER_SHOWCASE:
+                f.write(f"{sc['slug']}|Showcase|{sc['title']}|{sc['blurb']}\n")
+        for sc in SHOWCASE:     # a showcase patch listed among the Starters, ahead of the small ones
+            if sc["slug"] in STARTER_SHOWCASE:
+                f.write(f"{sc['slug']}|Starters|{sc['title']}|{sc['blurb']}\n")
         for t in T.all:
             f.write(f"{t.slug}|Starters|{t.title}|{t.blurb}\n")
     print(len(T.all), "starters,", len(SHOWCASE), "showcase")

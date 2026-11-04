@@ -1,6 +1,6 @@
 # slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.
 infinite-v1-showcase|Showcase|Infinite v1 showcase|drums, pads, 3D and a Perf page, all playing
-handheld|Showcase|Pocket console|a 3D game console staged in a 3D View on a Y2K poster wall: GLSL game on its screen, product-shot camera, Piano Roll chiptune
+handheld|Starters|Pocket console|a 3D game console staged in a 3D View on a Y2K poster wall: GLSL game on its screen, product-shot camera, Piano Roll chiptune
 first-sound|Starters|First sound|press play and hear notes
 first-image|Starters|First image|a shape on a colour wash
 first-music-image|Starters|Moves with the music|the shape grows with the sound
