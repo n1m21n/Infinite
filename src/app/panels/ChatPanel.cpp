@@ -888,12 +888,23 @@ namespace app
          return e;
       }
 
+      // The code pane beside the chat (see DrawCodeChip).
+      struct CodeView
+      {
+         bool open = false;
+         std::string title;
+         std::string code;
+         std::vector<std::string> lines;
+         double copiedAt = -10.0;
+      } sCodeView;
+
       void NewChat()
       {
          sThread = chat::Thread();
          sThread.id = NewId();
          sUi.clear();
          sAttach.clear();
+         sCodeView.open = false;
       }
 
       void OpenThread(const std::string& path)
@@ -904,6 +915,7 @@ namespace app
          sThread = std::move(t);
          sUi.assign(sThread.entries.size(), EntryUi());
          sScrollToEnd = true;
+         sCodeView.open = false;
       }
 
       // ---------------------------------------------------------------- sending
@@ -1966,6 +1978,73 @@ namespace app
             ImGui::SetTooltip("%s", path.c_str());
       }
 
+      // Code a turn wrote (a code param, a long block in a reply) folds to a chip: the code glyph and its line
+      // count. The chip opens the whole code in a pane beside the chat, monospace with line numbers.
+      int LineCount(const std::string& code)
+      {
+         int n = code.empty() ? 0 : 1;
+         for (size_t i = 0; i + 1 < code.size(); i++)
+            n += code[i] == '\n' ? 1 : 0;
+         return n;
+      }
+
+      void OpenCode(const std::string& title, const std::string& code)
+      {
+         if (sCodeView.open && sCodeView.code == code)
+         {
+            sCodeView.open = false;  // the chip toggles its own pane
+            return;
+         }
+         sCodeView.open = true;
+         sCodeView.title = title;
+         sCodeView.code = code;
+         sCodeView.lines.clear();
+         size_t at = 0;
+         while (at <= code.size())
+         {
+            const size_t nl = code.find('\n', at);
+            const size_t end = nl == std::string::npos ? code.size() : nl;
+            std::string line = code.substr(at, end - at);
+            for (size_t t; (t = line.find('\t')) != std::string::npos;)
+               line.replace(t, 1, "   ");
+            sCodeView.lines.push_back(line);
+            if (nl == std::string::npos)
+               break;
+            at = nl + 1;
+         }
+         while (sCodeView.lines.size() > 1 && sCodeView.lines.back().empty())
+            sCodeView.lines.pop_back();
+      }
+
+      void DrawCodeChip(const std::string& title, const std::string& code, const char* id)
+      {
+         UiType::Scope s(UiType::Size::Caption, UiType::Weight::Medium);
+         const int n = LineCount(code);
+         char label[48];
+         std::snprintf(label, sizeof label, n == 1 ? T("%d line") : T("%d lines"), n);
+         const float icon = tok::icon_sm;
+         const float pad = tok::space_2;
+         const ImVec2 ts = ImGui::CalcTextSize(label);
+         const ImVec2 sz(pad + icon + 6.0f + ts.x + pad, ChipButton::kHeight);
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         if (ImGui::InvisibleButton(id, sz))
+            OpenCode(title, code);
+         const bool hot = ImGui::IsItemHovered();
+         const bool on = sCodeView.open && sCodeView.code == code;
+         if (hot)
+            ImGui::SetTooltip("%s", on ? T("Close code") : T("Open code"));
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), TextTint(hot ? 0.10f : 0.06f), tok::radius_field);
+         if (on)
+            dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(AccentEmphasisSelected()), tok::radius_field);
+         const ImU32 fg = on ? ImGui::GetColorU32(AccentEmphasisSelected()) : (hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim());
+         glyph::Draw(dl, ImVec2(p.x + pad + icon * 0.5f, p.y + sz.y * 0.5f), icon, fg, IconsInfinite::Code);
+         dl->AddText(ImVec2(p.x + pad + icon + 6.0f, std::round(p.y + (sz.y - ImGui::GetFontSize()) * 0.5f)), fg, label);
+      }
+
+      // Long code in a reply folds to the chip; a short snippet stays inline, in the monospace face.
+      constexpr int kInlineCodeLines = 12;
+
       void DrawBlocks(const std::vector<chat::Block>& blocks, float width, int id)
       {
          int k = 0;
@@ -1978,6 +2057,12 @@ namespace app
                {
                   char cid[32];
                   std::snprintf(cid, sizeof cid, "##code%d", bid);
+                  if (LineCount(b.text) > kInlineCodeLines)
+                  {
+                     DrawCodeChip(T("Code"), b.text, cid);
+                     ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                     break;
+                  }
                   CodeBlock::Draw(b.text.c_str(), cid);
                   break;
                }
@@ -2058,6 +2143,25 @@ namespace app
       }
 
       // What changed in the patch: one line per change, links to each node and param, code as a block.
+      // The code pane is named after the param the code lives in ("sketch 3d · Code").
+      std::string CodeTitle(const chat::ChangeLine& l)
+      {
+         const std::vector<chat::Block>& blocks = BlocksFor(l.text);
+         if (!blocks.empty())
+            for (const chat::Seg& s : blocks[0].segs)
+               if (s.kind == chat::Seg::Kind::Param || s.kind == chat::Seg::Kind::Node)
+               {
+                  // A param chip reads "node.label"; the label may hold dots itself (p.count).
+                  const chat::CatalogNode* n = s.kind == chat::Seg::Kind::Param ? sCat.Node(s.node) : nullptr;
+                  const chat::CatalogParam* p = n != nullptr ? n->Find(s.key) : nullptr;
+                  const std::string label = p == nullptr ? std::string() : "." + (p->label.empty() ? p->key : p->label);
+                  if (!label.empty() && s.text.size() > label.size() && s.text.compare(s.text.size() - label.size(), label.size(), label) == 0)
+                     return s.text.substr(0, s.text.size() - label.size()) + " · " + label.substr(1);
+                  return s.text;
+               }
+         return T("Code");
+      }
+
       void DrawChange(Entry& e, EntryUi& ui, float width, int id, bool undoable)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2104,7 +2208,9 @@ namespace app
             {
                char cid[40];
                std::snprintf(cid, sizeof cid, "##chcode%d_%d", id, (int)i);
-               CodeBlock::Draw(l.code.c_str(), cid);
+               ImGui::Dummy(ImVec2(0.0f, 2.0f));
+               DrawCodeChip(CodeTitle(l), l.code, cid);
+               ImGui::Dummy(ImVec2(0.0f, 2.0f));
             }
          }
          if (e.changes.size() > shown)
@@ -3221,6 +3327,77 @@ namespace app
          }
       }
 
+      // The code pane: the chat header's row (title left, Copy and Close right), then the code, monospace,
+      // numbered, scrolling both ways so a long line never wraps into the next one.
+      void DrawCodePane(float width, float height)
+      {
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
+         const float rowH = 26.0f;
+         {
+            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            const float right = at.x + width - tok::space_1 - 2.0f * 22.0f - tok::space_2;
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            ImGui::RenderTextEllipsis(dl, ImVec2(at.x + tok::space_3, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
+                                      sCodeView.title.c_str(), nullptr, nullptr);
+            ImGui::PopStyleColor();
+         }
+         ImGui::SetCursorScreenPos(ImVec2(at.x + width - tok::space_1 - 2.0f * 22.0f - 2.0f, at.y + (rowH - 18.0f) * 0.5f));
+         const double now = ImGui::GetTime();
+         if (GlyphToggle::Draw("##codecopy", IconsInfinite::Copy, IconsInfinite::Copy, false))
+         {
+            ImGui::SetClipboardText(sCodeView.code.c_str());
+            sCodeView.copiedAt = now;
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", now - sCodeView.copiedAt < 1.5 ? T("Copied") : T("Copy"));
+         ImGui::SameLine(0.0f, 2.0f);
+         if (GlyphToggle::Draw("##codeclose", IconsInfinite::Close, IconsInfinite::Close, false))
+            sCodeView.open = false;
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Close"));
+         dl->AddLine(ImVec2(at.x, at.y + rowH - 0.5f), ImVec2(at.x + width, at.y + rowH - 0.5f), TextTint(0.08f));
+
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
+         ImGui::BeginChild("##codebody", ImVec2(width, std::max(1.0f, height - rowH)), ImGuiChildFlags_AlwaysUseWindowPadding,
+                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_HorizontalScrollbar);
+         ImGui::PopStyleVar();
+         // The steps rows' face: Geist Mono at caption size.
+         ImFont* mono = TerminalMonoFont();
+         ImGui::PushFont(mono, UiType::Px(UiType::Size::Caption));
+         const int count = (int)sCodeView.lines.size();
+         char widest[16];
+         std::snprintf(widest, sizeof widest, "%d", std::max(10, count));
+         const float gutter = ImGui::CalcTextSize(widest).x + tok::space_3;
+         const float lineH = ImGui::GetTextLineHeight() + 3.0f;
+         size_t longest = 0;
+         for (const std::string& l : sCodeView.lines)
+            longest = std::max(longest, l.size());
+         const float textW = ImGui::CalcTextSize("M").x * (float)longest;
+         const ImVec2 o = ImGui::GetCursorScreenPos();
+         ImDrawList* cl = ImGui::GetWindowDrawList();
+         ImGuiListClipper clip;
+         clip.Begin(count, lineH);
+         while (clip.Step())
+            for (int i = clip.DisplayStart; i < clip.DisplayEnd; i++)
+            {
+               const float y = o.y + lineH * (float)i;
+               char num[16];
+               std::snprintf(num, sizeof num, "%d", i + 1);
+               const float nw = ImGui::CalcTextSize(num).x;
+               cl->AddText(ImVec2(o.x + gutter - tok::space_3 - nw, y), Dim(), num);
+               const std::string& l = sCodeView.lines[(size_t)i];
+               cl->AddText(ImVec2(o.x + gutter, y), ImGui::GetColorU32(ImGuiCol_Text), l.c_str(), l.c_str() + l.size());
+               ImGui::SetCursorScreenPos(ImVec2(o.x, y));
+               ImGui::Dummy(ImVec2(gutter + textW, lineH));
+            }
+         clip.End();
+         ImGui::PopFont();
+         ImGui::EndChild();
+      }
+
       void DrawHeader(float width)
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -3264,6 +3441,10 @@ namespace app
    }
 
    void DrawChatBody();
+   void DrawChatWithCode();
+
+   static bool sShotOpenCode = false;
+   void ChatShotOpenCode() { sShotOpenCode = true; }
 
    void DrawChatPanel()
    {
@@ -3286,6 +3467,14 @@ namespace app
       PollSetups();
       PollRuns();
       RefreshCatalog(false);
+      if (sShotOpenCode)
+      {
+         sShotOpenCode = false;
+         for (const chat::Entry& e : sThread.entries)
+            for (const chat::ChangeLine& l : e.changes)
+               if (!l.code.empty() && !sCodeView.open)
+                  OpenCode(CodeTitle(l), l.code);
+      }
       if (sRail && ImGui::GetContentRegionAvail().x > 380.0f)
       {
          const ImVec2 all = ImGui::GetContentRegionAvail();
@@ -3297,11 +3486,37 @@ namespace app
          ImGui::EndChild();
          ImGui::SameLine(0.0f, 0.0f);
          ImGui::BeginChild("##chatmain", ImVec2(0.0f, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-         DrawChatBody();
+         DrawChatWithCode();
          ImGui::EndChild();
          return;
       }
+      DrawChatWithCode();
+   }
+
+   // The code pane sits right of the chat, as the side terminal does; on a narrow panel it covers the chat.
+   void DrawChatWithCode()
+   {
+      if (!sCodeView.open)
+      {
+         DrawChatBody();
+         return;
+      }
+      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      if (avail.x < 640.0f)
+      {
+         DrawCodePane(avail.x, avail.y);
+         return;
+      }
+      const float gap = tok::space_1;
+      const float codeW = std::floor(std::clamp(avail.x * 0.45f, 300.0f, 640.0f));
+      const ImGuiWindowFlags flags = ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+      ImGui::BeginChild("##chatleft", ImVec2(avail.x - codeW - gap, avail.y), false, flags);
       DrawChatBody();
+      ImGui::EndChild();
+      ImGui::SameLine(0.0f, gap);
+      ImGui::BeginChild("##coderight", ImVec2(codeW, avail.y), false, flags);
+      DrawCodePane(codeW, avail.y);
+      ImGui::EndChild();
    }
 
    void DrawChatBody()

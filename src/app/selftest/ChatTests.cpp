@@ -367,6 +367,38 @@ namespace app
             }
          }
 
+         // Code comes back unescaped, internal keys stay out, dotted keys link whole.
+         {
+            chat::Snapshot before, after;
+            before.catalog = cat;
+            chat::CatalogNode sk;
+            sk.index = 20;
+            sk.type = "Sketch3D";
+            sk.title = "sketch 3d";
+            sk.params.push_back({ "code", "Code", "a = 1;", "" });
+            sk.params.push_back({ "field_paramMap", "", "{}", "" });
+            sk.params.push_back({ "p.count", "", "4", "int" });
+            before.catalog.nodes.push_back(sk);
+            after.catalog = before.catalog;
+            after.catalog.nodes.back().params[0].value = "a = 1;\\nb = \\\"x\\\";\\tc";
+            after.catalog.nodes.back().params[1].value = "{\"x\":1}";
+            const std::vector<chat::ChangeLine> d = chat::Diff(before, after);
+            bool code = false, internal = false;
+            for (const chat::ChangeLine& l : d)
+            {
+               code = code || l.code == "a = 1;\nb = \"x\";\tc";
+               internal = internal || l.text.find("field_") != std::string::npos;
+            }
+            check(code, "diff: saved escapes in code come back as real newlines, quotes and tabs");
+            check(!internal, "diff: field_ bookkeeping keys never show as changes");
+            const auto dotted = chat::ParseReply("Set @sketch 3d#20.p.count to 8.", before.catalog);
+            bool whole = false;
+            if (!dotted.empty())
+               for (const chat::Seg& g : dotted[0].segs)
+                  whole = whole || (g.kind == chat::Seg::Kind::Param && g.key == "p.count" && g.node == 20);
+            check(whole, "reply links: a dotted key links as one param chip");
+         }
+
          // Steps: a retry of the same command (with a cd in front, a pipe after) shows once, failures count.
          {
             check(chat::StepKey("cd /tmp && infinite set 1 scale 3") == chat::StepKey("infinite set 1 scale 3"), "steps: a cd in front is the same command");

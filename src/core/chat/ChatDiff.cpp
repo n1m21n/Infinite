@@ -12,8 +12,32 @@ namespace chat
 
       std::string Shown(const CatalogParam& p) { return ShownValue(p); }
 
+      // Bookkeeping a node saves next to its params (a Field node's param id map), never a change to read.
+      bool Internal(const CatalogParam& p) { return p.key.rfind("field_", 0) == 0; }
+
+      // Saved text keeps newlines, tabs and quotes escaped; a code block shows the code itself.
+      std::string Unescape(const std::string& t)
+      {
+         std::string out;
+         out.reserve(t.size());
+         for (size_t i = 0; i < t.size(); i++)
+         {
+            if (t[i] != '\\' || i + 1 >= t.size())
+            {
+               out += t[i];
+               continue;
+            }
+            const char c = t[++i];
+            out += c == 'n' ? '\n' : c == 't' ? '\t' : c == 'r' ? '\r' : c;
+         }
+         return out;
+      }
+
       // Text a code node holds: more than one line, or too long to read on one.
-      bool IsCode(const CatalogParam& p) { return p.kind.empty() && (p.value.find('\n') != std::string::npos || p.value.size() > 60); }
+      bool IsCode(const CatalogParam& p)
+      {
+         return p.kind.empty() && (p.value.find('\n') != std::string::npos || p.value.find("\\n") != std::string::npos || p.value.size() > 60);
+      }
 
       std::string End(const Snapshot& s, int node, int output)
       {
@@ -73,7 +97,7 @@ namespace chat
             for (const CatalogParam& q : was->params)
                if (q.key == p.key)
                   old = &q;
-            if (old == nullptr)
+            if (old == nullptr || Internal(p))
                continue;
             const std::string at = Ref(n) + "." + p.key;
             if (p.modulated != old->modulated)
@@ -83,7 +107,7 @@ namespace chat
             if (p.value == old->value)
                continue;
             if (IsCode(p) || IsCode(*old))
-               out.push_back({ at + " changed", p.value });
+               out.push_back({ at + " changed", p.value.find('\n') == std::string::npos ? Unescape(p.value) : p.value });
             else
                out.push_back({ at + " " + Shown(*old) + " → " + Shown(p), "", n.index, p.key, p.value });
          }

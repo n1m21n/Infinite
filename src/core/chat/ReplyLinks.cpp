@@ -107,10 +107,23 @@ namespace chat
       {
          if (i >= line.size() || line[i] != '.' || i + 1 >= line.size() || !WordChar(line[i + 1]))
             return false;
+         // Keys can hold dots (a Field node's `p.count`): try the longest dotted run first.
+         std::vector<size_t> ends;
          size_t end = i + 1;
-         while (end < line.size() && WordChar(line[end]))
-            end++;
-         const CatalogParam* p = n.Find(line.substr(i + 1, end - i - 1));
+         while (true)
+         {
+            while (end < line.size() && WordChar(line[end]))
+               end++;
+            ends.push_back(end);
+            if (end + 1 < line.size() && line[end] == '.' && WordChar(line[end + 1]))
+               end++;
+            else
+               break;
+         }
+         const CatalogParam* p = nullptr;
+         for (auto it = ends.rbegin(); it != ends.rend() && p == nullptr; ++it)
+            if ((p = n.Find(line.substr(i + 1, *it - i - 1))) != nullptr)
+               end = *it;
          if (p == nullptr)
             return false;
          segs.pop_back();  // the node chip becomes the param chip

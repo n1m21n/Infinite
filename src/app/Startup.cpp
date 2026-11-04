@@ -4312,6 +4312,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gSampleStudioOpen = o.find("studio") != std::string::npos;
       gPianoRollOpen = o.find("pianoroll") != std::string::npos;
       gTerminalOpen = o.find("terminal") != std::string::npos;
+      if (o.find("chatcode") != std::string::npos)
+         ChatShotOpenCode();
       gView3DOpen = o.find("view3d") != std::string::npos;
       // "historydemo": a few named edits so the History panel has rows for a review shot.
       if (o.find("historydemo") != std::string::npos)

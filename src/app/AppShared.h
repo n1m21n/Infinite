@@ -5796,6 +5796,7 @@ bool DrawTerminalWelcome();   // CliSetupSection.cpp
 extern int gTerminalFace;
 extern bool gChatSideTerminal;   // the chat shows with a shell beside it
 void DrawChatPanel();
+void ChatShotOpenCode();  // review shots: the chat opens the first code change in its pane
 bool ChatBusy();   // an agent turn is running
 int ChatSavedCount();
 struct ChatAgentInfo
