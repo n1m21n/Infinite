@@ -17,16 +17,17 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 - One-Command Installation: `npx -y infinite-engine init` (auto-configures Claude Desktop, Cursor, and Windsurf) or `pip install infinite-daw` then `infinite-init`.
 - [Developers page](https://infinitedevices.org/developers.html): headless command line, Python SDK and MCP server setup
+- [Infinite chat](https://infinitedevices.org/chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account
 - [MCP Server (npm: infinite-engine)](https://github.com/n1m21n/Infinite/tree/main/tools/npm/infinite-engine): stdio server (`npx -y infinite-engine serve`) providing 9 tools:
-  - `validate_patch`: Syntax, cycle and port connection validation for `.inf` files
-  - `explain_patch`: Human-readable explanation of signal flow, nodes, and parameters
-  - `render_audio`: Headless audio rendering to `.wav` (offline DSP)
-  - `render_frame`: Headless visual rendering to `.png` at a specified timestamp `t`
-  - `render_video`: Headless audiovisual rendering to `.mp4` at target fps and duration
-  - `audio_summary`: Headless loudness (LUFS, RMS, peak) and spectral balance analysis
-  - `list_nodes`: Queries palette nodes by category (Synths, Effects, 3D, Source, Modulators, Notes)
-  - `node_info`: Full schema with inputs, outputs, modulatable controls and valid ranges
-  - `generate_patch`: Algorithmic creation of valid audio and visual patch topologies
+  - `infinite_synthesize_field_synth`: WAV audio from an inline Field Synth kernel
+  - `infinite_synthesize_field_notes`: algorithmic notes and Euclidean rhythms from a Field Notes kernel, rendered to audio
+  - `infinite_process_field_effect`: run audio through an inline Field Effect kernel
+  - `infinite_render_field_pixel`: render a Field Pixel shader to a PNG
+  - `infinite_render_field_primitive`: parametric 3D surfaces from Field Primitive equations
+  - `infinite_render_field_modifier`: deform a mesh with an inline Field Modifier kernel
+  - `infinite_render_sketch3d`: render JavaScript-built 3D geometry to a PNG
+  - `infinite_validate_patch`: check a `.inf` patch and report every problem
+  - `infinite_render_video`: render an MP4 from a `.inf` patch, headless
 - [Python SDK](https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk): headless Python wrappers (`infinite.field_synth`, `infinite.sketch_3d`)
 - [Agent guide](https://github.com/n1m21n/Infinite/blob/main/AGENT.md): complete engine specification for AI assistants
 - Headless CLI commands:
@@ -78,6 +79,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Blog](https://infinitedevices.org/blog/): guides on audio-reactive visuals, headless rendering, Field language, plugin modulation and motion tracking (feed: https://infinitedevices.org/blog/feed.xml)
 - [Art Gallery](https://infinitedevices.org/artworks.html): visuals and motion made with Infinite
 - [Developers](https://infinitedevices.org/developers.html): headless command line, Python SDK and the nine MCP tools, with what each needs
+- [Infinite chat](https://infinitedevices.org/chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account; direct commands, undo, speed and sign-in
 - [Philosophy](https://infinitedevices.org/philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles
 - [Infinite for artists](https://infinitedevices.org/artists.html), [musicians](https://infinitedevices.org/musicians.html), [VJs](https://infinitedevices.org/vjs.html), [creative coders](https://infinitedevices.org/creative-coders.html): one page per audience with starting patches
 - [Nodes](https://infinitedevices.org/nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch

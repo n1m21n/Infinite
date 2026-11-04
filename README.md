@@ -209,10 +209,6 @@ For AI coding assistants there is an MCP server, [`tools/npm/infinite-engine`](t
 ```bash
 # Add Infinite to Claude Desktop, Cursor and Windsurf:
 npx -y infinite-engine init
-
-# Or through the Smithery registry:
-npx -y @smithery/cli install infinite-engine --client claude
-npx -y @smithery/cli install infinite-engine --client cursor
 ```
 
 | MCP tool | What it does |

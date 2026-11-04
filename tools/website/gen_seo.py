@@ -152,7 +152,7 @@ def main():
         posts = []
     blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
-    pages = [("", 1.0), ("library.html", 0.8), ("samples/", 0.9)] + blog_pages + embed_pages + [("developers.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("extensions.html", 0.6), ("watch.html", 0.5), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
+    pages = [("", 1.0), ("library.html", 0.8), ("samples/", 0.9)] + blog_pages + embed_pages + [("developers.html", 0.7), ("chat.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("extensions.html", 0.6), ("watch.html", 0.5), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3), ("llms.txt", 0.6), ("llms-full.txt", 0.5)]
     open(os.path.join(W, "sitemap.xml"), "w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]) + "</urlset>\n")
     open(os.path.join(W, "robots.txt"), "w").write(
@@ -168,16 +168,17 @@ def main():
         "## For AI agents", "",
         "- One-Command Installation: `npx -y infinite-engine init` (auto-configures Claude Desktop, Cursor, and Windsurf) or `pip install infinite-daw` then `infinite-init`.",
         f"- [Developers page]({BASE}developers.html): headless command line, Python SDK and MCP server setup",
+        f"- [Infinite chat]({BASE}chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account",
         "- [MCP Server (npm: infinite-engine)](https://github.com/n1m21n/Infinite/tree/main/tools/npm/infinite-engine): stdio server (`npx -y infinite-engine serve`) providing 9 tools:",
-        "  - `validate_patch`: Syntax, cycle and port connection validation for `.inf` files",
-        "  - `explain_patch`: Human-readable explanation of signal flow, nodes, and parameters",
-        "  - `render_audio`: Headless audio rendering to `.wav` (offline DSP)",
-        "  - `render_frame`: Headless visual rendering to `.png` at a specified timestamp `t`",
-        "  - `render_video`: Headless audiovisual rendering to `.mp4` at target fps and duration",
-        "  - `audio_summary`: Headless loudness (LUFS, RMS, peak) and spectral balance analysis",
-        "  - `list_nodes`: Queries palette nodes by category (Synths, Effects, 3D, Source, Modulators, Notes)",
-        "  - `node_info`: Full schema with inputs, outputs, modulatable controls and valid ranges",
-        "  - `generate_patch`: Algorithmic creation of valid audio and visual patch topologies",
+        "  - `infinite_synthesize_field_synth`: WAV audio from an inline Field Synth kernel",
+        "  - `infinite_synthesize_field_notes`: algorithmic notes and Euclidean rhythms from a Field Notes kernel, rendered to audio",
+        "  - `infinite_process_field_effect`: run audio through an inline Field Effect kernel",
+        "  - `infinite_render_field_pixel`: render a Field Pixel shader to a PNG",
+        "  - `infinite_render_field_primitive`: parametric 3D surfaces from Field Primitive equations",
+        "  - `infinite_render_field_modifier`: deform a mesh with an inline Field Modifier kernel",
+        "  - `infinite_render_sketch3d`: render JavaScript-built 3D geometry to a PNG",
+        "  - `infinite_validate_patch`: check a `.inf` patch and report every problem",
+        "  - `infinite_render_video`: render an MP4 from a `.inf` patch, headless",
         "- [Python SDK](https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk): headless Python wrappers (`infinite.field_synth`, `infinite.sketch_3d`)",
         "- [Agent guide](https://github.com/n1m21n/Infinite/blob/main/AGENT.md): complete engine specification for AI assistants",
         "- Headless CLI commands:",
@@ -233,6 +234,7 @@ def main():
         f"- [Blog]({BASE}blog/): guides on audio-reactive visuals, headless rendering, Field language, plugin modulation and motion tracking (feed: {BASE}blog/feed.xml)",
         f"- [Art Gallery]({BASE}artworks.html): visuals and motion made with Infinite",
         f"- [Developers]({BASE}developers.html): headless command line, Python SDK and the nine MCP tools, with what each needs",
+        f"- [Infinite chat]({BASE}chat.html): the built-in chat that edits the open patch through your Claude, ChatGPT or Gemini account; direct commands, undo, speed and sign-in",
         f"- [Philosophy]({BASE}philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles",
         f"- [Infinite for artists]({BASE}artists.html), [musicians]({BASE}musicians.html), [VJs]({BASE}vjs.html), [creative coders]({BASE}creative-coders.html): one page per audience with starting patches",
         f"- [Nodes]({BASE}nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch",

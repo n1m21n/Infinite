@@ -39,6 +39,7 @@ GROUPS = [
         ("artworks.html", "Art gallery", "Made with Infinite"),
         ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
+        ("chat.html", "Chat", "Talk to your patch with an agent"),
         ("extensions.html", "Extensions", "Hand, face and pose tracking"),
         ("benchmarks.html", "Benchmarks", "Measured against other tools"),
     ]),
@@ -55,7 +56,7 @@ FOOTER_COLS = [
         ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
     ]),
     ("Explore", [
-        ("library.html", "Library"), ("samples/", "Samples"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("extensions.html", "Extensions"),
+        ("library.html", "Library"), ("samples/", "Samples"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("chat.html", "Chat"), ("extensions.html", "Extensions"),
         ("benchmarks.html", "Benchmarks"),
     ]),
     ("Learn", [
@@ -121,7 +122,7 @@ def is_current(path, rel):
 
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
-            "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer",
+            "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer", "chat.html": "chat",
             "benchmarks.html": "range", "samples/": "range", "index.html#learn": "play", "philosophy.html": "loop", "blog/": "pencil"}
 
 

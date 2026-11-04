@@ -128,7 +128,7 @@ AUDIENCES = [
                       ("Python", 'pip install infinite-daw\npython3\n>>> import infinite\n>>> infinite.field_synth("state float phase = 0\\nphase = (phase + freq / sr) % 1.0\\nout = sin(6.28318 * phase) * 0.4 * gate", out_wav="synth.wav", duration=3)',
                        'Available on PyPI. <a href="https://pypi.org/project/infinite-daw/" target="_blank" rel="noopener">PyPI package</a> and <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">source</a>.'),
                       ("MCP", 'npx -y infinite-engine init\n\n# Or manual mcp.json:\n{\n  "mcpServers": {\n    "infinite": {\n      "command": "npx",\n      "args": ["-y", "infinite-engine", "serve"]\n    }\n  }\n}',
-                       'One command configures Claude Desktop, Cursor and Windsurf. <a href="https://www.npmjs.com/package/infinite-engine" target="_blank" rel="noopener">npm package</a> and <a href="https://smithery.ai" target="_blank" rel="noopener">Smithery registry</a>.')],
+                       'One command configures Claude Desktop, Cursor and Windsurf. <a href="https://www.npmjs.com/package/infinite-engine" target="_blank" rel="noopener">npm package</a>.')],
              "note": "Illustration of the flow; the guide lists the real output files."},
      "start": [], "extra": ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide (PDF)")},
 ]

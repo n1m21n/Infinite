@@ -35,6 +35,7 @@ PAGES = {
     "artists.html": ("artists", "Infinite for artists", "For artists", "artists", "Images that move, made on one canvas.", FIELD),
     "vjs.html": ("vjs", "Infinite for VJs", "For VJs", "VJs", "Live visuals that follow the music.", BALL),
     "developers.html": ("developers", "Infinite for developers", "For developers", "developers", "CLI, Python SDK and MCP.", PATCH),
+    "chat.html": ("chat", "Infinite chat", "Talk to your patch", "patch", "Claude, ChatGPT or Gemini, in the app.", PATCH),
     "creative-coders.html": ("creative-coders", "Infinite for creative coders", "For coders", "coders", "Field, sketches and shaders.", FIELD),
     "benchmarks.html": ("benchmarks", "Benchmarks", "Made to be fast", "fast", "Audio, video and speed, measured.", NODE),
     "philosophy.html": ("philosophy", "Philosophy", "Built for you", "you", "Creative software, built for the person using it.", KIT),
