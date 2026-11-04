@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <unordered_map>
 
@@ -648,6 +649,7 @@ namespace Sculpt
          return;
       const float s = std::clamp(d.strength, 0.0f, 1.0f) / amount;
       const float sign = d.invert ? -1.0f : 1.0f;
+      const float st = std::clamp(d.strength, 0.0f, 1.0f);
       for (int m : Passes(d.symmetry))
       {
          float c[3];
@@ -684,12 +686,14 @@ namespace Sculpt
             switch (d.brush)
             {
                case kDraw:
+                  // Blender: radius * strength squared along the area normal.
                   for (int k = 0; k < 3; k++)
-                     move[k] = a.normal[k] * d.radius * 0.36f * f * sign;
+                     move[k] = a.normal[k] * d.radius * st * st * f * sign;
                   break;
                case kInflate:
+                  // Blender: a quarter of draw's, and half that again when deflating.
                   for (int k = 0; k < 3; k++)
-                     move[k] = n[k] * d.radius * 0.1f * f * sign;
+                     move[k] = n[k] * d.radius * 0.25f * st * st * f * sign * (sign < 0.0f ? 0.5f : 1.0f);
                   break;
                case kSmooth:
                {
@@ -722,7 +726,6 @@ namespace Sculpt
                      to[k] -= a.normal[k] * along;
                   // Blender: the pinch is the brush's pinch factor squared whatever the strength, the dig
                   // is radius * strength squared. Both are in final units, so Stroke does not scale them.
-                  const float st = std::clamp(d.strength, 0.0f, 1.0f);
                   for (int k = 0; k < 3; k++)
                      move[k] = (to[k] * 0.25f - a.normal[k] * d.radius * st * st * sign) * f;
                   break;
@@ -732,14 +735,14 @@ namespace Sculpt
                   const float h = (p[0] - a.center[0]) * a.normal[0] + (p[1] - a.center[1]) * a.normal[1] +
                                   (p[2] - a.center[2]) * a.normal[2];
                   for (int k = 0; k < 3; k++)
-                     move[k] = -a.normal[k] * h * 0.56f * f * sign;
+                     move[k] = -a.normal[k] * h * (0.56f * st) * f * sign;
                   break;
                }
                default:
                   break;
             }
             // Smooth already scales by strength above; the rest scale here.
-            const float scale = d.brush == kSmooth ? 1.0f / amount : d.brush == kCrease ? 1.0f / amount : s;
+            const float scale = d.brush == kSmooth || d.brush == kCrease || d.brush == kDraw || d.brush == kInflate || d.brush == kFlatten ? 1.0f / amount : s;
             for (int k = 0; k < 3; k++)
                o[k] += move[k] * scale;
          }

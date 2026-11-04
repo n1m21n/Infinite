@@ -5,7 +5,7 @@
 Blender preps the mesh and exports base.glb; Infinite's sculpt self-test runs the dabs on it
 (INFINITE_SCULPTTEST_STROKES); Blender runs them in a window (its brushes need a 3D view, so a
 Blender window opens for a few seconds per case). A dab with "to" is a drag: Blender spaces its
-own dabs along it, Infinite puts one every 0.15 radius as the 3D View does. Each point's move is compared:
+own dabs along it, Infinite puts one every 0.2 radius as the 3D View does. Each point's move is compared:
   err   rms of (Infinite move - Blender move) / rms of Blender's move, over points either moved
   gain  Infinite's total move / Blender's (1 = as strong)
   peak  largest move on each side
@@ -75,7 +75,7 @@ CASES = {
 
 
 def inf_dabs(k):
-    """Where Infinite puts dabs: one at `at`, or along a drag's path every 0.15 radius (View3DPanel's spacing)."""
+    """Where Infinite puts dabs: one at `at`, or along a drag's path every 0.2 radius, Smooth every 0.15 (View3DPanel's spacing, Blender's 10% of the diameter)."""
     path = k.get("path")
     if not path:
         if k["brush"] in LEAD_IN:   # Blender's stroke has a second sample half a pixel to the view's right: so does Infinite's
@@ -86,7 +86,7 @@ def inf_dabs(k):
             r = [y[1] * n[2] - y[2] * n[1], y[2] * n[0] - y[0] * n[2], y[0] * n[1] - y[1] * n[0]]
             return [k["at"], [k["at"][i] + r[i] * 1e-4 for i in range(3)]]
         return [k["at"]]
-    out, left, step = [path[0]], 0.0, k["radius"] * 0.15
+    out, left, step = [path[0]], 0.0, k["radius"] * (0.15 if k["brush"] == SMOOTH else 0.2)
     for a, b in zip(path, path[1:]):
         left += math.dist(a, b)
         if left >= step:
