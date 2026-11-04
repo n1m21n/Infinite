@@ -324,4 +324,67 @@ void RunView3DEditTest(int f)
       printf("VIEW3DEDITTEST %s\n", sOk ? "OK" : "FAIL");
    }
 }
+
+// ============================================================ INFINITE_VIEW3DPIVOTTEST
+//
+// Shift + two-finger scroll pans the pivot away; Shift + double-click on empty space glides it back onto the 3D
+// cursor (the origin in a new scene) and keeps the distance and the turn.
+void RunView3DPivotTest(int f)
+{
+   static float mid[2] = {}, before[18] = {}, panned[18] = {};
+   static bool ok = true;
+   ImGuiIO& io = ImGui::GetIO();
+   auto check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      ok = ok && pass;
+   };
+   auto len3 = [](const float* v) { return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); };
+   switch (f)
+   {
+   case 4:
+      NewPatch();
+      gView3DOpen = true;
+      break;
+   case 10:
+   {
+      float p[18];
+      check("the viewport is drawn", View3DNavProbe(p));
+      mid[0] = p[12];
+      mid[1] = p[13];
+      io.AddMousePosEvent(mid[0], mid[1]);
+      break;
+   }
+   case 12:
+      io.AddKeyEvent(ImGuiMod_Shift, true);
+      break;
+   case 14:
+      io.AddMouseWheelEvent(4.0f, 0.0f);   // Shift + vertical scroll arrives as horizontal on macOS
+      io.AddMouseWheelEvent(0.0f, 4.0f);
+      io.AddMouseWheelEvent(0.0f, 4.0f);
+      break;
+   case 18:
+   {
+      View3DNavProbe(panned);
+      check("Shift + scroll moved the pivot off the cursor", len3(panned + 3) > 0.01f);
+      break;
+   }
+   case 20: io.AddMouseButtonEvent(0, true); break;
+   case 21: io.AddMouseButtonEvent(0, false); break;
+   case 22: io.AddMouseButtonEvent(0, true); break;
+   case 23: io.AddMouseButtonEvent(0, false); break;
+   case 140:   // the glide takes about a third of a second
+   {
+      float p[18];
+      View3DNavProbe(p);
+      check("Shift + double-click: the pivot is on the 3D cursor", len3(p + 3) < 1e-3f);
+      check("the distance stayed", std::fabs(p[2] - panned[2]) < 1e-3f);
+      check("the turn stayed", std::fabs(p[0] - panned[0]) < 1e-3f && std::fabs(p[1] - panned[1]) < 1e-3f);
+      io.AddKeyEvent(ImGuiMod_Shift, false);
+      printf("VIEW3DPIVOTTEST %s\n", ok ? "OK" : "FAIL");
+      break;
+   }
+   }
+   (void)before;
+}
 } // namespace app

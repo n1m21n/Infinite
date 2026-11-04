@@ -762,6 +762,7 @@ namespace app
          { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Alt+G", I18N_KEY("Group the selected items, or dissolve the group") },
          { I18N_KEY("3D View"), I18N_KEY("Rename Item"), "F2", I18N_KEY("Rename the selected item") },
          { I18N_KEY("3D View"), I18N_KEY("Frame"), "F / Home", I18N_KEY("F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan") },
+         { I18N_KEY("3D View"), I18N_KEY("Pivot to 3D Cursor"), "Shift+Double-click", I18N_KEY("Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away") },
          { I18N_KEY("3D View"), I18N_KEY("Axis Views"), "1 / 3 / 7", I18N_KEY("Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps") },
          { I18N_KEY("3D View"), I18N_KEY("Camera View"), "0", I18N_KEY("Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view") },
          { I18N_KEY("3D View"), I18N_KEY("Shading"), "Z / Shift+Z", I18N_KEY("Cycle the shading; Shift+Z switches wireframe") },

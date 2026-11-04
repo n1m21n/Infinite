@@ -5268,7 +5268,14 @@ namespace
          {
             const int id = Pick(scene, mouse, true);
             sPressAt = mouse;
-            if (id != 0)
+            if (id == 0 && io.KeyShift && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+               // Shift + double-click on empty space: the view's pivot snaps back onto the 3D cursor (distance and turn stay).
+               GlideTo([] { std::copy(sSet->cursor, sSet->cursor + 3, sTarget); });
+               sBoxOn = false;
+               sLasso = false;
+            }
+            else if (id != 0)
             {
                if (!io.KeyShift)
                {
