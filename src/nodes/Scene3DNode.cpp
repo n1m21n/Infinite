@@ -1699,10 +1699,11 @@ unsigned int Scene3DNode::GridPass(unsigned int sceneTex, int w, int h, const Vi
          // In front of the scene in linear depth, by a margin the depth buffer can resolve:
          // a fixed slack in stored depth grows with distance and let the grid through meshes.
          // A few pixels of the floor's own depth slope are added so where a mesh meets the
-         // floor the mesh wins and no grid line is painted on its face.
+         // floor the mesh wins and no grid line is painted on its face. The margin never drops below
+         // four steps of a 24-bit buffer at that distance (a software GL rasteriser needs it far out).
          "      float sd = texture(uDepth, vUv).r;\n"
          "      float slope = fwidth(linDepth(pd));\n"
-         "      bool open = sd >= 0.999999 || linDepth(pd) < linDepth(sd) - (uNearFar.z > 0.5 ? 2e-5 : 0.002 * linDepth(sd)) - 3.0 * slope;\n"
+         "      bool open = sd >= 0.999999 || linDepth(pd) < linDepth(sd) - (uNearFar.z > 0.5 ? 2e-5 : max(0.002 * linDepth(sd), 4.0 * linDepth(sd) * linDepth(sd) / (uNearFar.x * 16777216.0))) - 3.0 * slope;\n"
          "      if (t > 0.0 && t <= 1.0 && (uWireMode == 2 || open) && fade > 0.0) {\n"
          "         float sub = max(uGridOpt.y, 2.0);\n"
          "         float level = log(max(uDist, 1e-3) * 0.25 / uGridOpt.x) / log(sub);\n"
