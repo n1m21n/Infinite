@@ -22,6 +22,9 @@ struct Material
    float roughness = 0.45f;
    float opacity = 1.0f;
    bool opacityMapped = false; // an opacity map is patched: draws in the see-through pass
+   // Explicit padding so every byte of a Material is defined: ComputeContentRevision() and the
+   // memcmp()s below read the raw bytes, and compiler padding in a copy is indeterminate.
+   unsigned char padA[3] = { 0, 0, 0 };
    int shading = 0; // lit / normals / uv / flat
 
    // Light the surface emits on its own. Added after shading and before
@@ -83,6 +86,7 @@ struct Material
    // sprites). Off by default so existing patches render unchanged; on, the
    // slot joins Render 3D's sorted translucent pass.
    bool textureAlpha = false;
+   unsigned char padB[3] = { 0, 0, 0 };
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
