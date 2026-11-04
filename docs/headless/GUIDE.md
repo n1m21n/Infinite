@@ -13,7 +13,7 @@ Render pictures, video and sound from a text file, with no window and no mouse. 
 
 You do not need: a project file, the app open, a licence dialog, or any knowledge of the node graph beyond the nodes you use.
 
-Not supported headless: patches that use a camera, microphone or MIDI device are refused (exit code 4), because there is no hardware to read. Replace them with a file or a generator.
+Not supported headless: patches that use a camera, microphone or MIDI device are refused (exit code 4) by `--render` and `--audio-summary`, because there is no hardware to read. Replace them with a file or a generator. (`--frame` does not check, so a stray MIDI node in a picture-only patch still draws.)
 
 ### The executable
 
@@ -236,6 +236,24 @@ Three ways, from simplest to most flexible.
 - Join shapes with **Join Geometry**, give them a **Material**, and send the result to **Render 3D** together with a **Camera** and one or more **Lights**.
 - `Infinite --explain patch.inf --all` prints each piece's world bounding box. Use it to check where things really are before blaming the lights.
 - If the picture is black or faint, check the camera distance, the light intensities, and the Render 3D ambient colour before changing anything else.
+
+### 7.1 The 3D editing nodes
+
+| Node | In a patch | Notes |
+|---|---|---|
+| Edit Mesh | `s ops sel all\nextrude 0.3` | One op per line, written `\n` in the file: `sel f/v/e/all`, `move`, `rotate`, `scale`, `extrude`, `inset`, `delete`. Elements are named by position, so the list survives an upstream change. `--explain` shows the resulting vertex and face counts |
+| Sculpt | `f amount`, `i level` | Strokes are the node's saved `data`; a patch with none passes the mesh through. A `brush` image input shapes the dab |
+| Bake | `i mode` AO, Curvature, Position, Normal, Thickness, Sculpt | Outputs an image, so wire it to an Output or to a Material slot. Sculpt mode needs a sculpted input |
+| Armature | `i bones`, `f curl`, `f waveAmount` | Pose and IK controls are `pose0..`; an optional `path` geometry input bends the chain along a curve |
+| UV Project | `i uvMode` Smart, Cube, Cylinder, Sphere | Same engine as Transform's UV Project operation |
+| Model 3D | `s path file.glb`, `i clip`, `pose0..` | Skinned glTF clips, morphs and poses animate with the clock |
+| Cloth, Rigid Bodies | `geo` input, Cloth also `collider` | Cloth `colliderFriction`, `colliderDistance`; Rigid Bodies `collider` Box, Sphere, Convex hull. Both simulate from time 0, so ask `--frame` for a later second to see motion |
+| Render 3D | `i engine` Raster or Path trace | `ptSamples`, `ptBounces` for the path tracer; `renderPass` and cavity, AO, depth of field controls for passes |
+| Light, HDRI, Camera | `geo r3 5 light`, `geo r3 4 camera`, `cable r3 8 hdri` | An HDRI is an environment: it uses a `cable` line, not `geo`. Light `useTemperature`, `useCutoff`; Camera `shiftX`, `sensorFit` |
+
+Write each control with its real tag; `--describe "<type>"` shows it, and `--validate` warns `W_TYPE_MISMATCH` when you guess wrong.
+
+Not reachable from the CLI: selecting elements with the mouse in Edit Mode, drawing sculpt strokes, and the 3D View editor's scene items, gizmos and overlays (a bare 3D View node renders its empty stage). The re-runnable check for everything in this section is `python3 tools/headless-docs/check_release_areas.py`.
 
 ## 8. Troubleshooting
 

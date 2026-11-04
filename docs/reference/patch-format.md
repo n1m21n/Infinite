@@ -48,7 +48,7 @@ end
 ## Wires
 
 ```
-cable <dstIndex> <dstSlot> <srcIndex>      image
+cable <dstIndex> <dstSlot> <srcIndex>      image, environment (HDRI into Render 3D env)
 geo   <dstIndex> <dstSlot> <srcIndex>      geometry, camera, light
 aud   <dstIndex> <dstSlot> <srcIndex>      audio
 note  <dstIndex> <dstSlot> <srcIndex>      notes
