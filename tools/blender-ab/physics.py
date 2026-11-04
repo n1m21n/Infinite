@@ -37,7 +37,7 @@ def tilted(deg):
 
 # Blender cloth bending b -> Infinite bending sqrt(b * BEND_SCALE) (Infinite squares
 # its knob). Fitted on the drape cases.
-BEND_SCALE = float(os.environ.get("BEND_SCALE", "0.02"))
+BEND_SCALE = float(os.environ.get("BEND_SCALE", "0.045"))
 BODY = {"friction": 0.5, "bounce": 0.5, "linear_damping": 0.04, "angular_damping": 0.1}
 CASES = {
     # A cube dropped from 2 m: fall time, bounce heights, rest.
