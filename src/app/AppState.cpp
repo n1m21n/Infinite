@@ -1030,7 +1030,6 @@ bool gHeadlessNeedProbe = false;
 
    bool gSettingsOpen = false;
    bool gTemplatesOpen = false;
-   bool gWatchSetupOpen = false;
 
    bool gShowUpdateCheckModal = false;
    bool gShowAboutModal = false;

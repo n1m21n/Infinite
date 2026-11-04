@@ -1,5 +1,0 @@
-*.xcodeproj
-Config/Local.xcconfig
-Config/Info.plist
-build/
-DerivedData/

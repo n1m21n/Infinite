@@ -459,7 +459,6 @@ set(COMMON_SOURCES
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
     src/app/bodies/SpatialMixerBody.cpp
-    src/app/bodies/WatchBody.cpp
     src/app/bodies/VmpcBody.cpp
     src/app/frame/CookFrame.cpp
     src/app/frame/FrameStatics.cpp
@@ -576,12 +575,6 @@ set(COMMON_SOURCES
     src/app/selftest/ThreeDBench.cpp
     src/app/selftest/FlowTests.cpp
     src/app/selftest/SpatialTests.cpp
-    src/app/selftest/WatchTests.cpp
-    src/core/WatchPacket.cpp
-    src/platform/WatchLink.cpp
-    src/app/panels/WatchSetupWindow.cpp
-    src/platform/WatchSetup.cpp
-    src/platform/WatchSetupSystem.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
     src/app/ui/ModWidgets.cpp
@@ -686,7 +679,6 @@ set(COMMON_SOURCES
     src/nodes/HandTrackNode.cpp
     src/nodes/FaceTrackNode.cpp
     src/nodes/PoseTrackNode.cpp
-    src/nodes/WatchNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/core/Skinning.cpp
@@ -931,7 +923,6 @@ set(APPLE_SOURCES
     src/platform/Platform.mm
     src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
-    src/platform/WatchLink.mm
     src/audio/AudioFileWriter.mm
     ${SYPHON_SOURCES}
 )
@@ -969,7 +960,6 @@ set(WIN32_SOURCES
     src/platform/win/Infinite.manifest
     src/platform/win/PlatformWin.cpp
     src/platform/HeadTrackerStub.cpp
-    src/platform/WatchLinkStub.cpp
     src/platform/win/TextWin.cpp
     src/platform/win/CrashHandlerWin.cpp
     # GL-only half of the Spout bridge (glad), kept out of PlatformWin.cpp's
@@ -1003,7 +993,6 @@ set(WIN32_SOURCES
 set(LINUX_SOURCES
     src/platform/linux/PlatformLinux.cpp
     src/platform/HeadTrackerStub.cpp
-    src/platform/WatchLinkStub.cpp
     src/platform/linux/TextLinux.cpp
     src/platform/linux/CrashHandlerLinux.cpp
     src/platform/linux/AudioDeviceLinux.cpp
@@ -1693,7 +1682,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
-    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/platform/WatchLink.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
@@ -1886,22 +1875,3 @@ if(APPLE)
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()
 
-# Apple Watch app source (docs/plans/apple-watch/README.md, D-B1): the whole apps/watch folder ships in
-# Infinite.app/Contents/Resources/WatchRemote, with the Xcode project generated here by xcodegen so users need
-# neither a repo clone nor xcodegen. Without xcodegen on the build machine the bundle carries sources only and the
-# "Set up watch app" window says the project is missing.
-if(APPLE)
-    set(WATCH_REMOTE_DST "$<TARGET_BUNDLE_CONTENT_DIR:Infinite>/Resources/WatchRemote")
-    add_custom_command(TARGET Infinite POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E remove_directory "${WATCH_REMOTE_DST}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/apps/watch" "${WATCH_REMOTE_DST}"
-        COMMENT "Copying the watch app source into the bundle")
-    find_program(INFINITE_XCODEGEN xcodegen)
-    if(INFINITE_XCODEGEN)
-        add_custom_command(TARGET Infinite POST_BUILD
-            COMMAND "${INFINITE_XCODEGEN}" generate --quiet --spec "${WATCH_REMOTE_DST}/project.yml" --project "${WATCH_REMOTE_DST}"
-            COMMENT "Generating the watch app Xcode project")
-    else()
-        message(WARNING "xcodegen not found: this build ships the watch app without its Xcode project (brew install xcodegen)")
-    endif()
-endif()

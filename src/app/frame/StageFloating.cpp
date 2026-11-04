@@ -78,8 +78,6 @@ int DrawFloating(FrameCtx& fc)
          DrawSettingsWindow(&gSettingsOpen);
       if (gTemplatesOpen)
          DrawTemplatesWindow(&gTemplatesOpen);
-      if (gWatchSetupOpen)
-         DrawWatchSetupWindow(&gWatchSetupOpen);
 
       PollPatchFileWatch();
       if (gPatchChangedOnDisk)

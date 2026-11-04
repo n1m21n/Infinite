@@ -1558,7 +1558,6 @@ extern bool gUiStyleEditorOpen;
 
 extern bool gSettingsOpen;
 extern bool gTemplatesOpen;
-extern bool gWatchSetupOpen;
 
 extern bool gShowUpdateCheckModal;
 extern bool gShowAboutModal;
@@ -2982,7 +2981,6 @@ void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
 void DrawTrackParams(TrackNodeBase* n);
-void DrawWatchParams(WatchNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 
@@ -6325,21 +6323,6 @@ bool RunPartialsFixture();
 bool RunStringFixture();
 bool RunSplitterFixture();
 bool RunSpatialFixture();
-bool RunWatchPacketTest();
-bool RunWatchNodeTest();
-bool RunWatchSetupTest();
-// Watch setup checklist (WatchSetupWindow.cpp): the window, and what the Apple Watch node card needs.
-void DrawWatchSetupWindow(bool* open);
-struct WatchSetupCardInfo
-{
-   std::string line;       // progress, last error or "watch app expires in N days"
-   bool running = false;
-   bool reinstallDue = false;
-};
-WatchSetupCardInfo WatchSetupCard();
-void WatchSetupTick();
-void WatchSetupRefreshSoon();
-void WatchSetupReinstall();
 
 bool RunSpectrumSlideFixture();
 

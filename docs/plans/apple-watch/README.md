@@ -1,5 +1,7 @@
 # Apple Watch: your wrist as a modulator
 
+> **Shelved (2026-11-04): not part of v1.1.** Everything built so far (node, Bluetooth link, watch app, setup window, tests) lives on the branch `idea/apple-watch` and was removed from `main`. The watch app was never compiled for watchOS or run on a real watch. To bring it back, merge that branch and regenerate the node tables.
+
 Status: plan, 2026-11-02. Not built. New node, so the owner approves this plan before Block A starts.
 Tracker: this file (top table). Branches: `feature/watch-a`, `feature/watch-b`, `feature/watch-c`, one per block, a commit per step.
 Skills to load before building: `node-ui-pillars`, `windows-parity`, `linux-parity` (Block C), `tool-first`.
