@@ -2249,3 +2249,358 @@ MIDI Inputs	MIDI入力
 Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	接続中のすべてのMIDIコントローラー。Midi Notesノードはすべて、または1台だけを受信し、Learnは次に弾いた鍵盤からデバイスとチャンネルを選びます。
 Start MIDI	MIDIを開始
 No MIDI inputs connected	MIDI入力が接続されていません
+3D cursor	3Dカーソル
+A cloth simulation over an input mesh - stiffness, bending, iterations, damping, mass and shape retention, plus gravity, wind, optional ground collision and an optional collider mesh it drapes over. 'Reset' re-drops the cloth from its rest pose.	入力メッシュ上の布シミュレーション：硬さ、曲げ、反復回数、減衰、質量、形状保持に加え、重力、風、任意の地面衝突、布がかぶさる任意のコライダーメッシュ。「Reset」で布を静止ポーズから落とし直します。
+Absolute increment	絶対増分
+Active Camera	アクティブカメラ
+Add / Clear IK	IK を追加 / クリア
+Add IK to Bone	ボーンに IK を追加
+Add Material	マテリアルを追加
+Align	整列
+Align rotation to target	回転をターゲットに合わせる
+Align to selected	選択に整列
+Align to view	ビューに整列
+Alpha threshold	アルファしきい値
+Apply the last move, turn or scale again to the selection	直前の移動・回転・拡大縮小を選択にもう一度適用
+Auto axis	自動軸
+Auto perspective	自動パース
+Axes	軸
+Axis Angle	軸角度
+Axis X	X 軸
+Axis Y	Y 軸
+Axis Z	Z 軸
+Back	背面
+Background	背景
+Background Image	背景画像
+Background color	背景色
+Base	ベース
+Bends any geometry with a chain of bones along an axis or the path curve. Curl, twist and wave bend it; Open in 3D View enters Pose mode, where IK works on it too, and W paints the weights ([ ] size, Ctrl removes).	任意のジオメトリを、軸またはパスカーブに沿ったボーンのチェーンで曲げます。Curl、Twist、Wave で曲げ、Open in 3D View でポーズモードに入ると IK も使え、W でウェイトをペイントします（[ ] でサイズ、Ctrl で消去）。
+Blades	ブレード
+Bounces	バウンス
+Bounds	バウンズ
+Box	ボックス
+Camera focus distance	カメラのフォーカス距離
+Camera lens	カメラレンズ
+Cameras	カメラ
+Cameras selectable	カメラを選択可能
+Cameras shown	カメラを表示
+Cancel Render	レンダリングをキャンセル
+Capsule	カプセル
+Carry	キャリー
+Cast shadows	影を落とす
+Cavity	キャビティ
+Center-cut	中央カット
+Centimeters	センチメートル
+Checker Deselect	チェッカーで選択解除
+Clear Follow	フォロー解除
+Clear IK	IK をクリア
+Clear Rulers	ルーラーをクリア
+Clear Weight Paint	ウェイトペイントをクリア
+Clearcoat	クリアコート
+Closest	最も近い
+Coding agent	コーディングエージェント
+Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done.	Connect はこの行をターミナルタブで実行します。下のスクリプトを実行し、各ステップを先に確認して、済んでいるものはスキップします。
+Connect your coding agent to Infinite. It runs in a Terminal tab you can watch.	コーディングエージェントを Infinite に接続します。見ていられるターミナルタブで実行されます。
+Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version.	上で Claude Code を接続すると、これらは ~/.claude/skills/ にインストールされ、最新に保たれます。別のアシスタントを使う場合は、フォルダーを選び、そのプロジェクトやチャットにファイルを追加してください。Infinite を更新したら、バージョンが合うよう再インストールします。
+Constant	定数
+Continuous grab	連続グラブ
+Copy Items	アイテムをコピー
+Copy Transform	トランスフォームをコピー
+Copy Transforms	トランスフォームをコピー
+Copy Transforms from Active	アクティブからトランスフォームをコピー
+Create Orientation	オリエンテーションを作成
+Crop	クロップ
+Crop to region	領域にクロップ
+Cursor	カーソル
+Cursor + frame all	カーソル + すべてをフレームに収める
+Cursor Plane	カーソル平面
+Cursor View	カーソルビュー
+Cursor to Active	カーソルをアクティブへ
+Cursor to Grid	カーソルをグリッドへ
+Cursor to World Origin	カーソルをワールド原点へ
+Curvature ridge	曲率の尾根
+Curvature valley	曲率の谷
+Custom distance	カスタム距離
+Cutoff	カットオフ
+Cylinder	シリンダー
+Date	日付
+Default	デフォルト
+Degrees	度
+Delete Orientation	オリエンテーションを削除
+Delta Transform	デルタトランスフォーム
+Depth	深度
+Diagonal	斜め
+Diffuse	ディフューズ
+Dimensions	寸法
+Dither	ディザ
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away	Shift を押しながら空白をダブルクリック：オービットの軸が 3D カーソルへ滑らかに戻ります（距離と角度は維持）。Shift + 2 本指スクロールでずらせます
+Edges	エッジ
+Edit Mode (Tab)	編集モード (Tab)
+Edit Operations	編集オペレーション
+Emission	エミッション
+Engine	エンジン
+Exact match	完全一致
+Extras	エクストラ
+Faces	フェース
+Faded	フェード
+Falloff	フォールオフ
+Feet	足
+Filter size	フィルターサイズ
+Flip horizontally	水平方向に反転
+Flip vertically	垂直方向に反転
+Follow	フォロー
+Follow / Clear Follow	フォロー / フォロー解除
+Follow Active	アクティブをフォロー
+Font size	フォントサイズ
+Frame method	フレーム方式
+Frame range	フレーム範囲
+Frame selected	選択をフレームに収める
+From the look	ルックから
+Front	前面
+Gamma	ガンマ
+Geometry in, image out: the mesh drawn in its own UV space. AO, curvature, position, normal or thickness, so the image can go through any 2D effect and back into a Material map. Sculpt bakes an upstream Sculpt node into a normal map for the unsculpted mesh: put Bake after the Sculpt, then feed the image to the Material's normal map on the mesh before it. Needs UVs (Model 3D, primitives, or UV Project). Bakes again when the mesh changes.	ジオメトリを入れると画像が出ます：メッシュを自身の UV 空間に描画します。AO、曲率、位置、法線、厚みを出力でき、画像を任意の 2D エフェクトに通してマテリアルのマップに戻せます。Sculpt は上流の Sculpt ノードを、スカルプト前のメッシュ用の法線マップにベイクします：Sculpt の後ろに Bake を置き、その画像を手前のメッシュのマテリアルの法線マップへ渡します。UV が必要です（Model 3D、プリミティブ、UV Project）。メッシュが変わると再ベイクします。
+Gizmos	ギズモ
+Golden triangle A	黄金三角形 A
+Golden triangle B	黄金三角形 B
+Harmonious triangle A	調和三角形 A
+Harmonious triangle B	調和三角形 B
+Hide Selected	選択を非表示
+Hide Unselected	非選択を非表示
+Hide selection	選択を隠す
+High contrast	高コントラスト
+Holds Edit Mode edits made in the 3D View: press Open in 3D View, or select the item and press Tab. 1/2/3 pick points, edges or faces; G, R and S move, rotate and scale the selection; E extrudes, I insets, X deletes. The edits replay on the input, so they follow an upstream change that keeps the shape in place: raise a Cube's detail and a picked face stays the whole face, a moved point stays a smooth bump of the same reach. A selection with nothing near it is skipped and the node warns.	3D ビューで行った編集モードの編集を保持します：Open in 3D View を押すか、アイテムを選んで Tab を押します。1/2/3 で点・エッジ・フェースを選び、G・R・S で選択を移動・回転・拡大縮小、E で押し出し、I でインセット、X で削除します。編集は入力に対して再生されるため、形を保つ上流の変更に追従します：Cube のディテールを上げても、選んだフェースはそのフェース全体のまま、動かした点は同じ範囲の滑らかな盛り上がりのままです。近くに何もない選択はスキップされ、ノードが警告します。
+Holds a sculpt painted in the 3D View: press Open in 3D View, or select the item and press Ctrl+Tab (or the brush chip). Amount blends it in, so an LFO or audio can drive it; level subdivides the input first. Chain Sculpt nodes to layer sculpts. Patch any 2D node into brush and each dab takes its shape: bright moves, dark holds. If the input's points change, the sculpt stops applying until they come back or it is cleared.	保存 3D ビューでペイントしたスカルプトを保持します：Open in 3D View を押すか、アイテムを選んで Ctrl+Tab（またはブラシチップ）を押します。Amount で混ぜ具合を決めるので、LFO やオーディオで動かせます。level は先に入力を細分化します。Sculpt ノードをつなぐとスカルプトを重ねられます。任意の 2D ノードをブラシにパッチすると、各ダブがその形になります：明るいところは動き、暗いところは保持します。入力の点が変わると、元に戻るかクリアするまでスカルプトは適用されません。
+IOR	IOR
+Imperial	ヤード・ポンド法
+In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection	編集モードで：E で押し出し、I でインセット、X または Delete で選択フェースを削除。G・R・S で選択を移動・回転・拡大縮小
+In Edit Mode: pick what a click selects. A selects all, Alt+A selects none	編集モードで：クリックで選ぶものを指定します。A で全選択、Alt+A で選択解除
+In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node	Armature のポーズモードで：ドラッグで選択ボーンのウェイトをペイント、Ctrl+ドラッグで消去、[ と ] でブラシサイズ。Armature ノードに保存されます
+In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK	ポーズモードで：選択ボーンが最後に選んだ別のアイテムへ伸びます（さらに 1 つ選ぶとそれがポールになります）。または IK をクリアします
+In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node	ポーズモードで：選択ボーンを視線軸まわりに回すか、その回転をクリアします。回転は Model 3D ノードのパラメータです
+Inches	インチ
+Index	インデックス
+Influence	影響
+Install runs the agent's own installer:	Install はエージェント自身のインストーラーを実行します：
+Intensity	強度
+Invert filter	フィルターを反転
+Invert zoom direction	ズーム方向を反転
+Kelvin	ケルビン
+Kilometers	キロメートル
+Labels	ラベル
+Light colors	ライトの色
+Light look-at	ライトの注視先
+Light size	ライトのサイズ
+Lighting	ライティング
+Lights	ライト
+Lights selectable	ライトを選択可能
+Lights shown	ライトを表示
+Limits	リミット
+Linear	リニア
+Lines	ライン
+Lit	ライト付き
+Load image...	画像を読み込む...
+Local view	ローカルビュー
+Location only	位置のみ
+Location, rotation and scale	位置・回転・スケール
+Lock to 3D cursor	3D カーソルにロック
+Lock to active	アクティブにロック
+Look	ルック
+Look at	注視
+Low contrast	低コントラスト
+Maps	マップ
+MatCap	MatCap
+Match case	大文字小文字を区別
+Material	マテリアル
+Max X	最大 X
+Max Y	最大 Y
+Max blur	最大ぼかし
+Max latitude	最大緯度
+Max longitude	最大経度
+Measure	計測
+Median	中央値
+Medium contrast	中コントラスト
+Metallic	メタリック
+Meters	メートル
+Metric	メートル法
+Millimeters	ミリメートル
+Min X	最小 X
+Min Y	最小 Y
+Min latitude	最小緯度
+Min longitude	最小経度
+Mini axes	ミニ軸
+Mini axes brightness	ミニ軸の明るさ
+Mini axes size	ミニ軸のサイズ
+Mirror	ミラー
+Mist	ミスト
+Mist depth	ミストの深さ
+Mist start	ミストの開始
+Motion	モーション
+Motion Blur	モーションブラー
+Move to Mouse	マウス位置へ移動
+Move, rotate, scale	移動・回転・拡大縮小
+Moving one item pulls its neighbours, weaker with distance	1 つのアイテムを動かすと近くのものも引かれ、距離が離れるほど弱まります
+Navigate	ナビゲート
+Navigation gizmo size	ナビゲーションギズモのサイズ
+Normal strength	法線の強さ
+Normalize	正規化
+Note text	ノートのテキスト
+Objects	オブジェクト
+Objects %d/%d   Cameras %d   Lights %d	オブジェクト %d/%d   カメラ %d   ライト %d
+Offset X	オフセット X
+Offset Y	オフセット Y
+On (O)	オン (O)
+On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves	メッシュのアイテムで：Edit Mesh ノードで点・エッジ・フェースを編集します。Tab または Esc で抜けます
+On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves	スキニングされた Model 3D アイテムで：ボーンを表示し、クリックで選択します。Ctrl+Tab または Esc で抜けます
+Only locations	位置のみ
+Open image	画像を開く
+Opens a Terminal tab and reruns only this step.	ターミナルタブを開き、このステップだけを再実行します。
+Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands.	ターミナルタブを開き、Reference の Setup commands に表示されるエージェント自身のインストーラーを実行します。
+Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair.	ターミナルタブを開き、Reference の Setup commands に表示されるスクリプトを実行します。各ステップは先に確認して済んだものをスキップするので、修復のためにいつでも再実行できます。
+Orbit sensitivity	オービット感度
+Origins (all)	原点（すべて）
+Orthographic grid	平行投影グリッド
+Outline	アウトライン
+Outline color	アウトラインの色
+Outline selected	選択をアウトライン表示
+Outside the panel (macOS):	パネルの外 (macOS)：
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.	Particle System は重力・抗力・乱流を持つ 3D エミッターです。Cloth はピン留めされた位置ベースの布で、風、任意の地面、任意のコライダーメッシュを備えます。
+Pass Index	パスインデックス
+Paste Items	アイテムをペースト
+Paste Transform	トランスフォームをペースト
+Path Tracing	パストレーシング
+Performance	パフォーマンス
+Persp / Ortho	パース / 平行
+Pivot to 3D Cursor	ピボットを 3D カーソルへ
+Pixel aspect X	ピクセルアスペクト X
+Pixel aspect Y	ピクセルアスペクト Y
+Placement	配置
+Plane axis	平面の軸
+Points	ポイント
+Points / Edges / Faces	ポイント / エッジ / フェース
+Pose Mode	ポーズモード
+Preferences	環境設定
+Projected from view	ビューから投影
+Proportional Editing	プロポーショナル編集
+Quaternion	クォータニオン
+Radians	ラジアン
+Randomize Transform	トランスフォームをランダム化
+Ratio	比率
+Reference	リファレンス
+Region	リージョン
+Remove from local view	ローカルビューから外す
+Remove image	画像を削除
+Render Only This Type	このタイプのみレンダリング
+Render Region	レンダー領域
+Render column	レンダー列
+Render time	レンダー時間
+Repair	修復
+Repeat Last	直前を繰り返す
+Reset motion	モーションをリセット
+Resolution	解像度
+Reveal Latest	最新を表示
+Reveal Previous	前を表示
+Ridge	尾根
+Roll View	ビューをロール
+Roll the view 15 degrees about the line of sight	視線を軸にビューを 15 度ロール
+Root	ルート
+Rotate precision	回転の精度
+Rotation mode	回転モード
+Rotation step	回転ステップ
+Roughness	粗さ
+Sculpt (Ctrl+Tab)	スカルプト (Ctrl+Tab)
+Sculpt Mode	スカルプトモード
+See through surfaces in Solid; show or hide the overlays	Solid で面を透過表示。オーバーレイの表示・非表示
+Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure	選択 (Shift+スペース, W)。右クリック：ボックス、ラッソ、3D カーソル、計測
+Select Box	ボックス選択
+Select Circle	サークル選択
+Select Lasso	ラッソ選択
+Select Linked	リンクを選択
+Select Pattern	パターンを選択
+Select Random	ランダム選択
+Select Same Type	同じタイプを選択
+Selectable	選択可能
+Selectable column	選択可能列
+Selectable only	選択可能のみ
+Selected	選択済み
+Selection to Active	選択をアクティブへ
+Selection to Cursor (Keep Offset)	選択をカーソルへ（オフセット維持）
+Selection to Grid	選択をグリッドへ
+Sensor fit	センサーフィット
+Setup	セットアップ
+Setup commands	セットアップコマンド
+Shadow	シャドウ
+Sharp	シャープ
+Sheen	シーン
+Show Active	アクティブを表示
+Show All in Renders	すべてをレンダーに表示
+Show cone	コーンを表示
+Shutter	シャッター
+Simple axes	シンプルな軸
+Simplify	簡略化
+Single color	単色
+Smooth	スムーズ
+Smooth view	スムースビュー
+Snap target	スナップ先
+Soft falloff	ソフトフォールオフ
+Sort A to Z	A から Z に並べ替え
+Specular	スペキュラー
+Sphere	球
+Stamp	スタンプ
+Start agent	エージェントを起動
+Start agent runs:	エージェントの起動で実行されるもの：
+Start with Terminal	ターミナルと同時に起動
+Starts the agent in the first Terminal tab each time the Terminal opens.	ターミナルを開くたびに、最初のターミナルタブでエージェントを起動します。
+State	ステート
+Statistics	統計
+Status	ステータス
+Step	ステップ
+Subdivisions	分割数
+Subsurface	サブサーフェス
+Sun angle	太陽の角度
+Sun filter	太陽フィルター
+Sun resolution	太陽の解像度
+Sun shadow	太陽のシャドウ
+Sun threshold	太陽のしきい値
+System	システム
+Temperature	色温度
+Terminal & coding agent	ターミナルとコーディングエージェント
+Text	テキスト
+Text info	テキスト情報
+The Terminal panel	ターミナルパネル
+The script, exactly as it runs:	スクリプト（実行されるそのままの内容）：
+The selected items follow the active one (Blender's parent), or stop following	選択アイテムがアクティブに追従します（Blender のペアレント）。または追従を解除します
+The selected items take the active item's location, rotation and scale	選択アイテムがアクティブの位置・回転・スケールを取ります
+Theme	テーマ
+To other objects	他のオブジェクトへ
+Track axis	トラック軸
+Transform gizmo size	トランスフォームギズモのサイズ
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset and UV Project - plus Sculpt, Edit Mesh, Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform、Array、Subdivide、Solidify、Extrude、Wireframe、Triangulate、Normals、Explode、Twist、Smooth、Mirror、Screw、Decimate、Bevel、Inset、UV Project に加え、Sculpt、Edit Mesh、Select、マークしたフェースだけに作用するオペレーション（Delete / Transform / Extrude Selected）、Join Geometry のブーリアン（Union、Intersect、Difference）、Displacement、Wrap、Merge by Distance。
+Transforms to Deltas	トランスフォームをデルタへ
+Transmission	トランスミッション
+Turn / Clear Bone	ボーンを回転 / 回転をクリア
+Unit scale	単位スケール
+Units	単位
+Up axis	上方向の軸
+Use for move	移動に使用
+Use for rotate	回転に使用
+Use for scale	拡大縮小に使用
+Valley	谷
+Viewpoint	ビューポイント
+Viewport Display	ビューポート表示
+Viewport Visibility	ビューポートの可視性
+Viewport display	ビューポート表示
+Visible	表示
+Weight Paint	ウェイトペイント
+Wireframe	ワイヤーフレーム
+World space	ワールド空間
+Writes real UVs so a texture sticks to the mesh as it moves or deforms. Smart splits it into islands of faces facing the same way and packs them into the square; Cube, Cylinder and Sphere project from the bounds. Use a Mapping node set to UV, or none, to read them.	実際の UV を書き込み、メッシュが動いたり変形してもテクスチャが貼り付いたままになります。Smart は同じ向きのフェースごとのアイランドに分けて正方形に詰め、Cube・Cylinder・Sphere は境界から投影します。読み取りには UV に設定した Mapping ノードを使うか、何も使いません。
+X	X
+X Global	グローバル X
+X-ray / Overlays	X線 / オーバーレイ
+X-ray: see through surfaces in Solid (Alt+Z)	X線：Solid で面を透過表示 (Alt+Z)
+XYZ Euler	XYZ オイラー
+Y Global	グローバル Y
+Yards	ヤード
+Z	Z
+Z Global	グローバル Z
+Zoom 1:1	ズーム 1:1

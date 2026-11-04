@@ -226,10 +226,9 @@ fi
 #    GitHub's own reported asset digest, exactly like test-plugins.sh's
 #    sha_check does for Surge XT - never hand-typed from a webpage.
 #
-#    linuxdeploy publishes only a rolling "continuous" release, so its pin is
-#    the SHA256 of the binary itself - if upstream republishes it, this script
-#    fails loudly on the mismatch rather than silently trusting whatever is
-#    there that day. appimagetool has versioned tags, so it is pinned to 1.9.1
+#    linuxdeploy is pinned to the versioned tag 1-alpha-20251107-1 (its rolling
+#    "continuous" build was republished 2026-11-01 and broke the pin); bump the
+#    tag and the hash together, hash from the release's own digest. appimagetool has versioned tags, so it is pinned to 1.9.1
 #    (the "continuous" build was republished 2026-10-04 and broke the old pin,
 #    R578); bump the tag and the hash together, hash from the release's own digest.
 # ---------------------------------------------------------------------------
@@ -248,7 +247,7 @@ sha_check() {
 }
 
 declare -A LINUXDEPLOY_SHA256=(
-  [x86_64]="8aea8da0f7f7039d2a2cecb14657d752a222a5e1d3825caeef186c82f751cdd1"
+  [x86_64]="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
   [aarch64]="__NOT_PINNED__"
 )
 declare -A APPIMAGETOOL_SHA256=(
@@ -261,7 +260,7 @@ APPIMAGETOOL="$WORK/appimagetool-${TOOL_ARCH}.AppImage"
 
 echo "==> Downloading linuxdeploy ($TOOL_ARCH)"
 curl -fSL -o "$LINUXDEPLOY" \
-  "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${TOOL_ARCH}.AppImage"
+  "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-${TOOL_ARCH}.AppImage"
 if [ "${LINUXDEPLOY_SHA256[$TOOL_ARCH]}" != "__NOT_PINNED__" ]; then
   sha_check "$LINUXDEPLOY" "${LINUXDEPLOY_SHA256[$TOOL_ARCH]}"
 else

@@ -2249,3 +2249,358 @@ MIDI Inputs	MIDI 输入
 Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	所有已连接的 MIDI 控制器。Midi Notes 节点可监听全部或其中一个，Learn 会根据你弹下的下一个琴键选择设备和通道。
 Start MIDI	启动 MIDI
 No MIDI inputs connected	未连接 MIDI 输入
+3D cursor	3D 光标
+A cloth simulation over an input mesh - stiffness, bending, iterations, damping, mass and shape retention, plus gravity, wind, optional ground collision and an optional collider mesh it drapes over. 'Reset' re-drops the cloth from its rest pose.	对输入网格进行布料模拟：刚度、弯曲、迭代次数、阻尼、质量和形状保持，另有重力、风、可选的地面碰撞，以及可选的碰撞体网格供布料垂落。“Reset”会让布料从静止姿态重新落下。
+Absolute increment	绝对增量
+Active Camera	活动相机
+Add / Clear IK	添加 / 清除 IK
+Add IK to Bone	为骨骼添加 IK
+Add Material	添加材质
+Align	对齐
+Align rotation to target	将旋转对齐到目标
+Align to selected	对齐到所选项
+Align to view	对齐到视图
+Alpha threshold	Alpha 阈值
+Apply the last move, turn or scale again to the selection	对所选项再次应用上一次移动、旋转或缩放
+Auto axis	自动轴
+Auto perspective	自动透视
+Axes	轴
+Axis Angle	轴角
+Axis X	X 轴
+Axis Y	Y 轴
+Axis Z	Z 轴
+Back	后
+Background	背景
+Background Image	背景图像
+Background color	背景颜色
+Base	基础
+Bends any geometry with a chain of bones along an axis or the path curve. Curl, twist and wave bend it; Open in 3D View enters Pose mode, where IK works on it too, and W paints the weights ([ ] size, Ctrl removes).	用一条骨骼链沿某个轴或路径曲线弯曲任意几何体。Curl、Twist 和 Wave 负责弯曲；Open in 3D View 进入姿态模式，IK 在其中同样可用，按 W 绘制权重（[ ] 调整大小，Ctrl 擦除）。
+Blades	叶片
+Bounces	反弹次数
+Bounds	边界
+Box	立方体
+Camera focus distance	相机对焦距离
+Camera lens	相机镜头
+Cameras	相机
+Cameras selectable	相机可选
+Cameras shown	显示相机
+Cancel Render	取消渲染
+Capsule	胶囊体
+Carry	携带
+Cast shadows	投射阴影
+Cavity	凹陷
+Center-cut	中心裁切
+Centimeters	厘米
+Checker Deselect	棋盘式取消选择
+Clear Follow	清除跟随
+Clear IK	清除 IK
+Clear Rulers	清除标尺
+Clear Weight Paint	清除权重绘制
+Clearcoat	清漆
+Closest	最近
+Coding agent	编程智能体
+Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done.	Connect 会在终端标签页中运行这一行。它运行下方的脚本，脚本会先检查每一步，并跳过已完成的部分。
+Connect your coding agent to Infinite. It runs in a Terminal tab you can watch.	将你的编程智能体连接到 Infinite。它在你可以查看的终端标签页中运行。
+Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version.	在上方连接 Claude Code 时，这些文件已安装到 ~/.claude/skills/ 并保持更新。若使用其他助手，请选择一个文件夹，把文件添加到它的项目或对话中；更新 Infinite 后请重新安装，使文件与此版本一致。
+Constant	常量
+Continuous grab	连续抓取
+Copy Items	复制项目
+Copy Transform	复制变换
+Copy Transforms	复制变换
+Copy Transforms from Active	从活动项复制变换
+Create Orientation	创建方向
+Crop	裁剪
+Crop to region	裁剪到区域
+Cursor	光标
+Cursor + frame all	光标 + 框选全部
+Cursor Plane	光标平面
+Cursor View	光标视图
+Cursor to Active	光标到活动项
+Cursor to Grid	光标到网格
+Cursor to World Origin	光标到世界原点
+Curvature ridge	曲率山脊
+Curvature valley	曲率山谷
+Custom distance	自定义距离
+Cutoff	截止
+Cylinder	圆柱体
+Date	日期
+Default	默认
+Degrees	度
+Delete Orientation	删除方向
+Delta Transform	增量变换
+Depth	深度
+Diagonal	对角线
+Diffuse	漫反射
+Dimensions	尺寸
+Dither	抖动
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away	按住 Shift 双击空白处：轨道枢轴滑回 3D 光标（距离和角度不变）；Shift + 双指滚动可将其平移开
+Edges	边
+Edit Mode (Tab)	编辑模式 (Tab)
+Edit Operations	编辑操作
+Emission	自发光
+Engine	引擎
+Exact match	完全匹配
+Extras	附加项
+Faces	面
+Faded	淡化
+Falloff	衰减
+Feet	脚
+Filter size	滤镜大小
+Flip horizontally	水平翻转
+Flip vertically	垂直翻转
+Follow	跟随
+Follow / Clear Follow	跟随 / 清除跟随
+Follow Active	跟随活动项
+Font size	字体大小
+Frame method	取景方式
+Frame range	帧范围
+Frame selected	框选所选项
+From the look	来自外观
+Front	前
+Gamma	伽马
+Geometry in, image out: the mesh drawn in its own UV space. AO, curvature, position, normal or thickness, so the image can go through any 2D effect and back into a Material map. Sculpt bakes an upstream Sculpt node into a normal map for the unsculpted mesh: put Bake after the Sculpt, then feed the image to the Material's normal map on the mesh before it. Needs UVs (Model 3D, primitives, or UV Project). Bakes again when the mesh changes.	输入几何体，输出图像：网格绘制在它自己的 UV 空间中。可烘焙 AO、曲率、位置、法线或厚度，让图像能经过任意 2D 效果再回到材质贴图。Sculpt 会把上游的 Sculpt 节点烘焙成未雕刻网格的法线贴图：把 Bake 放在 Sculpt 之后，再把图像接到上游网格的材质法线贴图。需要 UV（Model 3D、基本体或 UV Project）。网格改变时会重新烘焙。
+Gizmos	小工具
+Golden triangle A	黄金三角 A
+Golden triangle B	黄金三角 B
+Harmonious triangle A	和谐三角 A
+Harmonious triangle B	和谐三角 B
+Hide Selected	隐藏所选项
+Hide Unselected	隐藏未选项
+Hide selection	隐藏所选项
+High contrast	高对比度
+Holds Edit Mode edits made in the 3D View: press Open in 3D View, or select the item and press Tab. 1/2/3 pick points, edges or faces; G, R and S move, rotate and scale the selection; E extrudes, I insets, X deletes. The edits replay on the input, so they follow an upstream change that keeps the shape in place: raise a Cube's detail and a picked face stays the whole face, a moved point stays a smooth bump of the same reach. A selection with nothing near it is skipped and the node warns.	保存在 3D 视图中做的编辑模式修改：点击 Open in 3D View，或选中该项后按 Tab。1/2/3 选择点、边或面；G、R、S 移动、旋转、缩放所选项；E 挤出，I 内插，X 删除。这些编辑会在输入上重放，因此能跟随保持形状的上游改动：提高 Cube 的细节后，选中的面仍是整个面，移动过的点仍是同样范围的平滑隆起。附近没有对应内容的选择会被跳过，节点会给出警告。
+Holds a sculpt painted in the 3D View: press Open in 3D View, or select the item and press Ctrl+Tab (or the brush chip). Amount blends it in, so an LFO or audio can drive it; level subdivides the input first. Chain Sculpt nodes to layer sculpts. Patch any 2D node into brush and each dab takes its shape: bright moves, dark holds. If the input's points change, the sculpt stops applying until they come back or it is cleared.	保存在 3D 视图中绘制的雕刻：点击 Open in 3D View，或选中该项后按 Ctrl+Tab（或笔刷标签）。Amount 控制混合量，因此可用 LFO 或音频驱动；level 会先细分输入。串联多个 Sculpt 节点可叠加雕刻。把任意 2D 节点接到笔刷，每次点按都会采用它的形状：亮处移动，暗处保持。若输入的点发生变化，雕刻将停止生效，直到点恢复或雕刻被清除。
+IOR	IOR
+Imperial	英制
+In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection	在编辑模式中：E 挤出，I 内插，X 或 Delete 删除所选面。G、R、S 移动、旋转、缩放所选项
+In Edit Mode: pick what a click selects. A selects all, Alt+A selects none	在编辑模式中：选择点击所选取的对象类型。A 全选，Alt+A 取消全选
+In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node	在 Armature 的姿态模式中：拖动绘制所选骨骼的权重，Ctrl+拖动擦除，[ 和 ] 调整笔刷大小。保存在 Armature 节点上
+In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK	在姿态模式中：所选骨骼伸向最后选中的另一个项目（再多选一个项目则作为极向目标），或清除 IK
+In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node	在姿态模式中：让所选骨骼绕视图轴旋转，或清除其旋转。旋转是 Model 3D 节点上的参数
+Inches	英寸
+Index	索引
+Influence	影响
+Install runs the agent's own installer:	Install 会运行该智能体自带的安装程序：
+Intensity	强度
+Invert filter	反转筛选
+Invert zoom direction	反转缩放方向
+Kelvin	开尔文
+Kilometers	千米
+Labels	标签
+Light colors	灯光颜色
+Light look-at	灯光朝向目标
+Light size	灯光大小
+Lighting	照明
+Lights	灯光
+Lights selectable	灯光可选
+Lights shown	显示灯光
+Limits	限制
+Linear	线性
+Lines	线条
+Lit	受光
+Load image...	加载图像...
+Local view	局部视图
+Location only	仅位置
+Location, rotation and scale	位置、旋转和缩放
+Lock to 3D cursor	锁定到 3D 光标
+Lock to active	锁定到活动项
+Look	外观
+Look at	朝向
+Low contrast	低对比度
+Maps	贴图
+MatCap	MatCap
+Match case	区分大小写
+Material	材质
+Max X	最大 X
+Max Y	最大 Y
+Max blur	最大模糊
+Max latitude	最大纬度
+Max longitude	最大经度
+Measure	测量
+Median	中位数
+Medium contrast	中对比度
+Metallic	金属度
+Meters	米
+Metric	公制
+Millimeters	毫米
+Min X	最小 X
+Min Y	最小 Y
+Min latitude	最小纬度
+Min longitude	最小经度
+Mini axes	迷你坐标轴
+Mini axes brightness	迷你坐标轴亮度
+Mini axes size	迷你坐标轴大小
+Mirror	镜像
+Mist	雾
+Mist depth	雾深度
+Mist start	雾起点
+Motion	运动
+Motion Blur	运动模糊
+Move to Mouse	移到鼠标处
+Move, rotate, scale	移动、旋转、缩放
+Moving one item pulls its neighbours, weaker with distance	移动一个项目会带动其邻近项目，距离越远影响越弱
+Navigate	导航
+Navigation gizmo size	导航小工具大小
+Normal strength	法线强度
+Normalize	归一化
+Note text	注释文本
+Objects	物体
+Objects %d/%d   Cameras %d   Lights %d	物体 %d/%d   相机 %d   灯光 %d
+Offset X	X 偏移
+Offset Y	Y 偏移
+On (O)	开 (O)
+On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves	在网格项目上：在 Edit Mesh 节点中编辑它的点、边和面。按 Tab 或 Esc 退出
+On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves	在带蒙皮的 Model 3D 项目上：显示其骨骼；点击一根即可选中。按 Ctrl+Tab 或 Esc 退出
+Only locations	仅位置
+Open image	打开图像
+Opens a Terminal tab and reruns only this step.	打开终端标签页，只重新运行这一步。
+Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands.	打开终端标签页并运行该智能体自带的安装程序，内容见 Reference 中的 Setup commands。
+Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair.	打开终端标签页并运行 Reference 中 Setup commands 所示的脚本。每一步都会先检查并跳过已完成的部分，因此可随时重新运行来修复。
+Orbit sensitivity	轨道旋转灵敏度
+Origins (all)	原点（全部）
+Orthographic grid	正交网格
+Outline	轮廓
+Outline color	轮廓颜色
+Outline selected	为所选项描边
+Outside the panel (macOS):	面板之外 (macOS)：
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.	Particle System 是带重力、阻力和湍流的 3D 发射器。Cloth 是基于位置、带固定点的布片，具有风、可选地面平面和可选碰撞体网格。
+Pass Index	通道索引
+Paste Items	粘贴项目
+Paste Transform	粘贴变换
+Path Tracing	路径追踪
+Performance	性能
+Persp / Ortho	透视 / 正交
+Pivot to 3D Cursor	枢轴到 3D 光标
+Pixel aspect X	像素宽高比 X
+Pixel aspect Y	像素宽高比 Y
+Placement	放置
+Plane axis	平面轴
+Points	点
+Points / Edges / Faces	点 / 边 / 面
+Pose Mode	姿态模式
+Preferences	偏好设置
+Projected from view	从视图投影
+Proportional Editing	比例编辑
+Quaternion	四元数
+Radians	弧度
+Randomize Transform	随机变换
+Ratio	比率
+Reference	参考
+Region	区域
+Remove from local view	从局部视图移除
+Remove image	移除图像
+Render Only This Type	仅渲染此类型
+Render Region	渲染区域
+Render column	渲染列
+Render time	渲染时间
+Repair	修复
+Repeat Last	重复上次操作
+Reset motion	重置运动
+Resolution	分辨率
+Reveal Latest	显示最新项
+Reveal Previous	显示上一项
+Ridge	山脊
+Roll View	滚动视图
+Roll the view 15 degrees about the line of sight	沿视线方向将视图滚动 15 度
+Root	根
+Rotate precision	旋转精度
+Rotation mode	旋转模式
+Rotation step	旋转步长
+Roughness	粗糙度
+Sculpt (Ctrl+Tab)	雕刻 (Ctrl+Tab)
+Sculpt Mode	雕刻模式
+See through surfaces in Solid; show or hide the overlays	在 Solid 中透视表面；显示或隐藏叠加层
+Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure	选择 (Shift+空格, W)。右键：框选、套索、3D 光标、测量
+Select Box	框选
+Select Circle	圆形选择
+Select Lasso	套索选择
+Select Linked	选择关联项
+Select Pattern	选择图案
+Select Random	随机选择
+Select Same Type	选择同类型
+Selectable	可选
+Selectable column	可选列
+Selectable only	仅可选
+Selected	已选
+Selection to Active	所选项到活动项
+Selection to Cursor (Keep Offset)	所选项到光标（保持偏移）
+Selection to Grid	所选项到网格
+Sensor fit	传感器适配
+Setup	设置
+Setup commands	设置命令
+Shadow	阴影
+Sharp	锐利
+Sheen	光泽
+Show Active	显示活动项
+Show All in Renders	在渲染中显示全部
+Show cone	显示锥体
+Shutter	快门
+Simple axes	简易坐标轴
+Simplify	简化
+Single color	单色
+Smooth	平滑
+Smooth view	平滑视图
+Snap target	吸附目标
+Soft falloff	柔和衰减
+Sort A to Z	按 A 到 Z 排序
+Specular	高光
+Sphere	球体
+Stamp	标记
+Start agent	启动智能体
+Start agent runs:	启动智能体会运行：
+Start with Terminal	随终端启动
+Starts the agent in the first Terminal tab each time the Terminal opens.	每次打开终端时，在第一个终端标签页中启动该智能体。
+State	状态
+Statistics	统计
+Status	状态
+Step	步长
+Subdivisions	细分
+Subsurface	次表面
+Sun angle	太阳角度
+Sun filter	太阳滤镜
+Sun resolution	太阳分辨率
+Sun shadow	太阳阴影
+Sun threshold	太阳阈值
+System	系统
+Temperature	色温
+Terminal & coding agent	终端与编程智能体
+Text	文本
+Text info	文本信息
+The Terminal panel	终端面板
+The script, exactly as it runs:	脚本，与实际运行的完全一致：
+The selected items follow the active one (Blender's parent), or stop following	所选项目跟随活动项（Blender 的父级），或停止跟随
+The selected items take the active item's location, rotation and scale	所选项目采用活动项的位置、旋转和缩放
+Theme	主题
+To other objects	应用到其他物体
+Track axis	跟踪轴
+Transform gizmo size	变换小工具大小
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset and UV Project - plus Sculpt, Edit Mesh, Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform、Array、Subdivide、Solidify、Extrude、Wireframe、Triangulate、Normals、Explode、Twist、Smooth、Mirror、Screw、Decimate、Bevel、Inset 和 UV Project，以及 Sculpt、Edit Mesh、Select 和只作用于其标记面的操作（Delete / Transform / Extrude Selected）、Join Geometry 的布尔运算（Union、Intersect、Difference）、Displacement、Wrap 和 Merge by Distance。
+Transforms to Deltas	变换转为增量
+Transmission	透射
+Turn / Clear Bone	旋转 / 清除骨骼旋转
+Unit scale	单位缩放
+Units	单位
+Up axis	向上轴
+Use for move	用于移动
+Use for rotate	用于旋转
+Use for scale	用于缩放
+Valley	山谷
+Viewpoint	视点
+Viewport Display	视口显示
+Viewport Visibility	视口可见性
+Viewport display	视口显示
+Visible	可见
+Weight Paint	权重绘制
+Wireframe	线框
+World space	世界空间
+Writes real UVs so a texture sticks to the mesh as it moves or deforms. Smart splits it into islands of faces facing the same way and packs them into the square; Cube, Cylinder and Sphere project from the bounds. Use a Mapping node set to UV, or none, to read them.	写入真实的 UV，让纹理在网格移动或变形时依然贴合。Smart 会把它拆成朝向一致的面岛并打包进方形；Cube、Cylinder 和 Sphere 则按边界投影。读取时使用设为 UV 的 Mapping 节点，或不使用。
+X	X
+X Global	全局 X
+X-ray / Overlays	透视 / 叠加层
+X-ray: see through surfaces in Solid (Alt+Z)	透视：在 Solid 中透过表面查看 (Alt+Z)
+XYZ Euler	XYZ 欧拉
+Y Global	全局 Y
+Yards	码
+Z	Z
+Z Global	全局 Z
+Zoom 1:1	缩放 1:1

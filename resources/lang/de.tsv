@@ -2249,3 +2249,358 @@ MIDI Inputs	MIDI-Eingänge
 Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	Alle angeschlossenen MIDI-Controller. Ein Midi-Notes-Node hört auf alle oder auf einen, und Learn wählt Gerät und Kanal anhand der nächsten gespielten Taste.
 Start MIDI	MIDI starten
 No MIDI inputs connected	Keine MIDI-Eingänge verbunden
+3D cursor	3D-Cursor
+A cloth simulation over an input mesh - stiffness, bending, iterations, damping, mass and shape retention, plus gravity, wind, optional ground collision and an optional collider mesh it drapes over. 'Reset' re-drops the cloth from its rest pose.	Eine Stoffsimulation über einem Eingabe-Mesh: Steifigkeit, Biegung, Iterationen, Dämpfung, Masse und Formerhalt, dazu Schwerkraft, Wind, optionale Bodenkollision und ein optionales Kollisions-Mesh, über das der Stoff fällt. „Reset“ lässt den Stoff erneut aus der Ruhepose fallen.
+Absolute increment	Absolutes Inkrement
+Active Camera	Aktive Kamera
+Add / Clear IK	IK hinzufügen / entfernen
+Add IK to Bone	IK zum Knochen hinzufügen
+Add Material	Material hinzufügen
+Align	Ausrichten
+Align rotation to target	Rotation am Ziel ausrichten
+Align to selected	An Auswahl ausrichten
+Align to view	An Ansicht ausrichten
+Alpha threshold	Alpha-Schwellenwert
+Apply the last move, turn or scale again to the selection	Letzte Verschiebung, Drehung oder Skalierung erneut auf die Auswahl anwenden
+Auto axis	Automatische Achse
+Auto perspective	Automatische Perspektive
+Axes	Achsen
+Axis Angle	Achse-Winkel
+Axis X	X-Achse
+Axis Y	Y-Achse
+Axis Z	Z-Achse
+Back	Zurück
+Background	Hintergrund
+Background Image	Hintergrundbild
+Background color	Hintergrundfarbe
+Base	Basis
+Bends any geometry with a chain of bones along an axis or the path curve. Curl, twist and wave bend it; Open in 3D View enters Pose mode, where IK works on it too, and W paints the weights ([ ] size, Ctrl removes).	Biegt beliebige Geometrie mit einer Knochenkette entlang einer Achse oder der Pfadkurve. Curl, Twist und Wave biegen sie; Open in 3D View wechselt in den Pose-Modus, wo auch IK funktioniert, und W malt die Gewichte ([ ] Größe, Strg löscht).
+Blades	Flügel
+Bounces	Abpraller
+Bounds	Begrenzung
+Box	Quader
+Camera focus distance	Fokusabstand der Kamera
+Camera lens	Kameraobjektiv
+Cameras	Kameras
+Cameras selectable	Kameras auswählbar
+Cameras shown	Kameras angezeigt
+Cancel Render	Render abbrechen
+Capsule	Kapsel
+Carry	Mitführen
+Cast shadows	Schatten werfen
+Cavity	Kavität
+Center-cut	Mittelschnitt
+Centimeters	Zentimeter
+Checker Deselect	Schachbrett abwählen
+Clear Follow	Folgen aufheben
+Clear IK	IK entfernen
+Clear Rulers	Lineale löschen
+Clear Weight Paint	Gewichtsmalerei löschen
+Clearcoat	Klarlack
+Closest	Nächster
+Coding agent	Coding-Agent
+Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done.	Connect führt diese Zeile in einem Terminal-Tab aus. Sie startet das Skript unten, das jeden Schritt vorher prüft und bereits Erledigtes überspringt.
+Connect your coding agent to Infinite. It runs in a Terminal tab you can watch.	Verbinde deinen Coding-Agent mit Infinite. Er läuft in einem Terminal-Tab, den du beobachten kannst.
+Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version.	Beim Verbinden von Claude Code oben wird dies bereits in ~/.claude/skills/ installiert und aktuell gehalten. Für einen anderen Assistenten wähle einen Ordner und füge die Datei seinem Projekt oder Chat hinzu; installiere nach einem Infinite-Update neu, damit die Dateien zu dieser Version passen.
+Constant	Konstant
+Continuous grab	Kontinuierliches Greifen
+Copy Items	Elemente kopieren
+Copy Transform	Transformation kopieren
+Copy Transforms	Transformationen kopieren
+Copy Transforms from Active	Transformationen vom aktiven übernehmen
+Create Orientation	Orientierung erstellen
+Crop	Zuschneiden
+Crop to region	Auf Region zuschneiden
+Cursor	Cursor
+Cursor + frame all	Cursor + alles einpassen
+Cursor Plane	Cursor-Ebene
+Cursor View	Cursor-Ansicht
+Cursor to Active	Cursor zum Aktiven
+Cursor to Grid	Cursor zum Raster
+Cursor to World Origin	Cursor zum Weltursprung
+Curvature ridge	Krümmungsgrat
+Curvature valley	Krümmungstal
+Custom distance	Eigener Abstand
+Cutoff	Grenzwert
+Cylinder	Zylinder
+Date	Datum
+Default	Standard
+Degrees	Grad
+Delete Orientation	Orientierung löschen
+Delta Transform	Delta-Transformation
+Depth	Tiefe
+Diagonal	Diagonal
+Diffuse	Diffus
+Dimensions	Abmessungen
+Dither	Dithering
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away	Doppelklick auf leeren Raum bei gedrückter Umschalttaste: Der Orbit-Pivot gleitet zurück zum 3D-Cursor (Abstand und Winkel bleiben); Umschalt + Zwei-Finger-Scrollen verschiebt ihn wieder weg
+Edges	Kanten
+Edit Mode (Tab)	Bearbeitungsmodus (Tab)
+Edit Operations	Bearbeitungsoperationen
+Emission	Emission
+Engine	Engine
+Exact match	Exakte Übereinstimmung
+Extras	Extras
+Faces	Flächen
+Faded	Abgeschwächt
+Falloff	Abfall
+Feet	Füße
+Filter size	Filtergröße
+Flip horizontally	Horizontal spiegeln
+Flip vertically	Vertikal spiegeln
+Follow	Folgen
+Follow / Clear Follow	Folgen / Folgen aufheben
+Follow Active	Aktivem folgen
+Font size	Schriftgröße
+Frame method	Einpassungsmethode
+Frame range	Bildbereich
+Frame selected	Auswahl einpassen
+From the look	Vom Look
+Front	Vorne
+Gamma	Gamma
+Geometry in, image out: the mesh drawn in its own UV space. AO, curvature, position, normal or thickness, so the image can go through any 2D effect and back into a Material map. Sculpt bakes an upstream Sculpt node into a normal map for the unsculpted mesh: put Bake after the Sculpt, then feed the image to the Material's normal map on the mesh before it. Needs UVs (Model 3D, primitives, or UV Project). Bakes again when the mesh changes.	Geometrie rein, Bild raus: das Mesh in seinem eigenen UV-Raum gezeichnet. AO, Krümmung, Position, Normale oder Dicke, damit das Bild durch jeden 2D-Effekt laufen und zurück in eine Material-Map gehen kann. Sculpt backt einen vorgelagerten Sculpt-Node in eine Normal-Map für das unskulptierte Mesh: Bake hinter den Sculpt setzen, dann das Bild in die Normal-Map des Materials am Mesh davor führen. Braucht UVs (Model 3D, Primitive oder UV Project). Backt neu, wenn sich das Mesh ändert.
+Gizmos	Gizmos
+Golden triangle A	Goldenes Dreieck A
+Golden triangle B	Goldenes Dreieck B
+Harmonious triangle A	Harmonisches Dreieck A
+Harmonious triangle B	Harmonisches Dreieck B
+Hide Selected	Auswahl ausblenden
+Hide Unselected	Nicht Ausgewähltes ausblenden
+Hide selection	Auswahl ausblenden
+High contrast	Hoher Kontrast
+Holds Edit Mode edits made in the 3D View: press Open in 3D View, or select the item and press Tab. 1/2/3 pick points, edges or faces; G, R and S move, rotate and scale the selection; E extrudes, I insets, X deletes. The edits replay on the input, so they follow an upstream change that keeps the shape in place: raise a Cube's detail and a picked face stays the whole face, a moved point stays a smooth bump of the same reach. A selection with nothing near it is skipped and the node warns.	Hält Bearbeitungsmodus-Änderungen aus der 3D-Ansicht: Open in 3D View drücken oder das Element auswählen und Tab drücken. 1/2/3 wählen Punkte, Kanten oder Flächen; G, R und S verschieben, drehen und skalieren die Auswahl; E extrudiert, I insettet, X löscht. Die Änderungen werden auf die Eingabe erneut angewendet und folgen so einer vorgelagerten Änderung, die die Form beibehält: Erhöht man den Detailgrad eines Cube, bleibt eine gewählte Fläche die ganze Fläche, ein verschobener Punkt bleibt eine sanfte Beule gleicher Reichweite. Eine Auswahl ohne Treffer in der Nähe wird übersprungen, und der Node warnt.
+Holds a sculpt painted in the 3D View: press Open in 3D View, or select the item and press Ctrl+Tab (or the brush chip). Amount blends it in, so an LFO or audio can drive it; level subdivides the input first. Chain Sculpt nodes to layer sculpts. Patch any 2D node into brush and each dab takes its shape: bright moves, dark holds. If the input's points change, the sculpt stops applying until they come back or it is cleared.	Hält einen in der 3D-Ansicht gemalten Sculpt: Open in 3D View drücken oder das Element auswählen und Strg+Tab drücken (oder den Pinsel-Chip). Amount blendet ihn ein, sodass ein LFO oder Audio ihn steuern kann; level unterteilt zuerst die Eingabe. Sculpt-Nodes verketten, um Sculpts zu schichten. Einen beliebigen 2D-Node in den Pinsel patchen, und jeder Tupfer übernimmt dessen Form: hell bewegt, dunkel hält. Ändern sich die Punkte der Eingabe, wird der Sculpt nicht mehr angewendet, bis sie zurückkehren oder er gelöscht wird.
+IOR	IOR
+Imperial	Imperial
+In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection	Im Bearbeitungsmodus: E extrudiert, I insettet, X oder Entf löscht die gewählten Flächen. G, R und S verschieben, drehen und skalieren die Auswahl
+In Edit Mode: pick what a click selects. A selects all, Alt+A selects none	Im Bearbeitungsmodus: festlegen, was ein Klick auswählt. A wählt alles, Alt+A nichts
+In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node	Im Pose-Modus auf einer Armature: Ziehen malt das Gewicht des gewählten Knochens, Strg+Ziehen entfernt es, [ und ] ändern die Pinselgröße. Wird im Armature-Node gespeichert
+In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK	Im Pose-Modus: Der gewählte Knochen greift nach dem zuletzt gewählten anderen Element (ein weiteres gewähltes Element ist der Pol) oder löscht die IK
+In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node	Im Pose-Modus: den gewählten Knochen um die Blickachse drehen oder seine Drehung löschen. Drehungen sind Parameter am Model-3D-Node
+Inches	Zoll
+Index	Index
+Influence	Einfluss
+Install runs the agent's own installer:	Install führt den eigenen Installer des Agents aus:
+Intensity	Intensität
+Invert filter	Filter umkehren
+Invert zoom direction	Zoomrichtung umkehren
+Kelvin	Kelvin
+Kilometers	Kilometer
+Labels	Beschriftungen
+Light colors	Lichtfarben
+Light look-at	Licht-Blickziel
+Light size	Lichtgröße
+Lighting	Beleuchtung
+Lights	Lichter
+Lights selectable	Lichter auswählbar
+Lights shown	Lichter angezeigt
+Limits	Grenzen
+Linear	Linear
+Lines	Linien
+Lit	Beleuchtet
+Load image...	Bild laden...
+Local view	Lokale Ansicht
+Location only	Nur Position
+Location, rotation and scale	Position, Rotation und Skalierung
+Lock to 3D cursor	An 3D-Cursor binden
+Lock to active	Am Aktiven fixieren
+Look	Look
+Look at	Blick auf
+Low contrast	Niedriger Kontrast
+Maps	Maps
+MatCap	MatCap
+Match case	Groß-/Kleinschreibung beachten
+Material	Material
+Max X	Max. X
+Max Y	Max. Y
+Max blur	Max. Unschärfe
+Max latitude	Max. Breite
+Max longitude	Max. Länge
+Measure	Messen
+Median	Median
+Medium contrast	Mittlerer Kontrast
+Metallic	Metallisch
+Meters	Meter
+Metric	Metrisch
+Millimeters	Millimeter
+Min X	Min. X
+Min Y	Min. Y
+Min latitude	Min. Breite
+Min longitude	Min. Länge
+Mini axes	Mini-Achsen
+Mini axes brightness	Helligkeit der Mini-Achsen
+Mini axes size	Größe der Mini-Achsen
+Mirror	Spiegeln
+Mist	Nebel
+Mist depth	Nebeltiefe
+Mist start	Nebelbeginn
+Motion	Bewegung
+Motion Blur	Bewegungsunschärfe
+Move to Mouse	Zur Maus bewegen
+Move, rotate, scale	Verschieben, Drehen, Skalieren
+Moving one item pulls its neighbours, weaker with distance	Das Verschieben eines Elements zieht seine Nachbarn mit, schwächer mit zunehmendem Abstand
+Navigate	Navigieren
+Navigation gizmo size	Größe des Navigations-Gizmos
+Normal strength	Normalen-Stärke
+Normalize	Normalisieren
+Note text	Notiztext
+Objects	Objekte
+Objects %d/%d   Cameras %d   Lights %d	Objekte %d/%d   Kameras %d   Lichter %d
+Offset X	Versatz X
+Offset Y	Versatz Y
+On (O)	An (O)
+On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves	Bei einem Mesh-Element: dessen Punkte, Kanten und Flächen in einem Edit-Mesh-Node bearbeiten. Tab oder Esc beendet
+On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves	Bei einem Model-3D-Element mit Skinning: dessen Knochen anzeigen; einen anklicken, um ihn zu wählen. Strg+Tab oder Esc beendet
+Only locations	Nur Positionen
+Open image	Bild öffnen
+Opens a Terminal tab and reruns only this step.	Öffnet einen Terminal-Tab und wiederholt nur diesen Schritt.
+Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands.	Öffnet einen Terminal-Tab und führt den eigenen Installer des Agents aus, zu sehen unter Reference, Setup commands.
+Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair.	Öffnet einen Terminal-Tab und führt das Skript unter Reference, Setup commands aus. Jeder Schritt prüft vorher und überspringt Erledigtes, daher lässt es sich jederzeit zur Reparatur erneut starten.
+Orbit sensitivity	Orbit-Empfindlichkeit
+Origins (all)	Ursprünge (alle)
+Orthographic grid	Orthografisches Raster
+Outline	Kontur
+Outline color	Konturfarbe
+Outline selected	Auswahl umranden
+Outside the panel (macOS):	Außerhalb des Panels (macOS):
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.	Particle System ist ein 3D-Emitter mit Schwerkraft, Reibung und Turbulenz. Cloth ist ein angepinntes positionsbasiertes Tuch mit Wind, optionaler Bodenebene und optionalem Kollisions-Mesh.
+Pass Index	Pass-Index
+Paste Items	Elemente einfügen
+Paste Transform	Transformation einfügen
+Path Tracing	Pathtracing
+Performance	Leistung
+Persp / Ortho	Persp / Ortho
+Pivot to 3D Cursor	Pivot zum 3D-Cursor
+Pixel aspect X	Pixel-Seitenverhältnis X
+Pixel aspect Y	Pixel-Seitenverhältnis Y
+Placement	Platzierung
+Plane axis	Ebenenachse
+Points	Punkte
+Points / Edges / Faces	Punkte / Kanten / Flächen
+Pose Mode	Pose-Modus
+Preferences	Einstellungen
+Projected from view	Aus der Ansicht projiziert
+Proportional Editing	Proportionale Bearbeitung
+Quaternion	Quaternion
+Radians	Radiant
+Randomize Transform	Transformation zufällig
+Ratio	Verhältnis
+Reference	Referenz
+Region	Region
+Remove from local view	Aus lokaler Ansicht entfernen
+Remove image	Bild entfernen
+Render Only This Type	Nur diesen Typ rendern
+Render Region	Render-Region
+Render column	Render-Spalte
+Render time	Renderzeit
+Repair	Reparieren
+Repeat Last	Letzte wiederholen
+Reset motion	Bewegung zurücksetzen
+Resolution	Auflösung
+Reveal Latest	Neuestes anzeigen
+Reveal Previous	Vorheriges anzeigen
+Ridge	Grat
+Roll View	Ansicht rollen
+Roll the view 15 degrees about the line of sight	Rollt die Ansicht um 15 Grad um die Blickachse
+Root	Wurzel
+Rotate precision	Drehgenauigkeit
+Rotation mode	Rotationsmodus
+Rotation step	Drehschritt
+Roughness	Rauheit
+Sculpt (Ctrl+Tab)	Sculpt (Strg+Tab)
+Sculpt Mode	Sculpt-Modus
+See through surfaces in Solid; show or hide the overlays	In Solid durch Oberflächen sehen; Overlays ein- oder ausblenden
+Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure	Auswählen (Umschalt+Leertaste, W). Rechtsklick: Box, Lasso, 3D-Cursor, Messen
+Select Box	Rahmenauswahl
+Select Circle	Kreisauswahl
+Select Lasso	Lassoauswahl
+Select Linked	Verbundene auswählen
+Select Pattern	Muster auswählen
+Select Random	Zufällig auswählen
+Select Same Type	Gleichen Typ auswählen
+Selectable	Auswählbar
+Selectable column	Auswählbar-Spalte
+Selectable only	Nur auswählbar
+Selected	Ausgewählt
+Selection to Active	Auswahl zum Aktiven
+Selection to Cursor (Keep Offset)	Auswahl zum Cursor (Versatz beibehalten)
+Selection to Grid	Auswahl zum Raster
+Sensor fit	Sensor-Anpassung
+Setup	Einrichtung
+Setup commands	Einrichtungsbefehle
+Shadow	Schatten
+Sharp	Scharf
+Sheen	Sheen
+Show Active	Aktives anzeigen
+Show All in Renders	Alle in Renders anzeigen
+Show cone	Kegel anzeigen
+Shutter	Verschluss
+Simple axes	Einfache Achsen
+Simplify	Vereinfachen
+Single color	Einzelne Farbe
+Smooth	Glatt
+Smooth view	Sanfte Ansicht
+Snap target	Einrastziel
+Soft falloff	Weicher Abfall
+Sort A to Z	A bis Z sortieren
+Specular	Spekular
+Sphere	Kugel
+Stamp	Stempel
+Start agent	Agent starten
+Start agent runs:	Agent starten führt aus:
+Start with Terminal	Mit Terminal starten
+Starts the agent in the first Terminal tab each time the Terminal opens.	Startet den Agent bei jedem Öffnen des Terminals im ersten Terminal-Tab.
+State	Zustand
+Statistics	Statistiken
+Status	Status
+Step	Schritt
+Subdivisions	Unterteilungen
+Subsurface	Subsurface
+Sun angle	Sonnenwinkel
+Sun filter	Sonnenfilter
+Sun resolution	Sonnenauflösung
+Sun shadow	Sonnenschatten
+Sun threshold	Sonnenschwellenwert
+System	System
+Temperature	Temperatur
+Terminal & coding agent	Terminal & Coding-Agent
+Text	Text
+Text info	Textinfo
+The Terminal panel	Das Terminal-Panel
+The script, exactly as it runs:	Das Skript, genau wie es läuft:
+The selected items follow the active one (Blender's parent), or stop following	Die ausgewählten Elemente folgen dem aktiven (Blenders Parent) oder hören auf zu folgen
+The selected items take the active item's location, rotation and scale	Die ausgewählten Elemente übernehmen Position, Rotation und Skalierung des aktiven Elements
+Theme	Design
+To other objects	Auf andere Objekte
+Track axis	Verfolgungsachse
+Transform gizmo size	Größe des Transformations-Gizmos
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset and UV Project - plus Sculpt, Edit Mesh, Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset und UV Project, dazu Sculpt, Edit Mesh, Select und die Operationen, die nur auf dessen markierte Flächen wirken (Delete / Transform / Extrude Selected), die Booleschen Operationen von Join Geometry (Union, Intersect, Difference), Displacement, Wrap und Merge by Distance.
+Transforms to Deltas	Transformationen zu Deltas
+Transmission	Transmission
+Turn / Clear Bone	Knochen drehen / Drehung löschen
+Unit scale	Einheitenskalierung
+Units	Einheiten
+Up axis	Obere Achse
+Use for move	Zum Verschieben nutzen
+Use for rotate	Zum Drehen nutzen
+Use for scale	Zum Skalieren nutzen
+Valley	Tal
+Viewpoint	Blickpunkt
+Viewport Display	Viewport-Anzeige
+Viewport Visibility	Viewport-Sichtbarkeit
+Viewport display	Viewport-Anzeige
+Visible	Sichtbar
+Weight Paint	Gewichtsmalerei
+Wireframe	Drahtgitter
+World space	Weltraum
+Writes real UVs so a texture sticks to the mesh as it moves or deforms. Smart splits it into islands of faces facing the same way and packs them into the square; Cube, Cylinder and Sphere project from the bounds. Use a Mapping node set to UV, or none, to read them.	Schreibt echte UVs, damit eine Textur am Mesh haftet, wenn es sich bewegt oder verformt. Smart teilt es in Inseln gleich ausgerichteter Flächen und packt sie ins Quadrat; Cube, Cylinder und Sphere projizieren aus der Bounding Box. Zum Auslesen einen Mapping-Node auf UV stellen oder keinen verwenden.
+X	X
+X Global	X global
+X-ray / Overlays	Röntgen / Overlays
+X-ray: see through surfaces in Solid (Alt+Z)	Röntgen: in Solid durch Oberflächen sehen (Alt+Z)
+XYZ Euler	Euler XYZ
+Y Global	Y global
+Yards	Yards
+Z	Z
+Z Global	Z global
+Zoom 1:1	Zoom 1:1

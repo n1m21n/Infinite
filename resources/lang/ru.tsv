@@ -2249,3 +2249,358 @@ MIDI Inputs	MIDI-входы
 Every connected MIDI controller. A Midi Notes node listens to all of them or to one, and Learn picks the device and channel from the next key you play.	Все подключённые MIDI-контроллеры. Узел Midi Notes слушает все или один из них, а Learn выбирает устройство и канал по следующей сыгранной клавише.
 Start MIDI	Запустить MIDI
 No MIDI inputs connected	MIDI-входы не подключены
+3D cursor	3D-курсор
+A cloth simulation over an input mesh - stiffness, bending, iterations, damping, mass and shape retention, plus gravity, wind, optional ground collision and an optional collider mesh it drapes over. 'Reset' re-drops the cloth from its rest pose.	Симуляция ткани на входной сетке: жёсткость, изгиб, итерации, затухание, масса и сохранение формы, а также гравитация, ветер, необязательное столкновение с землёй и необязательная сетка-коллайдер, на которую ложится ткань. «Reset» заново роняет ткань из исходной позы.
+Absolute increment	Абсолютный шаг
+Active Camera	Активная камера
+Add / Clear IK	Добавить / убрать IK
+Add IK to Bone	Добавить IK к кости
+Add Material	Добавить материал
+Align	Выровнять
+Align rotation to target	Выровнять поворот по цели
+Align to selected	Выровнять по выделенному
+Align to view	Выровнять по виду
+Alpha threshold	Порог альфы
+Apply the last move, turn or scale again to the selection	Применить к выделенному последнее перемещение, поворот или масштаб ещё раз
+Auto axis	Авто-ось
+Auto perspective	Авто-перспектива
+Axes	Оси
+Axis Angle	Ось-угол
+Axis X	Ось X
+Axis Y	Ось Y
+Axis Z	Ось Z
+Back	Сзади
+Background	Фон
+Background Image	Фоновое изображение
+Background color	Цвет фона
+Base	Основа
+Bends any geometry with a chain of bones along an axis or the path curve. Curl, twist and wave bend it; Open in 3D View enters Pose mode, where IK works on it too, and W paints the weights ([ ] size, Ctrl removes).	Изгибает любую геометрию цепочкой костей вдоль оси или кривой пути. Curl, Twist и Wave изгибают её; Open in 3D View включает режим позы, где работает и IK, а W рисует веса ([ ] размер, Ctrl стирает).
+Blades	Лопасти
+Bounces	Отскоки
+Bounds	Границы
+Box	Параллелепипед
+Camera focus distance	Дистанция фокусировки камеры
+Camera lens	Объектив камеры
+Cameras	Камеры
+Cameras selectable	Камеры выбираемы
+Cameras shown	Камеры показаны
+Cancel Render	Отменить рендер
+Capsule	Капсула
+Carry	Перенос
+Cast shadows	Отбрасывать тени
+Cavity	Каверна
+Center-cut	Центральный срез
+Centimeters	Сантиметры
+Checker Deselect	Шахматное снятие выделения
+Clear Follow	Снять слежение
+Clear IK	Убрать IK
+Clear Rulers	Очистить линейки
+Clear Weight Paint	Очистить покраску весов
+Clearcoat	Лаковое покрытие
+Closest	Ближайший
+Coding agent	Агент для кода
+Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done.	Connect запускает эту строку во вкладке Terminal. Она выполняет скрипт ниже, который сначала проверяет каждый шаг и пропускает уже сделанное.
+Connect your coding agent to Infinite. It runs in a Terminal tab you can watch.	Подключите своего агента для кода к Infinite. Он работает во вкладке Terminal, за которой можно наблюдать.
+Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version.	При подключении Claude Code выше эти файлы уже устанавливаются в ~/.claude/skills/ и обновляются. Для другого ассистента выберите папку и добавьте файл в его проект или чат; после обновления Infinite переустановите, чтобы файлы соответствовали этой версии.
+Constant	Константа
+Continuous grab	Непрерывный захват
+Copy Items	Копировать элементы
+Copy Transform	Копировать трансформацию
+Copy Transforms	Копировать трансформации
+Copy Transforms from Active	Копировать трансформации с активного
+Create Orientation	Создать ориентацию
+Crop	Обрезка
+Crop to region	Обрезать по области
+Cursor	Курсор
+Cursor + frame all	Курсор + показать всё
+Cursor Plane	Плоскость курсора
+Cursor View	Вид курсора
+Cursor to Active	Курсор к активному
+Cursor to Grid	Курсор к сетке
+Cursor to World Origin	Курсор в начало мира
+Curvature ridge	Гребень кривизны
+Curvature valley	Впадина кривизны
+Custom distance	Своя дистанция
+Cutoff	Срез
+Cylinder	Цилиндр
+Date	Дата
+Default	По умолчанию
+Degrees	Градусы
+Delete Orientation	Удалить ориентацию
+Delta Transform	Дельта-трансформация
+Depth	Глубина
+Diagonal	Диагональ
+Diffuse	Диффузный
+Dimensions	Размеры
+Dither	Дизеринг
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away	Двойной щелчок по пустому месту с Shift: центр орбиты плавно возвращается к 3D-курсору (расстояние и угол сохраняются); Shift + прокрутка двумя пальцами сдвигает его прочь
+Edges	Рёбра
+Edit Mode (Tab)	Режим правки (Tab)
+Edit Operations	Операции правки
+Emission	Излучение
+Engine	Движок
+Exact match	Точное совпадение
+Extras	Дополнительно
+Faces	Грани
+Faded	Ослабленный
+Falloff	Спад
+Feet	Ступни
+Filter size	Размер фильтра
+Flip horizontally	Отразить по горизонтали
+Flip vertically	Отразить по вертикали
+Follow	Следовать
+Follow / Clear Follow	Следовать / Снять слежение
+Follow Active	Следовать за активным
+Font size	Размер шрифта
+Frame method	Способ кадрирования
+Frame range	Диапазон кадров
+Frame selected	Показать выделенное
+From the look	Из стиля
+Front	Спереди
+Gamma	Гамма
+Geometry in, image out: the mesh drawn in its own UV space. AO, curvature, position, normal or thickness, so the image can go through any 2D effect and back into a Material map. Sculpt bakes an upstream Sculpt node into a normal map for the unsculpted mesh: put Bake after the Sculpt, then feed the image to the Material's normal map on the mesh before it. Needs UVs (Model 3D, primitives, or UV Project). Bakes again when the mesh changes.	Геометрия на входе, изображение на выходе: сетка, нарисованная в собственном UV-пространстве. AO, кривизна, позиция, нормаль или толщина, так что изображение можно пропустить через любой 2D-эффект и вернуть в карту Material. Sculpt запекает вышестоящий узел Sculpt в карту нормалей для нескульптированной сетки: поставьте Bake после Sculpt, затем подайте изображение в карту нормалей Material у сетки перед ним. Нужны UV (Model 3D, примитивы или UV Project). Запекает заново при изменении сетки.
+Gizmos	Гизмо
+Golden triangle A	Золотой треугольник A
+Golden triangle B	Золотой треугольник B
+Harmonious triangle A	Гармоничный треугольник A
+Harmonious triangle B	Гармоничный треугольник B
+Hide Selected	Скрыть выделенное
+Hide Unselected	Скрыть невыделенное
+Hide selection	Скрыть выделение
+High contrast	Высокий контраст
+Holds Edit Mode edits made in the 3D View: press Open in 3D View, or select the item and press Tab. 1/2/3 pick points, edges or faces; G, R and S move, rotate and scale the selection; E extrudes, I insets, X deletes. The edits replay on the input, so they follow an upstream change that keeps the shape in place: raise a Cube's detail and a picked face stays the whole face, a moved point stays a smooth bump of the same reach. A selection with nothing near it is skipped and the node warns.	Хранит правки режима правки, сделанные в 3D-виде: нажмите Open in 3D View или выберите элемент и нажмите Tab. 1/2/3 выбирают точки, рёбра или грани; G, R и S перемещают, поворачивают и масштабируют выделенное; E выдавливает, I делает вставку, X удаляет. Правки воспроизводятся поверх входа, поэтому следуют за вышестоящим изменением, сохраняющим форму: повысьте детализацию Cube — выбранная грань останется целой гранью, сдвинутая точка останется плавным бугром того же охвата. Выделение без ничего поблизости пропускается, узел предупреждает.
+Holds a sculpt painted in the 3D View: press Open in 3D View, or select the item and press Ctrl+Tab (or the brush chip). Amount blends it in, so an LFO or audio can drive it; level subdivides the input first. Chain Sculpt nodes to layer sculpts. Patch any 2D node into brush and each dab takes its shape: bright moves, dark holds. If the input's points change, the sculpt stops applying until they come back or it is cleared.	Хранит скульпт, нарисованный в 3D-виде: нажмите Open in 3D View или выберите элемент и нажмите Ctrl+Tab (или чип кисти). Amount подмешивает его, так что им могут управлять LFO или аудио; level сначала подразделяет вход. Цепочка узлов Sculpt накладывает скульпты слоями. Подключите любой 2D-узел к кисти — каждый мазок примет его форму: светлое двигает, тёмное удерживает. Если точки входа меняются, скульпт не применяется, пока они не вернутся или скульпт не будет очищен.
+IOR	IOR
+Imperial	Британская
+In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection	В режиме правки: E выдавливает, I делает вставку, X или Delete удаляет выбранные грани. G, R и S перемещают, поворачивают и масштабируют выделенное
+In Edit Mode: pick what a click selects. A selects all, Alt+A selects none	В режиме правки: выберите, что выделяет щелчок. A выделяет всё, Alt+A снимает выделение
+In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node	В режиме позы на Armature: перетаскивание рисует вес выбранной кости, Ctrl+перетаскивание стирает его, [ и ] меняют размер кисти. Сохраняется в узле Armature
+In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK	В режиме позы: выбранная кость тянется к последнему другому выбранному элементу (ещё один выбранный элемент — полюс) либо IK очищается
+In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node	В режиме позы: поворачивает выбранную кость вокруг оси вида или сбрасывает её поворот. Повороты — параметры узла Model 3D
+Inches	Дюймы
+Index	Индекс
+Influence	Влияние
+Install runs the agent's own installer:	Install запускает собственный установщик агента:
+Intensity	Интенсивность
+Invert filter	Инвертировать фильтр
+Invert zoom direction	Инвертировать направление зума
+Kelvin	Кельвин
+Kilometers	Километры
+Labels	Подписи
+Light colors	Цвета света
+Light look-at	Цель света
+Light size	Размер света
+Lighting	Освещение
+Lights	Источники света
+Lights selectable	Источники света выбираемы
+Lights shown	Источники света показаны
+Limits	Ограничения
+Linear	Линейный
+Lines	Линии
+Lit	Освещённый
+Load image...	Загрузить изображение...
+Local view	Локальный вид
+Location only	Только положение
+Location, rotation and scale	Положение, поворот и масштаб
+Lock to 3D cursor	Привязать к 3D-курсору
+Lock to active	Привязать к активному
+Look	Стиль
+Look at	Смотреть на
+Low contrast	Низкий контраст
+Maps	Карты
+MatCap	MatCap
+Match case	Учитывать регистр
+Material	Материал
+Max X	Макс. X
+Max Y	Макс. Y
+Max blur	Макс. размытие
+Max latitude	Макс. широта
+Max longitude	Макс. долгота
+Measure	Измерение
+Median	Медиана
+Medium contrast	Средний контраст
+Metallic	Металличность
+Meters	Метры
+Metric	Метрическая
+Millimeters	Миллиметры
+Min X	Мин. X
+Min Y	Мин. Y
+Min latitude	Мин. широта
+Min longitude	Мин. долгота
+Mini axes	Мини-оси
+Mini axes brightness	Яркость мини-осей
+Mini axes size	Размер мини-осей
+Mirror	Зеркало
+Mist	Дымка
+Mist depth	Глубина дымки
+Mist start	Начало дымки
+Motion	Движение
+Motion Blur	Размытие движения
+Move to Mouse	Переместить к мыши
+Move, rotate, scale	Перемещение, поворот, масштаб
+Moving one item pulls its neighbours, weaker with distance	Перемещение одного элемента тянет соседние, слабее с расстоянием
+Navigate	Навигация
+Navigation gizmo size	Размер навигационного гизмо
+Normal strength	Сила нормалей
+Normalize	Нормализовать
+Note text	Текст заметки
+Objects	Объекты
+Objects %d/%d   Cameras %d   Lights %d	Объекты %d/%d   Камеры %d   Источники света %d
+Offset X	Смещение X
+Offset Y	Смещение Y
+On (O)	Вкл (O)
+On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves	На элементе-сетке: правка его точек, рёбер и граней в узле Edit Mesh. Tab или Esc — выход
+On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves	На Model 3D со скином: показывает его кости; щелчок выбирает кость. Ctrl+Tab или Esc — выход
+Only locations	Только положения
+Open image	Открыть изображение
+Opens a Terminal tab and reruns only this step.	Открывает вкладку Terminal и повторяет только этот шаг.
+Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands.	Открывает вкладку Terminal и запускает собственный установщик агента, показанный в Reference, Setup commands.
+Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair.	Открывает вкладку Terminal и запускает скрипт из Reference, Setup commands. Каждый шаг сначала проверяет и пропускает уже сделанное, поэтому для починки можно запускать снова когда угодно.
+Orbit sensitivity	Чувствительность орбиты
+Origins (all)	Начала координат (все)
+Orthographic grid	Ортографическая сетка
+Outline	Контур
+Outline color	Цвет контура
+Outline selected	Контур выделенного
+Outside the panel (macOS):	Вне панели (macOS):
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind, an optional ground plane and an optional collider mesh.	Particle System — 3D-эмиттер с гравитацией, сопротивлением и турбулентностью. Cloth — закреплённое позиционное полотно с ветром, необязательной плоскостью земли и необязательной сеткой-коллайдером.
+Pass Index	Индекс прохода
+Paste Items	Вставить элементы
+Paste Transform	Вставить трансформацию
+Path Tracing	Трассировка путей
+Performance	Производительность
+Persp / Ortho	Перспектива / Орто
+Pivot to 3D Cursor	Центр вращения к 3D-курсору
+Pixel aspect X	Соотношение пикселя X
+Pixel aspect Y	Соотношение пикселя Y
+Placement	Размещение
+Plane axis	Ось плоскости
+Points	Точки
+Points / Edges / Faces	Точки / Рёбра / Грани
+Pose Mode	Режим позы
+Preferences	Настройки
+Projected from view	Проекция из вида
+Proportional Editing	Пропорциональное редактирование
+Quaternion	Кватернион
+Radians	Радианы
+Randomize Transform	Случайная трансформация
+Ratio	Соотношение
+Reference	Справка
+Region	Область
+Remove from local view	Убрать из локального вида
+Remove image	Убрать изображение
+Render Only This Type	Рендерить только этот тип
+Render Region	Область рендера
+Render column	Столбец рендера
+Render time	Время рендера
+Repair	Починить
+Repeat Last	Повторить последнее
+Reset motion	Сбросить движение
+Resolution	Разрешение
+Reveal Latest	Показать последний
+Reveal Previous	Показать предыдущий
+Ridge	Гребень
+Roll View	Крен вида
+Roll the view 15 degrees about the line of sight	Поворачивает вид на 15 градусов вокруг линии взгляда
+Root	Корень
+Rotate precision	Точность поворота
+Rotation mode	Режим вращения
+Rotation step	Шаг поворота
+Roughness	Шероховатость
+Sculpt (Ctrl+Tab)	Скульпт (Ctrl+Tab)
+Sculpt Mode	Режим скульпта
+See through surfaces in Solid; show or hide the overlays	Видеть сквозь поверхности в Solid; показать или скрыть оверлеи
+Select (Shift+Space, W). Right-click: box, lasso, 3D cursor, measure	Выделение (Shift+Пробел, W). Правый клик: рамка, лассо, 3D-курсор, измерение
+Select Box	Выделение рамкой
+Select Circle	Круговое выделение
+Select Lasso	Выделение лассо
+Select Linked	Выделить связанные
+Select Pattern	Выделить по шаблону
+Select Random	Случайное выделение
+Select Same Type	Выделить того же типа
+Selectable	Выбираемый
+Selectable column	Столбец выбираемости
+Selectable only	Только выбираемые
+Selected	Выбрано
+Selection to Active	Выделенное к активному
+Selection to Cursor (Keep Offset)	Выделенное к курсору (с сохранением смещения)
+Selection to Grid	Выделенное к сетке
+Sensor fit	Подгонка сенсора
+Setup	Настройка
+Setup commands	Команды настройки
+Shadow	Тень
+Sharp	Резкий
+Sheen	Бархатистый блеск
+Show Active	Показать активный
+Show All in Renders	Показать всё в рендерах
+Show cone	Показать конус
+Shutter	Затвор
+Simple axes	Простые оси
+Simplify	Упростить
+Single color	Один цвет
+Smooth	Гладкий
+Smooth view	Плавный вид
+Snap target	Цель привязки
+Soft falloff	Мягкий спад
+Sort A to Z	Сортировать от А до Я
+Specular	Бликовый
+Sphere	Сфера
+Stamp	Штамп
+Start agent	Запустить агента
+Start agent runs:	Запуск агента выполняет:
+Start with Terminal	Запускать с Terminal
+Starts the agent in the first Terminal tab each time the Terminal opens.	Запускает агента в первой вкладке Terminal при каждом открытии Terminal.
+State	Состояние
+Statistics	Статистика
+Status	Статус
+Step	Шаг
+Subdivisions	Подразделения
+Subsurface	Подповерхностное рассеяние
+Sun angle	Угол солнца
+Sun filter	Фильтр солнца
+Sun resolution	Разрешение солнца
+Sun shadow	Тень солнца
+Sun threshold	Порог солнца
+System	Система
+Temperature	Температура
+Terminal & coding agent	Terminal и агент для кода
+Text	Текст
+Text info	Текстовая информация
+The Terminal panel	Панель Terminal
+The script, exactly as it runs:	Скрипт в точности так, как он выполняется:
+The selected items follow the active one (Blender's parent), or stop following	Выделенные элементы следуют за активным (родитель в Blender) или перестают следовать
+The selected items take the active item's location, rotation and scale	Выделенные элементы принимают положение, поворот и масштаб активного
+Theme	Тема
+To other objects	Для других объектов
+Track axis	Ось слежения
+Transform gizmo size	Размер гизмо трансформации
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset and UV Project - plus Sculpt, Edit Mesh, Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel, Inset и UV Project, а также Sculpt, Edit Mesh, Select и операции, действующие только на его отмеченные грани (Delete / Transform / Extrude Selected), булевы операции Join Geometry (Union, Intersect, Difference), Displacement, Wrap и Merge by Distance.
+Transforms to Deltas	Трансформации в дельты
+Transmission	Пропускание
+Turn / Clear Bone	Повернуть / сбросить поворот кости
+Unit scale	Масштаб единиц
+Units	Единицы
+Up axis	Ось «вверх»
+Use for move	Использовать для перемещения
+Use for rotate	Использовать для поворота
+Use for scale	Использовать для масштаба
+Valley	Впадина
+Viewpoint	Точка обзора
+Viewport Display	Отображение вьюпорта
+Viewport Visibility	Видимость во вьюпорте
+Viewport display	Отображение во вьюпорте
+Visible	Видимый
+Weight Paint	Покраска весов
+Wireframe	Каркас
+World space	Мировое пространство
+Writes real UVs so a texture sticks to the mesh as it moves or deforms. Smart splits it into islands of faces facing the same way and packs them into the square; Cube, Cylinder and Sphere project from the bounds. Use a Mapping node set to UV, or none, to read them.	Записывает настоящие UV, чтобы текстура держалась на сетке при движении и деформации. Smart делит её на острова граней с одинаковой ориентацией и упаковывает в квадрат; Cube, Cylinder и Sphere проецируют от границ. Для чтения используйте узел Mapping в режиме UV или не используйте его вовсе.
+X	X
+X Global	X глобально
+X-ray / Overlays	Рентген / Оверлеи
+X-ray: see through surfaces in Solid (Alt+Z)	Рентген: видеть сквозь поверхности в Solid (Alt+Z)
+XYZ Euler	Эйлер XYZ
+Y Global	Y глобально
+Yards	Ярды
+Z	Z
+Z Global	Z глобально
+Zoom 1:1	Масштаб 1:1
