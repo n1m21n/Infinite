@@ -283,7 +283,10 @@ bool RunSculptTest()
       float q[3];
       const int ring = Nearest(n, off, q);
       const float d0 = std::hypot(q[1] - c[1], q[2] - c[2]);
+      // Pinch waits for the brush to move: a first dab, then one along z (the surface faces x, so the ring lies across the stroke).
       Dab(n, Sculpt::kPinch, c, 0.3f, 1.0f, false, 0);
+      const float c2[3] = { c[0], c[1], c[2] + 0.002f };
+      Dab(n, Sculpt::kPinch, c2, 0.3f, 1.0f, false, 0);
       PointAt(n, ring, q);
       const float d1 = std::hypot(q[1] - c[1], q[2] - c[2]);
       check(d1 < d0 - 1e-4f, "Pinch pulls points toward the brush", d1, d0);
