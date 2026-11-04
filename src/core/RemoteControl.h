@@ -36,6 +36,8 @@ namespace RemoteControl
    // The port actually bound (0 = no server) and this app's token, for the
    // sessions of its Terminal panel.
    int Port();
+   // Where each running app leaves <pid>.json = {pid, port, token}; removed when it quits.
+   std::string InstancesDir();
    const std::string& Token();
 
    // Runs `handler` for every request received since the last call, in

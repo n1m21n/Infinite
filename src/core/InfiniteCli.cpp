@@ -16,6 +16,8 @@
 #include "platform/AppPaths.h"
 #include "platform/NetCompat.h"
 #include "platform/Platform.h"
+#include "platform/common/ProcessTree.h"
+#include "RemoteControl.h"
 
 #include <algorithm>
 #include <chrono>
@@ -233,24 +235,75 @@ namespace
    class Live
    {
    public:
-      // False when no app answers. Never fails hard: a headless route may still apply.
+      // The app this process belongs to, from the files each running app leaves in InstancesDir:
+      // the one INFINITE_SESSION names, else the one whose Terminal is an ancestor of this process,
+      // else the only one running. An app too old to leave a file is reached on the default port.
+      bool FindInstance(int& port, std::string& token)
+      {
+         struct Instance
+         {
+            int port = 0;
+            std::string token;
+         };
+         std::map<long, Instance> live;
+         std::error_code ec;
+         for (const auto& entry : std::filesystem::directory_iterator(AppPaths::FsPath(RemoteControl::InstancesDir()), ec))
+         {
+            std::ifstream in(entry.path());
+            const json j = json::parse(in, nullptr, false);
+            const long pid = j.is_object() ? j.value("pid", 0L) : 0L;
+            if (!ProcessTree::Alive(pid))
+            {
+               std::filesystem::remove(entry.path(), ec); // left by an app that crashed
+               continue;
+            }
+            live[pid] = { j.value("port", 0), j.value("token", std::string()) };
+         }
+         const auto pick = [&](long pid) {
+            port = live[pid].port;
+            token = live[pid].token;
+            return true;
+         };
+         if (const char* session = getenv("INFINITE_SESSION"); session != nullptr && live.count(atol(session)) != 0)
+            return pick(atol(session));
+         for (long pid = ProcessTree::ParentPid(ProcessTree::Self()), depth = 0; pid > 1 && depth < 64; pid = ProcessTree::ParentPid(pid), depth++)
+            if (live.count(pid) != 0)
+               return pick(pid);
+         if (live.size() == 1)
+            return pick(live.begin()->first);
+         if (live.size() > 1)
+         {
+            std::string list;
+            for (const auto& [pid, instance] : live)
+               list += (list.empty() ? "" : ", ") + std::string("pid ") + std::to_string(pid);
+            Fail(std::to_string(live.size()) + " Infinite windows are open (" + list +
+                    ") and this shell is not inside any of their Terminals. Run it from the Terminal of the window you mean, "
+                    "or set INFINITE_SESSION=<pid>",
+                 kExitNoApp);
+         }
+         port = kDefaultPort;
+         std::ifstream in(AppPaths::FsPath(AppPaths::AppSupportDir() + "/control_token"));
+         std::getline(in, token);
+         return !token.empty();
+      }
+
+      // False when no app answers. Never fails hard: a headless route may still apply. The one hard failure is
+      // several apps open with nothing to say which one is meant: guessing would edit the wrong patch.
       bool Connect()
       {
          if (mFd >= 0)
             return true;
-         int port = kDefaultPort;
+         int port = 0;
          std::string token;
          const char* envPort = getenv("INFINITE_CONTROL_PORT");
          const char* envToken = getenv("INFINITE_CONTROL_TOKEN");
-         if (envPort != nullptr)
-            port = atoi(envPort);
-         if (envToken != nullptr)
-            token = envToken;
-         else
+         if (envPort != nullptr && envToken != nullptr)
          {
-            std::ifstream in(AppPaths::FsPath(AppPaths::AppSupportDir() + "/control_token"));
-            std::getline(in, token);
+            port = atoi(envPort);
+            token = envToken;
          }
+         else if (!FindInstance(port, token))
+            return false;
          if (token.empty() || port <= 0)
             return false;
          const int fd = (int)socket(AF_INET, SOCK_STREAM, 0);
@@ -1096,6 +1149,7 @@ Terminal term open|list|read|send|run
       if (gLive.Connect())
       {
          brief["app"] = gLive.Call("status");
+         brief["target"] = "This is the open window the user is looking at. Edit it live with these verbs; do not write a new .inf unless asked.";
          brief["selection"] = gLive.Call("selection")["nodes"];
          brief["nodes"] = gLive.Call("list_nodes")["nodes"];
          brief["codeErrors"] = gLive.Call("code_errors")["errors"];

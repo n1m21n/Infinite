@@ -69,9 +69,9 @@ namespace CliSetup
 
    // The two scripts: shell-quoted variables first, then the fixed body. This is the exact text that runs.
    // `only` limits the run to those step ids (empty = all); `prior` seeds the other steps' last states so
-   // a repair leaves the rest of status.json as it was.
+   // a repair leaves the rest of status.json as it was. `installAgent` makes step 5 install a missing agent.
    std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
-                           const std::vector<std::string>& only = {}, const Status* prior = nullptr);
+                           const std::vector<std::string>& only = {}, const Status* prior = nullptr, bool installAgent = false);
    // The one line typed into the Terminal tab.
    std::string SetupLine(Os os, const std::string& scriptPath);
    std::string InstallAgentLine(Os os, const Agent& agent);

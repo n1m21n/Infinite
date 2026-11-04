@@ -131,6 +131,7 @@ namespace CliSetup
          { "infinite-patch-authoring", AISkillContent::kPatchAuthoringMarkdown },
          { "infinite-field-language", AISkillContent::kFieldLanguageMarkdown },
          { "infinite-expression-globals", AISkillContent::kExpressionGlobalsMarkdown },
+         { "infinite-live-session", AISkillContent::kLiveSessionMarkdown },
       };
       return kSkills;
    }
@@ -260,6 +261,15 @@ pkg_install() { # apt names, dnf names, pacman names, brew name
     *) return 1 ;;
   esac
 }
+node_hint() { # one next step for this machine
+  if command -v node >/dev/null 2>&1; then
+    printf 'Node.js %s is too old; 18 or newer is needed. Update it, then press Connect again' "$(node -v)"
+  elif [ "$(uname -s)" = Darwin ]; then
+    printf 'Node.js is needed. Run the macOS installer from https://nodejs.org/en/download, then press Connect again'
+  else
+    printf 'Node.js 18+ is needed. Install it with your package manager (zypper install nodejs, apk add nodejs npm) or from https://nodejs.org/en/download, then press Connect again'
+  fi
+}
 node_ok() {
   command -v node >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 &&
     [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]
@@ -332,7 +342,7 @@ if node_ok; then
 elif pkg_install "nodejs npm" "nodejs npm" "nodejs npm" node && node_ok; then
   finish ok "installed node $(node -v)"
 else
-  finish failed "Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again"
+  finish failed "$(node_hint)"
 fi
 fi
 
@@ -368,8 +378,14 @@ skills_sync() {
 if want agent; then
 begin 5 agent "Connect $AGENT_NAME (MCP server and AI skills)"
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
+if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ]; then
+  printf '   running: %s\n' "$AGENT_INSTALL"
+  sh -c "$AGENT_INSTALL"
+  hash -r 2>/dev/null
+fi
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
-  finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"
+  if [ -n "$AGENT_INSTALL" ]; then finish failed "$AGENT_NAME did not install. The lines above say why"
+  else finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"; fi
 elif [ ! -x "$APPBIN" ]; then
   finish failed "run step 1 first: $APPBIN is missing"
 else
@@ -457,7 +473,9 @@ Begin 3 'node' 'Check Node.js (runs the MCP server)'
 if (NodeOk) { Finish 'skipped' "node $(& node -v)" }
 else {
   if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host '   running: winget install OpenJS.NodeJS.LTS'; winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements; RefreshPath }
-  if (NodeOk) { Finish 'ok' "installed node $(& node -v)" } else { Finish 'failed' 'Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again' }
+  if (NodeOk) { Finish 'ok' "installed node $(& node -v)" }
+  elseif (Get-Command node -ErrorAction SilentlyContinue) { Finish 'failed' "Node.js $(& node -v) is too old; 18 or newer is needed. Update it, then press Connect again" }
+  else { Finish 'failed' 'Node.js is needed. Run the Windows installer (.msi) from https://nodejs.org/en/download, then press Connect again' }
 }
 }
 
@@ -489,7 +507,8 @@ function SkillsSync {
 if (Want 'agent') {
 Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
 $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; Invoke-Expression $AgentInstall; RefreshPath; $env:Path = "$env:USERPROFILE\.local\bin;$env:Path" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { if ($AgentInstall) { Finish 'failed' "$AgentName did not install. The lines above say why" } else { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" } }
 elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
 else {
   $reg = 'skipped'
@@ -510,7 +529,7 @@ if ($Failed -gt 0) { exit 1 }
    }
 
    std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
-                           const std::vector<std::string>& only, const Status* prior)
+                           const std::vector<std::string>& only, const Status* prior, bool installAgent)
    {
       std::ostringstream o;
       const std::string tool = ToolRef(os, statusPath.substr(0, statusPath.find_last_of("/\\") == std::string::npos ? 0 : statusPath.find_last_of("/\\")));
@@ -519,6 +538,7 @@ if ($Failed -gt 0) { exit 1 }
          o << "# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
          o << "$Exe = " << PsQuote(exe) << "\n$Status = " << PsQuote(statusPath) << "\n";
          o << "$AgentId = " << PsQuote(agent.id) << "\n$AgentName = " << PsQuote(agent.name) << "\n$AgentBin = " << PsQuote(agent.binary) << "\n";
+         o << "$AgentInstall = " << PsQuote(installAgent ? agent.installWin : "") << "\n";
          o << "$Only = @(";
          for (size_t i = 0; i < only.size(); i++)
             o << (i ? ", " : "") << PsQuote(only[i]);
@@ -542,6 +562,7 @@ if ($Failed -gt 0) { exit 1 }
       o << "#!/bin/sh\n# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
       o << "EXE=" << ShQuote(exe) << "\nSTATUS=" << ShQuote(statusPath) << "\n";
       o << "AGENT_ID=" << ShQuote(agent.id) << "\nAGENT_NAME=" << ShQuote(agent.name) << "\nAGENT_BIN=" << ShQuote(agent.binary) << "\n";
+      o << "AGENT_INSTALL=" << ShQuote(installAgent ? agent.installUnix : "") << "\n";
       o << "ONLY='";
       for (size_t i = 0; i < only.size(); i++)
          o << (i ? " " : "") << only[i];
@@ -927,18 +948,13 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
          StageSkills(paths);
          StageTool(paths);
          std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
-         out << BuildScript(os, exe, agent, paths.status);
+         // The script installs a missing agent at step 5, after step 3 has Node: Codex installs with npm.
+         out << BuildScript(os, exe, agent, paths.status, {}, nullptr, true);
          out.close();
          if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
             return fail("could not write " + paths.script);
          const bool win = os == Os::kWindows;
-         std::string line;
-         if (!AgentInstalledHere(agent))
-            line = InstallAgentLine(os, agent) + (win ? "; if ($?) { " : " && ");
-         line += SetupLine(os, paths.script) + (win ? "; if ($LASTEXITCODE -eq 0) { " : " && ") + StartAgentLine(os, exe, agent);
-         if (win)
-            line += std::string(!AgentInstalledHere(agent) ? " }" : "") + " }";
-         run(agent.name, line);
+         run(agent.name, SetupLine(os, paths.script) + (win ? "; if ($LASTEXITCODE -eq 0) { " : " && ") + StartAgentLine(os, exe, agent) + (win ? " }" : ""));
          return true;
       }
       case Action::kRepairStep:

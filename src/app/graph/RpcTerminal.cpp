@@ -3,6 +3,7 @@
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
 #include "app/AppShared.h"
+#include "platform/common/ProcessTree.h"
 
 namespace app
 {
@@ -78,7 +79,7 @@ namespace app
       if (method == "status")
       {
          Transport& tr = Transport::Instance();
-         outResult = { { "patch", gPatchPath }, { "dirty", gPatchDirty }, { "nodes", gNodes.size() }, { "cables", gLinks.size() },
+         outResult = { { "window", ProcessTree::Self() }, { "patch", gPatchPath }, { "dirty", gPatchDirty }, { "nodes", gNodes.size() }, { "cables", gLinks.size() },
                        { "playing", tr.IsPlaying() }, { "seconds", tr.Seconds() }, { "beats", tr.Beats() }, { "bpm", tr.Tempo() },
                        { "showLock", gShowLock } };
          return true;

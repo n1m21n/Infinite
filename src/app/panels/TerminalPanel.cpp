@@ -15,6 +15,7 @@
 #include "imgui_internal.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
+#include "platform/common/ProcessTree.h"
 
 #include <algorithm>
 #include <chrono>
@@ -135,6 +136,7 @@ namespace
       {
          spawn.env.push_back({ "INFINITE_CONTROL_PORT", std::to_string(RemoteControl::Port()) });
          spawn.env.push_back({ "INFINITE_CONTROL_TOKEN", RemoteControl::Token() });
+         spawn.env.push_back({ "INFINITE_SESSION", std::to_string(ProcessTree::Self()) });
       }
    }
 

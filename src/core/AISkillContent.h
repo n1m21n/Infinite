@@ -580,15 +580,51 @@ measure = mod(t * 0.5, 1)
 Put the expression in a patch and run `Infinite --validate patch.inf` (or `infinite patch check patch.inf`). Warnings count as errors. Fix every one before you tell the user it works. With the app running, `infinite context` shows `codeErrors` for what is open right now. Never hand over an expression that has not passed.
 )AISKILL";
 
+   inline const char* kLiveSessionMarkdown = R"AISKILL(---
+name: infinite-live-session
+description: Edit the Infinite window the user has open, live. Use whenever INFINITE_SESSION is set or you run inside Infinite's Terminal, and the user asks to build, change, wire, modulate or fix anything in their patch. Read `infinite context` first; never write a new .inf unless asked.
+---
+
+# Edit the open Infinite window
+
+You are running inside Infinite's Terminal panel. The user is looking at a live patch in that window,
+and every request is about that patch unless they name a file.
+
+1. Run `infinite context` first. It returns the window's status, the selected nodes, every node with
+   its index, and any code errors. Use `infinite params <node>` to see a node's keys and ranges.
+2. Change the patch with live verbs. Each one is applied to the window at once, can be undone, and
+   the user sees it happen:
+
+   | Want | Verb |
+   |---|---|
+   | add a node | `infinite add <Type>` |
+   | wire two nodes | `infinite connect <src[:out]> <dst[:slot]>` |
+   | set a value | `infinite set <node> <key> <value>` |
+   | modulate a value | `infinite mod <src[:out]> <dst> <key> [lo hi]` |
+   | expression on a value | `infinite expr <node> <key> "=sin(t)"` |
+   | many changes, one undo | `infinite batch -` (JSON array of {method, params} on stdin) |
+   | take it back | `infinite undo` |
+
+   A node can be its index or its name, as `infinite context` lists them.
+3. Do not write a new .inf file, and do not run `infinite render` or the headless engine on a copy,
+   unless the user asks for a file. Headless tools never touch the window.
+4. After a change, run `infinite context` again and read `codeErrors` before you say it is done.
+
+If `infinite` says several windows are open and this shell is not inside any of their Terminals,
+tell the user and stop. Do not guess a window.
+)AISKILL";
+
    inline const char* kPatchAuthoringMarkdown =
 R"AISKILL(---
 name: infinite-patch-authoring
-description: "Write, check and render Infinite .inf patches headless. Use whenever the user asks to build, change or debug a patch, wire nodes, add modulation, or render from a patch file."
+description: "Write, check and render Infinite .inf patch files headless. Use when the user asks for a patch file, or to change, debug or render one. Inside Infinite's Terminal (INFINITE_SESSION set) edit the open window with infinite-live-session instead."
 ---
 
 ## When to use (full scope)
 
 Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
+
+Inside Infinite's Terminal (`INFINITE_SESSION` is set) the user means the window they have open: use the `infinite-live-session` skill and its live verbs, and write a file only when they ask for one.
 
 # Authoring Infinite patches headless
 
@@ -764,12 +800,12 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Image to Points` | input:image | out:geometry | 10 | bypass |
 | `Inset` | geo:geometry | out:geometry | 76 | bypass |
 | `Instance on Points` | points:geometry, shape:geometry, cloud:geometry | out:geometry | 25 |  |
-| `Intersect` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
+)AISKILL"
+R"AISKILL(| `Intersect` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
-)AISKILL"
-R"AISKILL(| `Light` | none | out:light | 28 | bypass |
+| `Light` | none | out:light | 28 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
@@ -966,9 +1002,9 @@ R"AISKILL(| `Light` | none | out:light | 28 | bypass |
 | `Envelope` | in:modulator | out:modulator | 13 | bypass |
 | `Face Track` | input:image | present:modulator, head x:modulator, head y:modulator, yaw:modulator, pitch:modulator, roll:modulator, eye L:modulator, eye R:modulator, brows:modulator, mouth:modulator, smile:modulator, gaze x:modulator, gaze y:modulator | 3 | bypass |
 | `Geometry Table` | geo:geometry | cx:modulator, cy:modulator, cz:modulator, spread:modulator, x1:modulator, y1:modulator, z1:modulator, x2:modulator, y2:modulator, z2:modulator, x3:modulator, y3:modulator, z3:modulator, x4:modulator, y4:modulator, z4:modulator | 10 | bypass |
-| `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator, fist:modulator, point:modulator, peace:modulator, thumbs up:modulator, ok:modulator, rock:modulator | 3 | bypass |
 )AISKILL"
-R"AISKILL(| `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
+R"AISKILL(| `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator, fist:modulator, point:modulator, peace:modulator, thumbs up:modulator, ok:modulator, rock:modulator | 3 | bypass |
+| `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
 | `Invert` | in:modulator | out:modulator | 3 | bypass |
 | `LFO` | trig:modulator | out:modulator | 11 | bypass |
 | `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |

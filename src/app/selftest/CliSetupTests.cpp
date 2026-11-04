@@ -120,6 +120,12 @@ namespace app
             const size_t at = line.find("setup.sh");
             check(ran && at != std::string::npos && line.find(" && ", at) != std::string::npos && line.find("claude", at) != std::string::npos,
                   "connect-all: the setup script, then only on success the agent, in one line");
+            std::ifstream cf(real.script);
+            const std::string connect((std::istreambuf_iterator<char>(cf)), std::istreambuf_iterator<char>());
+            check(connect.find("AGENT_INSTALL='curl -fsSL https://claude.ai/install.sh | bash'") != std::string::npos &&
+                  connect.find("AGENT_INSTALL=") < connect.find("begin 5 agent") && connect.find("begin 3 node") < connect.find("sh -c \"$AGENT_INSTALL\""),
+                  "connect-all installs a missing agent at step 5, after Node");
+            check(script.find("AGENT_INSTALL=''") != std::string::npos, "plain setup installs no agent");
          }
          check(line.find("claude mcp get infinite 2>/dev/null | grep -qF \"$A\" ||") != std::string::npos && line.find("-e INFINITE_BIN=\"$A\"") != std::string::npos &&
                line.find("A='/Applications/Infinite'\\''s Dir") != std::string::npos &&
@@ -222,7 +228,7 @@ namespace app
          }
 
          // Skills: three shipped, an edited or deleted one turns the agent step amber.
-         check(Skills().size() == 3 && std::string(Skills()[0].name) == "infinite-patch-authoring", "three AI skills ship, patch authoring first");
+         check(Skills().size() == 4 && std::string(Skills()[0].name) == "infinite-patch-authoring" && std::string(Skills()[3].name) == "infinite-live-session", "four AI skills ship, patch authoring first, live session last");
          const fs::path sk = home / ".claude" / "skills" / "infinite-field-language" / "SKILL.md";
          std::ofstream(sk.string()) << "old";
          check(CheckHealth(in).step[4] == Health::kBroken && std::string(CheckHealth(in).why[4]).find("skill") != std::string::npos, "stale AI skill file: agent step is broken");

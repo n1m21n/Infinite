@@ -660,6 +660,7 @@ set(COMMON_SOURCES
     src/arrange/MidiImport.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
+    src/platform/common/ProcessTree.cpp
     src/core/InfiniteCli.cpp
     src/app/graph/RpcTerminal.cpp
     src/app/graph/RpcApp.cpp
