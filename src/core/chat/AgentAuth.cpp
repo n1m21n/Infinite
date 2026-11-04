@@ -156,6 +156,7 @@ namespace chat
    {
       std::vector<Model> out;
       size_t start = 0;
+      bool first = true;
       while (start < output.size())
       {
          size_t nl = output.find('\n', start);
@@ -163,8 +164,10 @@ namespace chat
             nl = output.size();
          const std::string line = StripAnsi(output.substr(start, nl - start));
          start = nl + 1;
+         const bool header = first;  // the first line names the columns
+         first = false;
          const size_t tab = line.find('\t');
-         if (tab == std::string::npos || tab == 0)
+         if (header || tab == std::string::npos || tab == 0)
             continue;
          Model m;
          m.id = line.substr(0, tab);
