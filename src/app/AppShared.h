@@ -5790,6 +5790,9 @@ bool DrawTerminalWelcome();   // CliSetupSection.cpp
 extern int gTerminalFace;
 void DrawChatPanel();
 bool ChatBusy();   // an agent turn is running
+int ChatSavedCount();
+void ChatClearHistory();   // deletes every saved chat and starts a new one; nothing while a turn runs
+void ChatDrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& agent);   // the agent's tinted initial
 void ChatShutdown();
 // What a terminal tab gets to run `infinite`: the PATH shim and this app's server, and the patch's folder.
 void TerminalCommandEnv(std::vector<std::pair<std::string, std::string>>& env, std::string& cwd);

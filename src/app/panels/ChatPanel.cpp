@@ -2169,6 +2169,26 @@ namespace app
 
    bool ChatBusy() { return !sRuns.empty(); }
 
+   int ChatSavedCount()
+   {
+      if (!sHistoryLoaded)
+         sHistory = chat::ListThreads(ChatsDir()), sHistoryLoaded = true;
+      return (int)sHistory.size();
+   }
+
+   void ChatClearHistory()
+   {
+      if (ChatBusy())
+         return;
+      for (const chat::ThreadInfo& t : chat::ListThreads(ChatsDir()))
+         chat::DeleteThread(ChatsDir(), t.id);
+      sHistory.clear();
+      sHistoryLoaded = true;
+      NewChat();
+   }
+
+   void ChatDrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& agent) { DrawAvatar(dl, centre, radius, agent); }
+
    void ChatShutdown()
    {
       for (Run& r : sRuns)

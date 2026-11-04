@@ -176,7 +176,7 @@ namespace
       return tab;
    }
 
-   // "Start the agent when the Terminal opens" (Settings > Terminal > Command line & agents, off by default):
+   // "Start the agent when the Terminal opens" (Settings > Agents & Terminal, off by default):
    // types the start line into the panel's first tab, only when the agent is installed.
    void StartAgentOnOpen(Tab& tab)
    {

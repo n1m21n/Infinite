@@ -1,4 +1,4 @@
-// Settings > Terminal > "Command line & agents" (docs/plans/terminal/cli-setup.md). Draws what
+// Settings > Agents & Terminal > "Agents" (docs/plans/terminal/cli-setup.md). Draws what
 // CliSetup::Describe() says; reads only status.json, never terminal text, and spawns nothing itself:
 // the buttons hand one line to a new Terminal tab.
 #include "app/AppShared.h"
@@ -85,9 +85,7 @@ namespace app
       const HealthReport health = LatestHealth();
       const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
 
-      FormParts::Section(T("Terminal & coding agent"));
-      ImGui::TextDisabled("%s", T("Connect your coding agent to Infinite. It runs in a Terminal tab you can watch."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+      FormParts::Section(T("Agents"));
 
       static std::string sError;
       auto perform = [&](Action a, const std::string& step = std::string())
@@ -132,7 +130,7 @@ namespace app
                cur = (int)i;
          }
          items.push_back('\0');
-         if (FormParts::Combo(L("Coding agent"), &cur, items.c_str()))
+         if (FormParts::Combo(L("Default agent"), &cur, items.c_str()))
          {
             prefs.agent = Agents()[(size_t)cur].id;
             SaveConfig(paths.config, prefs);
@@ -188,6 +186,66 @@ namespace app
          ImGui::EndDisabled();
          if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
+      }
+
+      // Every agent at a glance: the chat sends to any that is ready, by @name.
+      {
+         static std::vector<Readiness> sReady;
+         static double sReadyAt = -10.0;
+         if (now - sReadyAt > 1.0 || sReady.size() != Agents().size())
+         {
+            sReadyAt = now;
+            sReady.clear();
+            for (const Agent& a : Agents())
+               sReady.push_back(AgentReadiness(a));
+         }
+         FormParts::Label(L("Agents"));
+         const float h = ImGui::GetFrameHeight();
+         for (size_t i = 0; i < Agents().size(); i++)
+         {
+            const Agent& a = Agents()[i];
+            const Readiness& r = sReady[i];
+            if (i > 0)
+               FormParts::Label("");
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h * 0.36f, a.id);
+            ImGui::Dummy(ImVec2(h, h));
+            FormParts::Inline();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(a.name);
+            FormParts::Inline();
+            ImGui::AlignTextToFramePadding();
+            const char* state = r.Ready() ? T("Ready") : !r.installed ? T("Not installed") : !r.connected ? T("Not connected") : T("Sign in");
+            if (r.Ready())
+               ImGui::TextUnformatted(state);
+            else
+               ImGui::TextDisabled("%s", state);
+         }
+      }
+
+      {
+         FormParts::Label(L("Saved chats"));
+         const int count = ChatSavedCount();
+         ImGui::AlignTextToFramePadding();
+         ImGui::Text("%d", count);
+         FormParts::Inline();
+         ImGui::BeginDisabled(count == 0 || ChatBusy());
+         if (FormParts::Button(L("Clear all")))
+            ImGui::OpenPopup("##clearchats");
+         ImGui::EndDisabled();
+         if (ImGui::BeginPopup("##clearchats"))
+         {
+            ImGui::TextUnformatted(T("Delete every saved chat?"));
+            if (FormParts::Button(L("Delete")))
+            {
+               ChatClearHistory();
+               ImGui::CloseCurrentPopup();
+            }
+            FormParts::Inline();
+            if (FormParts::Button(L("Cancel")))
+               ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+         }
       }
 
       FormParts::Label(L("Terminal panel"));
