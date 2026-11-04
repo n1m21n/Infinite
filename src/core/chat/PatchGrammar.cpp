@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <set>
 
 namespace chat
@@ -54,11 +55,17 @@ namespace chat
          t.kind = TokKind::Ref;
          t.b = at;
          const size_t from = at + 1;
-         if (lower.compare(from, 5, "agent") == 0 && (from + 5 >= lower.size() || !WordChar(lower[from + 5])))
+         // `@agent` is the default agent; `@claude`, `@codex`, `@antigravity` name one.
+         for (const char* name : { "agent", "claude", "codex", "antigravity" })
          {
-            t.kind = TokKind::Agent;
-            t.e = from + 5;
-            return t;
+            const size_t n = std::strlen(name);
+            if (lower.compare(from, n, name) == 0 && (from + n >= lower.size() || !WordChar(lower[from + n])))
+            {
+               t.kind = TokKind::Agent;
+               t.e = from + n;
+               t.text = name;
+               return t;
+            }
          }
          size_t best = 0;
          for (const CatalogNode& n : catalog.nodes)
@@ -721,6 +728,7 @@ namespace chat
             s.begin = t.b;
             s.end = t.e;
             s.kind = SpanKind::Agent;
+            s.key = t.text;  // "agent", "claude", "codex" or "antigravity"
             out.spans.push_back(s);
          }
          if (t.kind == TokKind::Word && t.text == "or")

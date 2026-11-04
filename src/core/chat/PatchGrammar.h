@@ -9,7 +9,8 @@
 //   [connect] @a[:out] to @b[:slot]                    connect
 //   add <Type> [after @a]                              create_node (+ connect)
 //   remove @a | bypass @a | unbypass @a | undo | redo
-//   clauses joined by `and` run as one batch; `or` or `@agent` always goes to the agent
+//   clauses joined by `and` run as one batch; `or` or an agent (`@agent`, `@claude`, `@codex`,
+//   `@antigravity`) always goes to the agent
 #include "ChatCatalog.h"
 
 #include "json.hpp"
@@ -26,7 +27,7 @@ namespace chat
       size_t begin = 0, end = 0;  // bytes in the line
       SpanKind kind = SpanKind::Bad;
       int node = -1;    // Node, Param
-      std::string key;  // Param
+      std::string key;  // Param: the key; Agent: "agent", "claude", "codex" or "antigravity"
    };
 
    // What the word at the end of the line is, or the next word would be.

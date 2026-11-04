@@ -588,6 +588,18 @@ namespace Platform
                            false, std::string(), err);
    }
 
+   // The common dialog's multi-select hands back an item array this helper does not read; one file a pick.
+   std::vector<std::string> OpenFilesDialog(const char* title, const std::vector<std::string>& exts)
+   {
+      std::wstring pattern;
+      for (const std::string& e : exts)
+         pattern += (pattern.empty() ? L"*." : L";*.") + WinCommon::Utf8ToWide(e);
+      const std::wstring wtitle = WinCommon::Utf8ToWide(title != nullptr ? title : "Attach files");
+      std::string err;
+      const std::string path = RunOpenDialog(wtitle.c_str(), { { L"Files Infinite opens", pattern.c_str() } }, false, std::string(), err);
+      return path.empty() ? std::vector<std::string>() : std::vector<std::string>{ path };
+   }
+
    std::string OpenMidiDialog()
    {
       std::string err;

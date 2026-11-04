@@ -95,6 +95,53 @@ namespace chat
          else if (type == "turn.failed" || type == "error")
             out.push_back(Event(AgentEvent::Kind::End, Str(j, "message").empty() ? Str(j.value("error", json::object()), "message") : Str(j, "message"), true));
       }
+
+      // `agy --output-format stream-json`: init, step_update per step (user_input, agent_response with
+      // text_delta, tool with tool_info), then result.
+      void Antigravity(const json& j, std::string& reply, std::vector<AgentEvent>& out)
+      {
+         const std::string event = Str(j, "event");
+         if (event == "init")
+            out.push_back(Event(AgentEvent::Kind::Session, Str(j, "conversation_id")));
+         else if (event == "step_update" && j.contains("step_update") && j["step_update"].is_object())
+         {
+            const json& st = j["step_update"];
+            const std::string type = Str(st, "step_type"), state = Str(st, "state");
+            if (type == "agent_response")
+            {
+               reply += Str(st, "text_delta");
+               if (state == "DONE")
+               {
+                  while (!reply.empty() && (reply.back() == '\n' || reply.back() == ' '))
+                     reply.pop_back();
+                  if (!reply.empty())
+                     out.push_back(Event(AgentEvent::Kind::Text, reply));
+                  reply.clear();
+               }
+            }
+            else if (type == "tool")
+            {
+               const json info = st.value("tool_info", json::object());
+               const json params = info.value("parameters", json::object());
+               std::string line = Str(params, "CommandLine");
+               if (line.empty())
+                  line = ToolLine(Str(st, "tool_name"), params);
+               if (state == "ACTIVE")
+                  out.push_back(Event(AgentEvent::Kind::Tool, line));
+               else if (state == "DONE" || state == "ERROR")
+               {
+                  const std::string output = Str(info, "output");
+                  out.push_back(Event(AgentEvent::Kind::ToolResult, output, state == "ERROR" || (output.find("exited with code") != std::string::npos && output.find("exited with code 0") == std::string::npos)));
+               }
+            }
+         }
+         else if (event == "result")
+         {
+            const json r = j.value("result", json::object());
+            const bool ok = Str(r, "status") == "SUCCESS";
+            out.push_back(Event(AgentEvent::Kind::End, ok ? std::string() : Str(r, "response").empty() ? Str(r, "status") : Str(r, "response"), !ok));
+         }
+      }
    }
 
    void AgentStream::Feed(const std::string& bytes, std::vector<AgentEvent>& out)
@@ -122,8 +169,10 @@ namespace chat
          return;  // anything the CLI prints that is not an event
       if (mKind == AgentKind::Claude)
          Claude(j, out);
-      else
+      else if (mKind == AgentKind::Codex)
          Codex(j, out);
+      else
+         Antigravity(j, mReply, out);
    }
 
    namespace
@@ -131,26 +180,55 @@ namespace chat
       // The chat draws `@title#index` and `@title#index.key` as links; the skill's reply rule says the rest.
       const char* const kChatNote =
          "You are answering in Infinite's chat panel, not a terminal. Follow the infinite-live-session reply rule: "
-         "name every node as @title#index and every param as @title#index.key, with values and units. Keep replies short.";
+         "name every node as @title#index and every param as @title#index.key, with values and units. "
+         "The chat already lists every change you made to the patch, so do not repeat them: answer in one or two short "
+         "sentences, show code only when you wrote code, and give the path of any picture you made.";
+      // Antigravity takes only `command(...)` grants; this one lets the turn run `infinite` and nothing else unasked.
+      const char* const kAgySettings = "{\"permissions\":{\"allow\":[\"command(infinite)\"]}}";
    }
 
-   std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume)
+   std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
+                                      const std::vector<std::string>& dirs)
    {
+      if (kind == AgentKind::Antigravity)
+      {
+         // No system-prompt flag: the note leads the first message. The prompt follows -p directly.
+         std::vector<std::string> a = { "agy", "--output-format", "stream-json", "--settings", kAgySettings };
+         for (const std::string& d : dirs)
+            a.insert(a.end(), { "--add-dir", d });
+         if (resume && !session.empty())
+            a.insert(a.end(), { "--conversation", session });
+         a.insert(a.end(), { "-p", resume ? prompt : std::string("[") + kChatNote + "]\n\n" + prompt });
+         return a;
+      }
       if (kind == AgentKind::Codex)
       {
+         // Codex reads anywhere in its default sandbox; the paths in the prompt are enough.
          std::vector<std::string> a = { "codex", "exec", "--json" };
          if (resume && !session.empty())
             a.insert(a.end(), { "resume", session });
          a.push_back(prompt);
          return a;
       }
-      // --allowedTools takes several values, so another option follows it and `--` ends options.
-      return { "claude", "-p", "--allowedTools", "Bash(infinite:*)", "--output-format", "stream-json", "--verbose",
-               "--append-system-prompt", kChatNote, resume ? "--resume" : "--session-id", session, "--", prompt };
+      // --allowedTools and --add-dir take several values, so another option follows each and `--` ends options.
+      std::vector<std::string> a = { "claude", "-p" };
+      if (!dirs.empty())
+      {
+         a.push_back("--add-dir");
+         a.insert(a.end(), dirs.begin(), dirs.end());
+      }
+      a.insert(a.end(), { "--allowedTools", "Bash(infinite:*)" });
+      if (!dirs.empty())
+         a.push_back("Read");
+      a.insert(a.end(), { "--output-format", "stream-json", "--verbose", "--append-system-prompt", kChatNote,
+                          resume ? "--resume" : "--session-id", session, "--", prompt });
+      return a;
    }
 
    std::string TerminalResumeLine(AgentKind kind, const std::string& session)
    {
+      if (kind == AgentKind::Antigravity)
+         return "agy --conversation " + session;
       return kind == AgentKind::Codex ? "codex resume " + session : "claude --resume " + session;
    }
 }

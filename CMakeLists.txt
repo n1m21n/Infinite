@@ -534,6 +534,9 @@ set(COMMON_SOURCES
     src/core/chat/PatchGrammar.cpp
     src/core/chat/ReplyLinks.cpp
     src/core/chat/AgentRun.cpp
+    src/core/chat/ChatDiff.cpp
+    src/core/chat/ChatFiles.cpp
+    src/core/chat/ChatThread.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp

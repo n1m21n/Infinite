@@ -1,6 +1,6 @@
 #pragma once
 // One agent turn as a child process (docs/plans/agent-collab/README.md C5). The child runs through the
-// user's login shell so their PATH finds `claude` or `codex`; a reader thread parses its stream-json
+// user's login shell so their PATH finds `claude`, `codex` or `agy`; a reader thread parses its stream-json
 // and the main thread takes the events each frame. Never blocks the caller.
 #include "AgentStream.h"
 

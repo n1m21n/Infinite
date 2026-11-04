@@ -659,6 +659,8 @@ if ($Failed -gt 0) { exit 1 }
          c.agent = agent;
       c.autoStart = j.value("autoStart", false);
       c.welcomed = j.value("welcomed", false);
+      if (const std::string face = j.value("face", std::string()); face == "chat" || face == "terminal")
+         c.face = face;
       return c;
    }
 
@@ -666,7 +668,7 @@ if ($Failed -gt 0) { exit 1 }
    {
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
-      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed } }.dump(2) << "\n";
+      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face } }.dump(2) << "\n";
    }
 
    namespace
@@ -826,6 +828,36 @@ if ($Failed -gt 0) { exit 1 }
       }).detach();
    }
 
+   Readiness AgentReadiness(const Agent& agent)
+   {
+      const Os os = CurrentOs();
+      const char* homeEnv = getenv(os == Os::kWindows ? "USERPROFILE" : "HOME");
+      const char* pathEnv = getenv("PATH");
+      const char* local = getenv("LOCALAPPDATA");
+      HealthInput in;
+      in.os = os;
+      in.home = homeEnv != nullptr ? homeEnv : "";
+      in.pathEnv = pathEnv != nullptr ? pathEnv : "";
+      in.exe = RealExecutable();
+      in.recordFile = PathsFor(AppPaths::AppSupportDir(), os).record;
+      in.binDir = os == Os::kWindows ? std::string(local != nullptr ? local : "") + "/Infinite/bin" : in.home + "/.local/bin";
+      in.agent = &agent;
+      Readiness r;
+      r.installed = AgentInstalled(os, agent, in.home, in.pathEnv);
+      const HealthReport h = CheckHealth(in);
+      r.connected = r.installed && h.step[0] == Health::kOk && h.step[2] == Health::kOk && h.step[4] == Health::kOk;
+      // Each agent keeps its login in its own file; an API key in the environment works as well.
+      const std::string id = agent.id;
+      auto env = [](const char* name) { const char* v = getenv(name); return v != nullptr && v[0] != '\0'; };
+      if (id == "claude")
+         r.signedIn = ReadAll(in.home + "/.claude.json").find("\"oauthAccount\"") != std::string::npos || env("ANTHROPIC_API_KEY");
+      else if (id == "codex")
+         r.signedIn = IsFile(in.home + "/.codex/auth.json") || env("OPENAI_API_KEY");
+      else if (id == "antigravity")
+         r.signedIn = IsFile(in.home + "/.gemini/jetski-standalone-oauth-token") || env("GEMINI_API_KEY");
+      return r;
+   }
+
    HealthReport LatestHealth()
    {
       std::lock_guard<std::mutex> lock(gHealthMutex);
@@ -937,6 +969,7 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
          run("Infinite setup", SetupLine(os, paths.script));
          return true;
       }
+      case Action::kSetupAgent:
       case Action::kConnectAll:
       {
          // One tab, start to finish: install the agent if it is missing, run the setup script, and only when
@@ -953,6 +986,11 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
          out.close();
          if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
             return fail("could not write " + paths.script);
+         if (action == Action::kSetupAgent)
+         {
+            run(agent.name, SetupLine(os, paths.script));
+            return true;
+         }
          const bool win = os == Os::kWindows;
          run(agent.name, SetupLine(os, paths.script) + (win ? "; if ($LASTEXITCODE -eq 0) { " : " && ") + StartAgentLine(os, exe, agent) + (win ? " }" : ""));
          return true;

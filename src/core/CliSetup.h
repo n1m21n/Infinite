@@ -88,6 +88,7 @@ namespace CliSetup
       std::string agent = "claude";
       bool autoStart = false;
       bool welcomed = false; // the Terminal welcome has been dismissed once
+      std::string face = "chat";  // what the Terminal panel opens to: "chat" or "terminal"
    };
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);
@@ -114,8 +115,19 @@ namespace CliSetup
    void StartLaunchCheck();
    HealthReport LatestHealth();
 
+   // Can the chat use this agent now? File probes only, real HOME and PATH. `connected`: the launcher, Node
+   // and the agent's MCP registration and skills hold. `signedIn`: the agent's own login file or API key.
+   struct Readiness
+   {
+      bool installed = false, connected = false, signedIn = false;
+      bool Ready() const { return installed && connected && signedIn; }
+   };
+   Readiness AgentReadiness(const Agent& agent);
+
    // What the page shows. Everything it draws and every button comes from here.
-   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep, kConnectAll };  // kConnectAll: install if missing, set up, then start the agent, in one tab
+   // kConnectAll: install if missing, set up, then start the agent, in one tab. kSetupAgent: install if
+   // missing and set up, no start, for a runner that has no terminal (the chat runs it in the background).
+   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep, kConnectAll, kSetupAgent };
    struct View
    {
       std::vector<StepStatus> steps;
