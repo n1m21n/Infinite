@@ -3418,6 +3418,8 @@ namespace
       d.invert = ImGui::GetIO().KeyCtrl;
       d.symmetry = sSculpt.symmetry;
       SculptAlpha(node, world, d);
+      d.areaNormals = node->StrokeNormals();
+      node->StrokeStep(c, d.dir);
       static std::vector<unsigned int> touched;
       touched.clear();
       const Sculpt::Grid* grid = node->PointGrid(d.radius);
@@ -3515,7 +3517,8 @@ namespace
          else
          {
             // Dabs along the drag.
-            const float step = std::max(2.0f, sSculpt.radius * 0.15f);
+            const bool smoothing = sSculpt.brush == Sculpt::kSmooth || ImGui::GetIO().KeyShift;
+            const float step = std::max(2.0f, sSculpt.radius * (smoothing ? 0.15f : 0.2f));   // Blender's 10% of the diameter; Smooth is tuned denser
             const float dist = std::hypot(mouse.x - sSculpt.last.x, mouse.y - sSculpt.last.y);
             const int n = (int)(dist / step);
             const ImVec2 from = sSculpt.last;

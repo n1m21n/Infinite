@@ -156,3 +156,35 @@ reference, AO 512, 16 rays, reach 0.25:
 
 Mean error alone missed the banding (the bands average out), so read the
 sheet (truth, Blender bake, Infinite, diff x4) before the number.
+
+### Sculpt A/B vs Blender (2026-11-04)
+
+`tools/blender-ab/sculpt.py`, error vs Blender's brush, lower is closer, target < 0.25.
+
+| Case | Before | After |
+|---|---|---|
+| sculpt_draw | 0.280 | 0.000 |
+| sculpt_inflate | 0.200 | 0.003 |
+| sculpt_crease | 0.314 | 0.000 |
+| sculpt_pinch | 0.813 | 0.056 |
+| sculpt_flatten | 0.241 | 0.238 |
+| sculpt_smooth | 0.275 | 0.275 |
+| sculpt_deer | 0.415 | 0.253 |
+| drag_draw | 0.553 | 0.045 |
+| drag_inflate | 0.254 | 0.222 |
+| drag_smooth | 0.034 | 0.034 |
+| drag_crease | 0.512 | 0.032 |
+| drag_pinch | 0.656 | 0.091 |
+| drag_flatten | 0.496 | 0.465 |
+
+What changed: draw, inflate and crease use Blender's alpha-squared strength;
+crease pinches by a fixed 0.25; pinch pulls across the stroke and skips a dab
+with no direction; the area normal is frozen at stroke start; drag dabs sit
+0.2 radius apart (Smooth keeps 0.15); flatten strength 0.64.
+
+Not under 0.25: drag_flatten (0.465). The gain now matches (0.94); what is left
+is the plane. Blender fits it from an area-weighted centre and normal
+(radius 1.0 / 0.75) and accumulates it over the stroke; ours uses the
+stroke-start normal and each dab's centre. sculpt_smooth (0.275, gain 1.29)
+and sculpt_deer (0.253) sit just over; Smooth's falloff differs from Blender's
+and was left alone (drag_smooth is 0.034).

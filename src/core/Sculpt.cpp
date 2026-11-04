@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <unordered_map>
 
@@ -109,8 +110,9 @@ namespace Sculpt
       }
 
       Area Gather(const float c[3], float radius, const std::vector<float>& pos, const std::vector<float>& nrm,
-                  const Topology& t, bool sharp, const Grid* grid)
+                  const Topology& t, bool sharp, const Grid* grid, const std::vector<float>* areaNrm = nullptr)
       {
+         const std::vector<float>& an = areaNrm != nullptr && areaNrm->size() == nrm.size() ? *areaNrm : nrm;
          Area a;
          float wsum = 0.0f;
          const float r2 = radius * radius;
@@ -126,7 +128,7 @@ namespace Sculpt
                f *= f;
             for (int k = 0; k < 3; k++)
             {
-               a.normal[k] += nrm[(size_t)i * 3 + k] * f;
+               a.normal[k] += an[(size_t)i * 3 + k] * f;
                a.center[k] += p[k] * f;
             }
             wsum += f;
@@ -647,11 +649,27 @@ namespace Sculpt
          return;
       const float s = std::clamp(d.strength, 0.0f, 1.0f) / amount;
       const float sign = d.invert ? -1.0f : 1.0f;
+      const float st = std::clamp(d.strength, 0.0f, 1.0f);
       for (int m : Passes(d.symmetry))
       {
          float c[3];
          Flip(d.center, m, c);
-         Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid);
+         Area a = Gather(c, d.radius, pos, nrm, t, false, grid, d.areaNormals);
+         // Pinch gathers towards the line along the stroke: the pull is across it (and along the normal).
+         float across[3] = { 0, 0, 0 };
+         if (d.brush == kPinch)
+         {
+            float dir[3];
+            Flip(d.dir, m, dir);
+            across[0] = a.normal[1] * dir[2] - a.normal[2] * dir[1];
+            across[1] = a.normal[2] * dir[0] - a.normal[0] * dir[2];
+            across[2] = a.normal[0] * dir[1] - a.normal[1] * dir[0];
+            const float len = std::sqrt(across[0] * across[0] + across[1] * across[1] + across[2] * across[2]);
+            if (len < 1e-9f)
+               continue;
+            for (int k = 0; k < 3; k++)
+               across[k] /= len;
+         }
          if (d.alpha != nullptr)
             for (size_t e = 0; e < a.idx.size(); e++)
                a.f[e] *= AlphaAt(d, &pos[(size_t)a.idx[e] * 3], c, m);
@@ -668,12 +686,14 @@ namespace Sculpt
             switch (d.brush)
             {
                case kDraw:
+                  // Blender: radius * strength squared along the area normal.
                   for (int k = 0; k < 3; k++)
-                     move[k] = a.normal[k] * d.radius * 0.36f * f * sign;
+                     move[k] = a.normal[k] * d.radius * st * st * f * sign;
                   break;
                case kInflate:
+                  // Blender: a quarter of draw's, and half that again when deflating.
                   for (int k = 0; k < 3; k++)
-                     move[k] = n[k] * d.radius * 0.1f * f * sign;
+                     move[k] = n[k] * d.radius * 0.25f * st * st * f * sign * (sign < 0.0f ? 0.5f : 1.0f);
                   break;
                case kSmooth:
                {
@@ -690,18 +710,24 @@ namespace Sculpt
                   break;
                }
                case kPinch:
+               {
+                  const float to[3] = { c[0] - p[0], c[1] - p[1], c[2] - p[2] };
+                  const float x = to[0] * across[0] + to[1] * across[1] + to[2] * across[2];
+                  const float z = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
+                  for (int k = 0; k < 3; k++)
+                     move[k] = (across[k] * x + a.normal[k] * z) * d.strength * f * sign;
+                  break;
+               }
                case kCrease:
                {
                   float to[3] = { c[0] - p[0], c[1] - p[1], c[2] - p[2] };
                   const float along = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
                   for (int k = 0; k < 3; k++)
                      to[k] -= a.normal[k] * along;
-                  const float pull = d.brush == kPinch ? 0.27f : 0.8f;
+                  // Blender: the pinch is the brush's pinch factor squared whatever the strength, the dig
+                  // is radius * strength squared. Both are in final units, so Stroke does not scale them.
                   for (int k = 0; k < 3; k++)
-                     move[k] = to[k] * pull * f * (d.brush == kPinch ? sign : 1.0f);
-                  if (d.brush == kCrease)
-                     for (int k = 0; k < 3; k++)
-                        move[k] -= a.normal[k] * d.radius * 0.48f * f * sign;
+                     move[k] = (to[k] * 0.25f - a.normal[k] * d.radius * st * st * sign) * f;
                   break;
                }
                case kFlatten:
@@ -709,14 +735,14 @@ namespace Sculpt
                   const float h = (p[0] - a.center[0]) * a.normal[0] + (p[1] - a.center[1]) * a.normal[1] +
                                   (p[2] - a.center[2]) * a.normal[2];
                   for (int k = 0; k < 3; k++)
-                     move[k] = -a.normal[k] * h * 0.56f * f * sign;
+                     move[k] = -a.normal[k] * h * (0.64f * st) * f * sign;
                   break;
                }
                default:
                   break;
             }
             // Smooth already scales by strength above; the rest scale here.
-            const float scale = d.brush == kSmooth ? 1.0f / amount : s;
+            const float scale = d.brush == kSmooth || d.brush == kCrease || d.brush == kDraw || d.brush == kInflate || d.brush == kFlatten ? 1.0f / amount : s;
             for (int k = 0; k < 3; k++)
                o[k] += move[k] * scale;
          }

@@ -103,7 +103,11 @@ public:
    // climbing after it.
    bool Raycast(const float o[3], const float d[3], float& t);
    void BeginStroke();
+   // The points' normals as the stroke began (null outside a stroke).
+   const std::vector<float>* StrokeNormals() const { return mStrokeNrm.empty() ? nullptr : &mStrokeNrm; }
    void EndStroke();
+   // The move from the stroke's previous dab to c (false, dir zero, at the first); c becomes the previous.
+   bool StrokeStep(const float c[3], float dir[3]);
    std::vector<float>& Offsets() { return mOffsets; }
    // After editing Offsets(). With the points a dab touched, only the mesh
    // around them is re-shaped.
@@ -143,5 +147,8 @@ private:
    Sculpt::Grid mGrid;
    std::vector<unsigned int> mChanged;
    Mesh mStrokeMesh;
+   std::vector<float> mStrokeNrm;
+   float mStrokeLast[3] = { 0, 0, 0 };
+   bool mStrokeHasLast = false;
    Sculpt::Grid mStrokeGrid;
 };
