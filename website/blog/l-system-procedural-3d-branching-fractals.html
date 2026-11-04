@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'midnight';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>L-System Procedural 3D Branching and Fractals | Infinite</title>
+  <meta name="description" content="How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/l-system-procedural-3d-branching-fractals.html">
+  <meta property="og:title" content="L-System Procedural 3D Branching and Fractals | Infinite">
+  <meta property="og:description" content="How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_l_system_procedural_3d_branching_fractals.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/l-system-procedural-3d-branching-fractals.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="L-System Procedural 3D Branching and Fractals | Infinite">
+  <meta name="twitter:description" content="How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_l_system_procedural_3d_branching_fractals.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=34878888">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "L-system procedural 3D branching and fractal generation", "description": "How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.", "datePublished": "2026-11-04", "dateModified": "2026-11-04", "mainEntityOfPage": "https://infinitedevices.org/blog/l-system-procedural-3d-branching-fractals.html", "url": "https://infinitedevices.org/blog/l-system-procedural-3d-branching-fractals.html", "image": ["https://infinitedevices.org/assets/blog_l_system_procedural_3d_branching_fractals.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "l-system, procedural 3d, generative art, creative coding, fractals", "wordCount": 2334, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "L-system procedural 3D branching and fractal generation", "item": "https://infinitedevices.org/blog/l-system-procedural-3d-branching-fractals.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn share-btn" aria-label="Share this page" title="Share"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12.5V3.5M6.8 6.5L10 3.3l3.2 3.2M5.5 9H5a1.5 1.5 0 00-1.5 1.5v5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5v-5A1.5 1.5 0 0015 9h-.5"/></svg></button>
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn" aria-label="GitHub repository" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>L-system procedural 3D branching and fractal generation</h1>
+          <p class="post-lede">How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">4 November 2026 · 11 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/blog_l_system_procedural_3d_branching_fractals.png" alt="L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#formal-grammars-and-parallel-rewriting">Formal grammars and parallel rewriting</a></li><li><a href="#turtle-geometry-in-three-dimensions">Turtle geometry in three dimensions</a></li><li><a href="#tube-extrusion-and-branching-radii">Tube extrusion and branching radii</a></li><li><a href="#dual-mesh-and-polyline-representations">Dual mesh and polyline representations</a></li><li><a href="#real-time-audio-modulation-and-kinetic-foliage">Real-time audio modulation and kinetic foliage</a></li><li><a href="#composing-procedural-scenes-in-infinite">Composing procedural scenes in Infinite</a></li><li><a href="#algorithmic-variations-and-botanical-grammars">Algorithmic variations and botanical grammars</a></li><li><a href="#summary">Summary</a></li></ol></details>
+        <div class="prose">
+<p>An l-system procedural 3d branching architecture brings the algorithmic elegance of formal rewriting grammars into real-time computer graphics and modular audiovisual performance. In traditional generative design, procedural geometry often relies on explicit loops, mathematical trigonometric functions, or Perlin noise fields. While noise produces organic displacement and sine waves yield predictable oscillation, neither method captures the developmental morphology of living organisms: structured self-similarity, hierarchical vascular branching, and recursive form unfolding across space and time.</p>
+<p>In modular workstations like <a href="https://infinitedevices.org/">Infinite</a>, the Lindenmayer system bridges formal language theory, three-dimensional geometry, and live sound design. By evaluating production rules inside a native <code>L-System</code> node, creative coders can grow intricate botanical canopies, generate procedural coral and crystal formations, and modulate geometric growth parameters live using incoming audio frequencies.</p>
+<p>Here is how Lindenmayer grammars operate, how three-dimensional turtle geometry navigates space, how branch strands are swept into watertight polygonal tubes, and how to patch audio-reactive procedural trees on a unified canvas.</p>
+<figure><img src="https://infinitedevices.org/assets/blog_l_system_procedural_3d_branching_fractals.png" alt="L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph" width="1200" height="675" loading="lazy" decoding="async"><figcaption>L-system procedural 3D branching diagram showing rewrite grammar, turtle orientation vectors, tree hierarchy, and node graph</figcaption></figure>
+<h2 id="formal-grammars-and-parallel-rewriting">Formal grammars and parallel rewriting</h2>
+<p>The mathematical foundation of Lindenmayer systems was developed in 1968 by Hungarian theoretical biologist and botanist Aristid Lindenmayer. Originally formulated to study the growth patterns of multicellular algae, mosses, and vascular plants, L-systems belong to the family of formal rewriting grammars.</p>
+<p>In classical Chomsky grammars used across compiler design, production rules are applied sequentially, replacing one non-terminal symbol at a time. In contrast, an L-system applies its replacement rules in parallel across every symbol in the string simultaneously. This parallel replacement reflects biological cell division, where multiple biological structures grow and divide at the same physical instant.</p>
+<p>A deterministic context-free L-system (known formally as a DOL-system) is defined by three components:</p>
+<ol><li>Alphabet: A finite set of formal symbols <code>V</code> containing characters that can be replaced or walked by a geometry interpreter.</li><li>Axiom: An initial seed string <code>omega</code> of symbols chosen from <code>V</code> that defines the starting state of the organism.</li><li>Production rules: A mapping <code>P</code> that associates predecessor characters with successor replacement strings.</li></ol>
+<p>Consider the canonical branching plant grammar:</p>
+<pre><code class="language-text">Axiom: X
+Rules: X = F+[[X]-X]-F[-FX]+X; F = FF</code></pre>
+<p>During generation zero, the system state consists solely of the axiom <code>X</code>. In the first generation, the production rule replaces <code>X</code> with its successor:</p>
+<pre><code class="language-text">Generation 0: X
+Generation 1: F+[[X]-X]-F[-FX]+X
+Generation 2: FF+[[F+[[X]-X]-F[-FX]+X]-F+[[X]-X]-F[-FX]+X]-FF[-FFF+[[X]-X]-F[-FX]+X]+F+[[X]-X]-F[-FX]+X</code></pre>
+<p>As iterations advance, the length of the string increases exponentially. In the native <code>L-System</code> node inside Infinite, string expansion is governed by safety caps:</p>
+<ul><li>The maximum number of generations is bounded by <code>kMaxIterations = 10</code>.</li><li>The total rewritten symbol buffer is capped at <code>kMaxSymbols = 200000</code>.</li></ul>
+<p>If a grammar expands beyond the symbol limit, rewriting terminates cleanly and issues a diagnostic notification. This safety ceiling guarantees that complex grammars never exhaust host memory or block real-time rendering during live performances.</p>
+<h2 id="turtle-geometry-in-three-dimensions">Turtle geometry in three dimensions</h2>
+<p>Once a string of symbols is rewritten, it must be translated into spatial form. This translation is performed by a three-dimensional turtle geometry interpreter, extending Seymour Papert's original two-dimensional Logo turtle into Cartesian space.</p>
+<p>The turtle maintains an internal state consisting of a spatial position <code>(px, py, pz)</code> and three mutually orthogonal unit vectors that form an orthonormal frame in three dimensions:</p>
+<ul><li>Heading vector <code>H</code>: points in the direction the turtle is currently facing and moving forward.</li><li>Left vector <code>L</code>: points to the local left side of the turtle.</li><li>Up vector <code>U</code>: points along the local normal vector perpendicular to the heading and left vectors.</li></ul>
+<p>The orientation triad satisfies the cross-product relationship:</p>
+<pre><code class="language-text">H x L = U</code></pre>
+<p>As the interpreter parses the rewritten symbol string from left to right, each character commands the turtle to move or reorient its local frame:</p>
+<ul><li><code>F</code>: Move forward by the current step length while drawing geometry.</li><li><code>f</code>: Move forward by the current step length without drawing geometry, creating intentional structural gaps.</li><li><code>+</code>: Turn left by the branching angle, spinning vectors <code>H</code> and <code>L</code> around axis <code>U</code>.</li><li><code>-</code>: Turn right by the branching angle, spinning vectors <code>H</code> and <code>L</code> in the opposite direction around axis <code>U</code>.</li><li><code>&amp;amp;</code>: Pitch down by the branching angle, spinning vectors <code>H</code> and <code>U</code> around axis <code>L</code>.</li><li><code>^</code>: Pitch up by the branching angle, spinning vectors <code>H</code> and <code>U</code> in the opposite direction around axis <code>L</code>.</li><li><code>\</code>: Roll left by the branching angle, spinning vectors <code>L</code> and <code>U</code> around axis <code>H</code>.</li><li><code>/</code>: Roll right by the branching angle, spinning vectors <code>L</code> and <code>U</code> in the opposite direction around axis <code>H</code>.</li><li><code>|</code>: Reverse direction by 180 degrees, inverting the heading vector.</li></ul>
+<p>Because repeated floating-point matrix rotations accumulate subtle numerical errors over thousands of symbols, Infinite executes an orthonormal renormalisation step following each rotation:</p>
+<pre><code class="language-cpp">void Renormalize(Turtle&amp; t)
+{
+   float* v[3] = { t.h, t.l, t.u };
+   for (float* x : v)
+   {
+      const float len = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+      if (len &gt; 1e-6f)
+         for (int i = 0; i &lt; 3; i++)
+            x[i] /= len;
+   }
+}</code></pre>
+<p>This normalisation guarantees that the turtle orientation vectors never shear or collapse, maintaining geometric fidelity across deep recursive iterations.</p>
+<h3 id="branching-stacks-and-hierarchical-state">Branching stacks and hierarchical state</h3>
+<p>Botanical forms require branching structures where subsidiary twigs diverge from parent boles while preserving the original growth trajectory. In L-systems, this hierarchy is encoded through pushdown automata symbols:</p>
+<ul><li><code>[</code>: Push the current turtle state onto a lifo stack. The saved state includes spatial coordinates <code>(px, py, pz)</code>, orientation frame vectors <code>H</code>, <code>L</code>, <code>U</code>, current branch radius, and current step length. The branch radius is then multiplied by <code>radiusScale</code>, and the step length is multiplied by <code>lengthScale</code>.</li><li><code>]</code>: Terminate the active branch and pop the saved turtle state from the stack, restoring the parent branch position, frame orientation, radius, and step length.</li></ul>
+<p>Through this stack mechanism, a single linear string encodes complex tree canopies with nested sub-branches of proportional thickness and length.</p>
+<h2 id="tube-extrusion-and-branching-radii">Tube extrusion and branching radii</h2>
+<p>Drawing wireframe polylines produces an informative schematic, but visual rendering demands solid three-dimensional geometry with surface normals, cross-sectional volume, and UV mapping for material shaders.</p>
+<p>The native <code>L-System</code> node solves this by sweeping each continuous branch strand into a watertight polygonal cylinder via <code>MeshOps::TubeAlong</code>.</p>
+<pre><code class="language-text">Strand points -&gt; Cylindrical cross-sections -&gt; Triangular quad strips -&gt; Watertight mesh</code></pre>
+<p>Key physical parameters govern this mesh synthesis:</p>
+<ul><li><code>sides</code>: Controls the radial polygon count of the cross-sections, adjustable between 3 (producing low-poly crystalline trunks) and 24 (producing smooth organic boughs).</li><li><code>radius</code>: Sets the absolute base radius of the primary trunk.</li><li><code>radiusScale</code>: The geometric multiplier applied to <code>radius</code> each time a sub-branch is pushed with <code>[</code>. A value of <code>0.75</code> ensures parent limbs are sturdier than daughter branches, mirroring Leonardo da Vinci's botanical rule of trees.</li><li><code>taper</code>: Governs linear narrowing along the length of each strand segment, ensuring branches taper toward their terminal buds rather than ending abruptly as blunt cylinders.</li><li><code>length</code> and <code>lengthScale</code>: Control the physical reach of the primary trunk and the rate at which daughter twigs shorten toward the perimeter.</li></ul>
+<p>To prevent GPU memory saturation during live performances, Infinite enforces a hard cap of <code>kMaxStrands = 6000</code> extruded tubes. Any additional branches beyond this limit remain present in the polyline curve but are excluded from polygonal mesh extrusion.</p>
+<h2 id="dual-mesh-and-polyline-representations">Dual mesh and polyline representations</h2>
+<p>A distinctive design decision of the <code>L-System</code> node is its dual output contract: it concurrently provides both a three-dimensional polygonal <code>Mesh</code> and a continuous three-dimensional <code>Polyline</code>.</p>
+<pre><code class="language-text">L-System Node
+  ├── GetMesh()  -&gt; Watertight 3D polygonal geometry (tubes, vertices, normals, UVs)
+  └── GetCurve() -&gt; Continuous 3D polyline path (reconstructed traversal points)</code></pre>
+<p>This dual pipeline opens versatile creative workflows:</p>
+<ol><li>Polygonal mesh rendering: The mesh connects directly to standard 3D rendering pipelines, accepting PBR materials, casting shadow maps, and responding to scene lighting.</li><li>Path tracking and camera choreography: The <code>Polyline</code> output connects to the <code>Path</code> node. Because the turtle traverses the tree in deterministic order, a <code>Camera 3D</code> can be constrained to glide along the polyline path, flying smoothly through the interior vascular channels of the fractal tree canopy.</li><li>Particle flow guides: Downstream simulation nodes can distribute emitters or flow particles along the polyline curve, creating glowing sap rising through procedural veins.</li></ol>
+<h2 id="real-time-audio-modulation-and-kinetic-foliage">Real-time audio modulation and kinetic foliage</h2>
+<p>Because Infinite evaluates its node graph in real time, the parameters of the <code>L-System</code> node can be dynamically modulated by audio analysis or control signals. Unlike pre-rendered 3D assets, a procedural grammar can breathe and pulse in direct synchronisation with music.</p>
+<p>Consider the following audio-reactive modulation pairings:</p>
+<h3 id="modulating-branching-angles-with-frequency-bands">Modulating branching angles with frequency bands</h3>
+<p>By connecting the low-frequency band of an <code>Audio Analyze</code> node to the <code>angle</code> parameter of <code>L-System</code>, the physical divergence of the tree branches expands and contracts in response to bass transients:</p>
+<ul><li>At quiet moments (<code>angle = 18.0</code>), branches align closely with the primary trunk, producing a slender, dormant cypress form.</li><li>On heavy kick drum or bass hits (<code>angle = 38.0</code>), branches fan outward into an open, blossoming canopy.</li></ul>
+<p>Because changing the branching angle preserves the total number of vertices and triangles, angle modulation incurs zero memory allocation overhead, running at full display frame rates without dropped frames.</p>
+<h3 id="modulating-length-and-scale-with-melodic-envelopes">Modulating length and scale with melodic envelopes</h3>
+<p>Connecting mid-range or high-frequency energy to <code>lengthScale</code> dynamically alters the density of the outer foliage. When a synth arpeggio or percussion roll plays, outer branches extend outward and recoil, giving the tree an organic breathing kinetic presence.</p>
+<h3 id="modulating-growth-iterations-across-musical-sections">Modulating growth iterations across musical sections</h3>
+<p>The <code>iterations</code> parameter governs structural complexity. Routing a slow step sequencer or an arrangement automation curve to <code>iterations</code> allows a seed to sprout at generation 1 during an ambient intro, expand to generation 3 in the first verse, and erupt into a fully unfurled generation 5 fractal canopy at the musical drop.</p>
+<h2 id="composing-procedural-scenes-in-infinite">Composing procedural scenes in Infinite</h2>
+<p>To assemble a finished audiovisual composition, the <code>L-System</code> node is wired into the standard 3D rendering graph alongside lighting and camera nodes.</p>
+<pre><code class="language-text">Audio In ──────────&gt; Audio Analyze ──[Low Band]──&gt; Math ──&gt; L-System (angle)
+                                                               │
+                                                         [Mesh Output]
+                                                               │
+Light 3D ──&gt; Scene 3D ─────────────────────────────────────&gt; Material ──&gt; Render 3D ──&gt; Viewport
+                                                                            ▲
+Camera 3D ──────────────────────────────────────────────────────────────────┘</code></pre>
+<p>Here is the step-by-step assembly process:</p>
+<ol><li>Add the audio chain: Place an <code>Audio In</code> node, wire it into <code>Audio Analyze</code>, and extract the <code>low</code> output band. Route this through a <code>Math</code> node to map incoming zero-to-one signal ranges into the desired angular span, such as <code>20.0</code> to <code>40.0</code> degrees.</li><li>Add the generator: Place an <code>L-System</code> node. Connect the scaled audio signal into the <code>angle</code> parameter input. Set the <code>axiom</code> to <code>X</code> and <code>rules</code> to <code>X=F+[[X]-X]-F[-FX]+X;F=FF</code>. Set <code>iterations</code> to 4 or 5.</li><li>Apply materials: Wire the mesh output into a <code>Material</code> node. Assign a deep organic albedo colour, set <code>roughness</code> to <code>0.65</code> for natural wood scattering, and configure a subtle emissive tint modulated by high-frequency audio energy.</li><li>Set up lighting and camera: Connect the material into a <code>Render 3D</code> node. Add a <code>Camera 3D</code> positioned at <code>(0.0, 1.5, 4.0)</code> targeting the centre of the tree canopy. Add two <code>Light 3D</code> nodes: a warm directional key light and a cool cyan rim light to highlight branch contours against the dark ground.</li><li>Combine with shaders: In Infinite, you can pair 3D geometry with 2D post-processing. Take the render output and composite it with background gradients or <a href="https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html">real-time GLSL shaders</a> for depth of field and atmospheric haze.</li></ol>
+<p>To explore pre-configured templates and community patches featuring procedural geometry, visit the <a href="https://infinitedevices.org/library.html">patch library</a>.</p>
+<h2 id="algorithmic-variations-and-botanical-grammars">Algorithmic variations and botanical grammars</h2>
+<p>The flexibility of Lindenmayer systems lies in their grammatical versatility. By modifying the axiom and replacement rules, the exact same node architecture generates fundamentally distinct natural forms.</p>
+<h3 id="classic-3d-bush">Classic 3D bush</h3>
+<p>This classic grammar produces balanced spherical shrubbery with uniform outward branching:</p>
+<pre><code class="language-text">Axiom: A
+Rules: A = [&amp;+F[A]][&amp;-F[A]][^+F[A]][^-F[A]]; F = FF
+Angle: 28.0</code></pre>
+<p>The four-way branch split combines pitch (<code>&amp;amp;</code>, <code>^</code>) and yaw (<code>+</code>, <code>-</code>) rotations, producing full three-dimensional volumetric foliage.</p>
+<h3 id="monopodial-pine-tree">Monopodial pine tree</h3>
+<p>For coniferous trees where a dominant central trunk continues upward while subordinate whorls emerge at regular intervals:</p>
+<pre><code class="language-text">Axiom: !(1)F(100)/(45)A
+Rules: A = [&amp;(30)B]F(10)/(45)A; B = [&amp;(30)F(20)]F(10)/(45)B
+Angle: 25.0</code></pre>
+<p>Here, the primary trunk maintains vertical dominance while lateral branch clusters spiral radially around the central stem.</p>
+<h3 id="3d-hilbert-space-filling-curve">3D Hilbert space-filling curve</h3>
+<p>L-systems are not limited to biological plants; they also describe space-filling fractals and recursive mathematical curves:</p>
+<pre><code class="language-text">Axiom: X
+Rules: X = ^\XF^/XFX-F^//XFX&amp;F+//XFX-F/X-
+Angle: 90.0</code></pre>
+<p>When evaluated with 90-degree turning angles, this grammar weaves a single continuous polyline through every sub-cube of a three-dimensional lattice. When swept into tubes and modulated with audio, it creates intricate kinetic geometric sculptures.</p>
+<p>For broader techniques combining mathematical deformation with procedural meshes, see our guide on <a href="https://infinitedevices.org/blog/procedural-3d-geometry-nodes-and-audio-deformation.html">procedural 3D geometry nodes</a>.</p>
+<h2 id="summary">Summary</h2>
+<p>L-system procedural 3D branching provides an expressive bridge between theoretical linguistics, computer graphics, and live music performance. By encoding complex natural structures into concise symbolic grammars, artists can generate organic botanical forms that remain entirely deterministic, mathematically pure, and lightweight.</p>
+<p>Through Infinite's native <code>L-System</code> node, these formal grammars live inside an interactive modular graph. Artists can manipulate branch cross-sections, route geometry along motion paths, and modulate angles and lengths in real time to the rhythm of incoming audio. The result is a procedural instrument where mathematics, sound, and visual form grow together on a single canvas.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="reaction-diffusion-simulation-in-real-time-glsl.html"><span class="mono">Creative</span><b>Reaction-diffusion simulation in real-time GLSL</b></a><a class="rel-card" href="lorenz-attractor-interactive-simulation.html"><span class="mono">Creative</span><b>Lorenz attractor interactive simulation in creative coding</b></a><a class="rel-card" href="javascript-sketches.html"><span class="mono">Creative</span><b>javascript sketches as nodes: draw with code, wire it to anything</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../samples/">Samples</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+          <a href="../extensions.html">Extensions</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/GMeQTyJqkH" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../samples/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Samples</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../share.js?v=ad5e5392" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>
