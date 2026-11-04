@@ -979,6 +979,7 @@ namespace
       "      tangent = tRot;\n"
       "   }\n"
       "\n"
+      "   vec3 floorBounce = vec3(0.0);\n"
       "   for (int i = 0; i < 8; i++) {\n"
       "      if (i >= uLightCount) break;\n"
       "      if ((uLightMask & (1 << i)) == 0) continue;\n"
@@ -1088,10 +1089,14 @@ namespace
       "      vec3 kD = (vec3(1.0) - f) * (1.0 - metal) * ccAtten;\n"
       "      vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i] * attenuation;\n"
       "      float shadow = (i == uShadowLight) ? shadowFactor(n, shadeDir) : 1.0;\n"
+      // Floor bounce, no scene lookup: the light that reaches a floor under the point, at grey 0.5, lights
+      // the normals that face down in proportion to how far down they face.
+      "      floorBounce += radiance * max(lightDir.y, 0.0) * uLightTerms[i].x;\n"
       "      col += (kD * base / 3.14159265 * uLightTerms[i].x + (specular * ccAtten + vec3(clearcoatSpec) + sheenSpec) * uLightTerms[i].y) * radiance * nDotL * shadow;\n"
       "      if (trans > 0.0) glassSpec += (specular + vec3(clearcoatSpec)) * radiance * nDotL * shadow * uLightTerms[i].z;\n"
       "   }\n"
       "\n"
+      "   col += base / 3.14159265 * floorBounce * (0.25 * (1.0 - n.y)) * (1.0 - metal) * ccAtten * ao;\n"
       "   vec3 reflectDir = reflect(-viewDir, n);\n"
       "   vec3 irradiance = sampleEnv(n, 1.0) * toLinear(uAmbient) * 3.0;\n"
       "   vec3 reflection = sampleEnv(reflectDir, rough);\n"
