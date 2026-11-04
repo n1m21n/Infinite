@@ -1248,7 +1248,7 @@ namespace app
 
    void DrawBakeParams(BakeNode* n)
    {
-      DropdownButton("bake", BakeNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; }, kParamWidth, true, true);
+      DropdownButton("bake", BakeNode::ModeNames(), n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; }, kParamWidth, true, false);
       DropdownButton("size", BakeNode::SizeNames(), n->size, [n](int i) { PushUndoCheckpoint(); n->size = i; }, kParamWidth, true, true);
       if (n->mode == BakeNode::kAO || n->mode == BakeNode::kThickness)
       {

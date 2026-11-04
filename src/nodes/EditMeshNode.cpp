@@ -45,6 +45,8 @@ const Mesh& EditMeshNode::GetMesh()
 {
    if (input == nullptr)
       return kEmpty;
+   if (bypassed)
+      return input->GetMesh();
    Update();
    return mMesh;
 }
@@ -53,6 +55,8 @@ unsigned long long EditMeshNode::MeshRevision()
 {
    if (input == nullptr)
       return 0;
+   if (bypassed)
+      return input->MeshRevision();
    Update();
    return mMeshRevision;
 }

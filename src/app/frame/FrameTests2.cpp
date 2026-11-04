@@ -2805,6 +2805,14 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
                auto root = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
                corpus.clear();
                corpus.open(root / "tests/field/image-offset-corpus.txt");
+               // __FILE__ is relative to the build dir under ibuild; walk up from the cwd instead.
+               std::error_code ec;
+               for (auto dir = std::filesystem::current_path(ec); !corpus.is_open() && dir.has_parent_path() && dir != dir.parent_path();
+                    dir = dir.parent_path())
+               {
+                  corpus.clear();
+                  corpus.open(dir / "tests/field/image-offset-corpus.txt");
+               }
             }
             bool pass = corpus.good();
             int cases = 0;
