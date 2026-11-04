@@ -25,6 +25,10 @@ import argparse, os, re, shutil, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCK = "/tmp/infinite-build.lock"          # machine-wide, shared by every worktree/session
+# ccache keys on paths: rewrite them relative to the folder holding every worktree, so a
+# fresh worktree reuses objects another one already compiled instead of building from zero.
+os.environ.setdefault("CCACHE_BASEDIR", os.path.dirname(ROOT))
+os.environ.setdefault("CCACHE_NOHASHDIR", "1")
 MODES = {  # dir, cmake args, per-compile RAM estimate (MB), -j cap
     "dev":     ("build-dev",  ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64"], 450, 4),
     "asan":    ("build-asan", ["-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_OSX_ARCHITECTURES=arm64",
@@ -99,7 +103,7 @@ def configure(mode):
     path = os.path.join(ROOT, d)
     if os.path.exists(path + "/CMakeCache.txt"):
         return path
-    extra = ["-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "-DCMAKE_C_COMPILER_LAUNCHER=ccache"] if shutil.which("ccache") else []
+    extra = [f"-DCMAKE_{lang}_COMPILER_LAUNCHER=ccache" for lang in ("C", "CXX", "OBJC", "OBJCXX")] if shutil.which("ccache") else []
     print(f"ibuild: configuring {d} (first build in this dir compiles everything once)", flush=True)
     r = subprocess.run(["cmake", "-S", ROOT, "-B", path, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", *args, *extra])
     if r.returncode:
