@@ -114,7 +114,46 @@ namespace app
          double loginAt = 0.0;
          bool needsCode = false;                 // the sign-in page shows a code to paste back (Gemini)
          std::string codeInput;
+         unsigned long long codeBytes = 0;       // output length when a code was sent: only a new ask shows the field again
+         bool loginStopped = false;              // Cancel or the timeout ended the sign-in, not the CLI
+         bool loginTimedOut = false;
+         chat::Auth auth = chat::Auth::Unknown;  // the agent's own status check; wins over the file probe
+         bool probe = false;                     // the file probe's last answer, to notice a sign-in made elsewhere
+         bool everIn = false;                    // was signed in: a later failure asks to sign in again
+         bool signedOutHere = false;             // Sign out ran: a login file left behind is not a stale session
+         std::shared_ptr<chat::AgentRun> verify; // that status check, running
+         double verifyAt = -1.0;
+         std::shared_ptr<chat::AgentRun> logout; // Sign out, running
+         bool signInAfterLogout = false;         // Sign in again that clears the old login first (Gemini)
       };
+
+      // The one action each agent offers, the same in Settings, the agent picker, the onboarding card and an
+      // error in the thread.
+      enum class Act { None, SetUp, TryAgain, SignIn, SignInAgain, SignOut, Cancel };
+      struct AgentView
+      {
+         std::string status;
+         Act act = Act::None;
+         bool ready = false, busy = false;
+      };
+
+      const char* ActLabel(Act a)
+      {
+         switch (a)
+         {
+            case Act::SetUp: return T("Set up");
+            case Act::TryAgain: return T("Try again");
+            case Act::SignIn: return T("Sign in");
+            case Act::SignInAgain: return T("Sign in again");
+            case Act::SignOut: return T("Sign out");
+            case Act::Cancel: return T("Cancel");
+            default: return "";
+         }
+      }
+
+      bool OnMac() { return CliSetup::CurrentOs() == CliSetup::Os::kMac; }
+      constexpr double kStatusCheckSeconds = 30.0;    // a status check that takes longer is stopped
+      constexpr double kStatusRecheckSeconds = 300.0;  // a signed-in agent is checked again this often
 
       chat::Thread sThread;
       std::vector<EntryUi> sUi;
@@ -129,6 +168,7 @@ namespace app
       chat::Snapshot sBefore;
       std::map<std::string, AgentState> sAgents;
       std::map<std::string, double> sModelsFetchAt;  // when each agent's model list was last asked for
+      std::map<std::string, std::vector<chat::Model>> sModels;  // each agent's model menu
       double sAgentsAt = -100.0;
       int sLastFrame = -100;
       bool sScrollToEnd = false;
@@ -406,7 +446,21 @@ namespace app
          return std::string();
       }
 
-      // File probes only; on open, when a setup ends, and every 2 s while the setup card shows.
+      void StartVerify(const std::string& id, chat::AgentKind kind)
+      {
+         AgentState& s = sAgents[id];
+         if (s.verify != nullptr || s.login != nullptr || s.logout != nullptr || s.setup != nullptr)
+            return;  // asked again once that ends
+         s.verifyAt = ImGui::GetTime();
+         chat::AgentRun::Options o;
+         o.kind = kind;
+         o.raw = true;
+         o.argv = chat::StatusArgs(kind, OnMac());
+         TerminalCommandEnv(o.env, o.cwd);
+         s.verify = chat::AgentRun::Start(o);
+      }
+
+      // File probes, then the agents' own checks; on open, when a setup ends, and every 2 s while the setup card shows.
       void CheckAgents(bool force)
       {
          const double now = ImGui::GetTime();
@@ -423,8 +477,16 @@ namespace app
                continue;
             AgentState& s = sAgents[a.id];
             s.ready = CliSetup::AgentReadiness(a);
+            const bool probeChanged = s.ready.signedIn != s.probe;
+            s.probe = s.ready.signedIn;
+            if (s.auth != chat::Auth::Unknown)
+               s.ready.signedIn = s.auth == chat::Auth::In;
             if (s.ready.signedIn && s.login == nullptr)
                s.signingIn = false;
+            // The agent's own check settles it: first look, a login file that came or went, now and then
+            // while signed in. Never while signed out, so it cannot start a sign-in by itself.
+            if (s.ready.installed && (s.verifyAt < 0.0 || probeChanged || (s.auth == chat::Auth::In && now - s.verifyAt > kStatusRecheckSeconds)))
+               StartVerify(a.id, k);
          }
       }
 
@@ -459,8 +521,13 @@ namespace app
       {
          AgentState& s = sAgents[agent.id];
          chat::AgentKind kind;
-         if (s.login != nullptr || !KindOf(agent.id, kind))
+         if (s.login != nullptr || s.logout != nullptr || !KindOf(agent.id, kind))
             return;
+         if (s.verify != nullptr)
+         {
+            s.verify->Stop();
+            s.verify = nullptr;
+         }
          chat::AgentRun::Options o;
          o.kind = kind;
          o.raw = true;
@@ -471,6 +538,9 @@ namespace app
          s.loginLog.clear();
          s.needsCode = false;
          s.codeInput.clear();
+         s.codeBytes = 0;
+         s.loginStopped = false;
+         s.loginTimedOut = false;
          s.signingIn = true;
          s.loginAt = ImGui::GetTime();
          s.login = chat::AgentRun::Start(o);
@@ -497,6 +567,7 @@ namespace app
          code = code.substr(b);
          if (code.empty())
             return;
+         s.codeBytes = s.login->Bytes();  // the ask already shown does not bring the field back
          s.login->Write(code + "\r");
          s.codeInput.clear();
          s.needsCode = false;
@@ -510,32 +581,49 @@ namespace app
                continue;
             std::vector<chat::AgentEvent> ev;
             s.login->Poll(ev);
-            const std::string log = chat::StripAnsi(s.login->Log());
+            const std::string raw = s.login->Log();
+            const std::string log = chat::StripAnsi(raw);
             if (s.loginUrl.empty())
                s.loginUrl = chat::FindUrl(log);
-            s.needsCode = chat::AsksForCode(log);
+            // Only output after the last code sent counts: the old ask stays in the log.
+            const unsigned long long fresh = s.login->Bytes() - s.codeBytes;
+            const std::string recent = s.codeBytes == 0 ? raw : raw.substr(raw.size() - (size_t)std::min<unsigned long long>(raw.size(), fresh));
+            s.needsCode = chat::AsksForCode(recent);
             if (!s.login->Done())
+            {
+               if (!s.loginStopped && ImGui::GetTime() - s.loginAt > chat::kSignInSeconds)
+               {
+                  s.loginStopped = s.loginTimedOut = true;
+                  s.login->Stop();
+               }
                continue;
+            }
             bool error = false;
             for (const chat::AgentEvent& e : ev)
                if (e.kind == chat::AgentEvent::Kind::End)
                   error = e.error;
+            error = error || s.loginStopped;  // a stopped run ends quietly, but it did not sign in
             s.loginLog = log;
             s.login = nullptr;
             s.signingIn = false;
             s.needsCode = false;
-            CheckAgents(true);
             if (!error)
             {
                s.authBroken = false;
-               s.ready.signedIn = true;  // the CLI said it signed in: trust that over the file probe
+               s.auth = chat::Auth::In;  // the CLI said it signed in; its status check confirms next
+               s.everIn = true;
+               s.signedOutHere = false;
+               s.verifyAt = -1.0;
                sModelsFetchAt.erase(id);  // signed in: its model list can be asked for now
             }
-            else
+            else if (s.loginTimedOut)
+               s.loginError = T("Sign-in timed out. Try again.");
+            else if (!s.loginStopped)
             {
                const chat::Friendly f = chat::Explain(AgentName(id), log);
                s.loginError = f.kind == chat::Friendly::Kind::Other ? std::string(T("Sign-in did not finish. Try again.")) : f.text;
             }
+            CheckAgents(true);
          }
       }
 
@@ -548,9 +636,194 @@ namespace app
                  [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &err);
       }
 
+      void PollVerifies()
+      {
+         for (auto& [id, s] : sAgents)
+         {
+            if (s.verify == nullptr)
+               continue;
+            chat::AgentKind kind;
+            if (!KindOf(id, kind))
+               continue;
+            std::vector<chat::AgentEvent> ev;
+            s.verify->Poll(ev);
+            const bool late = ImGui::GetTime() - s.verifyAt > kStatusCheckSeconds;
+            if (!s.verify->Done())
+            {
+               if (late || chat::WaitsForSignIn(s.verify->Log()))
+                  s.verify->Stop();  // never leave a check waiting for a browser
+               continue;
+            }
+            bool exitOk = true;
+            for (const chat::AgentEvent& e : ev)
+               if (e.kind == chat::AgentEvent::Kind::End)
+                  exitOk = !e.error;
+            const std::string log = s.verify->Log();
+            s.verify = nullptr;
+            if (late)
+               continue;  // too slow to tell: keep what was known
+            const chat::Auth a = chat::SignedInFrom(kind, exitOk, log);
+            if (a == chat::Auth::Unknown)
+               continue;
+            s.auth = a;
+            s.ready.signedIn = a == chat::Auth::In;
+            if (a == chat::Auth::In)
+            {
+               s.everIn = true;
+               s.signedOutHere = false;
+               if (kind == chat::AgentKind::Antigravity)
+               {
+                  std::vector<chat::Model> list = chat::ParseAgyModels(chat::StripAnsi(log));
+                  if (!list.empty())
+                     sModels[id] = std::move(list);
+               }
+            }
+         }
+      }
+
+      void StartSignOut(const std::string& id)
+      {
+         AgentState& s = sAgents[id];
+         chat::AgentKind kind;
+         if (s.logout != nullptr || s.login != nullptr || !KindOf(id, kind))
+            return;
+         const std::vector<std::string> argv = chat::SignOutArgs(kind, OnMac());
+         if (argv.empty())
+            return;
+         if (s.verify != nullptr)
+         {
+            s.verify->Stop();
+            s.verify = nullptr;
+         }
+         chat::AgentRun::Options o;
+         o.kind = kind;
+         o.raw = true;
+         o.argv = argv;
+         TerminalCommandEnv(o.env, o.cwd);
+         s.loginError.clear();
+         s.logout = chat::AgentRun::Start(o);
+      }
+
+      void PollLogouts()
+      {
+         for (auto& [id, s] : sAgents)
+         {
+            if (s.logout == nullptr)
+               continue;
+            std::vector<chat::AgentEvent> drop;
+            s.logout->Poll(drop);
+            if (!s.logout->Done())
+               continue;
+            s.logout = nullptr;
+            s.auth = chat::Auth::Out;
+            s.ready.signedIn = false;
+            s.everIn = false;
+            s.authBroken = false;
+            s.signedOutHere = true;
+            sThread.sessions.erase(id);  // a conversation of the old login does not carry over
+            sModels.erase(id);
+            s.verifyAt = -1.0;           // its own check confirms
+            CheckAgents(true);
+            if (s.signInAfterLogout)
+            {
+               s.signInAfterLogout = false;
+               if (const CliSetup::Agent* a = CliSetup::FindAgent(id))
+                  StartSignIn(*a);
+            }
+         }
+      }
+
+      // Where an agent stands and the one thing to press.
+      AgentView ViewOf(const std::string& id)
+      {
+         AgentView v;
+         const auto it = sAgents.find(id);
+         if (it == sAgents.end())
+         {
+            v.status = T("Checking…");
+            v.busy = true;
+            return v;
+         }
+         const AgentState& s = it->second;
+         chat::AgentKind kind = chat::AgentKind::Claude;
+         KindOf(id, kind);
+         const bool canSignOut = !chat::SignOutArgs(kind, OnMac()).empty();
+         const bool stale = s.authBroken || (s.auth == chat::Auth::Out && s.probe && !s.signedOutHere) || (s.everIn && !s.ready.signedIn);
+         if (s.setup != nullptr)
+            v.status = T("Setting up…"), v.busy = true;
+         else if (s.logout != nullptr)
+            v.status = T("Signing out…"), v.busy = true;
+         else if (s.login != nullptr || s.signingIn)
+            v.status = T("Waiting for sign-in…"), v.busy = true, v.act = Act::Cancel;
+         else if (s.failed)
+            v.status = T("Setup did not finish"), v.act = Act::TryAgain;
+         else if (!s.ready.installed)
+            v.status = T("Not installed"), v.act = Act::SetUp;
+         else if (!s.ready.connected)
+            v.status = T("Needs setup"), v.act = Act::SetUp;
+         else if (s.ready.signedIn && !s.authBroken)
+            v.status = T("Ready"), v.ready = true, v.act = canSignOut ? Act::SignOut : Act::None;
+         else if (s.verify != nullptr && s.auth == chat::Auth::Unknown)
+            v.status = T("Checking…"), v.busy = true;
+         else if (stale)
+            v.status = T("Signed out"), v.act = Act::SignInAgain;
+         else
+            v.status = T("Not signed in"), v.act = Act::SignIn;
+         return v;
+      }
+
+      void Do(const std::string& id, Act act)
+      {
+         const CliSetup::Agent* a = CliSetup::FindAgent(id);
+         if (a == nullptr)
+            return;
+         AgentState& s = sAgents[id];
+         chat::AgentKind kind = chat::AgentKind::Claude;
+         KindOf(id, kind);
+         switch (act)
+         {
+            case Act::SetUp:
+            case Act::TryAgain:
+               s.failed = false;
+               s.loginError.clear();
+               s.chain = true;  // sign in right after, without another click
+               SetUpInBackground(*a);
+               break;
+            case Act::SignIn:
+               s.loginError.clear();
+               StartSignIn(*a);
+               break;
+            case Act::SignInAgain:
+               s.loginError.clear();
+               // agy has no login command: its sign-in turn only asks when no login is stored, so clear it first.
+               if (kind == chat::AgentKind::Antigravity && !chat::SignOutArgs(kind, OnMac()).empty())
+               {
+                  s.signInAfterLogout = true;
+                  StartSignOut(id);
+               }
+               else
+                  StartSignIn(*a);
+               break;
+            case Act::SignOut:
+               StartSignOut(id);
+               break;
+            case Act::Cancel:
+               if (s.login != nullptr)
+               {
+                  s.loginStopped = true;
+                  s.login->Stop();
+               }
+               break;
+            default:
+               break;
+         }
+      }
+
       void PollSetups()
       {
          PollLogins();
+         PollVerifies();
+         PollLogouts();
          for (auto& [id, s] : sAgents)
          {
             if (s.setup == nullptr)
@@ -2023,7 +2296,17 @@ namespace app
             }
             else if (s.login != nullptr)
             {
-               status(T("Finish in your browser…"), true, Dim());
+               const char* cancel = T("Cancel");
+               if (button(cancel, false))
+                  Do(a.id, Act::Cancel);
+               {
+                  const char* label = T("Finish in your browser…");
+                  const float bw = ImGui::CalcTextSize(cancel).x + 2.0f * tok::space_2 + tok::space_2;
+                  const float w = ImGui::CalcTextSize(label).x;
+                  dl->AddText(ImVec2(rx - bw - w, ty), Dim(), label);
+                  ImGui::SetCursorScreenPos(ImVec2(rx - bw - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
+                  BusyLine::Spinner();
+               }
                if (!s.loginUrl.empty())
                {
                   ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH));
@@ -2040,18 +2323,11 @@ namespace app
             }
             else
             {
-               if (button(s.failed ? T("Try again") : T("Connect"), true))
-               {
-                  s.failed = false;
-                  s.loginError.clear();
-                  if (s.ready.installed && s.ready.connected)
-                     StartSignIn(a);
-                  else
-                  {
-                     s.chain = true;
-                     SetUpInBackground(a);
-                  }
-               }
+               const AgentView v = ViewOf(a.id);
+               if (v.act == Act::None || v.act == Act::SignOut || v.busy)
+                  status(v.status.c_str(), v.busy, Dim());
+               else if (button(ActLabel(v.act), true))
+                  Do(a.id, v.act);
                std::string msg = s.failed ? std::string(T("Setup did not finish.")) + (s.ready.why.empty() ? std::string() : " " + s.ready.why) : s.loginError;
                if (!msg.empty())
                {
@@ -2225,11 +2501,12 @@ namespace app
                   {
                      ImGui::PushID(i);
                      const auto ag = sAgents.find(e.agent);
-                     if (ag != sAgents.end() && ag->second.authBroken && ag->second.login == nullptr)
+                     if (ag != sAgents.end() && ag->second.authBroken && ag->second.login == nullptr && ag->second.logout == nullptr)
                      {
-                        if (ChipButton::Draw(T("Sign in"), true))
-                           if (const CliSetup::Agent* a = CliSetup::FindAgent(e.agent))
-                              StartSignIn(*a);
+                        const Act act = ViewOf(e.agent).act;
+                        if (act == Act::SignIn || act == Act::SignInAgain || act == Act::SetUp || act == Act::TryAgain)
+                           if (ChipButton::Draw(ActLabel(act), true))
+                              Do(e.agent, act);
                      }
                      else if (ag != sAgents.end() && ag->second.login != nullptr)
                      {
@@ -2488,7 +2765,6 @@ namespace app
 
       std::vector<chat::Model>& ModelsOf(const std::string& agent)
       {
-         static std::map<std::string, std::vector<chat::Model>> sModels;
          static std::map<std::string, std::shared_ptr<chat::AgentRun>> sFetch;
          chat::AgentKind kind;
          std::vector<chat::Model>& list = sModels[agent];
@@ -2499,7 +2775,8 @@ namespace app
          // One fetch at a time, only for an installed agent, and an empty answer (signed out, offline) waits a
          // minute before the next try: this runs every frame the picker or Settings shows.
          const auto st = sAgents.find(agent);
-         const bool installed = st != sAgents.end() && st->second.ready.installed;
+         // The status check of a signed-in agy fills this list itself.
+         const bool installed = st != sAgents.end() && st->second.ready.installed && st->second.auth != chat::Auth::Out && st->second.verify == nullptr;
          const double now = ImGui::GetTime();
          const auto at = sModelsFetchAt.find(agent);
          const bool due = at == sModelsFetchAt.end() || now - at->second >= 60.0;
@@ -2578,14 +2855,10 @@ namespace app
                }
                else
                {
-                  const char* state = s.setup != nullptr ? T("Setting up…") : s.ready.connected ? T("Sign in") : T("Set up");
-                  if (MenuRow("##a", menuW, a.name, state, false, s.setup == nullptr, a.id))
-                  {
-                     if (s.ready.installed && s.ready.connected)
-                        StartSignIn(a);
-                     else
-                        SetUpInBackground(a);
-                  }
+                  const AgentView v = ViewOf(a.id);
+                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
+                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
+                     Do(a.id, v.act);
                }
                ImGui::PopID();
             }
@@ -2977,29 +3250,12 @@ namespace app
 
 ChatAgentInfo ChatAgentStatus(const std::string& id)
    {
+      const AgentView v = ViewOf(id);
       ChatAgentInfo info;
-      const auto it = sAgents.find(id);
-      if (it == sAgents.end())
-      {
-         info.status = T("Checking…");
-         info.busy = true;
-         return info;
-      }
-      const AgentState& s = it->second;
-      if (s.setup != nullptr)
-         info.status = T("Setting up…"), info.busy = true;
-      else if (s.login != nullptr || s.signingIn)
-         info.status = T("Waiting for sign-in…"), info.busy = true;
-      else if (s.ready.Ready() && !s.authBroken)
-         info.status = T("Ready"), info.ready = true, info.action = T("Sign in again");
-      else if (s.failed)
-         info.status = T("Setup did not finish"), info.action = T("Try again");
-      else if (!s.ready.installed)
-         info.status = T("Not installed"), info.action = T("Set up");
-      else if (!s.ready.connected)
-         info.status = T("Needs setup"), info.action = T("Set up");
-      else
-         info.status = T("Not signed in"), info.action = T("Sign in");
+      info.status = v.status;
+      info.action = ActLabel(v.act);
+      info.ready = v.ready;
+      info.busy = v.busy;
       return info;
    }
 
@@ -3017,11 +3273,10 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       const CliSetup::Agent* a = CliSetup::FindAgent(id);
       if (a == nullptr)
          return;
-      const AgentState& s = sAgents[id];
-      if (!repair && s.ready.installed && s.ready.connected)
-         StartSignIn(*a);
-      else
+      if (repair)
          SetUpInBackground(*a);
+      else
+         Do(id, ViewOf(id).act);
    }
 
    void ChatClearHistory()

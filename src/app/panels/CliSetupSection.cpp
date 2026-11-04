@@ -87,7 +87,7 @@ namespace app
             ImGui::TextUnformatted(info.status.c_str());
          else
             ImGui::TextDisabled("%s", info.status.c_str());
-         if (!info.action.empty() && !info.busy)
+         if (!info.action.empty())  // Cancel shows while a sign-in waits
          {
             const float bw = std::max(84.0f, ImGui::CalcTextSize(info.action.c_str()).x + 2.0f * tok::space_3);
             ImGui::SameLine(0.0f, 0.0f);
