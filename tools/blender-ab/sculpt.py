@@ -19,6 +19,7 @@ INFINITE = os.environ.get("INFINITE_BIN", os.path.join(REPO, "build-dev/Infinite
 BASELINE = os.path.join(HERE, "baseline_sculpt.json")
 DEER = os.environ.get("DEER_GLB", os.path.expanduser("~/Downloads/Assets/deer.glb"))
 DRAW, SMOOTH, GRAB, INFLATE, PINCH, FLATTEN, CREASE = range(7)
+LEAD_IN = (PINCH,)
 
 SPHERE = {"shape": "sphere"}
 TOP = [0, 0, 1.2]
@@ -77,6 +78,13 @@ def inf_dabs(k):
     """Where Infinite puts dabs: one at `at`, or along a drag's path every 0.15 radius (View3DPanel's spacing)."""
     path = k.get("path")
     if not path:
+        if k["brush"] in LEAD_IN:   # Blender's stroke has a second sample half a pixel to the view's right: so does Infinite's
+            n = k["normal"]
+            y = [-n[0] * n[2], -n[1] * n[2], 1 - n[2] * n[2]]   # world up, flattened onto the dab's plane
+            l = math.sqrt(sum(v * v for v in y)) or 1.0
+            y = [v / l for v in y]
+            r = [y[1] * n[2] - y[2] * n[1], y[2] * n[0] - y[0] * n[2], y[0] * n[1] - y[1] * n[0]]
+            return [k["at"], [k["at"][i] + r[i] * 1e-4 for i in range(3)]]
         return [k["at"]]
     out, left, step = [path[0]], 0.0, k["radius"] * 0.15
     for a, b in zip(path, path[1:]):

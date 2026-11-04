@@ -95,6 +95,9 @@ namespace Sculpt
       // Normals (per point) the brush's area normal is taken from, when not the shown surface's: Blender
       // keeps a stroke's normals as it began, so a ridge does not tip its own brush forward.
       const std::vector<float>* areaNormals = nullptr;
+      // Which way the brush moved since its last dab, in mesh space (zero at a stroke's first dab). Pinch
+      // pulls across it and waits for it, as Blender's does.
+      float dir[3] = { 0, 0, 0 };
    };
    // Adds one dab to `offsets` (per point, xyz), measured on the shaped
    // mesh's points. Offsets are in the sculpt's own units: a dab moves the

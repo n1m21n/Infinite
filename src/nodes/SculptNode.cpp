@@ -186,15 +186,29 @@ void SculptNode::BeginStroke()
 {
    Update();
    mStrokeMesh = mMesh;
+   mStrokeHasLast = false;
    std::vector<float> pos;
    Sculpt::PointFrame(mMesh, mTopo, pos, mStrokeNrm);
    mStrokeGrid = *PointGrid(mGrid.cell * 6.0f);
+}
+
+bool SculptNode::StrokeStep(const float c[3], float dir[3])
+{
+   const bool had = mStrokeHasLast;
+   for (int k = 0; k < 3; k++)
+   {
+      dir[k] = had ? c[k] - mStrokeLast[k] : 0.0f;
+      mStrokeLast[k] = c[k];
+   }
+   mStrokeHasLast = true;
+   return had;
 }
 
 void SculptNode::EndStroke()
 {
    mStrokeMesh = Mesh();
    mStrokeNrm.clear();
+   mStrokeHasLast = false;
    mStrokeGrid = Sculpt::Grid();
 }
 

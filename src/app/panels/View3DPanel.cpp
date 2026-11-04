@@ -3419,6 +3419,7 @@ namespace
       d.symmetry = sSculpt.symmetry;
       SculptAlpha(node, world, d);
       d.areaNormals = node->StrokeNormals();
+      node->StrokeStep(c, d.dir);
       static std::vector<unsigned int> touched;
       touched.clear();
       const Sculpt::Grid* grid = node->PointGrid(d.radius);

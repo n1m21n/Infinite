@@ -653,6 +653,21 @@ namespace Sculpt
          float c[3];
          Flip(d.center, m, c);
          Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid, d.areaNormals);
+         // Pinch gathers towards the line along the stroke: the pull is across it (and along the normal).
+         float across[3] = { 0, 0, 0 };
+         if (d.brush == kPinch)
+         {
+            float dir[3];
+            Flip(d.dir, m, dir);
+            across[0] = a.normal[1] * dir[2] - a.normal[2] * dir[1];
+            across[1] = a.normal[2] * dir[0] - a.normal[0] * dir[2];
+            across[2] = a.normal[0] * dir[1] - a.normal[1] * dir[0];
+            const float len = std::sqrt(across[0] * across[0] + across[1] * across[1] + across[2] * across[2]);
+            if (len < 1e-9f)
+               continue;
+            for (int k = 0; k < 3; k++)
+               across[k] /= len;
+         }
          if (d.alpha != nullptr)
             for (size_t e = 0; e < a.idx.size(); e++)
                a.f[e] *= AlphaAt(d, &pos[(size_t)a.idx[e] * 3], c, m);
@@ -691,15 +706,23 @@ namespace Sculpt
                   break;
                }
                case kPinch:
+               {
+                  const float to[3] = { c[0] - p[0], c[1] - p[1], c[2] - p[2] };
+                  const float x = to[0] * across[0] + to[1] * across[1] + to[2] * across[2];
+                  const float z = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
+                  for (int k = 0; k < 3; k++)
+                     move[k] = (across[k] * x + a.normal[k] * z) * d.strength * f * sign;
+                  break;
+               }
                case kCrease:
                {
                   float to[3] = { c[0] - p[0], c[1] - p[1], c[2] - p[2] };
                   const float along = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
                   for (int k = 0; k < 3; k++)
                      to[k] -= a.normal[k] * along;
-                  const float pull = d.brush == kPinch ? 0.27f : 0.8f;
+                  const float pull = 0.8f;
                   for (int k = 0; k < 3; k++)
-                     move[k] = to[k] * pull * f * (d.brush == kPinch ? sign : 1.0f);
+                     move[k] = to[k] * pull * f;
                   if (d.brush == kCrease)
                      for (int k = 0; k < 3; k++)
                         move[k] -= a.normal[k] * d.radius * 0.48f * f * sign;
