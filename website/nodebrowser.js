@@ -1,4 +1,4 @@
-/* The node browser on nodes/: the same fan deck and HUD as the audience pages (deck.js), over all 300 nodes. It opens on a random node,
+/* The node browser on nodes/: the same fan deck and HUD as the audience pages (deck.js), over all 347 nodes. It opens on a random node,
    the family menu narrows it, and only the cards near the front keep their picture so a phone never runs out of memory. */
 (function () {
   var root = document.getElementById('ns'), nd = root && root.querySelector('[data-nodedeck]');
