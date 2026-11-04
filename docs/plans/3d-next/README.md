@@ -177,5 +177,24 @@ Findings:
 - Spot light units and falloff already agree (brightness x0.93 raster, x0.98 pt).
 - Raster models, coat and velvet read dark because their undersides get no floor bounce
   (the room floor is white in Blender). Same cause as cornell.
-- Open path-tracer item: velvet sheen is about 17% too bright.
-- Baselines added: `cornell_pt`, `hero_pt`. No shading code changed, so raster baselines stand.
+- Fixed in the path tracer: the sheen layer now takes its directional albedo out of the base
+  (Cycles layering). Hero velvet 0.290 -> 0.266, brightness x1.17 -> x1.14 (still a little high).
+- Raster floor bounce (no scene lookup): the light reaching a floor under the point, at grey 0.5,
+  lights downward-facing normals by how far down they face. An isotropic version (added fill on
+  every normal) brightened the light cases by 10% and was dropped.
+
+| Raster case | Before | After |
+|---|---|---|
+| cornell | 0.583 | 0.547 |
+| light_sun / point / spot / area | 0.070 / 0.071 / 0.150 / 0.088 | 0.059 / 0.065 / 0.151 / 0.084 |
+| materials | 0.117 | 0.109 |
+| lineup | 0.076 | 0.074 |
+| view_agx | 0.071 | 0.067 |
+| deer | 0.119 | 0.120 |
+| hero (all) | 0.175 | 0.171 |
+| world_grey, furnace_* | unchanged | unchanged |
+
+Hero raster regions: models 0.473 -> 0.459, coat 0.438 -> 0.382, velvet 0.318 -> 0.314,
+instances 0.412 -> 0.389, fox 0.433 -> 0.412; emissive 0.092 -> 0.097. Cornell stays far from
+Blender: without wall-to-wall bounce a closed room cannot match; use the path tracer there.
+Baselines refreshed (raster and `hero_pt`). `INFINITE_VIEW3DTEST` passes.
