@@ -3462,7 +3462,7 @@ namespace
          x += 8.0f;
          const char* axes[3] = { "X", "Y", "Z" };
          for (int k = 0; k < 3; k++)
-            if (pill(axes[k], (sSculpt.symmetry >> k & 1) != 0))
+            if (pill(axes[kDisp[k]], (sSculpt.symmetry >> k & 1) != 0))
                sSculpt.symmetry ^= 1 << k;
       }
       char label[96];
