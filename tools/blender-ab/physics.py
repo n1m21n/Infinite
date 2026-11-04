@@ -147,11 +147,12 @@ def patch(scene, case):
         c = scene["cloth"]
         drag = 0.01 * c.get("air_damping", 1.0) * scene.get("fps", 30) / c.get("vertex_mass", 0.3)
         bend = min(1.0, math.sqrt(c.get("bending", 0.5) * BEND_SCALE))
+        # Blender cloth_friction (default 5) is a Coulomb coefficient on the contact: same number here.
         lines += ["node 1 3D Cloth",
                   "  i pinMode %d" % {"none": 0, "top": 1, "corners": 2, "edges": 3}[c.get("pin", "none")],
                   "  f stiffness 1", "  i iterations 20", "  f mass 1",
                   "  f damping %g" % (1 - math.exp(-drag / 120)), "  f bending %g" % bend,
-                  "  f colliderDistance %g" % (0.015 + 0.02), "  f colliderFriction 0.5",
+                  "  f colliderDistance %g" % (0.015 + 0.02), "  f colliderFriction %g" % c.get("friction", 5.0),
                   "  f gravityX %g" % gx, "  f gravityY %g" % gy, "  f gravityZ %g" % gz,
                   "  b groundEnabled %d" % (scene.get("ground") is not None),
                   "  f groundHeight %g" % (scene.get("ground") or 0.0), "end"]
@@ -265,6 +266,40 @@ def score_rigid(truth, inf, scene):
     return res, t, curves
 
 
+def silhouette(p, ax, size=2.4, n=60):
+    """The sheet's points as a filled-in picture along an axis pair, on a fixed n x n grid."""
+    img = np.zeros((n, n), bool)
+    i = np.clip(((p[:, ax[0]] + size / 2) / size * n).astype(int), 0, n - 1)
+    j = np.clip(((p[:, ax[1]] + size / 2) / size * n).astype(int), 0, n - 1)
+    img[i, j] = True
+    for _ in range(2):                      # close the gaps between the sample points
+        g = img.copy()
+        g[1:] |= img[:-1]; g[:-1] |= img[1:]; g[:, 1:] |= img[:, :-1]; g[:, :-1] |= img[:, 1:]
+        img = g
+    return img
+
+
+def cloth_shape(tv, iv, scene):
+    """What a viewer reads of a chaotic drape, beside the vertex distance: the sheet's top height,
+    its x/z extent, the share lying on the ground, and how much its front and top silhouettes overlap.
+    `score` is the mean of the five normalised gaps (0 = same shape)."""
+    gz = scene.get("ground") or 0.0
+    out = {}
+    for k, v in (("blender", tv), ("infinite", iv)):
+        out[k] = {"top": round(float(v[:, 1].max()), 3),
+                  "extent": [round(float(np.ptp(v[:, 0])), 3), round(float(np.ptp(v[:, 2])), 3)],
+                  "ground": round(float((v[:, 1] < gz + 0.02).mean()), 3)}
+    iou = lambda a, b: float((a & b).sum() / max(1, (a | b).sum()))
+    out["front_iou"] = round(iou(silhouette(tv, (0, 1)), silhouette(iv, (0, 1))), 3)
+    out["top_iou"] = round(iou(silhouette(tv, (0, 2)), silhouette(iv, (0, 2))), 3)
+    b, i = out["blender"], out["infinite"]
+    gaps = [abs(b["top"] - i["top"]) / 1.2, abs(b["extent"][0] - i["extent"][0]) / 2.4,
+            abs(b["extent"][1] - i["extent"][1]) / 2.4, abs(b["ground"] - i["ground"]),
+            1 - out["front_iou"], 1 - out["top_iou"]]
+    out["score"] = round(float(np.mean(gaps)), 4)
+    return out
+
+
 def score_cloth(truth, inf, scene):
     tv0 = np.array(truth[0]["v"]).reshape(-1, 3)
     iv0 = np.array(inf[0]["v"]).reshape(-1, 3)
@@ -280,6 +315,7 @@ def score_cloth(truth, inf, scene):
         lo_i.append(iv[:, 1].min())
     errs = np.array(errs)
     res = {"vertex_mean": float(errs.mean()), "vertex_final": float(errs[-1]), "error": float(errs.mean()),
+           "shape": cloth_shape(np.array(truth[-1]["v"]).reshape(-1, 3), np.array(inf[len(truth) - 1]["v"]).reshape(-1, 3), scene),
            "curve": "lowest point (m)", "blender_final": round(float(lo_b[-1]), 3), "infinite_final": round(float(lo_i[-1]), 3)}
     return res, t, {"blender": np.array(lo_b), "infinite": np.array(lo_i)}
 

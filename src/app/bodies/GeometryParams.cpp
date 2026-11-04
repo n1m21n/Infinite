@@ -544,7 +544,7 @@ namespace app
       NodeSeparator("collider");
       ImGui::BeginDisabled(n->collider == nullptr);
       ModSlider("distance", &n->colliderDistance, 0.0f, 0.2f);
-      ModSlider("friction##collider", &n->colliderFriction, 0.0f, 1.0f);
+      ModSlider("friction##collider", &n->colliderFriction, 0.0f, 10.0f);
       ImGui::EndDisabled();
    }
 
