@@ -159,19 +159,27 @@ sheet (truth, Blender bake, Infinite, diff x4) before the number.
 
 ### Cloth on the deer, tilted rigid bodies (2026-11-04, fix/cloth-deer)
 
-No source change kept; baseline_physics.json unchanged. Written reason, not a fix.
+Cause of the deer gap: collider friction. Blender's cloth friction is 5; Infinite scaled the
+sliding by (1 - friction) with friction capped at 1, so a sheet slid off the head and lay on the
+ground. Fix: Coulomb friction in `ClothNode::Collide` (a contact holds back up to mu x the push
+it just took, all of the slide when smaller), range 0-10, harness maps Blender's value 1:1. Cost: no
+extra work per point beyond a few multiplies. Cloth bending map refit to 0.045 for the stiff drape.
 
-| try (cloth_deer, base 0.5909)                     | error  |
-|---------------------------------------------------|--------|
-| outside side from the point's previous position   | 0.6636 (worse, reverted) |
-| collider friction 0.9 / 1.0 (Blender uses 5.0)    | 0.5625 / 0.5533 (small) |
-| collider distance 0.08 / 0.15 (with friction 1.0) | 0.9997 / 1.1713 (worse) |
+| case              | before | after  | shape score before -> after |
+|-------------------|--------|--------|-----------------------------|
+| cloth_deer        | 0.5909 | 0.3243 | 0.314 -> 0.197 (0.17 at friction 2-5) |
+| cloth_box         | 0.0866 | 0.0512 | 0.064 |
+| cloth_drape_stiff | 0.1042 | 0.0966 | 0.049 |
+| cloth_drape       | 0.0906 | 0.1001 | 0.119 (owner waived the +0.01 rule) |
+| other cloth, rigid, particles | unchanged within 0.001 | | |
 
-- Not tunnelling: at the end ~9 of 2401 cloth vertices are inside the deer (ray parity test).
-- Not scale/units: the collider is 1.2 m tall, the same on both sides.
-- The sheet is a chaotic fold. Blender's 2.4 m sheet bunches to ~1.0 m across with no
-  self-collision and hangs on the head (top 1.25 m, lowest 0.165 m); Infinite's spreads to
-  ~1.7 m, slides off the head and lies on the ground. Vertex-by-vertex distance to one fold
-  pattern cannot go under ~0.5 for a case like this; simple drapes (sphere, box) stay 0.09.
-- rb_tilted (0.153) and rb_tilted_hull (0.2147) are a corner landing that tips one way; the
-  final x differs by 0.15-0.2 m after the tip. Not re-tuned in this pass.
+Shape score (physics.py, beside the vertex error): top height, x/z extent, share on the ground,
+front and top silhouette overlap, mean of six gaps.
+
+Not reached: cloth_deer under 0.15 (the fold pattern of a sheet bunched to 1 m is chaotic; 0.32 is
+the vertex error, the shape score is 0.2) and tilted bodies under 0.10 (rb_tilted 0.153,
+rb_tilted_hull 0.2147, unchanged). Tried for the tilted cases, none kept:
+bounce x1.17 (rb_drop 0.137 -> 0.100 but tilted 0.153 -> 0.178), solver step 480 Hz (tilted
+unchanged, rb_topple worse), earlier: collider distance, friction on the old model, outside side from
+the previous position (worse). The tilted corner lands the same in time but tips sooner and further
+in x (-0.19 vs -0.04); the cause was not found in restitution or step size.
