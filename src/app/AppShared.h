@@ -5778,6 +5778,13 @@ extern std::vector<std::string> gTerminalDropPending; // paths dropped on the pa
 void TerminalLoadFonts(float bakedPx);
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
+// The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
+extern int gTerminalFace;
+void DrawChatPanel();
+bool ChatBusy();   // an agent turn is running
+void ChatShutdown();
+// What a terminal tab gets to run `infinite`: the PATH shim and this app's server, and the patch's folder.
+void TerminalCommandEnv(std::vector<std::pair<std::string, std::string>>& env, std::string& cwd);
 void TerminalPanelHidden();
 // A new tab with `line` typed and entered (the CLI setup section and the agent buttons).
 void TerminalRunInNewTab(const std::string& line);

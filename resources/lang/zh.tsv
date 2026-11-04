@@ -2610,3 +2610,20 @@ Choose your coding agent	选择你的编程代理
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	连接时会在需要时安装代理,将其链接到 Infinite 并添加 Infinite 技能。之后可在设置的终端中更改。
 Skip, just a terminal	跳过,仅使用终端
 Connect a coding agent to build with Infinite.	连接编程代理,用 Infinite 创作。
+%d step	%d 步
+%d steps	%d 步
+Chat	聊天
+Goes to the agent	发送给代理
+Message, or @node	消息，或 @节点
+New chat	新聊天
+Not allowed:	不允许：
+Not in the patch	不在补丁中
+Runs now	立即运行
+The agent stopped with an error.	代理因错误而停止。
+Type @ to command a node, or ask anything.	输入 @ 来指挥节点，或随便提问。
+ask the agent	询问代理
+expression	表达式
+%s is not installed.	%s 未安装。
+modulated	已调制
+now	当前
+%s works in the terminal.	%s 在终端中运行。

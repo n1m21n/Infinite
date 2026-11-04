@@ -2610,3 +2610,20 @@ Choose your coding agent	Elige tu agente de programación
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	Conectar instala el agente si hace falta, lo enlaza con Infinite y añade las habilidades de Infinite. Puedes cambiarlo luego en Ajustes, Terminal.
 Skip, just a terminal	Omitir, solo una terminal
 Connect a coding agent to build with Infinite.	Conecta un agente de programación para crear con Infinite.
+%d step	%d paso
+%d steps	%d pasos
+Chat	Chat
+Goes to the agent	Va al agente
+Message, or @node	Mensaje, o @nodo
+New chat	Nuevo chat
+Not allowed:	No permitido:
+Not in the patch	No está en el patch
+Runs now	Se ejecuta ya
+The agent stopped with an error.	El agente se detuvo con un error.
+Type @ to command a node, or ask anything.	Escribe @ para mandar a un nodo, o pregunta lo que quieras.
+ask the agent	preguntar al agente
+expression	expresión
+%s is not installed.	%s no está instalado.
+modulated	modulado
+now	ahora
+%s works in the terminal.	%s funciona en la terminal.

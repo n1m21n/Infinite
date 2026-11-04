@@ -2610,3 +2610,20 @@ Choose your coding agent	コーディングエージェントを選択
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	接続すると、必要に応じてエージェントをインストールし、Infinite にリンクして Infinite スキルを追加します。後で設定のターミナルから変更できます。
 Skip, just a terminal	スキップ(ターミナルのみ)
 Connect a coding agent to build with Infinite.	コーディングエージェントを接続して、Infinite で作りましょう。
+%d step	%d ステップ
+%d steps	%d ステップ
+Chat	チャット
+Goes to the agent	エージェントへ送る
+Message, or @node	メッセージ、または @ノード
+New chat	新しいチャット
+Not allowed:	許可されていません:
+Not in the patch	パッチにありません
+Runs now	すぐ実行
+The agent stopped with an error.	エージェントがエラーで停止しました。
+Type @ to command a node, or ask anything.	@ でノードに指示、または何でも質問。
+ask the agent	エージェントに聞く
+expression	式
+%s is not installed.	%s はインストールされていません。
+modulated	モジュレーション中
+now	現在
+%s works in the terminal.	%s はターミナルで動作します。

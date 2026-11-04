@@ -2610,3 +2610,20 @@ Choose your coding agent	Выберите ИИ-агента для кода
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	При подключении агент устанавливается при необходимости, связывается с Infinite и получает навыки Infinite. Позже это можно изменить в Настройках, Терминал.
 Skip, just a terminal	Пропустить, только терминал
 Connect a coding agent to build with Infinite.	Подключите ИИ-агента, чтобы создавать в Infinite.
+%d step	%d шаг
+%d steps	%d шагов
+Chat	Чат
+Goes to the agent	Уходит агенту
+Message, or @node	Сообщение или @узел
+New chat	Новый чат
+Not allowed:	Не разрешено:
+Not in the patch	Нет в патче
+Runs now	Выполняется сразу
+The agent stopped with an error.	Агент остановился с ошибкой.
+Type @ to command a node, or ask anything.	Введите @, чтобы управлять узлом, или спросите что угодно.
+ask the agent	спросить агента
+expression	выражение
+%s is not installed.	%s не установлен.
+modulated	модулируется
+now	сейчас
+%s works in the terminal.	%s работает в терминале.

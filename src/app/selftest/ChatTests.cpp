@@ -1,12 +1,15 @@
 // INFINITE_CHATTEST: the chat's patch grammar and reply links against a hand-made catalog
 // (docs/plans/agent-collab/README.md C3, C4). No window, no agent. Early exit before glfwInit().
 #include "app/AppShared.h"
+#include "core/chat/AgentRun.h"
 #include "core/chat/AgentStream.h"
 #include "core/chat/PatchGrammar.h"
 #include "core/chat/ReplyLinks.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
+#include <thread>
 
 namespace app
 {
@@ -202,6 +205,48 @@ namespace app
                   std::find(next.begin(), next.end(), "--resume") != next.end() && next.back() == "hello",
                "claude: first turn names the session, later turns resume it");
          check(chat::TerminalResumeLine(chat::AgentKind::Claude, "abc") == "claude --resume abc", "terminal face resumes the same session");
+
+         // A turn through the login shell: a stand-in agent prints stream-json, the runner hands it over.
+         auto runTurn = [](const std::vector<std::string>& argv, std::vector<chat::AgentEvent>& out)
+         {
+            chat::AgentRun::Options o;
+            o.argv = argv;
+            std::shared_ptr<chat::AgentRun> run = chat::AgentRun::Start(o);
+            const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+            while (!run->Done() && std::chrono::steady_clock::now() < until)
+            {
+               run->Poll(out);
+               std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            run->Poll(out);
+            return run->Done();
+         };
+#if !defined(_WIN32)
+         std::vector<chat::AgentEvent> rv;
+         const bool done = runTurn({ "printf", "%s\\n", "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\"}",
+                                     "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}}",
+                                     "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"session_id\":\"s1\"}" },
+                                   rv);
+         check(done && rv.size() == 3 && rv[0].text == "s1" && rv[1].text == "Hello" && rv[2].kind == chat::AgentEvent::Kind::End && !rv[2].error,
+               "runner: a turn's events arrive in order and it ends");
+         std::vector<chat::AgentEvent> fv;
+         const bool failed = runTurn({ "sh", "-c", "echo 'not found: claude' >&2; exit 3" }, fv);
+         check(failed && fv.size() == 1 && fv[0].kind == chat::AgentEvent::Kind::End && fv[0].error && fv[0].text.find("not found") != std::string::npos,
+               "runner: a child that dies without a result ends with its last words");
+         chat::AgentRun::Options so;
+         so.argv = { "sleep", "30" };
+         std::shared_ptr<chat::AgentRun> slow = chat::AgentRun::Start(so);
+         slow->Stop();
+         std::vector<chat::AgentEvent> sv;
+         const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+         while (!slow->Done() && std::chrono::steady_clock::now() < until)
+         {
+            slow->Poll(sv);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+         }
+         slow->Poll(sv);
+         check(slow->Done() && !sv.empty() && sv.back().kind == chat::AgentEvent::Kind::End && !sv.back().error, "runner: Stop ends the turn quietly");
+#endif
       }
       std::printf("CHATTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;

@@ -126,6 +126,14 @@ namespace chat
          Codex(j, out);
    }
 
+   namespace
+   {
+      // The chat draws `@title#index` and `@title#index.key` as links; the skill's reply rule says the rest.
+      const char* const kChatNote =
+         "You are answering in Infinite's chat panel, not a terminal. Follow the infinite-live-session reply rule: "
+         "name every node as @title#index and every param as @title#index.key, with values and units. Keep replies short.";
+   }
+
    std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume)
    {
       if (kind == AgentKind::Codex)
@@ -138,7 +146,7 @@ namespace chat
       }
       // --allowedTools takes several values, so another option follows it and `--` ends options.
       return { "claude", "-p", "--allowedTools", "Bash(infinite:*)", "--output-format", "stream-json", "--verbose",
-               resume ? "--resume" : "--session-id", session, "--", prompt };
+               "--append-system-prompt", kChatNote, resume ? "--resume" : "--session-id", session, "--", prompt };
    }
 
    std::string TerminalResumeLine(AgentKind kind, const std::string& session)

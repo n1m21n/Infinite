@@ -527,11 +527,13 @@ set(COMMON_SOURCES
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
+    src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
     src/core/chat/AgentStream.cpp
     src/core/chat/ChatCatalog.cpp
     src/core/chat/PatchGrammar.cpp
     src/core/chat/ReplyLinks.cpp
+    src/core/chat/AgentRun.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp

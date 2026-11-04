@@ -7,6 +7,7 @@
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/CliSetup.h"
@@ -689,6 +690,7 @@ namespace
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 start = ImGui::GetCursorScreenPos();
+      const float rowW = ImGui::GetContentRegionAvail().x;
       const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
       const ImU32 dimColor = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       float x = start.x;
@@ -755,6 +757,12 @@ namespace
             gTerminalFocus = true;
          }
       }
+      // The chat face, at the row's right end.
+      ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
+      if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
+         gTerminalFace = 0;
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("%s", T("Chat"));
       if (closeIndex >= 0)
          CloseTab(closeIndex);
       ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + kTabRowH));
@@ -897,6 +905,11 @@ namespace
    void DrawPanel()
    {
       FollowTheme();
+      if (gTerminalFace == 0)
+      {
+         DrawChatPanel();
+         return;
+      }
       if (sTabs.empty() && DrawTerminalWelcome())
          return;
       if (sTabs.empty())
@@ -1109,8 +1122,18 @@ bool TerminalRunInNewTab(const std::string& name, const std::string& command)
    sTabs.push_back(std::move(tab));
    sActive = (int)sTabs.size() - 1;
    gTerminalOpen = true;
+   gTerminalFace = 1;
    gTerminalFocus = true;
    return true;
+}
+
+void TerminalCommandEnv(std::vector<std::pair<std::string, std::string>>& env, std::string& cwd)
+{
+   term::PtySpawn spawn;
+   AddCommandEnv(spawn);
+   env = spawn.env;
+   const size_t slash = gPatchPath.find_last_of("/\\");
+   cwd = slash != std::string::npos ? gPatchPath.substr(0, slash) : std::string();
 }
 
 void TerminalRunInNewTab(const std::string& line)
@@ -1267,6 +1290,7 @@ void DrawTerminalQuitWarning()
 
 void TerminalShutdown()
 {
+   ChatShutdown();
    for (const auto& tab : sTabs)
       tab->session->Stop();
    sTabs.clear();
