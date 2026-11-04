@@ -356,6 +356,11 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 | A real `claude -p` turn (the chat's exact args, via the login shell) | run | 2026-11-04, Claude Code 2.1.318: session id kept, text and result read; CHATTEST with INFINITE_CHATTEST_CLAUDE_LOG |
 | `--resume` turn, `codex exec` turn | not yet run | |
 | `/` commands | not built | |
+| Chat buttons `[label](add\|set\|delete\|undo\|go\|open:arg)`, attention RPC, docs topics, 4 more skills (map, visual, sound, film craft) | built | CHATTEST, CLISETUPTEST (8 skills ship) |
+| Agent avatars; cached, searchable history | built | CHATTEST |
+| Settings > Agents & Terminal: default agent, interface, state of every agent, saved chats with Clear all | built | looked at off-screen 2026-11-04; state column aligned, Clear all confirm tidied |
+| Chat shows who is working when 2+ agents run (avatars + `N working`) | built | builds; CHATTEST passes; not yet looked at in the app |
+| Older installs show the agent step as needing repair until the 4 new skills are installed | known | Repair fixes it |
 
 ## 11. Critique
 
