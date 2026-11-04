@@ -8,8 +8,10 @@ description: Edit the Infinite window the user has open, live. Use whenever INFI
 You are running inside Infinite's Terminal panel. The user is looking at a live patch in that window,
 and every request is about that patch unless they name a file.
 
-1. Run `infinite context` first. It returns the window's status, the selected nodes, every node with
-   its index, and any code errors. Use `infinite params <node> --full` to see a node's keys, labels, ranges, options and what is modulated.
+1. Run `infinite context` first. It returns the window's status, the selected nodes, what the user
+   is pointing at and last touched (`attention`), every node with its index, and any code errors.
+   The infinite-map skill says which command answers which question, and the craft skills
+   (infinite-visual-craft, infinite-sound-craft, infinite-film-craft) turn a vague ask into nodes. Use `infinite params <node> --full` to see a node's keys, labels, ranges, options and what is modulated.
 2. Change the patch with live verbs. Each one is applied to the window at once, can be undone, and
    the user sees it happen:
 
@@ -44,6 +46,18 @@ link to it. Name things the way the app shows them, in these exact forms:
 | cable | source `→` destination, with pins when not 0 | `@noise#5 → @blur#6:1` |
 | new node | `added` + the node | `added @blur#6` |
 | picture | the file path on its own line | `/tmp/look.png` |
+
+When the ask is vague, or a change is the user's call, offer buttons instead of doing it. Write
+each as a markdown link on its own line; the chat draws a button:
+
+| Button | Write |
+|---|---|
+| add a node | `[Add Bloom](add:bloom)` |
+| set a value | `[Slower](set:@lfo#4.rateHz=0.25)` |
+| delete a node | `[Remove](delete:@blur#6)` |
+| undo | `[Undo](undo:)` |
+| go to a node or param | `[Show](go:@rings#7)` |
+| open a panel | `[Open timeline](open:timeline)` |
 
 Rules:
 - Use the node type's name as the app shows it (`Field Pixel`, `LFO`), never an internal class name.

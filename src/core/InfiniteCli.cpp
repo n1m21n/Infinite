@@ -1157,6 +1157,8 @@ Terminal term open|list|read|send|run
   patch-format   the .inf file format
   geometry       geometry domains (points, prims, instances, attributes)
   sketch | sketch3d | glsl | expressions | patch   the code languages (same as `code docs`)
+  map            which command answers which question, attention, buttons
+  visual | sound | film   craft: styles, composition, colour, type, genres, sound design, camera, sync
 Validators: `infinite code check <file>` for Field (.field), Sketch (.sketch.js), Sketch 3D
 (.sketch3d.js, three.js style), GLSL (.glsl), Formula and Equation; `infinite patch check <p.inf>`
 for patches; `infinite code errors` for the open window.
@@ -1224,6 +1226,14 @@ Open, close or dock one: `infinite panel <name> open|close [bottom|right|left|to
          fputs(AgentDocs::kPatchFormat, stdout);
       else if (topic == "geometry")
          fputs(AgentDocs::kGeometryDomains, stdout);
+      else if (topic == "map")
+         fputs(AgentDocs::kSkillMap, stdout);
+      else if (topic == "visual")
+         fputs(AgentDocs::kSkillVisualCraft, stdout);
+      else if (topic == "sound")
+         fputs(AgentDocs::kSkillSoundCraft, stdout);
+      else if (topic == "film")
+         fputs(AgentDocs::kSkillFilmCraft, stdout);
       else if (topic == "sketch" || topic == "sketch3d" || topic == "glsl" || topic == "shadertoy" || topic == "expressions" || topic == "expr" || topic == "patch")
          return CodeVerb({ "docs", topic });
       else
@@ -1255,7 +1265,8 @@ Open, close or dock one: `infinite panel <name> open|close [bottom|right|left|to
 Loop: patch new, edit the .inf, patch check, fix, patch layout, patch apply.
 Code loop: code new, edit, code check, code watch --node <n>, shot <n>.
 Facts come from `describe <type>`, `docs <topic>` and `code docs <language>`, never from memory.
-`docs` lists the manuals: shortcuts, panels, nodes, field, headless, connections, patch-format, geometry.
+`docs` lists the manuals: shortcuts, panels, nodes, field, headless, connections, patch-format, geometry,
+map, and the visual, sound and film crafts.
 `infinite` with no verb lists every verb; `infinite guide` prints the patch authoring guide.
 )", stdout);
       return 0;

@@ -228,7 +228,16 @@ namespace app
          }
 
          // Skills: three shipped, an edited or deleted one turns the agent step amber.
-         check(Skills().size() == 4 && std::string(Skills()[0].name) == "infinite-patch-authoring" && std::string(Skills()[3].name) == "infinite-live-session", "four AI skills ship, patch authoring first, live session last");
+         check(Skills().size() == 8 && std::string(Skills()[0].name) == "infinite-patch-authoring" && std::string(Skills()[3].name) == "infinite-live-session" &&
+                  std::string(Skills()[4].name) == "infinite-map" && std::string(Skills()[7].name) == "infinite-film-craft",
+               "eight AI skills ship: patch authoring first, live session, then the map and the three crafts");
+         {
+            bool named = true;
+            for (const Skill& k : Skills())
+               named = named && std::string(k.content).find(std::string("name: ") + k.name + "\n") != std::string::npos;
+            check(named, "every skill's front matter carries its own name");
+         }
+         check(std::string(Skills()[3].content).find("(add:bloom)") != std::string::npos, "live session skill carries the buttons");
          check(std::string(Skills()[3].content).find("`@<title>#<index>`") != std::string::npos, "live session skill carries the reply rule");
          const fs::path sk = home / ".claude" / "skills" / "infinite-field-language" / "SKILL.md";
          std::ofstream(sk.string()) << "old";

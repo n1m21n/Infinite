@@ -3068,4 +3068,367 @@ not this one.
    question; all three already had a decision (D3/D4/D5) that this pass
    confirmed rather than had to invent.
 )AGENTDOC";
+
+   inline const char* kSkillMap =
+R"AGENTDOC(---
+name: infinite-map
+description: The map of Infinite for any agent working with it - what exists (node families, panels, languages, manuals, validators), which command answers which question, how to read what the user is pointing at, and how to turn a vague ask into concrete node suggestions with buttons. Use at the start of every Infinite conversation, and whenever unsure where a fact lives.
+---
+
+# Infinite map
+
+Infinite is a live audiovisual instrument: one canvas of nodes for picture, 3D, sound, notes and
+modulation, played live, rendered or projected. Every fact below comes from a command. Ask the
+command, never your memory.
+
+## Where each answer lives
+
+| Question | Command |
+|---|---|
+| What is the user looking at and touching? | `infinite context` (its `attention` part) |
+| Every node, its index and title | `infinite context`, `infinite nodes` (types by family) |
+| A node type's params, pins, ranges, options | `infinite describe <Type>` |
+| A node in the patch: keys, values, what is modulated | `infinite params <node> --full` |
+| What a node is for, a thing to try, a chain it fits | `infinite docs nodes <Type>` |
+| Keyboard shortcuts | `infinite docs shortcuts` |
+| Panels and how to open them | `infinite docs panels` |
+| What can be cabled into what | `infinite docs connections` |
+| Field language, full manual | `infinite docs field`; quick reference `infinite code docs field` |
+| Sketch (JS 2D), Sketch 3D (three.js style), GLSL, expressions | `infinite code docs sketch\|sketch3d\|glsl\|expressions` |
+| Working examples per language | `infinite code examples <kind> [name]` |
+| Render, check, drive without the window | `infinite docs headless` |
+| .inf file format, geometry domains | `infinite docs patch-format`, `infinite docs geometry` |
+| Craft: pictures, sound, film | the infinite-visual-craft, infinite-sound-craft and infinite-film-craft skills |
+
+## Attention: what the user means by "this"
+
+`infinite context` returns `attention`:
+
+| Field | Meaning |
+|---|---|
+| `selected` | the nodes selected on the canvas |
+| `touched` | the control the user last pressed or dragged: node, key, label, value, range |
+| `hovered` | the control under the mouse now |
+| `keyboard` | the control Tab focus is on |
+| `panels` | the panels open now |
+
+"Make this slower", "this knob", "it": resolve to `touched`, then `selected`, then `hovered`. Say
+which one you took in a few words ("the speed you just moved on @lfo#4").
+
+## Validators: check before you say it works
+
+| Language | Check |
+|---|---|
+| Field Pixel | `infinite code check k.field` (any file: `--type <kind>`, kinds from `infinite code kinds`) |
+| Field Synth | `infinite code check k.synth.field` |
+| Field Modifier, Field Primitive | `infinite code check k.modifier.field`, `k.primitive.field` |
+| Sketch (JavaScript, 2D) | `infinite code check s.sketch.js` |
+| Sketch 3D (JavaScript, three.js style) | `infinite code check s.sketch3d.js` |
+| GLSL (Shadertoy node) | `infinite code check s.glsl` |
+| Formula, Equation Synth | `infinite code check f.formula`, `e.equation` |
+| A patch file | `infinite patch check p.inf` |
+| The open window | `infinite code errors` |
+
+Never hand the user code that has not passed its check.
+
+## Node families
+
+| Family | For | Reach for |
+|---|---|---|
+| Source | first picture | Shape, Noise, Ramp, Text, Image Source, Video, Video In, FieldPixel, Shadertoy, Sketch, Draw |
+| Effects | change a picture | gaussianblur, bloom, glitch, kaleidoscope, displace, halftone, pixelate, ripple, edge outline |
+| Compositing | colour, layers, time | Blend, Layer Stack, Curves, Color Ramp, Feedback, Trails, Fluid, Reaction Diffusion, chroma key |
+| 3D | geometry to a render | primitives, Model 3D, Instance on Points, Particle System, Field Modifier, Sketch 3D, Material, Camera, Light, Render 3D |
+| Synths | make sound | Analog, FM, Wavetable, Piano, String, Sampler, Granular, Drum Sequencer, Field Synth |
+| AudioEffects | change sound | Audio Filter, EQ, Dynamics, Delay, Reverb, Drive, Chorus, Stutter, Convolution Reverb |
+| Notes | notes and MIDI | MIDI Notes, Note Sequencer, Arpeggiator, Chorder, Piano Roll, Quantizer, Humanizer |
+| Modulators | move a value over time | LFO, Random, MSEG, Envelope, Audio Analyze, Audio to CV, Smoothing, Image Analyze, Hand Track |
+| Macros | knobs for playing live | Macro Knob, Macro XY, Macro Trigger |
+| Prediction | learned modulators | Drift, Moves, Predictive Modulator, Predictive Notes |
+| Utility | in and out | Output, Audio Out, Mixer, Syphon/NDI In and Out, OSC, MIDI Out, Projection |
+
+`infinite nodes` is the full list; this table is where to start.
+
+## Vague asks: suggest, then offer buttons
+
+People start vague ("make it dreamy", "something for a techno set"). Do this:
+
+1. Read `infinite context`. Build on what is there.
+2. Name the look or sound in craft terms (one line), using the craft skills.
+3. Offer two or three concrete moves, each a node or a value, each with a button.
+4. Do it yourself only when the ask is clear enough; otherwise let the buttons do it.
+
+## Buttons
+
+Write a button as a markdown link to `verb:arg`. The chat draws it as a button the user presses.
+
+| Button | Write |
+|---|---|
+| add a node | `[Add Bloom](add:bloom)` (the type name exactly as `infinite nodes` lists it) |
+| set a value | `[Slower](set:@lfo#4.rateHz=0.25)` |
+| delete a node | `[Remove blur](delete:@gaussianblur#6)` |
+| undo | `[Undo](undo:)` |
+| go to a node or param | `[Show](go:@rings#7)`, `[Show speed](go:@rings#7.speed)` |
+| open a panel | `[Open timeline](open:timeline)` (names from `infinite docs panels`) |
+
+Labels: two or three words, a verb first. Put buttons on their own line after the suggestion
+they belong to. Never offer a button for a node or key you have not checked exists.
+)AGENTDOC";
+
+   inline const char* kSkillVisualCraft =
+R"AGENTDOC(---
+name: infinite-visual-craft
+description: Visual art craft mapped onto Infinite's nodes - art movements and styles, composition, colour, compositing, typography and fonts, and motion design - so a vague visual ask ("dreamy", "brutalist poster", "VHS", "Bauhaus", "liquid chrome") becomes a short chain of real nodes and values. Use whenever the user describes a look, style, mood, layout, font or movement for a picture or 3D render.
+---
+
+# Visual craft in Infinite
+
+Turn a look into a chain: source -> shape it -> colour it -> finish it -> Output. Check every
+type name with `infinite nodes` and every key with `infinite describe <Type>` before you use it.
+
+## Styles and movements
+
+| Ask | What makes it | Chain to start from |
+|---|---|---|
+| dreamy, ethereal | soft edges, glow, low contrast, slow drift | Noise -> gaussianblur -> bloom -> Curves (lift blacks); LFO on Noise speed, slow |
+| VHS, lo-fi video | chroma bleed, scan lines, wobble, noise | Video -> glitch -> addnoise -> motionblur (small) -> vignette |
+| glitch, datamosh | blocks, channel shifts, frame smear | glitch, pixelate, Time Machine, Optical Flow, Feedback |
+| psychedelic, op art | symmetry, saturated cycling hue | kaleidoscope, mirror tile, twirl, Color Ramp; LFO on hue or ramp offset |
+| Bauhaus, Swiss | primary colours, circles, squares, grid, flat fills | Circle, Rectangle, Triangle -> Layer Stack; Text in Helvetica Neue or Futura |
+| brutalist | heavy type, raw black and white, hard edges | Text (Impact, Druk Wide Bold) -> threshold -> Layer Stack |
+| risograph, print | limited inks, grain, misregistration | halftone or dither -> posterize -> Color Ramp (2 to 3 inks) -> addnoise |
+| generative, algorithmic | rules, repetition, noise fields | FieldPixel, Sketch, Reaction Diffusion, L-System, Voronoi Cells |
+| liquid, organic | flowing distortion, metaballs | Fluid, liquify, displace with Noise, Metaballs, Blob |
+| cyberpunk, neon | dark base, magenta and cyan glow | edge outline -> bloom -> Color Ramp (magenta to cyan) -> Blend add |
+| minimal | one shape, space, one accent colour | one Shape or Text, plenty of empty frame |
+| chrome, Y2K | reflective metal, gradients, blobs | 3D: Supershape or Metaballs -> Material (metallic, low roughness) -> HDRI -> Render 3D |
+| ink, watercolour | bleed, paper texture, uneven edges | Draw or Image Source -> diffuseglow -> displace (Noise) -> Texture blend |
+| audio-reactive | picture follows the music | Audio Analyze or Audio to CV -> modulate scale, bloom, displace amount |
+
+## Composition
+
+- Rule of thirds: subject at 1/3 or 2/3 (Shape posX/posY 0.333 or 0.667). Centre only for
+  symmetry or iconic frames.
+- One hero, one support, the rest quiet. Sizes step down by about 0.6 each tier.
+- Negative space is part of the picture; leave at least a third of the frame empty in minimal work.
+- Lead the eye with lines (Line, Arrow, Chevron), light (vignette, Light) or the brightest colour.
+- Safe areas: keep text inside 90% of the frame; for 9:16 keep it out of the top 14% and bottom 22%.
+- Symmetry: mirror tile or kaleidoscope for formal, iconic or ritual moods; break it slightly to feel alive.
+
+## Colour
+
+| Scheme | Use | In Infinite |
+|---|---|---|
+| monochrome | calm, graphic | Color Ramp with two tones of one hue |
+| complementary | energy, contrast | two inks opposite on the wheel, Color Ramp or Palette |
+| analogous | harmony, mood | neighbouring hues, gradientmap |
+| triadic | playful, Bauhaus | three primaries as flat fills |
+| duotone | posters, album art | gradientmap or Color Ramp with two stops |
+
+- Warm reads near, cool reads far. Saturated accents on a muted base.
+- Grade last: Curves (contrast S), exposure, color adjustments, lut.
+- Palette and Predictive Coloring pull colour from images or learn it; Image Analyze modulates from a picture.
+
+## Compositing
+
+| Need | Node |
+|---|---|
+| stack layers with blend modes | Layer Stack, Blend (add, screen, multiply, overlay) |
+| cut out | chroma key, luma key, Remove Background, alpha from luma |
+| glow, shadow | bloom, outerglow, dropshadow, diffuseglow |
+| motion over time | Feedback, Trails, Time Machine, motionblur |
+| depth in 2D | gaussianblur on the back layer, vignette, smaller and dimmer far layers |
+| match two sources | Curves and color adjustments on one until blacks and whites agree |
+
+Order matters: key -> colour -> blur -> glow -> grade -> Output.
+
+## Typography and fonts
+
+The Text node uses the system's fonts (`fontName`; `infinite describe Text` lists them on this
+machine). Text 3D makes geometry from type.
+
+| Voice | Fonts commonly on macOS |
+|---|---|
+| neutral, Swiss | Helvetica Neue, Avenir Next, Futura |
+| editorial, elegant | Didot, Bodoni 72, Baskerville, Big Caslon |
+| heavy, poster | Impact, Druk Wide Bold, DIN Condensed |
+| technical, code | Menlo, Source Code Pro, PT Mono |
+| hand, warm | Bradley Hand, Marker Felt, SignPainter |
+
+- Two typefaces at most: one display, one text.
+- Size ladder: headline 1, sub 0.5, caption 0.25 of the headline.
+- Tight tracking for large display type (`tracking` negative), open tracking for small caps.
+- Contrast: light type on dark or dark on light; outline (`outlineWidth`) only for type over busy pictures.
+- Kinetic type: modulate `tracking`, `scaleX`/`scaleY`, `posY` with an Envelope or MSEG on the beat.
+
+## Motion design
+
+| Feel | Curve | In Infinite |
+|---|---|---|
+| snappy UI | ease out, 150 to 300 ms | MSEG with a fast attack, short decay |
+| natural | ease in-out | LFO sine, Smoothing on a stepped source |
+| bouncy | overshoot then settle | MSEG with an overshoot point, Envelope |
+| mechanical | linear, stepped | LFO saw or square, Pattern, Random stepped |
+| organic drift | slow noise | Random smooth, Drift |
+
+- Sync to music: LFO and Pattern rates in beats (`rateBeats`); Envelope from MIDI Trigger or Audio to CV on the kick.
+- Stagger: the same move on several layers, each offset by a fraction of a beat (LFO `phase`).
+- Rest: hold a frame still between moves; constant motion reads as noise.
+- Loops: rates that divide the loop length (1, 2, 4 bars) so the end meets the start.
+)AGENTDOC";
+
+   inline const char* kSkillSoundCraft =
+R"AGENTDOC(---
+name: infinite-sound-craft
+description: Sound design and music craft mapped onto Infinite's nodes - genres and subgenres (tempo, groove, palette, structure), sound design recipes (bass, pads, leads, drums, textures, FX), mixing order and arrangement - so a vague musical ask ("dark techno groove", "lo-fi chords", "cinematic riser") becomes real nodes and values. Use whenever the user names a genre, mood, instrument, sound, groove, mix problem or song section.
+---
+
+# Sound craft in Infinite
+
+Chain: notes -> synth -> effects -> Mixer -> Audio Out. Check every type with `infinite nodes`
+and every key with `infinite describe <Type>` before you use it. Tempo is the transport's `bpm`
+(`infinite status`); set it with `infinite tempo <bpm>`.
+
+## Genres and subgenres
+
+| Genre | Subgenres | BPM | Groove | Palette in Infinite |
+|---|---|---|---|---|
+| House | deep, tech, Chicago, French, afro | 118-128 | four on the floor, offbeat open hat, swung 16ths | Drum Sequencer, Analog bass, Chorder stabs, Piano chords, Reverb |
+| Techno | minimal, Detroit, industrial, hypnotic, dub | 125-140 | relentless kick, rumble, ride, little melody | Drum Sequencer, Analog or FM rumble -> Reverb -> Audio Filter, Stutter |
+| Drum and bass | liquid, neuro, jungle, jump-up | 170-176 | two-step breaks, half-time feel | Slicer on a break, Wavetable reese bass, Drive, Chorus |
+| Dubstep, bass | brostep, riddim, deep dubstep | 140 (half time 70) | kick 1, snare 3, wobble bass | Wavetable or FM bass, LFO on Audio Filter cutoff in beats, Drive, Saturator |
+| Hip-hop | boom bap, trap, lo-fi, drill | 70-100 (trap 130-150 felt half) | swung drums, sampled chords | Sampler, Slicer, MPC, Drum Sequencer, Humanizer, Bitcrush |
+| Lo-fi | lo-fi hip-hop, chillhop | 70-90 | lazy swing, soft kick | Piano or Sampler chords -> Bitcrush (light) -> Tremolo -> Audio Filter low-pass |
+| Ambient | drone, dark ambient, new age | free or 60-90 | no grid, slow swells | Granular, PaulStretch, Spectral Synth, Partials, Reverb huge, Convolution Reverb |
+| Synthwave | outrun, darksynth | 80-118 | gated snare, driving 8th bass | Analog with detune, Chorus, Delay, Arpeggiator |
+| Trance | uplifting, psy, progressive | 132-145 (psy 138-148) | rolling 16th bass, long builds | Arpeggiator -> Analog supersaw (voices, spread), Delay, Reverb |
+| Pop | synth-pop, indie, hyper-pop | 90-130 | clear backbeat, hook first | Piano, Analog, Chorder, Dynamics, Limiter |
+| Cinematic | trailer, underscore, horror | free | swells, hits, risers | String, Piano, Resonator Bank, Shape Resonator, Reverb, Pitch Shifter |
+| Experimental | IDM, glitch, noise, generative | any | broken, probabilistic | Field Synth, Random Note Generator, Bouncing Balls, Stutter, Spec Blur |
+| World-rooted | Indian classical, afrobeat, latin | per style | tala, clave, polyrhythm | Note Sequencer with odd lengths, Drum Sequencer lanes at different lengths, Key-Snap |
+
+Structure for dance music: intro 16 -> build 8 -> drop 16 -> break 16 -> build 8 -> drop 16 ->
+outro 16 (bars). Changes land on 8 or 16 bar boundaries. Arrange in the Timeline panel
+(`[Open timeline](open:timeline)`); launch live from the Session panel.
+
+## Sound design recipes
+
+| Sound | Recipe |
+|---|---|
+| sub bass | Analog or Oscillator sine, one octave below the bass line, no effects, mono |
+| reese bass | Analog two saws, `detune` up, Chorus, Audio Filter low-pass 200-800 Hz |
+| acid | Analog saw, high `resonance`, Envelope on `cutoff`, Glide on overlapping notes |
+| wobble | Wavetable bass, LFO in beats (1/4, 1/8) on Audio Filter cutoff |
+| pad | Analog or Wavetable, slow `attack` (0.5-2 s), long release, Chorus, Reverb |
+| pluck | short decay envelope, no sustain, Delay 1/8 dotted |
+| lead | one saw, light Drive, Delay 1/4, Reverb small |
+| supersaw | Analog `voices` up, `spread` and `detune` up, Stereo width |
+| kick | Drum Sequencer lane with a kick sample, or Oscillator with a fast pitch Envelope |
+| bell, metal | FM ratios not whole numbers, Metallic, Resonator Bank |
+| texture | Granular or Grain Molder on a field recording, PaulStretch, Spec Blur |
+| riser | noise -> Audio Filter with MSEG opening over 8 bars, Pitch Shifter up, Reverb growing |
+| impact | low Oscillator drop + noise burst -> Convolution Reverb |
+
+## Mixing
+
+- Order per channel: EQ (cut first) -> Dynamics -> Drive or Saturator -> modulation FX -> Delay -> Reverb.
+- Low end: one sub source, high-pass everything else around 100-150 Hz.
+- Space: Reverb and Delay on fewer sounds than you think; predelay keeps the dry hit clear.
+- Loudness: Limiter last on the master, never on every channel. Watch Audio Meter.
+- Width: low end mono, pads and FX wide (Stereo, Chorus), lead centred.
+- Sidechain feel: Envelope or Audio to CV from the kick ducking the pad's volume.
+
+## Notes and harmony
+
+| Ask | Do |
+|---|---|
+| chords | Chorder or Note Stack on a single note line; Piano Roll to edit |
+| stay in key | Key-Snap on audio pitch, Quantizer on notes |
+| groove | Humanizer for timing and velocity, Velocity Curve, swing in the sequencer |
+| melody ideas | Arpeggiator, Random Note Generator in a scale, Predictive Notes |
+| moods | minor and Dorian dark, Lydian dreamy, Phrygian tense, major pentatonic bright |
+
+Picture and sound together: Audio Analyze or Audio to CV turns the music into modulation for any
+visual param (see infinite-visual-craft).
+)AGENTDOC";
+
+   inline const char* kSkillFilmCraft =
+R"AGENTDOC(---
+name: infinite-film-craft
+description: Film, music-video and live-visual craft mapped onto Infinite - structure (acts, beats, sections), camera language in the 3D View, cutting and syncing picture to music, lighting, and render or live delivery - so an ask like "make a music video for this track", "a cinematic opener" or "visuals for my set" becomes a plan of scenes, nodes and a render. Use whenever the user wants a film, video, loop, VJ set, projection or anything that unfolds over time.
+---
+
+# Film craft in Infinite
+
+A film in Infinite is a patch that changes over time: scenes are clips or switched branches,
+the camera is a node, the music drives the cut, and the result renders to a file or plays live.
+
+## Structure first
+
+| Length | Shape |
+|---|---|
+| loop (4-16 bars) | one idea, one move, end meets start |
+| short (15-60 s) | hook in the first 2 s, one build, one payoff |
+| music video | follow the song: intro, verse, chorus, bridge, last chorus, outro |
+| live set | scenes per track section, launched from Session or a Show Set |
+
+Write the plan as a table before building: section, bars, picture idea, what moves, what drives it.
+Changes land on bar lines; big changes on 8 or 16 bars. Bars to seconds: `bars * 4 * 60 / bpm`.
+
+## Scenes and cutting
+
+| Need | In Infinite |
+|---|---|
+| switch looks on the beat | Switcher (2D) or Switcher 3D, index modulated by Pattern or MIDI Trigger |
+| arrange in time | Timeline panel: clips on lanes (`[Open timeline](open:timeline)`) |
+| launch live | Session panel, Show Set for whole patches |
+| crossfade | Blend with its mix on an Envelope or MSEG |
+| match cut | keep the shape or colour across the switch, change everything else |
+| hide a hard moment | cut away on a hit to a close-up or a flash (exposure spike) |
+
+## Camera language (3D)
+
+Build with 3D nodes -> Camera and Light -> Render 3D; compose in the 3D View
+(`[Open 3D View](open:view3d)`).
+
+| Shot | Use | Camera move |
+|---|---|---|
+| wide, establishing | where we are | slow push or none |
+| medium | the subject in its space | gentle orbit |
+| close-up | detail, emotion, the hit | still, or a small push on the beat |
+| low angle | power, scale | camera below the subject looking up |
+| top down | pattern, map, graphic | camera straight down, slow rotate |
+| orbit | reveal form | LFO on the camera's rotation, rate in bars |
+| push in | tension, focus | MSEG on distance over a build |
+
+- Motivate every move: music, story or reveal. A still camera makes a move mean something.
+- One move per shot. Ease in and out (MSEG, Smoothing); linear moves read as mechanical.
+- Lights: key, fill, rim. Rim light separates the subject from a dark background. HDRI for reflective work.
+
+## Sync to music
+
+| Picture | Driven by |
+|---|---|
+| cut, switch | Pattern in beats, MIDI Trigger, or kick through Audio to CV |
+| pulse, flash | Envelope on the kick or snare; Audio Analyze bands |
+| slow evolution | LFO in bars, MSEG over a section |
+| intensity | loudness from Audio Analyze to bloom, displace, particle rate |
+
+Hit the downbeat; anticipate big hits by a frame or two of build-up.
+
+## Look and finish
+
+- One colour grade per film: Curves, color adjustments or a lut, same on every scene.
+- Grain and vignette last, lightly (addnoise, vignette).
+- Text: see infinite-visual-craft typography; titles hold at least 2 s.
+
+## Delivery
+
+| Out | How |
+|---|---|
+| file | `infinite render p.inf out.mp4` (headless) or the app's render; `infinite docs headless` |
+| still | `infinite frame p.inf <t> out.png`, `infinite shot <node>` |
+| live screen or projector | Output, Projection |
+| other apps | Syphon Out, NDI Out; OSC Send and MIDI Out for control |
+)AGENTDOC";
 }

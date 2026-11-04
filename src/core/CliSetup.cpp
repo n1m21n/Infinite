@@ -10,6 +10,7 @@
 
 #include "json.hpp"
 #include "core/AISkillContent.h"
+#include "core/AgentDocs.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 
@@ -132,6 +133,10 @@ namespace CliSetup
          { "infinite-field-language", AISkillContent::kFieldLanguageMarkdown },
          { "infinite-expression-globals", AISkillContent::kExpressionGlobalsMarkdown },
          { "infinite-live-session", AISkillContent::kLiveSessionMarkdown },
+         { "infinite-map", AgentDocs::kSkillMap },
+         { "infinite-visual-craft", AgentDocs::kSkillVisualCraft },
+         { "infinite-sound-craft", AgentDocs::kSkillSoundCraft },
+         { "infinite-film-craft", AgentDocs::kSkillFilmCraft },
       };
       return kSkills;
    }
