@@ -294,37 +294,4 @@ namespace app
       ImGui::Dummy(ImVec2(availW, tok::space_4));
       return true;
    }
-
-   // The exact commands and script behind the buttons, for the Reference well on the same page.
-   void DrawCliSetupCommands()
-   {
-      using namespace CliSetup;
-      const Os os = CurrentOs();
-      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
-      const Agent* agent = FindAgent(Prefs().agent);
-      if (agent == nullptr)
-         agent = &Agents()[0];
-      const std::string exe = RealExecutable();
-      const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, nullptr);
-
-      ImGui::TextWrapped("%s", T("Set up and Repair run this line in the background, with no terminal. It runs the script below, which checks each step first and skips what is already done."));
-      CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
-      if (v.showInstall)
-      {
-         ImGui::TextWrapped("%s", T("The agent's own installer:"));
-         CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
-      }
-      ImGui::TextWrapped("%s", T("The command the chat starts for each message begins with:"));
-      CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
-      ImGui::TextWrapped("%s", T("The script, exactly as it runs:"));
-      static std::string sScript;
-      static std::string sScriptFor;
-      const std::string key = exe + "|" + agent->id;
-      if (sScriptFor != key)
-      {
-         sScriptFor = key;
-         sScript = BuildScript(os, exe, *agent, paths.status);
-      }
-      CodeBlock::Draw(sScript.c_str(), "cb_cli_script");
-   }
 }
