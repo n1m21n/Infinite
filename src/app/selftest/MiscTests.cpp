@@ -3629,6 +3629,7 @@ void RunView3DTest()
       std::copy(eye, eye + 3, view.eye);
       view.shading = Scene3DNode::Shading::Solid;
       view.gridDist = 4.0f * height;
+      Scene()->settings.axisX = Scene()->settings.axisY = Scene()->settings.axisZ = false;
       std::vector<float> off, on;
       for (int g = 0; g < 2; g++)
       {
@@ -3659,7 +3660,30 @@ void RunView3DTest()
          }
       printf("  floor seam from %.1f: %d face px above the floor line, %d with grid on them\n", height, band, bad);
       Check("the cube face is clear of the grid at floor height", band > 0 && bad == 0);
+      // Grid lines are anti-aliased from screen derivatives; with axes off no pixel of the grid
+      // may be stronger than a line (0.75). A derivative taken inside the depth branch gave full
+      // strength dashes on the background beside the mesh border, and any change on the mesh.
+      {
+         int changedMesh = 0, strong = 0, r0 = 999, r1 = -1, c0 = 999, c1 = -1;
+         for (size_t i = 0; i < off.size(); i += 4)
+         {
+            if (off[i + 3] > 0.99f && (int)(i / 4 / 256) >= seam - 1 && (int)(i / 4 % 256) >= 112 && (int)(i / 4 % 256) < 144 && (int)(i / 4 / 256) <= seam + 20)
+            {
+               if (std::abs(on[i] - off[i]) + std::abs(on[i + 1] - off[i + 1]) + std::abs(on[i + 2] - off[i + 2]) > 0.02f)
+               {
+                  changedMesh++;
+                  r0 = std::min(r0, (int)(i / 1024)); r1 = std::max(r1, (int)(i / 1024));
+                  c0 = std::min(c0, (int)(i / 4 % 256)); c1 = std::max(c1, (int)(i / 4 % 256));
+               }
+            }
+            else if (off[i + 3] < 0.01f && on[i + 3] > 0.8f)
+               strong++;
+         }
+         printf("  grid from %.1f: %d mesh px changed (rows %d-%d cols %d-%d, seam %d), %d over-strong grid px\n", height, changedMesh, r0, r1, c0, c1, seam, strong);
+         Check("grid on/off leaves the mesh above the floor and its border clean", changedMesh == 0 && strong == 0);
+      }
    }
+   Scene()->settings.axisX = Scene()->settings.axisY = true;
    shown->worldColorOn = true;
    // A camera's background image: behind the objects, over them, and only in the view.
    {
