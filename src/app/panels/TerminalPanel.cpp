@@ -927,7 +927,11 @@ namespace
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       if (avail.x < cw * 2.0f || avail.y < ch * 2.0f)
+      {
+         // The tab row moved the cursor; submit an item so ImGui's boundary check stays quiet.
+         ImGui::Dummy(ImVec2(0.0f, 0.0f));
          return;
+      }
       const int cols = std::max(2, (int)(avail.x / cw));
       const int rows = std::max(2, (int)(avail.y / ch));
       if (cols != tab->cols || rows != tab->rows)
