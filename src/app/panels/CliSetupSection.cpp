@@ -211,9 +211,11 @@ namespace app
             ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h * 0.36f, a.id);
             ImGui::Dummy(ImVec2(h, h));
             FormParts::Inline();
+            const float nameStartX = ImGui::GetCursorPosX();
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(a.name);
             FormParts::Inline();
+            ImGui::SetCursorPosX(nameStartX + 120.0f);
             ImGui::AlignTextToFramePadding();
             const char* state = r.Ready() ? T("Ready") : !r.installed ? T("Not installed") : !r.connected ? T("Not connected") : T("Sign in");
             if (r.Ready())
@@ -229,23 +231,33 @@ namespace app
          ImGui::AlignTextToFramePadding();
          ImGui::Text("%d", count);
          FormParts::Inline();
+         ImGui::SetCursorPosX(FormParts::gLabelW + 36.0f);
          ImGui::BeginDisabled(count == 0 || ChatBusy());
          if (FormParts::Button(L("Clear all")))
             ImGui::OpenPopup("##clearchats");
          ImGui::EndDisabled();
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
          if (ImGui::BeginPopup("##clearchats"))
          {
             ImGui::TextUnformatted(T("Delete every saved chat?"));
-            if (FormParts::Button(L("Delete")))
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            const float cancelW = std::max(64.0f, ImGui::CalcTextSize(T("Cancel")).x + 2.0f * tok::space_2);
+            const float deleteW = std::max(64.0f, ImGui::CalcTextSize(T("Delete")).x + 2.0f * tok::space_2);
+            const float total = cancelW + tok::space_2 + deleteW;
+            const float avail = ImGui::GetContentRegionAvail().x;
+            if (avail > total)
+               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
+            if (ChipButton::Draw(L("Cancel"), false, 24.0f, cancelW))
+               ImGui::CloseCurrentPopup();
+            FormParts::Inline(0.0f, tok::space_2);
+            if (ChipButton::Draw(L("Delete"), true, 24.0f, deleteW))
             {
                ChatClearHistory();
                ImGui::CloseCurrentPopup();
             }
-            FormParts::Inline();
-            if (FormParts::Button(L("Cancel")))
-               ImGui::CloseCurrentPopup();
             ImGui::EndPopup();
          }
+         ImGui::PopStyleVar();
       }
 
       FormParts::Label(L("Terminal panel"));
