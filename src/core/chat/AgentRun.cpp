@@ -18,10 +18,12 @@ namespace chat
       std::atomic<bool> finished{ false };
       std::atomic<bool> stopped{ false };
       std::string log;
+      std::atomic<unsigned long long> total{ 0 };
 
       void AppendLog(const std::string& bytes)
       {
          std::lock_guard<std::mutex> g(lock);
+         total += bytes.size();
          log += bytes;
          if (log.size() > 16384)
             log.erase(0, log.size() - 16384);
@@ -193,6 +195,8 @@ namespace chat
       std::lock_guard<std::mutex> g(mImpl->lock);
       return mImpl->log;
    }
+
+   unsigned long long AgentRun::Bytes() const { return mImpl->total.load(); }
 
    bool AgentRun::Write(const std::string& text)
    {

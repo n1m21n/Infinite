@@ -152,6 +152,32 @@ namespace chat
       return f;
    }
 
+   bool WaitsForSignIn(const std::string& log)
+   {
+      // Only plain lines count: a stream-json line (or a piece of one) can quote anything the model wrote.
+      std::string plain;
+      const std::string clean = StripAnsi(log);
+      size_t start = 0;
+      while (start < clean.size())
+      {
+         size_t nl = clean.find('\n', start);
+         if (nl == std::string::npos)
+            nl = clean.size();
+         std::string line = clean.substr(start, nl - start);
+         start = nl + 1;
+         const size_t b = line.find_first_not_of(" \t");
+         if (b == std::string::npos || line[b] == '{' || line.find("\":") != std::string::npos)
+            continue;
+         plain += Lower(line) + '\n';
+      }
+      if (plain.empty())
+         return false;
+      if (AsksForCode(plain))
+         return true;
+      return plain.find("https://") != std::string::npos &&
+             Has(plain, { "sign in", "sign-in", "log in", "login", "authoriz", "authoris", "authenticat", "oauth" });
+   }
+
    std::vector<Model> FixedModels(AgentKind kind)
    {
       if (kind == AgentKind::Claude)

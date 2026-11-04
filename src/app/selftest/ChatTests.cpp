@@ -525,6 +525,11 @@ namespace app
          check(chat::AsksForCode("Waiting for authentication (timeout 60s)...\nOr, paste the authorization code here and press Enter:"), "a sign-in that asks for a pasted code is noticed");
          check(!chat::AsksForCode("Open https://claude.ai/oauth?x=1 now"), "a plain browser sign-in does not ask for a code");
          check(chat::Explain("Claude", "Error: not logged in").kind == chat::Friendly::Kind::SignIn, "error: not logged in means sign in");
+         check(chat::WaitsForSignIn("Please sign in: https://accounts.google.com/o/oauth2/auth?x=1\nPaste the code here:"), "turn: agy asking for a sign-in mid-turn is noticed");
+         check(chat::WaitsForSignIn("\x1b[1mOpen this page to log in\x1b[0m\r\nhttps://example.com/device\n"), "turn: an address on the line after the ask still counts");
+         check(!chat::WaitsForSignIn("{\"type\":\"text\",\"text\":\"sign in at https://x.com and paste the code\"}\n"), "turn: a reply that talks about signing in is not a sign-in");
+         check(!chat::WaitsForSignIn("ign in at https://x.com/login\",\"more\":1}\n"), "turn: a cut-off piece of a json line is not a sign-in");
+         check(!chat::WaitsForSignIn("Working on it\nsee https://infinitedevices.org\n"), "turn: an address alone is not a sign-in");
          check(chat::Explain("Codex", "You've hit your usage limit").kind == chat::Friendly::Kind::Limit, "error: usage limit");
          check(chat::Explain("Codex", "getaddrinfo ENOTFOUND api").kind == chat::Friendly::Kind::Offline, "error: offline");
          check(chat::Explain("Codex", "zsh: command not found: codex").kind == chat::Friendly::Kind::Missing, "error: missing command");

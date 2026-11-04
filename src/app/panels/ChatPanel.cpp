@@ -89,7 +89,14 @@ namespace app
          bool error = false;
          std::string errorText;
          std::vector<std::string> denied;
+         unsigned long long bytes = 0;  // output seen at the last check
+         double activeAt = -1.0;        // when output last grew
+         double checkedAt = -1.0;
+         std::string cut;               // why the chat ended the turn itself ("" = it did not)
       };
+
+      // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
+      constexpr double kTurnSilentSeconds = 15.0 * 60.0;
 
       // What the chat knows about each agent: can it take a turn, and a setup running in the background.
       struct AgentState
@@ -916,6 +923,24 @@ namespace app
                continue;
             std::vector<chat::AgentEvent> events;
             r.run->Poll(events);
+            // Once a second: a turn that asks for a sign-in waits for input nobody can type, and one that has
+            // printed nothing for a long time is stuck. Either is ended here and said plainly.
+            const double now = ImGui::GetTime();
+            if (r.activeAt < 0.0)
+               r.activeAt = now;
+            if (r.cut.empty() && now - r.checkedAt >= 1.0)
+            {
+               r.checkedAt = now;
+               const unsigned long long b = r.run->Bytes();
+               if (b != r.bytes)
+                  r.bytes = b, r.activeAt = now;
+               if (chat::WaitsForSignIn(r.run->Log()))
+                  r.cut = "not signed in";
+               else if (now - r.activeAt > kTurnSilentSeconds)
+                  r.cut = T("It stopped responding, so the chat ended the turn. Try again.");
+               if (!r.cut.empty())
+                  r.run->Stop();
+            }
             Entry& steps = sThread.entries[(size_t)r.steps];
             for (const chat::AgentEvent& e : events)
                switch (e.kind)
@@ -945,6 +970,8 @@ namespace app
             if (r.run->Done())
             {
                r.run = nullptr;
+               if (!r.cut.empty())
+                  r.error = true, r.errorText = r.cut;
                FinishRun(r);
             }
          }

@@ -27,6 +27,9 @@ namespace chat
       std::string text;  // one short sentence, no jargon
    };
    Friendly Explain(const std::string& agentName, const std::string& raw);
+   // True when a chat turn stopped to ask for a sign-in (an address to open, a code to paste) in plain text
+   // outside its stream-json: nobody can answer it there, so the chat ends the turn and shows Sign in.
+   bool WaitsForSignIn(const std::string& log);
 
    // One row of a model menu.
    struct Model

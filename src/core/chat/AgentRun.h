@@ -38,6 +38,7 @@ namespace chat
       bool Write(const std::string& text);      // types into the child (a pasted sign-in code); false once it is gone
       void Stop();                              // ends the turn; an End event follows
       std::string Log() const;                  // everything the child printed (last ~16 KB), for a Details fold
+      unsigned long long Bytes() const;         // how much the child printed so far, all of it (Log() keeps the end)
 
       struct Impl;
 
