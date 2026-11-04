@@ -917,7 +917,10 @@ namespace app
       {
          ImGui::BeginChild("##chatlog", ImVec2(0.0f, height), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse * 0);
          const float width = ImGui::GetContentRegionAvail().x - tok::space_1;
-         if (sMsgs.empty() && sRun == nullptr)
+         const bool setup = DrawChatSetup(width);
+         if (setup && !sMsgs.empty())
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         if (!setup && sMsgs.empty() && sRun == nullptr)
          {
             const ImVec2 mn = ImGui::GetWindowPos(), mx(mn.x + ImGui::GetWindowWidth(), mn.y + ImGui::GetWindowHeight());
             EmptyState::DrawCaption(mn, mx, T("Type @ to command a node, or ask anything."));
@@ -1240,8 +1243,6 @@ namespace app
       RefreshCatalog(false);
       const float width = ImGui::GetContentRegionAvail().x;
       DrawHeader(width);
-      if (DrawTerminalWelcome())
-         return;
       const float composerH = 30.0f + tok::space_2;
       DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH));
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));

@@ -340,6 +340,22 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 | `infinite-live-session` skill, with the reply rule | built | ships as the 4th skill |
 | Parent-pid walk inside a real agent shell | not yet run | needs the owner's two-window repro |
 
+**T4 (2026-11-04, branch `agent-collab/t4`).**
+
+| Piece | State | Proof |
+|---|---|---|
+| `get_params --full`, `focus`, batch `$N` refs | built | CHATTEST |
+| Patch grammar: modulate / set / = / connect / add / remove / bypass / undo, `and` batches | built | CHATTEST: the owner's two-clause example runs as one batch with its CLI lines |
+| Reply links `@title#index[.key]`, backticked titles, bare keys, images, code | built | CHATTEST |
+| Claude and Codex stream parsers, resume args | built | CHATTEST |
+| Agent runner (login shell, stop, last words on a crash) | built | CHATTEST with a stand-in agent: events in order, crash text, quiet stop |
+| Chat face: messages, chips that frame the node, change cards with Undo, folded steps, images | built | builds; not yet looked at in the app |
+| Composer: span colours, route badge, per-slot dropdown, ↑↓ nudge, history | built | builds; not yet looked at in the app |
+| Terminal face toggle resumes the same session | built | resume line in CHATTEST |
+| Setup as the chat's opening message | built | CLISETUPTEST still passes |
+| A real `claude -p` / `codex exec` turn | not yet run | needs the owner's yes |
+| `/` commands | not built | |
+
 ## 11. Critique
 
 - **Agent modes differ.** Structured modes and resume commands differ by agent, and some may lack one. Then the chat degrades to the terminal. Each adapter is checked against the agent's own docs before building.
@@ -355,4 +371,4 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 3. T1: session binding, setup reorder, per-OS Node lines, instruction note; rerun B0.
 4. T2: `infinite mcp` with live tools.
 5. T3: the gate; keep only if it beats B1.
-6. Show the chat panel UI to the owner; build T4 on yes.
+6. T4 built; owner looks at the chat in the app and runs one real agent turn.

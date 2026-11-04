@@ -5778,6 +5778,7 @@ extern std::vector<std::string> gTerminalDropPending; // paths dropped on the pa
 void TerminalLoadFonts(float bakedPx);
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
+bool DrawChatSetup(float width); // the same choice as the chat's opening message
 // The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
 extern int gTerminalFace;
 void DrawChatPanel();
