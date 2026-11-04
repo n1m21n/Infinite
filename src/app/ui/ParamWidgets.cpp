@@ -707,6 +707,20 @@ namespace app
       const std::string caption = options[safeCurrent] + "##" + label;
       // R1: the parameter name lives inside the face, not beside it.
       const std::string inner = showCaption ? StripParamLabel(label) : std::string();
+      if (segmented && !options.empty())
+      {
+         // Segments only when every option's text fits its cell; otherwise the labels print over each other,
+         // so fall back to the dropdown face (same hit item, same behaviour).
+         const float pad = tok::space_2;
+         const float labelW = inner.empty() ? 0.0f : std::min(ImGui::CalcTextSize(inner.c_str()).x, width * 0.4f - pad) + 2.0f * pad;
+         const float cellW = (width - 2.0f - (inner.empty() ? 2.0f : labelW)) / (float)options.size();
+         for (const std::string& o : options)
+            if (ImGui::CalcTextSize(o.c_str()).x + 2.0f > cellW)
+            {
+               segmented = false;
+               break;
+            }
+      }
       PushDropdownStyle();
       if (h.modulated)
       {
