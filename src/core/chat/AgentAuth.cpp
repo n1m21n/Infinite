@@ -19,7 +19,41 @@ namespace chat
       }
    }
 
-   int SignInWaitSeconds(AgentKind kind) { return kind == AgentKind::Antigravity ? 60 : 0; }
+   std::vector<std::string> StatusArgs(AgentKind kind, bool mac)
+   {
+      switch (kind)
+      {
+         case AgentKind::Codex:
+            return { "codex", "login", "status" };
+         case AgentKind::Antigravity:
+            // `agy models` lists models only when signed in; its list fills the picker too.
+            if (!mac)
+               return { "agy", "models" };
+            return { "/bin/sh", "-c",
+                     "if /usr/bin/security find-generic-password -s gemini -a antigravity >/dev/null 2>&1 || "
+                     "[ -f \"$HOME/.gemini/jetski-standalone-oauth-token\" ]; then exec agy models; fi; "
+                     "echo 'not logged in'; exit 1" };
+         default:
+            return { "claude", "auth", "status" };
+      }
+   }
+
+   std::vector<std::string> SignOutArgs(AgentKind kind, bool mac)
+   {
+      switch (kind)
+      {
+         case AgentKind::Codex:
+            return { "codex", "logout" };
+         case AgentKind::Antigravity:
+            if (!mac)
+               return {};
+            return { "/bin/sh", "-c",
+                     "/usr/bin/security delete-generic-password -s gemini -a antigravity >/dev/null 2>&1; "
+                     "rm -f \"$HOME/.gemini/jetski-standalone-oauth-token\"; exit 0" };
+         default:
+            return { "claude", "auth", "logout" };
+      }
+   }
 
    std::string StripAnsi(const std::string& text)
    {
@@ -176,6 +210,37 @@ namespace chat
          return true;
       return plain.find("https://") != std::string::npos &&
              Has(plain, { "sign in", "sign-in", "log in", "login", "authoriz", "authoris", "authenticat", "oauth" });
+   }
+
+   Auth SignedInFrom(AgentKind kind, bool exitOk, const std::string& output)
+   {
+      std::string l = Lower(StripAnsi(output));
+      if (kind == AgentKind::Claude)
+      {
+         // JSON: "loggedIn": true
+         std::string tight;
+         for (char c : l)
+            if (!std::isspace((unsigned char)c))
+               tight += c;
+         if (tight.find("\"loggedin\":true") != std::string::npos)
+            return Auth::In;
+         if (tight.find("\"loggedin\":false") != std::string::npos)
+            return Auth::Out;
+         return exitOk ? Auth::Unknown : Auth::Out;
+      }
+      if (kind == AgentKind::Codex)
+      {
+         if (l.find("not logged in") != std::string::npos)
+            return Auth::Out;
+         if (exitOk && l.find("logged in") != std::string::npos)
+            return Auth::In;
+         return exitOk ? Auth::Unknown : Auth::Out;
+      }
+      if (WaitsForSignIn(output) || l.find("not logged in") != std::string::npos)
+         return Auth::Out;
+      if (exitOk && !ParseAgyModels(StripAnsi(output)).empty())
+         return Auth::In;
+      return Auth::Unknown;
    }
 
    std::vector<Model> FixedModels(AgentKind kind)

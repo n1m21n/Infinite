@@ -530,6 +530,31 @@ namespace app
          check(!chat::WaitsForSignIn("{\"type\":\"text\",\"text\":\"sign in at https://x.com and paste the code\"}\n"), "turn: a reply that talks about signing in is not a sign-in");
          check(!chat::WaitsForSignIn("ign in at https://x.com/login\",\"more\":1}\n"), "turn: a cut-off piece of a json line is not a sign-in");
          check(!chat::WaitsForSignIn("Working on it\nsee https://infinitedevices.org\n"), "turn: an address alone is not a sign-in");
+         {
+            using chat::Auth;
+            using chat::AgentKind;
+            check(chat::SignedInFrom(AgentKind::Claude, true, "{\n  \"loggedIn\": true,\n  \"authMethod\": \"claude.ai\"\n}") == Auth::In, "status: claude json says signed in");
+            check(chat::SignedInFrom(AgentKind::Claude, false, "{\"loggedIn\":false}") == Auth::Out, "status: claude json says signed out");
+            check(chat::SignedInFrom(AgentKind::Claude, true, "") == Auth::Unknown, "status: claude with no answer stays unknown");
+            check(chat::SignedInFrom(AgentKind::Codex, false, "Not logged in\n") == Auth::Out, "status: codex not logged in");
+            check(chat::SignedInFrom(AgentKind::Codex, true, "Logged in using ChatGPT\n") == Auth::In, "status: codex logged in");
+            check(chat::SignedInFrom(AgentKind::Antigravity, true, "Fetching available models...\nflash\tGemini Flash\n") == Auth::In, "status: agy lists models when signed in");
+            check(chat::SignedInFrom(AgentKind::Antigravity, false, "not logged in\n") == Auth::Out, "status: agy without a stored login is signed out");
+            check(chat::SignedInFrom(AgentKind::Antigravity, false, "Error: not logged into Antigravity") == Auth::Out, "status: agy not logged into Antigravity");
+            check(chat::SignedInFrom(AgentKind::Antigravity, true, "Please sign in: https://accounts.google.com/o/oauth2/auth?x=1\n") == Auth::Out, "status: agy asking for a sign-in is signed out");
+            check(chat::SignedInFrom(AgentKind::Antigravity, false, "getaddrinfo ENOTFOUND\n") == Auth::Unknown, "status: agy offline stays unknown");
+            check(chat::StatusArgs(AgentKind::Claude, true) == std::vector<std::string>({ "claude", "auth", "status" }), "status: claude asks claude auth status");
+            check(chat::StatusArgs(AgentKind::Codex, false) == std::vector<std::string>({ "codex", "login", "status" }), "status: codex asks codex login status");
+            const std::vector<std::string> am = chat::StatusArgs(AgentKind::Antigravity, true);
+            check(am.size() == 3 && am[0] == "/bin/sh" && am[2].find("find-generic-password -s gemini -a antigravity") != std::string::npos && am[2].find(" -w") == std::string::npos && am[2].find(" -g") == std::string::npos, "status: agy on mac checks the keychain item without reading the secret");
+            check(chat::StatusArgs(AgentKind::Antigravity, false) == std::vector<std::string>({ "agy", "models" }), "status: agy elsewhere lists models");
+            check(chat::SignOutArgs(AgentKind::Claude, true) == std::vector<std::string>({ "claude", "auth", "logout" }), "sign-out: claude auth logout");
+            check(chat::SignOutArgs(AgentKind::Codex, false) == std::vector<std::string>({ "codex", "logout" }), "sign-out: codex logout");
+            const std::vector<std::string> ao = chat::SignOutArgs(AgentKind::Antigravity, true);
+            check(ao.size() == 3 && ao[2].find("delete-generic-password -s gemini -a antigravity") != std::string::npos && ao[2].find("jetski-standalone-oauth-token") != std::string::npos, "sign-out: agy on mac clears the keychain item and the token file");
+            check(chat::SignOutArgs(AgentKind::Antigravity, false).empty(), "sign-out: agy on windows and linux is not offered");
+            check(chat::kSignInSeconds >= 60.0 && chat::kSignInSeconds <= 600.0, "sign-in: waiting for the browser times out");
+         }
          check(chat::Explain("Codex", "You've hit your usage limit").kind == chat::Friendly::Kind::Limit, "error: usage limit");
          check(chat::Explain("Codex", "getaddrinfo ENOTFOUND api").kind == chat::Friendly::Kind::Offline, "error: offline");
          check(chat::Explain("Codex", "zsh: command not found: codex").kind == chat::Friendly::Kind::Missing, "error: missing command");

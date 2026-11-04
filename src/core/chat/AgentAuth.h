@@ -11,8 +11,23 @@ namespace chat
 {
    // argv of the sign-in: the CLI opens the browser itself and waits for the callback.
    std::vector<std::string> SignInArgs(AgentKind kind);
-   // Seconds the CLI waits for the browser before it gives up (0 = it does not).
-   int SignInWaitSeconds(AgentKind kind);
+   // How long the chat waits for a browser sign-in before it stops it and says so.
+   constexpr double kSignInSeconds = 180.0;
+
+   // The agent's own "am I signed in" check, run in the background; a file probe alone goes stale (Antigravity
+   // keeps its login in the keychain, Claude leaves its account in ~/.claude.json after a logout).
+   // On macOS Antigravity's check first asks the keychain whether its item exists (no secret is read) and runs
+   // `agy models` only then, so a background check never starts a browser sign-in.
+   std::vector<std::string> StatusArgs(AgentKind kind, bool mac);
+   enum class Auth { Unknown, In, Out };
+   // What StatusArgs printed and whether it exited 0. Unknown when the answer says neither.
+   Auth SignedInFrom(AgentKind kind, bool exitOk, const std::string& output);
+
+   // argv that clears the agent's stored login ({} = not supported on this system). Antigravity has no
+   // logout command: on macOS its login is the keychain item service "gemini", account "antigravity", with
+   // ~/.gemini/jetski-standalone-oauth-token as a file fallback. Its Linux and Windows keyring entries are
+   // not verified, so there it is {}.
+   std::vector<std::string> SignOutArgs(AgentKind kind, bool mac);
 
    // Terminal output without colour codes, carriage returns or other control bytes.
    std::string StripAnsi(const std::string& text);
