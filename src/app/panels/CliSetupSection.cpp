@@ -7,6 +7,9 @@
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/CodeBlock.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
 #include "platform/AppPaths.h"
@@ -239,33 +242,48 @@ namespace app
          SaveConfig(paths.config, prefs);
       };
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_4));
-      ImGui::Indent(tok::space_4);
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(240.0f, ImGui::GetContentRegionAvail().x - tok::space_4));
-      ImGui::TextUnformatted(T("Welcome to the Terminal"));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      ImGui::TextDisabled("%s", T("A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
-
-      ImGui::TextUnformatted(T("Choose your coding agent"));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      const auto& all = Agents();
-      const float colW = ImGui::GetContentRegionAvail().x;
-      const float bw = ActionButton::RowWidth((int)all.size(), colW + ActionButton::ColumnIndent());
-      for (size_t i = 0; i < all.size(); i++)
+      // One centred column, never wider than reads well; every control is a design component.
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float availW = ImGui::GetContentRegionAvail().x;
+      const float colW = std::min(460.0f, std::max(160.0f, availW - 2.0f * tok::space_4));
+      const float x = origin.x + (availW - colW) * 0.5f;
+      const float rowH = ImGui::GetFrameHeight() + tok::space_1;
+      float y = origin.y + tok::space_5;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const float cx = x + colW * 0.5f;
+      auto centred = [&](UiType::Size size, UiType::Weight weight, ImU32 col, const char* text)
       {
-         if (i > 0)
-            ActionButton::RowNext();
-         const bool on = &all[i] == agent;
-         if (ActionButton::Draw((std::string(all[i].name) + "###welcome_agent" + std::to_string(i)).c_str(), ImVec2(bw, 0.0f), on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+         UiType::Scope scope(size, weight);
+         y = EmptyState::DrawWrapped(dl, cx, y, colW, col, text);
+      };
+
+      centred(UiType::Size::Title, UiType::Weight::Semibold, ImGui::GetColorU32(ImGuiCol_Text), T("Welcome to the Terminal"));
+      y += tok::space_2;
+      centred(UiType::Size::Body, UiType::Weight::Regular, dim, T("A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you."));
+      y += tok::space_5;
+
+      centred(UiType::Size::Caption, UiType::Weight::Medium, dim, T("Choose your coding agent"));
+      y += tok::space_2;
+      {
+         const auto& all = Agents();
+         std::vector<PillGroup::Segment> segs;
+         for (const Agent& a : all)
+            segs.push_back({ a.id, a.name });
+         int cur = 0;
+         for (size_t i = 0; i < all.size(); i++)
+            if (&all[i] == agent)
+               cur = (int)i;
+         const int hit = PillGroup::Draw("welcome.agent", UiLayout::Rect{ x, y, colW, rowH }, segs.data(), (int)segs.size(), cur);
+         if (hit >= 0 && hit != cur)
          {
-            prefs.agent = all[i].id;
+            prefs.agent = all[(size_t)hit].id;
             SaveConfig(paths.config, prefs);
          }
+         y += rowH + tok::space_3;
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
-      ImGui::TextDisabled("%s", T("Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+      centred(UiType::Size::Caption, UiType::Weight::Regular, dim, T("Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal."));
+      y += tok::space_4;
 
       static std::string sError;
       auto perform = [&](Action a)
@@ -274,15 +292,20 @@ namespace app
          Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, std::string(), nullptr);
          finish();
       };
-      const ImVec2 wide(std::min(colW, 260.0f), 0.0f);
-      if (ActionButton::Draw((std::string(T("Connect")) + " " + agent->name + "###welcome_connect").c_str(), wide, ActionButton::Kind::Primary))
+      const std::string connect = std::string(T("Connect")) + " " + agent->name;
+      if (TextButton::Draw("welcome.connect", UiLayout::Rect{ x, y, colW, rowH }, connect.c_str(), TextButton::Kind::Primary))
          perform(v.showInstall ? Action::kInstallAgent : Action::kSetup);
-      if (ActionButton::Draw((std::string(T("Skip, just a terminal")) + "###welcome_skip").c_str(), wide, ActionButton::Kind::Plain))
+      y += rowH + tok::space_2;
+      if (TextButton::Draw("welcome.skip", UiLayout::Rect{ x, y, colW, rowH }, T("Skip, just a terminal"), TextButton::Kind::Quiet))
          finish();
+      y += rowH;
       if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
-      ImGui::PopTextWrapPos();
-      ImGui::Unindent(tok::space_4);
+      {
+         y += tok::space_2;
+         centred(UiType::Size::Caption, UiType::Weight::Regular, tok::U32(tok::action_record, CategoryColors::IsThemeLight()), sError.c_str());
+      }
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, y));
+      ImGui::Dummy(ImVec2(availW, tok::space_4));
       return true;
    }
 
