@@ -4198,7 +4198,8 @@ namespace
             sEdit.op = 0;
             return true;
          }
-         const ImGuiKey axisKeys[3] = { ImGuiKey_X, ImGuiKey_Y, ImGuiKey_Z };
+         // The scene is Y-up, drawn Z-up: the Z key is the vertical axis (index 1), as in object mode.
+         const ImGuiKey axisKeys[3] = { ImGuiKey_X, ImGuiKey_Z, ImGuiKey_Y };
          for (int k = 0; k < 3 && sEdit.op != 'e' && sEdit.op != 'i'; k++)
             if (pressed(axisKeys[k]))
                sEdit.axis = sEdit.axis == k ? -1 : k;
