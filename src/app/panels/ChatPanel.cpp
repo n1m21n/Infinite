@@ -121,6 +121,7 @@ namespace app
       bool sRail = false;  // the chats list is open on the left
       chat::Snapshot sBefore;
       std::map<std::string, AgentState> sAgents;
+      std::map<std::string, double> sModelsFetchAt;  // when each agent's model list was last asked for
       double sAgentsAt = -100.0;
       int sLastFrame = -100;
       bool sScrollToEnd = false;
@@ -521,6 +522,7 @@ namespace app
             {
                s.authBroken = false;
                s.ready.signedIn = true;  // the CLI said it signed in: trust that over the file probe
+               sModelsFetchAt.erase(id);  // signed in: its model list can be asked for now
             }
             else
             {
@@ -2467,8 +2469,16 @@ namespace app
             return list;
          if (list.empty())
             list = chat::FixedModels(kind);
-         if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[agent] == nullptr)
+         // One fetch at a time, only for an installed agent, and an empty answer (signed out, offline) waits a
+         // minute before the next try: this runs every frame the picker or Settings shows.
+         const auto st = sAgents.find(agent);
+         const bool installed = st != sAgents.end() && st->second.ready.installed;
+         const double now = ImGui::GetTime();
+         const auto at = sModelsFetchAt.find(agent);
+         const bool due = at == sModelsFetchAt.end() || now - at->second >= 60.0;
+         if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[agent] == nullptr && installed && due)
          {
+            sModelsFetchAt[agent] = now;
             chat::AgentRun::Options o;
             o.kind = kind;
             o.raw = true;
