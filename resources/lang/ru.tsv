@@ -2609,3 +2609,4 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	Выберите ИИ-агента для кода
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	При подключении агент устанавливается при необходимости, связывается с Infinite и получает навыки Infinite. Позже это можно изменить в Настройках, Терминал.
 Skip, just a terminal	Пропустить, только терминал
+Connect a coding agent to build with Infinite.	Подключите ИИ-агента, чтобы создавать в Infinite.

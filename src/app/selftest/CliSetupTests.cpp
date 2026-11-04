@@ -114,6 +114,13 @@ namespace app
          check(script.find("sudo") != std::string::npos && script.find("brew install") != std::string::npos, "installs are visible in the script");
          check(Perform(Action::kInstallAgent, Os::kMac, claude, exe, real, runner, &err) && line == "curl -fsSL https://claude.ai/install.sh | bash", "install types the vendor's command");
          check(Perform(Action::kStartAgent, Os::kMac, claude, exe, real, runner, &err), "start action runs");
+         {
+            line.clear();
+            const bool ran = Perform(Action::kConnectAll, Os::kMac, claude, exe, real, runner, &err);
+            const size_t at = line.find("setup.sh");
+            check(ran && at != std::string::npos && line.find(" && ", at) != std::string::npos && line.find("claude", at) != std::string::npos,
+                  "connect-all: the setup script, then only on success the agent, in one line");
+         }
          check(line.find("claude mcp get infinite 2>/dev/null | grep -qF \"$A\" ||") != std::string::npos && line.find("-e INFINITE_BIN=\"$A\"") != std::string::npos &&
                line.find("A='/Applications/Infinite'\\''s Dir") != std::string::npos &&
                line.size() > 6 && line.compare(line.size() - 6, 6, "claude") == 0,

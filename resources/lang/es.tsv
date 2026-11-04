@@ -2609,3 +2609,4 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	Elige tu agente de programación
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	Conectar instala el agente si hace falta, lo enlaza con Infinite y añade las habilidades de Infinite. Puedes cambiarlo luego en Ajustes, Terminal.
 Skip, just a terminal	Omitir, solo una terminal
+Connect a coding agent to build with Infinite.	Conecta un agente de programación para crear con Infinite.

@@ -115,7 +115,7 @@ namespace CliSetup
    HealthReport LatestHealth();
 
    // What the page shows. Everything it draws and every button comes from here.
-   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep };
+   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep, kConnectAll };  // kConnectAll: install if missing, set up, then start the agent, in one tab
    struct View
    {
       std::vector<StepStatus> steps;

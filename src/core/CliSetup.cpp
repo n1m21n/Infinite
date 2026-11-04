@@ -916,6 +916,31 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
          run("Infinite setup", SetupLine(os, paths.script));
          return true;
       }
+      case Action::kConnectAll:
+      {
+         // One tab, start to finish: install the agent if it is missing, run the setup script, and only when
+         // that succeeds hand the tab to the agent. A failed step stops the chain and stays on screen.
+         if (exe.empty())
+            return fail("Infinite could not find its own executable");
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         StageSkills(paths);
+         StageTool(paths);
+         std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
+         out << BuildScript(os, exe, agent, paths.status);
+         out.close();
+         if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
+            return fail("could not write " + paths.script);
+         const bool win = os == Os::kWindows;
+         std::string line;
+         if (!AgentInstalledHere(agent))
+            line = InstallAgentLine(os, agent) + (win ? "; if ($?) { " : " && ");
+         line += SetupLine(os, paths.script) + (win ? "; if ($LASTEXITCODE -eq 0) { " : " && ") + StartAgentLine(os, exe, agent);
+         if (win)
+            line += std::string(!AgentInstalledHere(agent) ? " }" : "") + " }";
+         run(agent.name, line);
+         return true;
+      }
       case Action::kRepairStep:
       {
          if (exe.empty())

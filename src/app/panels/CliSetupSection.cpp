@@ -263,11 +263,9 @@ namespace app
 
       centred(UiType::Size::Title, UiType::Weight::Semibold, ImGui::GetColorU32(ImGuiCol_Text), T("Welcome to the Terminal"));
       y += tok::space_2;
-      centred(UiType::Size::Body, UiType::Weight::Regular, dim, T("A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you."));
+      centred(UiType::Size::Body, UiType::Weight::Regular, dim, T("Connect a coding agent to build with Infinite."));
       y += tok::space_5;
 
-      centred(UiType::Size::Caption, UiType::Weight::Medium, dim, T("Choose your coding agent"));
-      y += tok::space_2;
       {
          const auto& all = Agents();
          std::vector<PillGroup::Segment> segs;
@@ -285,8 +283,7 @@ namespace app
          }
          y += rowH + tok::space_3;
       }
-      centred(UiType::Size::Caption, UiType::Weight::Regular, dim, T("Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal."));
-      y += tok::space_4;
+      y += tok::space_1;
 
       static std::string sError;
       auto perform = [&](Action a)
@@ -297,7 +294,7 @@ namespace app
       };
       const std::string connect = std::string(T("Connect")) + " " + agent->name;
       if (TextButton::Draw("welcome.connect", UiLayout::Rect{ x, y, colW, rowH }, connect.c_str(), TextButton::Kind::Primary))
-         perform(v.showInstall ? Action::kInstallAgent : Action::kSetup);
+         perform(Action::kConnectAll);
       y += rowH + tok::space_2;
       if (TextButton::Draw("welcome.skip", UiLayout::Rect{ x, y, colW, rowH }, T("Skip, just a terminal"), TextButton::Kind::Quiet))
          finish();
