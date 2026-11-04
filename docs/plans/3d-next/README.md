@@ -156,3 +156,22 @@ reference, AO 512, 16 rays, reach 0.25:
 
 Mean error alone missed the banding (the bands average out), so read the
 sheet (truth, Blender bake, Infinite, diff x4) before the number.
+
+### Cloth on the deer, tilted rigid bodies (2026-11-04, fix/cloth-deer)
+
+No source change kept; baseline_physics.json unchanged. Written reason, not a fix.
+
+| try (cloth_deer, base 0.5909)                     | error  |
+|---------------------------------------------------|--------|
+| outside side from the point's previous position   | 0.6636 (worse, reverted) |
+| collider friction 0.9 / 1.0 (Blender uses 5.0)    | 0.5625 / 0.5533 (small) |
+| collider distance 0.08 / 0.15 (with friction 1.0) | 0.9997 / 1.1713 (worse) |
+
+- Not tunnelling: at the end ~9 of 2401 cloth vertices are inside the deer (ray parity test).
+- Not scale/units: the collider is 1.2 m tall, the same on both sides.
+- The sheet is a chaotic fold. Blender's 2.4 m sheet bunches to ~1.0 m across with no
+  self-collision and hangs on the head (top 1.25 m, lowest 0.165 m); Infinite's spreads to
+  ~1.7 m, slides off the head and lies on the ground. Vertex-by-vertex distance to one fold
+  pattern cannot go under ~0.5 for a case like this; simple drapes (sphere, box) stay 0.09.
+- rb_tilted (0.153) and rb_tilted_hull (0.2147) are a corner landing that tips one way; the
+  final x differs by 0.15-0.2 m after the tip. Not re-tuned in this pass.
