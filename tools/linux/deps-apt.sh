@@ -15,6 +15,7 @@ apt-get install -y --no-install-recommends \
   ccache \
   curl \
   patchelf \
+  python3 \
   libx11-dev \
   libxrandr-dev \
   libxinerama-dev \
