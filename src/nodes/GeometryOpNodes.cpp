@@ -626,8 +626,8 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
          const float s = std::sin(a), c = std::cos(a);
          if (axis == 1)
          {
-            const float nx = x * c - z * s;
-            const float nz = x * s + z * c;
+            const float nx = x * c + z * s;
+            const float nz = -x * s + z * c;
             x = nx; z = nz;
          }
          else if (axis == 0)
@@ -750,7 +750,7 @@ const GpuPoints* GeometryOpNode::GetGpuPoints()
          "vec2 Turn(vec2 v, float a) { float s = sin(a), c = cos(a); return vec2(v.x * c - v.y * s, v.x * s + v.y * c); }\n"
          "void main() {\n"
          "   LoadPoint();\n"
-         "   if (uAxis == 1) P.xz = Turn(P.xz, uAngle * P.y);\n"
+         "   if (uAxis == 1) P.xz = Turn(P.xz, -uAngle * P.y);\n"
          "   else if (uAxis == 0) P.yz = Turn(P.yz, uAngle * P.x);\n"
          "   else P.xy = Turn(P.xy, uAngle * P.z);\n"
          "   outPos = vec4(P, W);\n"

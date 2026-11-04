@@ -571,6 +571,7 @@ set(COMMON_SOURCES
     src/app/selftest/BvhTests.cpp
     src/app/selftest/PathTraceTests.cpp
     src/app/selftest/SculptTests.cpp
+    src/app/selftest/ModelAbTests.cpp
     src/app/selftest/ThreeDBench.cpp
     src/app/selftest/FlowTests.cpp
     src/app/selftest/SpatialTests.cpp

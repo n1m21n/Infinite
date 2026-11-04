@@ -1216,6 +1216,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_MODELAB") != nullptr)
+   {
+      const bool ok = RunModelAbTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_BAKETEST") != nullptr)
    {
       const bool ok = RunBakeTest();

@@ -750,6 +750,268 @@ namespace MeshOps
       return adjacency;
    }
 
+   // Catmull-Clark for a mesh whose faces are quads drawn as triangle pairs (a cube, a grid, a
+   // torus). The pairs are recovered as Blender's quads would be: each triangle's one clearly
+   // longest edge is the quad's diagonal, and the triangle across it must agree. Any other mesh
+   // (a pole fan, a seam of mixed sizes, per-vertex colours, a selection) returns false and takes
+   // the Loop path. All passes run on the quads, so level 2 is Catmull-Clark of level 1, not Loop
+   // of its triangles; `blend` mixes plain tessellation (0) into the surface (1), and the final
+   // vertices are moved to the limit surface at 1, as Blender's Subdivision Surface places them.
+   bool CatmullClarkQuads(const Mesh& in, int passes, float blend, Mesh& out)
+   {
+      if (in.HasVertexColor() || !in.faceMask.empty() || in.indices.size() < 6)
+         return false;
+      const std::vector<unsigned int> weld = BuildWeldMap(in);
+      const size_t T = in.indices.size() / 3;
+      auto key = [](unsigned int a, unsigned int b) { return std::make_pair(std::min(a, b), std::max(a, b)); };
+      std::vector<int> diag(T);
+      std::map<std::pair<unsigned int, unsigned int>, std::vector<size_t>> across;
+      for (size_t t = 0; t < T; t++)
+      {
+         unsigned int w[3];
+         float l2[3];
+         for (int k = 0; k < 3; k++)
+            w[k] = weld[in.indices[t * 3 + k]];
+         if (w[0] == w[1] || w[1] == w[2] || w[0] == w[2])
+            return false;
+         for (int k = 0; k < 3; k++)
+         {
+            const Vertex& a = in.vertices[in.indices[t * 3 + k]];
+            const Vertex& b = in.vertices[in.indices[t * 3 + (k + 1) % 3]];
+            l2[k] = (a.px - b.px) * (a.px - b.px) + (a.py - b.py) * (a.py - b.py) + (a.pz - b.pz) * (a.pz - b.pz);
+         }
+         int best = 0;
+         for (int k = 1; k < 3; k++)
+            if (l2[k] > l2[best])
+               best = k;
+         for (int k = 0; k < 3; k++)
+            if (k != best && l2[k] * 1.5f > l2[best])
+               return false;   // no clear diagonal: a real triangle
+         diag[t] = best;
+         across[key(w[best], w[(best + 1) % 3])].push_back(t);
+      }
+      struct Poly
+      {
+         std::vector<unsigned int> v;
+         std::vector<std::array<float, 2>> uv;
+      };
+      std::vector<Poly> polys;
+      std::vector<std::array<double, 3>> P(in.vertices.size());
+      for (size_t i = 0; i < in.vertices.size(); i++)
+         P[i] = { in.vertices[weld[i]].px, in.vertices[weld[i]].py, in.vertices[weld[i]].pz };
+      std::vector<unsigned char> done(T, 0);
+      for (size_t t = 0; t < T; t++)
+      {
+         if (done[t])
+            continue;
+         const int k = diag[t];
+         const unsigned int u = weld[in.indices[t * 3 + k]], v = weld[in.indices[t * 3 + (k + 1) % 3]];
+         const std::vector<size_t>& pair = across[key(u, v)];
+         if (pair.size() != 2)
+            return false;
+         const size_t p = pair[0] == t ? pair[1] : pair[0];
+         const int j = diag[p];
+         // The partner must call the same edge its diagonal, running the other way.
+         if (weld[in.indices[p * 3 + j]] != v || weld[in.indices[p * 3 + (j + 1) % 3]] != u)
+            return false;
+         const unsigned int corner[4] = { in.indices[t * 3 + k], in.indices[p * 3 + (j + 2) % 3],
+                                          in.indices[t * 3 + (k + 1) % 3], in.indices[t * 3 + (k + 2) % 3] };
+         Poly q;
+         for (unsigned int c : corner)
+         {
+            q.v.push_back(weld[c]);
+            q.uv.push_back({ in.vertices[c].u, in.vertices[c].v });
+         }
+         polys.push_back(q);
+         done[t] = done[p] = 1;
+      }
+
+      auto lerp = [](const std::array<double, 3>& a, const std::array<double, 3>& b, double t) {
+         return std::array<double, 3>{ a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t };
+      };
+      const double blendD = blend;
+      for (int pass = 0; pass < passes; pass++)
+      {
+         if (polys.size() > 60000)
+            break;
+         std::map<std::pair<unsigned int, unsigned int>, std::vector<size_t>> edgeFaces;
+         for (size_t f = 0; f < polys.size(); f++)
+            for (size_t i = 0; i < polys[f].v.size(); i++)
+               edgeFaces[key(polys[f].v[i], polys[f].v[(i + 1) % polys[f].v.size()])].push_back(f);
+         const size_t nOld = P.size();
+         std::vector<unsigned int> facePoint(polys.size());
+         for (size_t f = 0; f < polys.size(); f++)
+         {
+            std::array<double, 3> c = { 0, 0, 0 };
+            for (unsigned int v : polys[f].v)
+               for (int a = 0; a < 3; a++)
+                  c[a] += P[v][a] / polys[f].v.size();
+            facePoint[f] = (unsigned int)P.size();
+            P.push_back(c);
+         }
+         std::map<std::pair<unsigned int, unsigned int>, unsigned int> edgePoint;
+         std::vector<std::array<double, 3>> mid;   // per edge point, the plain midpoint
+         for (const auto& e : edgeFaces)
+         {
+            std::array<double, 3> m;
+            for (int a = 0; a < 3; a++)
+               m[a] = (P[e.first.first][a] + P[e.first.second][a]) * 0.5;
+            std::array<double, 3> r = m;
+            if (e.second.size() == 2)
+               for (int a = 0; a < 3; a++)
+                  r[a] = (P[e.first.first][a] + P[e.first.second][a] + P[facePoint[e.second[0]]][a] + P[facePoint[e.second[1]]][a]) * 0.25;
+            edgePoint[e.first] = (unsigned int)P.size();
+            P.push_back(lerp(m, r, blendD));
+            mid.push_back(m);
+         }
+         // Original vertices: (F + 2R + (n-3)P) / n inside, (6P + two boundary neighbours) / 8 on a boundary.
+         std::vector<std::array<double, 3>> F(nOld), R(nOld), B(nOld);
+         std::vector<int> nf(nOld, 0), ne(nOld, 0), nb(nOld, 0);
+         for (size_t f = 0; f < polys.size(); f++)
+            for (unsigned int v : polys[f].v)
+            {
+               nf[v]++;
+               for (int a = 0; a < 3; a++)
+                  F[v][a] += P[facePoint[f]][a];
+            }
+         for (const auto& e : edgeFaces)
+         {
+            for (unsigned int v : { e.first.first, e.first.second })
+            {
+               const unsigned int o = v == e.first.first ? e.first.second : e.first.first;
+               ne[v]++;
+               for (int a = 0; a < 3; a++)
+                  R[v][a] += (P[e.first.first][a] + P[e.first.second][a]) * 0.5;
+               if (e.second.size() != 2)
+               {
+                  nb[v]++;
+                  for (int a = 0; a < 3; a++)
+                     B[v][a] += P[o][a];
+               }
+            }
+         }
+         std::vector<std::array<double, 3>> moved(P.begin(), P.begin() + nOld);
+         for (size_t v = 0; v < nOld; v++)
+         {
+            if (!nf[v])
+               continue;
+            std::array<double, 3> r = P[v];
+            if (nb[v] == 2)
+               for (int a = 0; a < 3; a++)
+                  r[a] = (6.0 * P[v][a] + B[v][a]) / 8.0;
+            else if (nb[v] == 0)
+            {
+               const double n = ne[v];
+               for (int a = 0; a < 3; a++)
+                  r[a] = (F[v][a] / nf[v] + 2.0 * R[v][a] / ne[v] + (n - 3.0) * P[v][a]) / n;
+            }
+            moved[v] = lerp(P[v], r, blendD);
+         }
+         std::vector<Poly> next;
+         for (size_t f = 0; f < polys.size(); f++)
+         {
+            const Poly& q = polys[f];
+            const size_t n = q.v.size();
+            std::array<float, 2> c = { 0, 0 };
+            for (const auto& t : q.uv)
+            {
+               c[0] += t[0] / n;
+               c[1] += t[1] / n;
+            }
+            for (size_t i = 0; i < n; i++)
+            {
+               const size_t nx = (i + 1) % n, pv = (i + n - 1) % n;
+               Poly s;
+               s.v = { q.v[i], edgePoint[key(q.v[i], q.v[nx])], facePoint[f], edgePoint[key(q.v[pv], q.v[i])] };
+               s.uv = { q.uv[i], { (q.uv[i][0] + q.uv[nx][0]) * 0.5f, (q.uv[i][1] + q.uv[nx][1]) * 0.5f }, c,
+                        { (q.uv[pv][0] + q.uv[i][0]) * 0.5f, (q.uv[pv][1] + q.uv[i][1]) * 0.5f } };
+               next.push_back(s);
+            }
+         }
+         std::copy(moved.begin(), moved.end(), P.begin());
+         polys.swap(next);
+      }
+
+      if (blend > 0.0f)
+      {
+         // The limit surface of the finished quads: (n^2 P + 4 sum(edge ends) + sum(diagonal ends)) / (n (n + 5)),
+         // or (4P + the two boundary ends) / 6 on a boundary.
+         const size_t nv = P.size();
+         std::vector<std::array<double, 3>> E(nv), D(nv), L(P);
+         std::vector<int> ne(nv, 0);
+         std::map<std::pair<unsigned int, unsigned int>, int> uses;
+         for (const Poly& q : polys)
+            for (size_t i = 0; i < 4; i++)
+               uses[key(q.v[i], q.v[(i + 1) % 4])]++;
+         std::vector<int> onBoundary(nv, 0);
+         std::vector<std::array<double, 3>> Bd(nv);
+         for (const auto& e : uses)
+         {
+            for (unsigned int v : { e.first.first, e.first.second })
+            {
+               const unsigned int o = v == e.first.first ? e.first.second : e.first.first;
+               ne[v]++;
+               for (int a = 0; a < 3; a++)
+                  E[v][a] += P[o][a];
+               if (e.second == 1)
+               {
+                  onBoundary[v]++;
+                  for (int a = 0; a < 3; a++)
+                     Bd[v][a] += P[o][a];
+               }
+            }
+         }
+         for (const Poly& q : polys)
+            for (size_t i = 0; i < 4; i++)
+               for (int a = 0; a < 3; a++)
+                  D[q.v[i]][a] += P[q.v[(i + 2) % 4]][a];
+         for (size_t v = 0; v < nv; v++)
+         {
+            if (!ne[v])
+               continue;
+            if (onBoundary[v] == 2)
+               for (int a = 0; a < 3; a++)
+                  L[v][a] = (4.0 * P[v][a] + Bd[v][a]) / 6.0;
+            else if (onBoundary[v] == 0)
+            {
+               const double n = ne[v];
+               for (int a = 0; a < 3; a++)
+                  L[v][a] = (n * n * P[v][a] + 4.0 * E[v][a] + D[v][a]) / (n * (n + 5.0));
+            }
+         }
+         for (size_t v = 0; v < nv; v++)
+            P[v] = lerp(P[v], L[v], blendD);
+      }
+
+      Mesh m;
+      std::map<std::tuple<unsigned int, int, int>, unsigned int> index;
+      for (const Poly& q : polys)
+      {
+         unsigned int idx[4];
+         for (int i = 0; i < 4; i++)
+         {
+            const auto k = std::make_tuple(q.v[i], (int)std::lround(q.uv[i][0] * 1e5f), (int)std::lround(q.uv[i][1] * 1e5f));
+            auto it = index.find(k);
+            if (it == index.end())
+            {
+               Vertex w;
+               w.px = (float)P[q.v[i]][0];
+               w.py = (float)P[q.v[i]][1];
+               w.pz = (float)P[q.v[i]][2];
+               w.u = q.uv[i][0];
+               w.v = q.uv[i][1];
+               it = index.emplace(k, (unsigned int)m.vertices.size()).first;
+               m.vertices.push_back(w);
+            }
+            idx[i] = it->second;
+         }
+         const unsigned int tri[6] = { idx[0], idx[1], idx[2], idx[0], idx[2], idx[3] };
+         m.indices.insert(m.indices.end(), tri, tri + 6);
+      }
+      out = RecalculateNormals(m, false, false);
+      return true;
+   }
+
    // Loop subdivision. Each pass splits every triangle into four and then moves
    // both the new edge points and the original vertices onto the limit surface
    // using Loop's weights.
@@ -768,6 +1030,12 @@ namespace MeshOps
       Mesh current = in;
       const int passes = std::max(0, std::min(levels, 3));
       const float blend = std::max(0.0f, std::min(smooth, 1.0f));
+      if (passes > 0)
+      {
+         Mesh quads;
+         if (CatmullClarkQuads(in, passes, blend, quads))
+            return quads;
+      }
 
       for (int pass = 0; pass < passes; pass++)
       {
@@ -2701,8 +2969,9 @@ namespace MeshOps
          const float s = std::sin(a), c = std::cos(a);
          if (axis == 1)
          {
-            const float x = v.px * c - v.pz * s;
-            const float z = v.px * s + v.pz * c;
+            // Right-handed about +Y like the other two axes (and Blender's Simple Deform).
+            const float x = v.px * c + v.pz * s;
+            const float z = -v.px * s + v.pz * c;
             v.px = x; v.pz = z;
          }
          else if (axis == 0)
