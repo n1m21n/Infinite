@@ -1036,6 +1036,8 @@ namespace
    }
 }
 
+ImFont* TerminalMonoFont() { return sFont; }
+
 void TerminalLoadFonts(float bakedPx)
 {
    ImGuiIO& io = ImGui::GetIO();

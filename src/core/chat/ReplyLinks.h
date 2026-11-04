@@ -23,6 +23,7 @@ namespace chat
       // (delete, go) or a panel name (open). node and key are filled from arg when it names them.
       std::string verb;
       std::string arg;
+      bool dim = false;  // Text drawn in the quiet tint (a side note the panel adds, never parsed)
    };
 
    struct Block

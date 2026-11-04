@@ -17,12 +17,30 @@ namespace chat
       std::string agent;               // Agent, Steps, Error: which agent ("claude", "codex", "antigravity")
       std::string text;                // User, Agent, Note, Error
       std::vector<std::string> lines;  // Steps: what the agent ran; Change: the `infinite` lines of a direct command
+      std::vector<int> marks;          // Steps: one per line, a StepMark (missing: a command that ran)
       std::vector<ChangeLine> changes; // Change: what the patch now differs in
       std::vector<std::string> files;  // User: attached files
       bool ok = true;
       bool undone = false;             // Change from a direct command
       std::string detail;              // Error: the raw output behind the plain words (not saved)
    };
+
+   enum StepMark { kStepRan = 0, kStepFailed = 1, kStepNote = 2 };
+
+   // What a Steps block shows: commands in order, an earlier try hidden when the same command runs again
+   // (a `cd dir &&` in front, `2>&1` or a `| grep` behind do not make it another command).
+   struct StepRow
+   {
+      std::string text;
+      bool failed = false, note = false;
+   };
+   struct StepView
+   {
+      std::vector<StepRow> rows;
+      int commands = 0, failed = 0, retried = 0;
+   };
+   std::string StepKey(const std::string& command);
+   StepView ViewSteps(const std::vector<std::string>& lines, const std::vector<int>& marks);
 
    struct Session
    {

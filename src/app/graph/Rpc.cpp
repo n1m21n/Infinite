@@ -564,6 +564,24 @@ namespace app
          gRequestFitViewNodeIndex = gn->index;
          gRequestFitViewNodeZoom = false;
          outResult = { { "index", gn->index } };
+         // A param link also flashes that control: the same highlight "View in Modulation Matrix"
+         // sets, which the matrix row and the node's own control both draw.
+         const std::string key = params.value("key", std::string());
+         const int param = key.empty() ? -1 : ParamIndexOfKeyOnNode(*gn, key);
+         if (param >= 0)
+         {
+            // A control behind "show more" opens the node's params so there is something to see.
+            bool drawn = false;
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               drawn = drawn || (r.nodeIndex == gn->index && r.paramIndex == param && !r.hidden);
+            if (!drawn)
+               gn->showParams = gn->showAdvancedParams = true;
+            gModMatrixHighlightNode = gn->index;
+            gModMatrixHighlightParam = param;
+            gModMatrixHighlightUntil = ImGui::GetTime() + 2.0;
+            gModMatrixScrollPending = true;
+            outResult["param"] = param;
+         }
          return true;
       }
       else if (method == "expand_node")

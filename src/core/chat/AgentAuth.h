@@ -55,6 +55,8 @@ namespace chat
    std::vector<Model> FixedModels(AgentKind kind);
    // `agy models` output: a header line, then `<id>\t<label>`.
    std::vector<Model> ParseAgyModels(const std::string& output);
+   // Codex keeps the models its account may use in $CODEX_HOME/models_cache.json: the listed ones, by priority.
+   std::vector<Model> ParseCodexModels(const std::string& json);
    // True when a sign-in is waiting for the user to paste an authorization code (Gemini shows one in the browser).
    bool AsksForCode(const std::string& log);
 }

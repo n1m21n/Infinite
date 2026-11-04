@@ -1,5 +1,7 @@
 #include "AgentAuth.h"
 
+#include "json.hpp"
+
 #include <algorithm>
 #include <cctype>
 
@@ -248,6 +250,30 @@ namespace chat
       if (kind == AgentKind::Claude)
          return { { "sonnet", "Sonnet" }, { "opus", "Opus" }, { "haiku", "Haiku" } };
       return {};
+   }
+
+   std::vector<Model> ParseCodexModels(const std::string& text)
+   {
+      using json = nlohmann::json;
+      const json j = json::parse(text, nullptr, false);
+      if (!j.is_object() || !j.contains("models") || !j["models"].is_array())
+         return {};
+      std::vector<std::pair<int, Model>> ranked;
+      for (const json& m : j["models"])
+      {
+         if (!m.is_object() || m.value("visibility", std::string()) != "list")
+            continue;
+         Model one;
+         one.id = m.value("slug", std::string());
+         one.label = m.value("display_name", one.id);
+         if (!one.id.empty())
+            ranked.push_back({ m.value("priority", 1000), one });
+      }
+      std::stable_sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+      std::vector<Model> out;
+      for (auto& r : ranked)
+         out.push_back(std::move(r.second));
+      return out;
    }
 
    std::vector<Model> ParseAgyModels(const std::string& output)

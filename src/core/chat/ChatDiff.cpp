@@ -1,5 +1,7 @@
 #include "ChatDiff.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace chat
@@ -28,6 +30,24 @@ namespace chat
                return true;
          return false;
       }
+   }
+
+   std::string Drift(const ChangeLine& line, const Catalog& now)
+   {
+      if (line.node < 0 || line.key.empty())
+         return {};
+      const CatalogNode* n = now.Node(line.node);
+      const CatalogParam* p = n != nullptr ? n->Find(line.key) : nullptr;
+      if (p == nullptr || p->modulated || p->expression || p->value == line.after)
+         return {};
+      char* endA = nullptr;
+      char* endB = nullptr;
+      const double a = std::strtod(line.after.c_str(), &endA);
+      const double b = std::strtod(p->value.c_str(), &endB);
+      const bool numbers = endA != line.after.c_str() && *endA == '\0' && endB != p->value.c_str() && *endB == '\0';
+      if (numbers && std::abs(a - b) <= 1e-4 * std::max(1.0, std::abs(a)))
+         return {};
+      return ShownValue(*p);
    }
 
    std::vector<ChangeLine> Diff(const Snapshot& before, const Snapshot& after)
@@ -65,7 +85,7 @@ namespace chat
             if (IsCode(p) || IsCode(*old))
                out.push_back({ at + " changed", p.value });
             else
-               out.push_back({ at + " " + Shown(*old) + " → " + Shown(p), "" });
+               out.push_back({ at + " " + Shown(*old) + " → " + Shown(p), "", n.index, p.key, p.value });
          }
       }
 

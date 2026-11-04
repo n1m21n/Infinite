@@ -4,6 +4,7 @@
 #include "platform/AppPaths.h"
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -44,13 +45,30 @@ namespace chat
             o["text"] = e.text;
          if (!e.lines.empty())
             o["lines"] = e.lines;
+         for (int m : e.marks)
+            if (m != kStepRan)
+            {
+               o["marks"] = e.marks;
+               break;
+            }
          if (!e.files.empty())
             o["files"] = e.files;
          if (!e.changes.empty())
          {
             json c = json::array();
             for (const ChangeLine& l : e.changes)
-               c.push_back(l.code.empty() ? json{ { "text", l.text } } : json{ { "text", l.text }, { "code", l.code } });
+            {
+               json one = { { "text", l.text } };
+               if (!l.code.empty())
+                  one["code"] = l.code;
+               if (l.node >= 0 && !l.key.empty())
+               {
+                  one["node"] = l.node;
+                  one["key"] = l.key;
+                  one["after"] = l.after;
+               }
+               c.push_back(one);
+            }
             o["changes"] = c;
          }
          if (!e.ok)
@@ -92,11 +110,15 @@ namespace chat
             e.agent = o.value("agent", std::string());
             e.text = o.value("text", std::string());
             e.lines = Strings(o, "lines");
+            if (o.contains("marks") && o["marks"].is_array())
+               for (const json& m : o["marks"])
+                  e.marks.push_back(m.is_number_integer() ? m.get<int>() : 0);
             e.files = Strings(o, "files");
             if (o.contains("changes") && o["changes"].is_array())
                for (const json& c : o["changes"])
                   if (c.is_object())
-                     e.changes.push_back({ c.value("text", std::string()), c.value("code", std::string()) });
+                     e.changes.push_back({ c.value("text", std::string()), c.value("code", std::string()), c.value("node", -1),
+                                           c.value("key", std::string()), c.value("after", std::string()) });
             e.ok = o.value("ok", true);
             e.undone = o.value("undone", false);
             t.entries.push_back(e);
@@ -172,5 +194,72 @@ namespace chat
    {
       std::error_code ec;
       std::filesystem::remove(AppPaths::FsPath(dir + "/" + id + ".json"), ec);
+   }
+
+   std::string StepKey(const std::string& command)
+   {
+      std::string c = command;
+      auto trim = [](std::string& t)
+      {
+         const size_t a = t.find_first_not_of(" \t\n");
+         const size_t b = t.find_last_not_of(" \t\n");
+         t = a == std::string::npos ? std::string() : t.substr(a, b - a + 1);
+      };
+      trim(c);
+      // `cd somewhere && …` in front, as many as there are.
+      while (c.rfind("cd ", 0) == 0)
+      {
+         const size_t amp = c.find("&&");
+         if (amp == std::string::npos)
+            break;
+         c = c.substr(amp + 2);
+         trim(c);
+      }
+      // A filter or a redirect behind: `| grep …`, `| head`, `2>&1`.
+      const size_t pipe = c.find(" | ");
+      if (pipe != std::string::npos)
+         c = c.substr(0, pipe);
+      for (const char* tail : { " 2>&1", " 2>/dev/null" })
+      {
+         const size_t n = std::strlen(tail);
+         if (c.size() >= n && c.compare(c.size() - n, n, tail) == 0)
+            c = c.substr(0, c.size() - n);
+      }
+      trim(c);
+      std::string out;
+      for (char ch : c)
+         if (!(ch == ' ' && !out.empty() && out.back() == ' '))
+            out += ch;
+      return out;
+   }
+
+   StepView ViewSteps(const std::vector<std::string>& lines, const std::vector<int>& marks)
+   {
+      StepView v;
+      std::vector<std::string> keys(lines.size());
+      for (size_t i = 0; i < lines.size(); i++)
+         keys[i] = StepKey(lines[i]);
+      for (size_t i = 0; i < lines.size(); i++)
+      {
+         const int m = i < marks.size() ? marks[i] : kStepRan;
+         if (m == kStepNote)
+         {
+            v.rows.push_back({ lines[i], false, true });
+            continue;
+         }
+         bool again = false;
+         for (size_t j = i + 1; j < lines.size() && !again; j++)
+            again = (j >= marks.size() || marks[j] != kStepNote) && keys[j] == keys[i];
+         if (again)
+         {
+            v.retried++;
+            continue;
+         }
+         v.commands++;
+         if (m == kStepFailed)
+            v.failed++;
+         v.rows.push_back({ lines[i], m == kStepFailed, false });
+      }
+      return v;
    }
 }

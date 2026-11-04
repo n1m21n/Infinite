@@ -347,6 +347,48 @@ namespace app
             check(has("@Blur#12") && has("@cube#1") && d.size() >= 5, "diff: a new cable names both ends");
             check(code, "diff: a code param comes back as a block");
             check(chat::Diff(before, before).empty(), "diff: nothing changed, nothing to show");
+
+            // A value the canvas no longer shows is called out; one that still holds is not.
+            const chat::ChangeLine* size = nullptr;
+            for (const chat::ChangeLine& l : d)
+               if (l.key == "size")
+                  size = &l;
+            check(size != nullptr && size->node == 1 && size->after == "2.5", "diff: a value change keeps its param and value");
+            if (size != nullptr)
+            {
+               chat::Catalog now = after.catalog;
+               check(chat::Drift(*size, now).empty(), "drift: an unchanged value says nothing");
+               now.nodes[0].params[1].value = "2.50001";
+               check(chat::Drift(*size, now).empty(), "drift: rounding is not a change");
+               now.nodes[0].params[1].value = "45.183";
+               check(!chat::Drift(*size, now).empty(), "drift: a value moved after the turn is shown");
+               now.nodes[0].params[1].modulated = true;
+               check(chat::Drift(*size, now).empty(), "drift: a modulated param moves by design");
+            }
+         }
+
+         // Steps: a retry of the same command (with a cd in front, a pipe after) shows once, failures count.
+         {
+            check(chat::StepKey("cd /tmp && infinite set 1 scale 3") == chat::StepKey("infinite set 1 scale 3"), "steps: a cd in front is the same command");
+            check(chat::StepKey("infinite context | head -5") == chat::StepKey("infinite context 2>&1"), "steps: pipes and redirects are the same command");
+            const std::vector<std::string> lines = { "Setting the noise", "cd /tmp && infinite set 1 scale 3", "infinite set 1 scale 3", "infinite set 1 warp 0.8" };
+            const std::vector<int> marks = { chat::kStepNote, chat::kStepFailed, chat::kStepRan, chat::kStepRan };
+            const chat::StepView v = chat::ViewSteps(lines, marks);
+            check(v.commands == 2 && v.retried == 1 && v.failed == 0 && v.rows.size() == 3, "steps: a failed try that was retried shows once");
+            const chat::StepView f = chat::ViewSteps({ "infinite set 1 scale 3" }, { chat::kStepFailed });
+            check(f.failed == 1 && f.rows.size() == 1 && f.rows[0].failed, "steps: a failure that stood is shown");
+            const chat::StepView old = chat::ViewSteps({ "infinite a", "infinite b" }, {});
+            check(old.commands == 2 && old.failed == 0, "steps: a chat saved without marks reads as commands");
+         }
+
+         // ChatGPT's models come from Codex's own cache: listed ones only, in its order.
+         {
+            const std::vector<chat::Model> m = chat::ParseCodexModels(
+               R"({"models":[{"slug":"b","display_name":"B","visibility":"list","priority":2},)"
+               R"({"slug":"h","display_name":"H","visibility":"hide","priority":0},)"
+               R"({"slug":"a","display_name":"A","visibility":"list","priority":1}]})");
+            check(m.size() == 2 && m[0].id == "a" && m[1].label == "B", "models: codex cache, listed only, by priority");
+            check(chat::ParseCodexModels("not json").empty(), "models: a broken cache gives none");
          }
 
          // A saved chat comes back with its entries and the agents' sessions.

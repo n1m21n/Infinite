@@ -180,6 +180,7 @@ namespace app
       // Dropdown
       int sPick = 0;
       bool sPickByKey = false;
+      bool sPickMoved = false;  // ↑↓ moved the pick in this list: Enter takes it instead of sending
       std::string sDropKey;    // the slot + partial it was last shown for; a change resets the pick
       std::string sDismissed;  // Esc closed it for this key
       bool sDropHovered = false;
@@ -1224,15 +1225,31 @@ namespace app
                   case chat::AgentEvent::Kind::Text:
                      // Only the last text is the answer; what came before is part of the work.
                      if (!r.answer.empty())
+                     {
+                        steps.marks.resize(steps.lines.size(), chat::kStepRan);
                         steps.lines.push_back(r.answer.substr(0, r.answer.find('\n')));
+                        steps.marks.push_back(chat::kStepNote);
+                     }
                      r.answer = e.text;
                      break;
                   case chat::AgentEvent::Kind::Tool:
+                     steps.marks.resize(steps.lines.size(), chat::kStepRan);
                      steps.lines.push_back(e.text);
+                     steps.marks.push_back(chat::kStepRan);
                      break;
                   case chat::AgentEvent::Kind::ToolResult:
                      if (e.error)
+                     {
                         steps.ok = false;
+                        // The result belongs to the last command started.
+                        steps.marks.resize(steps.lines.size(), chat::kStepRan);
+                        for (size_t k = steps.marks.size(); k-- > 0;)
+                           if (steps.marks[k] != chat::kStepNote)
+                           {
+                              steps.marks[k] = chat::kStepFailed;
+                              break;
+                           }
+                     }
                      break;
                   case chat::AgentEvent::Kind::End:
                      r.error = e.error;
@@ -1510,6 +1527,24 @@ namespace app
                break;
          }
          sPickByKey = true;
+         sPickMoved = true;
+      }
+
+      // Enter sends what was typed. It takes the highlighted suggestion only when ↑↓ moved to it, or for an
+      // `@name` / `/command` still being typed, where sending the half word would mean nothing.
+      bool EnterPicks()
+      {
+         const Cand* c = Picked();
+         if (c == nullptr)
+            return false;
+         if (sPickMoved)
+            return true;
+         const std::string typed = chat::Lower(SlashTyping() ? sInput : sParse.partial);
+         const bool menu = SlashTyping() || (!typed.empty() && typed[0] == '@');
+         std::string insert = chat::Lower(c->insert);
+         while (!insert.empty() && insert.back() == ' ')
+            insert.pop_back();
+         return menu && insert != typed;
       }
 
       // The field is not active (Enter or a click took it): change the string, then focus it again.
@@ -1556,11 +1591,15 @@ namespace app
 
       // ---------------------------------------------------------------- drawing
 
-      void Focus(int node)
+      // Selects and frames the node; with a key it also flashes that control on the node.
+      void Focus(int node, const std::string& key = {})
       {
          json r;
          std::string e;
-         HandleRpcCommand("focus", { { "index", node } }, r, e);
+         json args = { { "index", node } };
+         if (!key.empty())
+            args["key"] = key;
+         HandleRpcCommand("focus", args, r, e);
       }
 
       // The buttons an agent offers (`[label](verb:arg)`): each runs one RPC, and add, set and
@@ -1621,7 +1660,7 @@ namespace app
             ok = HandleRpcCommand("undo", json::object(), r, err);
          else if (s.verb == "go")
          {
-            Focus(s.node);
+            Focus(s.node, s.key);
             ok = true;
          }
          else if (s.verb == "web")
@@ -1713,7 +1752,7 @@ namespace app
                ImGui::SetTooltip("%s  #%d", n->type.c_str(), n->index);
          }
          if (clicked)
-            Focus(s.node);
+            Focus(s.node, s.kind == chat::Seg::Kind::Param ? s.key : std::string());
       }
 
       // Words and chips laid out in `width`, wrapping between words. Returns the height used.
@@ -1767,7 +1806,7 @@ namespace app
                const ImVec2 p(origin.x + x, origin.y + y + (lineH - ImGui::GetFontSize()) * 0.5f);
                if (s.kind == chat::Seg::Kind::Code)
                   dl->AddRectFilled(ImVec2(p.x - 2.0f, origin.y + y + 1.0f), ImVec2(p.x + w + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
-               dl->AddText(font, ImGui::GetFontSize(), p, col, word.c_str());
+               dl->AddText(font, ImGui::GetFontSize(), p, s.dim ? Dim() : col, word.c_str());
                x += w;
                while (e < s.text.size() && s.text[e] == ' ')
                   x += space, e++;
@@ -2032,11 +2071,13 @@ namespace app
          const float rowH = ImGui::GetTextLineHeight();
          {
             UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+            // The heading row is as tall as the Undo chip, so the mark, the word and the chip share one centre line.
             const ImVec2 h = ImGui::GetCursorScreenPos();
+            const float headH = ChipButton::kHeight;
             const ImU32 accent = e.undone ? Dim() : (e.ok ? ImGui::GetColorU32(AccentEmphasisSelected()) : Red());
-            glyph::Draw(dl, ImVec2(h.x + 6.0f, h.y + rowH * 0.5f), tok::icon_sm, accent, IconsInfinite::Bolt);
-            dl->AddText(ImVec2(h.x + 16.0f, h.y), Dim(), e.undone ? T("Undone") : (e.ok ? T("Changed") : T("Did not run")));
-            ImGui::Dummy(ImVec2(inner, rowH + 4.0f));
+            glyph::Draw(dl, ImVec2(h.x + 6.0f, h.y + headH * 0.5f), tok::icon_sm, accent, IconsInfinite::Bolt);
+            dl->AddText(ImVec2(h.x + 16.0f, std::round(h.y + (headH - ImGui::GetFontSize()) * 0.5f)), Dim(), e.undone ? T("Undone") : (e.ok ? T("Changed") : T("Did not run")));
+            ImGui::Dummy(ImVec2(inner, headH + tok::space_1));
          }
          const ImU32 col = e.undone ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
          const size_t cap = 8;
@@ -2046,7 +2087,17 @@ namespace app
             const chat::ChangeLine& l = e.changes[i];
             const std::vector<chat::Block>& blocks = BlocksFor(l.text);
             const ImVec2 p = ImGui::GetCursorScreenPos();
-            const float h = blocks.empty() ? rowH : DrawFlow(blocks[0].segs, p, inner, id * 100 + (int)i, col);
+            // Moved since the turn (an edit, randomize, a cable): say what the canvas shows now, dimmed.
+            const std::string now = e.undone ? std::string() : chat::Drift(l, sCat);
+            std::vector<chat::Seg> segs = blocks.empty() ? std::vector<chat::Seg>() : blocks[0].segs;
+            if (!now.empty())
+            {
+               chat::Seg note;
+               note.text = std::string(" · ") + T("now") + " " + now;
+               note.dim = true;
+               segs.push_back(note);
+            }
+            const float h = segs.empty() ? rowH : DrawFlow(segs, p, inner, id * 100 + (int)i, col);
             ImGui::SetCursorScreenPos(p);
             ImGui::Dummy(ImVec2(inner, h));
             if (!l.code.empty() && !e.undone)
@@ -2087,7 +2138,7 @@ namespace app
          {
             const char* label = T("Undo");
             const float bw = ImGui::CalcTextSize(label).x + 2.0f * tok::space_2;
-            ImGui::SetCursorScreenPos(ImVec2(at.x + width - bw - tok::space_1, at.y + tok::space_1));
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - bw - pad, at.y + pad));
             ImGui::PushID(id);
             if (ChipButton::Draw(label, false))
             {
@@ -2107,53 +2158,75 @@ namespace app
          ImGui::Dummy(ImVec2(width, h));
       }
 
-      // What the agent did, folded to one row: Working… while it runs, the step count after.
+      // What the agent did, folded to one quiet row: "Ran 4 commands · 1 failed". Unfolded, one monospace line
+      // per command (an earlier try of the same command is left out), failures in red, notes in the body face.
       void DrawSteps(Entry& e, EntryUi& ui, float width, int id, bool running, bool named)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 at = ImGui::GetCursorScreenPos();
+         const chat::StepView v = chat::ViewSteps(e.lines, e.marks);
+         const bool any = !v.rows.empty();
+         UiType::Scope cap(UiType::Size::Caption);
          const float rowH = ImGui::GetTextLineHeight() + tok::space_1;
+         const float gutter = 18.0f;
          ImGui::PushID(id);
-         if (ImGui::InvisibleButton("##steps", ImVec2(width, rowH)) && !e.lines.empty())
+         if (ImGui::InvisibleButton("##steps", ImVec2(width, rowH)) && any && !running)
             ui.open = !ui.open;
          ImGui::PopID();
-         const bool hot = ImGui::IsItemHovered() && !e.lines.empty();
+         const bool hot = ImGui::IsItemHovered() && any && !running;
          const ImU32 dim = hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
-         float x = at.x;
+         const float cy = at.y + rowH * 0.5f;
          if (running)
          {
-            ImGui::SetCursorScreenPos(ImVec2(x + 1.0f, at.y + (rowH - BusyLine::kSpinner) * 0.5f));
+            ImGui::SetCursorScreenPos(ImVec2(at.x + (gutter - BusyLine::kSpinner) * 0.5f, cy - BusyLine::kSpinner * 0.5f));
             BusyLine::Spinner();
-            x += BusyLine::kSpinner + tok::space_1 + 2.0f;
          }
-         else
-         {
-            glyph::Draw(dl, ImVec2(x + 7.0f, at.y + rowH * 0.5f), tok::icon_sm, dim, ui.open ? IconsInfinite::ChevronDown : IconsInfinite::ChevronRight);
-            x += 18.0f;
-         }
-         std::string label = named ? std::string(AgentName(e.agent)) + "  " : std::string();
+         else if (any)
+            glyph::Draw(dl, ImVec2(at.x + gutter * 0.5f, cy), tok::icon_sm, dim, ui.open ? IconsInfinite::ChevronDown : IconsInfinite::ChevronRight);
+         std::string label = named ? std::string(AgentName(e.agent)) + "  ·  " : std::string();
          char count[64];
          if (running)
             std::snprintf(count, sizeof count, "%s", T("Working…"));
+         else if (v.commands > 0)
+            std::snprintf(count, sizeof count, v.commands == 1 ? T("Ran %d command") : T("Ran %d commands"), v.commands);
          else
-            std::snprintf(count, sizeof count, e.lines.size() == 1 ? T("%d step") : T("%d steps"), (int)e.lines.size());
+            std::snprintf(count, sizeof count, v.rows.size() == 1 ? T("%d step") : T("%d steps"), (int)v.rows.size());
          label += count;
-         dl->AddText(ImVec2(x, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), dim, label.c_str());
-         if (!e.ok)
-            dl->AddCircleFilled(ImVec2(x + ImGui::CalcTextSize(label.c_str()).x + 8.0f, at.y + rowH * 0.5f), 2.5f, Red());
-         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
-         if (ui.open || (running && !e.lines.empty()))
+         const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
+         dl->AddText(ImVec2(at.x + gutter, ty), dim, label.c_str());
+         if (!running && v.failed > 0)
          {
-            // While it runs, the latest step only; unfolded, every step.
-            const size_t from = ui.open ? 0 : e.lines.size() - 1;
-            UiType::Scope cap(UiType::Size::Caption);
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
-            for (size_t i = from; i < e.lines.size(); i++)
+            char failed[48];
+            std::snprintf(failed, sizeof failed, "  ·  %s", v.failed == 1 ? T("1 failed") : (std::to_string(v.failed) + " " + T("failed")).c_str());
+            dl->AddText(ImVec2(at.x + gutter + ImGui::CalcTextSize(label.c_str()).x, ty), Red(), failed);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
+         // While it runs, the latest line only; unfolded, every line.
+         if ((ui.open && !running) || (running && any))
+         {
+            ImFont* mono = TerminalMonoFont();
+            const size_t from = running ? v.rows.size() - 1 : 0;
+            const float lineH = ImGui::GetFontSize() + tok::space_1;
+            for (size_t i = from; i < v.rows.size(); i++)
             {
-               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 18.0f);
-               ImGui::TextDisabled("%s", e.lines[i].c_str());
+               const chat::StepRow& r = v.rows[i];
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const float x0 = p.x + gutter, x1 = p.x + width;
+               if (r.failed)
+                  glyph::Draw(dl, ImVec2(p.x + gutter * 0.5f, p.y + lineH * 0.5f), tok::icon_sm, Red(), IconsInfinite::Close);
+               const ImU32 col = r.failed ? Red() : (r.note ? TextTint(0.7f) : Dim());
+               const std::string one = r.text.substr(0, r.text.find('\n'));
+               if (mono != nullptr && !r.note)
+                  ImGui::PushFont(mono, ImGui::GetFontSize());
+               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(col));
+               ImGui::RenderTextEllipsis(dl, ImVec2(x0, p.y + (lineH - ImGui::GetFontSize()) * 0.5f), ImVec2(x1, p.y + lineH), x1, one.c_str(), nullptr, nullptr);
+               ImGui::PopStyleColor();
+               if (mono != nullptr && !r.note)
+                  ImGui::PopFont();
+               ImGui::Dummy(ImVec2(width, lineH));
+               if (ImGui::IsItemHovered() && (ImGui::CalcTextSize(one.c_str()).x > width - gutter || one.size() != r.text.size()))
+                  ImGui::SetTooltip("%s", r.text.c_str());
             }
-            ImGui::PopTextWrapPos();
          }
          ImGui::Dummy(ImVec2(width, 2.0f));
       }
@@ -2469,6 +2542,7 @@ namespace app
             bool running = false;
             for (const Run& r : sRuns)
                running = running || r.steps == i;
+            ImGui::PushID(i);  // chips and buttons inside each row get ids of their own
             switch (e.kind)
             {
                case Entry::Kind::User:
@@ -2530,6 +2604,7 @@ namespace app
                   break;
                }
             }
+            ImGui::PopID();
          }
          // Two or more agents at work: their avatars side by side, with a short count.
          if (sRuns.size() > 1)
@@ -2656,7 +2731,7 @@ namespace app
                   sPick = i, sPickByKey = false;
                if (i == sPick && !c.info)
                {
-                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(0.10f), tok::radius_field);
+                  dl->AddRectFilled(at, ImVec2(at.x + rowW, at.y + rowH), TextTint(EnterPicks() ? 0.10f : 0.05f), tok::radius_field);
                   if (sPickByKey && (at.y < ImGui::GetWindowPos().y || at.y + rowH > ImGui::GetWindowPos().y + ImGui::GetWindowHeight()))
                   {
                      ImGui::SetScrollHereY(at.y < ImGui::GetWindowPos().y ? 0.0f : 1.0f);
@@ -2790,6 +2865,14 @@ namespace app
             TerminalCommandEnv(o.env, o.cwd);
             sFetch[agent] = chat::AgentRun::Start(o);
          }
+         if (list.empty() && kind == chat::AgentKind::Codex && installed && due)
+         {
+            sModelsFetchAt[agent] = now;
+            const char* codexHome = std::getenv("CODEX_HOME");
+            const char* home = std::getenv(CliSetup::CurrentOs() == CliSetup::Os::kWindows ? "USERPROFILE" : "HOME");
+            const std::string dir = codexHome != nullptr && codexHome[0] != '\0' ? std::string(codexHome) : std::string(home != nullptr ? home : "") + "/.codex";
+            list = chat::ParseCodexModels(ReadAll(dir + "/models_cache.json"));
+         }
          if (sFetch[agent] != nullptr)
          {
             std::vector<chat::AgentEvent> drop;
@@ -2803,68 +2886,49 @@ namespace app
          return list;
       }
 
-      // The one picker in the tool row: who answers and with which model. Its face reads "Claude · Sonnet";
-      // its menu lists the agents (set up or sign in from there) and the chosen agent's models.
+      // A tool-row pill: [avatar] text, a tint on hover. Drawn right to left from `right`; returns its left edge.
+      float Pill(const char* id, const std::string& avatar, const std::string& text, float right, float y, float h, bool& clicked)
+      {
+         const float av = avatar.empty() ? 0.0f : 14.0f + tok::space_2;
+         const float w = av + ImGui::CalcTextSize(text.c_str()).x + 2.0f * tok::space_2;
+         ImGui::SetCursorScreenPos(ImVec2(right - w, y));
+         clicked = ImGui::InvisibleButton(id, ImVec2(w, h));
+         const bool hot = ImGui::IsItemHovered() || ImGui::IsPopupOpen(std::string(id).append("menu").c_str());
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+         if (hot)
+            dl->AddRectFilled(mn, mx, TextTint(0.06f), tok::radius_tile);
+         if (!avatar.empty())
+            DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, avatar);
+         dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
+         if (clicked)
+            ImGui::OpenPopup(std::string(id).append("menu").c_str());
+         return mn.x;
+      }
+
+      // Two pills in the tool row: who answers (with where each agent stands) and, beside it, which of that
+      // agent's models. Settings keeps the same default model per agent.
       void DrawPicker(float right, float y, float h)
       {
          const std::string cur = DefaultAgent();
          CliSetup::Config& prefs = CliSetup::Prefs();
          const std::vector<chat::Model>& list = cur.empty() ? std::vector<chat::Model>() : ModelsOf(cur);
          const std::string modelId = prefs.models.count(cur) ? prefs.models[cur] : std::string();
-         std::string face = cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur));
+         std::string modelFace = T("Default");
          for (const chat::Model& m : list)
-            if (!cur.empty() && m.id == modelId && !m.label.empty())
-               face += "  ·  " + m.label;
-         const float av = cur.empty() ? 0.0f : 14.0f + tok::space_2;
-         const float w = av + ImGui::CalcTextSize(face.c_str()).x + 2.0f * tok::space_2;
-         ImGui::SetCursorScreenPos(ImVec2(right - w, y));
-         const bool clicked = ImGui::InvisibleButton("##chatpicker", ImVec2(w, h));
-         const bool hot = ImGui::IsItemHovered();
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
-         if (hot)
-            dl->AddRectFilled(mn, mx, TextTint(0.06f), tok::radius_tile);
-         if (!cur.empty())
-            DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, cur);
-         dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f),
-                     hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), face.c_str());
-         if (clicked)
-            ImGui::OpenPopup("##chatpickermenu");
+            if (m.id == modelId && !m.label.empty())
+               modelFace = m.label;
          const float menuW = 248.0f;
-         ImGui::SetNextWindowPos(ImVec2(mx.x, mn.y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
-         BeginMenuStyle();
-         if (ImGui::BeginPopup("##chatpickermenu"))
+         bool clicked = false;
+         float left = right;
+         if (!cur.empty())
          {
-            MenuLabel(T("Agent"), menuW);
-            for (const CliSetup::Agent& a : CliSetup::Agents())
+            left = Pill("##chatmodel", "", modelFace, right, y, h, clicked);
+            ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+            ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
+            BeginMenuStyle();
+            if (ImGui::BeginPopup("##chatmodelmenu"))
             {
-               auto it = sAgents.find(a.id);
-               if (it == sAgents.end())
-                  continue;
-               AgentState& s = it->second;
-               ImGui::PushID(a.id);
-               if (s.ready.Ready() && !s.authBroken)
-               {
-                  if (MenuRow("##a", menuW, a.name, "", a.id == cur, true, a.id))
-                  {
-                     prefs.agent = a.id;
-                     SaveCliConfig();
-                     ImGui::CloseCurrentPopup();
-                  }
-               }
-               else
-               {
-                  const AgentView v = ViewOf(a.id);
-                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
-                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
-                     Do(a.id, v.act);
-               }
-               ImGui::PopID();
-            }
-            if (!list.empty())
-            {
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                MenuLabel(T("Model"), menuW);
                if (MenuRow("##m", menuW, T("Default"), "", modelId.empty(), true, std::string()))
                {
@@ -2885,6 +2949,41 @@ namespace app
                   }
                   ImGui::PopID();
                }
+               ImGui::EndPopup();
+            }
+            EndMenuStyle();
+            left -= tok::space_1;
+         }
+         const float agentRight = left;
+         Pill("##chatagent", cur, cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur)), agentRight, y, h, clicked);
+         ImGui::SetNextWindowPos(ImVec2(agentRight, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
+         BeginMenuStyle();
+         if (ImGui::BeginPopup("##chatagentmenu"))
+         {
+            MenuLabel(T("Agent"), menuW);
+            for (const CliSetup::Agent& a : CliSetup::Agents())
+            {
+               if (sAgents.find(a.id) == sAgents.end())
+                  continue;
+               ImGui::PushID(a.id);
+               const AgentView v = ViewOf(a.id);
+               if (v.ready)
+               {
+                  if (MenuRow("##a", menuW, a.name, "", a.id == cur, true, a.id))
+                  {
+                     prefs.agent = a.id;
+                     SaveCliConfig();
+                     ImGui::CloseCurrentPopup();
+                  }
+               }
+               else
+               {
+                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
+                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
+                     Do(a.id, v.act);
+               }
+               ImGui::PopID();
             }
             ImGui::EndPopup();
          }
@@ -2901,6 +3000,7 @@ namespace app
          {
             sDropKey = key;
             sPick = 0;
+            sPickMoved = false;
             while (sPick < (int)sCands.size() && sCands[(size_t)sPick].info)
                sPick++;
          }
@@ -2967,7 +3067,7 @@ namespace app
             ImGui::SetKeyboardFocusHere();
             sRefocus = false;
          }
-         const Cand* picked = Picked();
+         const bool enterPicks = EnterPicks();
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;
          const bool enter = ImGui::InputTextMultiline("##chatinput", &sInput, ImVec2(fieldW, textH), flags, InputCallback);
@@ -2976,7 +3076,7 @@ namespace app
          ImGui::PopStyleVar(2);
          if (enter)
          {
-            if (picked != nullptr)
+            if (enterPicks)
                AcceptInactive();
             else
                Send();
@@ -3127,20 +3227,9 @@ namespace app
          const float rowH = 26.0f;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const char* title = sThread.title.empty() ? T("New chat") : sThread.title.c_str();
-         const float right = at.x + width - 3.0f * 24.0f - tok::space_1;
-         {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            ImGui::RenderTextEllipsis(dl, ImVec2(at.x + tok::space_3, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
-                                      title, nullptr, nullptr);
-            ImGui::PopStyleColor();
-         }
-         ImGui::SetCursorScreenPos(ImVec2(at.x + width - 3.0f * 24.0f, at.y + (rowH - 22.0f) * 0.5f));
-         if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
-            gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
-         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Terminal"));
-         ImGui::SameLine(0.0f, 2.0f);
+         // Chat tools lead on the left, the title follows them.
+         const float iconsX = at.x + tok::space_1;
+         ImGui::SetCursorScreenPos(ImVec2(iconsX, at.y + (rowH - 22.0f) * 0.5f));
          if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, sRail))
          {
             sRail = !sRail;
@@ -3154,6 +3243,20 @@ namespace app
             NewChat();
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("New chat"));
+         ImGui::SameLine(0.0f, 2.0f);
+         if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
+            gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Terminal"));
+         const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
+         const float right = at.x + width - tok::space_3;
+         {
+            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            ImGui::RenderTextEllipsis(dl, ImVec2(titleX, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
+                                      title, nullptr, nullptr);
+            ImGui::PopStyleColor();
+         }
 
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
          dl->AddLine(ImVec2(at.x, at.y + rowH - 0.5f), ImVec2(at.x + width, at.y + rowH - 0.5f), TextTint(0.08f));
