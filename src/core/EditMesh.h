@@ -22,6 +22,19 @@
 // Elements are named by where they are, not by index, so the list still means
 // the same thing after an upstream change that keeps the shape roughly in
 // place. A selector with nothing near it is skipped and counted in `missed`.
+//
+// Optional trailing data keeps an edit meaning the same when the upstream mesh is refined
+// (Cube detail 4 -> 96). Without it, a line replays by nearest match as it always did:
+//   sel f c n c n ... t  a b c  a b c ...   `t`: the three corners of each face. A face selector then picks
+//                                           every face of the mesh whose centre lies inside that triangle
+//                                           (same side, within 0.15 of its longest edge), so a face made on a
+//                                           coarse mesh is the whole footprint on a refined one. No hit: nearest.
+//   sel v p p ... r  R  R ...               `r`: how far each point reached (its shortest edge). When the mesh
+//                                           now has edges under 0.6 R there, move / rotate / scale reach the
+//                                           points within R as a linear tent (sum capped at 1), so a moved
+//                                           corner is a smooth bump of the same footprint, never a spike.
+//                                           Delete after sel v still takes only the faces on the exact point.
+// A line with no marker, or a mesh whose topology is unchanged, replays exactly as before.
 // A trailing sel line is the selection Edit Mode shows; `selection` gets it.
 namespace EditMesh
 {
@@ -29,6 +42,7 @@ namespace EditMesh
    {
       std::vector<unsigned char> point;   // per vertex
       std::vector<unsigned char> face;    // per triangle
+      std::vector<float> soft;            // per vertex, only for refined points: how much of a move reaches it (0..1)
       char kind = 'f';                    // what the sel line named: f faces, v points, e edges, a all
       std::vector<std::pair<unsigned int, unsigned int>> edges;   // for 'e': the two points of each edge
    };
@@ -38,6 +52,10 @@ namespace EditMesh
    // Selector text for one element of `m`, for the 3D View to append to a sel line.
    std::string FaceSelector(const Mesh& m, size_t face);
    std::string PointSelector(const Mesh& m, unsigned int vertex);
+
+   // The whole sel line tail for the picked faces / points, with the optional footprint data (see above).
+   std::string FaceSelectors(const Mesh& m, const std::vector<unsigned char>& face);
+   std::string PointSelectors(const Mesh& m, const std::vector<unsigned int>& vertices);
 
    // The triangles of the flat patch around `face` (within `angleDeg`, sharing
    // points), so a click selects the whole quad or n-gon as Blender does.

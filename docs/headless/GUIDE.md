@@ -241,7 +241,7 @@ Three ways, from simplest to most flexible.
 
 | Node | In a patch | Notes |
 |---|---|---|
-| Edit Mesh | `s ops sel all\nextrude 0.3` | One op per line, written `\n` in the file: `sel f/v/e/all`, `move`, `rotate`, `scale`, `extrude`, `inset`, `delete`. Elements are named by position, so the list survives an upstream change. `--explain` shows the resulting vertex and face counts |
+| Edit Mesh | `s ops sel all\nextrude 0.3` | One op per line, written `\n` in the file: `sel f/v/e/all`, `move`, `rotate`, `scale`, `extrude`, `inset`, `delete`. Elements are named by position, so the list survives an upstream change; a `sel f` line may end `t` + three corners per face and a `sel v` line `r` + a reach per point, which keep a face the whole face and a moved point a bump when the input is refined (Cube detail 4 to 96). Without them the nearest element is used. `--explain` shows the resulting vertex and face counts |
 | Sculpt | `f amount`, `i level` | Strokes are the node's saved `data`; a patch with none passes the mesh through. A `brush` image input shapes the dab |
 | Bake | `i mode` AO, Curvature, Position, Normal, Thickness, Sculpt | Outputs an image, so wire it to an Output or to a Material slot. Sculpt mode needs a sculpted input |
 | Armature | `i bones`, `f curl`, `f waveAmount` | Pose and IK controls are `pose0..`; an optional `path` geometry input bends the chain along a curve |

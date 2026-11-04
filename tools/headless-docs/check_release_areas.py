@@ -92,6 +92,17 @@ case("edit_mesh_extrude_inset",
      settings={"em": {"ops": "sel all"}})
 
 n, w = scene("em")
+# The top picked as two coarse triangles with their footprints (`t`): on any Cube detail it is the whole top face.
+case("edit_mesh_footprint_top",
+     [node("cube", "3D", "Cube"),
+      node("em", "3D", "Edit Mesh",
+           ops="sel f 0.1667 0.5 0.1667 0 1 0 -0.1667 0.5 -0.1667 0 1 0 t -0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 -0.5 "
+               "-0.5 0.5 0.5 0.5 0.5 -0.5 -0.5 0.5 -0.5\\nextrude 0.3")] + n,
+     ["geo em 0 cube"] + w,
+     expect=[r'Edit Mesh "em".*\n\s+> geometry: (\d+) vertices'],
+     settings={"em": {"ops": "sel f"}})
+
+n, w = scene("em")
 case("edit_mesh_delete_face",
      [node("cube", "3D", "Cube"),
       node("em", "3D", "Edit Mesh", ops="sel f 0 0 0.5 0 0 1\\ndelete")] + n,

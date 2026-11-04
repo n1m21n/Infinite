@@ -542,6 +542,7 @@ set(COMMON_SOURCES
     src/app/selftest/UiAudit.cpp
     src/app/selftest/MidiOutTests.cpp
     src/app/selftest/View3DNavTests.cpp
+    src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/CliSetupTests.cpp
     src/app/selftest/BenchScenes.cpp
     src/app/selftest/DspFixtures1.cpp

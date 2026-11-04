@@ -7,6 +7,7 @@ void RunView3DMenuTest(int frameId);
 void RunView3DDropTest(int frameId);
 void RunView3DNavTest(int frameId);
 void RunView3DEditTest(int frameId);
+void RunEditMeshRefineTest(int frameId);
 
 void DrawFrameTestsA(FrameCtx& fc)
 {
@@ -1999,6 +2000,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunView3DNavTest(frameId);
       if (getenv("INFINITE_VIEW3DEDITTEST") != nullptr)
          RunView3DEditTest(frameId);
+      if (getenv("INFINITE_EDITMESHREFINETEST") != nullptr)
+         RunEditMeshRefineTest(frameId);
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && getenv("INFINITE_VIEW3DSHOT") == nullptr && (frameId == 7 || frameId == 8))
          RunView3DMenuTest(frameId);
       if (getenv("INFINITE_VIEW3DTEST") != nullptr && getenv("INFINITE_VIEW3DSHOT") == nullptr && (frameId == 9 || frameId == 11))

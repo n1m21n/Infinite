@@ -3730,19 +3730,17 @@ namespace
       std::string line = sEdit.mode == 3 ? "sel f" : "sel v";
       if (sEdit.mode == 3)
       {
-         for (size_t f = 0; f < face.size(); f++)
-            if (face[f])
-               line += EditMesh::FaceSelector(m, f);
-         return line;
+         return line + EditMesh::FaceSelectors(m, face);
       }
       std::vector<unsigned char> seen(sEdit.point.empty() ? 0 : *std::max_element(sEdit.point.begin(), sEdit.point.end()) + 1, 0);
+      std::vector<unsigned int> picked;
       for (size_t v = 0; v < point.size() && v < sEdit.point.size(); v++)
          if (point[v] && !seen[sEdit.point[v]])
          {
             seen[sEdit.point[v]] = 1;
-            line += EditMesh::PointSelector(m, (unsigned int)v);
+            picked.push_back((unsigned int)v);
          }
-      return line;
+      return line + EditMesh::PointSelectors(m, picked);
    }
 
    void EditRebuild(const Mesh& m)

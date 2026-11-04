@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <sstream>
@@ -200,6 +201,63 @@ std::string PointSelector(const Mesh& m, unsigned int vertex)
    return Fmt(p, 3);
 }
 
+namespace
+{
+   // The shortest edge that leaves position p: how far the point reaches (a regular grid's spacing).
+   float PointReach(const Mesh& m, const float p[3])
+   {
+      float best = 1e30f;
+      auto at = [&](const Vertex& v) {
+         return std::fabs(v.px - p[0]) < 1e-5f && std::fabs(v.py - p[1]) < 1e-5f && std::fabs(v.pz - p[2]) < 1e-5f;
+      };
+      for (size_t f = 0; f < m.FaceCount(); f++)
+         for (int k = 0; k < 3; k++)
+         {
+            const Vertex &a = m.vertices[m.indices[f * 3 + k]], &b = m.vertices[m.indices[f * 3 + (k + 1) % 3]];
+            if (!at(a) && !at(b))
+               continue;
+            const float len = std::sqrt((a.px - b.px) * (a.px - b.px) + (a.py - b.py) * (a.py - b.py) + (a.pz - b.pz) * (a.pz - b.pz));
+            if (len > 1e-7f)
+               best = std::min(best, len);
+         }
+      return best > 1e29f ? 0.0f : best;
+   }
+}
+
+std::string FaceSelectors(const Mesh& m, const std::vector<unsigned char>& face)
+{
+   std::string line, tail;
+   for (size_t f = 0; f < face.size() && f < m.FaceCount(); f++)
+   {
+      if (!face[f])
+         continue;
+      line += FaceSelector(m, f);
+      float corners[9];
+      for (int k = 0; k < 3; k++)
+      {
+         const Vertex& v = m.vertices[m.indices[f * 3 + k]];
+         corners[k * 3] = v.px;
+         corners[k * 3 + 1] = v.py;
+         corners[k * 3 + 2] = v.pz;
+      }
+      tail += Fmt(corners, 9);
+   }
+   return tail.empty() ? line : line + " t" + tail;
+}
+
+std::string PointSelectors(const Mesh& m, const std::vector<unsigned int>& vertices)
+{
+   std::string line, tail;
+   for (unsigned int v : vertices)
+   {
+      line += PointSelector(m, v);
+      const float p[3] = { m.vertices[v].px, m.vertices[v].py, m.vertices[v].pz };
+      const float reach = PointReach(m, p);
+      tail += Fmt(&reach, 1);
+   }
+   return tail.empty() ? line : line + " r" + tail;
+}
+
 std::vector<size_t> FlatPatch(const Mesh& m, size_t face, float angleDeg)
 {
    std::vector<size_t> out;
@@ -260,23 +318,79 @@ Selection Select(const Mesh& m, const std::string& selLine, int* missed)
       std::fill(s.face.begin(), s.face.end(), 1);
       return s;
    }
-   std::vector<float> nums;
-   float x;
-   while (in >> x)
-      nums.push_back(x);
+   // Numbers up to a `t` (triangle footprints) or `r` (point reach) marker, then that marker's numbers.
+   std::vector<float> nums, tail;
+   char tailKind = 0;
+   for (std::string w; in >> w;)
+   {
+      if (w == "t" || w == "r")
+      {
+         tailKind = w[0];
+         continue;
+      }
+      char* end = nullptr;
+      const float x = std::strtof(w.c_str(), &end);
+      if (end == w.c_str())
+         continue;
+      (tailKind ? tail : nums).push_back(x);
+   }
    // Near enough to follow an upstream change that keeps the shape in place.
    const float tol = Diagonal(m) * 0.05f;
    int miss = 0;
    if (mode == "f")
    {
-      for (size_t i = 0; i + 5 < nums.size(); i += 6)
+      std::vector<float> fc(s.face.size() * 3), fn(s.face.size() * 3);
+      for (size_t f = 0; f < s.face.size(); f++)
+         FaceData(m, f, &fc[f * 3], &fn[f * 3]);
+      auto pick = [&](size_t f) {
+         s.face[f] = 1;
+         for (int k = 0; k < 3; k++)
+            s.point[m.indices[f * 3 + k]] = 1;
+      };
+      for (size_t i = 0, g = 0; i + 5 < nums.size(); i += 6, g++)
       {
+         const float* nrm = &nums[i + 3];
+         // The coarse triangle's footprint (when the line has one): every face of the mesh that lies inside it.
+         bool hit = false;
+         if (tail.size() >= (g + 1) * 9)
+         {
+            const float* t = &tail[g * 9];
+            const float e0[3] = { t[3] - t[0], t[4] - t[1], t[5] - t[2] }, e1[3] = { t[6] - t[0], t[7] - t[1], t[8] - t[2] };
+            const float n0[3] = { e0[1] * e1[2] - e0[2] * e1[1], e0[2] * e1[0] - e0[0] * e1[2], e0[0] * e1[1] - e0[1] * e1[0] };
+            const float nl = std::sqrt(n0[0] * n0[0] + n0[1] * n0[1] + n0[2] * n0[2]);
+            const float d00 = e0[0] * e0[0] + e0[1] * e0[1] + e0[2] * e0[2], d11 = e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2];
+            const float d01 = e0[0] * e1[0] + e0[1] * e1[1] + e0[2] * e1[2];
+            const float den = d00 * d11 - d01 * d01;
+            if (nl > 1e-12f && std::fabs(den) > 1e-20f)
+            {
+               const float edge = std::sqrt(std::max({ d00, d11, d00 + d11 - 2.0f * d01 }));
+               const float planeTol = std::max(edge * 0.15f, Diagonal(m) * 1e-4f), eps = 1e-3f;
+               for (size_t f = 0; f < s.face.size(); f++)
+               {
+                  const float* n = &fn[f * 3];
+                  if (n[0] * nrm[0] + n[1] * nrm[1] + n[2] * nrm[2] < 0.9f)
+                     continue;
+                  const float d[3] = { fc[f * 3] - t[0], fc[f * 3 + 1] - t[1], fc[f * 3 + 2] - t[2] };
+                  if (std::fabs(d[0] * n0[0] + d[1] * n0[1] + d[2] * n0[2]) / nl > planeTol)
+                     continue;
+                  const float d0 = d[0] * e0[0] + d[1] * e0[1] + d[2] * e0[2], d1 = d[0] * e1[0] + d[1] * e1[1] + d[2] * e1[2];
+                  const float u = (d11 * d0 - d01 * d1) / den, v = (d00 * d1 - d01 * d0) / den;
+                  if (u >= -eps && v >= -eps && u + v <= 1.0f + eps)
+                  {
+                     pick(f);
+                     hit = true;
+                  }
+               }
+            }
+         }
+         if (hit)
+            continue;
          int best = -1;
          float bestD = tol * tol;
          for (size_t f = 0; f < s.face.size(); f++)
          {
-            float c[3], n[3];
-            FaceData(m, f, c, n);
+            const float* c = &fc[f * 3];
+            const float* n = &fn[f * 3];
             if (n[0] * nums[i + 3] + n[1] * nums[i + 4] + n[2] * nums[i + 5] < 0.9f)
                continue;
             const float d = (c[0] - nums[i]) * (c[0] - nums[i]) + (c[1] - nums[i + 1]) * (c[1] - nums[i + 1]) +
@@ -292,30 +406,60 @@ Selection Select(const Mesh& m, const std::string& selLine, int* missed)
             miss++;
             continue;
          }
-         s.face[best] = 1;
-         for (int k = 0; k < 3; k++)
-            s.point[m.indices[best * 3 + k]] = 1;
+         pick((size_t)best);
       }
       WeldExpand(m, s);
    }
    else if (mode == "v" || mode == "e")
    {
       const size_t group = mode == "v" ? 3 : 6;
-      for (size_t i = 0; i + group - 1 < nums.size(); i += group)
+      // A point that reached further on the mesh it was picked on than the mesh now has edges is refined:
+      // its move is spread over that reach as a tent, so the bump keeps its footprint and no spike appears.
+      std::vector<float> soft;
+      std::vector<std::pair<int, float>> tents;
+      for (size_t i = 0, g = 0; i + group - 1 < nums.size(); i += group, g++)
+      {
+         int ends[2] = { -1, -1 };
+         for (size_t j = 0; j < group; j += 3)
          {
-            int ends[2] = { -1, -1 };
-            for (size_t j = 0; j < group; j += 3)
-            {
-               const int v = NearestVertex(m, &nums[i + j], tol);
-               ends[j / 3] = v;
-               if (v < 0)
-                  miss++;
-               else
-                  s.point[v] = 1;
-            }
-            if (group == 6 && ends[0] >= 0 && ends[1] >= 0)
-               s.edges.push_back({ (unsigned int)ends[0], (unsigned int)ends[1] });
+            const int v = NearestVertex(m, &nums[i + j], tol);
+            ends[j / 3] = v;
+            if (v < 0)
+               miss++;
+            else
+               s.point[v] = 1;
          }
+         if (group == 6 && ends[0] >= 0 && ends[1] >= 0)
+            s.edges.push_back({ (unsigned int)ends[0], (unsigned int)ends[1] });
+         if (group == 3 && ends[0] >= 0 && g < tail.size() && tail[g] > 0.0f)
+         {
+            const float p[3] = { m.vertices[ends[0]].px, m.vertices[ends[0]].py, m.vertices[ends[0]].pz };
+            if (PointReach(m, p) < tail[g] * 0.6f)
+               tents.push_back({ ends[0], tail[g] });
+         }
+      }
+      if (!tents.empty())
+      {
+         soft.assign(m.vertices.size(), 0.0f);
+         for (const auto& t : tents)
+         {
+            const Vertex& c = m.vertices[t.first];
+            for (size_t w = 0; w < soft.size(); w++)
+            {
+               const Vertex& q = m.vertices[w];
+               const float d = std::sqrt((q.px - c.px) * (q.px - c.px) + (q.py - c.py) * (q.py - c.py) + (q.pz - c.pz) * (q.pz - c.pz));
+               if (d < t.second)
+                  soft[w] += 1.0f - d / t.second;
+            }
+         }
+         // Points that were not refined move whole.
+         for (size_t w = 0; w < soft.size(); w++)
+            if (s.point[w])
+               soft[w] = 1.0f;
+         for (float& x : soft)
+            x = std::min(x, 1.0f);
+         s.soft = soft;
+      }
       WeldExpand(m, s);
       // A face is selected when all its points are, as in Blender.
       for (size_t f = 0; f < s.face.size(); f++)
@@ -471,14 +615,15 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed, Selection* selec
          const float th = deg * 3.14159265f / 180.0f, ct = std::cos(th), st = std::sin(th);
          for (size_t i = 0; i < cur.vertices.size(); i++)
          {
-            if (!sel.point[i])
+            const float w = sel.soft.size() == cur.vertices.size() ? sel.soft[i] : (sel.point[i] ? 1.0f : 0.0f);
+            if (w <= 0.0f)
                continue;
             Vertex& v = cur.vertices[i];
             if (op == "move")
             {
-               v.px += a[0];
-               v.py += a[1];
-               v.pz += a[2];
+               v.px += a[0] * w;
+               v.py += a[1] * w;
+               v.pz += a[2] * w;
                continue;
             }
             float p[3] = { v.px - c[0], v.py - c[1], v.pz - c[2] };
@@ -492,9 +637,9 @@ Mesh Apply(const Mesh& in, const std::string& ops, int* missed, Selection* selec
                for (int k = 0; k < 3; k++)
                   p[k] = p[k] * ct + x[k] * st + ax[k] * d * (1.0f - ct);
             }
-            v.px = p[0] + c[0];
-            v.py = p[1] + c[1];
-            v.pz = p[2] + c[2];
+            v.px += (p[0] + c[0] - v.px) * w;
+            v.py += (p[1] + c[1] - v.py) * w;
+            v.pz += (p[2] + c[2] - v.pz) * w;
          }
          moved = true;
          continue;
