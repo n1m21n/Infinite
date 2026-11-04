@@ -156,3 +156,39 @@ reference, AO 512, 16 rays, reach 0.25:
 
 Mean error alone missed the banding (the bands average out), so read the
 sheet (truth, Blender bake, Infinite, diff x4) before the number.
+
+## Modelling A/B results (fix/model-ab)
+
+`tools/blender-ab/modeling.py` runs 32 modelling cases (Edit Mesh ops on a
+cube and a UV sphere, Geometry Ops, primitives, Revolve, Sweep) in headless
+Blender and Infinite on the same base mesh. Score = symmetric mean surface
+distance over Blender's bbox diagonal (`msd`); 20000 samples a side. Noise
+floor for differently tessellated copies of one surface is about
+0.0035-0.005; identical meshes score 0. Gate: `msd > baseline*1.1 + 0.001`
+fails. Baseline in `baseline_modeling.json`.
+
+| Case | msd before | msd after | Cause |
+|---|---|---|---|
+| cube_delete_point | 0.0519 | 0.0035 | Delete after a point selection did nothing |
+| cube_subdivide1 | 0.0592 | 0.0035 | Loop on triangles vs Blender's Catmull-Clark on quads |
+| cube_delete_edge | 0.0243 | 0.0041 | Delete after an edge selection did nothing |
+| cube_subdivide2 | 0.0251 | 0.0036 | as subdivide1 |
+| cube_twist | 0.0201 | 0.0 | Y-axis twist turned the opposite way to X and Z |
+
+Fixes: Subdivide pairs triangles back into quads and runs Catmull-Clark
+with the limit-surface stencil (falls back to Loop for meshes it cannot
+pair); Edit Mesh Delete takes every face that uses the selected points or
+edges, as Blender does; Twist on Y is right-handed, in the CPU, point-cloud
+and GLSL paths.
+
+Left as is (deliberate or not real):
+- cube_smooth 0.030, sphere_smooth 0.021: Infinite's Smooth is Taubin
+  (keeps volume); Blender's Smooth modifier shrinks.
+- cube_rotate 0.027: the cube's twisted quads are split along the other
+  diagonal; same corners, not a geometry gap.
+- prim_cylinder 50 vs 48 vertices: Infinite's cap fan has a centre vertex.
+- cube_bevel 80 vs 96 vertices, msd 0.0049: within noise.
+- All other extrude, inset, delete-face, move, scale, primitive, Revolve
+  and Sweep cases sit at the noise floor.
+
+Self-tests (MESHOPTEST, GEOTEST, GEOAUDIT, 3DTEST) pass.
