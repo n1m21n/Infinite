@@ -228,6 +228,9 @@ namespace app
       Config& prefs = Prefs();
       if (prefs.welcomed)
          return false;
+      // A clipped or collapsing panel submits no items; moving the cursor then would trip ImGui's boundary check.
+      if (ImGui::GetCurrentWindow()->SkipItems)
+         return true;
       const Os os = CurrentOs();
       const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
       const Agent* agent = FindAgent(prefs.agent);
