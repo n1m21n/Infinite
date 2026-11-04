@@ -9,7 +9,7 @@ You are running inside Infinite's Terminal panel. The user is looking at a live 
 and every request is about that patch unless they name a file.
 
 1. Run `infinite context` first. It returns the window's status, the selected nodes, every node with
-   its index, and any code errors. Use `infinite params <node>` to see a node's keys and ranges.
+   its index, and any code errors. Use `infinite params <node> --full` to see a node's keys, labels, ranges, options and what is modulated.
 2. Change the patch with live verbs. Each one is applied to the window at once, can be undone, and
    the user sees it happen:
 

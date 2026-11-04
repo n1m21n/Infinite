@@ -159,9 +159,36 @@ namespace app
          std::vector<std::pair<std::string, std::string>> raw;
          Patch::SaveParams(gn->node.get(), raw);
          json out = json::object();
+         if (!params.value("full", false))
+         {
+            for (const auto& kv : raw)
+               out[kv.first] = kv.second;
+            outResult = out;
+            return true;
+         }
+         // full: each key with what the node's control says about it (label, range, options) and
+         // whether it is modulated or has an expression. Keys with no drawn control carry the value only.
          for (const auto& kv : raw)
-            out[kv.first] = kv.second;
-         outResult = out;
+         {
+            json entry = { { "value", kv.second } };
+            const int param = ParamIndexOfKeyOnNode(*gn, kv.first);
+            if (param >= 0)
+               if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, param))
+               {
+                  entry["label"] = ref->name;
+                  entry["min"] = ref->minValue;
+                  entry["max"] = ref->maxValue;
+                  entry["step"] = ref->step;
+                  entry["kind"] = ref->isEnum ? "enum" : ref->isBool ? "bool" : ref->step >= 1.0f ? "int" : "float";
+                  if (!ref->enumOptions.empty())
+                     entry["options"] = ref->enumOptions;
+                  entry["modulatable"] = true;
+                  entry["modulated"] = Modulation::Instance().IsModulated(gn->index, param);
+                  entry["expression"] = Modulation::Instance().HasExpression(gn->index, param);
+               }
+            out[kv.first] = entry;
+         }
+         outResult = { { "index", gn->index }, { "type", gn->typeName }, { "title", NodeTitle(*gn) }, { "params", out } };
          return true;
       }
       else if (method == "param_ui_state")
@@ -518,6 +545,25 @@ namespace app
          outResult = json::object();
          return true;
       }
+      else if (method == "focus")
+      {
+         // The chat's node and param links: select the node and frame it, never zooming in.
+         GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+         if (gn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         ed::EditorContext* previous = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         ed::ClearSelection();
+         ed::SetCurrentEditor(previous);
+         gPendingSelect.assign(1, gn->NodeId());
+         gRequestFitViewNodeIndex = gn->index;
+         gRequestFitViewNodeZoom = false;
+         outResult = { { "index", gn->index } };
+         return true;
+      }
       else if (method == "expand_node")
       {
          const int index = params.value("index", -1);
@@ -740,9 +786,25 @@ namespace app
                failAt = (int)i;
                break;
             }
+            // A string "$N.field" in the params is result N's field, so one batch can add a node and
+            // then wire it (the chat's `add <Type> after @a`).
+            json callParams = call.contains("params") ? call["params"] : json::object();
+            for (auto& [name, value] : callParams.items())
+               if (value.is_string())
+               {
+                  const std::string text = value.get<std::string>();
+                  const size_t dot = text.find('.');
+                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)
+                  {
+                     const int at = atoi(text.substr(1, dot - 1).c_str());
+                     const std::string field = text.substr(dot + 1);
+                     if (at >= 0 && at < (int)results.size() && results[at].contains(field))
+                        value = results[at][field];
+                  }
+               }
             json r;
             std::string e;
-            if (!HandleRpcCommand(m, call.contains("params") ? call["params"] : json::object(), r, e))
+            if (!HandleRpcCommand(m, callParams, r, e))
             {
                failMsg = m + ": " + e;
                failAt = (int)i;

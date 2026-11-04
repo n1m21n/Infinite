@@ -6369,6 +6369,7 @@ void RunRecExportTest(int width, int height, bool starved, const char* label);
 bool RunAudioPdcTest();
 bool RunMidiOutTest();
 bool RunCliSetupTest();
+bool RunChatTest();
 bool RunI18nTest();
 
 #if defined(__linux__)

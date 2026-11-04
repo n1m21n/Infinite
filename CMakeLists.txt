@@ -528,6 +528,10 @@ set(COMMON_SOURCES
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
     src/core/CliSetup.cpp
+    src/core/chat/AgentStream.cpp
+    src/core/chat/ChatCatalog.cpp
+    src/core/chat/PatchGrammar.cpp
+    src/core/chat/ReplyLinks.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
@@ -544,6 +548,7 @@ set(COMMON_SOURCES
     src/app/selftest/View3DNavTests.cpp
     src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/CliSetupTests.cpp
+    src/app/selftest/ChatTests.cpp
     src/app/selftest/BenchScenes.cpp
     src/app/selftest/DspFixtures1.cpp
     src/app/selftest/DspFixtures2.cpp

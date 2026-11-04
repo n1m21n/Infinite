@@ -1118,11 +1118,11 @@ namespace
 
    const char* kHelp = R"(infinite: drive Infinite from a terminal. Live when the app answers, headless given a .inf file.
 
-Look     graph [p.inf]  explain [p.inf]  params <node>  selection  status  nodes  describe <type>
+Look     graph [p.inf]  explain [p.inf]  params <node> [--full]  selection  status  nodes  describe <type>
 Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disconnect <dst[:slot]>
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
-         select <node>...|all|none  copy  paste  duplicate  group  ungroup  view3d-add <node>...
+         select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
 Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
@@ -1332,8 +1332,8 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "params")
       {
-         need(1, "params <node>");
-         return call("get_params", { { "index", NodeRef(args[0]) } });
+         need(1, "params <node> [--full]");
+         return call("get_params", { { "index", NodeRef(args[0]) }, { "full", args.size() > 1 && args[1] == "--full" } });
       }
       if (verb == "selection")
          return call("selection");
@@ -1440,6 +1440,11 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
             for (const std::string& node : args)
                nodes.push_back(NodeRef(node));
          return call("select", { { "all", args[0] == "all" }, { "nodes", nodes } });
+      }
+      if (verb == "focus")
+      {
+         need(1, "focus <node>");
+         return call("focus", { { "index", NodeRef(args[0]) } });
       }
       if (verb == "view3d-add")
       {

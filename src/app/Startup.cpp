@@ -805,6 +805,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    if (getenv("INFINITE_CLISETUPTEST") != nullptr)
       return RunCliSetupTest() ? 0 : 1;
+   if (getenv("INFINITE_CHATTEST") != nullptr)
+      return RunChatTest() ? 0 : 1;
 
    if (getenv("INFINITE_MIDIOUTTEST") != nullptr)
    {
