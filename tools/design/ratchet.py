@@ -12,7 +12,7 @@ STORE = ROOT / "tools/design/ratchet.json"
 RX = re.compile(r"IM_COL32\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|ImVec4\(\s*[0-9.]+f\s*,\s*[0-9.]+f\s*,\s*[0-9.]+f\s*,\s*[0-9.]+f\s*\)")
 # Plan section 5: a surface never calls these; it uses a component. Existing calls are the baseline, new ones fail.
 RAW = re.compile(r"ImGui::(Button|SmallButton|Separator|SameLine|PushStyleColor|PushStyleVar)\(")
-ALLOW = {"src/app/ui/design/"}  # generated/bridge files and the components themselves
+ALLOW = {"src/app/ui/design/", "src/app/selftest/UiAudit.cpp"}  # components themselves; UiAudit draws raw widgets on purpose as canaries
 
 def counts(rx=RX):
     out = {}
