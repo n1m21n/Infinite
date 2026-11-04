@@ -10,6 +10,7 @@
 #include "app/ui/design/components/CodeBlock.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
@@ -223,6 +224,27 @@ namespace app
             else
                ImGui::TextDisabled("%s", state);
          }
+      }
+
+      {
+         Config& wp = Prefs();
+         const Paths wpaths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
+         FormParts::Label(L("Agent folder"));
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(wp.workspace.empty() ? T("The open patch's folder") : wp.workspace.c_str());
+         FormParts::Inline();
+         if (FormParts::Button(L("Choose…")))
+         {
+            const std::string dir = Platform::OpenFolderDialog("Folder for agents", wp.workspace);
+            if (!dir.empty())
+            {
+               wp.workspace = dir;
+               SaveConfig(wpaths.config, wp);
+            }
+         }
+         FormParts::Label(L("Edit files in it"));
+         if (Switch::Box("##agentaccess", &wp.folderAccess))
+            SaveConfig(wpaths.config, wp);
       }
 
       {

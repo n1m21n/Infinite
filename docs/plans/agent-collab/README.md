@@ -378,3 +378,18 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 4. T2: `infinite mcp` with live tools.
 5. T3: the gate; keep only if it beats B1.
 6. T4 built; owner looks at the chat in the app and runs one real agent turn.
+
+## C8 - sign-in, onboarding and plain errors (2026-11-04)
+
+Why: Sign in opened the agent's terminal screen and forced the terminal face; model choice and failures had no home in the chat.
+
+| Piece | What it does |
+|---|---|
+| Browser sign-in | `AgentAuth`: `claude auth login`, `codex login`, Antigravity's first headless turn. Runs as a raw `AgentRun` (no terminal tab); the page address shows as "Open sign-in page" if the CLI could not open it. A successful exit is trusted over the file probe. |
+| Onboarding card | One glass card: Connect per agent (setup, MCP, skills, then sign-in chained). Then one "Connected" card: folder, edit-files switch, Start; Start adds a one-line intro note. |
+| Plain errors | `Explain` maps raw output to one sentence (sign in, limit, offline, missing, terms). A sign-in error flips the agent back to Sign in and shows a Sign in chip. Raw output sits behind Details. |
+| Model | Picker next to the agent picker: Claude fixed list, Antigravity from `agy models`; saved per agent; passed to each turn. Workspace folder is the turn's cwd; edit-files adds Read/Edit/Write/Glob/Grep. |
+| Replies | Sound paths on their own line show as a play/stop row (Library preview player); images and code blocks as before. |
+| Settings | Agent folder and Edit-files rows beside the agent list. |
+
+Open: `/` commands; Antigravity sign-in waits 60 s for the browser; UI polish against the Claude desktop chat (icons, spacing, side panel) is a separate pass.

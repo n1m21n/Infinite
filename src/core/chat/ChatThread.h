@@ -21,6 +21,7 @@ namespace chat
       std::vector<std::string> files;  // User: attached files
       bool ok = true;
       bool undone = false;             // Change from a direct command
+      std::string detail;              // Error: the raw output behind the plain words (not saved)
    };
 
    struct Session

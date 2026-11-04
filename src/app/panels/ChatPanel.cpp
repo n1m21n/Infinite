@@ -14,6 +14,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/Switch.h"
 #include "core/CategoryColors.h"
 #include "core/CliSetup.h"
 #include "core/GraphNode.h"
@@ -99,6 +100,7 @@ namespace app
          std::string loginUrl;                   // the page to open by hand when the CLI could not
          std::string loginError;                 // plain words after a failed sign-in
          std::string loginLog;                   // raw output, behind Details
+         bool chain = false;                     // Connect pressed: after setup, sign in without another click
          bool authBroken = false;                // a turn said "sign in": overrides the file probe
          double loginAt = 0.0;
       };
@@ -467,6 +469,13 @@ namespace app
             s.setup = nullptr;
             CheckAgents(true);
             s.failed = !s.ready.connected;
+            if (!s.failed && s.chain && (!s.ready.signedIn || s.authBroken))
+            {
+               s.chain = false;
+               if (const CliSetup::Agent* ag = CliSetup::FindAgent(id))
+                  StartSignIn(*ag);
+            }
+            s.chain = false;
          }
       }
 
@@ -702,7 +711,10 @@ namespace app
             char note[300];
             const std::string why = f.kind != chat::Friendly::Kind::Other ? f.text : r.errorText.empty() ? std::string(T("stopped with an error.")) : r.errorText;
             std::snprintf(note, sizeof note, "%s: %s", AgentName(r.agent), why.c_str());
-            InsertAt(at++, Make(Entry::Kind::Error, note, r.agent));
+            Entry err = Make(Entry::Kind::Error, note, r.agent);
+            if (f.kind == chat::Friendly::Kind::Other || r.errorText.size() > why.size())
+               err.detail = chat::StripAnsi(r.errorText);
+            InsertAt(at++, std::move(err));
          }
          for (const std::string& d : r.denied)
             InsertAt(at++, Make(Entry::Kind::Note, std::string(T("Not allowed:")) + " " + d, r.agent));
@@ -1627,21 +1639,49 @@ namespace app
          ImGui::Dummy(ImVec2(width, y - origin.y));
       }
 
-      // While no agent can take a turn: one row per agent, each set up in the background.
+      // A glass card: the same well and hairline the composer uses.
+      void GlassCard(ImVec2 at, float width, float height)
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), TextTint(0.045f), tok::radius_tile + 4.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(0.10f), tok::radius_tile + 4.0f, 0, 1.0f);
+      }
+
+      void SaveCliConfig()
+      {
+         CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, CliSetup::Prefs());
+      }
+
+      // First run, one card: pick an agent, press Connect. Install, MCP, skills and the browser sign-in
+      // follow by themselves; the card says only where it is.
       bool DrawSetup(float width)
       {
          if (AnyReady())
             return false;
          using namespace CliSetup;
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+         const Paths paths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
+         const float pad = tok::space_3, rowH = 38.0f, titleH = 30.0f;
+         int rows = 0;
+         for (const Agent& a : Agents())
+            rows += sAgents.count(a.id) ? 1 : 0;
+         float extra = 0.0f;
+         for (const Agent& a : Agents())
+         {
+            const auto it = sAgents.find(a.id);
+            if (it != sAgents.end() && (it->second.login != nullptr && !it->second.loginUrl.empty()))
+               extra += 26.0f;
+            if (it != sAgents.end() && !it->second.loginError.empty())
+               extra += 18.0f;
+         }
+         const float height = pad * 2.0f + titleH + rows * (rowH + tok::space_1) + extra;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         GlassCard(at, width, height);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
          {
             UiType::Scope s(UiType::Size::Body, UiType::Weight::Semibold);
-            ImGui::TextUnformatted(T("Connect an agent"));
+            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connect an agent"));
          }
-         ImGui::PopTextWrapPos();
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-         const Paths paths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
-         const float rowH = 30.0f;
+         float y = at.y + pad + titleH;
          for (const Agent& a : Agents())
          {
             auto it = sAgents.find(a.id);
@@ -1649,65 +1689,133 @@ namespace app
                continue;
             AgentState& s = it->second;
             ImGui::PushID(a.id);
-            const ImVec2 at = ImGui::GetCursorScreenPos();
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(0.05f), tok::radius_tile);
-            const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
-            dl->AddText(ImVec2(at.x + tok::space_2, ty), ImGui::GetColorU32(ImGuiCol_Text), a.name);
-            auto right = [&](const char* label, bool primary) -> bool
+            DrawAvatar(dl, ImVec2(at.x + pad + 11.0f, y + rowH * 0.5f), 11.0f, a.id);
+            const float ty = y + (rowH - ImGui::GetFontSize()) * 0.5f;
+            dl->AddText(ImVec2(at.x + pad + 30.0f, ty), ImGui::GetColorU32(ImGuiCol_Text), a.name);
+            const float rx = at.x + width - pad;
+            auto button = [&](const char* label, bool primary) -> bool
             {
                const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_2;
-               ImGui::SetCursorScreenPos(ImVec2(at.x + width - w - tok::space_1, at.y + (rowH - ChipButton::kHeight) * 0.5f));
-               return ChipButton::Draw(label, primary);
+               ImGui::SetCursorScreenPos(ImVec2(rx - w, y + (rowH - 26.0f) * 0.5f));
+               return ChipButton::Draw(label, primary, 26.0f);
             };
+            auto status = [&](const char* label, bool spin, ImU32 col)
+            {
+               const float w = ImGui::CalcTextSize(label).x;
+               dl->AddText(ImVec2(rx - w, ty), col, label);
+               if (spin)
+               {
+                  ImGui::SetCursorScreenPos(ImVec2(rx - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
+                  BusyLine::Spinner();
+               }
+            };
+            float used = 0.0f;
             if (s.setup != nullptr)
             {
                const Status st = ParseStatus(ReadAll(paths.status), (long long)std::time(nullptr));
                char prog[48];
                std::snprintf(prog, sizeof prog, T("Setting up… %d of %d"), st.GreenCount(), kStepCount);
-               const float w = ImGui::CalcTextSize(prog).x;
-               dl->AddText(ImVec2(at.x + width - w - tok::space_2, ty), Dim(), prog);
-               ImGui::SetCursorScreenPos(ImVec2(at.x + width - w - tok::space_2 - BusyLine::kSpinner - tok::space_1, at.y + (rowH - BusyLine::kSpinner) * 0.5f));
-               BusyLine::Spinner();
-            }
-            else if (s.failed)
-            {
-               if (right(T("Open in Terminal"), false))
-                  OpenInTerminal(a);
-               dl->AddText(ImVec2(at.x + tok::space_2 + ImGui::CalcTextSize(a.name).x + tok::space_2, ty), Red(), T("Failed"));
+               status(prog, true, Dim());
             }
             else if (s.login != nullptr)
             {
-               const char* msg = T("Finish in your browser…");
-               const float w = ImGui::CalcTextSize(msg).x;
-               dl->AddText(ImVec2(at.x + width - w - tok::space_2, ty), Dim(), msg);
-               ImGui::SetCursorScreenPos(ImVec2(at.x + width - w - tok::space_2 - BusyLine::kSpinner - tok::space_1, at.y + (rowH - BusyLine::kSpinner) * 0.5f));
-               BusyLine::Spinner();
+               status(T("Finish in your browser…"), true, Dim());
                if (!s.loginUrl.empty())
                {
-                  ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH + 2.0f));
-                  ImGui::PushID("open");
-                  if (ChipButton::Draw(T("Open sign-in page"), false))
+                  ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH));
+                  if (ChipButton::Draw(T("Open sign-in page"), false, 22.0f, 0.0f, true))
                      Platform::OpenExternalUrl(s.loginUrl);
-                  ImGui::PopID();
-                  ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH + 2.0f + ChipButton::kHeight));
+                  used = 26.0f;
                }
             }
-            else if (s.ready.installed && s.ready.connected && (!s.ready.signedIn || s.authBroken))
+            else
             {
-               if (right(T("Sign in"), true))
-                  StartSignIn(a);
-               if (!s.loginError.empty())
+               if (button(s.failed ? T("Try again") : T("Connect"), true))
                {
-                  const float ex = at.x + tok::space_2 + ImGui::CalcTextSize(a.name).x + tok::space_2;
-                  dl->AddText(ImVec2(ex, ty), Red(), s.loginError.c_str());
+                  s.failed = false;
+                  s.loginError.clear();
+                  if (s.ready.installed && s.ready.connected)
+                     StartSignIn(a);
+                  else
+                  {
+                     s.chain = true;
+                     SetUpInBackground(a);
+                  }
+               }
+               const std::string msg = s.failed ? std::string(T("Setup failed")) : s.loginError;
+               if (!msg.empty())
+               {
+                  UiType::Scope cap(UiType::Size::Caption);
+                  dl->AddText(ImVec2(at.x + pad + 30.0f, y + rowH - 2.0f), Red(), msg.c_str());
+                  used = 18.0f;
                }
             }
-            else if (right(T("Set up"), true))
-               SetUpInBackground(a);
-            ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH + tok::space_1));
+            y += rowH + tok::space_1 + used;
             ImGui::PopID();
          }
+         ImGui::SetCursorScreenPos(at);
+         ImGui::Dummy(ImVec2(width, height));
+         return true;
+      }
+
+      // After the first agent connects: where it works and whether it may edit files, then one intro line.
+      bool DrawFolderStep(float width)
+      {
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         if (!AnyReady() || prefs.introduced)
+            return false;
+         const float pad = tok::space_3, rowH = 34.0f;
+         const float height = pad * 2.0f + 28.0f + rowH * 2.0f + 34.0f;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         GlassCard(at, width, height);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         {
+            UiType::Scope s(UiType::Size::Body, UiType::Weight::Semibold);
+            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connected"));
+         }
+         float y = at.y + pad + 28.0f;
+         // Folder
+         std::string folder = prefs.workspace;
+         if (folder.empty())
+            folder = T("The open patch's folder");
+         else if (const size_t sl = folder.find_last_of("/\\"); sl != std::string::npos && sl + 1 < folder.size())
+            folder = folder.substr(sl + 1);
+         dl->AddText(ImVec2(at.x + pad, y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), T("Folder"));
+         {
+            const float w = ImGui::CalcTextSize(T("Choose…")).x + 2.0f * tok::space_2;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - w, y + (rowH - 24.0f) * 0.5f));
+            if (ChipButton::Draw(T("Choose…"), false, 24.0f))
+            {
+               const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
+               if (!dir.empty())
+               {
+                  prefs.workspace = dir;
+                  SaveCliConfig();
+               }
+            }
+            const float fw = ImGui::CalcTextSize(folder.c_str()).x;
+            dl->AddText(ImVec2(at.x + width - pad - w - tok::space_2 - fw, y + (rowH - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), folder.c_str());
+         }
+         y += rowH;
+         // Access
+         dl->AddText(ImVec2(at.x + pad, y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), T("Edit files in it"));
+         ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - 36.0f, y + (rowH - 20.0f) * 0.5f));
+         if (Switch::Box("##access", &prefs.folderAccess))
+            SaveCliConfig();
+         y += rowH + 4.0f;
+         {
+            const float w = ImGui::CalcTextSize(T("Start")).x + 4.0f * tok::space_2;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - w, y));
+            if (ChipButton::Draw(T("Start"), true, 26.0f, w))
+            {
+               prefs.introduced = true;
+               SaveCliConfig();
+               Push(Make(Entry::Kind::Note, T("Try: add a Noise and wire it to the output. Type @ to point at a node, @claude or @codex to pick an agent.")));
+               SaveNow();
+            }
+         }
+         ImGui::SetCursorScreenPos(at);
+         ImGui::Dummy(ImVec2(width, height));
          return true;
       }
 
@@ -1746,7 +1854,7 @@ namespace app
          ImGui::BeginChild("##chatlog", ImVec2(0.0f, height), ImGuiChildFlags_AlwaysUseWindowPadding);
          ImGui::PopStyleVar();
          const float width = ImGui::GetContentRegionAvail().x;
-         const bool setup = DrawSetup(width);
+         const bool setup = DrawSetup(width) || DrawFolderStep(width);
          if (setup && !sThread.entries.empty())
             ImGui::Dummy(ImVec2(0.0f, tok::space_3));
          if (!setup && sThread.entries.empty())
@@ -1795,6 +1903,32 @@ namespace app
                   ImGui::TextUnformatted(e.text.c_str());
                   ImGui::PopTextWrapPos();
                   ImGui::PopStyleColor();
+                  if (e.kind == Entry::Kind::Error)
+                  {
+                     ImGui::PushID(i);
+                     const auto ag = sAgents.find(e.agent);
+                     if (ag != sAgents.end() && ag->second.authBroken && ag->second.login == nullptr)
+                     {
+                        if (ChipButton::Draw(T("Sign in"), true))
+                           if (const CliSetup::Agent* a = CliSetup::FindAgent(e.agent))
+                              StartSignIn(*a);
+                     }
+                     else if (ag != sAgents.end() && ag->second.login != nullptr)
+                        ImGui::TextDisabled("%s", T("Finish in your browser…"));
+                     if (!e.detail.empty())
+                     {
+                        if (ChipButton::Draw(ui.open ? T("Hide details") : T("Details"), false, ChipButton::kHeight, 0.0f, true))
+                           ui.open = !ui.open;
+                        if (ui.open)
+                        {
+                           UiType::Scope cap(UiType::Size::Caption);
+                           ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+                           ImGui::TextDisabled("%s", e.detail.c_str());
+                           ImGui::PopTextWrapPos();
+                        }
+                     }
+                     ImGui::PopID();
+                  }
                   break;
                }
             }
