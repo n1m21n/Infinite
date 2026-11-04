@@ -95,6 +95,7 @@ namespace app
             if (ChipButton::Draw(info.action.c_str(), !info.ready, h, bw))
                ChatAgentAct(a.id, false);
          }
+         ChatAgentCodeEntry(a.id, rowW);
          ImGui::PopID();
       }
 

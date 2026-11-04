@@ -105,6 +105,8 @@ namespace app
          bool chain = false;                     // Connect pressed: after setup, sign in without another click
          bool authBroken = false;                // a turn said "sign in": overrides the file probe
          double loginAt = 0.0;
+         bool needsCode = false;                 // the sign-in page shows a code to paste back (Gemini)
+         std::string codeInput;
       };
 
       chat::Thread sThread;
@@ -459,9 +461,37 @@ namespace app
          s.loginError.clear();
          s.loginUrl.clear();
          s.loginLog.clear();
+         s.needsCode = false;
+         s.codeInput.clear();
          s.signingIn = true;
          s.loginAt = ImGui::GetTime();
          s.login = chat::AgentRun::Start(o);
+      }
+
+      // The paste field for a sign-in that ends with a code shown in the browser: field + Submit on one line.
+      void DrawCodeEntry(AgentState& s, float width)
+      {
+         if (s.login == nullptr || !s.needsCode)
+            return;
+         const float btnW = ImGui::CalcTextSize(T("Submit")).x + 2.0f * tok::space_2;
+         ImGui::SetNextItemWidth(std::max(80.0f, width - btnW - tok::space_1));
+         const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code from the browser"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::SameLine(0.0f, tok::space_1);
+         const bool press = ChipButton::Draw(T("Submit"), true, 26.0f);
+         if (!(enter || press))
+            return;
+         std::string code = s.codeInput;
+         while (!code.empty() && std::isspace((unsigned char)code.back()))
+            code.pop_back();
+         size_t b = 0;
+         while (b < code.size() && std::isspace((unsigned char)code[b]))
+            b++;
+         code = code.substr(b);
+         if (code.empty())
+            return;
+         s.login->Write(code + "\r");
+         s.codeInput.clear();
+         s.needsCode = false;
       }
 
       void PollLogins()
@@ -475,6 +505,7 @@ namespace app
             const std::string log = chat::StripAnsi(s.login->Log());
             if (s.loginUrl.empty())
                s.loginUrl = chat::FindUrl(log);
+            s.needsCode = chat::AsksForCode(log);
             if (!s.login->Done())
                continue;
             bool error = false;
@@ -484,6 +515,7 @@ namespace app
             s.loginLog = log;
             s.login = nullptr;
             s.signingIn = false;
+            s.needsCode = false;
             CheckAgents(true);
             if (!error)
             {
@@ -1911,6 +1943,8 @@ namespace app
             const auto it = sAgents.find(a.id);
             if (it != sAgents.end() && (it->second.login != nullptr && !it->second.loginUrl.empty()))
                extra += 26.0f;
+            if (it != sAgents.end() && it->second.login != nullptr && it->second.needsCode)
+               extra += 34.0f;
             if (it != sAgents.end() && (!it->second.loginError.empty() || it->second.failed))
                extra += 34.0f;
          }
@@ -1967,6 +2001,12 @@ namespace app
                   if (ChipButton::Draw(T("Open sign-in page"), false, 22.0f, 0.0f, true))
                      Platform::OpenExternalUrl(s.loginUrl);
                   used = 26.0f;
+               }
+               if (s.needsCode)
+               {
+                  ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH + used));
+                  DrawCodeEntry(s, rx - (at.x + pad + 30.0f));
+                  used += 34.0f;
                }
             }
             else
@@ -2163,7 +2203,10 @@ namespace app
                               StartSignIn(*a);
                      }
                      else if (ag != sAgents.end() && ag->second.login != nullptr)
+                     {
                         ImGui::TextDisabled("%s", T("Finish in your browser…"));
+                        DrawCodeEntry(ag->second, std::min(width, 360.0f));
+                     }
                      if (!e.detail.empty())
                      {
                         if (ChipButton::Draw(ui.open ? T("Hide details") : T("Details"), false, ChipButton::kHeight, 0.0f, true))
@@ -2886,7 +2929,16 @@ namespace app
       PollSetups();
    }
 
-   ChatAgentInfo ChatAgentStatus(const std::string& id)
+   bool ChatAgentCodeEntry(const std::string& id, float width)
+{
+   const auto it = sAgents.find(id);
+   if (it == sAgents.end() || it->second.login == nullptr || !it->second.needsCode)
+      return false;
+   DrawCodeEntry(it->second, width);
+   return true;
+}
+
+ChatAgentInfo ChatAgentStatus(const std::string& id)
    {
       ChatAgentInfo info;
       const auto it = sAgents.find(id);

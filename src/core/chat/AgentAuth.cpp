@@ -67,6 +67,13 @@ namespace chat
       return t.substr(at, end - at);
    }
 
+   bool AsksForCode(const std::string& log)
+   {
+      std::string l = StripAnsi(log);
+      std::transform(l.begin(), l.end(), l.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      return l.find("paste the authorization code") != std::string::npos || l.find("paste the code") != std::string::npos;
+   }
+
    namespace
    {
       std::string Lower(std::string s)

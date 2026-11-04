@@ -37,4 +37,6 @@ namespace chat
    std::vector<Model> FixedModels(AgentKind kind);
    // `agy models` output: a header line, then `<id>\t<label>`.
    std::vector<Model> ParseAgyModels(const std::string& output);
+   // True when a sign-in is waiting for the user to paste an authorization code (Gemini shows one in the browser).
+   bool AsksForCode(const std::string& log);
 }

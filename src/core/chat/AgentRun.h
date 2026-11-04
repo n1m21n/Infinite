@@ -27,6 +27,7 @@ namespace chat
 
       void Poll(std::vector<AgentEvent>& out);  // events since the last call
       bool Done() const;                        // the child is gone and every event was taken
+      bool Write(const std::string& text);      // types into the child (a pasted sign-in code); false once it is gone
       void Stop();                              // ends the turn; an End event follows
       std::string Log() const;                  // everything the child printed (last ~16 KB), for a Details fold
 

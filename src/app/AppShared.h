@@ -5801,6 +5801,7 @@ struct ChatAgentInfo
 };
 void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
 ChatAgentInfo ChatAgentStatus(const std::string& id);
+bool ChatAgentCodeEntry(const std::string& id, float width);  // the paste-the-code field while a sign-in asks for one
 std::vector<std::pair<std::string, std::string>> ChatAgentModels(const std::string& id);   // {id, label}
 void ChatAgentAct(const std::string& id, bool repair);      // sign in, or set up again when repair (or not yet installed)
 void ChatClearHistory();   // deletes every saved chat and starts a new one; nothing while a turn runs

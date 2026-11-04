@@ -448,6 +448,8 @@ namespace app
          check(chat::SignInArgs(chat::AgentKind::Codex).size() == 2 && chat::SignInArgs(chat::AgentKind::Codex)[1] == "login", "sign-in: codex uses its browser login");
          check(chat::StripAnsi("\x1b[31mred\x1b[0m\r\n") == "red\n", "ansi codes and carriage returns are stripped");
          check(chat::FindUrl("Open https://claude.ai/oauth?x=1 now") == "https://claude.ai/oauth?x=1", "the sign-in address is found in the output");
+         check(chat::AsksForCode("Waiting for authentication (timeout 60s)...\nOr, paste the authorization code here and press Enter:"), "a sign-in that asks for a pasted code is noticed");
+         check(!chat::AsksForCode("Open https://claude.ai/oauth?x=1 now"), "a plain browser sign-in does not ask for a code");
          check(chat::Explain("Claude", "Error: not logged in").kind == chat::Friendly::Kind::SignIn, "error: not logged in means sign in");
          check(chat::Explain("Codex", "You've hit your usage limit").kind == chat::Friendly::Kind::Limit, "error: usage limit");
          check(chat::Explain("Codex", "getaddrinfo ENOTFOUND api").kind == chat::Friendly::Kind::Offline, "error: offline");

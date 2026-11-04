@@ -151,6 +151,14 @@ namespace chat
       return mImpl->log;
    }
 
+   bool AgentRun::Write(const std::string& text)
+   {
+      if (mImpl->finished)
+         return false;
+      std::lock_guard<std::mutex> g(mImpl->lock);
+      return mImpl->pty != nullptr && mImpl->pty->Write(text.data(), (int)text.size());
+   }
+
    void AgentRun::Stop()
    {
       if (mImpl->finished || mImpl->stopped.exchange(true))
