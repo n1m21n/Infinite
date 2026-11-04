@@ -366,6 +366,7 @@ namespace Platform
                         AV_PIX_FMT_RGBA, 1);
 
          double lastDeliveredSeconds = -1.0;
+         bool demuxDrained = false; // flush packet sent: the decoder is handing back its last buffered frames
          if (h->bench)
             h->bench->nominalFps = av_q2d(stream->avg_frame_rate);
          h->running.store(true);
@@ -413,7 +414,16 @@ namespace Platform
                   const int readErr = av_read_frame(fmt, pkt);
                   if (readErr < 0)
                   {
-                     avcodec_send_packet(codecCtx, nullptr); // flush
+                     // End of file. A decoder with B-frames still holds its last
+                     // few frames: send the flush packet once and keep receiving
+                     // until it reports EOF, or those frames are never delivered
+                     // and a seek to the final frame shows an earlier one.
+                     if (!demuxDrained)
+                     {
+                        demuxDrained = true;
+                        avcodec_send_packet(codecCtx, nullptr);
+                        continue;
+                     }
                      h->endOfStream.store(true);
                      return false;
                   }
@@ -478,6 +488,7 @@ namespace Platform
                }
                av_seek_frame(fmt, streamIndex, seekTarget, AVSEEK_FLAG_BACKWARD);
                avcodec_flush_buffers(codecCtx);
+               demuxDrained = false;
                h->endOfStream.store(false);
                {
                   std::lock_guard<std::mutex> lock(h->mutex);
