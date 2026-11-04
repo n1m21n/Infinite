@@ -1,0 +1,50 @@
+#!/bin/bash
+# Before any push: (1) no chat-derived semi-brain data leaves this machine,
+# (2) the exact commit being pushed passes the quick UI group on macOS, built
+# incrementally in the persistent base worktree (scripts/bench/base.sh), so
+# failures CI would find (e.g. NODETITLETEST) are caught here in ~1-2 min.
+# Emergency bypass for (2) only: INFINITE_SKIP_PREPUSH_TESTS=1 git push ...
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+ZERO=0000000000000000000000000000000000000000
+PRIVATE='session_history_corpus|antigravity_history_corpus|session_analysis_corpus|session_embeddings_cache|dev_trajectory_corpus|knowledge_index_private'
+IDX=tools/semi-brain/1_extractors/output/knowledge_index.db
+fail=0
+# Paths that can change app behaviour or the ui group; everything else pushes without a build.
+CODE='^(src/|CMakeLists\.txt|cmake/|external/|resources/|assets/|shaders/|tools/design/|\.claude/skills/run-infinite-hygiene/|scripts/(ibuild|bench))'
+while read -r lref lsha rref rsha; do
+  [[ "$lsha" == "$ZERO" ]] && continue
+  [[ "$rsha" == "$ZERO" ]] && range="origin/main..$lsha" || range="$rsha..$lsha"
+  if git log "$range" --name-only --format= | grep -Eq "output/($PRIVATE)"; then
+    echo "pre-push: BLOCKED - chat-derived semi-brain file in $range:" >&2
+    git log "$range" --name-only --format= | grep -E "output/($PRIVATE)" | sort -u >&2; fail=1
+  fi
+  for c in $(git log "$range" --format=%h -- "$IDX"); do
+    tmp=$(mktemp); git show "${c}:${IDX}" > "$tmp" 2>/dev/null || { rm -f "$tmp"; continue; }
+    bad=$(sqlite3 "$tmp" "select distinct category from vector_documents where category like '%session%' or category like '%trajectory%' or category like '%chat%'" 2>/dev/null)
+    rm -f "$tmp"
+    [[ -n "$bad" ]] && { echo "pre-push: BLOCKED - $IDX at $c has private categories: $bad" >&2; fail=1; }
+  done
+  (( fail )) && exit 1
+  if [[ "${INFINITE_SKIP_PREPUSH_TESTS:-0}" == 1 ]]; then
+    echo "pre-push: tests SKIPPED by INFINITE_SKIP_PREPUSH_TESTS=1" >&2; continue
+  fi
+  # Only code can break the ui group: skip the build when the push touches none.
+  if ! git diff --name-only "$range" 2>/dev/null | grep -Eq "$CODE"; then
+    echo "pre-push: no code in $range (docs/website/tools only) - ui group skipped" >&2; continue
+  fi
+  # Same tree already verified here (merge of a tested commit, amend, re-push): skip.
+  tree=$(git rev-parse "$lsha^{tree}"); stamp="$(git rev-parse --git-common-dir)/prepush-ok/$tree"
+  if [[ -e "$stamp" ]]; then
+    echo "pre-push: tree ${tree:0:7} already passed the ui group - skipped" >&2; continue
+  fi
+  echo "pre-push: building ${lsha:0:7} in the base worktree + running --group ui" >&2
+  bs="$ROOT/scripts/bench/base.sh"
+  if [[ ! -x "$bs" ]]; then bs=$(mktemp); git show main:scripts/bench/base.sh > "$bs"; chmod +x "$bs"; fi
+  app="$("$bs" "$lsha" | tail -1)" || { echo "pre-push: base build failed" >&2; exit 1; }
+  base="$(dirname "$(dirname "$app")")"
+  ( cd "$base" && .claude/skills/run-infinite-hygiene/driver.sh --group ui --skip-build ) 2>&1 | tail -4 >&2
+  [[ ${PIPESTATUS[0]} -eq 0 ]] || { echo "pre-push: BLOCKED - ui group failed on ${lsha:0:7}" >&2; exit 1; }
+  mkdir -p "$(dirname "$stamp")" && : > "$stamp"
+done
+exit 0
