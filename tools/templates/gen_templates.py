@@ -171,12 +171,17 @@ SHOWCASE = [
                 (3220, -330, 380, "Audio to CV listens to the sound; the LFOs and Random move things too. Open the Mod Matrix panel to see every live wire."),
                 (4800, -330, 420, "Picture band. A Field aurora, an Icosphere bent by a Field Modifier, a 3D scene with instances and particles, then bloom and vignette into Output."),
                 (5900, -330, 340, "World, Camera and two Lights frame the 3D scene. The 3D View shows it from the camera.")]),
+    # Written by docs/showcase/handheld/gen.py with its Comment notes already in it; no media.
+    dict(slug="handheld", title="Pocket console", blurb="a 3D game console staged in a 3D View on a Y2K poster wall: GLSL game on its screen, product-shot camera, Piano Roll chiptune",
+         src="docs/showcase/handheld/handheld.inf", media=None, last_node=None, notes=[]),
 ]
 
 def showcase_text(sc):
     text = open(os.path.join(ROOT, sc["src"])).read()
     for bad in ("/Users/", "C:\\Users", "/home/"):
         assert bad not in text, f"{sc['slug']}: personal path {bad!r}"
+    if not sc["notes"]:
+        return text
     first = text.index(sc["last_node"])
     end = text.index("\nend\n", first) + len("\nend\n")
     nid = max(int(m.split()[1]) for m in text.splitlines() if m.startswith("node ")) + 1
@@ -197,6 +202,8 @@ def main():
         assert 3 <= n <= 6, f"{t.slug}: a starter has 3-6 nodes besides comments, this has {n}"
     for sc in SHOWCASE:
         open(os.path.join(OUT, sc["slug"] + ".inf"), "w").write(showcase_text(sc))
+        if not sc["media"]:
+            continue
         dest = os.path.join(OUT, "media")
         os.makedirs(dest, exist_ok=True)
         for name in sorted(os.listdir(os.path.join(ROOT, sc["media"]))):

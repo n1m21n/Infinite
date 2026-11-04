@@ -1,0 +1,750 @@
+infinite-patch 1
+# A pocket game console: 3D nodes, a GLSL game on its screen, chiptune sounds.
+node 1 Source Formula
+  id shellTex
+  pos 2320 352
+  f width 1024.0
+  f height 1024.0
+  s formula // Speckled beige plastic for the shell: fine grain plus sparse dark and lime flecks.\nvec2 px = uv * 1024.0;\nvec3 col = vec3(0.80, 0.70, 0.64) * (0.97 + 0.05 * rand(floor(px)));\nfloat r = rand(floor(px / 6.0));\nif (r > 0.993) col = vec3(0.30, 0.26, 0.24);\nelse if (r > 0.989) col = vec3(0.78, 0.95, 0.20);\nreturn vec4(col, 1.0);
+end
+node 2 3D Rounded Cube
+  id body
+  pos 3240 352
+  f tube 0.12
+  i detail 48
+  f scaleX 1.6
+  f scaleY 2.1
+  f scaleZ 0.34
+  c color 1.0 1.0 1.0
+  f metallic 0.15
+  f roughness 0.5
+  f clearcoat 0.15
+end
+node 3 3D Rounded Cube
+  id bezel
+  pos 3240 782
+  f tube 0.14
+  i detail 36
+  f posY 0.36
+  f posZ 0.165
+  f scaleX 1.32
+  f scaleY 0.98
+  f scaleZ 0.03
+  c color 0.02 0.02 0.025
+  f metallic 0.0
+  f roughness 0.18
+  f clearcoat 1.0
+  f clearcoatRoughness 0.05
+end
+node 4 3D Plane
+  id screen
+  pos 2320 762
+  f posY 0.37
+  f posZ 0.182
+  f scaleX 1.22
+  f scaleY 0.9
+  c color 1.0 1.0 1.0
+  f roughness 0.25
+  f metallic 0.0
+end
+node 5 3D Material
+  id glass
+  pos 3240 1212
+  c color 1.0 1.0 1.0
+  f roughness 0.3
+  f metallic 0.0
+  f emission 1.2
+  c emissionColor 1.0 1.0 1.0
+end
+node 6 3D Sketch 3D
+  id plastic
+  pos 2320 1376
+  s code // Coloured plastic parts: buttons, clover, tag, cartridge, SD card, plug and cable.\nfunction pill(w, h, d) {   // a stadium in XY, d thick, facing +z\n  box(w - h, h, d);\n  push(); translate(-(w - h) / 2, 0, 0); rotateX(HALF_PI); cylinder(h / 2, d, 32); pop();\n  push(); translate((w - h) / 2, 0, 0); rotateX(HALF_PI); cylinder(h / 2, d, 32); pop();\n}\nfunction button(x, y, col, press) {\n  push(); translate(x, y, 0.17 - 0.035 * press); rotateX(HALF_PI);\n  fill(col[0], col[1], col[2]);\n  translate(0, 0.045, 0); cylinder(0.105, 0.09, 48);\n  translate(0, 0.045, 0); scale(1, 0.32, 1); sphere(0.104, 32);\n  pop();\n}\n// Same clock as the screen and the sound: a hop every second (A), the coin half a second later (B).\nfunction pulse(x) { return x >= 0 && x < 0.14 ? sin(PI * x / 0.14) : 0; }\nfunction draw(t) {\n  const ph = t - floor(t);\n  button(-0.56, -0.55, [0.12, 0.33, 0.85], pulse(ph));\n  button(-0.31, -0.55, [0.93, 0.70, 0.13], pulse(ph - 0.47));\n  button(-0.06, -0.55, [0.88, 0.22, 0.16], 0);\n  // clover\n  fill(0.62, 0.80, 0.93);\n  for (let i = 0; i < 4; i++) {\n    push(); translate(0.47, -0.22, 0.175); rotateZ(i * HALF_PI + PI / 4); translate(0.04, 0, 0);\n    scale(1, 1, 0.35); sphere(0.042, 20); pop();\n  }\n  // white slot under the screen\n  fill(0.97, 0.97, 0.96);\n  push(); translate(0, -0.2, 0.175); pill(0.3, 0.07, 0.02); pop();\n  // knob cap\n  fill(0.98, 0.80, 0.18);\n  push(); translate(0.47, -0.62, 0.33); rotateX(HALF_PI); cylinder(0.155, 0.03, 64); pop();\n  // keychain tag on top\n  fill(0.98, 0.82, 0.20);\n  push(); translate(-0.32, 1.1, 0.0); rotateZ(radians(4));\n  box(0.32, 0.2, 0.07); translate(0, 0.1, 0); rotateX(HALF_PI); cylinder(0.16, 0.07, 48); pop();\n  // SD card, right side\n  fill(0.30, 0.38, 0.92);\n  push(); translate(0.83, 0.55, 0.0); rotateZ(radians(-3)); box(0.14, 0.36, 0.035); pop();\n  fill(0.97, 0.97, 0.97);\n  push(); translate(0.86, 0.55, 0.019); rotateZ(radians(-3)); plane(0.06, 0.28); pop();\n  // red cartridge, bottom left\n  fill(0.94, 0.33, 0.20);\n  push(); translate(-0.4, -1.1, 0.02); box(0.42, 0.22, 0.1); pop();\n  // red side switch and pink slot, left face\n  fill(0.90, 0.30, 0.25);\n  push(); translate(-0.805, 0.82, 0); rotateY(-HALF_PI); pill(0.16, 0.05, 0.02); pop();\n  fill(0.90, 0.35, 0.55);\n  push(); translate(-0.805, -0.55, 0); rotateY(-HALF_PI); rotateZ(HALF_PI); pill(0.16, 0.05, 0.02); pop();\n  // USB plug and cable\n  fill(0.96, 0.96, 0.95);\n  push(); translate(0.12, -1.11, 0); box(0.14, 0.12, 0.08); pop();\n  let px = 0.12, py = -1.17, pz = 0;\n  for (let i = 1; i <= 40; i++) {\n    const s = i / 40;\n    const x = 0.12 + 0.9 * s * s, y = -1.17 - 0.9 * s + 0.2 * s * s, z = 0.25 * s;\n    tube(px, py, pz, x, y, z, 0.025, 12);\n    push(); translate(x, y, z); sphere(0.025, 8); pop();\n    px = x; py = y; pz = z;\n  }\n}
+end
+node 7 3D Material
+  id plasticMat
+  pos 3240 1842
+  c color 1.0 1.0 1.0
+  f metallic 0.0
+  f roughness 0.32
+  f clearcoat 0.5
+  f clearcoatRoughness 0.15
+end
+node 8 3D Sketch 3D
+  id dark
+  pos 2320 1968
+  s code // Dark rubber and holes: the big knob, grille slots, screw slots, port, tag hole, smiley face.\nfunction draw(t) {\n  fill(0.05, 0.05, 0.055);\n  push(); translate(0.47, -0.62, 0.25); rotateX(HALF_PI); cylinder(0.205, 0.16, 64); pop();\n  for (let i = 0; i < 10; i++) {   // speaker grille on the left face\n    push(); translate(-0.802, 0.05 + i * 0.05, 0); box(0.01, 0.022, 0.18); pop();\n  }\n  for (const [x, y] of [[-0.72, 0.97], [0.72, 0.97], [-0.72, -0.97], [0.72, -0.97]]) {\n    push(); translate(x, y, 0.183); rotateZ(0.6); box(0.05, 0.008, 0.004); pop();\n  }\n  push(); translate(-0.32, 1.24, 0); rotateX(HALF_PI); cylinder(0.035, 0.075, 24); pop();\n  // smiley on the knob cap, turning slowly\n  push(); translate(0.47, -0.62, 0); rotateZ(0.35 * sin(t * 0.8)); translate(-0.47, 0.62, 0);\n  for (const x of [-0.045, 0.045]) { push(); translate(0.47 + x, -0.58, 0.346); scale(0.6, 1, 0.3); sphere(0.018, 12); pop(); }\n  for (let i = 0; i <= 16; i++) {\n    const a = PI * (1.15 + 0.7 * i / 16);\n    push(); translate(0.47 + 0.07 * cos(a), -0.63 + 0.07 * sin(a), 0.346); scale(1, 1, 0.3); sphere(0.009, 8); pop();\n  }\n  pop();\n}
+end
+node 9 3D Material
+  id darkMat
+  pos 3720 206
+  c color 1.0 1.0 1.0
+  f metallic 0.0
+  f roughness 0.7
+end
+node 10 3D Sketch 3D
+  id metal
+  pos 2780 352
+  s code // Bright metal: corner screws and the knurled thumb wheel on the left.\nfunction draw(t) {\n  fill(0.80, 0.80, 0.82);\n  for (const [x, y] of [[-0.72, 0.97], [0.72, 0.97], [-0.72, -0.97], [0.72, -0.97]]) {\n    push(); translate(x, y, 0.175); rotateX(HALF_PI); cylinder(0.035, 0.014, 24); pop();\n  }\n  push(); translate(-0.86, -0.12, 0); rotateZ(HALF_PI);\n  cylinder(0.11, 0.1, 64);\n  for (let i = 0; i < 36; i++) { push(); rotateY(TAU * i / 36); translate(0.11, 0, 0); box(0.012, 0.1, 0.012); pop(); }\n  translate(0, -0.06, 0); cylinder(0.06, 0.04, 32);\n  pop();\n}
+  b animate 0
+end
+node 11 3D Material
+  id metalMat
+  pos 3720 836
+  c color 1.0 1.0 1.0
+  f metallic 1.0
+  f roughness 0.25
+end
+node 12 3D Plane
+  id play
+  pos 2780 782
+  f posX -0.5
+  f posY -0.27
+  f posZ 0.1715
+  f rotZ 0.14
+  f scaleX 0.44
+  f scaleY 0.22
+  c color 1.0 1.0 1.0
+  f metallic 0.0
+  f roughness 0.45
+end
+node 13 3D Material
+  id playMat
+  pos 3720 1466
+  c color 1.0 1.0 1.0
+  f metallic 0.0
+  f roughness 0.45
+  f alphaCutoff 0.5
+  b textureAlpha 1
+end
+node 14 3D Text 3D
+  id badge
+  pos 3720 2096
+  s text Infinite
+  s font Helvetica
+  f depth 0.006
+  f posX 0.0
+  f posY -0.92
+  f posZ 0.172
+  f scale 0.06
+  c color 0.55 0.47 0.43
+  f metallic 0.4
+  f roughness 0.5
+end
+node 15 3D Group 3D
+  id group
+  pos 4640 206
+  uid 2001
+end
+node 16 3D Sketch 3D
+  id title
+  pos 460 368
+  s code const FONT = {\n  P: ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],\n  L: ["#....", "#....", "#....", "#....", "#....", "#....", "#####"],\n  A: [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],\n  Y: ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],\n};\nconst S = 0.12;\nfunction draw(t) {\n  fill(1, 1, 1);\n  const word = "PLAY";\n  const cols = word.length * 6 - 1;\n  for (let l = 0; l < word.length; l++) {\n    const rows = FONT[word[l]];\n    for (let r = 0; r < 7; r++) {\n      for (let c = 0; c < 5; c++) {\n        if (rows[r][c] !== "#") continue;\n        const col = l * 6 + c;\n        const x = 0.3 + (col - (cols - 1) / 2) * S;\n        const y = 1.62 + (6 - r) * S;\n        const grow = Math.max(0, Math.min(1, (t - col * 0.06) * 5.0));\n        const k = grow < 1 ? grow * (1.0 + 0.3 * sin(PI * grow)) : 1;\n        const beat = t * 2.0;\n        const wave = 0.06 * pow(max(0, sin(PI * (beat - floor(beat)) * 1.0 - col * 0.12)), 4);\n        if (k <= 0) continue;\n        push(); translate(x, y, -0.8 + wave); scale(k, k, k); box(S * 0.94, S * 0.94, S * 0.9); pop();\n      }\n    }\n  }\n}
+end
+node 17 3D Material
+  id chrome
+  pos 1840 206
+  uid 2002
+  c color 0.86 0.87 0.9
+  f metallic 1.0
+  f roughness 0.22
+  f clearcoat 1.0
+  f clearcoatRoughness 0.05
+end
+node 18 3D Camera
+  id cam
+  pos 460 1822
+  uid 2004
+  f fov 28.0
+  f distance 10.0
+  f azimuth 90.0
+  f elevation 6.0
+  f targetY 0.55
+end
+node 19 3D Light
+  id key
+  pos 920 368
+  uid 2005
+  i type 4
+  f azimuth 50.0
+  f elevation 32.0
+  f distance 7.0
+  f intensity 5.0
+  f spotAngle 40.0
+  f spotPenumbra 0.6
+  f shadowRadius 0.6
+  c color 1.0 0.96 0.9
+end
+node 20 3D Light
+  id fill
+  pos 920 798
+  uid 2006
+  i type 0
+  f azimuth 150.0
+  f elevation 10.0
+  f intensity 0.6
+  c color 0.8 0.87 1.0
+  b castShadow 0
+end
+node 21 3D Light
+  id rimL
+  pos 920 1228
+  uid 2007
+  i type 0
+  f azimuth -80.0
+  f elevation 30.0
+  f intensity 2.4
+  c color 0.92 1.0 0.8
+  b castShadow 0
+end
+node 22 Source Formula
+  id game
+  pos 0 390
+  f width 640.0
+  f height 480.0
+  s formula // A tiny side-scroller on a 160x120 pixel grid. The hero hops once a second (two beats at 120 bpm),\n// over a block, and grabs the coin at the top of the hop: the sound band plays on the same clock.\nvec2 res = vec2(160.0, 120.0);\nvec2 q = floor(uv * res);\nfloat speed = 60.0;\nfloat scroll = t * speed;\nfloat groundY = 22.0;\n\n// sky: indigo to pink, pixel bands\nfloat h = q.y / res.y;\nvec3 col = mix(vec3(1.0, 0.56, 0.45), vec3(0.09, 0.06, 0.24), floor(pow(h, 0.8) * 10.0) / 10.0);\n\n// stars that twinkle\nfloat st = rand(q);\nif (st > 0.985 && h > 0.55) col = mix(col, vec3(1.0), 0.5 + 0.5 * sin(t * 4.0 + st * 80.0));\n\n// striped sun\nvec2 sc = vec2(112.0, 52.0);\nfloat sd = length(q + 0.5 - sc);\nif (sd < 22.0 && (q.y > 46.0 || mod(q.y, 4.0) > 1.0)) col = mix(vec3(1.0, 0.85, 0.35), vec3(1.0, 0.38, 0.52), clamp((sc.y + 22.0 - q.y) / 44.0, 0.0, 1.0));\n\n// two hill layers, parallax\nfloat x1 = q.x + scroll * 0.2;\nfloat hill1 = 44.0 + 10.0 * sin(x1 * 0.045) + 5.0 * sin(x1 * 0.11 + 1.3);\nif (q.y < floor(hill1)) col = vec3(0.36, 0.20, 0.50);\nfloat x2 = q.x + scroll * 0.5;\nfloat hill2 = 34.0 + 7.0 * sin(x2 * 0.07 + 2.0) + 3.0 * sin(x2 * 0.19);\nif (q.y < floor(hill2)) col = vec3(0.20, 0.42, 0.55);\n\n// ground: grass lip and brick dirt\nfloat gx = q.x + floor(scroll);\nif (q.y < groundY) {\n   col = vec3(0.55, 0.30, 0.18);\n   vec2 b = vec2(mod(gx + (mod(floor(q.y / 5.0), 2.0) * 5.0), 10.0), mod(q.y, 5.0));\n   if (b.x < 1.0 || b.y < 1.0) col = vec3(0.36, 0.18, 0.12);\n   if (q.y >= groundY - 3.0) col = mod(gx, 4.0) < 2.0 ? vec3(0.35, 0.86, 0.38) : vec3(0.27, 0.72, 0.30);\n}\n\n// blocks: one every hop, placed so the hero is over it at mid-hop\nfloat k = floor((gx - 34.0) / speed);\nfloat lx = gx - (k * speed + 64.0);\nfloat bh = 10.0 + 6.0 * step(0.5, rand(vec2(k, 3.0)));\nif (lx >= 0.0 && lx < 12.0 && q.y >= groundY && q.y < groundY + bh) {\n   col = vec3(0.98, 0.72, 0.15);\n   if (lx < 1.0 || lx > 10.0 || q.y < groundY + 1.0 || q.y > groundY + bh - 2.0) col = vec3(0.70, 0.36, 0.08);\n   if (abs(lx - 5.5) < 1.0 && abs(q.y - groundY - bh * 0.5) < 2.0) col = vec3(1.0, 0.95, 0.75);\n}\n\n// hero hop\nfloat ph = fract(t);\nfloat hop = floor(4.0 * 34.0 * ph * (1.0 - ph));\nvec2 hp = vec2(40.0, groundY + hop);\n\n// coin at the top of each hop, gone once grabbed\nfloat cx = lx - 6.0, cy = q.y - (groundY + 40.0);\nfloat coinScreen = (k * speed + 70.0) - floor(scroll);\nif (coinScreen > hp.x + 3.0) {\n   float w = 3.0 * abs(cos(t * 6.0)) + 0.5;\n   if (abs(cx) < w && abs(cy) < 4.0) col = abs(cx) < w - 1.0 ? vec3(1.0, 0.86, 0.2) : vec3(0.85, 0.5, 0.05);\n}\n\n// hero sprite, 10 x 10\nvec2 s = q - hp + vec2(5.0, 0.0);\nif (s.x >= 0.0 && s.x < 10.0 && s.y >= 0.0 && s.y < 10.0) {\n   col = vec3(0.98, 0.97, 0.93);\n   if (s.x < 1.0 || s.x > 8.0 || s.y < 1.0 || s.y > 8.0) col = vec3(0.12, 0.10, 0.20);\n   if ((s.x == 6.0 || s.x == 8.0) && s.y > 5.0 && s.y < 8.0) col = vec3(0.12, 0.10, 0.20);\n   if (s.y < 3.0 && s.y >= 1.0 && s.x > 1.0 && s.x < 8.0) col = vec3(0.93, 0.33, 0.30);\n}\n\n// CRT: scanlines, glow and a soft vignette\nfloat line = 0.82 + 0.18 * step(0.5, fract(uv.y * res.y));\ncol *= line;\nvec2 v = uv - 0.5;\ncol *= 1.0 - dot(v, v) * 0.9;\nreturn vec4(col, 1.0);
+end
+node 23 Source Text
+  id hud
+  pos 0 800
+  s text ...INFINITE 2026
+  s fontName Menlo
+  f fontSize 22.0
+  b fitToBox 0
+  f posX 0.78
+  f posY 0.93
+  f tracking 0.08
+  f width 640.0
+  f height 480.0
+end
+node 24 Compositing Layer Stack
+  id screenmix
+  pos 1380 368
+end
+node 25 Source Text
+  id stickerBack
+  pos 0 1210
+  s text Play
+  s fontName Arial Rounded MT Bold
+  f fontSize 300.0
+  c color 1.0 1.0 1.0
+  f outlineWidth 20.0
+  c outlineColor 1.0 1.0 1.0
+  b fitToBox 0
+  f width 1024.0
+  f height 512.0
+end
+node 26 Source Text
+  id stickerInk
+  pos 0 1620
+  s text Play
+  s fontName Arial Rounded MT Bold
+  f fontSize 300.0
+  c color 0.96 0.45 0.58
+  b fitToBox 0
+  f width 1024.0
+  f height 512.0
+end
+node 27 Compositing Layer Stack
+  id sticker
+  pos 1380 880
+end
+node 28 Source Formula
+  id poster
+  pos 460 982
+  f width 1080.0
+  f height 1350.0
+  s formula // Poster ground behind the console, 1080 x 1350, y up. Paper, a checkerboard "transparency" band,\n// two black panels of lime glyphs that re-roll every beat, and three old-OS windows.\n// uA is the kick (Audio Analyze): it flashes the glyphs. 120 bpm, so beat = t * 2.\nvec2 px = uv * vec2(1080.0, 1350.0);\nfloat beat = t * 2.0;\nvec3 paper = vec3(0.905, 0.905, 0.89);\nvec3 ink = vec3(0.05, 0.05, 0.06);\nvec3 lime = vec3(0.78, 1.0, 0.0);\nvec3 col = paper - 0.025 * rand(floor(px / 2.0));\n\n// checkerboard band, top-left to right, drifting slowly along itself\nvec2 dir = normalize(vec2(1.0, -0.62));\nvec2 nrm = vec2(-dir.y, dir.x);\nfloat across = dot(px - vec2(0.0, 1180.0), nrm);\nif (abs(across) < 150.0) {\n   vec2 c = floor((px + dir * t * 24.0) / 24.0);\n   col = mod(c.x + c.y, 2.0) < 1.0 ? vec3(0.97) : vec3(0.80);\n}\n\n// glyph panels: black rects filled with lime glyphs on a 30 px grid\nfloat inA = step(0.0, px.x) * step(px.x, 430.0) * step(110.0, px.y) * step(px.y, 560.0);\nfloat inB = step(650.0, px.x) * step(px.y, 980.0) * step(430.0, px.y);\nif (inA + inB > 0.0) {\n   col = ink;\n   vec2 cell = floor(px / 30.0);\n   vec2 f = px - cell * 30.0 - 15.0;\n   float r = length(f);\n   float roll = floor(beat);\n   float dens = rand(floor(cell / 4.0) + vec2(floor(beat / 4.0), 7.0));\n   float g = floor(rand(cell + vec2(roll * 0.37, roll * 1.13)) * 8.0);\n   float on = 0.0;\n   if (dens > 0.25) {\n      if (g < 1.0) on = step(abs(r - 10.0), 1.6) + step(r, 4.0);                     // target\n      else if (g < 2.0) on = step(abs(r - 10.0), 1.6);                                // ring\n      else if (g < 3.0) on = step(max(abs(f.x), abs(f.y)), 10.0) - step(max(abs(f.x), abs(f.y)), 7.0);  // square\n      else if (g < 4.0) on = step(min(abs(f.x - f.y), abs(f.x + f.y)), 2.2) * step(max(abs(f.x), abs(f.y)), 10.0); // x\n      else if (g < 5.0) on = step(min(abs(f.x), abs(f.y)), 1.6) * step(max(abs(f.x), abs(f.y)), 7.0);    // plus\n      else if (g < 6.0) on = step(r, 2.2);                                            // dot\n      else if (g < 7.0) on = step(abs(r - 10.0), 1.6) + step(abs(r - 5.0), 1.6);      // double ring\n      else on = step(max(abs(f.x), abs(f.y)), 10.0) - step(max(abs(f.x), abs(f.y)), 7.0) + step(r, 3.0);\n   } else if (dens > 0.12) {\n      on = step(r, 1.6);                                                               // sparse dots\n   }\n   col = mix(col, lime * (0.85 + 0.6 * uA), clamp(on, 0.0, 1.0));\n   // solid lime blocks that jump every bar\n   float bar = floor(beat / 4.0);\n   vec2 bA = vec2(floor(rand(vec2(bar, 1.0)) * 10.0) * 30.0, 110.0 + floor(rand(vec2(bar, 2.0)) * 10.0) * 30.0);\n   vec2 bB = vec2(650.0 + floor(rand(vec2(bar, 3.0)) * 9.0) * 30.0, 430.0 + floor(rand(vec2(bar, 4.0)) * 12.0) * 30.0);\n   if (inA > 0.0 && px.x > bA.x && px.x < bA.x + 150.0 && px.y > bA.y && px.y < bA.y + 120.0) col = lime;\n   if (inB > 0.0 && px.x > bB.x && px.x < bB.x + 180.0 && px.y > bB.y && px.y < bB.y + 210.0) col = lime;\n}\n\n// old-OS windows: grey frame, blue title bar, menu strip, checkerboard inside\nvec4 win[3];\nwin[0] = vec4(56.0, 930.0, 330.0, 220.0);\nwin[1] = vec4(770.0, 90.0, 260.0, 200.0);\nwin[2] = vec4(40.0, 640.0, 340.0, 110.0);\nfor (int i = 0; i < 3; i++) {\n   vec4 w = win[i];\n   w.xy += vec2(0.0, 6.0 * step(0.5, fract(beat * 0.25 + float(i) * 0.33)));   // a small hop on the off-bar\n   vec2 q = px - w.xy;\n   if (q.x >= -2.0 && q.x <= w.z + 2.0 && q.y >= -2.0 && q.y <= w.w + 2.0) {\n      col = vec3(0.30);\n      if (q.x >= 0.0 && q.x <= w.z && q.y >= 0.0 && q.y <= w.w) {\n         vec2 c = floor(q / 14.0);\n         col = mod(c.x + c.y, 2.0) < 1.0 ? vec3(0.98) : vec3(0.84);\n         if (q.y > w.w - 30.0) col = vec3(0.92);                                  // menu strip\n         if (q.y > w.w - 30.0 && q.y < w.w - 18.0 && mod(q.x - 8.0, 46.0) < 30.0 && q.x < 200.0) col = vec3(0.35);\n         if (q.y > w.w - 16.0) col = mix(vec3(0.0, 0.0, 0.50), vec3(0.06, 0.52, 0.82), q.x / w.z); // title bar\n         vec2 b = vec2(w.z - q.x, q.y - (w.w - 16.0));\n         if (b.y > 2.0 && b.y < 13.0 && mod(b.x - 3.0, 14.0) < 11.0 && b.x < 44.0) col = vec3(0.78);  // buttons\n      }\n   }\n}\nreturn vec4(col, 1.0);
+end
+node 29 3D Plane
+  id wall
+  pos 460 1392
+  c color 1.0 1.0 1.0
+  f roughness 0.85
+end
+node 30 3D Material
+  id wallMat
+  pos 1840 836
+  uid 2003
+  c color 1.0 1.0 1.0
+  f roughness 0.85
+  f metallic 0.0
+  f emission 0.07
+  c emissionColor 1.0 1.0 1.0
+end
+node 31 3D 3D View
+  id view
+  pos 1380 1436
+  f width 1080.0
+  f height 1350.0
+  b shadows 1
+  i shadowQuality 2
+  f shadowSoftness 3.0
+  f shadowStrength 0.85
+  f ao 0.6
+  i supersample 2
+  i samples 3
+  f exposure 1.0
+  f bloom 0.1
+  f bloomThreshold 1.2
+  c ambient 0.12 0.12 0.14
+  f envIntensity 0.6
+  i tonemap 1
+  f dofAperture 0.02
+  f focusDistance 10.0
+  s scene next 8\ncamera 4\nworld 0 1 0.30 0.30 0.33 1 0\nitem 1 2001 0 0.15 0 4 -24 0 1 1 1 1\nlabel 1 Console\nitem 2 2002 0 0 -0.4 0 0 0 1 1 1 1\nlabel 2 PLAY title\nitem 3 2003 0 0.9 -1.3 0 0 0 7.6 9.5 1 1\nlabel 3 Poster wall\nitem 4 2004 0 0 0 0 0 0 1 1 1 1\nlabel 4 Camera\nitem 5 2005 0 0 0 0 0 0 1 1 1 1\nlabel 5 Key\nitem 6 2006 0 0 0 0 0 0 1 1 1 1\nlabel 6 Fill\nitem 7 2007 0 0 0 0 0 0 1 1 1 1\nlabel 7 Rim
+end
+node 32 Source Text
+  id press
+  pos 0 2030
+  s text PRESS START
+  s fontName Arial Black
+  f fontSize 40.0
+  c color 0.05 0.05 0.06
+  f posX 0.5
+  f posY 0.93
+  i align 1
+  b fitToBox 0
+  f width 1080.0
+  f height 1350.0
+end
+node 33 Compositing opacity
+  id blink
+  pos 1380 1866
+  f uOpacity 1.0
+end
+node 34 Compositing Layer Stack
+  id comp
+  pos 2780 1212
+end
+node 35 Effects addnoise
+  id grain
+  pos 4200 206
+  f uAmount 0.03
+end
+node 36 Utility Output
+  id out
+  pos 4640 636
+  b includeAudio 1
+end
+node 37 Notes Piano Roll
+  id leadRoll
+  pos 0 2904
+  uid 3001
+end
+node 38 Notes Piano Roll
+  id bassRoll
+  pos 490 2904
+  uid 3002
+end
+node 39 Notes Piano Roll
+  id kickRoll
+  pos 490 3314
+  uid 3003
+end
+node 40 Notes Piano Roll
+  id snareRoll
+  pos 490 3724
+  uid 3004
+end
+node 41 Notes Piano Roll
+  id hatRoll
+  pos 490 4134
+  uid 3005
+end
+node 42 Notes Piano Roll
+  id sfxRoll
+  pos 490 4706
+  uid 3006
+end
+node 43 Synths Oscillator
+  id lead
+  pos 980 2904
+  i waveform 3
+  f volume 0.5
+  f ampAttack 2.0
+  f ampDecay 120.0
+  f ampSustain 0.6
+  f ampRelease 80.0
+end
+node 44 Synths Oscillator
+  id bass
+  pos 1840 2904
+  i waveform 1
+  f volume 0.9
+  f ampAttack 2.0
+  f ampDecay 200.0
+  f ampSustain 0.8
+  f ampRelease 40.0
+end
+node 45 Synths Oscillator
+  id kick
+  pos 1840 3914
+  i waveform 1
+  f volume 1.0
+  i octave -1
+  f ampAttack 1.0
+  f ampDecay 90.0
+  f ampSustain 0.0
+  f ampRelease 30.0
+end
+node 46 Synths Analog
+  id snare
+  pos 2700 2904
+  f osc1Vol 0.0
+  f osc2Vol 0.0
+  f noise 1.0
+  f cutoff 7000.0
+  f attack 1.0
+  f decay 130.0
+  f sustain 0.0
+  f release 60.0
+  f volume 0.7
+end
+node 47 Synths Analog
+  id hat
+  pos 2700 3914
+  f osc1Vol 0.0
+  f osc2Vol 0.0
+  f noise 1.0
+  f cutoff 16000.0
+  f attack 1.0
+  f decay 28.0
+  f sustain 0.0
+  f release 20.0
+  f volume 0.45
+end
+node 48 Synths Oscillator
+  id sfx
+  pos 3560 2904
+  i waveform 3
+  f volume 0.45
+  f ampAttack 1.0
+  f ampDecay 60.0
+  f ampSustain 0.7
+  f ampRelease 260.0
+end
+node 49 AudioEffects Delay
+  id echo
+  pos 3560 3914
+  f mix 0.18
+  f feedback 30.0
+end
+node 50 Utility Mixer
+  id mix
+  pos 4420 3050
+  f gain0 -6.0
+  f gain1 -3.0
+  f gain2 -2.0
+  f gain3 -9.0
+  f gain4 -15.0
+  f gain5 -7.0
+  f pan0 -0.15
+  f pan4 0.3
+  f pan5 0.1
+end
+node 51 AudioEffects Bitcrush
+  id crush
+  pos 5320 2904
+  f bits 8.0
+  f rate 16000.0
+  f mix 0.7
+end
+node 52 AudioEffects Limiter
+  id limit
+  pos 5940 2904
+  f threshold -1.0
+end
+node 53 Utility Audio Out
+  id speaker
+  pos 6560 2904
+end
+node 54 Modulators LFO
+  id sway
+  pos 0 5494
+  f rateBeats 32.0
+  f seed 7.0
+end
+node 55 Modulators LFO
+  id rise
+  pos 410 5494
+  f rateBeats 32.0
+  f phase 0.25
+  f seed 8.0
+end
+node 56 Modulators LFO
+  id push
+  pos 820 5494
+  f rateBeats 16.0
+  f phase 0.5
+  f seed 9.0
+end
+node 57 Modulators Random
+  id drift
+  pos 1230 5494
+  f rate 0.25
+  f smooth 1.0
+  f seed 11.0
+end
+node 58 Modulators Audio Analyze
+  id kickEar
+  pos 1640 5494
+  f attack 0.02
+  f release 0.18
+end
+node 59 Modulators LFO
+  id bob
+  pos 2050 5494
+  f rateBeats 4.0
+  f seed 13.0
+end
+node 60 Modulators LFO
+  id blinker
+  pos 2460 5494
+  i shape 4
+  f rateBeats 1.0
+  f seed 12.0
+end
+node 61 Compositing Comment
+  pos 0 0
+  s text Pocket console, Picture band. Primitives and Sketch 3D build the device, a GLSL game plays on its screen, and the 3D View stages it in front of a Y2K poster wall.
+  f width 340
+  f height 170
+end
+node 62 Compositing Comment
+  pos 0 2676
+  s text Sound band. Six Piano Rolls (open one to edit its notes) play chiptune at 120 bpm: square lead, triangle bass, noise drums, jump and coin blips locked to the hero's hops.
+  f width 340
+  f height 192
+end
+node 63 Compositing Comment
+  pos 0 5266
+  s text LFOs sway, raise and push the camera; a Random drifts the roll. The camera orbits the console, cranes on every bar and punches in on the kick, which also flashes the glyphs.
+  f width 340
+  f height 192
+end
+node 64 Compositing Comment
+  pos 1380 1230
+  s text 3D View: the console floats in front of the poster wall and casts a real shadow on it. Double-click to open the panel and move, light or reframe anything.
+  f width 300
+  f height 170
+end
+node 65 Compositing Comment
+  pos 460 206
+  s text PLAY in chrome pixel cubes behind the console. Sweeps in, then a wave on every beat.
+  f width 300
+  f height 126
+end
+node 66 Compositing Comment
+  pos 460 798
+  s text The poster in one Formula: paper, a checkerboard band, lime glyph panels that re-roll every beat, old-OS windows. It textures the wall.
+  f width 300
+  f height 148
+end
+node 67 Compositing Comment
+  pos 2320 206
+  s text Speckled plastic texture for the shell.
+  f width 300
+  f height 110
+end
+node 68 Compositing Comment
+  pos 3240 206
+  s text Rounded Cubes make the shell and the screen bezel.
+  f width 300
+  f height 110
+end
+node 69 Compositing Comment
+  pos 0 206
+  s text The game is one Formula: a 160 x 120 side-scroller. The hero hops every second; the coin comes half a second later.
+  f width 300
+  f height 148
+end
+node 70 Compositing Comment
+  pos 1380 206
+  s text Game plus HUD text, sent to the screen Material as albedo and emission.
+  f width 300
+  f height 126
+end
+node 71 Compositing Comment
+  pos 1380 718
+  s text Two Text layers make the Play sticker: white outline under pink ink. Its Material cuts the alpha.
+  f width 300
+  f height 126
+end
+node 72 Compositing Comment
+  pos 2320 1192
+  s text Sketch 3D in code: buttons, clover, tag, SD card, cartridge and cable. The buttons press on the same clock as the game.
+  f width 300
+  f height 148
+end
+node 73 Compositing Comment
+  pos 2320 1806
+  s text Knob, speaker grille, screw slots and the smiley, which turns slowly.
+  f width 300
+  f height 126
+end
+node 74 Compositing Comment
+  pos 2780 206
+  s text Screws and the knurled side wheel.
+  f width 300
+  f height 110
+end
+node 75 Compositing Comment
+  pos 920 206
+  s text Soft area key from the upper right casts the shadow; cool fill, lime rim.
+  f width 300
+  f height 126
+end
+node 76 Compositing Comment
+  pos 490 4544
+  s text 32nd notes, two beats per hop: a rising jump arpeggio, then a two-note coin.
+  f width 300
+  f height 126
+end
+node 77 Compositing Comment
+  pos 4420 2904
+  s text Mixer into an 8-bit Bitcrush and a Limiter at -1 dB.
+  f width 300
+  f height 110
+end
+cable screenmix input game
+cable screenmix input_2 hud
+cable screen 0 screenmix
+geo glass geo screen
+cable glass emission screenmix
+cable glass albedo screenmix
+cable sticker input stickerBack
+cable sticker input_2 stickerInk
+cable play 0 sticker
+geo playMat geo play
+cable playMat albedo sticker
+geo plasticMat geo plastic
+geo darkMat geo dark
+geo metalMat geo metal
+geo group geo_a body
+geo group geo_b bezel
+geo group geo_c glass
+geo group geo_d plasticMat
+geo group geo_e darkMat
+geo group geo_f metalMat
+geo group geo_g playMat
+geo group geo_h badge
+geo chrome geo title
+geo wallMat geo wall
+cable wallMat albedo poster
+cable wallMat emission poster
+cable body 0 shellTex
+cable blink input press
+cable comp input view
+cable comp input_2 blink
+cable grain input comp
+cable out 0 grain
+note lead notes leadRoll
+note bass notes bassRoll
+note kick notes kickRoll
+note snare notes snareRoll
+note hat notes hatRoll
+note sfx notes sfxRoll
+aud echo audio lead
+aud mix in_1 echo
+aud mix in_2 bass
+aud mix in_3 kick
+aud mix in_4 snare
+aud mix in_5 hat
+aud mix in_6 sfx
+aud crush audio mix
+aud limit audio crush
+aud speaker audio limit
+aud out audio limit
+aud kickEar audio kick
+mod cam azimuth sway 0 0 1 0.5 76 104
+mod cam elevation rise 0 0 1 0.5 2 12
+mod cam distance push 0 0 1 0.5 9.2 10.6
+mod cam roll drift 0 0 1 0.5 -2.5 2.5
+mod cam fov kickEar 0 0 1 0.5 28 26.8
+mod poster knobA kickEar 0 0 1 0.5 0 1
+mod cam targetY bob 0 0 1 0.5 0.5 0.6
+mod blink uOpacity blinker 0 0 1 0.5 0 1
+transport 120 4 4 0 0
+stream 2 0 1 0 0 1 0 Lead
+streamid 0 4001
+cliptick 0 5001 0 245760 3001 0 0 0 0 1 0 0 0 0 Lead
+streamnote 0 3001 0
+clipmidi 0 5001 16 0 1 0 7680 0 1 0
+clipnote 0 5001 id=1 s=0 l=288 p=69 v=96
+clipnote 0 5001 id=2 s=480 l=288 p=72 v=96
+clipnote 0 5001 id=3 s=960 l=288 p=76 v=96
+clipnote 0 5001 id=4 s=1440 l=288 p=72 v=96
+clipnote 0 5001 id=5 s=1920 l=288 p=81 v=96
+clipnote 0 5001 id=6 s=2400 l=288 p=79 v=96
+clipnote 0 5001 id=7 s=2880 l=288 p=76 v=96
+clipnote 0 5001 id=8 s=3360 l=288 p=72 v=96
+clipnote 0 5001 id=9 s=3840 l=288 p=77 v=96
+clipnote 0 5001 id=10 s=4320 l=288 p=76 v=96
+clipnote 0 5001 id=11 s=4800 l=288 p=72 v=96
+clipnote 0 5001 id=12 s=5280 l=288 p=69 v=96
+clipnote 0 5001 id=13 s=5760 l=288 p=74 v=96
+clipnote 0 5001 id=14 s=6240 l=288 p=76 v=96
+clipnote 0 5001 id=15 s=6720 l=288 p=79 v=96
+stream 2 0 1 0 0 1 0 Bass
+streamid 1 4002
+cliptick 1 5002 0 245760 3002 0 0 0 0 1 0 0 0 0 Bass
+streamnote 1 3002 0
+clipmidi 1 5002 17 0 1 0 7680 0 1 0
+clipnote 1 5002 id=1 s=0 l=216 p=45 v=100
+clipnote 1 5002 id=2 s=480 l=216 p=57 v=100
+clipnote 1 5002 id=3 s=960 l=216 p=45 v=100
+clipnote 1 5002 id=4 s=1440 l=216 p=57 v=100
+clipnote 1 5002 id=5 s=1920 l=216 p=45 v=100
+clipnote 1 5002 id=6 s=2400 l=216 p=57 v=100
+clipnote 1 5002 id=7 s=2880 l=216 p=45 v=100
+clipnote 1 5002 id=8 s=3360 l=216 p=57 v=100
+clipnote 1 5002 id=9 s=3840 l=216 p=41 v=100
+clipnote 1 5002 id=10 s=4320 l=216 p=53 v=100
+clipnote 1 5002 id=11 s=4800 l=216 p=41 v=100
+clipnote 1 5002 id=12 s=5280 l=216 p=53 v=100
+clipnote 1 5002 id=13 s=5760 l=216 p=43 v=100
+clipnote 1 5002 id=14 s=6240 l=216 p=55 v=100
+clipnote 1 5002 id=15 s=6720 l=216 p=43 v=100
+clipnote 1 5002 id=16 s=7200 l=216 p=55 v=100
+stream 2 0 1 0 0 1 0 Kick
+streamid 2 4003
+cliptick 2 5003 0 245760 3003 0 0 0 0 1 0 0 0 0 Kick
+streamnote 2 3003 0
+clipmidi 2 5003 5 0 1 0 7680 0 1 0
+clipnote 2 5003 id=1 s=0 l=144 p=36 v=120
+clipnote 2 5003 id=2 s=1440 l=144 p=36 v=120
+clipnote 2 5003 id=3 s=3840 l=144 p=36 v=120
+clipnote 2 5003 id=4 s=5280 l=144 p=36 v=120
+stream 2 0 1 0 0 1 0 Snare
+streamid 3 4004
+cliptick 3 5004 0 245760 3004 0 0 0 0 1 0 0 0 0 Snare
+streamnote 3 3004 0
+clipmidi 3 5004 3 0 1 0 7680 0 1 0
+clipnote 3 5004 id=1 s=1920 l=144 p=60 v=110
+clipnote 3 5004 id=2 s=5760 l=144 p=60 v=110
+stream 2 0 1 0 0 1 0 Hat
+streamid 4 4005
+cliptick 4 5005 0 245760 3005 0 0 0 0 1 0 0 0 0 Hat
+streamnote 4 3005 0
+clipmidi 4 5005 10 0 1 0 7680 0 1 0
+clipnote 4 5005 id=1 s=480 l=96 p=60 v=90
+clipnote 4 5005 id=2 s=1440 l=96 p=60 v=90
+clipnote 4 5005 id=3 s=2400 l=96 p=60 v=90
+clipnote 4 5005 id=4 s=3360 l=96 p=60 v=90
+clipnote 4 5005 id=5 s=4320 l=96 p=60 v=90
+clipnote 4 5005 id=6 s=5280 l=96 p=60 v=90
+clipnote 4 5005 id=7 s=6240 l=96 p=60 v=90
+clipnote 4 5005 id=8 s=6720 l=96 p=60 v=90
+clipnote 4 5005 id=9 s=7200 l=96 p=60 v=90
+stream 2 0 1 0 0 1 0 Sfx
+streamid 5 4006
+cliptick 5 5006 0 245760 3006 0 0 0 0 1 0 0 0 0 Sfx
+streamnote 5 3006 0
+clipmidi 5 5006 7 0 1 0 1920 0 1 0
+clipnote 5 5006 id=1 s=0 l=108 p=72 v=100
+clipnote 5 5006 id=2 s=120 l=108 p=76 v=100
+clipnote 5 5006 id=3 s=240 l=108 p=79 v=100
+clipnote 5 5006 id=4 s=360 l=108 p=84 v=100
+clipnote 5 5006 id=5 s=960 l=108 p=83 v=100
+clipnote 5 5006 id=6 s=1080 l=108 p=88 v=100

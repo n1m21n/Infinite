@@ -8,10 +8,13 @@ Layout: three horizontal bands (Picture, Sound, Modulation), each laid out left-
 real GUI sizes vary; the table is deliberately generous). Comment nodes are not part of the graph: put
 `# near <id>` on the line before a `node ... Comment` block and it is placed just above that node;
 `# band <Picture|Sound|Modulation>` places it as the band's header. Any node that already has a `pos`
-is left where it is only with --keep. Wire lines and everything else pass through untouched."""
+is left where it is only with --keep. Wire lines and everything else pass through untouched.
+--wide: for big patches. Each node moves right to sit just before the node it feeds (sources no longer pile up in
+column 0), a column is ordered by where its targets sit, and a column taller than WIDE_CAP wraps into sub-columns."""
 import re, sys
 
 GAP_X, GAP_Y, BAND_GAP, NOTE_GAP = 160, 110, 260, 36
+WIDE_CAP = 2400
 SIZES = {  # (w, h) canvas units, generous
     "Wavetable": (1000, 1260), "Analog": (700, 900), "Metallic": (460, 560), "Oscillator": (700, 900),
     "Mixer": (740, 580), "Reverb": (460, 480), "Delay": (460, 480), "Chorus": (460, 480), "Limiter": (460, 420),
@@ -33,6 +36,7 @@ WIRE = ("cable", "geo", "aud", "note")
 
 def main():
     keep = "--keep" in sys.argv
+    wide = "--wide" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     src = args[0]
     dst = args[1] if len(args) > 1 else src
@@ -94,6 +98,16 @@ def main():
             if nodes[s]["band"] == nodes[t]["band"] and depth[t] < depth[s] + 1:
                 depth[t] = depth[s] + 1; ch = True
         if not ch: break
+    succ = {d["idx"]: [t for s, t in edges if s == d["idx"] and nodes[t]["band"] == d["band"]] for d in real}
+    if wide:  # pull each node right, next to its nearest target
+        for _ in range(len(real)):
+            ch = False
+            for d in real:
+                if succ[d["idx"]]:
+                    want = min(depth[t] for t in succ[d["idx"]]) - 1
+                    if want > depth[d["idx"]]:
+                        depth[d["idx"]] = want; ch = True
+            if not ch: break
     pos = {}
     y0 = 0.0
     bands_y = {}
@@ -106,6 +120,23 @@ def main():
         if band == "Modulation":  # a row: modulators have no useful depth, one column each
             for k, d in enumerate(mem): depth[d["idx"]] = k
         for d in mem: cols.setdefault(depth[d["idx"]], []).append(d)
+        note_of = lambda d: next((c for c in order if c["typ"] == "Comment" and c["hint"] == f"near {d['id']}"), None)
+        if wide:  # order each column by where its targets sit (right to left), then wrap tall columns
+            rank = {}
+            for k in sorted(cols, reverse=True):
+                key = lambda d: (sum(rank.get(t, 1.0) for t in succ[d["idx"]]) / len(succ[d["idx"]]) if succ[d["idx"]] else 2.0)
+                cols[k].sort(key=key)
+                for j, d in enumerate(cols[k]): rank[d["idx"]] = j / max(1, len(cols[k]) - 1)
+            wrapped, n = {}, 0
+            for k in sorted(cols):
+                cur, h = [], 0.0
+                for d in cols[k]:
+                    dh = d["h"] + GAP_Y + ((note_of(d)["h"] + NOTE_GAP) if note_of(d) else 0)
+                    if cur and h + dh > WIDE_CAP:
+                        wrapped[n] = cur; n += 1; cur, h = [], 0.0
+                    cur.append(d); h += dh
+                wrapped[n] = cur; n += 1
+            cols = wrapped
         x = 0.0; band_h = 0.0
         for k in sorted(cols):
             y = top
