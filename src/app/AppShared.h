@@ -696,6 +696,12 @@ extern int gKbFocusNode;
 
 extern int gKbFocusParam;
 
+// The param under the mouse and the one last pressed or dragged (DrawModulationBindingMenu); -1 = none.
+extern int gHoverParamNode;
+extern int gHoverParamIndex;
+extern int gTouchParamNode;
+extern int gTouchParamIndex;
+
 extern int gKbNudge;
 
         // signed value steps queued for the focused param, applied in its widget
@@ -4873,6 +4879,8 @@ const char* HelpT(const char* key);
 void DrawSettingsWindow(bool* open);
 
 void DrawShortcutsWindow(bool* open);
+// The shortcut table as plain text, English, this system's keys (the `shortcuts` RPC).
+std::string ShortcutsText();
 
 void DrawHelpWindow(bool* open);
 

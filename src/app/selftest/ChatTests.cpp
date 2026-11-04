@@ -19,6 +19,8 @@
 
 namespace app
 {
+   bool HandleAppRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError);
+
    namespace
    {
       chat::Catalog MakeCatalog()
@@ -371,6 +373,15 @@ namespace app
                      chat::FileKind("s.mid") == "midi" && chat::FileKind("p.inf") == "patch" && chat::FileKind("k.field") == "field" &&
                      chat::FileKind("n.md") == "text" && chat::FileKind("x.exe").empty() && chat::FileKind("noext").empty(),
                   "files: kinds by extension");
+            {
+               const std::string keys = ShortcutsText();
+               check(keys.find("## File & Patch") != std::string::npos && keys.find("New Patch: ") != std::string::npos,
+                     "docs: the shortcut table reads as text");
+               nlohmann::json out;
+               std::string err;
+               check(HandleAppRpc("attention", nlohmann::json::object(), out, err) && out.contains("selected") && out.contains("touched") && out["panels"].is_array(),
+                     "docs: attention lists selection, touched control and panels");
+            }
             const std::string w = chat::WithFiles("look", { "/a/b.wav", "/c/d.png" });
             check(w.rfind("look", 0) == 0 && w.find("/a/b.wav (audio)") != std::string::npos && w.find("/c/d.png (image)") != std::string::npos,
                   "files: the prompt lists each path and kind");

@@ -353,6 +353,10 @@ bool gHeadlessNeedProbe = false;
    // GraphNode::index of the Tab-focused param's node
    int gKbFocusParam = -1;
   // its paramIndex; -1 = no param focused
+   int gHoverParamNode = -1;
+   int gHoverParamIndex = -1;
+   int gTouchParamNode = -1;
+   int gTouchParamIndex = -1;
    int gKbNudge = 0;
 
    std::vector<KbParamEntry> gKbParams;

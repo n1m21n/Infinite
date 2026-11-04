@@ -1,6 +1,7 @@
 #include "InfiniteCli.h"
 
 #include "AISkillContent.h"
+#include "AgentDocs.h"
 #include "core/NodeFactory.h"
 #include "Patch.h"
 #include "PatchLayout.h"
@@ -1136,12 +1137,102 @@ Generate patch recipes|new|check|layout|apply
 App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
          show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save|fade <ms>|quantize <n>|launch <n>
          view fit|params on|off|clearcards|metronome [on|off]  quit
-Learn    context  guide
+Learn    context  attention  guide  docs [topic [name]]
 Watch    watch
 Terminal term open|list|read|send|run
 
 <node> is an index, `selected`, or a title or type that only one node has.
 )";
+
+   // `infinite docs`: every manual and table an agent needs, by topic, so it never answers from memory.
+   int Docs(const Args& args)
+   {
+      static const char* kTopics = R"(Topics (infinite docs <topic>):
+  shortcuts      every keyboard shortcut on this system (needs the app open)
+  panels         the panels, which are open, and the verb that opens each
+  nodes [name]   the Node Field Guide: every node's card, or one node's
+  field          the Field manual (language, domains, nodes)
+  headless       the headless guide: render, check and drive Infinite without the window
+  connections    what can be cabled into what
+  patch-format   the .inf file format
+  geometry       geometry domains (points, prims, instances, attributes)
+  sketch | sketch3d | glsl | expressions | patch   the code languages (same as `code docs`)
+Validators: `infinite code check <file>` for Field (.field), Sketch (.sketch.js), Sketch 3D
+(.sketch3d.js, three.js style), GLSL (.glsl), Formula and Equation; `infinite patch check <p.inf>`
+for patches; `infinite code errors` for the open window.
+)";
+      const std::string topic = args.empty() ? std::string() : args[0];
+      const std::string name = args.size() > 1 ? args[1] : std::string();
+      const auto lower = [](std::string s)
+      {
+         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         return s;
+      };
+      if (topic.empty())
+         fputs(kTopics, stdout);
+      else if (topic == "shortcuts")
+      {
+         if (!gLive.Connect())
+            Fail("the shortcut table comes from the running app; open Infinite first");
+         fputs(gLive.Call("shortcuts")["text"].get<std::string>().c_str(), stdout);
+      }
+      else if (topic == "panels")
+      {
+         fputs(R"(viewport      the output picture; nodes' viewport cards dock here
+modmatrix     modulation matrix: every source -> destination binding and its depth
+perf          performance surface: macros, triggers and faders for playing live
+timeline      clips on lanes for arranging a piece in time
+session       clip launcher for playing clips live
+samplestudio  record, generate, slice and shape samples, then drop the result on the canvas
+pianoroll     notes of the selected note clip or pattern
+view3d        3D View: arranges 3D outputs, camera and lights, before Render 3D
+terminal      this Terminal and the agent chat
+showset       show set: patches to step through in a live set
+history       undo history
+settings      settings window
+templates     starter patches
+help          node help
+shortcuts     shortcut list
+Open, close or dock one: `infinite panel <name> open|close [bottom|right|left|top]`.
+)", stdout);
+         if (gLive.Connect())
+            Print(gLive.Call("panel"));
+      }
+      else if (topic == "nodes")
+      {
+         const std::string all = AgentDocs::kNodeGuide;
+         if (name.empty())
+            fputs(all.c_str(), stdout);
+         else
+         {
+            // One card: the "### Name" section whose name matches, ignoring case.
+            const std::string want = "\n### " + lower(name) + "\n";
+            const size_t at = lower(all).find(want);
+            if (at == std::string::npos)
+               Fail("no card for '" + name + "'; `infinite docs nodes` lists every node, `infinite describe <type>` has its params");
+            const size_t end = all.find("\n#", at + want.size());
+            fputs(all.substr(at + 1, end == std::string::npos ? std::string::npos : end - at).c_str(), stdout);
+         }
+      }
+      else if (topic == "field")
+         fputs(AgentDocs::kFieldManual, stdout);
+      else if (topic == "headless")
+         fputs(AgentDocs::kHeadlessGuide, stdout);
+      else if (topic == "connections")
+         fputs(AgentDocs::kConnectionRules, stdout);
+      else if (topic == "patch-format")
+         fputs(AgentDocs::kPatchFormat, stdout);
+      else if (topic == "geometry")
+         fputs(AgentDocs::kGeometryDomains, stdout);
+      else if (topic == "sketch" || topic == "sketch3d" || topic == "glsl" || topic == "shadertoy" || topic == "expressions" || topic == "expr" || topic == "patch")
+         return CodeVerb({ "docs", topic });
+      else
+      {
+         fputs(kTopics, stderr);
+         return kExitUsage;
+      }
+      return 0;
+   }
 
    int Context()
    {
@@ -1151,6 +1242,9 @@ Terminal term open|list|read|send|run
          brief["app"] = gLive.Call("status");
          brief["target"] = "This is the open window the user is looking at. Edit it live with these verbs; do not write a new .inf unless asked.";
          brief["selection"] = gLive.Call("selection")["nodes"];
+         // What the user points at: selected nodes, the control under the mouse, the one last touched,
+         // the Tab-focused one and the open panels.
+         brief["attention"] = gLive.Call("attention");
          brief["nodes"] = gLive.Call("list_nodes")["nodes"];
          brief["codeErrors"] = gLive.Call("code_errors")["errors"];
       }
@@ -1160,7 +1254,8 @@ Terminal term open|list|read|send|run
       fputs(R"(
 Loop: patch new, edit the .inf, patch check, fix, patch layout, patch apply.
 Code loop: code new, edit, code check, code watch --node <n>, shot <n>.
-Facts come from `describe <type>` and `code docs <language>`, never from memory.
+Facts come from `describe <type>`, `docs <topic>` and `code docs <language>`, never from memory.
+`docs` lists the manuals: shortcuts, panels, nodes, field, headless, connections, patch-format, geometry.
 `infinite` with no verb lists every verb; `infinite guide` prints the patch authoring guide.
 )", stdout);
       return 0;
@@ -1653,6 +1748,10 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
          return PatchVerb(args);
       if (verb == "context")
          return Context();
+      if (verb == "docs")
+         return Docs(args);
+      if (verb == "attention")
+         return call("attention");
       if (verb == "guide")
       {
          fputs(kHelp, stdout);

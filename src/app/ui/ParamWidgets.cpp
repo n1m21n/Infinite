@@ -505,6 +505,17 @@ namespace app
    // ed::Begin()/ed::End(), rather than right where the param is hovered.
    void DrawModulationBindingMenu(int nodeIndex, int paramIndex, bool hovered)
    {
+      // What the user points at and last touched, for the agents' `infinite context`.
+      if (hovered)
+      {
+         gHoverParamNode = nodeIndex;
+         gHoverParamIndex = paramIndex;
+         if (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsItemActive())
+         {
+            gTouchParamNode = nodeIndex;
+            gTouchParamIndex = paramIndex;
+         }
+      }
       if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       {
          gModBindingMenuNode = nodeIndex;
