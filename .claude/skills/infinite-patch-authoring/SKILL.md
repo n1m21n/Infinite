@@ -131,15 +131,15 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-351 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+352 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 59 | bypass |
-| `Armature` | in:geometry, path:geometry | out:geometry | 85 |  |
+| `3D View` | none | out:image | 62 | bypass |
+| `Armature` | in:geometry, path:geometry | out:geometry | 86 |  |
 | `Array` | geo:geometry | out:geometry | 76 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
@@ -165,6 +165,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |
+| `Edit Mesh` | geo:geometry | out:geometry | 1 | bypass |
 | `Explode` | geo:geometry | out:geometry | 76 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 76 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 76 | bypass |
@@ -212,7 +213,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
 | `Screw` | geo:geometry | out:geometry | 76 | bypass |
-| `Sculpt` | geo:geometry | out:geometry | 3 | bypass |
+| `Sculpt` | geo:geometry, brush:image | out:geometry | 3 |  |
 | `Select` | geo:geometry | out:geometry | 76 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
@@ -371,7 +372,6 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `Apple Watch` | none | connected:modulator, roll:modulator, pitch:modulator, yaw:modulator, rot x:modulator, rot y:modulator, rot z:modulator, accel x:modulator, accel y:modulator, accel z:modulator, energy:modulator, crown:modulator, crown speed:modulator, touch x:modulator, touch y:modulator, touching:modulator, tap:modulator, flick left:modulator, flick right:modulator, shake:modulator, strike:modulator, heart:modulator | 4 | bypass |
 | `Audio Analyze` | audio:audio | level:modulator, low:modulator, mid:modulator, high:modulator, onset:modulator, b1:modulator, b2:modulator, b3:modulator, b4:modulator, b5:modulator, b6:modulator, b7:modulator, b8:modulator | 4 | bypass |
 | `Audio File` | none | out:audio | 9 | bypass |
 | `Audio to CV` | audio:audio | out:modulator | 6 | bypass |

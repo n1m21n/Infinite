@@ -714,15 +714,15 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-351 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+352 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `3D View` | none | out:image | 59 | bypass |
-| `Armature` | in:geometry, path:geometry | out:geometry | 85 |  |
+| `3D View` | none | out:image | 62 | bypass |
+| `Armature` | in:geometry, path:geometry | out:geometry | 86 |  |
 | `Array` | geo:geometry | out:geometry | 76 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 51 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
@@ -748,6 +748,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |
+| `Edit Mesh` | geo:geometry | out:geometry | 1 | bypass |
 | `Explode` | geo:geometry | out:geometry | 76 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 76 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 76 | bypass |
@@ -767,9 +768,9 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Join Geometry` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Klein Bottle` | texture:image | out:geometry | 51 | bypass |
 | `L-System` | none | out:geometry | 21 | bypass |
-| `Light` | none | out:light | 28 | bypass |
 )AISKILL"
-R"AISKILL(| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
+R"AISKILL(| `Light` | none | out:light | 28 | bypass |
+| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image, opacity:image, transmission:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
@@ -796,7 +797,7 @@ R"AISKILL(| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 51 | bypass |
 | `Screw` | geo:geometry | out:geometry | 76 | bypass |
-| `Sculpt` | geo:geometry | out:geometry | 3 | bypass |
+| `Sculpt` | geo:geometry, brush:image | out:geometry | 3 |  |
 | `Select` | geo:geometry | out:geometry | 76 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
@@ -955,7 +956,6 @@ R"AISKILL(| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `Apple Watch` | none | connected:modulator, roll:modulator, pitch:modulator, yaw:modulator, rot x:modulator, rot y:modulator, rot z:modulator, accel x:modulator, accel y:modulator, accel z:modulator, energy:modulator, crown:modulator, crown speed:modulator, touch x:modulator, touch y:modulator, touching:modulator, tap:modulator, flick left:modulator, flick right:modulator, shake:modulator, strike:modulator, heart:modulator | 4 | bypass |
 | `Audio Analyze` | audio:audio | level:modulator, low:modulator, mid:modulator, high:modulator, onset:modulator, b1:modulator, b2:modulator, b3:modulator, b4:modulator, b5:modulator, b6:modulator, b7:modulator, b8:modulator | 4 | bypass |
 | `Audio File` | none | out:audio | 9 | bypass |
 | `Audio to CV` | audio:audio | out:modulator | 6 | bypass |
@@ -967,9 +967,9 @@ R"AISKILL(| `Mapping` | geo:geometry | out:geometry | 11 | bypass |
 | `Face Track` | input:image | present:modulator, head x:modulator, head y:modulator, yaw:modulator, pitch:modulator, roll:modulator, eye L:modulator, eye R:modulator, brows:modulator, mouth:modulator, smile:modulator, gaze x:modulator, gaze y:modulator | 3 | bypass |
 | `Geometry Table` | geo:geometry | cx:modulator, cy:modulator, cz:modulator, spread:modulator, x1:modulator, y1:modulator, z1:modulator, x2:modulator, y2:modulator, z2:modulator, x3:modulator, y3:modulator, z3:modulator, x4:modulator, y4:modulator, z4:modulator | 10 | bypass |
 | `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator, fist:modulator, point:modulator, peace:modulator, thumbs up:modulator, ok:modulator, rock:modulator | 3 | bypass |
-| `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
 )AISKILL"
-R"AISKILL(| `Invert` | in:modulator | out:modulator | 3 | bypass |
+R"AISKILL(| `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
+| `Invert` | in:modulator | out:modulator | 3 | bypass |
 | `LFO` | trig:modulator | out:modulator | 11 | bypass |
 | `MIDI CC` | none | out:modulator | 7 | hardware: refused headless, bypass |
 | `MIDI Trigger` | none | out:modulator | 6 | hardware: refused headless, bypass |
