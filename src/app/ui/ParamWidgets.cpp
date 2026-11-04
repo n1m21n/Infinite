@@ -6,6 +6,9 @@
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
+#include "imgui_internal.h"
+
+#include <cmath>
 
 namespace app
 {
@@ -503,8 +506,69 @@ namespace app
    // Only records the request here - see gModBindingMenuNode's comment for
    // why the popup itself has to be opened and drawn later, outside
    // ed::Begin()/ed::End(), rather than right where the param is hovered.
+   // Inactive controls (drawn inside BeginDisabled because the node's mode or a switch turns them
+   // off). ImGui fades only what it draws itself, and the param widgets paint their fills and wells
+   // straight from tokens, so a greyed slider used to keep its full accent bar. Every param widget
+   // marks where its drawing starts (TakePendingSrcAddr) and ends here, so the fade happens once:
+   // the widget's vertices go grey and lighter, still drawn, still wired, still in the layout.
+   namespace
+   {
+      ImDrawList* sParamDrawList = nullptr;
+      int sParamVtxStart = 0;
+      // The last switch or dropdown drawn live on this node: what an inactive control below it
+      // most likely depends on, for the hover hint.
+      int sGateNode = -1;
+      std::string sGateLabel;
+
+      void FadeInactive(ImDrawList* dl, int start)
+      {
+         constexpr float kGrey = 0.85f;   // how far colours move to their own grey
+         constexpr float kAlpha = 0.65f;  // on top of ImGui's own DisabledAlpha for its parts
+         for (int i = start; i < dl->VtxBuffer.Size; i++)
+         {
+            ImU32& c = dl->VtxBuffer[i].col;
+            const float r = (float)((c >> IM_COL32_R_SHIFT) & 0xFF), g = (float)((c >> IM_COL32_G_SHIFT) & 0xFF);
+            const float b = (float)((c >> IM_COL32_B_SHIFT) & 0xFF), a = (float)((c >> IM_COL32_A_SHIFT) & 0xFF);
+            const float y = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            auto mix = [&](float v) { return (ImU32)std::lround(v + (y - v) * kGrey); };
+            c = IM_COL32(mix(r), mix(g), mix(b), (ImU32)std::lround(a * kAlpha));
+         }
+      }
+   }
+
+   void NoteParamDrawStart()
+   {
+      ImGuiContext* g = ImGui::GetCurrentContext();
+      sParamDrawList = g != nullptr && g->CurrentWindow != nullptr ? ImGui::GetWindowDrawList() : nullptr;
+      sParamVtxStart = sParamDrawList != nullptr ? sParamDrawList->VtxBuffer.Size : 0;
+   }
+
+   void EndParamDraw(int nodeIndex, int paramIndex)
+   {
+      ImGuiContext* g = ImGui::GetCurrentContext();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool disabled = g != nullptr && (g->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
+      const bool owned = dl == sParamDrawList && sParamVtxStart <= dl->VtxBuffer.Size;
+      sParamDrawList = nullptr;
+      // A cable-driven param is drawn read-only the same way, but it is live: leave it alone.
+      if (!disabled || !owned || (paramIndex >= 0 && Modulation::Instance().IsModulated(nodeIndex, paramIndex)))
+         return;
+      FadeInactive(dl, sParamVtxStart);
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_ForTooltip))
+      {
+         if (sGateNode == nodeIndex && !sGateLabel.empty())
+            ImGui::SetTooltip("%s %s", T("Off: set by"), sGateLabel.c_str());
+         else
+            ImGui::SetTooltip("%s", T("Off in this mode"));
+      }
+   }
+
    void DrawModulationBindingMenu(int nodeIndex, int paramIndex, bool hovered)
    {
+      EndParamDraw(nodeIndex, paramIndex);
+      // A link to this control (a chat chip, "View in Modulation Matrix"): ring it until the flash ends.
+      if (nodeIndex == gModMatrixHighlightNode && paramIndex == gModMatrixHighlightParam && ImGui::GetTime() < gModMatrixHighlightUntil)
+         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
       // What the user points at and last touched, for the agents' `infinite context`.
       if (hovered)
       {
@@ -539,6 +603,7 @@ namespace app
 
    const void* TakePendingSrcAddr(const void* fallback)
    {
+      NoteParamDrawStart();  // every param widget starts here; DrawModulationBindingMenu ends it
       const void* a = gPendingSrcAddr != nullptr ? gPendingSrcAddr : fallback;
       gPendingSrcAddr = nullptr;
       return a;
@@ -583,6 +648,11 @@ namespace app
       h.registered = true;
       h.nodeIndex = gCurrentNodeIndex;
       h.paramIndex = DiscreteParamSlot(h.nodeIndex, label != nullptr ? label : "");
+      if (ImGuiContext* g = ImGui::GetCurrentContext(); g != nullptr && (g->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0)
+      {
+         sGateNode = h.nodeIndex;
+         sGateLabel = StripParamLabel(label);
+      }
 
       const std::pair<int, int> key(h.nodeIndex, h.paramIndex);
       float& slot = gDiscreteParamStore[key];

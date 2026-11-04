@@ -2162,6 +2162,11 @@ std::string StripParamLabel(const char* label);
 extern const void* gPendingSrcAddr;
 
 const void* TakePendingSrcAddr(const void* fallback);
+// Brackets one param widget's drawing: an inactive one (inside BeginDisabled, not cable-driven) is
+// faded to grey and gets a hover hint. TakePendingSrcAddr starts it; DrawModulationBindingMenu ends
+// it. paramIndex -1: a colour swatch, no cable check.
+void NoteParamDrawStart();
+void EndParamDraw(int nodeIndex, int paramIndex);
 
 int KbDiscreteHook(int nodeIndex, int paramIndex, bool modulated);
 
@@ -5784,6 +5789,7 @@ extern bool gTerminalFocus; // the terminal has the keyboard
 extern ImVec2 gTerminalRectMin, gTerminalRectMax;
 extern std::vector<std::string> gTerminalDropPending; // paths dropped on the panel, pasted as shell words
 void TerminalLoadFonts(float bakedPx);
+ImFont* TerminalMonoFont();  // Geist Mono, nullptr when the install lacks it
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
 // The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
