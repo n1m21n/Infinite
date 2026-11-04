@@ -353,7 +353,8 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 | Composer: span colours, route badge, per-slot dropdown, ↑↓ nudge, history | built | builds; not yet looked at in the app |
 | Terminal face toggle resumes the same session | built | resume line in CHATTEST |
 | Setup as the chat's opening message | built | CLISETUPTEST still passes |
-| A real `claude -p` / `codex exec` turn | not yet run | needs the owner's yes |
+| A real `claude -p` turn (the chat's exact args, via the login shell) | run | 2026-11-04, Claude Code 2.1.318: session id kept, text and result read; CHATTEST with INFINITE_CHATTEST_CLAUDE_LOG |
+| `--resume` turn, `codex exec` turn | not yet run | |
 | `/` commands | not built | |
 
 ## 11. Critique

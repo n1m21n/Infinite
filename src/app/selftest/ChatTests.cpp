@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <thread>
 
 namespace app
@@ -221,6 +224,21 @@ namespace app
             run->Poll(out);
             return run->Done();
          };
+         // A recorded real `claude -p` turn, when one is given: INFINITE_CHATTEST_CLAUDE_LOG=<stream-json file>.
+         if (const char* log = std::getenv("INFINITE_CHATTEST_CLAUDE_LOG"))
+         {
+            std::ifstream f(log, std::ios::binary);
+            const std::string bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            chat::AgentStream real(chat::AgentKind::Claude);
+            std::vector<chat::AgentEvent> lv;
+            real.Feed(bytes, lv);
+            int texts = 0;
+            for (const chat::AgentEvent& e : lv)
+               texts += e.kind == chat::AgentEvent::Kind::Text;
+            check(!bytes.empty() && lv.size() >= 3 && lv.front().kind == chat::AgentEvent::Kind::Session && texts >= 1 &&
+                     lv.back().kind == chat::AgentEvent::Kind::End && !lv.back().error,
+                  "claude: a recorded real turn reads as session, text, end");
+         }
 #if !defined(_WIN32)
          std::vector<chat::AgentEvent> rv;
          const bool done = runTurn({ "printf", "%s\\n", "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\"}",
