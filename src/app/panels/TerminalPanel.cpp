@@ -758,11 +758,14 @@ namespace
          }
       }
       // The chat face, at the row's right end.
-      ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
-      if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
-         gTerminalFace = 0;
-      if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("%s", T("Chat"));
+      if (CliSetup::Prefs().face == "chat")
+      {
+         ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
+         if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
+            gTerminalFace = 0;
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Chat"));
+      }
       if (closeIndex >= 0)
          CloseTab(closeIndex);
       ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + kTabRowH));
@@ -905,7 +908,7 @@ namespace
    void DrawPanel()
    {
       FollowTheme();
-      if (gTerminalFace == 0)
+      if (gTerminalFace == 0 && CliSetup::Prefs().face == "chat")
       {
          DrawChatPanel();
          return;

@@ -139,6 +139,18 @@ namespace app
          }
       }
 
+      {
+         // What the Terminal panel opens to.
+         int face = prefs.face == "terminal" ? 1 : 0;
+         std::string items = std::string(T("Chat")) + '\0' + T("Terminal") + '\0' + '\0';
+         if (FormParts::Combo(L("Agent interface"), &face, items.c_str()))
+         {
+            prefs.face = face == 1 ? "terminal" : "chat";
+            SaveConfig(paths.config, prefs);
+            gTerminalFace = face;
+         }
+      }
+
       FormParts::Label(L("Setup"));
       ImGui::BeginDisabled(!v.setupEnabled);
       if (button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str(), allGreen ? Kind::Plain : Kind::Primary))
@@ -307,58 +319,6 @@ namespace app
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, y));
       ImGui::Dummy(ImVec2(availW, tok::space_4));
-      return true;
-   }
-
-   // The same first-run choice as the welcome, as the chat's opening message: which agent, Connect, or Later.
-   // Returns true while it shows. Direct commands work below it before any agent is connected.
-   bool DrawChatSetup(float width)
-   {
-      using namespace CliSetup;
-      Config& prefs = Prefs();
-      if (prefs.welcomed)
-         return false;
-      const Os os = CurrentOs();
-      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
-      const Agent* agent = FindAgent(prefs.agent);
-      if (agent == nullptr)
-         agent = &Agents()[0];
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
-      ImGui::TextUnformatted(T("Connect a coding agent to build with Infinite."));
-      ImGui::PopTextWrapPos();
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      for (const Agent& a : Agents())
-      {
-         if (&a != &Agents()[0])
-            ImGui::SameLine(0.0f, tok::space_1);
-         ImGui::PushID(a.id);
-         if (ChipButton::Draw(a.name, &a == agent, ChipButton::kHeight, 0.0f, true) && &a != agent)
-         {
-            prefs.agent = a.id;
-            SaveConfig(paths.config, prefs);
-         }
-         ImGui::PopID();
-      }
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      static std::string sError;
-      const std::string connect = std::string(T("Connect")) + " " + agent->name + "###chatconnect";
-      if (ChipButton::Draw(connect.c_str(), true))
-      {
-         sError.clear();
-         // Setup runs in a Terminal tab, which turns the panel to the terminal face until it is done.
-         Perform(Action::kConnectAll, os, *agent, RealExecutable(), paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); },
-                 &sError, std::string(), nullptr);
-         prefs.welcomed = true;
-         SaveConfig(paths.config, prefs);
-      }
-      ImGui::SameLine(0.0f, tok::space_1);
-      if (ChipButton::Draw(T("Later"), false))
-      {
-         prefs.welcomed = true;
-         SaveConfig(paths.config, prefs);
-      }
-      if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       return true;
    }
 
