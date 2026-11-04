@@ -229,6 +229,7 @@ namespace app
 
          // Skills: three shipped, an edited or deleted one turns the agent step amber.
          check(Skills().size() == 4 && std::string(Skills()[0].name) == "infinite-patch-authoring" && std::string(Skills()[3].name) == "infinite-live-session", "four AI skills ship, patch authoring first, live session last");
+         check(std::string(Skills()[3].content).find("`@<title>#<index>`") != std::string::npos, "live session skill carries the reply rule");
          const fs::path sk = home / ".claude" / "skills" / "infinite-field-language" / "SKILL.md";
          std::ofstream(sk.string()) << "old";
          check(CheckHealth(in).step[4] == Health::kBroken && std::string(CheckHealth(in).why[4]).find("skill") != std::string::npos, "stale AI skill file: agent step is broken");

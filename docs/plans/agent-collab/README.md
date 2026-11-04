@@ -2,7 +2,7 @@
 
 Status: rewritten 2026-11-04 with the owner's additions: chat front end, both panels, @ nodes,
 slash commands, session awareness, clean-machine setup. Sections 1-7 await sign-off. T1 built; Block C
-refined with setup-as-chat, links and the patch grammar (C1-C7), awaiting approval.
+refined with setup-as-chat, links, the patch grammar and the agent reply rule (C1-C7); approved 2026-11-04.
 Comes before Field Coder (`docs/plans/field-coder/`), which later plugs in as one more executor.
 
 ## 1. Goal
@@ -227,10 +227,14 @@ modulated. It refreshes on every graph change, because it is in-process.
 | value `0.5` in a card | mono readout | none |
 | file `out.png` | inline image, max panel width | open full size |
 
-How agent text is matched: the live-session skill tells the agent to write `@title` and
-`@title.key`, so most links are exact. A fallback links a backticked word or a node title. A param
-word links only when it belongs to a node named in the same sentence, so prose like "more detail"
-stays plain. A missing node renders struck through.
+How agent text is matched. The live-session skill gives the agent one reply rule, "How to write
+replies": nodes as `@<title>#<index>`, params as `@<title>#<index>.<key>`, changes as `old → new`,
+modulation as `@src#i → @dst#j.key lo–hi`, pictures as a path on their own line, and a closing
+`Changed:` list. The `#index` ends the title, so titles with spaces or repeated titles still link
+exactly. In the terminal face the same text reads plainly. The chip shows the param's label from
+the catalog, not its key. A fallback links a backticked node title. A bare param word links only
+when its node is named in the same sentence, so prose like "more detail" stays plain. A node that
+no longer exists renders struck through.
 
 **C4. The patch grammar.** Short words people already say. A line that parses fully runs directly
 (⚡: one batch, one undo step, milliseconds). Anything else goes to the agent (✦). `@agent` forces
@@ -296,7 +300,7 @@ Gaps this needs filled first:
 |---|---|
 | `get_params` returns key → value strings only | `get_params` gains `full:true`: label, range, step, enum values, modulatable, mod/expr state (the `--describe` data, per node) |
 | No "show me this node" call | `focus {index, key?}`: select, frame, flash the control. Also an `infinite focus` verb. |
-| Agent does not write links | live-session skill: "name nodes `@title`, params `@title.key`" |
+| Agent does not write links | done in T1: the live-session skill's reply rule (see C3) |
 
 ### Test set: 30 tasks
 
@@ -319,7 +323,7 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 | T1 | A: session binding + setup order + Node messages | first; fixes the owner's bug and Codex |
 | T2 | A: `infinite mcp` native + live MCP tools | next; removes Node for 2 of 3 agents |
 | T3 | B: gate | then |
-| T4 | C: chat + terminal faces, setup-as-chat, links, grammar, dropdowns, `/`, cards | after owner approves C1-C7 |
+| T4 | C: chat + terminal faces, setup-as-chat, links, grammar, dropdowns, `/`, cards | approved by the owner 2026-11-04 |
 | T5 | Field Coder behind `propose` | only if it passes its own speed gate |
 
 ## 10. Results
@@ -333,7 +337,7 @@ frames, wrong-session hits and wall time. Correctness is scored with the field-c
 | Terminal sets INFINITE_SESSION; `status` and `context` name the window | built | |
 | Agent install moved into setup step 5, after Node | built | CLISETUPTEST 66/66, incl. "installs a missing agent at step 5, after Node" |
 | Per-OS Node lines (too old / macOS / Linux / Windows) | built | script text; Linux and Windows end-to-end runs still to do |
-| `infinite-live-session` skill | built | ships as the 4th skill |
+| `infinite-live-session` skill, with the reply rule | built | ships as the 4th skill |
 | Parent-pid walk inside a real agent shell | not yet run | needs the owner's two-window repro |
 
 ## 11. Critique
