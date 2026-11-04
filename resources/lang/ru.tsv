@@ -2627,3 +2627,29 @@ expression	выражение
 modulated	модулируется
 now	сейчас
 %s works in the terminal.	%s работает в терминале.
+%d more	ещё %d
+%s is not set up.	%s не настроен.
+Add a Noise and wire it to the output	Добавь Noise и подключи к выходу
+Agent interface	Интерфейс агента
+Ask, or type @ to name a node	Спросите или введите @, чтобы назвать узел
+Attach files	Прикрепить файлы
+Changed	Изменено
+Chats	Чаты
+Connect an agent	Подключить агента
+Did not run	Не выполнено
+Explain this patch	Объясни этот патч
+Failed	Ошибка
+Make the colours drift slowly	Пусть цвета медленно плывут
+No agent	Нет агента
+No saved chats	Нет сохранённых чатов
+Open in Terminal	Открыть в терминале
+Set up	Настроить
+Set up an agent first.	Сначала настройте агента.
+Setting up…	Настройка…
+Setting up… %d of %d	Настройка… %d из %d
+Sign in	Войти
+Undone	Отменено
+What should we make?	Что сделаем?
+Working…	Работаю…
+formula	формула
+stopped with an error.	остановился с ошибкой.

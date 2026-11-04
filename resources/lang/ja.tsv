@@ -2627,3 +2627,29 @@ expression	式
 modulated	モジュレーション中
 now	現在
 %s works in the terminal.	%s はターミナルで動作します。
+%d more	他 %d 件
+%s is not set up.	%s は未設定です。
+Add a Noise and wire it to the output	Noise を追加して出力につなぐ
+Agent interface	エージェントの表示
+Ask, or type @ to name a node	質問するか、@ でノードを指定
+Attach files	ファイルを添付
+Changed	変更済み
+Chats	チャット
+Connect an agent	エージェントを接続
+Did not run	実行されませんでした
+Explain this patch	このパッチを説明して
+Failed	失敗
+Make the colours drift slowly	色をゆっくり変化させて
+No agent	エージェントなし
+No saved chats	保存されたチャットはありません
+Open in Terminal	ターミナルで開く
+Set up	セットアップ
+Set up an agent first.	先にエージェントをセットアップしてください。
+Setting up…	セットアップ中…
+Setting up… %d of %d	セットアップ中… %d / %d
+Sign in	サインイン
+Undone	取り消し済み
+What should we make?	何を作りましょう？
+Working…	作業中…
+formula	数式
+stopped with an error.	エラーで停止しました。

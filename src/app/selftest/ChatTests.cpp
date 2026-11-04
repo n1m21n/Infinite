@@ -1,8 +1,11 @@
 // INFINITE_CHATTEST: the chat's patch grammar and reply links against a hand-made catalog
-// (docs/plans/agent-collab/README.md C3, C4). No window, no agent. Early exit before glfwInit().
+// (docs/plans/agent-collab/README.md C3-C7): grammar, reply links, agent streams, diffs, saved chats, files. No window, no agent. Early exit before glfwInit().
 #include "app/AppShared.h"
 #include "core/chat/AgentRun.h"
 #include "core/chat/AgentStream.h"
+#include "core/chat/ChatDiff.h"
+#include "core/chat/ChatFiles.h"
+#include "core/chat/ChatThread.h"
 #include "core/chat/PatchGrammar.h"
 #include "core/chat/ReplyLinks.h"
 
@@ -239,6 +242,147 @@ namespace app
                      lv.back().kind == chat::AgentEvent::Kind::End && !lv.back().error,
                   "claude: a recorded real turn reads as session, text, end");
          }
+         // Antigravity: the reply step's text arrives in deltas and goes out whole when the step is done.
+         {
+            chat::AgentStream g(chat::AgentKind::Antigravity);
+            std::vector<chat::AgentEvent> gv;
+            g.Feed("{\"event\":\"init\",\"conversation_id\":\"c-1\",\"init\":{}}\n"
+                   "{\"event\":\"step_update\",\"step_update\":{\"step_index\":0,\"state\":\"DONE\",\"step_type\":\"user_input\"}}\n"
+                   "{\"event\":\"step_update\",\"step_update\":{\"step_index\":1,\"state\":\"ACTIVE\",\"step_type\":\"tool\",\"tool_name\":\"run_command\",\"tool_info\":{\"name\":\"run_command\",\"parameters\":{\"CommandLine\":\"infinite context\"}}}}\n"
+                   "{\"event\":\"step_update\",\"step_update\":{\"step_index\":1,\"state\":\"DONE\",\"step_type\":\"tool\",\"tool_name\":\"run_command\",\"tool_info\":{\"name\":\"run_command\",\"parameters\":{\"CommandLine\":\"infinite context\"},\"output\":\"Command exited with code 0\"}}}\n"
+                   "{\"event\":\"step_update\",\"step_update\":{\"step_index\":2,\"state\":\"ACTIVE\",\"step_type\":\"agent_response\",\"text_delta\":\"mari\"}}\n"
+                   "{\"event\":\"step_update\",\"step_update\":{\"step_index\":2,\"state\":\"DONE\",\"step_type\":\"agent_response\",\"text_delta\":\"gold\"}}\n"
+                   "{\"event\":\"result\",\"result\":{\"conversation_id\":\"c-1\",\"status\":\"SUCCESS\"}}\n",
+                   gv);
+            int tools = 0, texts = 0;
+            std::string text;
+            for (const chat::AgentEvent& e : gv)
+            {
+               tools += e.kind == chat::AgentEvent::Kind::Tool;
+               if (e.kind == chat::AgentEvent::Kind::Text)
+                  texts++, text = e.text;
+            }
+            check(!gv.empty() && gv.front().kind == chat::AgentEvent::Kind::Session && gv.front().text == "c-1" && tools == 1 && texts == 1 &&
+                     text.find("marigold") != std::string::npos && gv.back().kind == chat::AgentEvent::Kind::End && !gv.back().error,
+                  "antigravity: session, one command, the reply whole, end");
+            const std::vector<std::string> ga = chat::AgentArgs(chat::AgentKind::Antigravity, "hi", "c-1", true, { "/tmp/a" });
+            check(ga[0] == "agy" && ga.back() == "hi" && ga[ga.size() - 2] == "-p" && std::find(ga.begin(), ga.end(), "--add-dir") != ga.end() &&
+                     std::find(ga.begin(), ga.end(), "--conversation") != ga.end(),
+                  "antigravity: prompt last, file folder readable, resumes the conversation");
+            const std::vector<std::string> ca = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, { "/tmp/a", "/tmp/b" });
+            check(std::find(ca.begin(), ca.end(), "--add-dir") != ca.end() && std::find(ca.begin(), ca.end(), "/tmp/b") != ca.end() && ca.back() == "hi",
+                  "claude: attached files' folders are readable");
+            if (const char* log = std::getenv("INFINITE_CHATTEST_AGY_LOG"))
+            {
+               std::ifstream f(log, std::ios::binary);
+               const std::string bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+               chat::AgentStream real(chat::AgentKind::Antigravity);
+               std::vector<chat::AgentEvent> lv;
+               real.Feed(bytes, lv);
+               check(!lv.empty() && lv.front().kind == chat::AgentEvent::Kind::Session && lv.back().kind == chat::AgentEvent::Kind::End && !lv.back().error,
+                     "antigravity: a recorded real turn reads as session ... end");
+            }
+         }
+
+         // Mentions route the message: each named agent, never direct.
+         {
+            const chat::Parse p = ParseLine("@claude @codex make it glow", cat);
+            int agents = 0;
+            bool claude = false, codex = false;
+            for (const chat::Span& sp : p.spans)
+               if (sp.kind == chat::SpanKind::Agent)
+                  agents++, claude = claude || sp.key == "claude", codex = codex || sp.key == "codex";
+            check(!p.direct && agents == 2 && claude && codex, "mentions: @claude @codex are two agents, never direct");
+            const chat::Parse a = ParseLine("@antigravity explain @cube", cat);
+            bool node = false, ag = false;
+            for (const chat::Span& sp : a.spans)
+               node = node || (sp.kind == chat::SpanKind::Node && sp.node == 1), ag = ag || (sp.kind == chat::SpanKind::Agent && sp.key == "antigravity");
+            check(!a.direct && node && ag, "mentions: an agent and a node in one line");
+         }
+
+         // What a turn changed: params, added and removed nodes, cables, code as a block.
+         {
+            chat::Snapshot before, after;
+            before.catalog = cat;
+            after.catalog = cat;
+            after.catalog.nodes[0].params[1].value = "2.5";  // cube size
+            after.catalog.nodes.erase(after.catalog.nodes.begin() + 3);  // Random gone
+            chat::CatalogNode blur;
+            blur.index = 12;
+            blur.type = "Blur";
+            blur.title = "Blur";
+            after.catalog.nodes.push_back(blur);
+            after.catalog.nodes[3].params[0].value = "a = 1;\nb = 2;\nout = a + b;";  // Field Pixel speed stands in for a code param
+            after.catalog.nodes[3].params[0].kind = "";  // text params carry no kind
+            after.links.push_back({ 12, 0, 1, 0, "" });
+            const std::vector<chat::ChangeLine> d = chat::Diff(before, after);
+            auto has = [&](const char* what)
+            {
+               for (const chat::ChangeLine& l : d)
+                  if (l.text.find(what) != std::string::npos)
+                     return true;
+               return false;
+            };
+            bool code = false;
+            for (const chat::ChangeLine& l : d)
+               code = code || l.code.find("out = a + b;") != std::string::npos;
+            check(has("@cube#1.size") && has("2.5"), "diff: a changed param names node, key and value");
+            check(has("Blur") && has("Random"), "diff: an added and a removed node");
+            check(has("@Blur#12") && has("@cube#1") && d.size() >= 5, "diff: a new cable names both ends");
+            check(code, "diff: a code param comes back as a block");
+            check(chat::Diff(before, before).empty(), "diff: nothing changed, nothing to show");
+         }
+
+         // A saved chat comes back with its entries and the agents' sessions.
+         {
+            chat::Thread t;
+            t.id = "t-test";
+            t.title = chat::TitleFor("make the colours drift slowly and then make the whole thing glow with a long soft bloom on the highlights");
+            t.updated = 1234;
+            t.sessions["claude"] = { "s-1", true };
+            t.sessions["antigravity"] = { "c-1", false };
+            chat::Entry u;
+            u.kind = chat::Entry::Kind::User;
+            u.text = "hi";
+            u.files = { "/tmp/a.png" };
+            chat::Entry c;
+            c.kind = chat::Entry::Kind::Change;
+            c.changes = { { "@cube#1.size 1 → 2", "" }, { "@Field Pixel#7.code", "x = 1;" } };
+            c.undone = true;
+            chat::Entry st;
+            st.kind = chat::Entry::Kind::Steps;
+            st.agent = "claude";
+            st.lines = { "infinite context" };
+            st.ok = false;
+            t.entries = { u, c, st };
+            chat::Thread back;
+            const bool read = chat::FromJson(chat::ToJson(t), back);
+            check(read && back.id == "t-test" && back.updated == 1234 && back.sessions.size() == 2 && back.sessions["claude"].live &&
+                     !back.sessions["antigravity"].live && back.entries.size() == 3 && back.entries[0].files.size() == 1 &&
+                     back.entries[1].changes[1].code == "x = 1;" && back.entries[1].undone && back.entries[2].agent == "claude" && !back.entries[2].ok,
+                  "thread: a saved chat reads back whole");
+            check(t.title.size() <= 64 && t.title.find("…") != std::string::npos, "thread: a long first message makes a short title");
+            check(!chat::FromJson("{\"version\":2}", back) && !chat::FromJson("not json", back), "thread: other files are not chats");
+         }
+
+         // Attachments: every kind Infinite opens, its folder readable.
+         {
+            check(chat::FileKind("/a/b.WAV") == "audio" && chat::FileKind("x.png") == "image" && chat::FileKind("m.glb") == "model" &&
+                     chat::FileKind("s.mid") == "midi" && chat::FileKind("p.inf") == "patch" && chat::FileKind("k.field") == "field" &&
+                     chat::FileKind("n.md") == "text" && chat::FileKind("x.exe").empty() && chat::FileKind("noext").empty(),
+                  "files: kinds by extension");
+            const std::string w = chat::WithFiles("look", { "/a/b.wav", "/c/d.png" });
+            check(w.rfind("look", 0) == 0 && w.find("/a/b.wav (audio)") != std::string::npos && w.find("/c/d.png (image)") != std::string::npos,
+                  "files: the prompt lists each path and kind");
+            const std::vector<std::string> dirs = chat::FileDirs({ "/a/b.wav", "/a/c.png", "/d/e.txt" });
+            check(dirs.size() == 2 && dirs[0] == "/a" && dirs[1] == "/d", "files: each folder once");
+            const std::vector<std::string> ex = chat::AttachExtensions();
+            bool all = true;
+            for (const std::string& e : ex)
+               all = all && !chat::FileKind("x." + e).empty();
+            check(ex.size() > 20 && all && std::count(ex.begin(), ex.end(), "png") == 1, "files: the dialog offers exactly what the chat takes");
+         }
+
 #if !defined(_WIN32)
          std::vector<chat::AgentEvent> rv;
          const bool done = runTurn({ "printf", "%s\\n", "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\"}",

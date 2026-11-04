@@ -2627,3 +2627,29 @@ expression	expresión
 modulated	modulado
 now	ahora
 %s works in the terminal.	%s funciona en la terminal.
+%d more	%d más
+%s is not set up.	%s no está configurado.
+Add a Noise and wire it to the output	Añade un Noise y conéctalo a la salida
+Agent interface	Interfaz del agente
+Ask, or type @ to name a node	Pregunta, o escribe @ para nombrar un nodo
+Attach files	Adjuntar archivos
+Changed	Cambiado
+Chats	Chats
+Connect an agent	Conecta un agente
+Did not run	No se ejecutó
+Explain this patch	Explica este patch
+Failed	Falló
+Make the colours drift slowly	Haz que los colores deriven despacio
+No agent	Sin agente
+No saved chats	No hay chats guardados
+Open in Terminal	Abrir en Terminal
+Set up	Configurar
+Set up an agent first.	Configura un agente primero.
+Setting up…	Configurando…
+Setting up… %d of %d	Configurando… %d de %d
+Sign in	Iniciar sesión
+Undone	Deshecho
+What should we make?	¿Qué hacemos?
+Working…	Trabajando…
+formula	fórmula
+stopped with an error.	terminó con un error.

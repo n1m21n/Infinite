@@ -2627,3 +2627,29 @@ expression	表达式
 modulated	已调制
 now	当前
 %s works in the terminal.	%s 在终端中运行。
+%d more	还有 %d 项
+%s is not set up.	%s 尚未设置。
+Add a Noise and wire it to the output	添加一个 Noise 并连接到输出
+Agent interface	智能体界面
+Ask, or type @ to name a node	提问，或输入 @ 指定节点
+Attach files	附加文件
+Changed	已更改
+Chats	聊天
+Connect an agent	连接智能体
+Did not run	未运行
+Explain this patch	解释这个 patch
+Failed	失败
+Make the colours drift slowly	让颜色缓慢漂移
+No agent	无智能体
+No saved chats	没有已保存的聊天
+Open in Terminal	在终端中打开
+Set up	设置
+Set up an agent first.	请先设置一个智能体。
+Setting up…	正在设置…
+Setting up… %d of %d	正在设置… 第 %d 步，共 %d 步
+Sign in	登录
+Undone	已撤销
+What should we make?	我们做点什么？
+Working…	处理中…
+formula	公式
+stopped with an error.	因错误而停止。
