@@ -735,7 +735,7 @@ namespace Sculpt
                   const float h = (p[0] - a.center[0]) * a.normal[0] + (p[1] - a.center[1]) * a.normal[1] +
                                   (p[2] - a.center[2]) * a.normal[2];
                   for (int k = 0; k < 3; k++)
-                     move[k] = -a.normal[k] * h * (0.56f * st) * f * sign;
+                     move[k] = -a.normal[k] * h * (0.64f * st) * f * sign;
                   break;
                }
                default:
