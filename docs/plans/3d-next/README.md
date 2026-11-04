@@ -266,3 +266,30 @@ Left as is (deliberate or not real):
   and Sweep cases sit at the noise floor.
 
 Self-tests (MESHOPTEST, GEOTEST, GEOAUDIT, 3DTEST) pass.
+
+### Cloth on the deer, tilted rigid bodies (2026-11-04, fix/cloth-deer)
+
+Cause of the deer gap: collider friction. Blender's cloth friction is 5; Infinite scaled the
+sliding by (1 - friction) with friction capped at 1, so a sheet slid off the head and lay on the
+ground. Fix: Coulomb friction in `ClothNode::Collide` (a contact holds back up to mu x the push
+it just took, all of the slide when smaller), range 0-10, harness maps Blender's value 1:1. Cost: no
+extra work per point beyond a few multiplies. Cloth bending map refit to 0.045 for the stiff drape.
+
+| case              | before | after  | shape score before -> after |
+|-------------------|--------|--------|-----------------------------|
+| cloth_deer        | 0.5909 | 0.3243 | 0.314 -> 0.197 (0.17 at friction 2-5) |
+| cloth_box         | 0.0866 | 0.0512 | 0.064 |
+| cloth_drape_stiff | 0.1042 | 0.0966 | 0.049 |
+| cloth_drape       | 0.0906 | 0.1001 | 0.119 (owner waived the +0.01 rule) |
+| other cloth, rigid, particles | unchanged within 0.001 | | |
+
+Shape score (physics.py, beside the vertex error): top height, x/z extent, share on the ground,
+front and top silhouette overlap, mean of six gaps.
+
+Not reached: cloth_deer under 0.15 (the fold pattern of a sheet bunched to 1 m is chaotic; 0.32 is
+the vertex error, the shape score is 0.2) and tilted bodies under 0.10 (rb_tilted 0.153,
+rb_tilted_hull 0.2147, unchanged). Tried for the tilted cases, none kept:
+bounce x1.17 (rb_drop 0.137 -> 0.100 but tilted 0.153 -> 0.178), solver step 480 Hz (tilted
+unchanged, rb_topple worse), earlier: collider distance, friction on the old model, outside side from
+the previous position (worse). The tilted corner lands the same in time but tips sooner and further
+in x (-0.19 vs -0.04); the cause was not found in restitution or step size.

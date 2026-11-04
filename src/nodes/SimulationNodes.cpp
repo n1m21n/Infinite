@@ -1788,7 +1788,7 @@ void ClothNode::Collide()
    if (mColTris.empty())
       return;
    const float gap = std::max(0.0f, colliderDistance);
-   const float slide = std::max(0.0f, 1.0f - std::max(0.0f, std::min(colliderFriction, 1.0f)));
+   const float mu = std::max(0.0f, colliderFriction);
    const size_t pointCount = mPinned.size();
    for (size_t p = 0; p < pointCount; p++)
    {
@@ -1827,15 +1827,24 @@ void ClothNode::Collide()
       float* prev = &mPrev[p * 3];
       for (int k = 0; k < 3; k++)
          pos[k] += n[k] * push;
-      // Velocity is pos - prev: drop its inward part, keep a share of the slide.
-      float v[3] = { pos[0] - prev[0], pos[1] - prev[1], pos[2] - prev[2] };
-      const float vn = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];
+      // Coulomb friction on this step's sliding: prev is where the point
+      // started the step, so pos - prev is the move. The contact holds back
+      // up to mu times the push it just took, all of it when the slide is
+      // smaller than that (static), so a sheet can catch on a surface.
+      float d[3] = { pos[0] - prev[0], pos[1] - prev[1], pos[2] - prev[2] };
+      const float dn = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+      float t[3] = { d[0] - n[0] * dn, d[1] - n[1] * dn, d[2] - n[2] * dn };
+      const float tl = std::sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]);
+      const float hold = tl > 1e-9f ? std::min(1.0f, mu * push / tl) : 0.0f;
       for (int k = 0; k < 3; k++)
       {
-         const float normal = n[k] * std::max(0.0f, vn);
-         const float tangent = (v[k] - n[k] * vn) * slide;
-         prev[k] = pos[k] - normal - tangent;
+         pos[k] -= t[k] * hold;
+         t[k] *= 1.0f - hold;
       }
+      // Velocity is pos - prev: drop its inward part, keep the slide that is left.
+      const float vn = std::max(0.0f, dn);
+      for (int k = 0; k < 3; k++)
+         prev[k] = pos[k] - n[k] * vn - t[k];
    }
 }
 
