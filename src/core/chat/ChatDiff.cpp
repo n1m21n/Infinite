@@ -8,19 +8,7 @@ namespace chat
    {
       std::string Ref(const CatalogNode& n) { return "@" + n.title + "#" + std::to_string(n.index); }
 
-      // Enums by option name, bools as on/off, numbers as saved.
-      std::string Shown(const CatalogParam& p)
-      {
-         if (p.kind == "enum")
-         {
-            const int i = std::atoi(p.value.c_str());
-            if (i >= 0 && i < (int)p.options.size())
-               return p.options[(size_t)i];
-         }
-         if (p.kind == "bool")
-            return p.value == "1" ? "on" : "off";
-         return p.value;
-      }
+      std::string Shown(const CatalogParam& p) { return ShownValue(p); }
 
       // Text a code node holds: more than one line, or too long to read on one.
       bool IsCode(const CatalogParam& p) { return p.kind.empty() && (p.value.find('\n') != std::string::npos || p.value.size() > 60); }

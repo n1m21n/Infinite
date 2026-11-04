@@ -393,3 +393,19 @@ Why: Sign in opened the agent's terminal screen and forced the terminal face; mo
 | Settings | Agent folder and Edit-files rows beside the agent list. |
 
 Open: `/` commands; Antigravity sign-in waits 60 s for the browser; UI polish against the Claude desktop chat (icons, spacing, side panel) is a separate pass.
+
+## C9/C10 - a complete chat (2026-11-04)
+
+| Piece | What it does |
+|---|---|
+| Welcome, slash, briefing | `ChatGuide`: first-open welcome note, `/help /agents /model /new /clear /undo` style commands answered in the chat, and a briefing prefixed to an agent's first message (patch, `@` mentions, reply links). |
+| Files in replies | `ReplyLinks` gained File blocks (download/reveal) and `web` / `say` verbs; an absolute image path inside a sentence also shows its picture; `[x](set:node.key=v)` works without the `@`. |
+| Names and marks | Agents are called Claude, ChatGPT, Gemini. Each has a vector mark (burst, knot, spark) as its avatar everywhere (replies, picker, Settings). |
+| One picker | The tool row has one pill ("Claude · Sonnet"); its glass menu lists agents (set up / sign in from there) and the agent's models, with a check on the chosen row. |
+| Values | The `get_params` RPC strips the saved type letter (`f strength` becomes `strength`), so controls resolve (label, range, kind) and the completion list shows short values (3 significant digits) in `@node.` lists and Changed lines. |
+| Undo | A reply's Undo chip disappears once pressed. |
+| Chats rail | The history icon opens the saved chats on the left (search, new chat, delete); no popup. |
+| Side terminal | The header terminal icon opens a real shell to the right of the chat (`gChatSideTerminal`); the old Agent interface setting is gone. |
+| Settings | Agents section: three rows (mark, name, status, one button: Set up / Sign in / Try again), a Repair row only when the plumbing is wrong, Agent folder, Edit files in it, Saved chats (N) + Clear all. Reference gained "How the chat works". |
+
+Type scale (chat): Title for the welcome, Body (Medium/Semibold) for messages and names, Caption for meta (ages, status, section labels). Menus share `BeginMenuStyle`, `MenuLabel`, `MenuRow`; 28 px rows, `tok::space_2` padding.

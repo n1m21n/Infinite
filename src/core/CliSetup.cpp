@@ -91,7 +91,7 @@ namespace CliSetup
    const std::vector<Agent>& Agents()
    {
       static const std::vector<Agent> kAgents = {
-         { "claude", "Claude Code", "claude",
+         { "claude", "Claude", "claude",
            "curl -fsSL https://claude.ai/install.sh | bash",
            "irm https://claude.ai/install.ps1 | iex",
            "claude",
@@ -100,8 +100,8 @@ namespace CliSetup
            "claude mcp remove infinite --scope user",
            ".claude.json",
            ".claude/skills",
-           "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },
-         { "codex", "Codex", "codex",
+           "Claude asks you to log in the first time it starts. Infinite never sees or stores the login." },
+         { "codex", "ChatGPT", "codex",
            "npm install -g @openai/codex",
            "npm install -g @openai/codex",
            "codex",
@@ -110,9 +110,9 @@ namespace CliSetup
            "codex mcp remove infinite",
            ".codex/config.toml",
            ".codex/skills",
-           "Codex asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
+           "ChatGPT asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
          // Antigravity has no `mcp add` command: the helper edits its JSON config (mcp_json.js, written next to the setup script).
-         { "antigravity", "Antigravity", "agy",
+         { "antigravity", "Gemini", "agy",
            "curl -fsSL https://antigravity.google/cli/install.sh | bash",
            "irm https://antigravity.google/cli/install.ps1 | iex",
            "agy",
@@ -121,7 +121,7 @@ namespace CliSetup
            "node {TOOL} remove ~/.gemini/config/mcp_config.json infinite",
            ".gemini/config/mcp_config.json",
            ".gemini/skills",
-           "Antigravity asks you to sign in with Google the first time it starts. Infinite never sees or stores the login." },
+           "Gemini asks you to sign in with Google the first time it starts. Infinite never sees or stores the login." },
       };
       return kAgents;
    }
@@ -769,8 +769,13 @@ if ($Failed -gt 0) { exit 1 }
          for (std::string d; std::getline(ss, d, ':');)
             onPath = onPath || d == in.binDir;
          bool inRc = false;
-         for (const char* rc : { "/.zshrc", "/.bash_profile", "/.bashrc", "/.profile" })
-            inRc = inRc || ReadAll(in.home + rc).find("# >>> infinite cli >>>") != std::string::npos;
+         // A Finder-launched app has a bare PATH, so the shell's own profile is the truth: our marker, or the
+         // user's own line that already puts ~/.local/bin on PATH (setup then had nothing to add).
+         for (const char* rc : { "/.zshrc", "/.zprofile", "/.zshenv", "/.bash_profile", "/.bashrc", "/.profile" })
+         {
+            const std::string text = ReadAll(in.home + rc);
+            inRc = inRc || text.find("# >>> infinite cli >>>") != std::string::npos || text.find(".local/bin") != std::string::npos;
+         }
          if (onPath || inRc)
             set(0, Health::kOk);
          else
@@ -860,6 +865,12 @@ if ($Failed -gt 0) { exit 1 }
       r.installed = AgentInstalled(os, agent, in.home, in.pathEnv);
       const HealthReport h = CheckHealth(in);
       r.connected = r.installed && h.step[0] == Health::kOk && h.step[2] == Health::kOk && h.step[4] == Health::kOk;
+      if (!r.installed)
+         r.why = std::string(agent.name) + " is not installed.";
+      else
+         for (int i : { 0, 2, 4 })
+            if (r.why.empty() && h.step[i] != Health::kOk)
+               r.why = !h.why[i].empty() ? h.why[i] : std::string("a setup step did not finish");
       // Each agent keeps its login in its own file; an API key in the environment works as well.
       const std::string id = agent.id;
       auto env = [](const char* name) { const char* v = getenv(name); return v != nullptr && v[0] != '\0'; };

@@ -20,6 +20,9 @@ namespace chat
       bool expression = false;
    };
 
+   // A value as a person reads it: enums by option name, bools as on/off, numbers to 3 significant digits.
+   std::string ShownValue(const CatalogParam& p);
+
    struct CatalogNode
    {
       int index = -1;

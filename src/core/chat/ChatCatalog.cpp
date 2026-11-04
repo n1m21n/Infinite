@@ -1,6 +1,8 @@
 #include "ChatCatalog.h"
 
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 
 namespace chat
 {
@@ -43,5 +45,29 @@ namespace chat
       for (const CatalogNode& other : nodes)
          same += other.title == n->title;  // `infinite` tries titles before types
       return same == 1 ? n->title : std::to_string(index);
+   }
+
+   std::string ShownValue(const CatalogParam& p)
+   {
+      if (p.kind == "enum")
+      {
+         const int i = std::atoi(p.value.c_str());
+         if (i >= 0 && i < (int)p.options.size())
+            return p.options[(size_t)i];
+      }
+      if (p.kind == "bool")
+         return p.value == "1" ? "on" : "off";
+      if (p.kind == "float" || p.kind == "int")
+      {
+         char* end = nullptr;
+         const double v = std::strtod(p.value.c_str(), &end);
+         if (end != p.value.c_str() && *end == '\0')
+         {
+            char buf[32];
+            std::snprintf(buf, sizeof buf, "%.3g", v);
+            return buf;
+         }
+      }
+      return p.value;
    }
 }

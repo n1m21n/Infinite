@@ -171,7 +171,9 @@ namespace app
          for (const auto& kv : raw)
          {
             json entry = { { "value", kv.second } };
-            const int param = ParamIndexOfKeyOnNode(*gn, kv.first);
+            // Saved keys carry the member's type letter ("f strength"); the controls and the chat know the bare name.
+            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;
+            const int param = ParamIndexOfKeyOnNode(*gn, bare);
             if (param >= 0)
                if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, param))
                {
@@ -186,7 +188,7 @@ namespace app
                   entry["modulated"] = Modulation::Instance().IsModulated(gn->index, param);
                   entry["expression"] = Modulation::Instance().HasExpression(gn->index, param);
                }
-            out[kv.first] = entry;
+            out[bare] = entry;
          }
          outResult = { { "index", gn->index }, { "type", gn->typeName }, { "title", NodeTitle(*gn) }, { "params", out } };
          return true;

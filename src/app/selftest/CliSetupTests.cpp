@@ -93,7 +93,7 @@ namespace app
       {
          const char* st[5] = { "ok", "ok", "ok", "ok", "waiting" };
          View v = describe(StatusJson(1, false, now - 30, st), false);
-         check(v.summary.find("after installing Claude Code") != std::string::npos, "waiting agent: summary names the next step");
+         check(v.summary.find("after installing Claude") != std::string::npos, "waiting agent: summary names the next step");
       }
 
       // 8. the buttons hand the exact line to the runner and write the script first.

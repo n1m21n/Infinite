@@ -5788,9 +5788,21 @@ void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
 // The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
 extern int gTerminalFace;
+extern bool gChatSideTerminal;   // the chat shows with a shell beside it
 void DrawChatPanel();
 bool ChatBusy();   // an agent turn is running
 int ChatSavedCount();
+struct ChatAgentInfo
+{
+   std::string status;   // Ready, Not installed, Setting up…
+   std::string action;   // the button's label, empty when nothing can be pressed
+   bool ready = false;
+   bool busy = false;
+};
+void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
+ChatAgentInfo ChatAgentStatus(const std::string& id);
+std::vector<std::pair<std::string, std::string>> ChatAgentModels(const std::string& id);   // {id, label}
+void ChatAgentAct(const std::string& id, bool repair);      // sign in, or set up again when repair (or not yet installed)
 void ChatClearHistory();   // deletes every saved chat and starts a new one; nothing while a turn runs
 void ChatDrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& agent);   // the agent's tinted initial
 void ChatShutdown();

@@ -737,6 +737,7 @@ namespace chat
 
       // The slot: parse everything before the word being typed. A line that ends in a space has none.
       const bool typing = !line.empty() && !std::isspace((unsigned char)line.back()) && !toks.empty();
+      out.partialBegin = line.size();  // nothing being typed: a pick is added at the end, never over the text
       {
          Parse probe;
          Parser(toks, typing ? toks.size() - 1 : toks.size(), catalog, probe).Run();

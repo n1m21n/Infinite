@@ -762,7 +762,7 @@ namespace
       {
          ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
          if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
-            gTerminalFace = 0;
+            gTerminalFace = 0, gChatSideTerminal = false;
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Chat"));
       }
@@ -905,21 +905,46 @@ namespace
          tab->session->SetColors(palette, tok::U32(tok::terminal_fg, sLight), tok::U32(tok::terminal_bg, sLight));
    }
 
+   void DrawTerminalBody();
+
    void DrawPanel()
    {
       FollowTheme();
       if (gTerminalFace == 0 && CliSetup::Prefs().face == "chat")
       {
+         if (!gChatSideTerminal)
+         {
+            DrawChatPanel();
+            return;
+         }
+         // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const float gap = tok::space_1;
+         const float left = std::floor((avail.x - gap) * 0.55f);
+         ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatPanel();
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+            gTerminalFocus = false;
+         ImGui::EndChild();
+         ImGui::SameLine(0.0f, gap);
+         ImGui::BeginChild("##shellside", ImVec2(0.0f, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         DrawTerminalBody();
+         ImGui::EndChild();
          return;
       }
-      if (sTabs.empty() && DrawTerminalWelcome())
+      DrawTerminalBody();
+   }
+
+   void DrawTerminalBody()
+   {
+      if (sTabs.empty() && !gChatSideTerminal && DrawTerminalWelcome())
          return;
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));
          sActive = 0;
-         StartAgentOnOpen(*sTabs[0]);
+         if (!gChatSideTerminal)
+            StartAgentOnOpen(*sTabs[0]);
       }
       if (sFont == nullptr)
       {

@@ -24,6 +24,7 @@
 #include "core/chat/AgentRun.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
+#include "core/chat/ChatGuide.h"
 #include "core/chat/ChatThread.h"
 #include "core/chat/PatchGrammar.h"
 #include "core/chat/ReplyLinks.h"
@@ -50,6 +51,7 @@
 namespace app
 {
    int gTerminalFace = 0;
+   bool gChatSideTerminal = false;
 
    namespace
    {
@@ -114,6 +116,7 @@ namespace app
       uint64_t sCatGen = 0;
       double sCatTime = -1.0;
       std::vector<Run> sRuns;
+      bool sRail = false;  // the chats list is open on the left
       chat::Snapshot sBefore;
       std::map<std::string, AgentState> sAgents;
       double sAgentsAt = -100.0;
@@ -278,6 +281,11 @@ namespace app
 
       // ---------------------------------------------------------------- agents
 
+      void SaveCliConfig()
+      {
+         CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, CliSetup::Prefs());
+      }
+
       bool KindOf(const std::string& id, chat::AgentKind& kind)
       {
          if (id == "claude")
@@ -306,15 +314,59 @@ namespace app
          return CategoryU32(it != kFamily.end() ? it->second : "Utility");
       }
 
-      void DrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& id)
+      // Each agent's mark, drawn as vectors in the brand's own colour on a quiet disc: Claude's burst,
+      // Gemini's four-point spark, ChatGPT's knot. Not pixel copies; the shapes people look for.
+      void DrawAvatar(ImDrawList* dl, ImVec2 c, float r, const std::string& id)
       {
-         const ImU32 tint = AgentTint(id);
-         dl->AddCircleFilled(centre, radius, WithAlpha(tint, 0.22f));
-         dl->AddCircle(centre, radius, WithAlpha(tint, 0.70f), 0, 1.0f);
-         const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
-         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
-         const ImVec2 ts = ImGui::CalcTextSize(name);
-         dl->AddText(ImVec2(std::floor(centre.x - ts.x * 0.5f), std::floor(centre.y - ts.y * 0.5f)), tint, name);
+         const float k = r / 11.0f;
+         dl->AddCircleFilled(c, r, TextTint(0.07f));
+         dl->AddCircle(c, r, TextTint(0.14f), 0, 1.0f);
+         if (id == "claude")
+         {
+            const ImU32 col = IM_COL32(217, 119, 87, 255);
+            for (int i = 0; i < 12; i++)
+            {
+               const float a = (float)i * 6.2831853f / 12.0f;
+               const float inner = (i % 2 == 0 ? 2.0f : 3.2f) * k, outer = (i % 2 == 0 ? 8.2f : 6.4f) * k;
+               dl->AddLine(ImVec2(c.x + std::cos(a) * inner, c.y + std::sin(a) * inner), ImVec2(c.x + std::cos(a) * outer, c.y + std::sin(a) * outer), col,
+                           std::max(1.0f, 1.6f * k));
+            }
+         }
+         else if (id == "antigravity")
+         {
+            const ImU32 col = IM_COL32(66, 133, 244, 255);
+            const float R = 8.6f * k, w = 1.5f * k;
+            dl->PathLineTo(ImVec2(c.x, c.y - R));
+            dl->PathBezierCubicCurveTo(ImVec2(c.x + w, c.y - w), ImVec2(c.x + w, c.y - w), ImVec2(c.x + R, c.y));
+            dl->PathBezierCubicCurveTo(ImVec2(c.x + w, c.y + w), ImVec2(c.x + w, c.y + w), ImVec2(c.x, c.y + R));
+            dl->PathBezierCubicCurveTo(ImVec2(c.x - w, c.y + w), ImVec2(c.x - w, c.y + w), ImVec2(c.x - R, c.y));
+            dl->PathBezierCubicCurveTo(ImVec2(c.x - w, c.y - w), ImVec2(c.x - w, c.y - w), ImVec2(c.x, c.y - R));
+            dl->PathFillConvex(col);
+         }
+         else if (id == "codex")
+         {
+            const ImU32 col = IM_COL32(16, 163, 127, 255);
+            for (int i = 0; i < 3; i++)
+            {
+               const float a = (float)i * 6.2831853f / 6.0f;
+               ImVec2 pts[4];
+               for (int j = 0; j < 4; j++)
+               {
+                  const float t = a + (j < 2 ? 0.0f : 3.14159265f) + (j % 2 == 0 ? -0.26f : 0.26f) * (j < 2 ? 1.0f : -1.0f);
+                  pts[j] = ImVec2(c.x + std::cos(t) * 8.0f * k, c.y + std::sin(t) * 8.0f * k);
+               }
+               dl->AddLine(pts[0], pts[1], col, std::max(1.0f, 1.5f * k));
+               dl->AddLine(pts[2], pts[3], col, std::max(1.0f, 1.5f * k));
+            }
+            dl->AddNgon(c, 8.0f * k, col, 6, std::max(1.0f, 1.5f * k));
+         }
+         else
+         {
+            const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
+            UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
+            const ImVec2 ts = ImGui::CalcTextSize(name);
+            dl->AddText(ImVec2(std::floor(c.x - ts.x * 0.5f), std::floor(c.y - ts.y * 0.5f)), AgentTint(id), name);
+         }
       }
 
       bool Ready(const std::string& id)
@@ -613,7 +665,7 @@ namespace app
                to.model = m->second;
             to.folderAccess = prefs.folderAccess;
          }
-         o.argv = chat::AgentArgs(r.kind, prompt, s.id, s.live, dirs, to);
+         o.argv = chat::AgentArgs(r.kind, s.live ? prompt : chat::Briefing() + prompt, s.id, s.live, dirs, to);
          TerminalCommandEnv(o.env, o.cwd);
          if (!CliSetup::Prefs().workspace.empty() && std::filesystem::is_directory(CliSetup::Prefs().workspace))
             o.cwd = CliSetup::Prefs().workspace;
@@ -621,6 +673,95 @@ namespace app
          r.steps = (int)sThread.entries.size();
          Push(Make(Entry::Kind::Steps, "", agent));
          sRuns.push_back(std::move(r));
+      }
+
+      // `/command`: most answer here with no agent; /explain, /check and /docs go to one with where to look.
+      // True when it was handled completely.
+      bool HandleSlash(const std::string& line, const std::string& name, const std::string& arg, std::string& agentPrompt)
+      {
+         const auto say = [&](const std::string& text)
+         {
+            if (sThread.title.empty())
+               sThread.title = chat::TitleFor(line);
+            Push(Make(Entry::Kind::User, line));
+            if (!text.empty())
+               Push(Make(Entry::Kind::Note, text));
+            sInput.clear();
+            SaveNow();
+         };
+         bool known = false;
+         for (const chat::SlashCommand& c : chat::SlashCommands())
+            known = known || name == c.name;
+         if (!known)
+         {
+            say("");
+            Push(Make(Entry::Kind::Error, std::string(T("Not a command: /")) + name + ". " + T("Type /help to see them.")));
+            return true;
+         }
+         if (name == "new")
+         {
+            sInput.clear();
+            SaveNow();
+            NewChat();
+            return true;
+         }
+         if (name == "agent")
+         {
+            std::string id = chat::Lower(arg);
+            for (const CliSetup::Agent& a : CliSetup::Agents())
+               if (chat::Lower(a.name) == id)
+                  id = a.id;
+            if (!Ready(id))
+            {
+               say("");
+               Push(Make(Entry::Kind::Error, arg.empty() ? std::string(T("Which agent? claude, codex or antigravity.")) : std::string(T("Not ready: ")) + arg));
+               return true;
+            }
+            CliSetup::Prefs().agent = id;
+            SaveCliConfig();
+            say(std::string(T("Now talking to ")) + AgentName(id) + ".");
+            return true;
+         }
+         if (name == "model")
+         {
+            const std::string cur = DefaultAgent();
+            chat::AgentKind kind;
+            if (cur.empty() || !KindOf(cur, kind))
+            {
+               say("");
+               Push(Make(Entry::Kind::Error, T("Set up an agent first.")));
+               return true;
+            }
+            std::string id = arg;
+            if (arg.empty() || chat::Lower(arg) == "default")
+               CliSetup::Prefs().models.erase(cur);
+            else
+            {
+               for (const chat::Model& m : chat::FixedModels(kind))
+                  if (chat::Lower(m.label) == chat::Lower(arg) || m.id == chat::Lower(arg))
+                     id = m.id;
+               CliSetup::Prefs().models[cur] = id;
+            }
+            SaveCliConfig();
+            say(std::string(AgentName(cur)) + T(" will use ") + (arg.empty() ? std::string(T("its default model")) : id) + ".");
+            return true;
+         }
+         if (name == "undo")
+            return false;  // runs as the direct command `undo`
+         const std::string answer = chat::SlashAnswer(name, arg);
+         if (!answer.empty())
+         {
+            say(answer);
+            return true;
+         }
+         agentPrompt = chat::SlashPrompt(name, arg);
+         if (agentPrompt.empty())
+         {
+            say("");
+            Push(Make(Entry::Kind::Error, std::string(T("Add a question: /")) + name + " …"));
+            return true;
+         }
+         return false;
       }
 
       void Send()
@@ -631,6 +772,17 @@ namespace app
          if ((line.empty() && sAttach.empty()) || !sRuns.empty())
             return;
          RefreshCatalog(true);
+         std::string slashPrompt;
+         {
+            std::string sn, sa;
+            if (sAttach.empty() && chat::ParseSlash(line, sn, sa))
+            {
+               if (HandleSlash(line, sn, sa, slashPrompt))
+                  return;
+               if (slashPrompt.empty() && sn == "undo")
+                  line = "undo";
+            }
+         }
          const chat::Parse p = chat::ParseLine(line, sCat);
          Entry user = Make(Entry::Kind::User, line);
          user.files = sAttach;
@@ -666,7 +818,7 @@ namespace app
             }
             agents.push_back(id);
          }
-         std::string prompt = PromptFor(line, p);
+         std::string prompt = slashPrompt.empty() ? PromptFor(line, p) : slashPrompt;
          if (prompt.empty())
             prompt = "Look at the attached files.";  // to the agent, not the user
          prompt = chat::WithFiles(prompt, files);
@@ -791,18 +943,7 @@ namespace app
          return at > 0 && !std::isalnum((unsigned char)t[at - 1]) ? 1 : 2;
       }
 
-      std::string ValueText(const chat::CatalogParam& p)
-      {
-         if (p.kind == "enum")
-         {
-            const int i = std::atoi(p.value.c_str());
-            if (i >= 0 && i < (int)p.options.size())
-               return p.options[(size_t)i];
-         }
-         if (p.kind == "bool")
-            return p.value == "1" ? "on" : "off";
-         return p.value;
-      }
+      std::string ValueText(const chat::CatalogParam& p) { return chat::ShownValue(p); }
 
       std::string Num(float v, bool integer)
       {
@@ -896,16 +1037,41 @@ namespace app
             out.push_back(r.second);
       }
 
+      // What each word does, said plainly beside it in the list.
+      const char* WordHint(const std::string& w)
+      {
+         static const std::map<std::string, const char*> kHint = {
+            { "add", "put a new node on the canvas" },     { "connect", "wire one node into another" },
+            { "remove", "delete a node" },                 { "bypass", "skip a node, keep its place" },
+            { "unbypass", "turn a skipped node back on" }, { "undo", "take back the last change" },
+            { "redo", "bring it back" },                   { "to", "into this node" },
+            { "modulate", "let a source move a control" }, { "set", "give a control a value" },
+            { "on", "" },                                  { "off", "" } };
+         const auto it = kHint.find(chat::Lower(w));
+         return it != kHint.end() ? it->second : "";
+      }
+
       void AddWords(std::vector<Cand>& out, const std::vector<std::string>& words, const std::string& want)
       {
          for (const std::string& w : words)
             if (Score(w, want) >= 0 && chat::Lower(w) != want)
-               out.push_back({ w + " ", w, "", "", 0, false });
+               out.push_back({ w + " ", w, WordHint(w), "", 0, false });
       }
+
+      // `/name` being typed as the whole first word: the completion replaces from the start.
+      bool SlashTyping() { return !sInput.empty() && sInput[0] == '/' && sInput.find_first_of(" \t\n") == std::string::npos; }
+
+      size_t ReplaceFrom() { return SlashTyping() ? 0 : sParse.partialBegin; }
 
       std::vector<Cand> Candidates(const chat::Parse& p)
       {
          std::vector<Cand> out;
+         if (SlashTyping())
+         {
+            for (const chat::SlashCommand* c : chat::MatchSlash(sInput.substr(1)))
+               out.push_back({ "/" + std::string(c->name) + " ", "/" + std::string(c->name), c->summary, "", 0, false });
+            return out;
+         }
          std::string want = chat::Lower(p.partial);
          const bool at = !want.empty() && want[0] == '@';
          if (at)
@@ -1017,7 +1183,7 @@ namespace app
       {
          if (const Cand* c = Picked())
          {
-            sInput = sInput.substr(0, std::min(sParse.partialBegin, sInput.size())) + c->insert;
+            sInput = sInput.substr(0, std::min(ReplaceFrom(), sInput.size())) + c->insert;
             sRefocus = true;
             sCursorToEnd = true;
          }
@@ -1045,7 +1211,7 @@ namespace app
          {
             if (const Cand* c = Picked())
             {
-               const int begin = (int)std::min(sParse.partialBegin, (size_t)data->BufTextLen);
+               const int begin = (int)std::min(ReplaceFrom(), (size_t)data->BufTextLen);
                data->DeleteChars(begin, data->BufTextLen - begin);
                data->InsertChars(begin, c->insert.c_str());
                data->CursorPos = data->SelectionStart = data->SelectionEnd = data->BufTextLen;
@@ -1079,6 +1245,10 @@ namespace app
             return IconsInfinite::History;
          if (s.verb == "go")
             return IconsInfinite::Zoom;
+         if (s.verb == "web")
+            return IconsInfinite::Browser;
+         if (s.verb == "say")
+            return IconsInfinite::Edit;
          static const std::map<std::string, const char*> kPanels = {
             { "viewport", IconsInfinite::Viewport }, { "modmatrix", IconsInfinite::ModMatrix }, { "perf", IconsInfinite::Perform },
             { "timeline", IconsInfinite::Arrange }, { "session", IconsInfinite::Session }, { "samplestudio", IconsInfinite::Waveform },
@@ -1120,6 +1290,18 @@ namespace app
             Focus(s.node);
             ok = true;
          }
+         else if (s.verb == "web")
+         {
+            Platform::OpenExternalUrl(s.arg);
+            ok = true;
+         }
+         else if (s.verb == "say")
+         {
+            sInput = s.arg;
+            sRefocus = true;
+            sCursorToEnd = true;
+            ok = true;
+         }
          else if (s.verb == "open")
             ok = HandleRpcCommand("panel", { { "name", s.arg }, { "open", true } }, r, err) && err.empty();
          RefreshCatalog(true);
@@ -1134,9 +1316,9 @@ namespace app
       {
          const ImVec2 ts = ImGui::CalcTextSize(s.text.c_str());
          const ImVec2 sz(ActionWidth(s), lineH);
-         const bool once = s.verb != "go" && s.verb != "open";
+         const bool once = s.verb != "go" && s.verb != "open" && s.verb != "web" && s.verb != "say";
          const bool done = once && sActed.count(id) != 0;
-         const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || sCat.Node(s.node) != nullptr;
+         const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || s.verb == "web" || s.verb == "say" || sCat.Node(s.node) != nullptr;
          ImGui::SetCursorScreenPos(at);
          ImGui::PushID(id.c_str());
          const bool clicked = ImGui::InvisibleButton("##act", sz) && !done && live;
@@ -1212,10 +1394,13 @@ namespace app
          {
             if (s.kind == chat::Seg::Kind::Action)
             {
+               const std::string aid = sThread.id + "/" + std::to_string(idBase) + "/" + std::to_string(chip++) + s.verb + s.arg;
+               if (s.verb == "undo" && sActed.count(aid) != 0)
+                  continue;  // an undo that happened leaves nothing to press
                const float w = ActionWidth(s);
                if (x > 0.0f && x + w > width)
                   x = 0.0f, y += lineH;
-               DrawAction(dl, ImVec2(origin.x + x, origin.y + y + 1.0f), s, lineH - 2.0f, sThread.id + "/" + std::to_string(idBase) + "/" + std::to_string(chip++) + s.verb + s.arg);
+               DrawAction(dl, ImVec2(origin.x + x, origin.y + y + 1.0f), s, lineH - 2.0f, aid);
                x += w + tok::space_1;
                continue;
             }
@@ -1335,6 +1520,61 @@ namespace app
          }
       }
 
+      std::string ExpandHome(const std::string& raw)
+      {
+         if (!raw.empty() && raw[0] == '~')
+            if (const char* home = std::getenv("HOME"))
+               return std::string(home) + raw.substr(1);
+         return raw;
+      }
+
+      // A small "Show in folder" under a file the agent made, so it can be kept.
+      void DrawReveal(const std::string& rawPath)
+      {
+         const std::string path = ExpandHome(rawPath);
+         if (!std::filesystem::exists(path))
+            return;
+         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+         const char* label = T("Show in folder");
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         const ImVec2 sz = ImGui::CalcTextSize(label);
+         ImGui::PushID(rawPath.c_str());
+         const bool clicked = ImGui::InvisibleButton("##reveal", ImVec2(sz.x, sz.y + 2.0f));
+         ImGui::PopID();
+         const bool hot = ImGui::IsItemHovered();
+         ImGui::GetWindowDrawList()->AddText(at, hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), label);
+         if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (clicked)
+            Platform::RevealInFileManager(path);
+      }
+
+      // Any other file an agent made: its name, and where it is.
+      void DrawFile(const std::string& rawPath, float width)
+      {
+         const std::string path = ExpandHome(rawPath);
+         const bool exists = std::filesystem::exists(path);
+         const float rowH = 30.0f;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ImGui::PushID(rawPath.c_str());
+         const bool clicked = ImGui::InvisibleButton("##file", ImVec2(width, rowH)) && exists;
+         ImGui::PopID();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
+         glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_sm, Dim(), IconsInfinite::Library);
+         const std::string name = std::filesystem::path(path).filename().string();
+         const std::string shown = exists ? name : name + "  " + T("(missing)");
+         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), shown.c_str());
+         if (exists)
+         {
+            const char* hint = T("Show in folder");
+            const float w = ImGui::CalcTextSize(hint).x;
+            dl->AddText(ImVec2(at.x + width - w - tok::space_2, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), hint);
+         }
+         if (clicked)
+            Platform::RevealInFileManager(path);
+      }
+
       void DrawImage(const std::string& path, float width)
       {
          Texture* t = TextureFor(path);
@@ -1370,10 +1610,16 @@ namespace app
                }
                case chat::Block::Kind::Audio:
                   DrawAudio(b.text, width);
+                  DrawReveal(b.text);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
                case chat::Block::Kind::Image:
                   DrawImage(b.text, width);
+                  DrawReveal(b.text);
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  break;
+               case chat::Block::Kind::File:
+                  DrawFile(b.text, width);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
                default:
@@ -1647,11 +1893,6 @@ namespace app
          dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(0.10f), tok::radius_tile + 4.0f, 0, 1.0f);
       }
 
-      void SaveCliConfig()
-      {
-         CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, CliSetup::Prefs());
-      }
-
       // First run, one card: pick an agent, press Connect. Install, MCP, skills and the browser sign-in
       // follow by themselves; the card says only where it is.
       bool DrawSetup(float width)
@@ -1670,8 +1911,8 @@ namespace app
             const auto it = sAgents.find(a.id);
             if (it != sAgents.end() && (it->second.login != nullptr && !it->second.loginUrl.empty()))
                extra += 26.0f;
-            if (it != sAgents.end() && !it->second.loginError.empty())
-               extra += 18.0f;
+            if (it != sAgents.end() && (!it->second.loginError.empty() || it->second.failed))
+               extra += 34.0f;
          }
          const float height = pad * 2.0f + titleH + rows * (rowH + tok::space_1) + extra;
          const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -1742,12 +1983,15 @@ namespace app
                      SetUpInBackground(a);
                   }
                }
-               const std::string msg = s.failed ? std::string(T("Setup failed")) : s.loginError;
+               std::string msg = s.failed ? std::string(T("Setup did not finish.")) + (s.ready.why.empty() ? std::string() : " " + s.ready.why) : s.loginError;
                if (!msg.empty())
                {
                   UiType::Scope cap(UiType::Size::Caption);
-                  dl->AddText(ImVec2(at.x + pad + 30.0f, y + rowH - 2.0f), Red(), msg.c_str());
-                  used = 18.0f;
+                  const float tw = rx - (at.x + pad + 30.0f);
+                  const ImVec2 sz = ImGui::CalcTextSize(msg.c_str(), nullptr, false, tw);
+                  dl->AddText(nullptr, 0.0f, ImVec2(at.x + pad + 30.0f, y + rowH - 4.0f), Red(), msg.c_str(), nullptr, tw);
+                  used = 34.0f;
+                  (void)sz;
                }
             }
             y += rowH + tok::space_1 + used;
@@ -1810,7 +2054,7 @@ namespace app
             {
                prefs.introduced = true;
                SaveCliConfig();
-               Push(Make(Entry::Kind::Note, T("Try: add a Noise and wire it to the output. Type @ to point at a node, @claude or @codex to pick an agent.")));
+               Push(Make(Entry::Kind::Note, chat::Welcome()));
                SaveNow();
             }
          }
@@ -1898,6 +2142,11 @@ namespace app
                case Entry::Kind::Note:
                case Entry::Kind::Error:
                {
+                  if (e.kind == Entry::Kind::Note && e.text.find("](") != std::string::npos)
+                  {
+                     DrawBlocks(BlocksFor(e.text), width, i);  // guide answers carry buttons
+                     break;
+                  }
                   ImGui::PushStyleColor(ImGuiCol_Text, e.kind == Entry::Kind::Error ? ImGui::ColorConvertU32ToFloat4(Red()) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
                   ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
                   ImGui::TextUnformatted(e.text.c_str());
@@ -2107,23 +2356,130 @@ namespace app
          gTerminalDropPending.clear();
       }
 
-      // The agent a message with no mention goes to; the menu sets it up or switches it.
-      void DrawAgentPicker(ImVec2 at, float h)
+      // ---- menus: one look for every popup in the chat (glass well, 28 px rows, a check on the chosen one)
+
+      void BeginMenuStyle()
       {
-         const std::string cur = DefaultAgent();
-         const char* name = cur.empty() ? T("No agent") : AgentName(cur);
-         const float w = ImGui::CalcTextSize(name).x + 2.0f * tok::space_2;
-         ImGui::SetCursorScreenPos(ImVec2(at.x - w, at.y));
-         const bool clicked = ImGui::InvisibleButton("##chatagent", ImVec2(w, h));
-         const bool hot = ImGui::IsItemHovered();
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_group);
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+      }
+
+      void EndMenuStyle() { ImGui::PopStyleVar(4); }
+
+      void MenuLabel(const char* text, float w)
+      {
+         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight() + tok::space_2));
+         ImGui::GetWindowDrawList()->AddText(ImVec2(p.x + tok::space_2, p.y + tok::space_1), Dim(), text);
+      }
+
+      // One row: [avatar] label ........ sub  [check]. True when pressed (and enabled).
+      bool MenuRow(const char* id, float w, const char* label, const char* sub, bool chosen, bool enabled, const std::string& avatar)
+      {
+         const float h = 28.0f;
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, h)) && enabled;
+         const bool hot = ImGui::IsItemHovered() && enabled;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          if (hot)
-            dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), TextTint(0.06f), tok::radius_tile);
-         dl->AddText(ImVec2(at.x - w + tok::space_2, at.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), name);
-         if (clicked)
-            ImGui::OpenPopup("##chatagents");
-         if (ImGui::BeginPopup("##chatagents"))
+            dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(0.08f), tok::radius_tile);
+         float x = p.x + tok::space_2;
+         if (!avatar.empty())
          {
+            DrawAvatar(dl, ImVec2(x + 9.0f, p.y + h * 0.5f), 9.0f, avatar);
+            x += 18.0f + tok::space_2;
+         }
+         const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
+         const float right = p.x + w - tok::space_2 - 14.0f;
+         float subW = 0.0f;
+         if (sub != nullptr && sub[0] != '\0')
+         {
+            subW = ImGui::CalcTextSize(sub).x;
+            dl->AddText(ImVec2(right - subW, ty), Dim(), sub);
+         }
+         const float lmax = right - (subW > 0.0f ? subW + tok::space_2 : 0.0f);
+         ImGui::PushStyleColor(ImGuiCol_Text, enabled ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+         ImGui::RenderTextEllipsis(dl, ImVec2(x, ty), ImVec2(lmax, ty + ImGui::GetFontSize()), lmax, label, nullptr, nullptr);
+         ImGui::PopStyleColor();
+         if (chosen)
+         {
+            const ImVec2 c(p.x + w - tok::space_2 - 6.0f, p.y + h * 0.5f);
+            const ImU32 col = ImGui::GetColorU32(AccentEmphasisSelected());
+            dl->AddLine(ImVec2(c.x - 4.0f, c.y), ImVec2(c.x - 1.0f, c.y + 3.0f), col, 1.6f);
+            dl->AddLine(ImVec2(c.x - 1.0f, c.y + 3.0f), ImVec2(c.x + 4.5f, c.y - 3.5f), col, 1.6f);
+         }
+         return pressed;
+      }
+
+      std::vector<chat::Model>& ModelsOf(const std::string& agent)
+      {
+         static std::map<std::string, std::vector<chat::Model>> sModels;
+         static std::map<std::string, std::shared_ptr<chat::AgentRun>> sFetch;
+         chat::AgentKind kind;
+         std::vector<chat::Model>& list = sModels[agent];
+         if (!KindOf(agent, kind))
+            return list;
+         if (list.empty())
+            list = chat::FixedModels(kind);
+         if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[agent] == nullptr)
+         {
+            chat::AgentRun::Options o;
+            o.kind = kind;
+            o.raw = true;
+            o.argv = { "agy", "models" };
+            TerminalCommandEnv(o.env, o.cwd);
+            sFetch[agent] = chat::AgentRun::Start(o);
+         }
+         if (sFetch[agent] != nullptr)
+         {
+            std::vector<chat::AgentEvent> drop;
+            sFetch[agent]->Poll(drop);
+            if (sFetch[agent]->Done())
+            {
+               list = chat::ParseAgyModels(chat::StripAnsi(sFetch[agent]->Log()));
+               sFetch[agent] = nullptr;
+            }
+         }
+         return list;
+      }
+
+      // The one picker in the tool row: who answers and with which model. Its face reads "Claude · Sonnet";
+      // its menu lists the agents (set up or sign in from there) and the chosen agent's models.
+      void DrawPicker(float right, float y, float h)
+      {
+         const std::string cur = DefaultAgent();
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         const std::vector<chat::Model>& list = cur.empty() ? std::vector<chat::Model>() : ModelsOf(cur);
+         const std::string modelId = prefs.models.count(cur) ? prefs.models[cur] : std::string();
+         std::string face = cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur));
+         for (const chat::Model& m : list)
+            if (!cur.empty() && m.id == modelId && !m.label.empty())
+               face += "  ·  " + m.label;
+         const float av = cur.empty() ? 0.0f : 14.0f + tok::space_2;
+         const float w = av + ImGui::CalcTextSize(face.c_str()).x + 2.0f * tok::space_2;
+         ImGui::SetCursorScreenPos(ImVec2(right - w, y));
+         const bool clicked = ImGui::InvisibleButton("##chatpicker", ImVec2(w, h));
+         const bool hot = ImGui::IsItemHovered();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+         if (hot)
+            dl->AddRectFilled(mn, mx, TextTint(0.06f), tok::radius_tile);
+         if (!cur.empty())
+            DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, cur);
+         dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f),
+                     hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), face.c_str());
+         if (clicked)
+            ImGui::OpenPopup("##chatpickermenu");
+         const float menuW = 248.0f;
+         ImGui::SetNextWindowPos(ImVec2(mx.x, mn.y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
+         BeginMenuStyle();
+         if (ImGui::BeginPopup("##chatpickermenu"))
+         {
+            MenuLabel(T("Agent"), menuW);
             for (const CliSetup::Agent& a : CliSetup::Agents())
             {
                auto it = sAgents.find(a.id);
@@ -2133,102 +2489,53 @@ namespace app
                ImGui::PushID(a.id);
                if (s.ready.Ready() && !s.authBroken)
                {
-                  if (ImGui::Selectable(a.name, a.id == cur))
+                  if (MenuRow("##a", menuW, a.name, "", a.id == cur, true, a.id))
                   {
-                     CliSetup::Prefs().agent = a.id;
-                     CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, CliSetup::Prefs());
+                     prefs.agent = a.id;
+                     SaveCliConfig();
+                     ImGui::CloseCurrentPopup();
                   }
                }
                else
                {
                   const char* state = s.setup != nullptr ? T("Setting up…") : s.ready.connected ? T("Sign in") : T("Set up");
-                  const std::string label = std::string(a.name) + "  ·  " + state;
-                  if (ImGui::Selectable(label.c_str(), false, s.setup != nullptr ? ImGuiSelectableFlags_Disabled : 0))
+                  if (MenuRow("##a", menuW, a.name, state, false, s.setup == nullptr, a.id))
                   {
                      if (s.ready.installed && s.ready.connected)
-                     {
                         StartSignIn(a);
-                     }
                      else
                         SetUpInBackground(a);
                   }
                }
                ImGui::PopID();
             }
-            ImGui::EndPopup();
-         }
-      }
-
-      // The model the default agent uses; "Default" lets the agent choose.
-      void DrawModelPicker(ImVec2 at, float h)
-      {
-         const std::string cur = DefaultAgent();
-         chat::AgentKind kind;
-         if (cur.empty() || !KindOf(cur, kind))
-            return;
-         static std::map<std::string, std::vector<chat::Model>> sModels;
-         static std::map<std::string, std::shared_ptr<chat::AgentRun>> sFetch;
-         std::vector<chat::Model>& list = sModels[cur];
-         if (list.empty())
-            list = chat::FixedModels(kind);
-         if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[cur] == nullptr)
-         {
-            chat::AgentRun::Options o;
-            o.kind = kind;
-            o.raw = true;
-            o.argv = { "agy", "models" };
-            TerminalCommandEnv(o.env, o.cwd);
-            sFetch[cur] = chat::AgentRun::Start(o);
-         }
-         if (sFetch[cur] != nullptr)
-         {
-            std::vector<chat::AgentEvent> drop;
-            sFetch[cur]->Poll(drop);
-            if (sFetch[cur]->Done())
+            if (!list.empty())
             {
-               list = chat::ParseAgyModels(chat::StripAnsi(sFetch[cur]->Log()));
-               sFetch[cur] = nullptr;
-               if (list.empty())
-                  list.push_back({ "", T("Default") });
-            }
-         }
-         if (list.empty())
-            return;
-         CliSetup::Config& prefs = CliSetup::Prefs();
-         const std::string id = prefs.models.count(cur) ? prefs.models[cur] : std::string();
-         std::string name = T("Default");
-         for (const chat::Model& m : list)
-            if (m.id == id)
-               name = m.label;
-         const float w = ImGui::CalcTextSize(name.c_str()).x + 2.0f * tok::space_2;
-         ImGui::SetCursorScreenPos(ImVec2(at.x - w, at.y));
-         const bool clicked = ImGui::InvisibleButton("##chatmodel", ImVec2(w, h));
-         const bool hot = ImGui::IsItemHovered();
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         if (hot)
-            dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), TextTint(0.06f), tok::radius_tile);
-         dl->AddText(ImVec2(at.x - w + tok::space_2, at.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), name.c_str());
-         if (clicked)
-            ImGui::OpenPopup("##chatmodels");
-         if (ImGui::BeginPopup("##chatmodels"))
-         {
-            if (ImGui::Selectable(T("Default"), id.empty()))
-            {
-               prefs.models.erase(cur);
-               CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, prefs);
-            }
-            for (const chat::Model& m : list)
-            {
-               if (m.id.empty())
-                  continue;
-               if (ImGui::Selectable(m.label.c_str(), m.id == id))
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+               MenuLabel(T("Model"), menuW);
+               if (MenuRow("##m", menuW, T("Default"), "", modelId.empty(), true, std::string()))
                {
-                  prefs.models[cur] = m.id;
-                  CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, prefs);
+                  prefs.models.erase(cur);
+                  SaveCliConfig();
+                  ImGui::CloseCurrentPopup();
+               }
+               for (const chat::Model& m : list)
+               {
+                  if (m.id.empty())
+                     continue;
+                  ImGui::PushID(m.id.c_str());
+                  if (MenuRow("##m", menuW, m.label.c_str(), "", m.id == modelId, true, std::string()))
+                  {
+                     prefs.models[cur] = m.id;
+                     SaveCliConfig();
+                     ImGui::CloseCurrentPopup();
+                  }
+                  ImGui::PopID();
                }
             }
             ImGui::EndPopup();
          }
+         EndMenuStyle();
       }
 
       void DrawComposer(float width)
@@ -2247,7 +2554,8 @@ namespace app
          if (sInput.empty())
             sDismissed.clear();
 
-         const float pad = tok::space_2;
+         const float pad = tok::space_3;
+         const float gap = 6.0f;  // air between the text and the tool row
          const float fs = ImGui::GetFontSize();
          const float padY = 2.0f;
          const float fieldW = width - 2.0f * pad;
@@ -2258,7 +2566,7 @@ namespace app
          const float chipsH = sAttach.empty() ? 0.0f : 26.0f;
          const float barH = 26.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         const float wellH = pad + chipsH + textH + barH + tok::space_1;
+         const float wellH = pad + chipsH + textH + gap + barH + tok::space_2;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.07f), tok::radius_tile * 2.0f);
          dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.10f), tok::radius_tile * 2.0f);
@@ -2329,7 +2637,7 @@ namespace app
          }
 
          // Tool row: attach on the left, the agent and Send/Stop on the right.
-         const float barY = at.y + pad + chipsH + textH;
+         const float barY = at.y + pad + chipsH + textH + gap;
          ImGui::SetCursorScreenPos(ImVec2(at.x + pad - 4.0f, barY + (barH - 22.0f) * 0.5f));
          if (GlyphToggle::Draw("##chatattach", IconsInfinite::Plus, IconsInfinite::Plus, false))
          {
@@ -2368,12 +2676,7 @@ namespace app
                sRefocus = true;
             }
          }
-         DrawAgentPicker(ImVec2(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f), 22.0f);
-         {
-            const std::string curAgent = DefaultAgent();
-            const char* an = curAgent.empty() ? T("No agent") : AgentName(curAgent);
-            DrawModelPicker(ImVec2(sc.x - sendW * 0.5f - tok::space_1 - ImGui::CalcTextSize(an).x - 2.0f * tok::space_2, barY + (barH - 22.0f) * 0.5f), 22.0f);
-         }
+         DrawPicker(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f, 22.0f);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + wellH));
          ImGui::Dummy(ImVec2(width, 0.0f));
          if (active || sDropHovered)
@@ -2397,13 +2700,81 @@ namespace app
          return buf;
       }
 
+      // The saved chats, on the left like the sidebar in Claude: search, one row per chat, new chat on top.
+      void DrawRail(float w, float h)
+      {
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(at, ImVec2(at.x + w, at.y + h), TextTint(0.035f), tok::radius_field);
+         dl->AddLine(ImVec2(at.x + w - 0.5f, at.y), ImVec2(at.x + w - 0.5f, at.y + h), TextTint(0.08f));
+         const float pad = tok::space_2;
+         const float rowW = w - 2.0f * pad - 1.0f;
+         ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad));
+         if (MenuRow("##railnew", rowW, T("New chat"), "", false, sRuns.empty(), std::string()))
+            NewChat();
+         ImGui::SetCursorScreenPos(ImVec2(at.x + pad, ImGui::GetCursorScreenPos().y + tok::space_1));
+         FormParts::SearchInput("##chatfind", T("Search chats"), sHistoryFilter, sizeof sHistoryFilter, rowW);
+         ImGui::SetCursorScreenPos(ImVec2(at.x + pad, ImGui::GetCursorScreenPos().y + tok::space_2));
+         std::string needle = sHistoryFilter;
+         std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         ImGui::BeginChild("##railList", ImVec2(rowW, std::max(10.0f, at.y + h - ImGui::GetCursorScreenPos().y - pad)), false, ImGuiWindowFlags_NoBackground);
+         std::string removeId;
+         if (sHistory.empty())
+            ImGui::TextDisabled("%s", T("No saved chats"));
+         for (const chat::ThreadInfo& t : sHistory)
+         {
+            if (!needle.empty())
+            {
+               std::string title = t.title;
+               std::transform(title.begin(), title.end(), title.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+               if (title.find(needle) == std::string::npos)
+                  continue;
+            }
+            ImGui::PushID(t.id.c_str());
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const float rw = ImGui::GetContentRegionAvail().x;
+            const float rh = 28.0f;
+            const bool open = ImGui::InvisibleButton("##open", ImVec2(rw - 24.0f, rh));
+            const bool hot = ImGui::IsMouseHoveringRect(p, ImVec2(p.x + rw, p.y + rh));
+            ImDrawList* cd = ImGui::GetWindowDrawList();
+            const bool current = t.id == sThread.id;
+            if (hot || current)
+               cd->AddRectFilled(p, ImVec2(p.x + rw, p.y + rh), TextTint(current ? 0.10f : 0.06f), tok::radius_tile);
+            const float ty = p.y + (rh - ImGui::GetFontSize()) * 0.5f;
+            const std::string age = Age(t.updated);
+            const float aw = ImGui::CalcTextSize(age.c_str()).x;
+            const float tmax = p.x + rw - (hot ? 24.0f : aw + tok::space_2) - tok::space_1;
+            ImGui::RenderTextEllipsis(cd, ImVec2(p.x + tok::space_2, ty), ImVec2(tmax, p.y + rh), tmax, t.title.empty() ? "…" : t.title.c_str(), nullptr, nullptr);
+            if (!hot)
+               cd->AddText(ImVec2(p.x + rw - aw - tok::space_2, ty), Dim(), age.c_str());
+            ImGui::SameLine(0.0f, 0.0f);
+            if (ImGui::InvisibleButton("##delete", ImVec2(24.0f, rh)))
+               removeId = t.id;
+            if (hot)
+               glyph::Draw(cd, ImVec2(p.x + rw - 12.0f, p.y + rh * 0.5f), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", T("Delete"));
+            if (open && sRuns.empty())
+               OpenThread(t.path);
+            ImGui::PopID();
+         }
+         ImGui::EndChild();
+         if (!removeId.empty())
+         {
+            chat::DeleteThread(ChatsDir(), removeId);
+            sHistory.erase(std::remove_if(sHistory.begin(), sHistory.end(), [&](const chat::ThreadInfo& t) { return t.id == removeId; }), sHistory.end());
+            if (removeId == sThread.id)
+               NewChat();
+         }
+      }
+
       void DrawHeader(float width)
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const float rowH = 26.0f;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const char* title = sThread.title.empty() ? T("New chat") : sThread.title.c_str();
-         const float right = at.x + width - 2.0f * 24.0f - tok::space_1;
+         const float right = at.x + width - 3.0f * 24.0f - tok::space_1;
          {
             UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
@@ -2411,13 +2782,17 @@ namespace app
                                       title, nullptr, nullptr);
             ImGui::PopStyleColor();
          }
-         ImGui::SetCursorScreenPos(ImVec2(at.x + width - 2.0f * 24.0f, at.y + (rowH - 22.0f) * 0.5f));
-         if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, false))
+         ImGui::SetCursorScreenPos(ImVec2(at.x + width - 3.0f * 24.0f, at.y + (rowH - 22.0f) * 0.5f));
+         if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
+            gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Terminal"));
+         ImGui::SameLine(0.0f, 2.0f);
+         if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, sRail))
          {
-            if (!sHistoryLoaded)
+            sRail = !sRail;
+            if (sRail)
                sHistory = chat::ListThreads(ChatsDir()), sHistoryLoaded = true;
-            sHistoryFilter[0] = '\0';
-            ImGui::OpenPopup("##chathistorymenu");
          }
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Chats"));
@@ -2427,86 +2802,12 @@ namespace app
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("New chat"));
 
-         ImGui::SetNextWindowSizeConstraints(ImVec2(260.0f, 0.0f), ImVec2(360.0f, 420.0f));
-         if (ImGui::BeginPopup("##chathistorymenu"))
-         {
-            if (sHistory.empty())
-               ImGui::TextDisabled("%s", T("No saved chats"));
-            if (sHistory.size() > 6)
-            {
-               if (ImGui::IsWindowAppearing())
-                  ImGui::SetKeyboardFocusHere();
-               FormParts::SearchInput("##chatfind", T("Search chats"), sHistoryFilter, sizeof sHistoryFilter, std::max(240.0f, ImGui::GetContentRegionAvail().x));
-            }
-            std::string needle = sHistoryFilter;
-            std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-            std::string removeId;
-            const chat::ThreadInfo* first = nullptr;
-            for (const chat::ThreadInfo& t : sHistory)
-            {
-               if (!needle.empty())
-               {
-                  std::string title = t.title;
-                  std::transform(title.begin(), title.end(), title.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-                  if (title.find(needle) == std::string::npos)
-                     continue;
-               }
-               if (first == nullptr)
-                  first = &t;
-               ImGui::PushID(t.id.c_str());
-               const ImVec2 p = ImGui::GetCursorScreenPos();
-               const float w = std::max(240.0f, ImGui::GetContentRegionAvail().x);
-               const float h = 24.0f;
-               const bool open = ImGui::InvisibleButton("##open", ImVec2(w - 22.0f, h));
-               const bool hot = ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + h));
-               ImDrawList* pd = ImGui::GetWindowDrawList();
-               if (hot || t.id == sThread.id)
-                  pd->AddRectFilled(p, ImVec2(p.x + w, p.y + h), TextTint(t.id == sThread.id ? 0.10f : 0.06f), tok::radius_field);
-               const std::string age = Age(t.updated);
-               const float aw = ImGui::CalcTextSize(age.c_str()).x;
-               const float ty = p.y + (h - ImGui::GetFontSize()) * 0.5f;
-               // who answered: one small avatar each, before the age
-               const float dots = (float)std::min<size_t>(t.agents.size(), 3) * 13.0f;
-               for (size_t k = 0; k < t.agents.size() && k < 3; k++)
-                  DrawAvatar(pd, ImVec2(p.x + w - aw - 22.0f - tok::space_2 - dots + 6.0f + 13.0f * (float)k, p.y + h * 0.5f), 5.5f, t.agents[k]);
-               const float tmax = p.x + w - aw - 22.0f - tok::space_2 - dots - (dots > 0.0f ? tok::space_1 : 0.0f);
-               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-               ImGui::RenderTextEllipsis(pd, ImVec2(p.x + tok::space_1, ty), ImVec2(tmax, p.y + h), tmax, t.title.empty() ? "…" : t.title.c_str(), nullptr, nullptr);
-               ImGui::PopStyleColor();
-               pd->AddText(ImVec2(p.x + w - aw - 22.0f - tok::space_1, ty), Dim(), age.c_str());
-               ImGui::SameLine(0.0f, 0.0f);
-               if (ImGui::InvisibleButton("##delete", ImVec2(22.0f, h)))
-                  removeId = t.id;
-               if (hot)
-                  glyph::Draw(pd, ImVec2(p.x + w - 11.0f, p.y + h * 0.5f), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
-               if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("%s", T("Delete"));
-               if (open && sRuns.empty())
-               {
-                  OpenThread(t.path);
-                  ImGui::CloseCurrentPopup();
-               }
-               ImGui::PopID();
-            }
-            // Enter opens the first match.
-            if (first != nullptr && !needle.empty() && ImGui::IsKeyPressed(ImGuiKey_Enter) && sRuns.empty())
-            {
-               OpenThread(first->path);
-               ImGui::CloseCurrentPopup();
-            }
-            if (!removeId.empty())
-            {
-               chat::DeleteThread(ChatsDir(), removeId);
-               sHistory.erase(std::remove_if(sHistory.begin(), sHistory.end(), [&](const chat::ThreadInfo& t) { return t.id == removeId; }), sHistory.end());
-               if (removeId == sThread.id)
-                  NewChat();
-            }
-            ImGui::EndPopup();
-         }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
          dl->AddLine(ImVec2(at.x, at.y + rowH - 0.5f), ImVec2(at.x + width, at.y + rowH - 0.5f), TextTint(0.08f));
       }
    }
+
+   void DrawChatBody();
 
    void DrawChatPanel()
    {
@@ -2529,18 +2830,39 @@ namespace app
       PollSetups();
       PollRuns();
       RefreshCatalog(false);
+      if (sRail && ImGui::GetContentRegionAvail().x > 380.0f)
+      {
+         const ImVec2 all = ImGui::GetContentRegionAvail();
+         const float railW = 220.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + all.x, origin.y + all.y), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
+         ImGui::BeginChild("##chatrail", ImVec2(railW, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
+         DrawRail(railW, all.y);
+         ImGui::EndChild();
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::BeginChild("##chatmain", ImVec2(0.0f, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         DrawChatBody();
+         ImGui::EndChild();
+         return;
+      }
+      DrawChatBody();
+   }
+
+   void DrawChatBody()
+   {
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       ImGui::GetWindowDrawList()->AddRectFilled(mn, ImVec2(mn.x + avail.x, mn.y + avail.y), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
       const float width = avail.x;
       DrawHeader(width);
+      ImGui::Dummy(ImVec2(0.0f, tok::space_2));  // air under the header, as in Claude
       const float composerW = std::min(width - 2.0f * tok::space_3, 760.0f);
       const float fs = ImGui::GetFontSize();
       // The composer's height is known before it draws: the log takes the rest.
-      const float wrapW = std::max(1.0f, composerW - 2.0f * tok::space_2 - ImGui::GetStyle().ScrollbarSize);
+      const float wrapW = std::max(1.0f, composerW - 2.0f * tok::space_3 - ImGui::GetStyle().ScrollbarSize);
       const float textH = fs * (float)std::clamp(VisualLines(wrapW), 1, 6) + 4.0f;
-      const float composerH = tok::space_2 + (sAttach.empty() ? 0.0f : 26.0f) + textH + 26.0f + tok::space_1;
-      DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - tok::space_3));
+      const float composerH = tok::space_3 + (sAttach.empty() ? 0.0f : 26.0f) + textH + 6.0f + 26.0f + tok::space_2;
+      DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, c.y + tok::space_1));
       DrawComposer(composerW);
@@ -2553,6 +2875,64 @@ namespace app
       if (!sHistoryLoaded)
          sHistory = chat::ListThreads(ChatsDir()), sHistoryLoaded = true;
       return (int)sHistory.size();
+   }
+
+   // Settings shows and drives the same agents the chat does, so the two never disagree.
+   void ChatAgentsTick()
+   {
+      const int frame = ImGui::GetFrameCount();
+      CheckAgents(frame - sLastFrame > 1);
+      sLastFrame = frame;
+      PollSetups();
+   }
+
+   ChatAgentInfo ChatAgentStatus(const std::string& id)
+   {
+      ChatAgentInfo info;
+      const auto it = sAgents.find(id);
+      if (it == sAgents.end())
+      {
+         info.status = T("Checking…");
+         info.busy = true;
+         return info;
+      }
+      const AgentState& s = it->second;
+      if (s.setup != nullptr)
+         info.status = T("Setting up…"), info.busy = true;
+      else if (s.login != nullptr || s.signingIn)
+         info.status = T("Waiting for sign-in…"), info.busy = true;
+      else if (s.ready.Ready() && !s.authBroken)
+         info.status = T("Ready"), info.ready = true, info.action = T("Sign in again");
+      else if (s.failed)
+         info.status = T("Setup did not finish"), info.action = T("Try again");
+      else if (!s.ready.installed)
+         info.status = T("Not installed"), info.action = T("Set up");
+      else if (!s.ready.connected)
+         info.status = T("Needs setup"), info.action = T("Set up");
+      else
+         info.status = T("Not signed in"), info.action = T("Sign in");
+      return info;
+   }
+
+   std::vector<std::pair<std::string, std::string>> ChatAgentModels(const std::string& id)
+   {
+      std::vector<std::pair<std::string, std::string>> out;
+      for (const chat::Model& m : ModelsOf(id))
+         if (!m.id.empty())
+            out.push_back({ m.id, m.label });
+      return out;
+   }
+
+   void ChatAgentAct(const std::string& id, bool repair)
+   {
+      const CliSetup::Agent* a = CliSetup::FindAgent(id);
+      if (a == nullptr)
+         return;
+      const AgentState& s = sAgents[id];
+      if (!repair && s.ready.installed && s.ready.connected)
+         StartSignIn(*a);
+      else
+         SetUpInBackground(*a);
    }
 
    void ChatClearHistory()

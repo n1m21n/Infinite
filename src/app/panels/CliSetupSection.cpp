@@ -65,195 +65,114 @@ namespace app
       const Os os = CurrentOs();
       const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
       Config& prefs = Prefs();
-      const Agent* agent = FindAgent(prefs.agent);
-      if (agent == nullptr)
-         agent = &Agents()[0];
-      const std::string exe = RealExecutable();
-
-      // The file is small; read it about once a second, and only while this section is on screen.
-      static double sLastRead = -10.0;
-      static Status sStatus = ParseStatus("", 0);
-      const double now = ImGui::GetTime();
-      if (now - sLastRead > 1.0)
-      {
-         sLastRead = now;
-         const bool wasRunning = sStatus.running;
-         sStatus = ParseStatus(ReadFile(paths.status), (long long)std::time(nullptr));
-         if (wasRunning && !sStatus.running)
-            StartLaunchCheck();   // a setup or repair just finished: look again, quietly
-      }
-      const bool installed = AgentInstalledHere(*agent);
-      const HealthReport health = LatestHealth();
-      const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
+      ChatAgentsTick();
 
       FormParts::Section(T("Agents"));
 
-      static std::string sError;
-      auto perform = [&](Action a, const std::string& step = std::string())
+      // One row per agent, all the same: its mark, its name, where it stands, and the one button that moves it on.
+      for (const Agent& a : Agents())
       {
-         sError.clear();
-         Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, step, &sStatus);
-         sLastRead = -10.0;
-      };
-      using Kind = ActionButton::Kind;
-      const ImVec2 wide(FormParts::ControlW(), 0.0f);   // frame height, the same as the dropdown above it
-      auto button = [&](const char* label, Kind kind) { return ActionButton::Draw(label, wide, kind); };
-
-      bool allGreen = sStatus.present && !sStatus.running;
-      bool anyFailed = false;
-      for (const StepStatus& st : v.steps)
-      {
-         allGreen = allGreen && st.Green();
-         anyFailed = anyFailed || st.state == StepState::kFailed;
-      }
-
-      // One status line: a glyph, then the sentence.
-      FormParts::Label(L("Status"));
-      {
-         StepStatus mark;
-         mark.state = allGreen ? StepState::kOk : anyFailed ? StepState::kFailed : sStatus.running ? StepState::kRunning : sStatus.present ? StepState::kRepair : StepState::kPending;
-         const float icon = ImGui::GetTextLineHeight();
-         ImGui::AlignTextToFramePadding();
-         DrawStepIcon(mark, icon);
+         const ChatAgentInfo info = ChatAgentStatus(a.id);
+         ImGui::PushID(a.id);
+         FormParts::Label(L(a.name));
+         const float h = ImGui::GetFrameHeight();
+         const float rowStart = ImGui::GetCursorPosX();
+         const float rowW = ImGui::GetContentRegionAvail().x;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h * 0.42f, a.id);
+         ImGui::Dummy(ImVec2(h, h));
          FormParts::Inline();
          ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(T(v.summary.c_str()));
+         if (info.ready)
+            ImGui::TextUnformatted(info.status.c_str());
+         else
+            ImGui::TextDisabled("%s", info.status.c_str());
+         if (!info.action.empty() && !info.busy)
+         {
+            const float bw = std::max(84.0f, ImGui::CalcTextSize(info.action.c_str()).x + 2.0f * tok::space_3);
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::SetCursorPosX(rowStart + rowW - bw);
+            if (ChipButton::Draw(info.action.c_str(), !info.ready, h, bw))
+               ChatAgentAct(a.id, false);
+         }
+         ImGui::PopID();
       }
 
+      // The model each agent starts with; the chat's picker changes it for a moment, this is where it is kept.
+      for (const Agent& a : Agents())
       {
-         std::string items;
+         const auto models = ChatAgentModels(a.id);
+         std::string items = std::string(T("Default")) + '\0';
          int cur = 0;
-         for (size_t i = 0; i < Agents().size(); i++)
+         const std::string saved = prefs.models.count(a.id) ? prefs.models[a.id] : std::string();
+         for (size_t i = 0; i < models.size(); i++)
          {
-            items += Agents()[i].name;
-            items.push_back('\0');
-            if (&Agents()[i] == agent)
-               cur = (int)i;
+            items += models[i].second + '\0';
+            if (models[i].first == saved)
+               cur = (int)i + 1;
          }
          items.push_back('\0');
-         if (FormParts::Combo(L("Default agent"), &cur, items.c_str()))
+         const std::string label = std::string(a.name) + " " + T("model");
+         ImGui::PushID(a.id);
+         if (FormParts::Combo(label.c_str(), &cur, items.c_str()))
          {
-            prefs.agent = Agents()[(size_t)cur].id;
-            SaveConfig(paths.config, prefs);
-         }
-      }
-
-      {
-         // What the Terminal panel opens to.
-         int face = prefs.face == "terminal" ? 1 : 0;
-         std::string items = std::string(T("Chat")) + '\0' + T("Terminal") + '\0' + '\0';
-         if (FormParts::Combo(L("Agent interface"), &face, items.c_str()))
-         {
-            prefs.face = face == 1 ? "terminal" : "chat";
-            SaveConfig(paths.config, prefs);
-            gTerminalFace = face;
-         }
-      }
-
-      FormParts::Label(L("Setup"));
-      ImGui::BeginDisabled(!v.setupEnabled);
-      if (button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str(), allGreen ? Kind::Plain : Kind::Primary))
-         perform(Action::kSetup);
-      ImGui::EndDisabled();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair."));
-
-      FormParts::Label(L("Agent"));
-      if (v.showInstall)
-      {
-         if (button((std::string(T("Install")) + "###cli_install").c_str(), Kind::Primary))
-            perform(Action::kInstallAgent);
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands."));
-      }
-      else
-      {
-         ImGui::BeginDisabled(!v.startEnabled);
-         if (button((std::string(T("Start agent")) + "###cli_start").c_str(), Kind::Plain))
-            perform(Action::kStartAgent);
-         ImGui::EndDisabled();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            HelpTip("%s", T(v.loginHint.c_str()));
-      }
-
-      {
-         bool autoStart = prefs.autoStart;
-         ImGui::BeginDisabled(!v.startEnabled);
-         if (FormParts::Switch(L("Start with Terminal"), &autoStart))
-         {
-            prefs.autoStart = autoStart;
-            SaveConfig(paths.config, prefs);
-         }
-         ImGui::EndDisabled();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
-      }
-
-      // Every agent at a glance: the chat sends to any that is ready, by @name.
-      {
-         static std::vector<Readiness> sReady;
-         static double sReadyAt = -10.0;
-         if (now - sReadyAt > 1.0 || sReady.size() != Agents().size())
-         {
-            sReadyAt = now;
-            sReady.clear();
-            for (const Agent& a : Agents())
-               sReady.push_back(AgentReadiness(a));
-         }
-         FormParts::Label(L("Agents"));
-         const float h = ImGui::GetFrameHeight();
-         for (size_t i = 0; i < Agents().size(); i++)
-         {
-            const Agent& a = Agents()[i];
-            const Readiness& r = sReady[i];
-            if (i > 0)
-               FormParts::Label("");
-            const ImVec2 at = ImGui::GetCursorScreenPos();
-            ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h * 0.36f, a.id);
-            ImGui::Dummy(ImVec2(h, h));
-            FormParts::Inline();
-            const float nameStartX = ImGui::GetCursorPosX();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(a.name);
-            FormParts::Inline();
-            ImGui::SetCursorPosX(nameStartX + 120.0f);
-            ImGui::AlignTextToFramePadding();
-            const char* state = r.Ready() ? T("Ready") : !r.installed ? T("Not installed") : !r.connected ? T("Not connected") : T("Sign in");
-            if (r.Ready())
-               ImGui::TextUnformatted(state);
+            if (cur == 0)
+               prefs.models.erase(a.id);
             else
-               ImGui::TextDisabled("%s", state);
+               prefs.models[a.id] = models[(size_t)cur - 1].first;
+            SaveConfig(paths.config, prefs);
+         }
+         ImGui::PopID();
+      }
+
+      // Only a fault in the plumbing (the infinite command, the MCP link, the skills) shows here, with its fix.
+      {
+         const std::string exe = RealExecutable();
+         const Agent* agent = FindAgent(prefs.agent);
+         if (agent == nullptr)
+            agent = &Agents()[0];
+         const HealthReport health = LatestHealth();
+         const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, &health);
+         std::string broken;
+         for (const StepStatus& st : v.steps)
+            if (st.state == StepState::kRepair || st.state == StepState::kFailed)
+               broken += (broken.empty() ? "" : ", ") + std::string(T(st.title));
+         const ChatAgentInfo cur = ChatAgentStatus(agent->id);
+         if (!broken.empty() && cur.ready && !cur.busy)
+         {
+            FormParts::Label(L("Connection"));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", broken.c_str());
+            FormParts::Inline();
+            if (FormParts::Button(L("Repair")))
+               ChatAgentAct(agent->id, true);
          }
       }
 
       {
-         Config& wp = Prefs();
          const Paths wpaths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
          FormParts::Label(L("Agent folder"));
          ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(wp.workspace.empty() ? T("The open patch's folder") : wp.workspace.c_str());
+         ImGui::TextUnformatted(prefs.workspace.empty() ? T("The open patch's folder") : prefs.workspace.c_str());
          FormParts::Inline();
          if (FormParts::Button(L("Choose…")))
          {
-            const std::string dir = Platform::OpenFolderDialog("Folder for agents", wp.workspace);
+            const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
             if (!dir.empty())
             {
-               wp.workspace = dir;
-               SaveConfig(wpaths.config, wp);
+               prefs.workspace = dir;
+               SaveConfig(wpaths.config, prefs);
             }
          }
          FormParts::Label(L("Edit files in it"));
-         if (Switch::Box("##agentaccess", &wp.folderAccess))
-            SaveConfig(wpaths.config, wp);
+         if (Switch::Box("##agentaccess", &prefs.folderAccess))
+            SaveConfig(wpaths.config, prefs);
       }
 
       {
-         FormParts::Label(L("Saved chats"));
          const int count = ChatSavedCount();
-         ImGui::AlignTextToFramePadding();
-         ImGui::Text("%d", count);
-         FormParts::Inline();
-         ImGui::SetCursorPosX(FormParts::gLabelW + 36.0f);
+         const std::string label = std::string(T("Saved chats")) + " (" + std::to_string(count) + ")";
+         FormParts::Label(label.c_str());
          ImGui::BeginDisabled(count == 0 || ChatBusy());
          if (FormParts::Button(L("Clear all")))
             ImGui::OpenPopup("##clearchats");
@@ -282,46 +201,7 @@ namespace app
          ImGui::PopStyleVar();
       }
 
-      FormParts::Label(L("Terminal panel"));
-      if (button(gTerminalOpen ? "Close Terminal###cli_term" : "Open Terminal###cli_term", Kind::Plain))
-      {
-         gTerminalOpen = !gTerminalOpen;
-         gTerminalFocus = gTerminalOpen;
-      }
-
-      // Only what is wrong is listed; when everything holds the steps stay out of the way.
-      if (!allGreen)
-      {
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-         const float icon = ImGui::GetTextLineHeight();
-         for (const StepStatus& s : v.steps)
-         {
-            if (s.Green())
-               continue;
-            ImGui::PushID(s.id);
-            DrawStepIcon(s, icon);
-            FormParts::Inline();
-            ImGui::TextUnformatted(T(s.title));
-            if (!s.detail.empty())
-            {
-               FormParts::Inline();
-               ImGui::TextDisabled("%s", s.detail.c_str());
-            }
-            if (s.state == StepState::kRepair)
-            {
-               FormParts::Inline();
-               if (FormParts::Button(L("Repair")))
-                  perform(Action::kRepairStep, s.id);
-               if (ImGui::IsItemHovered())
-                  HelpTip("%s", T("Opens a Terminal tab and reruns only this step."));
-            }
-            ImGui::PopID();
-         }
-      }
-      if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-
       SectionCard::End();
    }
 
@@ -426,14 +306,14 @@ namespace app
       const std::string exe = RealExecutable();
       const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, nullptr);
 
-      ImGui::TextWrapped("%s", T("Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done."));
+      ImGui::TextWrapped("%s", T("Set up and Repair run this line in the background, with no terminal. It runs the script below, which checks each step first and skips what is already done."));
       CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
       if (v.showInstall)
       {
-         ImGui::TextWrapped("%s", T("Install runs the agent's own installer:"));
+         ImGui::TextWrapped("%s", T("The agent's own installer:"));
          CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
       }
-      ImGui::TextWrapped("%s", T("Start agent runs:"));
+      ImGui::TextWrapped("%s", T("The command the chat starts for each message begins with:"));
       CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
       ImGui::TextWrapped("%s", T("The script, exactly as it runs:"));
       static std::string sScript;

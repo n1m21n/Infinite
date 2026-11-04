@@ -27,7 +27,7 @@ namespace chat
 
    struct Block
    {
-      enum class Kind { Para, Bullet, Heading, Code, Image, Audio };
+      enum class Kind { Para, Bullet, Heading, Code, Image, Audio, File };
       Kind kind = Kind::Para;
       std::vector<Seg> segs;  // Para, Bullet, Heading
       std::string text;       // Code: the lines; Image, Audio: the path
@@ -39,4 +39,6 @@ namespace chat
    bool IsImagePath(const std::string& path);
    // A sound file the reply points at on its own line (wav, mp3, flac, ogg, aiff, m4a).
    bool IsAudioPath(const std::string& path);
+   // Any other file an agent may have made, by absolute path on its own line (video, patch, code, archive, text, MIDI, model).
+   bool IsFilePath(const std::string& path);
 }

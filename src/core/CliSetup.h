@@ -125,6 +125,7 @@ namespace CliSetup
    struct Readiness
    {
       bool installed = false, connected = false, signedIn = false;
+      std::string why;   // plain words for the first broken step when not connected
       bool Ready() const { return installed && connected && signedIn; }
    };
    Readiness AgentReadiness(const Agent& agent);

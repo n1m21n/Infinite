@@ -9,6 +9,7 @@
 #include "core/chat/ChatThread.h"
 #include "core/chat/PatchGrammar.h"
 #include "core/chat/ReplyLinks.h"
+#include "core/chat/ChatGuide.h"
 
 #include <algorithm>
 #include <chrono>
@@ -468,6 +469,38 @@ namespace app
             code = code || b.kind == chat::Block::Kind::Code;
          }
          check(aud && img && code, "a reply can hold a sound, a picture and a code block");
+         // C9: slash commands, welcome, briefing, files.
+         std::string sn, sa;
+         check(chat::ParseSlash("/help", sn, sa) && sn == "help" && sa.empty(), "/help parses");
+         check(chat::ParseSlash("/Docs fields now", sn, sa) && sn == "docs" && sa == "fields now", "a command keeps its argument");
+         check(!chat::ParseSlash("/Users/x/kick.wav", sn, sa), "a path is not a command");
+         check(!chat::ParseSlash("add a noise", sn, sa), "plain text is not a command");
+         check(chat::MatchSlash("sh").size() == 1 && chat::MatchSlash("").size() == chat::SlashCommands().size(), "commands complete by prefix");
+         bool buttons = false, web = false, say = false;
+         for (const chat::SlashCommand& c : chat::SlashCommands())
+         {
+            const std::string ans = chat::SlashAnswer(c.name, "");
+            if (ans.empty())
+               continue;
+            for (const chat::Block& b : chat::ParseReply(ans, cat))
+               for (const chat::Seg& g : b.segs)
+                  if (g.kind == chat::Seg::Kind::Action)
+                  {
+                     buttons = true;
+                     web = web || g.verb == "web";
+                  }
+         }
+         for (const chat::Block& b : chat::ParseReply(chat::Welcome(), cat))
+            for (const chat::Seg& g : b.segs)
+               say = say || (g.kind == chat::Seg::Kind::Action && g.verb == "say");
+         check(buttons && web, "built-in answers carry buttons, links open the website");
+         check(say, "the welcome offers things to say");
+         check(chat::Briefing().find("infinite docs") != std::string::npos, "the briefing points agents at the manuals");
+         check(chat::IsFilePath("/tmp/out.mp4") && !chat::IsFilePath("/tmp/a file.mp4") && !chat::IsFilePath("out.mp4"), "files are recognised");
+         bool file = false;
+         for (const chat::Block& b : chat::ParseReply("Saved\n/tmp/out.mp4\n", cat))
+            file = file || b.kind == chat::Block::Kind::File;
+         check(file, "a reply can hold a file");
       }
       std::printf("CHATTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;

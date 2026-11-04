@@ -1,6 +1,8 @@
 #include "ReplyLinks.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cctype>
 #include <cstdlib>
 #include <iterator>
@@ -39,10 +41,56 @@ namespace chat
          return count == 1 ? hit : -1;
       }
 
-      void PushText(std::vector<Seg>& segs, const std::string& text, Seg::Kind kind = Seg::Kind::Text)
+      // 0.349999994 reads as 0.35: a decimal with four or more places is shown to three.
+      std::string RoundNumbers(const std::string& in)
       {
-         if (text.empty())
+         std::string out;
+         size_t i = 0;
+         while (i < in.size())
+         {
+            const bool start = std::isdigit((unsigned char)in[i]) && (i == 0 || !(std::isalnum((unsigned char)in[i - 1]) || in[i - 1] == '.' || in[i - 1] == '_'));
+            if (!start)
+            {
+               out += in[i++];
+               continue;
+            }
+            size_t j = i;
+            while (j < in.size() && std::isdigit((unsigned char)in[j]))
+               j++;
+            if (j + 1 < in.size() && in[j] == '.' && std::isdigit((unsigned char)in[j + 1]))
+            {
+               size_t k = j + 1;
+               while (k < in.size() && std::isdigit((unsigned char)in[k]))
+                  k++;
+               const bool tail = k < in.size() && (std::isalnum((unsigned char)in[k]) || in[k] == '.' ) && !(in[k] == '.' && (k + 1 >= in.size() || !std::isdigit((unsigned char)in[k + 1])));
+               if (k - j - 1 >= 4 && !tail)
+               {
+                  char buf[48];
+                  std::snprintf(buf, sizeof buf, "%.3f", std::strtod(in.substr(i, k - i).c_str(), nullptr));
+                  std::string num = buf;
+                  while (num.back() == '0')
+                     num.pop_back();
+                  if (num.back() == '.')
+                     num.pop_back();
+                  out += num;
+                  i = k;
+                  continue;
+               }
+               out += in.substr(i, k - i);
+               i = k;
+               continue;
+            }
+            out += in.substr(i, j - i);
+            i = j;
+         }
+         return out;
+      }
+
+      void PushText(std::vector<Seg>& segs, const std::string& rawText, Seg::Kind kind = Seg::Kind::Text)
+      {
+         if (rawText.empty())
             return;
+         const std::string text = kind == Seg::Kind::Text || kind == Seg::Kind::Bold ? RoundNumbers(rawText) : rawText;
          if (!segs.empty() && segs.back().kind == kind && kind == Seg::Kind::Text)
          {
             segs.back().text += text;
@@ -155,16 +203,18 @@ namespace chat
             return false;
          Seg s;
          s.kind = Seg::Kind::Action;
-         s.text = Trim(line.substr(i + 1, close - i - 1));
+         s.text = RoundNumbers(Trim(line.substr(i + 1, close - i - 1)));
          s.verb = Lower(Trim(line.substr(close + 2, colon - close - 2)));
          s.arg = Trim(line.substr(colon + 1, end - colon - 1));
-         static const char* const kVerbs[] = { "add", "set", "delete", "undo", "go", "open" };
+         static const char* const kVerbs[] = { "add", "set", "delete", "undo", "go", "open", "web", "say" };
          if (std::find(std::begin(kVerbs), std::end(kVerbs), s.verb) == std::end(kVerbs) || s.text.empty())
             return false;
          if (s.verb == "set" || s.verb == "delete" || s.verb == "go")
          {
             // The node (and key) the arg names, through the same reference rules as the text.
-            const std::string ref = s.verb == "set" ? s.arg.substr(0, s.arg.find('=')) : s.arg;
+            std::string ref = s.verb == "set" ? s.arg.substr(0, s.arg.find('=')) : s.arg;
+            if (!ref.empty() && ref[0] != '@')
+               ref = "@" + Trim(ref);  // agents often leave the @ off
             std::vector<Seg> linked;
             std::vector<int> unused;
             size_t at = 0;
@@ -180,6 +230,8 @@ namespace chat
                s.arg = Trim(s.arg.substr(eq + 1));
             }
          }
+         if (s.verb == "web" && s.arg.rfind("https://", 0) != 0)
+            return false;
          segs.push_back(s);
          i = end + 1;
          return true;
@@ -332,6 +384,23 @@ namespace chat
       return false;
    }
 
+   bool IsFilePath(const std::string& path)
+   {
+      const std::string p = Trim(path);
+      const bool absolute = !p.empty() && (p[0] == '/' || p[0] == '~' || (p.size() > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')));
+      if (!absolute || p.find(' ') != std::string::npos)
+         return false;
+      const std::string l = Lower(p);
+      for (const char* ext : { ".mp4", ".mov", ".webm", ".mkv", ".inf", ".zip", ".json", ".txt", ".md", ".csv", ".field", ".glsl", ".js", ".mid", ".midi",
+                               ".glb", ".gltf", ".obj", ".svg", ".pdf", ".ttf" })
+      {
+         const std::string e = ext;
+         if (l.size() > e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0)
+            return true;
+      }
+      return false;
+   }
+
    std::vector<Block> ParseReply(const std::string& text, const Catalog& catalog)
    {
       std::vector<Block> blocks;
@@ -393,6 +462,14 @@ namespace chat
             blocks.push_back(b);
             continue;
          }
+         if (IsFilePath(bare))
+         {
+            Block b;
+            b.kind = Block::Kind::File;
+            b.text = bare;
+            blocks.push_back(b);
+            continue;
+         }
          Block b;
          std::string body = trimmed;
          if (body.rfind("- ", 0) == 0 || body.rfind("* ", 0) == 0)
@@ -407,6 +484,19 @@ namespace chat
          }
          std::vector<std::string> images;
          b.segs = Inline(body, catalog, named, images);
+         // A path written inside a sentence ("The picture is at /tmp/a.png.") shows as a picture under it too.
+         for (size_t at = 0; at < body.size();)
+         {
+            const size_t end = std::min(body.find(' ', at), body.size());
+            std::string word = body.substr(at, end - at);
+            at = end + 1;
+            while (!word.empty() && std::string(".,;:)'\"`").find(word.back()) != std::string::npos)
+               word.pop_back();
+            while (!word.empty() && std::string("('\"`").find(word.front()) != std::string::npos)
+               word.erase(0, 1);
+            if (!word.empty() && (word[0] == '/' || word[0] == '~') && IsImagePath(word) && std::find(images.begin(), images.end(), word) == images.end())
+               images.push_back(word);
+         }
          // A bullet is its own sentence: its links do not reach the next bullet.
          if (b.kind == Block::Kind::Bullet)
          {

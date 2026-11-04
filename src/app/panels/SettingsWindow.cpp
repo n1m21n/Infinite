@@ -1703,7 +1703,7 @@ namespace app
             FormParts::Section(T("Reference"));
             static int sRef = 0;
             // i18n-skip-begin: topic names are the section titles below
-            static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills", "Setup commands" };
+            static const char* const kRef[] = { "All topics", "How the chat works", "The Terminal panel", "The infinite command", "Headless engine", "AI skills", "Setup commands" };
             // i18n-skip-end
             FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), FormParts::kControlW);
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
@@ -1712,12 +1712,21 @@ namespace app
             ImGui::PushTextWrapPos(0.0f);
             if (sRef == 0 || sRef == 1)
             {
-               FormParts::Heading(T("The Terminal panel"));
-               ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
-               ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
+               FormParts::Heading(T("How the chat works"));
+               ImGui::TextWrapped("%s", T("Each agent (Claude, ChatGPT, Gemini) is the command-line program you may know, started in your login shell for one turn per message, in the agent folder. Infinite reads what it prints and shows it as the reply. Nothing is sent anywhere else."));
+               ImGui::TextWrapped("%s", T("Sign in opens your browser. The agent keeps the login in its own config; Infinite never sees or stores it. Set up installs the agent if it is missing, puts the infinite command on your PATH, connects Infinite as an MCP server and adds Infinite's skills to the agent's own folder."));
+               ImGui::TextWrapped("%s", T("Every first message of a chat carries a short briefing: the open patch, the nodes you mention with @, and the few reply links the chat understands (add, set, go, open). Changes an agent makes to the patch are listed under its reply with Undo."));
+               ImGui::TextWrapped("%s", T("Edit files in it decides whether the agent may change files in the agent folder; the patch itself is always changed through Infinite. Saved chats live in Infinite's own data folder and Clear all removes them."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 2)
+            {
+               FormParts::Heading(T("The Terminal panel"));
+               ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it beside the chat with the terminal icon in the chat header, or from the >_ tile in the right rail or with Ctrl+`."));
+               ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
+               ImGui::Spacing();
+            }
+            if (sRef == 0 || sRef == 3)
             {
                FormParts::Heading(T("The infinite command"));
                ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
@@ -1740,7 +1749,7 @@ namespace app
                // i18n-skip-end
                ImGui::Spacing();
             }
-            if (sRef == 0 || sRef == 3)
+            if (sRef == 0 || sRef == 4)
             {
                FormParts::Heading(T("Headless engine"));
                ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
@@ -1755,10 +1764,10 @@ namespace app
                ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
                ImGui::Spacing();
             }
-            if (sRef == 0 || sRef == 4)
+            if (sRef == 0 || sRef == 5)
             {
                FormParts::Heading(T("AI skills"));
-               ImGui::TextWrapped("%s", T("Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version."));
+               ImGui::TextWrapped("%s", T("Setting up Claude above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version."));
                static std::string sSkillStatus;
                if (FormParts::Button(L("Install All AI Skills")))
                {
@@ -1792,7 +1801,7 @@ namespace app
                ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
                ImGui::Spacing();
             }
-            if (sRef == 0 || sRef == 5)
+            if (sRef == 0 || sRef == 6)
             {
                FormParts::Heading(T("Setup commands"));
                DrawCliSetupCommands();
