@@ -1648,6 +1648,24 @@ namespace app
                }
             }
          }
+         // Two or more agents at work: their avatars side by side, with a short count.
+         if (sRuns.size() > 1)
+         {
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            ImDrawList* wd = ImGui::GetWindowDrawList();
+            const ImVec2 wat = ImGui::GetCursorScreenPos();
+            const float r = 8.0f, step = r * 2.0f + tok::space_1;
+            float x = wat.x + r + 1.0f;
+            for (const Run& run : sRuns)
+            {
+               DrawAvatar(wd, ImVec2(x, wat.y + r + 1.0f), r, run.agent);
+               x += step;
+            }
+            char buf[64];
+            std::snprintf(buf, sizeof buf, T("%d working"), (int)sRuns.size());
+            wd->AddText(ImVec2(x + tok::space_1, wat.y + (r * 2.0f + 2.0f - ImGui::GetFontSize()) * 0.5f), Dim(), buf);
+            ImGui::Dummy(ImVec2(width, r * 2.0f + 2.0f));
+         }
          ImGui::Dummy(ImVec2(0.0f, tok::space_2));
          if (sScrollToEnd)
          {
