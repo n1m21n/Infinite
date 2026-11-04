@@ -5959,6 +5959,7 @@ bool RunRender3DPanoTest();
 bool RunRigTest();
 bool RunBakeTest();
 bool RunSculptTest();
+bool RunModelAbTest();
 bool RunThreeDBench();
 bool RunThreeDFlowTest();
 bool RunBvhTest();
