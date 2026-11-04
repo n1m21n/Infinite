@@ -652,7 +652,7 @@ namespace Sculpt
       {
          float c[3];
          Flip(d.center, m, c);
-         Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid, d.areaNormals);
+         Area a = Gather(c, d.radius, pos, nrm, t, false, grid, d.areaNormals);
          // Pinch gathers towards the line along the stroke: the pull is across it (and along the normal).
          float across[3] = { 0, 0, 0 };
          if (d.brush == kPinch)
@@ -720,12 +720,11 @@ namespace Sculpt
                   const float along = to[0] * a.normal[0] + to[1] * a.normal[1] + to[2] * a.normal[2];
                   for (int k = 0; k < 3; k++)
                      to[k] -= a.normal[k] * along;
-                  const float pull = 0.8f;
+                  // Blender: the pinch is the brush's pinch factor squared whatever the strength, the dig
+                  // is radius * strength squared. Both are in final units, so Stroke does not scale them.
+                  const float st = std::clamp(d.strength, 0.0f, 1.0f);
                   for (int k = 0; k < 3; k++)
-                     move[k] = to[k] * pull * f;
-                  if (d.brush == kCrease)
-                     for (int k = 0; k < 3; k++)
-                        move[k] -= a.normal[k] * d.radius * 0.48f * f * sign;
+                     move[k] = (to[k] * 0.25f - a.normal[k] * d.radius * st * st * sign) * f;
                   break;
                }
                case kFlatten:
@@ -740,7 +739,7 @@ namespace Sculpt
                   break;
             }
             // Smooth already scales by strength above; the rest scale here.
-            const float scale = d.brush == kSmooth ? 1.0f / amount : s;
+            const float scale = d.brush == kSmooth ? 1.0f / amount : d.brush == kCrease ? 1.0f / amount : s;
             for (int k = 0; k < 3; k++)
                o[k] += move[k] * scale;
          }
