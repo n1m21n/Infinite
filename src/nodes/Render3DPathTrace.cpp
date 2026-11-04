@@ -505,6 +505,9 @@ namespace
       "   float D = ggxD(nDotH, alpha);\n"
       "   vec3 F = s.f0 + (vec3(1.0) - s.f0) * schlick5(vDotH);\n"
       "   float ccAtten = 1.0 - s.cc * (0.04 + 0.96 * schlick5(nDotV));\n"
+      // The sheen layer sits over the base and takes its directional albedo out of it, as Cycles'
+      // layering does: the Charlie lobe's albedo at roughness 0.5 is 0.08 head on up to 0.6 at grazing.
+      "   if (s.sh > 0.0) ccAtten *= 1.0 - clamp(s.sh * max(s.shCol.r, max(s.shCol.g, s.shCol.b)) * (0.083 + 0.55 * pow(1.0 - nDotV, 1.5)), 0.0, 1.0);\n"
       "   vec3 f = (D * ggxVis(nDotV, nDotL, alpha) * F * w.y + (vec3(1.0) - F) * (1.0 - s.metal) * s.base * (1.0 / PI) * w.x) * ccAtten;\n"
       "\n"
       "   float ccAlpha = max(0.002, s.ccRough * s.ccRough);\n"

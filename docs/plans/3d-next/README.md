@@ -188,3 +188,45 @@ is the plane. Blender fits it from an area-weighted centre and normal
 stroke-start normal and each dab's centre. sculpt_smooth (0.275, gain 1.29)
 and sculpt_deer (0.253) sit just over; Smooth's falloff differs from Blender's
 and was left alone (drag_smooth is 0.034).
+
+## Results: render gaps vs Blender (picture A/B, `fix/render-ab`)
+
+Measured with the harness against a dev build of main 4b123939. FLIP, lower is closer;
+path-trace numbers are at 128 samples (cornell, light_spot) and 64 (hero), so noise
+inflates them a little.
+
+| Case | Raster | Path tracer | Reading |
+|---|---|---|---|
+| cornell | 0.579 | 0.101 | raster has no bounce light (walls' colour bleed, lit shadows, ceiling fill); pt matches Blender, brightness x1.00 |
+| light_spot | 0.150 | 0.057 | cone and blend already follow Cycles' spot_attenuation; the raster remainder is the missing floor-to-sphere bounce and hard shadow fill |
+| hero (all) | 0.175 | 0.109 | raster worst regions: models 0.47 (brightness x0.61), coat 0.44 (x0.72), instances 0.41, fox 0.43; pt worst: velvet 0.29 (x1.17), instances 0.35, fox 0.28-0.33 |
+
+Findings:
+
+- The cornell raster gap is global illumination, not a bug. A raster fix would need a baked
+  or probe-based bounce; that is not live-speed-free, so no change was made. Use the path
+  tracer for GI scenes.
+- Spot light units and falloff already agree (brightness x0.93 raster, x0.98 pt).
+- Raster models, coat and velvet read dark because their undersides get no floor bounce
+  (the room floor is white in Blender). Same cause as cornell.
+- Fixed in the path tracer: the sheen layer now takes its directional albedo out of the base
+  (Cycles layering). Hero velvet 0.290 -> 0.266, brightness x1.17 -> x1.14 (still a little high).
+- Raster floor bounce (no scene lookup): the light reaching a floor under the point, at grey 0.5,
+  lights downward-facing normals by how far down they face. An isotropic version (added fill on
+  every normal) brightened the light cases by 10% and was dropped.
+
+| Raster case | Before | After |
+|---|---|---|
+| cornell | 0.583 | 0.547 |
+| light_sun / point / spot / area | 0.070 / 0.071 / 0.150 / 0.088 | 0.059 / 0.065 / 0.151 / 0.084 |
+| materials | 0.117 | 0.109 |
+| lineup | 0.076 | 0.074 |
+| view_agx | 0.071 | 0.067 |
+| deer | 0.119 | 0.120 |
+| hero (all) | 0.175 | 0.171 |
+| world_grey, furnace_* | unchanged | unchanged |
+
+Hero raster regions: models 0.473 -> 0.459, coat 0.438 -> 0.382, velvet 0.318 -> 0.314,
+instances 0.412 -> 0.389, fox 0.433 -> 0.412; emissive 0.092 -> 0.097. Cornell stays far from
+Blender: without wall-to-wall bounce a closed room cannot match; use the path tracer there.
+Baselines refreshed (raster and `hero_pt`). `INFINITE_VIEW3DTEST` passes.
