@@ -1558,6 +1558,7 @@ extern bool gUiStyleEditorOpen;
 
 extern bool gSettingsOpen;
 extern bool gTemplatesOpen;
+extern bool gWatchSetupOpen;
 
 extern bool gShowUpdateCheckModal;
 extern bool gShowAboutModal;
@@ -2981,6 +2982,7 @@ void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
 void DrawTrackParams(TrackNodeBase* n);
+void DrawWatchParams(WatchNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 
@@ -5780,6 +5782,8 @@ void DrawTerminalDocked(const char* id, const ImVec2& size);
 void TerminalPanelHidden();
 // A new tab with `line` typed and entered (the CLI setup section and the agent buttons).
 void TerminalRunInNewTab(const std::string& line);
+// Opens a tab with a fixed title and types the command into it; true when the tab was started.
+bool TerminalRunInNewTab(const std::string& name, const std::string& command);
 void TerminalToggleShortcut();
 int TerminalBusyCount();
 void TerminalGuardQuit(std::function<void()> action);
@@ -6321,6 +6325,21 @@ bool RunPartialsFixture();
 bool RunStringFixture();
 bool RunSplitterFixture();
 bool RunSpatialFixture();
+bool RunWatchPacketTest();
+bool RunWatchNodeTest();
+bool RunWatchSetupTest();
+// Watch setup checklist (WatchSetupWindow.cpp): the window, and what the Apple Watch node card needs.
+void DrawWatchSetupWindow(bool* open);
+struct WatchSetupCardInfo
+{
+   std::string line;       // progress, last error or "watch app expires in N days"
+   bool running = false;
+   bool reinstallDue = false;
+};
+WatchSetupCardInfo WatchSetupCard();
+void WatchSetupTick();
+void WatchSetupRefreshSoon();
+void WatchSetupReinstall();
 
 bool RunSpectrumSlideFixture();
 

@@ -7,6 +7,7 @@
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
+#include "platform/WatchLink.h"
 #include "platform/AppPaths.h"
 
 namespace app
@@ -631,6 +632,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_SPATIALTEST") != nullptr)
       return RunSpatialFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_WATCHPACKETTEST") != nullptr)
+      return RunWatchPacketTest() ? 0 : 1;
+   if (getenv("INFINITE_WATCHNODETEST") != nullptr)
+      return RunWatchNodeTest() ? 0 : 1;
+   if (getenv("INFINITE_WATCHSETUPTEST") != nullptr)
+      return RunWatchSetupTest() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
@@ -914,6 +922,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          }
          gHeadlessAudioRate = gHeadlessJob.sampleRate;
          HeadTracker::Disable();
+         WatchLink::Disable();
          Platform::AttachConsoleForHeadless();
 #if !defined(__APPLE__) && !defined(_WIN32)
          // GLFW needs a display server. Say so with the fix, instead of the
@@ -1598,7 +1607,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       CheckPatchOpener();
    }
    else
+   {
       HeadTracker::Disable();
+      WatchLink::Disable();
+   }
 
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
    // external tool (the Infinite MCP server) drive this running instance.

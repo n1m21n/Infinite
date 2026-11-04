@@ -6,8 +6,8 @@ Skills to load before building: `node-ui-pillars`, `windows-parity`, `linux-pari
 
 | Block | What | State |
 |---|---|---|
-| A | Infinite side: Bluetooth link, packet decoder, `Apple Watch` node, gestures, help, selftest | not started |
-| B | watchOS app "Infinite Remote": sensors, crown, touch pad, double tap, Bluetooth sender | not started |
+| A | Infinite side: Bluetooth link, packet decoder, `Apple Watch` node, gestures, help, selftest | built on `feature/watch-a`, WATCHPACKETTEST + WATCHNODETEST pass; not merged. For Block B: the Mac also exposes a 4th GATT characteristic `name` (9A1F0004, write: the watch sends its display name), and the watch must subscribe to `control` (9A1F0003) or the Mac treats it as gone |
+| B | watchOS app "Infinite Remote": sensors, crown, touch pad, double tap, Bluetooth sender | written on `feature/watch-b` (`apps/watch/`, build-it-yourself, no store) plus the in-app "Set up watch app" window (D-B1 to D-B5). WATCHPACKETTEST (golden bytes), WATCHNODETEST and WATCHSETUPTEST pass. NOT compiled for watchOS and install_watch_app.sh never run against real Xcode (only against shimmed tools) (no Xcode on the build Mac); real-watch test pending |
 | C | Haptics back to the wrist, Windows + Linux link, TestFlight + App Store | not started |
 
 ## 1. The idea
@@ -213,27 +213,51 @@ Lives in `apps/watch/` with an XcodeGen `project.yml` (text, reviewable; the `.x
 |---|---|
 | `RemoteApp.swift` | App, `TabView` pages, keeps last Mac |
 | `MotionSource.swift` | `CMMotionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue)` at 50/100 Hz |
-| `WorkoutKeeper.swift` | `HKWorkoutSession` + `HKLiveWorkoutBuilder`, heart rate from `statistics(for: .heartRate)`; HealthKit entitlement + `NSHealthShareUsageDescription`, `NSMotionUsageDescription` |
+| `Keeper.swift` | default: `WKExtendedRuntimeSession` (no entitlement). With `INFINITE_WATCH_HEALTH=1`: `HKWorkoutSession` + `HKLiveWorkoutBuilder`, heart rate from `statistics(for: .heartRate)`; HealthKit entitlement + `NSHealthShareUsageDescription`, `NSMotionUsageDescription` |
 | `BLELink.swift` | `CBCentralManager`, scan for the service UUID, connect, `writeValue(.withoutResponse)` gated on `canSendWriteWithoutResponse`, reconnect on drop |
 | `Packet.swift` | Same layout as section 6; a unit test asserts byte equality with a golden packet produced by `WatchPacket.cpp` encode |
 | `PlayView.swift` | `DragGesture(minimumDistance: 0)` XY pad, `.digitalCrownRotation`, Play/Stop button with `.handGestureShortcut(.primaryAction)` while not playing, pad button during play |
 
 Simulator note: the watch simulator has no Bluetooth. Block B checks UI and packet bytes in the simulator; the link itself is tested on the owner's watch.
 
-Distribution needs the paid Apple Developer account (already used for notarising): TestFlight first, App Store in Block C. App Review note: explain the workout session is used to keep sensors alive during a performance and records heart rate.
+Distribution (decided 2026-11-02): the owner has no paid Apple Developer account, so there is no TestFlight and no App Store. The app lives in the repo and each user builds it in Xcode with their own free Apple ID (a "Personal Team") and installs it on their own watch. **macOS users only**, because building needs a Mac with Xcode. Free signing expires after 7 days, so the user re-runs the build weekly. Free teams need a unique bundle id per person, so the id prefix is a user-set value in `apps/watch/Config/Local.xcconfig` (with `DEVELOPMENT_TEAM`), never hard-coded.
+
+Build-it-yourself flow (details in `apps/watch/README.md`):
+
+```
+ install Xcode -> sign in with Apple ID -> Developer Mode (iPhone, watch)
+   -> set team + bundle prefix in Local.xcconfig -> scripts/build_watch_app.sh
+   -> trust the developer on the watch -> Apple Watch node + Play on the watch
+   -> repeat the build every 7 days
+```
+
+Keep-alive without HealthKit: free personal teams may not get the HealthKit entitlement. Default build uses `WKExtendedRuntimeSession` (physical-therapy session type, `WKBackgroundModes` in Info.plist, no entitlement), heart byte = 0. Building with `INFINITE_WATCH_HEALTH=1` switches to `HKWorkoutSession` + heart rate (`Keeper.swift`) for users whose team allows HealthKit. The Mac side is identical in both cases.
+
+### One-click setup from inside Infinite (decided 2026-11-02, D-B1 to D-B5)
+
+| Id | Decision |
+|---|---|
+| D-B1 | The source ships inside `Infinite.app/Contents/Resources/WatchRemote/`. The `.xcodeproj` is generated at Infinite build time with xcodegen (release builds need xcodegen; a dev build without it ships sources only and the checklist says the project is missing). Users need neither a repo clone nor xcodegen. Mac builds only. |
+| D-B2 | The Apple Watch node card has a "Set up watch app" button that opens a checklist window. Each step checks itself every few seconds and turns green alone: (1) Xcode installed (`xcode-select -p`, `xcodebuild -version`); (2) Apple ID in Xcode (`defaults read com.apple.dt.Xcode IDEProvisioningTeams`, the free Personal Team is picked automatically); (3) iPhone and watch visible with Developer Mode on (`xcrun devicectl list devices`); (4) "Install on my watch". An unmet step shows one sentence and an Open button where it helps. The website page `website/watch.html` is the same guide with screenshots, generated from `apps/watch/README.md` (the single source) by `tools/gen-watch-page.py`. |
+| D-B3 (revised 2026-11-02, owner request: run it in Infinite's own Terminal) | "Install on my watch" / "Reinstall" opens the Terminal panel in a new tab named "Watch app" (`TerminalRunInNewTab`, which types the command through `TermSession::SendBytes`) and runs the bundled `install_watch_app.sh` there. A hidden thread could not do the steps that ask for a password: `sudo xcodebuild -license accept`, `sudo xcode-select -s`, and sometimes `xcode-select --install` or the first `-allowProvisioningUpdates`. The user types into the tab; the script prints one plain line per step ("Step 3/5: preparing the project..."). The script does the whole chain and reruns safely: (1) check Xcode, the license, first-launch setup and `xcode-select`; (2) find the free Personal Team and the watch; (3) rsync the bundled project to `~/Library/Application Support/Infinite/WatchRemote/`, write `DEVELOPMENT_TEAM` and the bundle id `org.infinitedevices.remote.<8 hex of a hash of the team id>`; (4) `xcodebuild -allowProvisioningUpdates` (downloads the watchOS platform once if missing); (5) `xcrun devicectl device install app`. On failure it prints the one-line reason and the fix, writes `state: failed`, and opens the project in Xcode with the team filled in. `scripts/build_watch_app.sh` is a thin wrapper around the same file. |
+| D-B3 card progress | The script writes `~/Library/Application Support/Infinite/WatchRemote/status.json`: `{step, total, state: running\|ok\|failed, message, installedAt, updatedAt}`. The node card and the checklist read that file, never the terminal text. Pressing the button writes `running` first, so an old `ok` is not mistaken for the new run; a failed reinstall keeps the old `installedAt`; a `running` file not updated for 20 minutes (terminal closed) reads as failed so the button is not stuck. |
+| D-B4 | The install date is `installedAt` in `status.json`. The card shows "watch app expires in N days"; from 2 days before it offers a one-click "Reinstall" (same path as D-B3). |
+| D-B5 | Selftests never run xcodebuild or devicectl. The checks and the terminal launch sit behind `WatchSetup::IToolchain`; `WATCHSETUPTEST` fakes it and writes `status.json` itself to walk the checklist through every state. It never spawns the terminal or xcodebuild. |
 
 ## 9. Block C
 
 1. `control` notify + node input pin `haptic` -> `WKInterfaceDevice.current().play(.click)` on rising edge.
 2. Windows link: WinRT `GattServiceProvider` (Windows 10 1803+, adapter must support peripheral role; status says so when it does not).
 3. Linux link: BlueZ `GattManager1.RegisterApplication` over D-Bus (sd-bus or GDBus).
-4. TestFlight -> App Store submission, website + manual page, one tutorial film only if the owner asks.
+4. Website + manual page, one tutorial film only if the owner asks. (TestFlight / App Store are dropped: no paid developer account, see section 8.)
 
 ## 10. Risks
 
 | Risk | Plan |
 |---|---|
-| App Review rejects the workout session for a non-fitness app | Heart rate is shown and used; fallback is `WKExtendedRuntimeSession` (physical therapy, 1 h cap) |
+| Free team has no HealthKit entitlement | Default build uses `WKExtendedRuntimeSession` (physical therapy, no entitlement); `INFINITE_WATCH_HEALTH=1` opts into the workout session |
+| Free signing expires after 7 days; unique bundle id needed per person | README says re-run weekly; bundle prefix lives in `Local.xcconfig` |
+| Users without a Mac cannot build the app | Accepted: macOS users only |
 | Mac Bluetooth busy (AirPods, keyboard) raises latency | Measure on the owner's Mac in Block B; drop to 30 Hz automatically if writes back up |
 | Yaw drift | Recenter button, and help points users to roll/pitch for long holds |
 | macOS kills headless runs on Bluetooth | `WatchLink::Disable()` in every selftest path, like HeadTracker |

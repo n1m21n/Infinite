@@ -375,7 +375,8 @@ void DrawNodeBodies(FrameCtx& fc)
          // through to DrawPreview and show an empty "no input" box. Their status line is in the params.
          const bool externalSender =
             dynamic_cast<MidiOutNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr;
+            dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<WatchNode*>(gn.node.get()) != nullptr;   // 22 modulators: its card has the meters and status
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          // Breathing room between the title bar and a macro's main control.
          if (dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
@@ -1060,6 +1061,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawImageAnalyzeParams(n);
                else if (auto* n = dynamic_cast<TrackNodeBase*>(gn.node.get()))
                   DrawTrackParams(n);
+               else if (auto* n = dynamic_cast<WatchNode*>(gn.node.get()))
+                  DrawWatchParams(n);
                else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                   DrawNullModulatorParams(n);
                else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))

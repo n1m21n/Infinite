@@ -326,6 +326,10 @@ CHAPTERS = [
              "Tracks one person's body into modulators: head, both wrists, how high each arm is raised, how far apart the wrists are, lean and distance. Keep the upper body in view. Needs the Tracking pack from Settings > Extensions.",
              "raise an arm to bring a chord in.",
              ["Video In", "Pose Track", "Gain (Level)"]),
+            ("Apple Watch", "MODULATORS · WATCH IN",
+             "Your Apple Watch as 22 modulators: tilt, turn speed and acceleration on each axis, energy, Digital Crown, touch pad, tap, heart rate and four gestures (flick left, flick right, shake, strike). Press Recenter to set the middle. Needs macOS and Bluetooth, and the Infinite Remote app, which you build for your watch yourself with Xcode and a free Apple ID: press Set up watch app on the node, or read infinitedevices.org/watch.html.",
+             "tilt your wrist to sweep a filter cutoff.",
+             ["Apple Watch", "Audio Filter (Cutoff)"]),
         ],
     },
     {

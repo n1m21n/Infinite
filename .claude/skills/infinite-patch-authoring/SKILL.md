@@ -371,6 +371,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
+| `Apple Watch` | none | connected:modulator, roll:modulator, pitch:modulator, yaw:modulator, rot x:modulator, rot y:modulator, rot z:modulator, accel x:modulator, accel y:modulator, accel z:modulator, energy:modulator, crown:modulator, crown speed:modulator, touch x:modulator, touch y:modulator, touching:modulator, tap:modulator, flick left:modulator, flick right:modulator, shake:modulator, strike:modulator, heart:modulator | 4 | bypass |
 | `Audio Analyze` | audio:audio | level:modulator, low:modulator, mid:modulator, high:modulator, onset:modulator, b1:modulator, b2:modulator, b3:modulator, b4:modulator, b5:modulator, b6:modulator, b7:modulator, b8:modulator | 4 | bypass |
 | `Audio File` | none | out:audio | 9 | bypass |
 | `Audio to CV` | audio:audio | out:modulator | 6 | bypass |
