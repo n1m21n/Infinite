@@ -255,7 +255,7 @@ namespace app
       for (size_t i = 0; i < all.size(); i++)
       {
          if (i > 0)
-            ImGui::SameLine(0.0f, tok::space_1);
+            ActionButton::RowNext();
          const bool on = &all[i] == agent;
          if (ActionButton::Draw((std::string(all[i].name) + "###welcome_agent" + std::to_string(i)).c_str(), ImVec2(bw, 0.0f), on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
          {
@@ -277,7 +277,7 @@ namespace app
       const ImVec2 wide(std::min(colW, 260.0f), 0.0f);
       if (ActionButton::Draw((std::string(T("Connect")) + " " + agent->name + "###welcome_connect").c_str(), wide, ActionButton::Kind::Primary))
          perform(v.showInstall ? Action::kInstallAgent : Action::kSetup);
-      if (ImGui::Button(T("Skip, just a terminal")))
+      if (ActionButton::Draw((std::string(T("Skip, just a terminal")) + "###welcome_skip").c_str(), wide, ActionButton::Kind::Plain))
          finish();
       if (!sError.empty())
          ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
