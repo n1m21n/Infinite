@@ -78,6 +78,7 @@ struct Program
    plutovg_surface_t* surf = nullptr;
    plutovg_canvas_t* cv = nullptr;
    plutovg_font_face_t* font = nullptr;
+   std::vector<plutovg_font_face_t*> fallbacks;   // tried in order for codepoints `font` lacks
    DrawState st;
    std::vector<DrawState> stack;
    Rng rng;
@@ -112,6 +113,7 @@ struct SketchEngine::Impl
    Program* prog = nullptr;
    std::string fontPath;
    plutovg_font_face_t* font = nullptr;
+   std::vector<plutovg_font_face_t*> fallbacks;
    std::string svgText;
    std::unique_ptr<lunasvg::Document> svg;
    bool svgDirty = false;      // a script mutated `svg`: re-parse before the next run
@@ -119,6 +121,7 @@ struct SketchEngine::Impl
    {
       delete prog;
       if (font) plutovg_font_face_destroy(font);
+      for (auto* f : fallbacks) plutovg_font_face_destroy(f);
    }
 };
 
@@ -358,6 +361,28 @@ FN(js_endShape)
    p->shape.clear();
    return JS_UNDEFINED;
 }
+// Draws (or, with draw=false, just measures) `s` one codepoint at a time so a character the main
+// font lacks (CJK, say) comes from a fallback face instead of the main font's NO GLYPH box.
+float TextRun(Program* p, const char* s, float x, float y, bool draw)
+{
+   plutovg_text_iterator_t it;
+   plutovg_text_iterator_init(&it, s, -1, PLUTOVG_TEXT_ENCODING_UTF8);
+   float adv = 0;
+   while (plutovg_text_iterator_has_next(&it))
+   {
+      const plutovg_codepoint_t cp = plutovg_text_iterator_next(&it);
+      plutovg_font_face_t* face = p->font;
+      if (!plutovg_font_face_has_glyph(face, cp))
+         for (auto* f : p->fallbacks)
+            if (plutovg_font_face_has_glyph(f, cp)) { face = f; break; }
+      plutovg_canvas_set_font(p->cv, face, p->st.textSize);
+      float w;
+      if (draw) w = plutovg_canvas_fill_text(p->cv, &cp, 1, PLUTOVG_TEXT_ENCODING_UTF32, x + adv, y);
+      else w = plutovg_canvas_text_extents(p->cv, &cp, 1, PLUTOVG_TEXT_ENCODING_UTF32, nullptr);
+      adv += w;
+   }
+   return adv;
+}
 FN(js_text)
 {
    NEEDN(3);
@@ -368,9 +393,8 @@ FN(js_text)
    bool ok = Num(c, argv[1], x) && Num(c, argv[2], y);
    if (ok && p->font && p->st.fillOn)
    {
-      plutovg_canvas_set_font(p->cv, p->font, p->st.textSize);
       plutovg_canvas_set_rgba(p->cv, p->st.fill[0], p->st.fill[1], p->st.fill[2], p->st.fill[3]);
-      plutovg_canvas_fill_text(p->cv, s, -1, PLUTOVG_TEXT_ENCODING_UTF8, x, y);
+      TextRun(p, s, x, y, true);
    }
    JS_FreeCString(c, s);
    return ok ? JS_UNDEFINED : JS_EXCEPTION;
@@ -381,12 +405,7 @@ FN(js_textWidth)
    Program* p = P(c);
    const char* s = JS_ToCString(c, argv[0]);
    if (!s) return JS_EXCEPTION;
-   float w = 0;
-   if (p->font)
-   {
-      plutovg_canvas_set_font(p->cv, p->font, p->st.textSize);
-      w = plutovg_canvas_text_extents(p->cv, s, -1, PLUTOVG_TEXT_ENCODING_UTF8, nullptr);
-   }
+   float w = p->font ? TextRun(p, s, 0, 0, false) : 0.f;
    JS_FreeCString(c, s);
    return JS_NewFloat64(c, w);
 }
@@ -594,6 +613,13 @@ void SketchEngine::SetFontFile(const std::string& path)
    mImpl->fontPath = path;
    if (mImpl->font) { plutovg_font_face_destroy(mImpl->font); mImpl->font = nullptr; }
    if (!path.empty()) mImpl->font = plutovg_font_face_load_from_file(path.c_str(), 0);
+   for (auto* f : mImpl->fallbacks) plutovg_font_face_destroy(f);
+   mImpl->fallbacks.clear();
+   const size_t dirEnd = path.find_last_of("/\\");
+   if (dirEnd != std::string::npos)
+      for (const char* name : {"NotoSansSC-Subset.otf", "NotoSansJP-Subset.otf"})
+         if (auto* f = plutovg_font_face_load_from_file((path.substr(0, dirEnd + 1) + name).c_str(), 0))
+            mImpl->fallbacks.push_back(f);
 
    // lunasvg's font cache is process-wide and system fonts are compiled out, so give
    // SVG <text> the same bundled face under the usual family names (once per path).
@@ -790,6 +816,7 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
    p->shape.clear();
    p->inShape = false;
    p->font = mImpl->font;
+   p->fallbacks = mImpl->fallbacks;
    if (mImpl->svg && mImpl->svgDirty)   // undo last frame's svgSet so frames never depend on history
       if (auto fresh = lunasvg::Document::loadFromData(StripExternalRefs(mImpl->svgText))) mImpl->svg = std::move(fresh);
    mImpl->svgDirty = false;

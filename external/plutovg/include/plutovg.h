@@ -851,6 +851,8 @@ PLUTOVG_API void plutovg_font_face_get_metrics(const plutovg_font_face_t* face, 
  * @param left_side_bearing Pointer to store the left side bearing of the glyph.
  * @param extents Pointer to a `plutovg_rect_t` object to store the glyph bounding box.
  */
+/** Non-zero when the face maps the codepoint to a real glyph (not .notdef). */
+PLUTOVG_API int plutovg_font_face_has_glyph(plutovg_font_face_t* face, plutovg_codepoint_t codepoint);
 PLUTOVG_API void plutovg_font_face_get_glyph_metrics(plutovg_font_face_t* face, float size, plutovg_codepoint_t codepoint, float* advance_width, float* left_side_bearing, plutovg_rect_t* extents);
 
 /**

@@ -365,6 +365,11 @@ static plutovg_glyph_t* plutovg_font_face_get_glyph(plutovg_font_face_t* face, p
     return plutovg_glyph_cache_get(&face->cache, face, codepoint);
 }
 
+int plutovg_font_face_has_glyph(plutovg_font_face_t* face, plutovg_codepoint_t codepoint)
+{
+    return face && stbtt_FindGlyphIndex(&face->info, codepoint) != 0;
+}
+
 void plutovg_font_face_get_glyph_metrics(plutovg_font_face_t* face, float size, plutovg_codepoint_t codepoint, float* advance_width, float* left_side_bearing, plutovg_rect_t* extents)
 {
     float scale = plutovg_font_face_get_scale(face, size);

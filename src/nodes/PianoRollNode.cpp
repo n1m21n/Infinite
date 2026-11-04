@@ -82,10 +82,16 @@ public:
       const double tStart = tr.BlockStartBeats(), tEnd = tStart + dT;
       // A seek, a loop back or a fresh start: nothing held carries over, and
       // the next pass rolls chance anew.
+      double scanFrom = tStart;
       if (mLastTransport < 0.0 || tStart < mLastTransport - 1e-6 || tStart > mLastTransport + dT * 4.0 + 0.05)
       {
          ReleaseAll(0);
          mPass++;
+         // A loop wrap lands the block a little past the loop start (the overshoot is kept so laps
+         // stay exact): notes sitting right on the start would be skipped every lap, so scan from it.
+         if (mLastTransport >= 0.0 && tr.LoopEnabled() && tStart >= tr.LoopStartBeats() &&
+             tStart - tr.LoopStartBeats() <= dT * 2.0)
+            scanFrom = tr.LoopStartBeats();
       }
       mLastTransport = tEnd;
       mPlayhead.store(tStart, std::memory_order_relaxed);
@@ -105,7 +111,7 @@ public:
       const float velScale = mVelocity.load(std::memory_order_relaxed);
       const bool snap = mUseGlobalScale.load(std::memory_order_relaxed);
       const auto& notes = s->notes;
-      auto it = std::lower_bound(notes.begin(), notes.end(), tStart, [](const SchedNote& n, double b) { return n.on < b; });
+      auto it = std::lower_bound(notes.begin(), notes.end(), scanFrom, [](const SchedNote& n, double b) { return n.on < b; });
       for (; it != notes.end() && it->on < tEnd; ++it)
       {
          const SchedNote& n = *it;
