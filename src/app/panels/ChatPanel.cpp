@@ -18,6 +18,8 @@
 #include "core/CliSetup.h"
 #include "core/GraphNode.h"
 #include "core/NodeFactory.h"
+#include "audio/AudioEngine.h"
+#include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
@@ -93,6 +95,12 @@ namespace app
          std::shared_ptr<chat::AgentRun> setup;
          bool failed = false;
          bool signingIn = false;
+         std::shared_ptr<chat::AgentRun> login;  // the browser sign-in, running without a terminal
+         std::string loginUrl;                   // the page to open by hand when the CLI could not
+         std::string loginError;                 // plain words after a failed sign-in
+         std::string loginLog;                   // raw output, behind Details
+         bool authBroken = false;                // a turn said "sign in": overrides the file probe
+         double loginAt = 0.0;
       };
 
       chat::Thread sThread;
@@ -310,13 +318,13 @@ namespace app
       bool Ready(const std::string& id)
       {
          auto it = sAgents.find(id);
-         return it != sAgents.end() && it->second.ready.Ready();
+         return it != sAgents.end() && it->second.ready.Ready() && !it->second.authBroken;
       }
 
       bool AnyReady()
       {
          for (const auto& [id, s] : sAgents)
-            if (s.ready.Ready())
+            if (s.ready.Ready() && !s.authBroken)
                return true;
          return false;
       }
@@ -351,7 +359,7 @@ namespace app
                continue;
             AgentState& s = sAgents[a.id];
             s.ready = CliSetup::AgentReadiness(a);
-            if (s.ready.signedIn)
+            if (s.ready.signedIn && s.login == nullptr)
                s.signingIn = false;
          }
       }
@@ -382,6 +390,60 @@ namespace app
             s.failed = true;
       }
 
+      // Browser sign-in with no terminal: the CLI opens the browser itself and waits for the callback.
+      void StartSignIn(const CliSetup::Agent& agent)
+      {
+         AgentState& s = sAgents[agent.id];
+         chat::AgentKind kind;
+         if (s.login != nullptr || !KindOf(agent.id, kind))
+            return;
+         chat::AgentRun::Options o;
+         o.kind = kind;
+         o.raw = true;
+         o.argv = chat::SignInArgs(kind);
+         TerminalCommandEnv(o.env, o.cwd);
+         s.loginError.clear();
+         s.loginUrl.clear();
+         s.loginLog.clear();
+         s.signingIn = true;
+         s.loginAt = ImGui::GetTime();
+         s.login = chat::AgentRun::Start(o);
+      }
+
+      void PollLogins()
+      {
+         for (auto& [id, s] : sAgents)
+         {
+            if (s.login == nullptr)
+               continue;
+            std::vector<chat::AgentEvent> ev;
+            s.login->Poll(ev);
+            const std::string log = chat::StripAnsi(s.login->Log());
+            if (s.loginUrl.empty())
+               s.loginUrl = chat::FindUrl(log);
+            if (!s.login->Done())
+               continue;
+            bool error = false;
+            for (const chat::AgentEvent& e : ev)
+               if (e.kind == chat::AgentEvent::Kind::End)
+                  error = e.error;
+            s.loginLog = log;
+            s.login = nullptr;
+            s.signingIn = false;
+            CheckAgents(true);
+            if (!error)
+            {
+               s.authBroken = false;
+               s.ready.signedIn = true;  // the CLI said it signed in: trust that over the file probe
+            }
+            else
+            {
+               const chat::Friendly f = chat::Explain(AgentName(id), log);
+               s.loginError = f.kind == chat::Friendly::Kind::Other ? std::string(T("Sign-in did not finish. Try again.")) : f.text;
+            }
+         }
+      }
+
       void OpenInTerminal(const CliSetup::Agent& agent)
       {
          using namespace CliSetup;
@@ -393,6 +455,7 @@ namespace app
 
       void PollSetups()
       {
+         PollLogins();
          for (auto& [id, s] : sAgents)
          {
             if (s.setup == nullptr)
@@ -533,8 +596,18 @@ namespace app
             s.id = NewId();
          chat::AgentRun::Options o;
          o.kind = r.kind;
-         o.argv = chat::AgentArgs(r.kind, prompt, s.id, s.live, dirs);
+         chat::TurnOptions to;
+         {
+            const auto& prefs = CliSetup::Prefs();
+            const auto m = prefs.models.find(agent);
+            if (m != prefs.models.end())
+               to.model = m->second;
+            to.folderAccess = prefs.folderAccess;
+         }
+         o.argv = chat::AgentArgs(r.kind, prompt, s.id, s.live, dirs, to);
          TerminalCommandEnv(o.env, o.cwd);
+         if (!CliSetup::Prefs().workspace.empty() && std::filesystem::is_directory(CliSetup::Prefs().workspace))
+            o.cwd = CliSetup::Prefs().workspace;
          r.run = chat::AgentRun::Start(o);
          r.steps = (int)sThread.entries.size();
          Push(Make(Entry::Kind::Steps, "", agent));
@@ -622,8 +695,13 @@ namespace app
             InsertAt(at++, Make(Entry::Kind::Agent, r.answer, r.agent));
          if (r.error)
          {
-            char note[200];
-            std::snprintf(note, sizeof note, "%s: %s", AgentName(r.agent), r.errorText.empty() ? T("stopped with an error.") : r.errorText.c_str());
+            // Plain words for what went wrong; a "sign in" error flips the agent back to Sign in.
+            const chat::Friendly f = chat::Explain(AgentName(r.agent), r.errorText);
+            if (f.kind == chat::Friendly::Kind::SignIn || f.kind == chat::Friendly::Kind::Terms)
+               sAgents[r.agent].authBroken = true;
+            char note[300];
+            const std::string why = f.kind != chat::Friendly::Kind::Other ? f.text : r.errorText.empty() ? std::string(T("stopped with an error.")) : r.errorText;
+            std::snprintf(note, sizeof note, "%s: %s", AgentName(r.agent), why.c_str());
             InsertAt(at++, Make(Entry::Kind::Error, note, r.agent));
          }
          for (const std::string& d : r.denied)
@@ -1195,6 +1273,56 @@ namespace app
          return t.id != 0 ? &sTextures[path] : nullptr;
       }
 
+      // A sound the agent made: one row, play / stop on the same preview player the Library uses.
+      void DrawAudio(const std::string& rawPath, float width)
+      {
+         std::string path = rawPath;
+         if (!path.empty() && path[0] == '~')
+         {
+            const char* home = std::getenv("HOME");
+            if (home != nullptr)
+               path = std::string(home) + path.substr(1);
+         }
+         static std::string sError;
+         const bool exists = std::filesystem::exists(path);
+         const bool playing = gPreviewingSamplePath == path && AudioEngine::Instance().Preview().IsPlaying();
+         const float rowH = 30.0f;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ImGui::PushID(rawPath.c_str());
+         const bool clicked = ImGui::InvisibleButton("##aud", ImVec2(width, rowH)) && exists;
+         ImGui::PopID();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
+         const ImVec2 c(at.x + rowH * 0.5f, at.y + rowH * 0.5f);
+         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+         if (playing)
+            glyph::DrawPlayerPause(dl, c, rowH * 0.5f, col);
+         else
+            glyph::DrawPlayerPlay(dl, c, rowH * 0.5f, col, true);
+         const std::string name = std::filesystem::path(path).filename().string();
+         const std::string shown = exists ? name : name + "  " + T("(missing)");
+         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? col : Dim(), shown.c_str());
+         if (clicked)
+         {
+            SamplePreviewPlayer& preview = AudioEngine::Instance().Preview();
+            preview.Stop();
+            if (playing)
+               gPreviewingSamplePath.clear();
+            else
+            {
+               auto* decoded = new Platform::SampleBuffer();
+               std::string error;
+               if (Platform::DecodeAudioFileToBuffer(path, *decoded, error))
+               {
+                  preview.Play(decoded);
+                  gPreviewingSamplePath = path;
+               }
+               else
+                  delete decoded;
+            }
+         }
+      }
+
       void DrawImage(const std::string& path, float width)
       {
          Texture* t = TextureFor(path);
@@ -1228,6 +1356,10 @@ namespace app
                   CodeBlock::Draw(b.text.c_str(), cid);
                   break;
                }
+               case chat::Block::Kind::Audio:
+                  DrawAudio(b.text, width);
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  break;
                case chat::Block::Kind::Image:
                   DrawImage(b.text, width);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
@@ -1544,12 +1676,31 @@ namespace app
                   OpenInTerminal(a);
                dl->AddText(ImVec2(at.x + tok::space_2 + ImGui::CalcTextSize(a.name).x + tok::space_2, ty), Red(), T("Failed"));
             }
-            else if (s.ready.installed && s.ready.connected && !s.ready.signedIn)
+            else if (s.login != nullptr)
+            {
+               const char* msg = T("Finish in your browser…");
+               const float w = ImGui::CalcTextSize(msg).x;
+               dl->AddText(ImVec2(at.x + width - w - tok::space_2, ty), Dim(), msg);
+               ImGui::SetCursorScreenPos(ImVec2(at.x + width - w - tok::space_2 - BusyLine::kSpinner - tok::space_1, at.y + (rowH - BusyLine::kSpinner) * 0.5f));
+               BusyLine::Spinner();
+               if (!s.loginUrl.empty())
+               {
+                  ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH + 2.0f));
+                  ImGui::PushID("open");
+                  if (ChipButton::Draw(T("Open sign-in page"), false))
+                     Platform::OpenExternalUrl(s.loginUrl);
+                  ImGui::PopID();
+                  ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH + 2.0f + ChipButton::kHeight));
+               }
+            }
+            else if (s.ready.installed && s.ready.connected && (!s.ready.signedIn || s.authBroken))
             {
                if (right(T("Sign in"), true))
+                  StartSignIn(a);
+               if (!s.loginError.empty())
                {
-                  s.signingIn = true;
-                  TerminalRunInNewTab(a.launch);
+                  const float ex = at.x + tok::space_2 + ImGui::CalcTextSize(a.name).x + tok::space_2;
+                  dl->AddText(ImVec2(ex, ty), Red(), s.loginError.c_str());
                }
             }
             else if (right(T("Set up"), true))
@@ -1846,7 +1997,7 @@ namespace app
                   continue;
                AgentState& s = it->second;
                ImGui::PushID(a.id);
-               if (s.ready.Ready())
+               if (s.ready.Ready() && !s.authBroken)
                {
                   if (ImGui::Selectable(a.name, a.id == cur))
                   {
@@ -1862,14 +2013,85 @@ namespace app
                   {
                      if (s.ready.installed && s.ready.connected)
                      {
-                        s.signingIn = true;
-                        TerminalRunInNewTab(a.launch);
+                        StartSignIn(a);
                      }
                      else
                         SetUpInBackground(a);
                   }
                }
                ImGui::PopID();
+            }
+            ImGui::EndPopup();
+         }
+      }
+
+      // The model the default agent uses; "Default" lets the agent choose.
+      void DrawModelPicker(ImVec2 at, float h)
+      {
+         const std::string cur = DefaultAgent();
+         chat::AgentKind kind;
+         if (cur.empty() || !KindOf(cur, kind))
+            return;
+         static std::map<std::string, std::vector<chat::Model>> sModels;
+         static std::map<std::string, std::shared_ptr<chat::AgentRun>> sFetch;
+         std::vector<chat::Model>& list = sModels[cur];
+         if (list.empty())
+            list = chat::FixedModels(kind);
+         if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[cur] == nullptr)
+         {
+            chat::AgentRun::Options o;
+            o.kind = kind;
+            o.raw = true;
+            o.argv = { "agy", "models" };
+            TerminalCommandEnv(o.env, o.cwd);
+            sFetch[cur] = chat::AgentRun::Start(o);
+         }
+         if (sFetch[cur] != nullptr)
+         {
+            std::vector<chat::AgentEvent> drop;
+            sFetch[cur]->Poll(drop);
+            if (sFetch[cur]->Done())
+            {
+               list = chat::ParseAgyModels(chat::StripAnsi(sFetch[cur]->Log()));
+               sFetch[cur] = nullptr;
+               if (list.empty())
+                  list.push_back({ "", T("Default") });
+            }
+         }
+         if (list.empty())
+            return;
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         const std::string id = prefs.models.count(cur) ? prefs.models[cur] : std::string();
+         std::string name = T("Default");
+         for (const chat::Model& m : list)
+            if (m.id == id)
+               name = m.label;
+         const float w = ImGui::CalcTextSize(name.c_str()).x + 2.0f * tok::space_2;
+         ImGui::SetCursorScreenPos(ImVec2(at.x - w, at.y));
+         const bool clicked = ImGui::InvisibleButton("##chatmodel", ImVec2(w, h));
+         const bool hot = ImGui::IsItemHovered();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         if (hot)
+            dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), TextTint(0.06f), tok::radius_tile);
+         dl->AddText(ImVec2(at.x - w + tok::space_2, at.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), name.c_str());
+         if (clicked)
+            ImGui::OpenPopup("##chatmodels");
+         if (ImGui::BeginPopup("##chatmodels"))
+         {
+            if (ImGui::Selectable(T("Default"), id.empty()))
+            {
+               prefs.models.erase(cur);
+               CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, prefs);
+            }
+            for (const chat::Model& m : list)
+            {
+               if (m.id.empty())
+                  continue;
+               if (ImGui::Selectable(m.label.c_str(), m.id == id))
+               {
+                  prefs.models[cur] = m.id;
+                  CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, prefs);
+               }
             }
             ImGui::EndPopup();
          }
@@ -2013,6 +2235,11 @@ namespace app
             }
          }
          DrawAgentPicker(ImVec2(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f), 22.0f);
+         {
+            const std::string curAgent = DefaultAgent();
+            const char* an = curAgent.empty() ? T("No agent") : AgentName(curAgent);
+            DrawModelPicker(ImVec2(sc.x - sendW * 0.5f - tok::space_1 - ImGui::CalcTextSize(an).x - 2.0f * tok::space_2, barY + (barH - 22.0f) * 0.5f), 22.0f);
+         }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + wellH));
          ImGui::Dummy(ImVec2(width, 0.0f));
          if (active || sDropHovered)

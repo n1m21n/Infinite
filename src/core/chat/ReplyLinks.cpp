@@ -320,6 +320,18 @@ namespace chat
       return false;
    }
 
+   bool IsAudioPath(const std::string& path)
+   {
+      const std::string l = Lower(Trim(path));
+      for (const char* ext : { ".wav", ".mp3", ".flac", ".ogg", ".aiff", ".aif", ".m4a" })
+      {
+         const std::string e = ext;
+         if (l.size() > e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0)
+            return l.find(' ') == std::string::npos || l[0] == '/' || l[0] == '~';
+      }
+      return false;
+   }
+
    std::vector<Block> ParseReply(const std::string& text, const Catalog& catalog)
    {
       std::vector<Block> blocks;
@@ -369,6 +381,14 @@ namespace chat
          {
             Block b;
             b.kind = Block::Kind::Image;
+            b.text = bare;
+            blocks.push_back(b);
+            continue;
+         }
+         if (IsAudioPath(bare))
+         {
+            Block b;
+            b.kind = Block::Kind::Audio;
             b.text = bare;
             blocks.push_back(b);
             continue;

@@ -666,6 +666,13 @@ if ($Failed -gt 0) { exit 1 }
       c.welcomed = j.value("welcomed", false);
       if (const std::string face = j.value("face", std::string()); face == "chat" || face == "terminal")
          c.face = face;
+      c.workspace = j.value("workspace", std::string());
+      c.folderAccess = j.value("folderAccess", false);
+      c.introduced = j.value("introduced", false);
+      if (j.contains("models") && j["models"].is_object())
+         for (auto it = j["models"].begin(); it != j["models"].end(); ++it)
+            if (it.value().is_string() && FindAgent(it.key()) != nullptr)
+               c.models[it.key()] = it.value().get<std::string>();
       return c;
    }
 
@@ -673,7 +680,9 @@ if ($Failed -gt 0) { exit 1 }
    {
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
-      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face } }.dump(2) << "\n";
+      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
+                                                                { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced },
+                                                                { "models", c.models } }.dump(2) << "\n";
    }
 
    namespace

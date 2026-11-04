@@ -27,14 +27,16 @@ namespace chat
 
    struct Block
    {
-      enum class Kind { Para, Bullet, Heading, Code, Image };
+      enum class Kind { Para, Bullet, Heading, Code, Image, Audio };
       Kind kind = Kind::Para;
       std::vector<Seg> segs;  // Para, Bullet, Heading
-      std::string text;       // Code: the lines; Image: the path
+      std::string text;       // Code: the lines; Image, Audio: the path
    };
 
    std::vector<Block> ParseReply(const std::string& text, const Catalog& catalog);
 
    // A picture file the agent pointed at: ends in .png .jpg .jpeg .gif .bmp or .webp.
    bool IsImagePath(const std::string& path);
+   // A sound file the reply points at on its own line (wav, mp3, flac, ogg, aiff, m4a).
+   bool IsAudioPath(const std::string& path);
 }

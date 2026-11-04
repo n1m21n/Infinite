@@ -33,10 +33,18 @@ namespace chat
       std::string mReply;  // Antigravity: the reply step's text so far, sent whole when the step is done
    };
 
+   // What the user chose for a turn: a model ("" = the agent's own), and whether it may also read and edit
+   // files in its folder (else it only runs `infinite` and reads what the user attached).
+   struct TurnOptions
+   {
+      std::string model;
+      bool folderAccess = false;
+   };
+
    // argv for one turn. The prompt goes as an argument: a PTY line holds about 1 KB.
    // `dirs`: folders of attached files the turn may read (ChatFiles FileDirs).
    std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
-                                      const std::vector<std::string>& dirs = {});
+                                      const std::vector<std::string>& dirs = {}, const TurnOptions& options = TurnOptions());
    // The line the terminal face runs to open the same conversation.
    std::string TerminalResumeLine(AgentKind kind, const std::string& session);
 }

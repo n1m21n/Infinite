@@ -16,6 +16,15 @@ namespace chat
       std::unique_ptr<term::PtyHost> pty;
       std::atomic<bool> finished{ false };
       std::atomic<bool> stopped{ false };
+      std::string log;
+
+      void AppendLog(const std::string& bytes)
+      {
+         std::lock_guard<std::mutex> g(lock);
+         log += bytes;
+         if (log.size() > 16384)
+            log.erase(0, log.size() - 16384);
+      }
 
       void Push(std::vector<AgentEvent>& events)
       {
@@ -77,6 +86,7 @@ namespace chat
          for (int n; (n = pty->Read(buffer, sizeof buffer)) > 0;)
          {
             const std::string bytes(buffer, (size_t)n);
+            AppendLog(bytes);
             stream.Feed(bytes, events);
             // What is not an event (a missing command, a login prompt) explains a turn that ends with none.
             tail = (tail + bytes).substr(tail.size() + bytes.size() > 600 ? tail.size() + bytes.size() - 600 : 0);
@@ -88,6 +98,17 @@ namespace chat
          for (const AgentEvent& e : events)
             ended = ended || e.kind == AgentEvent::Kind::End;
          const int code = pty->ExitCode();
+         if (o.raw)
+         {
+            AgentEvent e;
+            e.kind = AgentEvent::Kind::End;
+            e.error = !stopped && code != 0;
+            e.text = stopped ? "stopped" : tail;
+            events.push_back(e);
+            Push(events);
+            finished = true;
+            return;
+         }
          if (!ended)
          {
             AgentEvent e;
@@ -122,6 +143,12 @@ namespace chat
    {
       std::lock_guard<std::mutex> g(mImpl->lock);
       return mImpl->finished && mImpl->queue.empty();
+   }
+
+   std::string AgentRun::Log() const
+   {
+      std::lock_guard<std::mutex> g(mImpl->lock);
+      return mImpl->log;
    }
 
    void AgentRun::Stop()

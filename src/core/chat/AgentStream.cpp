@@ -188,12 +188,16 @@ namespace chat
    }
 
    std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
-                                      const std::vector<std::string>& dirs)
+                                      const std::vector<std::string>& dirs, const TurnOptions& options)
    {
       if (kind == AgentKind::Antigravity)
       {
          // No system-prompt flag: the note leads the first message. The prompt follows -p directly.
          std::vector<std::string> a = { "agy", "--output-format", "stream-json", "--settings", kAgySettings };
+         if (!options.model.empty())
+            a.insert(a.end(), { "--model", options.model });
+         if (options.folderAccess)
+            a.insert(a.end(), { "--mode", "accept-edits" });
          for (const std::string& d : dirs)
             a.insert(a.end(), { "--add-dir", d });
          if (resume && !session.empty())
@@ -205,6 +209,10 @@ namespace chat
       {
          // Codex reads anywhere in its default sandbox; the paths in the prompt are enough.
          std::vector<std::string> a = { "codex", "exec", "--json" };
+         if (!options.model.empty())
+            a.insert(a.end(), { "-m", options.model });
+         if (options.folderAccess)
+            a.insert(a.end(), { "-s", "workspace-write" });
          if (resume && !session.empty())
             a.insert(a.end(), { "resume", session });
          a.push_back(prompt);
@@ -212,13 +220,17 @@ namespace chat
       }
       // --allowedTools and --add-dir take several values, so another option follows each and `--` ends options.
       std::vector<std::string> a = { "claude", "-p" };
+      if (!options.model.empty())
+         a.insert(a.end(), { "--model", options.model });
       if (!dirs.empty())
       {
          a.push_back("--add-dir");
          a.insert(a.end(), dirs.begin(), dirs.end());
       }
       a.insert(a.end(), { "--allowedTools", "Bash(infinite:*)" });
-      if (!dirs.empty())
+      if (options.folderAccess)
+         a.insert(a.end(), { "Read", "Edit", "Write", "Glob", "Grep" });
+      else if (!dirs.empty())
          a.push_back("Read");
       a.insert(a.end(), { "--output-format", "stream-json", "--verbose", "--append-system-prompt", kChatNote,
                           resume ? "--resume" : "--session-id", session, "--", prompt });

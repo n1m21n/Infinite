@@ -20,6 +20,7 @@ namespace chat
          std::vector<std::string> argv;  // AgentArgs()
          std::string cwd;
          std::vector<std::pair<std::string, std::string>> env;
+         bool raw = false;  // not a stream-json turn (a sign-in, a setup): End carries the exit status, Log() the text
       };
       static std::shared_ptr<AgentRun> Start(const Options& options);
       ~AgentRun();
@@ -27,6 +28,7 @@ namespace chat
       void Poll(std::vector<AgentEvent>& out);  // events since the last call
       bool Done() const;                        // the child is gone and every event was taken
       void Stop();                              // ends the turn; an End event follows
+      std::string Log() const;                  // everything the child printed (last ~16 KB), for a Details fold
 
       struct Impl;
 

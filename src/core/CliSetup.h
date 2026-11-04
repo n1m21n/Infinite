@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -89,6 +90,10 @@ namespace CliSetup
       bool autoStart = false;
       bool welcomed = false; // the Terminal welcome has been dismissed once
       std::string face = "chat";  // what the Terminal panel opens to: "chat" or "terminal"
+      std::string workspace;      // the folder agents work in; "" = the open patch's folder, else HOME
+      bool folderAccess = false;  // agents may also read and edit files in the folder (else only `infinite` and attached files)
+      std::map<std::string, std::string> models;  // per agent id; missing = the agent's own default
+      bool introduced = false;    // the "connected, try this" line was shown once
    };
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);

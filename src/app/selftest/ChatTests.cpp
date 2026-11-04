@@ -1,6 +1,7 @@
 // INFINITE_CHATTEST: the chat's patch grammar and reply links against a hand-made catalog
 // (docs/plans/agent-collab/README.md C3-C7): grammar, reply links, agent streams, diffs, saved chats, files. No window, no agent. Early exit before glfwInit().
 #include "app/AppShared.h"
+#include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
 #include "core/chat/AgentStream.h"
 #include "core/chat/ChatDiff.h"
@@ -439,6 +440,34 @@ namespace app
          slow->Poll(sv);
          check(slow->Done() && !sv.empty() && sv.back().kind == chat::AgentEvent::Kind::End && !sv.back().error, "runner: Stop ends the turn quietly");
 #endif
+      }
+      {
+         // C8: sign-in, plain-words errors, models, sound blocks, per-turn options.
+         check(chat::SignInArgs(chat::AgentKind::Claude) == std::vector<std::string>({ "claude", "auth", "login" }), "sign-in: claude uses its browser login");
+         check(chat::SignInArgs(chat::AgentKind::Codex).size() == 2 && chat::SignInArgs(chat::AgentKind::Codex)[1] == "login", "sign-in: codex uses its browser login");
+         check(chat::StripAnsi("\x1b[31mred\x1b[0m\r\n") == "red\n", "ansi codes and carriage returns are stripped");
+         check(chat::FindUrl("Open https://claude.ai/oauth?x=1 now") == "https://claude.ai/oauth?x=1", "the sign-in address is found in the output");
+         check(chat::Explain("Claude", "Error: not logged in").kind == chat::Friendly::Kind::SignIn, "error: not logged in means sign in");
+         check(chat::Explain("Codex", "You've hit your usage limit").kind == chat::Friendly::Kind::Limit, "error: usage limit");
+         check(chat::Explain("Codex", "getaddrinfo ENOTFOUND api").kind == chat::Friendly::Kind::Offline, "error: offline");
+         check(chat::Explain("Codex", "zsh: command not found: codex").kind == chat::Friendly::Kind::Missing, "error: missing command");
+         check(chat::Explain("Codex", "boom happened").text == "boom happened", "error: anything else shows the last line");
+         const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");
+         check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini Flash", "agy models are parsed from id<TAB>label rows");
+         chat::TurnOptions to;
+         to.model = "opus";
+         const std::vector<std::string> ma = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, to);
+         check(std::find(ma.begin(), ma.end(), "--model") != ma.end() && std::find(ma.begin(), ma.end(), "opus") != ma.end(), "claude: the chosen model is passed");
+         check(chat::IsAudioPath("/tmp/a.wav") && chat::IsAudioPath("~/x/y.mp3") && !chat::IsAudioPath("notes.txt"), "sound paths are recognised");
+         const std::vector<chat::Block> rb = chat::ParseReply("Here it is\n/tmp/kick.wav\n/tmp/pic.png\n```\ncode\n```\n", cat);
+         bool aud = false, img = false, code = false;
+         for (const chat::Block& b : rb)
+         {
+            aud = aud || b.kind == chat::Block::Kind::Audio;
+            img = img || b.kind == chat::Block::Kind::Image;
+            code = code || b.kind == chat::Block::Kind::Code;
+         }
+         check(aud && img && code, "a reply can hold a sound, a picture and a code block");
       }
       std::printf("CHATTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;
