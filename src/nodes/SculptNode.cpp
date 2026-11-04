@@ -186,12 +186,15 @@ void SculptNode::BeginStroke()
 {
    Update();
    mStrokeMesh = mMesh;
+   std::vector<float> pos;
+   Sculpt::PointFrame(mMesh, mTopo, pos, mStrokeNrm);
    mStrokeGrid = *PointGrid(mGrid.cell * 6.0f);
 }
 
 void SculptNode::EndStroke()
 {
    mStrokeMesh = Mesh();
+   mStrokeNrm.clear();
    mStrokeGrid = Sculpt::Grid();
 }
 

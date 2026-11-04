@@ -109,8 +109,9 @@ namespace Sculpt
       }
 
       Area Gather(const float c[3], float radius, const std::vector<float>& pos, const std::vector<float>& nrm,
-                  const Topology& t, bool sharp, const Grid* grid)
+                  const Topology& t, bool sharp, const Grid* grid, const std::vector<float>* areaNrm = nullptr)
       {
+         const std::vector<float>& an = areaNrm != nullptr && areaNrm->size() == nrm.size() ? *areaNrm : nrm;
          Area a;
          float wsum = 0.0f;
          const float r2 = radius * radius;
@@ -126,7 +127,7 @@ namespace Sculpt
                f *= f;
             for (int k = 0; k < 3; k++)
             {
-               a.normal[k] += nrm[(size_t)i * 3 + k] * f;
+               a.normal[k] += an[(size_t)i * 3 + k] * f;
                a.center[k] += p[k] * f;
             }
             wsum += f;
@@ -651,7 +652,7 @@ namespace Sculpt
       {
          float c[3];
          Flip(d.center, m, c);
-         Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid);
+         Area a = Gather(c, d.radius, pos, nrm, t, d.brush == kCrease, grid, d.areaNormals);
          if (d.alpha != nullptr)
             for (size_t e = 0; e < a.idx.size(); e++)
                a.f[e] *= AlphaAt(d, &pos[(size_t)a.idx[e] * 3], c, m);

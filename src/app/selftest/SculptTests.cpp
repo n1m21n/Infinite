@@ -63,6 +63,7 @@ namespace
       d.strength = strength;
       d.invert = invert;
       d.symmetry = symmetry;
+      d.areaNormals = n.StrokeNormals();
       Sculpt::Stroke(d, pos, nrm, n.Topology(), std::clamp(n.amount, 0.0f, 2.0f), n.Offsets());
       n.OffsetsChanged();
    }

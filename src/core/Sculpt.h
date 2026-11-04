@@ -92,6 +92,9 @@ namespace Sculpt
       // brightness under it. right/up: the view's axes in mesh space.
       const Alpha* alpha = nullptr;
       float right[3] = { 1, 0, 0 }, up[3] = { 0, 1, 0 };
+      // Normals (per point) the brush's area normal is taken from, when not the shown surface's: Blender
+      // keeps a stroke's normals as it began, so a ridge does not tip its own brush forward.
+      const std::vector<float>* areaNormals = nullptr;
    };
    // Adds one dab to `offsets` (per point, xyz), measured on the shaped
    // mesh's points. Offsets are in the sculpt's own units: a dab moves the

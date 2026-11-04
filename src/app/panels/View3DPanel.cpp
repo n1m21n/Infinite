@@ -3418,6 +3418,7 @@ namespace
       d.invert = ImGui::GetIO().KeyCtrl;
       d.symmetry = sSculpt.symmetry;
       SculptAlpha(node, world, d);
+      d.areaNormals = node->StrokeNormals();
       static std::vector<unsigned int> touched;
       touched.clear();
       const Sculpt::Grid* grid = node->PointGrid(d.radius);
