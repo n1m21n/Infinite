@@ -35,6 +35,22 @@ namespace CliSetup
          return s;
       }
 
+      // {EXE} -> how the launcher is spelled in this shell; {TOOL} -> the quoted path of the JSON-registration helper.
+      std::string Sub(const std::string& cmd, const std::string& exe, const std::string& tool)
+      {
+         return Replace(Replace(cmd, "{EXE}", exe), "{TOOL}", tool);
+      }
+
+      std::string ShQuote(const std::string& s);
+      std::string PsQuote(const std::string& s);
+
+      // The helper script path, quoted for the shell it is typed into.
+      std::string ToolRef(Os os, const std::string& dir)
+      {
+         const std::string path = dir + "/mcp_json.js";
+         return os == Os::kWindows ? PsQuote(path) : ShQuote(path);
+      }
+
       std::string ShQuote(const std::string& s)
       {
          std::string out = "'";
@@ -84,6 +100,27 @@ namespace CliSetup
            ".claude.json",
            ".claude/skills",
            "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },
+         { "codex", "Codex", "codex",
+           "npm install -g @openai/codex",
+           "npm install -g @openai/codex",
+           "codex",
+           "codex mcp get infinite",
+           "codex mcp add infinite --env INFINITE_BIN={EXE} -- npx -y infinite-engine serve",
+           "codex mcp remove infinite",
+           ".codex/config.toml",
+           ".codex/skills",
+           "Codex asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
+         // Antigravity has no `mcp add` command: the helper edits its JSON config (mcp_json.js, written next to the setup script).
+         { "antigravity", "Antigravity", "agy",
+           "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+           "irm https://antigravity.google/cli/install.ps1 | iex",
+           "agy",
+           "node {TOOL} check ~/.gemini/config/mcp_config.json infinite",
+           "node {TOOL} add ~/.gemini/config/mcp_config.json infinite {EXE}",
+           "node {TOOL} remove ~/.gemini/config/mcp_config.json infinite",
+           ".gemini/config/mcp_config.json",
+           ".gemini/skills",
+           "Antigravity asks you to sign in with Google the first time it starts. Infinite never sees or stores the login." },
       };
       return kAgents;
    }
@@ -476,6 +513,7 @@ if ($Failed -gt 0) { exit 1 }
                            const std::vector<std::string>& only, const Status* prior)
    {
       std::ostringstream o;
+      const std::string tool = ToolRef(os, statusPath.substr(0, statusPath.find_last_of("/\\") == std::string::npos ? 0 : statusPath.find_last_of("/\\")));
       if (os == Os::kWindows)
       {
          o << "# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
@@ -495,9 +533,9 @@ if ($Failed -gt 0) { exit 1 }
          o << "$AppBin = Join-Path (Join-Path $env:LOCALAPPDATA 'Infinite\\bin') 'infinite-app.cmd'\n";
          o << "$SkillsSrc = Join-Path (Split-Path $Status) 'skills'\n$SkillsDir = "
            << (agent.skillsDir[0] != '\0' ? "Join-Path $env:USERPROFILE " + PsQuote(Replace(agent.skillsDir, "/", "\\")) : std::string("''")) << "\n";
-         o << "function McpCheck { " << Replace(agent.mcpCheck, "{EXE}", "$AppBin") << " }\n";
-         o << "function McpAdd { " << Replace(agent.mcpAdd, "{EXE}", "$AppBin") << " }\n";
-         o << "function McpRemove { " << Replace(agent.mcpRemove, "{EXE}", "$AppBin") << " }\n";
+         o << "function McpCheck { " << Sub(agent.mcpCheck, "$AppBin", tool) << " }\n";
+         o << "function McpAdd { " << Sub(agent.mcpAdd, "$AppBin", tool) << " }\n";
+         o << "function McpRemove { " << Sub(agent.mcpRemove, "$AppBin", tool) << " }\n";
          o << kPsBody;
          return o.str();
       }
@@ -516,9 +554,9 @@ if ($Failed -gt 0) { exit 1 }
          }
       o << "APPBIN=\"$HOME/.local/bin/infinite-app\"\nSKILLS_SRC=\"$(dirname \"$STATUS\")/skills\"\n";
       o << "SKILLS_DIR=" << (agent.skillsDir[0] != '\0' ? "\"$HOME/" + std::string(agent.skillsDir) + "\"" : std::string("''")) << "\n";
-      o << "mcp_check() { " << Replace(agent.mcpCheck, "{EXE}", "\"$APPBIN\"") << "; }\n";
-      o << "mcp_add() { " << Replace(agent.mcpAdd, "{EXE}", "\"$APPBIN\"") << "; }\n";
-      o << "mcp_remove() { " << Replace(agent.mcpRemove, "{EXE}", "\"$APPBIN\"") << "; }\n";
+      o << "mcp_check() { " << Sub(agent.mcpCheck, "\"$APPBIN\"", tool) << "; }\n";
+      o << "mcp_add() { " << Sub(agent.mcpAdd, "\"$APPBIN\"", tool) << "; }\n";
+      o << "mcp_remove() { " << Sub(agent.mcpRemove, "\"$APPBIN\"", tool) << "; }\n";
       o << kShBody;
       return o.str();
    }
@@ -537,13 +575,14 @@ if ($Failed -gt 0) { exit 1 }
 
    std::string StartAgentLine(Os os, const std::string& exe, const Agent& agent)
    {
+      const std::string tool = ToolRef(os, PathsFor(AppPaths::AppSupportDir(), os).dir);
       if (os == Os::kWindows)
          return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
-                PsQuote(exe) + " }; if (-not ((" + Replace(agent.mcpCheck, "{EXE}", "$A") + " 2>$null | Out-String).Contains($A))) { " +
-                Replace(agent.mcpRemove, "{EXE}", "$A") + " 2>$null | Out-Null; " + Replace(agent.mcpAdd, "{EXE}", "$A") + " }; " + agent.launch;
+                PsQuote(exe) + " }; if (-not ((" + Sub(agent.mcpCheck, "$A", tool) + " 2>$null | Out-String).Contains($A))) { " +
+                Sub(agent.mcpRemove, "$A", tool) + " 2>$null | Out-Null; " + Sub(agent.mcpAdd, "$A", tool) + " }; " + agent.launch;
       return std::string("export PATH=\"$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; A=\"$HOME/.local/bin/infinite-app\"; [ -x \"$A\" ] || A=") +
-             ShQuote(exe) + "; " + agent.mcpCheck + " 2>/dev/null | grep -qF \"$A\" || { " + Replace(agent.mcpRemove, "{EXE}", "\"$A\"") +
-             " >/dev/null 2>&1; " + Replace(agent.mcpAdd, "{EXE}", "\"$A\"") + "; }; " + agent.launch;
+             ShQuote(exe) + "; " + Sub(agent.mcpCheck, "\"$A\"", tool) + " 2>/dev/null | grep -qF \"$A\" || { " + Sub(agent.mcpRemove, "\"$A\"", tool) +
+             " >/dev/null 2>&1; " + Sub(agent.mcpAdd, "\"$A\"", tool) + "; }; " + agent.launch;
    }
 
    bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv)
@@ -598,6 +637,7 @@ if ($Failed -gt 0) { exit 1 }
       if (FindAgent(agent) != nullptr)
          c.agent = agent;
       c.autoStart = j.value("autoStart", false);
+      c.welcomed = j.value("welcomed", false);
       return c;
    }
 
@@ -605,7 +645,7 @@ if ($Failed -gt 0) { exit 1 }
    {
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
-      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart } }.dump(2) << "\n";
+      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed } }.dump(2) << "\n";
    }
 
    namespace
@@ -816,6 +856,30 @@ if ($Failed -gt 0) { exit 1 }
 
    namespace
    {
+      // The one place Antigravity's JSON config is edited: add / remove / check one stdio server by name.
+      // Plain Node, no packages (Node is already a setup step), the same file on every OS.
+      const char* const kMcpJsonTool = R"JS(const fs = require("fs"), os = require("os"), path = require("path");
+const [cmd, rawFile, name, exe] = process.argv.slice(2);
+const file = rawFile.startsWith("~") ? path.join(os.homedir(), rawFile.slice(1)) : rawFile;
+let doc = {};
+try { doc = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { if (e.code !== "ENOENT") { console.error("cannot read " + file + ": " + e.message); process.exit(2); } }
+if (typeof doc !== "object" || doc === null || Array.isArray(doc)) { console.error(file + " is not a JSON object"); process.exit(2); }
+doc.mcpServers = doc.mcpServers || {};
+if (cmd === "check") { const e = doc.mcpServers[name]; if (!e) process.exit(1); console.log(JSON.stringify(e)); process.exit(0); }
+if (cmd === "add") doc.mcpServers[name] = { command: "npx", args: ["-y", "infinite-engine", "serve"], env: { INFINITE_BIN: exe } };
+else if (cmd === "remove") delete doc.mcpServers[name];
+else { console.error("usage: add|remove|check FILE NAME [EXE]"); process.exit(2); }
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
+)JS";
+
+      void StageTool(const Paths& paths)
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         std::ofstream(AppPaths::FsPath(paths.dir + "/mcp_json.js"), std::ios::binary) << kMcpJsonTool;
+      }
+
       // Writes the shipped skill files where the script copies them from.
       void StageSkills(const Paths& paths)
       {
@@ -843,6 +907,7 @@ if ($Failed -gt 0) { exit 1 }
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
          StageSkills(paths);
+         StageTool(paths);
          std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
          out << BuildScript(os, exe, agent, paths.status);
          out.close();
@@ -863,6 +928,7 @@ if ($Failed -gt 0) { exit 1 }
          std::error_code ec;
          std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
          StageSkills(paths);
+         StageTool(paths);
          std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
          out << BuildScript(os, exe, agent, paths.status, { step }, prior);
          out.close();

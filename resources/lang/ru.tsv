@@ -2604,3 +2604,8 @@ Yards	Ярды
 Z	Z
 Z Global	Z глобально
 Zoom 1:1	Масштаб 1:1
+Welcome to the Terminal	Добро пожаловать в Терминал
+A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you.	Настоящая оболочка внутри Infinite. Запускайте любые команды и подключайте ИИ-агента, который вместе с вами создаёт патчи, рендеры и сетки.
+Choose your coding agent	Выберите ИИ-агента для кода
+Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	При подключении агент устанавливается при необходимости, связывается с Infinite и получает навыки Infinite. Позже это можно изменить в Настройках, Терминал.
+Skip, just a terminal	Пропустить, только терминал

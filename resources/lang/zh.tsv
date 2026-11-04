@@ -2604,3 +2604,8 @@ Yards	码
 Z	Z
 Z Global	全局 Z
 Zoom 1:1	缩放 1:1
+Welcome to the Terminal	欢迎使用终端
+A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you.	Infinite 内的真实 Shell。可运行任意命令,并连接编程代理,与你一起创建补丁、渲染和编辑网格。
+Choose your coding agent	选择你的编程代理
+Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	连接时会在需要时安装代理,将其链接到 Infinite 并添加 Infinite 技能。之后可在设置的终端中更改。
+Skip, just a terminal	跳过,仅使用终端

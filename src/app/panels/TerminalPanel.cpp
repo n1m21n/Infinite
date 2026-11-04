@@ -895,6 +895,8 @@ namespace
    void DrawPanel()
    {
       FollowTheme();
+      if (sTabs.empty() && DrawTerminalWelcome())
+         return;
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));

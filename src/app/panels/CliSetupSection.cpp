@@ -217,6 +217,75 @@ namespace app
       SectionCard::End();
    }
 
+   // First open of the Terminal: what it is, which agent to connect, one button to set it up. Returns true
+   // while the welcome is showing (the panel draws nothing else then). "Skip" or any setup ends it for good.
+   bool DrawTerminalWelcome()
+   {
+      using namespace CliSetup;
+      Config& prefs = Prefs();
+      if (prefs.welcomed)
+         return false;
+      const Os os = CurrentOs();
+      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
+      const Agent* agent = FindAgent(prefs.agent);
+      if (agent == nullptr)
+         agent = &Agents()[0];
+      const std::string exe = RealExecutable();
+      const View v = Describe(os, ParseStatus(ReadFile(paths.status), (long long)std::time(nullptr)), *agent, AgentInstalledHere(*agent), exe, paths, nullptr);
+
+      auto finish = [&]()
+      {
+         prefs.welcomed = true;
+         SaveConfig(paths.config, prefs);
+      };
+
+      ImGui::Dummy(ImVec2(0.0f, tok::space_4));
+      ImGui::Indent(tok::space_4);
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(240.0f, ImGui::GetContentRegionAvail().x - tok::space_4));
+      ImGui::TextUnformatted(T("Welcome to the Terminal"));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      ImGui::TextDisabled("%s", T("A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you."));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+
+      ImGui::TextUnformatted(T("Choose your coding agent"));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      const auto& all = Agents();
+      const float colW = ImGui::GetContentRegionAvail().x;
+      const float bw = ActionButton::RowWidth((int)all.size(), colW + ActionButton::ColumnIndent());
+      for (size_t i = 0; i < all.size(); i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, tok::space_1);
+         const bool on = &all[i] == agent;
+         if (ActionButton::Draw((std::string(all[i].name) + "###welcome_agent" + std::to_string(i)).c_str(), ImVec2(bw, 0.0f), on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+         {
+            prefs.agent = all[i].id;
+            SaveConfig(paths.config, prefs);
+         }
+      }
+      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+      ImGui::TextDisabled("%s", T("Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal."));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+
+      static std::string sError;
+      auto perform = [&](Action a)
+      {
+         sError.clear();
+         Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, std::string(), nullptr);
+         finish();
+      };
+      const ImVec2 wide(std::min(colW, 260.0f), 0.0f);
+      if (ActionButton::Draw((std::string(T("Connect")) + " " + agent->name + "###welcome_connect").c_str(), wide, ActionButton::Kind::Primary))
+         perform(v.showInstall ? Action::kInstallAgent : Action::kSetup);
+      if (ImGui::Button(T("Skip, just a terminal")))
+         finish();
+      if (!sError.empty())
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
+      ImGui::PopTextWrapPos();
+      ImGui::Unindent(tok::space_4);
+      return true;
+   }
+
    // The exact commands and script behind the buttons, for the Reference well on the same page.
    void DrawCliSetupCommands()
    {

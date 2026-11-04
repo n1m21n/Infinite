@@ -2604,3 +2604,8 @@ Yards	ヤード
 Z	Z
 Z Global	グローバル Z
 Zoom 1:1	ズーム 1:1
+Welcome to the Terminal	ターミナルへようこそ
+A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you.	Infinite 内の本物のシェルです。任意のコマンドを実行でき、パッチ、レンダー、メッシュ編集を一緒に行うコーディングエージェントを接続できます。
+Choose your coding agent	コーディングエージェントを選択
+Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	接続すると、必要に応じてエージェントをインストールし、Infinite にリンクして Infinite スキルを追加します。後で設定のターミナルから変更できます。
+Skip, just a terminal	スキップ(ターミナルのみ)

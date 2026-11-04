@@ -5777,6 +5777,7 @@ extern ImVec2 gTerminalRectMin, gTerminalRectMax;
 extern std::vector<std::string> gTerminalDropPending; // paths dropped on the panel, pasted as shell words
 void TerminalLoadFonts(float bakedPx);
 void DrawTerminalDocked(const char* id, const ImVec2& size);
+bool DrawTerminalWelcome();   // CliSetupSection.cpp
 void TerminalPanelHidden();
 // A new tab with `line` typed and entered (the CLI setup section and the agent buttons).
 void TerminalRunInNewTab(const std::string& line);

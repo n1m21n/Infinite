@@ -200,6 +200,20 @@ namespace app
          std::ofstream(record) << app2.string() << "\n";
          check(LauncherResolves(Os::kLinux, record) && CheckHealth(in).step[0] == Health::kOk, "app moved, record refreshed at launch: the launcher resolves");
 
+         // Three agents ship; each builds a start line, and the welcome flag survives a save and load.
+         check(Agents().size() == 3 && FindAgent("codex") != nullptr && FindAgent("antigravity") != nullptr, "claude, codex and antigravity are offered");
+         for (const Agent& a : Agents())
+            check((StartAgentLine(Os::kLinux, exe, a).find("{EXE}") == std::string::npos && StartAgentLine(Os::kLinux, exe, a).find("{TOOL}") == std::string::npos), (std::string(a.id) + ": start line has no unfilled placeholder").c_str());
+         {
+            Config c;
+            c.welcomed = true;
+            c.agent = "codex";
+            const std::string cfg = (home / "welcome.json").string();
+            SaveConfig(cfg, c);
+            const Config r = LoadConfig(cfg);
+            check(r.welcomed && r.agent == "codex" && !LoadConfig((home / "none.json").string()).welcomed, "welcome flag and agent choice persist; a new user has not been welcomed");
+         }
+
          // Skills: three shipped, an edited or deleted one turns the agent step amber.
          check(Skills().size() == 3 && std::string(Skills()[0].name) == "infinite-patch-authoring", "three AI skills ship, patch authoring first");
          const fs::path sk = home / ".claude" / "skills" / "infinite-field-language" / "SKILL.md";

@@ -2604,3 +2604,8 @@ Yards	Yardas
 Z	Z
 Z Global	Z global
 Zoom 1:1	Zoom 1:1
+Welcome to the Terminal	Te damos la bienvenida al Terminal
+A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you.	Una shell real dentro de Infinite. Ejecuta cualquier comando y conecta un agente de programación que crea parches, renders y mallas contigo.
+Choose your coding agent	Elige tu agente de programación
+Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	Conectar instala el agente si hace falta, lo enlaza con Infinite y añade las habilidades de Infinite. Puedes cambiarlo luego en Ajustes, Terminal.
+Skip, just a terminal	Omitir, solo una terminal

@@ -87,6 +87,7 @@ namespace CliSetup
    {
       std::string agent = "claude";
       bool autoStart = false;
+      bool welcomed = false; // the Terminal welcome has been dismissed once
    };
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);
