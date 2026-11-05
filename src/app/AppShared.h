@@ -5791,6 +5791,9 @@ extern bool gTerminalOpen;
 extern float gTerminalHeight;
 extern float gTerminalWidth;
 extern int gTerminalDock; // 0 bottom, 1 right, 2 left, 3 top
+extern bool gTerminalFloating;   // the panel (chat or terminal) floats in its own movable, resizable window
+inline bool TerminalDocked() { return gTerminalOpen && !gTerminalFloating; }
+void DrawTerminalFloating();
 extern float gTerminalFontSize;
 extern bool gTerminalFocus; // the terminal has the keyboard
 extern ImVec2 gTerminalRectMin, gTerminalRectMax;

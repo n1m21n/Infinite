@@ -676,8 +676,10 @@ namespace
       {
          static const char* kDocks[] = { I18N_KEY("Terminal at Bottom"), I18N_KEY("Terminal at Right"), I18N_KEY("Terminal at Left"), I18N_KEY("Terminal at Top") };
          for (int i = 0; i < 4; ++i)
-            if (MenuParts::Item(L(kDocks[i]), nullptr, gTerminalDock == i))
-               gTerminalDock = i;
+            if (MenuParts::Item(L(kDocks[i]), nullptr, !gTerminalFloating && gTerminalDock == i))
+               gTerminalDock = i, gTerminalFloating = false;
+         if (MenuParts::Item(L("Floating Window"), nullptr, gTerminalFloating))
+            gTerminalFloating = true;
          ImGui::EndMenu();
       }
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
@@ -1139,6 +1141,37 @@ void DrawTerminalDocked(const char* id, const ImVec2& size)
    ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
    ImGui::EndChild();
    ImGui::GetStyle().ItemSpacing = savedSpacing;
+}
+
+// The panel in its own window over the stage, moved and sized like Settings or Shortcuts.
+void DrawTerminalFloating()
+{
+   const ImGuiViewport* vp = ImGui::GetMainViewport();
+   ImGui::SetNextWindowSize(ImVec2(440.0f, std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_FirstUseEver);
+   ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - 480.0f, vp->WorkPos.y + 80.0f), ImGuiCond_FirstUseEver);
+   ImGui::SetNextWindowSizeConstraints(ImVec2(kMinWidth, kMinHeight), ImVec2(FLT_MAX, FLT_MAX));
+   PushElevatedPanelStyle(/*isChild=*/false);
+   const bool chat = gTerminalFace == 0 && CliSetup::Prefs().face == "chat";
+   std::string title = std::string(chat ? T("Chat") : T("Terminal")) + "###terminalfloat";
+   bool open = true;
+   const bool visible = ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   if (visible)
+   {
+      gTerminalRectMin = ImGui::GetWindowPos();
+      gTerminalRectMax = ImVec2(gTerminalRectMin.x + ImGui::GetWindowSize().x, gTerminalRectMin.y + ImGui::GetWindowSize().y);
+      if (gTerminalFocus && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         gTerminalFocus = false;
+      const auto drawStart = std::chrono::steady_clock::now();
+      DrawPanel();
+      const double drawn = std::chrono::duration<double>(std::chrono::steady_clock::now() - drawStart).count();
+      sDrawSeconds += drawn;
+      sDrawFrames += 1.0;
+      sDrawWorst = std::max(sDrawWorst, drawn);
+   }
+   ImGui::End();
+   PopElevatedPanelStyle();
+   if (!open)
+      gTerminalOpen = false;
 }
 
 bool TerminalRunInNewTab(const std::string& name, const std::string& command)

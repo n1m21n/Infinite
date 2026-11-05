@@ -4345,6 +4345,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       }
       // "settingswin" / "shortcutswin" / "helpwin": that floating window open (design review shots).
       if (o.find("settingswin") != std::string::npos) gSettingsOpen = true;
+      if (o.find("chatfloat") != std::string::npos) gTerminalFloating = true;
       if (o.find("shortcutswin") != std::string::npos) gShortcutsOpen = true;
       if (o.find("helpwin") != std::string::npos) gHelpOpen = true;
       // "dialogdemo": the Unsaved Changes dialog open (design review shots).

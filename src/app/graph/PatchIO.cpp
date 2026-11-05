@@ -389,6 +389,8 @@ namespace app
             gTerminalHeight = std::max(160.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelTerminalDock")
             gTerminalDock = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "panelTerminalFloat")
+            gTerminalFloating = (val == "1");
          else if (key == "panelTerminalW")
             gTerminalWidth = std::max(280.0f, std::strtof(val.c_str(), nullptr));
          else if (key == "panelView3DOpen")
@@ -447,6 +449,7 @@ namespace app
       file << "panelTerminalH=" << gTerminalHeight << "\n";
       file << "panelTerminalDock=" << gTerminalDock << "\n";
       file << "panelTerminalW=" << gTerminalWidth << "\n";
+      file << "panelTerminalFloat=" << (gTerminalFloating ? 1 : 0) << "\n";
    }
 
 

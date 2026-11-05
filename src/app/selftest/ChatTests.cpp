@@ -177,6 +177,19 @@ namespace app
             check(blocks[2].kind == Block::Kind::Code && blocks[2].text == "infinite set 1 size 0.5", "code block");
             check(blocks[3].kind == Block::Kind::Image && blocks[3].text == "/tmp/look.png", "picture path");
          }
+         {
+            const auto stale = chat::ParseReply("Loaded it into @osc#3.", cat);
+            bool found = false;
+            for (const Seg& g : stale.empty() ? std::vector<Seg>{} : stale[0].segs)
+               found = found || (g.kind == Seg::Kind::Node && g.node == 2);
+            check(found,
+                  "a stale index falls back to the node's title");
+            const auto dead = chat::ParseReply("[Do it](frobnicate:x) now", cat);
+            bool raw = false;
+            for (const Seg& g : dead.empty() ? std::vector<Seg>{} : dead[0].segs)
+               raw = raw || g.text.find("](") != std::string::npos;
+            check(!dead.empty() && !raw, "an unknown action shows its label, never raw markdown");
+         }
          const auto bare = chat::ParseReply("I raised the detail on @cube#1, and the size too.", cat);
          int params = 0;
          for (const Seg& g : bare[0].segs)
@@ -559,6 +572,10 @@ namespace app
                std::string err;
                check(HandleAppRpc("attention", nlohmann::json::object(), out, err) && out.contains("selected") && out.contains("touched") && out["panels"].is_array(),
                      "docs: attention lists selection, touched control and panels");
+               const bool wasOpen = gPianoRollOpen;
+               gPianoRollOpen = false;
+               check(HandleAppRpc("panel", { { "name", "Piano-Roll" }, { "open", true } }, out, err) && gPianoRollOpen, "panel: names an agent writes open the panel");
+               gPianoRollOpen = wasOpen;
             }
             const std::string w = chat::WithFiles("look", { "/a/b.wav", "/c/d.png" });
             check(w.rfind("look", 0) == 0 && w.find("/a/b.wav (audio)") != std::string::npos && w.find("/c/d.png (image)") != std::string::npos,

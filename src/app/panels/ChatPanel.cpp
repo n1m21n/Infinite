@@ -1516,9 +1516,18 @@ namespace app
          const float pad = tok::space_3;                // the composer's own inset
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
          dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
-         dl->AddRect(t0, ImVec2(t1.x, t1.y + 1.0f), TextTint(0.10f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
-         const float leftC = at.x + pad + 7.0f;                      // centre of the composer's + glyph
-         const float rightC = std::floor(at.x + width - pad - 13.0f + 2.0f);  // centre of Send
+         {  // open outline (no bottom edge: the tray sits on the composer)
+            const float r = tok::radius_tile * 2.0f;
+            const ImVec2 a(t0.x + 0.5f, t0.y + 0.5f), b(t1.x - 0.5f, t1.y);
+            dl->PathClear();
+            dl->PathLineTo(ImVec2(a.x, b.y));
+            dl->PathArcTo(ImVec2(a.x + r, a.y + r), r, IM_PI, IM_PI * 1.5f);
+            dl->PathArcTo(ImVec2(b.x - r, a.y + r), r, IM_PI * 1.5f, IM_PI * 2.0f);
+            dl->PathLineTo(ImVec2(b.x, b.y));
+            dl->PathStroke(TextTint(0.10f), ImDrawFlags_None, 1.0f);
+         }
+         const float leftC = std::floor(t0.x + tok::space_3 + 7.0f);
+         const float rightC = std::floor(t1.x - tok::space_3 - 7.0f);
          int take = -1, drop = -1;
          for (size_t i = 0; i < sQueue.size(); i++)
          {
@@ -2119,14 +2128,44 @@ namespace app
                size_t e = i;
                while (e < s.text.size() && s.text[e] != ' ' && s.text[e] != '\n')
                   e++;
-               const std::string word = s.text.substr(i, e - i);
-               const float w = font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, word.c_str()).x;
+               std::string word = s.text.substr(i, e - i);
+               const float fsz = ImGui::GetFontSize();
+               auto widthOf = [&](const std::string& t) { return font->CalcTextSizeA(fsz, FLT_MAX, 0.0f, t.c_str()).x; };
+               float w = widthOf(word);
                if (x > 0.0f && x + w > width)
                   x = 0.0f, y += lineH;
-               const ImVec2 p(origin.x + x, origin.y + y + (lineH - ImGui::GetFontSize()) * 0.5f);
+               // A word wider than the whole line (a path, a hash) breaks where it must, after a / or - when it can.
+               while (w > width && word.size() > 1)
+               {
+                  size_t cut = 0;
+                  for (size_t k = 1; k < word.size(); k++)
+                  {
+                     if ((word[k] & 0xC0) == 0x80)
+                        continue;  // inside a UTF-8 character
+                     if (widthOf(word.substr(0, k)) > width)
+                        break;
+                     cut = k;
+                  }
+                  if (cut == 0)
+                     break;
+                  const size_t soft = word.find_last_of("/-_.", cut - 1);
+                  if (soft != std::string::npos && soft + 1 >= cut / 2 && soft + 1 < cut)
+                     cut = soft + 1;
+                  const std::string head = word.substr(0, cut);
+                  const float hw = widthOf(head);
+                  const ImVec2 hp(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
+                  if (s.kind == chat::Seg::Kind::Code)
+                     dl->AddRectFilled(ImVec2(hp.x - 2.0f, origin.y + y + 1.0f), ImVec2(hp.x + hw + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
+                  dl->AddText(font, fsz, hp, s.dim ? Dim() : col, head.c_str());
+                  record(head, ImVec2(origin.x + x, origin.y + y), hw, font);
+                  word = word.substr(cut);
+                  w = widthOf(word);
+                  x = 0.0f, y += lineH;
+               }
+               const ImVec2 p(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
                if (s.kind == chat::Seg::Kind::Code)
                   dl->AddRectFilled(ImVec2(p.x - 2.0f, origin.y + y + 1.0f), ImVec2(p.x + w + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
-               dl->AddText(font, ImGui::GetFontSize(), p, s.dim ? Dim() : col, word.c_str());
+               dl->AddText(font, fsz, p, s.dim ? Dim() : col, word.c_str());
                if (!word.empty())
                   record(word, ImVec2(origin.x + x, origin.y + y), w, font);
                x += w;
@@ -2168,37 +2207,141 @@ namespace app
       }
 
       // A sound the agent made: one row, play / stop on the same preview player the Library uses.
+      std::string ExpandHome(const std::string& raw)
+      {
+         if (!raw.empty() && raw[0] == '~')
+            if (const char* home = std::getenv("HOME"))
+               return std::string(home) + raw.substr(1);
+         return raw;
+      }
+
+      // Peaks + length of an audio file, read once per path for the player card.
+      struct AudioLook
+      {
+         std::vector<float> peaks;
+         float seconds = 0.0f;
+      };
+      const AudioLook& LookFor(const std::string& path)
+      {
+         static std::unordered_map<std::string, AudioLook> sLooks;
+         auto it = sLooks.find(path);
+         if (it != sLooks.end())
+            return it->second;
+         AudioLook look;
+         Platform::SampleBuffer buf;
+         std::string error;
+         if (Platform::DecodeAudioFileToBuffer(path, buf, error) && buf.numFrames > 0)
+         {
+            const int n = 96;
+            look.peaks.assign(n, 0.0f);
+            const int ch = std::max(1, buf.channels);
+            for (int i = 0; i < n; i++)
+            {
+               const int f0 = (int)((int64_t)buf.numFrames * i / n), f1 = std::max(f0 + 1, (int)((int64_t)buf.numFrames * (i + 1) / n));
+               float m = 0.0f;
+               for (int c = 0; c < ch; c++)
+                  for (int f = f0; f < f1 && f < buf.numFrames; f++)
+                     m = std::max(m, std::fabs(buf.channelData[(size_t)c * buf.numFrames + f]));
+               look.peaks[i] = m;
+            }
+            const float top = *std::max_element(look.peaks.begin(), look.peaks.end());
+            if (top > 0.0f)
+               for (float& v : look.peaks)
+                  v /= top;
+            look.seconds = buf.sampleRate > 0.0 ? (float)(buf.numFrames / buf.sampleRate) : 0.0f;
+         }
+         return sLooks.emplace(path, std::move(look)).first->second;
+      }
+
+      // An audio file an agent made: a small player (play, name, waveform, length, folder).
       void DrawAudio(const std::string& rawPath, float width)
       {
-         std::string path = rawPath;
-         if (!path.empty() && path[0] == '~')
-         {
-            const char* home = std::getenv("HOME");
-            if (home != nullptr)
-               path = std::string(home) + path.substr(1);
-         }
-         static std::string sError;
+         const std::string path = ExpandHome(rawPath);
          const bool exists = std::filesystem::exists(path);
-         const bool playing = gPreviewingSamplePath == path && AudioEngine::Instance().Preview().IsPlaying();
-         const float rowH = 30.0f;
+         SamplePreviewPlayer& preview = AudioEngine::Instance().Preview();
+         const bool playing = gPreviewingSamplePath == path && preview.IsPlaying();
+         const float cardH = 52.0f, pad = tok::space_2;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ImGui::PushID(rawPath.c_str());
-         const bool clicked = ImGui::InvisibleButton("##aud", ImVec2(width, rowH)) && exists;
-         ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
-         const ImVec2 c(at.x + rowH * 0.5f, at.y + rowH * 0.5f);
-         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+         const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
+         const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
+         const float btn = 32.0f, folder = 28.0f;
+         const ImVec2 bc(at.x + pad + btn * 0.5f, at.y + cardH * 0.5f);
+         const float folderX = at.x + width - pad - folder;
+
+         ImGui::PushID(rawPath.c_str());
+         ImGui::InvisibleButton("##aud", ImVec2(std::max(1.0f, folderX - at.x - tok::space_1), cardH));
+         const bool hot = ImGui::IsItemHovered() && exists;
+         const bool clicked = ImGui::IsItemClicked() && exists;
+         FormParts::Inline(0.0f, 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(folderX, at.y + (cardH - folder) * 0.5f));
+         const bool reveal = ImGui::InvisibleButton("##reveal", ImVec2(folder, folder)) && exists;
+         const bool folderHot = ImGui::IsItemHovered() && exists;
+         ImGui::PopID();
+
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? 0.08f : 0.05f), tok::radius_tile * 2.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(0.08f), tok::radius_tile * 2.0f);
+         dl->AddCircleFilled(bc, btn * 0.5f, exists ? WithAlpha(accent, hot ? 0.95f : 0.85f) : TextTint(0.08f), 32);
+         const ImU32 onAccent = IM_COL32_WHITE;  // as on Send
          if (playing)
-            glyph::DrawPlayerPause(dl, c, rowH * 0.5f, col);
+            glyph::DrawPlayerPause(dl, bc, btn * 0.36f, onAccent);
          else
-            glyph::DrawPlayerPlay(dl, c, rowH * 0.5f, col, true);
+            glyph::DrawPlayerPlay(dl, ImVec2(bc.x + 1.0f, bc.y), btn * 0.36f, exists ? onAccent : Dim(), true);
+
+         static const AudioLook kNone;
+         const AudioLook& look = exists ? LookFor(path) : kNone;
+         const float x0 = bc.x + btn * 0.5f + tok::space_3;
+         char dur[16] = "";
+         if (look.seconds > 0.0f)
+         {
+            const int s = (int)std::lround(look.seconds);
+            std::snprintf(dur, sizeof dur, "%d:%02d", s / 60, s % 60);
+         }
+         const float durW = dur[0] ? ImGui::CalcTextSize(dur).x : 0.0f;
+         const float x1 = folderX - tok::space_2 - (durW > 0.0f ? durW + tok::space_3 : 0.0f);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
-         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? col : Dim(), shown.c_str());
+         const float fs = ImGui::GetFontSize();
+         const float nameY = at.y + 8.0f;
+         ImGui::RenderTextEllipsis(dl, ImVec2(x0, nameY), ImVec2(x1, nameY + fs), x1, shown.c_str(), nullptr, nullptr);
+         if (dur[0])
+            dl->AddText(ImVec2(folderX - tok::space_2 - durW, at.y + (cardH - fs) * 0.5f), Dim(), dur);
+
+         // Waveform under the name: played part in the accent, the rest dim.
+         const float wy0 = nameY + fs + 5.0f, wy1 = at.y + cardH - 8.0f;
+         const float mid = (wy0 + wy1) * 0.5f, half = std::max(1.0f, (wy1 - wy0) * 0.5f);
+         if (!look.peaks.empty() && x1 > x0 + 8.0f)
+         {
+            const float step = 3.0f;
+            const int bars = (int)((x1 - x0) / step);
+            const float played = playing && look.seconds > 0.0f ? std::clamp(preview.PositionSeconds() / look.seconds, 0.0f, 1.0f) : -1.0f;
+            for (int i = 0; i < bars; i++)
+            {
+               const float u = (i + 0.5f) / bars;
+               const float v = look.peaks[std::min((int)(u * look.peaks.size()), (int)look.peaks.size() - 1)];
+               const float h = std::max(1.0f, v * half);
+               const float x = x0 + i * step;
+               dl->AddRectFilled(ImVec2(x, mid - h), ImVec2(x + 2.0f, mid + h), u <= played ? accent : TextTint(0.28f), 1.0f);
+            }
+         }
+         else
+            dl->AddLine(ImVec2(x0, mid), ImVec2(x1, mid), TextTint(0.16f));
+
+         const ImVec2 fc(folderX + folder * 0.5f, at.y + cardH * 0.5f);
+         if (folderHot)
+            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+         glyph::Draw(dl, fc, tok::icon_sm, folderHot ? text : Dim(), IconsInfinite::Folder);
+         if (folderHot)
+            ImGui::SetTooltip("%s", T("Show in folder"));
+         if (hot || folderHot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + cardH));
+         ImGui::Dummy(ImVec2(0.0f, 0.0f));
+
+         if (reveal)
+            Platform::RevealInFileManager(path);
          if (clicked)
          {
-            SamplePreviewPlayer& preview = AudioEngine::Instance().Preview();
             preview.Stop();
             if (playing)
                gPreviewingSamplePath.clear();
@@ -2217,13 +2360,6 @@ namespace app
          }
       }
 
-      std::string ExpandHome(const std::string& raw)
-      {
-         if (!raw.empty() && raw[0] == '~')
-            if (const char* home = std::getenv("HOME"))
-               return std::string(home) + raw.substr(1);
-         return raw;
-      }
 
       // A small "Show in folder" under a file the agent made, so it can be kept.
       void DrawReveal(const std::string& rawPath)
@@ -2261,13 +2397,16 @@ namespace app
          glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_sm, Dim(), IconsInfinite::Library);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
-         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), shown.c_str());
+         const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
+         float right = at.x + width - tok::space_2;
          if (exists)
          {
             const char* hint = T("Show in folder");
             const float w = ImGui::CalcTextSize(hint).x;
-            dl->AddText(ImVec2(at.x + width - w - tok::space_2, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), hint);
+            dl->AddText(ImVec2(right - w, ty), Dim(), hint);
+            right -= w + tok::space_3;
          }
+         ImGui::RenderTextEllipsis(dl, ImVec2(at.x + rowH, ty), ImVec2(right, ty + ImGui::GetFontSize()), right, shown.c_str(), nullptr, nullptr);
          if (clicked)
             Platform::RevealInFileManager(path);
       }
@@ -2380,7 +2519,6 @@ namespace app
                }
                case chat::Block::Kind::Audio:
                   DrawAudio(b.text, width);
-                  DrawReveal(b.text);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
                case chat::Block::Kind::Image:
@@ -4113,8 +4251,34 @@ namespace app
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Chats"));
          const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
-         const float toolsX = at.x + width - tok::space_1 - 2.0f * glyph - gap;
+         const float toolsX = at.x + width - tok::space_1 - 3.0f * glyph - 2.0f * gap;
          ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
+         {  // Pop out / dock back: a window with an arrow leaving it (or coming home)
+            const ImVec2 o = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton("##chatpopout", ImVec2(glyph, 18.0f)))
+               gTerminalFloating = !gTerminalFloating;
+            const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+            const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.5f + 0.5f * hv));
+            const ImVec2 c(std::floor(o.x + glyph * 0.5f) + 0.5f, std::floor(o.y + 9.0f) + 0.5f);
+            const float r = 5.5f;
+            // the window, open at its top-right corner where the arrow passes
+            dl->PathLineTo(ImVec2(c.x + 1.0f, c.y - r));
+            dl->PathLineTo(ImVec2(c.x - r, c.y - r));
+            dl->PathLineTo(ImVec2(c.x - r, c.y + r));
+            dl->PathLineTo(ImVec2(c.x + r, c.y + r));
+            dl->PathLineTo(ImVec2(c.x + r, c.y - 1.0f));
+            dl->PathStroke(col, ImDrawFlags_None, 1.25f);
+            const ImVec2 tip = gTerminalFloating ? ImVec2(c.x - 0.5f, c.y + 0.5f) : ImVec2(c.x + r + 1.5f, c.y - r - 1.5f);
+            const ImVec2 tail = gTerminalFloating ? ImVec2(c.x + r + 1.5f, c.y - r - 1.5f) : ImVec2(c.x - 0.5f, c.y + 0.5f);
+            dl->AddLine(tail, tip, col, 1.25f);
+            const float sx = tip.x > tail.x ? -1.0f : 1.0f, sy = tip.y > tail.y ? -1.0f : 1.0f;  // head points back along the shaft
+            dl->AddLine(tip, ImVec2(tip.x + sx * 4.0f, tip.y), col, 1.25f);
+            dl->AddLine(tip, ImVec2(tip.x, tip.y + sy * 4.0f), col, 1.25f);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
+         }
+         FormParts::Inline(0.0f, gap);
          if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
             gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
          if (ImGui::IsItemHovered())

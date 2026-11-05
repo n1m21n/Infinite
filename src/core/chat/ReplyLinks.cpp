@@ -374,12 +374,19 @@ namespace chat
                            hit = &p, node = index, count++;
                if (count == 1)
                {
-                  PushText(out, s.text.substr(last, i - last));
                   Seg p;
                   p.kind = Seg::Kind::Param;
                   p.node = node;
                   p.key = hit->key;
                   p.text = hit->label.empty() ? hit->key : hit->label;
+                  // `@node` `.` `key` split across segments: one param chip, as TryKey makes.
+                  if (s.text.substr(last, i - last) == "." && !out.empty() && out.back().kind == Seg::Kind::Node && out.back().node == node)
+                  {
+                     p.text = out.back().text + "." + p.text;
+                     out.pop_back();
+                  }
+                  else
+                     PushText(out, s.text.substr(last, i - last));
                   out.push_back(p);
                   last = end;
                }
