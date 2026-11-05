@@ -83,7 +83,16 @@ namespace app
          int w = 0, h = 0;
          std::vector<GLuint> frames;  // an animated gif: every frame, and when each one ends
          std::vector<int> endsMs;
+         long long bytes = -1;        // the file's size when read: a failed read tries again once it changes
       };
+
+      // A file's size, or -1 when it is not there: a file an agent is still writing grows.
+      long long FileSize(const std::string& path)
+      {
+         std::error_code ec;
+         const auto n = std::filesystem::file_size(AppPaths::FsPath(path), ec);
+         return ec ? -1 : (long long)n;
+      }
 
       // One agent's part of a turn.
       struct Run
@@ -2192,8 +2201,18 @@ namespace app
                path = home + path.substr(1);
          auto it = sTextures.find(path);
          if (it != sTextures.end())
-            return it->second.id != 0 ? &it->second : nullptr;
+         {
+            if (it->second.id != 0)
+               return &it->second;
+            // Not readable last time: look again once a second, in case it was still being written.
+            static double sLastLook = 0.0;
+            if (ImGui::GetTime() - sLastLook < 1.0 || FileSize(path) == it->second.bytes)
+               return nullptr;
+            sLastLook = ImGui::GetTime();
+            sTextures.erase(it);
+         }
          Texture t;
+         t.bytes = FileSize(path);
          int ch = 0;
          // stb is built with STBI_NO_STDIO here (EnvironmentNode.cpp): decode from memory.
          std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
@@ -2210,7 +2229,8 @@ namespace app
          // A gif plays: every frame on its own texture, at most 120 (a long gif keeps its first part).
          int* delays = nullptr;
          int count = 0;
-         const bool gif = bytes.size() > 6 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F';
+         // A gif over 16 MB shows its first frame only: stb decodes every frame at once, and that would not fit.
+         const bool gif = bytes.size() > 6 && bytes.size() < (16u << 20) && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F';
          if (unsigned char* px = gif ? stbi_load_gif_from_memory(bytes.data(), (int)bytes.size(), &delays, &t.w, &t.h, &count, &ch, 4) : nullptr)
          {
             int end = 0;
@@ -2517,6 +2537,9 @@ namespace app
       struct VideoLook
       {
          bool tried = false;
+         long long bytes = -1;  // the file's size when tried: a movie still being written is tried again
+         double lookedAt = 0.0;
+         int drawnFrame = 0;    // the last frame it was on screen: one scrolled away or in another chat stops
          GLuint tex = 0;
          int w = 0, h = 0;
          double seconds = 0.0;
@@ -2544,9 +2567,11 @@ namespace app
       VideoLook& VideoFor(const std::string& path)
       {
          VideoLook& v = sVideos[path];
-         if (v.tried)
+         if (v.tried && (v.tex != 0 || ImGui::GetTime() - v.lookedAt < 1.0 || FileSize(path) == v.bytes))
             return v;
          v.tried = true;
+         v.lookedAt = ImGui::GetTime();
+         v.bytes = FileSize(path);
          std::string error;
          Platform::VideoHandle* h = Platform::VideoOpen(path, error);
          if (h == nullptr)
@@ -2577,18 +2602,20 @@ namespace app
             DrawFile(rawPath, width);
             return;
          }
-         if (v->handle != nullptr)
-         {
-            const double t = v->seconds > 0.0 ? std::fmod(ImGui::GetTime() - v->started, v->seconds) : 0.0;
-            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)
-               UploadVideoFrame(*v);
-         }
          const float w = std::min(width, (float)v->w);
          const float h0 = w * (float)v->h / (float)std::max(1, v->w);
          const float s = h0 > 320.0f ? 320.0f / h0 : 1.0f;
          const ImVec2 sz(std::floor(w * s), std::floor(h0 * s));
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const ImVec2 end(at.x + sz.x, at.y + sz.y);
+         if (ImGui::IsRectVisible(at, end))
+            v->drawnFrame = ImGui::GetFrameCount();
+         if (v->handle != nullptr)
+         {
+            const double t = v->seconds > 0.0 ? std::fmod(ImGui::GetTime() - v->started, v->seconds) : 0.0;
+            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)
+               UploadVideoFrame(*v);
+         }
          ImGui::PushID(rawPath.c_str());
          const bool clicked = ImGui::InvisibleButton("##video", sz);
          ImGui::PopID();
@@ -4683,6 +4710,10 @@ namespace app
       }
       DrawComposer(composerW);
       DrawImageViewer();
+      // A movie that was not drawn this frame (scrolled away, another chat open) stops playing.
+      for (auto& [path, v] : sVideos)
+         if (v.handle != nullptr && v.drawnFrame < ImGui::GetFrameCount() - 1)
+            StopVideo(v);
    }
 
    bool ChatBusy() { return !sRuns.empty(); }
