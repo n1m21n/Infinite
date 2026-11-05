@@ -52,7 +52,24 @@ namespace chat
 #endif
          spawn.cwd = o.cwd;
          spawn.env = o.env;
-#if !defined(_WIN32)
+#if defined(_WIN32)
+         // A program installed since the app started (npm's %APPDATA%\\npm) is not on the PATH the app inherited.
+         if (!o.argv.empty() && o.argv[0].find_first_of("/\\\\") == std::string::npos)
+         {
+            const char* home = std::getenv("USERPROFILE");
+            const char* path = std::getenv("PATH");
+            const std::string dir = CliSetup::BinaryDir(CliSetup::Os::kWindows, o.argv[0], home != nullptr ? home : "", path != nullptr ? path : "");
+            if (!dir.empty())
+            {
+               bool set = false;
+               for (auto& kv : spawn.env)
+                  if (kv.first == "PATH")
+                     kv.second = dir + ";" + kv.second, set = true;
+               if (!set)
+                  spawn.env.push_back({ "PATH", dir + ";" + (path != nullptr ? path : "") });
+            }
+         }
+#else
          // The login shell reads .zprofile but not .zshrc, so a program that only .zshrc's PATH reaches (codex in a
          // Homebrew keg) would be "command not found" here although the user can run it. Put its folder, and so the
          // `node` beside it, on the PATH the agent starts with.

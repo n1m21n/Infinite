@@ -183,6 +183,7 @@ namespace app
       std::vector<EntryUi> sUi;
       bool sLoaded = false;
       std::string sInput;
+      std::string sReplyTo;  // the words being replied to: a glass card above the composer, sent as a quote with the message
       std::vector<std::string> sAttach;
       chat::Catalog sCat;
       uint64_t sCatGen = 0;
@@ -1016,6 +1017,7 @@ namespace app
          sThread.id = NewId();
          sUi.clear();
          sAttach.clear();
+         sReplyTo.clear();
          sCodeView.open = false;
       }
 
@@ -1209,6 +1211,22 @@ namespace app
          return false;
       }
 
+      // The reply card's words as "> " quote lines (the form agents and the log already read), then the card goes.
+      std::string TakeReply()
+      {
+         std::string q;
+         for (size_t i = 0; !sReplyTo.empty();)
+         {
+            const size_t e = sReplyTo.find('\n', i);
+            q += "> " + sReplyTo.substr(i, e == std::string::npos ? std::string::npos : e - i) + "\n";
+            if (e == std::string::npos)
+               break;
+            i = e + 1;
+         }
+         sReplyTo.clear();
+         return q.empty() ? q : q + "\n";
+      }
+
       void Send()
       {
          std::string line = sInput;
@@ -1218,6 +1236,7 @@ namespace app
             return;
          if (!sRuns.empty())
          {
+            line = TakeReply() + line;
             sQueue.push_back({ line, sAttach });
             sInput.clear();
             sAttach.clear();
@@ -1235,6 +1254,7 @@ namespace app
                   line = "undo";
             }
          }
+         line = TakeReply() + line;
          const chat::Parse p = chat::ParseLine(line, sCat);
          Entry user = Make(Entry::Kind::User, line);
          user.files = sAttach;
@@ -3597,19 +3617,10 @@ namespace app
          return out;
       }
 
-      // Reply: the words as a quote at the top of the composer, the cursor after them.
+      // Reply: the words become a glass card above the composer; the cursor stays in the field.
       void QuoteInComposer(const std::string& text)
       {
-         std::string q;
-         for (size_t i = 0;;)
-         {
-            const size_t e = text.find('\n', i);
-            q += "> " + text.substr(i, e == std::string::npos ? std::string::npos : e - i) + "\n";
-            if (e == std::string::npos)
-               break;
-            i = e + 1;
-         }
-         sInput = q + "\n" + sInput;
+         sReplyTo = text;
          sRefocus = sCursorToEnd = true;
       }
 
@@ -4385,13 +4396,38 @@ namespace app
          const int lines = VisualLines(wrapW);
          const int rows = std::clamp(lines, 1, 6);
          const float textH = fs * (float)rows + 2.0f * padY;
-         const float chipsH = sAttach.empty() ? 0.0f : 26.0f;
+         const float replyH = sReplyTo.empty() ? 0.0f : 46.0f;  // card 40 + air
+         const float chipsH = replyH + (sAttach.empty() ? 0.0f : 26.0f);
          const float barH = 26.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const float wellH = pad + chipsH + textH + gap + barH + tok::space_2;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.07f), tok::radius_tile * 2.0f);
          dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.10f), tok::radius_tile * 2.0f);
+
+         // Reply: a glass card inside the well, an accent edge, who it quotes in one line, a close mark.
+         if (replyH > 0.0f)
+         {
+            const ImVec2 a(at.x + pad, at.y + pad), b(at.x + width - pad, at.y + pad + 40.0f);
+            const float r = tok::radius_tile + 2.0f;
+            dl->AddRectFilled(a, b, TextTint(0.06f), r);
+            dl->AddRect(a, b, TextTint(0.12f), r);
+            dl->AddRectFilled(ImVec2(a.x + 8.0f, a.y + 8.0f), ImVec2(a.x + 11.0f, b.y - 8.0f), ImGui::GetColorU32(ImGuiCol_CheckMark), 2.0f);
+            std::string one = sReplyTo;
+            for (char& c : one)
+               if (c == '\n' || c == '\r' || c == '\t')
+                  c = ' ';
+            {
+               UiType::Scope cap(UiType::Size::Caption);
+               dl->AddText(ImVec2(a.x + 20.0f, a.y + 6.0f), Dim(), T("Replying to"));
+            }
+            ImGui::RenderTextEllipsis(dl, ImVec2(a.x + 20.0f, a.y + 21.0f), ImVec2(b.x - 30.0f, b.y), b.x - 30.0f, one.c_str(), nullptr, nullptr);
+            ImGui::SetCursorScreenPos(ImVec2(b.x - 26.0f, a.y + 8.0f));
+            const bool close = ImGui::InvisibleButton("##unreply", ImVec2(24.0f, 24.0f));
+            glyph::Draw(dl, ImVec2(b.x - 14.0f, a.y + 20.0f), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            if (close)
+               sReplyTo.clear();
+         }
 
          // Attached files, each with a remove mark.
          float x = at.x + pad;
@@ -4405,12 +4441,12 @@ namespace app
             const float moreW = ImGui::CalcTextSize(more.c_str()).x + 2.0f * tok::space_2;
             if (x + w + (i + 1 < sAttach.size() ? moreW + tok::space_1 : 0.0f) > at.x + width - pad)
             {
-               const ImVec2 p(x, at.y + pad);
+               const ImVec2 p(x, at.y + pad + replyH);
                dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
                dl->AddText(ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), Dim(), more.c_str());
                break;
             }
-            const ImVec2 p(x, at.y + pad);
+            const ImVec2 p(x, at.y + pad + replyH);
             dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), ImVec2(p.x + w - 20.0f, p.y + 22.0f), p.x + w - 20.0f, name.c_str(), nullptr, nullptr);

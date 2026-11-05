@@ -518,8 +518,8 @@ function SkillsSync {
 }
 if (Want 'agent') {
 Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
-$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; Invoke-Expression $AgentInstall; RefreshPath; $env:Path = "$env:USERPROFILE\.local\bin;$env:Path" }
+$env:Path = "$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path"
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; Invoke-Expression $AgentInstall; RefreshPath; $env:Path = "$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path" }
 if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { if ($AgentInstall) { Finish 'failed' "$AgentName did not install. The lines above say why" } else { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" } }
 elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
 else {
@@ -610,7 +610,7 @@ if ($Failed -gt 0) { exit 1 }
    {
       const std::string tool = ToolRef(os, PathsFor(AppPaths::AppSupportDir(), os).dir);
       if (os == Os::kWindows)
-         return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
+         return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:APPDATA\\npm;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
                 PsQuote(exe) + " }; if (-not ((" + Sub(agent.mcpCheck, "$A", tool) + " 2>$null | Out-String).Contains($A))) { " +
                 Sub(agent.mcpRemove, "$A", tool) + " 2>$null | Out-Null; " + Sub(agent.mcpAdd, "$A", tool) + " }; " + agent.launch;
       return std::string("export PATH=\"$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; A=\"$HOME/.local/bin/infinite-app\"; [ -x \"$A\" ] || A=") +
@@ -636,6 +636,14 @@ if ($Failed -gt 0) { exit 1 }
          dirs.push_back("/opt/homebrew/bin");
          dirs.push_back("/usr/local/bin");
       }
+      // npm's default global folders where no npm on the PATH leads to them: ~/.npm-global (Linux), %APPDATA%\npm (Windows).
+      if (os == Os::kWindows)
+      {
+         if (const char* appdata = getenv("APPDATA"))
+            dirs.push_back(std::string(appdata) + "\\npm");
+      }
+      else if (!home.empty())
+         dirs.push_back(home + "/.npm-global/bin");
       // `npm install -g` lands in the prefix npm itself lives in: a Homebrew keg, nvm's version folder.
       // A symlink such as /opt/homebrew/bin/npm leads there.
       if (os != Os::kWindows)
