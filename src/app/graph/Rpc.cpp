@@ -497,8 +497,25 @@ namespace app
             else
                valueStr = v.dump();
          }
+         // `set <node> <key> =sin(t)` is a formula, as typing it into the field is: the param turns purple.
+         const bool numeric = matchedKey[0] == 'f' || matchedKey[0] == 'i';
+         const size_t lead = valueStr.find_first_not_of(" \t");
+         if (numeric && lead != std::string::npos && valueStr[lead] == '=')
+         {
+            HandleTerminalRpc("set_expr", { { "index", index }, { "key", name }, { "text", valueStr } }, outResult, outError);
+            return outError.empty();
+         }
          PushUndoCheckpoint();
          Patch::LoadParams(gn->node.get(), { { matchedKey, valueStr } });
+         // A plain value replaces a formula, as it does in the field.
+         if (numeric)
+         {
+            int param = ParamIndexOfKeyOnNode(*gn, name);
+            if (param < 0)
+               param = ParamIndexOfKeyOnNode(*gn, "p." + name);
+            if (param >= 0)
+               Modulation::Instance().ClearExpression(gn->index, param);
+         }
          outResult = json::object();
          return true;
       }

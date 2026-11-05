@@ -3,6 +3,7 @@
 // open patch. Same rules as Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
 #include "app/AppShared.h"
+#include "core/GestureRecorder.h"
 #include "platform/common/ProcessTree.h"
 
 namespace app
@@ -151,8 +152,26 @@ namespace app
             return true;
          if (method == "set_expr")
          {
+            // The same as typing `=formula` into the field: the `=` is how a person says it, not part of it.
+            std::string text = params.value("text", std::string());
+            auto trim = [](std::string& t)
+            {
+               const size_t a = t.find_first_not_of(" \t\n");
+               t = a == std::string::npos ? std::string() : t.substr(a, t.find_last_not_of(" \t\n") - a + 1);
+            };
+            trim(text);
+            if (!text.empty() && text[0] == '=')
+               text.erase(0, 1);
+            trim(text);
             PushUndoCheckpoint();
-            Modulation::Instance().SetExpression(gn->index, param, params.value("text", std::string()));
+            if (text.empty())
+               Modulation::Instance().ClearExpression(gn->index, param);
+            else
+            {
+               Modulation::Instance().SetExpression(gn->index, param, text);
+               GestureRecorder::Instance().CancelArm(gn->index, param);
+               GestureRecorder::Instance().StopPlayback(gn->index, param);
+            }
          }
          else if (method == "unbind_mod")
          {
