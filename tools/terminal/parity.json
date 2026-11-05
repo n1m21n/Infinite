@@ -308,6 +308,9 @@
   "panels/ViewportPanel.cpp:Close panel": "panel viewport close"
  },
  "skip": {
+  "frame/StagePopupsA.cpp:Reference in chat": "puts the node in the chat box as an @ reference; an agent already names nodes with @",
+  "panels/PerfPanel.cpp:Floating Window": "window placement of a panel, a choice about the person's screen",
+  "panels/TerminalPanel.cpp:Floating Window": "window placement of a panel, a choice about the person's screen",
   "bodies/AudioNodeBodies.cpp:configure": "opens the plugin's own window, which a person uses",
   "frame/StageFloating.cpp:Include the open patch": "a tick box in the share dialog, which stays with a person",
   "frame/StageMenuBar.cpp:About Infinite": "`status` and `infinite --version` give the version",
