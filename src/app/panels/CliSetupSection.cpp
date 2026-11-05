@@ -98,9 +98,11 @@ namespace app
       // The row's button, in the right column.
       auto button = [&](const char* label, bool primary)
       {
+         // Measured without the "###id" a translated label carries, so every button is the column's width and
+         // none reaches past the card (that overflow let the page scroll sideways).
+         const float w = std::max(bw, ImGui::CalcTextSize(label, nullptr, true).x + 2.0f * tok::space_3);
          FormParts::Inline(0.0f, 0.0f);
-         ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - bw);
-         const float w = std::max(bw, ImGui::CalcTextSize(label).x + 2.0f * tok::space_3);
+         ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - w);
          return ChipButton::Draw(label, primary, rowH, w);
       };
 

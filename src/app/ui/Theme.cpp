@@ -219,8 +219,8 @@ namespace app
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       const bool isLight = IsThemeLight();
-      const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
-                                 : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
+      // Opaque: at 0.97 the bright chat text behind Settings read through as ghost lines.
+      const ImVec4 bg = ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
       // No border at all, in either theme: the previous white-tinted "catching
       // light" border was the actual source of the corner-bleed artifact users
@@ -276,8 +276,8 @@ namespace app
    {
       const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
       const bool isLight = IsThemeLight();
-      const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
-                                 : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
+      // Opaque: at 0.97 the bright chat text behind Settings read through as ghost lines.
+      const ImVec4 bg = ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
       ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
