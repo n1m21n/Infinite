@@ -2,6 +2,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "core/CliSetup.h"
 #include "core/FactoryPresets.h"
 #include "arrange/MidiImport.h"
 
@@ -64,6 +65,7 @@ namespace
 
 // Self-test: opens the node menu on this node with Add to 3D View clicked.
 int gView3DTestMenuNode = -1;
+bool gShotNodeMenu = false;
 
 void DrawPopupsA(FrameCtx& fc)
 {
@@ -82,6 +84,8 @@ void DrawPopupsA(FrameCtx& fc)
    };
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
+      if (gShotNodeMenu)  // review shots: a fixed spot, not wherever the mouse happens to be
+         ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->Pos.x + 120.0f, ImGui::GetMainViewport()->Pos.y + 120.0f));
       if (MenuParts::BeginPopup("##nodecontext"))
       {
          GraphNode* gn = FindNodeByIndex(gContextMenuNodeIndex);
@@ -352,6 +356,8 @@ void DrawPopupsA(FrameCtx& fc)
             MenuParts::Separator();
 
             // Information & Hierarchy
+            if (CliSetup::Prefs().face == "chat" && MenuParts::Item(L("Reference in chat")))
+               ChatReferenceNode(gn->index);
             if (MenuParts::Item(L("Help")))
             {
                gHelpPopupNodeIndex = gn->index;

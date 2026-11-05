@@ -12,6 +12,7 @@
 namespace app
 {
 bool RunAliasTest(); // selftest/AliasTests.cpp
+extern bool gShotNodeMenu; // frame/StagePopupsA.cpp: review shots open the first node's menu
 bool RunOversampleTest(); // selftest/AliasTests.cpp
 bool RunPitchTest(); // selftest/PitchTests.cpp
 bool RunLearningLogTest(); // selftest/GenSampleTests.cpp
@@ -4314,6 +4315,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gTerminalOpen = o.find("terminal") != std::string::npos;
       if (o.find("chatcode") != std::string::npos)
          ChatShotOpenCode();
+      gShotNodeMenu = o.find("nodemenu") != std::string::npos;
       gView3DOpen = o.find("view3d") != std::string::npos;
       // "historydemo": a few named edits so the History panel has rows for a review shot.
       if (o.find("historydemo") != std::string::npos)

@@ -175,6 +175,7 @@ namespace app
       int sLastFrame = -100;
       bool sScrollToEnd = false;
       bool sRefocus = false;
+      int sPendingRef = -1;   // a node the canvas menu asked to name in the composer
       bool sCursorToEnd = false;
       std::vector<chat::ThreadInfo> sHistory;  // newest first; read from disk once, then kept by SaveNow
       bool sHistoryLoaded = false;
@@ -2927,6 +2928,20 @@ namespace app
             if (!chat::FileKind(f).empty() && std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
                sAttach.push_back(f);
          gTerminalDropPending.clear();
+         // A node's "Reference in chat": its `@` name joins the line, and the cursor waits after it.
+         if (sPendingRef >= 0)
+         {
+            RefreshCatalog(true);
+            for (const chat::CatalogNode& n : sCat.nodes)
+               if (n.index == sPendingRef)
+               {
+                  if (!sInput.empty() && sInput.back() != ' ' && sInput.back() != '\n')
+                     sInput += ' ';
+                  sInput += RefText(n) + " ";
+                  sRefocus = sCursorToEnd = true;
+               }
+            sPendingRef = -1;
+         }
       }
 
       // ---- menus: one look for every popup in the chat (glass well, 28 px rows, a check on the chosen one)
@@ -3490,6 +3505,13 @@ namespace app
 
    static bool sShotOpenCode = false;
    void ChatShotOpenCode() { sShotOpenCode = true; }
+   void ChatReferenceNode(int index)
+   {
+      sPendingRef = index;
+      gTerminalOpen = true;
+      gTerminalFace = 0;
+      gChatSideTerminal = false;
+   }
 
    void DrawChatPanel()
    {

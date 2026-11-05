@@ -267,6 +267,7 @@ def html_chapter(P):
                           ("Add to Timeline", "Creates an assigned clip in the Arrangement."),
                           ("Add to Session", "Puts the node in a Session slot."),
                           ("Open in new window", "Pops the node's output into its own window."),
+                          ("Reference in chat", "Opens the chat with the node named in the message."),
                           ("Help", "Opens this node's help."),
                           ("Delete Node (Backspace)", "Removes it and its cables."),
                       ]), 1)),

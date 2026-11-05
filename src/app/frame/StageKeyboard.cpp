@@ -6,6 +6,7 @@ namespace app
 {
    static std::string gOwnNodeClipboardText;
 extern int gView3DTestMenuNode;
+extern bool gShotNodeMenu;
 
 void DrawKeyboard(FrameCtx& fc)
 {
@@ -1044,6 +1045,12 @@ void DrawKeyboard(FrameCtx& fc)
          if (ed::ShowNodeContextMenu(&contextNodeId) && !gParamRightClickConsumedThisFrame)
          {
             gContextMenuNodeIndex = (int)contextNodeId.Get() / GraphNode::kStride;
+            ImGui::OpenPopup("##nodecontext");
+         }
+         // Review shots (INFINITE_OPENPANELS=nodemenu): the first node's menu stays open once the canvas has nodes.
+         if (gShotNodeMenu && !gNodes.empty() && ImGui::GetTime() > 5.0 && !ImGui::IsPopupOpen("##nodecontext"))
+         {
+            gContextMenuNodeIndex = gNodes.front().index;
             ImGui::OpenPopup("##nodecontext");
          }
          if (gView3DTestMenuNode >= 0)
