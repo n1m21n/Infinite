@@ -52,13 +52,14 @@ def threads(rec):
         ],
         "changes": [
             {"kind": "user", "text": "make @Wavetable#2 brighter and slow the notes", "files": [rec + "/a-very-long-reference-file-name-for-wrapping.png", rec + "/b.wav", rec + "/c.mid"]},
-            {"kind": "steps", "agent": "claude", "lines": ["infinite context", "infinite set 2 cutoff 0.8", "infinite set 1 rateBeats 1"]},
+            {"kind": "steps", "agent": "claude", "lines": ["infinite context", "infinite set 2 a.cutoff 8000", "infinite set 2 a.position 0.6", "infinite set 1 groove 0.4"]},
             {"kind": "change", "agent": "claude", "changes": [
-                {"text": "@Wavetable#2.cutoff 0.35 → 0.8", "node": 2, "key": "cutoff", "after": "0.8"},
-                {"text": "@Random Note Generator#1.rateBeats 0.5 → 1", "node": 1, "key": "rateBeats", "after": "1"}]},
+                {"text": "@Wavetable#2.a.cutoff 2000 → 8000", "node": 2, "key": "a.cutoff", "after": "8000"},
+                {"text": "@Wavetable#2.a.position 0.2 → 0.6", "node": 2, "key": "a.position", "after": "0.6"},
+                {"text": "@Random Note Generator#1.groove 0 → 0.4", "node": 1, "key": "groove", "after": "0.4"}]},
             {"kind": "agent", "agent": "claude", "tokens": [9400, 7000],
-             "text": "Raised the **cutoff** on @Wavetable#2 and halved the note rate on @Random Note Generator#1.\n\n"
-                     "- `cutoff` 0.35 → 0.8\n- `rateBeats` 0.5 → 1\n\nChanged: @Wavetable#2.cutoff, @Random Note Generator#1.rateBeats"},
+             "text": "Opened the **cutoff** and moved the wave on @Wavetable#2, and loosened the timing on @Random Note Generator#1.\n\n"
+                     "- `a.cutoff` 2000 → 8000\n- `a.position` 0.2 → 0.6\n- `groove` 0 → 0.4"},
         ],
         "media": [
             {"kind": "user", "text": "render a short clip and a loop gif"},
@@ -135,7 +136,7 @@ def shoot(app, sid, theme, out_dir, timeout):
             env["INFINITE_CHATSHOT_VIEW"] = os.path.join(rec, VIEW[sid])
         try:
             subprocess.run([os.path.join(app, "Contents", "MacOS", "Infinite"), PATCH], env=env,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)
+                           stdout=subprocess.DEVNULL, stderr=(open(os.environ["SHOT_ERR"], "w") if os.environ.get("SHOT_ERR") else subprocess.DEVNULL), timeout=timeout)
         except subprocess.TimeoutExpired:
             pass
         return out if os.path.exists(out) else None

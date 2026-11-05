@@ -1,3 +1,4 @@
+#include <cmath>
 #include "ChatCatalog.h"
 
 #include <cctype>
@@ -64,7 +65,11 @@ namespace chat
          if (end != p.value.c_str() && *end == '\0')
          {
             char buf[32];
-            std::snprintf(buf, sizeof buf, "%.3g", v);
+            // Three significant digits, but never an exponent: 12000 Hz reads as 12000, not 1.2e+04.
+            if (std::fabs(v) >= 1000.0)
+               std::snprintf(buf, sizeof buf, "%.0f", v);
+            else
+               std::snprintf(buf, sizeof buf, "%.3g", v);
             return buf;
          }
       }

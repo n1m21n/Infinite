@@ -2854,6 +2854,165 @@ namespace app
          return T("Code");
       }
 
+      // The params a change card set, as the perform knob: live on the canvas value, drag to try other
+      // values, the agent's value kept as a dot on the ring. Floats and ints only; a modulated param shows
+      // read-only in the modulation colour, as in perform mode.
+      // Frames until the catalog re-reads after a knob write: the cook applies the write on a later frame,
+      // and the "now" note must show the new value, not the old one.
+      int sRefreshIn = 0;
+
+      void DrawChangeKnobs(const Entry& e, size_t shown, float inner, int id)
+      {
+         if (sRefreshIn > 0 && --sRefreshIn == 0)
+            RefreshCatalog(true);
+         struct Cell
+         {
+            int node = -1, param = -1;
+            const chat::CatalogParam* cp = nullptr;
+            const ParamRef* kp = nullptr;
+            float suggested = 0.0f;
+            bool hasSuggested = false;
+         };
+         std::vector<Cell> cells;
+         for (size_t i = 0; i < shown && cells.size() < 8; i++)
+         {
+            const chat::ChangeLine& l = e.changes[i];
+            if (l.node < 0 || l.key.empty())
+               continue;
+            GraphNode* gn = FindNodeByIndex(l.node);
+            const chat::CatalogNode* cn = sCat.Node(l.node);
+            if (!gn || !cn)
+               continue;
+            int pi = ParamIndexOfKeyOnNode(*gn, l.key);
+            if (pi < 0)
+               pi = ParamIndexOfKeyOnNode(*gn, "p." + l.key);
+            const ParamRef* kp = pi >= 0 ? Modulation::Instance().KnownParam(l.node, pi) : nullptr;
+            if (!kp || kp->isEnum || kp->isBool || kp->maxValue <= kp->minValue)
+               continue;
+            const chat::CatalogParam* cp = nullptr;
+            for (const chat::CatalogParam& p : cn->params)
+               if (p.key == l.key || p.key == "p." + l.key || "p." + p.key == l.key)
+                  cp = &p;
+            if (!cp || (cp->kind != "float" && cp->kind != "int") || cp->expression)
+               continue;
+            bool dup = false;
+            for (const Cell& c : cells)
+               dup = dup || (c.node == l.node && c.param == pi);
+            if (dup)
+               continue;
+            Cell c;
+            c.node = l.node;
+            c.param = pi;
+            c.cp = cp;
+            c.kp = kp;
+            char* end = nullptr;
+            c.suggested = std::strtof(l.after.c_str(), &end);
+            c.hasSuggested = end && end != l.after.c_str();
+            cells.push_back(c);
+         }
+         if (cells.empty())
+            return;
+
+         static std::map<std::pair<int, int>, float> sHeld;  // the un-snapped value while an int knob is held
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float diameter = 36.0f;
+         const float cellW = 84.0f;
+         const float lineH = ImGui::GetTextLineHeight();
+         const float cellH = diameter + 6.0f + 2.0f * lineH;
+         const int perRow = std::max(1, (int)(inner / cellW));
+         const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
+         const ImU32 modCol = Light() ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF);
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         const ImVec2 o = ImGui::GetCursorScreenPos();
+         const int rows = ((int)cells.size() + perRow - 1) / perRow;
+         for (size_t k = 0; k < cells.size(); k++)
+         {
+            const Cell& c = cells[k];
+            const int r = (int)k / perRow, col = (int)k % perRow;
+            const int inRow = std::min(perRow, (int)cells.size() - r * perRow);
+            const float x0 = o.x + (inner - inRow * cellW) * 0.5f + col * cellW;
+            const float y0 = o.y + r * cellH;
+            const float minV = c.kp->minValue, maxV = c.kp->maxValue;
+            const bool isInt = c.cp->kind == "int" || c.kp->step >= 1.0f;
+            const bool modulated = Modulation::Instance().IsModulated(c.node, c.param);
+
+            float live = c.suggested;
+            const auto pw = gPerfPendingWrites.find({c.node, c.param});
+            if (pw != gPerfPendingWrites.end())
+               live = pw->second;
+            else
+               for (const ParamRef& ref : Modulation::Instance().FrameParams())
+                  if (ref.nodeIndex == c.node && ref.paramIndex == c.param && ref.value)
+                  {
+                     live = *ref.value;
+                     break;
+                  }
+            const auto held = sHeld.find({c.node, c.param});
+            float v = held != sHeld.end() ? held->second : live;
+
+            char kid[48];
+            std::snprintf(kid, sizeof kid, "##chknob%d_%d", id, (int)k);
+            ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+            const float span = std::max(std::fabs(minV), std::fabs(maxV));
+            const char* fmt = (isInt || span >= 100.0f) ? "%.0f" : (span >= 10.0f ? "%.1f" : "%.2f");
+            bool moved = KnobFloat(kid, &v, minV, maxV, fmt, diameter, modulated ? modCol : accent, modulated,
+                                         cellW, c.kp->posToValue, c.kp->valueToPos);
+            if (ImGui::IsItemActivated() && !modulated)
+               PushUndoCheckpoint();
+            if (ImGui::IsItemActive())
+               sHeld[{c.node, c.param}] = v;
+            else
+               sHeld.erase({c.node, c.param});
+            // Double-click puts back the agent's value.
+            if (c.hasSuggested && !modulated && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+               PushUndoCheckpoint();
+               v = std::clamp(c.suggested, minV, maxV);
+               moved = true;
+               sRefreshIn = 3;
+            }
+            if (moved)
+            {
+               const float w = isInt ? std::round(v) : v;
+               gPerfPendingWrites[{c.node, c.param}] = w;
+               live = w;
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit())
+               sRefreshIn = 3;
+
+            // The agent's value: a dot just outside the ring, where the knob would point.
+            if (c.hasSuggested)
+            {
+               const float kTwoPi = 6.28318530717958647692f;
+               const float aMin = 0.75f * kTwoPi * 0.5f, aMax = 2.25f * kTwoPi * 0.5f;
+               const float pos = c.kp->valueToPos ? std::clamp(c.kp->valueToPos(c.suggested, minV, maxV), 0.0f, 1.0f)
+                                                  : std::clamp((c.suggested - minV) / (maxV - minV), 0.0f, 1.0f);
+               const float a = aMin + pos * (aMax - aMin);
+               const ImVec2 ctr(x0 + cellW * 0.5f, y0 + diameter * 0.5f);
+               const float rr = diameter * 0.5f + 4.5f;
+               dl->AddCircleFilled(ImVec2(ctr.x + std::cos(a) * rr, ctr.y + std::sin(a) * rr), 2.5f, modulated ? modCol : accent, 12);
+            }
+
+            const std::string name = app::TruncateWithEllipsis(c.cp->label.empty() ? c.cp->key.c_str() : c.cp->label.c_str(), cellW - 4.0f);
+            char val[48];
+            FormatAudioParam(val, sizeof val, fmt, live);
+            const float ty = y0 + diameter + 6.0f;
+            const float nw = ImGui::CalcTextSize(name.c_str()).x;
+            dl->AddText(ImVec2(std::round(x0 + (cellW - nw) * 0.5f), ty), Dim(), name.c_str());
+            Weight vw(UiType::Weight::Medium);
+            const float valW = ImGui::CalcTextSize(val).x;
+            dl->AddText(ImVec2(std::round(x0 + (cellW - valW) * 0.5f), ty + lineH), ImGui::GetColorU32(ImGuiCol_Text), val);
+            if (ImGui::IsItemHovered() && c.hasSuggested)
+            {
+               char tip[64];
+               FormatAudioParam(tip, sizeof tip, fmt, c.suggested);
+               ImGui::SetTooltip("%s %s", T("Agent set"), tip);
+            }
+         }
+         ImGui::SetCursorScreenPos(o);
+         ImGui::Dummy(ImVec2(inner, rows * cellH));
+      }
+
       void DrawChange(Entry& e, EntryUi& ui, float width, int id, bool undoable)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2905,6 +3064,8 @@ namespace app
                ImGui::Dummy(ImVec2(0.0f, 2.0f));
             }
          }
+         if (e.ok && !e.undone)
+            DrawChangeKnobs(e, shown, inner, id);
          if (e.changes.size() > shown)
          {
             char more[48];
