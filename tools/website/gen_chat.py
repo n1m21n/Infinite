@@ -92,7 +92,10 @@ def main_html():
             <li><strong>Runs short commands itself.</strong> Sentences like <code>@cube set size to 2</code> or <code>connect @a to @b</code> run at once, without waiting for a model.</li>
             <li><strong>Shows what it made.</strong> Pictures, audio files and code blocks in a reply appear in the chat. Pictures open full size on a click.</li>
             <li><strong>Explains and checks.</strong> <code>/explain</code> describes your patch, <code>/check</code> validates it and its code, and <code>/docs</code> answers from the manuals, so a question about Field or a node never needs a web search.</li>
-            <li><strong>Has slash commands.</strong> <code>/help</code> lists them. <code>/agent</code> and <code>/model</code> switch who is answering, <code>/new</code> starts a fresh chat and <code>/undo</code> takes back the last change.</li>
+            <li><strong>Has slash commands.</strong> <code>/help</code> lists them. <code>@claude</code>, <code>@chatgpt</code> and <code>@gemini</code> choose who answers, <code>/new</code> starts a fresh chat and <code>/undo</code> takes back the last change.</li>
+            <li><strong>Takes files and pictures.</strong> Press + or paste from the clipboard. Attached pictures open full size on a click.</li>
+            <li><strong>Lists every change.</strong> Each reply carries only this turn's changes, with live knobs for the values it set, links to the node or parameter, and Undo. A generated sample can be opened in a Sampler.</li>
+            <li><strong>Floats where you need it.</strong> Chat, Viewport, Modulation Matrix and Performance can each pop out into their own window.</li>
             <li><strong>Keeps your history.</strong> Chats are saved on your computer, searchable, and cleared with one button in Settings.</li>
           </ul>
         </section>
@@ -142,7 +145,7 @@ def main_html():
             <li><strong>Sign-in happens in your browser</strong>, on the provider's own page. Infinite never asks for, sees or stores your password.</li>
             <li><strong>Your plan and your limits.</strong> Usage counts against your own subscription or key, the same as using the agent anywhere else.</li>
             <li><strong>One setup card.</strong> A first run installs what is missing, connects the agent to the window and signs you in, all from the chat.</li>
-            <li><strong>Pick a model per agent.</strong> Settings holds a default model for each of the three.</li>
+            <li><strong>One model picker.</strong> The chat shows the models of the agent that is answering, and Settings holds a default for each of the three. Each reply shows its token count, and Settings shows usage per agent with a Reset.</li>
             <li><strong>Add more than one.</strong> When two agents work at once, the chat shows who is doing what.</li>
           </ul>
         </section>
