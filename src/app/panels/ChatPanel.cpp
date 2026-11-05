@@ -3704,13 +3704,15 @@ namespace app
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Attach files"));
          const float sendW = 26.0f;
-         const ImVec2 sc(at.x + width - pad - sendW * 0.5f + 2.0f, barY + barH * 0.5f);
+         // Whole-pixel centre: the circle and the shape drawn in it share it exactly.
+         const ImVec2 sc(std::floor(at.x + width - pad - sendW * 0.5f + 2.0f), std::floor(barY + barH * 0.5f));
          ImGui::SetCursorScreenPos(ImVec2(sc.x - sendW * 0.5f, sc.y - 11.0f));
          if (!sRuns.empty())
          {
             const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, 22.0f));
             dl->AddCircleFilled(sc, 11.0f, TextTint(ImGui::IsItemHovered() ? 0.9f : 0.75f), 24);
-            glyph::Draw(dl, sc, tok::icon_sm, ImGui::GetColorU32(ImGuiCol_WindowBg), IconsInfinite::StopFill);
+            // Drawn, not a font glyph: a glyph sits by its advance box, so its ink lands off centre.
+            dl->AddRectFilled(ImVec2(sc.x - 4.0f, sc.y - 4.0f), ImVec2(sc.x + 4.0f, sc.y + 4.0f), ImGui::GetColorU32(ImGuiCol_WindowBg), 1.5f);
             if (ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", T("Stop"));
             if (stop)
@@ -3727,7 +3729,10 @@ namespace app
             const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, 22.0f));
             if (canSend)
                dl->AddCircleFilled(sc, 11.0f, ImGui::GetColorU32(ImGui::IsItemHovered() ? AccentEmphasisHover() : AccentEmphasisSelected()), 24);
-            glyph::Draw(dl, sc, tok::icon_sm, canSend ? IM_COL32(255, 255, 255, 255) : TextTint(0.35f), IconsInfinite::Send);
+            const ImU32 ink = canSend ? IM_COL32(255, 255, 255, 255) : TextTint(0.35f);
+            dl->AddLine(ImVec2(sc.x, sc.y + 5.0f), ImVec2(sc.x, sc.y - 4.5f), ink, 1.8f);
+            const ImVec2 head[3] = { ImVec2(sc.x - 4.0f, sc.y - 0.5f), ImVec2(sc.x, sc.y - 4.5f), ImVec2(sc.x + 4.0f, sc.y - 0.5f) };
+            dl->AddPolyline(head, 3, ink, ImDrawFlags_None, 1.8f);
             if (clicked && canSend)
             {
                Send();
