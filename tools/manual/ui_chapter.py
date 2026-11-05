@@ -286,15 +286,100 @@ def html_chapter(P):
                   row((fig("settings_terminal", "Terminal: Command line &amp; agents (one-click setup, coding agent), the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
 
     b.append(page("<h2>Settings: Command line &amp; agents</h2>",
-                  "<p>On the Terminal page, <b>Connect terminal &amp; agent</b> opens a Terminal tab and runs a short setup script. "
-                  "It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with your coding agent. "
-                  "Each step checks first and is skipped when it is already done, so the button doubles as a repair. A tick appears per step when the script finishes it. Password prompts (Homebrew, sudo) appear in the tab.</p>",
-                  "<p><b>Coding agent</b> picks the agent (Claude Code first). <b>Install</b> shows when it is missing and types the vendor's own installer into a Terminal tab. "
-                  "<b>Start agent</b> opens a tab in the open patch's folder and starts it with Infinite's MCP server registered. "
-                  "<i>Start the agent when the Terminal opens</i> is off by default. Infinite never asks for or stores an API key: the agent's own login runs in the tab. "
-                  "Nothing is installed until you press a button.</p>"
+                  "<p>The Terminal page of Settings has one section, <b>Agents</b>: a row per coding agent (Claude Code, Codex, Antigravity) with its status and the button that moves it on, "
+                  "the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.</p>"
+                  "<p>Setting up an agent opens a Terminal tab and runs a short script. It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, "
+                  "fetches the Infinite MCP server and registers it with the agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Password prompts (Homebrew, sudo) appear in the tab. "
+                  "Infinite never asks for or stores an API key: the agent's own login runs in the browser. Nothing is installed until you press a button.</p>"
                   "<p>Setup is one time. It survives quitting, restarting and updating Infinite: the <code>infinite</code> command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. "
-                  "Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), that step turns amber with a <b>Repair</b> button that reruns only that step.</p>"))
+                  "Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), "
+                  "a <b>Connection</b> row appears naming the step, with a <b>Repair</b> button that reruns only that step.</p>"))
+
+    b.append(page("<h2>Chat</h2>",
+                  "<p>The Chat panel is how you talk to Infinite. Say what you want and the patch changes while you watch. "
+                  "It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. "
+                  "Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, "
+                  "which changes the open patch through the <code>infinite</code> command, so every change is listed on a card and can be undone.</p>",
+                  "<h3>Set up an agent</h3>"
+                  "<p>Infinite talks to three coding agents you install yourself: <b>Claude Code</b>, <b>Codex</b> and <b>Antigravity</b>. It never asks for or stores an API key; each agent signs in with its own account. "
+                  "The first time the Terminal opens, a welcome asks which agent to connect and has one <b>Connect</b> button; <b>Skip, just a terminal</b> leaves the chat for later. "
+                  "Settings, Terminal, Agents has one row per agent with its status and the one button that moves it on:</p>",
+                  table(["Status", "Button", "What it means"], [
+                      ("Not installed", "Set up", "The agent's program is missing. Set up opens a Terminal tab and types the vendor's own installer (Claude Code and Antigravity: the vendor's install script; Codex: <code>npm install -g @openai/codex</code>)."),
+                      ("Needs setup", "Set up", "Installed, but the <code>infinite</code> command, the MCP link or the skills are not connected yet. Set up runs the one-click connection in a Terminal tab."),
+                      ("Setting up… 2 of 5", "", "The setup script is running; passwords (Homebrew, sudo) are asked for in its tab."),
+                      ("Setup did not finish", "Try again", "A setup step failed; the tab shows which. Fix it there, or run the step by hand, then try again."),
+                      ("Not signed in", "Sign in", "Opens the agent's own sign-in. The page opens in your browser; the row reads <i>Waiting for sign-in…</i> with a Cancel button. A sign-in that is not finished in 3 minutes ends with <i>Sign-in timed out</i>."),
+                      ("Signed out", "Sign in again", "The agent said its sign-in expired in the middle of a chat. Sign in again and ask again."),
+                      ("Ready", "Sign out", "Installed, connected and signed in. Sign out is shown when the agent has a sign-out command."),
+                  ]),
+                  "<h3>When something fails</h3>",
+                  table(["You see", "What to do"], [
+                      ("<i>Finish in your browser…</i> and no page opened", "The sign-in address is shown in the row; open it by hand. If the page ends with a code (Antigravity), paste it into the field that appears and press Submit."),
+                      ("<i>Sign in to Claude Code to continue.</i>", "Press Sign in in Settings, Terminal, Agents (or the chat's agent row), then ask again."),
+                      ("<i>hit its usage limit</i>", "The agent's own plan is used up. Wait, or pick another connected agent in the model picker."),
+                      ("<i>Could not reach the agent</i>", "No internet, or a proxy blocks it. Check the connection and press Try again."),
+                      ("<i>needs its terms accepted once</i>", "Open the Terminal, start the agent and answer its first screen."),
+                      ("<i>is not installed. Set it up again.</i>", "The program was removed. Press Set up."),
+                      ("<i>It stopped responding, so the chat ended the turn</i>", "The agent went quiet for too long. Ask again; the earlier changes stay on their cards."),
+                      ("Setup keeps failing", "Fallback: open the Terminal, install the agent by hand (the commands above), then press Connect again. Each setup step checks first, so rerunning only repairs what is broken."),
+                  ]),
+                  "<h3>The message box</h3>",
+                  table(["Type", "What it does"], [
+                      ("@", "Opens the node picker: type to filter the nodes in the open patch, Up/Down to move, Return or Tab to take one, Esc to close. <code>@cube</code> names a node (<code>@cube#2</code> when there are two), <code>@cube.detail</code> one of its controls. The agent receives its exact type, index and values."),
+                      ("@claude, @codex, @antigravity", "Name an agent to have that agent answer this one message."),
+                      ("/", "Opens the command list: type to filter, Return to run."),
+                      ("Return / Shift+Return", "Return sends; Shift+Return starts a new line (the box grows to six lines, then scrolls). While an agent is working, Return adds the line to the queue; the Stop button ends the turn."),
+                  ]),
+                  table(["Command", "What it does"], [
+                      ("/help", "What the chat can do, with a button per command."),
+                      ("/shortcuts, /manuals, /languages, /about", "Answered by Infinite at once: the shortcut list, the three manuals, the built-in code languages, what Infinite is."),
+                      ("/website, /github", "Open the website or the repository."),
+                      ("/model <name>", "Switch the model, for example <code>/model opus</code>."),
+                      ("/new", "Start a new chat."),
+                      ("/undo", "Undo the last change."),
+                      ("/explain [topic]", "The agent explains the open patch in plain words."),
+                      ("/check", "Validates the patch and its code, one line per problem, with a button to fix what it can."),
+                      ("/docs <question>", "Answers from the manuals, found with <code>infinite docs</code>, not from memory."),
+                  ]),
+                  "<h3>One model picker</h3>"
+                  "<p>There is one picker, not an agent picker and a model picker. It lists every connected agent's models together, each under its agent's name. Choose a model and that agent answers from then on; "
+                  "the avatar in front of each reply shows who spoke. An agent that is not ready does not appear until you set it up. "
+                  "<code>/model</code> and Settings, Terminal, <i>Claude Code model</i> / <i>Codex model</i> / <i>Antigravity model</i> set the same thing. "
+                  "Each agent's list comes from the agent itself, so a new model shows up when the agent offers it; <i>its default model</i> leaves the choice to the agent.</p>"
+                  "<h3>Files, pictures and paste</h3>"
+                  "<p>Press <b>+</b> (Attach files) or drop files on the panel: audio, video, images, GIFs, 3D models, MIDI, patches and code. Cmd/Ctrl+V pastes copied files or a copied picture; text on the clipboard still pastes as text. "
+                  "A pasted picture is saved in the chats folder so the agent can read it. A file still being written is retried until it is complete.</p>"
+                  "<p>Pictures show as thumbnails in your message and in replies; click one to open it <b>full size</b> over the app, fitted to the window. A click or Esc closes it. "
+                  "Videos play in a card and stop when scrolled off screen. GIFs animate; a GIF over 16 MB shows its first frame only. Audio shows a player with a waveform, a folder button (Show in folder) and a waveform button.</p>"
+                  "<h3>Change cards</h3>"
+                  "<p>After each turn the chat lists what the agent did: <b>Looked at the patch</b> for a read-only turn, or <b>Made 3 changes</b> with one line per change (<i>old → new</i>). "
+                  "The card shows only this turn's changes, never the whole history. Node names and parameter names on it are links: click a node to select it and bring it into view, click a parameter to jump to that control. "
+                  "A name whose node is gone shows as plain text.</p>"
+                  "<p>Parameters the agent changed appear as <b>live knobs</b> on the card, only the ones that matter for the change. Turn a knob and the patch follows as you play; the agent's value stays as a dot on the track, and a double-click puts the knob back on it. "
+                  "<b>Undo</b> on the card reverts the whole turn; a changed line that has been undone reads <i>Undone</i>.</p>"
+                  "<p>An audio file the agent made shows as an audio card. <b>Open in a Sampler</b> (the waveform button) puts that file into a new Sampler node on the canvas, ready to play. "
+                  "<b>Show in folder</b> reveals the file.</p>"
+                  "<h3>Permissions</h3>"
+                  "<p>By default agents may only run <code>infinite</code> commands and read the files you attach. When one tries something else, a note <i>Not allowed: …</i> appears with an <b>Allow</b> button: "
+                  "<i>Allow folder</i> adds a folder, <i>Allow &lt;command&gt;</i> adds a command, for good. Settings, Terminal, Agents lists them:</p>",
+                  table(["Row", "What it does"], [
+                      ("Agent folder", "Where agents start, and the folder they may read. <i>The open patch's folder</i> by default; Choose… picks another."),
+                      ("More folders", "Extra folders agents may read. Add folder… adds one, Remove takes it back."),
+                      ("Edit files in them", "Off (default): agents run <code>infinite</code> and read attached files only. On: they may also read and change files in the folders above."),
+                      ("Allowed commands", "The commands agents may run besides <code>infinite</code>, added by Allow in the chat. Remove takes one back."),
+                      ("Claude Code / Codex / Antigravity model", "The model that agent answers with; the chat's picker sets the same value."),
+                      ("Claude Code / Codex / Antigravity usage", "Turns, tokens, the share of cached input and the cost when the agent reports one. Cached input is re-read on every step of a turn and costs about a tenth of fresh input. <b>Reset</b> clears the counts for every agent."),
+                      ("Connection", "Only when a step of the setup broke (the command, the MCP link, the skills): names the step; Repair reruns it."),
+                      ("Saved chats", "How many chats are kept on this computer. Clear all deletes them after a confirmation."),
+                  ]),
+                  "<h3>Usage and tokens</h3>"
+                  "<p>Under an agent's name on each reply, a faint <b>count of tokens</b> shows what that turn used (input, cached input and output together); hover it for the cached share. "
+                  "Chats are kept locally; the <b>Chats</b> button in the toolbar lists, searches and deletes them, and <b>New chat</b> starts a fresh one.</p>"
+                  "<h3>Floating windows</h3>"
+                  "<p>Chat, the Viewport, the Modulation Matrix and the Performance panel can leave the dock and float. Right-click the panel's toolbar (or use its dock menu) and choose <b>Floating Window</b> after Bottom, Right, Left and Top. "
+                  "The panel opens in its own window over the stage that you move and resize like Settings or Shortcuts; its X closes it. The chat's toolbar also has <b>Pop out</b>, which becomes <b>Dock</b> while it floats. "
+                  "Choosing any dock position puts the panel back.</p>"))
 
     b.append(page("<h2>Sound panels: Session, Sample Studio, Piano Roll</h2>",
                   "<p>Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.</p>",
