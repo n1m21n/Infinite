@@ -2,7 +2,7 @@
 // Usage: find-eval <asks.tsv> [min-hits]   (exit 1 when the hits fall below min-hits)
 // tests/chat: find_eval.tsv is what the finder is tuned on, find_holdout.tsv is never tuned on, find_glossary.tsv is
 // musician and visual-artist words, find_nodes.tsv asks for every node without its name (coverage).
-// 2026-11-05: eval 74/75, holdout 16/20, glossary 221/222, nodes 251/310. Pass these as min-hits to catch a regression.
+// 2026-11-05: eval 75/75, holdout 16/20, glossary 221/222, nodes 254/310 (help text ranked). Pass these as min-hits to catch a regression.
 #include "core/AgentDocs.h"
 #include "core/chat/NodeFinder.h"
 #include <cctype>

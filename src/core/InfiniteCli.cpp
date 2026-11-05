@@ -1153,7 +1153,7 @@ Terminal term open|list|read|send|run
       static const char* kTopics = R"(Topics (infinite docs <topic>):
   shortcuts      every keyboard shortcut on this system (needs the app open)
   panels         the panels, which are open, and the verb that opens each
-  nodes [name]   the Node Field Guide: every node's card, or one node's
+  nodes [name]   the Node Field Guide: every node's card, or one node's card, help text and controls
   field          the Field manual (language, domains, nodes)
   headless       the headless guide: render, check and drive Infinite without the window
   connections    what can be cabled into what
@@ -1168,11 +1168,6 @@ for patches; `infinite code errors` for the open window.
 )";
       const std::string topic = args.empty() ? std::string() : args[0];
       const std::string name = args.size() > 1 ? args[1] : std::string();
-      const auto lower = [](std::string s)
-      {
-         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-         return s;
-      };
       if (topic.empty())
          fputs(kTopics, stdout);
       else if (topic == "shortcuts")
@@ -1213,13 +1208,11 @@ midi general autosave performance movement-log learning diagnostics updates fiel
             fputs(all.c_str(), stdout);
          else
          {
-            // One card: the "### Name" section whose name matches, ignoring case.
-            const std::string want = "\n### " + lower(name) + "\n";
-            const size_t at = lower(all).find(want);
-            if (at == std::string::npos)
-               Fail("no card for '" + name + "'; `infinite docs nodes` lists every node, `infinite describe <type>` has its params");
-            const size_t end = all.find("\n#", at + want.size());
-            fputs(all.substr(at + 1, end == std::string::npos ? std::string::npos : end - at).c_str(), stdout);
+            // One node, by card name or type: its card, in-app help text and controls (card-less nodes too).
+            const std::string doc = chat::NodeDoc(name, all);
+            if (doc.empty())
+               Fail("no node called '" + name + "'; `infinite find <words>` finds one by what it does, `infinite nodes` lists every type");
+            fputs(doc.c_str(), stdout);
          }
       }
       else if (topic == "field")
@@ -1830,7 +1823,7 @@ map, and the visual, sound and film crafts.
                name += " [" + h.type + "]";
             printf("%-22s %s.%s%s\n", name.c_str(), h.kind.c_str(), h.purpose.empty() ? "" : " ", h.purpose.c_str());
          }
-         printf("Add by the bracketed type when shown. Card: `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
+         printf("Add by the bracketed type when shown. How to use one (card, help, recipe): `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
          return 0;
       }
       if (verb == "attention")

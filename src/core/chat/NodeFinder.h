@@ -19,4 +19,8 @@ namespace chat
    // with every node type's own control words (NodeVocab.gen.h, scripts/node_vocab.py); a type with no card is ranked
    // on its name, category and those words.
    std::vector<NodeHit> FindNodes(const std::string& ask, const std::string& guide, size_t limit = 8);
+
+   // Everything known about one node, by card name or type: its guide card (what it does, Try, Chain), its in-app help
+   // text, its control words and the type to add. Works for nodes with no card too; "" when no node has that name.
+   std::string NodeDoc(const std::string& name, const std::string& guide);
 }

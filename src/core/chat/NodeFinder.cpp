@@ -198,6 +198,17 @@ namespace chat
          return best;
       }
 
+      // A category's stock help text (many types share it) says nothing about which of them fits.
+      bool SharedHelp(const char* help)
+      {
+         if (help == nullptr || *help == '\0')
+            return true;
+         int n = 0;
+         for (const NodeVocab::Entry& e : NodeVocab::kEntries)
+            n += std::strcmp(e.help, help) == 0;
+         return n > 2;
+      }
+
       int DomainOfCategory(const std::string& c)
       {
          if (c == "Synths" || c == "AudioEffects" || c == "Notes")
@@ -274,6 +285,9 @@ namespace chat
             {
                c.hit.type = type->type;
                c.params = Split(type->words);
+               if (!SharedHelp(type->help))
+                  for (std::string& w : Split(type->help))
+                     c.body.push_back(std::move(w));
                if (c.domain == 0)
                   c.domain = DomainOfCategory(type->category);
             }
@@ -292,6 +306,9 @@ namespace chat
             c.params = Split(e.words);
             c.domain = DomainOfCategory(e.category);
             c.bare = true;
+            // Its help text is the card it lacks: ranked on, and quoted by its first sentence.
+            if (!SharedHelp(e.help))
+               c.body = Split(e.help);
             // No card to quote: its first controls say what it is ("Controls: rate, depth, feedback").
             std::string ctl;
             for (size_t i = 0; i < c.params.size() && i < 8; i++)
@@ -377,5 +394,63 @@ namespace chat
       if (hits.size() > limit)
          hits.resize(limit);
       return hits;
+   }
+
+   std::string NodeDoc(const std::string& name, const std::string& guide)
+   {
+      const std::string want = Norm(name);
+      if (want.empty())
+         return {};
+      // The guide's node cards, title and text.
+      std::vector<std::pair<std::string, std::string>> cardsOf;
+      for (size_t at = guide.find("### "); at != std::string::npos;)
+      {
+         const size_t next = guide.find("\n### ", at + 4);
+         const std::string text = guide.substr(at, next == std::string::npos ? std::string::npos : next - at);
+         at = next == std::string::npos ? next : next + 1;
+         const size_t nl = text.find('\n');
+         cardsOf.push_back({ text.substr(4, nl == std::string::npos ? std::string::npos : nl - 4), text });
+      }
+      const NodeVocab::Entry* type = nullptr;
+      for (const NodeVocab::Entry& e : NodeVocab::kEntries)
+         if (Norm(e.type) == want)
+            type = &e;
+      std::string card;
+      for (const auto& [title, text] : cardsOf)
+         if (Norm(title) == want)
+         {
+            card = text;
+            if (type == nullptr)
+               type = TypeOfCard(title, Split(title));
+            break;
+         }
+      // Asked by type ("Wavetable"): the card about that type ("Wavetable Synth").
+      if (card.empty() && type != nullptr)
+         for (const auto& [title, text] : cardsOf)
+            if (TypeOfCard(title, Split(title)) == type)
+            {
+               card = text;
+               break;
+            }
+      if (card.empty() && type == nullptr)
+         return {};
+      std::string out = card.empty() ? "### " + std::string(type->type) + "\n" + type->category + ".\n" : card;
+      while (!out.empty() && out.back() == '\n')
+         out.pop_back();
+      out += "\n";
+      if (type != nullptr)
+      {
+         if (type->help[0] != '\0' && card.find(type->help) == std::string::npos)
+            out += std::string("Help: ") + type->help + "\n";
+         if (type->words[0] != '\0')
+         {
+            std::string ctl;
+            for (const char* c = type->words; *c != '\0'; c++)
+               ctl += *c == ' ' ? std::string(", ") : std::string(1, *c);
+            out += "Control words: " + ctl + "\n";
+         }
+         out += std::string("Add as type `") + type->type + "`; params and ranges: `infinite describe " + type->type + "`.\n";
+      }
+      return out;
    }
 }

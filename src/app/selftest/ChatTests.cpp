@@ -341,6 +341,15 @@ namespace app
             check(top("add a chorus to the guitar", "Chorus", 3), "find: a node with no guide card is found by its own name");
             const std::vector<chat::NodeHit> wt = chat::FindNodes("wavetable synth", AgentDocs::kNodeGuide, 1);
             check(wt.size() == 1 && wt[0].type == "Wavetable", "find: a card named another way carries the type to add");
+            // One node's doc: card, help text and controls, for carded and card-less nodes alike.
+            const std::string chorus = chat::NodeDoc("chorus", AgentDocs::kNodeGuide);
+            check(chorus.find("### Chorus") == 0 && chorus.find("Help: ") != std::string::npos &&
+                     chorus.find("`Chorus`") != std::string::npos, "docs: a node with no card gets its help text and type");
+            const std::string reverb = chat::NodeDoc("Reverb", AgentDocs::kNodeGuide);
+            check(reverb.find("Try:") != std::string::npos && reverb.find("Chain:") != std::string::npos &&
+                     reverb.find("Help: ") != std::string::npos, "docs: a carded node keeps its recipe and gains its help text");
+            check(chat::NodeDoc("Wavetable", AgentDocs::kNodeGuide).find("### Wavetable Synth") == 0, "docs: by type finds the card named another way");
+            check(chat::NodeDoc("nope nope", AgentDocs::kNodeGuide).empty(), "docs: an unknown node is empty");
          }
 
          // What a turn changed: params, added and removed nodes, cables, code as a block.

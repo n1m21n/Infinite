@@ -637,7 +637,7 @@ and every request is about that patch unless they name a file.
    | theme, font, language, size | `infinite settings preset\|font\|language\|uiScale <value>`; `[Appearance](open:settings/appearance)` |
    | it is slow | `[Performance](open:perf)`, `infinite settings gpu`; offer `[Performance settings](open:settings/performance)` |
    | it crashed, send logs, update | `infinite settings logs`, `infinite settings updates`; `[Diagnostics](open:settings/diagnostics)` |
-   | what does this node do, shortcuts | `infinite docs nodes <name>`, `infinite docs shortcuts` |
+   | what does this node do, how to use it, shortcuts | `infinite docs nodes <name>`, `infinite docs shortcuts` |
    | where is a panel or setting | a button: `open:<panel>` or `open:settings/<place>` (`infinite docs panels`) |
    | upload or post somewhere | you cannot reach other sites from here: save the file, give its path, say where to upload it |
    | anything outside Infinite | answer briefly; say plainly what you cannot do from here |
