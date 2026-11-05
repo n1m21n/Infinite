@@ -33,6 +33,8 @@
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 #include "stb_image.h"
+#include "lunasvg.h"
+#include "app/ui/design/AgentLogos.gen.h"
 
 #include <algorithm>
 #include <cctype>
@@ -365,51 +367,90 @@ namespace app
          return CategoryU32(it != kFamily.end() ? it->second : "Utility");
       }
 
-      // Each agent's mark, drawn as vectors in the brand's own colour on a quiet disc: Claude's burst,
-      // Gemini's four-point spark, ChatGPT's knot. Not pixel copies; the shapes people look for.
+      // An agent's official logo (art/brand/agents) rasterised once per pixel size and theme. The vendor
+      // file is drawn unchanged, fitted by its own outline so each mark keeps the same clear space.
+      ImTextureID AgentLogoTexture(const std::string& id, int px, bool light)
+      {
+         const unsigned char* data = nullptr;
+         size_t size = 0;
+         if (id == "claude")
+            data = agentlogos::kClaude, size = sizeof(agentlogos::kClaude);
+         else if (id == "codex")
+            data = light ? agentlogos::kOpenAiBlack : agentlogos::kOpenAiWhite, size = sizeof(agentlogos::kOpenAiBlack);
+         const bool png = id == "antigravity";  // Google's spark is a 512 px picture, not vectors
+         if (png)
+            data = agentlogos::kGeminiPng, size = sizeof(agentlogos::kGeminiPng);
+         if (data == nullptr || px <= 0)
+            return ImTextureID{};
+         static std::map<std::string, GLuint> sTex;
+         const std::string key = png ? id : id + (light ? "/l/" : "/d/") + std::to_string(px);
+         const auto it = sTex.find(key);
+         if (it != sTex.end())
+            return (ImTextureID)(intptr_t)it->second;
+         GLuint tex = 0;
+         auto upload = [&](const unsigned char* rgba, int w, int h, int rowPx, bool mips)
+         {
+            glGenTextures(1, &tex);
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mips ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, rowPx);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+            if (mips)
+               glGenerateMipmap(GL_TEXTURE_2D);  // a 512 px picture shrunk to ~20 px stays smooth
+         };
+         if (png)
+         {
+            // One texture for every size: the picture's own transparent margin is cropped so the spark
+            // fills its box like the vector marks do.
+            int w = 0, h = 0, n = 0;
+            unsigned char* rgba = stbi_load_from_memory(data, (int)size, &w, &h, &n, 4);
+            if (rgba != nullptr)
+            {
+               int x0 = w, y0 = h, x1 = -1, y1 = -1;
+               for (int y = 0; y < h; y++)
+                  for (int x = 0; x < w; x++)
+                     if (rgba[(y * w + x) * 4 + 3] > 8)
+                        x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+               const int side = x1 >= x0 ? std::max(x1 - x0, y1 - y0) + 1 : 0;
+               if (side > 0)
+                  upload(rgba + (y0 * w + x0) * 4, side, side, w, true);
+               stbi_image_free(rgba);
+            }
+            sTex[key] = tex;
+            return (ImTextureID)(intptr_t)tex;
+         }
+         const std::unique_ptr<lunasvg::Document> doc = lunasvg::Document::loadFromData((const char*)data, size);
+         if (doc != nullptr)
+         {
+            const lunasvg::Box b = doc->boundingBox();
+            const float fit = (float)px / std::max(1e-3f, std::max(b.w, b.h));
+            lunasvg::Bitmap bmp(px, px);
+            bmp.clear(0x00000000);
+            doc->render(bmp, lunasvg::Matrix(fit, 0, 0, fit, (px - b.w * fit) * 0.5f - b.x * fit, (px - b.h * fit) * 0.5f - b.y * fit));
+            bmp.convertToRGBA();
+            upload(bmp.data(), px, px, bmp.stride() / 4, false);
+         }
+         sTex[key] = tex;
+         return (ImTextureID)(intptr_t)tex;
+      }
+
+      // Each agent's official logo on a quiet disc. The mark fills at most 62% of the disc, so it keeps
+      // clear space on every side as the vendors ask; an agent without a logo shows its tinted initial.
       void DrawAvatar(ImDrawList* dl, ImVec2 c, float r, const std::string& id)
       {
-         const float k = r / 11.0f;
          dl->AddCircleFilled(c, r, TextTint(0.07f));
          dl->AddCircle(c, r, TextTint(0.14f), 0, 1.0f);
-         if (id == "claude")
+         const float half = std::round(r * 0.62f);
+         const float scale = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.x);
+         const ImTextureID tex = AgentLogoTexture(id, (int)std::lround(half * 2.0f * scale), IsThemeLight());
+         if (tex != ImTextureID{})
          {
-            const ImU32 col = IM_COL32(217, 119, 87, 255);
-            for (int i = 0; i < 12; i++)
-            {
-               const float a = (float)i * 6.2831853f / 12.0f;
-               const float inner = (i % 2 == 0 ? 2.0f : 3.2f) * k, outer = (i % 2 == 0 ? 8.2f : 6.4f) * k;
-               dl->AddLine(ImVec2(c.x + std::cos(a) * inner, c.y + std::sin(a) * inner), ImVec2(c.x + std::cos(a) * outer, c.y + std::sin(a) * outer), col,
-                           std::max(1.0f, 1.6f * k));
-            }
-         }
-         else if (id == "antigravity")
-         {
-            const ImU32 col = IM_COL32(66, 133, 244, 255);
-            const float R = 8.6f * k, w = 1.5f * k;
-            dl->PathLineTo(ImVec2(c.x, c.y - R));
-            dl->PathBezierCubicCurveTo(ImVec2(c.x + w, c.y - w), ImVec2(c.x + w, c.y - w), ImVec2(c.x + R, c.y));
-            dl->PathBezierCubicCurveTo(ImVec2(c.x + w, c.y + w), ImVec2(c.x + w, c.y + w), ImVec2(c.x, c.y + R));
-            dl->PathBezierCubicCurveTo(ImVec2(c.x - w, c.y + w), ImVec2(c.x - w, c.y + w), ImVec2(c.x - R, c.y));
-            dl->PathBezierCubicCurveTo(ImVec2(c.x - w, c.y - w), ImVec2(c.x - w, c.y - w), ImVec2(c.x, c.y - R));
-            dl->PathFillConvex(col);
-         }
-         else if (id == "codex")
-         {
-            const ImU32 col = IM_COL32(16, 163, 127, 255);
-            for (int i = 0; i < 3; i++)
-            {
-               const float a = (float)i * 6.2831853f / 6.0f;
-               ImVec2 pts[4];
-               for (int j = 0; j < 4; j++)
-               {
-                  const float t = a + (j < 2 ? 0.0f : 3.14159265f) + (j % 2 == 0 ? -0.26f : 0.26f) * (j < 2 ? 1.0f : -1.0f);
-                  pts[j] = ImVec2(c.x + std::cos(t) * 8.0f * k, c.y + std::sin(t) * 8.0f * k);
-               }
-               dl->AddLine(pts[0], pts[1], col, std::max(1.0f, 1.5f * k));
-               dl->AddLine(pts[2], pts[3], col, std::max(1.0f, 1.5f * k));
-            }
-            dl->AddNgon(c, 8.0f * k, col, 6, std::max(1.0f, 1.5f * k));
+            const ImVec2 mn(std::round(c.x - half), std::round(c.y - half));
+            dl->AddImage(tex, mn, ImVec2(mn.x + half * 2.0f, mn.y + half * 2.0f));
          }
          else
          {
