@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <thread>
@@ -480,6 +481,20 @@ namespace app
                R"({"slug":"a","display_name":"A","visibility":"list","priority":1}]})");
             check(m.size() == 2 && m[0].id == "a" && m[1].label == "B", "models: codex cache, listed only, by priority");
             check(chat::ParseCodexModels("not json").empty(), "models: a broken cache gives none");
+            check(chat::ConfiguredModel(chat::AgentKind::Codex, "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"medium\"\n[profiles.x]\nmodel = \"other\"\n") == "gpt-6.1-sol", "models: codex's default comes from config.toml's top-level model");
+            check(chat::ConfiguredModel(chat::AgentKind::Codex, "[tui]\nmodel = \"x\"\n").empty(), "models: a model inside a table is not the default");
+            check(chat::ConfiguredModel(chat::AgentKind::Antigravity, R"j({"model": "Gemini 3.8 Flash (Medium)"})j") == "Gemini 3.8 Flash (Medium)", "models: gemini's default comes from its settings.json");
+            check(chat::ConfiguredModel(chat::AgentKind::Claude, R"({"theme": "dark"})").empty(), "models: no model set, no default named");
+            // The picker itself reads the cache from the user's Codex folder.
+            const char* home = std::getenv("HOME");
+            if (home != nullptr)
+            {
+               const std::string dir = std::string(home) + "/.codex";
+               std::filesystem::create_directories(dir);
+               std::ofstream(dir + "/models_cache.json") << R"({"models":[{"slug":"a","display_name":"A","visibility":"list","priority":1}]})";
+               const auto picker = ChatAgentModels("codex");
+               check(picker.size() == 1 && picker[0].first == "a", "models: the ChatGPT picker lists Codex's cached models");
+            }
          }
 
          // A saved chat comes back with its entries and the agents' sessions.

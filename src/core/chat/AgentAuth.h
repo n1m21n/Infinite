@@ -57,6 +57,11 @@ namespace chat
    std::vector<Model> ParseAgyModels(const std::string& output);
    // Codex keeps the models its account may use in $CODEX_HOME/models_cache.json: the listed ones, by priority.
    std::vector<Model> ParseCodexModels(const std::string& json);
+   // Where an agent keeps the model it uses when none is picked: Claude's and Antigravity's settings.json, Codex's
+   // config.toml ($CODEX_HOME when set).
+   std::string ModelSettingsPath(AgentKind kind, const std::string& home, const std::string& codexHome);
+   // That file's model ("sonnet", "gpt-6.1-sol", "Gemini 3.8 Flash (Medium)"); "" when it names none.
+   std::string ConfiguredModel(AgentKind kind, const std::string& text);
    // True when a sign-in is waiting for the user to paste an authorization code (Gemini shows one in the browser).
    bool AsksForCode(const std::string& log);
 }

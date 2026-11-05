@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -3453,7 +3454,8 @@ namespace app
          const auto st = sAgents.find(agent);
          // The status check of a signed-in agy fills this list itself.
          const bool installed = st != sAgents.end() && st->second.ready.installed && st->second.auth != chat::Auth::Out && st->second.verify == nullptr;
-         const double now = ImGui::GetTime();
+         // A steady clock, not ImGui time: Settings and the self-test ask outside a frame.
+         const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
          const auto at = sModelsFetchAt.find(agent);
          const bool due = at == sModelsFetchAt.end() || now - at->second >= 60.0;
          if (list.empty() && kind == chat::AgentKind::Antigravity && sFetch[agent] == nullptr && installed && due)
@@ -3488,6 +3490,43 @@ namespace app
          return list;
       }
 
+      // The model an agent's own settings choose, by its menu label when the menu has it; "" when none is set.
+      // Read at most every few seconds: the picker asks every frame.
+      std::string AgentDefaultModel(const std::string& agent, const std::vector<chat::Model>& list)
+      {
+         struct Seen
+         {
+            double at = -1e9;
+            std::string value;
+         };
+         static std::map<std::string, Seen> sSeen;
+         chat::AgentKind kind;
+         if (!KindOf(agent, kind))
+            return {};
+         Seen& s = sSeen[agent];
+         const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+         if (now - s.at >= 5.0)
+         {
+            s.at = now;
+            const char* codexHome = std::getenv("CODEX_HOME");
+            const char* home = std::getenv(CliSetup::CurrentOs() == CliSetup::Os::kWindows ? "USERPROFILE" : "HOME");
+            s.value = chat::ConfiguredModel(kind, ReadAll(chat::ModelSettingsPath(kind, home != nullptr ? home : "", codexHome != nullptr ? codexHome : "")));
+         }
+         if (s.value.empty())
+            return {};
+         std::string low = s.value;
+         std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         for (const chat::Model& m : list)
+         {
+            std::string id = m.id, label = m.label;
+            std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            if ((id == low || label == low) && !m.label.empty())
+               return m.label;
+         }
+         return s.value;
+      }
+
       // A tool-row pill: [avatar] text, a tint on hover. Drawn right to left from `right`; returns its left edge.
       float Pill(const char* id, const std::string& avatar, const std::string& text, float right, float y, float h, bool& clicked)
       {
@@ -3520,6 +3559,10 @@ namespace app
          for (const chat::Model& m : list)
             if (m.id == modelId && !m.label.empty())
                modelFace = m.label;
+         // Nothing picked: name the model the agent's own settings choose, so "Default" is never a guess.
+         const std::string theirs = modelId.empty() ? AgentDefaultModel(cur, list) : std::string();
+         if (!theirs.empty())
+            modelFace = theirs;
          const float menuW = 248.0f;
          bool clicked = false;
          float left = right;
@@ -3532,7 +3575,7 @@ namespace app
             if (ImGui::BeginPopup("##chatmodelmenu"))
             {
                MenuLabel(T("Model"), menuW);
-               if (MenuRow("##m", menuW, T("Default"), "", modelId.empty(), true, std::string()))
+               if (MenuRow("##m", menuW, T("Default"), AgentDefaultModel(cur, list).c_str(), modelId.empty(), true, std::string()))
                {
                   prefs.models.erase(cur);
                   SaveCliConfig();

@@ -276,6 +276,49 @@ namespace chat
       return out;
    }
 
+   std::string ModelSettingsPath(AgentKind kind, const std::string& home, const std::string& codexHome)
+   {
+      if (kind == AgentKind::Codex)
+         return (codexHome.empty() ? home + "/.codex" : codexHome) + "/config.toml";
+      if (kind == AgentKind::Antigravity)
+         return home + "/.gemini/antigravity-cli/settings.json";
+      return home + "/.claude/settings.json";
+   }
+
+   std::string ConfiguredModel(AgentKind kind, const std::string& text)
+   {
+      if (kind != AgentKind::Codex)
+      {
+         const nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
+         return j.is_object() && j.contains("model") && j["model"].is_string() ? j["model"].get<std::string>() : std::string();
+      }
+      // TOML: the top-level `model = "..."`, before the first [table]; `model_reasoning_effort` is another key.
+      size_t start = 0;
+      while (start < text.size())
+      {
+         size_t nl = text.find('\n', start);
+         if (nl == std::string::npos)
+            nl = text.size();
+         std::string line = text.substr(start, nl - start);
+         start = nl + 1;
+         const size_t b = line.find_first_not_of(" \t");
+         if (b == std::string::npos || line[b] == '#')
+            continue;
+         if (line[b] == '[')
+            break;
+         const size_t eq = line.find('=');
+         if (eq == std::string::npos)
+            continue;
+         std::string key = line.substr(b, eq - b);
+         key.erase(key.find_last_not_of(" \t") + 1);
+         if (key != "model")
+            continue;
+         const size_t q1 = line.find('"', eq), q2 = q1 == std::string::npos ? q1 : line.find('"', q1 + 1);
+         return q2 == std::string::npos ? std::string() : line.substr(q1 + 1, q2 - q1 - 1);
+      }
+      return {};
+   }
+
    std::vector<Model> ParseAgyModels(const std::string& output)
    {
       std::vector<Model> out;
