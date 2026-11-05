@@ -798,6 +798,7 @@ namespace app
             check(chat::SetupProblem("offline", "node", "Claude").kind == K::Offline && chat::SetupProblem("disk", "agent", "Claude").kind == K::Disk &&
                   chat::SetupProblem("policy", "node", "Claude").kind == K::Policy && chat::SetupProblem("password", "headless", "Claude").kind == K::Password,
                   "setup: every reason has its own words");
+            check(chat::SetupProblem("nofetch", "node", "Claude").text.find("curl") != std::string::npos, "setup: no curl names curl, not the internet");
             check(chat::SetupProblem("", "agent", "Claude").text.find("%s") != std::string::npos, "setup: an unknown failure names the step");
             check(chat::SetupProblem("", "node", "Claude").text.find("Press Try again") != std::string::npos, "setup: always one next thing");
             for (const char* r : { "offline", "download", "disk", "policy", "password", "unsupported", "nodeversion", "install", "register", "" })

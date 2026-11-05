@@ -82,6 +82,8 @@ namespace chat
       (void)agentName;
       if (reason == "offline")
          f = { K::Offline, "No internet. Connect to the internet, then press Try again." };
+      else if (reason == "nofetch")
+         f = { K::Missing, "This computer is missing curl, which downloads the setup. Install curl, then press Try again." };
       else if (reason == "download")
          f = { K::Offline, "A download did not finish. Check the internet, then press Try again." };
       else if (reason == "disk")

@@ -30,7 +30,7 @@ Infinite talks to three coding agents. The chat names them by what people call t
 - **Setup did not finish**: Try againA setup step failed; the Chat panel's card says why in one sentence (no internet, no space, a blocked installer, a password needed). Fix that, then try again.
 - **Not signed in**: Sign inOpens the agent's own sign-in. The page opens in your browser; the row reads Waiting for sign-in… with a Cancel button. A sign-in that is not finished in 3 minutes ends with Sign-in timed out.
 - **Signed out**: Sign in againThe agent said its sign-in expired in the middle of a chat. Sign in again and ask again.
-- **Ready**: Sign outInstalled, connected and signed in. Sign out is shown when the agent has a sign-out command.
+- **Ready**: Sign outInstalled, connected and signed in. Sign out is shown when the agent has a sign-out command. Gemini has none: it keeps its sign-in in the macOS Keychain (or a file in `~/.gemini`), the Windows Credential Manager, or the Linux keyring, so Sign out is offered on macOS only. On every system Infinite checks the sign-in by asking Gemini itself, not by looking for the file.
 
 ### When something fails
 

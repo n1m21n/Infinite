@@ -2794,3 +2794,4 @@ Type password	输入密码
 Who do you want to talk to?	你想和谁对话？
 You're in	已就绪
 Your files	你的文件
+This computer is missing curl, which downloads the setup. Install curl, then press Try again.	这台电脑缺少 curl（用来下载安装）。请安装 curl，然后按重试。

@@ -323,7 +323,7 @@ def html_chapter(P):
                       ("Setup did not finish", "Try again", "A setup step failed; the Chat panel's card says why in one sentence (no internet, no space, a blocked installer, a password needed). Fix that, then try again."),
                       ("Not signed in", "Sign in", "Opens the agent's own sign-in. The page opens in your browser; the row reads <i>Waiting for sign-in…</i> with a Cancel button. A sign-in that is not finished in 3 minutes ends with <i>Sign-in timed out</i>."),
                       ("Signed out", "Sign in again", "The agent said its sign-in expired in the middle of a chat. Sign in again and ask again."),
-                      ("Ready", "Sign out", "Installed, connected and signed in. Sign out is shown when the agent has a sign-out command."),
+                      ("Ready", "Sign out", "Installed, connected and signed in. Sign out is shown when the agent has a sign-out command. Gemini has none: it keeps its sign-in in the macOS Keychain (or a file in <code>~/.gemini</code>), the Windows Credential Manager, or the Linux keyring, so Sign out is offered on macOS only. On every system Infinite checks the sign-in by asking Gemini itself, not by looking for the file."),
                   ]),
                   "<h3>When something fails</h3>",
                   table(["You see", "What to do"], [

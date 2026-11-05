@@ -2794,3 +2794,4 @@ Type password	パスワードを入力
 Who do you want to talk to?	誰と話しますか？
 You're in	準備完了
 Your files	あなたのファイル
+This computer is missing curl, which downloads the setup. Install curl, then press Try again.	このコンピューターにはセットアップをダウンロードする curl がありません。curl をインストールしてから、再試行を押してください。

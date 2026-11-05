@@ -1716,7 +1716,7 @@ Infinite talks to three coding agents. The chat names them by what people call t
 - **Setup did not finish**: Try againA setup step failed; the Chat panel's card says why in one sentence (no internet, no space, a blocked installer, a password needed). Fix that, then try again.
 - **Not signed in**: Sign inOpens the agent's own sign-in. The page opens in your browser; the row reads Waiting for sign-in… with a Cancel button. A sign-in that is not finished in 3 minutes ends with Sign-in timed out.
 - **Signed out**: Sign in againThe agent said its sign-in expired in the middle of a chat. Sign in again and ask again.
-- **Ready**: Sign outInstalled, connected and signed in. Sign out is shown when the agent has a sign-out command.
+- **Ready**: Sign outInstalled, connected and signed in. Sign out is shown when the agent has a sign-out command. Gemini has none: it keeps its sign-in in the macOS Keychain (or a file in `~/.gemini`), the Windows Credential Manager, or the Linux keyring, so Sign out is offered on macOS only. On every system Infinite checks the sign-in by asking Gemini itself, not by looking for the file.
 
 ### When something fails
 
@@ -1745,13 +1745,13 @@ Infinite talks to three coding agents. The chat names them by what people call t
 - **/help**: What the chat can do, with a button per command.
 - **/shortcuts, /manuals, /languages, /about**: Answered by Infinite at once: the shortcut list, the three manuals, the built-in code languages, what Infinite is.
 - **/website, /github**: Open the website or the repository.
-- **/agent <name>**: Switch to a connected agent by name: `/agent claude`. The model picker does the same by choosing one of its models.
+)AGENTDOC"
+R"AGENTDOC(- **/agent <name>**: Switch to a connected agent by name: `/agent claude`. The model picker does the same by choosing one of its models.
 - **/model <name>**: Switch the model, for example `/model opus`.
 - **/new**: Start a new chat.
 - **/undo**: Undo the last change.
 - **/explain [topic]**: The agent explains the open patch in plain words.
-)AGENTDOC"
-R"AGENTDOC(- **/check**: Validates the patch and its code, one line per problem, with a button to fix what it can.
+- **/check**: Validates the patch and its code, one line per problem, with a button to fix what it can.
 - **/docs <question>**: Answers from the manuals, found with `infinite docs`, not from memory.
 
 ### One model picker

@@ -364,16 +364,18 @@ else
 fi
 fi
 
-# 3. Node.js
+# 3. Node.js (a failure's reason is kept: steps 4 and 5 need Node and say the same thing)
+NODE_WHY=
+node_fail() { NODE_WHY="$2"; finish failed "$1" "$2"; }
 if want node; then
 begin 3 node "Check Node.js (runs the MCP server)"
 if node_ok; then
   finish skipped "node $(node -v)"
 elif ! online; then
-  if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then finish failed "no internet: nodejs.org did not answer" offline
-  else finish failed "curl or wget is needed to download" download; fi
+  if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then node_fail "no internet: nodejs.org did not answer" offline
+  else node_fail "curl or wget is needed to download" nofetch; fi
 elif [ "$(free_kb)" -lt 600000 ] 2>/dev/null; then
-  finish failed "not enough free space in your home folder" disk
+  node_fail "not enough free space in your home folder" disk
 else
   private_node; rc=$?
   PATH="$NODE_DIR/bin:$PATH"; export PATH; hash -r 2>/dev/null
@@ -381,10 +383,10 @@ else
     case "$SHELL" in */zsh) NRC="$HOME/.zshrc" ;; */bash) if [ "$OS" = Darwin ]; then NRC="$HOME/.bash_profile"; else NRC="$HOME/.bashrc"; fi ;; *) NRC="$HOME/.profile" ;; esac
     grep -qs '# >>> infinite node >>>' "$NRC" || printf '\n# >>> infinite node >>>\nexport PATH="$HOME/.infinite/node/bin:$PATH"\n# <<< infinite node <<<\n' >> "$NRC" 2>/dev/null
     finish ok "installed node $(node -v) in ~/.infinite/node"
-  elif [ $rc = 1 ] || [ $rc = 2 ]; then finish failed "the Node.js download did not finish" download
-  elif [ $rc = 3 ]; then finish failed "nodejs.org has no Node.js for this computer ($(uname -s) $(uname -m))" unsupported
-  elif [ $rc = 4 ]; then finish failed "could not unpack Node.js into ~/.infinite/node" disk
-  else finish failed "Node.js did not start after install" nodeversion; fi
+  elif [ $rc = 1 ] || [ $rc = 2 ]; then node_fail "the Node.js download did not finish" download
+  elif [ $rc = 3 ]; then node_fail "nodejs.org has no Node.js for this computer ($(uname -s) $(uname -m))" unsupported
+  elif [ $rc = 4 ]; then node_fail "could not unpack Node.js into ~/.infinite/node" disk
+  else node_fail "Node.js did not start after install" nodeversion; fi
 fi
 fi
 
@@ -392,9 +394,9 @@ fi
 if want mcp; then
 begin 4 mcp "Fetch the Infinite MCP server"
 if ! node_ok; then
-  finish failed "needs Node.js (step 3)" nodeversion
+  finish failed "needs Node.js (step 3)" "${NODE_WHY:-nodeversion}"
 else
-  OUT=$(INFINITE_BIN="$EXE" npx -y infinite-engine status 2>&1)
+  OUT=$(INFINITE_BIN="$EXE" npx -y infinite-engine status 2>&1 | grep -v '^npm notice')
   if printf '%s' "$OUT" | grep -q 'infinite program: ' && ! printf '%s' "$OUT" | grep -q 'not found'; then
     finish ok "infinite-engine finds this app"
   elif printf '%s' "$OUT" | grep -qiE 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|network'; then
@@ -431,14 +433,18 @@ NPM_BIN="$(npm prefix -g 2>/dev/null)/bin"
 LOGIN_PATH="$("${SHELL:-/bin/sh}" -lc 'printf %s "$PATH"' 2>/dev/null)"
 [ -n "$LOGIN_PATH" ] && PATH="$PATH:$LOGIN_PATH"
 export PATH
-if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ]; then
+# An npm install needs Node (step 3); without it, say step 3's reason instead of running npm.
+NEEDS_NODE=; case "$AGENT_INSTALL" in npm\ *) node_ok || NEEDS_NODE=1 ;; esac
+if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ] && [ -z "$NEEDS_NODE" ]; then
   printf '   running: %s\n' "$AGENT_INSTALL"
   ( eval "$AGENT_INSTALL" ) </dev/null
   hash -r 2>/dev/null
 fi
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
   if [ -n "$AGENT_INSTALL" ]; then
-    if ! online; then finish failed "no internet while installing $AGENT_NAME" offline
+    if [ -n "$NEEDS_NODE" ]; then finish failed "needs Node.js (step 3)" "${NODE_WHY:-nodeversion}"
+    elif ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then finish failed "curl or wget is needed to download" nofetch
+    elif ! online; then finish failed "no internet while installing $AGENT_NAME" offline
     elif [ "$(free_kb)" -lt 300000 ] 2>/dev/null; then finish failed "not enough free space to install $AGENT_NAME" disk
     else finish failed "$AGENT_NAME did not install. The lines above say why" install; fi
   else finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"; fi
@@ -558,29 +564,31 @@ Begin 2 'headless' 'Check the headless engine'
 try { $ver = (& $Exe --version 2>&1 | Select-Object -First 1); if ($LASTEXITCODE -eq 0) { Finish 'skipped' "$ver" } else { Finish 'failed' "$Exe --version did not run" } } catch { Finish 'failed' "$_" }
 }
 
-# 3. Node.js
+# 3. Node.js (a failure's reason is kept: steps 4 and 5 need Node and say the same thing)
+$NodeWhy = ''
+function NodeFail($d, $r) { $script:NodeWhy = $r; Finish 'failed' $d $r }
 if (Want 'node') {
 Begin 3 'node' 'Check Node.js (runs the MCP server)'
 if (NodeOk) { Finish 'skipped' "node $(& node -v)" }
-elseif ($Locked) { Finish 'failed' 'this computer runs PowerShell in a locked mode; installers cannot run' 'policy' }
-elseif (-not (Online)) { Finish 'failed' 'no internet: nodejs.org did not answer' 'offline' }
-elseif ((FreeMb) -ge 0 -and (FreeMb) -lt 600) { Finish 'failed' 'not enough free space' 'disk' }
+elseif ($Locked) { NodeFail 'this computer runs PowerShell in a locked mode; installers cannot run' 'policy' }
+elseif (-not (Online)) { NodeFail 'no internet: nodejs.org did not answer' 'offline' }
+elseif ((FreeMb) -ge 0 -and (FreeMb) -lt 600) { NodeFail 'not enough free space' 'disk' }
 else {
   $why = PrivateNode
   $env:Path = "$NodeDir;$env:Path"
   if (-not $why -and (NodeOk)) { AddUserPath $NodeDir; Finish 'ok' "installed node $(& node -v) in $NodeDir" }
-  elseif ($why) { Finish 'failed' "Node.js could not be set up ($why)" $why }
-  else { Finish 'failed' 'Node.js did not start after install' 'nodeversion' }
+  elseif ($why) { NodeFail "Node.js could not be set up ($why)" $why }
+  else { NodeFail 'Node.js did not start after install' 'nodeversion' }
 }
 }
 
 # 4. the MCP server
 if (Want 'mcp') {
 Begin 4 'mcp' 'Fetch the Infinite MCP server'
-if (-not (NodeOk)) { Finish 'failed' 'needs Node.js (step 3)' 'nodeversion' }
+if (-not (NodeOk)) { Finish 'failed' 'needs Node.js (step 3)' $(if ($NodeWhy) { $NodeWhy } else { 'nodeversion' }) }
 else {
   $env:INFINITE_BIN = $Exe
-  $out = (& npx -y infinite-engine status 2>&1 | Out-String)
+  $out = (& npx -y infinite-engine status 2>&1 | Where-Object { "$_" -notmatch '^npm notice' } | Out-String)
   $last = (($out.Trim() -split "`n")[-1])
   if (($out -match 'infinite program: ') -and ($out -notmatch 'not found')) { Finish 'ok' 'infinite-engine finds this app' }
   elseif ($out -match 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|network') { Finish 'failed' $last 'offline' }
@@ -607,9 +615,11 @@ Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
 $env:Path = "$NodeDir;$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path"
 # Invoke-Expression runs the installer's text in this process, which already runs with -ExecutionPolicy Bypass:
 # the machine's script policy is not changed and does not stop it.
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; try { Invoke-Expression $AgentInstall } catch { Write-Host "   $_" }; RefreshPath; $env:Path = "$NodeDir;$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path" }
+$NeedsNode = $AgentInstall -like 'npm *' -and -not (NodeOk)
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall -and -not $NeedsNode) { Write-Host "   running: $AgentInstall"; try { Invoke-Expression $AgentInstall } catch { Write-Host "   $_" }; RefreshPath; $env:Path = "$NodeDir;$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path" }
 if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) {
   if (-not $AgentInstall) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" }
+  elseif ($NeedsNode) { Finish 'failed' 'needs Node.js (step 3)' $(if ($NodeWhy) { $NodeWhy } else { 'nodeversion' }) }
   elseif ($Locked) { Finish 'failed' "$AgentName did not install: PowerShell runs in a locked mode" 'policy' }
   elseif (-not (Online)) { Finish 'failed' "no internet while installing $AgentName" 'offline' }
   elseif ((FreeMb) -ge 0 -and (FreeMb) -lt 300) { Finish 'failed' "not enough free space to install $AgentName" 'disk' }

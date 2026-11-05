@@ -34,12 +34,18 @@ namespace app
          ok = ok && c;
       };
       using namespace CliSetup;
-      // INFINITE_CLISETUP_DUMP=<dir>: write the exact Mac/Linux setup script for each agent there (install
-      // included), to run by hand in a throw-away HOME; the test then runs as usual.
+      // INFINITE_CLISETUP_DUMP=<dir>: let Perform write exactly what the app runs (script, skills, JSON helper) into
+      // <dir>/<mac|linux>-<agent>/, to run by hand in a throw-away HOME or a container; the test then runs as usual.
       if (const char* dump = std::getenv("INFINITE_CLISETUP_DUMP"))
          for (const char* id : { "claude", "codex", "antigravity" })
-            std::ofstream(std::string(dump) + "/setup-" + id + ".sh")
-               << BuildScript(CurrentOs(), RealExecutable(), *FindAgent(id), std::string(dump) + "/status-" + id + ".json", {}, nullptr, true);
+            for (const Os os : { CurrentOs(), Os::kLinux, Os::kWindows })
+            {
+               const std::string d = std::string(dump) + "/" + (os == Os::kLinux ? "linux-" : os == Os::kWindows ? "windows-" : "here-") + id;
+               std::filesystem::create_directories(d);
+               std::string err;
+               Perform(Action::kSetupAgent, os, *FindAgent(id), os == Os::kLinux ? std::string("/opt/infinite/Infinite") : os == Os::kWindows ? std::string("C:\\Program Files\\Infinite\\Infinite.exe") : RealExecutable(),
+                       PathsFor(d, os), [](const std::string&, const std::string&) {}, &err);
+            }
       const Agent& claude = *FindAgent("claude");
       const long long now = 1800000000;
       const std::string exe = "/Applications/Infinite's Dir/Infinite.app/Contents/MacOS/Infinite";
@@ -313,6 +319,17 @@ namespace app
          const size_t at = j.find("\"detail\":\"d2\"");
          j.insert(at, "\"reason\":\"offline\",");
          check(ParseStatus(j, now).steps[2].reason == "offline", "reason: read from status.json");
+      }
+
+      // 13. a missing Node is said once, with step 3's reason, by every step that needs it (found on Ubuntu with no
+      //     curl: step 4 said "too old", step 5 ran npm and said "no internet").
+      {
+         const std::string sh = BuildScript(Os::kLinux, exe, *FindAgent("codex"), "/tmp/s.json");
+         check(sh.find("node_fail \"curl or wget is needed to download\" nofetch") != std::string::npos, "sh: no curl or wget is its own reason");
+         check(sh.find("\"needs Node.js (step 3)\" \"${NODE_WHY:-nodeversion}\"") != std::string::npos, "sh: steps 4 and 5 repeat step 3's reason");
+         check(sh.find("[ -z \"$NEEDS_NODE\" ]") != std::string::npos, "sh: npm is not run without Node");
+         const std::string ps = BuildScript(Os::kWindows, "C:\\I\\Infinite.exe", *FindAgent("codex"), "C:\\s.json");
+         check(ps.find("$NeedsNode = $AgentInstall -like 'npm *'") != std::string::npos && ps.find("NodeFail 'no internet") != std::string::npos, "ps: the same for Windows");
       }
 
       std::printf("CLISETUPTEST %s\n", ok ? "PASS" : "FAIL");
