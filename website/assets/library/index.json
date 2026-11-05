@@ -5257,6 +5257,216 @@
       "file": "assets/library/pixel/cyberpunk-neon-hologram-grid.field",
       "preview": "assets/library/previews/cyberpunk-neon-hologram-grid.jpg",
       "bytes": 1769
+    },
+    {
+      "id": "chavetta-montage-torn-ephemera",
+      "name": "Chavetta Montage Torn Ephemera",
+      "kind": "Generator",
+      "tags": [
+        "chavetta",
+        "montage",
+        "collage",
+        "ephemera",
+        "paper",
+        "mixedmedia"
+      ],
+      "description": "Mixed-media collage on aged kraft paper with torn paper horizontal stratum bands, distressed terracotta color blocks, slate blue overlays, and botanical specimen silhouette contours.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/chavetta-montage-torn-ephemera.js",
+      "preview": "assets/library/previews/chavetta-montage-torn-ephemera.jpg",
+      "bytes": 4382
+    },
+    {
+      "id": "chavetta-montage-classical-medallion",
+      "name": "Chavetta Montage Classical Medallion",
+      "kind": "Generator",
+      "tags": [
+        "chavetta",
+        "montage",
+        "medallion",
+        "classical",
+        "geometric",
+        "drawing"
+      ],
+      "description": "Constructed archival montage featuring concentric classical medallion rings, contrasting terracotta and slate geometric framing slabs, and tactile textured paper ephemera.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/chavetta-montage-classical-medallion.js",
+      "preview": "assets/library/previews/chavetta-montage-classical-medallion.jpg",
+      "bytes": 3236
+    },
+    {
+      "id": "ukiyoe-cartography-topographic-peak-3d",
+      "name": "Ukiyo-e Cartography Topographic Peak 3D",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "woodblock",
+        "cartography",
+        "topography",
+        "japanart",
+        "3d"
+      ],
+      "description": "Edo-period woodblock cartographic mountain relief with concentric stepped topographical strata, indigo marine foundations, and a vibrant cinnabar seal accent.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-cartography-topographic-peak-3d.js",
+      "preview": "assets/library/previews/ukiyoe-cartography-topographic-peak-3d.jpg",
+      "bytes": 2772
+    },
+    {
+      "id": "ukiyoe-cartography-compass-archipelago-3d",
+      "name": "Ukiyo-e Cartography Compass Archipelago 3D",
+      "kind": "Generator",
+      "tags": [
+        "ukiyoe",
+        "cartography",
+        "compass",
+        "archipelago",
+        "islands",
+        "3d"
+      ],
+      "description": "Procedural 3D nautical compass rose and floating archipelago islands rendered with indigo ink contours, seafoam wave ridges, and cinnabar navigational markers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/ukiyoe-cartography-compass-archipelago-3d.js",
+      "preview": "assets/library/previews/ukiyoe-cartography-compass-archipelago-3d.jpg",
+      "bytes": 2575
+    },
+    {
+      "id": "neurofunk-reese-roller-synth",
+      "name": "Neurofunk Reese Roller Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neurofunk",
+        "reese",
+        "dnb",
+        "bass",
+        "dsp"
+      ],
+      "description": "Multi-oscillator detuned reese bass synthesizer with dual saw spread, morphing lowpass-bandpass formant filter, analog saturation, and deep sub presence.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/neurofunk-reese-roller-synth.inf",
+      "preview": "assets/library/previews/neurofunk-reese-roller-synth.jpg",
+      "bytes": 2426
+    },
+    {
+      "id": "neurofunk-modulated-growl-synth",
+      "name": "Neurofunk Modulated Growl Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "neurofunk",
+        "growl",
+        "fm",
+        "bass",
+        "dsp"
+      ],
+      "description": "Aggressive frequency-modulated growl bass synthesizer with carrier-modulator phase feedback, vowel formant notch shaping, and tube drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/neurofunk-modulated-growl-synth.inf",
+      "preview": "assets/library/previews/neurofunk-modulated-growl-synth.jpg",
+      "bytes": 2439
+    },
+    {
+      "id": "dubstep-sub-drive-saturator-fx",
+      "name": "Dubstep Sub Drive Saturator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "dubstep",
+        "saturator",
+        "overdrive",
+        "distortion",
+        "audio"
+      ],
+      "description": "Heavy dynamic asymmetric tube overdrive and multi-band sub-bass exciter with tape warmth, parallel clean blend, and output ceiling limiting.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dubstep-sub-drive-saturator-fx.inf",
+      "preview": "assets/library/previews/dubstep-sub-drive-saturator-fx.jpg",
+      "bytes": 1903
+    },
+    {
+      "id": "dubstep-formant-vowel-filter-fx",
+      "name": "Dubstep Formant Vowel Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "dubstep",
+        "formant",
+        "vowel",
+        "filter",
+        "audio"
+      ],
+      "description": "Dynamic vowel-morphing dual-peak formant filter with modulated resonance sweep, vocal frequency emphasis, and stereo width generation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dubstep-formant-vowel-filter-fx.inf",
+      "preview": "assets/library/previews/dubstep-formant-vowel-filter-fx.jpg",
+      "bytes": 2214
+    },
+    {
+      "id": "technical-blueprint-drafting-grid",
+      "name": "Technical Blueprint Drafting Grid",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "blueprint",
+        "technical",
+        "cyanotype",
+        "grid",
+        "shader"
+      ],
+      "description": "Cyanotype architectural drafting blueprint shader with multi-scale coordinate grids, concentric measurement calipers, and audio-reactive dimension ticks.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/technical-blueprint-drafting-grid.field",
+      "preview": "assets/library/previews/technical-blueprint-drafting-grid.jpg",
+      "bytes": 1954
+    },
+    {
+      "id": "technical-blueprint-specimen-matrix",
+      "name": "Technical Blueprint Specimen Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "blueprint",
+        "schematic",
+        "specimen",
+        "scientific",
+        "shader"
+      ],
+      "description": "Speculative biological schematic blueprint shader with sectional specimen contour rings, radial coordinate calipers, and technical drafting callouts.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/technical-blueprint-specimen-matrix.field",
+      "preview": "assets/library/previews/technical-blueprint-specimen-matrix.jpg",
+      "bytes": 1856
     }
   ]
 }

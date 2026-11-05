@@ -441,5 +441,13 @@
  "embeds/cyberpunk-neon-hologram-grid.html": {
   "font-size": 2,
   "hex": 6
+ },
+ "embeds/technical-blueprint-drafting-grid.html": {
+  "font-size": 2,
+  "hex": 6
+ },
+ "embeds/technical-blueprint-specimen-matrix.html": {
+  "font-size": 2,
+  "hex": 6
  }
 }

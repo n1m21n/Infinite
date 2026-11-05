@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dubstep Sub Drive Saturator FX",
+    "author": "Infinite",
+    "description": "Heavy dynamic asymmetric tube overdrive and multi-band sub-bass exciter with tape warmth, parallel clean blend, and output ceiling limiting.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 1.8 [0.5, 4.0]\nparam float tone = 2600.0 [400.0, 6000.0]\nparam float bassBoost = 0.45 [0.0, 1.2]\nparam float mix = 0.65 [0.0, 1.0]\nstate float lpSub = 0\nstate float lpTone = 0\n\nfSubCut = clamp(180.0 / sr * 2.4, 0.005, 0.2)\nlpSub = lpSub + fSubCut * (in - lpSub)\n\nu = in * drive + lpSub * bassBoost\nsat = clamp(u - 0.22 * u * u * u, -0.95, 0.95)\n\nfToneCut = clamp(tone / sr * 2.4, 0.015, 0.45)\nlpTone = lpTone + fToneCut * (sat - lpTone)\n\nwet = lpTone * 1.05\nout = (in * (1.0 - mix) + wet * mix) * 1.05\n",
+    "params": {
+      "drive": 1.8,
+      "tone": 2600.0,
+      "bassBoost": 0.45,
+      "mix": 0.65
+    }
+  }
+}

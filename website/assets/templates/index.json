@@ -1509,6 +1509,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "neurofunk-reese-roller-synth",
+      "name": "Neurofunk Reese Roller Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Multi-oscillator detuned reese bass synthesizer with dual saw spread, morphing lowpass-bandpass formant filter, analog saturation, and deep sub presence.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-reese-roller-synth.webp",
+      "file": "assets/templates/neurofunk-reese-roller-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "neurofunk-modulated-growl-synth",
+      "name": "Neurofunk Modulated Growl Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Aggressive frequency-modulated growl bass synthesizer with carrier-modulator phase feedback, vowel formant notch shaping, and tube drive.",
+      "price": 0,
+      "preview": "assets/templates/neurofunk-modulated-growl-synth.webp",
+      "file": "assets/templates/neurofunk-modulated-growl-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dubstep-sub-drive-saturator-fx",
+      "name": "Dubstep Sub Drive Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Heavy dynamic asymmetric tube overdrive and multi-band sub-bass exciter with tape warmth, parallel clean blend, and output ceiling limiting.",
+      "price": 0,
+      "preview": "assets/templates/dubstep-sub-drive-saturator-fx.webp",
+      "file": "assets/templates/dubstep-sub-drive-saturator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dubstep-formant-vowel-filter-fx",
+      "name": "Dubstep Formant Vowel Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dynamic vowel-morphing dual-peak formant filter with modulated resonance sweep, vocal frequency emphasis, and stereo width generation.",
+      "price": 0,
+      "preview": "assets/templates/dubstep-formant-vowel-filter-fx.webp",
+      "file": "assets/templates/dubstep-formant-vowel-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

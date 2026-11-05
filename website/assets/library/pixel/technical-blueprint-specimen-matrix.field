@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Technical Blueprint Specimen Matrix",
+    "author": "Infinite",
+    "description": "Speculative biological schematic blueprint shader with sectional specimen contour rings, radial coordinate calipers, and technical drafting callouts.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float sectionDensity = 8.0 [3.0, 18.0]\nparam float specimenScale = 1.0 [0.5, 2.0]\nparam float draftingCyan = 1.2 [0.5, 2.5]\nparam float rotationRate = 0.25 [0.05, 1.0]\nparam float scanlineDarkness = 0.25 [0.0, 0.8]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * rotationRate\n\nr = length(p)\nang = atan2(p.y, p.x)\n\nspecContour = sin(r * 22.0 * specimenScale - time * 3.0 + sin(ang * 6.0) * 2.2)\ncontourLine = smoothstep(0.12, 0.0, abs(specContour)) * step(r, 0.88 * specimenScale)\n\ncal1 = abs(r - 0.92 * specimenScale)\ncal2 = abs(r - 0.74 * specimenScale)\nring1 = smoothstep(0.016, 0.002, cal1)\nring2 = smoothstep(0.012, 0.002, cal2)\n\ndivs = step(0.88, cos(ang * 12.0 + time * 1.4)) * step(0.72 * specimenScale, r) * step(r, 0.94 * specimenScale)\n\ngx = fract(p.x * 16.0)\ngy = fract(p.y * 16.0)\ngrid = (step(0.94, gx) + step(0.94, gy)) * 0.16\n\ncBlue = vec3(0.012, 0.07, 0.16)\ncCyan = vec3(0.0, 0.82, 1.0)\ncWhite = vec3(0.95, 0.97, 1.0)\n\ncol = cBlue + cCyan * (grid + contourLine * 0.75 + ring1 * 0.85 + ring2 * 0.65) * draftingCyan\ncol = col + cWhite * divs * 0.85\n\nscan = clamp(sin(uv.y * 560.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = col * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "sectionDensity": 8.0,
+      "specimenScale": 1.0,
+      "draftingCyan": 1.2,
+      "rotationRate": 0.25,
+      "scanlineDarkness": 0.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

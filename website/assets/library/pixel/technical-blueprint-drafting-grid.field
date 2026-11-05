@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Technical Blueprint Drafting Grid",
+    "author": "Infinite",
+    "description": "Cyanotype architectural drafting blueprint shader with multi-scale coordinate grids, concentric measurement calipers, and audio-reactive dimension ticks.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridDensity = 14.0 [6.0, 32.0]\nparam float caliperRadius = 0.48 [0.2, 1.0]\nparam float lineGlow = 1.3 [0.5, 3.0]\nparam float dimensionSpeed = 0.8 [0.1, 2.5]\nparam float scanlineDarkness = 0.25 [0.0, 0.8]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * dimensionSpeed\n\nr = length(p)\nang = atan2(p.y, p.x)\n\ngx = fract(p.x * gridDensity * 0.5)\ngy = fract(p.y * gridDensity * 0.5)\ngridFine = step(0.93, gx) + step(0.93, gy)\ngridMajor = step(0.97, fract(p.x * gridDensity * 0.1)) + step(0.97, fract(p.y * gridDensity * 0.1))\n\ncal1 = abs(r - caliperRadius)\ncal2 = abs(r - caliperRadius * 0.65)\nring1 = smoothstep(0.018, 0.002, cal1)\nring2 = smoothstep(0.014, 0.002, cal2)\n\nticks = step(0.85, sin(ang * 24.0 + time * 0.6)) * step(caliperRadius * 0.58, r) * step(r, caliperRadius * 0.72)\n\ncrosshair = (smoothstep(0.012, 0.002, abs(p.x)) + smoothstep(0.012, 0.002, abs(p.y))) * step(r, caliperRadius * 1.2)\n\ncBlue = vec3(0.015, 0.08, 0.18)\ncCyan = vec3(0.0, 0.82, 1.0)\ncWhite = vec3(0.95, 0.97, 1.0)\n\ncol = cBlue + cCyan * (gridFine * 0.18 + gridMajor * 0.35 + ring1 * 0.75 + ring2 * 0.65) * lineGlow\ncol = col + cWhite * (crosshair * 0.85 + ticks * 0.9) * lineGlow\n\nscan = clamp(sin(uv.y * 560.0) * 0.5 + 0.5, 0.0, 1.0)\ncol = col * (1.0 - scan * scanlineDarkness)\n\nalpha = 1.0\n",
+    "params": {
+      "gridDensity": 14.0,
+      "caliperRadius": 0.48,
+      "lineGlow": 1.3,
+      "dimensionSpeed": 0.8,
+      "scanlineDarkness": 0.25
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

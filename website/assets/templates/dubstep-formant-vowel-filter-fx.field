@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dubstep Formant Vowel Filter FX",
+    "author": "Infinite",
+    "description": "Dynamic vowel-morphing dual-peak formant filter with modulated resonance sweep, vocal frequency emphasis, and stereo width generation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float vowelMorph = 0.65 [0.0, 1.0]\nparam float resonance = 0.50 [0.1, 0.88]\nparam float sweepRate = 0.45 [0.05, 2.0]\nparam float mix = 0.70 [0.0, 1.0]\nstate float bp1 = 0\nstate float bp2 = 0\nstate float lp1 = 0\nstate float lp2 = 0\nstate float lfo = 0\n\nlfo = (lfo + sweepRate / sr) % 1.0\nwob = sin(lfo * 6.2831853) * 0.5 + 0.5\n\nf1 = 400.0 + (vowelMorph * 0.6 + wob * 0.4) * 500.0\nf2 = 1200.0 + (vowelMorph * 0.5 + wob * 0.5) * 1400.0\n\nfCut1 = clamp(f1 / sr * 2.2, 0.01, 0.45)\nfCut2 = clamp(f2 / sr * 2.2, 0.01, 0.45)\n\nlp1 = lp1 + fCut1 * (in - lp1 - resonance * bp1)\nbp1 = bp1 + fCut1 * (lp1 - bp1)\n\nlp2 = lp2 + fCut2 * (in - lp2 - resonance * bp2)\nbp2 = bp2 + fCut2 * (lp2 - bp2)\n\nvowel = bp1 * 0.8 + bp2 * 0.6\nu = vowel * 1.4\nsat = clamp(u - 0.20 * u * u * u, -0.92, 0.92)\n\nout = (in * (1.0 - mix) + sat * mix) * 1.08\n",
+    "params": {
+      "vowelMorph": 0.65,
+      "resonance": 0.5,
+      "sweepRate": 0.45,
+      "mix": 0.7
+    }
+  }
+}

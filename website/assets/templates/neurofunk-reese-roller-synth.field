@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neurofunk Reese Roller Synth",
+    "author": "Infinite",
+    "description": "Multi-oscillator detuned reese bass synthesizer with dual saw spread, morphing lowpass-bandpass formant filter, analog saturation, and deep sub presence.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.45 [0.05, 1.2]\nparam float cutoff = 1600.0 [250.0, 5000.0]\nparam float resonance = 0.42 [0.05, 0.85]\nparam float decay = 0.38 [0.1, 1.5]\nparam float subGain = 0.55 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float pSub = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00008, 0.02)\nenv = if(target > env, env + (target - env) * 0.38, env - env * decayRate)\npEnv = if(target > pEnv, pEnv + (target - pEnv) * 0.55, pEnv - pEnv * 0.004)\n\nfBase = clamp(freq, 32.0, 1200.0)\nf1 = fBase * (1.0 + detune * 0.015)\nf2 = fBase * (1.0 - detune * 0.015)\n\np1 = (p1 + f1 / sr) % 1.0\nsaw1 = p1 * 2.0 - 1.0\n\np2 = (p2 + f2 / sr) % 1.0\nsaw2 = p2 * 2.0 - 1.0\n\npSub = (pSub + (fBase * 0.5) / sr) % 1.0\nsubSine = sin(pSub * 6.2831853)\n\nraw = (saw1 * 0.5 + saw2 * 0.5 + subSine * subGain) * env\n\nu = raw * 1.6\nsat = clamp(u - 0.24 * u * u * u, -0.95, 0.95)\n\nfCut = clamp((cutoff + pEnv * 1600.0) / sr * 2.2, 0.01, 0.45)\nlp1 = lp1 + fCut * (sat - lp1 - resonance * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.38\n",
+    "params": {
+      "detune": 0.45,
+      "cutoff": 1600.0,
+      "resonance": 0.42,
+      "decay": 0.38,
+      "subGain": 0.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

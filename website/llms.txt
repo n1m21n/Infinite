@@ -189,6 +189,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Industrial Techno Metallic FM Synth](https://infinitedevices.org/library/industrial-techno-metallic-fm-synth.html): Raw industrial FM percussion synthesizer with metallic inharmonic operator modulation, snappy noise-burst transient, and gritty wavefolded decay. (file: https://infinitedevices.org/assets/templates/industrial-techno-metallic-fm-synth.inf)
 - [Classic Trance Euphoric Delay FX](https://infinitedevices.org/library/classic-trance-euphoric-delay-fx.html): Anthemic trance stereo delay line with synchronized 16th-note repeats, progressive high-frequency damping, gentle flutter modulation, and lush stereo width. (file: https://infinitedevices.org/assets/templates/classic-trance-euphoric-delay-fx.inf)
 - [Classic Trance Resonant Sweep FX](https://infinitedevices.org/library/classic-trance-resonant-sweep-fx.html): Euphoric trance resonant state-variable filter and harmonic exciter with modulated peak sweep, warm analog saturation, and dynamic stereo presence. (file: https://infinitedevices.org/assets/templates/classic-trance-resonant-sweep-fx.inf)
+- [Neurofunk Reese Roller Synth](https://infinitedevices.org/library/neurofunk-reese-roller-synth.html): Multi-oscillator detuned reese bass synthesizer with dual saw spread, morphing lowpass-bandpass formant filter, analog saturation, and deep sub presence. (file: https://infinitedevices.org/assets/templates/neurofunk-reese-roller-synth.inf)
+- [Neurofunk Modulated Growl Synth](https://infinitedevices.org/library/neurofunk-modulated-growl-synth.html): Aggressive frequency-modulated growl bass synthesizer with carrier-modulator phase feedback, vowel formant notch shaping, and tube drive. (file: https://infinitedevices.org/assets/templates/neurofunk-modulated-growl-synth.inf)
+- [Dubstep Sub Drive Saturator FX](https://infinitedevices.org/library/dubstep-sub-drive-saturator-fx.html): Heavy dynamic asymmetric tube overdrive and multi-band sub-bass exciter with tape warmth, parallel clean blend, and output ceiling limiting. (file: https://infinitedevices.org/assets/templates/dubstep-sub-drive-saturator-fx.inf)
+- [Dubstep Formant Vowel Filter FX](https://infinitedevices.org/library/dubstep-formant-vowel-filter-fx.html): Dynamic vowel-morphing dual-peak formant filter with modulated resonance sweep, vocal frequency emphasis, and stereo width generation. (file: https://infinitedevices.org/assets/templates/dubstep-formant-vowel-filter-fx.inf)
 
 ## Library: Community
 
@@ -549,7 +553,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 68 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 70 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -566,4 +570,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 53 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 55 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

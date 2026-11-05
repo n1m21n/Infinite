@@ -340,6 +340,16 @@
       "slug": "cyberpunk-neon-hologram-grid",
       "title": "Cyberpunk Neon Hologram Grid",
       "description": "Volumetric neon city hologram shader with segmented cyberpunk signage matrices, phosphor scanline bleeding, and radiant chromatic light corridors. Bass triggers volumetric hologram grid surges, mids warp matrix column alignment, highs trigger phosphor beam luminance spikes."
+    },
+    {
+      "slug": "technical-blueprint-drafting-grid",
+      "title": "Technical Blueprint Drafting Grid",
+      "description": "Architectural cyanotype drafting blueprint shader with multi-scale precision coordinate grids, concentric caliper dimension rings, and audio-reactive measurement arcs. Bass expands primary caliper circles, mids rotate dimension markers, highs ignite chalk-white crosshair ticks."
+    },
+    {
+      "slug": "technical-blueprint-specimen-matrix",
+      "title": "Technical Blueprint Specimen Matrix",
+      "description": "Speculative biological schematic blueprint shader with sectional specimen contour rings, radial coordinate calipers, and technical drafting callouts. Bass modulates sectional contour breathing, mids sweep drafting alignment arcs, highs trigger luminous chalk-white specimen flares."
     }
   ]
 }

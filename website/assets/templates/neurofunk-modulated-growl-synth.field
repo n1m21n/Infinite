@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neurofunk Modulated Growl Synth",
+    "author": "Infinite",
+    "description": "Aggressive frequency-modulated growl bass synthesizer with carrier-modulator phase feedback, vowel formant notch shaping, and tube drive.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float modRatio = 1.0 [0.5, 4.0]\nparam float modIndex = 2.4 [0.0, 5.0]\nparam float cutoff = 2200.0 [300.0, 6000.0]\nparam float decay = 0.34 [0.08, 1.2]\nparam float growlSpeed = 1.4 [0.2, 4.0]\nstate float pCar = 0\nstate float pMod = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\nstate float lfo = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.00009, 0.02)\nenv = if(target > env, env + (target - env) * 0.40, env - env * decayRate)\npEnv = if(target > pEnv, pEnv + (target - pEnv) * 0.65, pEnv - pEnv * 0.006)\n\nlfo = (lfo + growlSpeed / sr) % 1.0\nwobble = sin(lfo * 6.2831853) * 0.5 + 0.5\n\nfBase = clamp(freq, 35.0, 1400.0)\nfMod = fBase * modRatio\n\npMod = (pMod + fMod / sr) % 1.0\nmodSine = sin(pMod * 6.2831853) * (modIndex * (0.6 + wobble * 0.8)) * env\n\nfCar = fBase + modSine * fBase\npCar = (pCar + fCar / sr) % 1.0\ncarSine = sin(pCar * 6.2831853)\n\nraw = carSine * env\n\nu = raw * 1.55\nsat = clamp(u - 0.22 * u * u * u, -0.94, 0.94)\n\nfCut = clamp((cutoff + pEnv * 2000.0) / sr * 2.2, 0.015, 0.45)\nlp1 = lp1 + fCut * (sat - lp1 - 0.35 * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.36\n",
+    "params": {
+      "modRatio": 1.0,
+      "modIndex": 2.4,
+      "cutoff": 2200.0,
+      "decay": 0.34,
+      "growlSpeed": 1.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
