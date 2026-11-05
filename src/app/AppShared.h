@@ -5794,6 +5794,7 @@ void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
 // The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
 extern int gTerminalFace;
+extern int gChatSelectionFrame;   // last frame the chat held selected words: Cmd+C copies those, not nodes
 extern bool gChatSideTerminal;   // the chat shows with a shell beside it
 void DrawChatPanel();
 void ChatReferenceNode(int index);   // opens the chat with the node's `@` name typed in the composer

@@ -314,6 +314,11 @@ namespace app
             for (const chat::Span& sp : a.spans)
                node = node || (sp.kind == chat::SpanKind::Node && sp.node == 1), ag = ag || (sp.kind == chat::SpanKind::Agent && sp.key == "antigravity");
             check(!a.direct && node && ag, "mentions: an agent and a node in one line");
+            const chat::Parse g = ParseLine("@gemini @chatgpt hi", cat);
+            bool gem = false, gpt = false;
+            for (const chat::Span& sp : g.spans)
+               gem = gem || (sp.kind == chat::SpanKind::Agent && sp.key == "antigravity"), gpt = gpt || (sp.kind == chat::SpanKind::Agent && sp.key == "codex");
+            check(gem && gpt, "mentions: @gemini and @chatgpt name Antigravity and Codex");
          }
 
          // What a turn changed: params, added and removed nodes, cables, code as a block.
@@ -347,6 +352,31 @@ namespace app
             check(has("@Blur#12") && has("@cube#1") && d.size() >= 5, "diff: a new cable names both ends");
             check(code, "diff: a code param comes back as a block");
             check(chat::Diff(before, before).empty(), "diff: nothing changed, nothing to show");
+            // A removal that numbers the rest again (undo, reload): uids keep each node itself, no rename chain.
+            {
+               chat::Snapshot b2, a2;
+               const char* names[] = { "chorder", "arpeggiator", "analog", "reverb" };
+               for (int i = 0; i < 4; i++)
+               {
+                  chat::CatalogNode n;
+                  n.index = i + 1;
+                  n.uid = 100 + i;
+                  n.type = n.title = names[i];
+                  b2.catalog.nodes.push_back(n);
+                  if (i > 0)
+                  {
+                     n.index = i;  // one lower once chorder is gone
+                     a2.catalog.nodes.push_back(n);
+                  }
+               }
+               b2.links.push_back({ 2, 0, 3, 0, "" });
+               a2.links.push_back({ 1, 0, 2, 0, "" });
+               const std::vector<chat::ChangeLine> rd = chat::Diff(b2, a2);
+               bool renamed = false;
+               for (const chat::ChangeLine& l : rd)
+                  renamed = renamed || l.text.rfind("renamed", 0) == 0 || l.text.rfind("connected", 0) == 0 || l.text.rfind("disconnected", 0) == 0;
+               check(rd.size() == 1 && rd[0].text == "removed chorder" && !renamed, "diff: renumbered nodes are not renames");
+            }
 
             // A value the canvas no longer shows is called out; one that still holds is not.
             const chat::ChangeLine* size = nullptr;

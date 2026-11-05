@@ -54,6 +54,7 @@ namespace app
 {
    int gTerminalFace = 0;
    bool gChatSideTerminal = false;
+   int gChatSelectionFrame = -100;
 
    namespace
    {
@@ -176,8 +177,42 @@ namespace app
       int sLastFrame = -100;
       bool sScrollToEnd = false;
       bool sRefocus = false;
-      int sPendingRef = -1;   // a node the canvas menu asked to name in the composer
+      int sPendingRef = -1;  // a node the canvas menu asked to name in the composer
+      // Messages sent while an agent works wait here and go, in order, when the turn ends. Stop puts
+      // them back in the box instead, so nothing is sent that the person did not mean to send now.
+      struct Queued
+      {
+         std::string text;
+         std::vector<std::string> files;
+      };
+      std::vector<Queued> sQueue;
+      bool sQueueHold = false;
+      constexpr float kQueueRowH = 24.0f;
       bool sCursorToEnd = false;
+      // Selecting an agent's words: every word and chip DrawFlow lays out this frame, with where it
+      // sits, so a drag can be hit-tested, highlighted and copied as the text it reads.
+      struct Piece
+      {
+         int entry = -1;
+         ImVec2 min, max;
+         std::string text;
+         ImFont* font = nullptr;
+         float size = 0.0f;
+         bool spaceAfter = false;
+         bool breakBefore = false;  // the first word of a block or after a line break
+      };
+      struct SelPos
+      {
+         int piece = 0;  // within the entry's pieces
+         int ch = 0;     // byte offset in the piece's text
+      };
+      std::vector<Piece> sPieces;
+      std::vector<std::pair<int, ImRect>> sEntryRects;  // agent rows drawn this frame
+      int sFlowEntry = -1;       // the agent row DrawFlow records for, or -1
+      bool sFlowBreak = false;
+      int sSelEntry = -1;
+      SelPos sSelA, sSelB;
+      bool sSelDrag = false;
       std::vector<chat::ThreadInfo> sHistory;  // newest first; read from disk once, then kept by SaveNow
       bool sHistoryLoaded = false;
       char sHistoryFilter[96] = "";
@@ -249,6 +284,7 @@ namespace app
          {
             chat::CatalogNode n;
             n.index = gn.index;
+            n.uid = gn.uid;
             n.type = gn.typeName;
             n.title = NodeTitle(gn);
             n.category = NodeFactory::Instance().CategoryOf(gn.typeName);
@@ -359,6 +395,16 @@ namespace app
          const CliSetup::Agent* a = CliSetup::FindAgent(id);
          return a != nullptr ? a->name : id.c_str();
       }
+
+      // The chat reads at the app's base size (15): names, headers and the words share it, in a heavier
+      // weight where they lead; only subtext (step rows, details) steps down to the body token.
+      struct Weight
+      {
+         explicit Weight(UiType::Weight w) { ImGui::PushFont(UiType::Font(w), ImGui::GetFontSize()); }
+         ~Weight() { ImGui::PopFont(); }
+         Weight(const Weight&) = delete;
+         Weight& operator=(const Weight&) = delete;
+      };
 
       // Each agent's own colour (a node family's, so it follows the theme) and initial, so a reply
       // shows who wrote it at a glance when several agents answer in one chat.
@@ -1140,8 +1186,15 @@ namespace app
          std::string line = sInput;
          while (!line.empty() && std::isspace((unsigned char)line.back()))
             line.pop_back();
-         if ((line.empty() && sAttach.empty()) || !sRuns.empty())
+         if (line.empty() && sAttach.empty())
             return;
+         if (!sRuns.empty())
+         {
+            sQueue.push_back({ line, sAttach });
+            sInput.clear();
+            sAttach.clear();
+            return;
+         }
          RefreshCatalog(true);
          std::string slashPrompt;
          {
@@ -1243,6 +1296,8 @@ namespace app
             InsertAt(at++, Make(Entry::Kind::Note, std::string(T("Not allowed:")) + " " + d, r.agent));
       }
 
+      void SendQueued();
+
       void PollRuns()
       {
          if (sRuns.empty())
@@ -1332,6 +1387,95 @@ namespace app
          if (!change.changes.empty())
             Push(std::move(change));
          SaveNow();
+         SendQueued();
+      }
+
+      // The turn ended: the next queued message goes now; after Stop, all of them go back to the box.
+      void SendQueued()
+      {
+         if (sQueue.empty())
+         {
+            sQueueHold = false;
+            return;
+         }
+         if (sQueueHold)
+         {
+            std::string back;
+            for (const Queued& q : sQueue)
+            {
+               back += (back.empty() ? "" : "\n") + q.text;
+               for (const std::string& f : q.files)
+                  if (std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
+                     sAttach.push_back(f);
+            }
+            sInput = sInput.empty() ? back : back + "\n" + sInput;
+            sQueue.clear();
+            sQueueHold = false;
+            sRefocus = sCursorToEnd = true;
+            return;
+         }
+         Queued next = std::move(sQueue.front());
+         sQueue.erase(sQueue.begin());
+         std::string keep = std::move(sInput);
+         std::vector<std::string> keepFiles = std::move(sAttach);
+         sInput = next.text;
+         sAttach = next.files;
+         Send();
+         sInput = std::move(keep);
+         sAttach = std::move(keepFiles);
+      }
+
+      // Queued messages, one quiet row each over the composer: click to take it back into the box, × to drop it.
+      void DrawQueue(float width)
+      {
+         if (sQueue.empty())
+            return;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         int take = -1, drop = -1;
+         for (size_t i = 0; i < sQueue.size(); i++)
+         {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            ImGui::PushID((int)i);
+            const bool row = ImGui::InvisibleButton("##queued", ImVec2(width - kQueueRowH, kQueueRowH));
+            const bool hot = ImGui::IsItemHovered();
+            ImGui::SameLine(0.0f, 0.0f);
+            const bool x = ImGui::InvisibleButton("##unqueue", ImVec2(kQueueRowH, kQueueRowH));
+            const bool xHot = ImGui::IsItemHovered();
+            ImGui::PopID();
+            if (row)
+               take = (int)i;
+            if (x)
+               drop = (int)i;
+            if (hot || xHot)
+               dl->AddRectFilled(p, ImVec2(p.x + width, p.y + kQueueRowH), TextTint(0.05f), tok::radius_tile);
+            const float ty = p.y + (kQueueRowH - ImGui::GetFontSize()) * 0.5f;
+            const char* tag = T("Queued");
+            dl->AddText(ImVec2(p.x + tok::space_2, ty), Dim(), tag);
+            const float tx = p.x + tok::space_2 + ImGui::CalcTextSize(tag).x + tok::space_2;
+            std::string one = sQueue[i].text.substr(0, sQueue[i].text.find('\n'));
+            if (!sQueue[i].files.empty())
+               one += (one.empty() ? "" : "  ") + std::string("+") + std::to_string(sQueue[i].files.size());
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.75f)));
+            ImGui::RenderTextEllipsis(dl, ImVec2(tx, ty), ImVec2(p.x + width - kQueueRowH, p.y + kQueueRowH), p.x + width - kQueueRowH - tok::space_1, one.c_str(), nullptr, nullptr);
+            ImGui::PopStyleColor();
+            glyph::Draw(dl, ImVec2(p.x + width - kQueueRowH * 0.5f, p.y + kQueueRowH * 0.5f), tok::icon_sm, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            if (hot)
+               ImGui::SetTooltip("%s", T("Edit"));
+            else if (xHot)
+               ImGui::SetTooltip("%s", T("Remove"));
+         }
+         if (take >= 0)
+         {
+            Queued q = std::move(sQueue[(size_t)take]);
+            sQueue.erase(sQueue.begin() + take);
+            sInput = sInput.empty() ? q.text : q.text + "\n" + sInput;
+            for (const std::string& f : q.files)
+               if (std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
+                  sAttach.push_back(f);
+            sRefocus = sCursorToEnd = true;
+         }
+         else if (drop >= 0)
+            sQueue.erase(sQueue.begin() + drop);
       }
 
       // ---------------------------------------------------------------- dropdown
@@ -1414,8 +1558,12 @@ namespace app
       void AddAgents(std::vector<Cand>& out, const std::string& want)
       {
          for (const CliSetup::Agent& a : CliSetup::Agents())
-            if (Ready(a.id) && (Score(a.id, want) >= 0 || Score(a.name, want) >= 0))
-               out.push_back({ std::string("@") + a.id + " ", a.id, a.name, "", tok::U32(tok::pin_pred, Light()), false });
+         {
+            // Offered by the name people use: @gemini, @chatgpt; the tool's own id still matches.
+            const std::string handle = chat::Lower(AgentName(a.id));
+            if (Ready(a.id) && (Score(handle, want) >= 0 || Score(a.id, want) >= 0 || Score(a.name, want) >= 0))
+               out.push_back({ "@" + handle + " ", handle, a.name, "", tok::U32(tok::pin_pred, Light()), false });
+         }
       }
 
       // Rows read key then value; the label is in the tooltip, so nothing wraps or crowds.
@@ -1821,6 +1969,22 @@ namespace app
          const float space = ImGui::CalcTextSize(" ").x;
          float x = 0.0f, y = 0.0f;
          int chip = 0;
+         sFlowBreak = true;
+         const auto record = [&](const std::string& text, ImVec2 mn, float w, ImFont* font)
+         {
+            if (sFlowEntry < 0)
+               return;
+            Piece pc;
+            pc.entry = sFlowEntry;
+            pc.min = mn;
+            pc.max = ImVec2(mn.x + w, mn.y + lineH);
+            pc.text = text;
+            pc.font = font;
+            pc.size = ImGui::GetFontSize();
+            pc.breakBefore = sFlowBreak;
+            sFlowBreak = false;
+            sPieces.push_back(std::move(pc));
+         };
          for (const chat::Seg& s : segs)
          {
             if (s.kind == chat::Seg::Kind::Action)
@@ -1842,6 +2006,7 @@ namespace app
                if (x > 0.0f && x + w > width)
                   x = 0.0f, y += lineH;
                DrawChip(dl, ImVec2(origin.x + x, origin.y + y + 1.0f), s, lineH - 2.0f, idBase * 1000 + chip++);
+               record(s.text, ImVec2(origin.x + x + tok::space_1 + 1.0f, origin.y + y), w - 2.0f * tok::space_1 - 2.0f, ImGui::GetFont());
                x += w + 1.0f;
                continue;
             }
@@ -1852,6 +2017,7 @@ namespace app
                if (s.text[i] == '\n')
                {
                   x = 0.0f, y += lineH, i++;
+                  sFlowBreak = true;
                   continue;
                }
                size_t e = i;
@@ -1865,7 +2031,11 @@ namespace app
                if (s.kind == chat::Seg::Kind::Code)
                   dl->AddRectFilled(ImVec2(p.x - 2.0f, origin.y + y + 1.0f), ImVec2(p.x + w + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
                dl->AddText(font, ImGui::GetFontSize(), p, s.dim ? Dim() : col, word.c_str());
+               if (!word.empty())
+                  record(word, ImVec2(origin.x + x, origin.y + y), w, font);
                x += w;
+               if (e < s.text.size() && s.text[e] == ' ' && sFlowEntry >= 0 && !sPieces.empty() && sPieces.back().entry == sFlowEntry)
+                  sPieces.back().spaceAfter = true;
                while (e < s.text.size() && s.text[e] == ' ')
                   x += space, e++;
                i = e;
@@ -1965,7 +2135,7 @@ namespace app
          const std::string path = ExpandHome(rawPath);
          if (!std::filesystem::exists(path))
             return;
-         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+         UiType::Scope cap(UiType::Size::Body, UiType::Weight::Medium);
          const char* label = T("Show in folder");
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const ImVec2 sz = ImGui::CalcTextSize(label);
@@ -2064,7 +2234,7 @@ namespace app
 
       void DrawCodeChip(const std::string& title, const std::string& code, const char* id)
       {
-         UiType::Scope s(UiType::Size::Caption, UiType::Weight::Medium);
+         UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
          const int n = LineCount(code);
          char label[48];
          std::snprintf(label, sizeof label, n == 1 ? T("%d line") : T("%d lines"), n);
@@ -2138,7 +2308,7 @@ namespace app
                   float h;
                   if (b.kind == chat::Block::Kind::Heading)
                   {
-                     UiType::Scope scope(UiType::Size::Body, UiType::Weight::Semibold);
+                     Weight scope(UiType::Weight::Semibold);
                      h = DrawFlow(b.segs, ImVec2(at.x + indent, at.y), width - indent, bid, ImGui::GetColorU32(ImGuiCol_Text));
                   }
                   else
@@ -2158,11 +2328,11 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          float h = 0.0f;
          {
-            UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+            Weight cap(UiType::Weight::Medium);
             h = std::max(ImGui::GetTextLineHeight(), 16.0f);
          }
          DrawAvatar(dl, ImVec2(at.x + 8.0f, at.y + h * 0.5f), 8.0f, e.agent);
-         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+         Weight cap(UiType::Weight::Medium);
          dl->AddText(ImVec2(at.x + 22.0f, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f), AgentTint(e.agent), AgentName(e.agent));
          if (copy)
          {
@@ -2184,7 +2354,11 @@ namespace app
          const ImVec2 top = ImGui::GetCursorScreenPos();
          if (label)
             DrawAgentLabel(e, width, id, ui.hovered);
+         const ImVec2 body = ImGui::GetCursorScreenPos();
+         sFlowEntry = id;
          DrawBlocks(BlocksFor(e.text), width, id);
+         sFlowEntry = -1;
+         sEntryRects.push_back({ id, ImRect(body, ImVec2(body.x + width, ImGui::GetCursorScreenPos().y)) });
          ui.hovered = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(top, ImVec2(top.x + width, ImGui::GetCursorScreenPos().y));
       }
 
@@ -2220,7 +2394,7 @@ namespace app
          const float inner = width - 2.0f * pad;
          const float rowH = ImGui::GetTextLineHeight();
          {
-            UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Medium);
+            Weight cap(UiType::Weight::Medium);
             // The heading row is as tall as the Undo chip, so the mark, the word and the chip share one centre line.
             const ImVec2 h = ImGui::GetCursorScreenPos();
             const float headH = ChipButton::kHeight;
@@ -2319,8 +2493,9 @@ namespace app
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const chat::StepView v = chat::ViewSteps(e.lines, e.marks);
          const bool any = !v.rows.empty();
-         UiType::Scope cap(UiType::Size::Caption);
-         const float rowH = ImGui::GetTextLineHeight() + tok::space_1;
+         // One size ladder: the header reads at body size, like the agent's name and words; the steps under it are captions.
+         Weight body(UiType::Weight::Medium);
+         const float rowH = std::max(ImGui::GetTextLineHeight(), 16.0f) + tok::space_1;
          const float gutter = 18.0f;
          ImGui::PushID(id);
          if (ImGui::InvisibleButton("##steps", ImVec2(width, rowH)) && any && !running)
@@ -2336,7 +2511,17 @@ namespace app
          }
          else if (any)
             glyph::Draw(dl, ImVec2(at.x + gutter * 0.5f, cy), tok::icon_sm, dim, ui.open ? IconsInfinite::ChevronDown : IconsInfinite::ChevronRight);
-         std::string label = named ? std::string(AgentName(e.agent)) + "  ·  " : std::string();
+         std::string label;
+         float tx = at.x + gutter;
+         if (named)
+         {
+            DrawAvatar(dl, ImVec2(tx + 8.0f, cy), 8.0f, e.agent);
+            tx += 22.0f;
+            const char* name = AgentName(e.agent);
+            dl->AddText(ImVec2(tx, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), AgentTint(e.agent), name);
+            tx += ImGui::CalcTextSize(name).x;
+            label = "  ·  ";
+         }
          char count[64];
          if (running)
          {
@@ -2356,14 +2541,15 @@ namespace app
             std::snprintf(count, sizeof count, v.rows.size() == 1 ? T("%d step") : T("%d steps"), (int)v.rows.size());
          label += count;
          const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
-         dl->AddText(ImVec2(at.x + gutter, ty), dim, label.c_str());
+         dl->AddText(ImVec2(tx, ty), dim, label.c_str());
          if (!running && v.failed > 0)
          {
             char failed[48];
             std::snprintf(failed, sizeof failed, "  ·  %s", v.failed == 1 ? T("1 failed") : (std::to_string(v.failed) + " " + T("failed")).c_str());
-            dl->AddText(ImVec2(at.x + gutter + ImGui::CalcTextSize(label.c_str()).x, ty), Red(), failed);
+            dl->AddText(ImVec2(tx + ImGui::CalcTextSize(label.c_str()).x, ty), Red(), failed);
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + rowH));
+         UiType::Scope sub(UiType::Size::Body);
          // While it runs, the latest line only; unfolded, every line.
          if ((ui.open && !running) || (running && any))
          {
@@ -2495,7 +2681,7 @@ namespace app
          GlassCard(at, width, height);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Semibold);
+            Weight s(UiType::Weight::Semibold);
             dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connect an agent"));
          }
          float y = at.y + pad + titleH;
@@ -2599,7 +2785,7 @@ namespace app
          GlassCard(at, width, height);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Semibold);
+            Weight s(UiType::Weight::Semibold);
             dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connected"));
          }
          float y = at.y + pad + 28.0f;
@@ -2677,11 +2863,238 @@ namespace app
          }
       }
 
+      // ── Selecting an agent's words ──────────────────────────────────────────
+      std::vector<int> PiecesOf(int entry)
+      {
+         std::vector<int> out;
+         for (int i = 0; i < (int)sPieces.size(); i++)
+            if (sPieces[(size_t)i].entry == entry)
+               out.push_back(i);
+         return out;
+      }
+
+      float XOf(const Piece& p, int ch)
+      {
+         ch = std::clamp(ch, 0, (int)p.text.size());
+         return p.min.x + p.font->CalcTextSizeA(p.size, FLT_MAX, 0.0f, p.text.c_str(), p.text.c_str() + ch).x;
+      }
+
+      // The byte offset in `p` nearest the mouse's x, on a character boundary.
+      int CharAt(const Piece& p, float mx)
+      {
+         if (mx <= p.min.x)
+            return 0;
+         if (mx >= p.max.x)
+            return (int)p.text.size();
+         const char* b = p.text.c_str();
+         const char* end = b + p.text.size();
+         const char* c = b;
+         while (c < end)
+         {
+            unsigned int cp = 0;
+            const int n = std::max(1, ImTextCharFromUtf8(&cp, c, end));
+            const float l = XOf(p, (int)(c - b)), r = XOf(p, (int)(c - b) + n);
+            if (mx < (l + r) * 0.5f)
+               return (int)(c - b);
+            c += n;
+         }
+         return (int)p.text.size();
+      }
+
+      // The nearest piece by line first, then along it.
+      SelPos HitTest(const std::vector<int>& idx, ImVec2 m)
+      {
+         SelPos best;
+         float bestKey = FLT_MAX;
+         for (int k = 0; k < (int)idx.size(); k++)
+         {
+            const Piece& p = sPieces[(size_t)idx[(size_t)k]];
+            const float dy = m.y < p.min.y ? p.min.y - m.y : (m.y > p.max.y ? m.y - p.max.y : 0.0f);
+            const float dx = m.x < p.min.x ? p.min.x - m.x : (m.x > p.max.x ? m.x - p.max.x : 0.0f);
+            const float key = dy * 10000.0f + dx;
+            if (key < bestKey)
+               bestKey = key, best.piece = k, best.ch = CharAt(p, m.x);
+         }
+         return best;
+      }
+
+      bool Before(SelPos a, SelPos b) { return a.piece != b.piece ? a.piece < b.piece : a.ch < b.ch; }
+
+      std::string SelectedText(const std::vector<int>& idx, SelPos lo, SelPos hi)
+      {
+         std::string out;
+         for (int k = lo.piece; k <= hi.piece && k < (int)idx.size(); k++)
+         {
+            const Piece& p = sPieces[(size_t)idx[(size_t)k]];
+            if (k > lo.piece)
+               out += p.breakBefore ? "\n" : (sPieces[(size_t)idx[(size_t)k - 1]].spaceAfter ? " " : "");
+            const int a = k == lo.piece ? lo.ch : 0;
+            const int b = k == hi.piece ? hi.ch : (int)p.text.size();
+            if (b > a)
+               out += p.text.substr((size_t)a, (size_t)(b - a));
+         }
+         return out;
+      }
+
+      // Reply: the words as a quote at the top of the composer, the cursor after them.
+      void QuoteInComposer(const std::string& text)
+      {
+         std::string q;
+         for (size_t i = 0;;)
+         {
+            const size_t e = text.find('\n', i);
+            q += "> " + text.substr(i, e == std::string::npos ? std::string::npos : e - i) + "\n";
+            if (e == std::string::npos)
+               break;
+            i = e + 1;
+         }
+         sInput = q + "\n" + sInput;
+         sRefocus = sCursorToEnd = true;
+      }
+
+      void ClearSelection()
+      {
+         sSelEntry = -1;
+         sSelDrag = false;
+      }
+
+      // After the rows: highlight, the Copy / Reply pill, and the mouse. Inside ##chatlog.
+      void DrawSelection()
+      {
+         ImGuiWindow* win = ImGui::GetCurrentWindow();
+         const ImGuiID selId = ImGui::GetID("##chatsel");
+         const ImVec2 m = ImGui::GetMousePos();
+         std::vector<int> idx = sSelEntry >= 0 ? PiecesOf(sSelEntry) : std::vector<int>();
+         if (sSelEntry >= 0 && idx.empty())
+            ClearSelection();
+         // The drag follows the mouse, scrolling the log when it leaves the top or bottom.
+         if (sSelDrag)
+         {
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               sSelDrag = false;
+               if (ImGui::GetActiveID() == selId)
+                  ImGui::ClearActiveID();
+               if (sSelA.piece == sSelB.piece && sSelA.ch == sSelB.ch)
+                  ClearSelection();
+            }
+            else
+            {
+               ImGui::KeepAliveID(selId);
+               sSelB = HitTest(idx, m);
+               const float top = win->InnerRect.Min.y, bottom = win->InnerRect.Max.y;
+               if (m.y < top)
+                  ImGui::SetScrollY(ImGui::GetScrollY() - std::min(24.0f, (top - m.y) * 0.5f + 2.0f));
+               else if (m.y > bottom)
+                  ImGui::SetScrollY(ImGui::GetScrollY() + std::min(24.0f, (m.y - bottom) * 0.5f + 2.0f));
+            }
+         }
+         const bool has = sSelEntry >= 0 && !idx.empty() && (sSelA.piece != sSelB.piece || sSelA.ch != sSelB.ch);
+         SelPos lo = sSelA, hi = sSelB;
+         if (Before(hi, lo))
+            std::swap(lo, hi);
+         lo.piece = std::min(lo.piece, (int)idx.size() - 1);
+         hi.piece = std::min(hi.piece, (int)idx.size() - 1);
+         if (has)
+         {
+            gChatSelectionFrame = ImGui::GetFrameCount();
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
+            for (int k = lo.piece; k <= hi.piece; k++)
+            {
+               const Piece& p = sPieces[(size_t)idx[(size_t)k]];
+               float x0 = XOf(p, k == lo.piece ? lo.ch : 0);
+               float x1 = XOf(p, k == hi.piece ? hi.ch : (int)p.text.size());
+               // The space after a word is part of the run, up to the next word on the same line.
+               if (k < hi.piece && p.spaceAfter)
+               {
+                  const Piece& n = sPieces[(size_t)idx[(size_t)k + 1]];
+                  if (!n.breakBefore && n.min.y == p.min.y)
+                     x1 = n.min.x;
+               }
+               if (x1 > x0)
+                  dl->AddRectFilled(ImVec2(x0, p.min.y + 1.0f), ImVec2(x1, p.max.y - 1.0f), col);
+            }
+            if (!sSelDrag)
+            {
+               const Piece& hp = sPieces[(size_t)idx[(size_t)hi.piece]];
+               const Piece& lp = sPieces[(size_t)idx[(size_t)lo.piece]];
+               const float h = ChipButton::kHeight, pad = 3.0f;
+               const float w = ImGui::CalcTextSize(T("Copy")).x + ImGui::CalcTextSize(T("Reply")).x + 4.0f * tok::space_2 + 3.0f * pad;
+               ImVec2 at(XOf(hp, hi.ch) - w * 0.5f, hp.max.y + tok::space_1);
+               if (at.y + h + 2.0f * pad > win->InnerRect.Max.y)
+                  at.y = lp.min.y - h - 2.0f * pad - tok::space_1;
+               at.x = std::clamp(at.x, win->InnerRect.Min.x, win->InnerRect.Max.x - w);
+               const ImVec2 bg1(at.x + w, at.y + h + 2.0f * pad);
+               dl->AddRectFilled(at, bg1, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_tile + pad);
+               dl->AddRect(at, bg1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_tile + pad);
+               const ImVec2 back = ImGui::GetCursorScreenPos();
+               ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad));
+               const bool copy = ChipButton::Draw((std::string(T("Copy")) + "##selcopy").c_str(), false, h);
+               ImGui::SameLine(0.0f, pad);
+               const bool reply = ChipButton::Draw((std::string(T("Reply")) + "##selreply").c_str(), false, h);
+               ImGui::SetCursorScreenPos(back);
+               if (copy || reply)
+               {
+                  const std::string text = SelectedText(idx, lo, hi);
+                  if (copy)
+                     ImGui::SetClipboardText(text.c_str());
+                  else
+                     QuoteInComposer(text);
+                  ClearSelection();
+                  return;
+               }
+            }
+            const bool typing = ImGui::GetIO().WantTextInput;
+            if (!typing && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C))
+               ImGui::SetClipboardText(SelectedText(idx, lo, hi).c_str());
+            if (!typing && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+               ClearSelection();
+         }
+         // A press on an agent's words starts a selection; a double click takes the whole word.
+         const bool here = ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered();
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !sSelDrag)
+         {
+            int entry = -1;
+            for (const auto& [id, r] : sEntryRects)
+               if (r.Contains(m))
+                  entry = id;
+            if (here && entry >= 0)
+            {
+               std::vector<int> ix = PiecesOf(entry);
+               if (!ix.empty())
+               {
+                  sSelEntry = entry;
+                  sSelA = sSelB = HitTest(ix, m);
+                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  {
+                     sSelA.ch = 0;
+                     sSelB.ch = (int)sPieces[(size_t)ix[(size_t)sSelB.piece]].text.size();
+                  }
+                  else
+                  {
+                     sSelDrag = true;
+                     ImGui::SetActiveID(selId, win);   // the drag is ours: no window move, no canvas pan
+                     ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+                  }
+               }
+            }
+            else if (here || !ImGui::IsWindowHovered())
+               ClearSelection();
+         }
+         if (here)
+            for (const auto& [id, r] : sEntryRects)
+               if (r.Contains(m))
+                  ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+      }
+
       void DrawMessages(float height)
       {
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_2));
          ImGui::BeginChild("##chatlog", ImVec2(0.0f, height), ImGuiChildFlags_AlwaysUseWindowPadding);
          ImGui::PopStyleVar();
+         sPieces.clear();
+         sEntryRects.clear();
          const float width = ImGui::GetContentRegionAvail().x;
          const bool setup = DrawSetup(width) || DrawFolderStep(width);
          if (setup && !sThread.entries.empty())
@@ -2775,6 +3188,7 @@ namespace app
             }
             ImGui::PopID();
          }
+         DrawSelection();
          // Two or more agents at work: their avatars side by side, with a short count.
          if (sRuns.size() > 1)
          {
@@ -3241,7 +3655,7 @@ namespace app
          if (lines <= 6)
             DrawTints(ImVec2(fieldAt.x, fieldAt.y + padY), wrapW);
          if (sInput.empty())
-            dl->AddText(ImVec2(fieldAt.x, fieldAt.y + padY), Dim(), sRuns.empty() ? T("Ask, or type @ to name a node") : T("Working…"));
+            dl->AddText(ImVec2(fieldAt.x, fieldAt.y + padY), Dim(), sRuns.empty() ? T("Ask, or type @ to name a node") : T("Add to the queue"));
          ImGui::SetCursorScreenPos(fieldAt);
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, padY));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
@@ -3296,9 +3710,12 @@ namespace app
             if (ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", T("Stop"));
             if (stop)
+            {
+               sQueueHold = true;
                for (Run& r : sRuns)
                   if (r.run != nullptr)
                      r.run->Stop();
+            }
          }
          else
          {
@@ -3620,9 +4037,15 @@ namespace app
       const float wrapW = std::max(1.0f, composerW - 2.0f * tok::space_3 - ImGui::GetStyle().ScrollbarSize);
       const float textH = fs * (float)std::clamp(VisualLines(wrapW), 1, 6) + 4.0f;
       const float composerH = tok::space_3 + (sAttach.empty() ? 0.0f : 26.0f) + textH + 6.0f + 26.0f + tok::space_2;
-      DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - tok::space_4));
+      const float queueH = (float)sQueue.size() * kQueueRowH;
+      DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, c.y + tok::space_1));
+      if (!sQueue.empty())
+      {
+         DrawQueue(composerW);
+         ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, ImGui::GetCursorScreenPos().y));
+      }
       DrawComposer(composerW);
    }
 

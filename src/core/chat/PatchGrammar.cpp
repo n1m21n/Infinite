@@ -55,15 +55,20 @@ namespace chat
          t.kind = TokKind::Ref;
          t.b = at;
          const size_t from = at + 1;
-         // `@agent` is the default agent; `@claude`, `@codex`, `@antigravity` name one.
-         for (const char* name : { "agent", "claude", "codex", "antigravity" })
+         // `@agent` is the default agent; the others go by what people call them (`@gemini`, `@chatgpt`)
+         // or by their tool's name (`@antigravity`, `@codex`). The span keeps the tool's id.
+         static const std::pair<const char*, const char*> kNames[] = {
+            { "agent", "agent" },         { "claude", "claude" },  { "chatgpt", "codex" }, { "codex", "codex" },
+            { "openai", "codex" },        { "gpt", "codex" },      { "gemini", "antigravity" },
+            { "antigravity", "antigravity" }, { "agy", "antigravity" } };
+         for (const auto& [name, id] : kNames)
          {
             const size_t n = std::strlen(name);
             if (lower.compare(from, n, name) == 0 && (from + n >= lower.size() || !WordChar(lower[from + n])))
             {
                t.kind = TokKind::Agent;
                t.e = from + n;
-               t.text = name;
+               t.text = id;
                return t;
             }
          }

@@ -753,7 +753,7 @@ void DrawKeyboard(FrameCtx& fc)
          }
       }
 
-      const bool doCopy = gRequestCopy || (!typing && !gPerfMatrixFocused && !gArrangeFocused && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
+      const bool doCopy = gRequestCopy || (!typing && !gPerfMatrixFocused && !gArrangeFocused && gChatSelectionFrame < ImGui::GetFrameCount() - 1 && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false));
       gRequestCopy = false;
       if (doCopy)
       {
