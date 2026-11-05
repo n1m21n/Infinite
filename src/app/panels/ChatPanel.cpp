@@ -98,6 +98,7 @@ namespace app
          double checkedAt = -1.0;
          std::string cut;               // why the chat ended the turn itself ("" = it did not)
          double startAt = -1.0;         // when the turn began, for the Working row's clock
+         chat::TurnUsage usage;         // what the CLI said the turn used
       };
 
       // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
@@ -1280,8 +1281,23 @@ namespace app
                   o.steps--;
             at = r.steps;
          }
+         if (r.usage.Total() > 0)
+         {
+            CliSetup::Config::Usage& u = CliSetup::Prefs().usage[r.agent];
+            u.turns++;
+            u.input += r.usage.input;
+            u.cached += r.usage.cached;
+            u.output += r.usage.output;
+            u.cost += r.usage.cost;
+            CliSetup::SaveConfig(CliSetup::PathsFor(AppPaths::AppSupportDir(), CliSetup::CurrentOs()).config, CliSetup::Prefs());
+         }
          if (!r.answer.empty())
-            InsertAt(at++, Make(Entry::Kind::Agent, r.answer, r.agent));
+         {
+            Entry a = Make(Entry::Kind::Agent, r.answer, r.agent);
+            a.tokens = r.usage.Total();
+            a.cached = r.usage.cached;
+            InsertAt(at++, std::move(a));
+         }
          if (r.error)
          {
             // Plain words for what went wrong; a "sign in" error flips the agent back to Sign in.
@@ -1405,6 +1421,7 @@ namespace app
                      r.error = e.error;
                      r.errorText = e.text;
                      r.denied = e.denied;
+                     r.usage = e.usage;
                      break;
                }
             if (r.run->Done())
@@ -2391,7 +2408,18 @@ namespace app
          }
          DrawAvatar(dl, ImVec2(at.x + 8.0f, at.y + h * 0.5f), 8.0f, e.agent);
          Weight cap(UiType::Weight::Medium);
-         dl->AddText(ImVec2(at.x + 22.0f, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f), AgentTint(e.agent), AgentName(e.agent));
+         const float ty = at.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
+         dl->AddText(ImVec2(at.x + 22.0f, ty), AgentTint(e.agent), AgentName(e.agent));
+         // The turn's tokens, faint after the name; the cache share on hover.
+         if (e.tokens > 0)
+         {
+            const std::string count = chat::TokenCount(e.tokens) + " " + T("tokens");
+            const float x = at.x + 22.0f + ImGui::CalcTextSize(AgentName(e.agent)).x + 8.0f;
+            dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_TextDisabled), count.c_str());
+            const ImVec2 sz = ImGui::CalcTextSize(count.c_str());
+            if (ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(ImVec2(x, ty), ImVec2(x + sz.x, ty + sz.y)))
+               ImGui::SetTooltip("%s %s", chat::TokenCount(e.cached).c_str(), T("of them read from the cache"));
+         }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
 
@@ -2673,7 +2701,8 @@ namespace app
          float x = origin.x + width;
          for (size_t i = e.files.size(); i-- > 0;)
          {
-            const std::string name = std::filesystem::path(AppPaths::FsPath(e.files[i])).filename().u8string();
+            const std::string name = app::TruncateWithEllipsis(std::filesystem::path(AppPaths::FsPath(e.files[i])).filename().u8string(),
+                                                               std::max(40.0f, width * 0.8f - 2.0f * tok::space_2));
             const float w = ImGui::CalcTextSize(name.c_str()).x + 2.0f * tok::space_2;
             if (x - w < origin.x + width * 0.2f && x < origin.x + width)
                x = origin.x + width, y += 24.0f;
@@ -2711,16 +2740,30 @@ namespace app
          int rows = 0;
          for (const Agent& a : Agents())
             rows += sAgents.count(a.id) ? 1 : 0;
+         // A failed setup or sign-in says why under its row, wrapped to the card; the card grows to hold it.
+         const float msgW = std::max(40.0f, width - 2.0f * pad - 30.0f);
+         const auto failNote = [](const AgentState& st)
+         {
+            return st.failed ? std::string(T("Setup did not finish.")) + (st.ready.why.empty() ? std::string() : " " + st.ready.why) : st.loginError;
+         };
+         const auto noteH = [&](const std::string& msg)
+         {
+            UiType::Scope cap(UiType::Size::Caption);
+            return ImGui::CalcTextSize(msg.c_str(), nullptr, false, msgW).y + tok::space_2;
+         };
          float extra = 0.0f;
          for (const Agent& a : Agents())
          {
             const auto it = sAgents.find(a.id);
-            if (it != sAgents.end() && (it->second.login != nullptr && !it->second.loginUrl.empty()))
+            if (it == sAgents.end())
+               continue;
+            if (it->second.login != nullptr && !it->second.loginUrl.empty())
                extra += 26.0f;
-            if (it != sAgents.end() && it->second.login != nullptr && it->second.needsCode)
+            if (it->second.login != nullptr && it->second.needsCode)
                extra += 34.0f;
-            if (it != sAgents.end() && (!it->second.loginError.empty() || it->second.failed))
-               extra += 34.0f;
+            if (it->second.login == nullptr && it->second.setup == nullptr)
+               if (const std::string msg = failNote(it->second); !msg.empty())
+                  extra += noteH(msg);
          }
          const float height = pad * 2.0f + titleH + rows * (rowH + tok::space_1) + extra;
          const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -2800,15 +2843,11 @@ namespace app
                   status(v.status.c_str(), v.busy, Dim());
                else if (button(ActLabel(v.act), true))
                   Do(a.id, v.act);
-               std::string msg = s.failed ? std::string(T("Setup did not finish.")) + (s.ready.why.empty() ? std::string() : " " + s.ready.why) : s.loginError;
-               if (!msg.empty())
+               if (const std::string msg = failNote(s); !msg.empty())
                {
+                  used = noteH(msg);
                   UiType::Scope cap(UiType::Size::Caption);
-                  const float tw = rx - (at.x + pad + 30.0f);
-                  const ImVec2 sz = ImGui::CalcTextSize(msg.c_str(), nullptr, false, tw);
-                  dl->AddText(nullptr, 0.0f, ImVec2(at.x + pad + 30.0f, y + rowH - 4.0f), Red(), msg.c_str(), nullptr, tw);
-                  used = 34.0f;
-                  (void)sz;
+                  dl->AddText(nullptr, 0.0f, ImVec2(at.x + pad + 30.0f, y + rowH - 4.0f), Red(), msg.c_str(), nullptr, msgW);
                }
             }
             y += rowH + tok::space_1 + used;
@@ -3743,8 +3782,23 @@ namespace app
          {
             const std::string name = std::filesystem::path(AppPaths::FsPath(sAttach[i])).filename().u8string();
             const float w = std::min(ImGui::CalcTextSize(name.c_str()).x, 160.0f) + tok::space_2 + 20.0f;
-            if (x + w > at.x + width - pad)
+            // No room for the next chip: the rest are counted, every path in the tooltip, so none goes unseen.
+            const std::string more = "+" + std::to_string(sAttach.size() - i);
+            const float moreW = ImGui::CalcTextSize(more.c_str()).x + 2.0f * tok::space_2;
+            if (x + w + (i + 1 < sAttach.size() ? moreW + tok::space_1 : 0.0f) > at.x + width - pad)
+            {
+               const ImVec2 p(x, at.y + pad);
+               dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
+               dl->AddText(ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), Dim(), more.c_str());
+               if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + moreW, p.y + 22.0f)))
+               {
+                  std::string tip;
+                  for (size_t k = i; k < sAttach.size(); k++)
+                     tip += (tip.empty() ? "" : "\n") + sAttach[k];
+                  ImGui::SetTooltip("%s", tip.c_str());
+               }
                break;
+            }
             const ImVec2 p(x, at.y + pad);
             dl->AddRectFilled(p, ImVec2(p.x + w, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));

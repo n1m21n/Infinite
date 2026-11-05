@@ -10,6 +10,15 @@ namespace chat
 {
    enum class AgentKind { Claude, Codex, Antigravity };
 
+   // Tokens one turn used, as its CLI reports them (0 when it does not): input read fresh, input read
+   // from the prompt cache (about a tenth of the price), output, and the cost when the CLI gives one.
+   struct TurnUsage
+   {
+      long long input = 0, cached = 0, output = 0;
+      double cost = 0;
+      long long Total() const { return input + cached + output; }
+   };
+
    struct AgentEvent
    {
       enum class Kind { Session, Text, Tool, ToolResult, End };
@@ -17,6 +26,7 @@ namespace chat
       std::string text;  // Session: the id; Text: the reply; Tool: what it ran; ToolResult: its output
       bool error = false;               // ToolResult, End
       std::vector<std::string> denied;  // End: tools the permission mode refused ("Write /x")
+      TurnUsage usage;                  // End
    };
 
    class AgentStream

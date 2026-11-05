@@ -14,6 +14,7 @@
 #include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
+#include "core/chat/ChatThread.h"
 #include "platform/AppPaths.h"
 
 #include <ctime>
@@ -147,6 +148,42 @@ namespace app
             SaveConfig(paths.config, prefs);
          }
          ImGui::PopID();
+      }
+
+      // What each agent used through the chat, so a long chat's cost is never a surprise. Cached input is read
+      // again on every step of a turn and costs about a tenth of fresh input.
+      {
+         bool any = false;
+         for (const Agent& a : Agents())
+         {
+            const auto it = prefs.usage.find(a.id);
+            if (it == prefs.usage.end() || it->second.turns == 0)
+               continue;
+            const Config::Usage& u = it->second;
+            const long long total = u.input + u.cached + u.output;
+            std::string line = std::to_string(u.turns) + " " + T(u.turns == 1 ? "turn" : "turns") + " · " + chat::TokenCount(total) + " " + T("tokens");
+            if (total > 0)
+               line += " · " + std::to_string((int)(100.0 * (double)u.cached / (double)total)) + "% " + T("cached");
+            if (u.cost > 0.0)
+            {
+               char c[32];
+               std::snprintf(c, sizeof c, " · $%.2f", u.cost);
+               line += c;
+            }
+            const std::string label = std::string(a.name) + " " + T("usage");
+            ImGui::PushID(a.id);
+            FormParts::Label(label.c_str());
+            value(line, false);
+            const bool reset = !any && button(L("Reset"), false);
+            ImGui::PopID();
+            any = true;
+            if (reset)
+            {
+               prefs.usage.clear();
+               SaveConfig(paths.config, prefs);
+               break;
+            }
+         }
       }
 
       // Only a fault in the plumbing (the infinite command, the MCP link, the skills) shows here, with its fix.

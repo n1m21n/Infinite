@@ -4,6 +4,7 @@
 #include "platform/AppPaths.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -53,6 +54,8 @@ namespace chat
             }
          if (!e.files.empty())
             o["files"] = e.files;
+         if (e.tokens > 0)
+            o["tokens"] = { e.tokens, e.cached };
          if (!e.changes.empty())
          {
             json c = json::array();
@@ -121,6 +124,8 @@ namespace chat
                                            c.value("key", std::string()), c.value("after", std::string()) });
             e.ok = o.value("ok", true);
             e.undone = o.value("undone", false);
+            if (o.contains("tokens") && o["tokens"].is_array() && o["tokens"].size() == 2 && o["tokens"][0].is_number() && o["tokens"][1].is_number())
+               e.tokens = o["tokens"][0].get<long long>(), e.cached = o["tokens"][1].get<long long>();
             t.entries.push_back(e);
          }
       return !t.id.empty();
@@ -413,5 +418,17 @@ namespace chat
          v.rows.push_back(row);
       }
       return v;
+   }
+
+   std::string TokenCount(long long n)
+   {
+      char b[32];
+      if (n < 1000)
+         std::snprintf(b, sizeof b, "%lld", n);
+      else if (n < 1000000)
+         std::snprintf(b, sizeof b, n < 10000 ? "%.1fk" : "%.0fk", n / 1000.0);
+      else
+         std::snprintf(b, sizeof b, "%.1fM", n / 1000000.0);
+      return b;
    }
 }

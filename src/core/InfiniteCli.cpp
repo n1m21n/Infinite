@@ -1226,6 +1226,16 @@ midi general autosave performance movement-log learning diagnostics updates fiel
             // The sections whose heading names that part ("timeline", "matrix", "right-click").
             std::string want = name, out;
             std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            // The rail's own names for panels whose manual section is titled otherwise.
+            std::vector<std::string> wants = { want };
+            static const std::pair<const char*, std::vector<const char*>> kAlias[] = {
+               { "timeline", { "arrangement", "tracks" } }, { "clip", { "tracks" } }, { "mod matrix", { "modulation" } },
+               { "matrix", { "modulation" } }, { "session", { "sound panels" } }, { "studio", { "sound panels" } },
+               { "piano", { "sound panels" } }, { "terminal", { "command line" } }, { "chat", { "command line" } },
+               { "agent", { "command line" } }, { "menu", { "menus", "right-click" } }, { "3d", { "3d view" } } };
+            for (const auto& [from, to] : kAlias)
+               if (want == from || (want.size() > 3 && std::string(from).find(want) == 0))
+                  wants.insert(wants.end(), to.begin(), to.end());
             size_t at = 0;
             while ((at = all.find("\n## ", at)) != std::string::npos)
             {
@@ -1233,7 +1243,7 @@ midi general autosave performance movement-log learning diagnostics updates fiel
                const std::string sec = all.substr(at + 1, end == std::string::npos ? std::string::npos : end - at - 1);
                std::string head = sec.substr(0, sec.find('\n'));
                std::transform(head.begin(), head.end(), head.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-               if (head.find(want) != std::string::npos)
+               if (std::any_of(wants.begin(), wants.end(), [&](const std::string& w) { return head.find(w) != std::string::npos; }))
                   out += sec + "\n";
                at = end == std::string::npos ? all.size() : end;
             }

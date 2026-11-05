@@ -22,8 +22,12 @@ namespace chat
       std::vector<std::string> files;  // User: attached files
       bool ok = true;
       bool undone = false;             // Change from a direct command
+      long long tokens = 0, cached = 0; // Agent: the turn's tokens, and how many of them came from the prompt cache
       std::string detail;              // Error: the raw output behind the plain words (not saved)
    };
+
+   // A token count as the chat shows it: 950, 12.4k, 1.2M.
+   std::string TokenCount(long long n);
 
    enum StepMark { kStepRan = 0, kStepFailed = 1, kStepNote = 2 };
 

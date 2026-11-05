@@ -75,6 +75,14 @@ namespace chat
          else if (type == "result")
          {
             AgentEvent e = Event(AgentEvent::Kind::End, Str(j, "subtype") == "success" ? std::string() : Str(j, "result"), j.value("is_error", false));
+            if (const json u = j.value("usage", json::object()); u.is_object())
+            {
+               e.usage.input = u.value("input_tokens", 0LL) + u.value("cache_creation_input_tokens", 0LL);
+               e.usage.cached = u.value("cache_read_input_tokens", 0LL);
+               e.usage.output = u.value("output_tokens", 0LL);
+            }
+            if (j.contains("total_cost_usd") && j["total_cost_usd"].is_number())
+               e.usage.cost = j["total_cost_usd"].get<double>();
             if (j.contains("permission_denials") && j["permission_denials"].is_array())
                for (const json& d : j["permission_denials"])
                   e.denied.push_back(ToolLine(Str(d, "tool_name"), d.value("tool_input", json::object())));
@@ -96,7 +104,16 @@ namespace chat
          else if (type == "item.completed" && it == "agent_message")
             out.push_back(Event(AgentEvent::Kind::Text, Str(item, "text")));
          else if (type == "turn.completed")
-            out.push_back(Event(AgentEvent::Kind::End, ""));
+         {
+            AgentEvent e = Event(AgentEvent::Kind::End, "");
+            if (const json u = j.value("usage", json::object()); u.is_object())
+            {
+               e.usage.cached = u.value("cached_input_tokens", 0LL);
+               e.usage.input = std::max(0LL, u.value("input_tokens", 0LL) - e.usage.cached);
+               e.usage.output = u.value("output_tokens", 0LL);
+            }
+            out.push_back(e);
+         }
          else if (type == "turn.failed" || type == "error")
             out.push_back(Event(AgentEvent::Kind::End, Str(j, "message").empty() ? Str(j.value("error", json::object()), "message") : Str(j, "message"), true));
       }
@@ -184,8 +201,8 @@ namespace chat
    {
       // The chat draws `@title#index` and `@title#index.key` as links; the skill's reply rule says the rest.
       const char* const kChatNote =
-         "You are answering in Infinite's chat panel, not a terminal. Follow the infinite-live-session reply rule: "
-         "name every node as @title#index and every param as @title#index.key, with values and units. "
+         "You are answering in Infinite's chat panel, not a terminal. Read `infinite context` before you change anything. "
+         "Name every node as @title#index and every param as @title#index.key, with values and units. "
          "The chat already lists every change you made to the patch, so do not repeat them: answer in one or two short "
          "sentences, show code only when you wrote code, and give the path of any picture you made. "
          "Pick nodes with `infinite find <plain words>`, not from memory. Make samples with `infinite studio generate` and MIDI with "
@@ -304,6 +321,10 @@ namespace chat
          a.push_back("--add-dir");
          a.insert(a.end(), all.begin(), all.end());
       }
+      // Only what the chat needs: the user's MCP servers, plugins' and skills' listings and the other built-in
+      // tools would ride along on every request of every turn (about 46k tokens against 9k).
+      a.insert(a.end(), { "--strict-mcp-config", "--mcp-config", R"({"mcpServers":{}})", "--disable-slash-commands",
+                          "--tools", "Bash,Read,Edit,Write,Glob,Grep" });
       a.insert(a.end(), { "--allowedTools", "Bash(infinite:*)" });
       for (const std::string& c : options.commands)
          if (CommandName(c))

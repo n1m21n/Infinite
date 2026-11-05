@@ -724,6 +724,52 @@ namespace app
          to.model = "opus";
          const std::vector<std::string> ma = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, to);
          check(std::find(ma.begin(), ma.end(), "--model") != ma.end() && std::find(ma.begin(), ma.end(), "opus") != ma.end(), "claude: the chosen model is passed");
+         // Denied steps: the one-click fix under a "Not allowed" note.
+         {
+            using K = chat::DeniedFix::Kind;
+            const auto fix = [](const char* d, K k, const char* v)
+            {
+               const chat::DeniedFix f = chat::FixFor(d);
+               return f.kind == k && f.value == v;
+            };
+            check(fix("ffprobe -i x", K::Command, "ffprobe"), "denied: a command is offered by name");
+            check(fix("FOO=1 /usr/bin/ffmpeg", K::Command, "ffmpeg"), "denied: env and path are dropped from the name");
+            check(chat::FixFor("sudo rm x").kind == K::None, "denied: sudo is never one click");
+            check(fix("Read /a/b/c.mp4", K::Folder, "/a/b"), "denied: a file read offers its folder");
+            check(fix("mkdir /tmp/x", K::Command, "mkdir"), "denied: mkdir is a command");
+         }
+         {
+            chat::TurnOptions po;
+            po.commands = { "ffprobe" };
+            po.folders = { "/tmp/more" };
+            const std::vector<std::string> pa = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, po);
+            check(std::find(pa.begin(), pa.end(), "Bash(ffprobe:*)") != pa.end(), "claude: an allowed command is passed");
+            check(std::find(pa.begin(), pa.end(), "/tmp/more") != pa.end(), "claude: a folder from Settings is added");
+            check(std::find(pa.begin(), pa.end(), "--strict-mcp-config") != pa.end() && std::find(pa.begin(), pa.end(), "--disable-slash-commands") != pa.end() &&
+                     std::find(pa.begin(), pa.end(), "--tools") != pa.end() && pa.back() == "hi",
+                  "claude: no MCP servers, skills or extra tools ride along on chat turns");
+            const std::vector<std::string> ga = chat::AgentArgs(chat::AgentKind::Antigravity, "hi", "", false, {}, po);
+            bool agyCmd = false;
+            for (const std::string& x : ga)
+               agyCmd = agyCmd || x.find("command(ffprobe)") != std::string::npos;
+            check(agyCmd, "antigravity: an allowed command is in its settings");
+         }
+         // Usage: the result event's tokens reach the chat.
+         {
+            chat::AgentStream us(chat::AgentKind::Claude);
+            std::vector<chat::AgentEvent> uv;
+            us.Feed("{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"total_cost_usd\":0.01,"
+                    "\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":100,\"cache_read_input_tokens\":900,\"output_tokens\":8}}\n", uv);
+            check(uv.size() == 1 && uv[0].usage.input == 102 && uv[0].usage.cached == 900 && uv[0].usage.output == 8 && uv[0].usage.cost > 0.0,
+                  "claude: a turn's tokens and cost are read");
+            chat::AgentStream uc(chat::AgentKind::Codex);
+            std::vector<chat::AgentEvent> ucv;
+            uc.Feed("{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":1000,\"cached_input_tokens\":800,\"output_tokens\":20}}\n", ucv);
+            check(ucv.size() == 1 && ucv[0].usage.input == 200 && ucv[0].usage.cached == 800 && ucv[0].usage.output == 20, "codex: a turn's tokens are read");
+            check(chat::TokenCount(950) == "950" && chat::TokenCount(12400) == "12k" && chat::TokenCount(4200) == "4.2k" && chat::TokenCount(1200000) == "1.2M",
+                  "token counts read short");
+         }
+         check(std::string(AgentDocs::kUiGuide).find("## Modulation Matrix") != std::string::npos, "the UI guide has the Modulation Matrix");
          check(chat::IsAudioPath("/tmp/a.wav") && chat::IsAudioPath("~/x/y.mp3") && !chat::IsAudioPath("notes.txt"), "sound paths are recognised");
          const std::vector<chat::Block> rb = chat::ParseReply("Here it is\n/tmp/kick.wav\n/tmp/pic.png\n```\ncode\n```\n", cat);
          bool aud = false, img = false, code = false;

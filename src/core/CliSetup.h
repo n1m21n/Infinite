@@ -96,6 +96,13 @@ namespace CliSetup
       std::vector<std::string> folders;   // more folders agents may read (and edit, with folderAccess)
       std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")
       bool introduced = false;    // the "connected, try this" line was shown once
+      // Tokens the chat's agents used, per agent id, since the user last reset them (Settings > Agents).
+      struct Usage
+      {
+         long long turns = 0, input = 0, cached = 0, output = 0;
+         double cost = 0;
+      };
+      std::map<std::string, Usage> usage;
    };
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);

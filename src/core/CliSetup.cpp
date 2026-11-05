@@ -674,6 +674,17 @@ if ($Failed -gt 0) { exit 1 }
             for (const auto& v : j[key])
                if (v.is_string() && !v.get<std::string>().empty())
                   (std::string(key) == "folders" ? c.folders : c.commands).push_back(v.get<std::string>());
+      if (j.contains("usage") && j["usage"].is_object())
+         for (auto it = j["usage"].begin(); it != j["usage"].end(); ++it)
+            if (it.value().is_object() && FindAgent(it.key()) != nullptr)
+            {
+               Config::Usage& u = c.usage[it.key()];
+               u.turns = it.value().value("turns", 0LL);
+               u.input = it.value().value("input", 0LL);
+               u.cached = it.value().value("cached", 0LL);
+               u.output = it.value().value("output", 0LL);
+               u.cost = it.value().value("cost", 0.0);
+            }
       if (j.contains("models") && j["models"].is_object())
          for (auto it = j["models"].begin(); it != j["models"].end(); ++it)
             if (it.value().is_string() && FindAgent(it.key()) != nullptr)
@@ -685,9 +696,13 @@ if ($Failed -gt 0) { exit 1 }
    {
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
+      nlohmann::json usage = nlohmann::json::object();
+      for (const auto& [id, u] : c.usage)
+         usage[id] = { { "turns", u.turns }, { "input", u.input }, { "cached", u.cached }, { "output", u.output }, { "cost", u.cost } };
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
                                                                 { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced },
-                                                                { "models", c.models }, { "folders", c.folders }, { "commands", c.commands } }.dump(2) << "\n";
+                                                                { "models", c.models }, { "folders", c.folders }, { "commands", c.commands },
+                                                                { "usage", usage } }.dump(2) << "\n";
    }
 
    namespace
