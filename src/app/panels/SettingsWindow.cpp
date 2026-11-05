@@ -1785,7 +1785,7 @@ namespace app
             {
                FormParts::Heading(T("How the chat works"));
                ImGui::TextWrapped("%s", T("Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it."));
-               ImGui::TextWrapped("%s", T("Name nodes with @. Every change an agent makes to the patch is listed under its reply, with Undo."));
+               ImGui::TextWrapped("%s", T("Name nodes with @, run commands with /, attach files with +. Every change an agent makes to the patch is listed under its reply, with Undo."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 2)

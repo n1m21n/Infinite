@@ -2675,5 +2675,78 @@ Add to the queue	Añadir a la cola
 Reply	Responder
 Pop out	Desacoplar
 Floating Window	Ventana flotante
-Agent set	Fijado por el agente
 Open in a Sampler	Abrir en un Sampler
+ will use 	 usará 
+%d line	%d línea
+%d lines	%d líneas
+(missing)	(falta)
+1 failed	1 falló
+A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path.	Una shell real dentro de Infinite, que se abre desde la cabecera del chat o con Ctrl+`. Empieza en la carpeta del parche y infinite está en su PATH. Arrastra un nodo o un archivo para escribir su id o su ruta.
+Add a question: /	Añade una pregunta: /
+Add folder…	Añadir carpeta…
+Agent folder	Carpeta del agente
+Allow	Permitir
+Allow folder	Permitir carpeta
+Allowed	Permitido
+Allowed commands	Comandos permitidos
+Attach from Clipboard	Adjuntar del portapapeles
+Checking…	Comprobando…
+Choose…	Elegir…
+Close Picture	Cerrar imagen
+Close a picture opened full size	Cierra una imagen abierta a tamaño completo
+Close code	Cerrar código
+Commands	Comandos
+Connected	Conectado
+Connection	Conexión
+Copied	Copiado
+Details	Detalles
+Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it.	Cada agente es su propio programa de línea de comandos, que se ejecuta un turno por mensaje en la carpeta del agente. Infinite muestra lo que imprime como respuesta. El inicio de sesión es del agente; Infinite nunca lo ve.
+Edit files in it	Editar archivos en ella
+Edit files in them	Editar archivos en ellas
+Finish in your browser…	Termina en el navegador…
+Hide details	Ocultar detalles
+How the chat works	Cómo funciona el chat
+It stopped responding, so the chat ended the turn. Try again.	Dejó de responder y el chat terminó el turno. Inténtalo de nuevo.
+More folders	Más carpetas
+Move through the node or command list, then take the highlighted one. Esc closes it	Recorre la lista de nodos o comandos y toma el resaltado. Esc la cierra
+Name nodes with @, run commands with /, attach files with +. Every change an agent makes to the patch is listed under its reply, with Undo.	Nombra nodos con @, ejecuta comandos con /, adjunta archivos con +. Cada cambio que un agente hace al parche aparece bajo su respuesta, con Deshacer.
+Needs setup	Requiere configuración
+Not a command: /	No es un comando: /
+Not ready: 	No está listo: 
+Not signed in	Sin iniciar sesión
+Now talking to 	Ahora hablas con 
+Off in this mode	Desactivado en este modo
+Off: set by	Desactivado: lo fija
+Open code	Abrir código
+Open sign-in page	Abrir la página de inicio de sesión
+Outside the panel:	Fuera del panel:
+Paste copied files or a copied picture into the message; copied text still pastes as text	Pega archivos o una imagen copiados en el mensaje; el texto copiado se sigue pegando como texto
+Paste the code from the browser	Pega el código del navegador
+Pick @ or /	Elegir con @ o /
+Reference in chat	Referenciar en el chat
+Reset	Restablecer
+Send / New Line	Enviar / Nueva línea
+Send the message, or start a new line	Envía el mensaje o empieza una línea nueva
+Setup did not finish	La configuración no terminó
+Setup did not finish.	La configuración no terminó.
+Show in folder	Mostrar en la carpeta
+Sign in again	Iniciar sesión de nuevo
+Sign out	Cerrar sesión
+Sign-in did not finish. Try again.	El inicio de sesión no terminó. Inténtalo de nuevo.
+Sign-in timed out. Try again.	Se agotó el tiempo del inicio de sesión. Inténtalo de nuevo.
+Signed out	Sesión cerrada
+Signing out…	Cerrando sesión…
+Submit	Enviar
+The open patch's folder	La carpeta del parche abierto
+The same executable renders pictures, video and sound from a .inf patch with no window. The same patch always gives the same output.	El mismo ejecutable renderiza imágenes, vídeo y sonido de un parche .inf sin ventana. El mismo parche siempre da la misma salida.
+Try again	Reintentar
+Type /help to see them.	Escribe /help para verlos.
+Waiting for sign-in…	Esperando el inicio de sesión…
+Which agent? claude, chatgpt or gemini.	¿Qué agente? claude, chatgpt o gemini.
+cached	en caché
+failed	falló
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors.	infinite solo lista todos los verbos. infinite context muestra el parche abierto, la selección y los errores de código.
+its default model	su modelo predeterminado
+model	modelo
+tokens	tokens
+usage	uso

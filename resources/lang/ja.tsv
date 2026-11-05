@@ -2675,5 +2675,78 @@ Add to the queue	キューに追加
 Reply	返信
 Pop out	ポップアウト
 Floating Window	フローティングウィンドウ
-Agent set	エージェントの値
 Open in a Sampler	Sampler で開く
+ will use 	 が使うのは 
+%d line	%d 行
+%d lines	%d 行
+(missing)	(見つかりません)
+1 failed	1 件失敗
+A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path.	Infinite 内の本物のシェルです。チャットのヘッダーまたは Ctrl+` で開きます。パッチのフォルダーで始まり、infinite は PATH に入っています。ノードやファイルをドラッグすると、その id やパスが入力されます。
+Add a question: /	質問を追加: /
+Add folder…	フォルダーを追加…
+Agent folder	エージェントのフォルダー
+Allow	許可
+Allow folder	フォルダーを許可
+Allowed	許可済み
+Allowed commands	許可したコマンド
+Attach from Clipboard	クリップボードから添付
+Checking…	確認中…
+Choose…	選択…
+Close Picture	画像を閉じる
+Close a picture opened full size	全サイズで開いた画像を閉じます
+Close code	コードを閉じる
+Commands	コマンド
+Connected	接続済み
+Connection	接続
+Copied	コピーしました
+Details	詳細
+Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it.	各エージェントは独立したコマンドラインプログラムで、メッセージごとに 1 ターン、エージェントのフォルダーで実行されます。Infinite はその出力を返信として表示します。サインインはエージェント側で行われ、Infinite には見えません。
+Edit files in it	中のファイルを編集
+Edit files in them	中のファイルを編集
+Finish in your browser…	ブラウザーで完了してください…
+Hide details	詳細を隠す
+How the chat works	チャットのしくみ
+It stopped responding, so the chat ended the turn. Try again.	応答が止まったため、チャットはこのターンを終了しました。もう一度お試しください。
+More folders	その他のフォルダー
+Move through the node or command list, then take the highlighted one. Esc closes it	ノードまたはコマンドの一覧を移動し、選択中の項目を確定します。Esc で閉じます
+Name nodes with @, run commands with /, attach files with +. Every change an agent makes to the patch is listed under its reply, with Undo.	@ でノードを指定し、/ でコマンドを実行し、+ でファイルを添付します。エージェントがパッチに加えた変更はすべて返信の下に一覧され、元に戻せます。
+Needs setup	設定が必要
+Not a command: /	コマンドではありません: /
+Not ready: 	準備できていません: 
+Not signed in	サインインしていません
+Now talking to 	現在の相手: 
+Off in this mode	このモードではオフ
+Off: set by	オフ: 設定元
+Open code	コードを開く
+Open sign-in page	サインインページを開く
+Outside the panel:	パネルの外では:
+Paste copied files or a copied picture into the message; copied text still pastes as text	コピーしたファイルや画像をメッセージに貼り付けます。コピーしたテキストは従来どおりテキストとして貼り付けられます
+Paste the code from the browser	ブラウザーに表示されたコードを貼り付け
+Pick @ or /	@ または / の選択
+Reference in chat	チャットで参照
+Reset	リセット
+Send / New Line	送信 / 改行
+Send the message, or start a new line	メッセージを送信、または改行します
+Setup did not finish	設定が完了しませんでした
+Setup did not finish.	設定が完了しませんでした。
+Show in folder	フォルダーで表示
+Sign in again	再度サインイン
+Sign out	サインアウト
+Sign-in did not finish. Try again.	サインインが完了しませんでした。もう一度お試しください。
+Sign-in timed out. Try again.	サインインがタイムアウトしました。もう一度お試しください。
+Signed out	サインアウト済み
+Signing out…	サインアウト中…
+Submit	送信
+The open patch's folder	開いているパッチのフォルダー
+The same executable renders pictures, video and sound from a .inf patch with no window. The same patch always gives the same output.	同じ実行ファイルが、ウィンドウなしで .inf パッチから画像・動画・音を書き出せます。同じパッチは常に同じ出力になります。
+Try again	再試行
+Type /help to see them.	/help と入力すると一覧が表示されます。
+Waiting for sign-in…	サインインを待っています…
+Which agent? claude, chatgpt or gemini.	どのエージェント? claude、chatgpt、gemini のいずれかです。
+cached	キャッシュ
+failed	失敗
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors.	infinite だけで全コマンドを一覧表示します。infinite context は開いているパッチ、選択範囲、コードのエラーを表示します。
+its default model	既定のモデル
+model	モデル
+tokens	トークン
+usage	使用量

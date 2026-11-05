@@ -2675,5 +2675,78 @@ Add to the queue	Zur Warteschlange hinzufügen
 Reply	Antworten
 Pop out	Abdocken
 Floating Window	Schwebendes Fenster
-Agent set	Vom Agenten gesetzt
 Open in a Sampler	In einem Sampler öffnen
+ will use 	 verwendet 
+%d line	%d Zeile
+%d lines	%d Zeilen
+(missing)	(fehlt)
+1 failed	1 fehlgeschlagen
+A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path.	Eine echte Shell in Infinite, geöffnet über die Chat-Kopfzeile oder mit Ctrl+`. Sie startet im Ordner des Patches, und infinite liegt in ihrem PATH. Ziehe einen Node oder eine Datei hinein, um seine ID oder den Pfad einzutippen.
+Add a question: /	Füge eine Frage hinzu: /
+Add folder…	Ordner hinzufügen…
+Agent folder	Agent-Ordner
+Allow	Erlauben
+Allow folder	Ordner erlauben
+Allowed	Erlaubt
+Allowed commands	Erlaubte Befehle
+Attach from Clipboard	Aus Zwischenablage anhängen
+Checking…	Prüfe…
+Choose…	Wählen…
+Close Picture	Bild schließen
+Close a picture opened full size	Schließt ein in voller Größe geöffnetes Bild
+Close code	Code schließen
+Commands	Befehle
+Connected	Verbunden
+Connection	Verbindung
+Copied	Kopiert
+Details	Details
+Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it.	Jeder Agent ist ein eigenes Kommandozeilenprogramm, das pro Nachricht einen Durchgang im Agent-Ordner läuft. Infinite zeigt seine Ausgabe als Antwort. Die Anmeldung bleibt beim Agenten; Infinite sieht sie nie.
+Edit files in it	Dateien darin bearbeiten
+Edit files in them	Dateien darin bearbeiten
+Finish in your browser…	Im Browser abschließen…
+Hide details	Details ausblenden
+How the chat works	So funktioniert der Chat
+It stopped responding, so the chat ended the turn. Try again.	Er hat nicht mehr geantwortet, daher hat der Chat den Durchgang beendet. Versuche es erneut.
+More folders	Weitere Ordner
+Move through the node or command list, then take the highlighted one. Esc closes it	Durch die Node- oder Befehlsliste gehen und den markierten übernehmen. Esc schließt sie
+Name nodes with @, run commands with /, attach files with +. Every change an agent makes to the patch is listed under its reply, with Undo.	Nenne Nodes mit @, führe Befehle mit / aus, hänge Dateien mit + an. Jede Änderung eines Agenten am Patch steht unter seiner Antwort, mit Rückgängig.
+Needs setup	Einrichtung nötig
+Not a command: /	Kein Befehl: /
+Not ready: 	Nicht bereit: 
+Not signed in	Nicht angemeldet
+Now talking to 	Du sprichst jetzt mit 
+Off in this mode	In diesem Modus aus
+Off: set by	Aus: gesetzt von
+Open code	Code öffnen
+Open sign-in page	Anmeldeseite öffnen
+Outside the panel:	Außerhalb des Panels:
+Paste copied files or a copied picture into the message; copied text still pastes as text	Kopierte Dateien oder ein kopiertes Bild in die Nachricht einfügen; kopierter Text wird weiterhin als Text eingefügt
+Paste the code from the browser	Code aus dem Browser einfügen
+Pick @ or /	@ oder / wählen
+Reference in chat	Im Chat referenzieren
+Reset	Zurücksetzen
+Send / New Line	Senden / Neue Zeile
+Send the message, or start a new line	Nachricht senden oder neue Zeile beginnen
+Setup did not finish	Einrichtung nicht abgeschlossen
+Setup did not finish.	Einrichtung nicht abgeschlossen.
+Show in folder	Im Ordner zeigen
+Sign in again	Erneut anmelden
+Sign out	Abmelden
+Sign-in did not finish. Try again.	Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut.
+Sign-in timed out. Try again.	Zeitüberschreitung bei der Anmeldung. Versuche es erneut.
+Signed out	Abgemeldet
+Signing out…	Melde ab…
+Submit	Absenden
+The open patch's folder	Der Ordner des geöffneten Patches
+The same executable renders pictures, video and sound from a .inf patch with no window. The same patch always gives the same output.	Dieselbe ausführbare Datei rendert Bilder, Video und Ton aus einem .inf-Patch ohne Fenster. Derselbe Patch liefert immer dieselbe Ausgabe.
+Try again	Erneut versuchen
+Type /help to see them.	Tippe /help, um sie zu sehen.
+Waiting for sign-in…	Warte auf die Anmeldung…
+Which agent? claude, chatgpt or gemini.	Welcher Agent? claude, chatgpt oder gemini.
+cached	im Cache
+failed	fehlgeschlagen
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors.	infinite allein listet alle Verben auf. infinite context gibt den offenen Patch, die Auswahl und Codefehler aus.
+its default model	sein Standardmodell
+model	Modell
+tokens	Tokens
+usage	Nutzung

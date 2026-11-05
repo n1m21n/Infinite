@@ -2675,5 +2675,78 @@ Add to the queue	加入队列
 Reply	回复
 Pop out	弹出
 Floating Window	浮动窗口
-Agent set	代理设定
 Open in a Sampler	在 Sampler 中打开
+ will use 	 将使用 
+%d line	%d 行
+%d lines	%d 行
+(missing)	(缺失)
+1 failed	1 个失败
+A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path.	Infinite 内的真实 Shell，可从聊天标题栏或按 Ctrl+` 打开。它从补丁所在文件夹启动，infinite 已在其 PATH 中。把节点或文件拖进来即可输入其 id 或路径。
+Add a question: /	添加问题：/
+Add folder…	添加文件夹…
+Agent folder	智能体文件夹
+Allow	允许
+Allow folder	允许文件夹
+Allowed	已允许
+Allowed commands	允许的命令
+Attach from Clipboard	从剪贴板附加
+Checking…	正在检查…
+Choose…	选择…
+Close Picture	关闭图片
+Close a picture opened full size	关闭以全尺寸打开的图片
+Close code	关闭代码
+Commands	命令
+Connected	已连接
+Connection	连接
+Copied	已复制
+Details	详情
+Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it.	每个智能体都是独立的命令行程序，每条消息在智能体文件夹中运行一轮。Infinite 把它的输出显示为回复。登录由智能体自己处理，Infinite 从不接触。
+Edit files in it	编辑其中的文件
+Edit files in them	编辑其中的文件
+Finish in your browser…	请在浏览器中完成…
+Hide details	隐藏详情
+How the chat works	聊天如何工作
+It stopped responding, so the chat ended the turn. Try again.	它不再响应，聊天已结束这一轮。请重试。
+More folders	更多文件夹
+Move through the node or command list, then take the highlighted one. Esc closes it	在节点或命令列表中移动，再选取高亮项。Esc 关闭列表
+Name nodes with @, run commands with /, attach files with +. Every change an agent makes to the patch is listed under its reply, with Undo.	用 @ 指定节点，用 / 运行命令，用 + 附加文件。智能体对补丁所做的每项更改都列在其回复下方，并带有撤销。
+Needs setup	需要设置
+Not a command: /	不是命令：/
+Not ready: 	未就绪：
+Not signed in	未登录
+Now talking to 	现在正在与以下对象对话：
+Off in this mode	此模式下关闭
+Off: set by	已关闭：由以下设置
+Open code	打开代码
+Open sign-in page	打开登录页面
+Outside the panel:	在面板之外：
+Paste copied files or a copied picture into the message; copied text still pastes as text	把复制的文件或图片粘贴到消息中；复制的文本仍按文本粘贴
+Paste the code from the browser	粘贴浏览器中显示的代码
+Pick @ or /	选取 @ 或 /
+Reference in chat	在聊天中引用
+Reset	重置
+Send / New Line	发送 / 换行
+Send the message, or start a new line	发送消息，或另起一行
+Setup did not finish	设置未完成
+Setup did not finish.	设置未完成。
+Show in folder	在文件夹中显示
+Sign in again	重新登录
+Sign out	退出登录
+Sign-in did not finish. Try again.	登录未完成。请重试。
+Sign-in timed out. Try again.	登录超时。请重试。
+Signed out	已退出登录
+Signing out…	正在退出登录…
+Submit	提交
+The open patch's folder	当前打开补丁所在的文件夹
+The same executable renders pictures, video and sound from a .inf patch with no window. The same patch always gives the same output.	同一个可执行文件无需窗口即可从 .inf 补丁渲染图像、视频和声音。同一个补丁总是得到相同的输出。
+Try again	重试
+Type /help to see them.	输入 /help 查看全部命令。
+Waiting for sign-in…	正在等待登录…
+Which agent? claude, chatgpt or gemini.	哪个智能体？claude、chatgpt 或 gemini。
+cached	已缓存
+failed	失败
+infinite alone lists every verb. infinite context prints the open patch, the selection and code errors.	单独运行 infinite 会列出所有命令。infinite context 会输出当前补丁、选区和代码错误。
+its default model	其默认模型
+model	模型
+tokens	token
+usage	用量

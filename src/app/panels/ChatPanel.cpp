@@ -1159,7 +1159,7 @@ namespace app
             if (!Ready(id))
             {
                say("");
-               Push(Make(Entry::Kind::Error, arg.empty() ? std::string(T("Which agent? claude, codex or antigravity.")) : std::string(T("Not ready: ")) + arg));
+               Push(Make(Entry::Kind::Error, arg.empty() ? std::string(T("Which agent? claude, chatgpt or gemini.")) : std::string(T("Not ready: ")) + arg));
                return true;
             }
             CliSetup::Prefs().agent = id;
