@@ -1,4 +1,5 @@
 #include "core/chat/NodeFinder.h"
+#include "core/chat/NodeVocab.gen.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -47,6 +48,9 @@ namespace chat
             return false;
          // The ask may only run past the card word by an ending ("blurs", "delayed"), never a new word ("projector").
          static const std::set<std::string> kEnds = { "", "s", "es", "ed", "d", "e", "er", "ly", "y", "ing" };
+         // The card word may run past the whole ask by an ending too ("smooth" is Smoothing).
+         if (k == ask.size() && kEnds.count(card.substr(k)) > 0)
+            return true;
          return kEnds.count(ask.substr(k)) > 0 && card.size() - k <= slack;
       }
 
@@ -59,9 +63,9 @@ namespace chat
             { "mic", { "microphone", "input" } }, { "spacious", { "reverb", "room" } }, { "space", { "reverb" } },
             { "ambience", { "reverb" } }, { "crunchy", { "distortion", "saturation", "bitcrush" } },
             { "dirty", { "distortion", "saturation" } }, { "gritty", { "distortion", "saturation" } },
-            { "distort", { "distortion", "saturation" } }, { "louder", { "gain", "volume" } },
+            { "distort", { "distortion", "saturation", "displace", "liquify" } }, { "louder", { "gain", "volume" } },
             { "quieter", { "gain", "volume" } }, { "loud", { "gain" } }, { "projector", { "projection", "output" } }, { "display", { "output", "window" } }, { "monitor", { "output" } }, { "phone", { "osc" } }, { "ipad", { "osc" } }, { "tablet", { "osc" } },
-            { "app", { "syphon", "ndi" } }, { "apps", { "syphon", "ndi" } }, { "knob", { "macro" } },
+            { "gradient", { "ramp" } }, { "app", { "syphon", "ndi" } }, { "apps", { "syphon", "ndi" } }, { "knob", { "macro" } },
             { "wobble", { "lfo", "oscillation" } }, { "sway", { "lfo" } }, { "mix", { "mixer", "blend" } },
             { "combine", { "blend", "layer", "mixer" } }, { "photo", { "image" } }, { "picture", { "image" } },
             { "pan", { "spatial", "stereo" } }, { "jittery", { "smoothing" } }, { "jitter", { "smoothing" } },
@@ -71,6 +75,51 @@ namespace chat
             { "key", { "scale", "snap" } }, { "scale", { "key", "snap" } }, { "render", { "render" } },
             { "webcam", { "camera", "video" } }, { "code", { "sketch", "javascript", "kernel", "glsl" } },
             { "p5", { "sketch" } }, { "processing", { "sketch" } }, { "shader", { "glsl", "kernel", "pixel" } }, { "beat", { "drum", "rhythm" } }, { "chop", { "slice", "slices" } },
+            // Musician words no card uses (tests/chat/find_glossary.tsv).
+            { "lush", { "reverb", "chorus", "wavetable" } }, { "pad", { "wavetable", "analog", "reverb" } },
+            { "pads", { "wavetable", "analog", "reverb" } }, { "supersaw", { "analog", "unison", "detune" } },
+            { "hats", { "drum", "metallic" } }, { "hihat", { "drum", "metallic" } }, { "cymbal", { "metallic", "drum" } },
+            { "resonance", { "filter", "resonator" } }, { "resonant", { "filter", "resonator" } },
+            { "compressor", { "dynamics", "limiter" } }, { "compress", { "dynamics" } }, { "compression", { "dynamics" } },
+            { "overdrive", { "drive", "saturator" } }, { "distortion", { "drive", "saturator" } },
+            { "lofi", { "bitcrush", "saturator" } }, { "panning", { "stereo", "spatial" } },
+            { "autotune", { "key", "snap", "pitch" } }, { "octave", { "transpose", "pitch" } },
+            { "octaves", { "transpose", "pitch" } }, { "tuning", { "transpose", "snap", "pitch" } },
+            { "tune", { "transpose", "snap", "pitch" } }, { "arpeggio", { "arpeggiator" } },
+            { "arp", { "arpeggiator" } }, { "modulation", { "mod", "lfo", "envelope", "mseg" } }, { "modulate", { "lfo", "envelope" } },
+            { "follow", { "analyze", "track" } }, { "arrange", { "piano", "roll", "sequencer" } },
+            { "arranging", { "piano", "roll", "sequencer" } }, { "arrangement", { "piano", "roll" } },
+            { "record", { "audio", "looper" } }, { "wav", { "audio", "file", "sampler" } }, { "mp3", { "audio", "file" } },
+            // Visual-artist words no card uses.
+            { "glsl", { "shadertoy" } }, { "graphics", { "shape", "draw" } }, { "typography", { "text" } },
+            { "font", { "text" } }, { "duotone", { "gradientmap", "gradient" } }, { "grain", { "noise" } },
+            { "sharpen", { "unsharp", "unsharpmask" } }, { "pixel", { "pixelate", "dither" } }, { "warp", { "liquify", "displace" } },
+            { "swirl", { "twirl" } }, { "fisheye", { "lens", "lensdistortion" } },
+            { "shadow", { "dropshadow" } }, { "mask", { "key", "alpha", "matte" } }, { "transparency", { "opacity", "alpha" } },
+            { "transparent", { "opacity", "alpha" } }, { "rotate", { "transform" } }, { "rotation", { "transform" } },
+            { "smoke", { "fluid" } }, { "ink", { "fluid" } }, { "mesh", { "geometry", "edit" } },
+            { "lowpoly", { "decimate", "triangulate" } }, { "poly", { "decimate", "triangulate" } },
+            { "boolean", { "difference", "union", "intersect" } }, { "physics", { "rigid", "cloth" } },
+            { "rig", { "armature" } }, { "skeleton", { "armature" } }, { "bones", { "armature" } },
+            // Effect words people use for what a node does (tests/chat/find_nodes.tsv).
+            { "peaks", { "limiter", "dynamics" } }, { "clipping", { "limiter" } }, { "squash", { "dynamics", "compressor" } },
+            { "mids", { "eq" } }, { "treble", { "eq" } }, { "highs", { "eq", "filter" } },
+            { "harder", { "transient" } }, { "punch", { "transient" } }, { "whoosh", { "flanger" } }, { "jet", { "flanger" } },
+            { "notch", { "phaser" } }, { "thicken", { "chorus" } }, { "doubled", { "chorus" } }, { "warm", { "saturator", "analog" } },
+            { "robotic", { "ring" } }, { "static", { "noise", "addnoise" } }, { "corners", { "vignette" } },
+            { "blocky", { "pixelate" } }, { "negative", { "invert" } }, { "brighter", { "exposure" } }, { "darker", { "exposure" } },
+            { "tint", { "coloroverlay", "overlay" } }, { "comic", { "halftone" } }, { "barrel", { "lensdistortion", "lens" } },
+            { "smear", { "liquify" } }, { "past", { "machine" } }, { "fold", { "symmetry" } }, { "chunks", { "stutter" } },
+            { "harmonics", { "partials" } }, { "freeze", { "bake" } }, { "overlap", { "intersect" } },
+            { "subtract", { "difference" } }, { "shiny", { "material" } }, { "metal", { "material", "metallic" } },
+            { "liquid", { "fluid" } }, { "loudness", { "analyze" } }, { "interface", { "audio", "in" } },
+            { "listener", { "spatial" } }, { "kernel", { "convolve" } }, { "building", { "projection" } },
+            // Shape and object words the node names say another way.
+            { "oval", { "ellipse" } }, { "lamp", { "light" } }, { "donut", { "torus", "ring" } }, { "doughnut", { "torus", "ring" } },
+            { "ball", { "sphere" } }, { "coil", { "helix" } }, { "spring", { "helix" } }, { "cog", { "gear" } },
+            { "box", { "rectangle", "cube" } }, { "floor", { "plane" } }, { "ground", { "plane" } }, { "lettering", { "text" } },
+            { "words", { "text" } }, { "round", { "circle", "sphere" } }, { "pill", { "capsule" } }, { "square", { "rectangle" } },
+            { "reactive", { "analyze" } }, { "spectrum", { "analyze", "spectral" } }, { "waveform", { "meter", "ribbon", "scope" } },
          };
          return kBridges;
       }
@@ -92,13 +141,70 @@ namespace chat
       struct Card
       {
          NodeHit hit;
-         std::vector<std::string> name, kind, purpose, body;
+         std::vector<std::string> name, kind, purpose, body, params;
          int domain = 0; // 1 sound, 2 picture, 0 either
+         bool bare = false; // no guide card: ranked on its controls alone
       };
 
       bool In(const std::vector<std::string>& words, const std::string& w, size_t slack)
       {
          return std::any_of(words.begin(), words.end(), [&](const std::string& c) { return Same(w, c, slack); });
+      }
+
+      // Letters and digits only, lowercase: "Motion Blur" and "motionblur" are one name.
+      std::string Norm(const std::string& s)
+      {
+         std::string o;
+         for (char ch : s)
+            if (std::isalnum((unsigned char)ch))
+               o += (char)std::tolower((unsigned char)ch);
+         return o;
+      }
+
+      // The type a card is about: the same name ("Motion Blur" = motionblur), a name its words hold ("Wavetable Synth"
+      // holds Wavetable), or one of its words joined to the last ("Gaussian / Box Blur" = gaussianblur). The longest wins.
+      const NodeVocab::Entry* TypeOfCard(const std::string& title, const std::vector<std::string>& words)
+      {
+         const std::string n = Norm(title);
+         const NodeVocab::Entry* best = nullptr;
+         size_t bestLen = 0;
+         for (const NodeVocab::Entry& e : NodeVocab::kEntries)
+         {
+            const std::string t = Norm(e.type);
+            if (t == n)
+               return &e;
+            bool fits = false;
+            std::vector<std::string> tw = Split(e.type);
+            if (!tw.empty())
+               fits = std::all_of(tw.begin(), tw.end(), [&](const std::string& w) { return std::find(words.begin(), words.end(), w) != words.end(); });
+            if (!fits && words.size() > 1)
+               for (size_t i = 0; i + 1 < words.size() && !fits; i++)
+                  fits = t == words[i] + words.back();
+            if (fits && t.size() > bestLen)
+               best = &e, bestLen = t.size();
+         }
+         if (best != nullptr)
+            return best;
+         // Last: the card's words name part of a type ("Ramp" is Color Ramp); the shortest such type.
+         for (const NodeVocab::Entry& e : NodeVocab::kEntries)
+         {
+            const std::vector<std::string> tw = Split(e.type);
+            const bool holds = !words.empty() && std::all_of(words.begin(), words.end(), [&](const std::string& w) {
+               return std::find(tw.begin(), tw.end(), w) != tw.end();
+            });
+            if (holds && (best == nullptr || std::strlen(e.type) < std::strlen(best->type)))
+               best = &e;
+         }
+         return best;
+      }
+
+      int DomainOfCategory(const std::string& c)
+      {
+         if (c == "Synths" || c == "AudioEffects" || c == "Notes")
+            return 1;
+         if (c == "3D" || c == "Compositing" || c == "Effects" || c == "Source")
+            return 2;
+         return 0;
       }
 
       int AskDomain(const std::vector<std::string>& words)
@@ -160,6 +266,38 @@ namespace chat
                                k.find("compositing") != std::string::npos || k.find("effects") == 0 || k.find("source") == 0 ||
                                k.find("color") == 0 || k.find("text") == 0;
             c.domain = audio && !image ? 1 : image && !audio ? 2 : 0;
+            // The guide also holds language and manual sections; a card is a node when its kind line reads "KIND · IO".
+            const NodeVocab::Entry* type = TypeOfCard(c.hit.name, c.name);
+            if (type == nullptr && c.hit.kind.find("\xc2\xb7") == std::string::npos)
+               continue;
+            if (type != nullptr)
+            {
+               c.hit.type = type->type;
+               c.params = Split(type->words);
+               if (c.domain == 0)
+                  c.domain = DomainOfCategory(type->category);
+            }
+            cards.push_back(std::move(c));
+         }
+         // Nodes with no card: their name, category and control words.
+         for (const NodeVocab::Entry& e : NodeVocab::kEntries)
+         {
+            if (std::any_of(cards.begin(), cards.end(), [&](const Card& c) { return c.hit.type == e.type; }))
+               continue;
+            Card c;
+            c.hit.name = c.hit.type = e.type;
+            c.hit.kind = e.category;
+            c.name = Split(e.type);
+            c.kind = Split(e.category);
+            c.params = Split(e.words);
+            c.domain = DomainOfCategory(e.category);
+            c.bare = true;
+            // No card to quote: its first controls say what it is ("Controls: rate, depth, feedback").
+            std::string ctl;
+            for (size_t i = 0; i < c.params.size() && i < 8; i++)
+               ctl += (i ? ", " : "") + c.params[i];
+            if (!ctl.empty())
+               c.hit.purpose = "Controls: " + ctl + ".";
             cards.push_back(std::move(c));
          }
       }
@@ -169,7 +307,7 @@ namespace chat
       {
          int df = 0;
          for (const Card& c : cards)
-            df += In(c.body, w, 3) || In(c.name, w, 2);
+            df += In(c.body, w, 3) || In(c.name, w, 2) || In(c.params, w, 2);
          return std::log((cards.size() + 1.0) / (df + 1.0));
       };
       struct Term
@@ -196,7 +334,8 @@ namespace chat
             // A name hit counts even for a common word: "image" is everywhere, but Image Source is still the image node.
             const double w = std::max(t.weight, 1.5);
             const double field = In(c.name, t.word, 2) ? 6.0 * w : In(c.kind, t.word, 2) ? 2.0 * t.weight
-                               : In(c.purpose, t.word, 3) ? 2.5 * t.weight : In(c.body, t.word, 3) ? 1.0 * t.weight : 0.0;
+                               : In(c.purpose, t.word, 3) ? 2.5 * t.weight : In(c.params, t.word, 2) ? 1.5 * t.weight
+                               : In(c.body, t.word, 3) ? 1.0 * t.weight : 0.0;
             best[t.from] = std::max(best[t.from], field);
          }
          double score = 0.0;
@@ -222,11 +361,19 @@ namespace chat
             score *= c.domain == domain ? 1.3 : c.domain == 0 ? 1.0 : 0.6;
          else if (domain == 3)
             score *= c.domain == 0 ? 1.3 : 1.0;
+         // A node the guide describes is the surer pick over one known only by its controls.
+         if (c.bare)
+            score *= 0.85;
          NodeHit h = c.hit;
          h.score = (int)std::lround(score * 10.0);
          hits.push_back(h);
       }
       std::stable_sort(hits.begin(), hits.end(), [](const NodeHit& a, const NodeHit& b) { return a.score > b.score; });
+      // Two cards for one node (an OS variant, a section) show once, at the better score.
+      std::set<std::string> seen;
+      hits.erase(std::remove_if(hits.begin(), hits.end(), [&](const NodeHit& h) {
+         return !seen.insert(h.type.empty() ? h.name : h.type).second;
+      }), hits.end());
       if (hits.size() > limit)
          hits.resize(limit);
       return hits;

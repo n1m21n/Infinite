@@ -1088,7 +1088,7 @@ endif()
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
-# `infinite find` ranking: top-3 hits over real asks (tests/chat/find_eval.tsv tuned, find_holdout.tsv never tuned).
+# `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
 add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
 target_include_directories(find-eval PRIVATE src src/core)
 

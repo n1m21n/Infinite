@@ -1823,8 +1823,14 @@ map, and the visual, sound and film crafts.
          if (hits.empty())
             Fail("no node card matches '" + ask + "'; try other words, or `infinite docs nodes`");
          for (const chat::NodeHit& h : hits)
-            printf("%-22s %s. %s\n", h.name.c_str(), h.kind.c_str(), h.purpose.c_str());
-         printf("Card: `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
+         {
+            // The type to `add` goes in brackets when the card is named another way ("Wavetable Synth [Wavetable]").
+            std::string name = h.name;
+            if (!h.type.empty() && h.type != h.name)
+               name += " [" + h.type + "]";
+            printf("%-22s %s.%s%s\n", name.c_str(), h.kind.c_str(), h.purpose.empty() ? "" : " ", h.purpose.c_str());
+         }
+         printf("Add by the bracketed type when shown. Card: `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
          return 0;
       }
       if (verb == "attention")

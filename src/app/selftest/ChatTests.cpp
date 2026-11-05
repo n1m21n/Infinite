@@ -337,6 +337,9 @@ namespace app
             check(chat::FindNodes("the and of", AgentDocs::kNodeGuide).empty(), "find: stop words alone match nothing");
             const std::vector<chat::NodeHit> one = chat::FindNodes("reverb", AgentDocs::kNodeGuide, 1);
             check(one.size() == 1 && !one[0].kind.empty() && !one[0].purpose.empty(), "find: a hit carries its kind and purpose");
+            check(top("add a chorus to the guitar", "Chorus", 3), "find: a node with no guide card is found by its own name");
+            const std::vector<chat::NodeHit> wt = chat::FindNodes("wavetable synth", AgentDocs::kNodeGuide, 1);
+            check(wt.size() == 1 && wt[0].type == "Wavetable", "find: a card named another way carries the type to add");
          }
 
          // What a turn changed: params, added and removed nodes, cables, code as a block.
