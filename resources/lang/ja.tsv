@@ -2751,3 +2751,46 @@ model	モデル
 tokens	トークン
 usage	使用量
 Replying to	返信先
+%s did not install. Press Try again.	%s をインストールできませんでした。再試行を押してください。
+A download did not finish. Check the internet, then press Try again.	ダウンロードが完了しませんでした。インターネットを確認して再試行を押してください。
+A helper program on this computer is too old. Press Try again to get a new one.	このコンピューターの補助プログラムが古すぎます。再試行を押すと新しいものを入手します。
+After you sign in, the page shows a code. Paste it here.	サインインすると、ページにコードが表示されます。ここに貼り付けてください。
+Before we start	始める前に
+Check again	もう一度確認
+Checking the code…	コードを確認中…
+Checking this computer…	このコンピューターを確認中…
+Connecting to Infinite did not finish. Press Try again.	Infinite への接続が完了しませんでした。再試行を押してください。
+Continue	続ける
+Copy address	アドレスをコピー
+Could not connect %s to Infinite. Press Try again.	%s を Infinite に接続できませんでした。再試行を押してください。
+Get ready	準備
+Getting ready did not finish. Press Try again.	準備が完了しませんでした。再試行を押してください。
+I don't have one	持っていません
+I have an account	アカウントがあります
+Install %s	%s をインストール
+Install curl	curl をインストール
+Make a calm sound	穏やかな音を作って
+Make something that looks like rain	雨のように見えるものを作って
+Make your account	アカウントを作成
+Make your account in the browser. Infinite goes on when you come back.	ブラウザーでアカウントを作成してください。戻ると Infinite が続けます。
+Needs a browser	ブラウザーが必要
+No internet. Connect to the internet, then press Check again.	インターネットに接続されていません。接続してから、もう一度確認を押してください。
+No internet. Connect to the internet, then press Try again.	インターネットに接続されていません。接続してから再試行を押してください。
+No web browser found. You will sign in by copying an address and pasting a code.	ブラウザーが見つかりません。アドレスをコピーしてコードを貼り付けてサインインします。
+Not enough free space. Free up 2 GB, then press Check again.	空き容量が足りません。2 GB 空けてから、もう一度確認を押してください。
+Not enough free space. Free up 2 GB, then press Try again.	空き容量が足りません。2 GB 空けてから再試行を押してください。
+Open page again	ページをもう一度開く
+Paste the code	コードを貼り付け
+Pick again	選び直す
+Set up first	先に設定してください
+Setting up %s	%s を設定中
+Show me what you can do	できることを見せて
+That code did not work. Copy it again from the browser.	そのコードは使えませんでした。ブラウザーからもう一度コピーしてください。
+This computer is missing curl, which downloads the setup. Install curl, then press Check again.	このコンピューターにはセットアップをダウンロードする curl がありません。curl をインストールしてから、もう一度確認を押してください。
+This computer's settings block installers. Ask the person who manages it.	このコンピューターの設定でインストールがブロックされています。管理者に相談してください。
+This kind of computer is not supported yet. Pick another one.	この種類のコンピューターはまだ対応していません。別のものを選んでください。
+This step needs your computer password. Press Type password.	この手順にはコンピューターのパスワードが必要です。パスワードを入力を押してください。
+Type password	パスワードを入力
+Who do you want to talk to?	誰と話しますか？
+You're in	準備完了
+Your files	あなたのファイル

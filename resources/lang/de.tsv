@@ -2751,3 +2751,46 @@ model	Modell
 tokens	Tokens
 usage	Nutzung
 Replying to	Antwort auf
+%s did not install. Press Try again.	%s wurde nicht installiert. Drücke Erneut versuchen.
+A download did not finish. Check the internet, then press Try again.	Ein Download wurde nicht fertig. Prüfe das Internet und drücke Erneut versuchen.
+A helper program on this computer is too old. Press Try again to get a new one.	Ein Hilfsprogramm auf diesem Computer ist zu alt. Drücke Erneut versuchen, um ein neues zu holen.
+After you sign in, the page shows a code. Paste it here.	Nach der Anmeldung zeigt die Seite einen Code. Füge ihn hier ein.
+Before we start	Bevor es losgeht
+Check again	Erneut prüfen
+Checking the code…	Code wird geprüft…
+Checking this computer…	Dieser Computer wird geprüft…
+Connecting to Infinite did not finish. Press Try again.	Die Verbindung mit Infinite wurde nicht fertig. Drücke Erneut versuchen.
+Continue	Weiter
+Copy address	Adresse kopieren
+Could not connect %s to Infinite. Press Try again.	%s konnte nicht mit Infinite verbunden werden. Drücke Erneut versuchen.
+Get ready	Vorbereiten
+Getting ready did not finish. Press Try again.	Die Vorbereitung wurde nicht fertig. Drücke Erneut versuchen.
+I don't have one	Ich habe keins
+I have an account	Ich habe ein Konto
+Install %s	%s installieren
+Install curl	curl installieren
+Make a calm sound	Mach einen ruhigen Klang
+Make something that looks like rain	Mach etwas, das wie Regen aussieht
+Make your account	Konto erstellen
+Make your account in the browser. Infinite goes on when you come back.	Erstelle dein Konto im Browser. Infinite macht weiter, wenn du zurückkommst.
+Needs a browser	Braucht einen Browser
+No internet. Connect to the internet, then press Check again.	Kein Internet. Verbinde dich und drücke Erneut prüfen.
+No internet. Connect to the internet, then press Try again.	Kein Internet. Verbinde dich und drücke Erneut versuchen.
+No web browser found. You will sign in by copying an address and pasting a code.	Kein Browser gefunden. Du meldest dich an, indem du eine Adresse kopierst und einen Code einfügst.
+Not enough free space. Free up 2 GB, then press Check again.	Nicht genug freier Platz. Gib 2 GB frei und drücke Erneut prüfen.
+Not enough free space. Free up 2 GB, then press Try again.	Nicht genug freier Platz. Gib 2 GB frei und drücke Erneut versuchen.
+Open page again	Seite erneut öffnen
+Paste the code	Code einfügen
+Pick again	Neu wählen
+Set up first	Zuerst einrichten
+Setting up %s	%s wird eingerichtet
+Show me what you can do	Zeig mir, was du kannst
+That code did not work. Copy it again from the browser.	Der Code hat nicht funktioniert. Kopiere ihn erneut aus dem Browser.
+This computer is missing curl, which downloads the setup. Install curl, then press Check again.	Auf diesem Computer fehlt curl, das die Einrichtung herunterlädt. Installiere curl und drücke Erneut prüfen.
+This computer's settings block installers. Ask the person who manages it.	Die Einstellungen dieses Computers blockieren Installationen. Frag die Person, die ihn verwaltet.
+This kind of computer is not supported yet. Pick another one.	Diese Art Computer wird noch nicht unterstützt. Wähle ein anderes.
+This step needs your computer password. Press Type password.	Dieser Schritt braucht dein Computer-Passwort. Drücke Passwort eingeben.
+Type password	Passwort eingeben
+Who do you want to talk to?	Mit wem möchtest du sprechen?
+You're in	Du bist drin
+Your files	Deine Dateien

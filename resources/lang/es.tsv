@@ -2751,3 +2751,46 @@ model	modelo
 tokens	tokens
 usage	uso
 Replying to	Respondiendo a
+%s did not install. Press Try again.	%s no se instaló. Pulsa Reintentar.
+A download did not finish. Check the internet, then press Try again.	Una descarga no terminó. Revisa internet y pulsa Reintentar.
+A helper program on this computer is too old. Press Try again to get a new one.	Un programa auxiliar de este ordenador es demasiado antiguo. Pulsa Reintentar para obtener uno nuevo.
+After you sign in, the page shows a code. Paste it here.	Tras iniciar sesión, la página muestra un código. Pégalo aquí.
+Before we start	Antes de empezar
+Check again	Comprobar de nuevo
+Checking the code…	Comprobando el código…
+Checking this computer…	Comprobando este ordenador…
+Connecting to Infinite did not finish. Press Try again.	La conexión con Infinite no terminó. Pulsa Reintentar.
+Continue	Continuar
+Copy address	Copiar dirección
+Could not connect %s to Infinite. Press Try again.	No se pudo conectar %s con Infinite. Pulsa Reintentar.
+Get ready	Preparar
+Getting ready did not finish. Press Try again.	La preparación no terminó. Pulsa Reintentar.
+I don't have one	No tengo cuenta
+I have an account	Tengo una cuenta
+Install %s	Instalar %s
+Install curl	Instalar curl
+Make a calm sound	Haz un sonido tranquilo
+Make something that looks like rain	Haz algo que parezca lluvia
+Make your account	Crea tu cuenta
+Make your account in the browser. Infinite goes on when you come back.	Crea tu cuenta en el navegador. Infinite sigue cuando vuelvas.
+Needs a browser	Necesita un navegador
+No internet. Connect to the internet, then press Check again.	Sin internet. Conéctate y pulsa Comprobar de nuevo.
+No internet. Connect to the internet, then press Try again.	Sin internet. Conéctate y pulsa Reintentar.
+No web browser found. You will sign in by copying an address and pasting a code.	No hay navegador. Iniciarás sesión copiando una dirección y pegando un código.
+Not enough free space. Free up 2 GB, then press Check again.	No hay espacio libre suficiente. Libera 2 GB y pulsa Comprobar de nuevo.
+Not enough free space. Free up 2 GB, then press Try again.	No hay espacio libre suficiente. Libera 2 GB y pulsa Reintentar.
+Open page again	Abrir la página otra vez
+Paste the code	Pega el código
+Pick again	Elegir otra vez
+Set up first	Configura primero
+Setting up %s	Configurando %s
+Show me what you can do	Enséñame lo que sabes hacer
+That code did not work. Copy it again from the browser.	Ese código no funcionó. Cópialo otra vez del navegador.
+This computer is missing curl, which downloads the setup. Install curl, then press Check again.	A este ordenador le falta curl, que descarga la instalación. Instala curl y pulsa Comprobar de nuevo.
+This computer's settings block installers. Ask the person who manages it.	La configuración de este ordenador bloquea los instaladores. Pregunta a quien lo administra.
+This kind of computer is not supported yet. Pick another one.	Este tipo de ordenador aún no es compatible. Elige otro.
+This step needs your computer password. Press Type password.	Este paso necesita la contraseña del ordenador. Pulsa Escribir contraseña.
+Type password	Escribir contraseña
+Who do you want to talk to?	¿Con quién quieres hablar?
+You're in	Ya estás dentro
+Your files	Tus archivos

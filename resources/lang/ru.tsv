@@ -2751,3 +2751,46 @@ model	модель
 tokens	токенов
 usage	использование
 Replying to	Ответ на
+%s did not install. Press Try again.	%s не установился. Нажмите «Повторить».
+A download did not finish. Check the internet, then press Try again.	Загрузка не завершилась. Проверьте интернет и нажмите «Повторить».
+A helper program on this computer is too old. Press Try again to get a new one.	Вспомогательная программа на этом компьютере устарела. Нажмите «Повторить», чтобы получить новую.
+After you sign in, the page shows a code. Paste it here.	После входа на странице появится код. Вставьте его сюда.
+Before we start	Перед началом
+Check again	Проверить снова
+Checking the code…	Проверка кода…
+Checking this computer…	Проверка компьютера…
+Connecting to Infinite did not finish. Press Try again.	Подключение к Infinite не завершилось. Нажмите «Повторить».
+Continue	Продолжить
+Copy address	Копировать адрес
+Could not connect %s to Infinite. Press Try again.	Не удалось подключить %s к Infinite. Нажмите «Повторить».
+Get ready	Подготовка
+Getting ready did not finish. Press Try again.	Подготовка не завершилась. Нажмите «Повторить».
+I don't have one	У меня нет
+I have an account	У меня есть аккаунт
+Install %s	Установить %s
+Install curl	Установить curl
+Make a calm sound	Сделай спокойный звук
+Make something that looks like rain	Сделай что-то похожее на дождь
+Make your account	Создайте аккаунт
+Make your account in the browser. Infinite goes on when you come back.	Создайте аккаунт в браузере. Infinite продолжит, когда вы вернётесь.
+Needs a browser	Нужен браузер
+No internet. Connect to the internet, then press Check again.	Нет интернета. Подключитесь и нажмите «Проверить снова».
+No internet. Connect to the internet, then press Try again.	Нет интернета. Подключитесь и нажмите «Повторить».
+No web browser found. You will sign in by copying an address and pasting a code.	Браузер не найден. Вы войдёте, скопировав адрес и вставив код.
+Not enough free space. Free up 2 GB, then press Check again.	Недостаточно места. Освободите 2 ГБ и нажмите «Проверить снова».
+Not enough free space. Free up 2 GB, then press Try again.	Недостаточно места. Освободите 2 ГБ и нажмите «Повторить».
+Open page again	Открыть страницу снова
+Paste the code	Вставьте код
+Pick again	Выбрать снова
+Set up first	Сначала настройте
+Setting up %s	Настройка %s
+Show me what you can do	Покажи, что ты умеешь
+That code did not work. Copy it again from the browser.	Код не подошёл. Скопируйте его из браузера ещё раз.
+This computer is missing curl, which downloads the setup. Install curl, then press Check again.	На компьютере нет curl, который скачивает установку. Установите curl и нажмите «Проверить снова».
+This computer's settings block installers. Ask the person who manages it.	Настройки компьютера запрещают установку. Обратитесь к тому, кто им управляет.
+This kind of computer is not supported yet. Pick another one.	Такой компьютер пока не поддерживается. Выберите другой вариант.
+This step needs your computer password. Press Type password.	Для этого шага нужен пароль компьютера. Нажмите «Ввести пароль».
+Type password	Ввести пароль
+Who do you want to talk to?	С кем хотите поговорить?
+You're in	Готово
+Your files	Ваши файлы

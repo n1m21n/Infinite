@@ -171,7 +171,7 @@ namespace chat
       else if (Has(l, { "a password is required", "a terminal is required to read the password", "sudo: no tty" }))
       {
          f.kind = Friendly::Kind::Password;
-         f.text = "This step needs your computer password. Open the terminal and type it there.";
+         f.text = "This step needs your computer password.";
       }
       else if (Has(l, { "xdg-open: not found", "no browser", "could not open a browser", "failed to open browser", "unable to open browser", "couldn't open the browser" }))
       {

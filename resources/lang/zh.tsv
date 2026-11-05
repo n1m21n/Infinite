@@ -2751,3 +2751,46 @@ model	模型
 tokens	token
 usage	用量
 Replying to	回复
+%s did not install. Press Try again.	%s 没有安装成功。请按重试。
+A download did not finish. Check the internet, then press Try again.	下载没有完成。请检查网络，然后按重试。
+A helper program on this computer is too old. Press Try again to get a new one.	这台电脑上的一个辅助程序太旧了。按重试获取新版本。
+After you sign in, the page shows a code. Paste it here.	登录后，页面会显示一个代码。请粘贴到这里。
+Before we start	开始之前
+Check again	重新检查
+Checking the code…	正在检查代码…
+Checking this computer…	正在检查这台电脑…
+Connecting to Infinite did not finish. Press Try again.	连接 Infinite 没有完成。请按重试。
+Continue	继续
+Copy address	复制地址
+Could not connect %s to Infinite. Press Try again.	无法把 %s 连接到 Infinite。请按重试。
+Get ready	准备
+Getting ready did not finish. Press Try again.	准备没有完成。请按重试。
+I don't have one	我没有账号
+I have an account	我有账号
+Install %s	安装 %s
+Install curl	安装 curl
+Make a calm sound	做一个平静的声音
+Make something that looks like rain	做一个看起来像雨的东西
+Make your account	创建账号
+Make your account in the browser. Infinite goes on when you come back.	请在浏览器中创建账号。你回来后 Infinite 会继续。
+Needs a browser	需要浏览器
+No internet. Connect to the internet, then press Check again.	没有网络。请连接网络，然后按重新检查。
+No internet. Connect to the internet, then press Try again.	没有网络。请连接网络，然后按重试。
+No web browser found. You will sign in by copying an address and pasting a code.	没有找到浏览器。你将通过复制地址并粘贴代码来登录。
+Not enough free space. Free up 2 GB, then press Check again.	可用空间不足。请腾出 2 GB，然后按重新检查。
+Not enough free space. Free up 2 GB, then press Try again.	可用空间不足。请腾出 2 GB，然后按重试。
+Open page again	再次打开页面
+Paste the code	粘贴代码
+Pick again	重新选择
+Set up first	请先设置
+Setting up %s	正在设置 %s
+Show me what you can do	给我看看你能做什么
+That code did not work. Copy it again from the browser.	这个代码无效。请从浏览器重新复制。
+This computer is missing curl, which downloads the setup. Install curl, then press Check again.	这台电脑缺少 curl（用来下载安装）。请安装 curl，然后按重新检查。
+This computer's settings block installers. Ask the person who manages it.	这台电脑的设置阻止了安装。请询问管理这台电脑的人。
+This kind of computer is not supported yet. Pick another one.	暂不支持这种电脑。请选择另一个。
+This step needs your computer password. Press Type password.	这一步需要电脑密码。请按输入密码。
+Type password	输入密码
+Who do you want to talk to?	你想和谁对话？
+You're in	已就绪
+Your files	你的文件

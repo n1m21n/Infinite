@@ -18,6 +18,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import wave
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -86,6 +87,21 @@ SCENES = {
     "float": ("audio", "", "", "chatfloat", 0),
     "media": ("media", "", "", "", 0),
     "viewer": ("media", "", "", "", 0),
+    # First run (docs/CHAT.md, First run): each card held in one state, empty chat, nothing set up.
+    "first-check": ("empty", "", "", "", 0),
+    "first-blocked": ("empty", "", "", "", 0),
+    "first-pick": ("empty", "", "", "", 0),
+    "first-nobrowser": ("empty", "", "", "", 0),
+    "first-progress": ("empty", "", "", "", 0),
+    "first-code": ("empty", "", "", "", 0),
+    "first-failed": ("empty", "", "", "", 0),
+    "first-folder": ("empty", "", "", "", 0),
+    "first-ideas": ("empty", "", "", "", 0),
+}
+# A status.json for the setup steps the first-run scenes show (path, headless, node, mcp, agent).
+FIRST_STATUS = {
+    "first-progress": [("ok", ""), ("ok", ""), ("ok", ""), ("running", ""), ("pending", "")],
+    "first-failed": [("ok", ""), ("ok", ""), ("failed", "offline"), ("pending", ""), ("pending", "")],
 }
 # Scenes that open something a click would (the full-size picture view).
 VIEW = {"viewer": "loop.gif"}
@@ -119,8 +135,13 @@ def shoot(app, sid, theme, out_dir, timeout):
                     else PATCH, os.path.join(rec, "a-very-long-reference-file-name-for-wrapping.png"))
         json.dump({"agent": "claude", "face": "chat", "introduced": True, "welcomed": True, "folderAccess": False},
                   open(os.path.join(sup, "cli-setup", "config.json"), "w"))
+        if sid in FIRST_STATUS:
+            ids = ["path", "headless", "node", "mcp", "agent"]
+            json.dump({"version": 1, "os": "macos", "agent": "claude", "running": sid == "first-progress", "startedAt": int(time.time()),
+                       "finishedAt": 0, "steps": [{"id": i, "state": st, "detail": "", "reason": r} for i, (st, r) in zip(ids, FIRST_STATUS[sid])]},
+                      open(os.path.join(sup, "cli-setup", "status.json"), "w"))
         json.dump({"version": 1, "id": "shot", "title": sid, "updated": 1, "sessions": {},
-                   "entries": threads(rec)[thread]}, open(os.path.join(sup, "chats", "shot.json"), "w"))
+                   "entries": [] if thread == "empty" else threads(rec)[thread]}, open(os.path.join(sup, "chats", "shot.json"), "w"))
         out = os.path.join(out_dir, f"{sid}-{theme}.png")
         if os.path.exists(out):
             os.remove(out)
@@ -132,6 +153,8 @@ def shoot(app, sid, theme, out_dir, timeout):
             env["INFINITE_CHATSHOT_QUEUE"] = queue
         if typed:
             env["INFINITE_CHATSHOT_INPUT"] = typed
+        if sid.startswith("first-"):
+            env["INFINITE_CHATSHOT_ONBOARD"] = sid[len("first-"):]
         if sid in VIEW:
             env["INFINITE_CHATSHOT_VIEW"] = os.path.join(rec, VIEW[sid])
         try:

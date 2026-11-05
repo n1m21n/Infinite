@@ -3616,7 +3616,7 @@ namespace app
             EndCard(c);
             return true;
          }
-         CardTitle(c, T("This computer needs one thing first"));
+         CardTitle(c, T("Before we start"));
          bool noCurl = false;
          for (const chat::Problem& p : chat::CheckMachine(o.facts))
             if (p.blocks)
@@ -3765,8 +3765,8 @@ namespace app
             const chat::Friendly f = chat::SetupProblem(reason, step, a->name);
             CardText(c, Say(f.text, a->name), Red());
             const bool password = f.kind == chat::Friendly::Kind::Password;
-            const int b = password ? CardButtons(c, { { T("Type password"), true }, { T("Try again"), false }, { T("Details"), false }, { T("Back"), false } })
-                                   : CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Back"), false } });
+            const int b = password ? CardButtons(c, { { T("Type password"), true }, { T("Try again"), false }, { T("Details"), false }, { T("Pick again"), false } })
+                                   : CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Pick again"), false } });
             const int k = password ? b : (b < 0 ? -1 : b + 1);
             if (k == 0)
                OpenInTerminal(*a);
@@ -3822,7 +3822,7 @@ namespace app
          else if (!s.loginError.empty() && !setting)
          {
             CardText(c, s.loginError, Red());
-            const int b = CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Back"), false } });
+            const int b = CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Pick again"), false } });
             if (b == 0)
                Do(a->id, Act::SignIn);
             else if (b == 1)
@@ -3839,7 +3839,7 @@ namespace app
          else if (!setting && !signingIn && connected && !in)
          {
             // Set up, signed out, nothing running (a sign-in was cancelled): one button.
-            const int b = CardButtons(c, { { T("Sign in"), true }, { T("Back"), false } });
+            const int b = CardButtons(c, { { T("Sign in"), true }, { T("Pick again"), false } });
             if (b == 0)
                Do(a->id, Act::SignIn);
             else if (b == 1)
@@ -4744,7 +4744,7 @@ namespace app
          CliSetup::Config& prefs = CliSetup::Prefs();
          const float menuW = 264.0f;
          bool clicked = false;
-         Pill("##chatmodel", cur, cur.empty() ? std::string(T("Connect an agent")) : ModelFace(cur), right, y, h, clicked, room);
+         Pill("##chatmodel", cur, cur.empty() ? std::string(T("Set up first")) : ModelFace(cur), right, y, h, clicked, room);
          ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
          ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
          BeginMenuStyle();
@@ -5234,6 +5234,70 @@ namespace app
       gChatSideTerminal = false;
    }
 
+   namespace
+   {
+      // Review shots (tools/chat-shots, INFINITE_CHATSHOT_ONBOARD): hold the first-run card in one state.
+      // A `sleep` stands in for a running setup or sign-in so the card draws exactly what a user sees then.
+      std::shared_ptr<chat::AgentRun> Idle()
+      {
+         chat::AgentRun::Options o;
+         o.raw = true;
+         o.argv = { "/bin/sleep", "600" };
+         return chat::AgentRun::Start(o);
+      }
+
+      void HoldOnboardShot()
+      {
+         static const char* env = std::getenv("INFINITE_CHATSHOT_ONBOARD");
+         if (env == nullptr)
+            return;
+         const std::string m = env;
+         Onboard& o = sOnboard;
+         if (m == "check")
+         {
+            if (o.probe == nullptr)
+               o.probe = Idle(), o.probeAt = 1e9;
+            o.checked = false;
+         }
+         else
+         {
+            if (o.probe != nullptr)
+               o.probe->Stop(), o.probe = nullptr;
+            o.checked = true;
+            o.facts = chat::MachineFacts();
+            o.facts.netChecked = true;
+            o.facts.online = m != "blocked";
+            o.facts.freeBytes = m == "blocked" ? 200LL * 1024 * 1024 : 50LL * 1024 * 1024 * 1024;
+            o.facts.browser = m != "nobrowser";
+         }
+         const bool ready = m == "folder" || m == "ideas";
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         prefs.introduced = m != "folder";
+         prefs.tried = false;
+         for (auto& [id, s] : sAgents)
+         {
+            if (s.verify != nullptr)
+               s.verify->Stop(), s.verify = nullptr;
+            s.verifyAt = 1e9;
+            const bool chosen = id == "claude";
+            s.ready.installed = s.ready.connected = ready || (chosen && (m == "code"));
+            s.ready.signedIn = ready && chosen;
+            s.auth = s.ready.signedIn ? chat::Auth::In : chat::Auth::Out;
+            if (!chosen)
+               continue;
+            if (m == "progress" && s.setup == nullptr)
+               s.setup = Idle();
+            if (m == "code" && s.login == nullptr)
+               s.login = Idle(), s.loginAt = 1e9;
+            if (m == "code")
+               s.needsCode = true, s.loginUrl = "https://claude.ai/oauth/authorize?code=true";
+            s.failed = m == "failed";
+            s.signUp = m == "progress";
+         }
+         o.chosen = m == "progress" || m == "code" || m == "failed" ? "claude" : "";
+      }
+   }
+
    void DrawChatPanel()
    {
       if (ImGui::GetCurrentWindow()->SkipItems)
@@ -5265,6 +5329,7 @@ namespace app
       CheckAgents(frame - sLastFrame > 1);
       sLastFrame = frame;
       PollSetups();
+      HoldOnboardShot();
       PollRuns();
       RefreshCatalog(false);
       if (sShotOpenCode)
