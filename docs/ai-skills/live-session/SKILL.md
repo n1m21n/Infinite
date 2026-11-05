@@ -17,6 +17,7 @@ and every request is about that patch unless they name a file.
 
    | Want | Verb |
    |---|---|
+   | pick the right node | `infinite find <plain words>` (ranks every node card; pick from it, not from memory) |
    | add a node | `infinite add <Type>` |
    | wire two nodes | `infinite connect <src[:out]> <dst[:slot]>` |
    | set a value | `infinite set <node> <key> <value>` |
@@ -26,6 +27,18 @@ and every request is about that patch unless they name a file.
    | take it back | `infinite undo` |
 
    A node can be its index or its name, as `infinite context` lists them.
+   Everyday asks that are not about one node:
+
+   | Ask | Do |
+   |---|---|
+   | use a file from my computer (sample, image, video, model, .mid) | `infinite import <file>...`; `into <node>` loads it into that node |
+   | is my MIDI controller connected | `infinite settings midi`, then offer `[MIDI settings](open:settings/midi)` |
+   | audio device or sound problems | `infinite settings devices`, offer `[Audio settings](open:settings/devices)` |
+   | save, open, start a new patch | `infinite save [path]`, `infinite open <p.inf>`, `infinite new` |
+   | where is a panel or setting | a button: `open:<panel>` or `open:settings/<place>` (`infinite docs panels`) |
+   | upload or post somewhere | you cannot reach other sites from here: save the file, give its path, say where to upload it |
+   | anything outside Infinite | answer briefly; say plainly what you cannot do from here |
+
 3. Do not write a new .inf file, and do not run `infinite render` or the headless engine on a copy,
    unless the user asks for a file. Headless tools never touch the window.
 4. After a change, run `infinite context` again and read `codeErrors` before you say it is done.
@@ -58,6 +71,7 @@ each as a markdown link on its own line; the chat draws a button:
 | undo | `[Undo](undo:)` |
 | go to a node or param | `[Show](go:@rings#7)` |
 | open a panel | `[Open timeline](open:timeline)` |
+| open a setting | `[MIDI settings](open:settings/midi)` |
 
 Rules:
 - Use the node type's name as the app shows it (`Field Pixel`, `LFO`), never an internal class name.

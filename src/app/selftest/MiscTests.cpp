@@ -2537,6 +2537,32 @@ void RunRpcBatchTest()
       Check("create_node without x/y: four adds in one frame never overlap", apart);
    }
 
+   // Every setting is one link away, and a file from the computer goes in as a Finder drop would.
+   {
+      const bool was = gSettingsOpen;
+      gSettingsOpen = false;
+      e.clear();
+      Call("panel", { {"name", "settings/midi"} }, r, e);
+      Check("panel settings/midi opens Settings at MIDI Inputs", e.empty() && gSettingsOpen && r.value("place", "") == "midi");
+      e.clear();
+      Call("panel", { {"name", "settings/nope"} }, r, e);
+      Check("an unknown settings place errors and lists the places", e.find("midi") != std::string::npos);
+      gSettingsOpen = was;
+      e.clear();
+      Call("settings", { {"action", "midi"} }, r, e);
+      Check("settings midi reports running and inputs", e.empty() && r.contains("running") && r["inputs"].is_array());
+      e.clear();
+      Check("import a missing file errors", !Call("import", { {"paths", json::array({ "/nonexistent/x.wav" })} }, r, e) &&
+                                              e.find("no file") != std::string::npos);
+      const size_t before = gDroppedFiles.size();
+      e.clear();
+      const std::string here = std::filesystem::current_path().u8string();
+      Check("import queues an existing file as a canvas drop",
+            Call("import", { {"paths", json::array({ here })} }, r, e) && gDroppedFiles.size() == before + 1 && gDropAtCanvas);
+      gDroppedFiles.resize(before);
+      gDropAtCanvas = false;
+   }
+
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 

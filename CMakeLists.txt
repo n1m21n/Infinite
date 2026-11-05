@@ -538,6 +538,7 @@ set(COMMON_SOURCES
     src/core/chat/AgentAuth.cpp
     src/core/chat/ChatDiff.cpp
     src/core/chat/ChatFiles.cpp
+    src/core/chat/NodeFinder.cpp
     src/core/chat/ChatThread.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp

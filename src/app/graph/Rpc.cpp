@@ -561,6 +561,50 @@ namespace app
          ed::SetCurrentEditor(prevEditor);
          return true;
       }
+      else if (method == "import")
+      {
+         // Files from the user's computer, as if dropped on the canvas: on a node (`index`) they load into it, on a
+         // free spot they spawn the node their kind wants (a sample, an image, a video, a model, a .mid, a patch).
+         std::vector<std::string> paths;
+         for (const json& p : params.value("paths", json::array()))
+         {
+            std::string path = p.is_string() ? p.get<std::string>() : std::string();
+            std::error_code ec;
+            if (path.empty() || !std::filesystem::exists(AppPaths::FsPath(path), ec))
+            {
+               outError = "no file at '" + path + "'";
+               return false;
+            }
+            paths.push_back(path);
+         }
+         if (paths.empty())
+         {
+            outError = "import needs paths";
+            return false;
+         }
+         ImVec2 at;
+         if (params.contains("index"))
+         {
+            GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+            if (gn == nullptr)
+            {
+               outError = "unknown node index";
+               return false;
+            }
+            ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);
+            ed::SetCurrentEditor(prevEditor);
+         }
+         else
+            at = FindFreeSpawnPosition(gViewCenterCanvas);
+         gDropAtCanvas = true;
+         gDropCanvasPos = at;
+         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it
+         gDroppedFiles.insert(gDroppedFiles.end(), paths.begin(), paths.end());
+         outResult = { { "files", (int)paths.size() } };
+         return true;
+      }
       else if (method == "fit_view")
       {
          gRequestFitView = true;

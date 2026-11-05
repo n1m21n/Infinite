@@ -1572,6 +1572,8 @@ extern bool gShowDiagnosticsModal;
 ImTextureID BrandLogoTexture();
 
 extern std::vector<std::string> gDroppedFiles;
+extern bool gDropAtCanvas;     // the next drop lands at gDropCanvasPos (canvas space), not under gDropPos
+extern ImVec2 gDropCanvasPos;
 
 extern ImVec2 gDropPos;
 

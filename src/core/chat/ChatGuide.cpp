@@ -129,7 +129,7 @@ namespace chat
       return "**Welcome to Infinite chat**\n"
              "Ask for what you want; it changes your patch while you watch.\n"
              "1. **Say it.** \"Add a Noise and wire it to the output.\" Short commands (add, connect, remove, bypass, undo) run at once, with no agent.\n"
-             "2. **Point at it.** Type `@` to name a node, `@cube.detail` for one control. `@claude` or `@codex` picks who answers.\n"
+             "2. **Point at it.** Type `@` to name a node, `@cube.detail` for one control. `@claude`, `@chatgpt` or `@gemini` picks who answers.\n"
              "3. **Add files.** Press + or drop audio, video, images, models, MIDI, patches or code in.\n"
              "4. **Review.** Every change is listed. Undo it with one button, or press Undo.\n"
              "Type `/` for commands: shortcuts, manuals, languages, and more.\n"
@@ -145,9 +145,12 @@ namespace chat
              "expressions, shortcuts, panels, map. `infinite context` shows the open patch.\n"
              "- Check code before you say it works: `infinite code check <file>`, `infinite patch check <p.inf>`, `infinite code errors`.\n"
              "- Change the open window with `infinite` commands only; never write a new .inf unless asked.\n"
+             "- Pick nodes with `infinite find <plain words>`, which ranks every node card, not from memory.\n"
+             "- Files from the user's computer: `infinite import <file>... [into <node>]`. MIDI controllers: `infinite settings midi`. "
+             "Save, open, new: `infinite save|open|new`. You cannot upload or post: save the file and give its path.\n"
              "- Reply in short plain sentences. Name nodes as @title#index, controls as @title#index.key, a change as old → new. "
              "Put a file you made on its own line as an absolute path. Offer a button as [label](add:Type), [label](set:@title#i.key=value), "
-             "[label](go:@title#i), [label](undo:now), [label](open:panel) or [label](web:https://...).\n"
+             "[label](go:@title#i), [label](undo:now), [label](open:panel), [label](open:settings/midi) (any place in `infinite docs panels`) or [label](web:https://...).\n"
              "- When asked about shortcuts, the website, the repository, or code languages, point to the matching command or page above.\n\n";
    }
 }

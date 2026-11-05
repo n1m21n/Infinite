@@ -10,6 +10,8 @@
 #include "core/chat/PatchGrammar.h"
 #include "core/chat/ReplyLinks.h"
 #include "core/chat/ChatGuide.h"
+#include "core/chat/NodeFinder.h"
+#include "core/AgentDocs.h"
 
 #include <algorithm>
 #include <chrono>
@@ -319,6 +321,22 @@ namespace app
             for (const chat::Span& sp : g.spans)
                gem = gem || (sp.kind == chat::SpanKind::Agent && sp.key == "antigravity"), gpt = gpt || (sp.kind == chat::SpanKind::Agent && sp.key == "codex");
             check(gem && gpt, "mentions: @gemini and @chatgpt name Antigravity and Codex");
+         }
+
+         // Plain words find the node from every card, not just the few the examples name.
+         {
+            auto top = [](const std::string& ask, const std::string& want, size_t within)
+            {
+               const std::vector<chat::NodeHit> hits = chat::FindNodes(ask, AgentDocs::kNodeGuide, within);
+               return std::any_of(hits.begin(), hits.end(), [&](const chat::NodeHit& h) { return h.name == want; });
+            };
+            check(top("add some reverb", "Reverb", 3), "find: reverb");
+            check(top("blur the image", "Gaussian / Box Blur", 4), "find: blur the image");
+            check(top("drum pattern", "Drum Sequencer", 3), "find: drum pattern");
+            check(top("send notes out to my synth over midi", "MIDI Out", 5), "find: midi out");
+            check(chat::FindNodes("the and of", AgentDocs::kNodeGuide).empty(), "find: stop words alone match nothing");
+            const std::vector<chat::NodeHit> one = chat::FindNodes("reverb", AgentDocs::kNodeGuide, 1);
+            check(one.size() == 1 && !one[0].kind.empty() && !one[0].purpose.empty(), "find: a hit carries its kind and purpose");
          }
 
          // What a turn changed: params, added and removed nodes, cables, code as a block.

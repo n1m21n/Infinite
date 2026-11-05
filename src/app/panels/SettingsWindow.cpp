@@ -17,6 +17,52 @@ namespace app
    void DrawPluginManagerList();
    void DrawCliSetupSection();     // CliSetupSection.cpp
 
+   namespace
+   {
+      int sJumpTab = -1;
+      struct Place
+      {
+         const char* name;
+         int tab;
+         const char* section; // nullptr = the top of the page
+      };
+      // Every page and every section of Settings, by a short name: `open:settings/midi` in a chat reply,
+      // `infinite panel settings/midi` from the Terminal.
+      const Place kPlaces[] = {
+         { "appearance", 0, nullptr }, { "theme", 0, "Theme Preset & Palette" }, { "node-colors", 0, "Node Module Category Colors" },
+         { "cable-colors", 0, "Cable Category Colors" }, { "cards", 0, "Node Card Styling" }, { "display", 0, "Display" },
+         { "backdrop", 0, "Transparency Backdrop" }, { "canvas", 1, nullptr }, { "grid", 1, "Grid & Canvas" },
+         { "minimap", 1, "Minimap" }, { "cables", 1, "Cable Visibility" }, { "audio", 2, nullptr },
+         { "devices", 2, "Audio Devices & Format" }, { "midi", 2, "MIDI Inputs" }, { "general", 3, nullptr },
+         { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
+         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" },
+         { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
+         { "agents", 8, nullptr }, { "terminal", 8, nullptr },
+      };
+   }
+
+   std::vector<std::string> SettingsPlaces()
+   {
+      std::vector<std::string> out;
+      for (const Place& p : kPlaces)
+         out.push_back(p.name);
+      return out;
+   }
+
+   bool OpenSettingsAt(const std::string& place)
+   {
+      for (const Place& p : kPlaces)
+         if (place == p.name)
+         {
+            gSettingsOpen = true;
+            sJumpTab = p.tab;
+            FormParts::gScrollToSection = p.section ? T(p.section) : "";
+            ImGui::SetWindowFocus(L("Settings"));
+            return true;
+         }
+      return false;
+   }
+
    void DrawSettingsWindow(bool* open)
    {
       // No SetNextWindowPos meant this took ImGui's default cascade position
@@ -67,6 +113,14 @@ namespace app
          // "settingstab=N": any tab by index, so the manuals can shoot every page.
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
+         // "settingsplace=midi": a deep link, as a chat button opens it.
+         if (const char* sp = o ? strstr(o, "settingsplace=") : nullptr)
+            OpenSettingsAt(std::string(sp + 14, strcspn(sp + 14, ",")));
+      }
+      if (sJumpTab >= 0)
+      {
+         sTab = std::clamp(sJumpTab, 0, kTabCount - 1);
+         sJumpTab = -1;
       }
       // As wide as the longest section name in the current language, with the label inset on both sides.
       float navW = 0.0f;

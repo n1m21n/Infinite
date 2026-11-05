@@ -9,6 +9,9 @@
 
 namespace app
 {
+   bool OpenSettingsAt(const std::string& place);  // SettingsWindow.cpp
+   std::vector<std::string> SettingsPlaces();
+
    namespace
    {
       using json = nlohmann::json;
@@ -431,7 +434,22 @@ namespace app
       }
       if (method == "panel")
       {
-         const std::string name = params.value("name", std::string());
+         std::string name = params.value("name", std::string());
+         // "settings/midi": Settings, on the page and section that place names.
+         if (const size_t slash = name.find('/'); slash != std::string::npos && name.compare(0, slash, "settings") == 0)
+         {
+            const std::string place = name.substr(slash + 1);
+            if (!OpenSettingsAt(place))
+            {
+               std::string all;
+               for (const std::string& p : SettingsPlaces())
+                  all += (all.empty() ? "" : ", ") + p;
+               outError = "unknown settings place '" + place + "'; places: " + all;
+               return true;
+            }
+            outResult = { { "open", true }, { "place", place } };
+            return true;
+         }
          json all = json::object();
          for (const Panel& panel : Panels())
          {
@@ -745,6 +763,18 @@ namespace app
          {
             Extensions::InstallFileAsync(params.value("path", std::string()));
             outResult = json::object();
+            return true;
+         }
+         if (action == "midi")
+         {
+            // Connected MIDI controllers, and whether Infinite listens to each.
+            json inputs = json::array();
+            const bool running = Platform::MidiIsRunning();
+            if (running)
+               for (const auto& src : Platform::MidiListSources())
+                  inputs.push_back({ { "name", src.name },
+                                     { "on", std::find(gMidiOffSources.begin(), gMidiOffSources.end(), src.name) == gMidiOffSources.end() } });
+            outResult = { { "running", running }, { "inputs", inputs } };
             return true;
          }
          if (action == "devices")

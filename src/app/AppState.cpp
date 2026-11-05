@@ -1046,6 +1046,8 @@ bool gHeadlessNeedProbe = false;
    std::vector<std::string> gDroppedFiles;
 
    ImVec2 gDropPos(0.0f, 0.0f);
+   bool gDropAtCanvas = false;
+   ImVec2 gDropCanvasPos(0.0f, 0.0f);
 
 
    // Shared by the OS file-drop handler and the Media search panel's

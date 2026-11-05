@@ -2,6 +2,7 @@
 
 #include "AISkillContent.h"
 #include "AgentDocs.h"
+#include "core/chat/NodeFinder.h"
 #include "core/NodeFactory.h"
 #include "Patch.h"
 #include "PatchLayout.h"
@@ -1124,7 +1125,7 @@ Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disc
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
          select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
-Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
+Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
          session scene|launch|stop|add|insert|send|sceneset|slot ...
@@ -1134,10 +1135,10 @@ Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
 Code     code kinds|new|check|push|pull|watch|errors|docs|examples
 Generate patch recipes|new|check|layout|apply
-App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
+App      panel [name|settings/<place>] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|midi|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
          show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save|fade <ms>|quantize <n>|launch <n>
          view fit|params on|off|clearcards|metronome [on|off]  quit
-Learn    context  attention  guide  docs [topic [name]]
+Learn    context  attention  guide  docs [topic [name]]  find <words>
 Watch    watch
 Terminal term open|list|read|send|run
 
@@ -1196,6 +1197,9 @@ templates     starter patches
 help          node help
 shortcuts     shortcut list
 Open, close or dock one: `infinite panel <name> open|close [bottom|right|left|top]`.
+Settings opens at a page or section: `infinite panel settings/<place>`, a chat button `open:settings/<place>`.
+Places: appearance theme node-colors cable-colors cards display backdrop canvas grid minimap cables audio devices
+midi general autosave performance movement-log learning diagnostics updates field globals extensions plugins agents.
 )", stdout);
          if (gLive.Connect())
             Print(gLive.Call("panel"));
@@ -1580,7 +1584,7 @@ map, and the visual, sound and film crafts.
       }
       if (verb == "settings")
       {
-         if (!args.empty() && (args[0] == "apply" || args[0] == "devices" || args[0] == "updates" || args[0] == "reset" || args[0] == "logs"))
+         if (!args.empty() && (args[0] == "apply" || args[0] == "devices" || args[0] == "midi" || args[0] == "updates" || args[0] == "reset" || args[0] == "logs"))
             return call("settings", { { "action", args[0] } });
          if (!args.empty() && args[0] == "gpu")
             return call("settings", args.size() > 1 ? json{ { "action", "gpu" }, { "value", atoi(args[1].c_str()) } } : json{ { "action", "gpu" } });
@@ -1696,6 +1700,22 @@ map, and the visual, sound and film crafts.
          need(1, "open <file.inf>");
          return call("load_patch", { { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
       }
+      if (verb == "import")
+      {
+         // Files from this computer into the patch, as a Finder drop would: `into <node>` loads them into that node.
+         need(1, "import <file>... [into <node>]");
+         json paths = json::array();
+         json params = json::object();
+         for (size_t i = 0; i < args.size(); i++)
+         {
+            if (args[i] == "into" && i + 1 < args.size())
+               params["index"] = NodeRef(args[++i]);
+            else
+               paths.push_back(std::filesystem::absolute(AppPaths::FsPath(args[i])).u8string());
+         }
+         params["paths"] = paths;
+         return call("import", params);
+      }
       if (verb == "save")
          return call("save_patch", args.empty() ? json::object() : json{ { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
       if (verb == "validate")
@@ -1761,6 +1781,22 @@ map, and the visual, sound and film crafts.
          return Context();
       if (verb == "docs")
          return Docs(args);
+      if (verb == "find")
+      {
+         // Nodes for a plain-words ask, from every node card: pick from these, not from memory.
+         std::string ask;
+         for (const std::string& w : args)
+            ask += (ask.empty() ? "" : " ") + w;
+         if (ask.empty())
+            Fail("usage: infinite find <what you want, in plain words>", kExitUsage);
+         const std::vector<chat::NodeHit> hits = chat::FindNodes(ask, AgentDocs::kNodeGuide);
+         if (hits.empty())
+            Fail("no node card matches '" + ask + "'; try other words, or `infinite docs nodes`");
+         for (const chat::NodeHit& h : hits)
+            printf("%-22s %s. %s\n", h.name.c_str(), h.kind.c_str(), h.purpose.c_str());
+         printf("Card: `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
+         return 0;
+      }
       if (verb == "attention")
          return call("attention");
       if (verb == "guide")
