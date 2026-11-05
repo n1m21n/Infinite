@@ -33,6 +33,7 @@
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 #include "stb_image.h"
+#include "stb_image_write.h"
 #include "lunasvg.h"
 #include "app/ui/design/AgentLogos.gen.h"
 
@@ -80,6 +81,8 @@ namespace app
       {
          GLuint id = 0;
          int w = 0, h = 0;
+         std::vector<GLuint> frames;  // an animated gif: every frame, and when each one ends
+         std::vector<int> endsMs;
       };
 
       // One agent's part of a turn.
@@ -1261,6 +1264,8 @@ namespace app
          prompt = chat::WithFiles(prompt, files);
          const std::vector<std::string> dirs = chat::FileDirs(files);
          sBefore = Snap();
+         // The user's message is the last entry: each agent also gets what it missed of the chat before it.
+         const int upto = (int)sThread.entries.size() - 1;
          for (const std::string& id : agents)
          {
             if (!Ready(id))
@@ -1270,7 +1275,7 @@ namespace app
                Push(Make(Entry::Kind::Error, note, id));
                continue;
             }
-            StartRun(id, prompt, dirs);
+            StartRun(id, chat::MissedHistory(sThread, id, upto, [](const std::string& a) { return std::string(AgentName(a)); }) + prompt, dirs);
          }
          SaveNow();
       }
@@ -2193,13 +2198,37 @@ namespace app
          // stb is built with STBI_NO_STDIO here (EnvironmentNode.cpp): decode from memory.
          std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
          const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-         if (unsigned char* px = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &t.w, &t.h, &ch, 4))
-         {
-            glGenTextures(1, &t.id);
-            glBindTexture(GL_TEXTURE_2D, t.id);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, t.w, t.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+         const auto upload = [](const unsigned char* px, int w, int h) {
+            GLuint id = 0;
+            glGenTextures(1, &id);
+            glBindTexture(GL_TEXTURE_2D, id);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            return id;
+         };
+         // A gif plays: every frame on its own texture, at most 120 (a long gif keeps its first part).
+         int* delays = nullptr;
+         int count = 0;
+         const bool gif = bytes.size() > 6 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F';
+         if (unsigned char* px = gif ? stbi_load_gif_from_memory(bytes.data(), (int)bytes.size(), &delays, &t.w, &t.h, &count, &ch, 4) : nullptr)
+         {
+            int end = 0;
+            for (int i = 0; i < std::min(count, 120); i++)
+            {
+               t.frames.push_back(upload(px + (size_t)t.w * t.h * 4 * i, t.w, t.h));
+               end += delays != nullptr && delays[i] > 10 ? delays[i] : 100;  // browsers play a 0-10 ms delay at 100 ms
+               t.endsMs.push_back(end);
+            }
+            t.id = t.frames.empty() ? 0 : t.frames[0];
+            if (t.frames.size() < 2)
+               t.frames.clear(), t.endsMs.clear();
+            stbi_image_free(px);
+            std::free(delays);  // stb allocates with malloc
+         }
+         else if (unsigned char* px = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &t.w, &t.h, &ch, 4))
+         {
+            t.id = upload(px, t.w, t.h);
             stbi_image_free(px);
          }
          sTextures[path] = t;
@@ -2411,6 +2440,18 @@ namespace app
             Platform::RevealInFileManager(path);
       }
 
+      // The texture to show now: a gif's current frame, else the picture.
+      GLuint FrameOf(const Texture& t)
+      {
+         if (t.frames.empty())
+            return t.id;
+         const int ms = (int)std::fmod(ImGui::GetTime() * 1000.0, (double)t.endsMs.back());
+         const size_t i = std::upper_bound(t.endsMs.begin(), t.endsMs.end(), ms) - t.endsMs.begin();
+         return t.frames[std::min(i, t.frames.size() - 1)];
+      }
+
+      std::string sViewing;  // the picture open full size, or empty
+
       void DrawImage(const std::string& path, float width)
       {
          Texture* t = TextureFor(path);
@@ -2423,10 +2464,176 @@ namespace app
          const float h = w * (float)t->h / (float)std::max(1, t->w);
          const float s = h > 320.0f ? 320.0f / h : 1.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ImGui::Image((ImTextureID)(intptr_t)t->id, ImVec2(w * s, h * s));
-         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(0.12f), tok::radius_field);
-         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", path.c_str());
+         ImGui::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
+         const bool hot = ImGui::IsItemHovered();
+         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (ImGui::IsItemClicked())
+            sViewing = path;
+      }
+
+      // A picture opened full size over the app: fits the window, a click or Esc closes it.
+      void DrawImageViewer()
+      {
+         if (sViewing.empty())
+            return;
+         Texture* t = TextureFor(sViewing);
+         if (t == nullptr || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         {
+            sViewing.clear();
+            return;
+         }
+         const ImGuiViewport* vp = ImGui::GetMainViewport();
+         ImGui::SetNextWindowPos(vp->Pos);
+         ImGui::SetNextWindowSize(vp->Size);
+         ImGui::SetNextWindowFocus();
+         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav;
+         if (ImGui::Begin("##chatimageview", nullptr, flags))
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), WithAlpha(tok::U32(tok::terminal_bg, Light()), 0.92f));
+            const float fit = std::min({ 1.0f, vp->Size.x * 0.88f / (float)t->w, vp->Size.y * 0.84f / (float)t->h });
+            const ImVec2 sz(std::floor(t->w * fit), std::floor(t->h * fit));
+            const ImVec2 p0(std::floor(vp->Pos.x + (vp->Size.x - sz.x) * 0.5f), std::floor(vp->Pos.y + (vp->Size.y - sz.y) * 0.5f));
+            const ImVec2 p1(p0.x + sz.x, p0.y + sz.y);
+            dl->AddImageRounded((ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_field);
+            dl->AddRect(p0, p1, TextTint(0.12f), tok::radius_field);
+            const std::string name = std::filesystem::path(sViewing).filename().string();
+            char size[32];
+            std::snprintf(size, sizeof size, "%d × %d", t->w, t->h);
+            const float y = p1.y + tok::space_2;
+            dl->AddText(ImVec2(p0.x, y), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
+            dl->AddText(ImVec2(p1.x - ImGui::CalcTextSize(size).x, y), Dim(), size);
+            ImGui::SetCursorScreenPos(vp->Pos);
+            if (ImGui::InvisibleButton("##imageviewclose", vp->Size))
+               sViewing.clear();
+         }
+         ImGui::End();
+      }
+
+      // A movie an agent made: its first picture, its length, and it plays in place (no sound) on a click.
+      struct VideoLook
+      {
+         bool tried = false;
+         GLuint tex = 0;
+         int w = 0, h = 0;
+         double seconds = 0.0;
+         Platform::VideoHandle* handle = nullptr;  // open while it plays
+         double started = 0.0;
+         std::vector<unsigned char> px;
+      };
+      std::unordered_map<std::string, VideoLook> sVideos;
+
+      void UploadVideoFrame(VideoLook& v)
+      {
+         if (v.tex == 0)
+         {
+            glGenTextures(1, &v.tex);
+            glBindTexture(GL_TEXTURE_2D, v.tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, v.w, v.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, v.px.data());
+            return;
+         }
+         glBindTexture(GL_TEXTURE_2D, v.tex);
+         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, v.w, v.h, GL_RGBA, GL_UNSIGNED_BYTE, v.px.data());
+      }
+
+      VideoLook& VideoFor(const std::string& path)
+      {
+         VideoLook& v = sVideos[path];
+         if (v.tried)
+            return v;
+         v.tried = true;
+         std::string error;
+         Platform::VideoHandle* h = Platform::VideoOpen(path, error);
+         if (h == nullptr)
+            return v;
+         v.w = Platform::VideoWidth(h), v.h = Platform::VideoHeight(h);
+         v.seconds = Platform::VideoDuration(h);
+         // A frame a little in: the very first is often black.
+         if (v.w > 0 && v.h > 0 && Platform::VideoFrameAtExact(h, std::min(1.0, v.seconds * 0.2), v.px) && v.px.size() >= (size_t)v.w * v.h * 4)
+            UploadVideoFrame(v);
+         Platform::VideoClose(h);
+         return v;
+      }
+
+      void StopVideo(VideoLook& v)
+      {
+         if (v.handle != nullptr)
+            Platform::VideoClose(v.handle);
+         v.handle = nullptr;
+      }
+
+      void DrawVideo(const std::string& rawPath, float width)
+      {
+         const std::string path = ExpandHome(rawPath);
+         const bool exists = std::filesystem::exists(path);
+         VideoLook* v = exists ? &VideoFor(path) : nullptr;
+         if (v == nullptr || v->tex == 0)
+         {
+            DrawFile(rawPath, width);
+            return;
+         }
+         if (v->handle != nullptr)
+         {
+            const double t = v->seconds > 0.0 ? std::fmod(ImGui::GetTime() - v->started, v->seconds) : 0.0;
+            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)
+               UploadVideoFrame(*v);
+         }
+         const float w = std::min(width, (float)v->w);
+         const float h0 = w * (float)v->h / (float)std::max(1, v->w);
+         const float s = h0 > 320.0f ? 320.0f / h0 : 1.0f;
+         const ImVec2 sz(std::floor(w * s), std::floor(h0 * s));
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         const ImVec2 end(at.x + sz.x, at.y + sz.y);
+         ImGui::PushID(rawPath.c_str());
+         const bool clicked = ImGui::InvisibleButton("##video", sz);
+         ImGui::PopID();
+         const bool hot = ImGui::IsItemHovered();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         // Frames come row-flipped for GL: draw them with v running bottom to top.
+         dl->AddImageRounded((ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_field);
+         dl->AddRect(at, end, TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         const bool playing = v->handle != nullptr;
+         const ImVec2 c(std::floor((at.x + end.x) * 0.5f), std::floor((at.y + end.y) * 0.5f));
+         const ImU32 shade = WithAlpha(IM_COL32_BLACK, 0.47f);
+         if (!playing || hot)
+         {
+            dl->AddCircleFilled(c, 22.0f, hot ? WithAlpha(IM_COL32_BLACK, 0.63f) : shade, 32);
+            if (playing)
+               glyph::DrawPlayerPause(dl, c, 8.0f, IM_COL32_WHITE);
+            else
+               glyph::DrawPlayerPlay(dl, ImVec2(c.x + 2.0f, c.y), 8.0f, IM_COL32_WHITE, true);
+         }
+         // Length (or where it is, while it plays) in a pill at the bottom right.
+         const int secs = (int)std::lround(playing ? std::fmod(ImGui::GetTime() - v->started, std::max(0.001, v->seconds)) : v->seconds);
+         char dur[16];
+         std::snprintf(dur, sizeof dur, "%d:%02d", secs / 60, secs % 60);
+         const ImVec2 ds = ImGui::CalcTextSize(dur);
+         const ImVec2 d1(end.x - tok::space_2, end.y - tok::space_2), d0(d1.x - ds.x - 2.0f * tok::space_1 - 2.0f, d1.y - ds.y - 4.0f);
+         dl->AddRectFilled(d0, d1, shade, (d1.y - d0.y) * 0.5f);
+         dl->AddText(ImVec2(d0.x + tok::space_1 + 1.0f, d0.y + 2.0f), IM_COL32_WHITE, dur);
+         if (playing && v->seconds > 0.0)
+         {
+            const float u = (float)(std::fmod(ImGui::GetTime() - v->started, v->seconds) / v->seconds);
+            dl->AddRectFilled(ImVec2(at.x + 1.0f, end.y - 3.0f), ImVec2(at.x + 1.0f + (sz.x - 2.0f) * u, end.y - 1.0f), ImGui::GetColorU32(AccentEmphasisSelected()));
+         }
+         if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (clicked)
+         {
+            if (playing)
+               StopVideo(*v);
+            else
+            {
+               std::string error;
+               v->handle = Platform::VideoOpen(path, error);
+               v->started = ImGui::GetTime();
+            }
+         }
       }
 
       // Code a turn wrote (a code param, a long block in a reply) folds to a chip: the code glyph and its line
@@ -2523,6 +2730,11 @@ namespace app
                   break;
                case chat::Block::Kind::Image:
                   DrawImage(b.text, width);
+                  DrawReveal(b.text);
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  break;
+               case chat::Block::Kind::Video:
+                  DrawVideo(b.text, width);
                   DrawReveal(b.text);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
@@ -3624,6 +3836,46 @@ namespace app
          ImGui::PopStyleVar(3);
       }
 
+      // Cmd/Ctrl+V with copied files or a copied picture attaches them; text on the clipboard still pastes as text.
+      bool PasteAttachments()
+      {
+         bool took = false;
+         for (const std::string& f : Platform::ClipboardFiles())
+            if (!chat::FileKind(f).empty() && std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
+               sAttach.push_back(f), took = true;
+         if (took)
+            return true;
+         const char* text = ImGui::GetClipboardText();
+         if (text != nullptr && text[0] != '\0')
+            return false;
+         std::vector<unsigned char> png, rgba;
+         int w = 0, h = 0;
+         if (!Platform::ClipboardImage(png, rgba, w, h))
+            return false;
+         if (png.empty())
+            stbi_write_png_to_func([](void* ctx, void* data, int size) {
+               auto* out = (std::vector<unsigned char>*)ctx;
+               out->insert(out->end(), (unsigned char*)data, (unsigned char*)data + size);
+            }, &png, w, h, 4, rgba.data(), w * 4);
+         if (png.empty())
+            return false;
+         const std::string dir = ChatsDir() + "/pasted";
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(dir), ec);
+         char stamp[32];
+         const std::time_t now = std::time(nullptr);
+         std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", std::localtime(&now));
+         std::string path = dir + "/paste-" + stamp + ".png";
+         for (int n = 2; std::filesystem::exists(AppPaths::FsPath(path)); n++)
+            path = dir + "/paste-" + stamp + "-" + std::to_string(n) + ".png";
+         std::ofstream out(AppPaths::FsPath(path), std::ios::binary);
+         out.write((const char*)png.data(), (std::streamsize)png.size());
+         if (!out)
+            return false;
+         sAttach.push_back(path);
+         return true;
+      }
+
       void TakeDrops()
       {
          // Files dropped on the panel (StageLayout hands them to the Terminal) attach when the chat shows.
@@ -4000,10 +4252,16 @@ namespace app
             sRefocus = false;
          }
          const bool enterPicks = EnterPicks();
+         // A paste that attaches takes the key, so the field does not also paste a file's name.
+         static bool sInputWasActive = false;
+         const ImGuiIO& io = ImGui::GetIO();
+         if (sInputWasActive && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
+            ImGui::SetKeyOwner(ImGuiKey_V, ImGui::GetID("##chatpaste"), ImGuiInputFlags_LockThisFrame);
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;
          const bool enter = ImGui::InputTextMultiline("##chatinput", &sInput, ImVec2(fieldW, textH), flags, InputCallback);
          const bool active = ImGui::IsItemActive();
+         sInputWasActive = active;
          ImGui::PopStyleColor();
          ImGui::PopStyleVar(2);
          if (enter)
@@ -4338,6 +4596,8 @@ namespace app
          }
          if (const char* in = std::getenv("INFINITE_CHATSHOT_INPUT"))
             sInput = in;
+         if (const char* view = std::getenv("INFINITE_CHATSHOT_VIEW"))
+            sViewing = view;
       }
       // Opening the panel checks the agents again (a sign-in may have happened outside).
       const int frame = ImGui::GetFrameCount();
@@ -4422,6 +4682,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, ImGui::GetCursorScreenPos().y));
       }
       DrawComposer(composerW);
+      DrawImageViewer();
    }
 
    bool ChatBusy() { return !sRuns.empty(); }
@@ -4504,6 +4765,8 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       for (auto& [id, s] : sAgents)
          if (s.setup != nullptr)
             s.setup->Stop();
+      for (auto& [path, v] : sVideos)
+         StopVideo(v);
       SaveNow();
    }
 }

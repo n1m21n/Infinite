@@ -559,6 +559,76 @@ namespace Platform
       return out;
    }
 
+   namespace
+   {
+      // Everything a clipboard tool prints, or empty when it is missing or fails.
+      std::vector<unsigned char> ReadClipboardTool(const char* wayland, const char* x11)
+      {
+         ScopedHostEnvironment hostEnv;
+         const bool onWayland = std::getenv("WAYLAND_DISPLAY") != nullptr && CheckExecutableOnPath("wl-paste");
+         const char* cmd = onWayland ? wayland : (CheckExecutableOnPath("xclip") ? x11 : nullptr);
+         std::vector<unsigned char> out;
+         if (cmd == nullptr)
+            return out;
+         if (FILE* f = popen(cmd, "r"))
+         {
+            unsigned char buf[65536];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof buf, f)) > 0)
+               out.insert(out.end(), buf, buf + n);
+            if (pclose(f) != 0)
+               out.clear();
+         }
+         return out;
+      }
+   }
+
+   std::vector<std::string> ClipboardFiles()
+   {
+      std::vector<std::string> out;
+      const std::vector<unsigned char> raw = ReadClipboardTool("wl-paste --no-newline --type text/uri-list 2>/dev/null",
+                                                               "xclip -selection clipboard -t text/uri-list -o 2>/dev/null");
+      std::string line;
+      auto take = [&]() {
+         while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+            line.pop_back();
+         if (line.rfind("file://", 0) == 0)
+         {
+            std::string path;
+            for (size_t i = 7; i < line.size(); i++)
+            {
+               if (line[i] == '%' && i + 2 < line.size() && std::isxdigit((unsigned char)line[i + 1]) && std::isxdigit((unsigned char)line[i + 2]))
+               {
+                  path += (char)std::stoi(line.substr(i + 1, 2), nullptr, 16);
+                  i += 2;
+               }
+               else
+                  path += line[i];
+            }
+            if (!path.empty() && path[0] == '/')
+               out.push_back(path);
+         }
+         line.clear();
+      };
+      for (unsigned char c : raw)
+         if (c == '\n')
+            take();
+         else
+            line += (char)c;
+      take();
+      return out;
+   }
+
+   bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH)
+   {
+      outRgba.clear(), outW = outH = 0;
+      outPng = ReadClipboardTool("wl-paste --type image/png 2>/dev/null", "xclip -selection clipboard -t image/png -o 2>/dev/null");
+      static const unsigned char kSig[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+      if (outPng.size() < 8 || !std::equal(kSig, kSig + 8, outPng.begin()))
+         outPng.clear();
+      return !outPng.empty();
+   }
+
    void RevealInFileManager(const std::string& path)
    {
       if (path.empty())

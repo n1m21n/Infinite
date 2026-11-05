@@ -422,6 +422,22 @@ namespace chat
       return false;
    }
 
+   bool IsVideoPath(const std::string& path)
+   {
+      const std::string p = Trim(path);
+      const bool absolute = !p.empty() && (p[0] == '/' || p[0] == '~' || (p.size() > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')));
+      if (!absolute)  // on its own line an absolute path may hold spaces ("Application Support")
+         return false;
+      const std::string l = Lower(p);
+      for (const char* ext : { ".mp4", ".mov", ".webm", ".mkv", ".m4v" })
+      {
+         const std::string e = ext;
+         if (l.size() > e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0)
+            return true;
+      }
+      return false;
+   }
+
    bool IsFilePath(const std::string& path)
    {
       const std::string p = Trim(path);
@@ -496,6 +512,14 @@ namespace chat
          {
             Block b;
             b.kind = Block::Kind::Audio;
+            b.text = bare;
+            blocks.push_back(b);
+            continue;
+         }
+         if (IsVideoPath(bare))
+         {
+            Block b;
+            b.kind = Block::Kind::Video;
             b.text = bare;
             blocks.push_back(b);
             continue;

@@ -60,6 +60,11 @@ def threads(rec):
              "text": "Raised the **cutoff** on @Wavetable#2 and halved the note rate on @Random Note Generator#1.\n\n"
                      "- `cutoff` 0.35 → 0.8\n- `rateBeats` 0.5 → 1\n\nChanged: @Wavetable#2.cutoff, @Random Note Generator#1.rateBeats"},
         ],
+        "media": [
+            {"kind": "user", "text": "render a short clip and a loop gif"},
+            {"kind": "agent", "agent": "claude", "tokens": [8100, 6000],
+             "text": "Rendered both.\n\n" + rec + "/render_take_01.mp4\n\n" + rec + "/loop.gif"},
+        ],
         "errors": [
             {"kind": "user", "text": "export a video of this"},
             {"kind": "error", "agent": "codex", "text": "Codex is not signed in. Sign in from Settings > Agents, then send again."},
@@ -78,7 +83,23 @@ SCENES = {
     "queue": ("greeting", "hi|and then make the drums louder with a much longer queued line that has to cut off", "Add to the queue", "", 0),
     "settings-agents": ("greeting", "", "", "settingswin,settingsplace=agents", 0),
     "float": ("audio", "", "", "chatfloat", 0),
+    "media": ("media", "", "", "", 0),
+    "viewer": ("media", "", "", "", 0),
 }
+# Scenes that open something a click would (the full-size picture view).
+VIEW = {"viewer": "loop.gif"}
+
+
+def media(rec):
+    """A short test clip and an animated gif, made with ffmpeg when it is installed."""
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        return
+    q = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([ff, "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=3", "-pix_fmt", "yuv420p",
+                    os.path.join(rec, "render_take_01.mp4")], **q)
+    subprocess.run([ff, "-y", "-f", "lavfi", "-i", "testsrc=size=240x160:rate=10:duration=1",
+                    os.path.join(rec, "loop.gif")], **q)
 
 
 def shoot(app, sid, theme, out_dir, timeout):
@@ -91,6 +112,8 @@ def shoot(app, sid, theme, out_dir, timeout):
         for n in ("recording_generated-breakbeat-synths_20261105_104114_906_1.wav", "b.wav"):
             wav(os.path.join(rec, n))
         open(os.path.join(rec, "c.mid"), "wb").close()
+        if thread == "media":
+            media(rec)
         shutil.copy(os.path.join(ROOT, "assets", "brand", "icon.png") if os.path.exists(os.path.join(ROOT, "assets", "brand", "icon.png"))
                     else PATCH, os.path.join(rec, "a-very-long-reference-file-name-for-wrapping.png"))
         json.dump({"agent": "claude", "face": "chat", "introduced": True, "welcomed": True, "folderAccess": False},
@@ -108,6 +131,8 @@ def shoot(app, sid, theme, out_dir, timeout):
             env["INFINITE_CHATSHOT_QUEUE"] = queue
         if typed:
             env["INFINITE_CHATSHOT_INPUT"] = typed
+        if sid in VIEW:
+            env["INFINITE_CHATSHOT_VIEW"] = os.path.join(rec, VIEW[sid])
         try:
             subprocess.run([os.path.join(app, "Contents", "MacOS", "Infinite"), PATCH], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)

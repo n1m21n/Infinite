@@ -8366,6 +8366,43 @@ namespace Platform
       }
    }
 
+   std::vector<std::string> ClipboardFiles()
+   {
+      std::vector<std::string> out;
+      @autoreleasepool
+      {
+         NSArray* urls = [[NSPasteboard generalPasteboard] readObjectsForClasses:@[ [NSURL class] ]
+                                                                         options:@{ NSPasteboardURLReadingFileURLsOnlyKey : @YES }];
+         for (NSURL* url in urls)
+            if (const char* p = url.fileSystemRepresentation)
+               out.emplace_back(p);
+      }
+      return out;
+   }
+
+   bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH)
+   {
+      outPng.clear(), outRgba.clear(), outW = outH = 0;
+      @autoreleasepool
+      {
+         NSPasteboard* pb = [NSPasteboard generalPasteboard];
+         if (NSData* png = [pb dataForType:NSPasteboardTypePNG])
+         {
+            outPng.assign((const unsigned char*)png.bytes, (const unsigned char*)png.bytes + png.length);
+            return !outPng.empty();
+         }
+         NSData* tiff = [pb dataForType:NSPasteboardTypeTIFF];
+         if (tiff == nil)
+            return false;
+         NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:tiff];
+         NSData* png = rep != nil ? [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}] : nil;
+         if (png == nil)
+            return false;
+         outPng.assign((const unsigned char*)png.bytes, (const unsigned char*)png.bytes + png.length);
+         return !outPng.empty();
+      }
+   }
+
    void RevealInFileManager(const std::string& path)
    {
       if (path.empty())

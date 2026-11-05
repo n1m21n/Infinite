@@ -832,10 +832,34 @@ namespace app
          check(say, "the welcome offers things to say");
          check(chat::Briefing().find("infinite docs") != std::string::npos, "the briefing points agents at the manuals");
          check(chat::IsFilePath("/tmp/out.mp4") && !chat::IsFilePath("/tmp/a file.mp4") && !chat::IsFilePath("out.mp4"), "files are recognised");
-         bool file = false;
-         for (const chat::Block& b : chat::ParseReply("Saved\n/tmp/out.mp4\n", cat))
-            file = file || b.kind == chat::Block::Kind::File;
-         check(file, "a reply can hold a file");
+         bool file = false, video = false;
+         for (const chat::Block& b : chat::ParseReply("Saved\n/tmp/out.mp4\n/tmp/notes.txt\n", cat))
+            file = file || b.kind == chat::Block::Kind::File, video = video || b.kind == chat::Block::Kind::Video;
+         check(file && video, "a reply can hold a file and a video");
+         check(chat::IsVideoPath("~/clip.MOV") && !chat::IsVideoPath("/tmp/a.png") && !chat::IsVideoPath("clip.mp4"), "videos are recognised");
+         {
+            // A second agent tagged midway gets the chat so far; the first one gets only what it missed.
+            chat::Thread t;
+            const auto add = [&](chat::Entry::Kind k, const std::string& agent, const std::string& text) {
+               chat::Entry e;
+               e.kind = k, e.agent = agent, e.text = text;
+               t.entries.push_back(e);
+            };
+            add(chat::Entry::Kind::User, "", "make a pad");
+            add(chat::Entry::Kind::Steps, "claude", "");
+            add(chat::Entry::Kind::Agent, "claude", "Added a Wavetable pad.");
+            add(chat::Entry::Kind::User, "", "@gemini make it darker");
+            const auto name = [](const std::string& a) { return a == "claude" ? std::string("Claude") : std::string("Gemini"); };
+            const std::string g = chat::MissedHistory(t, "gemini", 3, name);
+            check(g.find("User: make a pad") != std::string::npos && g.find("Claude: Added a Wavetable pad.") != std::string::npos &&
+                     g.find("darker") == std::string::npos,
+                  "a newly tagged agent gets the chat so far");
+            check(chat::MissedHistory(t, "claude", 3, name).empty(), "an agent that saw everything gets nothing again");
+            add(chat::Entry::Kind::Agent, "gemini", "Lowered the cutoff.");
+            add(chat::Entry::Kind::User, "", "louder");
+            const std::string c = chat::MissedHistory(t, "claude", 5, name);
+            check(c.find("Gemini: Lowered the cutoff.") != std::string::npos && c.find("make a pad") == std::string::npos, "an agent catches up on what others said since");
+         }
       }
       std::printf("CHATTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;
