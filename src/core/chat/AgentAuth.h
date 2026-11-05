@@ -37,7 +37,9 @@ namespace chat
    // What a failed turn or setup means for the user.
    struct Friendly
    {
-      enum class Kind { Other, SignIn, Limit, Offline, Missing, Terms };
+      // Plan: the account needs a paid plan. Disk, Policy (Windows blocks scripts), Password (a step needs sudo)
+      // and NoBrowser come from a setup or sign-in; their text says the one next thing.
+      enum class Kind { Other, SignIn, Limit, Offline, Missing, Terms, Plan, Disk, Policy, Password, NoBrowser };
       Kind kind = Kind::Other;
       std::string text;  // one short sentence, no jargon
    };

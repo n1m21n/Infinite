@@ -2,10 +2,12 @@
 #include "core/CliSetup.h"
 
 #include "core/term/PtyHost.h"
+#include "platform/AppPaths.h"
 
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 #include <thread>
 
@@ -93,6 +95,26 @@ namespace chat
             }
          }
 #endif
+         // Infinite's own Node folder (setup puts Node there when the computer had none): every agent starts the
+         // Infinite MCP server with npx, so it must be on the PATH whichever agent runs.
+         {
+            const bool win = CliSetup::CurrentOs() == CliSetup::Os::kWindows;
+            const char* home = std::getenv(win ? "USERPROFILE" : "HOME");
+            const char* local = std::getenv("LOCALAPPDATA");
+            const std::string own = CliSetup::NodeDir(CliSetup::CurrentOs(), home != nullptr ? home : "", local != nullptr ? local : "");
+            std::error_code ec;
+            if (!own.empty() && std::filesystem::is_directory(AppPaths::FsPath(own), ec))
+            {
+               const char sep = win ? ';' : ':';
+               const char* path = std::getenv("PATH");
+               bool set = false;
+               for (auto& kv : spawn.env)
+                  if (kv.first == "PATH")
+                     kv.second = own + sep + kv.second, set = true;
+               if (!set)
+                  spawn.env.push_back({ "PATH", own + sep + (path != nullptr ? path : "") });
+            }
+         }
          spawn.env.push_back({ "TERM", "dumb" });
          spawn.env.push_back({ "NO_COLOR", "1" });
          spawn.cols = 400;  // long lines are not wrapped by the PTY, but some CLIs size their output to it

@@ -23,6 +23,7 @@
 #include "audio/AudioEngine.h"
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
+#include "core/chat/Onboarding.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
 #include "core/chat/ChatGuide.h"
@@ -149,6 +150,11 @@ namespace app
          double verifyAt = -1.0;
          std::shared_ptr<chat::AgentRun> logout; // Sign out, running
          bool signInAfterLogout = false;         // Sign in again that clears the old login first (Gemini)
+         std::string setupLog;                   // the last setup's output, behind Details
+         bool signUp = false;                    // "I don't have one": the sign-up page is open, the sign-in waits longer
+         bool signInOnFocus = false;             // start the sign-in when the person comes back from the browser
+         bool codeSent = false;                  // a pasted code is being checked
+         bool codeRejected = false;              // the sign-in asked for a code again after one was sent
       };
 
       // The one action each agent offers, the same in Settings, the agent picker, the onboarding card and an
@@ -623,6 +629,7 @@ namespace app
                                      o.argv = os == Os::kWindows ? std::vector<std::string>{ "powershell", "-NoProfile", "-Command", line }
                                                                  : std::vector<std::string>{ "sh", "-c", line };
                                      TerminalCommandEnv(o.env, o.cwd);
+                                     o.env.push_back({ "INFINITE_SETUP_QUIET", "1" });  // no one can answer a password prompt here
                                      s.setup = chat::AgentRun::Start(o);
                                   },
                                   &err);
@@ -651,6 +658,9 @@ namespace app
          s.loginUrl.clear();
          s.loginLog.clear();
          s.needsCode = false;
+         s.codeSent = false;
+         s.codeRejected = false;
+         s.signInOnFocus = false;
          s.codeInput.clear();
          s.codeBytes = 0;
          s.loginStopped = false;
@@ -667,7 +677,7 @@ namespace app
             return;
          const float btnW = ImGui::CalcTextSize(T("Submit")).x + 2.0f * tok::space_2;
          ImGui::SetNextItemWidth(std::max(80.0f, width - btnW - tok::space_1));
-         const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code from the browser"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
+         const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
          FormParts::Inline(0.0f, tok::space_1);
          const bool press = ChipButton::Draw(T("Submit"), true, 26.0f);
          if (!(enter || press))
@@ -685,6 +695,8 @@ namespace app
          s.login->Write(code + "\r");
          s.codeInput.clear();
          s.needsCode = false;
+         s.codeSent = true;
+         s.codeRejected = false;
       }
 
       void PollLogins()
@@ -703,9 +715,11 @@ namespace app
             const unsigned long long fresh = s.login->Bytes() - s.codeBytes;
             const std::string recent = s.codeBytes == 0 ? raw : raw.substr(raw.size() - (size_t)std::min<unsigned long long>(raw.size(), fresh));
             s.needsCode = chat::AsksForCode(recent);
+            if (s.needsCode && s.codeSent)
+               s.codeSent = false, s.codeRejected = true;  // asked again: the code did not work
             if (!s.login->Done())
             {
-               if (!s.loginStopped && ImGui::GetTime() - s.loginAt > chat::kSignInSeconds)
+               if (!s.loginStopped && ImGui::GetTime() - s.loginAt > (s.signUp ? chat::kSignUpSeconds : chat::kSignInSeconds))
                {
                   s.loginStopped = s.loginTimedOut = true;
                   s.login->Stop();
@@ -721,9 +735,12 @@ namespace app
             s.login = nullptr;
             s.signingIn = false;
             s.needsCode = false;
+            s.codeSent = false;
             if (!error)
             {
                s.authBroken = false;
+               s.signUp = false;
+               s.codeRejected = false;
                s.auth = chat::Auth::In;  // the CLI said it signed in; its status check confirms next
                s.everIn = true;
                s.signedOutHere = false;
@@ -933,8 +950,131 @@ namespace app
          }
       }
 
+      // ── First run, step 0: what this computer has (docs/CHAT.md, First run) ──
+      struct Onboard
+      {
+         std::shared_ptr<chat::AgentRun> probe;  // the network check
+         double probeAt = 0.0;
+         bool checked = false;
+         chat::MachineFacts facts;
+         std::string pick = "claude";            // the highlighted row
+         std::string chosen;                     // the agent being set up; "" = still choosing
+         bool details = false;                   // the raw output is open
+         bool wasAway = false;                   // the app had lost focus
+         double signUpAt = 0.0;                  // "I don't have one" pressed
+         bool leftSinceSignUp = false;           // the browser came to the front after it
+      };
+      Onboard sOnboard;
+
+      bool AppAway() { return ImGui::GetIO().AppFocusLost; }
+
+      std::string EnvOr(const char* name)
+      {
+         const char* v = std::getenv(name);
+         return v != nullptr ? v : "";
+      }
+
+      void StartMachineCheck()
+      {
+         Onboard& o = sOnboard;
+         if (o.probe != nullptr)
+            return;
+         using CliSetup::Os;
+         const Os os = CliSetup::CurrentOs();
+         o.checked = false;
+         o.facts = chat::MachineFacts();
+         o.facts.linux = os == Os::kLinux;
+         o.facts.windows = os == Os::kWindows;
+         const std::string home = EnvOr(o.facts.windows ? "USERPROFILE" : "HOME");
+         std::error_code ec;
+         if (!home.empty())
+         {
+            const std::filesystem::space_info sp = std::filesystem::space(AppPaths::FsPath(home), ec);
+            if (!ec)
+               o.facts.freeBytes = (long long)sp.available;
+         }
+         o.facts.browser = chat::HasBrowser(o.facts.linux, EnvOr("DISPLAY"), EnvOr("WAYLAND_DISPLAY"),
+                                            o.facts.linux && !CliSetup::BinaryDir(os, "xdg-open", home, EnvOr("PATH")).empty());
+         chat::AgentRun::Options opt;
+         opt.raw = true;
+         opt.argv = chat::NetProbeArgs(o.facts.windows);
+         TerminalCommandEnv(opt.env, opt.cwd);
+         o.probeAt = ImGui::GetTime();
+         o.probe = chat::AgentRun::Start(opt);
+         if (o.probe == nullptr)
+            o.checked = true;  // could not ask: the setup itself says what is wrong
+      }
+
+      void PollMachineCheck()
+      {
+         Onboard& o = sOnboard;
+         if (o.probe == nullptr)
+            return;
+         std::vector<chat::AgentEvent> drop;
+         o.probe->Poll(drop);
+         const bool late = ImGui::GetTime() - o.probeAt > 25.0;
+         if (!o.probe->Done() && !late)
+            return;
+         if (!o.probe->Done())
+            o.probe->Stop();
+         const chat::NetProbe p = chat::ReadNetProbe(o.probe->Log());
+         o.facts.netChecked = true;
+         o.facts.online = p.online;
+         o.facts.fetchTool = p.fetchTool;
+         o.facts.scriptsLocked = p.locked;
+         o.probe = nullptr;
+         o.checked = true;
+      }
+
+      bool MachineBlocked()
+      {
+         if (!sOnboard.checked)
+            return false;
+         for (const chat::Problem& p : chat::CheckMachine(sOnboard.facts))
+            if (p.blocks)
+               return true;
+         return false;
+      }
+
+      // Back from the browser (or anywhere): look again. A sign-up waits for this moment to start the sign-in.
+      void OnFocusBack()
+      {
+         if (MachineBlocked())
+            StartMachineCheck();
+         for (auto& [id, s] : sAgents)
+         {
+            if (s.signInOnFocus && s.setup == nullptr && s.login == nullptr)
+            {
+               s.signInOnFocus = false;
+               if (const CliSetup::Agent* a = CliSetup::FindAgent(id))
+                  StartSignIn(*a);
+            }
+            else if (s.ready.installed && !s.ready.signedIn && s.login == nullptr && s.verify == nullptr)
+               s.verifyAt = -1.0;
+         }
+         CheckAgents(true);
+      }
+
       void PollSetups()
       {
+         {
+            const bool away = AppAway();
+            if (sOnboard.wasAway && !away)
+               OnFocusBack();
+            sOnboard.wasAway = away;
+            sOnboard.leftSinceSignUp = sOnboard.leftSinceSignUp || away;
+            // The sign-up page never took the front (another screen, a slow browser): do not wait for a return
+            // that will not come.
+            if (!sOnboard.leftSinceSignUp && ImGui::GetTime() - sOnboard.signUpAt > 5.0)
+               for (auto& [id, st] : sAgents)
+                  if (st.signInOnFocus && st.setup == nullptr && st.login == nullptr)
+                  {
+                     st.signInOnFocus = false;
+                     if (const CliSetup::Agent* ag = CliSetup::FindAgent(id))
+                        StartSignIn(*ag);
+                  }
+         }
+         PollMachineCheck();
          PollLogins();
          PollVerifies();
          PollLogouts();
@@ -946,13 +1086,17 @@ namespace app
             s.setup->Poll(drop);
             if (!s.setup->Done())
                continue;
+            s.setupLog = chat::StripAnsi(s.setup->Log());
             s.setup = nullptr;
             CheckAgents(true);
             s.failed = !s.ready.connected;
             if (!s.failed && s.chain && (!s.ready.signedIn || s.authBroken))
             {
                s.chain = false;
-               if (const CliSetup::Agent* ag = CliSetup::FindAgent(id))
+               // Making a new account: start the sign-in when the person is back from the sign-up page, not over it.
+               if (s.signUp && AppAway())
+                  s.signInOnFocus = true;
+               else if (const CliSetup::Agent* ag = CliSetup::FindAgent(id))
                   StartSignIn(*ag);
             }
             s.chain = false;
@@ -1241,6 +1385,11 @@ namespace app
             sInput.clear();
             sAttach.clear();
             return;
+         }
+         if (CliSetup::Config& prefs = CliSetup::Prefs(); !prefs.tried)
+         {
+            prefs.tried = true;
+            SaveCliConfig();
          }
          RefreshCatalog(true);
          std::string slashPrompt;
@@ -3324,137 +3473,408 @@ namespace app
          dl->AddRect(at, ImVec2(at.x + width, at.y + height), TextTint(0.10f), tok::radius_tile + 4.0f, 0, 1.0f);
       }
 
-      // First run, one card: pick an agent, press Connect. Install, MCP, skills and the browser sign-in
-      // follow by themselves; the card says only where it is.
+      // ── First run (docs/CHAT.md, First run) ─────────────────────────────────
+      // A card whose height follows what it holds: content goes on the top channel, the glass behind it once
+      // the bottom is known.
+      struct Card
+      {
+         ImVec2 at;
+         float width = 0.0f, pad = 0.0f, x = 0.0f, inner = 0.0f;
+         ImDrawListSplitter split;
+      };
+
+      void BeginCard(Card& c, float width)
+      {
+         c.at = ImGui::GetCursorScreenPos();
+         c.width = width;
+         c.pad = tok::space_3;
+         c.x = c.at.x + c.pad;
+         c.inner = std::max(40.0f, width - 2.0f * c.pad);
+         c.split.Split(ImGui::GetWindowDrawList(), 2);
+         c.split.SetCurrentChannel(ImGui::GetWindowDrawList(), 1);
+         ImGui::SetCursorScreenPos(ImVec2(c.x, c.at.y + c.pad));
+      }
+
+      void EndCard(Card& c)
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float bottom = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + c.pad;
+         c.split.SetCurrentChannel(dl, 0);
+         GlassCard(c.at, c.width, bottom - c.at.y);
+         c.split.Merge(dl);
+         ImGui::SetCursorScreenPos(c.at);
+         ImGui::Dummy(ImVec2(c.width, bottom - c.at.y));
+      }
+
+      // Wrapped text at the card's left edge, one item tall.
+      void CardText(const Card& c, const std::string& text, ImU32 col, float indent = 0.0f)
+      {
+         const ImVec2 p(c.x + indent, ImGui::GetCursorScreenPos().y);
+         const float w = c.inner - indent;
+         const ImVec2 sz = ImGui::CalcTextSize(text.c_str(), nullptr, false, w);
+         ImGui::GetWindowDrawList()->AddText(nullptr, 0.0f, p, col, text.c_str(), nullptr, w);
+         ImGui::SetCursorScreenPos(p);
+         ImGui::Dummy(ImVec2(w, sz.y));
+      }
+
+      void CardTitle(const Card& c, const std::string& text)
+      {
+         Weight s(UiType::Weight::Semibold);
+         CardText(c, text, ImGui::GetColorU32(ImGuiCol_Text));
+         ImGui::Dummy(ImVec2(1.0f, tok::space_1));
+      }
+
+      // A row of buttons at the card's left edge; returns the index pressed, or -1.
+      int CardButtons(const Card& c, std::initializer_list<std::pair<const char*, bool>> buttons)
+      {
+         int pressed = -1, i = 0;
+         ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + tok::space_1));
+         for (const auto& [label, primary] : buttons)
+         {
+            if (i > 0)
+               FormParts::Inline(0.0f, tok::space_1);
+            if (ChipButton::Draw(label, primary, 26.0f))
+               pressed = i;
+            i++;
+         }
+         return pressed;
+      }
+
+      // A translated sentence with the agent's name in it.
+      std::string Say(const std::string& key, const char* name)
+      {
+         std::string t = T(key.c_str());
+         if (const size_t at = t.find("%s"); at != std::string::npos)
+            t.replace(at, 2, name);
+         return t;
+      }
+
+      // One step row: the Settings page's marks (check, error, amber dot, dash) and a label.
+      void StepRow(const Card& c, CliSetup::StepState state, const std::string& label)
+      {
+         using S = CliSetup::StepState;
+         const float rowH = 26.0f, size = 16.0f;
+         const ImVec2 p(c.x, ImGui::GetCursorScreenPos().y);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 m(p.x + size * 0.5f, p.y + rowH * 0.5f);
+         const float r = size * 0.28f;
+         const bool light = Light();
+         if (state == S::kOk || state == S::kSkipped)
+            dl->AddPolyline(std::array<ImVec2, 3>{ ImVec2(m.x - r, m.y), ImVec2(m.x - r * 0.25f, m.y + r * 0.8f), ImVec2(m.x + r, m.y - r * 0.7f) }.data(), 3,
+                            tok::U32(tok::action_go, light), 0, 2.0f);
+         else if (state == S::kFailed)
+            glyph::Draw(dl, m, size, Red(), IconsInfinite::Error);
+         else if (state == S::kRunning)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(m.x - BusyLine::kSpinner * 0.5f, m.y - BusyLine::kSpinner * 0.5f));
+            BusyLine::Spinner();
+         }
+         else
+            dl->AddLine(ImVec2(m.x - r * 0.7f, m.y), ImVec2(m.x + r * 0.7f, m.y), Dim(), 2.0f);
+         const bool done = state == S::kOk || state == S::kSkipped;
+         dl->AddText(ImVec2(p.x + size + tok::space_2, p.y + (rowH - ImGui::GetFontSize()) * 0.5f),
+                     state == S::kPending ? Dim() : (done ? TextTint(0.7f) : ImGui::GetColorU32(ImGuiCol_Text)), label.c_str());
+         ImGui::SetCursorScreenPos(p);
+         ImGui::Dummy(ImVec2(c.inner, rowH));
+      }
+
+      // Several setup steps shown as one row: failed wins, then all done, then running.
+      CliSetup::StepState GroupState(const CliSetup::Status& st, std::initializer_list<const char*> ids, bool running)
+      {
+         using S = CliSetup::StepState;
+         bool all = true, any = false;
+         for (const CliSetup::StepStatus& s : st.steps)
+            for (const char* id : ids)
+               if (std::strcmp(s.id, id) == 0)
+               {
+                  if (s.state == S::kFailed)
+                     return S::kFailed;
+                  all = all && s.Green();
+                  any = any || s.state == S::kRunning;
+               }
+         if (all && st.present)
+            return S::kOk;
+         return any || running ? S::kRunning : S::kPending;
+      }
+
+      // Step 0: this computer. True while it holds the first-run card (checking, or something blocks).
+      bool DrawMachineCard(float width)
+      {
+         Onboard& o = sOnboard;
+         if (!o.checked && o.probe == nullptr)
+            StartMachineCheck();
+         if (o.checked && !MachineBlocked())
+            return false;
+         Card c;
+         BeginCard(c, width);
+         if (!o.checked)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + 4.0f));
+            BusyLine::Spinner();
+            FormParts::Inline(0.0f, tok::space_2);
+            ImGui::TextUnformatted(T("Checking this computer…"));
+            EndCard(c);
+            return true;
+         }
+         CardTitle(c, T("This computer needs one thing first"));
+         bool noCurl = false;
+         for (const chat::Problem& p : chat::CheckMachine(o.facts))
+            if (p.blocks)
+            {
+               CardText(c, T(p.text.c_str()), Red());
+               noCurl = noCurl || p.kind == chat::Problem::Kind::NoFetch;
+            }
+         // Linux without curl: installing it needs the computer password, typed in a terminal.
+         const int b = noCurl ? CardButtons(c, { { T("Check again"), true }, { T("Install curl"), false } }) : CardButtons(c, { { T("Check again"), true } });
+         if (b == 0)
+            StartMachineCheck();
+         else if (b == 1)
+            TerminalRunInNewTab("if command -v apt-get >/dev/null; then sudo apt-get install -y curl; "
+                                "elif command -v dnf >/dev/null; then sudo dnf install -y curl; "
+                                "elif command -v pacman >/dev/null; then sudo pacman -S --noconfirm curl; "
+                                "elif command -v zypper >/dev/null; then sudo zypper install -y curl; fi");
+         EndCard(c);
+         return true;
+      }
+
+      // Steps 1-2: who to talk to, and whether there is an account.
+      void Choose(const std::string& id, bool hasAccount)
+      {
+         AgentState& s = sAgents[id];
+         sOnboard.chosen = id;
+         sOnboard.details = false;
+         s.signUp = !hasAccount;
+         const AgentView v = ViewOf(id);
+         if (!hasAccount)
+         {
+            sOnboard.signUpAt = ImGui::GetTime();
+            sOnboard.leftSinceSignUp = false;
+            Platform::OpenExternalUrl(chat::SignUpUrl(id));
+         }
+         if (v.act == Act::SetUp || v.act == Act::TryAgain)
+            Do(id, v.act);
+         else if (v.act == Act::SignIn || v.act == Act::SignInAgain)
+         {
+            if (hasAccount)
+               Do(id, v.act);
+            else
+               s.signInOnFocus = true;  // after the sign-up page, not over it
+         }
+      }
+
+      void DrawPickCard(float width)
+      {
+         Onboard& o = sOnboard;
+         Card c;
+         BeginCard(c, width);
+         CardTitle(c, T("Who do you want to talk to?"));
+         const float rowH = 38.0f;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         for (const CliSetup::Agent& a : CliSetup::Agents())
+         {
+            chat::AgentKind kind;
+            if (!KindOf(a.id, kind))
+               continue;
+            const bool usable = o.facts.browser || chat::SignsInWithoutBrowser(kind);
+            if (!usable && o.pick == a.id)
+               o.pick = "claude";
+            const bool on = o.pick == a.id;
+            const ImVec2 p(c.at.x + tok::space_1, ImGui::GetCursorScreenPos().y);
+            const float w = c.width - 2.0f * tok::space_1;
+            ImGui::SetCursorScreenPos(p);
+            ImGui::PushID(a.id);
+            const bool click = ImGui::InvisibleButton("##pick", ImVec2(w, rowH)) && usable;
+            const bool hot = ImGui::IsItemHovered() && usable;
+            ImGui::PopID();
+            if (click)
+               o.pick = a.id;
+            if (on || hot)
+               dl->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), TextTint(on ? 0.09f : 0.05f), tok::radius_tile);
+            DrawAvatar(dl, ImVec2(c.x + 11.0f, p.y + rowH * 0.5f), 11.0f, a.id);
+            const float ty = p.y + (rowH - ImGui::GetFontSize()) * 0.5f;
+            dl->AddText(ImVec2(c.x + 30.0f, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
+            if (!usable)
+            {
+               const char* why = T("Needs a browser");
+               dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(why).x, ty), Dim(), why);
+            }
+            ImGui::SetCursorScreenPos(ImVec2(c.x, p.y + rowH + 2.0f));
+            ImGui::Dummy(ImVec2(1.0f, 0.0f));
+         }
+         for (const chat::Problem& p : chat::CheckMachine(o.facts))
+            if (!p.blocks)
+               CardText(c, T(p.text.c_str()), Dim());
+         const int b = CardButtons(c, { { T("I have an account"), true }, { T("I don't have one"), false } });
+         if (b >= 0)
+            Choose(o.pick, b == 0);
+         EndCard(c);
+      }
+
+      // Steps 3-4: one card from download to signed in.
+      void DrawProgressCard(float width)
+      {
+         using namespace CliSetup;
+         using S = StepState;
+         Onboard& o = sOnboard;
+         const Agent* a = FindAgent(o.chosen);
+         if (a == nullptr)
+         {
+            o.chosen.clear();
+            return;
+         }
+         AgentState& s = sAgents[a->id];
+         const Status st = ParseStatus(ReadAll(PathsFor(AppPaths::AppSupportDir(), CurrentOs()).status), (long long)std::time(nullptr));
+         const bool setting = s.setup != nullptr;
+         const bool connected = s.ready.connected && !setting;
+         const bool signingIn = s.login != nullptr || s.signingIn || s.signInOnFocus;
+         Card c;
+         BeginCard(c, width);
+         CardTitle(c, Say("Setting up %s", a->name));
+         // Rows: [account], ready, install, sign in. The setup script's five steps fold into two.
+         if (s.signUp || s.signInOnFocus)
+            StepRow(c, S::kRunning, T("Make your account"));
+         S ready = connected ? S::kOk : GroupState(st, { "path", "headless", "node", "mcp" }, setting);
+         S install = connected ? S::kOk : GroupState(st, { "agent" }, false);
+         if (setting && ready == S::kOk && install == S::kPending)
+            install = S::kRunning;
+         if (!setting && s.failed && ready != S::kFailed && install != S::kFailed)
+            (ready == S::kOk ? install : ready) = S::kFailed;
+         if (!setting && !s.failed && !connected)
+         {
+            ready = ready == S::kRunning ? S::kPending : ready;
+            install = install == S::kRunning ? S::kPending : install;
+         }
+         StepRow(c, ready, T("Get ready"));
+         StepRow(c, install, Say("Install %s", a->name));
+         const bool in = s.ready.signedIn && !s.authBroken;
+         const S signIn = in ? S::kOk : (signingIn ? S::kRunning : (!s.loginError.empty() ? S::kFailed : S::kPending));
+         StepRow(c, signIn, T("Sign in"));
+         ImGui::Dummy(ImVec2(1.0f, tok::space_1));
+
+         bool back = false;
+         if (!setting && s.failed)
+         {
+            // The failed step's own reason, else the step it stopped at.
+            std::string reason, step;
+            for (const StepStatus& x : st.steps)
+               if (x.state == S::kFailed)
+               {
+                  reason = x.reason, step = x.id;
+                  break;
+               }
+            const chat::Friendly f = chat::SetupProblem(reason, step, a->name);
+            CardText(c, Say(f.text, a->name), Red());
+            const bool password = f.kind == chat::Friendly::Kind::Password;
+            const int b = password ? CardButtons(c, { { T("Type password"), true }, { T("Try again"), false }, { T("Details"), false }, { T("Back"), false } })
+                                   : CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Back"), false } });
+            const int k = password ? b : (b < 0 ? -1 : b + 1);
+            if (k == 0)
+               OpenInTerminal(*a);
+            else if (k == 1)
+               Do(a->id, Act::TryAgain);
+            else if (k == 2)
+               o.details = !o.details;
+            else if (k == 3)
+               back = true;
+            if (o.details && !s.setupLog.empty())
+            {
+               ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + tok::space_1));
+               ImGui::InputTextMultiline("##setuplog", &s.setupLog, ImVec2(c.inner, 120.0f), ImGuiInputTextFlags_ReadOnly);
+            }
+         }
+         else if (s.signInOnFocus)
+         {
+            CardText(c, T("Make your account in the browser. Infinite goes on when you come back."), Dim());
+            if (CardButtons(c, { { T("Open page again"), false } }) == 0)
+               Platform::OpenExternalUrl(chat::SignUpUrl(a->id));
+         }
+         else if (s.login != nullptr)
+         {
+            if (s.codeSent)
+               CardText(c, T("Checking the code…"), Dim());
+            else if (s.needsCode)
+            {
+               if (s.codeRejected)
+                  CardText(c, T("That code did not work. Copy it again from the browser."), Red());
+               else
+                  CardText(c, T("After you sign in, the page shows a code. Paste it here."), Dim());
+               ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + tok::space_1));
+               DrawCodeEntry(s, c.inner);
+            }
+            else
+               CardText(c, T("Finish in your browser…"), Dim());
+            // No browser here: the address to open on another device.
+            if (!o.facts.browser && !s.loginUrl.empty())
+               CardText(c, s.loginUrl, TextTint(0.8f));
+            const bool url = !s.loginUrl.empty();
+            const char* again = o.facts.browser ? T("Open page again") : T("Copy address");
+            const int b = url ? CardButtons(c, { { again, false }, { T("Cancel"), false } }) : CardButtons(c, { { T("Cancel"), false } });
+            if (url && b == 0)
+            {
+               if (o.facts.browser)
+                  Platform::OpenExternalUrl(s.loginUrl);
+               else
+                  ImGui::SetClipboardText(s.loginUrl.c_str());
+            }
+            else if (b == (url ? 1 : 0))
+               Do(a->id, Act::Cancel);
+         }
+         else if (!s.loginError.empty() && !setting)
+         {
+            CardText(c, s.loginError, Red());
+            const int b = CardButtons(c, { { T("Try again"), true }, { T("Details"), false }, { T("Back"), false } });
+            if (b == 0)
+               Do(a->id, Act::SignIn);
+            else if (b == 1)
+               o.details = !o.details;
+            else if (b == 2)
+               back = true;
+            if (o.details && !s.loginLog.empty())
+            {
+               ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + tok::space_1));
+               std::string log = chat::StripAnsi(s.loginLog);
+               ImGui::InputTextMultiline("##loginlog", &log, ImVec2(c.inner, 120.0f), ImGuiInputTextFlags_ReadOnly);
+            }
+         }
+         else if (!setting && !signingIn && connected && !in)
+         {
+            // Set up, signed out, nothing running (a sign-in was cancelled): one button.
+            const int b = CardButtons(c, { { T("Sign in"), true }, { T("Back"), false } });
+            if (b == 0)
+               Do(a->id, Act::SignIn);
+            else if (b == 1)
+               back = true;
+         }
+         EndCard(c);
+         if (back)
+         {
+            s.signUp = s.signInOnFocus = false;
+            s.loginError.clear();
+            s.failed = false;
+            o.chosen.clear();
+         }
+      }
+
+      // First run, one card at a time: this computer, who to talk to, then setup and sign-in in one list.
       bool DrawSetup(float width)
       {
          if (AnyReady())
             return false;
-         using namespace CliSetup;
-         const Paths paths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
-         const float pad = tok::space_3, rowH = 38.0f, titleH = 30.0f;
-         int rows = 0;
-         for (const Agent& a : Agents())
-            rows += sAgents.count(a.id) ? 1 : 0;
-         // A failed setup or sign-in says why under its row, wrapped to the card; the card grows to hold it.
-         const float msgW = std::max(40.0f, width - 2.0f * pad - 30.0f);
-         const auto failNote = [](const AgentState& st)
+         if (sOnboard.chosen.empty())
          {
-            return st.failed ? std::string(T("Setup did not finish.")) + (st.ready.why.empty() ? std::string() : " " + st.ready.why) : st.loginError;
-         };
-         const auto noteH = [&](const std::string& msg)
-         {
-            UiType::Scope cap(UiType::Size::Caption);
-            return ImGui::CalcTextSize(msg.c_str(), nullptr, false, msgW).y + tok::space_2;
-         };
-         float extra = 0.0f;
-         for (const Agent& a : Agents())
-         {
-            const auto it = sAgents.find(a.id);
-            if (it == sAgents.end())
-               continue;
-            if (it->second.login != nullptr && !it->second.loginUrl.empty())
-               extra += 26.0f;
-            if (it->second.login != nullptr && it->second.needsCode)
-               extra += 34.0f;
-            if (it->second.login == nullptr && it->second.setup == nullptr)
-               if (const std::string msg = failNote(it->second); !msg.empty())
-                  extra += noteH(msg);
+            // Something already running (Settings started it): show that agent's progress.
+            for (const auto& [id, s] : sAgents)
+               if (s.setup != nullptr || s.login != nullptr)
+                  sOnboard.chosen = id;
          }
-         const float height = pad * 2.0f + titleH + rows * (rowH + tok::space_1) + extra;
-         const ImVec2 at = ImGui::GetCursorScreenPos();
-         GlassCard(at, width, height);
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         {
-            Weight s(UiType::Weight::Semibold);
-            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connect an agent"));
-         }
-         float y = at.y + pad + titleH;
-         for (const Agent& a : Agents())
-         {
-            auto it = sAgents.find(a.id);
-            if (it == sAgents.end())
-               continue;
-            AgentState& s = it->second;
-            ImGui::PushID(a.id);
-            DrawAvatar(dl, ImVec2(at.x + pad + 11.0f, y + rowH * 0.5f), 11.0f, a.id);
-            const float ty = y + (rowH - ImGui::GetFontSize()) * 0.5f;
-            dl->AddText(ImVec2(at.x + pad + 30.0f, ty), ImGui::GetColorU32(ImGuiCol_Text), a.name);
-            const float rx = at.x + width - pad;
-            auto button = [&](const char* label, bool primary) -> bool
-            {
-               const float w = ImGui::CalcTextSize(label).x + 2.0f * tok::space_2;
-               ImGui::SetCursorScreenPos(ImVec2(rx - w, y + (rowH - 26.0f) * 0.5f));
-               return ChipButton::Draw(label, primary, 26.0f);
-            };
-            // Status text sits right of the name and never over it: a narrow panel cuts it short, then drops it
-            // and keeps only the spinner.
-            const float nameEnd = at.x + pad + 30.0f + ImGui::CalcTextSize(a.name).x + tok::space_3;
-            auto statusAt = [&](float right, const char* label, bool spin, ImU32 col)
-            {
-               const float room = right - nameEnd - (spin ? BusyLine::kSpinner + tok::space_1 : 0.0f);
-               const std::string text = room >= 48.0f ? app::TruncateWithEllipsis(label, room) : std::string();
-               const float w = text.empty() ? 0.0f : ImGui::CalcTextSize(text.c_str()).x;
-               if (!text.empty())
-                  dl->AddText(ImVec2(right - w, ty), col, text.c_str());
-               if (spin)
-               {
-                  ImGui::SetCursorScreenPos(ImVec2(right - w - BusyLine::kSpinner - (w > 0.0f ? tok::space_1 : 0.0f), y + (rowH - BusyLine::kSpinner) * 0.5f));
-                  BusyLine::Spinner();
-               }
-            };
-            auto status = [&](const char* label, bool spin, ImU32 col) { statusAt(rx, label, spin, col); };
-            float used = 0.0f;
-            if (s.setup != nullptr)
-            {
-               const Status st = ParseStatus(ReadAll(paths.status), (long long)std::time(nullptr));
-               char prog[48];
-               std::snprintf(prog, sizeof prog, T("Setting up… %d of %d"), st.GreenCount(), kStepCount);
-               status(prog, true, Dim());
-            }
-            else if (s.login != nullptr)
-            {
-               const char* cancel = T("Cancel");
-               if (button(cancel, false))
-                  Do(a.id, Act::Cancel);
-               statusAt(rx - ImGui::CalcTextSize(cancel).x - 3.0f * tok::space_2, T("Finish in your browser…"), true, Dim());
-               if (!s.loginUrl.empty())
-               {
-                  ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH));
-                  if (ChipButton::Draw(T("Open sign-in page"), false, 22.0f, 0.0f, true))
-                     Platform::OpenExternalUrl(s.loginUrl);
-                  used = 26.0f;
-               }
-               if (s.needsCode)
-               {
-                  ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH + used));
-                  DrawCodeEntry(s, rx - (at.x + pad + 30.0f));
-                  used += 34.0f;
-               }
-            }
-            else
-            {
-               const AgentView v = ViewOf(a.id);
-               if (v.act == Act::None || v.act == Act::SignOut || v.busy)
-                  status(v.status.c_str(), v.busy, Dim());
-               else if (button(ActLabel(v.act), true))
-                  Do(a.id, v.act);
-               if (const std::string msg = failNote(s); !msg.empty())
-               {
-                  used = noteH(msg);
-                  UiType::Scope cap(UiType::Size::Caption);
-                  dl->AddText(nullptr, 0.0f, ImVec2(at.x + pad + 30.0f, y + rowH - 4.0f), Red(), msg.c_str(), nullptr, msgW);
-               }
-            }
-            y += rowH + tok::space_1 + used;
-            ImGui::PopID();
-         }
-         ImGui::SetCursorScreenPos(at);
-         ImGui::Dummy(ImVec2(width, height));
+         if (!sOnboard.chosen.empty())
+            DrawProgressCard(width);
+         else if (!DrawMachineCard(width))
+            DrawPickCard(width);
          return true;
       }
 
-      // After the first agent connects: where it works and whether it may edit files, then one intro line.
+      // Step 5, once: the folder agents work in and whether they may edit files there.
       bool DrawFolderStep(float width)
       {
          CliSetup::Config& prefs = CliSetup::Prefs();
@@ -3467,7 +3887,7 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          {
             Weight s(UiType::Weight::Semibold);
-            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Connected"));
+            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Your files"));
          }
          float y = at.y + pad + 28.0f;
          // Folder
@@ -3500,14 +3920,12 @@ namespace app
             SaveCliConfig();
          y += rowH + 4.0f;
          {
-            const float w = ImGui::CalcTextSize(T("Start")).x + 4.0f * tok::space_2;
+            const float w = ImGui::CalcTextSize(T("Continue")).x + 4.0f * tok::space_2;
             ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - w, y));
-            if (ChipButton::Draw(T("Start"), true, 26.0f, w))
+            if (ChipButton::Draw(T("Continue"), true, 26.0f, w))
             {
                prefs.introduced = true;
                SaveCliConfig();
-               Push(Make(Entry::Kind::Note, chat::Welcome()));
-               SaveNow();
             }
          }
          ImGui::SetCursorScreenPos(at);
@@ -3519,25 +3937,38 @@ namespace app
       {
          const ImVec2 mn = ImGui::GetWindowPos();
          const float h = ImGui::GetWindowHeight();
-         const char* hello = T("What should we make?");
+         // The very first time: three things a beginner can press that make something to see or hear right away.
+         const bool first = !CliSetup::Prefs().tried && AnyReady();
+         const char* hello = first ? T("You're in") : T("What should we make?");
          {
             UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
             const ImVec2 ts = ImGui::CalcTextSize(hello);
             ImGui::GetWindowDrawList()->AddText(ImVec2(mn.x + (ImGui::GetWindowWidth() - ts.x) * 0.5f, mn.y + h * 0.38f), TextTint(0.85f), hello);
          }
-         // Starting points: each fills the composer, nothing is sent until Enter.
-         const char* ideas[] = { T("Add a Noise and wire it to the output"), T("Make the colours drift slowly"), T("Explain this patch") };
+         // Later: each fills the composer, nothing is sent until Enter. First time: each is sent at once.
+         const char* ideas[3] = { T("Add a Noise and wire it to the output"), T("Make the colours drift slowly"), T("Explain this patch") };
+         if (first)
+            for (int i = 0; i < 3; i++)
+               ideas[i] = T(chat::FirstIdeas()[(size_t)i].label);
          float y = mn.y + h * 0.38f + 40.0f;
          for (int i = 0; i < 3; i++)
          {
             const float w = std::min(width, ImGui::CalcTextSize(ideas[i]).x + 2.0f * tok::space_3);
             ImGui::SetCursorScreenPos(ImVec2(mn.x + (ImGui::GetWindowWidth() - w) * 0.5f, y));
             ImGui::PushID(i);
-            if (ChipButton::Draw(ideas[i], false, 26.0f, w, true))
+            if (ChipButton::Draw(ideas[i], first && i == 0, 26.0f, w, !first))
             {
-               sInput = ideas[i];
-               sRefocus = true;
-               sCursorToEnd = true;
+               if (first)
+               {
+                  sInput = chat::FirstIdeas()[(size_t)i].prompt;
+                  Send();
+               }
+               else
+               {
+                  sInput = ideas[i];
+                  sRefocus = true;
+                  sCursorToEnd = true;
+               }
             }
             ImGui::PopID();
             y += 30.0f;

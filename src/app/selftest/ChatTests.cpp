@@ -4,6 +4,7 @@
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
 #include "core/chat/AgentStream.h"
+#include "core/chat/Onboarding.h"
 #include "core/chat/ChatDiff.h"
 #include "core/chat/ChatFiles.h"
 #include "core/chat/ChatThread.h"
@@ -741,6 +742,74 @@ namespace app
          check(chat::Explain("Codex", "getaddrinfo ENOTFOUND api").kind == chat::Friendly::Kind::Offline, "error: offline");
          check(chat::Explain("Codex", "zsh: command not found: codex").kind == chat::Friendly::Kind::Missing, "error: missing command");
          check(chat::Explain("Codex", "boom happened").text == "boom happened", "error: anything else shows the last line");
+         // First run for someone who has never used a terminal (docs/CHAT.md, First run).
+         {
+            using K = chat::Friendly::Kind;
+            check(chat::Explain("Claude", "npm ERR! code ENOSPC\nno space left on device").kind == K::Disk, "error: disk full");
+            check(chat::Explain("Codex", "File cannot be loaded because running scripts is disabled on this system.").kind == K::Policy, "error: windows script policy");
+            check(chat::Explain("Claude", "sudo: a password is required").kind == K::Password, "error: needs the computer password");
+            check(chat::Explain("Claude", "xdg-open: not found").kind == K::NoBrowser, "error: no browser");
+            check(chat::Explain("Claude", "Credit balance is too low").kind == K::Plan, "error: account needs a paid plan");
+            check(chat::AsksForCode("Browser didn't open? Use the url below to sign in\n\nPaste code here if prompted >"), "claude: the no-browser paste prompt asks for a code");
+
+            using P = chat::Problem::Kind;
+            const auto kinds = [](const chat::MachineFacts& f)
+            {
+               std::vector<P> out;
+               for (const chat::Problem& p : chat::CheckMachine(f))
+                  out.push_back(p.kind);
+               return out;
+            };
+            chat::MachineFacts f;
+            check(chat::CheckMachine(f).empty(), "machine: nothing known yet is nothing wrong");
+            f.netChecked = true;
+            f.online = true;
+            f.freeBytes = 50LL * 1024 * 1024 * 1024;
+            check(chat::CheckMachine(f).empty(), "machine: online with room is fine");
+            f.online = false;
+            check(kinds(f) == std::vector<P>{ P::Offline } && chat::CheckMachine(f)[0].blocks, "machine: offline blocks");
+            f.fetchTool = false;
+            check(kinds(f) == std::vector<P>{ P::NoFetch }, "machine: no curl/wget is said instead of offline");
+            f.fetchTool = true, f.online = true, f.freeBytes = 100LL * 1024 * 1024;
+            check(kinds(f) == std::vector<P>{ P::Disk }, "machine: too little space blocks");
+            f.freeBytes = -1, f.scriptsLocked = true;
+            check(kinds(f).empty(), "machine: script lock only counts on windows");
+            f.windows = true;
+            check(kinds(f) == std::vector<P>{ P::Locked }, "machine: windows script lock blocks");
+            f.windows = f.scriptsLocked = false, f.browser = false;
+            check(kinds(f) == std::vector<P>{ P::NoBrowser } && !chat::CheckMachine(f)[0].blocks, "machine: no browser does not block");
+
+            check(chat::HasBrowser(false, "", "", false), "browser: mac and windows always have one");
+            check(!chat::HasBrowser(true, "", "", true), "browser: linux over ssh has none");
+            check(chat::HasBrowser(true, ":0", "", true) && chat::HasBrowser(true, "", "wayland-0", true), "browser: linux desktop has one");
+            check(!chat::HasBrowser(true, ":0", "", false), "browser: linux without xdg-open has none");
+
+            const chat::NetProbe on = chat::ReadNetProbe("online\n");
+            check(on.online && on.fetchTool && !on.locked, "probe: online");
+            check(!chat::ReadNetProbe("offline\n").online, "probe: offline");
+            check(!chat::ReadNetProbe("nofetch\n").fetchTool, "probe: no download tool");
+            check(chat::ReadNetProbe("locked\r\nonline\r\n").locked, "probe: windows lock with crlf");
+            check(!chat::ReadNetProbe("not online today").online, "probe: only a whole line counts");
+            check(chat::NetProbeArgs(false)[0] == "/bin/sh" && chat::NetProbeArgs(true)[0] == "powershell", "probe: a command per platform");
+
+            check(chat::SignUpUrl("claude").find("claude.ai") != std::string::npos && chat::SignUpUrl("codex").find("chatgpt.com") != std::string::npos &&
+                  chat::SignUpUrl("antigravity").find("accounts.google.com") != std::string::npos, "sign-up: each provider's own page");
+            check(chat::kSignUpSeconds > chat::kSignInSeconds, "sign-up: a new account gets longer than a sign-in");
+            check(chat::SetupProblem("offline", "node", "Claude").kind == K::Offline && chat::SetupProblem("disk", "agent", "Claude").kind == K::Disk &&
+                  chat::SetupProblem("policy", "node", "Claude").kind == K::Policy && chat::SetupProblem("password", "headless", "Claude").kind == K::Password,
+                  "setup: every reason has its own words");
+            check(chat::SetupProblem("", "agent", "Claude").text.find("%s") != std::string::npos, "setup: an unknown failure names the step");
+            check(chat::SetupProblem("", "node", "Claude").text.find("Press Try again") != std::string::npos, "setup: always one next thing");
+            for (const char* r : { "offline", "download", "disk", "policy", "password", "unsupported", "nodeversion", "install", "register", "" })
+            {
+               const std::string t = chat::SetupProblem(r, "mcp", "Claude").text;
+               check(t.find("npm") == std::string::npos && t.find("Node") == std::string::npos && t.find("MCP") == std::string::npos &&
+                     t.find("terminal") == std::string::npos, "setup: no jargon in a failure sentence");
+            }
+            check(!chat::SignsInWithoutBrowser(chat::AgentKind::Codex) && chat::SignsInWithoutBrowser(chat::AgentKind::Claude) &&
+                  chat::SignsInWithoutBrowser(chat::AgentKind::Antigravity), "no browser: only chatgpt cannot sign in");
+            check(chat::FirstIdeas().size() == 3, "first ideas: three");
+         }
          const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");
          check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini", "agy models are parsed from id<TAB>label rows");
          const std::vector<chat::Model> agy2 = chat::ParseAgyModels("Fetching available models...\ngemini-4-argon-medium\tGemini 4 Argon (Medium)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n");

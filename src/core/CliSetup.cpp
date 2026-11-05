@@ -92,7 +92,7 @@ namespace CliSetup
    {
       static const std::vector<Agent> kAgents = {
          { "claude", "Claude", "claude",
-           "curl -fsSL https://claude.ai/install.sh | bash",
+           "fetch https://claude.ai/install.sh | bash",
            "irm https://claude.ai/install.ps1 | iex",
            "claude",
            "claude mcp get infinite",
@@ -102,8 +102,9 @@ namespace CliSetup
            ".claude/skills",
            "Claude asks you to log in the first time it starts. Infinite never sees or stores the login." },
          { "codex", "ChatGPT", "codex",
-           "npm install -g @openai/codex",
-           "npm install -g @openai/codex",
+           // Into Infinite's own Node folder: npm's global folder can belong to the system (sudo) or sit off PATH.
+           "npm install -g --prefix \"$HOME/.infinite/node\" @openai/codex",
+           "npm install -g --prefix \"$env:LOCALAPPDATA\\Infinite\\node\" @openai/codex",
            "codex",
            "codex mcp get infinite",
            "codex mcp add infinite --env INFINITE_BIN={EXE} -- npx -y infinite-engine serve",
@@ -113,7 +114,7 @@ namespace CliSetup
            "ChatGPT asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
          // Antigravity has no `mcp add` command: the helper edits its JSON config (mcp_json.js, written next to the setup script).
          { "antigravity", "Gemini", "agy",
-           "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+           "fetch https://antigravity.google/cli/install.sh | bash",
            "irm https://antigravity.google/cli/install.ps1 | iex",
            "agy",
            "node {TOOL} check ~/.gemini/config/mcp_config.json infinite",
@@ -196,6 +197,7 @@ namespace CliSetup
             if (id != s.id)
                continue;
             s.detail = e.value("detail", std::string());
+            s.reason = e.value("reason", std::string());
             if (state == "ok") s.state = StepState::kOk;
             else if (state == "skipped") s.state = StepState::kSkipped;
             else if (state == "failed") s.state = StepState::kFailed;
@@ -227,7 +229,7 @@ namespace CliSetup
 OS=$(uname -s)
 STARTED=$(date +%s)
 STEPS="path headless node mcp agent"
-for s in $STEPS; do eval ": \"\${ST_$s:=pending}\"; : \"\${DT_$s:=}\""; done
+for s in $STEPS; do eval ": \"\${ST_$s:=pending}\"; : \"\${DT_$s:=}\"; : \"\${RS_$s:=}\""; done
 FAILED=0
 BIN="$HOME/.local/bin"; APPBIN="$BIN/infinite-app"
 RECORD="$(dirname "$STATUS")/exe"
@@ -241,39 +243,61 @@ write_status() {
       "$(clean "$OS")" "$(clean "$AGENT_ID")" "$(clean "$EXE")" "$1" "$STARTED" "$fin"
     sep=""
     for s in $STEPS; do
-      eval "st=\$ST_$s; dt=\$DT_$s"
-      printf '%s{"id":"%s","state":"%s","detail":"%s"}' "$sep" "$s" "$st" "$(clean "$dt")"
+      eval "st=\$ST_$s; dt=\$DT_$s; rs=\$RS_$s"
+      printf '%s{"id":"%s","state":"%s","detail":"%s","reason":"%s"}' "$sep" "$s" "$st" "$(clean "$dt")" "$(clean "$rs")"
       sep=","
     done
     printf ']}\n'
   } > "$STATUS.tmp" && mv "$STATUS.tmp" "$STATUS"
 }
 begin() { ID=$2; printf '\nStep %s/5: %s\n' "$1" "$3"; eval "ST_$ID=running"; write_status true; }
-finish() {
-  eval "ST_$ID=\$1; DT_$ID=\$2"
+finish() { # state, detail, reason (why a failed step failed, read by the app: offline, disk, download, password, ...)
+  eval "ST_$ID=\$1; DT_$ID=\$2; RS_$ID=\${3:-}"
   printf '   %s: %s\n' "$1" "$2"
   [ "$1" = failed ] && FAILED=$((FAILED + 1))
   write_status true
 }
-pkg_install() { # apt names, dnf names, pacman names, brew name
-  case "$OS" in
-    Darwin) command -v brew >/dev/null 2>&1 || return 1; printf '   running: brew install %s\n' "$4"; brew install $4 ;;
-    Linux)
-      if command -v apt-get >/dev/null 2>&1; then printf '   running: sudo apt-get install -y %s\n' "$1"; sudo apt-get install -y $1
-      elif command -v dnf >/dev/null 2>&1; then printf '   running: sudo dnf install -y %s\n' "$2"; sudo dnf install -y $2
-      elif command -v pacman >/dev/null 2>&1; then printf '   running: sudo pacman -S --noconfirm %s\n' "$3"; sudo pacman -S --noconfirm $3
-      else return 1; fi ;;
-    *) return 1 ;;
-  esac
+# Linux packages only. Run by the Chat panel (no terminal, INFINITE_SETUP_QUIET set) sudo -n fails at once
+# instead of waiting for a password no one can type; in a Terminal tab sudo asks as usual.
+SUDO=sudo
+[ -n "${INFINITE_SETUP_QUIET:-}" ] && SUDO="sudo -n"
+pkg_install() { # apt names, dnf names, pacman names
+  [ "$OS" = Linux ] || return 1
+  if command -v apt-get >/dev/null 2>&1; then printf '   running: sudo apt-get install -y %s\n' "$1"; $SUDO apt-get install -y $1
+  elif command -v dnf >/dev/null 2>&1; then printf '   running: sudo dnf install -y %s\n' "$2"; $SUDO dnf install -y $2
+  elif command -v pacman >/dev/null 2>&1; then printf '   running: sudo pacman -S --noconfirm %s\n' "$3"; $SUDO pacman -S --noconfirm $3
+  else return 1; fi
 }
-node_hint() { # one next step for this machine
-  if command -v node >/dev/null 2>&1; then
-    printf 'Node.js %s is too old; 18 or newer is needed. Update it, then press Connect again' "$(node -v)"
-  elif [ "$(uname -s)" = Darwin ]; then
-    printf 'Node.js is needed. Run the macOS installer from https://nodejs.org/en/download, then press Connect again'
-  else
-    printf 'Node.js 18+ is needed. Install it with your package manager (zypper install nodejs, apk add nodejs npm) or from https://nodejs.org/en/download, then press Connect again'
-  fi
+# Downloads with curl, or wget where a small Linux has no curl. The agents' install lines use it too.
+fetch() {
+  if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 2 "$1"
+  elif command -v wget >/dev/null 2>&1; then wget -qO- "$1"
+  else printf 'neither curl nor wget is installed\n' >&2; return 127; fi
+}
+online() { fetch https://nodejs.org/dist/index.json >/dev/null 2>&1; }
+free_kb() { df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print $4}'; }
+# Node.js from nodejs.org into ~/.infinite/node: no Homebrew, no sudo, no admin rights. The file is checked
+# against nodejs.org's SHASUMS256.txt. Returns: 1 download failed, 2 checksum differs, 3 no build for this
+# machine, 4 could not unpack or write.
+NODE_DIR="$HOME/.infinite/node"
+private_node() {
+  case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=x64 ;; armv7l) arch=armv7l ;; *) return 3 ;; esac
+  case "$OS" in Darwin) plat=darwin ;; Linux) plat=linux ;; *) return 3 ;; esac
+  base=https://nodejs.org/dist/latest-v24.x
+  tmp="$HOME/.infinite/download.$$"; rm -rf "$tmp"; mkdir -p "$tmp" || return 4
+  fetch "$base/SHASUMS256.txt" > "$tmp/sums" || { rm -rf "$tmp"; return 1; }
+  name=$(grep -E " node-v[0-9.]+-$plat-$arch\.tar\.gz\$" "$tmp/sums" | awk '{print $2}' | head -n 1)
+  [ -n "$name" ] || { rm -rf "$tmp"; return 3; }
+  want=$(grep -F " $name" "$tmp/sums" | awk '{print $1}' | head -n 1)
+  printf '   downloading %s from nodejs.org\n' "$name"
+  fetch "$base/$name" > "$tmp/$name" || { rm -rf "$tmp"; return 1; }
+  got=$( { sha256sum "$tmp/$name" 2>/dev/null || shasum -a 256 "$tmp/$name"; } | awk '{print $1}')
+  [ -n "$want" ] && [ "$got" = "$want" ] || { rm -rf "$tmp"; return 2; }
+  mkdir -p "$tmp/x" && tar -xzf "$tmp/$name" -C "$tmp/x" || { rm -rf "$tmp"; return 4; }
+  rm -rf "$NODE_DIR.old"; [ -d "$NODE_DIR" ] && mv "$NODE_DIR" "$NODE_DIR.old"
+  if mv "$tmp/x/${name%.tar.gz}" "$NODE_DIR"; then rm -rf "$tmp" "$NODE_DIR.old"; return 0; fi
+  [ -d "$NODE_DIR.old" ] && mv "$NODE_DIR.old" "$NODE_DIR"
+  rm -rf "$tmp"; return 4
 }
 node_ok() {
   command -v node >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 &&
@@ -285,6 +309,7 @@ launcher() { # $1 = "--cli " for the infinite command, empty for infinite-app
   printf '#!/bin/sh\nP=$(cat "%s" 2>/dev/null)\n[ -x "$P" ] || for P in /Applications/Infinite.app/Contents/MacOS/Infinite "$HOME/Applications/Infinite.app/Contents/MacOS/Infinite" /opt/Infinite/Infinite; do [ -x "$P" ] && break; done\n[ -x "$P" ] || { echo "infinite: Infinite is not installed or was moved. Open it once, then try again." >&2; exit 127; }\nexec "$P" %s"$@"\n' "$RECORD" "$1"
 }
 mkdir -p "$(dirname "$STATUS")"
+[ -x "$NODE_DIR/bin/node" ] && PATH="$NODE_DIR/bin:$PATH" && export PATH
 write_status true
 printf 'Infinite: command line and agent setup. Safe to run again.\n'
 
@@ -308,14 +333,14 @@ esac
 ON_PATH=0; case ":$PATH:" in *":$BIN:"*) ON_PATH=1 ;; esac
 IN_RC=0; grep -qs '# >>> infinite cli >>>' "$RC" && IN_RC=1
 if [ $SHIM_ERR = 1 ]; then
-  finish failed "could not write ~/.local/bin/infinite"
+  finish failed "could not write ~/.local/bin/infinite" launcher
 elif [ $ON_PATH = 1 ] || [ $IN_RC = 1 ]; then
   if [ $SHIM_NEW = 1 ]; then finish ok "updated ~/.local/bin/infinite"; else finish skipped "~/.local/bin/infinite already set up"; fi
 else
   if printf '\n# >>> infinite cli >>>\nexport PATH="$HOME/.local/bin:$PATH"\n# <<< infinite cli <<<\n' >> "$RC" 2>/dev/null; then
     finish ok "added ~/.local/bin/infinite and a PATH line in $(basename "$RC"). Open a new terminal tab to use it"
   else
-    finish failed "could not write $(basename "$RC")"
+    finish failed "could not write $(basename "$RC")" launcher
   fi
 fi
 fi
@@ -331,7 +356,7 @@ else
     if pkg_install xvfb xorg-x11-server-Xvfb xorg-server-xvfb xvfb && command -v xvfb-run >/dev/null 2>&1; then
       finish ok "$VER; installed xvfb for renders without a display"
     else
-      finish failed "renders without a display need xvfb-run. Install the xvfb package"
+      finish failed "renders without a display need xvfb-run. Install the xvfb package" password
     fi
   else
     finish skipped "$VER"
@@ -344,10 +369,22 @@ if want node; then
 begin 3 node "Check Node.js (runs the MCP server)"
 if node_ok; then
   finish skipped "node $(node -v)"
-elif pkg_install "nodejs npm" "nodejs npm" "nodejs npm" node && node_ok; then
-  finish ok "installed node $(node -v)"
+elif ! online; then
+  if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then finish failed "no internet: nodejs.org did not answer" offline
+  else finish failed "curl or wget is needed to download" download; fi
+elif [ "$(free_kb)" -lt 600000 ] 2>/dev/null; then
+  finish failed "not enough free space in your home folder" disk
 else
-  finish failed "$(node_hint)"
+  private_node; rc=$?
+  PATH="$NODE_DIR/bin:$PATH"; export PATH; hash -r 2>/dev/null
+  if [ $rc = 0 ] && node_ok; then
+    case "$SHELL" in */zsh) NRC="$HOME/.zshrc" ;; */bash) if [ "$OS" = Darwin ]; then NRC="$HOME/.bash_profile"; else NRC="$HOME/.bashrc"; fi ;; *) NRC="$HOME/.profile" ;; esac
+    grep -qs '# >>> infinite node >>>' "$NRC" || printf '\n# >>> infinite node >>>\nexport PATH="$HOME/.infinite/node/bin:$PATH"\n# <<< infinite node <<<\n' >> "$NRC" 2>/dev/null
+    finish ok "installed node $(node -v) in ~/.infinite/node"
+  elif [ $rc = 1 ] || [ $rc = 2 ]; then finish failed "the Node.js download did not finish" download
+  elif [ $rc = 3 ]; then finish failed "nodejs.org has no Node.js for this computer ($(uname -s) $(uname -m))" unsupported
+  elif [ $rc = 4 ]; then finish failed "could not unpack Node.js into ~/.infinite/node" disk
+  else finish failed "Node.js did not start after install" nodeversion; fi
 fi
 fi
 
@@ -355,13 +392,17 @@ fi
 if want mcp; then
 begin 4 mcp "Fetch the Infinite MCP server"
 if ! node_ok; then
-  finish failed "needs Node.js (step 3)"
+  finish failed "needs Node.js (step 3)" nodeversion
 else
   OUT=$(INFINITE_BIN="$EXE" npx -y infinite-engine status 2>&1)
   if printf '%s' "$OUT" | grep -q 'infinite program: ' && ! printf '%s' "$OUT" | grep -q 'not found'; then
     finish ok "infinite-engine finds this app"
+  elif printf '%s' "$OUT" | grep -qiE 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|network'; then
+    finish failed "$(printf '%s' "$OUT" | tail -n 1)" offline
+  elif printf '%s' "$OUT" | grep -qi 'ENOSPC'; then
+    finish failed "$(printf '%s' "$OUT" | tail -n 1)" disk
   else
-    finish failed "$(printf '%s' "$OUT" | tail -n 1)"
+    finish failed "$(printf '%s' "$OUT" | tail -n 1)" register
   fi
 fi
 fi
@@ -382,7 +423,7 @@ skills_sync() {
 }
 if want agent; then
 begin 5 agent "Connect $AGENT_NAME (MCP server and AI skills)"
-export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="$NODE_DIR/bin:$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
 # npm puts a global install in its own prefix (a Homebrew keg, nvm, ~/.npm-global), which a Mac app's PATH lacks;
 # the login shell's PATH is where the agent will run from, so look there too.
 NPM_BIN="$(npm prefix -g 2>/dev/null)/bin"
@@ -392,14 +433,17 @@ LOGIN_PATH="$("${SHELL:-/bin/sh}" -lc 'printf %s "$PATH"' 2>/dev/null)"
 export PATH
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ]; then
   printf '   running: %s\n' "$AGENT_INSTALL"
-  sh -c "$AGENT_INSTALL"
+  ( eval "$AGENT_INSTALL" ) </dev/null
   hash -r 2>/dev/null
 fi
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
-  if [ -n "$AGENT_INSTALL" ]; then finish failed "$AGENT_NAME did not install. The lines above say why"
+  if [ -n "$AGENT_INSTALL" ]; then
+    if ! online; then finish failed "no internet while installing $AGENT_NAME" offline
+    elif [ "$(free_kb)" -lt 300000 ] 2>/dev/null; then finish failed "not enough free space to install $AGENT_NAME" disk
+    else finish failed "$AGENT_NAME did not install. The lines above say why" install; fi
   else finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"; fi
 elif [ ! -x "$APPBIN" ]; then
-  finish failed "run step 1 first: $APPBIN is missing"
+  finish failed "run step 1 first: $APPBIN is missing" launcher
 else
   REG=skipped
   if mcp_check_out=$(mcp_check 2>/dev/null) && printf '%s' "$mcp_check_out" | grep -qF "$APPBIN"; then :
@@ -408,9 +452,9 @@ else
     if mcp_add; then REG=ok; else REG=failed; fi
   fi
   if ! skills_sync; then
-    finish failed "could not write the AI skills to $SKILLS_DIR"
+    finish failed "could not write the AI skills to $SKILLS_DIR" skills
   elif [ "$REG" = failed ]; then
-    finish failed "$AGENT_NAME refused the registration"
+    finish failed "$AGENT_NAME refused the registration" register
   elif [ "$REG" = ok ] || [ "$SK_N" -gt 0 ]; then
     finish ok "registered with $AGENT_NAME; $SK_N AI skill file(s) installed"
   else
@@ -427,8 +471,13 @@ printf '\nDone. %s step(s) need attention.\n' "$FAILED"
       const char* const kPsBody = R"PS(
 # ---- fixed part -------------------------------------------------------------------------------
 $Started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$Steps = [ordered]@{ path = @('pending', ''); headless = @('pending', ''); node = @('pending', ''); mcp = @('pending', ''); agent = @('pending', '') }
-foreach ($k in @($Steps.Keys)) { if ($Prior.ContainsKey($k)) { $Steps[$k] = @($Prior[$k][0], $Prior[$k][1]) } }
+# Older Windows 10 PowerShell speaks TLS 1.0 by default, which nodejs.org and the installers refuse.
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch {}
+$ProgressPreference = 'SilentlyContinue'
+$Steps = [ordered]@{ path = @('pending', '', ''); headless = @('pending', '', ''); node = @('pending', '', ''); mcp = @('pending', '', ''); agent = @('pending', '', '') }
+foreach ($k in @($Steps.Keys)) { if ($Prior.ContainsKey($k)) { $Steps[$k] = @($Prior[$k][0], $Prior[$k][1], $Prior[$k][2]) } }
+$NodeDir = Join-Path $env:LOCALAPPDATA 'Infinite\node'
+if (Test-Path (Join-Path $NodeDir 'node.exe')) { $env:Path = "$NodeDir;$env:Path" }
 $Failed = 0
 $Id = ''
 $Bin = Join-Path $env:LOCALAPPDATA 'Infinite\bin'
@@ -437,19 +486,49 @@ $Record = Join-Path (Split-Path $Status) 'exe'
 function Want([string]$id) { return ($Only.Count -eq 0) -or ($Only -contains $id) }
 function Save([bool]$Running) {
   $fin = 0; if (-not $Running) { $fin = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
-  $list = @(); foreach ($k in $Steps.Keys) { $d = [string]$Steps[$k][1]; if ($d.Length -gt 200) { $d = $d.Substring(0, 200) }; $list += [ordered]@{ id = $k; state = $Steps[$k][0]; detail = $d } }
+  $list = @(); foreach ($k in $Steps.Keys) { $d = [string]$Steps[$k][1]; if ($d.Length -gt 200) { $d = $d.Substring(0, 200) }; $list += [ordered]@{ id = $k; state = $Steps[$k][0]; detail = $d; reason = [string]$Steps[$k][2] } }
   $obj = [ordered]@{ version = 1; os = 'windows'; agent = $AgentId; exe = $Exe; running = $Running; startedAt = $Started; finishedAt = $fin; steps = $list }
   $dir = Split-Path $Status; if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force $dir | Out-Null }
   ($obj | ConvertTo-Json -Depth 4) | Set-Content -Encoding UTF8 "$Status.tmp"; Move-Item -Force "$Status.tmp" $Status
 }
 function Begin([int]$n, [string]$id, [string]$title) { $script:Id = $id; Write-Host ""; Write-Host "Step ${n}/5: $title"; $Steps[$id][0] = 'running'; Save $true }
-function Finish([string]$state, [string]$detail) {
-  $Steps[$Id][0] = $state; $Steps[$Id][1] = $detail; Write-Host "   ${state}: $detail"
+function Finish([string]$state, [string]$detail, [string]$reason = '') {
+  $Steps[$Id][0] = $state; $Steps[$Id][1] = $detail; $Steps[$Id][2] = $reason; Write-Host "   ${state}: $detail"
   if ($state -eq 'failed') { $script:Failed++ }
   Save $true
 }
 function NodeOk { $n = Get-Command node -ErrorAction SilentlyContinue; $x = Get-Command npx -ErrorAction SilentlyContinue; if (-not $n -or -not $x) { return $false }; return ([int](& node -p 'process.versions.node.split(".")[0]')) -ge 18 }
-function RefreshPath { $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User') }
+function RefreshPath { $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User'); if (Test-Path (Join-Path $NodeDir 'node.exe')) { $env:Path = "$NodeDir;$env:Path" } }
+function Online { try { Invoke-WebRequest -UseBasicParsing -Method Head -TimeoutSec 15 'https://nodejs.org/dist/index.json' | Out-Null; return $true } catch { return $false } }
+function FreeMb { try { $d = Get-PSDrive ($env:LOCALAPPDATA.Substring(0, 1)); return [int]($d.Free / 1MB) } catch { return -1 } }
+function AddUserPath([string]$dir) { $u = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $u) { $u = '' }; if (-not (($u -split ';') -contains $dir)) { [Environment]::SetEnvironmentVariable('Path', ($dir + ';' + $u.TrimStart(';')), 'User') } }
+# Node.js from nodejs.org into %LOCALAPPDATA%\Infinite\node: no winget, no admin rights. Checked against SHASUMS256.txt.
+# Returns '' or a reason: download, unsupported, disk.
+function PrivateNode {
+  $arch = 'x64'; if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { $arch = 'arm64' }
+  $base = 'https://nodejs.org/dist/latest-v24.x'
+  $tmp = Join-Path $env:TEMP ('infinite-node-' + [guid]::NewGuid().ToString('N'))
+  try {
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    $sums = (Invoke-WebRequest -UseBasicParsing "$base/SHASUMS256.txt").Content
+    if ($sums -is [byte[]]) { $sums = [Text.Encoding]::ASCII.GetString($sums) }
+    $line = ($sums -split "`n") | Where-Object { $_ -match "\snode-v[0-9.]+-win-$arch\.zip\s*$" } | Select-Object -First 1
+    if (-not $line) { return 'unsupported' }
+    $want = ($line -split '\s+')[0]; $name = ($line.Trim() -split '\s+')[-1]
+    Write-Host "   downloading $name from nodejs.org"
+    $zip = Join-Path $tmp $name
+    try { Invoke-WebRequest -UseBasicParsing "$base/$name" -OutFile $zip } catch { return 'download' }
+    if ((Get-FileHash -Algorithm SHA256 $zip).Hash -ne $want.ToUpper()) { return 'download' }
+    try { Expand-Archive -Force $zip (Join-Path $tmp 'x') } catch { return 'disk' }
+    $inner = Join-Path (Join-Path $tmp 'x') ([IO.Path]::GetFileNameWithoutExtension($name))
+    New-Item -ItemType Directory -Force (Split-Path $NodeDir) | Out-Null
+    if (Test-Path $NodeDir) { Remove-Item -Recurse -Force $NodeDir }
+    Move-Item $inner $NodeDir
+    return ''
+  } catch { if ("$_" -match 'space') { return 'disk' }; return 'download' }
+  finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+}
+if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { $Locked = $true } else { $Locked = $false }
 # The launchers never name this copy of Infinite: they read the path Infinite records at each start.
 function Launcher([string]$arg) { return "@echo off`r`nset /p P=<`"$Record`"`r`nif not exist `"%P%`" set P=C:\Program Files\Infinite\Infinite.exe`r`nif not exist `"%P%`" (echo infinite: Infinite is not installed or was moved. Open it once, then try again. 1>&2 & exit /b 127)`r`n`"%P%`" $arg%*`r`n" }
 Save $true
@@ -470,7 +549,7 @@ try {
   $user = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $user) { $user = '' }
   if (($user -split ';') -contains $Bin) { if ($new) { Finish 'ok' "updated $Bin" } else { Finish 'skipped' "$Bin already set up" } }
   else { [Environment]::SetEnvironmentVariable('Path', ($user.TrimEnd(';') + ';' + $Bin), 'User'); Finish 'ok' "added $Bin to your PATH. Open a new terminal tab to use it" }
-} catch { Finish 'failed' "$_" }
+} catch { Finish 'failed' "$_" 'launcher' }
 }
 
 # 2. the headless engine
@@ -483,23 +562,30 @@ try { $ver = (& $Exe --version 2>&1 | Select-Object -First 1); if ($LASTEXITCODE
 if (Want 'node') {
 Begin 3 'node' 'Check Node.js (runs the MCP server)'
 if (NodeOk) { Finish 'skipped' "node $(& node -v)" }
+elseif ($Locked) { Finish 'failed' 'this computer runs PowerShell in a locked mode; installers cannot run' 'policy' }
+elseif (-not (Online)) { Finish 'failed' 'no internet: nodejs.org did not answer' 'offline' }
+elseif ((FreeMb) -ge 0 -and (FreeMb) -lt 600) { Finish 'failed' 'not enough free space' 'disk' }
 else {
-  if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host '   running: winget install OpenJS.NodeJS.LTS'; winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements; RefreshPath }
-  if (NodeOk) { Finish 'ok' "installed node $(& node -v)" }
-  elseif (Get-Command node -ErrorAction SilentlyContinue) { Finish 'failed' "Node.js $(& node -v) is too old; 18 or newer is needed. Update it, then press Connect again" }
-  else { Finish 'failed' 'Node.js is needed. Run the Windows installer (.msi) from https://nodejs.org/en/download, then press Connect again' }
+  $why = PrivateNode
+  $env:Path = "$NodeDir;$env:Path"
+  if (-not $why -and (NodeOk)) { AddUserPath $NodeDir; Finish 'ok' "installed node $(& node -v) in $NodeDir" }
+  elseif ($why) { Finish 'failed' "Node.js could not be set up ($why)" $why }
+  else { Finish 'failed' 'Node.js did not start after install' 'nodeversion' }
 }
 }
 
 # 4. the MCP server
 if (Want 'mcp') {
 Begin 4 'mcp' 'Fetch the Infinite MCP server'
-if (-not (NodeOk)) { Finish 'failed' 'needs Node.js (step 3)' }
+if (-not (NodeOk)) { Finish 'failed' 'needs Node.js (step 3)' 'nodeversion' }
 else {
   $env:INFINITE_BIN = $Exe
   $out = (& npx -y infinite-engine status 2>&1 | Out-String)
+  $last = (($out.Trim() -split "`n")[-1])
   if (($out -match 'infinite program: ') -and ($out -notmatch 'not found')) { Finish 'ok' 'infinite-engine finds this app' }
-  else { Finish 'failed' (($out.Trim() -split "`n")[-1]) }
+  elseif ($out -match 'ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|network') { Finish 'failed' $last 'offline' }
+  elseif ($out -match 'ENOSPC') { Finish 'failed' $last 'disk' }
+  else { Finish 'failed' $last 'register' }
 }
 }
 
@@ -518,17 +604,25 @@ function SkillsSync {
 }
 if (Want 'agent') {
 Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
-$env:Path = "$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path"
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; Invoke-Expression $AgentInstall; RefreshPath; $env:Path = "$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path" }
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { if ($AgentInstall) { Finish 'failed' "$AgentName did not install. The lines above say why" } else { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" } }
-elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
+$env:Path = "$NodeDir;$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path"
+# Invoke-Expression runs the installer's text in this process, which already runs with -ExecutionPolicy Bypass:
+# the machine's script policy is not changed and does not stop it.
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; try { Invoke-Expression $AgentInstall } catch { Write-Host "   $_" }; RefreshPath; $env:Path = "$NodeDir;$env:USERPROFILE\.local\bin;$env:APPDATA\npm;$env:Path" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) {
+  if (-not $AgentInstall) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" }
+  elseif ($Locked) { Finish 'failed' "$AgentName did not install: PowerShell runs in a locked mode" 'policy' }
+  elseif (-not (Online)) { Finish 'failed' "no internet while installing $AgentName" 'offline' }
+  elseif ((FreeMb) -ge 0 -and (FreeMb) -lt 300) { Finish 'failed' "not enough free space to install $AgentName" 'disk' }
+  else { Finish 'failed' "$AgentName did not install. The lines above say why" 'install' }
+}
+elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" 'launcher' }
 else {
   $reg = 'skipped'
   $cur = (McpCheck 2>$null | Out-String)
   if (-not $cur.Contains($AppBin)) { McpRemove 2>$null | Out-Null; McpAdd; if ($LASTEXITCODE -eq 0) { $reg = 'ok' } else { $reg = 'failed' } }
   try { [void](SkillsSync); $skOk = $true } catch { $skOk = $false }
-  if (-not $skOk) { Finish 'failed' "could not write the AI skills to $SkillsDir" }
-  elseif ($reg -eq 'failed') { Finish 'failed' "$AgentName refused the registration" }
+  if (-not $skOk) { Finish 'failed' "could not write the AI skills to $SkillsDir" 'skills' }
+  elseif ($reg -eq 'failed') { Finish 'failed' "$AgentName refused the registration" 'register' }
   elseif ($reg -eq 'ok' -or $SkN -gt 0) { Finish 'ok' "registered with $AgentName; $SkN AI skill file(s) installed" }
   else { Finish 'skipped' 'already registered; AI skills up to date' }
 }
@@ -559,7 +653,7 @@ if ($Failed -gt 0) { exit 1 }
             for (const StepStatus& st : prior->steps)
             {
                const char* name = st.state == StepState::kOk ? "ok" : st.state == StepState::kSkipped ? "skipped" : st.state == StepState::kFailed ? "failed" : st.state == StepState::kWaiting ? "waiting" : "pending";
-               o << " " << PsQuote(st.id) << " = @(" << PsQuote(name) << ", " << PsQuote(st.detail) << ");";
+               o << " " << PsQuote(st.id) << " = @(" << PsQuote(name) << ", " << PsQuote(st.detail) << ", " << PsQuote(st.reason) << ");";
             }
          o << " }\n";
          o << "$AppBin = Join-Path (Join-Path $env:LOCALAPPDATA 'Infinite\\bin') 'infinite-app.cmd'\n";
@@ -583,7 +677,7 @@ if ($Failed -gt 0) { exit 1 }
          for (const StepStatus& st : prior->steps)
          {
             const char* name = st.state == StepState::kOk ? "ok" : st.state == StepState::kSkipped ? "skipped" : st.state == StepState::kFailed ? "failed" : st.state == StepState::kWaiting ? "waiting" : "pending";
-            o << "ST_" << st.id << "=" << name << "; DT_" << st.id << "=" << ShQuote(st.detail) << "\n";
+            o << "ST_" << st.id << "=" << name << "; DT_" << st.id << "=" << ShQuote(st.detail) << "; RS_" << st.id << "=" << ShQuote(st.reason) << "\n";
          }
       o << "APPBIN=\"$HOME/.local/bin/infinite-app\"\nSKILLS_SRC=\"$(dirname \"$STATUS\")/skills\"\n";
       o << "SKILLS_DIR=" << (agent.skillsDir[0] != '\0' ? "\"$HOME/" + std::string(agent.skillsDir) + "\"" : std::string("''")) << "\n";
@@ -603,17 +697,28 @@ if ($Failed -gt 0) { exit 1 }
 
    std::string InstallAgentLine(Os os, const Agent& agent)
    {
-      return os == Os::kWindows ? agent.installWin : agent.installUnix;
+      if (os == Os::kWindows)
+         return agent.installWin;
+      // The same fetch() the setup script defines: curl, or wget where there is no curl.
+      return std::string("fetch() { if command -v curl >/dev/null 2>&1; then curl -fsSL \"$1\"; else wget -qO- \"$1\"; fi; }; "
+                         "export PATH=\"$HOME/.infinite/node/bin:$PATH\"; ") + agent.installUnix;
+   }
+
+   std::string NodeDir(Os os, const std::string& home, const std::string& localAppData)
+   {
+      if (os == Os::kWindows)
+         return localAppData.empty() ? std::string() : localAppData + "\\Infinite\\node";
+      return home.empty() ? std::string() : home + "/.infinite/node/bin";
    }
 
    std::string StartAgentLine(Os os, const std::string& exe, const Agent& agent)
    {
       const std::string tool = ToolRef(os, PathsFor(AppPaths::AppSupportDir(), os).dir);
       if (os == Os::kWindows)
-         return "$env:Path = \"$env:USERPROFILE\\.local\\bin;$env:APPDATA\\npm;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
+         return "$env:Path = \"$env:LOCALAPPDATA\\Infinite\\node;$env:USERPROFILE\\.local\\bin;$env:APPDATA\\npm;$env:Path\"; $A = Join-Path $env:LOCALAPPDATA 'Infinite\\bin\\infinite-app.cmd'; if (-not (Test-Path $A)) { $A = " +
                 PsQuote(exe) + " }; if (-not ((" + Sub(agent.mcpCheck, "$A", tool) + " 2>$null | Out-String).Contains($A))) { " +
                 Sub(agent.mcpRemove, "$A", tool) + " 2>$null | Out-Null; " + Sub(agent.mcpAdd, "$A", tool) + " }; " + agent.launch;
-      return std::string("export PATH=\"$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; A=\"$HOME/.local/bin/infinite-app\"; [ -x \"$A\" ] || A=") +
+      return std::string("export PATH=\"$HOME/.infinite/node/bin:$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH\"; A=\"$HOME/.local/bin/infinite-app\"; [ -x \"$A\" ] || A=") +
              ShQuote(exe) + "; " + Sub(agent.mcpCheck, "\"$A\"", tool) + " 2>/dev/null | grep -qF \"$A\" || { " + Sub(agent.mcpRemove, "\"$A\"", tool) +
              " >/dev/null 2>&1; " + Sub(agent.mcpAdd, "\"$A\"", tool) + "; }; " + agent.launch;
    }
@@ -630,6 +735,13 @@ if ($Failed -gt 0) { exit 1 }
       {
          dirs.push_back(home + "/.local/bin");
          dirs.push_back(home + "/.claude/local");
+      }
+      // Infinite's own Node folder: setup installs Node there, and ChatGPT with it.
+      {
+         const char* local = getenv("LOCALAPPDATA");
+         const std::string own = NodeDir(os, home, local != nullptr ? local : "");
+         if (!own.empty())
+            dirs.push_back(own);
       }
       if (os == Os::kMac)
       {
@@ -699,6 +811,7 @@ if ($Failed -gt 0) { exit 1 }
       c.workspace = j.value("workspace", std::string());
       c.folderAccess = j.value("folderAccess", false);
       c.introduced = j.value("introduced", false);
+      c.tried = j.value("tried", false);
       for (const char* key : { "folders", "commands" })
          if (j.contains(key) && j[key].is_array())
             for (const auto& v : j[key])
@@ -730,7 +843,7 @@ if ($Failed -gt 0) { exit 1 }
       for (const auto& [id, u] : c.usage)
          usage[id] = { { "turns", u.turns }, { "input", u.input }, { "cached", u.cached }, { "output", u.output }, { "cost", u.cost } };
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
-                                                                { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced },
+                                                                { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced }, { "tried", c.tried },
                                                                 { "models", c.models }, { "folders", c.folders }, { "commands", c.commands },
                                                                 { "usage", usage } }.dump(2) << "\n";
    }
@@ -768,6 +881,12 @@ if ($Failed -gt 0) { exit 1 }
                dirs.push_back(d);
          if (!home.empty())
             dirs.push_back(home + "/.local/bin");
+         {
+            const char* local = getenv("LOCALAPPDATA");
+            const std::string own = NodeDir(os, home, local != nullptr ? local : "");
+            if (!own.empty())
+               dirs.push_back(own);
+         }
          if (os == Os::kMac)
          {
             dirs.push_back("/opt/homebrew/bin");

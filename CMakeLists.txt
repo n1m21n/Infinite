@@ -536,6 +536,7 @@ set(COMMON_SOURCES
     src/core/chat/AgentRun.cpp
     src/core/chat/ChatGuide.cpp
     src/core/chat/AgentAuth.cpp
+    src/core/chat/Onboarding.cpp
     src/core/chat/ChatDiff.cpp
     src/core/chat/ChatFiles.cpp
     src/core/chat/NodeFinder.cpp

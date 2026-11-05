@@ -44,6 +44,7 @@ namespace CliSetup
       const char* title;
       StepState state = StepState::kPending;
       std::string detail;
+      std::string reason;       // why a failed step failed, for plain words: offline, disk, download, policy, password, ...
       std::string repairLine;   // only on a kRepair row: the line its Repair button types
       bool Green() const { return state == StepState::kOk || state == StepState::kSkipped; }
    };
@@ -76,6 +77,9 @@ namespace CliSetup
    // The one line typed into the Terminal tab.
    std::string SetupLine(Os os, const std::string& scriptPath);
    std::string InstallAgentLine(Os os, const Agent& agent);
+   // Where setup puts Node.js when the computer has none (or too old a one): a folder of the user's own, so no
+   // admin rights. Mac/Linux: ~/.infinite/node/bin; Windows: %LOCALAPPDATA%\Infinite\node. "" when unknown.
+   std::string NodeDir(Os os, const std::string& home, const std::string& localAppData);
    // Registers MCP when missing, then starts the agent.
    std::string StartAgentLine(Os os, const std::string& exe, const Agent& agent);
 
@@ -98,7 +102,8 @@ namespace CliSetup
       std::map<std::string, std::string> models;  // per agent id; missing = the agent's own default
       std::vector<std::string> folders;   // more folders agents may read (and edit, with folderAccess)
       std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")
-      bool introduced = false;    // the "connected, try this" line was shown once
+      bool introduced = false;    // the first-run folder card was answered
+      bool tried = false;         // a first message was sent: the empty chat stops offering the beginner ideas
       // Tokens the chat's agents used, per agent id, since the user last reset them (Settings > Agents).
       struct Usage
       {

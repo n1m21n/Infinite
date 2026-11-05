@@ -108,7 +108,9 @@ namespace chat
    {
       std::string l = StripAnsi(log);
       std::transform(l.begin(), l.end(), l.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-      return l.find("paste the authorization code") != std::string::npos || l.find("paste the code") != std::string::npos;
+      // Gemini: "paste the authorization code"; Claude with no browser: "Paste code here if prompted".
+      return l.find("paste the authorization code") != std::string::npos || l.find("paste the code") != std::string::npos ||
+             l.find("paste code here") != std::string::npos || l.find("enter the authorization code") != std::string::npos;
    }
 
    namespace
@@ -155,7 +157,33 @@ namespace chat
       Friendly f;
       const std::string clean = StripAnsi(raw);
       const std::string l = Lower(clean);
-      if (Has(l, { "authentication required", "authentication failed", "not logged in", "not signed in", "please run /login", "please log in",
+      // Machine problems first: their messages can also contain words like "login" or "not found".
+      if (Has(l, { "no space left on device", "enospc", "not enough space", "disk full", "there is not enough space" }))
+      {
+         f.kind = Friendly::Kind::Disk;
+         f.text = "Not enough free space. Free up 2 GB, then try again.";
+      }
+      else if (Has(l, { "running scripts is disabled", "executionpolicy", "execution policy", "constrainedlanguage" }))
+      {
+         f.kind = Friendly::Kind::Policy;
+         f.text = "This computer's settings block installers. Ask the person who manages it.";
+      }
+      else if (Has(l, { "a password is required", "a terminal is required to read the password", "sudo: no tty" }))
+      {
+         f.kind = Friendly::Kind::Password;
+         f.text = "This step needs your computer password. Open the terminal and type it there.";
+      }
+      else if (Has(l, { "xdg-open: not found", "no browser", "could not open a browser", "failed to open browser", "unable to open browser", "couldn't open the browser" }))
+      {
+         f.kind = Friendly::Kind::NoBrowser;
+         f.text = "No web browser found. Copy the sign-in address to a browser, then paste the code here.";
+      }
+      else if (Has(l, { "requires a subscription", "subscription required", "upgrade your plan", "upgrade to pro", "not available on your plan", "does not have access to claude code", "credit balance is too low" }))
+      {
+         f.kind = Friendly::Kind::Plan;
+         f.text = "Your " + agentName + " account needs a paid plan for this. Pick another one or upgrade.";
+      }
+      else if (Has(l, { "authentication required", "authentication failed", "not logged in", "not signed in", "please run /login", "please log in",
                    "invalid api key", "invalid x-api-key", "unauthorized", "token expired", "expired token", "oauth", "sign in", "log in", "login required" }))
       {
          f.kind = Friendly::Kind::SignIn;

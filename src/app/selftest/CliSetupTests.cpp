@@ -111,8 +111,12 @@ namespace app
          check(script.find("EXE='/Applications/Infinite'\\''s Dir/Infinite.app/Contents/MacOS/Infinite'") != std::string::npos, "single quote in the exe path is escaped");
          for (const char* step : { "begin 1 path", "begin 2 headless", "begin 3 node", "begin 4 mcp", "begin 5 agent" })
             check(script.find(step) != std::string::npos, step);
-         check(script.find("sudo") != std::string::npos && script.find("brew install") != std::string::npos, "installs are visible in the script");
-         check(Perform(Action::kInstallAgent, Os::kMac, claude, exe, real, runner, &err) && line == "curl -fsSL https://claude.ai/install.sh | bash", "install types the vendor's command");
+         check(script.find("brew install") == std::string::npos && script.find("private_node") != std::string::npos && script.find("SHASUMS256.txt") != std::string::npos,
+               "node comes from nodejs.org into Infinite's own folder, checksum checked, no Homebrew");
+         check(script.find("SUDO=\"sudo -n\"") != std::string::npos && script.find("INFINITE_SETUP_QUIET") != std::string::npos, "no password prompt when nobody can answer it");
+         check(script.find("\"reason\"") != std::string::npos, "status.json carries a reason for a failed step");
+         check(Perform(Action::kInstallAgent, Os::kMac, claude, exe, real, runner, &err) && line.find("fetch https://claude.ai/install.sh | bash") != std::string::npos &&
+               line.find("fetch()") == 0, "install types the vendor's command, through curl or wget");
          check(Perform(Action::kStartAgent, Os::kMac, claude, exe, real, runner, &err), "start action runs");
          {
             line.clear();
@@ -122,8 +126,8 @@ namespace app
                   "connect-all: the setup script, then only on success the agent, in one line");
             std::ifstream cf(real.script);
             const std::string connect((std::istreambuf_iterator<char>(cf)), std::istreambuf_iterator<char>());
-            check(connect.find("AGENT_INSTALL='curl -fsSL https://claude.ai/install.sh | bash'") != std::string::npos &&
-                  connect.find("AGENT_INSTALL=") < connect.find("begin 5 agent") && connect.find("begin 3 node") < connect.find("sh -c \"$AGENT_INSTALL\""),
+            check(connect.find("AGENT_INSTALL='fetch https://claude.ai/install.sh | bash'") != std::string::npos &&
+                  connect.find("AGENT_INSTALL=") < connect.find("begin 5 agent") && connect.find("begin 3 node") < connect.find("eval \"$AGENT_INSTALL\""),
                   "connect-all installs a missing agent at step 5, after Node");
             check(script.find("AGENT_INSTALL=''") != std::string::npos, "plain setup installs no agent");
          }
@@ -143,6 +147,10 @@ namespace app
          check(v.installLine.find("irm ") == 0, "windows: install is the PowerShell installer");
          const std::string ps = BuildScript(Os::kWindows, "C:\\Program Files\\Infinite\\Infinite.exe", claude, "C:\\s\\status.json");
          check(ps.find("$Exe = 'C:\\Program Files\\Infinite\\Infinite.exe'") != std::string::npos && ps.find("Step ${n}/5") != std::string::npos, "windows: script carries the exe and the steps");
+         check(ps.find("winget install") == std::string::npos && ps.find("PrivateNode") != std::string::npos && ps.find("Get-FileHash") != std::string::npos,
+               "windows: node from nodejs.org into LOCALAPPDATA, checksum checked, no winget or admin");
+         check(NodeDir(Os::kWindows, "", "C:\\Users\\a\\AppData\\Local") == "C:\\Users\\a\\AppData\\Local\\Infinite\\node", "windows: Infinite's own node folder");
+         check(NodeDir(Os::kMac, "/Users/a", "") == "/Users/a/.infinite/node/bin" && NodeDir(Os::kLinux, "", "").empty(), "mac/linux: Infinite's own node folder");
       }
 
       // 10. the agent probe and the config file.
@@ -166,6 +174,10 @@ namespace app
             std::error_code same;
             check(!ec && !found.empty() && std::filesystem::equivalent(found, keg, same) && !same, "probe: codex next to the real npm is found through a symlinked npm");
             check(BinaryDir(Os::kMac, "nothing-here", "", link.string()).empty(), "probe: an absent program has no folder");
+            // Infinite's own Node folder is looked in with nothing on the PATH (codex installs there).
+            std::filesystem::create_directories(dir / ".infinite" / "node" / "bin");
+            std::ofstream((dir / ".infinite" / "node" / "bin" / "codex").string()) << "x";
+            check(!BinaryDir(Os::kMac, "codex", dir.string(), "").empty(), "probe: codex in ~/.infinite/node/bin is found");
          }
          const std::string cfg = (dir / "config.json").string();
          check(LoadConfig(cfg).agent == "claude" && !LoadConfig(cfg).autoStart, "config: defaults (auto-start off)");
@@ -283,6 +295,17 @@ namespace app
          check(fs::exists(fs::path(real.dir) / "skills" / "infinite-expression-globals" / "SKILL.md") && script.find("SKILLS_DIR=\"$HOME/.claude/skills\"") != std::string::npos && script.find("cmp -s") != std::string::npos, "repair stages the skill files and the script copies them");
          check(!Perform(Action::kRepairStep, Os::kLinux, claude, exe, real, [&](const std::string&, const std::string&) {}, &err, "bogus", &prior), "repair refuses an unknown step");
          fs::remove_all(root);
+      }
+
+      // 12. a failed step's reason, for plain words in the Chat panel.
+      {
+         const char* st[5] = { "ok", "ok", "failed", "pending", "pending" };
+         const Status s = ParseStatus(StatusJson(1, false, now, st), now);
+         check(s.present && s.steps[2].reason.empty(), "reason: missing reads as empty");
+         std::string j = StatusJson(1, false, now, st);
+         const size_t at = j.find("\"detail\":\"d2\"");
+         j.insert(at, "\"reason\":\"offline\",");
+         check(ParseStatus(j, now).steps[2].reason == "offline", "reason: read from status.json");
       }
 
       std::printf("CLISETUPTEST %s\n", ok ? "PASS" : "FAIL");
