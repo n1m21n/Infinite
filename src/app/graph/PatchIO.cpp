@@ -348,7 +348,7 @@ namespace app
          else if (key == "panelViewportOpen")
             gViewportPanelOpen = (val != "0");
          else if (key == "panelViewportDock")
-            gViewportPanelDock = std::clamp(atoi(val.c_str()), 0, 3);
+            gViewportPanelDock = std::clamp(atoi(val.c_str()), 0, kDockFloating);
          else if (key == "panelViewportW")
             gViewportPanelWidth = std::max(kViewportPanelMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelViewportH")
@@ -356,7 +356,7 @@ namespace app
          else if (key == "panelMatrixOpen")
             gModMatrixOpen = (val != "0");
          else if (key == "panelMatrixDock")
-            gModMatrixDock = std::clamp(atoi(val.c_str()), 0, 3);
+            gModMatrixDock = std::clamp(atoi(val.c_str()), 0, kDockFloating);
          else if (key == "panelMatrixW")
             gModMatrixWidth = std::max(kModMatrixMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelMatrixH")
@@ -364,7 +364,7 @@ namespace app
          else if (key == "panelPerfOpen")
             gPerfPanelOpen = (val != "0");
          else if (key == "panelPerfDock")
-            gPerfPanelDock = std::clamp(atoi(val.c_str()), 0, 3);
+            gPerfPanelDock = std::clamp(atoi(val.c_str()), 0, kDockFloating);
          else if (key == "panelPerfW")
             gPerfPanelWidth = std::max(kPerfPanelMinWidth, std::strtof(val.c_str(), nullptr));
          else if (key == "panelPerfH")

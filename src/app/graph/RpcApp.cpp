@@ -59,7 +59,7 @@ namespace app
          static const std::pair<const char*, const char*> kAlias[] = {
             { "nodes", "library" }, { "nodelibrary", "library" }, { "browser", "library" }, { "addnode", "library" },
             { "piano", "pianoroll" }, { "notes", "pianoroll" }, { "studio", "samplestudio" }, { "sample", "samplestudio" },
-            { "samples", "samplestudio" }, { "sampler", "samplestudio" }, { "matrix", "modmatrix" },
+            { "samples", "samplestudio" }, { "matrix", "modmatrix" },
             { "modulation", "modmatrix" }, { "modulationmatrix", "modmatrix" }, { "performance", "perf" },
             { "arrange", "timeline" }, { "arrangement", "timeline" }, { "tracks", "timeline" }, { "3d", "view3d" },
             { "3dview", "view3d" }, { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" },

@@ -760,6 +760,14 @@ extern bool gNodePanelOpen;
 
 extern bool gViewportPanelOpen;
 
+// The dock value past Bottom/Right/Left/Top: the panel floats in its own movable, resizable window.
+inline constexpr int kDockFloating = 4;
+bool BeginFloatingPanel(const char* title, bool* open, const ImVec2& firstSize);
+void EndFloatingPanel();
+void DrawViewportPanelFloating();
+void DrawModMatrixFloating();
+void DrawPerfPanelFloating();
+
 extern std::vector<int> gViewportPanelNodes;
 
 extern int gViewportPanelDock;
@@ -5822,6 +5830,7 @@ void ChatAgentsTick();                                      // keeps the agents'
 ChatAgentInfo ChatAgentStatus(const std::string& id);
 bool ChatAgentCodeEntry(const std::string& id, float width);  // the paste-the-code field while a sign-in asks for one
 std::vector<std::pair<std::string, std::string>> ChatAgentModels(const std::string& id);   // {id, label}
+std::string ChatAgentModelFace(const std::string& id);   // the model it answers with, by name
 void ChatAgentAct(const std::string& id, bool repair);      // sign in, or set up again when repair (or not yet installed)
 void ChatClearHistory();   // deletes every saved chat and starts a new one; nothing while a turn runs
 void ChatDrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& agent);   // the agent's tinted initial

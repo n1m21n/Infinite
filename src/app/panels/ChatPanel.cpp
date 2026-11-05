@@ -19,6 +19,7 @@
 #include "core/CliSetup.h"
 #include "core/GraphNode.h"
 #include "core/NodeFactory.h"
+#include "nodes/SamplerNode.h"
 #include "audio/AudioEngine.h"
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
@@ -189,6 +190,8 @@ namespace app
       std::vector<Run> sRuns;
       bool sRail = false;  // the chats list is open on the left
       chat::Snapshot sBefore;
+      // Params the user turned from a change card while an agent ran: the next card is the agent's, not theirs.
+      std::set<std::pair<int, std::string>> sUserTurned;
       std::map<std::string, AgentState> sAgents;
       std::map<std::string, double> sModelsFetchAt;  // when each agent's model list was last asked for
       std::map<std::string, std::vector<chat::Model>> sModels;  // each agent's model menu
@@ -1273,6 +1276,7 @@ namespace app
          prompt = chat::WithFiles(prompt, files);
          const std::vector<std::string> dirs = chat::FileDirs(files);
          sBefore = Snap();
+         sUserTurned.clear();
          // The user's message is the last entry: each agent also gets what it missed of the chat before it.
          const int upto = (int)sThread.entries.size() - 1;
          for (const std::string& id : agents)
@@ -1371,8 +1375,6 @@ namespace app
                SaveCliConfig();
             }
             ImGui::EndDisabled();
-            if (fix.kind == chat::DeniedFix::Kind::Folder && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-               ImGui::SetTooltip("%s", CliSetup::HomeTilde(fix.value).c_str());
             FormParts::Inline(0.0f, tok::space_2);
          }
          if (ChipButton::Draw(T("Settings"), false))
@@ -1475,6 +1477,11 @@ namespace app
          sRuns.clear();
          Entry change = Make(Entry::Kind::Change, "");
          change.changes = chat::Diff(sBefore, Snap());
+         // What the user turned on a change card while the agent ran is theirs, not the agent's.
+         change.changes.erase(std::remove_if(change.changes.begin(), change.changes.end(),
+                                             [](const chat::ChangeLine& l) { return !l.key.empty() && sUserTurned.count({ l.node, l.key }) > 0; }),
+                              change.changes.end());
+         sUserTurned.clear();
          if (!change.changes.empty())
             Push(std::move(change));
          SaveNow();
@@ -1955,8 +1962,12 @@ namespace app
          return it != kPanels.end() ? it->second : IconsInfinite::Browser;
       }
 
-      bool RunAction(const chat::Seg& s)
+      bool RunAction(const chat::Seg& seg)
       {
+         // A Sampler is a node, not a panel: "open sampler" makes one.
+         chat::Seg s = seg;
+         if (s.verb == "open" && (s.arg == "sampler" || s.arg == "Sampler"))
+            s.verb = "add", s.arg = "Sampler";
          json r;
          std::string err;
          bool ok = false;
@@ -2034,11 +2045,7 @@ namespace app
          if (hovered)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            if (s.verb == "set")
-               ImGui::SetTooltip("%s.%s = %s", sCat.Node(s.node)->title.c_str(), s.key.c_str(), s.arg.c_str());
          }
-         else if (!live && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Not in the patch"));
          if (clicked && RunAction(s) && once)
             sActed.insert(id);
       }
@@ -2058,8 +2065,6 @@ namespace app
          {
             dl->AddText(ImVec2(at.x + tok::space_1, at.y + (lineH - ts.y) * 0.5f), Dim(), s.text.c_str());
             dl->AddLine(ImVec2(at.x + tok::space_1, at.y + lineH * 0.5f), ImVec2(at.x + tok::space_1 + ts.x, at.y + lineH * 0.5f), Dim(), 1.0f);
-            if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", T("Not in the patch"));
             return;
          }
          const ImU32 cat = n != nullptr ? CategoryU32(n->category) : TextTint(1.0f);
@@ -2071,10 +2076,6 @@ namespace app
          if (ImGui::IsItemHovered())
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            if (p != nullptr)
-               ImGui::SetTooltip("%s = %s   %s", p->key.c_str(), ValueText(*p).c_str(), ParamTip(*p).c_str());
-            else if (n != nullptr)
-               ImGui::SetTooltip("%s  #%d", n->type.c_str(), n->index);
          }
          if (clicked)
             Focus(s.node, s.kind == chat::Seg::Kind::Param ? s.key : std::string());
@@ -2317,11 +2318,16 @@ namespace app
          const float btn = 32.0f, folder = 28.0f;
          const ImVec2 bc(at.x + pad + btn * 0.5f, at.y + cardH * 0.5f);
          const float folderX = at.x + width - pad - folder;
+         const float samplerX = folderX - folder - tok::space_1;
 
          ImGui::PushID(rawPath.c_str());
-         ImGui::InvisibleButton("##aud", ImVec2(std::max(1.0f, folderX - at.x - tok::space_1), cardH));
+         ImGui::InvisibleButton("##aud", ImVec2(std::max(1.0f, samplerX - at.x - tok::space_1), cardH));
          const bool hot = ImGui::IsItemHovered() && exists;
          const bool clicked = ImGui::IsItemClicked() && exists;
+         FormParts::Inline(0.0f, 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(samplerX, at.y + (cardH - folder) * 0.5f));
+         const bool toSampler = ImGui::InvisibleButton("##sampler", ImVec2(folder, folder)) && exists;
+         const bool samplerHot = ImGui::IsItemHovered() && exists;
          FormParts::Inline(0.0f, 0.0f);
          ImGui::SetCursorScreenPos(ImVec2(folderX, at.y + (cardH - folder) * 0.5f));
          const bool reveal = ImGui::InvisibleButton("##reveal", ImVec2(folder, folder)) && exists;
@@ -2347,14 +2353,14 @@ namespace app
             std::snprintf(dur, sizeof dur, "%d:%02d", s / 60, s % 60);
          }
          const float durW = dur[0] ? ImGui::CalcTextSize(dur).x : 0.0f;
-         const float x1 = folderX - tok::space_2 - (durW > 0.0f ? durW + tok::space_3 : 0.0f);
+         const float x1 = samplerX - tok::space_2 - (durW > 0.0f ? durW + tok::space_3 : 0.0f);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
          const float fs = ImGui::GetFontSize();
          const float nameY = at.y + 8.0f;
          ImGui::RenderTextEllipsis(dl, ImVec2(x0, nameY), ImVec2(x1, nameY + fs), x1, shown.c_str(), nullptr, nullptr);
          if (dur[0])
-            dl->AddText(ImVec2(folderX - tok::space_2 - durW, at.y + (cardH - fs) * 0.5f), Dim(), dur);
+            dl->AddText(ImVec2(samplerX - tok::space_2 - durW, at.y + (cardH - fs) * 0.5f), Dim(), dur);
 
          // Waveform under the name: played part in the accent, the rest dim.
          const float wy0 = nameY + fs + 5.0f, wy1 = at.y + cardH - 8.0f;
@@ -2382,10 +2388,31 @@ namespace app
          glyph::Draw(dl, fc, tok::icon_sm, folderHot ? text : Dim(), IconsInfinite::Folder);
          if (folderHot)
             ImGui::SetTooltip("%s", T("Show in folder"));
-         if (hot || folderHot)
+         const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
+         if (samplerHot)
+            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+         glyph::Draw(dl, sc, tok::icon_sm, samplerHot ? text : Dim(), IconsInfinite::Waveform);
+         if (samplerHot)
+            ImGui::SetTooltip("%s", T("Open in a Sampler"));
+         if (hot || folderHot || samplerHot)
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + cardH));
          ImGui::Dummy(ImVec2(0.0f, 0.0f));
+
+         // The file becomes a Sampler on the canvas, loaded and in view.
+         if (toSampler)
+         {
+            PushUndoCheckpoint();
+            const ImVec2 spawn = FindFreeSpawnPosition(gViewCenterCanvas);
+            if (GraphNode* gn = SpawnNode("Sampler", "Synths", spawn.x, spawn.y))
+            {
+               if (auto* sampler = dynamic_cast<SamplerNode*>(gn->node.get()))
+                  sampler->LoadFile(path);
+               gPatchDirty = true;
+               Focus(gn->index);
+               RefreshCatalog(true);
+            }
+         }
 
          if (reveal)
             Platform::RevealInFileManager(path);
@@ -2416,7 +2443,7 @@ namespace app
          const std::string path = ExpandHome(rawPath);
          if (!std::filesystem::exists(path))
             return;
-         UiType::Scope cap(UiType::Size::Body, UiType::Weight::Medium);
+         Weight cap(UiType::Weight::Medium);
          const char* label = T("Show in folder");
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const ImVec2 sz = ImGui::CalcTextSize(label);
@@ -2703,7 +2730,7 @@ namespace app
 
       void DrawCodeChip(const std::string& title, const std::string& code, const char* id)
       {
-         UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+         Weight s(UiType::Weight::Medium);
          const int n = LineCount(code);
          char label[48];
          std::snprintf(label, sizeof label, n == 1 ? T("%d line") : T("%d lines"), n);
@@ -2815,8 +2842,6 @@ namespace app
             const float x = at.x + 22.0f + ImGui::CalcTextSize(AgentName(e.agent)).x + 8.0f;
             dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_TextDisabled), count.c_str());
             const ImVec2 sz = ImGui::CalcTextSize(count.c_str());
-            if (ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(ImVec2(x, ty), ImVec2(x + sz.x, ty + sz.y)))
-               ImGui::SetTooltip("%s %s", chat::TokenCount(e.cached).c_str(), T("of them read from the cache"));
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
@@ -2854,27 +2879,26 @@ namespace app
          return T("Code");
       }
 
-      // The params a change card set, as the perform knob: live on the canvas value, drag to try other
-      // values, the agent's value kept as a dot on the ring. Floats and ints only; a modulated param shows
-      // read-only in the modulation colour, as in perform mode.
       // Frames until the catalog re-reads after a knob write: the cook applies the write on a later frame,
-      // and the "now" note must show the new value, not the old one.
+      // and the card must show the new value, not the old one.
       int sRefreshIn = 0;
 
-      void DrawChangeKnobs(const Entry& e, size_t shown, float inner, int id)
+      struct KnobCell
       {
-         if (sRefreshIn > 0 && --sRefreshIn == 0)
-            RefreshCatalog(true);
-         struct Cell
-         {
-            int node = -1, param = -1;
-            const chat::CatalogParam* cp = nullptr;
-            const ParamRef* kp = nullptr;
-            float suggested = 0.0f;
-            bool hasSuggested = false;
-         };
-         std::vector<Cell> cells;
-         for (size_t i = 0; i < shown && cells.size() < 8; i++)
+         size_t line = 0;
+         int node = -1, param = -1;
+         const chat::CatalogParam* cp = nullptr;
+         const ParamRef* kp = nullptr;
+      };
+
+      // The value lines of a change card that can be a perform knob: a float or int the canvas has a control
+      // for, not moved by modulation or a formula. One per param.
+      std::vector<KnobCell> KnobCells(const Entry& e, size_t shown)
+      {
+         std::vector<KnobCell> cells;
+         if (!e.ok || e.undone)
+            return cells;
+         for (size_t i = 0; i < shown; i++)
          {
             const chat::ChangeLine& l = e.changes[i];
             if (l.node < 0 || l.key.empty())
@@ -2887,130 +2911,122 @@ namespace app
             if (pi < 0)
                pi = ParamIndexOfKeyOnNode(*gn, "p." + l.key);
             const ParamRef* kp = pi >= 0 ? Modulation::Instance().KnownParam(l.node, pi) : nullptr;
-            if (!kp || kp->isEnum || kp->isBool || kp->maxValue <= kp->minValue)
+            if (!kp || kp->isEnum || kp->isBool || kp->maxValue <= kp->minValue || Modulation::Instance().IsModulated(l.node, pi))
                continue;
             const chat::CatalogParam* cp = nullptr;
-            for (const chat::CatalogParam& p : cn->params)
-               if (p.key == l.key || p.key == "p." + l.key || "p." + p.key == l.key)
-                  cp = &p;
-            if (!cp || (cp->kind != "float" && cp->kind != "int") || cp->expression)
+            for (const chat::CatalogParam& q : cn->params)
+               if (q.key == l.key || q.key == "p." + l.key || "p." + q.key == l.key)
+                  cp = &q;
+            if (!cp || (cp->kind != "float" && cp->kind != "int") || cp->expression || cp->modulated)
                continue;
             bool dup = false;
-            for (const Cell& c : cells)
+            for (const KnobCell& c : cells)
                dup = dup || (c.node == l.node && c.param == pi);
             if (dup)
                continue;
-            Cell c;
-            c.node = l.node;
-            c.param = pi;
-            c.cp = cp;
-            c.kp = kp;
-            char* end = nullptr;
-            c.suggested = std::strtof(l.after.c_str(), &end);
-            c.hasSuggested = end && end != l.after.c_str();
-            cells.push_back(c);
+            cells.push_back({ i, l.node, pi, cp, kp });
          }
+         return cells;
+      }
+
+      // The knobs, grouped under the node they belong to: the node's chip, then a left-aligned rack of perform
+      // knobs, each with its name and its live value. Dragging writes the param as perform mode does.
+      void DrawChangeKnobs(const Entry& e, const std::vector<KnobCell>& cells, float inner, int id)
+      {
+         if (sRefreshIn > 0 && --sRefreshIn == 0)
+            RefreshCatalog(true);
          if (cells.empty())
             return;
-
          static std::map<std::pair<int, int>, float> sHeld;  // the un-snapped value while an int knob is held
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const float diameter = 36.0f;
-         const float cellW = 84.0f;
+         const float diameter = 34.0f;
          const float lineH = ImGui::GetTextLineHeight();
-         const float cellH = diameter + 6.0f + 2.0f * lineH;
-         const int perRow = std::max(1, (int)(inner / cellW));
+         const float perRowF = std::max(1.0f, std::floor(inner / 76.0f));
+         const float cellW = std::min(96.0f, inner / perRowF);
+         const int perRow = (int)perRowF;
+         const float cellH = diameter + tok::space_2 + 2.0f * lineH;
          const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
-         const ImU32 modCol = Light() ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF);
-         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-         const ImVec2 o = ImGui::GetCursorScreenPos();
-         const int rows = ((int)cells.size() + perRow - 1) / perRow;
-         for (size_t k = 0; k < cells.size(); k++)
+
+         std::vector<int> nodes;  // in the order the card names them
+         for (const KnobCell& c : cells)
+            if (std::find(nodes.begin(), nodes.end(), c.node) == nodes.end())
+               nodes.push_back(c.node);
+         for (int node : nodes)
          {
-            const Cell& c = cells[k];
-            const int r = (int)k / perRow, col = (int)k % perRow;
-            const int inRow = std::min(perRow, (int)cells.size() - r * perRow);
-            const float x0 = o.x + (inner - inRow * cellW) * 0.5f + col * cellW;
-            const float y0 = o.y + r * cellH;
-            const float minV = c.kp->minValue, maxV = c.kp->maxValue;
-            const bool isInt = c.cp->kind == "int" || c.kp->step >= 1.0f;
-            const bool modulated = Modulation::Instance().IsModulated(c.node, c.param);
-
-            float live = c.suggested;
-            const auto pw = gPerfPendingWrites.find({c.node, c.param});
-            if (pw != gPerfPendingWrites.end())
-               live = pw->second;
-            else
-               for (const ParamRef& ref : Modulation::Instance().FrameParams())
-                  if (ref.nodeIndex == c.node && ref.paramIndex == c.param && ref.value)
-                  {
-                     live = *ref.value;
-                     break;
-                  }
-            const auto held = sHeld.find({c.node, c.param});
-            float v = held != sHeld.end() ? held->second : live;
-
-            char kid[48];
-            std::snprintf(kid, sizeof kid, "##chknob%d_%d", id, (int)k);
-            ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-            const float span = std::max(std::fabs(minV), std::fabs(maxV));
-            const char* fmt = (isInt || span >= 100.0f) ? "%.0f" : (span >= 10.0f ? "%.1f" : "%.2f");
-            bool moved = KnobFloat(kid, &v, minV, maxV, fmt, diameter, modulated ? modCol : accent, modulated,
-                                         cellW, c.kp->posToValue, c.kp->valueToPos);
-            if (ImGui::IsItemActivated() && !modulated)
-               PushUndoCheckpoint();
-            if (ImGui::IsItemActive())
-               sHeld[{c.node, c.param}] = v;
-            else
-               sHeld.erase({c.node, c.param});
-            // Double-click puts back the agent's value.
-            if (c.hasSuggested && !modulated && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            const chat::CatalogNode* cn = sCat.Node(node);
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             {
-               PushUndoCheckpoint();
-               v = std::clamp(c.suggested, minV, maxV);
-               moved = true;
-               sRefreshIn = 3;
+               chat::Seg chip;
+               chip.kind = chat::Seg::Kind::Node;
+               chip.node = node;
+               chip.text = cn ? cn->title : std::string();
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const float h = DrawFlow({ chip }, p, inner, id * 100 + 90 + node, ImGui::GetColorU32(ImGuiCol_Text));
+               ImGui::SetCursorScreenPos(p);
+               ImGui::Dummy(ImVec2(inner, h + tok::space_2));
             }
-            if (moved)
+            const ImVec2 o = ImGui::GetCursorScreenPos();
+            int k = 0;
+            for (const KnobCell& c : cells)
             {
-               const float w = isInt ? std::round(v) : v;
-               gPerfPendingWrites[{c.node, c.param}] = w;
-               live = w;
-            }
-            if (ImGui::IsItemDeactivatedAfterEdit())
-               sRefreshIn = 3;
+               if (c.node != node)
+                  continue;
+               const float x0 = o.x + (float)(k % perRow) * cellW;
+               const float y0 = o.y + (float)(k / perRow) * (cellH + tok::space_2);
+               k++;
+               const float minV = c.kp->minValue, maxV = c.kp->maxValue;
+               const bool isInt = c.cp->kind == "int" || c.kp->step >= 1.0f;
+               const float span = std::max(std::fabs(minV), std::fabs(maxV));
+               const char* fmt = (isInt || span >= 100.0f) ? "%.0f" : (span >= 10.0f ? "%.1f" : "%.2f");
 
-            // The agent's value: a dot just outside the ring, where the knob would point.
-            if (c.hasSuggested)
-            {
-               const float kTwoPi = 6.28318530717958647692f;
-               const float aMin = 0.75f * kTwoPi * 0.5f, aMax = 2.25f * kTwoPi * 0.5f;
-               const float pos = c.kp->valueToPos ? std::clamp(c.kp->valueToPos(c.suggested, minV, maxV), 0.0f, 1.0f)
-                                                  : std::clamp((c.suggested - minV) / (maxV - minV), 0.0f, 1.0f);
-               const float a = aMin + pos * (aMax - aMin);
-               const ImVec2 ctr(x0 + cellW * 0.5f, y0 + diameter * 0.5f);
-               const float rr = diameter * 0.5f + 4.5f;
-               dl->AddCircleFilled(ImVec2(ctr.x + std::cos(a) * rr, ctr.y + std::sin(a) * rr), 2.5f, modulated ? modCol : accent, 12);
-            }
+               float live = minV;
+               const auto pw = gPerfPendingWrites.find({ c.node, c.param });
+               if (pw != gPerfPendingWrites.end())
+                  live = pw->second;
+               else
+                  for (const ParamRef& ref : Modulation::Instance().FrameParams())
+                     if (ref.nodeIndex == c.node && ref.paramIndex == c.param && ref.value)
+                     {
+                        live = *ref.value;
+                        break;
+                     }
+               const auto held = sHeld.find({ c.node, c.param });
+               float v = held != sHeld.end() ? held->second : live;
 
-            const std::string name = app::TruncateWithEllipsis(c.cp->label.empty() ? c.cp->key.c_str() : c.cp->label.c_str(), cellW - 4.0f);
-            char val[48];
-            FormatAudioParam(val, sizeof val, fmt, live);
-            const float ty = y0 + diameter + 6.0f;
-            const float nw = ImGui::CalcTextSize(name.c_str()).x;
-            dl->AddText(ImVec2(std::round(x0 + (cellW - nw) * 0.5f), ty), Dim(), name.c_str());
-            Weight vw(UiType::Weight::Medium);
-            const float valW = ImGui::CalcTextSize(val).x;
-            dl->AddText(ImVec2(std::round(x0 + (cellW - valW) * 0.5f), ty + lineH), ImGui::GetColorU32(ImGuiCol_Text), val);
-            if (ImGui::IsItemHovered() && c.hasSuggested)
-            {
-               char tip[64];
-               FormatAudioParam(tip, sizeof tip, fmt, c.suggested);
-               ImGui::SetTooltip("%s %s", T("Agent set"), tip);
+               char kid[48];
+               std::snprintf(kid, sizeof kid, "##chknob%d_%d", id, (int)c.line);
+               ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+               const bool moved = KnobFloat(kid, &v, minV, maxV, fmt, diameter, accent, false, cellW, c.kp->posToValue, c.kp->valueToPos);
+               if (ImGui::IsItemActivated())
+                  PushUndoCheckpoint();
+               if (ImGui::IsItemActive())
+                  sHeld[{ c.node, c.param }] = v;
+               else
+                  sHeld.erase({ c.node, c.param });
+               if (moved)
+               {
+                  const float w = isInt ? std::round(v) : v;
+                  gPerfPendingWrites[{ c.node, c.param }] = w;
+                  live = w;
+                  if (!sRuns.empty())
+                     sUserTurned.insert({ c.node, e.changes[c.line].key });
+               }
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  sRefreshIn = 3;
+
+               const std::string name = app::TruncateWithEllipsis(c.cp->label.empty() ? c.cp->key : c.cp->label, cellW - tok::space_2);
+               char val[48];
+               FormatAudioParam(val, sizeof val, fmt, live);
+               const float ty = y0 + diameter + tok::space_2;
+               const float nw = ImGui::CalcTextSize(name.c_str()).x;
+               const float vw = ImGui::CalcTextSize(val).x;
+               dl->AddText(ImVec2(std::round(x0 + (cellW - nw) * 0.5f), ty), Dim(), name.c_str());
+               dl->AddText(ImVec2(std::round(x0 + (cellW - vw) * 0.5f), ty + lineH), ImGui::GetColorU32(ImGuiCol_Text), val);
             }
+            const int rows = (k + perRow - 1) / perRow;
+            ImGui::SetCursorScreenPos(o);
+            ImGui::Dummy(ImVec2(inner, (float)rows * cellH + (float)(rows - 1) * tok::space_2));
          }
-         ImGui::SetCursorScreenPos(o);
-         ImGui::Dummy(ImVec2(inner, rows * cellH));
       }
 
       void DrawChange(Entry& e, EntryUi& ui, float width, int id, bool undoable)
@@ -3037,8 +3053,14 @@ namespace app
          const ImU32 col = e.undone ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
          const size_t cap = 8;
          const size_t shown = ui.open ? e.changes.size() : std::min(e.changes.size(), cap);
+         const std::vector<KnobCell> knobs = KnobCells(e, shown);
          for (size_t i = 0; i < shown; i++)
          {
+            bool asKnob = false;
+            for (const KnobCell& c : knobs)
+               asKnob = asKnob || c.line == i;
+            if (asKnob)
+               continue;  // drawn as a knob below, its live value under it
             const chat::ChangeLine& l = e.changes[i];
             const std::vector<chat::Block>& blocks = BlocksFor(l.text);
             const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -3064,8 +3086,7 @@ namespace app
                ImGui::Dummy(ImVec2(0.0f, 2.0f));
             }
          }
-         if (e.ok && !e.undone)
-            DrawChangeKnobs(e, shown, inner, id);
+         DrawChangeKnobs(e, knobs, inner, id);
          if (e.changes.size() > shown)
          {
             char more[48];
@@ -3210,8 +3231,6 @@ namespace app
                if (monoRow)
                   ImGui::PopFont();
                ImGui::Dummy(ImVec2(width, lineH));
-               if (ImGui::IsItemHovered() && (words || ImGui::CalcTextSize(one.c_str()).x > width - gutter || one.size() != r.text.size()))
-                  ImGui::SetTooltip("%s", r.text.c_str());
             }
          }
          ImGui::Dummy(ImVec2(width, 2.0f));
@@ -3269,8 +3288,6 @@ namespace app
             const ImVec2 p(x, y + 3.0f);
             dl->AddRect(p, ImVec2(p.x + w, p.y + 20.0f), TextTint(0.16f), tok::radius_tile);
             dl->AddText(ImVec2(p.x + tok::space_2, p.y + (20.0f - ImGui::GetFontSize()) * 0.5f), TextTint(0.8f), name.c_str());
-            if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + 20.0f)) && ImGui::IsWindowHovered())
-               ImGui::SetTooltip("%s", e.files[i].c_str());
             x -= tok::space_1;
          }
          if (!e.files.empty())
@@ -3350,16 +3367,23 @@ namespace app
                ImGui::SetCursorScreenPos(ImVec2(rx - w, y + (rowH - 26.0f) * 0.5f));
                return ChipButton::Draw(label, primary, 26.0f);
             };
-            auto status = [&](const char* label, bool spin, ImU32 col)
+            // Status text sits right of the name and never over it: a narrow panel cuts it short, then drops it
+            // and keeps only the spinner.
+            const float nameEnd = at.x + pad + 30.0f + ImGui::CalcTextSize(a.name).x + tok::space_3;
+            auto statusAt = [&](float right, const char* label, bool spin, ImU32 col)
             {
-               const float w = ImGui::CalcTextSize(label).x;
-               dl->AddText(ImVec2(rx - w, ty), col, label);
+               const float room = right - nameEnd - (spin ? BusyLine::kSpinner + tok::space_1 : 0.0f);
+               const std::string text = room >= 48.0f ? app::TruncateWithEllipsis(label, room) : std::string();
+               const float w = text.empty() ? 0.0f : ImGui::CalcTextSize(text.c_str()).x;
+               if (!text.empty())
+                  dl->AddText(ImVec2(right - w, ty), col, text.c_str());
                if (spin)
                {
-                  ImGui::SetCursorScreenPos(ImVec2(rx - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
+                  ImGui::SetCursorScreenPos(ImVec2(right - w - BusyLine::kSpinner - (w > 0.0f ? tok::space_1 : 0.0f), y + (rowH - BusyLine::kSpinner) * 0.5f));
                   BusyLine::Spinner();
                }
             };
+            auto status = [&](const char* label, bool spin, ImU32 col) { statusAt(rx, label, spin, col); };
             float used = 0.0f;
             if (s.setup != nullptr)
             {
@@ -3373,14 +3397,7 @@ namespace app
                const char* cancel = T("Cancel");
                if (button(cancel, false))
                   Do(a.id, Act::Cancel);
-               {
-                  const char* label = T("Finish in your browser…");
-                  const float bw = ImGui::CalcTextSize(cancel).x + 2.0f * tok::space_2 + tok::space_2;
-                  const float w = ImGui::CalcTextSize(label).x;
-                  dl->AddText(ImVec2(rx - bw - w, ty), Dim(), label);
-                  ImGui::SetCursorScreenPos(ImVec2(rx - bw - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
-                  BusyLine::Spinner();
-               }
+               statusAt(rx - ImGui::CalcTextSize(cancel).x - 3.0f * tok::space_2, T("Finish in your browser…"), true, Dim());
                if (!s.loginUrl.empty())
                {
                   ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH));
@@ -4011,8 +4028,6 @@ namespace app
                   ImGui::RenderTextEllipsis(dl, ImVec2(right - dw, ty), ImVec2(right, ty + ImGui::GetFontSize()), right, c.detail.c_str(), nullptr, nullptr);
                   ImGui::PopStyleColor();
                }
-               if (hovered && !c.tip.empty())
-                  ImGui::SetTooltip("%s", c.tip.c_str());
                if (clicked)
                {
                   sPick = i;
@@ -4158,7 +4173,8 @@ namespace app
          // minute before the next try: this runs every frame the picker or Settings shows.
          const auto st = sAgents.find(agent);
          // The status check of a signed-in agy fills this list itself.
-         const bool installed = st != sAgents.end() && st->second.ready.installed && st->second.auth != chat::Auth::Out && st->second.verify == nullptr;
+         // Not checked yet (Settings opened before the chat) counts as worth one try: `agy models` needs no sign-in.
+         const bool installed = st == sAgents.end() || (st->second.ready.installed && st->second.verify == nullptr);
          // A steady clock, not ImGui time: Settings and the self-test ask outside a frame.
          const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
          const auto at = sModelsFetchAt.find(agent);
@@ -4249,99 +4265,93 @@ namespace app
          if (!avatar.empty())
             DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, avatar);
          dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
-         if (text != full && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", full.c_str());
          if (clicked)
             ImGui::OpenPopup(std::string(id).append("menu").c_str());
          return mn.x;
       }
 
-      // Two pills in the tool row: who answers (with where each agent stands) and, beside it, which of that
-      // agent's models. Settings keeps the same default model per agent.
+      // The name a model shows under: the one picked for this agent, else the one its own settings choose,
+      // else its first, else the agent's name.
+      std::string ModelFace(const std::string& agent)
+      {
+         if (agent.empty())
+            return {};
+         const std::vector<chat::Model>& list = ModelsOf(agent);
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         const std::string picked = prefs.models.count(agent) ? prefs.models[agent] : std::string();
+         for (const chat::Model& m : list)
+            if (!picked.empty() && m.id == picked && !m.label.empty())
+               return m.label;
+         const std::string theirs = AgentDefaultModel(agent, list);
+         if (!theirs.empty())
+            return theirs;
+         for (const chat::Model& m : list)
+            if (!m.label.empty())
+               return m.label;
+         return AgentName(agent);
+      }
+
+      // One pill in the tool row: the model that answers, from every connected agent's models in one menu,
+      // each agent under its name. Picking a model picks its agent too. Settings keeps the same choice.
       void DrawPicker(float right, float y, float h, float minLeft)
       {
-         // Both pills share the room between the attach button and Send; the model gets a little more.
          const float room = std::max(80.0f, right - minLeft - tok::space_1);
          const std::string cur = DefaultAgent();
          CliSetup::Config& prefs = CliSetup::Prefs();
-         const std::vector<chat::Model>& list = cur.empty() ? std::vector<chat::Model>() : ModelsOf(cur);
-         const std::string modelId = prefs.models.count(cur) ? prefs.models[cur] : std::string();
-         std::string modelFace = T("Default");
-         for (const chat::Model& m : list)
-            if (m.id == modelId && !m.label.empty())
-               modelFace = m.label;
-         // Nothing picked: name the model the agent's own settings choose, so "Default" is never a guess.
-         const std::string theirs = modelId.empty() ? AgentDefaultModel(cur, list) : std::string();
-         if (!theirs.empty())
-            modelFace = theirs;
-         const float menuW = 248.0f;
+         const float menuW = 264.0f;
          bool clicked = false;
-         float left = right;
-         if (!cur.empty())
+         Pill("##chatmodel", cur, cur.empty() ? std::string(T("Connect an agent")) : ModelFace(cur), right, y, h, clicked, room);
+         ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
+         BeginMenuStyle();
+         if (ImGui::BeginPopup("##chatmodelmenu"))
          {
-            left = Pill("##chatmodel", "", modelFace, right, y, h, clicked, room * 0.55f);
-            ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-            ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
-            BeginMenuStyle();
-            if (ImGui::BeginPopup("##chatmodelmenu"))
+            bool anyReady = false;
+            for (const CliSetup::Agent& a : CliSetup::Agents())
             {
-               MenuLabel(T("Model"), menuW);
-               if (MenuRow("##m", menuW, T("Default"), AgentDefaultModel(cur, list).c_str(), modelId.empty(), true, std::string()))
-               {
-                  prefs.models.erase(cur);
-                  SaveCliConfig();
-                  ImGui::CloseCurrentPopup();
-               }
+               if (sAgents.find(a.id) == sAgents.end() || !ViewOf(a.id).ready)
+                  continue;
+               anyReady = true;
+               ImGui::PushID(a.id);
+               MenuLabel(a.name, menuW);
+               const std::vector<chat::Model>& list = ModelsOf(a.id);
+               const std::string face = ModelFace(a.id);
+               bool rows = false;
                for (const chat::Model& m : list)
                {
-                  if (m.id.empty())
+                  if (m.id.empty() || m.label.empty())
                      continue;
+                  rows = true;
                   ImGui::PushID(m.id.c_str());
-                  if (MenuRow("##m", menuW, m.label.c_str(), "", m.id == modelId, true, std::string()))
+                  if (MenuRow("##m", menuW, m.label.c_str(), "", a.id == cur && m.label == face, true, std::string()))
                   {
-                     prefs.models[cur] = m.id;
+                     prefs.agent = a.id;
+                     prefs.models[a.id] = m.id;
                      SaveCliConfig();
                      ImGui::CloseCurrentPopup();
                   }
                   ImGui::PopID();
                }
-               ImGui::EndPopup();
-            }
-            EndMenuStyle();
-            left -= tok::space_1;
-         }
-         const float agentRight = left;
-         Pill("##chatagent", cur, cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur)), agentRight, y, h, clicked,
-              std::max(48.0f, agentRight - minLeft));
-         ImGui::SetNextWindowPos(ImVec2(agentRight, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
-         BeginMenuStyle();
-         if (ImGui::BeginPopup("##chatagentmenu"))
-         {
-            MenuLabel(T("Agent"), menuW);
-            for (const CliSetup::Agent& a : CliSetup::Agents())
-            {
-               if (sAgents.find(a.id) == sAgents.end())
-                  continue;
-               ImGui::PushID(a.id);
-               const AgentView v = ViewOf(a.id);
-               if (v.ready)
+               if (!rows && MenuRow("##only", menuW, face.c_str(), "", a.id == cur, true, std::string()))
                {
-                  if (MenuRow("##a", menuW, a.name, "", a.id == cur, true, a.id))
-                  {
-                     prefs.agent = a.id;
-                     SaveCliConfig();
-                     ImGui::CloseCurrentPopup();
-                  }
-               }
-               else
-               {
-                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
-                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
-                     Do(a.id, v.act);
+                  prefs.agent = a.id;
+                  SaveCliConfig();
+                  ImGui::CloseCurrentPopup();
                }
                ImGui::PopID();
             }
+            if (!anyReady)
+               for (const CliSetup::Agent& a : CliSetup::Agents())
+               {
+                  if (sAgents.find(a.id) == sAgents.end())
+                     continue;
+                  ImGui::PushID(a.id);
+                  const AgentView v = ViewOf(a.id);
+                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
+                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
+                     Do(a.id, v.act);
+                  ImGui::PopID();
+               }
             ImGui::EndPopup();
          }
          EndMenuStyle();
@@ -4396,13 +4406,6 @@ namespace app
                const ImVec2 p(x, at.y + pad);
                dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
                dl->AddText(ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), Dim(), more.c_str());
-               if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + moreW, p.y + 22.0f)))
-               {
-                  std::string tip;
-                  for (size_t k = i; k < sAttach.size(); k++)
-                     tip += (tip.empty() ? "" : "\n") + sAttach[k];
-                  ImGui::SetTooltip("%s", tip.c_str());
-               }
                break;
             }
             const ImVec2 p(x, at.y + pad);
@@ -4417,8 +4420,6 @@ namespace app
             const ImU32 mark = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
             ImGui::PopID();
             glyph::Draw(dl, ImVec2(p.x + w - 10.0f, p.y + 11.0f), tok::icon_sm, mark, IconsInfinite::Close);
-            if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w - 20.0f, p.y + 22.0f)))
-               ImGui::SetTooltip("%s", sAttach[i].c_str());
             x += w + tok::space_1;
          }
          if (remove >= 0)
@@ -4450,6 +4451,9 @@ namespace app
          const bool enter = ImGui::InputTextMultiline("##chatinput", &sInput, ImVec2(fieldW, textH), flags, InputCallback);
          const bool active = ImGui::IsItemActive();
          sInputWasActive = active;
+         // The well itself shows where typing goes: no keyboard-nav ring around it.
+         if (active || ImGui::IsItemFocused())
+            ImGui::GetCurrentContext()->NavCursorVisible = false;
          ImGui::PopStyleColor();
          ImGui::PopStyleVar(2);
          if (enter)
@@ -4616,7 +4620,7 @@ namespace app
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
          const float rowH = 26.0f;
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            Weight s(UiType::Weight::Medium);
             const float right = at.x + width - tok::space_1 - 2.0f * 22.0f - tok::space_2;
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(at.x + tok::space_3, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
@@ -4736,7 +4740,7 @@ namespace app
             ImGui::SetTooltip("%s", T("New chat"));
          const float right = toolsX - tok::space_2;
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            Weight s(UiType::Weight::Medium);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(titleX, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
                                       title, nullptr, nullptr);
@@ -4923,6 +4927,8 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
             out.push_back({ m.id, m.label });
       return out;
    }
+
+   std::string ChatAgentModelFace(const std::string& id) { return ModelFace(id); }
 
    void ChatAgentAct(const std::string& id, bool repair)
    {

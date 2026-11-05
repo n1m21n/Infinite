@@ -35,6 +35,12 @@ int DrawFloating(FrameCtx& fc)
 
       if (gTerminalOpen && gTerminalFloating)
          DrawTerminalFloating();
+      if (gViewportPanelOpen && gViewportPanelDock == kDockFloating)
+         DrawViewportPanelFloating();
+      if (gModMatrixOpen && gModMatrixDock == kDockFloating)
+         DrawModMatrixFloating();
+      if (gPerfPanelOpen && gPerfPanelDock == kDockFloating)
+         DrawPerfPanelFloating();
 
 #ifndef NDEBUG
       // Stock ImGui windows, deliberately left un-themed (PushElevatedPanelStyle

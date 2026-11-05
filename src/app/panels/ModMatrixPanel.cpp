@@ -981,8 +981,8 @@ namespace app
 
       if (MenuParts::BeginPopup("##modmatrixctx"))
       {
-         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-         for (int i = 0; i < 4; i++)
+         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
                gModMatrixDock = i;
          MenuParts::Separator();
@@ -1100,5 +1100,15 @@ namespace app
       // every theme change re-breaks it. The panel already reads as separate
       // because its opaque panelBg fill differs from the canvas' windowBg;
       // the line added no information. Removed rather than re-tuned.
+   }
+
+   void DrawModMatrixFloating()
+   {
+      bool open = true;
+      if (BeginFloatingPanel((std::string(T("Modulation Matrix")) + "###modmatrixfloat").c_str(), &open, ImVec2(760.0f, 420.0f)))
+         DrawModMatrixTable();
+      EndFloatingPanel();
+      if (!open)
+         gModMatrixOpen = false;
    }
 }

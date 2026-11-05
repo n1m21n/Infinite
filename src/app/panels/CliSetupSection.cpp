@@ -125,28 +125,27 @@ namespace app
          ImGui::PopID();
       }
 
-      // The model each agent starts with; the chat's picker changes it for a moment, this is where it is kept.
+      // The model each connected agent answers with; the chat's picker sets the same thing.
       for (const Agent& a : Agents())
       {
          const auto models = ChatAgentModels(a.id);
-         std::string items = std::string(T("Default")) + '\0';
+         if (models.empty())
+            continue;
+         const std::string face = ChatAgentModelFace(a.id);
+         std::string items;
          int cur = 0;
-         const std::string saved = prefs.models.count(a.id) ? prefs.models[a.id] : std::string();
          for (size_t i = 0; i < models.size(); i++)
          {
             items += models[i].second + '\0';
-            if (models[i].first == saved)
-               cur = (int)i + 1;
+            if (models[i].second == face)
+               cur = (int)i;
          }
          items.push_back('\0');
          const std::string label = std::string(a.name) + " " + T("model");
          ImGui::PushID(a.id);
          if (FormParts::Combo(label.c_str(), &cur, items.c_str()))
          {
-            if (cur == 0)
-               prefs.models.erase(a.id);
-            else
-               prefs.models[a.id] = models[(size_t)cur - 1].first;
+            prefs.models[a.id] = models[(size_t)cur].first;
             SaveConfig(paths.config, prefs);
          }
          ImGui::PopID();

@@ -364,7 +364,7 @@ namespace app
       RebuildAudioTopology();
 
       gViewportPanelOpen = data.viewport.open;
-      gViewportPanelDock = std::clamp(data.viewport.dock, 0, 3);
+      gViewportPanelDock = std::clamp(data.viewport.dock, 0, kDockFloating);
       if (std::isfinite(data.viewport.width) && data.viewport.width >= kViewportPanelMinWidth)
          gViewportPanelWidth = data.viewport.width;
       if (std::isfinite(data.viewport.height) && data.viewport.height >= kViewportPanelMinHeight)

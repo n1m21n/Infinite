@@ -396,6 +396,14 @@ namespace app
             check(has("@Blur#12") && has("@cube#1") && d.size() >= 5, "diff: a new cable names both ends");
             check(code, "diff: a code param comes back as a block");
             check(chat::Diff(before, before).empty(), "diff: nothing changed, nothing to show");
+            {
+               chat::Snapshot moving = before;
+               moving.catalog.nodes[0].params[1].value = "3.5";
+               moving.catalog.nodes[0].params[1].modulated = true;
+               chat::Snapshot was = before;
+               was.catalog.nodes[0].params[1].modulated = true;
+               check(chat::Diff(was, moving).empty(), "diff: a modulated param moving on its own is not a change");
+            }
             // A removal that numbers the rest again (undo, reload): uids keep each node itself, no rename chain.
             {
                chat::Snapshot b2, a2;

@@ -152,10 +152,10 @@ namespace app
    // so the two can't drift apart.
    void ViewportPanelDockCombo()
    {
-      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
       if (MenuParts::BeginCombo("##viewportdock", T(kDockLabels[gViewportPanelDock])))
       {
-         for (int i = 0; i < 4; i++)
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Choice(L(kDockLabels[i]), i == gViewportPanelDock))
                gViewportPanelDock = i;
          MenuParts::EndCombo();
@@ -411,7 +411,6 @@ namespace app
    // ever has room left over for a scrollbar of its own.
    void DrawViewportPanelContainer()
    {
-      const bool horizontal = (gViewportPanelDock == 0 || gViewportPanelDock == 3);
 
       // The render's fixed axis: the strip's height when cards run across it,
       // its width when they run down it. Squared off, since a mesh render has
@@ -427,6 +426,8 @@ namespace app
       const float bar = ImGui::GetStyle().ScrollbarSize;
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
       const ImVec2 strip = ImGui::GetContentRegionAvail();
+      // Floating, the cards run along the window's long side.
+      const bool horizontal = gViewportPanelDock == kDockFloating ? strip.x > strip.y : (gViewportPanelDock == 0 || gViewportPanelDock == 3);
       // The PanelFrame card around this already keeps space_2 to the edge on every side, so cards fill the strip.
       const float box = horizontal ? std::max(48.0f, strip.y - bar) : std::max(48.0f, strip.x - bar);
 
@@ -482,8 +483,8 @@ namespace app
 
       if (MenuParts::BeginPopup("##viewportpanelctx"))
       {
-         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-         for (int i = 0; i < 4; i++)
+         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
                gViewportPanelDock = i;
          MenuParts::Separator();
@@ -620,13 +621,41 @@ namespace app
    // right-click menu and the Menu dropdown - see ViewportPanelDockCombo.
    void ModMatrixDockCombo()
    {
-      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
       if (MenuParts::BeginCombo("##modmatrixdock", T(kDockLabels[gModMatrixDock])))
       {
-         for (int i = 0; i < 4; i++)
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Choice(L(kDockLabels[i]), i == gModMatrixDock))
                gModMatrixDock = i;
          MenuParts::EndCombo();
       }
+   }
+
+   // A docked panel popped out: the chat's floating window, for any panel.
+   bool BeginFloatingPanel(const char* title, bool* open, const ImVec2& firstSize)
+   {
+      const ImGuiViewport* vp = ImGui::GetMainViewport();
+      ImGui::SetNextWindowSize(firstSize, ImGuiCond_FirstUseEver);
+      ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + (vp->WorkSize.x - firstSize.x) * 0.5f, vp->WorkPos.y + (vp->WorkSize.y - firstSize.y) * 0.5f),
+                              ImGuiCond_FirstUseEver);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f, 160.0f), ImVec2(FLT_MAX, FLT_MAX));
+      PushElevatedPanelStyle(/*isChild=*/false);
+      return ImGui::Begin(title, open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+   }
+
+   void EndFloatingPanel()
+   {
+      ImGui::End();
+      PopElevatedPanelStyle();
+   }
+
+   void DrawViewportPanelFloating()
+   {
+      bool open = true;
+      if (BeginFloatingPanel((std::string(T("Viewport")) + "###viewportfloat").c_str(), &open, ImVec2(520.0f, 420.0f)))
+         DrawViewportPanelContainer();
+      EndFloatingPanel();
+      if (!open)
+         gViewportPanelOpen = false;
    }
 }
