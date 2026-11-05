@@ -29,6 +29,7 @@ namespace chat
    struct CatalogNode
    {
       int index = -1;
+      unsigned long long uid = 0;  // the node's own id: kept across undo and reload, when an index may move
       std::string type;
       std::string title;
       std::string category;

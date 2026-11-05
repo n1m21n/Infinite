@@ -44,6 +44,31 @@ namespace chat
          return Ref(*n) + (output > 0 ? ":" + std::to_string(output) : std::string());
       }
 
+      // The same node in the other snapshot: by its uid when both know it (an undo or a reload can number
+      // nodes again, so index 7 may now be another node), else by index.
+      const CatalogNode* Same(const Snapshot& s, const CatalogNode& n)
+      {
+         if (n.uid != 0)
+            for (const CatalogNode& o : s.catalog.nodes)
+               if (o.uid == n.uid)
+                  return &o;
+         const CatalogNode* o = s.catalog.Node(n.index);
+         return o != nullptr && (o->uid == 0 || n.uid == 0) ? o : nullptr;
+      }
+
+      // A link in the other snapshot's numbering, through the uids of its ends; as is when they are unknown.
+      CatalogLink Renumber(const CatalogLink& l, const Snapshot& from, const Snapshot& to)
+      {
+         CatalogLink r = l;
+         const CatalogNode* a = from.catalog.Node(l.src);
+         const CatalogNode* b = from.catalog.Node(l.dst);
+         const CatalogNode* a2 = a != nullptr ? Same(to, *a) : nullptr;
+         const CatalogNode* b2 = b != nullptr ? Same(to, *b) : nullptr;
+         r.src = a2 != nullptr ? a2->index : (a != nullptr && a->uid != 0 ? -1 : l.src);
+         r.dst = b2 != nullptr ? b2->index : (b != nullptr && b->uid != 0 ? -1 : l.dst);
+         return r;
+      }
+
       bool Has(const std::vector<CatalogLink>& links, const CatalogLink& l)
       {
          for (const CatalogLink& o : links)
@@ -75,15 +100,15 @@ namespace chat
    {
       std::vector<ChangeLine> out;
       for (const CatalogNode& n : after.catalog.nodes)
-         if (before.catalog.Node(n.index) == nullptr)
+         if (Same(before, n) == nullptr)
             out.push_back({ "added " + Ref(n) + (n.type != n.title ? " (" + n.type + ")" : std::string()), "" });
       for (const CatalogNode& n : before.catalog.nodes)
-         if (after.catalog.Node(n.index) == nullptr)
+         if (Same(after, n) == nullptr)
             out.push_back({ "removed " + n.title, "" });
 
       for (const CatalogNode& n : after.catalog.nodes)
       {
-         const CatalogNode* was = before.catalog.Node(n.index);
+         const CatalogNode* was = Same(before, n);
          if (was == nullptr)
             continue;
          if (was->title != n.title)
@@ -111,11 +136,14 @@ namespace chat
       }
 
       for (const CatalogLink& l : after.links)
-         if (!Has(before.links, l))
+         if (!Has(before.links, Renumber(l, after, before)))
             out.push_back({ "connected " + End(after, l.src, l.srcOutput) + " → " + End(after, l.dst, l.dstSlot > 0 ? l.dstSlot : 0), "" });
-      for (const CatalogLink& l : before.links)
+      for (const CatalogLink& b : before.links)
+      {
+         const CatalogLink l = Renumber(b, before, after);  // in the after numbering
          if (!Has(after.links, l) && after.catalog.Node(l.src) != nullptr && after.catalog.Node(l.dst) != nullptr)
             out.push_back({ "disconnected " + End(after, l.src, l.srcOutput) + " → " + End(after, l.dst, l.dstSlot > 0 ? l.dstSlot : 0), "" });
+      }
       return out;
    }
 }
