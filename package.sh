@@ -34,7 +34,7 @@ cmake -S "$ROOT" -B "$BUILD" ${GENERATOR[@]+"${GENERATOR[@]}"} \
 
 echo "==> building"
 # Capped: a bare -j froze the 8 GB Mac (2026-10-23). Two arches at once need the memory.
-JOBS=$(( $(sysctl -n hw.ncpu) > 4 ? 4 : $(sysctl -n hw.ncpu) ))
+JOBS=${INFINITE_JOBS:-$(( $(sysctl -n hw.ncpu) > 4 ? 4 : $(sysctl -n hw.ncpu) ))}
 nice cmake --build "$BUILD" -j"$JOBS"
 
 APP="$BUILD/Infinite.app"
