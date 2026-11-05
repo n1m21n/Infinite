@@ -841,8 +841,7 @@ int DrawTestsB(FrameCtx& fc)
                if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
                   GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
                else
-                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true,
-                                              /*transparentWindow=*/!gProjectorWindows[i].fullscreen);
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
             }
             else
             {

@@ -525,13 +525,10 @@ namespace app
       // an earlier window that went fullscreen (which sets FLOATING TRUE)
       // would leak that attribute into every later window created.
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
-      // Alpha-capable window: a node with a transparent background shows the
-      // desktop through the windowed Output (OBS window capture) instead of a
-      // checkerboard. Sticky like the hints above, so set explicitly and
-      // reset after creation; opaque output is unaffected (alpha 1).
-      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
-      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
+      // Opaque window: a transparent background shows the checkerboard, as the node's own preview does,
+      // never the canvas or desktop through the window (which read as a broken, frameless window).
       glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
+      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
