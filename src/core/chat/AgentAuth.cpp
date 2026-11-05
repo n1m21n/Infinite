@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 
 namespace chat
 {
@@ -347,6 +348,41 @@ namespace chat
          if (m.id.find(' ') == std::string::npos && !m.label.empty())
             out.push_back(m);
       }
+      ShortenModelLabels(out);
       return out;
+   }
+
+   void ShortenModelLabels(std::vector<Model>& models)
+   {
+      const auto tidy = [](std::string s, bool brackets, bool tier)
+      {
+         if (brackets)
+            if (const size_t open = s.find(" ("); open != std::string::npos)
+               s.erase(open);
+         if (tier)
+            for (const char* word : { " Flash", " Pro", " Lite" })
+               if (const size_t at = s.find(word); at != std::string::npos && (at + std::strlen(word) == s.size() || s[at + std::strlen(word)] == ' ' || s[at + std::strlen(word)] == '('))
+                  s.erase(at, std::strlen(word));
+         while (!s.empty() && s.back() == ' ')
+            s.pop_back();
+         return s;
+      };
+      for (const auto& [brackets, tier] : { std::pair<bool, bool>{ true, true }, { false, true }, { true, false } })
+      {
+         std::vector<std::string> names;
+         for (const Model& m : models)
+            names.push_back(tidy(m.full.empty() ? m.label : m.full, brackets, tier));
+         std::vector<std::string> sorted = names;
+         std::sort(sorted.begin(), sorted.end());
+         if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end() || std::find(names.begin(), names.end(), std::string()) != names.end())
+            continue;
+         for (size_t i = 0; i < models.size(); ++i)
+         {
+            if (models[i].full.empty())
+               models[i].full = models[i].label;
+            models[i].label = names[i];
+         }
+         return;
+      }
    }
 }

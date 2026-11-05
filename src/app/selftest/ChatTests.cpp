@@ -742,9 +742,12 @@ namespace app
          check(chat::Explain("Codex", "zsh: command not found: codex").kind == chat::Friendly::Kind::Missing, "error: missing command");
          check(chat::Explain("Codex", "boom happened").text == "boom happened", "error: anything else shows the last line");
          const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");
-         check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini Flash", "agy models are parsed from id<TAB>label rows");
+         check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini", "agy models are parsed from id<TAB>label rows");
          const std::vector<chat::Model> agy2 = chat::ParseAgyModels("Fetching available models...\ngemini-4-argon-medium\tGemini 4 Argon (Medium)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n");
          check(agy2.size() == 2 && agy2[0].id == "gemini-4-argon-medium", "agy models: no header line, every row kept");
+         check(agy2[0].label == "Gemini 4 Argon" && agy2[1].label == "Gemini 3.8" && agy2[1].full == "Gemini 3.8 Flash (High)", "agy models: names shortened to the family, the full name kept");
+         const std::vector<chat::Model> agy3 = chat::ParseAgyModels("a\tGemini 3.8 Flash (Medium)\nb\tGemini 3.8 Flash (High)\n");
+         check(agy3[0].label == "Gemini 3.8 (Medium)" && agy3[1].label == "Gemini 3.8 (High)", "agy models: efforts stay when they are all that tells two apart");
          chat::TurnOptions to;
          to.model = "opus";
          const std::vector<std::string> ma = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, to);

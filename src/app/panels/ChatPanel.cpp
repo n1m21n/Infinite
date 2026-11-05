@@ -4116,7 +4116,7 @@ namespace app
 
       void MenuLabel(const char* text, float w)
       {
-         UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
+         UiType::Scope cap(UiType::Size::Body, UiType::Weight::Semibold);  // same size as the rows and the pill
          const ImVec2 p = ImGui::GetCursorScreenPos();
          ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight() + tok::space_2));
          ImGui::GetWindowDrawList()->AddText(ImVec2(p.x + tok::space_2, p.y + tok::space_1), Dim(), text);
@@ -4242,7 +4242,9 @@ namespace app
             std::string id = m.id, label = m.label;
             std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return (char)std::tolower(c); });
             std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-            if ((id == low || label == low) && !m.label.empty())
+            std::string full = m.full;
+            std::transform(full.begin(), full.end(), full.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            if ((id == low || label == low || (!full.empty() && full == low)) && !m.label.empty())
                return m.label;
          }
          return s.value;

@@ -50,7 +50,11 @@ namespace chat
    struct Model
    {
       std::string id, label;
+      std::string full;  // the agent's own name when `label` is shortened for the picker
    };
+   // "Gemini 3.8 Flash (Medium)" -> "Gemini 3.8": drop the effort in brackets and the tier word, but only while every
+   // name in the list stays different; otherwise keep as much as is needed to tell them apart.
+   void ShortenModelLabels(std::vector<Model>& models);
    // The fixed list for an agent ({} = the agent picks); Antigravity's comes from `agy models`.
    std::vector<Model> FixedModels(AgentKind kind);
    // `agy models` output: a header line, then `<id>\t<label>`.
