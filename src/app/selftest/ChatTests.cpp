@@ -411,6 +411,14 @@ namespace app
             check(f.failed == 1 && f.rows.size() == 1 && f.rows[0].failed, "steps: a failure that stood is shown");
             const chat::StepView old = chat::ViewSteps({ "infinite a", "infinite b" }, {});
             check(old.commands == 2 && old.failed == 0, "steps: a chat saved without marks reads as commands");
+            bool ed = false;
+            check(chat::StepPhrase("infinite add Noise --at 0 0", &ed) == "Added Noise" && ed, "steps: add reads as Added <type>");
+            check(chat::StepPhrase("infinite connect 3:out 4:in") == "Connected 3 \xE2\x86\x92 4", "steps: connect reads as Connected a to b");
+            check(chat::StepPhrase("infinite set 2 scale 3") == "Set 2 scale to 3", "steps: set reads in words");
+            check(chat::StepPhrase("cd /x && infinite context | head", &ed) == "Looked at the patch" && !ed, "steps: reading is not an edit");
+            check(chat::StepPhrase("echo hi").empty(), "steps: an unknown command keeps its own text");
+            const chat::StepView rd = chat::ViewSteps({ "infinite context", "infinite graph", "infinite add Blur" }, {});
+            check(rd.rows.size() == 2 && rd.rows[0].times == 2 && rd.edits == 1, "steps: reads in a row fold to one row");
          }
 
          // ChatGPT's models come from Codex's own cache: listed ones only, in its order.
@@ -635,6 +643,8 @@ namespace app
          check(chat::Explain("Codex", "boom happened").text == "boom happened", "error: anything else shows the last line");
          const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");
          check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini Flash", "agy models are parsed from id<TAB>label rows");
+         const std::vector<chat::Model> agy2 = chat::ParseAgyModels("Fetching available models...\ngemini-4-argon-medium\tGemini 4 Argon (Medium)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n");
+         check(agy2.size() == 2 && agy2[0].id == "gemini-4-argon-medium", "agy models: no header line, every row kept");
          chat::TurnOptions to;
          to.model = "opus";
          const std::vector<std::string> ma = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, to);

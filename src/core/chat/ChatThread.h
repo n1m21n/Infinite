@@ -31,14 +31,19 @@ namespace chat
    // (a `cd dir &&` in front, `2>&1` or a `| grep` behind do not make it another command).
    struct StepRow
    {
-      std::string text;
+      std::string text;    // the command as run (a note: its words)
+      std::string phrase;  // the command in plain words ("Added Noise"); "" = show the command
+      int times = 1;       // the same phrase in a row, folded to one row
       bool failed = false, note = false;
    };
    struct StepView
    {
       std::vector<StepRow> rows;
       int commands = 0, failed = 0, retried = 0;
+      int edits = 0;  // commands that changed the patch or the app (add, set, connect, save…)
    };
+   // A command in plain words, and whether it changes something; "" when there are none for it.
+   std::string StepPhrase(const std::string& command, bool* edits = nullptr);
    std::string StepKey(const std::string& command);
    StepView ViewSteps(const std::vector<std::string>& lines, const std::vector<int>& marks);
 

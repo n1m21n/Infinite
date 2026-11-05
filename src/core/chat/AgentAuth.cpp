@@ -288,11 +288,16 @@ namespace chat
             nl = output.size();
          const std::string line = StripAnsi(output.substr(start, nl - start));
          start = nl + 1;
-         const bool header = first;  // the first line names the columns
-         first = false;
+         // Rows are `<id>\t<label>`; progress lines have no tab, and a column header names "ID".
          const size_t tab = line.find('\t');
-         if (header || tab == std::string::npos || tab == 0)
+         if (tab == std::string::npos || tab == 0)
             continue;
+         if (first && (line.compare(0, tab, "ID") == 0 || line.compare(0, tab, "id") == 0))
+         {
+            first = false;
+            continue;
+         }
+         first = false;
          Model m;
          m.id = line.substr(0, tab);
          m.label = line.substr(tab + 1);

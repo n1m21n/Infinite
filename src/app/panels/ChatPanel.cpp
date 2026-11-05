@@ -95,6 +95,7 @@ namespace app
          double activeAt = -1.0;        // when output last grew
          double checkedAt = -1.0;
          std::string cut;               // why the chat ended the turn itself ("" = it did not)
+         double startAt = -1.0;         // when the turn began, for the Working row's clock
       };
 
       // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
@@ -1041,6 +1042,7 @@ namespace app
          r.run = chat::AgentRun::Start(o);
          r.steps = (int)sThread.entries.size();
          Push(Make(Entry::Kind::Steps, "", agent));
+         r.startAt = ImGui::GetTime();
          sRuns.push_back(std::move(r));
       }
 
@@ -2308,9 +2310,10 @@ namespace app
          ImGui::Dummy(ImVec2(width, h));
       }
 
-      // What the agent did, folded to one quiet row: "Ran 4 commands · 1 failed". Unfolded, one monospace line
-      // per command (an earlier try of the same command is left out), failures in red, notes in the body face.
-      void DrawSteps(Entry& e, EntryUi& ui, float width, int id, bool running, bool named)
+      // What the agent did, folded to one quiet row: "Made 3 changes · 1 failed", or "Working… 12s" with the
+      // latest step under it while it runs. Unfolded, one row per step in plain words ("Added Noise"), the
+      // command itself in the tooltip; a command with no plain words shows as itself, in monospace.
+      void DrawSteps(Entry& e, EntryUi& ui, float width, int id, bool running, bool named, double since)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -2336,9 +2339,19 @@ namespace app
          std::string label = named ? std::string(AgentName(e.agent)) + "  ·  " : std::string();
          char count[64];
          if (running)
-            std::snprintf(count, sizeof count, "%s", T("Working…"));
+         {
+            const int secs = since >= 0.0 ? (int)(ImGui::GetTime() - since) : 0;
+            if (secs >= 60)
+               std::snprintf(count, sizeof count, "%s  %d:%02d", T("Working…"), secs / 60, secs % 60);
+            else if (secs >= 3)
+               std::snprintf(count, sizeof count, "%s  %ds", T("Working…"), secs);
+            else
+               std::snprintf(count, sizeof count, "%s", T("Working…"));
+         }
+         else if (v.edits > 0)
+            std::snprintf(count, sizeof count, v.edits == 1 ? T("Made %d change") : T("Made %d changes"), v.edits);
          else if (v.commands > 0)
-            std::snprintf(count, sizeof count, v.commands == 1 ? T("Ran %d command") : T("Ran %d commands"), v.commands);
+            std::snprintf(count, sizeof count, "%s", T("Looked at the patch"));
          else
             std::snprintf(count, sizeof count, v.rows.size() == 1 ? T("%d step") : T("%d steps"), (int)v.rows.size());
          label += count;
@@ -2365,16 +2378,20 @@ namespace app
                if (r.failed)
                   glyph::Draw(dl, ImVec2(p.x + gutter * 0.5f, p.y + lineH * 0.5f), tok::icon_sm, Red(), IconsInfinite::Close);
                const ImU32 col = r.failed ? Red() : (r.note ? TextTint(0.7f) : Dim());
-               const std::string one = r.text.substr(0, r.text.find('\n'));
-               if (mono != nullptr && !r.note)
+               const bool words = !r.phrase.empty();
+               std::string one = words ? r.phrase : r.text.substr(0, r.text.find('\n'));
+               if (words && r.times > 1)
+                  one += "  \xC3\x97" + std::to_string(r.times);
+               const bool monoRow = mono != nullptr && !r.note && !words;
+               if (monoRow)
                   ImGui::PushFont(mono, ImGui::GetFontSize());
                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(col));
                ImGui::RenderTextEllipsis(dl, ImVec2(x0, p.y + (lineH - ImGui::GetFontSize()) * 0.5f), ImVec2(x1, p.y + lineH), x1, one.c_str(), nullptr, nullptr);
                ImGui::PopStyleColor();
-               if (mono != nullptr && !r.note)
+               if (monoRow)
                   ImGui::PopFont();
                ImGui::Dummy(ImVec2(width, lineH));
-               if (ImGui::IsItemHovered() && (ImGui::CalcTextSize(one.c_str()).x > width - gutter || one.size() != r.text.size()))
+               if (ImGui::IsItemHovered() && (words || ImGui::CalcTextSize(one.c_str()).x > width - gutter || one.size() != r.text.size()))
                   ImGui::SetTooltip("%s", r.text.c_str());
             }
          }
@@ -2690,8 +2707,10 @@ namespace app
             // An agent's name sits over the first of its rows in a run of them.
             const bool label = prev == nullptr || prev->agent != e.agent || prev->kind == Entry::Kind::User;
             bool running = false;
+            double since = -1.0;
             for (const Run& r : sRuns)
-               running = running || r.steps == i;
+               if (r.steps == i)
+                  running = true, since = r.startAt;
             ImGui::PushID(i);  // chips and buttons inside each row get ids of their own
             switch (e.kind)
             {
@@ -2706,7 +2725,7 @@ namespace app
                                                  (prev != nullptr && prev->kind == Entry::Kind::User));
                   break;
                case Entry::Kind::Steps:
-                  DrawSteps(e, ui, width, i, running, agents > 1);
+                  DrawSteps(e, ui, width, i, running, agents > 1, since);
                   break;
                case Entry::Kind::Note:
                case Entry::Kind::Error:
@@ -3029,7 +3048,8 @@ namespace app
             TerminalCommandEnv(o.env, o.cwd);
             sFetch[agent] = chat::AgentRun::Start(o);
          }
-         if (list.empty() && kind == chat::AgentKind::Codex && installed && due)
+         // Codex's list is a file it keeps: read it whenever it is there, no process, no sign-in state needed.
+         if (list.empty() && kind == chat::AgentKind::Codex && due)
          {
             sModelsFetchAt[agent] = now;
             const char* codexHome = std::getenv("CODEX_HOME");

@@ -233,6 +233,140 @@ namespace chat
       return out;
    }
 
+   std::string StepPhrase(const std::string& command, bool* edits)
+   {
+      if (edits != nullptr)
+         *edits = false;
+      // Words, quotes kept together.
+      std::vector<std::string> w;
+      {
+         const std::string c = StepKey(command);
+         std::string cur;
+         char q = 0;
+         bool have = false;
+         for (char ch : c)
+         {
+            if (q != 0)
+            {
+               if (ch == q)
+                  q = 0;
+               else
+                  cur += ch;
+               continue;
+            }
+            if (ch == '"' || ch == '\'')
+            {
+               q = ch;
+               have = true;
+               continue;
+            }
+            if (ch == ' ' || ch == '\t' || ch == '\n')
+            {
+               if (have || !cur.empty())
+                  w.push_back(cur);
+               cur.clear();
+               have = false;
+               continue;
+            }
+            if ((ch == ';' || ch == '&' || ch == '|') && q == 0)
+               break;  // the first command of a chain says what it is
+            cur += ch;
+         }
+         if (have || !cur.empty())
+            w.push_back(cur);
+      }
+      if (w.empty())
+         return std::string();
+      auto base = [](const std::string& t) { const size_t s = t.find_last_of('/'); return s == std::string::npos ? t : t.substr(s + 1); };
+      auto arg = [&](size_t i) { return i < w.size() ? w[i] : std::string(); };
+      auto mark = [&](bool e) { if (edits != nullptr) *edits = e; };
+      const std::string tool = base(w[0]);
+      if (tool != "infinite" && tool != "infinite.exe")
+      {
+         static const char* const kRead[] = { "cat", "head", "tail", "sed", "grep", "rg", "ls", "find", "wc", "less", "file", "stat", "tree", "jq" };
+         for (const char* r : kRead)
+            if (tool == r)
+               return "Read files";
+         if (tool == "python" || tool == "python3" || tool == "node" || tool == "bash" || tool == "sh" || tool == "zsh")
+            return "Ran a script";
+         if (tool == "cp" || tool == "mv" || tool == "mkdir" || tool == "ln")
+         {
+            mark(true);
+            return "Moved files";
+         }
+         if (tool == "curl" || tool == "wget")
+            return "Fetched from the web";
+         if (tool == "ffmpeg" || tool == "ffprobe" || tool == "sox")
+            return "Worked on a media file";
+         return std::string();
+      }
+      const std::string v = arg(1);
+      static const char* const kLook[] = { "context", "graph", "explain", "params", "nodes", "describe", "status", "selection", "patch", "attention", "kinds" };
+      for (const char* l : kLook)
+         if (v == l)
+            return v == "params" || v == "describe" ? (arg(2).empty() ? "Looked at the patch" : "Looked at " + arg(2)) : "Looked at the patch";
+      if (v == "docs" || v == "guide" || v == "examples" || v == "recipes" || v == "help" || v == "--help")
+         return "Read the docs";
+      if (v == "render" || v == "shot" || v == "frame")
+         return "Looked at the picture";
+      if (v == "audio")
+         return "Listened to the sound";
+      if (v == "validate" || v == "check" || v == "errors")
+         return "Checked the patch";
+      mark(true);
+      if (v == "add")
+         return "Added " + (arg(2).empty() ? std::string("a node") : arg(2));
+      if (v == "remove")
+         return "Removed " + (arg(2).empty() ? std::string("a node") : arg(2));
+      if (v == "connect" || v == "disconnect")
+      {
+         std::string a = arg(2), b = arg(3);
+         a = a.substr(0, a.find(':'));
+         b = b.substr(0, b.find(':'));
+         return std::string(v == "connect" ? "Connected " : "Disconnected ") + a + (b.empty() ? "" : " \xE2\x86\x92 " + b);
+      }
+      if (v == "set" && w.size() >= 5)
+         return "Set " + arg(2) + " " + arg(3) + " to " + arg(4);
+      if (v == "set")
+         return "Set " + arg(2);
+      if (v == "mod")
+         return "Modulated " + arg(2) + (arg(3).empty() ? "" : " " + arg(3));
+      if (v == "expr")
+         return "Gave " + arg(2) + (arg(3).empty() ? "" : " " + arg(3)) + " a formula";
+      if (v == "bypass")
+         return "Bypassed " + arg(2);
+      if (v == "batch" || v == "apply")
+         return "Made several changes";
+      if (v == "undo")
+         return "Undid a change";
+      if (v == "redo")
+         return "Redid a change";
+      if (v == "code")
+         return "Edited code";
+      if (v == "panel")
+         return "Opened " + (arg(2).empty() ? std::string("a panel") : arg(2));
+      if (v == "settings")
+         return "Changed a setting";
+      if (v == "save")
+         return "Saved the patch";
+      if (v == "open")
+         return "Opened a patch";
+      if (v == "new")
+         return "Started a new patch";
+      if (v == "play")
+         return "Started playback";
+      if (v == "stop")
+         return "Stopped playback";
+      if (v == "tempo")
+         return "Set the tempo" + (arg(2).empty() ? "" : " to " + arg(2));
+      static const char* const kDid[][2] = { { "copy", "Copied" }, { "paste", "Pasted" }, { "duplicate", "Duplicated" }, { "group", "Grouped" }, { "ungroup", "Ungrouped" } };
+      for (const auto& d : kDid)
+         if (v == d[0])
+            return std::string(d[1]) + (arg(2).empty() ? "" : " " + arg(2));
+      mark(false);
+      return std::string();
+   }
+
    StepView ViewSteps(const std::vector<std::string>& lines, const std::vector<int>& marks)
    {
       StepView v;
@@ -244,7 +378,10 @@ namespace chat
          const int m = i < marks.size() ? marks[i] : kStepRan;
          if (m == kStepNote)
          {
-            v.rows.push_back({ lines[i], false, true });
+            StepRow note;
+            note.text = lines[i];
+            note.note = true;
+            v.rows.push_back(note);
             continue;
          }
          bool again = false;
@@ -258,7 +395,22 @@ namespace chat
          v.commands++;
          if (m == kStepFailed)
             v.failed++;
-         v.rows.push_back({ lines[i], m == kStepFailed, false });
+         bool edits = false;
+         StepRow row;
+         row.text = lines[i];
+         row.phrase = StepPhrase(lines[i], &edits);
+         row.failed = m == kStepFailed;
+         if (edits && !row.failed)
+            v.edits++;
+         // Three reads in a row are one row: "Looked at the patch ×3".
+         if (!row.phrase.empty() && !row.failed && !v.rows.empty() && !v.rows.back().note && !v.rows.back().failed &&
+             v.rows.back().phrase == row.phrase)
+         {
+            v.rows.back().times++;
+            v.rows.back().text += "\n" + row.text;
+            continue;
+         }
+         v.rows.push_back(row);
       }
       return v;
    }
