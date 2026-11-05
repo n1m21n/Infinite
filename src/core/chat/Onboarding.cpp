@@ -19,9 +19,9 @@ namespace chat
       return out;
    }
 
-   bool HasBrowser(bool linux, const std::string& display, const std::string& wayland, bool xdgOpen)
+   bool HasBrowser(bool isLinux, const std::string& display, const std::string& wayland, bool xdgOpen)
    {
-      if (!linux)
+      if (!isLinux)
          return true;
       return xdgOpen && (!display.empty() || !wayland.empty());
    }

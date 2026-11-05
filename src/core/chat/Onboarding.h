@@ -11,7 +11,7 @@ namespace chat
    // ---- 0. this computer ----
    struct MachineFacts
    {
-      bool linux = false, windows = false;
+      bool onLinux = false, windows = false;
       bool netChecked = false, online = false;
       bool fetchTool = true;          // curl or wget (Linux can have neither)
       bool scriptsLocked = false;     // Windows PowerShell outside FullLanguage: installers cannot run
@@ -30,7 +30,7 @@ namespace chat
 
    // Can the agents open a web page here? macOS and Windows always can; Linux needs a desktop session
    // (DISPLAY or WAYLAND_DISPLAY) and xdg-open, and an SSH login without a forwarded display has neither.
-   bool HasBrowser(bool linux, const std::string& display, const std::string& wayland, bool xdgOpen);
+   bool HasBrowser(bool isLinux, const std::string& display, const std::string& wayland, bool xdgOpen);
 
    // The network probe the app runs before setup: argv for the platform, and how to read what it printed.
    std::vector<std::string> NetProbeArgs(bool windows);

@@ -985,7 +985,7 @@ namespace app
          const Os os = CliSetup::CurrentOs();
          o.checked = false;
          o.facts = chat::MachineFacts();
-         o.facts.linux = os == Os::kLinux;
+         o.facts.onLinux = os == Os::kLinux;
          o.facts.windows = os == Os::kWindows;
          const std::string home = EnvOr(o.facts.windows ? "USERPROFILE" : "HOME");
          std::error_code ec;
@@ -995,8 +995,8 @@ namespace app
             if (!ec)
                o.facts.freeBytes = (long long)sp.available;
          }
-         o.facts.browser = chat::HasBrowser(o.facts.linux, EnvOr("DISPLAY"), EnvOr("WAYLAND_DISPLAY"),
-                                            o.facts.linux && !CliSetup::BinaryDir(os, "xdg-open", home, EnvOr("PATH")).empty());
+         o.facts.browser = chat::HasBrowser(o.facts.onLinux, EnvOr("DISPLAY"), EnvOr("WAYLAND_DISPLAY"),
+                                            o.facts.onLinux && !CliSetup::BinaryDir(os, "xdg-open", home, EnvOr("PATH")).empty());
          chat::AgentRun::Options opt;
          opt.raw = true;
          opt.argv = chat::NetProbeArgs(o.facts.windows);
