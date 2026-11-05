@@ -4,6 +4,7 @@
 // Rpc.cpp: main thread, between frames, one undo step per edit.
 #include <algorithm>
 #include "app/AppShared.h"
+#include "app/graph/NoteGen.h"
 #include "core/FactoryPresets.h"
 
 namespace app
@@ -435,6 +436,41 @@ namespace app
 
       void Notes(const std::string& action, const Words& args, const json& fields, json& outResult, std::string& outError)
       {
+         if (action == "generate")
+         {
+            // notes generate <type> [key=value ...]: NoteGen's settings, `page` picks the page.
+            NoteGen::Type type;
+            if (args.empty() || !NoteGen::TypeFromName(args[0], type))
+            {
+               outError = "notes generate chords|comp|pads|strum|arp|bass|melody|drums [style= seed= bars= form= creativity= energy= mood= density= swing= gate=] [page=<track>]";
+               return;
+            }
+            std::string spec = "type=" + args[0];
+            uint64_t page = 0;
+            for (auto it = fields.begin(); it != fields.end(); ++it)
+               if (it.key() == "page")
+                  page = it.value().is_number() ? it.value().get<uint64_t>() : strtoull(it.value().get<std::string>().c_str(), nullptr, 10);
+               else
+                  spec += " " + it.key() + "=" + (it.value().is_string() ? it.value().get<std::string>() : it.value().dump());
+            const uint64_t clip = PianoRollGenerate(spec, page, outError);
+            if (clip == 0)
+               return;
+            const Arrange::Clip* c = Arrange::FindClipOrSlot(gArrange, clip);
+            outResult = { { "clip", clip }, { "notes", c != nullptr ? (int)c->notes.size() : 0 }, { "spec", spec } };
+            return;
+         }
+         if (action == "export")
+         {
+            if (args.empty())
+            {
+               outError = "notes export <clip> [path=<file.mid>]";
+               return;
+            }
+            const std::string path = PianoRollExportMidi(strtoull(args[0].c_str(), nullptr, 10), fields.value("path", std::string()), outError);
+            if (!path.empty())
+               outResult = { { "path", path } };
+            return;
+         }
          if (args.empty())
          {
             outError = "notes " + action + " <clip> ...";
@@ -858,6 +894,44 @@ namespace app
          }
          else if (action == "set")
             SampleStudioApply(fields.value("text", std::string()));
+         else if (action == "generate")
+         {
+            // studio generate <part> [bars=1|2|4|8]: a new take in the Sample studio (the panel opens).
+            if (args.empty() || !SampleStudioGenerate(args[0], fields.value("bars", 2), outError))
+            {
+               std::string parts;
+               for (const std::string& p : SampleStudioParts())
+                  parts += (parts.empty() ? "" : "|") + p;
+               outError = (outError.empty() ? std::string() : outError + "; ") + "studio generate " + parts + " [bars=1|2|4|8]";
+            }
+            else
+               outResult = { { "generating", true }, { "next", "infinite studio status, until ready" } };
+         }
+         else if (action == "status")
+         {
+            bool busy = false, ready = false;
+            std::string name;
+            double seconds = 0.0;
+            SampleStudioStatus(busy, ready, name, seconds);
+            outResult = { { "busy", busy }, { "ready", ready }, { "name", name }, { "seconds", seconds } };
+         }
+         else if (action == "export")
+         {
+            const std::string path = SampleStudioExportWav(fields.value("path", std::string()));
+            if (path.empty())
+               outError = "the Sample studio is empty";
+            else
+               outResult = { { "path", path } };
+         }
+         else if (action == "node")
+         {
+            std::string type;
+            for (const std::string& w : args)
+               type += (type.empty() ? "" : " ") + w;
+            const int index = SampleStudioToNode(type.empty() ? std::string("Sampler") : type, outError);
+            if (index >= 0)
+               outResult = { { "index", index } };
+         }
          else
             outResult = { { "text", SampleStudioSerialize() } };
       }

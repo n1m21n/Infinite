@@ -2,6 +2,7 @@
 
 #include "AISkillContent.h"
 #include "AgentDocs.h"
+#include "core/chat/FileFinder.h"
 #include "core/chat/NodeFinder.h"
 #include "core/NodeFactory.h"
 #include "Patch.h"
@@ -1125,11 +1126,12 @@ Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disc
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
          select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
-Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
+Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  files <words>  reveal <file>  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
          session scene|launch|stop|add|insert|send|sceneset|slot ...
-         notes get|add|set|delete|move|quantize|transform <clip>  perf ...  studio get|set
+         notes get|add|set|delete|move|quantize|transform|export <clip>  notes generate <type> [key=value]  perf ...
+Make     studio generate <part> [bars=n]  studio status|export [path=]|node <type>|get|set
 Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|display <n>], timeline|session [video|audio], preset <name>
          library list|add|remove|refresh samples|media [folder]
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
@@ -1693,6 +1695,34 @@ map, and the visual, sound and film crafts.
       }
       if (verb == "recent")
          return call("recent");
+      if (verb == "files")
+      {
+         // The user's own files by name, for `import`: the usual folders, newest first.
+         need(1, "files <words> [audio|image|video|model|midi|patch]");
+         std::string ask, kind;
+         for (const std::string& w : args)
+            if (w == "audio" || w == "image" || w == "video" || w == "model" || w == "midi" || w == "patch")
+               kind = w;
+            else
+               ask += (ask.empty() ? "" : " ") + w;
+         const std::string home = AppPaths::HomeDir();
+         std::vector<std::string> roots = { std::filesystem::current_path().u8string() };
+         for (const char* sub : { "Desktop", "Downloads", "Music", "Documents", "Pictures", "Movies", "Videos" })
+            roots.push_back(home + "/" + sub);
+         json out = json::array();
+         for (const chat::FileHit& h : chat::FindFiles(ask, roots, kind))
+            out.push_back({ { "path", h.path }, { "kind", h.kind } });
+         if (out.empty())
+            Fail("no " + (kind.empty() ? std::string("media") : kind) + " file named like '" + ask +
+                 "' in Desktop, Downloads, Music, Documents, Pictures or Movies; ask the user where it is");
+         Print(json{ { "files", out } });
+         return 0;
+      }
+      if (verb == "reveal")
+      {
+         need(1, "reveal <file>");
+         return call("reveal", { { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
+      }
       if (verb == "quit")
          return call("quit");
       if (verb == "open")

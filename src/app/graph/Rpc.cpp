@@ -605,6 +605,20 @@ namespace app
          outResult = { { "files", (int)paths.size() } };
          return true;
       }
+      else if (method == "reveal")
+      {
+         // A file in Finder / Explorer, selected: where a save or render went.
+         const std::string path = params.value("path", std::string());
+         std::error_code ec;
+         if (path.empty() || !std::filesystem::exists(AppPaths::FsPath(path), ec))
+         {
+            outError = "no file at '" + path + "'";
+            return false;
+         }
+         Platform::RevealInFileManager(path);
+         outResult = json::object();
+         return true;
+      }
       else if (method == "fit_view")
       {
          gRequestFitView = true;

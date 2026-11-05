@@ -539,6 +539,7 @@ set(COMMON_SOURCES
     src/core/chat/ChatDiff.cpp
     src/core/chat/ChatFiles.cpp
     src/core/chat/NodeFinder.cpp
+    src/core/chat/FileFinder.cpp
     src/core/chat/ChatThread.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
@@ -1086,6 +1087,10 @@ endif()
 # Headless checks for the Piano Roll's note model (docs/plans/piano-roll/README.md §10 Block A).
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
+
+# `infinite find` ranking: top-3 hits over real asks (tests/chat/find_eval.tsv tuned, find_holdout.tsv never tuned).
+add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
+target_include_directories(find-eval PRIVATE src src/core)
 
 # Terminal (docs/plans/terminal/README.md). libvterm is vendored as plain source
 # behind src/core/term/VtEngine.h; see external/libvterm/VENDORED_COMMIT.txt.

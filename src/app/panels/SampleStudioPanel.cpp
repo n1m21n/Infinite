@@ -1154,23 +1154,23 @@ namespace
    // A node that plays the edit: Generate Samples keeps the recipe (it re-renders the same take between the start
    // and end markers), the others load the edit as heard from a .wav in the Recordings folder. The Slicer gets
    // these slices.
-   void ConvertToNode(const char* type)
+   GraphNode* ConvertToNode(const char* type)
    {
       Studio& s = S();
       if (!s.src)
-         return;
+         return nullptr;
       const bool generator = std::strcmp(type, "Generate Samples") == 0;
       if (generator && !s.take)
-         return;
+         return nullptr;
       SliceRenderResult res;
       const std::string wav = generator ? std::string() : WriteEdit(std::string(), "wav", AudioFileWriter::Format::Wav, 24, &res);
       if (!generator && wav.empty())
-         return;
+         return nullptr;
       const ImVec2 at = FindFreeSpawnPosition(gViewCenterCanvas);
       PushUndoCheckpoint("Add sample from studio");
       GraphNode* gn = SpawnNode(type, "Synths", at.x, at.y);
       if (gn == nullptr)
-         return;
+         return nullptr;
       INode* node = gn->node.get();
       if (generator)
       {
@@ -1213,6 +1213,7 @@ namespace
       else if (auto* n = dynamic_cast<GranularNode*>(node))
          n->LoadFile(wav);
       gPatchDirty = true;
+      return gn;
    }
 
    // The selected slices, each as heard, to a Sampler of its own on the canvas.
@@ -3380,6 +3381,82 @@ void SampleStudioApply(const std::string& text)
          s.gen->Cancel();
       Render(true);
    }
+}
+
+// ---- the agent's hands on the Studio (`infinite studio generate|status|export|node`) ----
+
+std::vector<std::string> SampleStudioParts()
+{
+   std::vector<std::string> out;
+   for (P p : kParts)
+      out.push_back(SampleStyles::PartName(p));
+   return out;
+}
+
+bool SampleStudioGenerate(const std::string& part, int bars, std::string& err)
+{
+   Studio& s = S();
+   int at = -1;
+   for (int i = 0; i < (int)(sizeof(kParts) / sizeof(kParts[0])); i++)
+      if (part == SampleStyles::PartName(kParts[i]) || part + "s" == SampleStyles::PartName(kParts[i]))
+         at = i;
+   if (at < 0)
+   {
+      err = "no part '" + part + "'";
+      return false;
+   }
+   if (s.recording)
+   {
+      err = "the Sample studio is recording";
+      return false;
+   }
+   s.part = at;
+   for (int i = 0; i < 4; i++)
+      if (kBars[i] == bars)
+         s.barsIdx = i;
+   gSampleStudioOpen = true;
+   if (s.busy)
+      s.gen->Cancel();
+   s.dropTake = false;
+   Render(false);
+   return true;
+}
+
+// {busy, ready, name, seconds}: whether a take is being made and what the Studio holds.
+void SampleStudioStatus(bool& busy, bool& ready, std::string& name, double& seconds)
+{
+   const Studio& s = S();
+   busy = s.busy;
+   ready = s.src != nullptr && !s.busy;
+   name = s.src ? SourceName() : std::string();
+   seconds = s.src ? (double)Frames() / Sr() : 0.0;
+}
+
+// The edit as heard, as a 24-bit wav at `path` (empty: the Recordings folder). "" when nothing is there.
+std::string SampleStudioExportWav(const std::string& path)
+{
+   return WriteEdit(path, "wav", AudioFileWriter::Format::Wav, 24);
+}
+
+// The Studio's Make node menu: Generate Samples, Sampler, Slicer, Molder, Grain Molder, PaulStretch or Granular.
+int SampleStudioToNode(const std::string& type, std::string& err)
+{
+   static const char* const types[] = { "Generate Samples", "Sampler", "Slicer", "Molder", "Grain Molder", "PaulStretch", "Granular" };
+   for (const char* t : types)
+      if (type == t)
+      {
+         if (!S().src || S().busy)
+         {
+            err = S().busy ? "the take is still being made" : "the Sample studio is empty";
+            return -1;
+         }
+         GraphNode* gn = ConvertToNode(t);
+         if (gn == nullptr)
+            err = "could not make the node";
+         return gn != nullptr ? gn->index : -1;
+      }
+   err = "node type is one of: Generate Samples, Sampler, Slicer, Molder, Grain Molder, PaulStretch, Granular";
+   return -1;
 }
 
 void DrawSampleStudioDocked(const char* id, const ImVec2& size)

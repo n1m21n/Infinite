@@ -219,7 +219,7 @@ namespace chat
          s.text = RoundNumbers(Trim(line.substr(i + 1, close - i - 1)));
          s.verb = Lower(Trim(line.substr(close + 2, colon - close - 2)));
          s.arg = Trim(line.substr(colon + 1, end - colon - 1));
-         static const char* const kVerbs[] = { "add", "set", "delete", "undo", "go", "open", "web", "say" };
+         static const char* const kVerbs[] = { "add", "set", "delete", "undo", "go", "open", "web", "say", "reveal" };
          if (std::find(std::begin(kVerbs), std::end(kVerbs), s.verb) == std::end(kVerbs) || s.text.empty())
             return false;
          if (s.verb == "set" || s.verb == "delete" || s.verb == "go")

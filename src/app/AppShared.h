@@ -5775,6 +5775,11 @@ void DrawSampleStudioDocked(const char* id, const ImVec2& size);
 // The Studio's work as text for the patch (`studio` lines), and back; empty text clears it.
 std::string SampleStudioSerialize();
 void SampleStudioApply(const std::string& text);
+std::vector<std::string> SampleStudioParts();
+bool SampleStudioGenerate(const std::string& part, int bars, std::string& err);
+void SampleStudioStatus(bool& busy, bool& ready, std::string& name, double& seconds);
+std::string SampleStudioExportWav(const std::string& path);
+int SampleStudioToNode(const std::string& type, std::string& err);
 // True while the pointer is over the Studio's waveform: its keys (split, join, zoom, undo) beat the canvas's.
 extern bool gSampleStudioClaimedKeys;
 // The Studio's screen rect last frame, so a file dropped on it isn't also dropped on the canvas.
@@ -5840,6 +5845,8 @@ extern int gPianoRollDock; // 0 = bottom, 3 = top (the Timeline's codes)
 void DrawPianoRollDocked(const char* id, const ImVec2& size);
 // Opens the panel on this MIDI lane's page.
 void PianoRollOpenPage(uint64_t laneId);
+uint64_t PianoRollGenerate(const std::string& spec, uint64_t laneId, std::string& err);
+std::string PianoRollExportMidi(uint64_t clipId, std::string path, std::string& err);
 // True while the pointer is over the panel: its keys beat the canvas's (the Timeline's rule).
 extern bool gPianoRollClaimedKeys;
 extern bool gView3DOpen;

@@ -146,11 +146,15 @@ namespace chat
              "- Check code before you say it works: `infinite code check <file>`, `infinite patch check <p.inf>`, `infinite code errors`.\n"
              "- Change the open window with `infinite` commands only; never write a new .inf unless asked.\n"
              "- Pick nodes with `infinite find <plain words>`, which ranks every node card, not from memory.\n"
-             "- Files from the user's computer: `infinite import <file>... [into <node>]`. MIDI controllers: `infinite settings midi`. "
+             "- Asked for a sample or sound: `infinite studio generate <part>` (Sample studio), then `studio export` for a wav or "
+             "`studio node Sampler|Slicer|PaulStretch|...`. Asked for MIDI, chords, a melody or a beat: `infinite notes generate <type>` "
+             "(Piano Roll), then `notes export <clip>` for a .mid. Use these built-in generators before anything else.\n"
+             "- Files from the user's computer: `infinite files <words>` finds them, `infinite import <file>... [into <node>]` loads them. "
+             "MIDI controllers: `infinite settings midi`. "
              "Save, open, new: `infinite save|open|new`. You cannot upload or post: save the file and give its path.\n"
              "- Reply in short plain sentences. Name nodes as @title#index, controls as @title#index.key, a change as old → new. "
              "Put a file you made on its own line as an absolute path. Offer a button as [label](add:Type), [label](set:@title#i.key=value), "
-             "[label](go:@title#i), [label](undo:now), [label](open:panel), [label](open:settings/midi) (any place in `infinite docs panels`) or [label](web:https://...).\n"
+             "[label](go:@title#i), [label](undo:now), [label](open:panel), [label](open:settings/midi) (any place in `infinite docs panels`), [label](reveal:/path/file.wav) or [label](web:https://...).\n"
              "- When asked about shortcuts, the website, the repository, or code languages, point to the matching command or page above.\n\n";
    }
 }

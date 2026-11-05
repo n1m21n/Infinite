@@ -31,10 +31,31 @@ and every request is about that patch unless they name a file.
 
    | Ask | Do |
    |---|---|
-   | use a file from my computer (sample, image, video, model, .mid) | `infinite import <file>...`; `into <node>` loads it into that node |
+   | make me a sample, loop, drum hit, pad sound | `infinite studio generate <part> [bars=2]`, then `infinite studio status` until ready; offer `[Sample studio](open:samplestudio)` |
+   | send me the sample, as a wav | `infinite studio export`, give the path and `[Show in Finder](reveal:<path>)` |
+   | put the sample in a node | `infinite studio node Sampler` (or Slicer, Molder, Grain Molder, PaulStretch, Granular, Generate Samples) |
+   | write me a melody, chords, bassline, drum beat, MIDI | `infinite notes generate <chords\|comp\|pads\|strum\|arp\|bass\|melody\|drums> [bars=4 style=... energy=...]`; it lands in the Piano Roll (offer `[Piano roll](open:pianoroll)`) |
+   | send me the MIDI file | `infinite notes export <clip>`, give the path and `[Show in Finder](reveal:<path>)` |
+   | play that MIDI in a node | the take already plays through its Piano Roll node; for a MIDI File node, `infinite import <file.mid>` |
+   | use a file from my computer (sample, image, video, model, .mid) | `infinite files <words> [audio\|image\|video\|model\|midi]` finds it; then `infinite import <file>...`, `into <node>` loads it into that node |
+   | where is that file | `[Show in Finder](reveal:<path>)` |
    | is my MIDI controller connected | `infinite settings midi`, then offer `[MIDI settings](open:settings/midi)` |
-   | audio device or sound problems | `infinite settings devices`, offer `[Audio settings](open:settings/devices)` |
-   | save, open, start a new patch | `infinite save [path]`, `infinite open <p.inf>`, `infinite new` |
+   | map my knob or fader | add `MIDI CC` (Learn on the node), then `infinite mod <cc> <node> <key>` |
+   | control it from my phone | add `OSC Receive`, then `mod` it like an LFO |
+   | I can't hear anything | `infinite status` (is audio running), `infinite settings devices`, check the patch ends in `Output`; offer `[Audio settings](open:settings/devices)` |
+   | use my webcam / mic | `Video In` / `Audio In` nodes (`infinite find webcam`) |
+   | put it on my projector or second screen | `infinite node <Output> window display <n>`; for warping, `Projection` |
+   | play, stop, tempo | `infinite play`, `stop`, `tempo <bpm>` |
+   | save, open, start a new patch, recent ones | `infinite save [path]`, `open <p.inf>`, `new`, `recent` |
+   | start from an example | `[Templates](open:templates)` |
+   | undo that | `infinite undo`, or a `[Undo](undo:)` button |
+   | render or export a video | `infinite timeline render`; `infinite render <p.inf> <out.mp4>` only when asked for a file |
+   | show me what it looks like | `infinite shot <node>` |
+   | add my sample folder | `infinite library add samples <folder>` |
+   | theme, font, language, size | `infinite settings preset\|font\|language\|uiScale <value>`; `[Appearance](open:settings/appearance)` |
+   | it is slow | `[Performance](open:perf)`, `infinite settings gpu`; offer `[Performance settings](open:settings/performance)` |
+   | it crashed, send logs, update | `infinite settings logs`, `infinite settings updates`; `[Diagnostics](open:settings/diagnostics)` |
+   | what does this node do, shortcuts | `infinite docs nodes <name>`, `infinite docs shortcuts` |
    | where is a panel or setting | a button: `open:<panel>` or `open:settings/<place>` (`infinite docs panels`) |
    | upload or post somewhere | you cannot reach other sites from here: save the file, give its path, say where to upload it |
    | anything outside Infinite | answer briefly; say plainly what you cannot do from here |
@@ -72,6 +93,7 @@ each as a markdown link on its own line; the chat draws a button:
 | go to a node or param | `[Show](go:@rings#7)` |
 | open a panel | `[Open timeline](open:timeline)` |
 | open a setting | `[MIDI settings](open:settings/midi)` |
+| show a file in Finder | `[Show in Finder](reveal:/path/to/file.wav)` |
 
 Rules:
 - Use the node type's name as the app shows it (`Field Pixel`, `LFO`), never an internal class name.

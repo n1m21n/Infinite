@@ -1828,6 +1828,8 @@ namespace app
             return IconsInfinite::Browser;
          if (s.verb == "say")
             return IconsInfinite::Edit;
+         if (s.verb == "reveal")
+            return IconsInfinite::Folder;
          static const std::map<std::string, const char*> kPanels = {
             { "viewport", IconsInfinite::Viewport }, { "modmatrix", IconsInfinite::ModMatrix }, { "perf", IconsInfinite::Perform },
             { "timeline", IconsInfinite::Arrange }, { "session", IconsInfinite::Session }, { "samplestudio", IconsInfinite::Waveform },
@@ -1883,6 +1885,8 @@ namespace app
          }
          else if (s.verb == "open")
             ok = HandleRpcCommand("panel", { { "name", s.arg }, { "open", true } }, r, err) && err.empty();
+         else if (s.verb == "reveal")
+            ok = HandleRpcCommand("reveal", { { "path", s.arg } }, r, err) && err.empty();
          RefreshCatalog(true);
          return ok;
       }
@@ -1895,9 +1899,9 @@ namespace app
       {
          const ImVec2 ts = ImGui::CalcTextSize(s.text.c_str());
          const ImVec2 sz(ActionWidth(s), lineH);
-         const bool once = s.verb != "go" && s.verb != "open" && s.verb != "web" && s.verb != "say";
+         const bool once = s.verb != "go" && s.verb != "open" && s.verb != "web" && s.verb != "say" && s.verb != "reveal";
          const bool done = once && sActed.count(id) != 0;
-         const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || s.verb == "web" || s.verb == "say" || sCat.Node(s.node) != nullptr;
+         const bool live = s.verb == "add" || s.verb == "undo" || s.verb == "open" || s.verb == "web" || s.verb == "say" || s.verb == "reveal" || sCat.Node(s.node) != nullptr;
          ImGui::SetCursorScreenPos(at);
          ImGui::PushID(id.c_str());
          const bool clicked = ImGui::InvisibleButton("##act", sz) && !done && live;

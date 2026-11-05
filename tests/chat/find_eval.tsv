@@ -1,0 +1,76 @@
+# ask<TAB>nodes that count as right (|-separated); a hit = one of them in the top 3 of `infinite find`
+react to the bass	Audio Analyze
+make the visuals pulse with the kick	Audio Analyze
+record my voice	Audio In|Sampler|Looper
+sing into the mic and make it echo	Audio In|Delay
+slice a drum loop	Slicer|MPC
+chop up a sample	Slicer|MPC|Sampler
+play a midi file	MIDI File
+add reverb	Reverb|Convolution Reverb
+make it sound spacious	Reverb|Convolution Reverb
+blur the image	Gaussian / Box Blur
+make it glow	Bloom & Diffuse Glow
+leave trails behind moving things	Feedback & Trails
+use my webcam	Video In
+track my hand	Hand Track
+follow my face	Face Track
+remove the background	Remove Background|Chroma Key
+green screen	Chroma Key
+put text on screen	Text
+3d text	Text 3D
+spinning cube	Geometry Primitives|Rounded Cube
+load a 3d model	Model 3D
+particles falling like snow	Particle System
+ocean waves	Ocean Surface
+a flag waving in the wind	Cloth Simulation
+color correct the video	Color Adjustments|Curves|LUT
+make it black and white	Color Adjustments
+mirror it like a kaleidoscope	Kaleidoscope|Mirror Tile
+glitchy datamosh	Glitch
+send it to my projector	Projection|Output
+projection mapping	Projection|Mapping
+send video to another app	Syphon Out|NDI Out
+a fat synth bass	Wavetable Synth|Analog|Oscillator|FM
+drum machine	Drum Sequencer|MPC
+arpeggiate my chords	Arpeggiator
+play chords from one note	Chorder
+random melody	Random Note Generator|Predictive Notes
+keep notes in key	Quantizer|Key-Snap
+a knob I can turn	Macro Knob
+wobble slowly over time	LFO|Drift
+map my midi knob	MIDI CC
+make the sound crunchy	Drive|Bitcrush|Saturator
+lowpass filter sweep	Audio Filter
+make it louder	Gain
+echo	Delay|Note Echo
+stretch audio super slow	PaulStretch
+granular texture	Granular
+load a vst plugin	Plugin
+send osc to touchdesigner	OSC Send
+receive osc messages	OSC Receive
+play a video file	Video
+load an image	Image Source
+write a shader	FieldPixel|Sketch|Formula
+draw with code like p5	Sketch
+mix two images	Blend|Layer Stack
+mix audio tracks	Mixer
+pan sound around the room	Spatial Mixer
+slideshow of photos	Slideshow
+voronoi cells	Voronoi Cells
+grow a tree	L-System
+metallic bell sound	Metallic Resonator|Shape Resonator
+plucked string	String
+smooth out jittery values	Smoothing
+noise texture	Noise
+gradient background	Ramp|Color Ramp
+light the scene	Light|HDRI
+orbit the camera	Camera
+render the 3d scene	Render 3D
+sequence notes step by step	Note Sequencer
+humanize the timing	Humanizer
+fluid smoke	Fluid
+detect motion	Optical Flow
+visualize the sound	Audio Displacement|Audio Ribbon|Audio Texture|Audio Meter|Audio Color Ramp
+bouncing balls	Bouncing Balls
+retro dithered look	Dither
+outline the edges	Edge Outline|Edge Sobel

@@ -36,4 +36,14 @@ namespace MidiFile
    // Parses `size` bytes. On failure returns false and fills `error`.
    bool Parse(const uint8_t* data, size_t size, Song& out, std::string& error);
    bool Load(const std::string& path, Song& out, std::string& error);
+
+   // A note to write: start and length in beats.
+   struct Note
+   {
+      double beat = 0.0, length = 0.25;
+      uint8_t pitch = 60, velocity = 100, channel = 0;
+   };
+   // A format-0 file at 480 ticks per beat, with `bpm` as its tempo. Parse reads it back.
+   std::vector<uint8_t> Encode(const std::vector<Note>& notes, double bpm);
+   bool Save(const std::string& path, const std::vector<Note>& notes, double bpm, std::string& error);
 }

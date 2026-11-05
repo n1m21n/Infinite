@@ -1,0 +1,21 @@
+# held-out asks: never tuned against; a check that find generalises
+make the picture wavy like water	Twirl, Pinch/Punch & Ripple|Displacement
+add a delay on my synth	Delay
+pitch the sample down	Sampler|Note Transpose
+make a beat	Drum Sequencer|MPC|Predictive Rhythm
+put a logo on top of the video	Image Source|Layer Stack|Blend
+fade between two videos	Blend|Switcher
+make the colors more vivid	Color Adjustments
+sparkly dust floating	Particle System
+change the tempo of notes randomly	Humanizer|Random Note Generator
+make the cube bigger when it gets loud	Audio Analyze|Audio Displacement
+cut out the person	Remove Background|Pose Track
+turn my photo into dots	Image to Points|Dither
+make a terrain	Displacement|Noise|Ocean Surface
+loop my guitar live	Looper|Audio In
+a pad sound that evolves	Wavetable Synth|Spectral Synth|Granular
+bitcrusher	Bitcrush
+mirror the image	Mirror Tile|Kaleidoscope
+control it from my phone	OSC Receive
+draw on the canvas with a brush	Draw
+show the waveform	Audio Meter|Audio Ribbon|Audio Texture

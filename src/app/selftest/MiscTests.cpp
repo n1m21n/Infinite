@@ -11,6 +11,7 @@
 #include <chrono>
 #include <algorithm>
 #include "app/AppShared.h"
+#include "audio/MidiFile.h"
 #include "app/graph/NodeClipboard.h"
 #include "miniz.h"
 #include "core/MediaCollect.h"
@@ -2561,6 +2562,35 @@ void RunRpcBatchTest()
             Call("import", { {"paths", json::array({ here })} }, r, e) && gDroppedFiles.size() == before + 1 && gDropAtCanvas);
       gDroppedFiles.resize(before);
       gDropAtCanvas = false;
+      e.clear();
+      Check("reveal a missing file errors", !Call("reveal", { {"path", "/nonexistent/x.wav"} }, r, e) || !e.empty());
+   }
+
+   // The built-in generators, for the agent: MIDI into the Piano Roll and out as a .mid; samples in the Sample studio.
+   {
+      e.clear();
+      Call("notes", { {"action", "generate"}, {"args", json::array({ "chords" })}, {"fields", { {"bars", 1}, {"seed", 7} }} }, r, e);
+      const uint64_t clip = r.value("clip", (uint64_t)0);
+      Check("notes generate chords writes a clip in the Piano Roll", e.empty() && clip != 0 && r.value("notes", 0) > 0 && gPianoRollOpen);
+      const std::string mid = (std::filesystem::temp_directory_path() / "infinite_rpcgen.mid").string();
+      e.clear();
+      Call("notes", { {"action", "export"}, {"args", json::array({ std::to_string(clip) })}, {"fields", { {"path", mid} }} }, r, e);
+      MidiFile::Song song;
+      std::string err;
+      Check("notes export writes a .mid that reads back", e.empty() && MidiFile::Load(mid, song, err) && song.noteCount == (int)Arrange::FindClipOrSlot(gArrange, clip)->notes.size());
+      std::filesystem::remove(mid);
+      e.clear();
+      Call("notes", { {"action", "generate"}, {"args", json::array({ "kazoo" })} }, r, e);
+      Check("notes generate with an unknown type errors", !e.empty());
+      e.clear();
+      Call("studio", { {"action", "generate"}, {"args", json::array({ "kazoo" })} }, r, e);
+      Check("studio generate with an unknown part errors and lists parts", e.find("pads") != std::string::npos);
+      e.clear();
+      Call("studio", { {"action", "status"} }, r, e);
+      Check("studio status reports busy and ready", e.empty() && r.contains("busy") && r.contains("ready"));
+      e.clear();
+      Call("studio", { {"action", "node"}, {"args", json::array({ "Toaster" })} }, r, e);
+      Check("studio node with an unknown type errors", !e.empty());
    }
 
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");

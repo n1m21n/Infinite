@@ -183,7 +183,8 @@ namespace chat
          "name every node as @title#index and every param as @title#index.key, with values and units. "
          "The chat already lists every change you made to the patch, so do not repeat them: answer in one or two short "
          "sentences, show code only when you wrote code, and give the path of any picture you made. "
-         "Pick nodes with `infinite find <plain words>`, not from memory. "
+         "Pick nodes with `infinite find <plain words>`, not from memory. Make samples with `infinite studio generate` and MIDI with "
+         "`infinite notes generate`; find the user's files with `infinite files`. "
          "Run `infinite` commands on their own: no cd, pipes or redirects around them, which are not allowed and fail.";
       // Antigravity takes only `command(...)` grants; this one lets the turn run `infinite` and nothing else unasked.
       const char* const kAgySettings = "{\"permissions\":{\"allow\":[\"command(infinite)\"]}}";
