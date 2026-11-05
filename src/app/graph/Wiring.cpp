@@ -1613,21 +1613,29 @@ namespace app
       const float kMargin = 24.0f;
 
       ed::EditorContext* prevEditor = ed::GetCurrentEditor();
-      ed::SetCurrentEditor(gEditor);
+      if (gEditor != nullptr)
+         ed::SetCurrentEditor(gEditor);
 
       std::vector<std::pair<ImVec2, ImVec2>> occupied;
       occupied.reserve(gNodes.size());
       for (GraphNode& gn : gNodes)
       {
-         ImVec2 p = ed::GetNodePosition(gn.NodeId());
-         ImVec2 s = ed::GetNodeSize(gn.NodeId());
+         ImVec2 p(gn.liveX, gn.liveY);
+         ImVec2 s(0.0f, 0.0f);
+         if (gEditor != nullptr)
+         {
+            p = ed::GetNodePosition(gn.NodeId());
+            s = ed::GetNodeSize(gn.NodeId());
+         }
+         // Never laid out (this frame's spawn, or several from one agent turn): where it will appear, a node's size.
          if (s.x <= 0.0f || s.y <= 0.0f)
-            continue; // never laid out (e.g. this frame's spawn) - nothing to avoid yet
+            p = ImVec2(gn.liveX, gn.liveY), s = ImVec2(kFootprintW, kFootprintH);
          occupied.emplace_back(ImVec2(p.x - kMargin, p.y - kMargin),
                                 ImVec2(p.x + s.x + kMargin, p.y + s.y + kMargin));
       }
 
-      ed::SetCurrentEditor(prevEditor);
+      if (gEditor != nullptr)
+         ed::SetCurrentEditor(prevEditor);
 
       auto overlapsAny = [&](const ImVec2& candMin, const ImVec2& candMax)
       {

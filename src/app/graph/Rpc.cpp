@@ -4,6 +4,8 @@
 
 namespace app
 {
+   static int sLastSpawnIndex = -1;  // the last node create_node placed on its own, for the next one to sit beside
+
    // Dispatches one RemoteControl JSON-RPC request. Runs on the main thread,
    // once per frame per pending command (see RemoteControl::DrainPending's
    // call site, right after glfwPollEvents()) - so every case here is free to
@@ -63,14 +65,28 @@ namespace app
       {
          const std::string typeName = params.value("typeName", std::string());
          const std::string category = params.value("category", std::string());
-         const float x = params.value("x", 0.0f);
-         const float y = params.value("y", 0.0f);
+         float x = params.value("x", 0.0f);
+         float y = params.value("y", 0.0f);
+         // No place given (an agent's or the CLI's add): a free spot, not the origin. A run of adds a few
+         // seconds apart reads left to right as a chain, each one right of the last; otherwise near the view.
+         if (!params.contains("x") && !params.contains("y"))
+         {
+            static double lastAt = -100.0;
+            static ImVec2 lastPos;
+            const double now = ImGui::GetTime();
+            const bool chain = now - lastAt < 20.0 && FindNodeByIndex(sLastSpawnIndex) != nullptr;
+            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;
+            const ImVec2 at = FindFreeSpawnPosition(want);
+            x = at.x, y = at.y;
+            lastAt = now, lastPos = at;
+         }
          GraphNode* gn = SpawnNode(typeName, category, x, y);
          if (gn == nullptr)
          {
             outError = "unknown node type '" + typeName + "'";
             return false;
          }
+         sLastSpawnIndex = gn->index;
          outResult = { {"index", gn->index} };
          return true;
       }

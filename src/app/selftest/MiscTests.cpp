@@ -2522,6 +2522,21 @@ void RunRpcBatchTest()
    Check("render_frame without an Output errors", !Call("render_frame", { {"path", "/tmp/infinite_rf.png"} }, r, e) &&
                                                      e.find("no Output") != std::string::npos);
 
+   // Adds with no place given (agents, the CLI) never land on one another, even within one frame.
+   NewPatch();
+   {
+      std::vector<ImVec2> at;
+      for (int i = 0; i < 4; i++)
+         if (Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, r, e))
+            if (GraphNode* gn = FindNodeByIndex(r.value("index", -1)))
+               at.push_back(ImVec2(gn->liveX, gn->liveY));
+      bool apart = at.size() == 4;
+      for (size_t a = 0; a < at.size(); a++)
+         for (size_t b = a + 1; b < at.size(); b++)
+            apart = apart && (std::fabs(at[a].x - at[b].x) >= 260.0f || std::fabs(at[a].y - at[b].y) >= 300.0f);
+      Check("create_node without x/y: four adds in one frame never overlap", apart);
+   }
+
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }
 
