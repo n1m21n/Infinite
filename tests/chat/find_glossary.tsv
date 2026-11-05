@@ -1,0 +1,224 @@
+# Artist words: one musician or visual-artist term per line, as people say it, with the nodes that fit (any of, top 3).
+# A miss here is fixed by a bridge in NodeFinder.cpp or a better card, never by editing this file to pass.
+lush pads	Wavetable Synth|Wavetable|Analog|Reverb|Molder|Spectral Synth|Chorus
+plucks	String|Karplus|Analog|Wavetable Synth|Wavetable|Piano
+pluck sound	String|Analog|Wavetable Synth|Wavetable
+bass line	Analog|Note Sequencer|Wavetable Synth|Wavetable|Oscillator|Piano Roll
+sub bass	Analog|Oscillator|Wavetable Synth|Wavetable
+lead synth	Analog|Wavetable Synth|Wavetable|FM
+bells	FM|Metallic|Resonator Bank
+metallic hits	Metallic|FM|Ring Mod|Resonator Bank
+oscillator	Oscillator|Analog|LFO
+sine wave	Oscillator|LFO|Analog
+saw wave	Oscillator|Analog|LFO
+square wave	Oscillator|Analog|LFO
+detune	Analog|Chorus|Wavetable Synth|Wavetable|Voice Spread
+supersaw	Analog|Voice Spread|Wavetable Synth|Wavetable
+unison voices	Voice Spread|Analog|Wavetable Synth|Wavetable
+fm synthesis	FM
+additive synthesis	Partials|Spectral Synth
+granular texture	Granular|Grain Molder|Audio Texture
+time stretch	PaulStretch|Granular
+drum machine	Drum Sequencer|MPC|VMPC
+beat	Drum Sequencer|MPC|Pattern
+hi hats	Drum Sequencer|MPC|Metallic
+kick drum	Drum Sequencer|MPC
+chop a sample	Slicer|Sampler|MPC
+sampler	Sampler|Slicer|MPC
+loop pedal	Looper
+reverb	Reverb|Convolution Reverb
+hall reverb	Reverb|Convolution Reverb
+echo	Delay|Note Echo
+delay	Delay|Note Echo
+ping pong delay	Delay
+cutoff	Audio Filter|Formant Filter
+low pass filter	Audio Filter
+high pass	Audio Filter|EQ
+resonance	Audio Filter|Resonator Bank|Shape Resonator
+filter sweep	Audio Filter|LFO|Envelope
+wah	Formant Filter|Audio Filter|LFO
+vowel sound	Formant Filter
+compressor	Dynamics|Limiter
+sidechain	Dynamics|Envelope|Audio Analyze
+limiter	Limiter|Dynamics
+saturation	Saturator|Drive
+overdrive	Drive|Saturator
+distortion	Drive|Saturator|Bitcrush
+bitcrusher	Bitcrush
+lofi	Bitcrush|Saturator
+tape warmth	Saturator|Drive
+chorus	Chorus
+flanger	Flanger
+phaser	Phaser
+tremolo	Tremolo
+vibrato	Vibrato
+ring modulation	Ring Mod
+stereo width	Stereo|Voice Spread
+panning	Stereo|Spatial Mixer|Mixer
+equalizer	EQ
+transients	Transient Shaper|Dynamics
+punchy drums	Transient Shaper|Dynamics|Drive
+glitch stutter	Stutter
+pitch shift	Pitch Shifter|Note Transpose|Frequency Shifter
+autotune	Key-Snap|Pitch Shifter
+semitones	Note Transpose|Pitch Shifter
+octave up	Note Transpose|Pitch Shifter
+tuning	Key-Snap|Note Transpose|Pitch Shifter|Quantizer
+frequency	Frequency Shifter|Oscillator|Audio Analyze
+arpeggio	Arpeggiator
+chords	Chorder|Note Stack
+strum	Note Strum
+scale	Quantizer|Key-Snap|Note Filter
+melody	Note Sequencer|Piano Roll|Random Note Generator|Predictive Notes
+sequencer	Note Sequencer|Drum Sequencer|Pattern
+step sequencer	Note Sequencer|Drum Sequencer|Pattern
+piano roll	Piano Roll
+humanize	Humanizer
+swing	Humanizer|Drum Sequencer|Pattern
+velocity	Velocity Curve|Velocity to CV
+glide	Glide
+portamento	Glide
+pitch bend	Pitch Bend
+midi keyboard	Keyboard|MIDI Notes
+midi file	MIDI File
+midi controller	MIDI CC|MIDI Notes|Macro Knob
+knobs	Macro Knob|Macro Bipolar Knob|MIDI CC
+fader	Macro Slider|Mixer
+sliders	Macro Slider
+xy pad	Macro XY
+lfo	LFO
+envelope	Envelope|MSEG
+adsr	Envelope
+modulation	LFO|Envelope|Random|MSEG
+random values	Random|Random Note Generator
+values	Constant|Macro Knob|Math|Range to Range|Random|Pattern
+smooth values	Smoothing
+map a range	Range to Range|Math
+math	Math|Formula
+follow the volume	Audio Analyze|Audio to CV|Envelope
+mixer	Mixer|Spatial Mixer
+arranging	Piano Roll|Note Sequencer
+record audio	Audio In|Looper|Audio File
+play a wav	Audio File|Sampler
+spatial audio	Spatial Mixer|Stereo
+shader	Shadertoy|FieldPixel|Formula
+glsl	Shadertoy|FieldPixel
+graphics	Shape|Shadertoy|Draw
+noise	Noise|addnoise
+perlin noise	Noise
+grain	addnoise|Noise
+textures	Texture|Noise|Audio Texture
+material	Material
+blending	Blend|Layer Stack
+blend modes	Blend|Layer Stack
+compositing	Layer Stack|Blend
+layers	Layer Stack|Blend
+drawing	Draw|Sketch
+sketch	Sketch|Draw|Sketch 3D
+brush	Draw|Sketch|Sculpt
+paint	Draw|Sketch
+text	Text|Text 3D
+typography	Text|Text 3D
+font	Text|Text 3D
+logo	Image Source|Text|Texture
+image	Image Source|Texture
+photo	Image Source|Texture
+slideshow	Slideshow
+video	Video|Video In
+webcam	Video In
+camera	Video In|Camera
+color grading	color adjustments|Curves|lut|lookup|exposure
+curves	Curves
+lut	lut|lookup
+saturation boost	color adjustments
+brightness	color adjustments|exposure
+contrast	color adjustments|Curves
+hue shift	color adjustments|coloroverlay
+gradient	Ramp|Color Ramp|gradientmap
+palette	Palette|Color Ramp
+duotone	gradientmap|Color Ramp
+blur	gaussianblur|boxblur|motionblur|radialblur
+gaussian blur	gaussianblur
+motion blur	motionblur
+glow	bloom|outerglow|diffuseglow
+bloom	bloom
+vignette	vignette
+film grain	addnoise|Noise
+sharpen	unsharpmask
+pixel art	pixelate|dither
+pixelate	pixelate
+dithering	dither
+halftone	halftone
+posterize	posterize
+glitch art	glitch|Stutter
+kaleidoscope	kaleidoscope
+symmetry	symmetry|mirror tile|Mirror
+mirror	mirror tile|symmetry|Mirror
+tile	mirror tile
+warp	liquify|displace|twirl|lensdistortion
+distort the image	displace|liquify|lensdistortion|twirl
+ripple	ripple
+swirl	twirl
+fisheye	lensdistortion
+edges	edge sobel|edge outline
+outline	edge outline|dropshadow|outerglow
+emboss	emboss
+drop shadow	dropshadow
+mask	luma key|set alpha|alpha from luma|chroma key
+green screen	chroma key
+key out black	luma key|alpha from luma
+transparency	opacity|set alpha
+crop	crop
+resize	Fit|transform
+rotate	transform|Transform
+feedback	Feedback|Feedback 3D
+trails	Trails|Point Trails|Feedback
+echo trails	Trails|Feedback
+fluid	Fluid
+smoke	Fluid
+reaction diffusion	Reaction Diffusion
+optical flow	Optical Flow
+datamosh	Optical Flow|glitch|Feedback
+time delay video	Time Machine|Feedback
+shapes	Shape|Polygon|Circle
+circle	Circle|Ellipse|Ring
+star	Star|Star 3D
+polygon	Polygon|Hexagon
+3d model	Model 3D
+mesh	Geometry|Edit Mesh|Model 3D
+sculpt	Sculpt
+lighting	Light|HDRI
+lights	Light
+environment map	HDRI
+render	Render 3D|3D View
+3d camera	Camera
+particles	Particle System|Instance on Points|Distribute Points on Faces
+instancing	Instance on Points|Array
+scatter	Distribute Points on Faces|Instance on Points
+array	Array
+extrude	Extrude|Extrude Selected
+bevel	Bevel
+subdivide	Subdivide
+smooth the mesh	Smooth|Subdivide
+wireframe	Wireframe|Mesh to Edges
+low poly	Decimate|Triangulate
+boolean	Difference|Union|Intersect
+voronoi	Voronoi Cells
+cloth	Cloth
+physics	Rigid Bodies|Cloth
+ocean waves	Ocean
+rig	Armature
+skeleton	Armature
+uv	UV Project|Mapping
+procedural	L-System|Noise|Formula
+fractal	L-System|Formula|Shadertoy
+audio reactive	Audio Analyze|Audio Displacement|Audio to CV
+spectrum	Audio Analyze|Audio Color Ramp|Spectral Synth
+waveform	Audio Meter|Audio Ribbon|Audio Analyze
+hand tracking	Hand Track
+face tracking	Face Track
+pose	Pose Track
+projection mapping	Projection
+fullscreen output	Output|Projection
+send video to resolume	Syphon Out|NDI Out
+osc	OSC Receive|OSC Send

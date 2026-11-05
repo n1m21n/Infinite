@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -69,9 +70,9 @@ namespace CliSetup
 
    // The two scripts: shell-quoted variables first, then the fixed body. This is the exact text that runs.
    // `only` limits the run to those step ids (empty = all); `prior` seeds the other steps' last states so
-   // a repair leaves the rest of status.json as it was.
+   // a repair leaves the rest of status.json as it was. `installAgent` makes step 5 install a missing agent.
    std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
-                           const std::vector<std::string>& only = {}, const Status* prior = nullptr);
+                           const std::vector<std::string>& only = {}, const Status* prior = nullptr, bool installAgent = false);
    // The one line typed into the Terminal tab.
    std::string SetupLine(Os os, const std::string& scriptPath);
    std::string InstallAgentLine(Os os, const Agent& agent);
@@ -88,6 +89,20 @@ namespace CliSetup
       std::string agent = "claude";
       bool autoStart = false;
       bool welcomed = false; // the Terminal welcome has been dismissed once
+      std::string face = "chat";  // what the Terminal panel opens to: "chat" or "terminal"
+      std::string workspace;      // the folder agents work in; "" = the open patch's folder, else HOME
+      bool folderAccess = false;  // agents may also read and edit files in the folder (else only `infinite` and attached files)
+      std::map<std::string, std::string> models;  // per agent id; missing = the agent's own default
+      std::vector<std::string> folders;   // more folders agents may read (and edit, with folderAccess)
+      std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")
+      bool introduced = false;    // the "connected, try this" line was shown once
+      // Tokens the chat's agents used, per agent id, since the user last reset them (Settings > Agents).
+      struct Usage
+      {
+         long long turns = 0, input = 0, cached = 0, output = 0;
+         double cost = 0;
+      };
+      std::map<std::string, Usage> usage;
    };
    Config LoadConfig(const std::string& file);
    void SaveConfig(const std::string& file, const Config& config);
@@ -114,8 +129,20 @@ namespace CliSetup
    void StartLaunchCheck();
    HealthReport LatestHealth();
 
+   // Can the chat use this agent now? File probes only, real HOME and PATH. `connected`: the launcher, Node
+   // and the agent's MCP registration and skills hold. `signedIn`: the agent's own login file or API key.
+   struct Readiness
+   {
+      bool installed = false, connected = false, signedIn = false;
+      std::string why;   // plain words for the first broken step when not connected
+      bool Ready() const { return installed && connected && signedIn; }
+   };
+   Readiness AgentReadiness(const Agent& agent);
+
    // What the page shows. Everything it draws and every button comes from here.
-   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep };
+   // kConnectAll: install if missing, set up, then start the agent, in one tab. kSetupAgent: install if
+   // missing and set up, no start, for a runner that has no terminal (the chat runs it in the background).
+   enum class Action { kNone, kSetup, kInstallAgent, kStartAgent, kRepairStep, kConnectAll, kSetupAgent };
    struct View
    {
       std::vector<StepStatus> steps;
@@ -142,5 +169,7 @@ namespace CliSetup
 
    // Process-wide state used by the app (Settings page and the Terminal panel).
    Config& Prefs();
+   // A path as the user reads it: their home folder as ~ ("~/Music"), so no account name shows on screen.
+   std::string HomeTilde(const std::string& path);
    std::string RealExecutable();
 }

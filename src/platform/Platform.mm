@@ -5133,6 +5133,34 @@ namespace Platform
       }
    }
 
+   std::vector<std::string> OpenFilesDialog(const char* title, const std::vector<std::string>& exts)
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:YES];
+         [panel setTitle:[NSString stringWithUTF8String:title != nullptr ? title : "Attach files"]];
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray* types = [NSMutableArray array];
+            for (const std::string& e : exts)
+               if (UTType* t = [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:e.c_str()]])
+                  [types addObject:t];
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+         std::vector<std::string> out;
+         if ([panel runModal] != NSModalResponseOK)
+            return out;
+         for (NSURL* url in [panel URLs])
+            if (url != nil && [url path] != nil)
+               out.push_back([[url path] UTF8String]);
+         return out;
+      }
+   }
+
    std::string OpenMidiDialog()
    {
       @autoreleasepool

@@ -1,0 +1,323 @@
+# Every node, asked for the way a user would, without its name. Coverage, not tuning: report the score, fix only
+# with grounded bridges (NodeFinder.cpp) or better cards. Right = the node's type or card in the top 3.
+# Notes
+play my chord as a rising pattern	Arpeggiator
+balls that bounce and play notes when they hit	Bouncing Balls
+turn one note into a full chord	Chorder
+let notes through only on the beat	Gate
+slide smoothly from one note to the next	Glide
+make the timing feel less robotic	Humanizer
+play notes with the computer keys	Keyboard
+play back a .mid file	MIDI File
+notes from my midi keyboard	MIDI Notes|Keyboard
+catch the notes I just played	Note Capturer
+repeat each note a few times, quieter	Note Echo
+drop notes outside a pitch range	Note Filter
+merge two note streams	Note Merge
+send low notes one way and high notes another	Note Router
+a step sequencer for melodies	Note Sequencer
+stack notes into intervals	Note Stack|Chorder
+spread a chord out like a guitar strum	Note Strum
+switch between note sources	Note Switcher
+shift all notes up an octave	Note Transpose
+draw notes on a grid	Piano Roll
+bend the pitch up and down	Pitch Bend
+snap notes to a scale	Quantizer|Key-Snap
+generate random melodies	Random Note Generator
+make soft notes louder	Velocity Curve
+# Utility
+take sound from my audio interface	Audio In
+see how loud the signal is	Audio Meter
+send sound to the speakers	Audio Out
+crossfade between two sounds	Blend Audio
+change the volume of a sound	Gain
+send notes to hardware	MIDI Out
+sum several sounds together	Mixer
+receive video over the network	NDI In
+send video over the network to another computer	NDI Out
+receive messages from touchosc	OSC Receive
+send values to another app over osc	OSC Send
+show the picture fullscreen on the second screen	Output|Projection
+map the picture onto a building	Projection
+place sounds around the listener	Spatial Mixer
+split one signal into many	Splitter
+bring in video from another app on this mac	Syphon In
+share my visuals with resolume	Syphon Out
+# Visual effects
+blur the picture	gaussianblur|boxblur
+make the bright parts glow	bloom|diffuseglow
+sharpen with a custom kernel	convolve
+cut off the edges of the frame	crop
+soft dreamy glow	diffuseglow|bloom
+push pixels around with another image	displace
+draw lines along the edges	edge outline|edge sobel
+make it look like a broken screen	glitch
+comic book dots	halftone
+mirror it into a mandala	kaleidoscope
+barrel lens bend	lensdistortion
+smear the picture like wet paint	liquify
+streak it as if moving fast	motionblur
+make a bump map from the picture	normal map
+pinch the middle inward	pinchpunch
+make it blocky and low res	pixelate
+zoom blur out from the center	radialblur
+water drop waves across the picture	ripple
+fold it so both halves match	symmetry
+dark corners	vignette
+add static to the picture	addnoise
+evolve the image into something new	Resynthesize
+# Modulators
+move things with the music's loudness	Audio Analyze
+play an audio file and read its level	Audio File
+turn sound into a control signal	Audio to CV
+record a knob movement and play it back	CV Recorder
+turn a value into a pitch	CV to Pitch
+fire when a value crosses a threshold	Compare
+a fixed number	Constant
+attack decay sustain release	Envelope
+follow my face with the camera	Face Track
+read points off a mesh as values	Geometry Table
+move things with my hand in front of the webcam	Hand Track
+read the colour of the picture as a value	Image Analyze
+flip a value upside down	Invert
+a slow wobble that goes up and down	LFO
+use a midi knob to move a param	MIDI CC
+a trigger from a midi note	MIDI Trigger
+draw a custom modulation shape	MSEG|Mod Curve
+add or multiply two values	Math
+reshape a value with a curve	Mod Curve
+control how much modulation goes through	Mod Depth
+per-note pressure and slide	Note Expression
+turn notes into a control value	Note to CV
+pick colours from a palette over time	Palette
+move along a drawn path	Path
+step through a few values in a loop	Pattern
+follow my body pose	Pose Track
+a value that wanders randomly	Random
+rescale 0 to 1 into 20 to 200	Range to Range
+smooth out a jumpy value	Smoothing
+use how hard I hit the key	Velocity to CV
+wobble the pitch slightly	Vibrato
+a different value for each voice	Voice Spread
+# Audio effects
+cut the highs	Audio Filter
+crunchy low bit sound	Bitcrush
+thicken the sound with a doubled shimmer	Chorus
+reverb from a real room recording	Convolution Reverb
+waveshape each cycle	Cycle Shaper
+repeating echoes	Delay
+make it dirtier and louder	Drive|Saturator
+squash the peaks	Dynamics|Limiter
+boost the bass and cut the mids	EQ
+write my own audio effect code	Field Effect
+jet plane whoosh sweep	Flanger
+make it talk like a vowel	Formant Filter
+shift every frequency by a fixed amount	Frequency Shifter
+pull the voice onto the right notes	Key-Snap
+stop it from clipping	Limiter
+swirling notch sweep	Phaser
+load my vst plugin	Plugin
+change the pitch without changing speed	Pitch Shifter
+ring like tuned strings	Resonator Bank
+add a sense of space	Reverb
+metallic robotic sound	Ring Mod
+warm analog colour	Saturator
+resonate through a shape	Shape Resonator
+smear the spectrum	Spec Blur
+slide the spectrum up	Spectrum Slide
+make it wider in stereo	Stereo
+repeat little chunks in rhythm	Stutter
+make the drums hit harder	Transient Shaper
+pulse the volume up and down	Tremolo
+warp the sound through a wavetable	Wavetable Shaper
+# Macros
+one big knob for many params	Macro Knob
+a knob centered at zero	Macro Bipolar Knob
+type an exact number	Macro NumBox
+pick one of a few options	Macro Radio Selector
+a fader for the performance	Macro Slider
+a row of on off steps	Macro Step Gate
+an on off switch	Macro Toggle
+a button to fire something	Macro Trigger
+a 2d pad to control two things	Macro XY
+# Picture sources
+draw an arrow	Arrow
+turn sound into a texture	Audio Texture
+a soft organic blob	Blob
+a chevron stripe	Chevron
+a round shape	Circle|Ellipse
+a moon shape	Crescent
+a plus sign	Cross
+draw with my mouse	Draw
+an oval	Ellipse
+write my own pixel shader	FieldPixel|Shadertoy
+type a maths formula for the picture	Formula
+a cog wheel	Gear
+a heart shape	Heart
+six sided shape	Hexagon
+open a picture from my computer	Image Source
+a straight line	Line
+cloudy random texture	Noise
+a pie chart slice	Pie
+a shape with n sides	Polygon
+a colour gradient	Ramp
+a box shape	Rectangle
+a donut ring	Ring
+a box with round corners	Rounded Rect
+paste a shader from shadertoy	Shadertoy
+code a p5 sketch	Sketch
+cycle through a folder of pictures	Slideshow
+a star shape	Star
+a squircle	Superellipse
+a drop shape	Teardrop
+write words on screen	Text
+tile a pattern texture	Texture
+three corners	Triangle
+play a video file	Video
+use my webcam	Video In
+# Prediction
+let it drift on its own	Drift
+learn moves and replay them	Moves
+colour that learns from the music	Predictive Coloring
+a modulator that learns my gestures	Predictive Modulator
+notes that predict what comes next	Predictive Notes
+quantize by learning my timing	Predictive Quantize
+learn my drum rhythm	Predictive Rhythm
+learn my playing dynamics	Predictive Velocity
+# Compositing
+colour bands from the audio	Audio Color Ramp
+mix two pictures together	Blend
+recolour by brightness with a gradient	Color Ramp|gradientmap
+leave a note on the canvas	Comment
+adjust the tone curve	Curves
+feed the picture back into itself	Feedback
+fit the picture to the frame	Fit
+liquid simulation	Fluid
+group nodes into a box	Group
+stack layers on top of each other	Layer Stack
+motion vectors from the video	Optical Flow
+coral like growing patterns	Reaction Diffusion
+cut the person out of the background	Remove Background
+switch between pictures	Switcher
+show frames from the past	Time Machine
+leave ghost trails	Trails|Feedback
+transparency from brightness	alpha from luma
+flip the transparency	alpha invert
+remove the green screen	chroma key
+change hue and saturation	color adjustments
+tint it one colour	coloroverlay
+fewer colours with dots	dither
+a shadow under the shape	dropshadow
+brighter overall	exposure
+negative colours	invert
+key out dark parts	luma key
+apply a colour lut	lut|lookup
+fade it out	opacity
+glow around the edges of a shape	outerglow
+fewer colour steps	posterize
+black and white only	threshold
+move and rotate the picture	transform
+# Synths
+a classic warm synth	Analog
+a drum machine pattern	Drum Sequencer
+make sound from a maths equation	Equation Synth
+bell like electric piano	FM
+write my own synth code	Field Synth
+make a sample for me	Generate Samples
+mangle a sample into grains	Grain Molder|Granular
+cloud of tiny sound grains	Granular
+record and overdub loops	Looper
+pads to trigger samples	MPC|VMPC
+clangy metal percussion	Metallic
+reshape a recording	Molder
+a simple tone	Oscillator
+build sound from harmonics	Partials
+stretch a sound extremely slow	PaulStretch
+a piano	Piano
+play a sample across the keyboard	Sampler
+cut a loop into pieces	Slicer
+paint sound in the spectrum	Spectral Synth
+plucked guitar string	String
+scan across a terrain to make sound	Wave Terrain
+morphing wavetables	Wavetable
+wind and breath noise	Wind
+# 3D
+look at the 3d scene	3D View
+bones to bend a model	Armature
+repeat an object in a row	Array
+a 3d arrow	Arrow 3D
+push the mesh with the sound	Audio Displacement
+a ribbon that follows the audio	Audio Ribbon
+freeze the result	Bake
+round off the hard edges	Bevel
+point of view for the 3d scene	Camera
+a pill shape	Capsule
+cloth that drapes	Cloth
+a cone	Cone
+a cube	Cube
+a 3d curve	Curve
+resample the curve	Curve Ops
+reduce polygon count	Decimate
+triangle mesh from points	Delaunay Mesh
+remove part of the mesh	Delete|Delete Selected
+use depth to make 3d from a picture	Depth Projection
+subtract one mesh from another	Difference
+a flat disc	Disc
+displace the surface with noise	Displacement
+points in a grid	Distribute Points in Grid
+scatter points over a surface	Distribute Points on Faces
+twelve sided solid	Dodecahedron
+edit vertices by hand	Edit Mesh
+blow the mesh apart	Explode
+pull faces out	Extrude|Extrude Selected
+feedback in 3d	Feedback 3D
+write code that changes geometry	Field Modifier
+a 3d gear	Gear 3D
+a sky picture for lighting	HDRI
+a spring coil	Helix
+a smooth sphere made of triangles	Icosphere
+turn a picture into points	Image to Points
+shrink faces inward	Inset
+put copies on every point	Instance on Points
+keep only the overlap	Intersect
+combine meshes into one	Join Geometry
+a bottle with no inside	Klein Bottle
+grow a plant	L-System
+a lamp	Light
+texture coordinates	Mapping|UV Project
+make it shiny metal	Material
+weld nearby vertices	Merge by Distance
+blobs that merge together	Metaballs
+flip the mesh across an axis	Mirror
+a one sided loop	Mobius Strip
+open an obj or gltf	Model 3D
+an ocean surface	Ocean
+eight sided solid	Octahedron
+spray particles	Particle System
+a flat floor	Plane
+trails behind moving points	Point Trails
+lines between nearby points	Proximity Lines
+a pyramid	Pyramid
+render the 3d to a picture	Render 3D
+spin a profile into a vase	Revolve
+objects that fall and collide	Rigid Bodies
+a cube with soft edges	Rounded Cube
+sculpt clay	Sculpt
+pick some faces	Select
+paint vertex colours	Set Vertex Color
+draw lines in 3d	Sketch 3D
+give a flat surface thickness	Solidify
+a ball	Sphere
+spikey organic shapes	Supershape
+pull a shape along a curve	Sweep
+a tube along a path	Tube|Sweep
+a donut	Torus
+a knot	Torus Knot
+four triangle faces	Tetrahedron
+3d letters	Text 3D
+make every face a triangle	Triangulate
+twist the mesh	Twist
+merge two meshes	Union|Join Geometry
+cracked cells pattern	Voronoi Cells
+show only the edges	Wireframe
+shrink wrap onto another mesh	Wrap

@@ -2609,3 +2609,67 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	Elige tu agente de programación
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	Conectar instala el agente si hace falta, lo enlaza con Infinite y añade las habilidades de Infinite. Puedes cambiarlo luego en Ajustes, Terminal.
 Skip, just a terminal	Omitir, solo una terminal
+Connect a coding agent to build with Infinite.	Conecta un agente de programación para crear con Infinite.
+%d step	%d paso
+%d steps	%d pasos
+Chat	Chat
+Goes to the agent	Va al agente
+Message, or @node	Mensaje, o @nodo
+New chat	Nuevo chat
+Not allowed:	No permitido:
+Not in the patch	No está en el patch
+Runs now	Se ejecuta ya
+The agent stopped with an error.	El agente se detuvo con un error.
+Type @ to command a node, or ask anything.	Escribe @ para mandar a un nodo, o pregunta lo que quieras.
+ask the agent	preguntar al agente
+expression	expresión
+%s is not installed.	%s no está instalado.
+modulated	modulado
+now	ahora
+%s works in the terminal.	%s funciona en la terminal.
+%d more	%d más
+%s is not set up.	%s no está configurado.
+Add a Noise and wire it to the output	Añade un Noise y conéctalo a la salida
+Agent interface	Interfaz del agente
+Ask, or type @ to name a node	Pregunta, o escribe @ para nombrar un nodo
+Attach files	Adjuntar archivos
+Changed	Cambiado
+Chats	Chats
+Connect an agent	Conecta un agente
+Did not run	No se ejecutó
+Explain this patch	Explica este patch
+Failed	Falló
+Make the colours drift slowly	Haz que los colores deriven despacio
+No agent	Sin agente
+No saved chats	No hay chats guardados
+Open in Terminal	Abrir en Terminal
+Set up	Configurar
+Set up an agent first.	Configura un agente primero.
+Setting up…	Configurando…
+Setting up… %d of %d	Configurando… %d de %d
+Sign in	Iniciar sesión
+Undone	Deshecho
+What should we make?	¿Qué hacemos?
+Working…	Trabajando…
+formula	fórmula
+stopped with an error.	terminó con un error.
+Search chats	Buscar chats
+Agents	Agentes
+Agents & Terminal	Agentes y terminal
+Default agent	Agente predeterminado
+Not installed	No instalado
+Not connected	No conectado
+Ready	Listo
+Saved chats	Chats guardados
+Clear all	Borrar todo
+Delete every saved chat?	¿Eliminar todos los chats guardados?
+%d working	%d trabajando
+3D View at Bottom	3D View abajo
+3D View at Top	3D View arriba
+Close 3D View	Cerrar 3D View
+Made %d change	%d cambio
+Made %d changes	%d cambios
+Looked at the patch	Patch revisado
+Queued	En cola
+Add to the queue	Añadir a la cola
+Reply	Responder

@@ -11,6 +11,7 @@
 #include <chrono>
 #include <algorithm>
 #include "app/AppShared.h"
+#include "audio/MidiFile.h"
 #include "app/graph/NodeClipboard.h"
 #include "miniz.h"
 #include "core/MediaCollect.h"
@@ -2521,6 +2522,76 @@ void RunRpcBatchTest()
    NewPatch();
    Check("render_frame without an Output errors", !Call("render_frame", { {"path", "/tmp/infinite_rf.png"} }, r, e) &&
                                                      e.find("no Output") != std::string::npos);
+
+   // Adds with no place given (agents, the CLI) never land on one another, even within one frame.
+   NewPatch();
+   {
+      std::vector<ImVec2> at;
+      for (int i = 0; i < 4; i++)
+         if (Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, r, e))
+            if (GraphNode* gn = FindNodeByIndex(r.value("index", -1)))
+               at.push_back(ImVec2(gn->liveX, gn->liveY));
+      bool apart = at.size() == 4;
+      for (size_t a = 0; a < at.size(); a++)
+         for (size_t b = a + 1; b < at.size(); b++)
+            apart = apart && (std::fabs(at[a].x - at[b].x) >= 260.0f || std::fabs(at[a].y - at[b].y) >= 300.0f);
+      Check("create_node without x/y: four adds in one frame never overlap", apart);
+   }
+
+   // Every setting is one link away, and a file from the computer goes in as a Finder drop would.
+   {
+      const bool was = gSettingsOpen;
+      gSettingsOpen = false;
+      e.clear();
+      Call("panel", { {"name", "settings/midi"} }, r, e);
+      Check("panel settings/midi opens Settings at MIDI Inputs", e.empty() && gSettingsOpen && r.value("place", "") == "midi");
+      e.clear();
+      Call("panel", { {"name", "settings/nope"} }, r, e);
+      Check("an unknown settings place errors and lists the places", e.find("midi") != std::string::npos);
+      gSettingsOpen = was;
+      e.clear();
+      Call("settings", { {"action", "midi"} }, r, e);
+      Check("settings midi reports running and inputs", e.empty() && r.contains("running") && r["inputs"].is_array());
+      e.clear();
+      Check("import a missing file errors", !Call("import", { {"paths", json::array({ "/nonexistent/x.wav" })} }, r, e) &&
+                                              e.find("no file") != std::string::npos);
+      const size_t before = gDroppedFiles.size();
+      e.clear();
+      const std::string here = std::filesystem::current_path().u8string();
+      Check("import queues an existing file as a canvas drop",
+            Call("import", { {"paths", json::array({ here })} }, r, e) && gDroppedFiles.size() == before + 1 && gDropAtCanvas);
+      gDroppedFiles.resize(before);
+      gDropAtCanvas = false;
+      e.clear();
+      Check("reveal a missing file errors", !Call("reveal", { {"path", "/nonexistent/x.wav"} }, r, e) || !e.empty());
+   }
+
+   // The built-in generators, for the agent: MIDI into the Piano Roll and out as a .mid; samples in the Sample studio.
+   {
+      e.clear();
+      Call("notes", { {"action", "generate"}, {"args", json::array({ "chords" })}, {"fields", { {"bars", 1}, {"seed", 7} }} }, r, e);
+      const uint64_t clip = r.value("clip", (uint64_t)0);
+      Check("notes generate chords writes a clip in the Piano Roll", e.empty() && clip != 0 && r.value("notes", 0) > 0 && gPianoRollOpen);
+      const std::string mid = (std::filesystem::temp_directory_path() / "infinite_rpcgen.mid").string();
+      e.clear();
+      Call("notes", { {"action", "export"}, {"args", json::array({ std::to_string(clip) })}, {"fields", { {"path", mid} }} }, r, e);
+      MidiFile::Song song;
+      std::string err;
+      Check("notes export writes a .mid that reads back", e.empty() && MidiFile::Load(mid, song, err) && song.noteCount == (int)Arrange::FindClipOrSlot(gArrange, clip)->notes.size());
+      std::filesystem::remove(mid);
+      e.clear();
+      Call("notes", { {"action", "generate"}, {"args", json::array({ "kazoo" })} }, r, e);
+      Check("notes generate with an unknown type errors", !e.empty());
+      e.clear();
+      Call("studio", { {"action", "generate"}, {"args", json::array({ "kazoo" })} }, r, e);
+      Check("studio generate with an unknown part errors and lists parts", e.find("pads") != std::string::npos);
+      e.clear();
+      Call("studio", { {"action", "status"} }, r, e);
+      Check("studio status reports busy and ready", e.empty() && r.contains("busy") && r.contains("ready"));
+      e.clear();
+      Call("studio", { {"action", "node"}, {"args", json::array({ "Toaster" })} }, r, e);
+      Check("studio node with an unknown type errors", !e.empty());
+   }
 
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }

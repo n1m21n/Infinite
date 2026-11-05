@@ -32,10 +32,6 @@ npx -y infinite-engine init
 # or via python:
 pip install infinite-daw
 infinite-init --dry-run   # then run without --dry-run
-
-# or via smithery registry:
-npx -y @smithery/cli install infinite-engine --client claude
-npx -y @smithery/cli install infinite-engine --client cursor
 ```
 
 The Infinite app must be installed. Set `INFINITE_BIN` to its path if it is not found (`INFINITE_APP` still works in the npm server). Both installers only touch apps that are already installed, keep a `.infinite-backup`, and leave a config alone if it is not plain JSON.

@@ -1,0 +1,48 @@
+/* Chat page: the chat window drawn in HTML, and the numbered flow. Colours come from the site tokens, so every mode follows. */
+.dv-sec.cx-stage { display: grid; gap: 12px; justify-items: center; background: none; box-shadow: none; padding: 0; }
+.cx { --cx-bg: var(--mid); --cx-ink: var(--mid-ink); --cx-dim: color-mix(in srgb, var(--mid-ink) 62%, transparent); --cx-line: color-mix(in srgb, var(--mid-ink) 14%, transparent);
+  --cx-well: color-mix(in srgb, var(--mid-ink) 8%, transparent); --cx-amber: #FACC15; --cx-green: #4ADE80;
+  width: 100%; max-width: 640px; border-radius: var(--web-card-radius); background: var(--cx-bg); color: var(--cx-ink); box-shadow: var(--shadow-2, var(--shadow-1)); overflow: hidden;
+  font-size: 0.9375rem; line-height: 1.5; text-align: left; }
+.cx-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--cx-line); }
+.cx-title { font-weight: 600; }
+.cx-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px 0 6px; border-radius: var(--r-pill); background: var(--cx-well); font-size: 0.8125rem; }
+.cx-pill b { font-weight: 500; color: var(--cx-dim); }
+.cx-av { width: 18px; height: 18px; border-radius: 50%; display: inline-block; background: #D97757; }
+.cx-body { display: grid; gap: 14px; padding: 18px 16px 8px; }
+.cx-user { justify-self: end; max-width: 88%; padding: 10px 14px; border-radius: 14px; background: var(--cx-well); }
+.cx-chip { display: inline-block; padding: 0 8px; border-radius: var(--r-pill); font: 500 0.8125rem/1.55 'Geist Mono', ui-monospace, monospace; background: var(--cx-well); white-space: nowrap; }
+.cx-node::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--signal-300, #6992F6); }
+.cx-param { color: var(--cx-ink); }
+.cx-mod { background: color-mix(in srgb, var(--cx-amber) 22%, transparent); }
+.cx-card { border-radius: 12px; border: 1px solid var(--cx-line); overflow: hidden; }
+.cx-card-h { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 0.8125rem; font-weight: 600; color: var(--cx-dim); border-bottom: 1px solid var(--cx-line); }
+.cx-bolt .ic { width: 16px; height: 16px; color: var(--cx-amber); }
+.cx-card-b { padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cx-mono { font: 500 0.8125rem/1 'Geist Mono', ui-monospace, monospace; color: var(--cx-dim); }
+.cx-card-f { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--cx-line); background: var(--cx-well); }
+.cx-card-f code { min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; background: none; color: var(--cx-dim); }
+.cx-undo { flex: none; padding: 2px 10px; border-radius: var(--r-pill); border: 1px solid var(--cx-line); font-size: 0.75rem; font-weight: 600; }
+.cx-steps { color: var(--cx-dim); font-size: 0.8125rem; }
+.cx-agent { max-width: 96%; }
+.cx-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cx-line); font-size: 0.8125rem; color: var(--cx-dim); }
+.cx-list > span:first-child { font-weight: 600; }
+.cx-list b { color: var(--cx-ink); font-weight: 600; }
+.cx-comp { display: flex; align-items: center; gap: 10px; margin: 8px 16px 16px; padding: 8px 8px 8px 10px; border-radius: 16px; border: 1px solid var(--cx-line); background: var(--cx-well); }
+.cx-badge { flex: none; display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 50%; background: color-mix(in srgb, var(--cx-ink) 12%, transparent); }
+.cx-badge .ic, .cx-send .ic { width: 16px; height: 16px; }
+.cx-ph { flex: 1; min-width: 0; color: var(--cx-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-send { flex: none; display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 50%; background: var(--cx-ink); color: var(--cx-bg); }
+.cx-note { margin: 0; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+
+/* the numbered flow */
+.cx-flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-width: 72ch; }
+.cx-flow li { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 16px; padding-bottom: 20px; }
+.cx-flow li:last-child { padding-bottom: 0; }
+.cx-flow li::before { content: ""; position: absolute; left: 17px; top: 38px; bottom: 2px; width: 2px; background: var(--line); }
+.cx-flow li:last-child::before { display: none; }
+.cx-flow li > span { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 50%; background: var(--mid); color: var(--mid-ink); font: 600 0.9375rem/1 'Geist Mono', ui-monospace, monospace; }
+.cx-flow h3 { margin: 6px 0 4px; font-size: 1.0625rem; letter-spacing: -0.01em; }
+.cx-flow p { margin: 0; line-height: 1.55; }
+
+@media (max-width: 600px) { .cx-user { max-width: 100%; } .cx-body { padding: 14px 12px 6px; } .cx-comp { margin: 6px 12px 12px; } }

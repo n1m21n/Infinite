@@ -2609,3 +2609,67 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	选择你的编程代理
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	连接时会在需要时安装代理,将其链接到 Infinite 并添加 Infinite 技能。之后可在设置的终端中更改。
 Skip, just a terminal	跳过,仅使用终端
+Connect a coding agent to build with Infinite.	连接编程代理,用 Infinite 创作。
+%d step	%d 步
+%d steps	%d 步
+Chat	聊天
+Goes to the agent	发送给代理
+Message, or @node	消息，或 @节点
+New chat	新聊天
+Not allowed:	不允许：
+Not in the patch	不在补丁中
+Runs now	立即运行
+The agent stopped with an error.	代理因错误而停止。
+Type @ to command a node, or ask anything.	输入 @ 来指挥节点，或随便提问。
+ask the agent	询问代理
+expression	表达式
+%s is not installed.	%s 未安装。
+modulated	已调制
+now	当前
+%s works in the terminal.	%s 在终端中运行。
+%d more	还有 %d 项
+%s is not set up.	%s 尚未设置。
+Add a Noise and wire it to the output	添加一个 Noise 并连接到输出
+Agent interface	智能体界面
+Ask, or type @ to name a node	提问，或输入 @ 指定节点
+Attach files	附加文件
+Changed	已更改
+Chats	聊天
+Connect an agent	连接智能体
+Did not run	未运行
+Explain this patch	解释这个 patch
+Failed	失败
+Make the colours drift slowly	让颜色缓慢漂移
+No agent	无智能体
+No saved chats	没有已保存的聊天
+Open in Terminal	在终端中打开
+Set up	设置
+Set up an agent first.	请先设置一个智能体。
+Setting up…	正在设置…
+Setting up… %d of %d	正在设置… 第 %d 步，共 %d 步
+Sign in	登录
+Undone	已撤销
+What should we make?	我们做点什么？
+Working…	处理中…
+formula	公式
+stopped with an error.	因错误而停止。
+Search chats	搜索聊天
+Agents	智能体
+Agents & Terminal	智能体与终端
+Default agent	默认智能体
+Not installed	未安装
+Not connected	未连接
+Ready	就绪
+Saved chats	已保存的聊天
+Clear all	全部清除
+Delete every saved chat?	删除所有已保存的聊天？
+%d working	%d 个在工作
+3D View at Bottom	3D View 在底部
+3D View at Top	3D View 在顶部
+Close 3D View	关闭 3D View
+Made %d change	%d 处更改
+Made %d changes	%d 处更改
+Looked at the patch	已查看补丁
+Queued	排队中
+Add to the queue	加入队列
+Reply	回复

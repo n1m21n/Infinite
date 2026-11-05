@@ -9,6 +9,9 @@
 
 namespace app
 {
+   bool OpenSettingsAt(const std::string& place);  // SettingsWindow.cpp
+   std::vector<std::string> SettingsPlaces();
+
    namespace
    {
       using json = nlohmann::json;
@@ -299,8 +302,75 @@ namespace app
       }
    }
 
+   namespace
+   {
+      // A control by node and modulatable index: its saved key, label and current value.
+      json ParamInfo(int nodeIndex, int paramIndex)
+      {
+         GraphNode* gn = FindNodeByIndex(nodeIndex);
+         if (gn == nullptr || paramIndex < 0)
+            return nullptr;
+         json out = { { "node", gn->index }, { "type", gn->typeName }, { "title", NodeTitle(*gn) }, { "param", paramIndex } };
+         const auto join = gParamJoin.find(gn->typeName);
+         if (join != gParamJoin.end())
+         {
+            const auto key = join->second.keyOfParam.find(paramIndex);
+            if (key != join->second.keyOfParam.end())
+            {
+               out["key"] = key->second;
+               std::vector<std::pair<std::string, std::string>> raw;
+               Patch::SaveParams(gn->node.get(), raw);
+               for (const auto& kv : raw)
+                  if (kv.first == key->second)
+                     out["value"] = kv.second;
+            }
+         }
+         if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, paramIndex))
+         {
+            out["label"] = ref->name;
+            out["min"] = ref->minValue;
+            out["max"] = ref->maxValue;
+            out["modulated"] = Modulation::Instance().IsModulated(gn->index, paramIndex);
+         }
+         return out;
+      }
+   }
+
    bool HandleAppRpc(const std::string& method, const nlohmann::json& params, nlohmann::json& outResult, std::string& outError)
    {
+      // "attention": everything the user is pointing at, so an agent never has to ask. Selected nodes,
+      // the control under the mouse, the one last pressed, the Tab-focused one and the open panels.
+      if (method == "shortcuts")
+      {
+         outResult = { { "text", ShortcutsText() } };
+         return true;
+      }
+      if (method == "attention")
+      {
+         json nodes = json::array();
+         std::vector<ed::NodeId> ids;
+         int got = 0;
+         if (gEditor != nullptr)
+         {
+            ed::EditorContext* previous = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            const int count = ed::GetSelectedObjectCount();
+            ids.resize((size_t)std::max(1, count));
+            got = ed::GetSelectedNodes(ids.data(), count);
+            ed::SetCurrentEditor(previous);
+         }
+         for (int i = 0; i < got; i++)
+            if (GraphNode* gn = FindNodeByIndex((int)ids[(size_t)i].Get() / GraphNode::kStride))
+               nodes.push_back({ { "index", gn->index }, { "type", gn->typeName }, { "title", NodeTitle(*gn) } });
+         json panels = json::array();
+         for (const Panel& panel : Panels())
+            if (*panel.open)
+               panels.push_back(panel.name);
+         outResult = { { "selected", nodes }, { "hovered", ParamInfo(gHoverParamNode, gHoverParamIndex) },
+                       { "touched", ParamInfo(gTouchParamNode, gTouchParamIndex) }, { "keyboard", ParamInfo(gKbFocusNode, gKbFocusParam) },
+                       { "panels", panels } };
+         return true;
+      }
       // "ui": synthetic ImGui input for scripted documentation shots (tools/manual/ui_shots_offscreen.py), so menus,
       // right-click menus and dropdowns can be opened in an off-screen run. x, y are window points.
       // actions: move {x,y}; click {x,y,button 0|1|2, double}; down / up {x,y,button} (a drag is down, move, up); key {key: escape|enter|tab|up|down|left|right|a..z|0..9,
@@ -364,7 +434,22 @@ namespace app
       }
       if (method == "panel")
       {
-         const std::string name = params.value("name", std::string());
+         std::string name = params.value("name", std::string());
+         // "settings/midi": Settings, on the page and section that place names.
+         if (const size_t slash = name.find('/'); slash != std::string::npos && name.compare(0, slash, "settings") == 0)
+         {
+            const std::string place = name.substr(slash + 1);
+            if (!OpenSettingsAt(place))
+            {
+               std::string all;
+               for (const std::string& p : SettingsPlaces())
+                  all += (all.empty() ? "" : ", ") + p;
+               outError = "unknown settings place '" + place + "'; places: " + all;
+               return true;
+            }
+            outResult = { { "open", true }, { "place", place } };
+            return true;
+         }
          json all = json::object();
          for (const Panel& panel : Panels())
          {
@@ -678,6 +763,18 @@ namespace app
          {
             Extensions::InstallFileAsync(params.value("path", std::string()));
             outResult = json::object();
+            return true;
+         }
+         if (action == "midi")
+         {
+            // Connected MIDI controllers, and whether Infinite listens to each.
+            json inputs = json::array();
+            const bool running = Platform::MidiIsRunning();
+            if (running)
+               for (const auto& src : Platform::MidiListSources())
+                  inputs.push_back({ { "name", src.name },
+                                     { "on", std::find(gMidiOffSources.begin(), gMidiOffSources.end(), src.name) == gMidiOffSources.end() } });
+            outResult = { { "running", running }, { "inputs", inputs } };
             return true;
          }
          if (action == "devices")

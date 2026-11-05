@@ -386,6 +386,6 @@
   "panels/SettingsWindow.cpp:Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.": "Field language reference text; `code docs field` prints it",
   "panels/SettingsWindow.cpp:Types: float, int, bool, vec2, vec3, vec4.": "Field language reference text; `code docs field` prints it",
   "panels/SettingsWindow.cpp:reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).": "Field language reference text; `code docs field` prints it",
-  "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app; the same steps are the shell script shown under Settings, Reference, Setup commands"
+  "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app"
  }
 }

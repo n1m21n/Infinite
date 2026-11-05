@@ -27,13 +27,6 @@ safe by default: other servers in the file are kept, the old file is saved next 
 
 it needs the infinite app. the program is found through `INFINITE_BIN`, `/Applications/Infinite.app`, the usual windows and linux install folders, or `PATH`. `INFINITE_APP` still works as an older name. check with `npx -y infinite-engine status`.
 
-### via smithery registry
-
-```bash
-npx -y @smithery/cli install infinite-engine --client claude
-npx -y @smithery/cli install infinite-engine --client cursor
-```
-
 ---
 
 ## 2. manual mcp configuration

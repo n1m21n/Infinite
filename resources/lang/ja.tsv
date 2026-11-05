@@ -2609,3 +2609,67 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	コーディングエージェントを選択
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	接続すると、必要に応じてエージェントをインストールし、Infinite にリンクして Infinite スキルを追加します。後で設定のターミナルから変更できます。
 Skip, just a terminal	スキップ(ターミナルのみ)
+Connect a coding agent to build with Infinite.	コーディングエージェントを接続して、Infinite で作りましょう。
+%d step	%d ステップ
+%d steps	%d ステップ
+Chat	チャット
+Goes to the agent	エージェントへ送る
+Message, or @node	メッセージ、または @ノード
+New chat	新しいチャット
+Not allowed:	許可されていません:
+Not in the patch	パッチにありません
+Runs now	すぐ実行
+The agent stopped with an error.	エージェントがエラーで停止しました。
+Type @ to command a node, or ask anything.	@ でノードに指示、または何でも質問。
+ask the agent	エージェントに聞く
+expression	式
+%s is not installed.	%s はインストールされていません。
+modulated	モジュレーション中
+now	現在
+%s works in the terminal.	%s はターミナルで動作します。
+%d more	他 %d 件
+%s is not set up.	%s は未設定です。
+Add a Noise and wire it to the output	Noise を追加して出力につなぐ
+Agent interface	エージェントの表示
+Ask, or type @ to name a node	質問するか、@ でノードを指定
+Attach files	ファイルを添付
+Changed	変更済み
+Chats	チャット
+Connect an agent	エージェントを接続
+Did not run	実行されませんでした
+Explain this patch	このパッチを説明して
+Failed	失敗
+Make the colours drift slowly	色をゆっくり変化させて
+No agent	エージェントなし
+No saved chats	保存されたチャットはありません
+Open in Terminal	ターミナルで開く
+Set up	セットアップ
+Set up an agent first.	先にエージェントをセットアップしてください。
+Setting up…	セットアップ中…
+Setting up… %d of %d	セットアップ中… %d / %d
+Sign in	サインイン
+Undone	取り消し済み
+What should we make?	何を作りましょう？
+Working…	作業中…
+formula	数式
+stopped with an error.	エラーで停止しました。
+Search chats	チャットを検索
+Agents	エージェント
+Agents & Terminal	エージェントとターミナル
+Default agent	既定のエージェント
+Not installed	未インストール
+Not connected	未接続
+Ready	準備完了
+Saved chats	保存したチャット
+Clear all	すべて消去
+Delete every saved chat?	保存したチャットをすべて削除しますか？
+%d working	%d 件作業中
+3D View at Bottom	3D View を下に
+3D View at Top	3D View を上に
+Close 3D View	3D View を閉じる
+Made %d change	%d 件の変更
+Made %d changes	%d 件の変更
+Looked at the patch	パッチを確認
+Queued	待機中
+Add to the queue	キューに追加
+Reply	返信

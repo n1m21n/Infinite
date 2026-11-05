@@ -3520,6 +3520,101 @@ bool PianoRollTransform(uint64_t laneId, const std::string& name)
    return true;
 }
 
+// The agent's Generate (`infinite notes generate <type> key=value...`): a take written as a new clip at the playhead
+// on page `laneId` (0: the page shown, or a new page and its Piano Roll node when there is none), the panel opened on
+// it. Keys are NoteGen's (style, seed, bars, form, creativity, energy, mood, density, swing, gate, ...). Returns the
+// clip id, 0 with `err` set.
+uint64_t PianoRollGenerate(const std::string& spec, uint64_t laneId, std::string& err)
+{
+   State& s = S();
+   NoteGen::GenSpec g = s.gen;
+   g.seed = s.seedLock ? g.seed : g.seed + 1;
+   if (!NoteGen::Parse(spec, g))
+   {
+      err = "bad generate settings: " + spec;
+      return 0;
+   }
+   Transport& tr = Transport::Instance();
+   if (g.key < 0)
+      g.key = tr.Key();
+   if (g.scale < 0)
+      g.scale = tr.Scale();
+   Arrange::Lane* page = laneId != 0 ? Arrange::FindLane(gArrange, laneId) : Page();
+   if (laneId != 0 && (page == nullptr || page->type != Arrange::kLaneMidi))
+   {
+      err = "no piano roll page " + std::to_string(laneId);
+      return 0;
+   }
+   if (page == nullptr)
+   {
+      AddPage();
+      page = Page();
+      if (page == nullptr)
+      {
+         err = "could not add a page";
+         return 0;
+      }
+   }
+   s.lane = page->id;
+   gPianoRollOpen = true;
+   const Tick at = Arrange::GridFloor(ArrangePlayTick(), Arrange::kTicksPerBar);
+   Tick span = g.bars * Arrange::kTicksPerBar * (g.form == NoteGen::Form::None ? 1 : 4);
+   for (const Arrange::Clip& c : page->clips)
+      if (c.start > at)
+         span = std::min(span, c.start - at);
+   s.clips.clear();
+   s.genError.clear();
+   WriteTake(*page, 0, at, std::max<Tick>(span, Arrange::kTicksPerBar), g);
+   s.gen.seed = g.seed;
+   if (!s.genError.empty() || s.clips.empty())
+   {
+      err = s.genError.empty() ? std::string("nothing was generated") : s.genError;
+      return 0;
+   }
+   return *s.clips.begin();
+}
+
+// A clip's notes as a .mid at `path` (empty: the Recordings folder), at the transport's tempo. "" with `err` set.
+std::string PianoRollExportMidi(uint64_t clipId, std::string path, std::string& err)
+{
+   const Arrange::Clip* c = Arrange::FindClipOrSlot(gArrange, clipId);
+   if (c == nullptr || c->notes.empty())
+   {
+      err = c == nullptr ? "unknown clip" : "the clip has no notes";
+      return std::string();
+   }
+   bool drums = false;
+   for (const Arrange::Lane& l : gArrange.lanes)
+      for (const Arrange::Clip& lc : l.clips)
+         if (lc.id == clipId)
+            drums = l.drumRows;
+   std::vector<MidiFile::Note> out;
+   for (const Arrange::Note& n : c->notes)
+   {
+      if (n.mute || n.start < c->contentOffset)
+         continue;
+      MidiFile::Note m;
+      m.beat = (double)(n.start - c->contentOffset) / (double)Arrange::kPPQ;
+      m.length = (double)n.length / (double)Arrange::kPPQ;
+      m.pitch = n.pitch;
+      m.velocity = n.vel;
+      m.channel = drums ? 9 : 0;
+      out.push_back(m);
+   }
+   if (path.empty())
+   {
+      std::string name = "notes";
+      for (const Arrange::Lane& l : gArrange.lanes)
+         for (const Arrange::Clip& lc : l.clips)
+            if (lc.id == clipId && !l.name.empty())
+               name = l.name;
+      path = AudioRecordings::GenerateFilePath(name, "mid");
+   }
+   if (!MidiFile::Save(path, out, Transport::Instance().Tempo(), err))
+      return std::string();
+   return path;
+}
+
 void PianoRollOpenPage(uint64_t laneId)
 {
    gPianoRollOpen = true;

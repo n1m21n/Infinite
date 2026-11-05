@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import node_screenshot as ns  # noqa: E402
 
 OUT = os.path.join(ROOT, "docs", "ui_screenshots")
-APP = os.path.expanduser("~/Infinite/infinte-base/build-dev/Infinite.app/Contents/MacOS/Infinite")
+APP = os.path.join(ROOT, "build-dev", "Infinite.app", "Contents", "MacOS", "Infinite")
 PATCH = os.path.join(ROOT, "docs", "showcase", "infinite-v1-showcase.inf")
 TOKFILE = os.path.expanduser("~/Library/Application Support/Infinite/control_token")
 PORT = 7794
@@ -156,7 +156,7 @@ def scenes(s):
         "panel_view3d": seq(panel("view3d", "bottom"), wait(3)),
         "panel_history_big": panel("history"),
         "window_settings": panel("settings"),
-        **{f"settings_{n}": seq(panel("settings"), click(480, 274 + 28.8 * i), wait(1.0))
+        **{f"settings_{n}": seq(panel("settings"), click(480, 263 + 28.8 * i), wait(1.0))
            for i, n in enumerate(["appearance", "canvas", "audio", "general", "field", "globals", "extensions",
                                   "plugins", "terminal"])},
         "dialog_about": seq(click(166, 25), wait(0.6), click(173, 266), wait(1.2)),

@@ -11,6 +11,7 @@ namespace term {
 struct PtySpawn {
     std::string shell;                                     // empty = the user's login shell
     std::vector<std::string> args;                         // after argv[0]; empty = login-shell flags
+    std::string rawArgs;                                   // Windows: when set, follows the quoted shell verbatim instead of args
     std::string cwd;                                       // empty = home
     std::vector<std::pair<std::string, std::string>> env;  // on top of the app's environment
     int cols = 80;

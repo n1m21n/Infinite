@@ -12,6 +12,9 @@
 #include <sys/stat.h>
 #include <thread>
 #include "platform/AppPaths.h"
+#include "platform/common/ProcessTree.h"
+
+#include <filesystem>
 
 using json = nlohmann::json;
 
@@ -59,6 +62,31 @@ namespace RemoteControl
             return;
          std::ofstream file(AppPaths::FsPath(dir + "/control_token"));
          file << token;
+      }
+
+      std::string gInstanceFile;
+
+      void RemoveInstanceFile()
+      {
+         std::error_code ec;
+         if (!gInstanceFile.empty())
+            std::filesystem::remove(AppPaths::FsPath(gInstanceFile), ec);
+      }
+
+      // One file per running app, so `infinite` can reach the app whose Terminal started it when the
+      // port and token in the environment were lost, instead of whichever app holds the default port.
+      void WriteInstanceFile(int port, const std::string& token)
+      {
+         const std::string dir = InstancesDir();
+         if (dir.empty())
+            return;
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(dir), ec);
+         gInstanceFile = dir + "/" + std::to_string(ProcessTree::Self()) + ".json";
+         std::ofstream file(AppPaths::FsPath(gInstanceFile));
+         file << json{ { "pid", ProcessTree::Self() }, { "port", port }, { "token", token } }.dump();
+         file.close();
+         std::atexit(RemoveInstanceFile);
       }
 
       // Handles one client connection to completion (reads/replies until the
@@ -184,8 +212,15 @@ namespace RemoteControl
       // out the MCP client of the first. Its own terminals get the token through the environment.
       if (boundPort == port || port == 0)
          WriteTokenFile(gToken);
+      WriteInstanceFile(boundPort, gToken);
 
       std::thread(AcceptLoop, listenFd).detach();
+   }
+
+   std::string InstancesDir()
+   {
+      const std::string dir = AppPaths::AppSupportDir();
+      return dir.empty() ? dir : dir + "/instances";
    }
 
    int Port()

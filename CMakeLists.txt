@@ -527,7 +527,20 @@ set(COMMON_SOURCES
     src/app/panels/View3DPanel.cpp
     src/app/panels/TerminalPanel.cpp
     src/app/panels/CliSetupSection.cpp
+    src/app/panels/ChatPanel.cpp
     src/core/CliSetup.cpp
+    src/core/chat/AgentStream.cpp
+    src/core/chat/ChatCatalog.cpp
+    src/core/chat/PatchGrammar.cpp
+    src/core/chat/ReplyLinks.cpp
+    src/core/chat/AgentRun.cpp
+    src/core/chat/ChatGuide.cpp
+    src/core/chat/AgentAuth.cpp
+    src/core/chat/ChatDiff.cpp
+    src/core/chat/ChatFiles.cpp
+    src/core/chat/NodeFinder.cpp
+    src/core/chat/FileFinder.cpp
+    src/core/chat/ChatThread.cpp
     src/app/panels/TerminalDraw.cpp
     src/app/panels/SampleStudioPanel.cpp
     src/app/panels/TemplatesWindow.cpp
@@ -544,6 +557,7 @@ set(COMMON_SOURCES
     src/app/selftest/View3DNavTests.cpp
     src/app/selftest/EditMeshRefineTests.cpp
     src/app/selftest/CliSetupTests.cpp
+    src/app/selftest/ChatTests.cpp
     src/app/selftest/BenchScenes.cpp
     src/app/selftest/DspFixtures1.cpp
     src/app/selftest/DspFixtures2.cpp
@@ -660,6 +674,7 @@ set(COMMON_SOURCES
     src/arrange/MidiImport.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
+    src/platform/common/ProcessTree.cpp
     src/core/InfiniteCli.cpp
     src/app/graph/RpcTerminal.cpp
     src/app/graph/RpcApp.cpp
@@ -1072,6 +1087,10 @@ endif()
 # Headless checks for the Piano Roll's note model (docs/plans/piano-roll/README.md §10 Block A).
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
+
+# `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
+add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
+target_include_directories(find-eval PRIVATE src src/core)
 
 # Terminal (docs/plans/terminal/README.md). libvterm is vendored as plain source
 # behind src/core/term/VtEngine.h; see external/libvterm/VENDORED_COMMIT.txt.

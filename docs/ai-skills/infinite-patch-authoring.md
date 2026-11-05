@@ -1,11 +1,13 @@
 ---
 name: infinite-patch-authoring
-description: "Write, check and render Infinite .inf patches headless. Use whenever the user asks to build, change or debug a patch, wire nodes, add modulation, or render from a patch file."
+description: "Write, check and render Infinite .inf patch files headless. Use when the user asks for a patch file, or to change, debug or render one. Inside Infinite's Terminal (INFINITE_SESSION set) edit the open window with infinite-live-session instead."
 ---
 
 ## When to use (full scope)
 
 Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
+
+Inside Infinite's Terminal (`INFINITE_SESSION` is set) the user means the window they have open: use the `infinite-live-session` skill and its live verbs, and write a file only when they ask for one.
 
 # Authoring Infinite patches headless
 

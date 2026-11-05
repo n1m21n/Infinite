@@ -2,7 +2,7 @@
           <h2>One-command AI agent setup</h2>
           <p>Connect Infinite's nine MCP tools to Claude Desktop, Cursor and Windsurf with one terminal command:</p>
           <pre class="aud-code"><code>npx -y infinite-engine init</code></pre>
-          <p>Or install via the <a href="https://smithery.ai" target="_blank" rel="noopener">Smithery</a> registry: <code>npx -y @smithery/cli install infinite-engine --client claude</code>. For Python environments, run <code>pip install infinite-daw</code>.</p>
+          <p>For Python environments, run <code>pip install infinite-daw</code>.</p>
         </div>
 
         <div class="dev-wide">
@@ -26,15 +26,15 @@ field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p)
           <div class="table-wrap"><table>
             <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
             <tbody>
-            <tr><td><code>infinite_render_video</code></td><td>Synthesise audio and render an MP4 from GLSL or a 2D sketch</td></tr>
-            <tr><td><code>infinite_render_frame</code></td><td>Render one PNG from a shader, sketch or .inf patch</td></tr>
-            <tr><td><code>infinite_validate_patch</code></td><td>Check a .inf file and report every problem</td></tr>
-            <tr><td><code>infinite_field_synth</code></td><td>Per-sample Field synth to a WAV</td></tr>
-            <tr><td><code>infinite_field_effect</code></td><td>Run audio through a Field effect kernel</td></tr>
-            <tr><td><code>infinite_field_notes</code></td><td>Algorithmic notes, such as Euclidean rhythms</td></tr>
-            <tr><td><code>infinite_sketch_3d</code></td><td>Procedural 3D meshes from a JavaScript sketch</td></tr>
-            <tr><td><code>infinite_field_primitive</code></td><td>Parametric 3D surfaces from uv to P, N, Cd</td></tr>
-            <tr><td><code>infinite_field_modifier</code></td><td>Deform and shade a mesh with a Field modifier</td></tr>
+            <tr><td><code>infinite_synthesize_field_synth</code></td><td>Synthesise WAV audio from an inline Field Synth kernel</td></tr>
+            <tr><td><code>infinite_synthesize_field_notes</code></td><td>Algorithmic notes and Euclidean rhythms from a Field Notes kernel, rendered to audio</td></tr>
+            <tr><td><code>infinite_process_field_effect</code></td><td>Run audio through an inline Field Effect kernel, such as a filter or wavefolder</td></tr>
+            <tr><td><code>infinite_render_field_pixel</code></td><td>Render a Field Pixel shader to a PNG</td></tr>
+            <tr><td><code>infinite_render_field_primitive</code></td><td>Parametric 3D surfaces from Field Primitive equations</td></tr>
+            <tr><td><code>infinite_render_field_modifier</code></td><td>Deform a mesh with an inline Field Modifier kernel</td></tr>
+            <tr><td><code>infinite_render_sketch3d</code></td><td>Render JavaScript-built 3D geometry to a PNG</td></tr>
+            <tr><td><code>infinite_validate_patch</code></td><td>Check a .inf patch against the engine and report every problem</td></tr>
+            <tr><td><code>infinite_render_video</code></td><td>Render an MP4 from a .inf patch, headless</td></tr>
             </tbody>
           </table></div>
         </div>

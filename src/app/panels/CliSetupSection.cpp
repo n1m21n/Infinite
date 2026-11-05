@@ -1,4 +1,4 @@
-// Settings > Terminal > "Command line & agents" (docs/plans/terminal/cli-setup.md). Draws what
+// Settings > Agents & Terminal > "Agents" (docs/plans/terminal/cli-setup.md). Draws what
 // CliSetup::Describe() says; reads only status.json, never terminal text, and spawns nothing itself:
 // the buttons hand one line to a new Terminal tab.
 #include "app/AppShared.h"
@@ -6,9 +6,15 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/Tokens.gen.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/CodeBlock.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/Switch.h"
+#include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
+#include "core/chat/ChatThread.h"
 #include "platform/AppPaths.h"
 
 #include <ctime>
@@ -60,160 +66,246 @@ namespace app
       const Os os = CurrentOs();
       const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
       Config& prefs = Prefs();
-      const Agent* agent = FindAgent(prefs.agent);
-      if (agent == nullptr)
-         agent = &Agents()[0];
-      const std::string exe = RealExecutable();
+      ChatAgentsTick();
 
-      // The file is small; read it about once a second, and only while this section is on screen.
-      static double sLastRead = -10.0;
-      static Status sStatus = ParseStatus("", 0);
-      const double now = ImGui::GetTime();
-      if (now - sLastRead > 1.0)
+      FormParts::Section(T("Agents"));
+
+      // Every row the same grid: the label column, the value after it, and one button column on the right edge whose
+      // buttons all share one width and the row's height.
+      const float rowH = ImGui::GetFrameHeight();
+      float bw = 84.0f;
+      for (const char* l : { "Sign in", "Sign out", "Set up", "Cancel", "Repair", "Choose…", "Clear all", "Add folder…", "Remove" })
+         bw = std::max(bw, ImGui::CalcTextSize(T(l)).x + 2.0f * tok::space_3);
+      // Label first, then this: the value text, cut to what fits before the button column.
+      auto value = [&](const std::string& text, bool dim)
       {
-         sLastRead = now;
-         const bool wasRunning = sStatus.running;
-         sStatus = ParseStatus(ReadFile(paths.status), (long long)std::time(nullptr));
-         if (wasRunning && !sStatus.running)
-            StartLaunchCheck();   // a setup or repair just finished: look again, quietly
-      }
-      const bool installed = AgentInstalledHere(*agent);
-      const HealthReport health = LatestHealth();
-      const View v = Describe(os, sStatus, *agent, installed, exe, paths, &health);
-
-      FormParts::Section(T("Terminal & coding agent"));
-      ImGui::TextDisabled("%s", T("Connect your coding agent to Infinite. It runs in a Terminal tab you can watch."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-
-      static std::string sError;
-      auto perform = [&](Action a, const std::string& step = std::string())
-      {
-         sError.clear();
-         Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, step, &sStatus);
-         sLastRead = -10.0;
-      };
-      using Kind = ActionButton::Kind;
-      const ImVec2 wide(FormParts::ControlW(), 0.0f);   // frame height, the same as the dropdown above it
-      auto button = [&](const char* label, Kind kind) { return ActionButton::Draw(label, wide, kind); };
-
-      bool allGreen = sStatus.present && !sStatus.running;
-      bool anyFailed = false;
-      for (const StepStatus& st : v.steps)
-      {
-         allGreen = allGreen && st.Green();
-         anyFailed = anyFailed || st.state == StepState::kFailed;
-      }
-
-      // One status line: a glyph, then the sentence.
-      FormParts::Label(L("Status"));
-      {
-         StepStatus mark;
-         mark.state = allGreen ? StepState::kOk : anyFailed ? StepState::kFailed : sStatus.running ? StepState::kRunning : sStatus.present ? StepState::kRepair : StepState::kPending;
-         const float icon = ImGui::GetTextLineHeight();
-         ImGui::AlignTextToFramePadding();
-         DrawStepIcon(mark, icon);
-         FormParts::Inline();
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(T(v.summary.c_str()));
-      }
-
-      {
-         std::string items;
-         int cur = 0;
-         for (size_t i = 0; i < Agents().size(); i++)
+         const float room = std::max(0.0f, ImGui::GetContentRegionAvail().x - bw - tok::space_3);
+         std::string shown = text;
+         if (ImGui::CalcTextSize(shown.c_str()).x > room)
          {
-            items += Agents()[i].name;
-            items.push_back('\0');
-            if (&Agents()[i] == agent)
-               cur = (int)i;
+            while (!shown.empty() && ImGui::CalcTextSize(("…" + shown).c_str()).x > room)
+               shown.erase(0, 1);
+            shown = "…" + shown;
+         }
+         ImGui::AlignTextToFramePadding();
+         if (dim)
+            ImGui::TextDisabled("%s", shown.c_str());
+         else
+            ImGui::TextUnformatted(shown.c_str());
+         if (shown != text && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", text.c_str());
+      };
+      // The row's button, in the right column.
+      auto button = [&](const char* label, bool primary)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - bw);
+         const float w = std::max(bw, ImGui::CalcTextSize(label).x + 2.0f * tok::space_3);
+         return ChipButton::Draw(label, primary, rowH, w);
+      };
+
+      // One row per agent, all the same: its mark, its name, where it stands, and the one button that moves it on.
+      for (const Agent& a : Agents())
+      {
+         const ChatAgentInfo info = ChatAgentStatus(a.id);
+         ImGui::PushID(a.id);
+         FormParts::Label(L(a.name));
+         const float rowW = ImGui::GetContentRegionAvail().x;
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * 0.42f, a.id);
+         ImGui::Dummy(ImVec2(rowH, rowH));
+         FormParts::Inline(0.0f, tok::space_2);
+         value(info.status, !info.ready);
+         if (!info.action.empty())  // Cancel shows while a sign-in waits
+            if (button(info.action.c_str(), !info.ready))
+               ChatAgentAct(a.id, false);
+         ChatAgentCodeEntry(a.id, rowW);
+         ImGui::PopID();
+      }
+
+      // The model each agent starts with; the chat's picker changes it for a moment, this is where it is kept.
+      for (const Agent& a : Agents())
+      {
+         const auto models = ChatAgentModels(a.id);
+         std::string items = std::string(T("Default")) + '\0';
+         int cur = 0;
+         const std::string saved = prefs.models.count(a.id) ? prefs.models[a.id] : std::string();
+         for (size_t i = 0; i < models.size(); i++)
+         {
+            items += models[i].second + '\0';
+            if (models[i].first == saved)
+               cur = (int)i + 1;
          }
          items.push_back('\0');
-         if (FormParts::Combo(L("Coding agent"), &cur, items.c_str()))
+         const std::string label = std::string(a.name) + " " + T("model");
+         ImGui::PushID(a.id);
+         if (FormParts::Combo(label.c_str(), &cur, items.c_str()))
          {
-            prefs.agent = Agents()[(size_t)cur].id;
+            if (cur == 0)
+               prefs.models.erase(a.id);
+            else
+               prefs.models[a.id] = models[(size_t)cur - 1].first;
             SaveConfig(paths.config, prefs);
          }
+         ImGui::PopID();
       }
 
-      FormParts::Label(L("Setup"));
-      ImGui::BeginDisabled(!v.setupEnabled);
-      if (button((std::string(T(v.setupLabel.c_str())) + "###cli_setup").c_str(), allGreen ? Kind::Plain : Kind::Primary))
-         perform(Action::kSetup);
-      ImGui::EndDisabled();
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-         HelpTip("%s", T("Opens a Terminal tab and runs the script shown under Reference, Setup commands. Each step checks first and skips what is already done, so run it again any time to repair."));
-
-      FormParts::Label(L("Agent"));
-      if (v.showInstall)
+      // What each agent used through the chat, so a long chat's cost is never a surprise. Cached input is read
+      // again on every step of a turn and costs about a tenth of fresh input.
       {
-         if (button((std::string(T("Install")) + "###cli_install").c_str(), Kind::Primary))
-            perform(Action::kInstallAgent);
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Opens a Terminal tab and runs the agent's own installer, shown under Reference, Setup commands."));
-      }
-      else
-      {
-         ImGui::BeginDisabled(!v.startEnabled);
-         if (button((std::string(T("Start agent")) + "###cli_start").c_str(), Kind::Plain))
-            perform(Action::kStartAgent);
-         ImGui::EndDisabled();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            HelpTip("%s", T(v.loginHint.c_str()));
-      }
-
-      {
-         bool autoStart = prefs.autoStart;
-         ImGui::BeginDisabled(!v.startEnabled);
-         if (FormParts::Switch(L("Start with Terminal"), &autoStart))
+         bool any = false;
+         for (const Agent& a : Agents())
          {
-            prefs.autoStart = autoStart;
-            SaveConfig(paths.config, prefs);
-         }
-         ImGui::EndDisabled();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            HelpTip("%s", T("Starts the agent in the first Terminal tab each time the Terminal opens."));
-      }
-
-      FormParts::Label(L("Terminal panel"));
-      if (button(gTerminalOpen ? "Close Terminal###cli_term" : "Open Terminal###cli_term", Kind::Plain))
-      {
-         gTerminalOpen = !gTerminalOpen;
-         gTerminalFocus = gTerminalOpen;
-      }
-
-      // Only what is wrong is listed; when everything holds the steps stay out of the way.
-      if (!allGreen)
-      {
-         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
-         const float icon = ImGui::GetTextLineHeight();
-         for (const StepStatus& s : v.steps)
-         {
-            if (s.Green())
+            const auto it = prefs.usage.find(a.id);
+            if (it == prefs.usage.end() || it->second.turns == 0)
                continue;
-            ImGui::PushID(s.id);
-            DrawStepIcon(s, icon);
-            FormParts::Inline();
-            ImGui::TextUnformatted(T(s.title));
-            if (!s.detail.empty())
+            const Config::Usage& u = it->second;
+            const long long total = u.input + u.cached + u.output;
+            std::string line = std::to_string(u.turns) + " " + T(u.turns == 1 ? "turn" : "turns") + " · " + chat::TokenCount(total) + " " + T("tokens");
+            if (total > 0)
+               line += " · " + std::to_string((int)(100.0 * (double)u.cached / (double)total)) + "% " + T("cached");
+            if (u.cost > 0.0)
             {
-               FormParts::Inline();
-               ImGui::TextDisabled("%s", s.detail.c_str());
+               char c[32];
+               std::snprintf(c, sizeof c, " · $%.2f", u.cost);
+               line += c;
             }
-            if (s.state == StepState::kRepair)
-            {
-               FormParts::Inline();
-               if (FormParts::Button(L("Repair")))
-                  perform(Action::kRepairStep, s.id);
-               if (ImGui::IsItemHovered())
-                  HelpTip("%s", T("Opens a Terminal tab and reruns only this step."));
-            }
+            const std::string label = std::string(a.name) + " " + T("usage");
+            ImGui::PushID(a.id);
+            FormParts::Label(label.c_str());
+            value(line, false);
+            const bool reset = !any && button(L("Reset"), false);
             ImGui::PopID();
+            any = true;
+            if (reset)
+            {
+               prefs.usage.clear();
+               SaveConfig(paths.config, prefs);
+               break;
+            }
          }
       }
-      if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
 
+      // Only a fault in the plumbing (the infinite command, the MCP link, the skills) shows here, with its fix.
+      {
+         const std::string exe = RealExecutable();
+         const Agent* agent = FindAgent(prefs.agent);
+         if (agent == nullptr)
+            agent = &Agents()[0];
+         const HealthReport health = LatestHealth();
+         const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, &health);
+         std::string broken;
+         for (const StepStatus& st : v.steps)
+            if (st.state == StepState::kRepair || st.state == StepState::kFailed)
+               broken += (broken.empty() ? "" : ", ") + std::string(T(st.title));
+         const ChatAgentInfo cur = ChatAgentStatus(agent->id);
+         if (!broken.empty() && cur.ready && !cur.busy)
+         {
+            FormParts::Label(L("Connection"));
+            value(broken, true);
+            if (button(L("Repair"), true))
+               ChatAgentAct(agent->id, true);
+         }
+      }
+
+      {
+         const Paths wpaths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
+         FormParts::Label(L("Agent folder"));
+         value(prefs.workspace.empty() ? std::string(T("The open patch's folder")) : HomeTilde(prefs.workspace), prefs.workspace.empty());
+         if (button(L("Choose…"), false))
+         {
+            const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
+            if (!dir.empty())
+            {
+               prefs.workspace = dir;
+               SaveConfig(wpaths.config, prefs);
+            }
+         }
+         // More folders agents may open, and the commands they may run besides `infinite`: what an Allow under a
+         // "Not allowed" note in the chat adds, and where it is taken back.
+         for (size_t i = 0; i < prefs.folders.size(); i++)
+         {
+            ImGui::PushID((int)i);
+            FormParts::Label(i == 0 ? L("More folders") : "");
+            value(HomeTilde(prefs.folders[i]), false);
+            const bool remove = button(L("Remove"), false);
+            ImGui::PopID();
+            if (remove)
+            {
+               prefs.folders.erase(prefs.folders.begin() + (long)i);
+               SaveConfig(wpaths.config, prefs);
+               break;
+            }
+         }
+         FormParts::Label(prefs.folders.empty() ? L("More folders") : "");
+         value(prefs.folders.empty() ? std::string(T("None")) : std::string(), true);
+         if (button(L("Add folder…"), false))
+         {
+            const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
+            if (!dir.empty() && std::find(prefs.folders.begin(), prefs.folders.end(), dir) == prefs.folders.end())
+            {
+               prefs.folders.push_back(dir);
+               SaveConfig(wpaths.config, prefs);
+            }
+         }
+         FormParts::Label(L("Edit files in them"));
+         {
+            const float pad = (rowH - Switch::kH) * 0.5f;
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+            if (Switch::Box("##agentaccess", &prefs.folderAccess))
+               SaveConfig(wpaths.config, prefs);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+         }
+         for (size_t i = 0; i < prefs.commands.size(); i++)
+         {
+            ImGui::PushID(1000 + (int)i);
+            FormParts::Label(i == 0 ? L("Allowed commands") : "");
+            value(prefs.commands[i], false);
+            const bool remove = button(L("Remove"), false);
+            ImGui::PopID();
+            if (remove)
+            {
+               prefs.commands.erase(prefs.commands.begin() + (long)i);
+               SaveConfig(wpaths.config, prefs);
+               break;
+            }
+         }
+      }
+
+      {
+         const int count = ChatSavedCount();
+         const std::string label = std::string(T("Saved chats")) + " (" + std::to_string(count) + ")";
+         FormParts::Label(label.c_str());
+         ImGui::Dummy(ImVec2(0.0f, rowH));
+         ImGui::BeginDisabled(count == 0 || ChatBusy());
+         if (button(L("Clear all"), false))
+            ImGui::OpenPopup("##clearchats");
+         ImGui::EndDisabled();
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
+         if (ImGui::BeginPopup("##clearchats"))
+         {
+            ImGui::TextUnformatted(T("Delete every saved chat?"));
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            const float cancelW = std::max(64.0f, ImGui::CalcTextSize(T("Cancel")).x + 2.0f * tok::space_2);
+            const float deleteW = std::max(64.0f, ImGui::CalcTextSize(T("Delete")).x + 2.0f * tok::space_2);
+            const float total = cancelW + tok::space_2 + deleteW;
+            const float avail = ImGui::GetContentRegionAvail().x;
+            if (avail > total)
+               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
+            if (ChipButton::Draw(L("Cancel"), false, 24.0f, cancelW))
+               ImGui::CloseCurrentPopup();
+            FormParts::Inline(0.0f, tok::space_2);
+            if (ChipButton::Draw(L("Delete"), true, 24.0f, deleteW))
+            {
+               ChatClearHistory();
+               ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+         }
+         ImGui::PopStyleVar();
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
       SectionCard::End();
    }
 
@@ -225,6 +317,9 @@ namespace app
       Config& prefs = Prefs();
       if (prefs.welcomed)
          return false;
+      // A clipped or collapsing panel submits no items; moving the cursor then would trip ImGui's boundary check.
+      if (ImGui::GetCurrentWindow()->SkipItems)
+         return true;
       const Os os = CurrentOs();
       const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
       const Agent* agent = FindAgent(prefs.agent);
@@ -239,33 +334,45 @@ namespace app
          SaveConfig(paths.config, prefs);
       };
 
-      ImGui::Dummy(ImVec2(0.0f, tok::space_4));
-      ImGui::Indent(tok::space_4);
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(240.0f, ImGui::GetContentRegionAvail().x - tok::space_4));
-      ImGui::TextUnformatted(T("Welcome to the Terminal"));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      ImGui::TextDisabled("%s", T("A real shell inside Infinite. Run any command, and connect a coding agent that builds patches, renders and edits meshes with you."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
-
-      ImGui::TextUnformatted(T("Choose your coding agent"));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-      const auto& all = Agents();
-      const float colW = ImGui::GetContentRegionAvail().x;
-      const float bw = ActionButton::RowWidth((int)all.size(), colW + ActionButton::ColumnIndent());
-      for (size_t i = 0; i < all.size(); i++)
+      // One centred column, never wider than reads well; every control is a design component.
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float availW = ImGui::GetContentRegionAvail().x;
+      const float colW = std::min(460.0f, std::max(160.0f, availW - 2.0f * tok::space_4));
+      const float x = origin.x + (availW - colW) * 0.5f;
+      const float rowH = ImGui::GetFrameHeight() + tok::space_1;
+      float y = origin.y + tok::space_5;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const float cx = x + colW * 0.5f;
+      auto centred = [&](UiType::Size size, UiType::Weight weight, ImU32 col, const char* text)
       {
-         if (i > 0)
-            ActionButton::RowNext();
-         const bool on = &all[i] == agent;
-         if (ActionButton::Draw((std::string(all[i].name) + "###welcome_agent" + std::to_string(i)).c_str(), ImVec2(bw, 0.0f), on ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
+         UiType::Scope scope(size, weight);
+         y = EmptyState::DrawWrapped(dl, cx, y, colW, col, text);
+      };
+
+      centred(UiType::Size::Title, UiType::Weight::Semibold, ImGui::GetColorU32(ImGuiCol_Text), T("Welcome to the Terminal"));
+      y += tok::space_2;
+      centred(UiType::Size::Body, UiType::Weight::Regular, dim, T("Connect a coding agent to build with Infinite."));
+      y += tok::space_5;
+
+      {
+         const auto& all = Agents();
+         std::vector<PillGroup::Segment> segs;
+         for (const Agent& a : all)
+            segs.push_back({ a.id, a.name });
+         int cur = 0;
+         for (size_t i = 0; i < all.size(); i++)
+            if (&all[i] == agent)
+               cur = (int)i;
+         const int hit = PillGroup::Draw("welcome.agent", UiLayout::Rect{ x, y, colW, rowH }, segs.data(), (int)segs.size(), cur);
+         if (hit >= 0 && hit != cur)
          {
-            prefs.agent = all[i].id;
+            prefs.agent = all[(size_t)hit].id;
             SaveConfig(paths.config, prefs);
          }
+         y += rowH + tok::space_3;
       }
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
-      ImGui::TextDisabled("%s", T("Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal."));
-      ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+      y += tok::space_1;
 
       static std::string sError;
       auto perform = [&](Action a)
@@ -274,48 +381,20 @@ namespace app
          Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, std::string(), nullptr);
          finish();
       };
-      const ImVec2 wide(std::min(colW, 260.0f), 0.0f);
-      if (ActionButton::Draw((std::string(T("Connect")) + " " + agent->name + "###welcome_connect").c_str(), wide, ActionButton::Kind::Primary))
-         perform(v.showInstall ? Action::kInstallAgent : Action::kSetup);
-      if (ActionButton::Draw((std::string(T("Skip, just a terminal")) + "###welcome_skip").c_str(), wide, ActionButton::Kind::Plain))
+      const std::string connect = std::string(T("Connect")) + " " + agent->name;
+      if (TextButton::Draw("welcome.connect", UiLayout::Rect{ x, y, colW, rowH }, connect.c_str(), TextButton::Kind::Primary))
+         perform(Action::kConnectAll);
+      y += rowH + tok::space_2;
+      if (TextButton::Draw("welcome.skip", UiLayout::Rect{ x, y, colW, rowH }, T("Skip, just a terminal"), TextButton::Kind::Quiet))
          finish();
+      y += rowH;
       if (!sError.empty())
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())), "%s", sError.c_str());
-      ImGui::PopTextWrapPos();
-      ImGui::Unindent(tok::space_4);
+      {
+         y += tok::space_2;
+         centred(UiType::Size::Caption, UiType::Weight::Regular, tok::U32(tok::action_record, CategoryColors::IsThemeLight()), sError.c_str());
+      }
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, y));
+      ImGui::Dummy(ImVec2(availW, tok::space_4));
       return true;
-   }
-
-   // The exact commands and script behind the buttons, for the Reference well on the same page.
-   void DrawCliSetupCommands()
-   {
-      using namespace CliSetup;
-      const Os os = CurrentOs();
-      const Paths paths = PathsFor(AppPaths::AppSupportDir(), os);
-      const Agent* agent = FindAgent(Prefs().agent);
-      if (agent == nullptr)
-         agent = &Agents()[0];
-      const std::string exe = RealExecutable();
-      const View v = Describe(os, ParseStatus("", 0), *agent, AgentInstalledHere(*agent), exe, paths, nullptr);
-
-      ImGui::TextWrapped("%s", T("Connect runs this line in a Terminal tab. It runs the script below, which checks each step first and skips what is already done."));
-      CodeBlock::Draw(v.setupLine.c_str(), "cb_cli_setup");
-      if (v.showInstall)
-      {
-         ImGui::TextWrapped("%s", T("Install runs the agent's own installer:"));
-         CodeBlock::Draw(v.installLine.c_str(), "cb_cli_install");
-      }
-      ImGui::TextWrapped("%s", T("Start agent runs:"));
-      CodeBlock::Draw(v.startLine.c_str(), "cb_cli_start");
-      ImGui::TextWrapped("%s", T("The script, exactly as it runs:"));
-      static std::string sScript;
-      static std::string sScriptFor;
-      const std::string key = exe + "|" + agent->id;
-      if (sScriptFor != key)
-      {
-         sScriptFor = key;
-         sScript = BuildScript(os, exe, *agent, paths.status);
-      }
-      CodeBlock::Draw(sScript.c_str(), "cb_cli_script");
    }
 }

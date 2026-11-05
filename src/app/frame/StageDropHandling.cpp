@@ -114,7 +114,9 @@ void DrawDropHandling(FrameCtx& fc)
          // so "field" and "infdev" never collide with it, but must still get
          // their own branch since they aren't in kAudioExt/kModelExt/etc.
          static const std::vector<std::string> kFieldExt = { "field", "infdev" };
-         ImVec2 canvasPos = ed::ScreenToCanvas(gDropPos);
+         // An `import` RPC names a canvas point instead of a screen point (the agent has no mouse).
+         ImVec2 canvasPos = gDropAtCanvas ? gDropCanvasPos : ed::ScreenToCanvas(gDropPos);
+         gDropAtCanvas = false;
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;

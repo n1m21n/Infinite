@@ -923,6 +923,39 @@ namespace Platform
       return res ? std::string(res) : std::string();
    }
 
+   std::vector<std::string> OpenFilesDialog(const char* title, const std::vector<std::string>& exts)
+   {
+      std::vector<std::string> out;
+      if (std::getenv("INFINITE_EXITAFTER") != nullptr) return out;
+      const char* disp = std::getenv("DISPLAY");
+      const char* wayland = std::getenv("WAYLAND_DISPLAY");
+      if ((!disp || disp[0] == '\0') && (!wayland || wayland[0] == '\0')) return out;
+
+      ScopedHostEnvironment hostEnv;
+      std::vector<std::string> patterns;
+      for (const std::string& e : exts)
+         patterns.push_back("*." + e);
+      std::vector<const char*> ptrs;
+      for (const std::string& p : patterns)
+         ptrs.push_back(p.c_str());
+      // Several files come back joined by '|'.
+      const char* res = tinyfd_openFileDialog(title != nullptr ? title : "Attach files", "", (int)ptrs.size(), ptrs.data(), "Files Infinite opens", 1);
+      if (res == nullptr)
+         return out;
+      std::string all = res;
+      for (size_t at = 0; at <= all.size();)
+      {
+         const size_t bar = all.find('|', at);
+         const std::string one = all.substr(at, bar == std::string::npos ? std::string::npos : bar - at);
+         if (!one.empty())
+            out.push_back(one);
+         if (bar == std::string::npos)
+            break;
+         at = bar + 1;
+      }
+      return out;
+   }
+
    std::string OpenMidiDialog()
    {
       if (std::getenv("INFINITE_EXITAFTER") != nullptr) return "";

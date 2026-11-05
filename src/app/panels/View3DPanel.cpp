@@ -8130,6 +8130,31 @@ namespace
          TogglePose(scene);
    }
 
+   // Right-click the header strip: dock position and close, like the other docked panels.
+   void DrawDockMenu(float top, float bottom)
+   {
+      const ImVec2 mn(ImGui::GetWindowPos().x, top), mx(mn.x + ImGui::GetWindowSize().x, bottom);
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsMouseHoveringRect(mn, mx) && !ImGui::IsAnyItemHovered() &&
+          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+         ImGui::OpenPopup("##v3ddockmenu");
+      if (MenuParts::BeginPopup("##v3ddockmenu"))
+      {
+         if (MenuParts::SubMenu(T("Dock Position")))
+         {
+            const bool atTop = gView3DDock == 3;
+            if (MenuParts::Item(T("3D View at Bottom"), nullptr, !atTop) && atTop)
+               gView3DDock = 0;
+            if (MenuParts::Item(T("3D View at Top"), nullptr, atTop) && !atTop)
+               gView3DDock = 3;
+            ImGui::EndMenu();
+         }
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         if (MenuParts::Item(T("Close 3D View")))
+            gView3DOpen = false;
+         MenuParts::EndPopup();
+      }
+   }
+
    void DrawPanel()
    {
       FollowCanvasSelection();
@@ -8178,7 +8203,9 @@ namespace
       static Scene3DNode::Settings sSeen;
       std::memcpy(&sSeen, sSet, sizeof(sSeen));
 
+      const float headTop = ImGui::GetCursorScreenPos().y;
       DrawHeader(scene);
+      DrawDockMenu(headTop, ImGui::GetCursorScreenPos().y);
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const float gapX = ImGui::GetStyle().ItemSpacing.x;
       const float sideW = sSideOpen ? std::min(kSideW, avail.x * 0.5f) : 0.0f;

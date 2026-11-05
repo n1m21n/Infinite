@@ -58,9 +58,26 @@ namespace MenuParts
                                  ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, a)), tok::radius_tile);
    }
 
+   // A shortcut ends flush with the row's right text inset, mirroring the label's left inset; ImGui still sizes
+   // the popup for it. A checked row keeps ImGui's own column so the check never lands on the shortcut.
    inline bool Item(const char* label, const char* shortcut = nullptr, bool selected = false, bool enabled = true)
    {
+      const bool ours = shortcut != nullptr && shortcut[0] != 0 && !selected;
+      ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      if (ours)
+         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4(0, 0, 0, 0));
       const bool r = ImGui::MenuItem(label, shortcut, selected, enabled);
+      if (ours)
+      {
+         ImGui::PopStyleColor();
+         ImGuiWindow* w = ImGui::GetCurrentWindow();
+         const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+         const float sw = ImGui::CalcTextSize(shortcut).x;
+         if (!enabled)
+            dim.w *= ImGui::GetStyle().DisabledAlpha;
+         w->DrawList->AddText(ImVec2(std::floor(w->Pos.x + w->Size.x - kInset - kTextInset - sw), std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f)),
+                              ImGui::GetColorU32(dim), shortcut);
+      }
       Wash(enabled && ImGui::IsItemHovered(), enabled && ImGui::IsItemActive(), false);
       return r;
    }

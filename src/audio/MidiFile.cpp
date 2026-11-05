@@ -222,4 +222,70 @@ namespace MidiFile
       fclose(f);
       return Parse(bytes.data(), bytes.size(), out, error);
    }
+
+   std::vector<uint8_t> Encode(const std::vector<Note>& notes, double bpm)
+   {
+      constexpr int kDiv = 480;
+      struct Ev
+      {
+         uint32_t tick;
+         uint8_t status, a, b;
+      };
+      std::vector<Ev> evs;
+      for (const Note& n : notes)
+      {
+         const uint32_t on = (uint32_t)std::max(0.0, n.beat * kDiv + 0.5);
+         const uint32_t off = std::max(on + 1, (uint32_t)std::max(0.0, (n.beat + n.length) * kDiv + 0.5));
+         const uint8_t ch = (uint8_t)(n.channel & 15);
+         evs.push_back({ on, (uint8_t)(0x90 | ch), (uint8_t)(n.pitch & 127), (uint8_t)std::clamp<int>(n.velocity, 1, 127) });
+         evs.push_back({ off, (uint8_t)(0x80 | ch), (uint8_t)(n.pitch & 127), 0 });
+      }
+      // Note-offs before note-ons at the same tick, so a repeated pitch is not cut.
+      std::stable_sort(evs.begin(), evs.end(), [](const Ev& x, const Ev& y) {
+         return x.tick != y.tick ? x.tick < y.tick : (x.status & 0xF0) < (y.status & 0xF0);
+      });
+      std::vector<uint8_t> trk;
+      const auto varLen = [&](uint32_t v) {
+         uint8_t tmp[5];
+         int k = 0;
+         tmp[k++] = (uint8_t)(v & 0x7F);
+         while ((v >>= 7) != 0)
+            tmp[k++] = (uint8_t)((v & 0x7F) | 0x80);
+         while (k > 0)
+            trk.push_back(tmp[--k]);
+      };
+      const uint32_t us = (uint32_t)(60000000.0 / std::clamp(bpm, 20.0, 999.0));
+      varLen(0);
+      trk.insert(trk.end(), { 0xFF, 0x51, 0x03, (uint8_t)(us >> 16), (uint8_t)(us >> 8), (uint8_t)us });
+      uint32_t last = 0;
+      for (const Ev& e : evs)
+      {
+         varLen(e.tick - last);
+         last = e.tick;
+         trk.insert(trk.end(), { e.status, e.a, e.b });
+      }
+      varLen(0);
+      trk.insert(trk.end(), { 0xFF, 0x2F, 0x00 });
+      std::vector<uint8_t> out = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, (uint8_t)(kDiv >> 8), (uint8_t)kDiv, 'M', 'T', 'r', 'k' };
+      const uint32_t len = (uint32_t)trk.size();
+      out.insert(out.end(), { (uint8_t)(len >> 24), (uint8_t)(len >> 16), (uint8_t)(len >> 8), (uint8_t)len });
+      out.insert(out.end(), trk.begin(), trk.end());
+      return out;
+   }
+
+   bool Save(const std::string& path, const std::vector<Note>& notes, double bpm, std::string& error)
+   {
+      const std::vector<uint8_t> bytes = Encode(notes, bpm);
+      FILE* f = AppPaths::OpenFile(path, "wb");
+      if (!f)
+      {
+         error = "cannot write file";
+         return false;
+      }
+      const bool ok = fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
+      fclose(f);
+      if (!ok)
+         error = "cannot write file";
+      return ok;
+   }
 }

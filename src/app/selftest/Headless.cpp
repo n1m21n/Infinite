@@ -1220,7 +1220,14 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
          joinKeyed += ts.joinKeyed;
          std::sort(ts.modulatable.begin(), ts.modulatable.end(),
                    [](const auto& a, const auto& b) { return a.index < b.index; });
-         typesJson += (first ? "" : ",") + PatchSchema::ToJson(ts);
+         // The node's in-app help text (Menu > Help), so agents can explain a node in its own words.
+         std::string entry = PatchSchema::ToJson(ts);
+         if (!entry.empty() && entry.back() == '}')
+         {
+            entry.pop_back();
+            entry += ",\"help\":\"" + Headless::JsonEscape(NodeHelpTextFor(n, ts.category)) + "\"}";
+         }
+         typesJson += (first ? "" : ",") + entry;
          first = false;
       }
       typesJson += "]";

@@ -10,6 +10,7 @@
 
 #include "json.hpp"
 #include "core/AISkillContent.h"
+#include "core/AgentDocs.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 
@@ -90,7 +91,7 @@ namespace CliSetup
    const std::vector<Agent>& Agents()
    {
       static const std::vector<Agent> kAgents = {
-         { "claude", "Claude Code", "claude",
+         { "claude", "Claude", "claude",
            "curl -fsSL https://claude.ai/install.sh | bash",
            "irm https://claude.ai/install.ps1 | iex",
            "claude",
@@ -99,8 +100,8 @@ namespace CliSetup
            "claude mcp remove infinite --scope user",
            ".claude.json",
            ".claude/skills",
-           "Claude Code asks you to log in the first time it starts. Infinite never sees or stores the login." },
-         { "codex", "Codex", "codex",
+           "Claude asks you to log in the first time it starts. Infinite never sees or stores the login." },
+         { "codex", "ChatGPT", "codex",
            "npm install -g @openai/codex",
            "npm install -g @openai/codex",
            "codex",
@@ -109,9 +110,9 @@ namespace CliSetup
            "codex mcp remove infinite",
            ".codex/config.toml",
            ".codex/skills",
-           "Codex asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
+           "ChatGPT asks you to sign in with ChatGPT or an API key the first time it starts. Infinite never sees or stores the login." },
          // Antigravity has no `mcp add` command: the helper edits its JSON config (mcp_json.js, written next to the setup script).
-         { "antigravity", "Antigravity", "agy",
+         { "antigravity", "Gemini", "agy",
            "curl -fsSL https://antigravity.google/cli/install.sh | bash",
            "irm https://antigravity.google/cli/install.ps1 | iex",
            "agy",
@@ -120,7 +121,7 @@ namespace CliSetup
            "node {TOOL} remove ~/.gemini/config/mcp_config.json infinite",
            ".gemini/config/mcp_config.json",
            ".gemini/skills",
-           "Antigravity asks you to sign in with Google the first time it starts. Infinite never sees or stores the login." },
+           "Gemini asks you to sign in with Google the first time it starts. Infinite never sees or stores the login." },
       };
       return kAgents;
    }
@@ -131,6 +132,11 @@ namespace CliSetup
          { "infinite-patch-authoring", AISkillContent::kPatchAuthoringMarkdown },
          { "infinite-field-language", AISkillContent::kFieldLanguageMarkdown },
          { "infinite-expression-globals", AISkillContent::kExpressionGlobalsMarkdown },
+         { "infinite-live-session", AISkillContent::kLiveSessionMarkdown },
+         { "infinite-map", AgentDocs::kSkillMap },
+         { "infinite-visual-craft", AgentDocs::kSkillVisualCraft },
+         { "infinite-sound-craft", AgentDocs::kSkillSoundCraft },
+         { "infinite-film-craft", AgentDocs::kSkillFilmCraft },
       };
       return kSkills;
    }
@@ -260,6 +266,15 @@ pkg_install() { # apt names, dnf names, pacman names, brew name
     *) return 1 ;;
   esac
 }
+node_hint() { # one next step for this machine
+  if command -v node >/dev/null 2>&1; then
+    printf 'Node.js %s is too old; 18 or newer is needed. Update it, then press Connect again' "$(node -v)"
+  elif [ "$(uname -s)" = Darwin ]; then
+    printf 'Node.js is needed. Run the macOS installer from https://nodejs.org/en/download, then press Connect again'
+  else
+    printf 'Node.js 18+ is needed. Install it with your package manager (zypper install nodejs, apk add nodejs npm) or from https://nodejs.org/en/download, then press Connect again'
+  fi
+}
 node_ok() {
   command -v node >/dev/null 2>&1 && command -v npx >/dev/null 2>&1 &&
     [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 18 ]
@@ -332,7 +347,7 @@ if node_ok; then
 elif pkg_install "nodejs npm" "nodejs npm" "nodejs npm" node && node_ok; then
   finish ok "installed node $(node -v)"
 else
-  finish failed "Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again"
+  finish failed "$(node_hint)"
 fi
 fi
 
@@ -368,8 +383,14 @@ skills_sync() {
 if want agent; then
 begin 5 agent "Connect $AGENT_NAME (MCP server and AI skills)"
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
+if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ]; then
+  printf '   running: %s\n' "$AGENT_INSTALL"
+  sh -c "$AGENT_INSTALL"
+  hash -r 2>/dev/null
+fi
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1; then
-  finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"
+  if [ -n "$AGENT_INSTALL" ]; then finish failed "$AGENT_NAME did not install. The lines above say why"
+  else finish waiting "$AGENT_NAME is not installed. Press Install in Settings, then connect again"; fi
 elif [ ! -x "$APPBIN" ]; then
   finish failed "run step 1 first: $APPBIN is missing"
 else
@@ -457,7 +478,9 @@ Begin 3 'node' 'Check Node.js (runs the MCP server)'
 if (NodeOk) { Finish 'skipped' "node $(& node -v)" }
 else {
   if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host '   running: winget install OpenJS.NodeJS.LTS'; winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements; RefreshPath }
-  if (NodeOk) { Finish 'ok' "installed node $(& node -v)" } else { Finish 'failed' 'Node.js 18 or newer is needed. Install it from https://nodejs.org, then run this again' }
+  if (NodeOk) { Finish 'ok' "installed node $(& node -v)" }
+  elseif (Get-Command node -ErrorAction SilentlyContinue) { Finish 'failed' "Node.js $(& node -v) is too old; 18 or newer is needed. Update it, then press Connect again" }
+  else { Finish 'failed' 'Node.js is needed. Run the Windows installer (.msi) from https://nodejs.org/en/download, then press Connect again' }
 }
 }
 
@@ -489,7 +512,8 @@ function SkillsSync {
 if (Want 'agent') {
 Begin 5 'agent' "Connect $AgentName (MCP server and AI skills)"
 $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue) -and $AgentInstall) { Write-Host "   running: $AgentInstall"; Invoke-Expression $AgentInstall; RefreshPath; $env:Path = "$env:USERPROFILE\.local\bin;$env:Path" }
+if (-not (Get-Command $AgentBin -ErrorAction SilentlyContinue)) { if ($AgentInstall) { Finish 'failed' "$AgentName did not install. The lines above say why" } else { Finish 'waiting' "$AgentName is not installed. Press Install in Settings, then connect again" } }
 elseif (-not (Test-Path $AppBin)) { Finish 'failed' "run step 1 first: $AppBin is missing" }
 else {
   $reg = 'skipped'
@@ -510,7 +534,7 @@ if ($Failed -gt 0) { exit 1 }
    }
 
    std::string BuildScript(Os os, const std::string& exe, const Agent& agent, const std::string& statusPath,
-                           const std::vector<std::string>& only, const Status* prior)
+                           const std::vector<std::string>& only, const Status* prior, bool installAgent)
    {
       std::ostringstream o;
       const std::string tool = ToolRef(os, statusPath.substr(0, statusPath.find_last_of("/\\") == std::string::npos ? 0 : statusPath.find_last_of("/\\")));
@@ -519,6 +543,7 @@ if ($Failed -gt 0) { exit 1 }
          o << "# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
          o << "$Exe = " << PsQuote(exe) << "\n$Status = " << PsQuote(statusPath) << "\n";
          o << "$AgentId = " << PsQuote(agent.id) << "\n$AgentName = " << PsQuote(agent.name) << "\n$AgentBin = " << PsQuote(agent.binary) << "\n";
+         o << "$AgentInstall = " << PsQuote(installAgent ? agent.installWin : "") << "\n";
          o << "$Only = @(";
          for (size_t i = 0; i < only.size(); i++)
             o << (i ? ", " : "") << PsQuote(only[i]);
@@ -542,6 +567,7 @@ if ($Failed -gt 0) { exit 1 }
       o << "#!/bin/sh\n# Infinite: command line and agent setup. Written by Infinite; safe to run again.\n";
       o << "EXE=" << ShQuote(exe) << "\nSTATUS=" << ShQuote(statusPath) << "\n";
       o << "AGENT_ID=" << ShQuote(agent.id) << "\nAGENT_NAME=" << ShQuote(agent.name) << "\nAGENT_BIN=" << ShQuote(agent.binary) << "\n";
+      o << "AGENT_INSTALL=" << ShQuote(installAgent ? agent.installUnix : "") << "\n";
       o << "ONLY='";
       for (size_t i = 0; i < only.size(); i++)
          o << (i ? " " : "") << only[i];
@@ -638,6 +664,31 @@ if ($Failed -gt 0) { exit 1 }
          c.agent = agent;
       c.autoStart = j.value("autoStart", false);
       c.welcomed = j.value("welcomed", false);
+      if (const std::string face = j.value("face", std::string()); face == "chat" || face == "terminal")
+         c.face = face;
+      c.workspace = j.value("workspace", std::string());
+      c.folderAccess = j.value("folderAccess", false);
+      c.introduced = j.value("introduced", false);
+      for (const char* key : { "folders", "commands" })
+         if (j.contains(key) && j[key].is_array())
+            for (const auto& v : j[key])
+               if (v.is_string() && !v.get<std::string>().empty())
+                  (std::string(key) == "folders" ? c.folders : c.commands).push_back(v.get<std::string>());
+      if (j.contains("usage") && j["usage"].is_object())
+         for (auto it = j["usage"].begin(); it != j["usage"].end(); ++it)
+            if (it.value().is_object() && FindAgent(it.key()) != nullptr)
+            {
+               Config::Usage& u = c.usage[it.key()];
+               u.turns = it.value().value("turns", 0LL);
+               u.input = it.value().value("input", 0LL);
+               u.cached = it.value().value("cached", 0LL);
+               u.output = it.value().value("output", 0LL);
+               u.cost = it.value().value("cost", 0.0);
+            }
+      if (j.contains("models") && j["models"].is_object())
+         for (auto it = j["models"].begin(); it != j["models"].end(); ++it)
+            if (it.value().is_string() && FindAgent(it.key()) != nullptr)
+               c.models[it.key()] = it.value().get<std::string>();
       return c;
    }
 
@@ -645,7 +696,13 @@ if ($Failed -gt 0) { exit 1 }
    {
       std::error_code ec;
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
-      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed } }.dump(2) << "\n";
+      nlohmann::json usage = nlohmann::json::object();
+      for (const auto& [id, u] : c.usage)
+         usage[id] = { { "turns", u.turns }, { "input", u.input }, { "cached", u.cached }, { "output", u.output }, { "cost", u.cost } };
+      std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
+                                                                { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced },
+                                                                { "models", c.models }, { "folders", c.folders }, { "commands", c.commands },
+                                                                { "usage", usage } }.dump(2) << "\n";
    }
 
    namespace
@@ -732,8 +789,13 @@ if ($Failed -gt 0) { exit 1 }
          for (std::string d; std::getline(ss, d, ':');)
             onPath = onPath || d == in.binDir;
          bool inRc = false;
-         for (const char* rc : { "/.zshrc", "/.bash_profile", "/.bashrc", "/.profile" })
-            inRc = inRc || ReadAll(in.home + rc).find("# >>> infinite cli >>>") != std::string::npos;
+         // A Finder-launched app has a bare PATH, so the shell's own profile is the truth: our marker, or the
+         // user's own line that already puts ~/.local/bin on PATH (setup then had nothing to add).
+         for (const char* rc : { "/.zshrc", "/.zprofile", "/.zshenv", "/.bash_profile", "/.bashrc", "/.profile" })
+         {
+            const std::string text = ReadAll(in.home + rc);
+            inRc = inRc || text.find("# >>> infinite cli >>>") != std::string::npos || text.find(".local/bin") != std::string::npos;
+         }
          if (onPath || inRc)
             set(0, Health::kOk);
          else
@@ -803,6 +865,42 @@ if ($Failed -gt 0) { exit 1 }
          std::lock_guard<std::mutex> lock(gHealthMutex);
          gHealth = r;
       }).detach();
+   }
+
+   Readiness AgentReadiness(const Agent& agent)
+   {
+      const Os os = CurrentOs();
+      const char* homeEnv = getenv(os == Os::kWindows ? "USERPROFILE" : "HOME");
+      const char* pathEnv = getenv("PATH");
+      const char* local = getenv("LOCALAPPDATA");
+      HealthInput in;
+      in.os = os;
+      in.home = homeEnv != nullptr ? homeEnv : "";
+      in.pathEnv = pathEnv != nullptr ? pathEnv : "";
+      in.exe = RealExecutable();
+      in.recordFile = PathsFor(AppPaths::AppSupportDir(), os).record;
+      in.binDir = os == Os::kWindows ? std::string(local != nullptr ? local : "") + "/Infinite/bin" : in.home + "/.local/bin";
+      in.agent = &agent;
+      Readiness r;
+      r.installed = AgentInstalled(os, agent, in.home, in.pathEnv);
+      const HealthReport h = CheckHealth(in);
+      r.connected = r.installed && h.step[0] == Health::kOk && h.step[2] == Health::kOk && h.step[4] == Health::kOk;
+      if (!r.installed)
+         r.why = std::string(agent.name) + " is not installed.";
+      else
+         for (int i : { 0, 2, 4 })
+            if (r.why.empty() && h.step[i] != Health::kOk)
+               r.why = !h.why[i].empty() ? h.why[i] : std::string("a setup step did not finish");
+      // Each agent keeps its login in its own file; an API key in the environment works as well.
+      const std::string id = agent.id;
+      auto env = [](const char* name) { const char* v = getenv(name); return v != nullptr && v[0] != '\0'; };
+      if (id == "claude")
+         r.signedIn = ReadAll(in.home + "/.claude.json").find("\"oauthAccount\"") != std::string::npos || env("ANTHROPIC_API_KEY");
+      else if (id == "codex")
+         r.signedIn = IsFile(in.home + "/.codex/auth.json") || env("OPENAI_API_KEY");
+      else if (id == "antigravity")
+         r.signedIn = IsFile(in.home + "/.gemini/jetski-standalone-oauth-token") || env("GEMINI_API_KEY");
+      return r;
    }
 
    HealthReport LatestHealth()
@@ -916,6 +1014,32 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
          run("Infinite setup", SetupLine(os, paths.script));
          return true;
       }
+      case Action::kSetupAgent:
+      case Action::kConnectAll:
+      {
+         // One tab, start to finish: install the agent if it is missing, run the setup script, and only when
+         // that succeeds hand the tab to the agent. A failed step stops the chain and stays on screen.
+         if (exe.empty())
+            return fail("Infinite could not find its own executable");
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(paths.dir), ec);
+         StageSkills(paths);
+         StageTool(paths);
+         std::ofstream out(AppPaths::FsPath(paths.script), std::ios::binary);
+         // The script installs a missing agent at step 5, after step 3 has Node: Codex installs with npm.
+         out << BuildScript(os, exe, agent, paths.status, {}, nullptr, true);
+         out.close();
+         if (!out.good() && !std::filesystem::exists(AppPaths::FsPath(paths.script)))
+            return fail("could not write " + paths.script);
+         if (action == Action::kSetupAgent)
+         {
+            run(agent.name, SetupLine(os, paths.script));
+            return true;
+         }
+         const bool win = os == Os::kWindows;
+         run(agent.name, SetupLine(os, paths.script) + (win ? "; if ($LASTEXITCODE -eq 0) { " : " && ") + StartAgentLine(os, exe, agent) + (win ? " }" : ""));
+         return true;
+      }
       case Action::kRepairStep:
       {
          if (exe.empty())
@@ -948,6 +1072,21 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
       default:
          return false;
       }
+   }
+
+   std::string HomeTilde(const std::string& path)
+   {
+      const char* home = std::getenv("HOME");
+      if (home == nullptr || *home == '\0')
+         return path;
+      std::string h = home;
+      while (h.size() > 1 && (h.back() == '/' || h.back() == '\\'))
+         h.pop_back();
+      if (path == h)
+         return "~";
+      if (path.size() > h.size() && path.compare(0, h.size(), h) == 0 && (path[h.size()] == '/' || path[h.size()] == '\\'))
+         return "~" + path.substr(h.size());
+      return path;
    }
 
    Config& Prefs()

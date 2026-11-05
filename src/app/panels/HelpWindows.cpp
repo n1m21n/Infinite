@@ -562,6 +562,226 @@ namespace app
    void DrawSettingsWindow(bool* open);
 
 
+   struct ShortcutEntry {
+      const char* category;
+      const char* action;
+      const char* key;
+      const char* description;
+   };
+
+   // One block per category, never split: the loop below opens a new card (and a table
+   // with the id "tbl_<category>") each time the category changes, so a row placed away
+   // from its siblings made a second card with a clashing table id.
+   static const ShortcutEntry kShortcuts[] = {
+      // Patch & File
+      { I18N_KEY("File & Patch"), I18N_KEY("Settings..."), MODKEY "+0", I18N_KEY("Open appearance, canvas, audio, and performance settings") },
+      { I18N_KEY("File & Patch"), I18N_KEY("New Patch"), MODKEY "+N", I18N_KEY("Create a new empty patch") },
+      { I18N_KEY("File & Patch"), I18N_KEY("New Synth"), MODKEY "+Shift+N", I18N_KEY("Add a Keyboard, a synth and an Audio Out, wired and ready to play") },
+      { I18N_KEY("File & Patch"), I18N_KEY("New Effect Chain"), "", I18N_KEY("Add an Audio File, Filter, Delay and Reverb into an Audio Out, ready for a sample") },
+      { I18N_KEY("File & Patch"), I18N_KEY("New 3D Scene"), "", I18N_KEY("Add a Sphere, Camera and Light wired into a Render 3D") },
+      { I18N_KEY("File & Patch"), I18N_KEY("Open Patch"), MODKEY "+O", I18N_KEY("Open an existing .inf patch file") },
+      { I18N_KEY("File & Patch"), I18N_KEY("Save"), MODKEY "+S", I18N_KEY("Save current patch") },
+      { I18N_KEY("File & Patch"), I18N_KEY("Save As..."), MODKEY "+Shift+S", I18N_KEY("Save patch to a new file") },
+
+      // Edit & Canvas
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Undo"), MODKEY "+Z", I18N_KEY("Undo last graph action") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Redo"), MODKEY "+Shift+Z / " MODKEY "+Y", I18N_KEY("Redo last undone action") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Copy"), MODKEY "+C", I18N_KEY("Copy selected nodes and internal connections") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Paste"), MODKEY "+V", I18N_KEY("Paste copied nodes with automatic offset") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Duplicate"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate selected nodes in-place. Canvas only - with the timeline focused, this duplicates clips instead") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete"), "Delete / Backspace / Shift+X", I18N_KEY("Delete selected nodes, groups, or links") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete Cable"), "X", I18N_KEY("Delete selected cable/link only") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), "Shift+A", I18N_KEY("Select all nodes on the canvas") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("UI Scale"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Make the whole interface bigger or smaller in 0.1 steps (0.5x to 2x); same setting as Settings > UI Scale") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Walk Params"), "Tab / Shift+Tab", I18N_KEY("Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Nudge Param"), "Left / Right", I18N_KEY("With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Move Node"), "Up / Down / Left / Right", I18N_KEY("Click a node, then the arrow keys move it one grid step. With a param focused they nudge the value instead") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Next Node"), "Shift+Up / Down / Left / Right", I18N_KEY("Select the neighbouring node in that direction") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Zoom Into Node"), "Shift+Enter", I18N_KEY("Zoom the view into the selected node; Enter zooms back out to where you were") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Node Help"), "H (again to close)", I18N_KEY("Show the help for the selected node") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Bypass Selection"), "B", I18N_KEY("Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Group Selection"), MODKEY "+G", I18N_KEY("Wrap selected nodes in a group box") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Ungroup"), MODKEY "+U / " MODKEY "+Shift+G", I18N_KEY("Dissolve the selected group without deleting nodes") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Add Node"), "Shift+N", I18N_KEY("Open quick type-to-filter node picker") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Add Note / Comment"), "/", I18N_KEY("Drop a comment note under mouse pointer") },
+      { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
+
+      // Canvas & View
+      { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas"), "Drag Canvas", I18N_KEY("Pan graph view") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Zoom"), "Scroll Wheel", I18N_KEY("Zoom in and out") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Rubber-band Select"), "Shift + Drag", I18N_KEY("Select multiple nodes in box") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Toggle Params"), "Shift+H", I18N_KEY("Show / hide parameter knobs & sliders") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Viewport Panel"), "Shift+V", I18N_KEY("Toggle viewport panel (or dock selected nodes)") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
+      { I18N_KEY("Canvas & View"), I18N_KEY("Preview Views"), "1 / 3 / 7 / 0", I18N_KEY("With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom") },
+
+      // Transport & Audio
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Play / Pause"), "Space", I18N_KEY("Start / pause timeline and animations") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Next / Previous Show Patch"), "PageDown / PageUp", I18N_KEY("Switch to the next or previous patch of the show set, on its launch grid. Works in a projector window too") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Show Lock"), MODKEY "+Shift+L", I18N_KEY("Lock the canvas for a live show: no node drag, cable drag, delete or undo. Knobs, sliders and the keyboard keep working") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Panic"), MODKEY "+.", I18N_KEY("Silence everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops and each projector holds its last frame. Press again to resume") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Toggle Audio Engine"), "Shift+K", I18N_KEY("Start / stop audio device. Canvas only - with the timeline focused, Shift+K adds an audio track instead") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Play Notes"), "Z X C V / Q W E R", I18N_KEY("With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing") },
+      { I18N_KEY("Transport & Audio"), I18N_KEY("Keyboard Octave"), "- / =", I18N_KEY("Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)") },
+
+      // Performance Matrix - edit mode, panel clicked
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Copy / Cut / Paste Controls"), MODKEY "+C / X / V", I18N_KEY("In edit mode, with the panel clicked: copy or cut the selected controls, or paste them") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), "Shift+D", I18N_KEY("Duplicate the selected controls") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Select All Controls"), MODKEY "+A", I18N_KEY("Select every control on the page") },
+      { I18N_KEY("Performance Matrix"), I18N_KEY("Delete Controls"), "Delete / Backspace", I18N_KEY("Delete the selected controls; Esc clears the selection") },
+
+      // Sample Studio - every key but the panel toggle needs the pointer over the waveform
+      { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio Record"), "R", I18N_KEY("Start or stop recording the chosen audio input into a new sample") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Undo / Redo Studio Edit"), MODKEY "+Z / " MODKEY "+Shift+Z", I18N_KEY("Undo or redo the Studio's own edits; the patch's undo is not touched") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Split / Join Slices"), MODKEY "+E / J", I18N_KEY("Cut a slice at the pointer (on the grid); join the selected slices") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Copy / Cut / Paste Slices"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected slices, or paste them") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Select All Slices"), MODKEY "+A", I18N_KEY("Select every slice") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Delete Slices"), "Delete / Backspace", I18N_KEY("Delete the selected slices") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Studio Tools"), "A / B / H", I18N_KEY("Select, Blade and Hand (drag to pan); Esc also returns to Select") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Zoom Sample Studio"), "= / - / Keypad + / Keypad - / F / Z", I18N_KEY("Zoom in, zoom out, fit the sample, zoom to the selection") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Previous / Next Slice"), "Left / Right", I18N_KEY("Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Audition Slice"), "Q", I18N_KEY("Play the selected slice, or the one under the pointer") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Mute / Solo Slice"), "M / S", I18N_KEY("Mute or solo the selected slices") },
+      { I18N_KEY("Sample Studio"), I18N_KEY("Reverse Slice"), "V", I18N_KEY("Reverse the selected slices") },
+
+      // Piano Roll
+      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Ruler"), "Click / Shift+drag", I18N_KEY("The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Generate Range"), "Alt+drag", I18N_KEY("Drag on the ruler with Alt held to mark the range Generate fills") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Record MIDI"), "R", I18N_KEY("Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Duplicate Notes"), MODKEY "+D / Shift+D", I18N_KEY("Lay the selected notes or clips again right after themselves") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Delete Notes"), "Delete / Backspace", I18N_KEY("Delete the selected notes or clips") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Split / Join Notes"), MODKEY "+E / " MODKEY "+J", I18N_KEY("Cut the selected notes at the playhead; join runs on one pitch into one note") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Select All Notes"), MODKEY "+A", I18N_KEY("Select every note of the clips being edited") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Group / Ungroup Clips"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group the selected clips or dissolve their groups") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Generate"), "G", I18N_KEY("Open Generate for this page; with an Alt+drag range on the ruler it fills that range") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Quantise"), "Q / Shift+Q", I18N_KEY("Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Transpose Notes"), "Up / Down", I18N_KEY("One semitone, or one scale degree with scale snap on; hold Shift for an octave") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Nudge Notes / Step Playhead"), "Left / Right", I18N_KEY("Move the selected notes one grid step; with nothing selected, step the playhead") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Zoom Piano Roll"), "= / - / F / Z", I18N_KEY("Zoom in, zoom out, fit the page, zoom to the selection") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Previous / Next Page"), "[ / ]", I18N_KEY("Switch to the neighbouring page") },
+      { I18N_KEY("Piano Roll"), I18N_KEY("Loop"), MODKEY "+L / I / O", I18N_KEY("Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead") },
+
+      // Arrangement Timeline - these fire only while the timeline panel
+      // owns the keyboard (click inside it) and no text field is active;
+      // the canvas's own Cmd+C/V/D/G and Delete stand down meanwhile.
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Video Track"), "Shift+J", I18N_KEY("Add a new video track below the selected track. Every key in this section needs the timeline panel focused - click inside it first") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Audio Track"), "Shift+K", I18N_KEY("Add a new audio track below the selected track (Shift+K toggles the audio engine when the canvas has focus)") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), "Shift+A", I18N_KEY("Select every clip on the timeline") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Timeline Tools"), "A / P / T / R / Z / H", I18N_KEY("Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Copy / Paste Clips"), MODKEY "+C / V", I18N_KEY("Copy the selected clips; paste at the playhead on the last-clicked clip's lane") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Duplicate Clips"), MODKEY "+D / Shift+D", I18N_KEY("Copy the selected block right after itself (the same keys duplicate nodes when the canvas has focus)") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Split at Playhead"), MODKEY "+E", I18N_KEY("Cut every selected clip the playhead passes through") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Enable / Disable Clips"), "0 / Keypad 0", I18N_KEY("Mute the selected clips (they draw hatched) or bring them back") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Blade Tool"), "B", I18N_KEY("Toggle the blade: click a clip to cut it (and its group) at the mouse; Esc turns it off (B bypasses nodes when the canvas has focus)") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Rename"), MODKEY "+R", I18N_KEY("Rename selected track, group, clip, or multiple selected clips") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Group / Ungroup Clips"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group merges whole groups and loose clips into one; Ungroup dissolves every group touched") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Delete Clips"), "Delete / Backspace", I18N_KEY("Delete the selected clips") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Marker"), "M", I18N_KEY("Drop a marker at the playhead, on the snap grid") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Previous / Next Marker"), "Alt+Left / Right", I18N_KEY("Jump the playhead to the previous or next marker") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Nudge Clips / Step Playhead"), "Left / Right", I18N_KEY("Move the selected clips one grid step; with nothing selected, step the playhead") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Playhead to Start"), "Home", I18N_KEY("Move the playhead to the start of the timeline") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Playhead to End"), "End", I18N_KEY("Move the playhead to the end of the last clip") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline"), MODKEY " + Scroll Wheel", I18N_KEY("Zoom around the mouse (trackpad pinch works too)") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline In / Out"), "= / -", I18N_KEY("Zoom around the playhead (the view's centre when the playhead is off screen)") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline to Fit"), "F", I18N_KEY("Show the whole arrangement, from the start to the end of the last clip") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Loop On / Off"), MODKEY "+L", I18N_KEY("Toggle the loop region") },
+      { I18N_KEY("Arrangement Timeline"), I18N_KEY("Loop In / Out"), "I / O", I18N_KEY("Set the loop region's start or end at the playhead") },
+
+      // Session
+      { I18N_KEY("Session"), I18N_KEY("Session"), "Shift+S", I18N_KEY("Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first") },
+      { I18N_KEY("Session"), I18N_KEY("Move Cell"), "Arrow keys", I18N_KEY("Move the cell cursor between tracks and scenes; a clip under it is selected") },
+      { I18N_KEY("Session"), I18N_KEY("Launch / Stop"), "Click / Enter", I18N_KEY("Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip") },
+      { I18N_KEY("Session"), I18N_KEY("Select Clip"), MODKEY "+Click", I18N_KEY("Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target") },
+      { I18N_KEY("Session"), I18N_KEY("Select Scene"), "Click scene", I18N_KEY("Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection") },
+      { I18N_KEY("Session"), I18N_KEY("Launch Scene"), "Shift+Enter", I18N_KEY("Launch every clip of the cursor's scene") },
+      { I18N_KEY("Session"), I18N_KEY("Copy / Cut / Paste Clip"), MODKEY "+C / X / V", I18N_KEY("Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind") },
+      { I18N_KEY("Session"), I18N_KEY("Duplicate Clip"), MODKEY "+D", I18N_KEY("Copy the clip into the next free cell below it") },
+      { I18N_KEY("Session"), I18N_KEY("Clear Clip"), "Delete / Backspace", I18N_KEY("Empty the cell under the cursor") },
+      { I18N_KEY("Session"), I18N_KEY("Rename Clip"), MODKEY "+R", I18N_KEY("Rename the clip under the cursor") },
+      { I18N_KEY("Session"), I18N_KEY("Enable / Disable Clip"), "0 / Keypad 0", I18N_KEY("Mute the clip (it draws hatched) or bring it back") },
+      { I18N_KEY("Session"), I18N_KEY("Add Scene"), MODKEY "+Shift+I", I18N_KEY("Add a scene row at the bottom") },
+      { I18N_KEY("Session"), I18N_KEY("Stop All"), ".", I18N_KEY("Stop every playing clip at the next quantize point") },
+      { I18N_KEY("Session"), I18N_KEY("Cancel"), "Esc", I18N_KEY("Abandon a click-to-assign on a clip, otherwise clear the selection") },
+
+      // 3D View - every key but the panel toggle needs the pointer over the view
+      { I18N_KEY("3D View"), I18N_KEY("3D View Panel"), "Shift+3", I18N_KEY("Show or hide the 3D View. Every other key in this section needs the pointer over the view") },
+      { I18N_KEY("3D View"), I18N_KEY("Add to the View"), "Shift+A", I18N_KEY("Add a node, a camera, a light, an HDRI or a new scene") },
+      { I18N_KEY("3D View"), I18N_KEY("Move / Rotate / Scale"), "G / R / S", I18N_KEY("Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels") },
+      { I18N_KEY("3D View"), I18N_KEY("Tools"), "Shift+Space", I18N_KEY("Then W, G, R or S picks the Select, Move, Rotate or Scale tool") },
+      { I18N_KEY("3D View"), I18N_KEY("Clear Transform"), "Alt+G / Alt+R / Alt+S", I18N_KEY("Reset the position, rotation or scale of the selection") },
+      { I18N_KEY("3D View"), I18N_KEY("Select All / None"), "A / Alt+A", I18N_KEY("Select every shown item, or nothing") },
+      { I18N_KEY("3D View"), I18N_KEY("Invert Selection"), MODKEY "+I", I18N_KEY("Select every shown item that is not selected") },
+      { I18N_KEY("3D View"), I18N_KEY("Duplicate"), "Shift+D", I18N_KEY("Duplicate the selected items") },
+      { I18N_KEY("3D View"), I18N_KEY("Remove"), "X / Delete / Backspace", I18N_KEY("Take the selected items out of the view; the nodes stay on the canvas") },
+      { I18N_KEY("3D View"), I18N_KEY("Hide / Show"), "H / Shift+H / Alt+H", I18N_KEY("Hide the selection, hide everything else, show everything") },
+      { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Alt+G", I18N_KEY("Group the selected items, or dissolve the group") },
+      { I18N_KEY("3D View"), I18N_KEY("Rename Item"), "F2", I18N_KEY("Rename the selected item") },
+      { I18N_KEY("3D View"), I18N_KEY("Frame"), "F / Home", I18N_KEY("F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan") },
+      { I18N_KEY("3D View"), I18N_KEY("Pivot to 3D Cursor"), "Shift+Double-click", I18N_KEY("Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away") },
+      { I18N_KEY("3D View"), I18N_KEY("Axis Views"), "1 / 3 / 7", I18N_KEY("Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps") },
+      { I18N_KEY("3D View"), I18N_KEY("Camera View"), "0", I18N_KEY("Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view") },
+      { I18N_KEY("3D View"), I18N_KEY("Shading"), "Z / Shift+Z", I18N_KEY("Cycle the shading; Shift+Z switches wireframe") },
+      { I18N_KEY("3D View"), I18N_KEY("Zoom 3D View"), "= / - / Shift+B", I18N_KEY("Zoom in or out; Shift+B drags a box to zoom into") },
+      { I18N_KEY("3D View"), I18N_KEY("Fly"), "Right-drag + W / A / S / D / Q / E", I18N_KEY("Hold the right button to look around and walk; Shift goes faster") },
+      { I18N_KEY("3D View"), I18N_KEY("Snap"), "Shift+Tab", I18N_KEY("Turn snapping on or off; hold {mod} while moving to flip it") },
+      { I18N_KEY("3D View"), I18N_KEY("Reset 3D Cursor"), "Shift+C", I18N_KEY("Put the 3D cursor back at the centre and frame everything") },
+      { I18N_KEY("3D View"), I18N_KEY("Pivot / Orientation"), "Period / Comma", I18N_KEY("Open the pivot point or the transform orientation menu") },
+      { I18N_KEY("3D View"), I18N_KEY("Local View"), "/", I18N_KEY("Show only the selection (Keypad / too); press again to show everything") },
+      { I18N_KEY("3D View"), I18N_KEY("Sidebar"), "N", I18N_KEY("Show or hide the side panel") },
+      { I18N_KEY("3D View"), I18N_KEY("Overlays"), "Ctrl+`", I18N_KEY("Show or hide the overlays (over the 3D View this key does not open the Terminal)") },
+      { I18N_KEY("3D View"), I18N_KEY("X-ray / Overlays"), "Alt+Z / Shift+Alt+Z", I18N_KEY("See through surfaces in Solid; show or hide the overlays") },
+      { I18N_KEY("3D View"), I18N_KEY("Follow / Clear Follow"), MODKEY "+P / Alt+P", I18N_KEY("The selected items follow the active one (Blender's parent), or stop following") },
+      { I18N_KEY("3D View"), I18N_KEY("Copy Transforms"), MODKEY "+L", I18N_KEY("The selected items take the active item's location, rotation and scale") },
+      { I18N_KEY("3D View"), I18N_KEY("Repeat Last"), "Shift+R", I18N_KEY("Apply the last move, turn or scale again to the selection") },
+      { I18N_KEY("3D View"), I18N_KEY("Roll View"), "Shift+Keypad 4 / Shift+Keypad 6", I18N_KEY("Roll the view 15 degrees about the line of sight") },
+      { I18N_KEY("3D View"), I18N_KEY("Proportional Editing"), "O", I18N_KEY("Moving one item pulls its neighbours, weaker with distance") },
+      { I18N_KEY("3D View"), I18N_KEY("Edit Mode"), "Tab", I18N_KEY("On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves") },
+      { I18N_KEY("3D View"), I18N_KEY("Points / Edges / Faces"), "Keys 1 to 3", I18N_KEY("In Edit Mode: pick what a click selects. A selects all, Alt+A selects none") },
+      { I18N_KEY("3D View"), I18N_KEY("Edit Operations"), "E / I / X", I18N_KEY("In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection") },
+      { I18N_KEY("3D View"), I18N_KEY("Pose Mode"), "Ctrl+Tab", I18N_KEY("On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves") },
+      { I18N_KEY("3D View"), I18N_KEY("Turn / Clear Bone"), "R / Alt+R", I18N_KEY("In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node") },
+      { I18N_KEY("3D View"), I18N_KEY("Add / Clear IK"), "Shift+I / Alt+I", I18N_KEY("In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK") },
+      { I18N_KEY("3D View"), I18N_KEY("Weight Paint"), "W", I18N_KEY("In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node") },
+      { I18N_KEY("3D View"), I18N_KEY("Copy / Paste / Duplicate Scene"), MODKEY "+C / V / D", I18N_KEY("Copy the whole scene, paste it as a new scene, or duplicate it") },
+      { I18N_KEY("3D View"), I18N_KEY("Render"), "F12 / " MODKEY "+F12", I18N_KEY("Render a still from the scene camera, or render the camera for its set duration") },
+
+      // Terminal (right rail). The app keys are Cmd on macOS, Ctrl+Shift elsewhere, so plain Ctrl reaches the shell.
+      { I18N_KEY("Terminal"), I18N_KEY("Terminal"), "Ctrl+`", I18N_KEY("Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system") },
+      { I18N_KEY("Terminal"), I18N_KEY("Copy / Paste"), TERMKEY "+C / V", I18N_KEY("Copy the selected text, or paste into the shell") },
+      { I18N_KEY("Terminal"), I18N_KEY("Find in Terminal"), TERMKEY "+F", I18N_KEY("Search the terminal's text") },
+      { I18N_KEY("Terminal"), I18N_KEY("New / Close Tab"), TERMKEY "+T / W", I18N_KEY("Open a new terminal tab, or close this one") },
+      { I18N_KEY("Terminal"), I18N_KEY("Clear"), TERMKEY "+K", I18N_KEY("Clear the screen") },
+      { I18N_KEY("Terminal"), I18N_KEY("Scroll Back"), "Shift+PageUp / PageDown", I18N_KEY("Scroll the terminal's history a page at a time") },
+   };
+
+   // The table as plain text for the agents (`infinite docs shortcuts`), English, this OS's keys.
+   std::string ShortcutsText()
+   {
+      std::string out;
+      const char* lastCat = nullptr;
+      for (const auto& s : kShortcuts)
+      {
+         if (lastCat == nullptr || strcmp(lastCat, s.category) != 0)
+         {
+            out += std::string(out.empty() ? "" : "\n") + "## " + s.category + "\n";
+            lastCat = s.category;
+         }
+         out += std::string(s.key) + "  " + s.action + ": " + s.description + "\n";
+      }
+      return out;
+   }
+
    void DrawShortcutsWindow(bool* open)
    {
       // Every other floating dialog (Settings, Field editor, colour picker)
@@ -596,208 +816,6 @@ namespace app
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);
 
-      struct ShortcutEntry {
-         const char* category;
-         const char* action;
-         const char* key;
-         const char* description;
-      };
-
-      // One block per category, never split: the loop below opens a new card (and a table
-      // with the id "tbl_<category>") each time the category changes, so a row placed away
-      // from its siblings made a second card with a clashing table id.
-      static const ShortcutEntry kShortcuts[] = {
-         // Patch & File
-         { I18N_KEY("File & Patch"), I18N_KEY("Settings..."), MODKEY "+0", I18N_KEY("Open appearance, canvas, audio, and performance settings") },
-         { I18N_KEY("File & Patch"), I18N_KEY("New Patch"), MODKEY "+N", I18N_KEY("Create a new empty patch") },
-         { I18N_KEY("File & Patch"), I18N_KEY("New Synth"), MODKEY "+Shift+N", I18N_KEY("Add a Keyboard, a synth and an Audio Out, wired and ready to play") },
-         { I18N_KEY("File & Patch"), I18N_KEY("New Effect Chain"), "", I18N_KEY("Add an Audio File, Filter, Delay and Reverb into an Audio Out, ready for a sample") },
-         { I18N_KEY("File & Patch"), I18N_KEY("New 3D Scene"), "", I18N_KEY("Add a Sphere, Camera and Light wired into a Render 3D") },
-         { I18N_KEY("File & Patch"), I18N_KEY("Open Patch"), MODKEY "+O", I18N_KEY("Open an existing .inf patch file") },
-         { I18N_KEY("File & Patch"), I18N_KEY("Save"), MODKEY "+S", I18N_KEY("Save current patch") },
-         { I18N_KEY("File & Patch"), I18N_KEY("Save As..."), MODKEY "+Shift+S", I18N_KEY("Save patch to a new file") },
-
-         // Edit & Canvas
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Undo"), MODKEY "+Z", I18N_KEY("Undo last graph action") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Redo"), MODKEY "+Shift+Z / " MODKEY "+Y", I18N_KEY("Redo last undone action") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Copy"), MODKEY "+C", I18N_KEY("Copy selected nodes and internal connections") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Paste"), MODKEY "+V", I18N_KEY("Paste copied nodes with automatic offset") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Duplicate"), MODKEY "+D / Shift+D", I18N_KEY("Duplicate selected nodes in-place. Canvas only - with the timeline focused, this duplicates clips instead") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete"), "Delete / Backspace / Shift+X", I18N_KEY("Delete selected nodes, groups, or links") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Delete Cable"), "X", I18N_KEY("Delete selected cable/link only") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Select All"), "Shift+A", I18N_KEY("Select all nodes on the canvas") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("UI Scale"), MODKEY "+= / " MODKEY "+-", I18N_KEY("Make the whole interface bigger or smaller in 0.1 steps (0.5x to 2x); same setting as Settings > UI Scale") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Walk Params"), "Tab / Shift+Tab", I18N_KEY("Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Nudge Param"), "Left / Right", I18N_KEY("With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Move Node"), "Up / Down / Left / Right", I18N_KEY("Click a node, then the arrow keys move it one grid step. With a param focused they nudge the value instead") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Next Node"), "Shift+Up / Down / Left / Right", I18N_KEY("Select the neighbouring node in that direction") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Zoom Into Node"), "Shift+Enter", I18N_KEY("Zoom the view into the selected node; Enter zooms back out to where you were") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Node Help"), "H (again to close)", I18N_KEY("Show the help for the selected node") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Bypass Selection"), "B", I18N_KEY("Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Group Selection"), MODKEY "+G", I18N_KEY("Wrap selected nodes in a group box") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Ungroup"), MODKEY "+U / " MODKEY "+Shift+G", I18N_KEY("Dissolve the selected group without deleting nodes") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Add Node"), "Shift+N", I18N_KEY("Open quick type-to-filter node picker") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Add Note / Comment"), "/", I18N_KEY("Drop a comment note under mouse pointer") },
-         { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
-
-         // Canvas & View
-         { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas"), "Drag Canvas", I18N_KEY("Pan graph view") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Zoom"), "Scroll Wheel", I18N_KEY("Zoom in and out") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Rubber-band Select"), "Shift + Drag", I18N_KEY("Select multiple nodes in box") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Toggle Params"), "Shift+H", I18N_KEY("Show / hide parameter knobs & sliders") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Viewport Panel"), "Shift+V", I18N_KEY("Toggle viewport panel (or dock selected nodes)") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
-         { I18N_KEY("Canvas & View"), I18N_KEY("Preview Views"), "1 / 3 / 7 / 0", I18N_KEY("With the pointer over a 3D preview (node, viewport card, Render 3D): front, right, top, or the default view. Hold {mod} for back, left, bottom") },
-
-         // Transport & Audio
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Play / Pause"), "Space", I18N_KEY("Start / pause timeline and animations") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Next / Previous Show Patch"), "PageDown / PageUp", I18N_KEY("Switch to the next or previous patch of the show set, on its launch grid. Works in a projector window too") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Show Lock"), MODKEY "+Shift+L", I18N_KEY("Lock the canvas for a live show: no node drag, cable drag, delete or undo. Knobs, sliders and the keyboard keep working") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Panic"), MODKEY "+.", I18N_KEY("Silence everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops and each projector holds its last frame. Press again to resume") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Toggle Audio Engine"), "Shift+K", I18N_KEY("Start / stop audio device. Canvas only - with the timeline focused, Shift+K adds an audio track instead") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Play Notes"), "Z X C V / Q W E R", I18N_KEY("With the mouse over a Keyboard node (or it as the only selection) and its numpad box ticked, the letter rows play notes: the Z row the lower octave, the Q row the upper. Shift, Ctrl, Cmd or Alt plus a letter plays nothing") },
-         { I18N_KEY("Transport & Audio"), I18N_KEY("Keyboard Octave"), "- / =", I18N_KEY("Step the octave of the Keyboard node you are over down or up (the same rule as Play Notes)") },
-
-         // Performance Matrix - edit mode, panel clicked
-         { I18N_KEY("Performance Matrix"), I18N_KEY("Copy / Cut / Paste Controls"), MODKEY "+C / X / V", I18N_KEY("In edit mode, with the panel clicked: copy or cut the selected controls, or paste them") },
-         { I18N_KEY("Performance Matrix"), I18N_KEY("Duplicate Controls"), "Shift+D", I18N_KEY("Duplicate the selected controls") },
-         { I18N_KEY("Performance Matrix"), I18N_KEY("Select All Controls"), MODKEY "+A", I18N_KEY("Select every control on the page") },
-         { I18N_KEY("Performance Matrix"), I18N_KEY("Delete Controls"), "Delete / Backspace", I18N_KEY("Delete the selected controls; Esc clears the selection") },
-
-         // Sample Studio - every key but the panel toggle needs the pointer over the waveform
-         { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio"), "Shift+W", I18N_KEY("Toggle the docked Sample Studio. Every other key in this section needs the pointer over its waveform") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Sample Studio Record"), "R", I18N_KEY("Start or stop recording the chosen audio input into a new sample") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Undo / Redo Studio Edit"), MODKEY "+Z / " MODKEY "+Shift+Z", I18N_KEY("Undo or redo the Studio's own edits; the patch's undo is not touched") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Split / Join Slices"), MODKEY "+E / J", I18N_KEY("Cut a slice at the pointer (on the grid); join the selected slices") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Copy / Cut / Paste Slices"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected slices, or paste them") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Select All Slices"), MODKEY "+A", I18N_KEY("Select every slice") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Delete Slices"), "Delete / Backspace", I18N_KEY("Delete the selected slices") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Studio Tools"), "A / B / H", I18N_KEY("Select, Blade and Hand (drag to pan); Esc also returns to Select") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Zoom Sample Studio"), "= / - / Keypad + / Keypad - / F / Z", I18N_KEY("Zoom in, zoom out, fit the sample, zoom to the selection") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Previous / Next Slice"), "Left / Right", I18N_KEY("Select the neighbouring slice; with Shift, stretch (Right) or compact (Left) the selected slices") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Audition Slice"), "Q", I18N_KEY("Play the selected slice, or the one under the pointer") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Mute / Solo Slice"), "M / S", I18N_KEY("Mute or solo the selected slices") },
-         { I18N_KEY("Sample Studio"), I18N_KEY("Reverse Slice"), "V", I18N_KEY("Reverse the selected slices") },
-
-         // Piano Roll
-         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Panel"), "Shift+R", I18N_KEY("Show or hide the docked Piano Roll") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Ruler"), "Click / Shift+drag", I18N_KEY("The same on the Timeline and the Piano Roll, and click or drag on the Sample Studio: click or drag places the playhead when you let go; Shift+drag carves the loop; drag a loop edge to move it; right-click drops the loop") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Generate Range"), "Alt+drag", I18N_KEY("Drag on the ruler with Alt held to mark the range Generate fills") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Piano Roll Tools"), "A / P / E / B / 0 / H", I18N_KEY("Select, Draw, Erase, Cut, Mute and Hand (drag to pan), the same keys as the Timeline and Sample Studio, while the pointer is over the Piano Roll (Esc also returns to Select). The tool dropdown holds them with the zoom. Every key in this section needs the pointer there") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Record MIDI"), "R", I18N_KEY("Start or stop recording notes from your MIDI controller while the transport plays (only when a MIDI device is connected)") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Mute Notes"), "0 / Keypad 0", I18N_KEY("Mute the selected notes, or the selected clips, or bring them back") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Copy / Cut / Paste Notes"), MODKEY "+C / X / V", I18N_KEY("Copy or cut the selected notes, or copy the selected clips; paste lays them right after the original") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Duplicate Notes"), MODKEY "+D / Shift+D", I18N_KEY("Lay the selected notes or clips again right after themselves") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Delete Notes"), "Delete / Backspace", I18N_KEY("Delete the selected notes or clips") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Split / Join Notes"), MODKEY "+E / " MODKEY "+J", I18N_KEY("Cut the selected notes at the playhead; join runs on one pitch into one note") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Select All Notes"), MODKEY "+A", I18N_KEY("Select every note of the clips being edited") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Rename Page"), MODKEY "+R", I18N_KEY("Rename the page") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Group / Ungroup Clips"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group the selected clips or dissolve their groups") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Generate"), "G", I18N_KEY("Open Generate for this page; with an Alt+drag range on the ruler it fills that range") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Quantise"), "Q / Shift+Q", I18N_KEY("Quantise the selection, or the clips being edited, to the grid; Shift+Q opens strength, swing and ends in the settings") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Transpose Notes"), "Up / Down", I18N_KEY("One semitone, or one scale degree with scale snap on; hold Shift for an octave") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Nudge Notes / Step Playhead"), "Left / Right", I18N_KEY("Move the selected notes one grid step; with nothing selected, step the playhead") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Zoom Piano Roll"), "= / - / F / Z", I18N_KEY("Zoom in, zoom out, fit the page, zoom to the selection") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Previous / Next Page"), "[ / ]", I18N_KEY("Switch to the neighbouring page") },
-         { I18N_KEY("Piano Roll"), I18N_KEY("Loop"), MODKEY "+L / I / O", I18N_KEY("Loop the Alt+drag ruler range or the selected notes; set the loop start or end at the playhead") },
-
-         // Arrangement Timeline - these fire only while the timeline panel
-         // owns the keyboard (click inside it) and no text field is active;
-         // the canvas's own Cmd+C/V/D/G and Delete stand down meanwhile.
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Video Track"), "Shift+J", I18N_KEY("Add a new video track below the selected track. Every key in this section needs the timeline panel focused - click inside it first") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Audio Track"), "Shift+K", I18N_KEY("Add a new audio track below the selected track (Shift+K toggles the audio engine when the canvas has focus)") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Select All Clips"), "Shift+A", I18N_KEY("Select every clip on the timeline") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Timeline Tools"), "A / P / T / R / Z / H", I18N_KEY("Select, Pencil, Trim, Range, Zoom and Hand; press a tool's key again, or Esc, to go back to Select") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Copy / Paste Clips"), MODKEY "+C / V", I18N_KEY("Copy the selected clips; paste at the playhead on the last-clicked clip's lane") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Duplicate Clips"), MODKEY "+D / Shift+D", I18N_KEY("Copy the selected block right after itself (the same keys duplicate nodes when the canvas has focus)") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Split at Playhead"), MODKEY "+E", I18N_KEY("Cut every selected clip the playhead passes through") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Enable / Disable Clips"), "0 / Keypad 0", I18N_KEY("Mute the selected clips (they draw hatched) or bring them back") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Blade Tool"), "B", I18N_KEY("Toggle the blade: click a clip to cut it (and its group) at the mouse; Esc turns it off (B bypasses nodes when the canvas has focus)") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Rename"), MODKEY "+R", I18N_KEY("Rename selected track, group, clip, or multiple selected clips") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Group / Ungroup Clips"), MODKEY "+G / " MODKEY "+Shift+G", I18N_KEY("Group merges whole groups and loose clips into one; Ungroup dissolves every group touched") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Delete Clips"), "Delete / Backspace", I18N_KEY("Delete the selected clips") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Add Marker"), "M", I18N_KEY("Drop a marker at the playhead, on the snap grid") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Previous / Next Marker"), "Alt+Left / Right", I18N_KEY("Jump the playhead to the previous or next marker") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Nudge Clips / Step Playhead"), "Left / Right", I18N_KEY("Move the selected clips one grid step; with nothing selected, step the playhead") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Playhead to Start"), "Home", I18N_KEY("Move the playhead to the start of the timeline") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Playhead to End"), "End", I18N_KEY("Move the playhead to the end of the last clip") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline"), MODKEY " + Scroll Wheel", I18N_KEY("Zoom around the mouse (trackpad pinch works too)") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline In / Out"), "= / -", I18N_KEY("Zoom around the playhead (the view's centre when the playhead is off screen)") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Zoom Timeline to Fit"), "F", I18N_KEY("Show the whole arrangement, from the start to the end of the last clip") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Loop On / Off"), MODKEY "+L", I18N_KEY("Toggle the loop region") },
-         { I18N_KEY("Arrangement Timeline"), I18N_KEY("Loop In / Out"), "I / O", I18N_KEY("Set the loop region's start or end at the playhead") },
-
-         // Session
-         { I18N_KEY("Session"), I18N_KEY("Session"), "Shift+S", I18N_KEY("Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first") },
-         { I18N_KEY("Session"), I18N_KEY("Move Cell"), "Arrow keys", I18N_KEY("Move the cell cursor between tracks and scenes; a clip under it is selected") },
-         { I18N_KEY("Session"), I18N_KEY("Launch / Stop"), "Click / Enter", I18N_KEY("Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip") },
-         { I18N_KEY("Session"), I18N_KEY("Select Clip"), MODKEY "+Click", I18N_KEY("Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target") },
-         { I18N_KEY("Session"), I18N_KEY("Select Scene"), "Click scene", I18N_KEY("Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection") },
-         { I18N_KEY("Session"), I18N_KEY("Launch Scene"), "Shift+Enter", I18N_KEY("Launch every clip of the cursor's scene") },
-         { I18N_KEY("Session"), I18N_KEY("Copy / Cut / Paste Clip"), MODKEY "+C / X / V", I18N_KEY("Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind") },
-         { I18N_KEY("Session"), I18N_KEY("Duplicate Clip"), MODKEY "+D", I18N_KEY("Copy the clip into the next free cell below it") },
-         { I18N_KEY("Session"), I18N_KEY("Clear Clip"), "Delete / Backspace", I18N_KEY("Empty the cell under the cursor") },
-         { I18N_KEY("Session"), I18N_KEY("Rename Clip"), MODKEY "+R", I18N_KEY("Rename the clip under the cursor") },
-         { I18N_KEY("Session"), I18N_KEY("Enable / Disable Clip"), "0 / Keypad 0", I18N_KEY("Mute the clip (it draws hatched) or bring it back") },
-         { I18N_KEY("Session"), I18N_KEY("Add Scene"), MODKEY "+Shift+I", I18N_KEY("Add a scene row at the bottom") },
-         { I18N_KEY("Session"), I18N_KEY("Stop All"), ".", I18N_KEY("Stop every playing clip at the next quantize point") },
-         { I18N_KEY("Session"), I18N_KEY("Cancel"), "Esc", I18N_KEY("Abandon a click-to-assign on a clip, otherwise clear the selection") },
-
-         // 3D View - every key but the panel toggle needs the pointer over the view
-         { I18N_KEY("3D View"), I18N_KEY("3D View Panel"), "Shift+3", I18N_KEY("Show or hide the 3D View. Every other key in this section needs the pointer over the view") },
-         { I18N_KEY("3D View"), I18N_KEY("Add to the View"), "Shift+A", I18N_KEY("Add a node, a camera, a light, an HDRI or a new scene") },
-         { I18N_KEY("3D View"), I18N_KEY("Move / Rotate / Scale"), "G / R / S", I18N_KEY("Move, rotate or scale the selection at once. X / Y / Z lock an axis (Shift for a plane), digits type an amount; click or Enter confirms, Esc or right-click cancels") },
-         { I18N_KEY("3D View"), I18N_KEY("Tools"), "Shift+Space", I18N_KEY("Then W, G, R or S picks the Select, Move, Rotate or Scale tool") },
-         { I18N_KEY("3D View"), I18N_KEY("Clear Transform"), "Alt+G / Alt+R / Alt+S", I18N_KEY("Reset the position, rotation or scale of the selection") },
-         { I18N_KEY("3D View"), I18N_KEY("Select All / None"), "A / Alt+A", I18N_KEY("Select every shown item, or nothing") },
-         { I18N_KEY("3D View"), I18N_KEY("Invert Selection"), MODKEY "+I", I18N_KEY("Select every shown item that is not selected") },
-         { I18N_KEY("3D View"), I18N_KEY("Duplicate"), "Shift+D", I18N_KEY("Duplicate the selected items") },
-         { I18N_KEY("3D View"), I18N_KEY("Remove"), "X / Delete / Backspace", I18N_KEY("Take the selected items out of the view; the nodes stay on the canvas") },
-         { I18N_KEY("3D View"), I18N_KEY("Hide / Show"), "H / Shift+H / Alt+H", I18N_KEY("Hide the selection, hide everything else, show everything") },
-         { I18N_KEY("3D View"), I18N_KEY("Group / Ungroup"), MODKEY "+G / " MODKEY "+Alt+G", I18N_KEY("Group the selected items, or dissolve the group") },
-         { I18N_KEY("3D View"), I18N_KEY("Rename Item"), "F2", I18N_KEY("Rename the selected item") },
-         { I18N_KEY("3D View"), I18N_KEY("Frame"), "F / Home", I18N_KEY("F (or Keypad .) frames the selection, everything when nothing is selected; Home frames everything, or resets the camera view's zoom and pan") },
-         { I18N_KEY("3D View"), I18N_KEY("Pivot to 3D Cursor"), "Shift+Double-click", I18N_KEY("Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + two-finger scroll pans it away") },
-         { I18N_KEY("3D View"), I18N_KEY("Axis Views"), "1 / 3 / 7", I18N_KEY("Front, right, top; hold {mod} for back, left, bottom. 5 switches orthographic, 9 turns to the other side, 2 / 4 / 6 / 8 orbit in steps") },
-         { I18N_KEY("3D View"), I18N_KEY("Camera View"), "0", I18N_KEY("Look through the scene camera. {mod}+0 makes the selected camera the scene camera; {mod}+Alt+0 moves the camera to the current view") },
-         { I18N_KEY("3D View"), I18N_KEY("Shading"), "Z / Shift+Z", I18N_KEY("Cycle the shading; Shift+Z switches wireframe") },
-         { I18N_KEY("3D View"), I18N_KEY("Zoom 3D View"), "= / - / Shift+B", I18N_KEY("Zoom in or out; Shift+B drags a box to zoom into") },
-         { I18N_KEY("3D View"), I18N_KEY("Fly"), "Right-drag + W / A / S / D / Q / E", I18N_KEY("Hold the right button to look around and walk; Shift goes faster") },
-         { I18N_KEY("3D View"), I18N_KEY("Snap"), "Shift+Tab", I18N_KEY("Turn snapping on or off; hold {mod} while moving to flip it") },
-         { I18N_KEY("3D View"), I18N_KEY("Reset 3D Cursor"), "Shift+C", I18N_KEY("Put the 3D cursor back at the centre and frame everything") },
-         { I18N_KEY("3D View"), I18N_KEY("Pivot / Orientation"), "Period / Comma", I18N_KEY("Open the pivot point or the transform orientation menu") },
-         { I18N_KEY("3D View"), I18N_KEY("Local View"), "/", I18N_KEY("Show only the selection (Keypad / too); press again to show everything") },
-         { I18N_KEY("3D View"), I18N_KEY("Sidebar"), "N", I18N_KEY("Show or hide the side panel") },
-         { I18N_KEY("3D View"), I18N_KEY("Overlays"), "Ctrl+`", I18N_KEY("Show or hide the overlays (over the 3D View this key does not open the Terminal)") },
-         { I18N_KEY("3D View"), I18N_KEY("X-ray / Overlays"), "Alt+Z / Shift+Alt+Z", I18N_KEY("See through surfaces in Solid; show or hide the overlays") },
-         { I18N_KEY("3D View"), I18N_KEY("Follow / Clear Follow"), MODKEY "+P / Alt+P", I18N_KEY("The selected items follow the active one (Blender's parent), or stop following") },
-         { I18N_KEY("3D View"), I18N_KEY("Copy Transforms"), MODKEY "+L", I18N_KEY("The selected items take the active item's location, rotation and scale") },
-         { I18N_KEY("3D View"), I18N_KEY("Repeat Last"), "Shift+R", I18N_KEY("Apply the last move, turn or scale again to the selection") },
-         { I18N_KEY("3D View"), I18N_KEY("Roll View"), "Shift+Keypad 4 / Shift+Keypad 6", I18N_KEY("Roll the view 15 degrees about the line of sight") },
-         { I18N_KEY("3D View"), I18N_KEY("Proportional Editing"), "O", I18N_KEY("Moving one item pulls its neighbours, weaker with distance") },
-         { I18N_KEY("3D View"), I18N_KEY("Edit Mode"), "Tab", I18N_KEY("On a mesh item: edit its points, edges and faces in an Edit Mesh node. Tab or Esc leaves") },
-         { I18N_KEY("3D View"), I18N_KEY("Points / Edges / Faces"), "Keys 1 to 3", I18N_KEY("In Edit Mode: pick what a click selects. A selects all, Alt+A selects none") },
-         { I18N_KEY("3D View"), I18N_KEY("Edit Operations"), "E / I / X", I18N_KEY("In Edit Mode: E extrudes, I insets, X or Delete deletes the selected faces. G, R and S move, turn and scale the selection") },
-         { I18N_KEY("3D View"), I18N_KEY("Pose Mode"), "Ctrl+Tab", I18N_KEY("On a skinned Model 3D item: show its bones; click one to pick it. Ctrl+Tab or Esc leaves") },
-         { I18N_KEY("3D View"), I18N_KEY("Turn / Clear Bone"), "R / Alt+R", I18N_KEY("In Pose Mode: turn the picked bone about the view axis, or clear its turn. Turns are params on the Model 3D node") },
-         { I18N_KEY("3D View"), I18N_KEY("Add / Clear IK"), "Shift+I / Alt+I", I18N_KEY("In Pose Mode: the picked bone reaches for the last other selected item (one more selected item is the pole), or clear the IK") },
-         { I18N_KEY("3D View"), I18N_KEY("Weight Paint"), "W", I18N_KEY("In Pose Mode on an Armature: drag paints the picked bone's weight, Ctrl+drag removes it, [ and ] size the brush. Saved on the Armature node") },
-         { I18N_KEY("3D View"), I18N_KEY("Copy / Paste / Duplicate Scene"), MODKEY "+C / V / D", I18N_KEY("Copy the whole scene, paste it as a new scene, or duplicate it") },
-         { I18N_KEY("3D View"), I18N_KEY("Render"), "F12 / " MODKEY "+F12", I18N_KEY("Render a still from the scene camera, or render the camera for its set duration") },
-
-         // Terminal (right rail). The app keys are Cmd on macOS, Ctrl+Shift elsewhere, so plain Ctrl reaches the shell.
-         { I18N_KEY("Terminal"), I18N_KEY("Terminal"), "Ctrl+`", I18N_KEY("Open the Terminal in the right rail, move the keyboard to it, or close it. Physical Ctrl on every system") },
-         { I18N_KEY("Terminal"), I18N_KEY("Copy / Paste"), TERMKEY "+C / V", I18N_KEY("Copy the selected text, or paste into the shell") },
-         { I18N_KEY("Terminal"), I18N_KEY("Find in Terminal"), TERMKEY "+F", I18N_KEY("Search the terminal's text") },
-         { I18N_KEY("Terminal"), I18N_KEY("New / Close Tab"), TERMKEY "+T / W", I18N_KEY("Open a new terminal tab, or close this one") },
-         { I18N_KEY("Terminal"), I18N_KEY("Clear"), TERMKEY "+K", I18N_KEY("Clear the screen") },
-         { I18N_KEY("Terminal"), I18N_KEY("Scroll Back"), "Shift+PageUp / PageDown", I18N_KEY("Scroll the terminal's history a page at a time") },
-      };
 
       const char* lastCat = nullptr;
       bool inTable = false;

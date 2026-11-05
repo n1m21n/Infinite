@@ -1,6 +1,9 @@
 #include "InfiniteCli.h"
 
 #include "AISkillContent.h"
+#include "AgentDocs.h"
+#include "core/chat/FileFinder.h"
+#include "core/chat/NodeFinder.h"
 #include "core/NodeFactory.h"
 #include "Patch.h"
 #include "PatchLayout.h"
@@ -16,6 +19,8 @@
 #include "platform/AppPaths.h"
 #include "platform/NetCompat.h"
 #include "platform/Platform.h"
+#include "platform/common/ProcessTree.h"
+#include "RemoteControl.h"
 
 #include <algorithm>
 #include <chrono>
@@ -233,24 +238,75 @@ namespace
    class Live
    {
    public:
-      // False when no app answers. Never fails hard: a headless route may still apply.
+      // The app this process belongs to, from the files each running app leaves in InstancesDir:
+      // the one INFINITE_SESSION names, else the one whose Terminal is an ancestor of this process,
+      // else the only one running. An app too old to leave a file is reached on the default port.
+      bool FindInstance(int& port, std::string& token)
+      {
+         struct Instance
+         {
+            int port = 0;
+            std::string token;
+         };
+         std::map<long, Instance> live;
+         std::error_code ec;
+         for (const auto& entry : std::filesystem::directory_iterator(AppPaths::FsPath(RemoteControl::InstancesDir()), ec))
+         {
+            std::ifstream in(entry.path());
+            const json j = json::parse(in, nullptr, false);
+            const long pid = j.is_object() ? j.value("pid", 0L) : 0L;
+            if (!ProcessTree::Alive(pid))
+            {
+               std::filesystem::remove(entry.path(), ec); // left by an app that crashed
+               continue;
+            }
+            live[pid] = { j.value("port", 0), j.value("token", std::string()) };
+         }
+         const auto pick = [&](long pid) {
+            port = live[pid].port;
+            token = live[pid].token;
+            return true;
+         };
+         if (const char* session = getenv("INFINITE_SESSION"); session != nullptr && live.count(atol(session)) != 0)
+            return pick(atol(session));
+         for (long pid = ProcessTree::ParentPid(ProcessTree::Self()), depth = 0; pid > 1 && depth < 64; pid = ProcessTree::ParentPid(pid), depth++)
+            if (live.count(pid) != 0)
+               return pick(pid);
+         if (live.size() == 1)
+            return pick(live.begin()->first);
+         if (live.size() > 1)
+         {
+            std::string list;
+            for (const auto& [pid, instance] : live)
+               list += (list.empty() ? "" : ", ") + std::string("pid ") + std::to_string(pid);
+            Fail(std::to_string(live.size()) + " Infinite windows are open (" + list +
+                    ") and this shell is not inside any of their Terminals. Run it from the Terminal of the window you mean, "
+                    "or set INFINITE_SESSION=<pid>",
+                 kExitNoApp);
+         }
+         port = kDefaultPort;
+         std::ifstream in(AppPaths::FsPath(AppPaths::AppSupportDir() + "/control_token"));
+         std::getline(in, token);
+         return !token.empty();
+      }
+
+      // False when no app answers. Never fails hard: a headless route may still apply. The one hard failure is
+      // several apps open with nothing to say which one is meant: guessing would edit the wrong patch.
       bool Connect()
       {
          if (mFd >= 0)
             return true;
-         int port = kDefaultPort;
+         int port = 0;
          std::string token;
          const char* envPort = getenv("INFINITE_CONTROL_PORT");
          const char* envToken = getenv("INFINITE_CONTROL_TOKEN");
-         if (envPort != nullptr)
-            port = atoi(envPort);
-         if (envToken != nullptr)
-            token = envToken;
-         else
+         if (envPort != nullptr && envToken != nullptr)
          {
-            std::ifstream in(AppPaths::FsPath(AppPaths::AppSupportDir() + "/control_token"));
-            std::getline(in, token);
+            port = atoi(envPort);
+            token = envToken;
          }
+         else if (!FindInstance(port, token))
+            return false;
          if (token.empty() || port <= 0)
             return false;
          const int fd = (int)socket(AF_INET, SOCK_STREAM, 0);
@@ -1065,30 +1121,164 @@ namespace
 
    const char* kHelp = R"(infinite: drive Infinite from a terminal. Live when the app answers, headless given a .inf file.
 
-Look     graph [p.inf]  explain [p.inf]  params <node>  selection  status  nodes  describe <type>
+Look     graph [p.inf]  explain [p.inf]  params <node> [--full]  selection  status  nodes  describe <type>
 Edit     add <type> [x y]  remove <node>  connect <src[:out]> <dst[:slot]>  disconnect <dst[:slot]>
          set <node> <key> <value>  mod <src[:out]> <dst> <key> [lo hi]  mod clear <dst> <key>  mod curve <dst> <key> <-1..1>
          expr <node> <key> <text>  bypass <node> [on|off]  batch <file|->  undo  redo
-         select <node>...|all|none  copy  paste  duplicate  group  ungroup  view3d-add <node>...
-Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
+         select <node>...|all|none  focus <node>  copy  paste  duplicate  group  ungroup  view3d-add <node>...
+Patch    new [synth|effect|3d]  recent  open <p.inf>  save [p.inf]  import <file>... [into <node>]  files <words>  reveal <file>  validate <p.inf>  canonicalize <in> <out>  apply <p.inf>
 Play     play  stop  rewind  seek <seconds>  tempo <bpm>
 Timeline timeline [track|clip|marker|group|loop|snap|render] ...  (times in beats, key=value sets fields)
          session scene|launch|stop|add|insert|send|sceneset|slot ...
-         notes get|add|set|delete|move|quantize|transform <clip>  perf ...  studio get|set
+         notes get|add|set|delete|move|quantize|transform|export <clip>  notes generate <type> [key=value]  perf ...
+Make     studio generate <part> [bars=n]  studio status|export [path=]|node <type>|get|set
 Nodes    node <node> rename <name>, params|viewport on|off, panel, window [close|fullscreen|display <n>], timeline|session [video|audio], preset <name>
          library list|add|remove|refresh samples|media [folder]
 See      shot <node> [out.png]  frame [p.inf] <t> <out.png>  render <p.inf> <out.mp4>  audio <p.inf> <out.json>
 Code     code kinds|new|check|push|pull|watch|errors|docs|examples
 Generate patch recipes|new|check|layout|apply
-App      panel [name] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
+App      panel [name|settings/<place>] [open|close] [bottom|right|left|top]  settings [key [value]]|devices|midi|apply|updates|reset|logs|gpu [n]|global [name [expr]]|extension <file>
          show list|next|prev|go <n>|lock|panic|check|add|remove <n>|clear|open|save|fade <ms>|quantize <n>|launch <n>
          view fit|params on|off|clearcards|metronome [on|off]  quit
-Learn    context  guide
+Learn    context  attention  guide  docs [topic [name]]  find <words>
 Watch    watch
 Terminal term open|list|read|send|run
 
 <node> is an index, `selected`, or a title or type that only one node has.
 )";
+
+   // `infinite docs`: every manual and table an agent needs, by topic, so it never answers from memory.
+   int Docs(const Args& args)
+   {
+      static const char* kTopics = R"(Topics (infinite docs <topic>):
+  shortcuts      every keyboard shortcut on this system (needs the app open)
+  panels         the panels, which are open, and the verb that opens each
+  ui [part]      every panel, menu, column, button and dropdown, and what each does (part: a word of a heading, e.g. timeline)
+  nodes [name]   the Node Field Guide: every node's card, or one node's card, help text and controls
+  field          the Field manual (language, domains, nodes)
+  headless       the headless guide: render, check and drive Infinite without the window
+  connections    what can be cabled into what
+  patch-format   the .inf file format
+  geometry       geometry domains (points, prims, instances, attributes)
+  sketch | sketch3d | glsl | expressions | patch   the code languages (same as `code docs`)
+  map            which command answers which question, attention, buttons
+  visual | sound | film   craft: styles, composition, colour, type, genres, sound design, camera, sync
+Validators: `infinite code check <file>` for Field (.field), Sketch (.sketch.js), Sketch 3D
+(.sketch3d.js, three.js style), GLSL (.glsl), Formula and Equation; `infinite patch check <p.inf>`
+for patches; `infinite code errors` for the open window.
+)";
+      const std::string topic = args.empty() ? std::string() : args[0];
+      const std::string name = args.size() > 1 ? args[1] : std::string();
+      if (topic.empty())
+         fputs(kTopics, stdout);
+      else if (topic == "shortcuts")
+      {
+         if (!gLive.Connect())
+            Fail("the shortcut table comes from the running app; open Infinite first");
+         fputs(gLive.Call("shortcuts")["text"].get<std::string>().c_str(), stdout);
+      }
+      else if (topic == "panels")
+      {
+         fputs(R"(viewport      the output picture; nodes' viewport cards dock here
+modmatrix     modulation matrix: every source -> destination binding and its depth
+perf          performance surface: macros, triggers and faders for playing live
+timeline      clips on lanes for arranging a piece in time
+session       clip launcher for playing clips live
+samplestudio  record, generate, slice and shape samples, then drop the result on the canvas
+pianoroll     notes of the selected note clip or pattern
+view3d        3D View: arranges 3D outputs, camera and lights, before Render 3D
+terminal      this Terminal and the agent chat
+showset       show set: patches to step through in a live set
+history       undo history
+settings      settings window
+templates     starter patches
+help          node help
+shortcuts     shortcut list
+Open, close or dock one: `infinite panel <name> open|close [bottom|right|left|top]`.
+Settings opens at a page or section: `infinite panel settings/<place>`, a chat button `open:settings/<place>`.
+Places: appearance theme node-colors cable-colors cards display backdrop canvas grid minimap cables audio devices
+midi general autosave performance movement-log learning diagnostics updates field globals extensions plugins agents.
+)", stdout);
+         if (gLive.Connect())
+            Print(gLive.Call("panel"));
+      }
+      else if (topic == "nodes")
+      {
+         const std::string all = AgentDocs::kNodeGuide;
+         if (name.empty())
+            fputs(all.c_str(), stdout);
+         else
+         {
+            // One node, by card name or type: its card, in-app help text and controls (card-less nodes too).
+            const std::string doc = chat::NodeDoc(name, all);
+            if (doc.empty())
+               Fail("no node called '" + name + "'; `infinite find <words>` finds one by what it does, `infinite nodes` lists every type");
+            fputs(doc.c_str(), stdout);
+         }
+      }
+      else if (topic == "ui")
+      {
+         const std::string all = AgentDocs::kUiGuide;
+         if (name.empty())
+            fputs(all.c_str(), stdout);
+         else
+         {
+            // The sections whose heading names that part ("timeline", "matrix", "right-click").
+            std::string want = name, out;
+            std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            // The rail's own names for panels whose manual section is titled otherwise.
+            std::vector<std::string> wants = { want };
+            static const std::pair<const char*, std::vector<const char*>> kAlias[] = {
+               { "timeline", { "arrangement", "tracks" } }, { "clip", { "tracks" } }, { "mod matrix", { "modulation" } },
+               { "matrix", { "modulation" } }, { "session", { "sound panels" } }, { "studio", { "sound panels" } },
+               { "piano", { "sound panels" } }, { "terminal", { "command line" } }, { "chat", { "command line" } },
+               { "agent", { "command line" } }, { "menu", { "menus", "right-click" } }, { "3d", { "3d view" } } };
+            for (const auto& [from, to] : kAlias)
+               if (want == from || (want.size() > 3 && std::string(from).find(want) == 0))
+                  wants.insert(wants.end(), to.begin(), to.end());
+            size_t at = 0;
+            while ((at = all.find("\n## ", at)) != std::string::npos)
+            {
+               const size_t end = all.find("\n## ", at + 1);
+               const std::string sec = all.substr(at + 1, end == std::string::npos ? std::string::npos : end - at - 1);
+               std::string head = sec.substr(0, sec.find('\n'));
+               std::transform(head.begin(), head.end(), head.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+               if (std::any_of(wants.begin(), wants.end(), [&](const std::string& w) { return head.find(w) != std::string::npos; }))
+                  out += sec + "\n";
+               at = end == std::string::npos ? all.size() : end;
+            }
+            if (out.empty())
+               Fail("no part of the app called '" + name + "'; `infinite docs ui` has every panel");
+            fputs(out.c_str(), stdout);
+         }
+      }
+      else if (topic == "field")
+         fputs(AgentDocs::kFieldManual, stdout);
+      else if (topic == "headless")
+         fputs(AgentDocs::kHeadlessGuide, stdout);
+      else if (topic == "connections")
+         fputs(AgentDocs::kConnectionRules, stdout);
+      else if (topic == "patch-format")
+         fputs(AgentDocs::kPatchFormat, stdout);
+      else if (topic == "geometry")
+         fputs(AgentDocs::kGeometryDomains, stdout);
+      else if (topic == "map")
+         fputs(AgentDocs::kSkillMap, stdout);
+      else if (topic == "visual")
+         fputs(AgentDocs::kSkillVisualCraft, stdout);
+      else if (topic == "sound")
+         fputs(AgentDocs::kSkillSoundCraft, stdout);
+      else if (topic == "film")
+         fputs(AgentDocs::kSkillFilmCraft, stdout);
+      else if (topic == "sketch" || topic == "sketch3d" || topic == "glsl" || topic == "shadertoy" || topic == "expressions" || topic == "expr" || topic == "patch")
+         return CodeVerb({ "docs", topic });
+      else
+      {
+         fputs(kTopics, stderr);
+         return kExitUsage;
+      }
+      return 0;
+   }
 
    int Context()
    {
@@ -1096,7 +1286,11 @@ Terminal term open|list|read|send|run
       if (gLive.Connect())
       {
          brief["app"] = gLive.Call("status");
+         brief["target"] = "This is the open window the user is looking at. Edit it live with these verbs; do not write a new .inf unless asked.";
          brief["selection"] = gLive.Call("selection")["nodes"];
+         // What the user points at: selected nodes, the control under the mouse, the one last touched,
+         // the Tab-focused one and the open panels.
+         brief["attention"] = gLive.Call("attention");
          brief["nodes"] = gLive.Call("list_nodes")["nodes"];
          brief["codeErrors"] = gLive.Call("code_errors")["errors"];
       }
@@ -1106,7 +1300,9 @@ Terminal term open|list|read|send|run
       fputs(R"(
 Loop: patch new, edit the .inf, patch check, fix, patch layout, patch apply.
 Code loop: code new, edit, code check, code watch --node <n>, shot <n>.
-Facts come from `describe <type>` and `code docs <language>`, never from memory.
+Facts come from `describe <type>`, `docs <topic>` and `code docs <language>`, never from memory.
+`docs` lists the manuals: shortcuts, panels, ui, nodes, field, headless, connections, patch-format, geometry,
+map, and the visual, sound and film crafts.
 `infinite` with no verb lists every verb; `infinite guide` prints the patch authoring guide.
 )", stdout);
       return 0;
@@ -1278,8 +1474,8 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "params")
       {
-         need(1, "params <node>");
-         return call("get_params", { { "index", NodeRef(args[0]) } });
+         need(1, "params <node> [--full]");
+         return call("get_params", { { "index", NodeRef(args[0]) }, { "full", args.size() > 1 && args[1] == "--full" } });
       }
       if (verb == "selection")
          return call("selection");
@@ -1387,6 +1583,11 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
                nodes.push_back(NodeRef(node));
          return call("select", { { "all", args[0] == "all" }, { "nodes", nodes } });
       }
+      if (verb == "focus")
+      {
+         need(1, "focus <node>");
+         return call("focus", { { "index", NodeRef(args[0]) } });
+      }
       if (verb == "view3d-add")
       {
          need(1, "view3d-add <node>...");
@@ -1415,7 +1616,7 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "settings")
       {
-         if (!args.empty() && (args[0] == "apply" || args[0] == "devices" || args[0] == "updates" || args[0] == "reset" || args[0] == "logs"))
+         if (!args.empty() && (args[0] == "apply" || args[0] == "devices" || args[0] == "midi" || args[0] == "updates" || args[0] == "reset" || args[0] == "logs"))
             return call("settings", { { "action", args[0] } });
          if (!args.empty() && args[0] == "gpu")
             return call("settings", args.size() > 1 ? json{ { "action", "gpu" }, { "value", atoi(args[1].c_str()) } } : json{ { "action", "gpu" } });
@@ -1524,12 +1725,56 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
       }
       if (verb == "recent")
          return call("recent");
+      if (verb == "files")
+      {
+         // The user's own files by name, for `import`: the usual folders, newest first.
+         need(1, "files <words> [audio|image|video|model|midi|patch]");
+         std::string ask, kind;
+         for (const std::string& w : args)
+            if (w == "audio" || w == "image" || w == "video" || w == "model" || w == "midi" || w == "patch")
+               kind = w;
+            else
+               ask += (ask.empty() ? "" : " ") + w;
+         const std::string home = AppPaths::HomeDir();
+         std::vector<std::string> roots = { std::filesystem::current_path().u8string() };
+         for (const char* sub : { "Desktop", "Downloads", "Music", "Documents", "Pictures", "Movies", "Videos" })
+            roots.push_back(home + "/" + sub);
+         json out = json::array();
+         for (const chat::FileHit& h : chat::FindFiles(ask, roots, kind))
+            out.push_back({ { "path", h.path }, { "kind", h.kind } });
+         if (out.empty())
+            Fail("no " + (kind.empty() ? std::string("media") : kind) + " file named like '" + ask +
+                 "' in Desktop, Downloads, Music, Documents, Pictures or Movies; ask the user where it is");
+         Print(json{ { "files", out } });
+         return 0;
+      }
+      if (verb == "reveal")
+      {
+         need(1, "reveal <file>");
+         return call("reveal", { { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
+      }
       if (verb == "quit")
          return call("quit");
       if (verb == "open")
       {
          need(1, "open <file.inf>");
          return call("load_patch", { { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
+      }
+      if (verb == "import")
+      {
+         // Files from this computer into the patch, as a Finder drop would: `into <node>` loads them into that node.
+         need(1, "import <file>... [into <node>]");
+         json paths = json::array();
+         json params = json::object();
+         for (size_t i = 0; i < args.size(); i++)
+         {
+            if (args[i] == "into" && i + 1 < args.size())
+               params["index"] = NodeRef(args[++i]);
+            else
+               paths.push_back(std::filesystem::absolute(AppPaths::FsPath(args[i])).u8string());
+         }
+         params["paths"] = paths;
+         return call("import", params);
       }
       if (verb == "save")
          return call("save_patch", args.empty() ? json::object() : json{ { "path", std::filesystem::absolute(AppPaths::FsPath(args[0])).u8string() } });
@@ -1594,6 +1839,32 @@ Facts come from `describe <type>` and `code docs <language>`, never from memory.
          return PatchVerb(args);
       if (verb == "context")
          return Context();
+      if (verb == "docs")
+         return Docs(args);
+      if (verb == "find")
+      {
+         // Nodes for a plain-words ask, from every node card: pick from these, not from memory.
+         std::string ask;
+         for (const std::string& w : args)
+            ask += (ask.empty() ? "" : " ") + w;
+         if (ask.empty())
+            Fail("usage: infinite find <what you want, in plain words>", kExitUsage);
+         const std::vector<chat::NodeHit> hits = chat::FindNodes(ask, AgentDocs::kNodeGuide);
+         if (hits.empty())
+            Fail("no node card matches '" + ask + "'; try other words, or `infinite docs nodes`");
+         for (const chat::NodeHit& h : hits)
+         {
+            // The type to `add` goes in brackets when the card is named another way ("Wavetable Synth [Wavetable]").
+            std::string name = h.name;
+            if (!h.type.empty() && h.type != h.name)
+               name += " [" + h.type + "]";
+            printf("%-22s %s.%s%s\n", name.c_str(), h.kind.c_str(), h.purpose.empty() ? "" : " ", h.purpose.c_str());
+         }
+         printf("Add by the bracketed type when shown. How to use one (card, help, recipe): `infinite docs nodes <name>`. Params: `infinite describe <type>`.\n");
+         return 0;
+      }
+      if (verb == "attention")
+         return call("attention");
       if (verb == "guide")
       {
          fputs(kHelp, stdout);

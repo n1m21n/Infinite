@@ -353,6 +353,10 @@ bool gHeadlessNeedProbe = false;
    // GraphNode::index of the Tab-focused param's node
    int gKbFocusParam = -1;
   // its paramIndex; -1 = no param focused
+   int gHoverParamNode = -1;
+   int gHoverParamIndex = -1;
+   int gTouchParamNode = -1;
+   int gTouchParamIndex = -1;
    int gKbNudge = 0;
 
    std::vector<KbParamEntry> gKbParams;
@@ -452,7 +456,7 @@ bool gHeadlessNeedProbe = false;
    bool  gTerminalOpen = false;
    float gTerminalHeight = 320.0f;
    float gTerminalWidth = 560.0f;
-   int   gTerminalDock = 0;
+   int   gTerminalDock = 1;
    float gTerminalFontSize = 13.0f;
    bool  gTerminalFocus = false;
    ImVec2 gTerminalRectMin, gTerminalRectMax;
@@ -1042,6 +1046,8 @@ bool gHeadlessNeedProbe = false;
    std::vector<std::string> gDroppedFiles;
 
    ImVec2 gDropPos(0.0f, 0.0f);
+   bool gDropAtCanvas = false;
+   ImVec2 gDropCanvasPos(0.0f, 0.0f);
 
 
    // Shared by the OS file-drop handler and the Media search panel's

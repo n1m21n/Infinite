@@ -85,8 +85,16 @@ namespace FormParts
 
    inline std::string Id(const char* label) { return std::string("##") + label; }
 
+   // Settings deep links: the (translated) section title the next draw scrolls to, then clears.
+   inline std::string gScrollToSection;
+
    inline void Section(const char* title)
    {
+      if (!gScrollToSection.empty() && gScrollToSection == title)
+      {
+         ImGui::SetScrollHereY(0.0f);
+         gScrollToSection.clear();
+      }
       SectionCard::Begin(title);
    }
 

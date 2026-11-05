@@ -696,6 +696,12 @@ extern int gKbFocusNode;
 
 extern int gKbFocusParam;
 
+// The param under the mouse and the one last pressed or dragged (DrawModulationBindingMenu); -1 = none.
+extern int gHoverParamNode;
+extern int gHoverParamIndex;
+extern int gTouchParamNode;
+extern int gTouchParamIndex;
+
 extern int gKbNudge;
 
         // signed value steps queued for the focused param, applied in its widget
@@ -1566,6 +1572,8 @@ extern bool gShowDiagnosticsModal;
 ImTextureID BrandLogoTexture();
 
 extern std::vector<std::string> gDroppedFiles;
+extern bool gDropAtCanvas;     // the next drop lands at gDropCanvasPos (canvas space), not under gDropPos
+extern ImVec2 gDropCanvasPos;
 
 extern ImVec2 gDropPos;
 
@@ -2156,6 +2164,11 @@ std::string StripParamLabel(const char* label);
 extern const void* gPendingSrcAddr;
 
 const void* TakePendingSrcAddr(const void* fallback);
+// Brackets one param widget's drawing: an inactive one (inside BeginDisabled, not cable-driven) is
+// faded to grey and gets a hover hint. TakePendingSrcAddr starts it; DrawModulationBindingMenu ends
+// it. paramIndex -1: a colour swatch, no cable check.
+void NoteParamDrawStart();
+void EndParamDraw(int nodeIndex, int paramIndex);
 
 int KbDiscreteHook(int nodeIndex, int paramIndex, bool modulated);
 
@@ -4873,6 +4886,8 @@ const char* HelpT(const char* key);
 void DrawSettingsWindow(bool* open);
 
 void DrawShortcutsWindow(bool* open);
+// The shortcut table as plain text, English, this system's keys (the `shortcuts` RPC).
+std::string ShortcutsText();
 
 void DrawHelpWindow(bool* open);
 
@@ -5760,6 +5775,11 @@ void DrawSampleStudioDocked(const char* id, const ImVec2& size);
 // The Studio's work as text for the patch (`studio` lines), and back; empty text clears it.
 std::string SampleStudioSerialize();
 void SampleStudioApply(const std::string& text);
+std::vector<std::string> SampleStudioParts();
+bool SampleStudioGenerate(const std::string& part, int bars, std::string& err);
+void SampleStudioStatus(bool& busy, bool& ready, std::string& name, double& seconds);
+std::string SampleStudioExportWav(const std::string& path);
+int SampleStudioToNode(const std::string& type, std::string& err);
 // True while the pointer is over the Studio's waveform: its keys (split, join, zoom, undo) beat the canvas's.
 extern bool gSampleStudioClaimedKeys;
 // The Studio's screen rect last frame, so a file dropped on it isn't also dropped on the canvas.
@@ -5776,8 +5796,35 @@ extern bool gTerminalFocus; // the terminal has the keyboard
 extern ImVec2 gTerminalRectMin, gTerminalRectMax;
 extern std::vector<std::string> gTerminalDropPending; // paths dropped on the panel, pasted as shell words
 void TerminalLoadFonts(float bakedPx);
+ImFont* TerminalMonoFont();  // Geist Mono, nullptr when the install lacks it
 void DrawTerminalDocked(const char* id, const ImVec2& size);
 bool DrawTerminalWelcome();   // CliSetupSection.cpp
+// The panel's face: 0 the chat (ChatPanel.cpp), 1 the terminal tabs.
+extern int gTerminalFace;
+extern int gChatSelectionFrame;   // last frame the chat held selected words: Cmd+C copies those, not nodes
+extern bool gChatSideTerminal;   // the chat shows with a shell beside it
+void DrawChatPanel();
+void ChatReferenceNode(int index);   // opens the chat with the node's `@` name typed in the composer
+void ChatShotOpenCode();  // review shots: the chat opens the first code change in its pane
+bool ChatBusy();   // an agent turn is running
+int ChatSavedCount();
+struct ChatAgentInfo
+{
+   std::string status;   // Ready, Not installed, Setting up…
+   std::string action;   // the button's label, empty when nothing can be pressed
+   bool ready = false;
+   bool busy = false;
+};
+void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
+ChatAgentInfo ChatAgentStatus(const std::string& id);
+bool ChatAgentCodeEntry(const std::string& id, float width);  // the paste-the-code field while a sign-in asks for one
+std::vector<std::pair<std::string, std::string>> ChatAgentModels(const std::string& id);   // {id, label}
+void ChatAgentAct(const std::string& id, bool repair);      // sign in, or set up again when repair (or not yet installed)
+void ChatClearHistory();   // deletes every saved chat and starts a new one; nothing while a turn runs
+void ChatDrawAvatar(ImDrawList* dl, ImVec2 centre, float radius, const std::string& agent);   // the agent's tinted initial
+void ChatShutdown();
+// What a terminal tab gets to run `infinite`: the PATH shim and this app's server, and the patch's folder.
+void TerminalCommandEnv(std::vector<std::pair<std::string, std::string>>& env, std::string& cwd);
 void TerminalPanelHidden();
 // A new tab with `line` typed and entered (the CLI setup section and the agent buttons).
 void TerminalRunInNewTab(const std::string& line);
@@ -5798,6 +5845,8 @@ extern int gPianoRollDock; // 0 = bottom, 3 = top (the Timeline's codes)
 void DrawPianoRollDocked(const char* id, const ImVec2& size);
 // Opens the panel on this MIDI lane's page.
 void PianoRollOpenPage(uint64_t laneId);
+uint64_t PianoRollGenerate(const std::string& spec, uint64_t laneId, std::string& err);
+std::string PianoRollExportMidi(uint64_t clipId, std::string path, std::string& err);
 // True while the pointer is over the panel: its keys beat the canvas's (the Timeline's rule).
 extern bool gPianoRollClaimedKeys;
 extern bool gView3DOpen;
@@ -6369,6 +6418,7 @@ void RunRecExportTest(int width, int height, bool starved, const char* label);
 bool RunAudioPdcTest();
 bool RunMidiOutTest();
 bool RunCliSetupTest();
+bool RunChatTest();
 bool RunI18nTest();
 
 #if defined(__linux__)

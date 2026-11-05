@@ -4,6 +4,8 @@
 
 namespace app
 {
+   static int sLastSpawnIndex = -1;  // the last node create_node placed on its own, for the next one to sit beside
+
    // Dispatches one RemoteControl JSON-RPC request. Runs on the main thread,
    // once per frame per pending command (see RemoteControl::DrainPending's
    // call site, right after glfwPollEvents()) - so every case here is free to
@@ -63,14 +65,28 @@ namespace app
       {
          const std::string typeName = params.value("typeName", std::string());
          const std::string category = params.value("category", std::string());
-         const float x = params.value("x", 0.0f);
-         const float y = params.value("y", 0.0f);
+         float x = params.value("x", 0.0f);
+         float y = params.value("y", 0.0f);
+         // No place given (an agent's or the CLI's add): a free spot, not the origin. A run of adds a few
+         // seconds apart reads left to right as a chain, each one right of the last; otherwise near the view.
+         if (!params.contains("x") && !params.contains("y"))
+         {
+            static double lastAt = -100.0;
+            static ImVec2 lastPos;
+            const double now = ImGui::GetTime();
+            const bool chain = now - lastAt < 20.0 && FindNodeByIndex(sLastSpawnIndex) != nullptr;
+            const ImVec2 want = chain ? ImVec2(lastPos.x + 320.0f, lastPos.y) : gViewCenterCanvas;
+            const ImVec2 at = FindFreeSpawnPosition(want);
+            x = at.x, y = at.y;
+            lastAt = now, lastPos = at;
+         }
          GraphNode* gn = SpawnNode(typeName, category, x, y);
          if (gn == nullptr)
          {
             outError = "unknown node type '" + typeName + "'";
             return false;
          }
+         sLastSpawnIndex = gn->index;
          outResult = { {"index", gn->index} };
          return true;
       }
@@ -159,9 +175,38 @@ namespace app
          std::vector<std::pair<std::string, std::string>> raw;
          Patch::SaveParams(gn->node.get(), raw);
          json out = json::object();
+         if (!params.value("full", false))
+         {
+            for (const auto& kv : raw)
+               out[kv.first] = kv.second;
+            outResult = out;
+            return true;
+         }
+         // full: each key with what the node's control says about it (label, range, options) and
+         // whether it is modulated or has an expression. Keys with no drawn control carry the value only.
          for (const auto& kv : raw)
-            out[kv.first] = kv.second;
-         outResult = out;
+         {
+            json entry = { { "value", kv.second } };
+            // Saved keys carry the member's type letter ("f strength"); the controls and the chat know the bare name.
+            const std::string bare = kv.first.size() > 2 && kv.first[1] == ' ' ? kv.first.substr(2) : kv.first;
+            const int param = ParamIndexOfKeyOnNode(*gn, bare);
+            if (param >= 0)
+               if (const ParamRef* ref = Modulation::Instance().KnownParam(gn->index, param))
+               {
+                  entry["label"] = ref->name;
+                  entry["min"] = ref->minValue;
+                  entry["max"] = ref->maxValue;
+                  entry["step"] = ref->step;
+                  entry["kind"] = ref->isEnum ? "enum" : ref->isBool ? "bool" : ref->step >= 1.0f ? "int" : "float";
+                  if (!ref->enumOptions.empty())
+                     entry["options"] = ref->enumOptions;
+                  entry["modulatable"] = true;
+                  entry["modulated"] = Modulation::Instance().IsModulated(gn->index, param);
+                  entry["expression"] = Modulation::Instance().HasExpression(gn->index, param);
+               }
+            out[bare] = entry;
+         }
+         outResult = { { "index", gn->index }, { "type", gn->typeName }, { "title", NodeTitle(*gn) }, { "params", out } };
          return true;
       }
       else if (method == "param_ui_state")
@@ -468,9 +513,33 @@ namespace app
             else
                valueStr = v.dump();
          }
+         // `set <node> <key> =sin(t)` is a formula, as typing it into the field is: the param turns purple.
+         const bool numeric = matchedKey[0] == 'f' || matchedKey[0] == 'i';
+         const size_t lead = valueStr.find_first_not_of(" \t");
+         if (numeric && lead != std::string::npos && valueStr[lead] == '=')
+         {
+            HandleTerminalRpc("set_expr", { { "index", index }, { "key", name }, { "text", valueStr } }, outResult, outError);
+            return outError.empty();
+         }
          PushUndoCheckpoint();
          Patch::LoadParams(gn->node.get(), { { matchedKey, valueStr } });
+         // Text is code or a file path: compile it or load the file now, as the editor's Apply and a patch load do,
+         // so the canvas shows what was set (a Field kernel otherwise keeps running its old program).
+         if (matchedKey[0] == 's')
+            ReloadDerivedState(gn->node.get());
+         // A plain value replaces a formula, as it does in the field.
+         if (numeric)
+         {
+            int param = ParamIndexOfKeyOnNode(*gn, name);
+            if (param < 0)
+               param = ParamIndexOfKeyOnNode(*gn, "p." + name);
+            if (param >= 0)
+               Modulation::Instance().ClearExpression(gn->index, param);
+         }
          outResult = json::object();
+         if (matchedKey[0] == 's')
+            if (const std::string err = gn->node->CodeError(); !err.empty())
+               outResult["codeError"] = err;  // set, but it does not compile: say so instead of a silent ok
          return true;
       }
       else if (method == "set_node_position" || method == "get_node_position")
@@ -499,6 +568,64 @@ namespace app
          ed::SetCurrentEditor(prevEditor);
          return true;
       }
+      else if (method == "import")
+      {
+         // Files from the user's computer, as if dropped on the canvas: on a node (`index`) they load into it, on a
+         // free spot they spawn the node their kind wants (a sample, an image, a video, a model, a .mid, a patch).
+         std::vector<std::string> paths;
+         for (const json& p : params.value("paths", json::array()))
+         {
+            std::string path = p.is_string() ? p.get<std::string>() : std::string();
+            std::error_code ec;
+            if (path.empty() || !std::filesystem::exists(AppPaths::FsPath(path), ec))
+            {
+               outError = "no file at '" + path + "'";
+               return false;
+            }
+            paths.push_back(path);
+         }
+         if (paths.empty())
+         {
+            outError = "import needs paths";
+            return false;
+         }
+         ImVec2 at;
+         if (params.contains("index"))
+         {
+            GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+            if (gn == nullptr)
+            {
+               outError = "unknown node index";
+               return false;
+            }
+            ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            at = ed::GetNodePosition(gn->NodeId()) + ImVec2(24.0f, 48.0f);
+            ed::SetCurrentEditor(prevEditor);
+         }
+         else
+            at = FindFreeSpawnPosition(gViewCenterCanvas);
+         gDropAtCanvas = true;
+         gDropCanvasPos = at;
+         gDropPos = ImVec2(-1e6f, -1e6f); // off every panel, so only the canvas takes it
+         gDroppedFiles.insert(gDroppedFiles.end(), paths.begin(), paths.end());
+         outResult = { { "files", (int)paths.size() } };
+         return true;
+      }
+      else if (method == "reveal")
+      {
+         // A file in Finder / Explorer, selected: where a save or render went.
+         const std::string path = params.value("path", std::string());
+         std::error_code ec;
+         if (path.empty() || !std::filesystem::exists(AppPaths::FsPath(path), ec))
+         {
+            outError = "no file at '" + path + "'";
+            return false;
+         }
+         Platform::RevealInFileManager(path);
+         outResult = json::object();
+         return true;
+      }
       else if (method == "fit_view")
       {
          gRequestFitView = true;
@@ -516,6 +643,43 @@ namespace app
          gRequestFitViewNodeIndex = index;
          gRequestFitViewNodeZoom = params.value("zoom", false);
          outResult = json::object();
+         return true;
+      }
+      else if (method == "focus")
+      {
+         // The chat's node and param links: select the node and frame it, never zooming in.
+         GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+         if (gn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         ed::EditorContext* previous = ed::GetCurrentEditor();
+         ed::SetCurrentEditor(gEditor);
+         ed::ClearSelection();
+         ed::SetCurrentEditor(previous);
+         gPendingSelect.assign(1, gn->NodeId());
+         gRequestFitViewNodeIndex = gn->index;
+         gRequestFitViewNodeZoom = false;
+         outResult = { { "index", gn->index } };
+         // A param link also flashes that control: the same highlight "View in Modulation Matrix"
+         // sets, which the matrix row and the node's own control both draw.
+         const std::string key = params.value("key", std::string());
+         const int param = key.empty() ? -1 : ParamIndexOfKeyOnNode(*gn, key);
+         if (param >= 0)
+         {
+            // A control behind "show more" opens the node's params so there is something to see.
+            bool drawn = false;
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               drawn = drawn || (r.nodeIndex == gn->index && r.paramIndex == param && !r.hidden);
+            if (!drawn)
+               gn->showParams = gn->showAdvancedParams = true;
+            gModMatrixHighlightNode = gn->index;
+            gModMatrixHighlightParam = param;
+            gModMatrixHighlightUntil = ImGui::GetTime() + 2.0;
+            gModMatrixScrollPending = true;
+            outResult["param"] = param;
+         }
          return true;
       }
       else if (method == "expand_node")
@@ -709,7 +873,8 @@ namespace app
          for (const auto& oi : ts->outputs)
             out.push_back({ {"label", oi.label}, {"kind", oi.kind}, {"modulator", oi.modulator} });
          outResult = { {"type", ts->name}, {"category", ts->category}, {"params", pj}, {"inputs", in}, {"outputs", out},
-                       {"canBypass", ts->canBypass}, {"hardwareDriven", ts->hardwareDriven} };
+                       {"canBypass", ts->canBypass}, {"hardwareDriven", ts->hardwareDriven},
+                       {"help", NodeHelpTextFor(ts->name, ts->category)} };
          return true;
       }
       else if (method == "batch")
@@ -740,9 +905,25 @@ namespace app
                failAt = (int)i;
                break;
             }
+            // A string "$N.field" in the params is result N's field, so one batch can add a node and
+            // then wire it (the chat's `add <Type> after @a`).
+            json callParams = call.contains("params") ? call["params"] : json::object();
+            for (auto& [name, value] : callParams.items())
+               if (value.is_string())
+               {
+                  const std::string text = value.get<std::string>();
+                  const size_t dot = text.find('.');
+                  if (text.size() > 3 && text[0] == '$' && dot != std::string::npos)
+                  {
+                     const int at = atoi(text.substr(1, dot - 1).c_str());
+                     const std::string field = text.substr(dot + 1);
+                     if (at >= 0 && at < (int)results.size() && results[at].contains(field))
+                        value = results[at][field];
+                  }
+               }
             json r;
             std::string e;
-            if (!HandleRpcCommand(m, call.contains("params") ? call["params"] : json::object(), r, e))
+            if (!HandleRpcCommand(m, callParams, r, e))
             {
                failMsg = m + ": " + e;
                failAt = (int)i;

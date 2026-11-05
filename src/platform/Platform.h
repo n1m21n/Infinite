@@ -392,6 +392,9 @@ namespace Platform
    std::string OpenAudioDialog();
    // Standard MIDI files (.mid / .midi), for the MIDI File node.
    std::string OpenMidiDialog();
+   // Any of `exts` (no dot), several at once where the OS picker allows it (macOS, Linux). For the chat's
+   // attachments. Empty when cancelled.
+   std::vector<std::string> OpenFilesDialog(const char* title, const std::vector<std::string>& exts);
 
    bool AudioStart(std::string& outError);
    void AudioStop();

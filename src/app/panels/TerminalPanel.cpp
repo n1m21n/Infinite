@@ -7,6 +7,7 @@
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "core/CliSetup.h"
@@ -15,6 +16,7 @@
 #include "imgui_internal.h"
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
+#include "platform/common/ProcessTree.h"
 
 #include <algorithm>
 #include <chrono>
@@ -135,6 +137,7 @@ namespace
       {
          spawn.env.push_back({ "INFINITE_CONTROL_PORT", std::to_string(RemoteControl::Port()) });
          spawn.env.push_back({ "INFINITE_CONTROL_TOKEN", RemoteControl::Token() });
+         spawn.env.push_back({ "INFINITE_SESSION", std::to_string(ProcessTree::Self()) });
       }
    }
 
@@ -173,7 +176,7 @@ namespace
       return tab;
    }
 
-   // "Start the agent when the Terminal opens" (Settings > Terminal > Command line & agents, off by default):
+   // "Start the agent when the Terminal opens" (Settings > Agents & Terminal, off by default):
    // types the start line into the panel's first tab, only when the agent is installed.
    void StartAgentOnOpen(Tab& tab)
    {
@@ -687,6 +690,7 @@ namespace
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 start = ImGui::GetCursorScreenPos();
+      const float rowW = ImGui::GetContentRegionAvail().x;
       const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
       const ImU32 dimColor = ImGui::GetColorU32(ImGuiCol_TextDisabled);
       float x = start.x;
@@ -752,6 +756,15 @@ namespace
             sActive = (int)sTabs.size() - 1;
             gTerminalFocus = true;
          }
+      }
+      // The chat face, at the row's right end; not while the chat already shows beside the shell.
+      if (CliSetup::Prefs().face == "chat" && !gChatSideTerminal)
+      {
+         ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
+         if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
+            gTerminalFace = 0, gChatSideTerminal = false;
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("Chat"));
       }
       if (closeIndex >= 0)
          CloseTab(closeIndex);
@@ -892,16 +905,51 @@ namespace
          tab->session->SetColors(palette, tok::U32(tok::terminal_fg, sLight), tok::U32(tok::terminal_bg, sLight));
    }
 
+   void DrawTerminalBody();
+
    void DrawPanel()
    {
       FollowTheme();
-      if (sTabs.empty() && DrawTerminalWelcome())
+      if (gTerminalFace == 0 && CliSetup::Prefs().face == "chat")
+      {
+         if (!gChatSideTerminal)
+         {
+            DrawChatPanel();
+            DrawDockMenu(false, nullptr);   // right-click: Dock Position and Close, as on every panel
+            return;
+         }
+         // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const float gap = tok::space_1;
+         const float left = std::floor((avail.x - gap) * 0.55f);
+         ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         DrawChatPanel();
+         DrawDockMenu(false, nullptr);
+         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+            gTerminalFocus = false;
+         ImGui::EndChild();
+         ImGui::SameLine(0.0f, gap);
+         ImGui::BeginChild("##shellside", ImVec2(0.0f, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         DrawTerminalBody();
+         ImGui::EndChild();
          return;
+      }
+      DrawTerminalBody();
+   }
+
+   void DrawTerminalBody()
+   {
+      if (sTabs.empty() && !gChatSideTerminal && DrawTerminalWelcome())
+      {
+         DrawDockMenu(false, nullptr);
+         return;
+      }
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));
          sActive = 0;
-         StartAgentOnOpen(*sTabs[0]);
+         if (!gChatSideTerminal)
+            StartAgentOnOpen(*sTabs[0]);
       }
       if (sFont == nullptr)
       {
@@ -915,7 +963,10 @@ namespace
 
       DrawTabRow(snap.get());
       if (sTabs.empty())
+      {
+         ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the tab row moved the cursor
          return;
+      }
       tab = sTabs[(size_t)sActive].get();
       snap = tab->session->Latest();
       if (sSearchOpen)
@@ -927,7 +978,11 @@ namespace
       const ImVec2 avail = ImGui::GetContentRegionAvail();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       if (avail.x < cw * 2.0f || avail.y < ch * 2.0f)
+      {
+         // The tab row moved the cursor; submit an item so ImGui's boundary check stays quiet.
+         ImGui::Dummy(ImVec2(0.0f, 0.0f));
          return;
+      }
       const int cols = std::max(2, (int)(avail.x / cw));
       const int rows = std::max(2, (int)(avail.y / ch));
       if (cols != tab->cols || rows != tab->rows)
@@ -985,6 +1040,8 @@ namespace
          HandleKeyboard(*tab, snap.get());
    }
 }
+
+ImFont* TerminalMonoFont() { return sFont; }
 
 void TerminalLoadFonts(float bakedPx)
 {
@@ -1100,8 +1157,18 @@ bool TerminalRunInNewTab(const std::string& name, const std::string& command)
    sTabs.push_back(std::move(tab));
    sActive = (int)sTabs.size() - 1;
    gTerminalOpen = true;
+   gTerminalFace = 1;
    gTerminalFocus = true;
    return true;
+}
+
+void TerminalCommandEnv(std::vector<std::pair<std::string, std::string>>& env, std::string& cwd)
+{
+   term::PtySpawn spawn;
+   AddCommandEnv(spawn);
+   env = spawn.env;
+   const size_t slash = gPatchPath.find_last_of("/\\");
+   cwd = slash != std::string::npos ? gPatchPath.substr(0, slash) : std::string();
 }
 
 void TerminalRunInNewTab(const std::string& line)
@@ -1258,6 +1325,7 @@ void DrawTerminalQuitWarning()
 
 void TerminalShutdown()
 {
+   ChatShutdown();
    for (const auto& tab : sTabs)
       tab->session->Stop();
    sTabs.clear();

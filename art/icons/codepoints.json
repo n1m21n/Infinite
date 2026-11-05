@@ -100,5 +100,11 @@
  "world": 59746,
  "lock": 59747,
  "view-3d": 59748,
- "edit-mesh": 59749
+ "edit-mesh": 59749,
+ "bolt": 59750,
+ "chat": 59751,
+ "send": 59752,
+ "spark": 59753,
+ "code": 59754,
+ "copy": 59755
 }

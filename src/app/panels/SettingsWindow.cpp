@@ -16,7 +16,52 @@ namespace app
    void DrawPluginScanControls(bool foldersOpen); // LibraryPanels.cpp
    void DrawPluginManagerList();
    void DrawCliSetupSection();     // CliSetupSection.cpp
-   void DrawCliSetupCommands();    // CliSetupSection.cpp
+
+   namespace
+   {
+      int sJumpTab = -1;
+      struct Place
+      {
+         const char* name;
+         int tab;
+         const char* section; // nullptr = the top of the page
+      };
+      // Every page and every section of Settings, by a short name: `open:settings/midi` in a chat reply,
+      // `infinite panel settings/midi` from the Terminal.
+      const Place kPlaces[] = {
+         { "appearance", 0, nullptr }, { "theme", 0, "Theme Preset & Palette" }, { "node-colors", 0, "Node Module Category Colors" },
+         { "cable-colors", 0, "Cable Category Colors" }, { "cards", 0, "Node Card Styling" }, { "display", 0, "Display" },
+         { "backdrop", 0, "Transparency Backdrop" }, { "canvas", 1, nullptr }, { "grid", 1, "Grid & Canvas" },
+         { "minimap", 1, "Minimap" }, { "cables", 1, "Cable Visibility" }, { "audio", 2, nullptr },
+         { "devices", 2, "Audio Devices & Format" }, { "midi", 2, "MIDI Inputs" }, { "general", 3, nullptr },
+         { "autosave", 3, "Autosave" }, { "performance", 3, "Performance & Rendering" }, { "movement-log", 3, "Movement Log" },
+         { "learning", 3, "Learning" }, { "diagnostics", 3, "Diagnostics" }, { "updates", 3, "Application & Updates" },
+         { "field", 4, nullptr }, { "globals", 5, nullptr }, { "extensions", 6, nullptr }, { "plugins", 7, nullptr },
+         { "agents", 8, nullptr }, { "terminal", 8, nullptr },
+      };
+   }
+
+   std::vector<std::string> SettingsPlaces()
+   {
+      std::vector<std::string> out;
+      for (const Place& p : kPlaces)
+         out.push_back(p.name);
+      return out;
+   }
+
+   bool OpenSettingsAt(const std::string& place)
+   {
+      for (const Place& p : kPlaces)
+         if (place == p.name)
+         {
+            gSettingsOpen = true;
+            sJumpTab = p.tab;
+            FormParts::gScrollToSection = p.section ? T(p.section) : "";
+            ImGui::SetWindowFocus(L("Settings"));
+            return true;
+         }
+      return false;
+   }
 
    void DrawSettingsWindow(bool* open)
    {
@@ -47,7 +92,7 @@ namespace app
       static const char* const kTabs[] = { I18N_KEY("Appearance"), I18N_KEY("Canvas & Workspace"), I18N_KEY("Audio"),
                                            I18N_KEY("General & Performance"), I18N_KEY("Field Language"),
                                            I18N_KEY("Expression Globals"), I18N_KEY("Extensions"), I18N_KEY("Plugins"),
-                                           I18N_KEY("Terminal") };
+                                           I18N_KEY("Agents & Terminal") };
       constexpr int kTabCount = (int)(sizeof(kTabs) / sizeof(kTabs[0]));
       // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens General & Performance first (design review shots).
       static bool sTabPicked = false;
@@ -68,6 +113,14 @@ namespace app
          // "settingstab=N": any tab by index, so the manuals can shoot every page.
          if (const char* st = o ? strstr(o, "settingstab=") : nullptr)
             sTab = std::clamp(atoi(st + 12), 0, kTabCount - 1);
+         // "settingsplace=midi": a deep link, as a chat button opens it.
+         if (const char* sp = o ? strstr(o, "settingsplace=") : nullptr)
+            OpenSettingsAt(std::string(sp + 14, strcspn(sp + 14, ",")));
+      }
+      if (sJumpTab >= 0)
+      {
+         sTab = std::clamp(sJumpTab, 0, kTabCount - 1);
+         sJumpTab = -1;
       }
       // As wide as the longest section name in the current language, with the label inset on both sides.
       float navW = 0.0f;
@@ -1701,10 +1754,28 @@ namespace app
             ImGui::PopTextWrapPos();
 
             FormParts::Section(T("Reference"));
+            // Review hook: INFINITE_OPENPANELS=...settingsreference scrolls here once (design review shots).
+            static bool sRefScrolled = false;
+            if (!sRefScrolled)
+            {
+               sRefScrolled = true;
+               const char* o = getenv("INFINITE_OPENPANELS");
+               if (o && strstr(o, "settingsreference"))
+                  ImGui::SetScrollHereY(0.0f);
+            }
             static int sRef = 0;
             // i18n-skip-begin: topic names are the section titles below
-            static const char* const kRef[] = { "All topics", "The Terminal panel", "The infinite command", "Headless engine", "AI skills", "Setup commands" };
+            static const char* const kRef[] = { "All topics", "How the chat works", "The Terminal panel", "Commands", "Headless engine" };
             // i18n-skip-end
+            // Where a standard install puts the executable on this platform. Never the running copy's
+            // own path: that names the user's folders on a page people screenshot.
+#if defined(_WIN32)
+            const char* const kExe = "& 'C:\\Program Files\\Infinite\\Infinite.exe'";
+#elif defined(__APPLE__)
+            const char* const kExe = "/Applications/Infinite.app/Contents/MacOS/Infinite";
+#else
+            const char* const kExe = "/opt/Infinite/Infinite";
+#endif
             FormParts::BareCombo("##refTopic", &sRef, kRef, IM_ARRAYSIZE(kRef), FormParts::kControlW);
             ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             LibraryParts::BeginWell("##terminalref", 380.0f);
@@ -1712,90 +1783,50 @@ namespace app
             ImGui::PushTextWrapPos(0.0f);
             if (sRef == 0 || sRef == 1)
             {
-               FormParts::Heading(T("The Terminal panel"));
-               ImGui::TextWrapped("%s", T("A real shell inside Infinite, for you and your coding agents. Open it from the >_ tile in the right rail or with Ctrl+`, which also gives it focus, and closes it when it already has focus."));
-               ImGui::TextWrapped("%s", T("It starts in the open patch's folder. With focus, every key goes to the shell. Drag a node, file or sample in to type its id or path. Right-click the panel to dock it at the bottom, right, left or top."));
+               FormParts::Heading(T("How the chat works"));
+               ImGui::TextWrapped("%s", T("Each agent is its own command-line program, run for one turn per message in the agent folder. Infinite shows what it prints as the reply. Sign-in stays with the agent; Infinite never sees it."));
+               ImGui::TextWrapped("%s", T("Name nodes with @. Every change an agent makes to the patch is listed under its reply, with Undo."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 2)
             {
-               FormParts::Heading(T("The infinite command"));
-               ImGui::TextWrapped("%s", T("Inside the Terminal panel, infinite is on the PATH and talks to this app. Outside it, run the app's executable with --cli. With a .inf file instead of a running app, the same verbs work headless."));
-               ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors in one answer."));
-               // i18n-skip-begin: command vocabulary
-               CodeBlock::Draw(
-                  "Look       graph  explain  params <node>  selection  status  nodes  describe <type>\n"
-                  "Edit       add  remove  connect  disconnect  set  mod  expr  bypass  batch  undo  redo\n"
-                  "Patch      new  recent  open  save  validate  canonicalize  apply\n"
-                  "Play       play  stop  rewind  seek <seconds>  tempo <bpm>\n"
-                  "Arrange    timeline ...  session ...  notes ...  perf ...  studio get|set\n"
-                  "See        shot <node> [out.png]  frame  render  audio\n"
-                  "Code       code kinds|new|check|push|pull|watch|errors|docs|examples\n"
-                  "Generate   patch recipes|new|check|layout|apply\n"
-                  "App        panel  settings  show  view  quit\n"
-                  "Learn      context  guide      Watch  watch      Terminal  term open|list|read|send|run",
-                  "cb_verbs");
-               ImGui::TextDisabled("%s", T("Outside the panel (macOS):"));
-               CodeBlock::Draw("/Applications/Infinite.app/Contents/MacOS/Infinite --cli graph", "cb_outside");
-               // i18n-skip-end
+               FormParts::Heading(T("The Terminal panel"));
+               ImGui::TextWrapped("%s", T("A real shell inside Infinite, opened from the chat header or with Ctrl+`. It starts in the patch's folder, and infinite is on its PATH. Drag a node or file in to type its id or path."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 3)
             {
-               FormParts::Heading(T("Headless engine"));
-               ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. Output is deterministic: the same patch gives the same frames and samples. The last line printed is one JSON object (ok, files, warnings, errors)."));
+               FormParts::Heading(T("Commands"));
+               ImGui::TextWrapped("%s", T("infinite alone lists every verb. infinite context prints the open patch, the selection and code errors."));
                // i18n-skip-begin: command vocabulary
                CodeBlock::Draw(
-                  "Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png\n"
-                  "Infinite --render hello.inf hello.mp4 --duration 4 --fps 30\n"
-                  "Infinite --frames-dir hello.inf out/ --duration 4 --fps 30\n"
-                  "Infinite --version",
-                  "cb_headless");
+                  "infinite context\n"
+                  "infinite graph\n"
+                  "infinite add Noise\n"
+                  "infinite set 1 scale 3\n"
+                  "infinite connect 1 2\n"
+                  "infinite shot 1 out.png\n"
+                  "infinite undo",
+                  "cb_verbs");
+               ImGui::TextDisabled("%s", T("Outside the panel:"));
+               const std::string outside = std::string(kExe) + " --cli graph";
+               CodeBlock::Draw(outside.c_str(), "cb_outside");
                // i18n-skip-end
-               ImGui::TextDisabled("%s", T("Linux needs a virtual display: xvfb-run -a Infinite ...  The full guide ships as the Headless User Guide."));
                ImGui::Spacing();
             }
             if (sRef == 0 || sRef == 4)
             {
-               FormParts::Heading(T("AI skills"));
-               ImGui::TextWrapped("%s", T("Connecting Claude Code above already installs these into ~/.claude/skills/ and keeps them current. For another assistant, pick a folder and add the file to its project or chat; reinstall after updating Infinite so the files match this version."));
-               static std::string sSkillStatus;
-               if (FormParts::Button(L("Install All AI Skills")))
-               {
-                  const std::string folder = Platform::OpenFolderDialog("Choose folder for the Infinite AI skill files");
-                  if (!folder.empty())
-                  {
-                     SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
-                     SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
-                     sSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
-                  }
-               }
-               if (!sSkillStatus.empty())
-               {
-                  ImGui::SameLine();
-                  ImGui::TextDisabled("%s", sSkillStatus.c_str());
-               }
-               static std::string sPatchSkillStatus;
-               if (FormParts::Button(L("Install AI Skill##patchAuthoring")))
-               {
-                  const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
-                  if (!folder.empty())
-                     sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
-               }
-               ActionButton::RowNext();
-               ImGui::TextDisabled("%s", T("Patch authoring: write, check and render .inf patches."));
-               if (ImGui::IsItemHovered())
-                  HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
-               if (!sPatchSkillStatus.empty())
-                  ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
-               ImGui::TextDisabled("%s", T("The Field Language and Expression Globals pages each have an Install AI Skill button for their own file."));
-               ImGui::TextDisabled("%s", T("In the Terminal, infinite guide and infinite code docs <language> print the same references."));
+               FormParts::Heading(T("Headless engine"));
+               ImGui::TextWrapped("%s", T("The same executable renders pictures, video and sound from a .inf patch with no window. The same patch always gives the same output."));
+               // i18n-skip-begin: command vocabulary
+               const std::string exe(kExe);
+               const std::string headless = exe + " --frame hello.inf 0 pics/\n" + exe + " --render hello.inf hello.mp4 --duration 4 --fps 30";
+               CodeBlock::Draw(headless.c_str(), "cb_headless");
+#if !defined(_WIN32) && !defined(__APPLE__)
+               ImGui::TextDisabled("%s", "xvfb-run -a ...");
+#endif
+               // i18n-skip-end
                ImGui::Spacing();
-            }
-            if (sRef == 0 || sRef == 5)
-            {
-               FormParts::Heading(T("Setup commands"));
-               DrawCliSetupCommands();
             }
             ImGui::PopTextWrapPos();
             FormParts::PopReferenceStyle();

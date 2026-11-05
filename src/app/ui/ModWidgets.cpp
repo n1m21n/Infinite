@@ -1623,6 +1623,7 @@ namespace app
       PaletteBinding::Instance().RegisterColor(ref);
       if (gParamRegisterOnly)
          return; // registered, deliberately not drawn - see gParamRegisterOnly
+      NoteParamDrawStart();
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kColorBase + colorIndex;
       const PaletteBinding::Source bound =
@@ -1680,6 +1681,7 @@ namespace app
          }
       }
 
+      EndParamDraw(nodeIndex, -1);
       ImGui::PopID();
       ImGui::PopID();
    }

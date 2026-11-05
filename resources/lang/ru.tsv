@@ -2609,3 +2609,67 @@ A real shell inside Infinite. Run any command, and connect a coding agent that b
 Choose your coding agent	Выберите ИИ-агента для кода
 Connecting installs the agent if needed, links it to Infinite and adds the Infinite skills. You can change this later in Settings, Terminal.	При подключении агент устанавливается при необходимости, связывается с Infinite и получает навыки Infinite. Позже это можно изменить в Настройках, Терминал.
 Skip, just a terminal	Пропустить, только терминал
+Connect a coding agent to build with Infinite.	Подключите ИИ-агента, чтобы создавать в Infinite.
+%d step	%d шаг
+%d steps	%d шагов
+Chat	Чат
+Goes to the agent	Уходит агенту
+Message, or @node	Сообщение или @узел
+New chat	Новый чат
+Not allowed:	Не разрешено:
+Not in the patch	Нет в патче
+Runs now	Выполняется сразу
+The agent stopped with an error.	Агент остановился с ошибкой.
+Type @ to command a node, or ask anything.	Введите @, чтобы управлять узлом, или спросите что угодно.
+ask the agent	спросить агента
+expression	выражение
+%s is not installed.	%s не установлен.
+modulated	модулируется
+now	сейчас
+%s works in the terminal.	%s работает в терминале.
+%d more	ещё %d
+%s is not set up.	%s не настроен.
+Add a Noise and wire it to the output	Добавь Noise и подключи к выходу
+Agent interface	Интерфейс агента
+Ask, or type @ to name a node	Спросите или введите @, чтобы назвать узел
+Attach files	Прикрепить файлы
+Changed	Изменено
+Chats	Чаты
+Connect an agent	Подключить агента
+Did not run	Не выполнено
+Explain this patch	Объясни этот патч
+Failed	Ошибка
+Make the colours drift slowly	Пусть цвета медленно плывут
+No agent	Нет агента
+No saved chats	Нет сохранённых чатов
+Open in Terminal	Открыть в терминале
+Set up	Настроить
+Set up an agent first.	Сначала настройте агента.
+Setting up…	Настройка…
+Setting up… %d of %d	Настройка… %d из %d
+Sign in	Войти
+Undone	Отменено
+What should we make?	Что сделаем?
+Working…	Работаю…
+formula	формула
+stopped with an error.	остановился с ошибкой.
+Search chats	Искать чаты
+Agents	Агенты
+Agents & Terminal	Агенты и терминал
+Default agent	Агент по умолчанию
+Not installed	Не установлен
+Not connected	Не подключён
+Ready	Готов
+Saved chats	Сохранённые чаты
+Clear all	Очистить всё
+Delete every saved chat?	Удалить все сохранённые чаты?
+%d working	%d работают
+3D View at Bottom	3D View снизу
+3D View at Top	3D View сверху
+Close 3D View	Закрыть 3D View
+Made %d change	%d изменение
+Made %d changes	Изменений: %d
+Looked at the patch	Патч просмотрен
+Queued	В очереди
+Add to the queue	Добавить в очередь
+Reply	Ответить
