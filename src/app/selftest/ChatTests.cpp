@@ -177,6 +177,19 @@ namespace app
             check(blocks[2].kind == Block::Kind::Code && blocks[2].text == "infinite set 1 size 0.5", "code block");
             check(blocks[3].kind == Block::Kind::Image && blocks[3].text == "/tmp/look.png", "picture path");
          }
+         {
+            const auto stale = chat::ParseReply("Loaded it into @osc#3.", cat);
+            bool found = false;
+            for (const Seg& g : stale.empty() ? std::vector<Seg>{} : stale[0].segs)
+               found = found || (g.kind == Seg::Kind::Node && g.node == 2);
+            check(found,
+                  "a stale index falls back to the node's title");
+            const auto dead = chat::ParseReply("[Do it](frobnicate:x) now", cat);
+            bool raw = false;
+            for (const Seg& g : dead.empty() ? std::vector<Seg>{} : dead[0].segs)
+               raw = raw || g.text.find("](") != std::string::npos;
+            check(!dead.empty() && !raw, "an unknown action shows its label, never raw markdown");
+         }
          const auto bare = chat::ParseReply("I raised the detail on @cube#1, and the size too.", cat);
          int params = 0;
          for (const Seg& g : bare[0].segs)
@@ -383,6 +396,14 @@ namespace app
             check(has("@Blur#12") && has("@cube#1") && d.size() >= 5, "diff: a new cable names both ends");
             check(code, "diff: a code param comes back as a block");
             check(chat::Diff(before, before).empty(), "diff: nothing changed, nothing to show");
+            {
+               chat::Snapshot moving = before;
+               moving.catalog.nodes[0].params[1].value = "3.5";
+               moving.catalog.nodes[0].params[1].modulated = true;
+               chat::Snapshot was = before;
+               was.catalog.nodes[0].params[1].modulated = true;
+               check(chat::Diff(was, moving).empty(), "diff: a modulated param moving on its own is not a change");
+            }
             // A removal that numbers the rest again (undo, reload): uids keep each node itself, no rename chain.
             {
                chat::Snapshot b2, a2;
@@ -559,6 +580,10 @@ namespace app
                std::string err;
                check(HandleAppRpc("attention", nlohmann::json::object(), out, err) && out.contains("selected") && out.contains("touched") && out["panels"].is_array(),
                      "docs: attention lists selection, touched control and panels");
+               const bool wasOpen = gPianoRollOpen;
+               gPianoRollOpen = false;
+               check(HandleAppRpc("panel", { { "name", "Piano-Roll" }, { "open", true } }, out, err) && gPianoRollOpen, "panel: names an agent writes open the panel");
+               gPianoRollOpen = wasOpen;
             }
             const std::string w = chat::WithFiles("look", { "/a/b.wav", "/c/d.png" });
             check(w.rfind("look", 0) == 0 && w.find("/a/b.wav (audio)") != std::string::npos && w.find("/c/d.png (image)") != std::string::npos,
@@ -815,10 +840,34 @@ namespace app
          check(say, "the welcome offers things to say");
          check(chat::Briefing().find("infinite docs") != std::string::npos, "the briefing points agents at the manuals");
          check(chat::IsFilePath("/tmp/out.mp4") && !chat::IsFilePath("/tmp/a file.mp4") && !chat::IsFilePath("out.mp4"), "files are recognised");
-         bool file = false;
-         for (const chat::Block& b : chat::ParseReply("Saved\n/tmp/out.mp4\n", cat))
-            file = file || b.kind == chat::Block::Kind::File;
-         check(file, "a reply can hold a file");
+         bool file = false, video = false;
+         for (const chat::Block& b : chat::ParseReply("Saved\n/tmp/out.mp4\n/tmp/notes.txt\n", cat))
+            file = file || b.kind == chat::Block::Kind::File, video = video || b.kind == chat::Block::Kind::Video;
+         check(file && video, "a reply can hold a file and a video");
+         check(chat::IsVideoPath("~/clip.MOV") && !chat::IsVideoPath("/tmp/a.png") && !chat::IsVideoPath("clip.mp4"), "videos are recognised");
+         {
+            // A second agent tagged midway gets the chat so far; the first one gets only what it missed.
+            chat::Thread t;
+            const auto add = [&](chat::Entry::Kind k, const std::string& agent, const std::string& text) {
+               chat::Entry e;
+               e.kind = k, e.agent = agent, e.text = text;
+               t.entries.push_back(e);
+            };
+            add(chat::Entry::Kind::User, "", "make a pad");
+            add(chat::Entry::Kind::Steps, "claude", "");
+            add(chat::Entry::Kind::Agent, "claude", "Added a Wavetable pad.");
+            add(chat::Entry::Kind::User, "", "@gemini make it darker");
+            const auto name = [](const std::string& a) { return a == "claude" ? std::string("Claude") : std::string("Gemini"); };
+            const std::string g = chat::MissedHistory(t, "gemini", 3, name);
+            check(g.find("User: make a pad") != std::string::npos && g.find("Claude: Added a Wavetable pad.") != std::string::npos &&
+                     g.find("darker") == std::string::npos,
+                  "a newly tagged agent gets the chat so far");
+            check(chat::MissedHistory(t, "claude", 3, name).empty(), "an agent that saw everything gets nothing again");
+            add(chat::Entry::Kind::Agent, "gemini", "Lowered the cutoff.");
+            add(chat::Entry::Kind::User, "", "louder");
+            const std::string c = chat::MissedHistory(t, "claude", 5, name);
+            check(c.find("Gemini: Lowered the cutoff.") != std::string::npos && c.find("make a pad") == std::string::npos, "an agent catches up on what others said since");
+         }
       }
       std::printf("CHATTEST %s\n", ok ? "PASS" : "FAIL");
       return ok;

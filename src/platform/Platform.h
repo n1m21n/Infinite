@@ -1557,6 +1557,12 @@ namespace Platform
    // executes it, and a path that does not exist is dropped.
    void RevealInFileManager(const std::string& path);
 
+   // What the system clipboard holds that a chat can attach. Files copied in the file manager come back as
+   // paths (empty when there are none). A copied picture comes back as PNG bytes when the clipboard has them,
+   // else as RGBA8 rows top-down with its size; false when the clipboard holds no picture.
+   std::vector<std::string> ClipboardFiles();
+   bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH);
+
    // Which app double-clicking a patch launches, against this running copy. Several copies of Infinite on one
    // machine (an old download, a build folder) share one identity, and the OS picks among them by version number
    // or at random, so a patch can open in an old copy where fixed bugs look unfixed. Asked once at launch.

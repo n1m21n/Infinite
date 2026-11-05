@@ -1021,6 +1021,81 @@ namespace Platform
       ShellExecuteW(nullptr, L"open", wideUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
    }
 
+   std::vector<std::string> ClipboardFiles()
+   {
+      std::vector<std::string> out;
+      if (!IsClipboardFormatAvailable(CF_HDROP) || !OpenClipboard(nullptr))
+         return out;
+      if (HANDLE h = GetClipboardData(CF_HDROP))
+         if (HDROP drop = (HDROP)GlobalLock(h))
+         {
+            const UINT n = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < n; i++)
+            {
+               std::wstring w(DragQueryFileW(drop, i, nullptr, 0) + 1, L'\0');
+               w.resize(DragQueryFileW(drop, i, w.data(), (UINT)w.size()));
+               out.push_back(WinCommon::WideToUtf8(w));
+            }
+            GlobalUnlock(h);
+         }
+      CloseClipboard();
+      return out;
+   }
+
+   bool ClipboardImage(std::vector<unsigned char>& outPng, std::vector<unsigned char>& outRgba, int& outW, int& outH)
+   {
+      outPng.clear(), outRgba.clear(), outW = outH = 0;
+      if (!OpenClipboard(nullptr))
+         return false;
+      // Browsers and most editors put a "PNG" stream next to the bitmap: it keeps alpha, so it wins.
+      const UINT pngFormat = RegisterClipboardFormatW(L"PNG");
+      if (HANDLE h = IsClipboardFormatAvailable(pngFormat) ? GetClipboardData(pngFormat) : nullptr)
+         if (const unsigned char* p = (const unsigned char*)GlobalLock(h))
+         {
+            outPng.assign(p, p + GlobalSize(h));
+            GlobalUnlock(h);
+         }
+      if (outPng.empty())
+         if (HANDLE h = IsClipboardFormatAvailable(CF_DIB) ? GetClipboardData(CF_DIB) : nullptr)
+            if (const unsigned char* p = (const unsigned char*)GlobalLock(h))
+            {
+               const BITMAPINFOHEADER* bi = (const BITMAPINFOHEADER*)p;
+               const int w = bi->biWidth, hgt = std::abs(bi->biHeight);
+               const bool bottomUp = bi->biHeight > 0;
+               const int bpp = bi->biBitCount;
+               if (w > 0 && hgt > 0 && (bpp == 24 || bpp == 32) && (bi->biCompression == BI_RGB || bi->biCompression == BI_BITFIELDS))
+               {
+                  size_t offset = bi->biSize + (bi->biCompression == BI_BITFIELDS && bi->biSize == sizeof(BITMAPINFOHEADER) ? 12 : 0);
+                  offset += (size_t)bi->biClrUsed * 4;
+                  const unsigned char* px = p + offset;
+                  const size_t stride = ((size_t)w * bpp / 8 + 3) & ~(size_t)3;
+                  if (offset + stride * hgt <= GlobalSize(h))
+                  {
+                     outRgba.resize((size_t)w * hgt * 4);
+                     bool anyAlpha = false;
+                     for (int y = 0; y < hgt; y++)
+                     {
+                        const unsigned char* row = px + stride * (bottomUp ? hgt - 1 - y : y);
+                        for (int x = 0; x < w; x++)
+                        {
+                           const unsigned char* s = row + (size_t)x * (bpp / 8);
+                           unsigned char* d = &outRgba[((size_t)y * w + x) * 4];
+                           d[0] = s[2], d[1] = s[1], d[2] = s[0], d[3] = bpp == 32 ? s[3] : 255;
+                           anyAlpha = anyAlpha || d[3] != 0;
+                        }
+                     }
+                     if (!anyAlpha)  // a 32-bit bitmap with an unused alpha byte
+                        for (size_t i = 3; i < outRgba.size(); i += 4)
+                           outRgba[i] = 255;
+                     outW = w, outH = hgt;
+                  }
+               }
+               GlobalUnlock(h);
+            }
+      CloseClipboard();
+      return !outPng.empty() || !outRgba.empty();
+   }
+
    void RevealInFileManager(const std::string& path)
    {
       if (path.empty())

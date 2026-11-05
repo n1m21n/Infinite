@@ -457,6 +457,7 @@ bool gHeadlessNeedProbe = false;
    float gTerminalHeight = 320.0f;
    float gTerminalWidth = 560.0f;
    int   gTerminalDock = 1;
+   bool  gTerminalFloating = false;
    float gTerminalFontSize = 13.0f;
    bool  gTerminalFocus = false;
    ImVec2 gTerminalRectMin, gTerminalRectMax;

@@ -73,6 +73,12 @@ namespace chat
       std::vector<std::string> agents;  // who answered, in order of first reply
    };
 
+   // What `agent` has not seen of this chat before entry `upto` (the message it is about to answer): everything
+   // since its own last reply, or the whole chat when it never answered here. Users' messages and other agents'
+   // replies, oldest first, cut to fit; "" when it missed nothing (no other agent spoke since its last reply).
+   // `nameOf` turns an agent id into the name the chat shows.
+   std::string MissedHistory(const Thread& t, const std::string& agent, int upto, std::string (*nameOf)(const std::string&));
+
    std::string ToJson(const Thread& t);
    bool FromJson(const std::string& text, Thread& t);
    std::string TitleFor(const std::string& firstMessage);

@@ -29,6 +29,51 @@ namespace chat
       }
    }
 
+   std::string MissedHistory(const Thread& t, const std::string& agent, int upto, std::string (*nameOf)(const std::string&))
+   {
+      upto = std::clamp(upto, 0, (int)t.entries.size());
+      int from = 0;
+      bool answered = false;
+      for (int i = upto - 1; i >= 0; i--)
+         if (t.entries[(size_t)i].kind == Entry::Kind::Agent && t.entries[(size_t)i].agent == agent)
+         {
+            from = i + 1, answered = true;
+            break;
+         }
+      // A message whose text is long keeps its start: the agent gets the gist, not a wall.
+      const auto cut = [](const std::string& text, size_t n) { return text.size() <= n ? text : text.substr(0, n) + " […]"; };
+      std::vector<std::string> lines;
+      bool others = false;
+      for (int i = from; i < upto; i++)
+      {
+         const Entry& e = t.entries[(size_t)i];
+         if (e.kind == Entry::Kind::User && (!e.text.empty() || !e.files.empty()))
+         {
+            std::string l = "User: " + cut(e.text, 2000);
+            for (const std::string& f : e.files)
+               l += "\n  (attached " + f + ")";
+            lines.push_back(l);
+         }
+         else if (e.kind == Entry::Kind::Agent && !e.text.empty())
+         {
+            lines.push_back((nameOf != nullptr ? nameOf(e.agent) : e.agent) + ": " + cut(e.text, 3000));
+            others = others || e.agent != agent;
+         }
+      }
+      if (lines.empty() || (answered && !others))
+         return "";
+      // The newest part when the whole would be too long.
+      size_t total = 0, keep = lines.size();
+      while (keep > 0 && total + lines[keep - 1].size() < 16000)
+         total += lines[--keep].size();
+      std::string out = answered ? "Since your last reply in this chat:\n\n" : "The chat so far (you are joining it now):\n\n";
+      if (keep > 0)
+         out += "[earlier messages left out]\n\n";
+      for (size_t i = keep; i < lines.size(); i++)
+         out += lines[i] + "\n\n";
+      return out + "Now the user writes to you:\n";
+   }
+
    std::string ToJson(const Thread& t)
    {
       json j = { { "version", 1 }, { "id", t.id }, { "title", t.title }, { "updated", t.updated } };

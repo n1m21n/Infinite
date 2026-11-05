@@ -152,9 +152,17 @@ namespace chat
             const std::string title = line.substr(from, hash - from);
             if (title.find('@') == std::string::npos && title.find('`') == std::string::npos)
             {
-               const int index = std::atoi(line.substr(hash + 1, end - hash - 1).c_str());
-               Seg s;
+               int index = std::atoi(line.substr(hash + 1, end - hash - 1).c_str());
                const CatalogNode* n = catalog.Node(index);
+               // A stale or guessed index ("@sample player#1" when the Sampler is #4): the title, when it names
+               // one node, wins over a number that names none.
+               if (n == nullptr || Lower(n->title) != Lower(title))
+                  if (const int byTitle = ByName(catalog, title); byTitle >= 0 && (n == nullptr || Lower(catalog.Node(byTitle)->title) == Lower(title)))
+                  {
+                     index = byTitle;
+                     n = catalog.Node(index);
+                  }
+               Seg s;
                s.kind = n != nullptr ? Seg::Kind::Node : Seg::Kind::Missing;
                s.node = n != nullptr ? index : -1;
                s.text = n != nullptr ? Shown(*n) : title;
@@ -273,6 +281,16 @@ namespace chat
                flush();
                if (TryAction(line, i, catalog, segs))
                   continue;
+               // A link whose target is gone or unknown reads as its label, never as raw markdown.
+               const size_t close = line.find("](", i + 1);
+               const size_t end = close == std::string::npos ? std::string::npos : line.find(')', close + 2);
+               if (close != std::string::npos && end != std::string::npos && close > i + 1 && line.find('[', i + 1) > close)
+               {
+                  text += line.substr(i + 1, close - i - 1);
+                  flush();
+                  i = end + 1;
+                  continue;
+               }
             }
             if (c == '`')
             {
@@ -356,12 +374,19 @@ namespace chat
                            hit = &p, node = index, count++;
                if (count == 1)
                {
-                  PushText(out, s.text.substr(last, i - last));
                   Seg p;
                   p.kind = Seg::Kind::Param;
                   p.node = node;
                   p.key = hit->key;
                   p.text = hit->label.empty() ? hit->key : hit->label;
+                  // `@node` `.` `key` split across segments: one param chip, as TryKey makes.
+                  if (s.text.substr(last, i - last) == "." && !out.empty() && out.back().kind == Seg::Kind::Node && out.back().node == node)
+                  {
+                     p.text = out.back().text + "." + p.text;
+                     out.pop_back();
+                  }
+                  else
+                     PushText(out, s.text.substr(last, i - last));
                   out.push_back(p);
                   last = end;
                }
@@ -393,6 +418,22 @@ namespace chat
          const std::string e = ext;
          if (l.size() > e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0)
             return l.find(' ') == std::string::npos || l[0] == '/' || l[0] == '~';
+      }
+      return false;
+   }
+
+   bool IsVideoPath(const std::string& path)
+   {
+      const std::string p = Trim(path);
+      const bool absolute = !p.empty() && (p[0] == '/' || p[0] == '~' || (p.size() > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')));
+      if (!absolute)  // on its own line an absolute path may hold spaces ("Application Support")
+         return false;
+      const std::string l = Lower(p);
+      for (const char* ext : { ".mp4", ".mov", ".webm", ".mkv", ".m4v" })
+      {
+         const std::string e = ext;
+         if (l.size() > e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0)
+            return true;
       }
       return false;
    }
@@ -471,6 +512,14 @@ namespace chat
          {
             Block b;
             b.kind = Block::Kind::Audio;
+            b.text = bare;
+            blocks.push_back(b);
+            continue;
+         }
+         if (IsVideoPath(bare))
+         {
+            Block b;
+            b.kind = Block::Kind::Video;
             b.text = bare;
             blocks.push_back(b);
             continue;

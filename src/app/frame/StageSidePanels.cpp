@@ -401,7 +401,7 @@ void DrawSidePanels(FrameCtx& fc)
       }
 
       // Right-docked terminal
-      if (gTerminalOpen && gTerminalDock == 1)
+      if (TerminalDocked() && gTerminalDock == 1)
       {
          FormParts::Inline(0.0f, 0.0f);
          DrawTerminalDocked("##terminal_right", ImVec2(gTerminalWidth, graphHeight));
@@ -715,7 +715,7 @@ void DrawSidePanels(FrameCtx& fc)
       if (gView3DOpen && gView3DDock != 3)
          DrawView3DDocked("##view3d_bottom", ImVec2(0, gView3DHeight));
       // Terminal (View > Terminal or Ctrl+`) docked at the bottom; the other sides draw with their row.
-      if (gTerminalOpen && gTerminalDock == 0)
+      if (TerminalDocked() && gTerminalDock == 0)
          DrawTerminalDocked("##terminal_bottom", ImVec2(0, gTerminalHeight));
       if (!gTerminalOpen)
          TerminalPanelHidden();

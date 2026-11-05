@@ -19,6 +19,7 @@
 #include "core/CliSetup.h"
 #include "core/GraphNode.h"
 #include "core/NodeFactory.h"
+#include "nodes/SamplerNode.h"
 #include "audio/AudioEngine.h"
 #include "core/chat/AgentAuth.h"
 #include "core/chat/AgentRun.h"
@@ -33,6 +34,7 @@
 #include "platform/AppPaths.h"
 #include "platform/Platform.h"
 #include "stb_image.h"
+#include "stb_image_write.h"
 #include "lunasvg.h"
 #include "app/ui/design/AgentLogos.gen.h"
 
@@ -80,7 +82,18 @@ namespace app
       {
          GLuint id = 0;
          int w = 0, h = 0;
+         std::vector<GLuint> frames;  // an animated gif: every frame, and when each one ends
+         std::vector<int> endsMs;
+         long long bytes = -1;        // the file's size when read: a failed read tries again once it changes
       };
+
+      // A file's size, or -1 when it is not there: a file an agent is still writing grows.
+      long long FileSize(const std::string& path)
+      {
+         std::error_code ec;
+         const auto n = std::filesystem::file_size(AppPaths::FsPath(path), ec);
+         return ec ? -1 : (long long)n;
+      }
 
       // One agent's part of a turn.
       struct Run
@@ -177,6 +190,8 @@ namespace app
       std::vector<Run> sRuns;
       bool sRail = false;  // the chats list is open on the left
       chat::Snapshot sBefore;
+      // Params the user turned from a change card while an agent ran: the next card is the agent's, not theirs.
+      std::set<std::pair<int, std::string>> sUserTurned;
       std::map<std::string, AgentState> sAgents;
       std::map<std::string, double> sModelsFetchAt;  // when each agent's model list was last asked for
       std::map<std::string, std::vector<chat::Model>> sModels;  // each agent's model menu
@@ -1261,6 +1276,9 @@ namespace app
          prompt = chat::WithFiles(prompt, files);
          const std::vector<std::string> dirs = chat::FileDirs(files);
          sBefore = Snap();
+         sUserTurned.clear();
+         // The user's message is the last entry: each agent also gets what it missed of the chat before it.
+         const int upto = (int)sThread.entries.size() - 1;
          for (const std::string& id : agents)
          {
             if (!Ready(id))
@@ -1270,7 +1288,7 @@ namespace app
                Push(Make(Entry::Kind::Error, note, id));
                continue;
             }
-            StartRun(id, prompt, dirs);
+            StartRun(id, chat::MissedHistory(sThread, id, upto, [](const std::string& a) { return std::string(AgentName(a)); }) + prompt, dirs);
          }
          SaveNow();
       }
@@ -1357,8 +1375,6 @@ namespace app
                SaveCliConfig();
             }
             ImGui::EndDisabled();
-            if (fix.kind == chat::DeniedFix::Kind::Folder && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-               ImGui::SetTooltip("%s", CliSetup::HomeTilde(fix.value).c_str());
             FormParts::Inline(0.0f, tok::space_2);
          }
          if (ChipButton::Draw(T("Settings"), false))
@@ -1461,6 +1477,11 @@ namespace app
          sRuns.clear();
          Entry change = Make(Entry::Kind::Change, "");
          change.changes = chat::Diff(sBefore, Snap());
+         // What the user turned on a change card while the agent ran is theirs, not the agent's.
+         change.changes.erase(std::remove_if(change.changes.begin(), change.changes.end(),
+                                             [](const chat::ChangeLine& l) { return !l.key.empty() && sUserTurned.count({ l.node, l.key }) > 0; }),
+                              change.changes.end());
+         sUserTurned.clear();
          if (!change.changes.empty())
             Push(std::move(change));
          SaveNow();
@@ -1516,9 +1537,18 @@ namespace app
          const float pad = tok::space_3;                // the composer's own inset
          const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
          dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
-         dl->AddRect(t0, ImVec2(t1.x, t1.y + 1.0f), TextTint(0.10f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
-         const float leftC = at.x + pad + 7.0f;                      // centre of the composer's + glyph
-         const float rightC = std::floor(at.x + width - pad - 13.0f + 2.0f);  // centre of Send
+         {  // open outline (no bottom edge: the tray sits on the composer)
+            const float r = tok::radius_tile * 2.0f;
+            const ImVec2 a(t0.x + 0.5f, t0.y + 0.5f), b(t1.x - 0.5f, t1.y);
+            dl->PathClear();
+            dl->PathLineTo(ImVec2(a.x, b.y));
+            dl->PathArcTo(ImVec2(a.x + r, a.y + r), r, IM_PI, IM_PI * 1.5f);
+            dl->PathArcTo(ImVec2(b.x - r, a.y + r), r, IM_PI * 1.5f, IM_PI * 2.0f);
+            dl->PathLineTo(ImVec2(b.x, b.y));
+            dl->PathStroke(TextTint(0.10f), ImDrawFlags_None, 1.0f);
+         }
+         const float leftC = std::floor(t0.x + tok::space_3 + 7.0f);
+         const float rightC = std::floor(t1.x - tok::space_3 - 7.0f);
          int take = -1, drop = -1;
          for (size_t i = 0; i < sQueue.size(); i++)
          {
@@ -1932,8 +1962,12 @@ namespace app
          return it != kPanels.end() ? it->second : IconsInfinite::Browser;
       }
 
-      bool RunAction(const chat::Seg& s)
+      bool RunAction(const chat::Seg& seg)
       {
+         // A Sampler is a node, not a panel: "open sampler" makes one.
+         chat::Seg s = seg;
+         if (s.verb == "open" && (s.arg == "sampler" || s.arg == "Sampler"))
+            s.verb = "add", s.arg = "Sampler";
          json r;
          std::string err;
          bool ok = false;
@@ -2011,11 +2045,7 @@ namespace app
          if (hovered)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            if (s.verb == "set")
-               ImGui::SetTooltip("%s.%s = %s", sCat.Node(s.node)->title.c_str(), s.key.c_str(), s.arg.c_str());
          }
-         else if (!live && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Not in the patch"));
          if (clicked && RunAction(s) && once)
             sActed.insert(id);
       }
@@ -2035,8 +2065,6 @@ namespace app
          {
             dl->AddText(ImVec2(at.x + tok::space_1, at.y + (lineH - ts.y) * 0.5f), Dim(), s.text.c_str());
             dl->AddLine(ImVec2(at.x + tok::space_1, at.y + lineH * 0.5f), ImVec2(at.x + tok::space_1 + ts.x, at.y + lineH * 0.5f), Dim(), 1.0f);
-            if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", T("Not in the patch"));
             return;
          }
          const ImU32 cat = n != nullptr ? CategoryU32(n->category) : TextTint(1.0f);
@@ -2048,10 +2076,6 @@ namespace app
          if (ImGui::IsItemHovered())
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            if (p != nullptr)
-               ImGui::SetTooltip("%s = %s   %s", p->key.c_str(), ValueText(*p).c_str(), ParamTip(*p).c_str());
-            else if (n != nullptr)
-               ImGui::SetTooltip("%s  #%d", n->type.c_str(), n->index);
          }
          if (clicked)
             Focus(s.node, s.kind == chat::Seg::Kind::Param ? s.key : std::string());
@@ -2119,14 +2143,44 @@ namespace app
                size_t e = i;
                while (e < s.text.size() && s.text[e] != ' ' && s.text[e] != '\n')
                   e++;
-               const std::string word = s.text.substr(i, e - i);
-               const float w = font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, word.c_str()).x;
+               std::string word = s.text.substr(i, e - i);
+               const float fsz = ImGui::GetFontSize();
+               auto widthOf = [&](const std::string& t) { return font->CalcTextSizeA(fsz, FLT_MAX, 0.0f, t.c_str()).x; };
+               float w = widthOf(word);
                if (x > 0.0f && x + w > width)
                   x = 0.0f, y += lineH;
-               const ImVec2 p(origin.x + x, origin.y + y + (lineH - ImGui::GetFontSize()) * 0.5f);
+               // A word wider than the whole line (a path, a hash) breaks where it must, after a / or - when it can.
+               while (w > width && word.size() > 1)
+               {
+                  size_t cut = 0;
+                  for (size_t k = 1; k < word.size(); k++)
+                  {
+                     if ((word[k] & 0xC0) == 0x80)
+                        continue;  // inside a UTF-8 character
+                     if (widthOf(word.substr(0, k)) > width)
+                        break;
+                     cut = k;
+                  }
+                  if (cut == 0)
+                     break;
+                  const size_t soft = word.find_last_of("/-_.", cut - 1);
+                  if (soft != std::string::npos && soft + 1 >= cut / 2 && soft + 1 < cut)
+                     cut = soft + 1;
+                  const std::string head = word.substr(0, cut);
+                  const float hw = widthOf(head);
+                  const ImVec2 hp(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
+                  if (s.kind == chat::Seg::Kind::Code)
+                     dl->AddRectFilled(ImVec2(hp.x - 2.0f, origin.y + y + 1.0f), ImVec2(hp.x + hw + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
+                  dl->AddText(font, fsz, hp, s.dim ? Dim() : col, head.c_str());
+                  record(head, ImVec2(origin.x + x, origin.y + y), hw, font);
+                  word = word.substr(cut);
+                  w = widthOf(word);
+                  x = 0.0f, y += lineH;
+               }
+               const ImVec2 p(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f);
                if (s.kind == chat::Seg::Kind::Code)
                   dl->AddRectFilled(ImVec2(p.x - 2.0f, origin.y + y + 1.0f), ImVec2(p.x + w + 2.0f, origin.y + y + lineH - 1.0f), TextTint(0.08f), tok::radius_cell);
-               dl->AddText(font, ImGui::GetFontSize(), p, s.dim ? Dim() : col, word.c_str());
+               dl->AddText(font, fsz, p, s.dim ? Dim() : col, word.c_str());
                if (!word.empty())
                   record(word, ImVec2(origin.x + x, origin.y + y), w, font);
                x += w;
@@ -2148,19 +2202,54 @@ namespace app
                path = home + path.substr(1);
          auto it = sTextures.find(path);
          if (it != sTextures.end())
-            return it->second.id != 0 ? &it->second : nullptr;
+         {
+            if (it->second.id != 0)
+               return &it->second;
+            // Not readable last time: look again once a second, in case it was still being written.
+            static double sLastLook = 0.0;
+            if (ImGui::GetTime() - sLastLook < 1.0 || FileSize(path) == it->second.bytes)
+               return nullptr;
+            sLastLook = ImGui::GetTime();
+            sTextures.erase(it);
+         }
          Texture t;
+         t.bytes = FileSize(path);
          int ch = 0;
          // stb is built with STBI_NO_STDIO here (EnvironmentNode.cpp): decode from memory.
          std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
          const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-         if (unsigned char* px = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &t.w, &t.h, &ch, 4))
-         {
-            glGenTextures(1, &t.id);
-            glBindTexture(GL_TEXTURE_2D, t.id);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, t.w, t.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+         const auto upload = [](const unsigned char* px, int w, int h) {
+            GLuint id = 0;
+            glGenTextures(1, &id);
+            glBindTexture(GL_TEXTURE_2D, id);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            return id;
+         };
+         // A gif plays: every frame on its own texture, at most 120 (a long gif keeps its first part).
+         int* delays = nullptr;
+         int count = 0;
+         // A gif over 16 MB shows its first frame only: stb decodes every frame at once, and that would not fit.
+         const bool gif = bytes.size() > 6 && bytes.size() < (16u << 20) && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F';
+         if (unsigned char* px = gif ? stbi_load_gif_from_memory(bytes.data(), (int)bytes.size(), &delays, &t.w, &t.h, &count, &ch, 4) : nullptr)
+         {
+            int end = 0;
+            for (int i = 0; i < std::min(count, 120); i++)
+            {
+               t.frames.push_back(upload(px + (size_t)t.w * t.h * 4 * i, t.w, t.h));
+               end += delays != nullptr && delays[i] > 10 ? delays[i] : 100;  // browsers play a 0-10 ms delay at 100 ms
+               t.endsMs.push_back(end);
+            }
+            t.id = t.frames.empty() ? 0 : t.frames[0];
+            if (t.frames.size() < 2)
+               t.frames.clear(), t.endsMs.clear();
+            stbi_image_free(px);
+            std::free(delays);  // stb allocates with malloc
+         }
+         else if (unsigned char* px = bytes.empty() ? nullptr : stbi_load_from_memory(bytes.data(), (int)bytes.size(), &t.w, &t.h, &ch, 4))
+         {
+            t.id = upload(px, t.w, t.h);
             stbi_image_free(px);
          }
          sTextures[path] = t;
@@ -2168,37 +2257,167 @@ namespace app
       }
 
       // A sound the agent made: one row, play / stop on the same preview player the Library uses.
+      std::string ExpandHome(const std::string& raw)
+      {
+         if (!raw.empty() && raw[0] == '~')
+            if (const char* home = std::getenv("HOME"))
+               return std::string(home) + raw.substr(1);
+         return raw;
+      }
+
+      // Peaks + length of an audio file, read once per path for the player card.
+      struct AudioLook
+      {
+         std::vector<float> peaks;
+         float seconds = 0.0f;
+      };
+      const AudioLook& LookFor(const std::string& path)
+      {
+         static std::unordered_map<std::string, AudioLook> sLooks;
+         auto it = sLooks.find(path);
+         if (it != sLooks.end())
+            return it->second;
+         AudioLook look;
+         Platform::SampleBuffer buf;
+         std::string error;
+         if (Platform::DecodeAudioFileToBuffer(path, buf, error) && buf.numFrames > 0)
+         {
+            const int n = 96;
+            look.peaks.assign(n, 0.0f);
+            const int ch = std::max(1, buf.channels);
+            for (int i = 0; i < n; i++)
+            {
+               const int f0 = (int)((int64_t)buf.numFrames * i / n), f1 = std::max(f0 + 1, (int)((int64_t)buf.numFrames * (i + 1) / n));
+               float m = 0.0f;
+               for (int c = 0; c < ch; c++)
+                  for (int f = f0; f < f1 && f < buf.numFrames; f++)
+                     m = std::max(m, std::fabs(buf.channelData[(size_t)c * buf.numFrames + f]));
+               look.peaks[i] = m;
+            }
+            const float top = *std::max_element(look.peaks.begin(), look.peaks.end());
+            if (top > 0.0f)
+               for (float& v : look.peaks)
+                  v /= top;
+            look.seconds = buf.sampleRate > 0.0 ? (float)(buf.numFrames / buf.sampleRate) : 0.0f;
+         }
+         return sLooks.emplace(path, std::move(look)).first->second;
+      }
+
+      // An audio file an agent made: a small player (play, name, waveform, length, folder).
       void DrawAudio(const std::string& rawPath, float width)
       {
-         std::string path = rawPath;
-         if (!path.empty() && path[0] == '~')
-         {
-            const char* home = std::getenv("HOME");
-            if (home != nullptr)
-               path = std::string(home) + path.substr(1);
-         }
-         static std::string sError;
+         const std::string path = ExpandHome(rawPath);
          const bool exists = std::filesystem::exists(path);
-         const bool playing = gPreviewingSamplePath == path && AudioEngine::Instance().Preview().IsPlaying();
-         const float rowH = 30.0f;
+         SamplePreviewPlayer& preview = AudioEngine::Instance().Preview();
+         const bool playing = gPreviewingSamplePath == path && preview.IsPlaying();
+         const float cardH = 52.0f, pad = tok::space_2;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ImGui::PushID(rawPath.c_str());
-         const bool clicked = ImGui::InvisibleButton("##aud", ImVec2(width, rowH)) && exists;
-         ImGui::PopID();
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + rowH), TextTint(ImGui::IsItemHovered() ? 0.09f : 0.05f), tok::radius_tile);
-         const ImVec2 c(at.x + rowH * 0.5f, at.y + rowH * 0.5f);
-         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+         const ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
+         const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
+         const float btn = 32.0f, folder = 28.0f;
+         const ImVec2 bc(at.x + pad + btn * 0.5f, at.y + cardH * 0.5f);
+         const float folderX = at.x + width - pad - folder;
+         const float samplerX = folderX - folder - tok::space_1;
+
+         ImGui::PushID(rawPath.c_str());
+         ImGui::InvisibleButton("##aud", ImVec2(std::max(1.0f, samplerX - at.x - tok::space_1), cardH));
+         const bool hot = ImGui::IsItemHovered() && exists;
+         const bool clicked = ImGui::IsItemClicked() && exists;
+         FormParts::Inline(0.0f, 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(samplerX, at.y + (cardH - folder) * 0.5f));
+         const bool toSampler = ImGui::InvisibleButton("##sampler", ImVec2(folder, folder)) && exists;
+         const bool samplerHot = ImGui::IsItemHovered() && exists;
+         FormParts::Inline(0.0f, 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(folderX, at.y + (cardH - folder) * 0.5f));
+         const bool reveal = ImGui::InvisibleButton("##reveal", ImVec2(folder, folder)) && exists;
+         const bool folderHot = ImGui::IsItemHovered() && exists;
+         ImGui::PopID();
+
+         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + cardH), TextTint(hot ? 0.08f : 0.05f), tok::radius_tile * 2.0f);
+         dl->AddRect(at, ImVec2(at.x + width, at.y + cardH), TextTint(0.08f), tok::radius_tile * 2.0f);
+         dl->AddCircleFilled(bc, btn * 0.5f, exists ? WithAlpha(accent, hot ? 0.95f : 0.85f) : TextTint(0.08f), 32);
+         const ImU32 onAccent = IM_COL32_WHITE;  // as on Send
          if (playing)
-            glyph::DrawPlayerPause(dl, c, rowH * 0.5f, col);
+            glyph::DrawPlayerPause(dl, bc, btn * 0.36f, onAccent);
          else
-            glyph::DrawPlayerPlay(dl, c, rowH * 0.5f, col, true);
+            glyph::DrawPlayerPlay(dl, ImVec2(bc.x + 1.0f, bc.y), btn * 0.36f, exists ? onAccent : Dim(), true);
+
+         static const AudioLook kNone;
+         const AudioLook& look = exists ? LookFor(path) : kNone;
+         const float x0 = bc.x + btn * 0.5f + tok::space_3;
+         char dur[16] = "";
+         if (look.seconds > 0.0f)
+         {
+            const int s = (int)std::lround(look.seconds);
+            std::snprintf(dur, sizeof dur, "%d:%02d", s / 60, s % 60);
+         }
+         const float durW = dur[0] ? ImGui::CalcTextSize(dur).x : 0.0f;
+         const float x1 = samplerX - tok::space_2 - (durW > 0.0f ? durW + tok::space_3 : 0.0f);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
-         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? col : Dim(), shown.c_str());
+         const float fs = ImGui::GetFontSize();
+         const float nameY = at.y + 8.0f;
+         ImGui::RenderTextEllipsis(dl, ImVec2(x0, nameY), ImVec2(x1, nameY + fs), x1, shown.c_str(), nullptr, nullptr);
+         if (dur[0])
+            dl->AddText(ImVec2(samplerX - tok::space_2 - durW, at.y + (cardH - fs) * 0.5f), Dim(), dur);
+
+         // Waveform under the name: played part in the accent, the rest dim.
+         const float wy0 = nameY + fs + 5.0f, wy1 = at.y + cardH - 8.0f;
+         const float mid = (wy0 + wy1) * 0.5f, half = std::max(1.0f, (wy1 - wy0) * 0.5f);
+         if (!look.peaks.empty() && x1 > x0 + 8.0f)
+         {
+            const float step = 3.0f;
+            const int bars = (int)((x1 - x0) / step);
+            const float played = playing && look.seconds > 0.0f ? std::clamp(preview.PositionSeconds() / look.seconds, 0.0f, 1.0f) : -1.0f;
+            for (int i = 0; i < bars; i++)
+            {
+               const float u = (i + 0.5f) / bars;
+               const float v = look.peaks[std::min((int)(u * look.peaks.size()), (int)look.peaks.size() - 1)];
+               const float h = std::max(1.0f, v * half);
+               const float x = x0 + i * step;
+               dl->AddRectFilled(ImVec2(x, mid - h), ImVec2(x + 2.0f, mid + h), u <= played ? accent : TextTint(0.28f), 1.0f);
+            }
+         }
+         else
+            dl->AddLine(ImVec2(x0, mid), ImVec2(x1, mid), TextTint(0.16f));
+
+         const ImVec2 fc(folderX + folder * 0.5f, at.y + cardH * 0.5f);
+         if (folderHot)
+            dl->AddRectFilled(ImVec2(folderX, fc.y - folder * 0.5f), ImVec2(folderX + folder, fc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+         glyph::Draw(dl, fc, tok::icon_sm, folderHot ? text : Dim(), IconsInfinite::Folder);
+         if (folderHot)
+            ImGui::SetTooltip("%s", T("Show in folder"));
+         const ImVec2 sc(samplerX + folder * 0.5f, at.y + cardH * 0.5f);
+         if (samplerHot)
+            dl->AddRectFilled(ImVec2(samplerX, sc.y - folder * 0.5f), ImVec2(samplerX + folder, sc.y + folder * 0.5f), TextTint(0.08f), tok::radius_tile);
+         glyph::Draw(dl, sc, tok::icon_sm, samplerHot ? text : Dim(), IconsInfinite::Waveform);
+         if (samplerHot)
+            ImGui::SetTooltip("%s", T("Open in a Sampler"));
+         if (hot || folderHot || samplerHot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + cardH));
+         ImGui::Dummy(ImVec2(0.0f, 0.0f));
+
+         // The file becomes a Sampler on the canvas, loaded and in view.
+         if (toSampler)
+         {
+            PushUndoCheckpoint();
+            const ImVec2 spawn = FindFreeSpawnPosition(gViewCenterCanvas);
+            if (GraphNode* gn = SpawnNode("Sampler", "Synths", spawn.x, spawn.y))
+            {
+               if (auto* sampler = dynamic_cast<SamplerNode*>(gn->node.get()))
+                  sampler->LoadFile(path);
+               gPatchDirty = true;
+               Focus(gn->index);
+               RefreshCatalog(true);
+            }
+         }
+
+         if (reveal)
+            Platform::RevealInFileManager(path);
          if (clicked)
          {
-            SamplePreviewPlayer& preview = AudioEngine::Instance().Preview();
             preview.Stop();
             if (playing)
                gPreviewingSamplePath.clear();
@@ -2217,13 +2436,6 @@ namespace app
          }
       }
 
-      std::string ExpandHome(const std::string& raw)
-      {
-         if (!raw.empty() && raw[0] == '~')
-            if (const char* home = std::getenv("HOME"))
-               return std::string(home) + raw.substr(1);
-         return raw;
-      }
 
       // A small "Show in folder" under a file the agent made, so it can be kept.
       void DrawReveal(const std::string& rawPath)
@@ -2231,7 +2443,7 @@ namespace app
          const std::string path = ExpandHome(rawPath);
          if (!std::filesystem::exists(path))
             return;
-         UiType::Scope cap(UiType::Size::Body, UiType::Weight::Medium);
+         Weight cap(UiType::Weight::Medium);
          const char* label = T("Show in folder");
          const ImVec2 at = ImGui::GetCursorScreenPos();
          const ImVec2 sz = ImGui::CalcTextSize(label);
@@ -2261,16 +2473,31 @@ namespace app
          glyph::Draw(dl, ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), tok::icon_sm, Dim(), IconsInfinite::Library);
          const std::string name = std::filesystem::path(path).filename().string();
          const std::string shown = exists ? name : name + "  " + T("(missing)");
-         dl->AddText(ImVec2(at.x + rowH, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), exists ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), shown.c_str());
+         const float ty = at.y + (rowH - ImGui::GetFontSize()) * 0.5f;
+         float right = at.x + width - tok::space_2;
          if (exists)
          {
             const char* hint = T("Show in folder");
             const float w = ImGui::CalcTextSize(hint).x;
-            dl->AddText(ImVec2(at.x + width - w - tok::space_2, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), hint);
+            dl->AddText(ImVec2(right - w, ty), Dim(), hint);
+            right -= w + tok::space_3;
          }
+         ImGui::RenderTextEllipsis(dl, ImVec2(at.x + rowH, ty), ImVec2(right, ty + ImGui::GetFontSize()), right, shown.c_str(), nullptr, nullptr);
          if (clicked)
             Platform::RevealInFileManager(path);
       }
+
+      // The texture to show now: a gif's current frame, else the picture.
+      GLuint FrameOf(const Texture& t)
+      {
+         if (t.frames.empty())
+            return t.id;
+         const int ms = (int)std::fmod(ImGui::GetTime() * 1000.0, (double)t.endsMs.back());
+         const size_t i = std::upper_bound(t.endsMs.begin(), t.endsMs.end(), ms) - t.endsMs.begin();
+         return t.frames[std::min(i, t.frames.size() - 1)];
+      }
+
+      std::string sViewing;  // the picture open full size, or empty
 
       void DrawImage(const std::string& path, float width)
       {
@@ -2284,10 +2511,183 @@ namespace app
          const float h = w * (float)t->h / (float)std::max(1, t->w);
          const float s = h > 320.0f ? 320.0f / h : 1.0f;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ImGui::Image((ImTextureID)(intptr_t)t->id, ImVec2(w * s, h * s));
-         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(0.12f), tok::radius_field);
-         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", path.c_str());
+         ImGui::Image((ImTextureID)(intptr_t)FrameOf(*t), ImVec2(w * s, h * s));
+         const bool hot = ImGui::IsItemHovered();
+         ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + w * s, at.y + h * s), TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (ImGui::IsItemClicked())
+            sViewing = path;
+      }
+
+      // A picture opened full size over the app: fits the window, a click or Esc closes it.
+      void DrawImageViewer()
+      {
+         if (sViewing.empty())
+            return;
+         Texture* t = TextureFor(sViewing);
+         if (t == nullptr || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         {
+            sViewing.clear();
+            return;
+         }
+         const ImGuiViewport* vp = ImGui::GetMainViewport();
+         ImGui::SetNextWindowPos(vp->Pos);
+         ImGui::SetNextWindowSize(vp->Size);
+         ImGui::SetNextWindowFocus();
+         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav;
+         if (ImGui::Begin("##chatimageview", nullptr, flags))
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddRectFilled(vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), WithAlpha(tok::U32(tok::terminal_bg, Light()), 0.92f));
+            const float fit = std::min({ 1.0f, vp->Size.x * 0.88f / (float)t->w, vp->Size.y * 0.84f / (float)t->h });
+            const ImVec2 sz(std::floor(t->w * fit), std::floor(t->h * fit));
+            const ImVec2 p0(std::floor(vp->Pos.x + (vp->Size.x - sz.x) * 0.5f), std::floor(vp->Pos.y + (vp->Size.y - sz.y) * 0.5f));
+            const ImVec2 p1(p0.x + sz.x, p0.y + sz.y);
+            dl->AddImageRounded((ImTextureID)(intptr_t)FrameOf(*t), p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, tok::radius_field);
+            dl->AddRect(p0, p1, TextTint(0.12f), tok::radius_field);
+            const std::string name = std::filesystem::path(sViewing).filename().string();
+            char size[32];
+            std::snprintf(size, sizeof size, "%d × %d", t->w, t->h);
+            const float y = p1.y + tok::space_2;
+            dl->AddText(ImVec2(p0.x, y), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
+            dl->AddText(ImVec2(p1.x - ImGui::CalcTextSize(size).x, y), Dim(), size);
+            ImGui::SetCursorScreenPos(vp->Pos);
+            if (ImGui::InvisibleButton("##imageviewclose", vp->Size))
+               sViewing.clear();
+         }
+         ImGui::End();
+      }
+
+      // A movie an agent made: its first picture, its length, and it plays in place (no sound) on a click.
+      struct VideoLook
+      {
+         bool tried = false;
+         long long bytes = -1;  // the file's size when tried: a movie still being written is tried again
+         double lookedAt = 0.0;
+         int drawnFrame = 0;    // the last frame it was on screen: one scrolled away or in another chat stops
+         GLuint tex = 0;
+         int w = 0, h = 0;
+         double seconds = 0.0;
+         Platform::VideoHandle* handle = nullptr;  // open while it plays
+         double started = 0.0;
+         std::vector<unsigned char> px;
+      };
+      std::unordered_map<std::string, VideoLook> sVideos;
+
+      void UploadVideoFrame(VideoLook& v)
+      {
+         if (v.tex == 0)
+         {
+            glGenTextures(1, &v.tex);
+            glBindTexture(GL_TEXTURE_2D, v.tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, v.w, v.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, v.px.data());
+            return;
+         }
+         glBindTexture(GL_TEXTURE_2D, v.tex);
+         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, v.w, v.h, GL_RGBA, GL_UNSIGNED_BYTE, v.px.data());
+      }
+
+      VideoLook& VideoFor(const std::string& path)
+      {
+         VideoLook& v = sVideos[path];
+         if (v.tried && (v.tex != 0 || ImGui::GetTime() - v.lookedAt < 1.0 || FileSize(path) == v.bytes))
+            return v;
+         v.tried = true;
+         v.lookedAt = ImGui::GetTime();
+         v.bytes = FileSize(path);
+         std::string error;
+         Platform::VideoHandle* h = Platform::VideoOpen(path, error);
+         if (h == nullptr)
+            return v;
+         v.w = Platform::VideoWidth(h), v.h = Platform::VideoHeight(h);
+         v.seconds = Platform::VideoDuration(h);
+         // A frame a little in: the very first is often black.
+         if (v.w > 0 && v.h > 0 && Platform::VideoFrameAtExact(h, std::min(1.0, v.seconds * 0.2), v.px) && v.px.size() >= (size_t)v.w * v.h * 4)
+            UploadVideoFrame(v);
+         Platform::VideoClose(h);
+         return v;
+      }
+
+      void StopVideo(VideoLook& v)
+      {
+         if (v.handle != nullptr)
+            Platform::VideoClose(v.handle);
+         v.handle = nullptr;
+      }
+
+      void DrawVideo(const std::string& rawPath, float width)
+      {
+         const std::string path = ExpandHome(rawPath);
+         const bool exists = std::filesystem::exists(path);
+         VideoLook* v = exists ? &VideoFor(path) : nullptr;
+         if (v == nullptr || v->tex == 0)
+         {
+            DrawFile(rawPath, width);
+            return;
+         }
+         const float w = std::min(width, (float)v->w);
+         const float h0 = w * (float)v->h / (float)std::max(1, v->w);
+         const float s = h0 > 320.0f ? 320.0f / h0 : 1.0f;
+         const ImVec2 sz(std::floor(w * s), std::floor(h0 * s));
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         const ImVec2 end(at.x + sz.x, at.y + sz.y);
+         if (ImGui::IsRectVisible(at, end))
+            v->drawnFrame = ImGui::GetFrameCount();
+         if (v->handle != nullptr)
+         {
+            const double t = v->seconds > 0.0 ? std::fmod(ImGui::GetTime() - v->started, v->seconds) : 0.0;
+            if (Platform::VideoFrameAt(v->handle, t, v->px) && v->px.size() >= (size_t)v->w * v->h * 4)
+               UploadVideoFrame(*v);
+         }
+         ImGui::PushID(rawPath.c_str());
+         const bool clicked = ImGui::InvisibleButton("##video", sz);
+         ImGui::PopID();
+         const bool hot = ImGui::IsItemHovered();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         // Frames come row-flipped for GL: draw them with v running bottom to top.
+         dl->AddImageRounded((ImTextureID)(intptr_t)v->tex, at, end, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_field);
+         dl->AddRect(at, end, TextTint(hot ? 0.24f : 0.12f), tok::radius_field);
+         const bool playing = v->handle != nullptr;
+         const ImVec2 c(std::floor((at.x + end.x) * 0.5f), std::floor((at.y + end.y) * 0.5f));
+         const ImU32 shade = WithAlpha(IM_COL32_BLACK, 0.47f);
+         if (!playing || hot)
+         {
+            dl->AddCircleFilled(c, 22.0f, hot ? WithAlpha(IM_COL32_BLACK, 0.63f) : shade, 32);
+            if (playing)
+               glyph::DrawPlayerPause(dl, c, 8.0f, IM_COL32_WHITE);
+            else
+               glyph::DrawPlayerPlay(dl, ImVec2(c.x + 2.0f, c.y), 8.0f, IM_COL32_WHITE, true);
+         }
+         // Length (or where it is, while it plays) in a pill at the bottom right.
+         const int secs = (int)std::lround(playing ? std::fmod(ImGui::GetTime() - v->started, std::max(0.001, v->seconds)) : v->seconds);
+         char dur[16];
+         std::snprintf(dur, sizeof dur, "%d:%02d", secs / 60, secs % 60);
+         const ImVec2 ds = ImGui::CalcTextSize(dur);
+         const ImVec2 d1(end.x - tok::space_2, end.y - tok::space_2), d0(d1.x - ds.x - 2.0f * tok::space_1 - 2.0f, d1.y - ds.y - 4.0f);
+         dl->AddRectFilled(d0, d1, shade, (d1.y - d0.y) * 0.5f);
+         dl->AddText(ImVec2(d0.x + tok::space_1 + 1.0f, d0.y + 2.0f), IM_COL32_WHITE, dur);
+         if (playing && v->seconds > 0.0)
+         {
+            const float u = (float)(std::fmod(ImGui::GetTime() - v->started, v->seconds) / v->seconds);
+            dl->AddRectFilled(ImVec2(at.x + 1.0f, end.y - 3.0f), ImVec2(at.x + 1.0f + (sz.x - 2.0f) * u, end.y - 1.0f), ImGui::GetColorU32(AccentEmphasisSelected()));
+         }
+         if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (clicked)
+         {
+            if (playing)
+               StopVideo(*v);
+            else
+            {
+               std::string error;
+               v->handle = Platform::VideoOpen(path, error);
+               v->started = ImGui::GetTime();
+            }
+         }
       }
 
       // Code a turn wrote (a code param, a long block in a reply) folds to a chip: the code glyph and its line
@@ -2330,7 +2730,7 @@ namespace app
 
       void DrawCodeChip(const std::string& title, const std::string& code, const char* id)
       {
-         UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+         Weight s(UiType::Weight::Medium);
          const int n = LineCount(code);
          char label[48];
          std::snprintf(label, sizeof label, n == 1 ? T("%d line") : T("%d lines"), n);
@@ -2380,11 +2780,15 @@ namespace app
                }
                case chat::Block::Kind::Audio:
                   DrawAudio(b.text, width);
-                  DrawReveal(b.text);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
                case chat::Block::Kind::Image:
                   DrawImage(b.text, width);
+                  DrawReveal(b.text);
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  break;
+               case chat::Block::Kind::Video:
+                  DrawVideo(b.text, width);
                   DrawReveal(b.text);
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                   break;
@@ -2438,8 +2842,6 @@ namespace app
             const float x = at.x + 22.0f + ImGui::CalcTextSize(AgentName(e.agent)).x + 8.0f;
             dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_TextDisabled), count.c_str());
             const ImVec2 sz = ImGui::CalcTextSize(count.c_str());
-            if (ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(ImVec2(x, ty), ImVec2(x + sz.x, ty + sz.y)))
-               ImGui::SetTooltip("%s %s", chat::TokenCount(e.cached).c_str(), T("of them read from the cache"));
          }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
@@ -2477,6 +2879,156 @@ namespace app
          return T("Code");
       }
 
+      // Frames until the catalog re-reads after a knob write: the cook applies the write on a later frame,
+      // and the card must show the new value, not the old one.
+      int sRefreshIn = 0;
+
+      struct KnobCell
+      {
+         size_t line = 0;
+         int node = -1, param = -1;
+         const chat::CatalogParam* cp = nullptr;
+         const ParamRef* kp = nullptr;
+      };
+
+      // The value lines of a change card that can be a perform knob: a float or int the canvas has a control
+      // for, not moved by modulation or a formula. One per param.
+      std::vector<KnobCell> KnobCells(const Entry& e, size_t shown)
+      {
+         std::vector<KnobCell> cells;
+         if (!e.ok || e.undone)
+            return cells;
+         for (size_t i = 0; i < shown; i++)
+         {
+            const chat::ChangeLine& l = e.changes[i];
+            if (l.node < 0 || l.key.empty())
+               continue;
+            GraphNode* gn = FindNodeByIndex(l.node);
+            const chat::CatalogNode* cn = sCat.Node(l.node);
+            if (!gn || !cn)
+               continue;
+            int pi = ParamIndexOfKeyOnNode(*gn, l.key);
+            if (pi < 0)
+               pi = ParamIndexOfKeyOnNode(*gn, "p." + l.key);
+            const ParamRef* kp = pi >= 0 ? Modulation::Instance().KnownParam(l.node, pi) : nullptr;
+            if (!kp || kp->isEnum || kp->isBool || kp->maxValue <= kp->minValue || Modulation::Instance().IsModulated(l.node, pi))
+               continue;
+            const chat::CatalogParam* cp = nullptr;
+            for (const chat::CatalogParam& q : cn->params)
+               if (q.key == l.key || q.key == "p." + l.key || "p." + q.key == l.key)
+                  cp = &q;
+            if (!cp || (cp->kind != "float" && cp->kind != "int") || cp->expression || cp->modulated)
+               continue;
+            bool dup = false;
+            for (const KnobCell& c : cells)
+               dup = dup || (c.node == l.node && c.param == pi);
+            if (dup)
+               continue;
+            cells.push_back({ i, l.node, pi, cp, kp });
+         }
+         return cells;
+      }
+
+      // The knobs, grouped under the node they belong to: the node's chip, then a left-aligned rack of perform
+      // knobs, each with its name and its live value. Dragging writes the param as perform mode does.
+      void DrawChangeKnobs(const Entry& e, const std::vector<KnobCell>& cells, float inner, int id)
+      {
+         if (sRefreshIn > 0 && --sRefreshIn == 0)
+            RefreshCatalog(true);
+         if (cells.empty())
+            return;
+         static std::map<std::pair<int, int>, float> sHeld;  // the un-snapped value while an int knob is held
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float diameter = 34.0f;
+         const float lineH = ImGui::GetTextLineHeight();
+         const float perRowF = std::max(1.0f, std::floor(inner / 76.0f));
+         const float cellW = std::min(96.0f, inner / perRowF);
+         const int perRow = (int)perRowF;
+         const float cellH = diameter + tok::space_2 + 2.0f * lineH;
+         const ImU32 accent = ImGui::GetColorU32(AccentEmphasisSelected());
+
+         std::vector<int> nodes;  // in the order the card names them
+         for (const KnobCell& c : cells)
+            if (std::find(nodes.begin(), nodes.end(), c.node) == nodes.end())
+               nodes.push_back(c.node);
+         for (int node : nodes)
+         {
+            const chat::CatalogNode* cn = sCat.Node(node);
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+            {
+               chat::Seg chip;
+               chip.kind = chat::Seg::Kind::Node;
+               chip.node = node;
+               chip.text = cn ? cn->title : std::string();
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const float h = DrawFlow({ chip }, p, inner, id * 100 + 90 + node, ImGui::GetColorU32(ImGuiCol_Text));
+               ImGui::SetCursorScreenPos(p);
+               ImGui::Dummy(ImVec2(inner, h + tok::space_2));
+            }
+            const ImVec2 o = ImGui::GetCursorScreenPos();
+            int k = 0;
+            for (const KnobCell& c : cells)
+            {
+               if (c.node != node)
+                  continue;
+               const float x0 = o.x + (float)(k % perRow) * cellW;
+               const float y0 = o.y + (float)(k / perRow) * (cellH + tok::space_2);
+               k++;
+               const float minV = c.kp->minValue, maxV = c.kp->maxValue;
+               const bool isInt = c.cp->kind == "int" || c.kp->step >= 1.0f;
+               const float span = std::max(std::fabs(minV), std::fabs(maxV));
+               const char* fmt = (isInt || span >= 100.0f) ? "%.0f" : (span >= 10.0f ? "%.1f" : "%.2f");
+
+               float live = minV;
+               const auto pw = gPerfPendingWrites.find({ c.node, c.param });
+               if (pw != gPerfPendingWrites.end())
+                  live = pw->second;
+               else
+                  for (const ParamRef& ref : Modulation::Instance().FrameParams())
+                     if (ref.nodeIndex == c.node && ref.paramIndex == c.param && ref.value)
+                     {
+                        live = *ref.value;
+                        break;
+                     }
+               const auto held = sHeld.find({ c.node, c.param });
+               float v = held != sHeld.end() ? held->second : live;
+
+               char kid[48];
+               std::snprintf(kid, sizeof kid, "##chknob%d_%d", id, (int)c.line);
+               ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+               const bool moved = KnobFloat(kid, &v, minV, maxV, fmt, diameter, accent, false, cellW, c.kp->posToValue, c.kp->valueToPos);
+               if (ImGui::IsItemActivated())
+                  PushUndoCheckpoint();
+               if (ImGui::IsItemActive())
+                  sHeld[{ c.node, c.param }] = v;
+               else
+                  sHeld.erase({ c.node, c.param });
+               if (moved)
+               {
+                  const float w = isInt ? std::round(v) : v;
+                  gPerfPendingWrites[{ c.node, c.param }] = w;
+                  live = w;
+                  if (!sRuns.empty())
+                     sUserTurned.insert({ c.node, e.changes[c.line].key });
+               }
+               if (ImGui::IsItemDeactivatedAfterEdit())
+                  sRefreshIn = 3;
+
+               const std::string name = app::TruncateWithEllipsis(c.cp->label.empty() ? c.cp->key : c.cp->label, cellW - tok::space_2);
+               char val[48];
+               FormatAudioParam(val, sizeof val, fmt, live);
+               const float ty = y0 + diameter + tok::space_2;
+               const float nw = ImGui::CalcTextSize(name.c_str()).x;
+               const float vw = ImGui::CalcTextSize(val).x;
+               dl->AddText(ImVec2(std::round(x0 + (cellW - nw) * 0.5f), ty), Dim(), name.c_str());
+               dl->AddText(ImVec2(std::round(x0 + (cellW - vw) * 0.5f), ty + lineH), ImGui::GetColorU32(ImGuiCol_Text), val);
+            }
+            const int rows = (k + perRow - 1) / perRow;
+            ImGui::SetCursorScreenPos(o);
+            ImGui::Dummy(ImVec2(inner, (float)rows * cellH + (float)(rows - 1) * tok::space_2));
+         }
+      }
+
       void DrawChange(Entry& e, EntryUi& ui, float width, int id, bool undoable)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2501,8 +3053,14 @@ namespace app
          const ImU32 col = e.undone ? Dim() : ImGui::GetColorU32(ImGuiCol_Text);
          const size_t cap = 8;
          const size_t shown = ui.open ? e.changes.size() : std::min(e.changes.size(), cap);
+         const std::vector<KnobCell> knobs = KnobCells(e, shown);
          for (size_t i = 0; i < shown; i++)
          {
+            bool asKnob = false;
+            for (const KnobCell& c : knobs)
+               asKnob = asKnob || c.line == i;
+            if (asKnob)
+               continue;  // drawn as a knob below, its live value under it
             const chat::ChangeLine& l = e.changes[i];
             const std::vector<chat::Block>& blocks = BlocksFor(l.text);
             const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -2528,6 +3086,7 @@ namespace app
                ImGui::Dummy(ImVec2(0.0f, 2.0f));
             }
          }
+         DrawChangeKnobs(e, knobs, inner, id);
          if (e.changes.size() > shown)
          {
             char more[48];
@@ -2672,8 +3231,6 @@ namespace app
                if (monoRow)
                   ImGui::PopFont();
                ImGui::Dummy(ImVec2(width, lineH));
-               if (ImGui::IsItemHovered() && (words || ImGui::CalcTextSize(one.c_str()).x > width - gutter || one.size() != r.text.size()))
-                  ImGui::SetTooltip("%s", r.text.c_str());
             }
          }
          ImGui::Dummy(ImVec2(width, 2.0f));
@@ -2731,8 +3288,6 @@ namespace app
             const ImVec2 p(x, y + 3.0f);
             dl->AddRect(p, ImVec2(p.x + w, p.y + 20.0f), TextTint(0.16f), tok::radius_tile);
             dl->AddText(ImVec2(p.x + tok::space_2, p.y + (20.0f - ImGui::GetFontSize()) * 0.5f), TextTint(0.8f), name.c_str());
-            if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w, p.y + 20.0f)) && ImGui::IsWindowHovered())
-               ImGui::SetTooltip("%s", e.files[i].c_str());
             x -= tok::space_1;
          }
          if (!e.files.empty())
@@ -2812,16 +3367,23 @@ namespace app
                ImGui::SetCursorScreenPos(ImVec2(rx - w, y + (rowH - 26.0f) * 0.5f));
                return ChipButton::Draw(label, primary, 26.0f);
             };
-            auto status = [&](const char* label, bool spin, ImU32 col)
+            // Status text sits right of the name and never over it: a narrow panel cuts it short, then drops it
+            // and keeps only the spinner.
+            const float nameEnd = at.x + pad + 30.0f + ImGui::CalcTextSize(a.name).x + tok::space_3;
+            auto statusAt = [&](float right, const char* label, bool spin, ImU32 col)
             {
-               const float w = ImGui::CalcTextSize(label).x;
-               dl->AddText(ImVec2(rx - w, ty), col, label);
+               const float room = right - nameEnd - (spin ? BusyLine::kSpinner + tok::space_1 : 0.0f);
+               const std::string text = room >= 48.0f ? app::TruncateWithEllipsis(label, room) : std::string();
+               const float w = text.empty() ? 0.0f : ImGui::CalcTextSize(text.c_str()).x;
+               if (!text.empty())
+                  dl->AddText(ImVec2(right - w, ty), col, text.c_str());
                if (spin)
                {
-                  ImGui::SetCursorScreenPos(ImVec2(rx - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
+                  ImGui::SetCursorScreenPos(ImVec2(right - w - BusyLine::kSpinner - (w > 0.0f ? tok::space_1 : 0.0f), y + (rowH - BusyLine::kSpinner) * 0.5f));
                   BusyLine::Spinner();
                }
             };
+            auto status = [&](const char* label, bool spin, ImU32 col) { statusAt(rx, label, spin, col); };
             float used = 0.0f;
             if (s.setup != nullptr)
             {
@@ -2835,14 +3397,7 @@ namespace app
                const char* cancel = T("Cancel");
                if (button(cancel, false))
                   Do(a.id, Act::Cancel);
-               {
-                  const char* label = T("Finish in your browser…");
-                  const float bw = ImGui::CalcTextSize(cancel).x + 2.0f * tok::space_2 + tok::space_2;
-                  const float w = ImGui::CalcTextSize(label).x;
-                  dl->AddText(ImVec2(rx - bw - w, ty), Dim(), label);
-                  ImGui::SetCursorScreenPos(ImVec2(rx - bw - w - BusyLine::kSpinner - tok::space_1, y + (rowH - BusyLine::kSpinner) * 0.5f));
-                  BusyLine::Spinner();
-               }
+               statusAt(rx - ImGui::CalcTextSize(cancel).x - 3.0f * tok::space_2, T("Finish in your browser…"), true, Dim());
                if (!s.loginUrl.empty())
                {
                   ImGui::SetCursorScreenPos(ImVec2(at.x + pad + 30.0f, y + rowH));
@@ -3473,8 +4028,6 @@ namespace app
                   ImGui::RenderTextEllipsis(dl, ImVec2(right - dw, ty), ImVec2(right, ty + ImGui::GetFontSize()), right, c.detail.c_str(), nullptr, nullptr);
                   ImGui::PopStyleColor();
                }
-               if (hovered && !c.tip.empty())
-                  ImGui::SetTooltip("%s", c.tip.c_str());
                if (clicked)
                {
                   sPick = i;
@@ -3484,6 +4037,46 @@ namespace app
          }
          ImGui::End();
          ImGui::PopStyleVar(3);
+      }
+
+      // Cmd/Ctrl+V with copied files or a copied picture attaches them; text on the clipboard still pastes as text.
+      bool PasteAttachments()
+      {
+         bool took = false;
+         for (const std::string& f : Platform::ClipboardFiles())
+            if (!chat::FileKind(f).empty() && std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
+               sAttach.push_back(f), took = true;
+         if (took)
+            return true;
+         const char* text = ImGui::GetClipboardText();
+         if (text != nullptr && text[0] != '\0')
+            return false;
+         std::vector<unsigned char> png, rgba;
+         int w = 0, h = 0;
+         if (!Platform::ClipboardImage(png, rgba, w, h))
+            return false;
+         if (png.empty())
+            stbi_write_png_to_func([](void* ctx, void* data, int size) {
+               auto* out = (std::vector<unsigned char>*)ctx;
+               out->insert(out->end(), (unsigned char*)data, (unsigned char*)data + size);
+            }, &png, w, h, 4, rgba.data(), w * 4);
+         if (png.empty())
+            return false;
+         const std::string dir = ChatsDir() + "/pasted";
+         std::error_code ec;
+         std::filesystem::create_directories(AppPaths::FsPath(dir), ec);
+         char stamp[32];
+         const std::time_t now = std::time(nullptr);
+         std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", std::localtime(&now));
+         std::string path = dir + "/paste-" + stamp + ".png";
+         for (int n = 2; std::filesystem::exists(AppPaths::FsPath(path)); n++)
+            path = dir + "/paste-" + stamp + "-" + std::to_string(n) + ".png";
+         std::ofstream out(AppPaths::FsPath(path), std::ios::binary);
+         out.write((const char*)png.data(), (std::streamsize)png.size());
+         if (!out)
+            return false;
+         sAttach.push_back(path);
+         return true;
       }
 
       void TakeDrops()
@@ -3580,7 +4173,8 @@ namespace app
          // minute before the next try: this runs every frame the picker or Settings shows.
          const auto st = sAgents.find(agent);
          // The status check of a signed-in agy fills this list itself.
-         const bool installed = st != sAgents.end() && st->second.ready.installed && st->second.auth != chat::Auth::Out && st->second.verify == nullptr;
+         // Not checked yet (Settings opened before the chat) counts as worth one try: `agy models` needs no sign-in.
+         const bool installed = st == sAgents.end() || (st->second.ready.installed && st->second.verify == nullptr);
          // A steady clock, not ImGui time: Settings and the self-test ask outside a frame.
          const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
          const auto at = sModelsFetchAt.find(agent);
@@ -3671,99 +4265,93 @@ namespace app
          if (!avatar.empty())
             DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, avatar);
          dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
-         if (text != full && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", full.c_str());
          if (clicked)
             ImGui::OpenPopup(std::string(id).append("menu").c_str());
          return mn.x;
       }
 
-      // Two pills in the tool row: who answers (with where each agent stands) and, beside it, which of that
-      // agent's models. Settings keeps the same default model per agent.
+      // The name a model shows under: the one picked for this agent, else the one its own settings choose,
+      // else its first, else the agent's name.
+      std::string ModelFace(const std::string& agent)
+      {
+         if (agent.empty())
+            return {};
+         const std::vector<chat::Model>& list = ModelsOf(agent);
+         CliSetup::Config& prefs = CliSetup::Prefs();
+         const std::string picked = prefs.models.count(agent) ? prefs.models[agent] : std::string();
+         for (const chat::Model& m : list)
+            if (!picked.empty() && m.id == picked && !m.label.empty())
+               return m.label;
+         const std::string theirs = AgentDefaultModel(agent, list);
+         if (!theirs.empty())
+            return theirs;
+         for (const chat::Model& m : list)
+            if (!m.label.empty())
+               return m.label;
+         return AgentName(agent);
+      }
+
+      // One pill in the tool row: the model that answers, from every connected agent's models in one menu,
+      // each agent under its name. Picking a model picks its agent too. Settings keeps the same choice.
       void DrawPicker(float right, float y, float h, float minLeft)
       {
-         // Both pills share the room between the attach button and Send; the model gets a little more.
          const float room = std::max(80.0f, right - minLeft - tok::space_1);
          const std::string cur = DefaultAgent();
          CliSetup::Config& prefs = CliSetup::Prefs();
-         const std::vector<chat::Model>& list = cur.empty() ? std::vector<chat::Model>() : ModelsOf(cur);
-         const std::string modelId = prefs.models.count(cur) ? prefs.models[cur] : std::string();
-         std::string modelFace = T("Default");
-         for (const chat::Model& m : list)
-            if (m.id == modelId && !m.label.empty())
-               modelFace = m.label;
-         // Nothing picked: name the model the agent's own settings choose, so "Default" is never a guess.
-         const std::string theirs = modelId.empty() ? AgentDefaultModel(cur, list) : std::string();
-         if (!theirs.empty())
-            modelFace = theirs;
-         const float menuW = 248.0f;
+         const float menuW = 264.0f;
          bool clicked = false;
-         float left = right;
-         if (!cur.empty())
+         Pill("##chatmodel", cur, cur.empty() ? std::string(T("Connect an agent")) : ModelFace(cur), right, y, h, clicked, room);
+         ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
+         BeginMenuStyle();
+         if (ImGui::BeginPopup("##chatmodelmenu"))
          {
-            left = Pill("##chatmodel", "", modelFace, right, y, h, clicked, room * 0.55f);
-            ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-            ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
-            BeginMenuStyle();
-            if (ImGui::BeginPopup("##chatmodelmenu"))
+            bool anyReady = false;
+            for (const CliSetup::Agent& a : CliSetup::Agents())
             {
-               MenuLabel(T("Model"), menuW);
-               if (MenuRow("##m", menuW, T("Default"), AgentDefaultModel(cur, list).c_str(), modelId.empty(), true, std::string()))
-               {
-                  prefs.models.erase(cur);
-                  SaveCliConfig();
-                  ImGui::CloseCurrentPopup();
-               }
+               if (sAgents.find(a.id) == sAgents.end() || !ViewOf(a.id).ready)
+                  continue;
+               anyReady = true;
+               ImGui::PushID(a.id);
+               MenuLabel(a.name, menuW);
+               const std::vector<chat::Model>& list = ModelsOf(a.id);
+               const std::string face = ModelFace(a.id);
+               bool rows = false;
                for (const chat::Model& m : list)
                {
-                  if (m.id.empty())
+                  if (m.id.empty() || m.label.empty())
                      continue;
+                  rows = true;
                   ImGui::PushID(m.id.c_str());
-                  if (MenuRow("##m", menuW, m.label.c_str(), "", m.id == modelId, true, std::string()))
+                  if (MenuRow("##m", menuW, m.label.c_str(), "", a.id == cur && m.label == face, true, std::string()))
                   {
-                     prefs.models[cur] = m.id;
+                     prefs.agent = a.id;
+                     prefs.models[a.id] = m.id;
                      SaveCliConfig();
                      ImGui::CloseCurrentPopup();
                   }
                   ImGui::PopID();
                }
-               ImGui::EndPopup();
-            }
-            EndMenuStyle();
-            left -= tok::space_1;
-         }
-         const float agentRight = left;
-         Pill("##chatagent", cur, cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur)), agentRight, y, h, clicked,
-              std::max(48.0f, agentRight - minLeft));
-         ImGui::SetNextWindowPos(ImVec2(agentRight, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-         ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
-         BeginMenuStyle();
-         if (ImGui::BeginPopup("##chatagentmenu"))
-         {
-            MenuLabel(T("Agent"), menuW);
-            for (const CliSetup::Agent& a : CliSetup::Agents())
-            {
-               if (sAgents.find(a.id) == sAgents.end())
-                  continue;
-               ImGui::PushID(a.id);
-               const AgentView v = ViewOf(a.id);
-               if (v.ready)
+               if (!rows && MenuRow("##only", menuW, face.c_str(), "", a.id == cur, true, std::string()))
                {
-                  if (MenuRow("##a", menuW, a.name, "", a.id == cur, true, a.id))
-                  {
-                     prefs.agent = a.id;
-                     SaveCliConfig();
-                     ImGui::CloseCurrentPopup();
-                  }
-               }
-               else
-               {
-                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
-                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
-                     Do(a.id, v.act);
+                  prefs.agent = a.id;
+                  SaveCliConfig();
+                  ImGui::CloseCurrentPopup();
                }
                ImGui::PopID();
             }
+            if (!anyReady)
+               for (const CliSetup::Agent& a : CliSetup::Agents())
+               {
+                  if (sAgents.find(a.id) == sAgents.end())
+                     continue;
+                  ImGui::PushID(a.id);
+                  const AgentView v = ViewOf(a.id);
+                  const bool acts = v.act == Act::SetUp || v.act == Act::TryAgain || v.act == Act::SignIn || v.act == Act::SignInAgain;
+                  if (MenuRow("##a", menuW, a.name, acts ? ActLabel(v.act) : v.status.c_str(), false, acts, a.id))
+                     Do(a.id, v.act);
+                  ImGui::PopID();
+               }
             ImGui::EndPopup();
          }
          EndMenuStyle();
@@ -3818,13 +4406,6 @@ namespace app
                const ImVec2 p(x, at.y + pad);
                dl->AddRectFilled(p, ImVec2(p.x + moreW, p.y + 22.0f), TextTint(0.08f), tok::radius_tile);
                dl->AddText(ImVec2(p.x + tok::space_2, p.y + (22.0f - fs) * 0.5f), Dim(), more.c_str());
-               if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + moreW, p.y + 22.0f)))
-               {
-                  std::string tip;
-                  for (size_t k = i; k < sAttach.size(); k++)
-                     tip += (tip.empty() ? "" : "\n") + sAttach[k];
-                  ImGui::SetTooltip("%s", tip.c_str());
-               }
                break;
             }
             const ImVec2 p(x, at.y + pad);
@@ -3839,8 +4420,6 @@ namespace app
             const ImU32 mark = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim();
             ImGui::PopID();
             glyph::Draw(dl, ImVec2(p.x + w - 10.0f, p.y + 11.0f), tok::icon_sm, mark, IconsInfinite::Close);
-            if (ImGui::IsMouseHoveringRect(p, ImVec2(p.x + w - 20.0f, p.y + 22.0f)))
-               ImGui::SetTooltip("%s", sAttach[i].c_str());
             x += w + tok::space_1;
          }
          if (remove >= 0)
@@ -3862,10 +4441,19 @@ namespace app
             sRefocus = false;
          }
          const bool enterPicks = EnterPicks();
+         // A paste that attaches takes the key, so the field does not also paste a file's name.
+         static bool sInputWasActive = false;
+         const ImGuiIO& io = ImGui::GetIO();
+         if (sInputWasActive && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && PasteAttachments())
+            ImGui::SetKeyOwner(ImGuiKey_V, ImGui::GetID("##chatpaste"), ImGuiInputFlags_LockThisFrame);
          const ImGuiInputTextFlags flags = ImGuiInputTextFlags_WordWrap | ImGuiInputTextFlags_CtrlEnterForNewLine | ImGuiInputTextFlags_EnterReturnsTrue |
                                            ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion;
          const bool enter = ImGui::InputTextMultiline("##chatinput", &sInput, ImVec2(fieldW, textH), flags, InputCallback);
          const bool active = ImGui::IsItemActive();
+         sInputWasActive = active;
+         // The well itself shows where typing goes: no keyboard-nav ring around it.
+         if (active || ImGui::IsItemFocused())
+            ImGui::GetCurrentContext()->NavCursorVisible = false;
          ImGui::PopStyleColor();
          ImGui::PopStyleVar(2);
          if (enter)
@@ -4032,7 +4620,7 @@ namespace app
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + height), tok::U32(tok::terminal_bg, Light()), tok::radius_field);
          const float rowH = 26.0f;
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            Weight s(UiType::Weight::Medium);
             const float right = at.x + width - tok::space_1 - 2.0f * 22.0f - tok::space_2;
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(at.x + tok::space_3, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
@@ -4113,8 +4701,34 @@ namespace app
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Chats"));
          const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
-         const float toolsX = at.x + width - tok::space_1 - 2.0f * glyph - gap;
+         const float toolsX = at.x + width - tok::space_1 - 3.0f * glyph - 2.0f * gap;
          ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
+         {  // Pop out / dock back: a window with an arrow leaving it (or coming home)
+            const ImVec2 o = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton("##chatpopout", ImVec2(glyph, 18.0f)))
+               gTerminalFloating = !gTerminalFloating;
+            const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+            const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.5f + 0.5f * hv));
+            const ImVec2 c(std::floor(o.x + glyph * 0.5f) + 0.5f, std::floor(o.y + 9.0f) + 0.5f);
+            const float r = 5.5f;
+            // the window, open at its top-right corner where the arrow passes
+            dl->PathLineTo(ImVec2(c.x + 1.0f, c.y - r));
+            dl->PathLineTo(ImVec2(c.x - r, c.y - r));
+            dl->PathLineTo(ImVec2(c.x - r, c.y + r));
+            dl->PathLineTo(ImVec2(c.x + r, c.y + r));
+            dl->PathLineTo(ImVec2(c.x + r, c.y - 1.0f));
+            dl->PathStroke(col, ImDrawFlags_None, 1.25f);
+            const ImVec2 tip = gTerminalFloating ? ImVec2(c.x - 0.5f, c.y + 0.5f) : ImVec2(c.x + r + 1.5f, c.y - r - 1.5f);
+            const ImVec2 tail = gTerminalFloating ? ImVec2(c.x + r + 1.5f, c.y - r - 1.5f) : ImVec2(c.x - 0.5f, c.y + 0.5f);
+            dl->AddLine(tail, tip, col, 1.25f);
+            const float sx = tip.x > tail.x ? -1.0f : 1.0f, sy = tip.y > tail.y ? -1.0f : 1.0f;  // head points back along the shaft
+            dl->AddLine(tip, ImVec2(tip.x + sx * 4.0f, tip.y), col, 1.25f);
+            dl->AddLine(tip, ImVec2(tip.x, tip.y + sy * 4.0f), col, 1.25f);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", gTerminalFloating ? T("Dock") : T("Pop out"));
+         }
+         FormParts::Inline(0.0f, gap);
          if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
             gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
          if (ImGui::IsItemHovered())
@@ -4126,7 +4740,7 @@ namespace app
             ImGui::SetTooltip("%s", T("New chat"));
          const float right = toolsX - tok::space_2;
          {
-            UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+            Weight s(UiType::Weight::Medium);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ImGui::RenderTextEllipsis(dl, ImVec2(titleX, at.y + (rowH - ImGui::GetFontSize()) * 0.5f), ImVec2(right, at.y + rowH), right,
                                       title, nullptr, nullptr);
@@ -4164,6 +4778,18 @@ namespace app
             OpenThread(all[0].path);
          else
             NewChat();
+         // Review shots (tools/chat-shots): queued messages ("a|b") and a half-typed line, as a user leaves them.
+         if (const char* q = std::getenv("INFINITE_CHATSHOT_QUEUE"))
+         {
+            std::string rest = q;
+            for (size_t at; !rest.empty(); rest = at == std::string::npos ? std::string() : rest.substr(at + 1))
+               if ((at = rest.find('|')) != 0)
+                  sQueue.push_back({ rest.substr(0, at), {} });
+         }
+         if (const char* in = std::getenv("INFINITE_CHATSHOT_INPUT"))
+            sInput = in;
+         if (const char* view = std::getenv("INFINITE_CHATSHOT_VIEW"))
+            sViewing = view;
       }
       // Opening the panel checks the agents again (a sign-in may have happened outside).
       const int frame = ImGui::GetFrameCount();
@@ -4248,6 +4874,11 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, ImGui::GetCursorScreenPos().y));
       }
       DrawComposer(composerW);
+      DrawImageViewer();
+      // A movie that was not drawn this frame (scrolled away, another chat open) stops playing.
+      for (auto& [path, v] : sVideos)
+         if (v.handle != nullptr && v.drawnFrame < ImGui::GetFrameCount() - 1)
+            StopVideo(v);
    }
 
    bool ChatBusy() { return !sRuns.empty(); }
@@ -4297,6 +4928,8 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       return out;
    }
 
+   std::string ChatAgentModelFace(const std::string& id) { return ModelFace(id); }
+
    void ChatAgentAct(const std::string& id, bool repair)
    {
       const CliSetup::Agent* a = CliSetup::FindAgent(id);
@@ -4330,6 +4963,8 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       for (auto& [id, s] : sAgents)
          if (s.setup != nullptr)
             s.setup->Stop();
+      for (auto& [path, v] : sVideos)
+         StopVideo(v);
       SaveNow();
    }
 }

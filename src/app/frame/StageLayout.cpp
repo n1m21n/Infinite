@@ -286,7 +286,7 @@ void DrawLayout(FrameCtx& fc)
          topBottom += gPianoRollHeight;
          topBottomRows++;
       }
-      if (gTerminalOpen && (gTerminalDock == 0 || gTerminalDock == 3))
+      if (TerminalDocked() && (gTerminalDock == 0 || gTerminalDock == 3))
       {
          gTerminalHeight = std::clamp(gTerminalHeight, 160.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y - topBottom - 150.0f));
          topBottom += gTerminalHeight;
@@ -321,7 +321,7 @@ void DrawLayout(FrameCtx& fc)
          DrawPianoRollDocked("##pianoroll_top", ImVec2(0, gPianoRollHeight));
       if (gView3DOpen && gView3DDock == 3)
          DrawView3DDocked("##view3d_top", ImVec2(0, gView3DHeight));
-      if (gTerminalOpen && gTerminalDock == 3)
+      if (TerminalDocked() && gTerminalDock == 3)
          DrawTerminalDocked("##terminal_top", ImVec2(0, gTerminalHeight));
       if (viewportLeft)
       {
@@ -343,9 +343,9 @@ void DrawLayout(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_left", ImVec2(gArrangePanelWidth, graphHeight));
          ImGui::SameLine(0.0f, 0.0f);
       }
-      if (gTerminalOpen && (gTerminalDock == 1 || gTerminalDock == 2))
+      if (TerminalDocked() && (gTerminalDock == 1 || gTerminalDock == 2))
          gTerminalWidth = std::clamp(gTerminalWidth, 280.0f, std::max(280.0f, ImGui::GetContentRegionAvail().x - 300.0f));
-      if (gTerminalOpen && gTerminalDock == 2)
+      if (TerminalDocked() && gTerminalDock == 2)
       {
          DrawTerminalDocked("##terminal_left", ImVec2(gTerminalWidth, graphHeight));
          FormParts::Inline(0.0f, 0.0f);
@@ -390,7 +390,7 @@ void DrawLayout(FrameCtx& fc)
       if (matrixRight) rightReserved += gModMatrixWidth;
       if (perfRight) rightReserved += gPerfPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
-      if (gTerminalOpen && gTerminalDock == 1) rightReserved += gTerminalWidth;
+      if (TerminalDocked() && gTerminalDock == 1) rightReserved += gTerminalWidth;
       if (gHistoryOpen)
       {
          gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));

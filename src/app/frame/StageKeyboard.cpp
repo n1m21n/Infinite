@@ -1025,7 +1025,9 @@ void DrawKeyboard(FrameCtx& fc)
 
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.
-      if (ed::ShowBackgroundContextMenu() && gCommentEdit.target == nullptr)
+      // A floating window over the canvas (chat, panels) keeps its own right-clicks.
+      const bool canvasUnderMouse = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+      if (ed::ShowBackgroundContextMenu() && gCommentEdit.target == nullptr && canvasUnderMouse)
       {
          gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
          searchBuf[0] = '\0';
@@ -1042,7 +1044,7 @@ void DrawKeyboard(FrameCtx& fc)
          // gParamRightClickConsumedThisFrame) opens that param's text field
          // instead - node editor still reports the click as a node context
          // menu request, so it has to be swallowed here rather than upstream.
-         if (ed::ShowNodeContextMenu(&contextNodeId) && !gParamRightClickConsumedThisFrame)
+         if (ed::ShowNodeContextMenu(&contextNodeId) && !gParamRightClickConsumedThisFrame && canvasUnderMouse)
          {
             gContextMenuNodeIndex = (int)contextNodeId.Get() / GraphNode::kStride;
             ImGui::OpenPopup("##nodecontext");

@@ -126,7 +126,8 @@ namespace chat
                out.push_back({ at + (p.modulated ? " modulated" : " no longer modulated"), "" });
             if (p.expression != old->expression)
                out.push_back({ at + (p.expression ? " follows a formula" : " no longer follows a formula"), "" });
-            if (p.value == old->value)
+            // A modulated or formula-driven param moves on its own every frame: its value is not an edit.
+            if (p.value == old->value || p.modulated || p.expression)
                continue;
             if (IsCode(p) || IsCode(*old))
                out.push_back({ at + " changed", p.value.find('\n') == std::string::npos ? Unescape(p.value) : p.value });

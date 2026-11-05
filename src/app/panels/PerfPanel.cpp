@@ -16,10 +16,10 @@ namespace app
    // ---- Performance Matrix ----
    void PerfPanelDockCombo()
    {
-      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top"), I18N_KEY("Floating Window") };
       if (MenuParts::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock])))
       {
-         for (int i = 0; i < 4; i++)
+         for (int i = 0; i < 5; i++)
             if (MenuParts::Choice(L(kDockLabels[i]), i == gPerfPanelDock))
                gPerfPanelDock = i;
          MenuParts::EndCombo();
@@ -2438,6 +2438,7 @@ namespace app
             if (MenuParts::Item(L("Right"), nullptr, gPerfPanelDock == 1)) gPerfPanelDock = 1;
             if (MenuParts::Item(L("Left"), nullptr, gPerfPanelDock == 2)) gPerfPanelDock = 2;
             if (MenuParts::Item(L("Top"), nullptr, gPerfPanelDock == 3)) gPerfPanelDock = 3;
+            if (MenuParts::Item(L("Floating Window"), nullptr, gPerfPanelDock == kDockFloating)) gPerfPanelDock = kDockFloating;
             ImGui::EndMenu();
          }
          MenuParts::Separator();
@@ -2665,5 +2666,15 @@ namespace app
       AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
       ImGui::Text("%.3f", value);
+   }
+
+   void DrawPerfPanelFloating()
+   {
+      bool open = true;
+      if (BeginFloatingPanel((std::string(T("Performance")) + "###perffloat").c_str(), &open, ImVec2(640.0f, 420.0f)))
+         DrawPerfPanelContent();
+      EndFloatingPanel();
+      if (!open)
+         gPerfPanelOpen = false;
    }
 }
