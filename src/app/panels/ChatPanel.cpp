@@ -3464,7 +3464,7 @@ namespace app
          const char* title = sThread.title.empty() ? T("New chat") : sThread.title.c_str();
          // Past chats on the left before the title; Terminal and New chat on the right, each set the same
          // inset from its edge so the row stays symmetric.
-         const float glyph = 22.0f, gap = 2.0f, glyphY = at.y + (rowH - glyph) * 0.5f;
+         const float glyph = 22.0f, gap = 2.0f, glyphY = at.y + (rowH - 18.0f) * 0.5f;  // GlyphToggle is 22 x 18: centred on the title's line
          ImGui::SetCursorScreenPos(ImVec2(at.x + tok::space_1, glyphY));
          if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, sRail))
          {

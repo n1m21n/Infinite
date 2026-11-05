@@ -757,8 +757,8 @@ namespace
             gTerminalFocus = true;
          }
       }
-      // The chat face, at the row's right end.
-      if (CliSetup::Prefs().face == "chat")
+      // The chat face, at the row's right end; not while the chat already shows beside the shell.
+      if (CliSetup::Prefs().face == "chat" && !gChatSideTerminal)
       {
          ImGui::SetCursorScreenPos(ImVec2(start.x + rowW - 22.0f, start.y));
          if (GlyphToggle::Draw("##chatface", IconsInfinite::Chat, IconsInfinite::Chat, false))
@@ -915,6 +915,7 @@ namespace
          if (!gChatSideTerminal)
          {
             DrawChatPanel();
+            DrawDockMenu(false, nullptr);   // right-click: Dock Position and Close, as on every panel
             return;
          }
          // The terminal opens beside the chat, as the side terminal does in Claude: chat left, shell right.
@@ -923,6 +924,7 @@ namespace
          const float left = std::floor((avail.x - gap) * 0.55f);
          ImGui::BeginChild("##chatside", ImVec2(left, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatPanel();
+         DrawDockMenu(false, nullptr);
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             gTerminalFocus = false;
          ImGui::EndChild();
@@ -938,7 +940,10 @@ namespace
    void DrawTerminalBody()
    {
       if (sTabs.empty() && !gChatSideTerminal && DrawTerminalWelcome())
+      {
+         DrawDockMenu(false, nullptr);
          return;
+      }
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));
