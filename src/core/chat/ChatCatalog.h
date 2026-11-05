@@ -20,6 +20,9 @@ namespace chat
       bool expression = false;
    };
 
+   // Bookkeeping a node saves beside its params (a Field node's param id map): never offered, linked or reported.
+   inline bool IsInternal(const CatalogParam& p) { return p.key.rfind("field_", 0) == 0; }
+
    // A value as a person reads it: enums by option name, bools as on/off, numbers to 3 significant digits.
    std::string ShownValue(const CatalogParam& p);
 

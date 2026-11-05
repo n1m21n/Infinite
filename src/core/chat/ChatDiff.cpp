@@ -12,9 +12,6 @@ namespace chat
 
       std::string Shown(const CatalogParam& p) { return ShownValue(p); }
 
-      // Bookkeeping a node saves next to its params (a Field node's param id map), never a change to read.
-      bool Internal(const CatalogParam& p) { return p.key.rfind("field_", 0) == 0; }
-
       // Saved text keeps newlines, tabs and quotes escaped; a code block shows the code itself.
       std::string Unescape(const std::string& t)
       {
@@ -97,7 +94,7 @@ namespace chat
             for (const CatalogParam& q : was->params)
                if (q.key == p.key)
                   old = &q;
-            if (old == nullptr || Internal(p))
+            if (old == nullptr || IsInternal(p))
                continue;
             const std::string at = Ref(n) + "." + p.key;
             if (p.modulated != old->modulated)

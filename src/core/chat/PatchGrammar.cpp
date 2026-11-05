@@ -409,7 +409,7 @@ namespace chat
             }
             std::vector<std::string> keys;
             for (const CatalogParam& p : n->params)
-               if (!modulatableOnly || p.modulatable)
+               if ((!modulatableOnly || p.modulatable) && !IsInternal(p))
                   keys.push_back(p.key);
             return Fail(mToks[mPos], "@" + (n->title.empty() ? n->type : n->title) + " has no param '" + mToks[mPos].text + "'",
                         Nearest(mToks[mPos].text, keys));

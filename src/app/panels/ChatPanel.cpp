@@ -1421,6 +1421,8 @@ namespace app
          std::vector<std::pair<int, Cand>> ranked;
          for (const chat::CatalogParam& p : n.params)
          {
+            if (chat::IsInternal(p))
+               continue;
             const int a = Score(p.key, want), b = Score(p.label, want);
             const int s = a >= 0 && b >= 0 ? std::min(a, b) : std::max(a, b);
             if (s < 0)
@@ -3445,9 +3447,10 @@ namespace app
          const float rowH = 26.0f;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const char* title = sThread.title.empty() ? T("New chat") : sThread.title.c_str();
-         // Chat tools lead on the left, the title follows them.
-         const float iconsX = at.x + tok::space_1;
-         ImGui::SetCursorScreenPos(ImVec2(iconsX, at.y + (rowH - 22.0f) * 0.5f));
+         // Past chats on the left before the title; Terminal and New chat on the right, each set the same
+         // inset from its edge so the row stays symmetric.
+         const float glyph = 22.0f, gap = 2.0f, glyphY = at.y + (rowH - glyph) * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(at.x + tok::space_1, glyphY));
          if (GlyphToggle::Draw("##chathistory", IconsInfinite::History, IconsInfinite::History, sRail))
          {
             sRail = !sRail;
@@ -3456,18 +3459,19 @@ namespace app
          }
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Chats"));
-         ImGui::SameLine(0.0f, 2.0f);
-         if (GlyphToggle::Draw("##chatnew", IconsInfinite::Plus, IconsInfinite::Plus, false) && sRuns.empty())
-            NewChat();
-         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("New chat"));
-         ImGui::SameLine(0.0f, 2.0f);
+         const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
+         const float toolsX = at.x + width - tok::space_1 - 2.0f * glyph - gap;
+         ImGui::SetCursorScreenPos(ImVec2(toolsX, glyphY));
          if (GlyphToggle::Draw("##chatterminal", IconsInfinite::Terminal, IconsInfinite::Terminal, gChatSideTerminal))
             gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Terminal"));
-         const float titleX = ImGui::GetItemRectMax().x + tok::space_2;
-         const float right = at.x + width - tok::space_3;
+         ImGui::SameLine(0.0f, gap);
+         if (GlyphToggle::Draw("##chatnew", IconsInfinite::Plus, IconsInfinite::Plus, false) && sRuns.empty())
+            NewChat();
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", T("New chat"));
+         const float right = toolsX - tok::space_2;
          {
             UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
