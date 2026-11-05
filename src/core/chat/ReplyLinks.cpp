@@ -152,9 +152,17 @@ namespace chat
             const std::string title = line.substr(from, hash - from);
             if (title.find('@') == std::string::npos && title.find('`') == std::string::npos)
             {
-               const int index = std::atoi(line.substr(hash + 1, end - hash - 1).c_str());
-               Seg s;
+               int index = std::atoi(line.substr(hash + 1, end - hash - 1).c_str());
                const CatalogNode* n = catalog.Node(index);
+               // A stale or guessed index ("@sample player#1" when the Sampler is #4): the title, when it names
+               // one node, wins over a number that names none.
+               if (n == nullptr || Lower(n->title) != Lower(title))
+                  if (const int byTitle = ByName(catalog, title); byTitle >= 0 && (n == nullptr || Lower(catalog.Node(byTitle)->title) == Lower(title)))
+                  {
+                     index = byTitle;
+                     n = catalog.Node(index);
+                  }
+               Seg s;
                s.kind = n != nullptr ? Seg::Kind::Node : Seg::Kind::Missing;
                s.node = n != nullptr ? index : -1;
                s.text = n != nullptr ? Shown(*n) : title;
@@ -273,6 +281,16 @@ namespace chat
                flush();
                if (TryAction(line, i, catalog, segs))
                   continue;
+               // A link whose target is gone or unknown reads as its label, never as raw markdown.
+               const size_t close = line.find("](", i + 1);
+               const size_t end = close == std::string::npos ? std::string::npos : line.find(')', close + 2);
+               if (close != std::string::npos && end != std::string::npos && close > i + 1 && line.find('[', i + 1) > close)
+               {
+                  text += line.substr(i + 1, close - i - 1);
+                  flush();
+                  i = end + 1;
+                  continue;
+               }
             }
             if (c == '`')
             {

@@ -2,6 +2,7 @@
 // and every setting (docs/plans/terminal/README.md D19). Same rules as Rpc.cpp: main thread,
 // between frames. tools/terminal/parity.py holds the list of what has a verb.
 #include <algorithm>
+#include <cctype>
 #include <functional>
 #include "app/AppShared.h"
 #include "imgui.h"
@@ -42,8 +43,36 @@ namespace app
             { "templates", &gTemplatesOpen, nullptr, false },
             { "help", &gHelpOpen, nullptr, false },
             { "shortcuts", &gShortcutsOpen, nullptr, false },
+            { "library", &gNodePanelOpen, nullptr, false },
          };
          return panels;
+      }
+
+      // The names people and agents write for a panel ("Piano Roll", "nodes", "sample-studio") to its own name;
+      // a name already in Panels() comes back unchanged.
+      std::string PanelName(const std::string& raw)
+      {
+         std::string k;
+         for (char c : raw)
+            if (std::isalnum((unsigned char)c))
+               k += (char)std::tolower((unsigned char)c);
+         static const std::pair<const char*, const char*> kAlias[] = {
+            { "nodes", "library" }, { "nodelibrary", "library" }, { "browser", "library" }, { "addnode", "library" },
+            { "piano", "pianoroll" }, { "notes", "pianoroll" }, { "studio", "samplestudio" }, { "sample", "samplestudio" },
+            { "samples", "samplestudio" }, { "sampler", "samplestudio" }, { "matrix", "modmatrix" },
+            { "modulation", "modmatrix" }, { "modulationmatrix", "modmatrix" }, { "performance", "perf" },
+            { "arrange", "timeline" }, { "arrangement", "timeline" }, { "tracks", "timeline" }, { "3d", "view3d" },
+            { "3dview", "view3d" }, { "chat", "terminal" }, { "agent", "terminal" }, { "shell", "terminal" },
+            { "preview", "viewport" }, { "output", "viewport" }, { "show", "showset" }, { "undo", "history" },
+            { "keys", "shortcuts" }, { "keyboardshortcuts", "shortcuts" },
+         };
+         for (const auto& [from, to] : kAlias)
+            if (k == from)
+               return to;
+         for (const Panel& p : Panels())
+            if (k == p.name)
+               return p.name;
+         return raw;
       }
 
       // The dock codes every panel shares: 0 bottom, 1 right, 2 left, 3 top.
@@ -450,6 +479,7 @@ namespace app
             outResult = { { "open", true }, { "place", place } };
             return true;
          }
+         name = PanelName(name);
          json all = json::object();
          for (const Panel& panel : Panels())
          {

@@ -4164,6 +4164,16 @@ namespace app
             OpenThread(all[0].path);
          else
             NewChat();
+         // Review shots (tools/chat-shots): queued messages ("a|b") and a half-typed line, as a user leaves them.
+         if (const char* q = std::getenv("INFINITE_CHATSHOT_QUEUE"))
+         {
+            std::string rest = q;
+            for (size_t at; !rest.empty(); rest = at == std::string::npos ? std::string() : rest.substr(at + 1))
+               if ((at = rest.find('|')) != 0)
+                  sQueue.push_back({ rest.substr(0, at), {} });
+         }
+         if (const char* in = std::getenv("INFINITE_CHATSHOT_INPUT"))
+            sInput = in;
       }
       // Opening the panel checks the agents again (a sign-in may have happened outside).
       const int frame = ImGui::GetFrameCount();
