@@ -125,9 +125,8 @@ namespace app
          if (!info.problem.empty())
          {
             FormParts::Label("");
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())));
-            ImGui::TextWrapped("%s", info.problem.c_str());
-            ImGui::PopStyleColor();
+            FormParts::TintedText(tok::U32(tok::action_record, CategoryColors::IsThemeLight()),
+                                  [&] { ImGui::TextWrapped("%s", info.problem.c_str()); });
          }
          ImGui::PopID();
       }

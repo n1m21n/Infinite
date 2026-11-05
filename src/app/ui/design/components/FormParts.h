@@ -273,6 +273,15 @@ namespace FormParts
                                           EdgeCol(), rounding);
    }
 
+   // Runs `draw` with the text colour set to `col` (a coloured line, or a hint drawn through RenderTextEllipsis).
+   template <class Draw>
+   inline void TintedText(ImU32 col, Draw&& draw)
+   {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(col));
+      draw();
+      ImGui::PopStyleColor();
+   }
+
    // Muted section title for long reference text (no card): Body size, medium.
    // Bullet whose text wraps at the window edge (ImGui::BulletText never wraps, so long lines widen the page).
    inline void Bullet(const char* text)

@@ -4976,10 +4976,10 @@ namespace app
          {
             // A narrow window cuts the hint short rather than running it under Send.
             const float end = fieldAt.x + fieldW - tok::space_1;
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(Dim()));
-            ImGui::RenderTextEllipsis(dl, ImVec2(fieldAt.x, fieldAt.y + padY), ImVec2(end, fieldAt.y + padY + fs), end,
-                                      sRuns.empty() ? T("Ask, or type @ to name a node") : T("Add to the queue"), nullptr, nullptr);
-            ImGui::PopStyleColor();
+            FormParts::TintedText(Dim(), [&] {
+               ImGui::RenderTextEllipsis(dl, ImVec2(fieldAt.x, fieldAt.y + padY), ImVec2(end, fieldAt.y + padY + fs), end,
+                                         sRuns.empty() ? T("Ask, or type @ to name a node") : T("Add to the queue"), nullptr, nullptr);
+            });
          }
          ImGui::SetCursorScreenPos(fieldAt);
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, padY));
