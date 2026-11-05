@@ -458,8 +458,9 @@ int RunPatchOpenerTest()
    base.version = "0.4.25";
    std::string detail;
    check(offer(base, &detail), "another copy opens patches: offered");
-   check(detail.find("0.4.25") != std::string::npos && detail.find("/Desktop/old/") != std::string::npos,
-         "the notice names the other copy's version and path");
+   check(detail.find("0.4.25") != std::string::npos && detail.find("~/Desktop/old/") != std::string::npos &&
+            detail.find("/Users/x") == std::string::npos,
+         "the notice names the other copy's version and path, without the home folder");
    { Platform::PatchOpener o = base; o.isSelf = true; check(!offer(o), "this copy already opens patches: silent"); }
    { Platform::PatchOpener o = base; o.otherApp = true; check(!offer(o), "the user picked another app: silent"); }
    { Platform::PatchOpener o = base; o.selfTemporary = true; check(!offer(o), "running from a disk image: silent"); }
