@@ -283,10 +283,10 @@ def html_chapter(P):
                   row((fig("settings_audio", "Audio", box=(410, 200, 1190, 805)), 1), (fig("settings_general", "General & Performance", box=(410, 200, 1190, 805)), 1)),
                   row((fig("settings_field", "Field Language", box=(410, 200, 1190, 805)), 1), (fig("settings_globals", "Expression Globals", box=(410, 200, 1190, 805)), 1))),
              page(row((fig("settings_extensions", "Extensions: install extension packs.", box=(410, 200, 1190, 805)), 1), (fig("settings_plugins", "Plugins: VST3 folders and every scanned plugin.", box=(410, 200, 1190, 805)), 1)),
-                  row((fig("settings_terminal", "Terminal: Command line &amp; agents (one-click setup, coding agent), the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
+                  row((fig("settings_terminal", "Agents &amp; Terminal: each agent with its status and button, models, folders and saved chats.", box=(420, 210, 1180, 790)), 1), ("", 1)))))
 
     b.append(page("<h2>Settings: Command line &amp; agents</h2>",
-                  "<p>The Terminal page of Settings has one section, <b>Agents</b>: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, "
+                  "<p>The Agents &amp; Terminal page of Settings has one section, <b>Agents</b>: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, "
                   "the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.</p>"
                   "<p>Setting up an agent opens a Terminal tab and runs a short script. It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, "
                   "fetches the Infinite MCP server and registers it with the agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Password prompts (Homebrew, sudo) appear in the tab. "
@@ -300,6 +300,7 @@ def html_chapter(P):
                   "It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. "
                   "Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, "
                   "which changes the open patch through the <code>infinite</code> command, so every change is listed on a card and can be undone.</p>",
+                  fig("chat_changes", "The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.", box=(1000, 50, 1560, 990), width="50%"),
                   "<h3>Set up an agent</h3>"
                   "<p>Infinite talks to three coding agents you install yourself. The chat names them by what people call them: <b>Claude</b> (Claude Code), <b>ChatGPT</b> (Codex) and <b>Gemini</b> (Antigravity). It never asks for or stores an API key; each agent signs in with its own account. "
                   "The first time the Terminal opens, a welcome asks which agent to connect and has one <b>Connect</b> button; <b>Skip, just a terminal</b> leaves the chat for later. "

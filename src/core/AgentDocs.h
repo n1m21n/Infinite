@@ -1686,15 +1686,16 @@ Picture: Field Language
 Picture: Expression Globals
 Picture: Extensions: install extension packs.
 Picture: Plugins: VST3 folders and every scanned plugin.
-Picture: Terminal: Command line & agents (one-click setup, coding agent), the panel and the infinite command.
+Picture: Agents & Terminal: each agent with its status and button, models, folders and saved chats.
 
 ## Settings: Command line & agents
-The Terminal page of Settings has one section, **Agents**: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.
+The Agents & Terminal page of Settings has one section, **Agents**: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.
 Setting up an agent opens a Terminal tab and runs a short script. It puts the `infinite` command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with the agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Password prompts (Homebrew, sudo) appear in the tab. Infinite never asks for or stores an API key: the agent's own login runs in the browser. Nothing is installed until you press a button.
 Setup is one time. It survives quitting, restarting and updating Infinite: the `infinite` command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), a **Connection** row appears naming the step, with a **Repair** button that reruns only that step.
 
 ## Chat
 The Chat panel is how you talk to Infinite. Say what you want and the patch changes while you watch. It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, which changes the open patch through the `infinite` command, so every change is listed on a card and can be undone.
+Picture: The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.
 
 ### Set up an agent
 Infinite talks to three coding agents you install yourself. The chat names them by what people call them: **Claude** (Claude Code), **ChatGPT** (Codex) and **Gemini** (Antigravity). It never asks for or stores an API key; each agent signs in with its own account. The first time the Terminal opens, a welcome asks which agent to connect and has one **Connect** button; **Skip, just a terminal** leaves the chat for later. Settings, Terminal, Agents has one row per agent with its status and the one button that moves it on:
