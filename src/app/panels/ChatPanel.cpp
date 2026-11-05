@@ -5450,6 +5450,21 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       info.action = ActLabel(v.act);
       info.ready = v.ready;
       info.busy = v.busy;
+      const auto it = sAgents.find(id);
+      const CliSetup::Agent* a = CliSetup::FindAgent(id);
+      if (it != sAgents.end() && it->second.failed && it->second.setup == nullptr && a != nullptr)
+      {
+         using namespace CliSetup;
+         const Status st = ParseStatus(ReadAll(PathsFor(AppPaths::AppSupportDir(), CurrentOs()).status), (long long)std::time(nullptr));
+         std::string reason, step;
+         for (const StepStatus& x : st.steps)
+            if (x.state == StepState::kFailed)
+            {
+               reason = x.reason, step = x.id;
+               break;
+            }
+         info.problem = Say(chat::SetupProblem(reason, step, a->name).text, a->name);
+      }
       return info;
    }
 

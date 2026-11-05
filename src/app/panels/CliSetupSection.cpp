@@ -122,6 +122,13 @@ namespace app
             if (button(info.action.c_str(), !info.ready))
                ChatAgentAct(a.id, false);
          ChatAgentCodeEntry(a.id, rowW);
+         if (!info.problem.empty())
+         {
+            FormParts::Label("");
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(tok::U32(tok::action_record, CategoryColors::IsThemeLight())));
+            ImGui::TextWrapped("%s", info.problem.c_str());
+            ImGui::PopStyleColor();
+         }
          ImGui::PopID();
       }
 

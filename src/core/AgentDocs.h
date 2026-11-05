@@ -1690,34 +1690,50 @@ Picture: Agents & Terminal: each agent with its status and button, models, folde
 
 ## Settings: Command line & agents
 The Agents & Terminal page of Settings has one section, **Agents**: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.
-Setting up an agent opens a Terminal tab and runs a short script. It puts the `infinite` command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with the agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Password prompts (Homebrew, sudo) appear in the tab. Infinite never asks for or stores an API key: the agent's own login runs in the browser. Nothing is installed until you press a button.
+Setting up an agent runs a short script in the background (the Chat panel shows its progress; Settings can also run it in a Terminal tab). It puts the `infinite` command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with the agent. When Node.js is missing it is downloaded from nodejs.org into Infinite's own folder (`~/.infinite/node` on macOS and Linux, `%LOCALAPPDATA%\Infinite\node` on Windows) and checked against nodejs.org's published checksums: no Homebrew, no winget, no administrator password. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Only Linux may need your password, for a missing system package; the card then says so and opens a terminal to type it. Infinite never asks for or stores an API key: the agent's own login runs in the browser. Nothing is installed until you press a button.
 Setup is one time. It survives quitting, restarting and updating Infinite: the `infinite` command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), a **Connection** row appears naming the step, with a **Repair** button that reruns only that step.
 
 ## Chat
 The Chat panel is how you talk to Infinite. Say what you want and the patch changes while you watch. It is the Terminal panel's chat face: the Terminal opens to it, and the Terminal button in its toolbar switches to a plain shell and back. Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, which changes the open patch through the `infinite` command, so every change is listed on a card and can be undone.
 Picture: The Chat panel: the agents card, a reply with its change card (live knobs for what changed) and the written list.
 
-### Set up an agent
-Infinite talks to three coding agents you install yourself. The chat names them by what people call them: **Claude** (Claude Code), **ChatGPT** (Codex) and **Gemini** (Antigravity). It never asks for or stores an API key; each agent signs in with its own account. The first time the Terminal opens, a welcome asks which agent to connect and has one **Connect** button; **Skip, just a terminal** leaves the chat for later. Settings, Terminal, Agents has one row per agent with its status and the one button that moves it on:
+### First run
+The first time, the Chat panel walks you from a new computer to your first result, one card at a time. You need nothing installed and no terminal.
 
-- **Not installed**: Set upThe agent's program is missing. Set up opens a Terminal tab and types the vendor's own installer (Claude and Gemini: the vendor's install script; ChatGPT: `npm install -g @openai/codex`).
+- **Checking this computer…**: Infinite checks the internet, free space (about 2 GB), that it can download, and whether there is a web browser. A problem is named in one sentence with the one thing to do, and **Check again**. With no browser (Linux over SSH), you sign in by copying an address and pasting a code; ChatGPT is greyed out because its sign-in needs a browser on this computer.
+- **Who do you want to talk to?**: Pick **Claude**, **ChatGPT** or **Gemini**, then **I have an account** or **I don't have one**. Without an account, the provider's own sign-up page opens; Infinite never sees what you type there. Setup runs meanwhile, and sign-in starts by itself when you come back to Infinite.
+- **Setting up Claude**: One list: Make your account (when making one), Get ready, Install Claude, Sign in. A failed row says why and offers **Try again**, **Details** (the raw output) and **Pick again**.
+- **Sign in**: The browser opens the provider's page. If it ends with a code (Claude without a browser, Gemini), paste it into the field and press Submit; a wrong code says so. **Open page again** reopens it; Infinite also checks again whenever you come back to it.
+- **Your files**: The folder agents work in and whether they may edit files there. Camera and microphone are asked only when a request needs them.
+- **You're in**: Three ideas to press: Make something that looks like rain, Make a calm sound, Show me what you can do. Each is sent at once and the result plays.
+
+### Set up an agent
+Infinite talks to three coding agents. The chat names them by what people call them: **Claude** (Claude Code), **ChatGPT** (Codex) and **Gemini** (Antigravity). It never asks for or stores an API key; each agent signs in with its own account. Settings, Terminal, Agents has one row per agent with its status and the one button that moves it on:
+
+- **Not installed**: Set upThe agent's program is missing. Set up runs the vendor's own installer (Claude and Gemini: the vendor's install script; ChatGPT: `npm install -g @openai/codex` into Infinite's own Node folder).
 - **Needs setup**: Set upInstalled, but the `infinite` command, the MCP link or the skills are not connected yet. Set up runs the one-click connection in a Terminal tab.
-- **Setting up… 2 of 5**: The setup script is running; passwords (Homebrew, sudo) are asked for in its tab.
-- **Setup did not finish**: Try againA setup step failed; the tab shows which. Fix it there, or run the step by hand, then try again.
+- **Setting up… 2 of 5**: The setup script is running.
+- **Setup did not finish**: Try againA setup step failed; the Chat panel's card says why in one sentence (no internet, no space, a blocked installer, a password needed). Fix that, then try again.
 - **Not signed in**: Sign inOpens the agent's own sign-in. The page opens in your browser; the row reads Waiting for sign-in… with a Cancel button. A sign-in that is not finished in 3 minutes ends with Sign-in timed out.
 - **Signed out**: Sign in againThe agent said its sign-in expired in the middle of a chat. Sign in again and ask again.
 - **Ready**: Sign outInstalled, connected and signed in. Sign out is shown when the agent has a sign-out command.
 
 ### When something fails
 
-- **<i>Finish in your browser…</i> and no page opened**: The sign-in address is shown in the row; open it by hand. If the page ends with a code (Gemini), paste it into the field that appears and press Submit.
+- **<i>Finish in your browser…</i> and no page opened**: Press Open page again. With no browser on this computer the address is shown with Copy address; open it on another device and paste the code it shows.
+- **<i>No internet</i> or <i>A download did not finish</i>**: Connect to the internet, then press Check again or Try again.
+- **<i>Not enough free space</i>**: Free up 2 GB, then press Try again.
+- **<i>This computer's settings block installers</i>**: Windows is set to block scripts (a work or school computer). Ask the person who manages it.
+- **<i>This step needs your computer password</i>**: Linux only: press Type password and type it in the terminal that opens.
+- **<i>That code did not work</i>**: Copy the code again from the browser page and paste it.
+- **<i>needs a paid plan</i>**: That provider's free account cannot be used here. Pick another one or upgrade.
 - **<i>Sign in to Claude to continue.</i>**: Press Sign in in Settings, Terminal, Agents (or the chat's agent row), then ask again.
 - **<i>hit its usage limit</i>**: The agent's own plan is used up. Wait, or pick another connected agent in the model picker.
 - **<i>Could not reach the agent</i>**: No internet, or a proxy blocks it. Check the connection and press Try again.
 - **<i>needs its terms accepted once</i>**: Open the Terminal, start the agent and answer its first screen.
 - **<i>is not installed. Set it up again.</i>**: The program was removed. Press Set up.
 - **<i>It stopped responding, so the chat ended the turn</i>**: The agent went quiet for too long. Ask again; the earlier changes stay on their cards.
-- **Setup keeps failing**: Fallback: open the Terminal, install the agent by hand (the commands above), then press Connect again. Each setup step checks first, so rerunning only repairs what is broken.
+- **Setup keeps failing**: Press Details to see what the setup printed. Fallback: open the Terminal, install the agent by hand (the commands above), then press Set up again. Each setup step checks first, so rerunning only repairs what is broken.
 
 ### The message box
 
@@ -1734,7 +1750,8 @@ Infinite talks to three coding agents you install yourself. The chat names them 
 - **/new**: Start a new chat.
 - **/undo**: Undo the last change.
 - **/explain [topic]**: The agent explains the open patch in plain words.
-- **/check**: Validates the patch and its code, one line per problem, with a button to fix what it can.
+)AGENTDOC"
+R"AGENTDOC(- **/check**: Validates the patch and its code, one line per problem, with a button to fix what it can.
 - **/docs <question>**: Answers from the manuals, found with `infinite docs`, not from memory.
 
 ### One model picker
@@ -1750,8 +1767,7 @@ Parameters the agent changed appear as **live knobs** on the card, only the ones
 An audio file the agent made shows as an audio card. **Open in a Sampler** (the waveform button) puts that file into a new Sampler node on the canvas, ready to play. **Show in folder** reveals the file.
 
 ### Permissions
-)AGENTDOC"
-R"AGENTDOC(By default agents may only run `infinite` commands and read the files you attach. When one tries something else, a note Not allowed: … appears with an **Allow** button: Allow folder adds a folder, Allow <command> adds a command, for good. Settings, Terminal, Agents lists them:
+By default agents may only run `infinite` commands and read the files you attach. When one tries something else, a note Not allowed: … appears with an **Allow** button: Allow folder adds a folder, Allow <command> adds a command, for good. Settings, Terminal, Agents lists them:
 
 - **Agent folder**: Where agents start, and the folder they may read. The open patch's folder by default; Choose… picks another.
 - **More folders**: Extra folders agents may read. Add folder… adds one, Remove takes it back.

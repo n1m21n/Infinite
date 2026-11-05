@@ -97,12 +97,15 @@ SCENES = {
     "first-failed": ("empty", "", "", "", 0),
     "first-folder": ("empty", "", "", "", 0),
     "first-ideas": ("empty", "", "", "", 0),
+    # Settings' agent row after a failed setup: the same plain sentence as the chat's card.
+    "settings-failed": ("empty", "", "", "settingswin,settingsplace=agents", 0),
 }
 # A status.json for the setup steps the first-run scenes show (path, headless, node, mcp, agent).
 FIRST_STATUS = {
     "first-progress": [("ok", ""), ("ok", ""), ("ok", ""), ("running", ""), ("pending", "")],
     "first-failed": [("ok", ""), ("ok", ""), ("failed", "offline"), ("pending", ""), ("pending", "")],
 }
+FIRST_STATUS["settings-failed"] = FIRST_STATUS["first-failed"]
 # Scenes that open something a click would (the full-size picture view).
 VIEW = {"viewer": "loop.gif"}
 
@@ -155,6 +158,8 @@ def shoot(app, sid, theme, out_dir, timeout):
             env["INFINITE_CHATSHOT_INPUT"] = typed
         if sid.startswith("first-"):
             env["INFINITE_CHATSHOT_ONBOARD"] = sid[len("first-"):]
+        elif sid == "settings-failed":
+            env["INFINITE_CHATSHOT_ONBOARD"] = "failed"
         if sid in VIEW:
             env["INFINITE_CHATSHOT_VIEW"] = os.path.join(rec, VIEW[sid])
         try:

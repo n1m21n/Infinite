@@ -144,7 +144,7 @@ def main_html():
           <ul class="dev-list">
             <li><strong>Sign-in happens in your browser</strong>, on the provider's own page. Infinite never asks for, sees or stores your password.</li>
             <li><strong>Your plan and your limits.</strong> Usage counts against your own subscription or key, the same as using the agent anywhere else.</li>
-            <li><strong>One setup card.</strong> A first run installs what is missing, connects the agent to the window and signs you in, all from the chat.</li>
+            <li><strong>One setup card.</strong> A first run checks the computer, installs what is missing into Infinite's own folder, connects the agent and signs you in, all from the chat. A failed step says why in one sentence.</li>
             <li><strong>One model picker.</strong> The chat shows the models of the agent that is answering, and Settings holds a default for each of the three. Each reply shows its token count, and Settings shows usage per agent with a Reset.</li>
             <li><strong>Add more than one.</strong> When two agents work at once, the chat shows who is doing what.</li>
           </ul>
@@ -163,8 +163,9 @@ def main_html():
         <section class="dv-sec" id="start"><h2>Get started</h2>
           <ol class="dev-list">
             <li><a href="index.html#download">Download Infinite</a> and open a patch.</li>
-            <li>Open the chat panel, choose Claude, ChatGPT or Gemini, and press Connect. Finish signing in in the browser.</li>
-            <li>Type <code>@</code> and pick a node, then say what you want.</li>
+            <li>Open the chat panel and pick Claude, ChatGPT or Gemini. No account yet? Press <em>I don't have one</em> and make it on the provider's page.</li>
+            <li>Infinite installs what is missing by itself: no terminal, no password. Finish signing in in the browser.</li>
+            <li>Press one of the three ideas, or type <code>@</code>, pick a node and say what you want.</li>
           </ol>
           <p>Building tools of your own? The <a href="developers.html">developers page</a> covers the command line, Python SDK and MCP server that the chat is built on.</p>
         </section>

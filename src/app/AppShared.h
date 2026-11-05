@@ -5825,6 +5825,7 @@ struct ChatAgentInfo
    std::string action;   // the button's label, empty when nothing can be pressed
    bool ready = false;
    bool busy = false;
+   std::string problem;  // why setup did not finish, in one plain sentence; empty otherwise
 };
 void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
 ChatAgentInfo ChatAgentStatus(const std::string& id);

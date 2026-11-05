@@ -5,6 +5,7 @@
 #include "core/CliSetup.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -33,6 +34,12 @@ namespace app
          ok = ok && c;
       };
       using namespace CliSetup;
+      // INFINITE_CLISETUP_DUMP=<dir>: write the exact Mac/Linux setup script for each agent there (install
+      // included), to run by hand in a throw-away HOME; the test then runs as usual.
+      if (const char* dump = std::getenv("INFINITE_CLISETUP_DUMP"))
+         for (const char* id : { "claude", "codex", "antigravity" })
+            std::ofstream(std::string(dump) + "/setup-" + id + ".sh")
+               << BuildScript(CurrentOs(), RealExecutable(), *FindAgent(id), std::string(dump) + "/status-" + id + ".json", {}, nullptr, true);
       const Agent& claude = *FindAgent("claude");
       const long long now = 1800000000;
       const std::string exe = "/Applications/Infinite's Dir/Infinite.app/Contents/MacOS/Infinite";
