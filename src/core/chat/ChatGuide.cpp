@@ -73,7 +73,7 @@ namespace chat
          std::string out = "**Commands**\n";
          for (const SlashCommand& c : SlashCommands())
             out += std::string("- [/") + c.name + (c.takesArg ? " …" : "") + "](say:/" + c.name + (c.takesArg ? " " : "") + ") " + c.summary + "\n";
-         out += "\n**Point at things**\n- `@cube` a node, `@cube.detail` one of its controls\n- `@claude`, `@codex`, `@antigravity` choose who answers\n"
+         out += "\n**Point at things**\n- `@cube` a node, `@cube.detail` one of its controls\n- `@claude`, `@chatgpt`, `@gemini` choose who answers\n"
                 "- add, connect, remove, bypass, undo, modulate, set: Infinite does it directly, no agent needed\n"
                 "- attach a file with +, or drop it in\n";
          return out;

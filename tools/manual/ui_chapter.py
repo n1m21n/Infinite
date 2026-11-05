@@ -286,7 +286,7 @@ def html_chapter(P):
                   row((fig("settings_terminal", "Terminal: Command line &amp; agents (one-click setup, coding agent), the panel and the infinite command.", box=(410, 200, 1190, 805)), 1), ("", 1)))))
 
     b.append(page("<h2>Settings: Command line &amp; agents</h2>",
-                  "<p>The Terminal page of Settings has one section, <b>Agents</b>: a row per coding agent (Claude Code, Codex, Antigravity) with its status and the button that moves it on, "
+                  "<p>The Terminal page of Settings has one section, <b>Agents</b>: a row per coding agent (Claude, ChatGPT, Gemini) with its status and the button that moves it on, "
                   "the model each answers with, what each has used, the folders and commands agents may use, and the saved chats. The Chat chapter below explains every row.</p>"
                   "<p>Setting up an agent opens a Terminal tab and runs a short script. It puts the <code>infinite</code> command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, "
                   "fetches the Infinite MCP server and registers it with the agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. Password prompts (Homebrew, sudo) appear in the tab. "
@@ -301,11 +301,11 @@ def html_chapter(P):
                   "Short commands (add, connect, remove, bypass, undo, modulate, set) run at once inside Infinite with no agent. Anything else goes to the agent you picked, "
                   "which changes the open patch through the <code>infinite</code> command, so every change is listed on a card and can be undone.</p>",
                   "<h3>Set up an agent</h3>"
-                  "<p>Infinite talks to three coding agents you install yourself: <b>Claude Code</b>, <b>Codex</b> and <b>Antigravity</b>. It never asks for or stores an API key; each agent signs in with its own account. "
+                  "<p>Infinite talks to three coding agents you install yourself. The chat names them by what people call them: <b>Claude</b> (Claude Code), <b>ChatGPT</b> (Codex) and <b>Gemini</b> (Antigravity). It never asks for or stores an API key; each agent signs in with its own account. "
                   "The first time the Terminal opens, a welcome asks which agent to connect and has one <b>Connect</b> button; <b>Skip, just a terminal</b> leaves the chat for later. "
                   "Settings, Terminal, Agents has one row per agent with its status and the one button that moves it on:</p>",
                   table(["Status", "Button", "What it means"], [
-                      ("Not installed", "Set up", "The agent's program is missing. Set up opens a Terminal tab and types the vendor's own installer (Claude Code and Antigravity: the vendor's install script; Codex: <code>npm install -g @openai/codex</code>)."),
+                      ("Not installed", "Set up", "The agent's program is missing. Set up opens a Terminal tab and types the vendor's own installer (Claude and Gemini: the vendor's install script; ChatGPT: <code>npm install -g @openai/codex</code>)."),
                       ("Needs setup", "Set up", "Installed, but the <code>infinite</code> command, the MCP link or the skills are not connected yet. Set up runs the one-click connection in a Terminal tab."),
                       ("Setting up… 2 of 5", "", "The setup script is running; passwords (Homebrew, sudo) are asked for in its tab."),
                       ("Setup did not finish", "Try again", "A setup step failed; the tab shows which. Fix it there, or run the step by hand, then try again."),
@@ -315,8 +315,8 @@ def html_chapter(P):
                   ]),
                   "<h3>When something fails</h3>",
                   table(["You see", "What to do"], [
-                      ("<i>Finish in your browser…</i> and no page opened", "The sign-in address is shown in the row; open it by hand. If the page ends with a code (Antigravity), paste it into the field that appears and press Submit."),
-                      ("<i>Sign in to Claude Code to continue.</i>", "Press Sign in in Settings, Terminal, Agents (or the chat's agent row), then ask again."),
+                      ("<i>Finish in your browser…</i> and no page opened", "The sign-in address is shown in the row; open it by hand. If the page ends with a code (Gemini), paste it into the field that appears and press Submit."),
+                      ("<i>Sign in to Claude to continue.</i>", "Press Sign in in Settings, Terminal, Agents (or the chat's agent row), then ask again."),
                       ("<i>hit its usage limit</i>", "The agent's own plan is used up. Wait, or pick another connected agent in the model picker."),
                       ("<i>Could not reach the agent</i>", "No internet, or a proxy blocks it. Check the connection and press Try again."),
                       ("<i>needs its terms accepted once</i>", "Open the Terminal, start the agent and answer its first screen."),
@@ -327,7 +327,7 @@ def html_chapter(P):
                   "<h3>The message box</h3>",
                   table(["Type", "What it does"], [
                       ("@", "Opens the node picker: type to filter the nodes in the open patch, Up/Down to move, Return or Tab to take one, Esc to close. <code>@cube</code> names a node (<code>@cube#2</code> when there are two), <code>@cube.detail</code> one of its controls. The agent receives its exact type, index and values."),
-                      ("@claude, @codex, @antigravity", "Name an agent to have that agent answer this one message."),
+                      ("@claude, @chatgpt, @gemini", "Name an agent to have that agent answer this one message."),
                       ("/", "Opens the command list: type to filter, Return to run."),
                       ("Return / Shift+Return", "Return sends; Shift+Return starts a new line (the box grows to six lines, then scrolls). While an agent is working, Return adds the line to the queue; the Stop button ends the turn."),
                   ]),
@@ -335,6 +335,7 @@ def html_chapter(P):
                       ("/help", "What the chat can do, with a button per command."),
                       ("/shortcuts, /manuals, /languages, /about", "Answered by Infinite at once: the shortcut list, the three manuals, the built-in code languages, what Infinite is."),
                       ("/website, /github", "Open the website or the repository."),
+                      ("/agent <name>", "Switch to a connected agent by name: <code>/agent claude</code>. The model picker does the same by choosing one of its models."),
                       ("/model <name>", "Switch the model, for example <code>/model opus</code>."),
                       ("/new", "Start a new chat."),
                       ("/undo", "Undo the last change."),
@@ -345,7 +346,7 @@ def html_chapter(P):
                   "<h3>One model picker</h3>"
                   "<p>There is one picker, not an agent picker and a model picker. It lists every connected agent's models together, each under its agent's name. Choose a model and that agent answers from then on; "
                   "the avatar in front of each reply shows who spoke. An agent that is not ready does not appear until you set it up. "
-                  "<code>/model</code> and Settings, Terminal, <i>Claude Code model</i> / <i>Codex model</i> / <i>Antigravity model</i> set the same thing. "
+                  "<code>/model</code> and Settings, Terminal, <i>Claude model</i> / <i>ChatGPT model</i> / <i>Gemini model</i> set the same thing. "
                   "Each agent's list comes from the agent itself, so a new model shows up when the agent offers it; <i>its default model</i> leaves the choice to the agent.</p>"
                   "<h3>Files, pictures and paste</h3>"
                   "<p>Press <b>+</b> (Attach files) or drop files on the panel: audio, video, images, GIFs, 3D models, MIDI, patches and code. Cmd/Ctrl+V pastes copied files or a copied picture; text on the clipboard still pastes as text. "
@@ -368,8 +369,8 @@ def html_chapter(P):
                       ("More folders", "Extra folders agents may read. Add folder… adds one, Remove takes it back."),
                       ("Edit files in them", "Off (default): agents run <code>infinite</code> and read attached files only. On: they may also read and change files in the folders above."),
                       ("Allowed commands", "The commands agents may run besides <code>infinite</code>, added by Allow in the chat. Remove takes one back."),
-                      ("Claude Code / Codex / Antigravity model", "The model that agent answers with; the chat's picker sets the same value."),
-                      ("Claude Code / Codex / Antigravity usage", "Turns, tokens, the share of cached input and the cost when the agent reports one. Cached input is re-read on every step of a turn and costs about a tenth of fresh input. <b>Reset</b> clears the counts for every agent."),
+                      ("Claude / ChatGPT / Gemini model", "The model that agent answers with; the chat's picker sets the same value."),
+                      ("Claude / ChatGPT / Gemini usage", "Turns, tokens, the share of cached input and the cost when the agent reports one. Cached input is re-read on every step of a turn and costs about a tenth of fresh input. <b>Reset</b> clears the counts for every agent."),
                       ("Connection", "Only when a step of the setup broke (the command, the MCP link, the skills): names the step; Repair reruns it."),
                       ("Saved chats", "How many chats are kept on this computer. Clear all deletes them after a confirmation."),
                   ]),

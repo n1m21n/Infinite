@@ -763,6 +763,12 @@ namespace app
       { I18N_KEY("Terminal"), I18N_KEY("New / Close Tab"), TERMKEY "+T / W", I18N_KEY("Open a new terminal tab, or close this one") },
       { I18N_KEY("Terminal"), I18N_KEY("Clear"), TERMKEY "+K", I18N_KEY("Clear the screen") },
       { I18N_KEY("Terminal"), I18N_KEY("Scroll Back"), "Shift+PageUp / PageDown", I18N_KEY("Scroll the terminal's history a page at a time") },
+
+      // Chat (the Terminal's chat face).
+      { I18N_KEY("Chat"), I18N_KEY("Send / New Line"), "Return / Shift+Return", I18N_KEY("Send the message, or start a new line") },
+      { I18N_KEY("Chat"), I18N_KEY("Pick @ or /"), "Up / Down, Return", I18N_KEY("Move through the node or command list, then take the highlighted one. Esc closes it") },
+      { I18N_KEY("Chat"), I18N_KEY("Attach from Clipboard"), MODKEY "+V", I18N_KEY("Paste copied files or a copied picture into the message; copied text still pastes as text") },
+      { I18N_KEY("Chat"), I18N_KEY("Close Picture"), "Esc", I18N_KEY("Close a picture opened full size") },
    };
 
    // The table as plain text for the agents (`infinite docs shortcuts`), English, this OS's keys.
