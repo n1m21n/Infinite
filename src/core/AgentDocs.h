@@ -1465,6 +1465,252 @@ Try: animate it into a loading ring.
 Chain: Pie -> Render 3D
 )AGENTDOC";
 
+   inline const char* kUiGuide =
+R"AGENTDOC(# Using the App: Panels, Menus & Settings
+
+Every panel, menu, column, button and dropdown of the app, from the manual's Using the App chapter. Act through verbs, not clicks: `infinite panel <name|settings/place>` opens a panel or a Settings page, `infinite settings [key [value]]` reads and changes settings, and timeline, session, notes, perf, studio, view3d-add and node cover what the panels' buttons do. `infinite docs panels` names the verb for each panel.
+
+Everything around the nodes: the panels on the right, the strips along the bottom, the right-click menus, the dropdowns and the settings. Every picture here is a real screenshot of the app, taken by a script.
+These are the questions people ask most: what does the library do, what is the modulation matrix, how do I build a performance page, how do clips and tracks work, what is in the right-click menu. Each section shows the panel big, then explains every column, icon and control in it.
+
+## The window at a glance
+Picture: The whole window: menus and transport on top, the node canvas in the middle, the panel rail down the right edge.
+Picture: The top bar: logo, File, Edit and Menu, play and rewind, tempo, time signature, key and scale, metronome, the audio switch and the mode badge.
+
+- **Play / Rewind**: Starts and pauses the shared clock that drives sequencers, LFOs and the arrangement; rewind returns to the start.
+- **BPM (120.0)**: Tempo. Double-click to type an exact value or drag to change it. Every tempo-synced node follows it.
+- **Time signature (4 / 4)**: Beats per bar and the note value of a beat. It sets the bar lines in the arrangement.
+- **Key and scale (C Major)**: The global key. Scale-aware nodes snap to it. The dropdown lists Major, Natural / Harmonic / Melodic Minor, the church modes, Major and Minor Pentatonic, Blues, Whole Tone and Chromatic.
+- **Metronome**: Click track on or off.
+- **Start Audio / Stop Audio**: Starts or stops the audio engine. While it is stopped you will hear nothing.
+- **Timeline / Session / Studio badge**: Shows which of them is driving playback right now.
+- **fps, ms, cpu**: Frame rate, frame time and audio load, at the far right when the window is wide enough. Hover the audio readout for dropout (xrun) counts.
+Picture: Rail, top.
+Picture: Bottom.
+
+- **Library**: Every node, Field program, sample, media file and plugin.
+- **Viewport**: Live preview cards of any image node.
+- **Mod Matrix**: Every modulation route in one table.
+- **Performance**: Your own control surface of knobs, faders and pads.
+- **Timeline**: The arrangement: clips over time.
+- **Session**: Clip launcher: tracks across, scenes down.
+- **Studio**: Sample Studio: record, slice and export a take.
+- **3D**: 3D View: the scene, its camera and gizmos.
+- **Piano Roll**: Note editing and Generate.
+- **Terminal**: A real shell inside the app, with the infinite command.
+- **History (bottom)**: Every edit, newest first.
+- **Settings (bottom)**: The Settings window.
+
+## Menus
+The three menus at the top left. File handles patches, Edit handles undo and clipboard, Menu holds the windows, help and the show/set tools.
+Picture: File
+Picture: Edit
+Picture: Menu
+Picture: Menu, Panels: open any panel and set where it docks.
+
+## Library panel
+The top button of the panel rail opens the library: every node, sample, media file and plugin you can drop on the canvas. Click an entry, or drag it onto the canvas.
+Picture: Library, Modules tab: search box, Sort, order toggle, Filter, then the alphabetical list.
+
+- **Tabs**: Modules (every node type), Field (Field-language nodes and examples), Samples and Media (your own files), Plugins (VST3 and AU instruments and effects).
+- **Search**: Filters the list as you type.
+- **Sort**: Orders the list: favourites first, alphabetical and so on. The button beside it flips ascending and descending.
+- **Filter**: Narrows the list by category, for example only effects or only synths.
+- **List**: Click to add at the centre of the view, or drag to a spot. Star an entry to make it a favourite.
+Picture: Sort dropdown
+Picture: Filter dropdown
+Picture: Field tab
+Picture: Plugins tab
+
+## Viewport panel
+A live preview of any image node, next to the canvas. Right-click a node and choose **Open in viewport panel** (or select it and press Shift+V). Each card follows its node in real time and has a close button at its top right. Add several cards to watch different stages of a chain at once.
+Picture: No cards yet: the panel says how to add one.
+Picture: Right-click a node for its menu.
+
+## Modulation Matrix
+Every modulation in the patch in one table: which source drives which parameter, and how. Drag the splitter above the panel to make it taller. The table is shown in two halves so each column is readable.
+Picture: Left half: Source, Destination, Parameter, Value, Confidence.
+Picture: Right half: Lo, Hi, Inv, Curve, Signal and the delete button.
+
+- **Colour bar**: The cable colour of the source, so you can match a row to the cable on the canvas.
+- **Source**: The node that produces the control signal: macro xy, random, an LFO, an envelope and so on.
+- **Destination**: The node that receives it.
+- **Parameter**: Which parameter on the destination is being moved.
+- **Value**: The live, current value of that parameter after modulation.
+- **Confidence**: Used by prediction sources to report how sure they are. It shows -- for ordinary sources.
+- **Lo / Hi**: The range the parameter travels between. Click a number to type an exact limit. Narrow it for subtle movement.
+- **Inv**: Inverts the mapping: when the source goes up, the parameter goes down.
+- **Curve**: The response curve between source and parameter, drawn as a small graph.
+- **Signal**: A tiny live scope of the incoming signal, so you can see it moving.
+- **x**: Removes the route. The cable on the canvas disappears with it.
+
+## Performance panel
+Build your own control surface from knobs, faders, pads and switches, then play it live. It opens in **Edit Mode**; switch off Edit Mode (the button then reads **Perform**) to lock the layout and play it. Drag the splitter up for more room.
+Picture: The Performance panel docked at the right, in Edit Mode, with the showcase page.
+Picture: Edit Mode: knobs, faders, number boxes and a slider on the Showcase page.
+
+- **Edit Mode / Perform**: Edit Mode lets you add, move, resize and rename controls. Perform locks the layout so a stray drag cannot move anything.
+- **+ Add Control**: Opens the control list below and places the chosen control on the next free cell.
+- **Page tabs, +**: Pages group controls into screens (here one page, Showcase). The + button adds a page.
+Picture: + Add Control menu: ten control types, with their grid size in brackets.
+
+- **Knob (1x1)**: Any single parameter.
+- **Vertical Fader (1x2)**: Levels and mixes.
+- **Horizontal Slider (2x1)**: Long throws, crossfades.
+- **Toggle (1x1)**: On/off switches and bypass.
+- **XY Pad (2x2)**: Two parameters with one finger.
+- **Momentary Trigger / Bang (1x1)**: Fires a one-shot while held.
+- **Digital Number Box (1x1)**: Type or drag an exact value.
+- **Radio Selector (2x1)**: Pick one of several steps, 1 to 8.
+- **Bipolar Pan Knob (1x1)**: Centre-detent knob for pan or detune.
+- **Step Gate Ribbon (3x1)**: Eight on/off steps for a gate pattern.
+Picture: Right-click a control: Rename, Type, Assign Parameter, Clear Destination, MIDI CC Learn, Color Tint.
+Picture: The same page in Perform mode: the toolbar shrinks to Perform and the page tabs.
+
+- **Rename**: Change the label shown on the control.
+- **Type**: Swap the control for another type without losing its assignment.
+- **Assign Parameter...**: Bind the control to a node parameter, then move the control to move the parameter. The current target is shown greyed below it.
+- **Clear Destination**: Unbinds the control.
+- **MIDI CC Learn**: Move a knob on your MIDI controller to bind it to this control.
+- **Color Tint**: Colour-code the control so groups are easy to find on stage.
+
+## Arrangement panel
+The timeline. It sequences clips of nodes over time so a patch becomes a piece with a start and an end. Each icon in the toolbar is explained below; hover any of them in the app for its tooltip.
+Picture: The Timeline docked at the bottom: monitor, tracks, clips and markers.
+Picture: The Timeline made tall: toolbar, monitor, track list, markers (Intro, Groove), ruler, clips and the Inspector.
+Picture: Right end of the toolbar: Render, Audio and the Inspector pencil.
+
+- **Viewport monitor**: Shows or hides the preview of the timeline output at the left of the panel. Right-click for its dock position.
+- **Play / Pause (Space)**: Plays the timeline from the playhead.
+- **Return to Start (Enter)**: Jumps the playhead to the beginning.
+- **Bars / Time**: Switches the ruler between bars and beats and minutes and seconds.
+- **Tool (arrow)**: Selects the editing tool. See the dropdown below.
+- **Snap (magnet)**: Clip edges snap to the grid when on.
+- **1/4 (grid division)**: How fine the snap grid is. See the dropdown below.
+- **Loop**: Turns the loop region on or off. Shift-drag on the ruler to set the region.
+- **Flag (M)**: Drops a marker at the playhead.
+- **Row height**: Resets any resized tracks back to the default height.
+- **Render**: Renders the timeline to a video file (or a WAV when it holds only audio).
+- **Audio**: Lets the timeline drive audio as well as picture.
+- **Pencil**: Opens or closes the Inspector.
+Picture: Tool dropdown: Select (A), Range Selection (R), Trim (T), Pencil / Draw Clip (P), Cut (B), Hand (H), Zoom (Z).
+Picture: Snap grid dropdown: Off, 1 bar, 1/2, 1/4, 1/8, 1/16, each with a triplet (T).
+
+## Tracks, clips and the inspector
+
+### Adding tracks
+Click **+ Add Track** and choose Video Track or Audio Track. Audio tracks also carry **S** (solo), **M** (mute), a pan knob and a level knob; video tracks carry an opacity slider.
+Picture: + Add Track offers Video Track and Audio Track.
+
+### Adding a clip
+Right-click an empty spot on a track and choose **Add Clip**. The menu shows the bar and beat it will land on, snapped to the grid. A clip with no node yet is shown hatched.
+Picture: Right-click a lane: Add Clip at the clicked bar and beat.
+
+### Assigning a clip to a node
+Three ways: right-click a node on the canvas and choose **Add to Timeline** (creates an assigned clip at the playhead), choose **Assign Node...** in the clip's right-click menu, or use **Assign Different Node...** in the inspector. An assigned clip takes the node's name and a thumbnail, and the viewport monitor shows its output as the playhead crosses it.Picture: The Stage clip selected (outlined); the monitor on the left shows the timeline output.
+
+### Right-clicking a clip
+Picture: The clip menu.
+
+- **Rename (Cmd+R)**: Names the clip.
+- **Active**: Tick to play the clip; untick to mute it without deleting (it turns hatched).
+- **Fade In / Fade Out**: Fade length in milliseconds.
+- **Opacity**: Clip brightness against what is beneath it.
+- **Compositing**: Blend mode used to combine this clip with lower tracks.
+- **Color Grade**: A submenu of colour-grade adjustments for the clip.
+- **Color Tint**: Colour of the clip block on the timeline.
+- **Assign Node...**: Pick the node this clip plays.
+- **Group (Cmd+G) / Ungroup (Cmd+Shift+G)**: Treat several clips as one block you can move together.
+- **Delete (Backspace)**: Removes the clip.
+
+### The Inspector
+The pencil icon opens a side panel for whatever is selected. Select a clip and it shows the clip; select a track and it shows the track.
+Picture: Video Clip: name, Active, Timing & Position, Compositing & Video, Color Tint, Source Node.
+Picture: Video Track: name, Active, opacity, Track Tint, Duplicate, Delete.
+
+- **Name / Active**: Rename and enable or disable the clip or track.
+- **Start / Length**: Exact position and duration in bars.beats.ticks. Type a value for sample-accurate placement.
+- **Fade In / Fade Out**: Edge fades in milliseconds.
+)AGENTDOC"
+R"AGENTDOC(- **Blend / Opacity / Bright / Contrast / Sat**: How the clip composites over tracks beneath it.
+- **Color Tint**: The swatches colour the clip block.
+- **Source Node**: The node and node type the clip plays.
+- **Assign Different Node... / Clear Source**: Swap the node or make the clip unassigned again.
+
+### Selecting several clips and grouping
+To move or colour several clips at once, press **R** for the Range Selection tool and drag a box over them, then press **A** to return to Select. Clips grouped with Group (Cmd+G) move as one.
+
+### Grouping tracks
+Right-click a track name. **Convert to Group** wraps the track in a collapsible folder so a whole stack of tracks can be folded away. The same menu adds and renames tracks, deletes them, and offers **Render Track** to export just that track.
+Picture: Track menu.
+Picture: After Convert to Group: Group 2 (1) holds Stage.
+
+### Rendering
+**Render** opens the Render Timeline popup: the span (whole arrangement, loop, markers or a custom range), the video size and rate, and the output name, folder and format.
+Picture: Render Timeline popup.
+
+## History panel
+Every edit you make is listed, newest at the top. Click any line to jump the patch back (or forward) to that moment; edits after it are kept until you make a new change.
+Picture: History before the first edit.
+
+- **Start**: The patch as it was loaded.
+- **Bypass**: A node was bypassed or enabled.
+- **Edit 2 settings**: Two or more parameters changed together.
+- **Edit timeline**: A change in the arrangement.
+
+## Right-click menus and the Add Node palette
+Right-click does different things depending on what is under the cursor.
+Picture: On an audio node: bypass, duplicate, add to Timeline or Session, help, delete. Image nodes add viewport and window items.
+
+- **Bypass Node (B)**: Passes the input straight through.
+- **Duplicate (Cmd+D)**: Copies the node and its settings.
+- **Hide params**: Hides the node's parameter controls so it takes less room on the canvas.
+- **Open in viewport panel**: Adds a live card to the Viewport panel.
+- **Add to Timeline**: Creates an assigned clip in the Arrangement.
+- **Add to Session**: Puts the node in a Session slot.
+- **Open in new window**: Pops the node's output into its own window.
+- **Reference in chat**: Opens the chat with the node named in the message.
+- **Help**: Opens this node's help.
+- **Delete Node (Backspace)**: Removes it and its cables.
+Right-click empty canvas, or press Shift+N, to open the **Add node** palette. Type to search, or walk the categories (source, compositing, effects, 3d, notes, synths, audio effects, modulators, prediction, macros, utility). The arrow means a submenu.
+Picture: The Add node palette.
+Picture: Hover a category to see its nodes: compositing shown.
+
+## Settings
+The gear at the bottom of the rail (or Cmd+0) opens Settings. It has nine pages.
+Picture: Appearance
+Picture: Canvas & Workspace
+Picture: Audio
+Picture: General & Performance
+Picture: Field Language
+Picture: Expression Globals
+Picture: Extensions: install extension packs.
+Picture: Plugins: VST3 folders and every scanned plugin.
+Picture: Terminal: Command line & agents (one-click setup, coding agent), the panel and the infinite command.
+
+## Settings: Command line & agents
+On the Terminal page, **Connect terminal & agent** opens a Terminal tab and runs a short setup script. It puts the `infinite` command on your PATH for every terminal, checks the headless engine, makes sure Node.js is present, fetches the Infinite MCP server and registers it with your coding agent. Each step checks first and is skipped when it is already done, so the button doubles as a repair. A tick appears per step when the script finishes it. Password prompts (Homebrew, sudo) appear in the tab.
+**Coding agent** picks the agent (Claude Code first). **Install** shows when it is missing and types the vendor's own installer into a Terminal tab. **Start agent** opens a tab in the open patch's folder and starts it with Infinite's MCP server registered. Start the agent when the Terminal opens is off by default. Infinite never asks for or stores an API key: the agent's own login runs in the tab. Nothing is installed until you press a button.
+Setup is one time. It survives quitting, restarting and updating Infinite: the `infinite` command is a small launcher that finds the current Infinite, and the agent's registration points at that launcher. Each time Infinite starts it quietly checks the steps. If everything holds, nothing shows. If something broke (Infinite moved, the agent was uninstalled, the line was removed from your shell profile), that step turns amber with a **Repair** button that reruns only that step.
+
+## Sound panels: Session, Sample Studio, Piano Roll
+Three more strips dock along the bottom. Each has its own toolbar; right-click the toolbar for its dock position.
+Picture: Session: tracks across, scenes down. Click a clip to launch it, click a scene name to launch the row. The playing scene is outlined.
+Picture: Sample Studio: a take cut into eight slices. Toolbar: open, play, input, Bars/Time/Samples, tools, Slice, Generate, Export, Convert. The Sample card on the right sets pitch, speed and fades.
+Picture: Piano Roll: pages of notes over the keyboard, with record input, quantise, Fx and Generate in the toolbar.
+
+## 3D View
+The 3D View shows the scene the 3D nodes build. The toolbar holds add, select, move, rotate and scale, the pivot and orientation choices and the view toggles. Drag the axis gizmo at the top right to orbit; the four buttons at the bottom right zoom, pan, fly the camera and lock it. The Scene list at the right lists every object; the eye hides one.
+Picture: 3D View docked at the bottom with the Scene list open.
+
+## Windows and dialogs
+Picture: All Shortcuts (Menu, All shortcuts): filter box, then every shortcut by group.
+Picture: Help and module reference: getting started, controls, then every node.
+Picture: Template library (File, Template library): opens a copy; the original never changes.
+Picture: About Infinite: version, build, credits, licence links.
+
+)AGENTDOC";
+
    inline const char* kFieldManual =
 R"AGENTDOC(# The Field Language Manual
 

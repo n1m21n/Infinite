@@ -93,6 +93,8 @@ namespace CliSetup
       std::string workspace;      // the folder agents work in; "" = the open patch's folder, else HOME
       bool folderAccess = false;  // agents may also read and edit files in the folder (else only `infinite` and attached files)
       std::map<std::string, std::string> models;  // per agent id; missing = the agent's own default
+      std::vector<std::string> folders;   // more folders agents may read (and edit, with folderAccess)
+      std::vector<std::string> commands;  // commands agents may run besides `infinite` ("ffprobe")
       bool introduced = false;    // the "connected, try this" line was shown once
    };
    Config LoadConfig(const std::string& file);
@@ -160,5 +162,7 @@ namespace CliSetup
 
    // Process-wide state used by the app (Settings page and the Terminal panel).
    Config& Prefs();
+   // A path as the user reads it: their home folder as ~ ("~/Music"), so no account name shows on screen.
+   std::string HomeTilde(const std::string& path);
    std::string RealExecutable();
 }

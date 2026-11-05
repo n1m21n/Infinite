@@ -669,6 +669,11 @@ if ($Failed -gt 0) { exit 1 }
       c.workspace = j.value("workspace", std::string());
       c.folderAccess = j.value("folderAccess", false);
       c.introduced = j.value("introduced", false);
+      for (const char* key : { "folders", "commands" })
+         if (j.contains(key) && j[key].is_array())
+            for (const auto& v : j[key])
+               if (v.is_string() && !v.get<std::string>().empty())
+                  (std::string(key) == "folders" ? c.folders : c.commands).push_back(v.get<std::string>());
       if (j.contains("models") && j["models"].is_object())
          for (auto it = j["models"].begin(); it != j["models"].end(); ++it)
             if (it.value().is_string() && FindAgent(it.key()) != nullptr)
@@ -682,7 +687,7 @@ if ($Failed -gt 0) { exit 1 }
       std::filesystem::create_directories(AppPaths::FsPath(file).parent_path(), ec);
       std::ofstream(AppPaths::FsPath(file)) << nlohmann::json{ { "agent", c.agent }, { "autoStart", c.autoStart }, { "welcomed", c.welcomed }, { "face", c.face },
                                                                 { "workspace", c.workspace }, { "folderAccess", c.folderAccess }, { "introduced", c.introduced },
-                                                                { "models", c.models } }.dump(2) << "\n";
+                                                                { "models", c.models }, { "folders", c.folders }, { "commands", c.commands } }.dump(2) << "\n";
    }
 
    namespace
@@ -1052,6 +1057,21 @@ fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
       default:
          return false;
       }
+   }
+
+   std::string HomeTilde(const std::string& path)
+   {
+      const char* home = std::getenv("HOME");
+      if (home == nullptr || *home == '\0')
+         return path;
+      std::string h = home;
+      while (h.size() > 1 && (h.back() == '/' || h.back() == '\\'))
+         h.pop_back();
+      if (path == h)
+         return "~";
+      if (path.size() > h.size() && path.compare(0, h.size(), h) == 0 && (path[h.size()] == '/' || path[h.size()] == '\\'))
+         return "~" + path.substr(h.size());
+      return path;
    }
 
    Config& Prefs()

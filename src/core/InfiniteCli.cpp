@@ -1153,6 +1153,7 @@ Terminal term open|list|read|send|run
       static const char* kTopics = R"(Topics (infinite docs <topic>):
   shortcuts      every keyboard shortcut on this system (needs the app open)
   panels         the panels, which are open, and the verb that opens each
+  ui [part]      every panel, menu, column, button and dropdown, and what each does (part: a word of a heading, e.g. timeline)
   nodes [name]   the Node Field Guide: every node's card, or one node's card, help text and controls
   field          the Field manual (language, domains, nodes)
   headless       the headless guide: render, check and drive Infinite without the window
@@ -1215,6 +1216,32 @@ midi general autosave performance movement-log learning diagnostics updates fiel
             fputs(doc.c_str(), stdout);
          }
       }
+      else if (topic == "ui")
+      {
+         const std::string all = AgentDocs::kUiGuide;
+         if (name.empty())
+            fputs(all.c_str(), stdout);
+         else
+         {
+            // The sections whose heading names that part ("timeline", "matrix", "right-click").
+            std::string want = name, out;
+            std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            size_t at = 0;
+            while ((at = all.find("\n## ", at)) != std::string::npos)
+            {
+               const size_t end = all.find("\n## ", at + 1);
+               const std::string sec = all.substr(at + 1, end == std::string::npos ? std::string::npos : end - at - 1);
+               std::string head = sec.substr(0, sec.find('\n'));
+               std::transform(head.begin(), head.end(), head.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+               if (head.find(want) != std::string::npos)
+                  out += sec + "\n";
+               at = end == std::string::npos ? all.size() : end;
+            }
+            if (out.empty())
+               Fail("no part of the app called '" + name + "'; `infinite docs ui` has every panel");
+            fputs(out.c_str(), stdout);
+         }
+      }
       else if (topic == "field")
          fputs(AgentDocs::kFieldManual, stdout);
       else if (topic == "headless")
@@ -1264,7 +1291,7 @@ midi general autosave performance movement-log learning diagnostics updates fiel
 Loop: patch new, edit the .inf, patch check, fix, patch layout, patch apply.
 Code loop: code new, edit, code check, code watch --node <n>, shot <n>.
 Facts come from `describe <type>`, `docs <topic>` and `code docs <language>`, never from memory.
-`docs` lists the manuals: shortcuts, panels, nodes, field, headless, connections, patch-format, geometry,
+`docs` lists the manuals: shortcuts, panels, ui, nodes, field, headless, connections, patch-format, geometry,
 map, and the visual, sound and film crafts.
 `infinite` with no verb lists every verb; `infinite guide` prints the patch authoring guide.
 )", stdout);

@@ -639,6 +639,7 @@ and every request is about that patch unless they name a file.
    | it crashed, send logs, update | `infinite settings logs`, `infinite settings updates`; `[Diagnostics](open:settings/diagnostics)` |
    | what does this node do, how to use it, shortcuts | `infinite docs nodes <name>`, `infinite docs shortcuts` |
    | where is a panel or setting | a button: `open:<panel>` or `open:settings/<place>` (`infinite docs panels`) |
+   | what a button, column or dropdown in a panel does; how a panel works | `infinite docs ui <panel>`, then the verb it names |
    | upload or post somewhere | you cannot reach other sites from here: save the file, give its path, say where to upload it |
    | anything outside Infinite | answer briefly; say plainly what you cannot do from here |
 

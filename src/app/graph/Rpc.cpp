@@ -523,6 +523,10 @@ namespace app
          }
          PushUndoCheckpoint();
          Patch::LoadParams(gn->node.get(), { { matchedKey, valueStr } });
+         // Text is code or a file path: compile it or load the file now, as the editor's Apply and a patch load do,
+         // so the canvas shows what was set (a Field kernel otherwise keeps running its old program).
+         if (matchedKey[0] == 's')
+            ReloadDerivedState(gn->node.get());
          // A plain value replaces a formula, as it does in the field.
          if (numeric)
          {
@@ -533,6 +537,9 @@ namespace app
                Modulation::Instance().ClearExpression(gn->index, param);
          }
          outResult = json::object();
+         if (matchedKey[0] == 's')
+            if (const std::string err = gn->node->CodeError(); !err.empty())
+               outResult["codeError"] = err;  // set, but it does not compile: say so instead of a silent ok
          return true;
       }
       else if (method == "set_node_position" || method == "get_node_position")

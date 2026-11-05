@@ -188,7 +188,8 @@ namespace app
       };
       std::vector<Queued> sQueue;
       bool sQueueHold = false;
-      constexpr float kQueueRowH = 24.0f;
+      constexpr float kQueueRowH = 26.0f;
+      constexpr float kQueuePad = 3.0f;  // air above and below the tray's rows
       bool sCursorToEnd = false;
       // Selecting an agent's words: every word and chip DrawFlow lays out this frame, with where it
       // sits, so a drag can be hit-tested, highlighted and copied as the text it reads.
@@ -1081,6 +1082,8 @@ namespace app
             if (m != prefs.models.end())
                to.model = m->second;
             to.folderAccess = prefs.folderAccess;
+            to.folders = prefs.folders;
+            to.commands = prefs.commands;
          }
          o.argv = chat::AgentArgs(r.kind, s.live ? prompt : chat::Briefing() + prompt, s.id, s.live, dirs, to);
          TerminalCommandEnv(o.env, o.cwd);
@@ -1299,6 +1302,41 @@ namespace app
 
       void SendQueued();
 
+      // Under a "Not allowed: …" note: one click to allow that command or folder from now on, and the Settings page
+      // that lists what agents may run and open.
+      void DrawDeniedFix(const Entry& e, int i)
+      {
+         const std::string denied = e.text.substr(std::strlen(T("Not allowed:")) + 1);
+         const chat::DeniedFix fix = chat::FixFor(denied);
+         auto& prefs = CliSetup::Prefs();
+         auto& list = fix.kind == chat::DeniedFix::Kind::Folder ? prefs.folders : prefs.commands;
+         const bool have = fix.kind != chat::DeniedFix::Kind::None && std::find(list.begin(), list.end(), fix.value) != list.end();
+         ImGui::PushID(i);
+         ImGui::PushID("deny");
+         if (fix.kind != chat::DeniedFix::Kind::None)
+         {
+            std::string label = have ? std::string(T("Allowed")) : fix.kind == chat::DeniedFix::Kind::Folder ? std::string(T("Allow folder")) : std::string(T("Allow")) + " " + fix.value;
+            ImGui::BeginDisabled(have);
+            if (ChipButton::Draw(label.c_str(), !have))
+            {
+               list.push_back(fix.value);
+               SaveCliConfig();
+            }
+            ImGui::EndDisabled();
+            if (fix.kind == chat::DeniedFix::Kind::Folder && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+               ImGui::SetTooltip("%s", CliSetup::HomeTilde(fix.value).c_str());
+            ImGui::SameLine(0.0f, tok::space_2);
+         }
+         if (ChipButton::Draw(T("Settings"), false))
+         {
+            json r;
+            std::string err;
+            HandleRpcCommand("panel", { { "name", "settings/agents" }, { "open", true } }, r, err);
+         }
+         ImGui::PopID();
+         ImGui::PopID();
+      }
+
       void PollRuns()
       {
          if (sRuns.empty())
@@ -1426,45 +1464,60 @@ namespace app
          sAttach = std::move(keepFiles);
       }
 
-      // Queued messages, one quiet row each over the composer: click to take it back into the box, × to drop it.
+      // Queued messages: a tray tucked on top of the composer, one row each. The clock sits over the composer's +,
+      // the × over Send, so the tray and the box share one set of columns. Click a row to edit it, × to drop it.
+      float QueueHeight() { return sQueue.empty() ? 0.0f : (float)sQueue.size() * kQueueRowH + 2.0f * kQueuePad; }
+
       void DrawQueue(float width)
       {
          if (sQueue.empty())
             return;
          ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 at = ImGui::GetCursorScreenPos();
+         const float inset = tok::radius_tile * 2.0f;  // the composer's corner: the tray meets its straight edge
+         const float pad = tok::space_3;                // the composer's own inset
+         const ImVec2 t0(at.x + inset, at.y), t1(at.x + width - inset, at.y + QueueHeight());
+         dl->AddRectFilled(t0, t1, TextTint(0.04f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
+         dl->AddRect(t0, ImVec2(t1.x, t1.y + 1.0f), TextTint(0.10f), tok::radius_tile * 2.0f, ImDrawFlags_RoundCornersTop);
+         const float leftC = at.x + pad + 7.0f;                      // centre of the composer's + glyph
+         const float rightC = std::floor(at.x + width - pad - 13.0f + 2.0f);  // centre of Send
          int take = -1, drop = -1;
          for (size_t i = 0; i < sQueue.size(); i++)
          {
-            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const ImVec2 p(t0.x, at.y + kQueuePad + kQueueRowH * (float)i);
+            const float rowW = t1.x - t0.x;
+            const float xW = 2.0f * (t1.x - rightC);
+            ImGui::SetCursorScreenPos(p);
             ImGui::PushID((int)i);
-            const bool row = ImGui::InvisibleButton("##queued", ImVec2(width - kQueueRowH, kQueueRowH));
+            const bool row = ImGui::InvisibleButton("##queued", ImVec2(rowW - xW, kQueueRowH));
             const bool hot = ImGui::IsItemHovered();
             ImGui::SameLine(0.0f, 0.0f);
-            const bool x = ImGui::InvisibleButton("##unqueue", ImVec2(kQueueRowH, kQueueRowH));
+            const bool x = ImGui::InvisibleButton("##unqueue", ImVec2(xW, kQueueRowH));
             const bool xHot = ImGui::IsItemHovered();
             ImGui::PopID();
             if (row)
                take = (int)i;
             if (x)
                drop = (int)i;
-            if (hot || xHot)
-               dl->AddRectFilled(p, ImVec2(p.x + width, p.y + kQueueRowH), TextTint(0.05f), tok::radius_tile);
-            const float ty = p.y + (kQueueRowH - ImGui::GetFontSize()) * 0.5f;
-            const char* tag = T("Queued");
-            dl->AddText(ImVec2(p.x + tok::space_2, ty), Dim(), tag);
-            const float tx = p.x + tok::space_2 + ImGui::CalcTextSize(tag).x + tok::space_2;
+            const float cy = std::floor(p.y + kQueueRowH * 0.5f);
+            if (hot)
+               dl->AddRectFilled(ImVec2(p.x + 3.0f, p.y), ImVec2(p.x + rowW - 3.0f, p.y + kQueueRowH), TextTint(0.05f), tok::radius_tile);
+            glyph::Draw(dl, ImVec2(leftC, cy), tok::icon_sm, Dim(), IconsInfinite::History);
+            const float tx = leftC + 7.0f + tok::space_2, ty = cy - ImGui::GetFontSize() * 0.5f;
             std::string one = sQueue[i].text.substr(0, sQueue[i].text.find('\n'));
             if (!sQueue[i].files.empty())
                one += (one.empty() ? "" : "  ") + std::string("+") + std::to_string(sQueue[i].files.size());
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.75f)));
-            ImGui::RenderTextEllipsis(dl, ImVec2(tx, ty), ImVec2(p.x + width - kQueueRowH, p.y + kQueueRowH), p.x + width - kQueueRowH - tok::space_1, one.c_str(), nullptr, nullptr);
+            const float textEnd = rightC - 7.0f - tok::space_2;
+            ImGui::RenderTextEllipsis(dl, ImVec2(tx, ty), ImVec2(textEnd, p.y + kQueueRowH), textEnd, one.c_str(), nullptr, nullptr);
             ImGui::PopStyleColor();
-            glyph::Draw(dl, ImVec2(p.x + width - kQueueRowH * 0.5f, p.y + kQueueRowH * 0.5f), tok::icon_sm, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            glyph::Draw(dl, ImVec2(rightC, cy), tok::icon_sm, xHot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (hot)
                ImGui::SetTooltip("%s", T("Edit"));
             else if (xHot)
                ImGui::SetTooltip("%s", T("Remove"));
          }
+         ImGui::SetCursorScreenPos(ImVec2(at.x, t1.y));
          if (take >= 0)
          {
             Queued q = std::move(sQueue[(size_t)take]);
@@ -2326,8 +2379,8 @@ namespace app
          }
       }
 
-      // A small grey line above an agent's rows: its name, and Copy while the answer is hovered.
-      void DrawAgentLabel(const Entry& e, float width, int id, bool copy)
+      // A small grey line above an agent's rows: its avatar and name. Words are copied by selecting them.
+      void DrawAgentLabel(const Entry& e)
       {
          const ImVec2 at = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2339,18 +2392,6 @@ namespace app
          DrawAvatar(dl, ImVec2(at.x + 8.0f, at.y + h * 0.5f), 8.0f, e.agent);
          Weight cap(UiType::Weight::Medium);
          dl->AddText(ImVec2(at.x + 22.0f, at.y + (h - ImGui::GetTextLineHeight()) * 0.5f), AgentTint(e.agent), AgentName(e.agent));
-         if (copy)
-         {
-            const char* label = T("Copy");
-            const float w = ImGui::CalcTextSize(label).x;
-            ImGui::SetCursorScreenPos(ImVec2(at.x + width - w, at.y));
-            ImGui::PushID(id);
-            const bool clicked = ImGui::InvisibleButton("##copy", ImVec2(w, h));
-            ImGui::PopID();
-            dl->AddText(ImVec2(at.x + width - w, at.y), ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), label);
-            if (clicked)
-               ImGui::SetClipboardText(e.text.c_str());
-         }
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + h + 4.0f));
       }
 
@@ -2358,7 +2399,7 @@ namespace app
       {
          const ImVec2 top = ImGui::GetCursorScreenPos();
          if (label)
-            DrawAgentLabel(e, width, id, ui.hovered);
+            DrawAgentLabel(e);
          const ImVec2 body = ImGui::GetCursorScreenPos();
          sFlowEntry = id;
          DrawBlocks(BlocksFor(e.text), width, id);
@@ -2957,6 +2998,9 @@ namespace app
          sRefocus = sCursorToEnd = true;
       }
 
+      bool sOverPill = false; // the mouse is on the Copy / Reply pill this frame
+      int sPillPress = 0;     // 1 Copy, 2 Reply: pressed, waiting for the release
+
       void ClearSelection()
       {
          sSelEntry = -1;
@@ -3033,20 +3077,39 @@ namespace app
                const ImVec2 bg1(at.x + w, at.y + h + 2.0f * pad);
                dl->AddRectFilled(at, bg1, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_tile + pad);
                dl->AddRect(at, bg1, ImGui::GetColorU32(ImGuiCol_Border), tok::radius_tile + pad);
-               const ImVec2 back = ImGui::GetCursorScreenPos();
-               ImGui::SetCursorScreenPos(ImVec2(at.x + pad, at.y + pad));
-               const bool copy = ChipButton::Draw((std::string(T("Copy")) + "##selcopy").c_str(), false, h);
-               ImGui::SameLine(0.0f, pad);
-               const bool reply = ChipButton::Draw((std::string(T("Reply")) + "##selreply").c_str(), false, h);
-               ImGui::SetCursorScreenPos(back);
-               if (copy || reply)
+               // Hit-tested by hand, not ImGui items: while the composer holds focus ImGui hovers nothing else,
+               // and the press would fall through to the words and start a new selection.
+               const float cw = ImGui::CalcTextSize(T("Copy")).x + 2.0f * tok::space_2;
+               const ImRect copyR(ImVec2(at.x + pad, at.y + pad), ImVec2(at.x + pad + cw, at.y + pad + h));
+               const ImRect replyR(ImVec2(copyR.Max.x + pad, at.y + pad), ImVec2(bg1.x - pad, at.y + pad + h));
+               sOverPill = ImRect(at, bg1).Contains(m);
+               int action = 0;
+               for (int k = 0; k < 2; k++)
+               {
+                  const ImRect& r = k == 0 ? copyR : replyR;
+                  const bool hov = r.Contains(m);
+                  const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                  dl->AddRectFilled(r.Min, r.Max, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 0.12f : 0.06f)), tok::radius_tile);
+                  const char* label = k == 0 ? T("Copy") : T("Reply");
+                  const ImVec2 ts = ImGui::CalcTextSize(label);
+                  dl->AddText(ImVec2(std::round(r.Min.x + (r.GetWidth() - ts.x) * 0.5f), std::round(r.Min.y + (h - ts.y) * 0.5f)),
+                              ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : 0.8f)), label);
+                  if (hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                     sPillPress = k + 1;
+                  if (hov && sPillPress == k + 1 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+                     action = k + 1;
+               }
+               if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+                  sPillPress = 0;
+               if (action != 0)
                {
                   const std::string text = SelectedText(idx, lo, hi);
-                  if (copy)
+                  if (action == 1)
                      ImGui::SetClipboardText(text.c_str());
                   else
                      QuoteInComposer(text);
                   ClearSelection();
+                  sOverPill = false;
                   return;
                }
             }
@@ -3057,7 +3120,9 @@ namespace app
                ClearSelection();
          }
          // A press on an agent's words starts a selection; a double click takes the whole word.
-         const bool here = ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered();
+         const bool pill = sOverPill && has && !sSelDrag;
+         sOverPill = false;
+         const bool here = ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && !pill && sPillPress == 0;
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !sSelDrag)
          {
             int entry = -1;
@@ -3084,7 +3149,7 @@ namespace app
                   }
                }
             }
-            else if (here || !ImGui::IsWindowHovered())
+            else if (!pill && sPillPress == 0 && (here || !ImGui::IsWindowHovered()))
                ClearSelection();
          }
          if (here)
@@ -3158,6 +3223,8 @@ namespace app
                   ImGui::TextUnformatted(e.text.c_str());
                   ImGui::PopTextWrapPos();
                   ImGui::PopStyleColor();
+                  if (e.kind == Entry::Kind::Note && e.text.rfind(T("Not allowed:"), 0) == 0)
+                     DrawDeniedFix(e, i);
                   if (e.kind == Entry::Kind::Error)
                   {
                      ImGui::PushID(i);
@@ -4089,7 +4156,7 @@ namespace app
       const float wrapW = std::max(1.0f, composerW - 2.0f * tok::space_3 - ImGui::GetStyle().ScrollbarSize);
       const float textH = fs * (float)std::clamp(VisualLines(wrapW), 1, 6) + 4.0f;
       const float composerH = tok::space_3 + (sAttach.empty() ? 0.0f : 26.0f) + textH + 6.0f + 26.0f + tok::space_2;
-      const float queueH = (float)sQueue.size() * kQueueRowH;
+      const float queueH = QueueHeight();
       DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();
       ImGui::SetCursorScreenPos(ImVec2(mn.x + (width - composerW) * 0.5f, c.y + tok::space_1));

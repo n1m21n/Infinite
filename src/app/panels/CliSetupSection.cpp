@@ -69,32 +69,55 @@ namespace app
 
       FormParts::Section(T("Agents"));
 
+      // Every row the same grid: the label column, the value after it, and one button column on the right edge whose
+      // buttons all share one width and the row's height.
+      const float rowH = ImGui::GetFrameHeight();
+      float bw = 84.0f;
+      for (const char* l : { "Sign in", "Sign out", "Set up", "Cancel", "Repair", "Choose…", "Clear all", "Add folder…", "Remove" })
+         bw = std::max(bw, ImGui::CalcTextSize(T(l)).x + 2.0f * tok::space_3);
+      // Label first, then this: the value text, cut to what fits before the button column.
+      auto value = [&](const std::string& text, bool dim)
+      {
+         const float room = std::max(0.0f, ImGui::GetContentRegionAvail().x - bw - tok::space_3);
+         std::string shown = text;
+         if (ImGui::CalcTextSize(shown.c_str()).x > room)
+         {
+            while (!shown.empty() && ImGui::CalcTextSize(("…" + shown).c_str()).x > room)
+               shown.erase(0, 1);
+            shown = "…" + shown;
+         }
+         ImGui::AlignTextToFramePadding();
+         if (dim)
+            ImGui::TextDisabled("%s", shown.c_str());
+         else
+            ImGui::TextUnformatted(shown.c_str());
+         if (shown != text && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", text.c_str());
+      };
+      // The row's button, in the right column.
+      auto button = [&](const char* label, bool primary)
+      {
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - bw);
+         const float w = std::max(bw, ImGui::CalcTextSize(label).x + 2.0f * tok::space_3);
+         return ChipButton::Draw(label, primary, rowH, w);
+      };
+
       // One row per agent, all the same: its mark, its name, where it stands, and the one button that moves it on.
       for (const Agent& a : Agents())
       {
          const ChatAgentInfo info = ChatAgentStatus(a.id);
          ImGui::PushID(a.id);
          FormParts::Label(L(a.name));
-         const float h = ImGui::GetFrameHeight();
-         const float rowStart = ImGui::GetCursorPosX();
          const float rowW = ImGui::GetContentRegionAvail().x;
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h * 0.42f, a.id);
-         ImGui::Dummy(ImVec2(h, h));
-         FormParts::Inline();
-         ImGui::AlignTextToFramePadding();
-         if (info.ready)
-            ImGui::TextUnformatted(info.status.c_str());
-         else
-            ImGui::TextDisabled("%s", info.status.c_str());
+         ChatDrawAvatar(ImGui::GetWindowDrawList(), ImVec2(at.x + rowH * 0.5f, at.y + rowH * 0.5f), rowH * 0.42f, a.id);
+         ImGui::Dummy(ImVec2(rowH, rowH));
+         FormParts::Inline(0.0f, tok::space_2);
+         value(info.status, !info.ready);
          if (!info.action.empty())  // Cancel shows while a sign-in waits
-         {
-            const float bw = std::max(84.0f, ImGui::CalcTextSize(info.action.c_str()).x + 2.0f * tok::space_3);
-            ImGui::SameLine(0.0f, 0.0f);
-            ImGui::SetCursorPosX(rowStart + rowW - bw);
-            if (ChipButton::Draw(info.action.c_str(), !info.ready, h, bw))
+            if (button(info.action.c_str(), !info.ready))
                ChatAgentAct(a.id, false);
-         }
          ChatAgentCodeEntry(a.id, rowW);
          ImGui::PopID();
       }
@@ -142,10 +165,8 @@ namespace app
          if (!broken.empty() && cur.ready && !cur.busy)
          {
             FormParts::Label(L("Connection"));
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%s", broken.c_str());
-            FormParts::Inline();
-            if (FormParts::Button(L("Repair")))
+            value(broken, true);
+            if (button(L("Repair"), true))
                ChatAgentAct(agent->id, true);
          }
       }
@@ -153,10 +174,8 @@ namespace app
       {
          const Paths wpaths = PathsFor(AppPaths::AppSupportDir(), CurrentOs());
          FormParts::Label(L("Agent folder"));
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(prefs.workspace.empty() ? T("The open patch's folder") : prefs.workspace.c_str());
-         FormParts::Inline();
-         if (FormParts::Button(L("Choose…")))
+         value(prefs.workspace.empty() ? std::string(T("The open patch's folder")) : HomeTilde(prefs.workspace), prefs.workspace.empty());
+         if (button(L("Choose…"), false))
          {
             const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
             if (!dir.empty())
@@ -165,17 +184,64 @@ namespace app
                SaveConfig(wpaths.config, prefs);
             }
          }
-         FormParts::Label(L("Edit files in it"));
-         if (Switch::Box("##agentaccess", &prefs.folderAccess))
-            SaveConfig(wpaths.config, prefs);
+         // More folders agents may open, and the commands they may run besides `infinite`: what an Allow under a
+         // "Not allowed" note in the chat adds, and where it is taken back.
+         for (size_t i = 0; i < prefs.folders.size(); i++)
+         {
+            ImGui::PushID((int)i);
+            FormParts::Label(i == 0 ? L("More folders") : "");
+            value(HomeTilde(prefs.folders[i]), false);
+            const bool remove = button(L("Remove"), false);
+            ImGui::PopID();
+            if (remove)
+            {
+               prefs.folders.erase(prefs.folders.begin() + (long)i);
+               SaveConfig(wpaths.config, prefs);
+               break;
+            }
+         }
+         FormParts::Label(prefs.folders.empty() ? L("More folders") : "");
+         value(prefs.folders.empty() ? std::string(T("None")) : std::string(), true);
+         if (button(L("Add folder…"), false))
+         {
+            const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
+            if (!dir.empty() && std::find(prefs.folders.begin(), prefs.folders.end(), dir) == prefs.folders.end())
+            {
+               prefs.folders.push_back(dir);
+               SaveConfig(wpaths.config, prefs);
+            }
+         }
+         FormParts::Label(L("Edit files in them"));
+         {
+            const float pad = (rowH - Switch::kH) * 0.5f;
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+            if (Switch::Box("##agentaccess", &prefs.folderAccess))
+               SaveConfig(wpaths.config, prefs);
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+         }
+         for (size_t i = 0; i < prefs.commands.size(); i++)
+         {
+            ImGui::PushID(1000 + (int)i);
+            FormParts::Label(i == 0 ? L("Allowed commands") : "");
+            value(prefs.commands[i], false);
+            const bool remove = button(L("Remove"), false);
+            ImGui::PopID();
+            if (remove)
+            {
+               prefs.commands.erase(prefs.commands.begin() + (long)i);
+               SaveConfig(wpaths.config, prefs);
+               break;
+            }
+         }
       }
 
       {
          const int count = ChatSavedCount();
          const std::string label = std::string(T("Saved chats")) + " (" + std::to_string(count) + ")";
          FormParts::Label(label.c_str());
+         ImGui::Dummy(ImVec2(0.0f, rowH));
          ImGui::BeginDisabled(count == 0 || ChatBusy());
-         if (FormParts::Button(L("Clear all")))
+         if (button(L("Clear all"), false))
             ImGui::OpenPopup("##clearchats");
          ImGui::EndDisabled();
          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));

@@ -39,7 +39,19 @@ namespace chat
    {
       std::string model;
       bool folderAccess = false;
+      std::vector<std::string> folders;   // more folders from Settings, read (and edited with folderAccess)
+      std::vector<std::string> commands;  // commands allowed besides `infinite`
    };
+
+   // What would have let a denied step run: a command to allow ("ffprobe"), or a folder to open to agents.
+   // `denied` is a "Not allowed" line (a Bash command, or "Read /path"). None for commands too wide to allow
+   // with one click (a shell, sudo, rm).
+   struct DeniedFix
+   {
+      enum class Kind { None, Command, Folder } kind = Kind::None;
+      std::string value;
+   };
+   DeniedFix FixFor(const std::string& denied);
 
    // argv for one turn. The prompt goes as an argument: a PTY line holds about 1 KB.
    // `dirs`: folders of attached files the turn may read (ChatFiles FileDirs).

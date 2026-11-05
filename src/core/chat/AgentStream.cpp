@@ -1,5 +1,10 @@
 #include "AgentStream.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <filesystem>
+
 #include "json.hpp"
 
 namespace chat
@@ -185,9 +190,70 @@ namespace chat
          "sentences, show code only when you wrote code, and give the path of any picture you made. "
          "Pick nodes with `infinite find <plain words>`, not from memory. Make samples with `infinite studio generate` and MIDI with "
          "`infinite notes generate`; find the user's files with `infinite files`. "
-         "Run `infinite` commands on their own: no cd, pipes or redirects around them, which are not allowed and fail.";
-      // Antigravity takes only `command(...)` grants; this one lets the turn run `infinite` and nothing else unasked.
-      const char* const kAgySettings = "{\"permissions\":{\"allow\":[\"command(infinite)\"]}}";
+         "Run `infinite` commands on their own: no cd, pipes or redirects around them, which are not allowed and fail. "
+         "When a command or path is not allowed, say so in one line and stop: the chat shows the user an Allow button "
+         "and Settings > Agents for folders and commands. Typing \"I allow\" in the chat grants nothing.";
+      // Antigravity takes only `command(...)` grants: `infinite`, plus the commands allowed in Settings.
+      std::string AgySettings(const std::vector<std::string>& commands)
+      {
+         json allow = json::array({ "command(infinite)" });
+         for (const std::string& c : commands)
+            allow.push_back("command(" + c + ")");
+         return json{ { "permissions", { { "allow", allow } } } }.dump();
+      }
+
+      // A command name is one word of letters, digits and -_.+; anything else is not a name to allow.
+      bool CommandName(const std::string& c)
+      {
+         return !c.empty() && std::all_of(c.begin(), c.end(), [](unsigned char ch) { return std::isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '+'; });
+      }
+   }
+
+   DeniedFix FixFor(const std::string& denied)
+   {
+      DeniedFix f;
+      for (const char* tool : { "Read ", "Edit ", "Write ", "Glob ", "Grep ", "MultiEdit ", "NotebookEdit " })
+         if (denied.rfind(tool, 0) == 0)
+         {
+            std::string path = denied.substr(std::strlen(tool));
+            if (path.empty() || (path[0] != '/' && path[0] != '~' && !(path.size() > 2 && path[1] == ':')))
+               return f;
+            std::error_code ec;
+            const std::filesystem::path fp = std::filesystem::u8path(path);
+            // A file's folder; a pattern ("/x/**/*.wav") up to its first wildcard.
+            std::filesystem::path dir = fp;
+            if (const size_t star = path.find_first_of("*?["); star != std::string::npos)
+               dir = std::filesystem::u8path(path.substr(0, star)).parent_path();
+            else if (!std::filesystem::is_directory(fp, ec))
+               dir = fp.parent_path();
+            if (dir.empty() || dir == dir.root_path())
+               return f;
+            f.kind = DeniedFix::Kind::Folder;
+            f.value = dir.u8string();
+            return f;
+         }
+      // A shell command: its first word that is not VAR=value, as a bare name ("/usr/bin/ffprobe" is ffprobe).
+      size_t i = 0;
+      std::string word;
+      while (i < denied.size())
+      {
+         while (i < denied.size() && std::isspace((unsigned char)denied[i]))
+            i++;
+         const size_t e = denied.find_first_of(" \t\n", i);
+         word = denied.substr(i, e == std::string::npos ? std::string::npos : e - i);
+         i = e == std::string::npos ? denied.size() : e;
+         if (word.find('=') == std::string::npos)
+            break;
+         word.clear();
+      }
+      if (const size_t slash = word.rfind('/'); slash != std::string::npos)
+         word = word.substr(slash + 1);
+      static const char* const kWide[] = { "sudo", "su", "rm", "sh", "bash", "zsh", "fish", "env", "eval", "exec", "xargs", "dd", "chmod", "chown", "infinite" };
+      if (!CommandName(word) || std::find(std::begin(kWide), std::end(kWide), word) != std::end(kWide))
+         return f;
+      f.kind = DeniedFix::Kind::Command;
+      f.value = word;
+      return f;
    }
 
    std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
@@ -196,12 +262,14 @@ namespace chat
       if (kind == AgentKind::Antigravity)
       {
          // No system-prompt flag: the note leads the first message. The prompt follows -p directly.
-         std::vector<std::string> a = { "agy", "--output-format", "stream-json", "--settings", kAgySettings };
+         std::vector<std::string> a = { "agy", "--output-format", "stream-json", "--settings", AgySettings(options.commands) };
          if (!options.model.empty())
             a.insert(a.end(), { "--model", options.model });
          if (options.folderAccess)
             a.insert(a.end(), { "--mode", "accept-edits" });
          for (const std::string& d : dirs)
+            a.insert(a.end(), { "--add-dir", d });
+         for (const std::string& d : options.folders)
             a.insert(a.end(), { "--add-dir", d });
          if (resume && !session.empty())
             a.insert(a.end(), { "--conversation", session });
@@ -215,7 +283,11 @@ namespace chat
          if (!options.model.empty())
             a.insert(a.end(), { "-m", options.model });
          if (options.folderAccess)
+         {
             a.insert(a.end(), { "-s", "workspace-write" });
+            for (const std::string& d : options.folders)
+               a.insert(a.end(), { "--add-dir", d });
+         }
          if (resume && !session.empty())
             a.insert(a.end(), { "resume", session });
          a.push_back(prompt);
@@ -225,16 +297,21 @@ namespace chat
       std::vector<std::string> a = { "claude", "-p" };
       if (!options.model.empty())
          a.insert(a.end(), { "--model", options.model });
-      if (!dirs.empty())
+      std::vector<std::string> all = dirs;
+      all.insert(all.end(), options.folders.begin(), options.folders.end());
+      if (!all.empty())
       {
          a.push_back("--add-dir");
-         a.insert(a.end(), dirs.begin(), dirs.end());
+         a.insert(a.end(), all.begin(), all.end());
       }
       a.insert(a.end(), { "--allowedTools", "Bash(infinite:*)" });
+      for (const std::string& c : options.commands)
+         if (CommandName(c))
+            a.push_back("Bash(" + c + ":*)");
       if (options.folderAccess)
          a.insert(a.end(), { "Read", "Edit", "Write", "Glob", "Grep" });
-      else if (!dirs.empty())
-         a.push_back("Read");
+      else if (!all.empty())
+         a.insert(a.end(), { "Read", "Glob", "Grep" });
       a.insert(a.end(), { "--output-format", "stream-json", "--verbose", "--append-system-prompt", kChatNote,
                           resume ? "--resume" : "--session-id", session, "--", prompt });
       return a;
