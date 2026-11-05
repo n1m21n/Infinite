@@ -54,8 +54,8 @@ namespace chat
       std::string id, label;
       std::string full;  // the agent's own name when `label` is shortened for the picker
    };
-   // "Gemini 3.8 Flash (Medium)" -> "Gemini 3.8": drop the effort in brackets and the tier word, but only while every
-   // name in the list stays different; otherwise keep as much as is needed to tell them apart.
+   // "Gemini 3.8 Flash (Medium)" -> "Gemini 3.8 Flash": drop the effort in brackets, but only while every name in
+   // the list stays different; otherwise the full names stay.
    void ShortenModelLabels(std::vector<Model>& models);
    // The fixed list for an agent ({} = the agent picks); Antigravity's comes from `agy models`.
    std::vector<Model> FixedModels(AgentKind kind);

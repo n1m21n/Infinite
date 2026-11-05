@@ -38,7 +38,7 @@ def chip(kind, text):
 def mock():
     """The chat window, drawn in HTML from the real layout: header pill, user lines, a change card, folded steps, agent text, composer."""
     return f'''<div class="cx" role="img" aria-label="An illustration of the Infinite chat: a sentence, the change it made, and the composer">
-          <div class="cx-bar"><span class="cx-title">Chat</span><span class="cx-pill"><i class="cx-av cx-av-claude"></i>Claude <b>Sonnet</b></span></div>
+          <div class="cx-bar"><span class="cx-title">Chat</span><span class="cx-pill"><i class="cx-av cx-av-claude"></i>Claude <b>Sonnet 5.5</b></span></div>
           <div class="cx-body">
             <div class="cx-user">{chip("node", "@oscillator")} modulate {chip("param", "frequency")} with {chip("node", "@lfo")} from 200 to 800</div>
             <div class="cx-card">

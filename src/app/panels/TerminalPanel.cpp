@@ -1148,6 +1148,10 @@ void DrawTerminalFloating()
 {
    const ImGuiViewport* vp = ImGui::GetMainViewport();
    ImGui::SetNextWindowSize(ImVec2(440.0f, std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_FirstUseEver);
+   // Review shots (tools/chat-shots --float-width): hold the window at one width.
+   static const char* shotW = std::getenv("INFINITE_CHATSHOT_FLOATW");
+   if (shotW != nullptr)
+      ImGui::SetNextWindowSize(ImVec2(std::max(kMinWidth, (float)std::atof(shotW)), std::min(680.0f, vp->WorkSize.y - 120.0f)), ImGuiCond_Always);
    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - 480.0f, vp->WorkPos.y + 80.0f), ImGuiCond_FirstUseEver);
    ImGui::SetNextWindowSizeConstraints(ImVec2(kMinWidth, kMinHeight), ImVec2(FLT_MAX, FLT_MAX));
    PushElevatedPanelStyle(/*isChild=*/false);

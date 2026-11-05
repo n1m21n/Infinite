@@ -518,11 +518,10 @@ namespace app
 
       // Each agent's official logo on a quiet disc. The mark fills at most 62% of the disc, so it keeps
       // clear space on every side as the vendors ask; an agent without a logo shows its tinted initial.
+      // An agent's mark, bare like every other icon: no disc or ring around it. `r` is half the box it fills.
       void DrawAvatar(ImDrawList* dl, ImVec2 c, float r, const std::string& id)
       {
-         dl->AddCircleFilled(c, r, TextTint(0.07f));
-         dl->AddCircle(c, r, TextTint(0.14f), 0, 1.0f);
-         const float half = std::round(r * 0.62f);
+         const float half = std::round(r * 0.9f);
          const float scale = std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.x);
          const ImTextureID tex = AgentLogoTexture(id, (int)std::lround(half * 2.0f * scale), IsThemeLight());
          if (tex != ImTextureID{})
@@ -532,6 +531,9 @@ namespace app
          }
          else
          {
+            // No mark: its first letter on a neutral tile, the icon tile's shape.
+            const ImVec2 a(std::round(c.x - r), std::round(c.y - r)), b(a.x + std::round(r * 2.0f), a.y + std::round(r * 2.0f));
+            dl->AddRectFilled(a, b, TextTint(0.08f), std::min(tok::radius_tile, r * 0.5f));
             const char name[2] = { (char)std::toupper((unsigned char)AgentName(id)[0]), 0 };
             UiType::Scope cap(UiType::Size::Caption, UiType::Weight::Semibold);
             const ImVec2 ts = ImGui::CalcTextSize(name);
@@ -2274,8 +2276,26 @@ namespace app
             sFlowBreak = false;
             sPieces.push_back(std::move(pc));
          };
-         for (const chat::Seg& s : segs)
+         for (size_t si = 0; si < segs.size(); si++)
          {
+            const chat::Seg& s = segs[si];
+            // A "·" between two actions is their separator: it stays on the line only when the next action
+            // fits after it, so a wrapped row never starts or ends with a lone dot.
+            if (s.kind == chat::Seg::Kind::Text && si > 0 && si + 1 < segs.size() && segs[si - 1].kind == chat::Seg::Kind::Action &&
+                segs[si + 1].kind == chat::Seg::Kind::Action && s.text.find_first_not_of(" \t") != std::string::npos &&
+                s.text.find_first_not_of(" \t\xC2\xB7") == std::string::npos)
+            {
+               const float dotW = ImGui::CalcTextSize(" \xC2\xB7 ").x;
+               if (x > 0.0f && x + dotW + ActionWidth(segs[si + 1]) <= width)
+               {
+                  const float fsz = ImGui::GetFontSize();
+                  dl->AddText(ImVec2(origin.x + x, origin.y + y + (lineH - fsz) * 0.5f), col, "\xC2\xB7");
+                  x += dotW;
+               }
+               else
+                  x = 0.0f, y += lineH;
+               continue;
+            }
             if (s.kind == chat::Seg::Kind::Action)
             {
                const std::string aid = sThread.id + "/" + std::to_string(idBase) + "/" + std::to_string(chip++) + s.verb + s.arg;
@@ -3527,13 +3547,22 @@ namespace app
       // A row of buttons at the card's left edge; returns the index pressed, or -1.
       int CardButtons(const Card& c, std::initializer_list<std::pair<const char*, bool>> buttons)
       {
+         // One row while they fit the card; a button that would run past its edge starts the next row.
          int pressed = -1, i = 0;
-         ImGui::SetCursorScreenPos(ImVec2(c.x, ImGui::GetCursorScreenPos().y + tok::space_1));
+         const float h = 26.0f;
+         float x = c.x, y = ImGui::GetCursorScreenPos().y + tok::space_1;
          for (const auto& [label, primary] : buttons)
          {
+            const float w = ImGui::CalcTextSize(label, nullptr, true).x + 2.0f * tok::space_2;
             if (i > 0)
-               FormParts::Inline(0.0f, tok::space_1);
-            if (ChipButton::Draw(label, primary, 26.0f))
+            {
+               x += tok::space_1;
+               if (x + w > c.x + c.inner)
+                  x = c.x, y += h + tok::space_1;
+            }
+            ImGui::SetCursorScreenPos(ImVec2(x, y));
+            x += w;
+            if (ChipButton::Draw(label, primary, h))
                pressed = i;
             i++;
          }
@@ -4602,6 +4631,20 @@ namespace app
          return pressed;
       }
 
+      // The reply card above the composer, with the air under it: a caption line and one line of the quote,
+      // sized from the fonts so a larger UI scale still fits. 0 when not replying.
+      float ReplyHeight()
+      {
+         if (sReplyTo.empty())
+            return 0.0f;
+         float capFs;
+         {
+            UiType::Scope cap(UiType::Size::Caption);
+            capFs = ImGui::GetFontSize();
+         }
+         return std::max(40.0f, 6.0f + capFs + 2.0f + ImGui::GetFontSize() + 7.0f) + 6.0f;
+      }
+
       std::vector<chat::Model>& ModelsOf(const std::string& agent)
       {
          static std::map<std::string, std::shared_ptr<chat::AgentRun>> sFetch;
@@ -4737,6 +4780,33 @@ namespace app
 
       // One pill in the tool row: the model that answers, from every connected agent's models in one menu,
       // each agent under its name. Picking a model picks its agent too. Settings keeps the same choice.
+      // The composer, as in Claude: one row of [+] text [send] on a shared centre line inside the well (reply
+      // and attachments above it), and the agent picker as a quiet row under the well.
+      struct ComposerGeom
+      {
+         float padX = 0.0f, padV = 0.0f, tile = 24.0f, fieldW = 0.0f, wrapW = 0.0f, textH = 0.0f, chipsH = 0.0f, rowTop = 0.0f, rowH = 0.0f,
+               wellH = 0.0f, pickerH = 22.0f, totalH = 0.0f;
+         int lines = 1;
+      };
+      ComposerGeom Geom(float width)
+      {
+         ComposerGeom g;
+         const float fs = ImGui::GetFontSize();
+         g.padX = tok::space_2;
+         g.padV = tok::space_2;
+         g.fieldW = std::max(40.0f, width - 2.0f * (g.padX + g.tile + tok::space_2));
+         g.wrapW = std::max(1.0f, g.fieldW - ImGui::GetStyle().ScrollbarSize);
+         g.lines = VisualLines(g.wrapW);
+         g.textH = fs * (float)std::clamp(g.lines, 1, 6) + 4.0f;
+         g.chipsH = ReplyHeight() + (sAttach.empty() ? 0.0f : 26.0f);
+         g.rowTop = g.chipsH > 0.0f ? tok::space_3 + g.chipsH : g.padV;
+         // The icons sit on the last text line's centre; the row is tall enough for both.
+         g.rowH = std::max(g.tile, g.textH - 2.0f - fs * 0.5f + g.tile * 0.5f);
+         g.wellH = g.rowTop + g.rowH + g.padV;
+         g.totalH = g.wellH + tok::space_1 + g.pickerH;
+         return g;
+      }
+
       void DrawPicker(float right, float y, float h, float minLeft)
       {
          const float room = std::max(80.0f, right - minLeft - tok::space_1);
@@ -4818,20 +4888,14 @@ namespace app
          if (sInput.empty())
             sDismissed.clear();
 
-         const float pad = tok::space_3;
-         const float gap = 6.0f;  // air between the text and the tool row
+         const float pad = tok::space_3;  // reply and attachment chips sit this far in
          const float fs = ImGui::GetFontSize();
          const float padY = 2.0f;
-         const float fieldW = width - 2.0f * pad;
-         const float wrapW = std::max(1.0f, fieldW - ImGui::GetStyle().ScrollbarSize);
-         const int lines = VisualLines(wrapW);
-         const int rows = std::clamp(lines, 1, 6);
-         const float textH = fs * (float)rows + 2.0f * padY;
-         const float replyH = sReplyTo.empty() ? 0.0f : 46.0f;  // card 40 + air
-         const float chipsH = replyH + (sAttach.empty() ? 0.0f : 26.0f);
-         const float barH = 26.0f;
+         const ComposerGeom g = Geom(width);
+         const float fieldW = g.fieldW, wrapW = g.wrapW, textH = g.textH, wellH = g.wellH;
+         const int lines = g.lines;
+         const float replyH = ReplyHeight();
          const ImVec2 at = ImGui::GetCursorScreenPos();
-         const float wellH = pad + chipsH + textH + gap + barH + tok::space_2;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.07f), tok::radius_tile * 2.0f);
          dl->AddRect(at, ImVec2(at.x + width, at.y + wellH), TextTint(0.10f), tok::radius_tile * 2.0f);
@@ -4839,7 +4903,12 @@ namespace app
          // Reply: a glass card inside the well, an accent edge, who it quotes in one line, a close mark.
          if (replyH > 0.0f)
          {
-            const ImVec2 a(at.x + pad, at.y + pad), b(at.x + width - pad, at.y + pad + 40.0f);
+            float capFs;
+            {
+               UiType::Scope cap(UiType::Size::Caption);
+               capFs = ImGui::GetFontSize();
+            }
+            const ImVec2 a(at.x + pad, at.y + pad), b(at.x + width - pad, at.y + pad + replyH - 6.0f);
             const float r = tok::radius_tile + 2.0f;
             dl->AddRectFilled(a, b, TextTint(0.06f), r);
             dl->AddRect(a, b, TextTint(0.12f), r);
@@ -4852,10 +4921,11 @@ namespace app
                UiType::Scope cap(UiType::Size::Caption);
                dl->AddText(ImVec2(a.x + 20.0f, a.y + 6.0f), Dim(), T("Replying to"));
             }
-            ImGui::RenderTextEllipsis(dl, ImVec2(a.x + 20.0f, a.y + 21.0f), ImVec2(b.x - 30.0f, b.y), b.x - 30.0f, one.c_str(), nullptr, nullptr);
-            ImGui::SetCursorScreenPos(ImVec2(b.x - 26.0f, a.y + 8.0f));
+            ImGui::RenderTextEllipsis(dl, ImVec2(a.x + 20.0f, a.y + 8.0f + capFs), ImVec2(b.x - 30.0f, b.y), b.x - 30.0f, one.c_str(), nullptr, nullptr);
+            const float midY = (a.y + b.y) * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(b.x - 26.0f, midY - 12.0f));
             const bool close = ImGui::InvisibleButton("##unreply", ImVec2(24.0f, 24.0f));
-            glyph::Draw(dl, ImVec2(b.x - 14.0f, a.y + 20.0f), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
+            glyph::Draw(dl, ImVec2(b.x - 14.0f, midY), tok::icon_sm, ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), IconsInfinite::Close);
             if (close)
                sReplyTo.clear();
          }
@@ -4895,11 +4965,22 @@ namespace app
             sAttach.erase(sAttach.begin() + remove);
 
          // The text: wraps, grows to six lines, then scrolls. Enter sends, Shift+Enter breaks the line.
-         const ImVec2 fieldAt(at.x + pad, at.y + pad + chipsH);
+         // The text sits between the two icon tiles; one line is centred on the row, more lines grow upward
+         // from the icons, which stay on the last line's centre.
+         const float rowTop = at.y + g.rowTop;
+         const float midY = std::floor(rowTop + g.rowH - g.tile * 0.5f);
+         const ImVec2 fieldAt(at.x + g.padX + g.tile + tok::space_2, midY + fs * 0.5f + padY - textH - 1.0f);  // -1: the text's visual middle sits a pixel under its line middle
          if (lines <= 6)
             DrawTints(ImVec2(fieldAt.x, fieldAt.y + padY), wrapW);
          if (sInput.empty())
-            dl->AddText(ImVec2(fieldAt.x, fieldAt.y + padY), Dim(), sRuns.empty() ? T("Ask, or type @ to name a node") : T("Add to the queue"));
+         {
+            // A narrow window cuts the hint short rather than running it under Send.
+            const float end = fieldAt.x + fieldW - tok::space_1;
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(Dim()));
+            ImGui::RenderTextEllipsis(dl, ImVec2(fieldAt.x, fieldAt.y + padY), ImVec2(end, fieldAt.y + padY + fs), end,
+                                      sRuns.empty() ? T("Ask, or type @ to name a node") : T("Add to the queue"), nullptr, nullptr);
+            ImGui::PopStyleColor();
+         }
          ImGui::SetCursorScreenPos(fieldAt);
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, padY));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
@@ -4940,29 +5021,38 @@ namespace app
             sCursorToEnd = true;
          }
 
-         // Tool row: attach on the left, the agent and Send/Stop on the right.
-         const float barY = at.y + pad + chipsH + textH + gap;
-         ImGui::SetCursorScreenPos(ImVec2(at.x + pad - 4.0f, barY + (barH - 22.0f) * 0.5f));
-         if (GlyphToggle::Draw("##chatattach", IconsInfinite::Plus, IconsInfinite::Plus, false))
+         // Attach on the left, Send/Stop on the right: the same 24 px icon tile, mirrored on the well's edge.
+         const float sendW = g.tile;
+         const ImVec2 ac(std::floor(at.x + g.padX + sendW * 0.5f), midY);
+         ImGui::SetCursorScreenPos(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f));
+         if (ImGui::InvisibleButton("##chatattach", ImVec2(sendW, sendW)))
          {
             for (const std::string& f : Platform::OpenFilesDialog(T("Attach files"), chat::AttachExtensions()))
                if (std::find(sAttach.begin(), sAttach.end(), f) == sAttach.end())
                   sAttach.push_back(f);
             sRefocus = true;
          }
-         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", T("Attach files"));
-         const float sendW = 26.0f;
-         // Whole-pixel centre: the circle and the shape drawn in it share it exactly.
-         const ImVec2 sc(std::floor(at.x + width - pad - sendW * 0.5f + 2.0f), std::floor(barY + barH * 0.5f));
-         ImGui::SetCursorScreenPos(ImVec2(sc.x - sendW * 0.5f, sc.y - 11.0f));
+         {
+            const bool hot = ImGui::IsItemHovered();
+            if (hot)
+            {
+               dl->AddRectFilled(ImVec2(ac.x - sendW * 0.5f, ac.y - sendW * 0.5f), ImVec2(ac.x + sendW * 0.5f, ac.y + sendW * 0.5f), TextTint(0.10f), tok::radius_tile);
+               ImGui::SetTooltip("%s", T("Attach files"));
+            }
+            glyph::Draw(dl, ac, tok::icon_md, hot ? ImGui::GetColorU32(ImGuiCol_Text) : TextTint(0.70f), IconsInfinite::Plus);
+         }
+         // Send and Stop: Send fills with the accent once there is something to send; Stop is a neutral tile
+         // while an agent works.
+         const ImVec2 sc(std::floor(at.x + width - g.padX - sendW * 0.5f), midY);
+         const ImVec2 tileMn(sc.x - sendW * 0.5f, sc.y - sendW * 0.5f), tileMx(sc.x + sendW * 0.5f, sc.y + sendW * 0.5f);
+         ImGui::SetCursorScreenPos(tileMn);
          if (!sRuns.empty())
          {
-            const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, 22.0f));
-            dl->AddCircleFilled(sc, 11.0f, TextTint(ImGui::IsItemHovered() ? 0.9f : 0.75f), 24);
-            // Drawn, not a font glyph: a glyph sits by its advance box, so its ink lands off centre.
-            dl->AddRectFilled(ImVec2(sc.x - 4.0f, sc.y - 4.0f), ImVec2(sc.x + 4.0f, sc.y + 4.0f), ImGui::GetColorU32(ImGuiCol_WindowBg), 1.5f);
-            if (ImGui::IsItemHovered())
+            const bool stop = ImGui::InvisibleButton("##chatstop", ImVec2(sendW, sendW));
+            const bool hot = ImGui::IsItemHovered();
+            dl->AddRectFilled(tileMn, tileMx, TextTint(hot ? 0.16f : 0.10f), tok::radius_tile);
+            glyph::Draw(dl, sc, tok::icon_sm, ImGui::GetColorU32(ImGuiCol_Text), IconsInfinite::StopFill);
+            if (hot)
                ImGui::SetTooltip("%s", T("Stop"));
             if (stop)
             {
@@ -4975,21 +5065,22 @@ namespace app
          else
          {
             const bool canSend = !sInput.empty() || !sAttach.empty();
-            const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, 22.0f));
+            const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, sendW));
+            const bool hot = ImGui::IsItemHovered();
             if (canSend)
-               dl->AddCircleFilled(sc, 11.0f, ImGui::GetColorU32(ImGui::IsItemHovered() ? AccentEmphasisHover() : AccentEmphasisSelected()), 24);
-            const ImU32 ink = canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f);
-            dl->AddLine(ImVec2(sc.x, sc.y + 5.0f), ImVec2(sc.x, sc.y - 4.5f), ink, 1.8f);
-            const ImVec2 head[3] = { ImVec2(sc.x - 4.0f, sc.y - 0.5f), ImVec2(sc.x, sc.y - 4.5f), ImVec2(sc.x + 4.0f, sc.y - 0.5f) };
-            dl->AddPolyline(head, 3, ink, ImDrawFlags_None, 1.8f);
+               dl->AddRectFilled(tileMn, tileMx, ImGui::GetColorU32(hot ? AccentEmphasisHover() : AccentEmphasisSelected()), tok::radius_tile);
+            glyph::Draw(dl, sc, tok::icon_sm, canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f), IconsInfinite::Send);
+            if (hot && canSend)
+               ImGui::SetTooltip("%s", T("Send"));
             if (clicked && canSend)
             {
                Send();
                sRefocus = true;
             }
          }
-         DrawPicker(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f, 22.0f, at.x + pad + 26.0f);
-         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + wellH));
+         // The agent and model, under the well at its right edge.
+         DrawPicker(at.x + width - tok::space_1, at.y + wellH + tok::space_1, g.pickerH, at.x + tok::space_1);
+         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + g.totalH));
          ImGui::Dummy(ImVec2(width, 0.0f));
          if (active || sDropHovered)
             DrawDropdown(ImVec2(at.x, at.y), std::min(width, 420.0f));
@@ -5321,6 +5412,8 @@ namespace app
          }
          if (const char* in = std::getenv("INFINITE_CHATSHOT_INPUT"))
             sInput = in;
+         if (const char* re = std::getenv("INFINITE_CHATSHOT_REPLY"))
+            sReplyTo = re;
          if (const char* view = std::getenv("INFINITE_CHATSHOT_VIEW"))
             sViewing = view;
       }
@@ -5395,9 +5488,7 @@ namespace app
       const float composerW = std::min(width - 2.0f * tok::space_3, 760.0f);
       const float fs = ImGui::GetFontSize();
       // The composer's height is known before it draws: the log takes the rest.
-      const float wrapW = std::max(1.0f, composerW - 2.0f * tok::space_3 - ImGui::GetStyle().ScrollbarSize);
-      const float textH = fs * (float)std::clamp(VisualLines(wrapW), 1, 6) + 4.0f;
-      const float composerH = tok::space_3 + (sAttach.empty() ? 0.0f : 26.0f) + textH + 6.0f + 26.0f + tok::space_2;
+      const float composerH = Geom(composerW).totalH;
       const float queueH = QueueHeight();
       DrawMessages(std::max(40.0f, ImGui::GetContentRegionAvail().y - composerH - queueH - tok::space_4));
       const ImVec2 c = ImGui::GetCursorScreenPos();

@@ -192,7 +192,7 @@ def showcase_text(sc):
         nid += 1
     return text[:end] + add + text[end:]
 
-STARTER_SHOWCASE = {"handheld"}   # built by a showcase script, shown with the Starters
+STARTER_SHOWCASE = set()   # showcase slugs to list among the Starters instead
 
 
 def main():

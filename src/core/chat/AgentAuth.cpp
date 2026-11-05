@@ -277,7 +277,9 @@ namespace chat
    std::vector<Model> FixedModels(AgentKind kind)
    {
       if (kind == AgentKind::Claude)
-         return { { "sonnet", "Sonnet" }, { "opus", "Opus" }, { "haiku", "Haiku" } };
+         // The ids are Claude Code's aliases, so a newer model is picked up by itself; the names say which one
+         // the aliases mean today (update them when a new family ships).
+         return { { "sonnet", "Sonnet 5.5" }, { "opus", "Opus 5.5" }, { "fable", "Fable 5.1" }, { "haiku", "Haiku 5.5" } };
       return {};
    }
 
@@ -382,35 +384,26 @@ namespace chat
 
    void ShortenModelLabels(std::vector<Model>& models)
    {
-      const auto tidy = [](std::string s, bool brackets, bool tier)
+      // "Gemini 3.8 Flash (Medium)" -> "Gemini 3.8 Flash" when no other name in the list is left the same.
+      std::vector<std::string> names;
+      for (const Model& m : models)
       {
-         if (brackets)
-            if (const size_t open = s.find(" ("); open != std::string::npos)
-               s.erase(open);
-         if (tier)
-            for (const char* word : { " Flash", " Pro", " Lite" })
-               if (const size_t at = s.find(word); at != std::string::npos && (at + std::strlen(word) == s.size() || s[at + std::strlen(word)] == ' ' || s[at + std::strlen(word)] == '('))
-                  s.erase(at, std::strlen(word));
+         std::string s = m.full.empty() ? m.label : m.full;
+         if (const size_t open = s.find(" ("); open != std::string::npos)
+            s.erase(open);
          while (!s.empty() && s.back() == ' ')
             s.pop_back();
-         return s;
-      };
-      for (const auto& [brackets, tier] : { std::pair<bool, bool>{ true, true }, { false, true }, { true, false } })
-      {
-         std::vector<std::string> names;
-         for (const Model& m : models)
-            names.push_back(tidy(m.full.empty() ? m.label : m.full, brackets, tier));
-         std::vector<std::string> sorted = names;
-         std::sort(sorted.begin(), sorted.end());
-         if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end() || std::find(names.begin(), names.end(), std::string()) != names.end())
-            continue;
-         for (size_t i = 0; i < models.size(); ++i)
-         {
-            if (models[i].full.empty())
-               models[i].full = models[i].label;
-            models[i].label = names[i];
-         }
+         names.push_back(s);
+      }
+      std::vector<std::string> sorted = names;
+      std::sort(sorted.begin(), sorted.end());
+      if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end() || std::find(names.begin(), names.end(), std::string()) != names.end())
          return;
+      for (size_t i = 0; i < models.size(); ++i)
+      {
+         if (models[i].full.empty())
+            models[i].full = models[i].label;
+         models[i].label = names[i];
       }
    }
 }

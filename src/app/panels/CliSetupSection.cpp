@@ -132,9 +132,12 @@ namespace app
          ImGui::PopID();
       }
 
-      // The model each connected agent answers with; the chat's picker sets the same thing.
+      // The model each connected agent answers with; the chat's picker sets the same thing. An agent that is not
+      // installed and signed in has no model to pick yet.
       for (const Agent& a : Agents())
       {
+         if (!ChatAgentStatus(a.id).ready)
+            continue;
          const auto models = ChatAgentModels(a.id);
          if (models.empty())
             continue;

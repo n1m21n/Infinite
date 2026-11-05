@@ -27,8 +27,13 @@ namespace glyph
    inline void Draw(ImDrawList* dl, ImVec2 center, float size, ImU32 col, const char* g)
    {
       ImFont* font = ImGui::GetFont();
-      const ImVec2 ext = font->CalcTextSizeA(size, FLT_MAX, 0.0f, g);
-      dl->AddText(font, size, ImVec2(center.x - ext.x * 0.5f, (float)(int)(TopFor(font, center, size) + 0.5f)), col, g);
+      // Centre on the glyph as baked, not on its advance: the icon font is merged with PixelSnapH and a minimum
+      // advance, which can move the drawn shape up to a pixel off the advance's middle.
+      const unsigned char* u = (const unsigned char*)g;  // glyphs are private-use codepoints: 3-byte UTF-8
+      const unsigned int cp = (u[0] & 0xF0) == 0xE0 ? ((u[0] & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu) : u[0];
+      const ImFontGlyph* gl = font->GetFontBaked(size)->FindGlyphNoFallback((ImWchar)cp);
+      const float left = gl != nullptr ? center.x - (gl->X0 + gl->X1) * 0.5f : center.x - font->CalcTextSizeA(size, FLT_MAX, 0.0f, g).x * 0.5f;
+      dl->AddText(font, size, ImVec2(left, (float)(int)(TopFor(font, center, size) + 0.5f)), col, g);
    }
 
    // Call-site wrappers (same argument order the retired glyph:: icons used). A trailing stroke argument is accepted and

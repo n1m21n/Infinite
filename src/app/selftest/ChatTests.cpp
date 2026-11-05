@@ -516,15 +516,31 @@ namespace app
             check(chat::ConfiguredModel(chat::AgentKind::Codex, "[tui]\nmodel = \"x\"\n").empty(), "models: a model inside a table is not the default");
             check(chat::ConfiguredModel(chat::AgentKind::Antigravity, R"j({"model": "Gemini 3.8 Flash (Medium)"})j") == "Gemini 3.8 Flash (Medium)", "models: gemini's default comes from its settings.json");
             check(chat::ConfiguredModel(chat::AgentKind::Claude, R"({"theme": "dark"})").empty(), "models: no model set, no default named");
-            // The picker itself reads the cache from the user's Codex folder.
-            const char* home = std::getenv("HOME");
-            if (home != nullptr)
+            // The picker itself reads the cache from Codex's folder. The test points CODEX_HOME at a temp folder:
+            // the suite may run under the real HOME (the pre-push hook), and the user's own cache is never written.
             {
-               const std::string dir = std::string(home) + "/.codex";
+               const char* was = std::getenv("CODEX_HOME");
+               const std::string keep = was != nullptr ? was : "";
+               const std::filesystem::path dir = std::filesystem::temp_directory_path() / "infinite-chattest-codex";
                std::filesystem::create_directories(dir);
-               std::ofstream(dir + "/models_cache.json") << R"({"models":[{"slug":"a","display_name":"A","visibility":"list","priority":1}]})";
+               std::ofstream(dir / "models_cache.json") << R"({"models":[{"slug":"a","display_name":"A","visibility":"list","priority":1}]})";
+               const auto setCodexHome = [](const std::string& v)
+               {
+#if defined(_WIN32)
+                  _putenv_s("CODEX_HOME", v.c_str());  // "" removes it
+#else
+                  if (v.empty())
+                     unsetenv("CODEX_HOME");
+                  else
+                     setenv("CODEX_HOME", v.c_str(), 1);
+#endif
+               };
+               setCodexHome(dir.string());
                const auto picker = ChatAgentModels("codex");
                check(picker.size() == 1 && picker[0].first == "a", "models: the ChatGPT picker lists Codex's cached models");
+               setCodexHome(keep);
+               std::error_code ec;
+               std::filesystem::remove_all(dir, ec);
             }
          }
 
@@ -812,12 +828,13 @@ namespace app
             check(chat::FirstIdeas().size() == 3, "first ideas: three");
          }
          const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");
-         check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini", "agy models are parsed from id<TAB>label rows");
+         check(agy.size() == 1 && agy[0].id == "flash" && agy[0].label == "Gemini Flash", "agy models are parsed from id<TAB>label rows");
          const std::vector<chat::Model> agy2 = chat::ParseAgyModels("Fetching available models...\ngemini-4-argon-medium\tGemini 4 Argon (Medium)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n");
          check(agy2.size() == 2 && agy2[0].id == "gemini-4-argon-medium", "agy models: no header line, every row kept");
-         check(agy2[0].label == "Gemini 4 Argon" && agy2[1].label == "Gemini 3.8" && agy2[1].full == "Gemini 3.8 Flash (High)", "agy models: names shortened to the family, the full name kept");
+         check(agy2[0].label == "Gemini 4 Argon" && agy2[1].label == "Gemini 3.8 Flash" && agy2[1].full == "Gemini 3.8 Flash (High)", "agy models: the effort dropped, the model name and the full name kept");
          const std::vector<chat::Model> agy3 = chat::ParseAgyModels("a\tGemini 3.8 Flash (Medium)\nb\tGemini 3.8 Flash (High)\n");
-         check(agy3[0].label == "Gemini 3.8 (Medium)" && agy3[1].label == "Gemini 3.8 (High)", "agy models: efforts stay when they are all that tells two apart");
+         check(agy3[0].label == "Gemini 3.8 Flash (Medium)" && agy3[1].label == "Gemini 3.8 Flash (High)", "agy models: efforts stay when they are all that tells two apart");
+         check(chat::FixedModels(chat::AgentKind::Claude).size() == 4 && chat::FixedModels(chat::AgentKind::Claude)[0].label == "Sonnet 5.5", "claude: the menu names the model and its version");
          chat::TurnOptions to;
          to.model = "opus";
          const std::vector<std::string> ma = chat::AgentArgs(chat::AgentKind::Claude, "hi", "abc", false, {}, to);

@@ -83,6 +83,8 @@ SCENES = {
     "changes": ("changes", "", "", "", 0),
     "errors": ("errors", "", "", "", 0),
     "queue": ("greeting", "hi|and then make the drums louder with a much longer queued line that has to cut off", "Add to the queue", "", 0),
+    # Replying to a message: the quote card in the composer, the log above it ending where the box starts.
+    "reply": ("changes", "", "", "", 0),
     "settings-agents": ("greeting", "", "", "settingswin,settingsplace=agents", 0),
     "float": ("audio", "", "", "chatfloat", 0),
     "media": ("media", "", "", "", 0),
@@ -124,6 +126,9 @@ def media(rec):
 
 def shoot(app, sid, theme, out_dir, timeout):
     thread, queue, typed, panels, _ = SCENES[sid]
+    fw = os.environ.get("INFINITE_CHATSHOT_FLOATW")
+    if fw and "chatfloat" not in panels:
+        panels = ",".join(x for x in (panels, "chatfloat") if x)
     home = tempfile.mkdtemp(prefix="chatshot-")
     try:
         sup = os.path.join(home, "Library", "Application Support", "Infinite")
@@ -145,7 +150,7 @@ def shoot(app, sid, theme, out_dir, timeout):
                       open(os.path.join(sup, "cli-setup", "status.json"), "w"))
         json.dump({"version": 1, "id": "shot", "title": sid, "updated": 1, "sessions": {},
                    "entries": [] if thread == "empty" else threads(rec)[thread]}, open(os.path.join(sup, "chats", "shot.json"), "w"))
-        out = os.path.join(out_dir, f"{sid}-{theme}.png")
+        out = os.path.join(out_dir, f"{sid}-{theme}" + (f"-w{fw}" if fw else "") + ".png")
         if os.path.exists(out):
             os.remove(out)
         env = dict(os.environ, HOME=home, INFINITE_NO_SINGLE_INSTANCE="1", INFINITE_NO_UPDATE_CHECK="1",
@@ -160,6 +165,8 @@ def shoot(app, sid, theme, out_dir, timeout):
             env["INFINITE_CHATSHOT_ONBOARD"] = sid[len("first-"):]
         elif sid == "settings-failed":
             env["INFINITE_CHATSHOT_ONBOARD"] = "failed"
+        if sid == "reply":
+            env["INFINITE_CHATSHOT_REPLY"] = "stopped earlier because reading outside the workspace was blocked and the session restarted."
         if sid in VIEW:
             env["INFINITE_CHATSHOT_VIEW"] = os.path.join(rec, VIEW[sid])
         try:
@@ -179,7 +186,10 @@ def main():
     ap.add_argument("--theme", default="dark", choices=["dark", "light", "both"])
     ap.add_argument("--out", default=os.path.join(ROOT, "build-dev", "chat-shots"))
     ap.add_argument("--timeout", type=int, default=60)
+    ap.add_argument("--float-width", type=int, default=0, help="open the chat as a floating window this wide (280 = its narrowest)")
     a = ap.parse_args()
+    if a.float_width:
+        os.environ["INFINITE_CHATSHOT_FLOATW"] = str(a.float_width)
     a.out = os.path.abspath(a.out)
     os.makedirs(a.out, exist_ok=True)
     themes = ["dark", "light"] if a.theme == "both" else [a.theme]
