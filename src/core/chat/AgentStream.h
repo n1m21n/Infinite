@@ -67,6 +67,9 @@ namespace chat
    // `dirs`: folders of attached files the turn may read (ChatFiles FileDirs).
    std::vector<std::string> AgentArgs(AgentKind kind, const std::string& prompt, const std::string& session, bool resume,
                                       const std::vector<std::string>& dirs = {}, const TurnOptions& options = TurnOptions());
+   // The agent no longer has the conversation the chat resumes (its files were cleared, or Claude's folder
+   // changed): the turn should start a new one.
+   bool LostSession(const std::string& text);
    // The line the terminal face runs to open the same conversation.
    std::string TerminalResumeLine(AgentKind kind, const std::string& session);
 }

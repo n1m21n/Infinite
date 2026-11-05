@@ -769,6 +769,13 @@ namespace app
             check(chat::TokenCount(950) == "950" && chat::TokenCount(12400) == "12k" && chat::TokenCount(4200) == "4.2k" && chat::TokenCount(1200000) == "1.2M",
                   "token counts read short");
          }
+         {
+            chat::AgentStream ls(chat::AgentKind::Claude);
+            std::vector<chat::AgentEvent> lv;
+            ls.Feed("{\"type\":\"result\",\"subtype\":\"error_during_execution\",\"is_error\":true,\"errors\":[\"No conversation found with session ID: x\"]}\n", lv);
+            check(lv.size() == 1 && lv[0].error && chat::LostSession(lv[0].text) && !chat::LostSession("rate limit"),
+                  "claude: a lost conversation is told apart, so the chat starts a new one");
+         }
          check(std::string(AgentDocs::kUiGuide).find("## Modulation Matrix") != std::string::npos, "the UI guide has the Modulation Matrix");
          check(chat::IsAudioPath("/tmp/a.wav") && chat::IsAudioPath("~/x/y.mp3") && !chat::IsAudioPath("notes.txt"), "sound paths are recognised");
          const std::vector<chat::Block> rb = chat::ParseReply("Here it is\n/tmp/kick.wav\n/tmp/pic.png\n```\ncode\n```\n", cat);

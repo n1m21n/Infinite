@@ -75,6 +75,9 @@ namespace chat
          else if (type == "result")
          {
             AgentEvent e = Event(AgentEvent::Kind::End, Str(j, "subtype") == "success" ? std::string() : Str(j, "result"), j.value("is_error", false));
+            // A turn that never started ("No conversation found…") says why in `errors`, not `result`.
+            if (e.error && e.text.empty() && j.contains("errors") && j["errors"].is_array() && !j["errors"].empty() && j["errors"][0].is_string())
+               e.text = j["errors"][0].get<std::string>();
             if (const json u = j.value("usage", json::object()); u.is_object())
             {
                e.usage.input = u.value("input_tokens", 0LL) + u.value("cache_creation_input_tokens", 0LL);
@@ -336,6 +339,16 @@ namespace chat
       a.insert(a.end(), { "--output-format", "stream-json", "--verbose", "--append-system-prompt", kChatNote,
                           resume ? "--resume" : "--session-id", session, "--", prompt });
       return a;
+   }
+
+   bool LostSession(const std::string& text)
+   {
+      std::string low = text;
+      std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      for (const char* k : { "no conversation found", "conversation not found", "session not found", "thread not found", "no session found" })
+         if (low.find(k) != std::string::npos)
+            return true;
+      return false;
    }
 
    std::string TerminalResumeLine(AgentKind kind, const std::string& session)

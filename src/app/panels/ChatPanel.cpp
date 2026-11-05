@@ -99,7 +99,12 @@ namespace app
          std::string cut;               // why the chat ended the turn itself ("" = it did not)
          double startAt = -1.0;         // when the turn began, for the Working row's clock
          chat::TurnUsage usage;         // what the CLI said the turn used
+         std::string prompt;            // as the user's turn asked it, for a retry in a new conversation
+         std::vector<std::string> dirs;
+         bool retried = false;          // already the retry: a second loss is shown
       };
+      // Turns whose conversation was lost, started again once PollRuns has finished walking sRuns.
+      std::vector<Run> sRetry;
 
       // A turn with no output at all for this long is stuck (a long render still prints its tool call first).
       constexpr double kTurnSilentSeconds = 15.0 * 60.0;
@@ -1066,10 +1071,13 @@ namespace app
          Push(std::move(e));
       }
 
-      void StartRun(const std::string& agent, const std::string& prompt, const std::vector<std::string>& dirs)
+      void StartRun(const std::string& agent, const std::string& prompt, const std::vector<std::string>& dirs, bool retried = false)
       {
          Run r;
          r.agent = agent;
+         r.prompt = prompt;
+         r.dirs = dirs;
+         r.retried = retried;
          KindOf(agent, r.kind);
          chat::Session& s = sThread.sessions[agent];
          if (s.id.empty() && r.kind == chat::AgentKind::Claude)
@@ -1270,6 +1278,16 @@ namespace app
       // One agent's turn ended: its answer replaces its Working row when it ran nothing, else goes under it.
       void FinishRun(Run& r)
       {
+         // The agent lost the conversation (Claude keeps them per folder): start a new one with the briefing,
+         // once, instead of showing an error the user cannot act on.
+         if (r.error && !r.retried && r.answer.empty() && chat::LostSession(r.errorText))
+         {
+            sThread.sessions.erase(r.agent);
+            sRetry.push_back(r);
+            r.error = false;
+            r.errorText.clear();
+            r.denied.clear();
+         }
          Entry& steps = sThread.entries[(size_t)r.steps];
          int at = r.steps + 1;
          if (steps.lines.empty())
@@ -1432,6 +1450,9 @@ namespace app
                FinishRun(r);
             }
          }
+         for (const Run& again : sRetry)
+            StartRun(again.agent, again.prompt, again.dirs, true);
+         sRetry.clear();
          bool all = true;
          for (const Run& r : sRuns)
             all = all && r.run == nullptr;
@@ -3634,9 +3655,11 @@ namespace app
       }
 
       // A tool-row pill: [avatar] text, a tint on hover. Drawn right to left from `right`; returns its left edge.
-      float Pill(const char* id, const std::string& avatar, const std::string& text, float right, float y, float h, bool& clicked)
+      // `maxW` caps it: a longer name ends in an ellipsis, the whole name in the tooltip.
+      float Pill(const char* id, const std::string& avatar, const std::string& full, float right, float y, float h, bool& clicked, float maxW)
       {
          const float av = avatar.empty() ? 0.0f : 14.0f + tok::space_2;
+         const std::string text = app::TruncateWithEllipsis(full, std::max(24.0f, maxW - av - 2.0f * tok::space_2));
          const float w = av + ImGui::CalcTextSize(text.c_str()).x + 2.0f * tok::space_2;
          ImGui::SetCursorScreenPos(ImVec2(right - w, y));
          clicked = ImGui::InvisibleButton(id, ImVec2(w, h));
@@ -3648,6 +3671,8 @@ namespace app
          if (!avatar.empty())
             DrawAvatar(dl, ImVec2(mn.x + tok::space_2 + 7.0f, mn.y + h * 0.5f), 7.0f, avatar);
          dl->AddText(ImVec2(mn.x + tok::space_2 + av, mn.y + (h - ImGui::GetFontSize()) * 0.5f), hot ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), text.c_str());
+         if (text != full && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", full.c_str());
          if (clicked)
             ImGui::OpenPopup(std::string(id).append("menu").c_str());
          return mn.x;
@@ -3655,8 +3680,10 @@ namespace app
 
       // Two pills in the tool row: who answers (with where each agent stands) and, beside it, which of that
       // agent's models. Settings keeps the same default model per agent.
-      void DrawPicker(float right, float y, float h)
+      void DrawPicker(float right, float y, float h, float minLeft)
       {
+         // Both pills share the room between the attach button and Send; the model gets a little more.
+         const float room = std::max(80.0f, right - minLeft - tok::space_1);
          const std::string cur = DefaultAgent();
          CliSetup::Config& prefs = CliSetup::Prefs();
          const std::vector<chat::Model>& list = cur.empty() ? std::vector<chat::Model>() : ModelsOf(cur);
@@ -3674,7 +3701,7 @@ namespace app
          float left = right;
          if (!cur.empty())
          {
-            left = Pill("##chatmodel", "", modelFace, right, y, h, clicked);
+            left = Pill("##chatmodel", "", modelFace, right, y, h, clicked, room * 0.55f);
             ImGui::SetNextWindowPos(ImVec2(right, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
             ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
             BeginMenuStyle();
@@ -3706,7 +3733,8 @@ namespace app
             left -= tok::space_1;
          }
          const float agentRight = left;
-         Pill("##chatagent", cur, cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur)), agentRight, y, h, clicked);
+         Pill("##chatagent", cur, cur.empty() ? std::string(T("Choose an agent")) : std::string(AgentName(cur)), agentRight, y, h, clicked,
+              std::max(48.0f, agentRight - minLeft));
          ImGui::SetNextWindowPos(ImVec2(agentRight, y - tok::space_1), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
          ImGui::SetNextWindowSizeConstraints(ImVec2(menuW + 2.0f * tok::space_2, 0.0f), ImVec2(menuW + 2.0f * tok::space_2, 460.0f));
          BeginMenuStyle();
@@ -3903,7 +3931,7 @@ namespace app
                sRefocus = true;
             }
          }
-         DrawPicker(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f, 22.0f);
+         DrawPicker(sc.x - sendW * 0.5f - tok::space_1, barY + (barH - 22.0f) * 0.5f, 22.0f, at.x + pad + 26.0f);
          ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + wellH));
          ImGui::Dummy(ImVec2(width, 0.0f));
          if (active || sDropHovered)
