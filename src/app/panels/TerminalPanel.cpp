@@ -928,7 +928,7 @@ namespace
          if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
             gTerminalFocus = false;
          ImGui::EndChild();
-         ImGui::SameLine(0.0f, gap);
+         FormParts::Inline(0.0f, gap);
          ImGui::BeginChild("##shellside", ImVec2(0.0f, avail.y), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawTerminalBody();
          ImGui::EndChild();

@@ -98,7 +98,7 @@ namespace app
       // The row's button, in the right column.
       auto button = [&](const char* label, bool primary)
       {
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
          ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - bw);
          const float w = std::max(bw, ImGui::CalcTextSize(label).x + 2.0f * tok::space_3);
          return ChipButton::Draw(label, primary, rowH, w);

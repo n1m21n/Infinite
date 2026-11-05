@@ -652,7 +652,7 @@ namespace app
          const float btnW = ImGui::CalcTextSize(T("Submit")).x + 2.0f * tok::space_2;
          ImGui::SetNextItemWidth(std::max(80.0f, width - btnW - tok::space_1));
          const bool enter = ImGui::InputTextWithHint("##signincode", T("Paste the code from the browser"), &s.codeInput, ImGuiInputTextFlags_EnterReturnsTrue);
-         ImGui::SameLine(0.0f, tok::space_1);
+         FormParts::Inline(0.0f, tok::space_1);
          const bool press = ChipButton::Draw(T("Submit"), true, 26.0f);
          if (!(enter || press))
             return;
@@ -1359,7 +1359,7 @@ namespace app
             ImGui::EndDisabled();
             if (fix.kind == chat::DeniedFix::Kind::Folder && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                ImGui::SetTooltip("%s", CliSetup::HomeTilde(fix.value).c_str());
-            ImGui::SameLine(0.0f, tok::space_2);
+            FormParts::Inline(0.0f, tok::space_2);
          }
          if (ChipButton::Draw(T("Settings"), false))
          {
@@ -1529,7 +1529,7 @@ namespace app
             ImGui::PushID((int)i);
             const bool row = ImGui::InvisibleButton("##queued", ImVec2(rowW - xW, kQueueRowH));
             const bool hot = ImGui::IsItemHovered();
-            ImGui::SameLine(0.0f, 0.0f);
+            FormParts::Inline(0.0f, 0.0f);
             const bool x = ImGui::InvisibleButton("##unqueue", ImVec2(xW, kQueueRowH));
             const bool xHot = ImGui::IsItemHovered();
             ImGui::PopID();
@@ -3921,7 +3921,7 @@ namespace app
             const bool clicked = ImGui::InvisibleButton("##chatsend", ImVec2(sendW, 22.0f));
             if (canSend)
                dl->AddCircleFilled(sc, 11.0f, ImGui::GetColorU32(ImGui::IsItemHovered() ? AccentEmphasisHover() : AccentEmphasisSelected()), 24);
-            const ImU32 ink = canSend ? IM_COL32(255, 255, 255, 255) : TextTint(0.35f);
+            const ImU32 ink = canSend ? tok::U32(tok::pal::c_FFFFFFFF) : TextTint(0.35f);
             dl->AddLine(ImVec2(sc.x, sc.y + 5.0f), ImVec2(sc.x, sc.y - 4.5f), ink, 1.8f);
             const ImVec2 head[3] = { ImVec2(sc.x - 4.0f, sc.y - 0.5f), ImVec2(sc.x, sc.y - 4.5f), ImVec2(sc.x + 4.0f, sc.y - 0.5f) };
             dl->AddPolyline(head, 3, ink, ImDrawFlags_None, 1.8f);
@@ -4002,7 +4002,7 @@ namespace app
             ImGui::RenderTextEllipsis(cd, ImVec2(p.x + tok::space_2, ty), ImVec2(tmax, p.y + rh), tmax, t.title.empty() ? "…" : t.title.c_str(), nullptr, nullptr);
             if (!hot)
                cd->AddText(ImVec2(p.x + rw - aw - tok::space_2, ty), Dim(), age.c_str());
-            ImGui::SameLine(0.0f, 0.0f);
+            FormParts::Inline(0.0f, 0.0f);
             if (ImGui::InvisibleButton("##delete", ImVec2(24.0f, rh)))
                removeId = t.id;
             if (hot)
@@ -4048,7 +4048,7 @@ namespace app
          }
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", now - sCodeView.copiedAt < 1.5 ? T("Copied") : T("Copy"));
-         ImGui::SameLine(0.0f, 2.0f);
+         FormParts::Inline(0.0f, 2.0f);
          if (GlyphToggle::Draw("##codeclose", IconsInfinite::Close, IconsInfinite::Close, false))
             sCodeView.open = false;
          if (ImGui::IsItemHovered())
@@ -4119,7 +4119,7 @@ namespace app
             gChatSideTerminal = !gChatSideTerminal;  // opens beside the chat, like the side terminal in Claude
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", T("Terminal"));
-         ImGui::SameLine(0.0f, gap);
+         FormParts::Inline(0.0f, gap);
          if (GlyphToggle::Draw("##chatnew", IconsInfinite::Plus, IconsInfinite::Plus, false) && sRuns.empty())
             NewChat();
          if (ImGui::IsItemHovered())
@@ -4189,7 +4189,7 @@ namespace app
          ImGui::BeginChild("##chatrail", ImVec2(railW, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
          DrawRail(railW, all.y);
          ImGui::EndChild();
-         ImGui::SameLine(0.0f, 0.0f);
+         FormParts::Inline(0.0f, 0.0f);
          ImGui::BeginChild("##chatmain", ImVec2(0.0f, all.y), false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
          DrawChatWithCode();
          ImGui::EndChild();
@@ -4218,7 +4218,7 @@ namespace app
       ImGui::BeginChild("##chatleft", ImVec2(avail.x - codeW - gap, avail.y), false, flags);
       DrawChatBody();
       ImGui::EndChild();
-      ImGui::SameLine(0.0f, gap);
+      FormParts::Inline(0.0f, gap);
       ImGui::BeginChild("##coderight", ImVec2(codeW, avail.y), false, flags);
       DrawCodePane(codeW, avail.y);
       ImGui::EndChild();
