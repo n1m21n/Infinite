@@ -153,6 +153,20 @@ namespace app
          check(!AgentInstalled(Os::kLinux, claude, dir.string(), ""), "probe: not found");
          std::ofstream((dir / ".local" / "bin" / "claude").string()) << "x";
          check(AgentInstalled(Os::kLinux, claude, dir.string(), ""), "probe: found in ~/.local/bin");
+         // npm's global prefix is the folder npm really lives in (a Homebrew keg); a symlinked npm on the PATH leads there.
+         {
+            const std::filesystem::path keg = dir / "keg" / "bin", link = dir / "linked";
+            std::filesystem::create_directories(keg);
+            std::filesystem::create_directories(link);
+            std::ofstream((keg / "npm").string()) << "x";
+            std::ofstream((keg / "codex").string()) << "x";
+            std::error_code ec;
+            std::filesystem::create_symlink(keg / "npm", link / "npm", ec);
+            const std::string found = BinaryDir(Os::kMac, "codex", "", link.string());
+            std::error_code same;
+            check(!ec && !found.empty() && std::filesystem::equivalent(found, keg, same) && !same, "probe: codex next to the real npm is found through a symlinked npm");
+            check(BinaryDir(Os::kMac, "nothing-here", "", link.string()).empty(), "probe: an absent program has no folder");
+         }
          const std::string cfg = (dir / "config.json").string();
          check(LoadConfig(cfg).agent == "claude" && !LoadConfig(cfg).autoStart, "config: defaults (auto-start off)");
          Config c; c.autoStart = true; SaveConfig(cfg, c);

@@ -383,6 +383,13 @@ skills_sync() {
 if want agent; then
 begin 5 agent "Connect $AGENT_NAME (MCP server and AI skills)"
 export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# npm puts a global install in its own prefix (a Homebrew keg, nvm, ~/.npm-global), which a Mac app's PATH lacks;
+# the login shell's PATH is where the agent will run from, so look there too.
+NPM_BIN="$(npm prefix -g 2>/dev/null)/bin"
+[ -d "$NPM_BIN" ] && PATH="$NPM_BIN:$PATH"
+LOGIN_PATH="$("${SHELL:-/bin/sh}" -lc 'printf %s "$PATH"' 2>/dev/null)"
+[ -n "$LOGIN_PATH" ] && PATH="$PATH:$LOGIN_PATH"
+export PATH
 if ! command -v "$AGENT_BIN" >/dev/null 2>&1 && [ -n "$AGENT_INSTALL" ]; then
   printf '   running: %s\n' "$AGENT_INSTALL"
   sh -c "$AGENT_INSTALL"
@@ -611,7 +618,7 @@ if ($Failed -gt 0) { exit 1 }
              " >/dev/null 2>&1; " + Sub(agent.mcpAdd, "\"$A\"", tool) + "; }; " + agent.launch;
    }
 
-   bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv)
+   std::string BinaryDir(Os os, const std::string& binary, const std::string& home, const std::string& pathEnv)
    {
       std::vector<std::string> dirs;
       const char sep = os == Os::kWindows ? ';' : ':';
@@ -629,17 +636,32 @@ if ($Failed -gt 0) { exit 1 }
          dirs.push_back("/opt/homebrew/bin");
          dirs.push_back("/usr/local/bin");
       }
-      std::vector<std::string> names = { agent.binary };
+      // `npm install -g` lands in the prefix npm itself lives in: a Homebrew keg, nvm's version folder.
+      // A symlink such as /opt/homebrew/bin/npm leads there.
+      if (os != Os::kWindows)
+         for (const std::string& d : std::vector<std::string>(dirs))
+         {
+            std::error_code ec;
+            const std::filesystem::path real = std::filesystem::canonical(AppPaths::FsPath(d + "/npm"), ec);
+            if (!ec && real.has_parent_path())
+               dirs.push_back(real.parent_path().string());
+         }
+      std::vector<std::string> names = { binary };
       if (os == Os::kWindows)
-         names = { std::string(agent.binary) + ".exe", std::string(agent.binary) + ".cmd" };
+         names = { binary + ".exe", binary + ".cmd" };
       for (const std::string& d : dirs)
          for (const std::string& n : names)
          {
             std::error_code ec;
             if (std::filesystem::is_regular_file(AppPaths::FsPath(d + "/" + n), ec))
-               return true;
+               return d;
          }
-      return false;
+      return std::string();
+   }
+
+   bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv)
+   {
+      return !BinaryDir(os, agent.binary, home, pathEnv).empty();
    }
 
    bool AgentInstalledHere(const Agent& agent)

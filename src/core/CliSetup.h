@@ -80,6 +80,9 @@ namespace CliSetup
    std::string StartAgentLine(Os os, const std::string& exe, const Agent& agent);
 
    // File probe: is the agent's binary in PATH or a usual install folder? `home` and `pathEnv` are injected.
+   // The folder that holds `binary`: the app's PATH, the usual install folders, and the prefix `npm install -g` uses
+   // (a Homebrew keg or nvm folder a Mac app's PATH lacks). Empty when it is nowhere.
+   std::string BinaryDir(Os os, const std::string& binary, const std::string& home, const std::string& pathEnv);
    bool AgentInstalled(Os os, const Agent& agent, const std::string& home, const std::string& pathEnv);
 
    bool AgentInstalledHere(const Agent& agent);   // the real HOME and PATH

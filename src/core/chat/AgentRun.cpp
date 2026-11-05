@@ -1,4 +1,5 @@
 #include "AgentRun.h"
+#include "core/CliSetup.h"
 
 #include "core/term/PtyHost.h"
 
@@ -51,6 +52,30 @@ namespace chat
 #endif
          spawn.cwd = o.cwd;
          spawn.env = o.env;
+#if !defined(_WIN32)
+         // The login shell reads .zprofile but not .zshrc, so a program that only .zshrc's PATH reaches (codex in a
+         // Homebrew keg) would be "command not found" here although the user can run it. Put its folder, and so the
+         // `node` beside it, on the PATH the agent starts with.
+         if (!o.argv.empty() && o.argv[0].find('/') == std::string::npos)
+         {
+            const char* home = std::getenv("HOME");
+            const char* path = std::getenv("PATH");
+            std::string current = path != nullptr ? path : "";
+            for (auto& kv : spawn.env)
+               if (kv.first == "PATH")
+                  current = kv.second;
+            const std::string dir = CliSetup::BinaryDir(CliSetup::CurrentOs(), o.argv[0], home != nullptr ? home : "", current);
+            if (!dir.empty() && (":" + current + ":").find(":" + dir + ":") == std::string::npos)
+            {
+               bool set = false;
+               for (auto& kv : spawn.env)
+                  if (kv.first == "PATH")
+                     kv.second = dir + ":" + kv.second, set = true;
+               if (!set)
+                  spawn.env.push_back({ "PATH", dir + ":" + current });
+            }
+         }
+#endif
          spawn.env.push_back({ "TERM", "dumb" });
          spawn.env.push_back({ "NO_COLOR", "1" });
          spawn.cols = 400;  // long lines are not wrapped by the PTY, but some CLIs size their output to it
