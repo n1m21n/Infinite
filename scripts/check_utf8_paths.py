@@ -37,6 +37,10 @@ ALLOW = {
     ("src/platform/common/PathOpen.h", "return std::ifstream(pathUtf8, mode);"),
     ("src/platform/AppPaths.h", "return std::fopen(utf8.c_str(), mode);"),
     ("src/audio/AudioFileWriter.cpp", "return fopen(path.c_str(), mode);"),
+    # entry.path() is a std::filesystem::path; the eval tool takes its own argv; /proc exists only on Linux.
+    ("src/core/InfiniteCli.cpp", "std::ifstream in(entry.path());"),
+    ("src/core/chat/FindEval.cpp", "std::ifstream f(argv[1]);"),
+    ("src/platform/common/ProcessTree.cpp", 'std::ifstream in("/proc/" + std::to_string(pid) + "/stat");'),
     # sketch-check is a developer CLI that takes its own argv.
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(path.c_str(), "wb"))'),
     ("src/core/sketch/SketchCheck.cpp", 'if (FILE* fp = std::fopen(argv[1], "wb"))'),
