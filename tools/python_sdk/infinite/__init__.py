@@ -284,6 +284,19 @@ cable out 0 visuals
     else:
         shutil.copy(raw_video, out_mp4)
 
+    try:
+        shutil.rmtree(tmp_dir)
+    except OSError:
+        pass
+
+    return {
+        "ok": os.path.exists(out_mp4),
+        "video_path": out_mp4,
+        "duration": duration,
+        "fps": fps,
+        **ATTRIBUTION,
+    }
+
 def field_synth(code: str, out_wav: str = "/tmp/field_synth.wav", duration: float = 5.0) -> Dict[str, Any]:
     """Synthesize custom audio from Field Synth expression code.
     
