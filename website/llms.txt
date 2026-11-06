@@ -208,6 +208,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Breakbeat Hoover Rave Stab Synth](https://infinitedevices.org/library/breakbeat-hoover-rave-stab-synth.html): Classic 90s rave hoover stab synthesizer with pitch-swept multi-pulse chorus width, biting resonant filter decay, and aggressive distortion. (file: https://infinitedevices.org/assets/templates/breakbeat-hoover-rave-stab-synth.inf)
 - [Dark Ambient Abyssal Drone Reverb FX](https://infinitedevices.org/library/dark-ambient-abyssal-drone-reverb-fx.html): Deep subterranean cavern reverberator with endless low-frequency resonance, pitch dispersion feedback, and dense spectral decay diffusion. (file: https://infinitedevices.org/assets/templates/dark-ambient-abyssal-drone-reverb-fx.inf)
 - [Dark Ambient Spectral Filter FX](https://infinitedevices.org/library/dark-ambient-spectral-filter-fx.html): Atmospheric multi-pole morphing lowpass and notch filter with slow drifting LFO modulation, sub-harmonic exciter, and soft tape clipping. (file: https://infinitedevices.org/assets/templates/dark-ambient-spectral-filter-fx.inf)
+- [Minimal Techno Sine Core Sub Synth](https://infinitedevices.org/library/minimal-techno-sine-core-sub-synth.html): Deep surgical sine-core sub synthesizer with micro-tuned transient punch, subtle saturation drive, and rapid exponential low-end decay. (file: https://infinitedevices.org/assets/templates/minimal-techno-sine-core-sub-synth.inf)
+- [Minimal Techno Transient Chirp Synth](https://infinitedevices.org/library/minimal-techno-transient-chirp-synth.html): Percussive minimal techno modulation synthesizer with snappy envelope pitch chirps, resonant bandpass click, and tight metallic body. (file: https://infinitedevices.org/assets/templates/minimal-techno-transient-chirp-synth.inf)
+- [IDM Algorithmic Comb Resonator FX](https://infinitedevices.org/library/idm-algorithmic-comb-resonator-fx.html): Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation. (file: https://infinitedevices.org/assets/templates/idm-algorithmic-comb-resonator-fx.inf)
+- [IDM Pitch Warp Granular Delay FX](https://infinitedevices.org/library/idm-pitch-warp-granular-delay-fx.html): Micro-modulated granular delay with pitch-warping buffer sweeps, asymmetric waveshaping distortion, and diffuse spatial feedback. (file: https://infinitedevices.org/assets/templates/idm-pitch-warp-granular-delay-fx.inf)
 
 ## Library: Community
 
@@ -568,7 +572,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 79 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 81 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -585,4 +589,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 64 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 66 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

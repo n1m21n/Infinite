@@ -395,6 +395,16 @@
       "slug": "y2k-acid-liquid-matrix",
       "title": "Y2K Acid Liquid Matrix",
       "description": "Fluid molten chrome displacement matrix with undulating iridescent ripples, vivid acid magenta caustics, and audio-reactive specular contours. Bass deepens the chrome fluid displacement, mids accelerate the liquid wave matrix, and highs shimmer metallic cyan reflection highlights."
+    },
+    {
+      "slug": "ditherpunk-bayer-matrix-threshold",
+      "title": "1-Bit Ditherpunk Bayer Matrix Threshold",
+      "description": "High-contrast 1-bit Bayer ordered dither shader with audio-reactive threshold modulation, sacred cyber-glyph lattices, and duo-tone Klein blue and ivory palette. Bass drives radial shockwave distortion, mids rotate the Bayer dither matrix, and highs scatter binary grain."
+    },
+    {
+      "slug": "ditherpunk-cyber-glyph-lattice",
+      "title": "1-Bit Ditherpunk Cyber Glyph Lattice",
+      "description": "Esoteric cyber-glyph grid shader with 1-bit procedural blue noise dithering, audio-reactive interference waves, and duo-tone stippling. Bass pulses the geometric glyph scale, mids shift the horizontal scanline frequency, and highs ignite stippled dither sparks."
     }
   ]
 }

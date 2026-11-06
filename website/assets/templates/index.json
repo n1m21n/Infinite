@@ -1641,6 +1641,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "minimal-techno-sine-core-sub-synth",
+      "name": "Minimal Techno Sine Core Sub Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Deep surgical sine-core sub synthesizer with micro-tuned transient punch, subtle saturation drive, and rapid exponential low-end decay.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-sine-core-sub-synth.webp",
+      "file": "assets/templates/minimal-techno-sine-core-sub-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "minimal-techno-transient-chirp-synth",
+      "name": "Minimal Techno Transient Chirp Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Percussive minimal techno modulation synthesizer with snappy envelope pitch chirps, resonant bandpass click, and tight metallic body.",
+      "price": 0,
+      "preview": "assets/templates/minimal-techno-transient-chirp-synth.webp",
+      "file": "assets/templates/minimal-techno-transient-chirp-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "idm-algorithmic-comb-resonator-fx",
+      "name": "IDM Algorithmic Comb Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation.",
+      "price": 0,
+      "preview": "assets/templates/idm-algorithmic-comb-resonator-fx.webp",
+      "file": "assets/templates/idm-algorithmic-comb-resonator-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "idm-pitch-warp-granular-delay-fx",
+      "name": "IDM Pitch Warp Granular Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Micro-modulated granular delay with pitch-warping buffer sweeps, asymmetric waveshaping distortion, and diffuse spatial feedback.",
+      "price": 0,
+      "preview": "assets/templates/idm-pitch-warp-granular-delay-fx.webp",
+      "file": "assets/templates/idm-pitch-warp-granular-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

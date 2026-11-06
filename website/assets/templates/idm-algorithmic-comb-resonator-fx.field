@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "IDM Algorithmic Comb Resonator FX",
+    "author": "Infinite",
+    "description": "Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float resonance = 0.68 [0.1, 0.92]\nparam float damping = 3200.0 [800.0, 7000.0]\nparam float microTune = 0.45 [0.0, 1.0]\nparam float mix = 0.62 [0.0, 1.0]\nstate float c1 = 0\nstate float c2 = 0\nstate float c3 = 0\nstate float c4 = 0\nstate float lp = 0\n\nfDamp = clamp(damping / sr * 2.0, 0.01, 0.42)\nlp = lp + fDamp * (in - lp)\n\nfb = clamp(resonance, 0.1, 0.88)\ntune = 1.0 + microTune * 0.25\n\nc1 = c1 + 0.18 * (lp + c4 * fb * 0.75 - c1)\nc2 = c2 + 0.14 * (c1 * tune + c3 * fb * 0.65 - c2)\nc3 = c3 + 0.11 * (c2 * tune + c1 * fb * 0.55 - c3)\nc4 = c4 + 0.08 * (c3 * tune - c4)\n\nresonated = (c1 + c2 * 0.8 - c3 * 0.6 + c4 * 0.5) * 0.35\nsat = clamp(resonated * 1.2, -0.85, 0.85)\n\nout = in * (1.0 - mix) + sat * mix\n",
+    "params": {
+      "resonance": 0.68,
+      "damping": 3200.0,
+      "microTune": 0.45,
+      "mix": 0.62
+    }
+  }
+}

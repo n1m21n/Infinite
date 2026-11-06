@@ -1,0 +1,84 @@
+infinite-patch 1
+# IDM Algorithmic Comb Resonator FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3400.0
+  f resonance 0.32
+  f decay 0.28
+  f volume 0.8
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float resonance = 0.68 [0.1, 0.92]\nparam float damping = 3200.0 [800.0, 7000.0]\nparam float microTune = 0.45 [0.0, 1.0]\nparam float mix = 0.62 [0.0, 1.0]\nstate float c1 = 0\nstate float c2 = 0\nstate float c3 = 0\nstate float c4 = 0\nstate float lp = 0\n\nfDamp = clamp(damping / sr * 2.0, 0.01, 0.42)\nlp = lp + fDamp * (in - lp)\n\nfb = clamp(resonance, 0.1, 0.88)\ntune = 1.0 + microTune * 0.25\n\nc1 = c1 + 0.18 * (lp + c4 * fb * 0.75 - c1)\nc2 = c2 + 0.14 * (c1 * tune + c3 * fb * 0.65 - c2)\nc3 = c3 + 0.11 * (c2 * tune + c1 * fb * 0.55 - c3)\nc4 = c4 + 0.08 * (c3 * tune - c4)\n\nresonated = (c1 + c2 * 0.8 - c3 * 0.6 + c4 * 0.5) * 0.35\nsat = clamp(resonated * 1.2, -0.85, 0.85)\n\nout = in * (1.0 - mix) + sat * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.05 0.15 0.35
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text IDM Algorithmic Comb Resonator FX. Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

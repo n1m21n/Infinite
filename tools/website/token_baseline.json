@@ -457,5 +457,13 @@
  "embeds/y2k-acid-liquid-matrix.html": {
   "font-size": 2,
   "hex": 6
+ },
+ "embeds/ditherpunk-bayer-matrix-threshold.html": {
+  "font-size": 2,
+  "hex": 6
+ },
+ "embeds/ditherpunk-cyber-glyph-lattice.html": {
+  "font-size": 2,
+  "hex": 6
  }
 }

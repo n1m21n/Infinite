@@ -5677,6 +5677,215 @@
       "file": "assets/library/pixel/y2k-acid-liquid-matrix.field",
       "preview": "assets/library/previews/y2k-acid-liquid-matrix.jpg",
       "bytes": 1752
+    },
+    {
+      "id": "op-art-undulating-moire-lattice",
+      "name": "Op-Art Undulating Moir\u00e9 Lattice",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "moire",
+        "kinetic",
+        "optical",
+        "lattice",
+        "drawing"
+      ],
+      "description": "Optical illusion kinetic moir\u00e9 lattice with undulating sine-phase contour lines, high-frequency grid interference, and visceral retinal vibration.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/op-art-undulating-moire-lattice.js",
+      "preview": "assets/library/previews/op-art-undulating-moire-lattice.jpg",
+      "bytes": 3094
+    },
+    {
+      "id": "op-art-concentric-vibration-field",
+      "name": "Op-Art Concentric Vibration Field",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "concentric",
+        "vibration",
+        "optical",
+        "geometric",
+        "drawing"
+      ],
+      "description": "Hypnotic concentric geometric ellipse field with alternating phase rings, logarithmic radial spokes, and pulsating retinal contrast shifts.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/op-art-concentric-vibration-field.js",
+      "preview": "assets/library/previews/op-art-concentric-vibration-field.jpg",
+      "bytes": 2459
+    },
+    {
+      "id": "neo-brutalist-monolithic-pylon-3d",
+      "name": "Neo-Brutalist Monolithic Pylon 3D",
+      "kind": "Generator",
+      "tags": [
+        "neo-brutalist",
+        "monolith",
+        "pylon",
+        "architecture",
+        "concrete",
+        "3d"
+      ],
+      "description": "Stark architectural composition featuring heavy chamfered concrete pylons with bold ultramarine accents, deep cast shadows, and cantilevered slabs.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/neo-brutalist-monolithic-pylon-3d.js",
+      "preview": "assets/library/previews/neo-brutalist-monolithic-pylon-3d.jpg",
+      "bytes": 2334
+    },
+    {
+      "id": "neo-brutalist-cantilever-plinth-3d",
+      "name": "Neo-Brutalist Cantilever Plinth 3D",
+      "kind": "Generator",
+      "tags": [
+        "neo-brutalist",
+        "cantilever",
+        "plinth",
+        "monumental",
+        "geometric",
+        "3d"
+      ],
+      "description": "Monumental stepped cantilever plinths in raw cast stone, framed with industrial hazard orange datum lines and stark geometric projections.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/neo-brutalist-cantilever-plinth-3d.js",
+      "preview": "assets/library/previews/neo-brutalist-cantilever-plinth-3d.jpg",
+      "bytes": 2046
+    },
+    {
+      "id": "minimal-techno-sine-core-sub-synth",
+      "name": "Minimal Techno Sine Core Sub Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "minimal",
+        "techno",
+        "sub",
+        "sine",
+        "dsp"
+      ],
+      "description": "Deep surgical sine-core sub synthesizer with micro-tuned transient punch, subtle saturation drive, and rapid exponential low-end decay.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/minimal-techno-sine-core-sub-synth.inf",
+      "preview": "assets/library/previews/minimal-techno-sine-core-sub-synth.jpg",
+      "bytes": 2430
+    },
+    {
+      "id": "minimal-techno-transient-chirp-synth",
+      "name": "Minimal Techno Transient Chirp Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "minimal",
+        "techno",
+        "chirp",
+        "percussive",
+        "dsp"
+      ],
+      "description": "Percussive minimal techno modulation synthesizer with snappy envelope pitch chirps, resonant bandpass click, and tight metallic body.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/minimal-techno-transient-chirp-synth.inf",
+      "preview": "assets/library/previews/minimal-techno-transient-chirp-synth.jpg",
+      "bytes": 2531
+    },
+    {
+      "id": "idm-algorithmic-comb-resonator-fx",
+      "name": "IDM Algorithmic Comb Resonator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "idm",
+        "comb",
+        "resonator",
+        "delay",
+        "audio"
+      ],
+      "description": "Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/idm-algorithmic-comb-resonator-fx.inf",
+      "preview": "assets/library/previews/idm-algorithmic-comb-resonator-fx.jpg",
+      "bytes": 2096
+    },
+    {
+      "id": "idm-pitch-warp-granular-delay-fx",
+      "name": "IDM Pitch Warp Granular Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "idm",
+        "delay",
+        "granular",
+        "pitch",
+        "audio"
+      ],
+      "description": "Micro-modulated granular delay with pitch-warping buffer sweeps, asymmetric waveshaping distortion, and diffuse spatial feedback.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/idm-pitch-warp-granular-delay-fx.inf",
+      "preview": "assets/library/previews/idm-pitch-warp-granular-delay-fx.jpg",
+      "bytes": 2097
+    },
+    {
+      "id": "ditherpunk-bayer-matrix-threshold",
+      "name": "1-Bit Ditherpunk Bayer Matrix Threshold",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "ditherpunk",
+        "1bit",
+        "bayer",
+        "shader"
+      ],
+      "description": "High-contrast 1-bit Bayer ordered dither shader with audio-reactive threshold modulation, concentric cyber-glyphs, and duo-tone palette.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ditherpunk-bayer-matrix-threshold.field",
+      "preview": "assets/library/previews/ditherpunk-bayer-matrix-threshold.jpg",
+      "bytes": 1495
+    },
+    {
+      "id": "ditherpunk-cyber-glyph-lattice",
+      "name": "1-Bit Ditherpunk Cyber Glyph Lattice",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "ditherpunk",
+        "1bit",
+        "glyph",
+        "lattice",
+        "shader"
+      ],
+      "description": "Esoteric cyber-glyph grid shader with 1-bit procedural blue noise dithering, audio-reactive interference waves, and duo-tone stippling.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ditherpunk-cyber-glyph-lattice.field",
+      "preview": "assets/library/previews/ditherpunk-cyber-glyph-lattice.jpg",
+      "bytes": 1533
     }
   ]
 }

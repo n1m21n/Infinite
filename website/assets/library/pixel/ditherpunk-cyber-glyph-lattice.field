@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "1-Bit Ditherpunk Cyber Glyph Lattice",
+    "author": "Infinite",
+    "description": "Esoteric cyber-glyph grid shader with 1-bit procedural blue noise dithering, audio-reactive interference waves, and duo-tone stippling.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridDivs = 8.0 [4.0, 16.0]\nparam float stippleScale = 2.5 [1.0, 6.0]\nparam float waveSpeed = 0.85 [0.1, 2.5]\nparam float threshold = 0.48 [0.1, 0.9]\nparam float crosshairSize = 0.35 [0.1, 0.8]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0\ntime = t * waveSpeed\n\ncell = fract(uv * gridDivs) - 0.5\ngridId = floor(uv * gridDivs)\n\ndCell = length(cell)\nring = smoothstep(0.06, 0.01, abs(dCell - 0.28))\ncross = smoothstep(0.04, 0.01, min(abs(cell.x), abs(cell.y))) * step(dCell, crosshairSize)\n\nwave = sin(gridId.x * 0.8 + gridId.y * 0.6 - time * 2.0) * 0.5 + 0.5\nglyph = max(ring, cross) * wave\n\npx = floor(uv * res / stippleScale)\nhash = fract(sin(dot(px, vec2(12.9898, 78.233)) + time * 0.1) * 43758.5453)\n\ndithered = step(threshold, glyph * 0.85 + hash * 0.45)\n\ncBlue = vec3(0.012, 0.045, 0.450)\ncIvory = vec3(0.965, 0.950, 0.915)\n\ncol = mix(cBlue, cIvory, dithered)\nout = clamp(col, 0.0, 1.0)\n",
+    "params": {
+      "gridDivs": 8.0,
+      "stippleScale": 2.5,
+      "waveSpeed": 0.85,
+      "threshold": 0.48,
+      "crosshairSize": 0.35
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

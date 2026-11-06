@@ -119,6 +119,8 @@
   <url><loc>https://infinitedevices.org/embeds/ukiyoe_cartography.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/y2k-acid-chrome-starburst.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/y2k-acid-liquid-matrix.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ditherpunk-bayer-matrix-threshold.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ditherpunk-cyber-glyph-lattice.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/chat.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-06</lastmod><priority>0.7</priority></url>
@@ -235,6 +237,10 @@
   <url><loc>https://infinitedevices.org/library/breakbeat-hoover-rave-stab-synth.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dark-ambient-abyssal-drone-reverb-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/dark-ambient-spectral-filter-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-techno-sine-core-sub-synth.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-techno-transient-chirp-synth.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/idm-algorithmic-comb-resonator-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/idm-pitch-warp-granular-delay-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
@@ -639,6 +645,16 @@
   <url><loc>https://infinitedevices.org/library/dark-ambient-spectral-filter-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-chrome-starburst.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/y2k-acid-liquid-matrix.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-undulating-moire-lattice.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/op-art-concentric-vibration-field.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neo-brutalist-monolithic-pylon-3d.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/neo-brutalist-cantilever-plinth-3d.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-techno-sine-core-sub-synth.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/minimal-techno-transient-chirp-synth.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/idm-algorithmic-comb-resonator-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/idm-pitch-warp-granular-delay-fx.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-bayer-matrix-threshold.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ditherpunk-cyber-glyph-lattice.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-06</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-06</lastmod><priority>0.5</priority></url>
