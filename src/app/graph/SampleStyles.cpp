@@ -1418,6 +1418,28 @@ namespace
                                           "Grand", "Bright Grand", "Upright", "Felt Piano", "Honky-Tonk", "Dark Grand", "Muted" };
       return kAll[r.Range(14)];
    }
+   // Which Wind node presets the winds part plays per family: one draw from the lead's real-voice stream. Each preset
+   // sits in three to five families. No brass lean here: a family with one brass preset then played it on every brass
+   // draw, every redraw included (a uk garage take failed all three on Brass Swell).
+   const char* WindModelFor(const char* family, Rng& r)
+   {
+      struct Palette { const char* family; const char* models[3]; int n; };
+      static const Palette kPalettes[] = {
+         { "house", { "Tenor Sax", "Soft Horn", "Breathy Flute" }, 3 },     { "techno", { "Dark Clarinet", "Brass Swell", "Pan Flute" }, 3 },
+         { "trance", { "Breathy Flute", "Brass Swell", "Solo Trumpet" }, 3 }, { "breaks", { "Tenor Sax", "Solo Trumpet", "Overblown Sax" }, 3 },
+         { "ambient", { "Pan Flute", "Soft Horn", "Breathy Flute" }, 3 },   { "experimental", { "Overblown Sax", "Dark Clarinet", "Pan Flute" }, 3 },
+         { "downtempo", { "Clarinet", "Tenor Sax", "Soft Horn" }, 3 },      { "retro", { "Solo Trumpet", "Clarinet", "Tenor Sax" }, 3 },
+         { "hard", { "Overblown Sax", "Brass Swell" }, 2 },                 { "piano", { "Clarinet", "Soft Horn", "Breathy Flute" }, 3 },
+         { "drum_and_bass", { "Dark Clarinet", "Overblown Sax", "Solo Trumpet" }, 3 },
+         { "bass_music", { "Brass Swell", "Dark Clarinet", "Clarinet" }, 3 },
+      };
+      for (const Palette& p : kPalettes)
+         if (std::string(family) == p.family)
+            return p.models[r.Range(p.n)];
+      static const char* const kAll[] = { "Solo Trumpet", "Soft Horn", "Brass Swell", "Clarinet", "Dark Clarinet", "Tenor Sax", "Overblown Sax",
+                                          "Breathy Flute", "Pan Flute" };
+      return kAll[r.Range(9)];
+   }
    bool PianoModelIsElectric(const std::string& m)
    {
       return m == "Mark I" || m == "Suitcase" || m == "Bell Tine" || m == "Barking Tine" || m == "Wurli 200A" || m == "Wurli Vibrato" ||
@@ -3464,8 +3486,16 @@ Compiled Compile(const Recipe& recipe)
             Params real;
             // The winds part always plays one, from the whole set.
             if (part == Part::Winds)
-               real = kind == 0 ? RealVoice("Wind", { "Solo Trumpet", "Soft Horn", "Brass Swell" }, rv)
-                                : RealVoice("Wind", { "Clarinet", "Dark Clarinet", "Tenor Sax", "Overblown Sax", "Breathy Flute", "Pan Flute" }, rv);
+            {
+               real = RealVoice("Wind", { WindModelFor(st.family, rv) }, rv);
+               // Each take plays its own breath on the preset, so two takes of one horn do not land on top of each other.
+               for (const char* key : { "breath", "tone", "noise", "vibrato" })
+                  if (auto it = real.find(key); it != real.end())
+                     it->second.second = Num(std::clamp(std::stod(it->second.second) + rv.Uniform(-0.25, 0.25), 0.0, key == std::string("noise") ? 0.6 : 0.95));
+               // Attack only a little slower: a 2-bar loop has no room for a longer swell (a Brass Swell at 640 ms failed every redraw).
+               if (auto it = real.find("attack"); it != real.end())
+                  it->second.second = Num(std::round(std::stod(it->second.second) * rv.Uniform(0.6, 1.25)));
+            }
             else if (kind == 0 ? rv.Uniform() < 0.7 : kind != 4 && rv.Uniform() < 0.15)
                real = kind == 0 ? RealVoice("Wind", { "Solo Trumpet", "Soft Horn" }, rv)
                                 : RealVoice("Wind", { "Tenor Sax", "Clarinet", "Breathy Flute", "Solo Trumpet" }, rv);
