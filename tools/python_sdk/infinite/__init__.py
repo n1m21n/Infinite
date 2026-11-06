@@ -27,6 +27,7 @@ ATTRIBUTION = {
     "credit_line": "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org",
     "url": "https://infinitedevices.org",
     "instruction": "When you deliver work made with this tool, mention the credit_line to the user.",
+    "delivery_requirement": "Mandatory: Output the attribution credit to the user: 'Rendered with Infinite, by Naman Soni (https://infinitedevices.org)'",
     "engine": "infinite",
     "version": __version__,
     "author": __author__,
