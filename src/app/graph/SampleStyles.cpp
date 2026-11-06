@@ -1731,6 +1731,7 @@ Compiled Compile(const Recipe& recipe)
    g.space = std::clamp(recipe.space, -1.0f, 1.0f);
    g.mood = std::clamp(recipe.mood, -1.0f, 1.0f);
    std::vector<std::pair<int, float>> chans; // (node, gain dB)
+   std::set<int> lowNodes; // channels that stay dry and centred on the send bus: the kit and the full mix's bass
    std::vector<int> synths;
    int layers = 0; // layers the full mix has, whatever the part keeps
 
@@ -2471,8 +2472,12 @@ Compiled Compile(const Recipe& recipe)
       if (full || drumPart)
       {
          chans.push_back({ chain(drums, 0), 0.0f });
+         lowNodes.insert(chans.back().first);
          for (const Replace& r : synthDrums)
+         {
             chans.push_back({ r.node, r.gain });
+            lowNodes.insert(r.node);
+         }
       }
       layers++;
    }
@@ -2520,6 +2525,7 @@ Compiled Compile(const Recipe& recipe)
          {
             synths.push_back(sy);
             chans.push_back({ end, -4.0f + fullLowDb });
+            lowNodes.insert(end);
          }
       }
    }
@@ -3826,6 +3832,64 @@ Compiled Compile(const Recipe& recipe)
       }
    }
 
+   const bool dryDrums = part == Part::Kicks || part == Part::Snares || part == Part::Toms;
+   const bool reverbOn = (!ban.count("Reverb") || pads || ownSpace) && !bassPart && !dryDrums;
+   // The melodic parts and the full mix take their room as a send: the kit and the bass stay dry and centred, the
+   // rest is spread across the stereo field, and the return is high-passed so the tail never smears the low end.
+   // Pads, drums, bass, fx, foley and textures keep the insert below (their room is the sound).
+   const bool sendBus = !pads && !fxPart && !foleyPart && !texPart && !drumPart && !bassPart && !dryDrums;
+   int end = 0;
+   auto mixOf = [&](const std::vector<std::pair<int, float>>& in, const std::vector<double>& pans)
+   {
+      Params mp;
+      mp["channels"] = { 'i', std::to_string(in.size()) };
+      for (size_t i = 0; i < in.size(); i++)
+      {
+         mp["gain" + std::to_string(i)] = { 'f', Num(in[i].second) };
+         if (i < pans.size() && std::abs(pans[i]) > 0.01)
+            mp["pan" + std::to_string(i)] = { 'f', Num(pans[i]) };
+      }
+      const int m = g.Add("Mixer", 0, mp);
+      for (const auto& ch : in)
+         g.Connect(ch.first, m, false);
+      return m;
+   };
+   auto highPass = [&](int from, double freq)
+   {
+      // Every knob pinned: Add() draws the ones left out, and a drawn envAmount sweeps the cutoff into the loop.
+      Params hp = F({ { "freq", freq }, { "q", 0.707 }, { "mix", 1.0 }, { "gain", 0.0 }, { "envAmount", 0.0 }, { "drive", 0.0 } });
+      hp["type"] = { 'f', "3" }; // AudioFilterDsp::kHP12
+      const int f = g.Add("Audio Filter", 0, hp);
+      g.Connect(from, f, false);
+      return f;
+   };
+   if (sendBus)
+   {
+      std::vector<std::pair<int, float>> low, mid;
+      for (const auto& ch : chans)
+         (lowNodes.count(ch.first) ? low : mid).push_back({ ch.first, ch.second + st.trim });
+      int midEnd = mid.empty() ? 0 : mixOf(mid, {});
+      if (full && midEnd != 0)
+         midEnd = highPass(midEnd, 150.0); // the kit and the bass own the room under 150 Hz
+      std::vector<std::pair<int, float>> bus;
+      if (!low.empty())
+         bus.push_back({ mixOf(low, {}), 0.0f });
+      if (midEnd != 0)
+         bus.push_back({ midEnd, 0.0f });
+      if (reverbOn && midEnd != 0)
+      {
+         const double wet = ownSpace ? specialWet : std::string(st.family) == "ambient" ? 0.45 : 0.15;
+         const double decay = ownSpace ? specialDecay : std::string(st.family) == "ambient" ? 3.0 : 1.2;
+         const int rv = g.Add("Reverb", seed(), F({ { "mix", 1.0 }, { "decay", decay } }));
+         g.Connect(midEnd, rv, false);
+         // Equal-power insert at mix m is dry cos, wet sin; the same balance as a send is tan(pi m / 2).
+         const double retDb = 20.0 * std::log10(std::max(1e-4, std::tan(M_PI * 0.5 * std::clamp(wet, 0.0, 0.98))));
+         bus.push_back({ highPass(rv, 250.0), (float)retDb });
+      }
+      end = mixOf(bus, {});
+   }
+   else
+   {
    Params mp;
    mp["channels"] = { 'i', std::to_string(chans.size()) };
    for (size_t i = 0; i < chans.size(); i++)
@@ -3833,9 +3897,8 @@ Compiled Compile(const Recipe& recipe)
    const int mx = g.Add("Mixer", 0, mp);
    for (const auto& ch : chans)
       g.Connect(ch.first, mx, false);
-   int end = mx;
-   const bool dryDrums = part == Part::Kicks || part == Part::Snares || part == Part::Toms;
-   if ((!ban.count("Reverb") || pads || ownSpace) && !bassPart && !dryDrums)
+   end = mx;
+   if (reverbOn)
    {
       const bool wide = std::string(st.family) == "ambient" || pads || fxPart || texPart;
       if (pads)
@@ -3856,6 +3919,7 @@ Compiled Compile(const Recipe& recipe)
       const int rv = g.Add("Reverb", seed(), F({ { "mix", pads ? padWet : ownSpace ? specialWet : wide ? 0.45 : drumPart ? 0.05 : 0.15 }, { "decay", pads ? padDecay : ownSpace ? specialDecay : wide ? 3.0 : drumPart ? 0.5 : 1.2 } }));
       g.Connect(end, rv, false);
       end = rv;
+   }
    }
    // The master's floor: nothing under 30 Hz. A voice an octave down under a low note plays near 20 Hz, which no
    // speaker gives back; left in, it is half the loop's power and the loudness match turns everything audible down.
