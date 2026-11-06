@@ -3,6 +3,7 @@
 // shaped: every render gets its own dots (tone, energy, space, mood uniform in -1..1) and variation (0..1), drawn from the seed.
 // Per render: one header line {style, id, part, seed, bpm, frames, label} then frames*2 float32 (interleaved stereo, 48 kHz).
 // Otherwise dots at rest, variation 0.5: the generator as a visitor first hears it. Always 2 bars, card key/scale.
+// WITH_PATCH=1 (env): the header also carries the compiled patch text. attempt: how many redraws the critic made.
 // STYLE_FROM / STYLE_STEP (env): render styles FROM, FROM+STEP, ... only (resume a cut run, or shard it over processes).
 const path = require('path'), fs = require('fs');
 const out = b => { for (let o = 0; o < b.length;) o += fs.writeSync(1, b, o); };  // sync: process.exit drops queued pipe writes
@@ -14,6 +15,17 @@ const M0 = require(path.join(dir, 'infinite_gen_wasm.js'));
 M0({ locateFile: f => path.join(dir, f), print: () => {}, printErr: () => {} }).then(M => {
   if (M._gen_set_shape) M._gen_set_shape(0, 0, 0, 0, 0.5, 0, 0);
   const n = M._gen_style_count();
+  if (process.env.LIST) {   // LIST=<file.json>: [{style: id, part, seed, key, scale}], rendered in that order (key/scale -1 = card picks)
+    const ids = {}; for (let i = 0; i < n; i++) ids[M.UTF8ToString(M._gen_style_id(i))] = i;
+    for (const t of JSON.parse(fs.readFileSync(process.env.LIST, 'utf8'))) {
+      const style = ids[t.style]; if (style === undefined) continue;
+      const frames = M._gen_run(style, t.part, t.seed, 2, t.key ?? -1, t.scale ?? -1); if (!frames) continue;
+      const pcm = Buffer.from(new Float32Array(M.HEAPF32.buffer, M._gen_pcm(), frames * 2).slice().buffer);
+      out(Buffer.from(JSON.stringify({ ...t, style, id: t.style, bpm: M._gen_bpm(), frames, label: M.UTF8ToString(M._gen_label()) }) + '\n'));
+      out(pcm);
+    }
+    process.exit(0);
+  }
   for (let style = +(process.env.STYLE_FROM || 0); style < n; style += +(process.env.STYLE_STEP || 1)) {
     const id = M.UTF8ToString(M._gen_style_id(style));
     for (const part of parts)
@@ -25,7 +37,9 @@ M0({ locateFile: f => path.join(dir, f), print: () => {}, printErr: () => {} }).
         const frames = M._gen_run(style, part, seed, 2, -1, -1);
         if (!frames) continue;
         const pcm = Buffer.from(new Float32Array(M.HEAPF32.buffer, M._gen_pcm(), frames * 2).slice().buffer);
-        out(Buffer.from(JSON.stringify({ style, id, part, seed, bpm: M._gen_bpm(), frames, shape, label: M.UTF8ToString(M._gen_label()) }) + '\n'));
+        out(Buffer.from(JSON.stringify({ style, id, part, seed, bpm: M._gen_bpm(), frames, shape, label: M.UTF8ToString(M._gen_label()),
+                                             attempt: M._gen_attempt ? M._gen_attempt() : null,
+                                             ...(process.env.WITH_PATCH ? { patch: M.UTF8ToString(M._gen_patch()) } : {}) }) + '\n'));
         out(pcm);
       }
   }
