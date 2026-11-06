@@ -1757,6 +1757,32 @@ Compiled Compile(const Recipe& recipe)
          shapedVoice = "String";
          shapedEnv = RealVoice("String", { "Violin Bowed", "Cello Bowed" }, rv);
       }
+      if (plucks && !stringsPart)
+      {
+         // A hand on the pluck, one a take (its own stream: no other draw moves). Same-kit and same-model plucks from
+         // different cards were near-duplicates (cross-family 0.40): the strike, the tone and the ring now move per take.
+         Rng hp(std::string("hand:pluck:") + std::to_string(recipe.seed));
+         auto nudge = [&](const char* key, double lo, double hi, double mul) {
+            if (auto it = shapedEnv.find(key); it != shapedEnv.end())
+               it->second.second = Num(std::round(std::clamp(mul > 0.0 ? std::stod(it->second.second) * std::exp2(hp.Uniform(-mul, mul))
+                                                                         : std::stod(it->second.second) + hp.Uniform(lo, hi), lo < 0.0 ? 0.0 : lo,
+                                                   mul > 0.0 ? 1e9 : 0.95) * 1000.0) / 1000.0);
+         };
+         if (shapedVoice == "String")
+         {
+            for (const char* key : { "hardness", "position", "body" })
+               nudge(key, -0.15, 0.15, 0.0);
+            nudge("tone", -0.05, 0.2, 0.0); // brighter more than darker, as with the cutoff
+            nudge("decay", 0.0, 0.0, 0.5);
+         }
+         else
+         {
+            if (auto it = shapedEnv.find("a.cutoff"); it != shapedEnv.end()) // up more than down: the 8 kHz air stays
+               it->second.second = Num(std::round(std::min(16000.0, std::stod(it->second.second) * std::exp2(hp.Uniform(-0.15, 0.45)))));
+            nudge("a.filterDecay", 0.0, 0.0, 0.5);
+            nudge("a.position", -0.12, 0.12, 0.0);
+         }
+      }
    }
 
    std::set<std::string> ban;
