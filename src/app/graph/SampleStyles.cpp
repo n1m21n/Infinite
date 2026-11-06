@@ -1390,6 +1390,39 @@ namespace
             return p.kits[r.Range(p.n)];
       return r.Range(kPluckKitCount);
    }
+   // Which Piano node models the piano part plays per family: one draw from the piano stream. A techno piano is a dark
+   // grand or a barking tine, a retro one a Wurli or a honky-tonk, an ambient one felt. Each model sits in two to four
+   // families, so no one model piles up across cards. Bell Tine is left out: the piano critic rejects it every time
+   // (it reads as a mallet), so it only cost redraws. A family not listed draws from every model.
+   const char* PianoModelFor(const char* family, Rng& r)
+   {
+      struct Palette { const char* family; const char* models[4]; };
+      static const Palette kPalettes[] = {
+         { "house", { "Mark I", "Wurli 200A", "Suitcase", "Bright Grand" } },
+         { "techno", { "Dark Grand", "Muted", "Barking Tine", "Soft Reed" } },
+         { "trance", { "Bright Grand", "Grand", "Felt Piano", "Mark I" } },
+         { "breaks", { "Wurli Bark", "Barking Tine", "Honky-Tonk", "Upright" } },
+         { "ambient", { "Felt Piano", "Soft Reed", "Grand", "Wurli Vibrato" } },
+         { "experimental", { "Muted", "Barking Tine", "Honky-Tonk", "Soft Reed" } },
+         { "downtempo", { "Wurli Vibrato", "Suitcase", "Felt Piano", "Upright" } },
+         { "retro", { "Wurli 200A", "Honky-Tonk", "Mark I", "Suitcase" } },
+         { "hard", { "Bright Grand", "Barking Tine", "Upright", "Dark Grand" } },
+         { "piano", { "Grand", "Upright", "Felt Piano", "Dark Grand" } },
+         { "drum_and_bass", { "Mark I", "Suitcase", "Wurli Bark", "Muted" } },
+         { "bass_music", { "Dark Grand", "Wurli Bark", "Muted", "Wurli 200A" } },
+      };
+      for (const Palette& p : kPalettes)
+         if (std::string(family) == p.family)
+            return p.models[r.Range(4)];
+      static const char* const kAll[] = { "Mark I", "Suitcase", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed",
+                                          "Grand", "Bright Grand", "Upright", "Felt Piano", "Honky-Tonk", "Dark Grand", "Muted" };
+      return kAll[r.Range(14)];
+   }
+   bool PianoModelIsElectric(const std::string& m)
+   {
+      return m == "Mark I" || m == "Suitcase" || m == "Bell Tine" || m == "Barking Tine" || m == "Wurli 200A" || m == "Wurli Vibrato" ||
+             m == "Wurli Bark" || m == "Soft Reed";
+   }
 }
 
 namespace SampleStyles
@@ -3243,9 +3276,14 @@ Compiled Compile(const Recipe& recipe)
             if (part == Part::Piano)
             {
                Rng pr(std::string("piano:") + std::to_string(recipe.seed));
-               kind = pr.Uniform() < 0.5 ? 2 : 0;
-               real = kind == 0 ? RealVoice("Piano", { "Mark I", "Suitcase", "Bell Tine", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed" }, pr)
-                                : RealVoice("Piano", { "Grand", "Bright Grand", "Upright", "Felt Piano", "Honky-Tonk", "Dark Grand", "Muted" }, pr);
+               const char* model = PianoModelFor(st.family, pr);
+               kind = PianoModelIsElectric(model) ? 0 : 2;
+               real = RealVoice("Piano", { model }, pr);
+               // A preset alone leaves two takes of one model near-identical (every cross-family near-duplicate was a
+               // same-model pair): each take plays its own hand on the preset's continuous knobs.
+               for (const char* key : { "hardness", "tone", "body", "decay" })
+                  if (auto it = real.find(key); it != real.end())
+                     it->second.second = Num(std::clamp(std::stod(it->second.second) + pr.Uniform(-0.18, 0.18), 0.05, 0.95));
             }
             else if (kind == 0 && rv.Uniform() < 0.75)
                real = RealVoice("Piano", { "Mark I", "Suitcase", "Bell Tine", "Barking Tine", "Wurli 200A", "Wurli Vibrato", "Wurli Bark", "Soft Reed" }, rv);
