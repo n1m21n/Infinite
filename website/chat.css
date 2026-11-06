@@ -46,3 +46,11 @@
 .cx-flow p { margin: 0; line-height: 1.55; }
 
 @media (max-width: 600px) { .cx-user { max-width: 100%; } .cx-body { padding: 14px 12px 6px; } .cx-comp { margin: 6px 12px 12px; } }
+
+/* real screenshots */
+.cx-shot { margin: 0; display: grid; gap: 8px; justify-items: center; }
+.cx-shot img { display: block; width: 100%; height: auto; border-radius: var(--web-card-radius); box-shadow: var(--shadow-2, var(--shadow-1)); }
+.cx-shot figcaption { color: var(--muted); font-size: 0.8125rem; text-align: center; }
+.cx-split { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.cx-legend { margin: 0; padding-left: 1.2em; display: grid; gap: 12px; line-height: 1.55; }
+@media (max-width: 800px) { .cx-split { grid-template-columns: 1fr; } .cx-tall { max-width: 340px; margin: 0 auto; } }
