@@ -37,6 +37,13 @@ def refdir(name):
 TD = os.path.expanduser("~/Infinite/training-data")
 LEARN = os.path.expanduser("~/Library/Application Support/Infinite/learning")
 PY = sys.executable
+def _families():
+    import re
+    try: src = open(os.path.join(REPO, "src/app/graph/GenerateSamplesTables.inc")).read()
+    except OSError: return {}
+    return dict(re.findall(r'^\s*\{\s*"([a-z0-9_]+)",\s*"[^"]*",\s*"([a-z_]+)",\s*\d+', src, re.M))
+FAMILY = _families()   # card id -> family, from the card table
+
 PARTS = ["all", "synths", "pads", "plucks", "percussion", "drums", "bass", "fx", "foley", "keys", "leads", "textures", "kicks", "snares",
          "hats", "toms", "strings", "winds", "piano"]
 DRUMISH = {4, 5, 12, 13, 14, 15}
@@ -176,7 +183,7 @@ def area_clusters(card):
 def area_cards(card, T, refs, freeze):
     thr = refs.get("neardup") or {}
     newthr = {}
-    ident, ndup, sdup, groove, npart = {}, {}, {}, {}, {}
+    ident, ndup, sdup, groove, npart, fident, fchance = {}, {}, {}, {}, {}, {}, {}
     for p in range(19):
         R = [r for r in T if r["part"] == p and r.get("timbre")]
         if len(R) < 4: continue
@@ -187,8 +194,16 @@ def area_cards(card, T, refs, freeze):
         mean_pd = float(D[np.isfinite(D)].mean()); newthr[PARTS[p]] = 0.25 * mean_pd
         t = thr.get(PARTS[p], 0.25 * mean_pd)
         same = [(i, j) for i in range(n) for j in range(i + 1, n) if R[i]["id"] == R[j]["id"]]
-        other_nn = [min(D[i, j] for j in range(n) if R[j]["id"] != R[i]["id"]) for i in range(n)]
+        # Near-duplicates count only pairs from another family: cards of one family are meant to share a palette, the
+        # owner's complaint is a techno take that sounds like an ambient one. Family identity: the nearest take from
+        # another card belongs to the same family.
+        fam = [FAMILY.get(r["id"], r["id"]) for r in R]
+        other_nn = [min(D[i, j] for j in range(n) if fam[j] != fam[i]) for i in range(n)]
         ndup[p] = float(np.mean([d < t for d in other_nn]))
+        oc = [min((j for j in range(n) if R[j]["id"] != R[i]["id"]), key=lambda j: D[i, j]) for i in range(n)]
+        fident[p] = float(np.mean([fam[i] == fam[j] for i, j in enumerate(oc)]))
+        fchance[p] = float(np.mean([(sum(f == a for f in fam) - sum(R[k]["id"] == R[i]["id"] for k in range(n))) / max(1, n - 2)
+                                    for i, a in enumerate(fam)]))
         sdup[p] = float(np.mean([D[i, j] < t for i, j in same])) if same else float("nan")
         if p in DRUMISH or p == 0:
             groove[p] = float(np.mean([cos(R[i]["rhythm"], R[j]["rhythm"]) > 0.9 for i, j in same])) if same else float("nan")
@@ -198,14 +213,18 @@ def area_cards(card, T, refs, freeze):
     card.add("5 cards", "own-card nearest timbre neighbour, median over parts", v, ">= 0.25 (chance %.3f)" % chance, v >= 0.25, fmt="%.3f",
              tol=0.01, detail="lowest %s %.2f; " % (PARTS[worst], ident[worst]) + " ".join("%s %.2f" % (PARTS[p], x) for p, x in ident.items()))
     v = max(ndup.values()); wp = max(ndup, key=ndup.get)
-    card.add("5 cards", "cross-card near-duplicates, worst part", v, "<= 0.10", v <= 0.10, better="low", fmt="%.3f", tol=0.01,
+    card.add("5 cards", "cross-family near-duplicates, worst part", v, "<= 0.10", v <= 0.10, better="low", fmt="%.3f", tol=0.01,
              detail="%s; " % PARTS[wp] + " ".join("%s %.2f" % (PARTS[p], x) for p, x in ndup.items() if x > 0))
     for p in (3, 18, 1, 6, 5, 17):   # the parts the owner rerolls most (learning log since Oct 31), each on its own row
         if p in ident:
-            one = 1.5 / npart[p]   # a move of one take is below what the row can resolve
-            card.add("5 cards", "%s: own-card nearest timbre neighbour" % PARTS[p], ident[p], ">= 0.25", ident[p] >= 0.25, fmt="%.3f", tol=one)
-            card.add("5 cards", "%s: cross-card near-duplicates" % PARTS[p], ndup[p], "<= 0.10", ndup[p] <= 0.10, better="low", fmt="%.3f",
-                     tol=one)
+            # Noise on a share of n takes: one take (1.5/n) or one binomial standard error, whichever is larger.
+            se = lambda v: max(1.5 / npart[p], math.sqrt(max(v, 1.0 / npart[p]) * (1 - min(v, 0.99)) / npart[p]))
+            card.add("5 cards", "%s: own-card nearest timbre neighbour" % PARTS[p], ident[p], ">= 0.25", ident[p] >= 0.25, fmt="%.3f",
+                     tol=se(ident[p]))
+            card.add("5 cards", "%s: cross-family near-duplicates" % PARTS[p], ndup[p], "<= 0.10", ndup[p] <= 0.10, better="low", fmt="%.3f",
+                     tol=se(ndup[p]))
+            card.add("5 cards", "%s: nearest other-card take from the same family" % PARTS[p], fident[p], ">= 0.25 (chance %.3f)" % fchance[p],
+                     fident[p] >= 0.25, fmt="%.3f", tol=se(fident[p]))
     v = med(list(sdup.values()))
     card.add("5 cards", "same-card seeds near-duplicate, median over parts", v, "<= 0.10", v <= 0.10, better="low", fmt="%.3f", tol=0.01,
              detail=" ".join("%s %.2f" % (PARTS[p], x) for p, x in sdup.items() if x > 0.1))
