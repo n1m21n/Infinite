@@ -56,7 +56,7 @@ FOOTER_COLS = [
         ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
     ]),
     ("Explore", [
-        ("library.html", "Library"), ("samples/", "Samples"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("chat.html", "Chat"), ("extensions.html", "Extensions"),
+        ("library.html", "Library"), ("samples/", "Samples"), ("samples/studio.html", "Sample studio"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("chat.html", "Chat"), ("extensions.html", "Extensions"),
         ("benchmarks.html", "Benchmarks"),
     ]),
     ("Learn", [

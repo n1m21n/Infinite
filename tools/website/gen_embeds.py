@@ -39,12 +39,12 @@ SHELL_HEAD = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#151930">
-  <title>@@TITLE@@: audio-reactive visual | Infinite</title>
-  <meta name="description" content="@@DESC@@ Free to embed, made in Infinite by Naman Soni.">
+  <title>@@PAGE_TITLE@@</title>
+  <meta name="description" content="@@META_DESC@@">
   <link rel="canonical" href="@@URL@@">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="@@TITLE@@: audio-reactive visual">
-  <meta property="og:description" content="@@DESC@@">
+  <meta property="og:title" content="@@OG_TITLE@@">
+  <meta property="og:description" content="@@OG_DESC@@">
   <meta property="og:url" content="@@URL@@">
   <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
   <meta name="twitter:card" content="summary_large_image">
@@ -119,6 +119,27 @@ SHARE_JS = '''<!--share--><script>
 '''
 
 
+def format_title(t):
+    title = f"{t}: audio-reactive visual | Infinite"
+    if len(title) > 60:
+        title = f"{t} | Infinite visual"
+    if len(title) > 60:
+        title = f"{t} | Infinite"
+    return title
+
+
+def format_desc(d):
+    for tail in (" Free to embed, made in Infinite by Naman Soni.", " Free to embed, made in Infinite.", " Free to embed.", ""):
+        if 70 <= len(d + tail) <= 160:
+            return d + tail
+    if len(d) > 160:
+        return d[:157].rsplit(" ", 1)[0] + "..."
+    for tail in (" Free audio-reactive WebGL visual to embed, made in Infinite by Naman Soni.", " Free to embed, made in Infinite by Naman Soni."):
+        if len(d + tail) >= 70 and len(d + tail) <= 160:
+            return d + tail
+    return (d + " Free to embed, made in Infinite by Naman Soni.")[:160]
+
+
 def build_widget(it):
     path = os.path.join(E, it["slug"] + ".html")
     if not os.path.exists(path):
@@ -131,15 +152,27 @@ def build_widget(it):
     for a, b in SCRIPT_FIXES:
         body = body.replace(a, b)
     body = body.replace('</body>', SHARE_JS + '</body>', 1)
-    head = (SHELL_HEAD.replace("@@TITLE@@", e(it["title"])).replace("@@DESC@@", e(it["description"]))
-            .replace("@@URL@@", f"{BASE}embeds/{it['slug']}.html").replace("@@LD@@", ld(it)))
+    p_title = format_title(it["title"])
+    m_desc = format_desc(it["description"])
+    og_title = it["title"] + ": audio-reactive visual"
+    if len(og_title) > 65:
+        og_title = it["title"]
+    head = (SHELL_HEAD
+            .replace("@@PAGE_TITLE@@", e(p_title))
+            .replace("@@META_DESC@@", e(m_desc))
+            .replace("@@OG_TITLE@@", e(og_title))
+            .replace("@@OG_DESC@@", e(m_desc))
+            .replace("@@TITLE@@", e(it["title"]))
+            .replace("@@URL@@", f"{BASE}embeds/{it['slug']}.html")
+            .replace("@@LD@@", ld(it, m_desc)))
     return head + body
 
 
-def ld(it):
+def ld(it, desc=None):
     """CreativeWork JSON-LD for one widget, part of the embeds gallery. </ is escaped so the script tag cannot close early."""
     url = f"{BASE}embeds/{it['slug']}.html"
-    return json.dumps({"@context": "https://schema.org", "@type": "CreativeWork", "name": it["title"], "description": it["description"],
+    d = desc or it["description"]
+    return json.dumps({"@context": "https://schema.org", "@type": "CreativeWork", "name": it["title"], "description": d,
                        "url": url, "image": BASE + "assets/og-image.jpg", "genre": "Audio-reactive visual", "isAccessibleForFree": True,
                        "author": {"@type": "Person", "name": "Naman Soni"},
                        "isPartOf": {"@type": "CollectionPage", "name": "Infinite embeds", "url": BASE + "embeds/"}},

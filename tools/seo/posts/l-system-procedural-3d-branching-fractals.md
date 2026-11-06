@@ -1,7 +1,7 @@
 ---
 title: L-system procedural 3D branching and fractal generation
 seo_title: L-System Procedural 3D Branching and Fractals | Infinite
-description: How to build procedural 3D trees and fractals using l-system procedural 3d branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.
+description: Build procedural 3D trees and fractals using L-system branching, 3D turtle geometry, mesh extrusion, and real-time audio modulation in Infinite.
 date: 2026-11-04
 category: creative
 tags: [l-system, procedural 3d, generative art, creative coding, fractals]

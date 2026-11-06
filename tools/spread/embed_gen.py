@@ -25,12 +25,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{TITLE} — Interactive Infinite Visualizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#151930">
+  <title>{TITLE}: audio-reactive visual | Infinite</title>
+  <meta name="description" content="{TITLE}: an interactive audio-reactive WebGL visualizer. Free to embed, made in Infinite by Naman Soni.">
+  <link rel="canonical" href="https://infinitedevices.org/embeds/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{TITLE}: audio-reactive visual">
+  <meta property="og:description" content="{TITLE}: an interactive audio-reactive WebGL visualizer. Free to embed, made in Infinite by Naman Soni.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">{{"@context":"https://schema.org","@type":"CreativeWork","name":"{TITLE}","description":"{TITLE}: an interactive audio-reactive WebGL visualizer. Free to embed, made in Infinite by Naman Soni.","url":"https://infinitedevices.org/embeds/","image":"https://infinitedevices.org/assets/og-image.jpg","genre":"Audio-reactive visual","isAccessibleForFree":true,"author":{{"@type":"Person","name":"Naman Soni"}},"isPartOf":{{"@type":"CollectionPage","name":"Infinite embeds","url":"https://infinitedevices.org/embeds/"}}}}</script>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body, html {{ width: 100%; height: 100%; overflow: hidden; background: #0b0d17; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
     canvas {{ width: 100%; height: 100%; display: block; }}
+    .sr-only {{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }}
     .badge {{
       position: absolute;
       bottom: 14px;
@@ -86,7 +96,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <canvas id="gl"></canvas>
+  <main>
+    <h1 class="sr-only">{TITLE}</h1>
+    <canvas id="gl" role="img" aria-label="{TITLE}, an audio-reactive visual"></canvas>
 
   <div class="controls">
     <button class="btn" id="btn-audio">enable mic input</button>
@@ -96,6 +108,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <span class="badge-icon"></span>
     <span>made in <strong>infinite</strong></span>
   </a>
+  </main>
 
   <script>
     const canvas = document.getElementById("gl");

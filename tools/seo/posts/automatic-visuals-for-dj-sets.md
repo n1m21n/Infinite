@@ -116,7 +116,7 @@ You can introduce macro evolution autonomously using slow modulators:
 - **Dynamic colour ramps**: Route a slow noise signal from a `Noise` node into a `Color Ramp` node. Instead of fixed RGB values, the colour palette gradually glides from deep midnight blues and indigos into warm ember and amber hues over ten to fifteen minutes.
 - **Breakdown detectors**: Use a comparison node to monitor overall `level`. If overall audio amplitude drops below a threshold for more than four seconds, automatically trigger a slow fade into an expansive, floating particle field. When the onset detector registers a sudden peak in `low` energy, switch back to high-impact geometric pulses.
 
-You can explore pre-configured generative patches and modulation recipes in the [Infinite node library](https://infinitedevices.org/library).
+You can explore pre-configured generative patches and modulation recipes in the [Infinite node library](https://infinitedevices.org/library.html).
 
 ## Routing low-latency video to stage projectors
 
