@@ -3066,6 +3066,17 @@ Compiled Compile(const Recipe& recipe)
          }
          if (k["b.on"].second == "0")
             k["mix"] = { 'f', "0" };
+         {
+            // A hand on the sound, one a take (its own stream: no other draw moves). Same-kind basses from different cards
+            // were near-duplicates (cross-family 0.40); the filter, its envelope and the layer balance now move per take.
+            Rng hb(std::string("hand:bass:") + std::to_string(recipe.seed));
+            cut = std::clamp(cut * std::exp2(hb.Uniform(-0.5, 0.5)), 250.0, 3500.0);
+            res = std::clamp(res + hb.Uniform(-0.08, 0.12), 0.0, 0.8);
+            fd = std::clamp(fd * std::exp2(hb.Uniform(-0.6, 0.6)), 60.0, 1200.0);
+            ad = std::clamp(ad * std::exp2(hb.Uniform(-0.5, 0.5)), 120.0, 2000.0);
+            if (k["b.on"].second == "1")
+               k["mix"] = { 'f', num(std::clamp(std::stod(k["mix"].second) + hb.Uniform(-0.15, 0.15), 0.15, 0.8)) };
+         }
          for (char e : { 'a', 'b' })
          {
             EngineFilter(k, e, filter, cut, res, amt, 0.0, fd, fs, 80.0);
