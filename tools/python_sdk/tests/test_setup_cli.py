@@ -65,6 +65,8 @@ class Setup(unittest.TestCase):
         self.assertEqual(by["cursor (global)"], "added")
         self.assertEqual(by["claude desktop"], "not found")
         self.assertEqual(by["windsurf"], "not found")
+        self.assertEqual(by["antigravity"], "not found")
+        self.assertEqual(by["codex"], "not found")
         self.assertFalse(os.path.exists(os.path.join(home, ".config")))
 
 

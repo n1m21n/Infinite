@@ -36,6 +36,10 @@ def targets(home=None, platform=None, cwd=None, appdata=None):
         out.append(("cursor", "cursor (this folder)", d, os.path.join(d, "mcp.json")))
     d = os.path.join(home, ".codeium")
     out.append(("windsurf", "windsurf", d, os.path.join(d, "windsurf", "mcp_config.json")))
+    d = os.path.join(home, ".gemini")
+    out.append(("antigravity", "antigravity", d, os.path.join(d, "config", "mcp_config.json")))
+    d = os.path.join(home, ".codex")
+    out.append(("codex", "codex", d, os.path.join(d, "mcp.json")))
     return out
 
 
@@ -105,9 +109,9 @@ def setup(only=None, all_apps=False, dry_run=False, force=False, **where):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="infinite-init", description="Add Infinite to Claude Desktop, Cursor and Windsurf.")
+    ap = argparse.ArgumentParser(prog="infinite-init", description="Add Infinite to Claude Desktop, Cursor, Windsurf, Antigravity and Codex.")
     ap.add_argument("--dry-run", action="store_true", help="show what would change and write nothing")
-    ap.add_argument("--only", choices=["claude", "cursor", "windsurf"])
+    ap.add_argument("--only", choices=["claude", "cursor", "windsurf", "antigravity", "codex"])
     ap.add_argument("--all", action="store_true", help="also create the config for apps that are not installed")
     ap.add_argument("--force", action="store_true", help="replace an existing infinite entry that has other settings")
     a = ap.parse_args(argv)

@@ -9,7 +9,7 @@ Official Python interface for **Infinite**, the free, open-source modular audiov
 ```bash
 pip install infinite-daw
 python3 -c "import infinite"
-infinite-init --dry-run   # adds the MCP server to Claude Desktop, Cursor and Windsurf
+infinite-init --dry-run   # adds the MCP server to Claude Desktop, Cursor, Windsurf, Antigravity and Codex
 ```
 
 From a checkout instead: `pip install -e tools/python_sdk`.
