@@ -217,11 +217,14 @@ def build_index(posts, header, footer):
                "description": "Notes on building and using Infinite, the free open-source DAW for visuals, music and code.",
                "publisher": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"},
                "blogPost": [{"@type": "BlogPosting", "headline": p["title"], "url": p["url"], "datePublished": p["date"]} for p in posts]}
+    item_list_ld = {"@context": "https://schema.org", "@type": "ItemList", "name": "Infinite blog posts", "url": BASE + "blog/",
+                    "numberOfItems": len(posts),
+                    "itemListElement": [{"@type": "ListItem", "position": idx + 1, "url": p["url"], "name": p["title"]} for idx, p in enumerate(posts)]}
     crumbs = {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Infinite", "item": BASE}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": BASE + "blog/"}]}
     s = head("Infinite blog: audio-reactive visuals, music and code",
              "Notes on building and using Infinite, the free open-source DAW for visuals, music and code on one canvas. Tutorials, engineering write-ups and ideas.",
-             BASE + "blog/", "assets/og-image.jpg", ld(blog_ld) + ld(crumbs))
+             BASE + "blog/", "assets/og-image.jpg", ld(blog_ld) + ld(crumbs) + ld(item_list_ld))
     s = s.replace('blog.css?v=', 'blog.css?v=', 1)
     s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=e7678fc1">', s, count=1)
     s += f"""<body class="blog-page blog-index">
@@ -314,7 +317,7 @@ def build_post(p, posts, header, footer):
     related.sort(key=lambda r: (-(len(set(r["tags"]) & set(p["tags"]))), r["category"] != p["category"]))
     rel = "".join(f'<a class="rel-card" href="{r["slug"]}.html"><span class="mono">{e(CATS.get(r["category"], r["category"]))}</span><b>{e(r["title"])}</b></a>' for r in related[:3])
     rel_html = f'<section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid">{rel}</div></section>' if rel else ""
-    art = {"@context": "https://schema.org", "@type": "BlogPosting", "headline": p["title"], "description": p["description"],
+    art = {"@context": "https://schema.org", "@type": ["Article", "BlogPosting"], "headline": p["title"], "description": p["description"],
            "datePublished": p["date"], "dateModified": p.get("updated", p["date"]), "mainEntityOfPage": p["url"], "url": p["url"],
            "image": [(img if img.startswith("http") else BASE + img) if img else BASE + "assets/og-image.jpg"],
            "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"},

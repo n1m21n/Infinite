@@ -74,10 +74,12 @@ def page(i, embeds=frozenset()):
         t = f'{i["name"]} | Infinite'
     d = i["description"] or f'{i["name"]}, a free {i["category"]} for Infinite.'
     e = html.escape
-    ld = {"@context": "https://schema.org", "@type": "CreativeWork", "name": i["name"], "description": d, "genre": i["category"],
-          "image": i["preview"], "url": url, "isAccessibleForFree": True, "encodingFormat": ext, "contentUrl": i["file"],
+    ld = {"@context": "https://schema.org", "@type": ["Article", "CreativeWork"], "headline": i["name"], "name": i["name"],
+          "description": d, "genre": i["category"], "image": i["preview"], "url": url, "mainEntityOfPage": url,
+          "datePublished": "2026-01-01", "dateModified": "2026-11-06", "isAccessibleForFree": True, "encodingFormat": ext, "contentUrl": i["file"],
           "isPartOf": {"@type": "CollectionPage", "name": "Infinite Library", "url": BASE + "library.html"},
-          "author": {"@type": "Person", "name": i["author"] or "n1m21n", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []}}
+          "author": {"@type": "Person", "name": i["author"] or "Naman Soni", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []},
+          "publisher": {"@type": "Organization", "name": "Infinite", "url": BASE, "logo": {"@type": "ImageObject", "url": BASE + "assets/icon.png"}}}
     by = f' by {e(i["author"])}' if i["author"] else ""
     hear = f'  <a class="btn btn-ghost" href="../{e(i["sample"])}">Hear it first</a>\n' if i.get("sample") else ""
     live = f'  <a class="btn btn-ghost" href="../embeds/{e(i["id"])}.html">Play it live in your browser</a>\n' if i["id"] in embeds else ""
@@ -143,6 +145,25 @@ def main():
     json.dump({"name": "Infinite Library", "url": BASE + "library.html", "count": len(its), "items": its},
               open(os.path.join(W, "assets/library/catalog.json"), "w"), indent=1, ensure_ascii=False)
     p = os.path.join(W, "library.html"); s = open(p).read()
+    item_list_ld = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Infinite Library",
+        "description": "Free starter templates, community patches and Field devices for Infinite, the real-time audiovisual workstation.",
+        "url": BASE + "library.html",
+        "numberOfItems": len(its),
+        "itemListElement": [
+            {"@type": "ListItem", "position": n + 1, "url": f"{BASE}library/{i['id']}.html", "name": i["name"]}
+            for n, i in enumerate(its)
+        ]
+    }
+    head_ld = ('<!-- seo-head:start -->\n  <script type="application/ld+json">\n' +
+               json.dumps(item_list_ld, indent=2, ensure_ascii=False) +
+               '\n  </script>\n  <!-- seo-head:end -->\n</head>')
+    if "<!-- seo-head:start -->" in s:
+        s = re.sub(r"<!-- seo-head:start -->.*?<!-- seo-head:end -->\s*</head>", head_ld, s, flags=re.S)
+    else:
+        s = s.replace("</head>", head_ld, 1)
     blk = library_block(its)
     if "<!-- seo:start -->" in s:
         s = re.sub(r"<!-- seo:start -->.*?<!-- seo:end -->", lambda m: blk, s, flags=re.S)

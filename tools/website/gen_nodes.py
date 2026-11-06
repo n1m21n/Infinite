@@ -468,9 +468,26 @@ def page(it, items, bynorm):
           {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
               {"@type": "ListItem", "position": 1, "name": "Infinite", "item": BASE}, {"@type": "ListItem", "position": 2, "name": "Nodes", "item": BASE + "nodes/"},
               {"@type": "ListItem", "position": 3, "name": name, "item": url}]}]
+    product_ld = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": f"{name} Node",
+        "description": desc_meta,
+        "image": img_abs,
+        "category": label,
+        "brand": {"@type": "Brand", "name": "Infinite"},
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock",
+            "url": url,
+        },
+    }
     h = head(title, desc_meta, url, img_abs, ld[0], rel)
-    # the second JSON-LD block: breadcrumbs
-    h = h.replace("</head>", '  <script type="application/ld+json">%s</script>\n</head>' % json.dumps(ld[1], ensure_ascii=False), 1)
+    # the second JSON-LD block: breadcrumbs, and third: product
+    h = h.replace("</head>", '  <script type="application/ld+json">%s</script>\n  <script type="application/ld+json">%s</script>\n</head>' % (
+        json.dumps(ld[1], ensure_ascii=False), json.dumps(product_ld, ensure_ascii=False)), 1)
     hdr, ftr = chrome.header_html(rel), chrome.footer_html(rel)
     shotf = ""
     if shot:

@@ -433,13 +433,22 @@ def faq():
 def jsonld(n):
     url = BASE + "benchmarks.html"
     return json.dumps({"@context": "https://schema.org", "@graph": [
-        {"@type": "TechArticle", "@id": url + "#article", "headline": "Infinite v0.6 benchmarks: audio, video and speed against Vital, Serum 2, Blender, Ableton, Bitwig and more",
+        {"@type": ["Article", "TechArticle"], "@id": url + "#article", "headline": "Infinite v0.6 benchmarks: audio, video and speed against Vital, Serum 2, Blender, Ableton, Bitwig and more",
          "description": "Independent, reproducible measurements of Infinite against other synths, effects, 3D and creative tools on a base MacBook Air M2, including where Infinite is slower.",
          "url": url, "datePublished": ISO, "dateModified": ISO, "inLanguage": "en", "isAccessibleForFree": True,
          "author": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"},
          "publisher": {"@type": "Organization", "name": "Infinite Devices", "url": BASE},
          "about": {"@type": "SoftwareApplication", "name": "Infinite", "url": BASE},
          "encoding": {"@type": "MediaObject", "contentUrl": BASE + "assets/" + PDF_NAME, "encodingFormat": "application/pdf"}},
+        {"@type": "ItemList", "name": "Infinite benchmark categories", "url": url,
+         "numberOfItems": 5,
+         "itemListElement": [
+             {"@type": "ListItem", "position": 1, "name": "Polyphonic Synthesizers (CPU vs Vital & Serum)", "url": url + "#synths"},
+             {"@type": "ListItem", "position": 2, "name": "Mixing and Audio Effects (DSP overhead)", "url": url + "#effects"},
+             {"@type": "ListItem", "position": 3, "name": "Real-Time 3D Rendering (Geometry throughput)", "url": url + "#3d"},
+             {"@type": "ListItem", "position": 4, "name": "Offline Export and Rendering (Speed & efficiency)", "url": url + "#export"},
+             {"@type": "ListItem", "position": 5, "name": "App Footprint (Launch time, bundle size, RAM)", "url": url + "#footprint"}
+         ]},
         {"@type": "Dataset", "name": "Infinite v0.6 benchmark results", "description": f"{n} tracked metrics plus competitor comparisons for instruments, effects, 3D, export and app footprint.",
          "url": url, "license": "https://github.com/n1m21n/Infinite/blob/main/LICENSE", "creator": {"@type": "Person", "name": "Naman Soni"},
          "distribution": [{"@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": BASE + "assets/benchmarks.json"},

@@ -17,13 +17,13 @@
   <link rel="canonical" href="https://infinitedevices.org/benchmarks.html">
   <meta property="og:title" content="Infinite benchmarks">
   <meta property="og:description" content="Open, reproducible benchmarks of Infinite against Vital, Serum 2, Blender, Ableton and TouchDesigner on a MacBook Air M2, including where it is slower.">
-  <meta property="og:image" content="https://infinitedevices.org/assets/og/benchmarks.jpg">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
   <meta property="og:url" content="https://infinitedevices.org/benchmarks.html">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Infinite benchmarks">
   <meta name="twitter:description" content="Open, reproducible benchmarks of Infinite against Vital, Serum 2, Blender, Ableton and TouchDesigner on a MacBook Air M2, including where it is slower.">
-  <meta name="twitter:image" content="https://infinitedevices.org/assets/og/benchmarks.jpg">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/og-image.jpg">
   <link rel="alternate" type="text/plain" href="llms.txt" title="Plain-text summary for language models">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
@@ -35,6 +35,7 @@
   <link rel="stylesheet" href="style.css?v=34878888">
   <link rel="stylesheet" href="library.css?v=2a6c31a2">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
+  <link rel="stylesheet" href="library-deck.css?v=e7992427">
   <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -42,6 +43,8 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
+<!-- seo-head:start -->
+  <!-- seo-head:end -->
   <link rel="stylesheet" href="benchmarks.css?v=c060dbfd">
   <link rel="alternate" type="application/json" href="assets/benchmarks.json" title="Benchmark data">
   <link rel="alternate" type="application/pdf" href="assets/Infinite_Benchmark_Report.pdf" title="Benchmark report (PDF)">
@@ -50,7 +53,10 @@
  "@context": "https://schema.org",
  "@graph": [
   {
-   "@type": "TechArticle",
+   "@type": [
+    "Article",
+    "TechArticle"
+   ],
    "@id": "https://infinitedevices.org/benchmarks.html#article",
    "headline": "Infinite v0.6 benchmarks: audio, video and speed against Vital, Serum 2, Blender, Ableton, Bitwig and more",
    "description": "Independent, reproducible measurements of Infinite against other synths, effects, 3D and creative tools on a base MacBook Air M2, including where Infinite is slower.",
@@ -79,6 +85,44 @@
     "contentUrl": "https://infinitedevices.org/assets/Infinite_Benchmark_Report.pdf",
     "encodingFormat": "application/pdf"
    }
+  },
+  {
+   "@type": "ItemList",
+   "name": "Infinite benchmark categories",
+   "url": "https://infinitedevices.org/benchmarks.html",
+   "numberOfItems": 5,
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Polyphonic Synthesizers (CPU vs Vital & Serum)",
+     "url": "https://infinitedevices.org/benchmarks.html#synths"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Mixing and Audio Effects (DSP overhead)",
+     "url": "https://infinitedevices.org/benchmarks.html#effects"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "Real-Time 3D Rendering (Geometry throughput)",
+     "url": "https://infinitedevices.org/benchmarks.html#3d"
+    },
+    {
+     "@type": "ListItem",
+     "position": 4,
+     "name": "Offline Export and Rendering (Speed & efficiency)",
+     "url": "https://infinitedevices.org/benchmarks.html#export"
+    },
+    {
+     "@type": "ListItem",
+     "position": 5,
+     "name": "App Footprint (Launch time, bundle size, RAM)",
+     "url": "https://infinitedevices.org/benchmarks.html#footprint"
+    }
+   ]
   },
   {
    "@type": "Dataset",
@@ -172,12 +216,7 @@
   <link rel="stylesheet" href="scale.css?v=f0c66d50">
   <link rel="stylesheet" href="neumo.css?v=3a020cee">
   <link rel="stylesheet" href="search.css?v=96e10ca3">
-</head>
-<body class="benchmarks-page">
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
+</head><body class="benchmarks-page">
   <header class="site-header" id="site-header">
     <div class="container nav-container">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
@@ -261,22 +300,6 @@ python3 tools/re-survey/render_bench.py infinite</code></pre><p>Corrections and 
       </div>
     </section>
   </main>
-<script>(function(){
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.2});
-  document.querySelectorAll('.bm-bento,.cmp').forEach(function(n){io.observe(n);});
-  document.querySelectorAll('.cmp').forEach(function(card){
-    var seg=card.querySelector('.seg'),views=card.querySelectorAll('.view');
-    seg.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var i=+b.getAttribute('data-i');
-      seg.style.setProperty('--i',i);seg.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
-      views.forEach(function(v,k){v.classList.toggle('on',k===i);});});
-    card.addEventListener('click',function(e){var c=e.target.closest('.col,.grp');if(!c)return;var v=c.closest('.view');
-      v.querySelectorAll('.sel').forEach(function(x){x.classList.remove('sel');});c.classList.add('sel');
-      var ro=v.querySelector('.ro');ro.querySelector('.ro-t').textContent=c.getAttribute('data-t');
-      var n=ro.querySelector('.ro-n'),a=c.getAttribute('data-a'),b=c.getAttribute('data-b');
-      n.innerHTML='<b class="a">'+a+'</b>'+(b!==null?'<b class="b">'+b+'</b>':'');ro.querySelector('.ro-p').textContent=c.getAttribute('data-p');});
-  });
-})();</script>
-
 
   <footer class="site-footer">
     <div class="container">
@@ -350,6 +373,22 @@ python3 tools/re-survey/render_bench.py infinite</code></pre><p>Corrections and 
       <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
     </div>
   </footer>
+<script>(function(){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.2});
+  document.querySelectorAll('.bm-bento,.cmp').forEach(function(n){io.observe(n);});
+  document.querySelectorAll('.cmp').forEach(function(card){
+    var seg=card.querySelector('.seg'),views=card.querySelectorAll('.view');
+    seg.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var i=+b.getAttribute('data-i');
+      seg.style.setProperty('--i',i);seg.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
+      views.forEach(function(v,k){v.classList.toggle('on',k===i);});});
+    card.addEventListener('click',function(e){var c=e.target.closest('.col,.grp');if(!c)return;var v=c.closest('.view');
+      v.querySelectorAll('.sel').forEach(function(x){x.classList.remove('sel');});c.classList.add('sel');
+      var ro=v.querySelector('.ro');ro.querySelector('.ro-t').textContent=c.getAttribute('data-t');
+      var n=ro.querySelector('.ro-n'),a=c.getAttribute('data-a'),b=c.getAttribute('data-b');
+      n.innerHTML='<b class="a">'+a+'</b>'+(b!==null?'<b class="b">'+b+'</b>':'');ro.querySelector('.ro-p').textContent=c.getAttribute('data-p');});
+  });
+})();</script>
+
   <script src="site.js?v=21" defer></script>
 <nav class="dock" id="dock" aria-label="Main">
   <div class="dock-bar">

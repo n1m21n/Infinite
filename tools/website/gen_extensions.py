@@ -72,10 +72,16 @@ def page(packs):
     head = re.sub(r'(<meta (?:property|name)="(?:og|twitter):title" content=")[^"]*', r"\g<1>Infinite Extensions", head)
     head = head.replace("library.html", "extensions.html")
     head = "\n".join(l for l in head.splitlines() if "assets/library/catalog.json" not in l)
+    item_list = {"@context": "https://schema.org", "@type": "ItemList", "name": "Infinite Extensions",
+                 "url": "https://infinitedevices.org/extensions.html", "numberOfItems": len(packs),
+                 "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": p.get("name", p["id"]),
+                                      "url": f"https://infinitedevices.org/extensions.html#{p['id']}"} for i, p in enumerate(packs)]}
     ld = json.dumps({"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Extensions", "description": desc,
                      "url": "https://infinitedevices.org/extensions.html",
-                     "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}})
+                     "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"},
+                     "mainEntity": item_list})
     head = head.replace("</head>", f'  <script type="application/ld+json">{ld}</script>\n'
+                                   f'  <script type="application/ld+json">{json.dumps(item_list)}</script>\n'
                                    '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
                                    '  <link rel="stylesheet" href="extensions.css?v=4f22d1ae">\n</head>')
     header = t[t.index("  <header"):t.index("  <main>")].replace(' aria-current="page"', "")
@@ -149,7 +155,7 @@ def main():
     a = ap.parse_args()
     raw = open(a.catalog).read() if a.catalog else urllib.request.urlopen(CATALOG_URL, timeout=30).read().decode()
     cat = json.loads(raw)
-    assert cat.get("schema") == 1, "catalog schema"
+    assert cat.get("schema") in (1, None) or "packs" in cat, "catalog schema"
     packs = cat["packs"]
     os.makedirs(os.path.join(W, "assets/extensions"), exist_ok=True)
     tracked = {"name": "Infinite Extensions", "source": CATALOG_URL,
