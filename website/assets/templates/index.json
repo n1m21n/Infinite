@@ -1575,6 +1575,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "breakbeat-hardcore-sub-roller-synth",
+      "name": "Breakbeat Hardcore Sub Roller Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Heavy syncopated breakbeat sub-roller synthesizer with dual detuned saw-pulse oscillators, driven lowpass filter punch, and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-hardcore-sub-roller-synth.webp",
+      "file": "assets/templates/breakbeat-hardcore-sub-roller-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "breakbeat-hoover-rave-stab-synth",
+      "name": "Breakbeat Hoover Rave Stab Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Classic 90s rave hoover stab synthesizer with pitch-swept multi-pulse chorus width, biting resonant filter decay, and aggressive distortion.",
+      "price": 0,
+      "preview": "assets/templates/breakbeat-hoover-rave-stab-synth.webp",
+      "file": "assets/templates/breakbeat-hoover-rave-stab-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dark-ambient-abyssal-drone-reverb-fx",
+      "name": "Dark Ambient Abyssal Drone Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Deep subterranean cavern reverberator with endless low-frequency resonance, pitch dispersion feedback, and dense spectral decay diffusion.",
+      "price": 0,
+      "preview": "assets/templates/dark-ambient-abyssal-drone-reverb-fx.webp",
+      "file": "assets/templates/dark-ambient-abyssal-drone-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dark-ambient-spectral-filter-fx",
+      "name": "Dark Ambient Spectral Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Atmospheric multi-pole morphing lowpass and notch filter with slow drifting LFO modulation, sub-harmonic exciter, and soft tape clipping.",
+      "price": 0,
+      "preview": "assets/templates/dark-ambient-spectral-filter-fx.webp",
+      "file": "assets/templates/dark-ambient-spectral-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

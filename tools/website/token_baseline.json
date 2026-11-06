@@ -449,5 +449,13 @@
  "embeds/technical-blueprint-specimen-matrix.html": {
   "font-size": 2,
   "hex": 6
+ },
+ "embeds/y2k-acid-chrome-starburst.html": {
+  "font-size": 2,
+  "hex": 6
+ },
+ "embeds/y2k-acid-liquid-matrix.html": {
+  "font-size": 2,
+  "hex": 6
  }
 }

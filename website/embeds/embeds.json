@@ -350,6 +350,51 @@
       "slug": "technical-blueprint-specimen-matrix",
       "title": "Technical Blueprint Specimen Matrix",
       "description": "Speculative biological schematic blueprint shader with sectional specimen contour rings, radial coordinate calipers, and technical drafting callouts. Bass modulates sectional contour breathing, mids sweep drafting alignment arcs, highs trigger luminous chalk-white specimen flares."
+    },
+    {
+      "slug": "ditherpunk",
+      "title": "Ditherpunk 1-Bit",
+      "description": "High-contrast duo-tone stippling and 1-bit Bayer matrices with audio-reactive cyber-glyphs."
+    },
+    {
+      "slug": "indie_psychedelic",
+      "title": "Indie Psychedelia",
+      "description": "Dreamy interior perspectives, organic vines sprouting into fractals, and fluid domain warp."
+    },
+    {
+      "slug": "lilliputian_surreal",
+      "title": "Lilliputian Surreal",
+      "description": "Miniature figures traversing titanic anatomical objects inside uncanny domestic landscapes."
+    },
+    {
+      "slug": "liminal_void",
+      "title": "Liminal Void",
+      "description": "Desolate concrete architecture, infinite reflective water plane, and solitary silhouettes at dusk."
+    },
+    {
+      "slug": "riso_manga_zine",
+      "title": "Risograph Manga",
+      "description": "Halftone Ben-Day dots, CMYK screen misregistration, and fluorescent spot inks in real time."
+    },
+    {
+      "slug": "thundr_brutalist",
+      "title": "Thundr Brutalism",
+      "description": "Utilitarian barcodes, receipt monospace typography, and distressed vector textures."
+    },
+    {
+      "slug": "ukiyoe_cartography",
+      "title": "Ukiyo-e Cartography",
+      "description": "Edo-period antique mapmaking, topographical contour ripples, and indigo rice paper."
+    },
+    {
+      "slug": "y2k-acid-chrome-starburst",
+      "title": "Y2K Acid Chrome Starburst",
+      "description": "Y2K cyber-acid liquid chrome shader with multi-point specular starburst rays, iridescent chromatic dispersion, and audio-reactive radial warp. Bass pulses the molten chrome core, mids rotate the iridescent starburst rays, and highs ignite electric cyan specular highlights."
+    },
+    {
+      "slug": "y2k-acid-liquid-matrix",
+      "title": "Y2K Acid Liquid Matrix",
+      "description": "Fluid molten chrome displacement matrix with undulating iridescent ripples, vivid acid magenta caustics, and audio-reactive specular contours. Bass deepens the chrome fluid displacement, mids accelerate the liquid wave matrix, and highs shimmer metallic cyan reflection highlights."
     }
   ]
 }

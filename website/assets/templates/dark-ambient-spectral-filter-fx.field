@@ -1,0 +1,19 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dark Ambient Spectral Filter FX",
+    "author": "Infinite",
+    "description": "Atmospheric multi-pole morphing lowpass and notch filter with slow drifting LFO modulation, sub-harmonic exciter, and soft tape clipping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float lfoRate = 0.25 [0.05, 1.5]\nparam float centerFreq = 1400.0 [250.0, 4500.0]\nparam float resonance = 0.45 [0.05, 0.85]\nparam float mix = 0.70 [0.0, 1.0]\nstate float lfo = 0\nstate float lp1 = 0\nstate float lp2 = 0\nstate float bp1 = 0\nstate float subTone = 0\n\nlfo = (lfo + lfoRate / sr) % 1.0\nwob = sin(lfo * 6.2831853) * 0.5 + 0.5\n\nfCut = clamp((centerFreq * (0.6 + wob * 0.8)) / sr * 2.2, 0.01, 0.45)\nlp1 = lp1 + fCut * (in - lp1 - resonance * bp1)\nbp1 = bp1 + fCut * (lp1 - bp1)\nlp2 = lp2 + fCut * (bp1 - lp2)\n\nfSub = clamp(90.0 / sr * 2.2, 0.005, 0.1)\nsubTone = subTone + fSub * (in - subTone)\n\nwet = (lp2 * 0.85 + bp1 * 0.65 + subTone * 0.4) * 1.35\nu = wet * 1.2\nsat = clamp(u - 0.18 * u * u * u, -0.92, 0.92)\n\nout = (in * (1.0 - mix) + sat * mix) * 1.06\n",
+    "params": {
+      "lfoRate": 0.25,
+      "centerFreq": 1400.0,
+      "resonance": 0.45,
+      "mix": 0.7
+    }
+  }
+}

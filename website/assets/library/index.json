@@ -5467,6 +5467,216 @@
       "file": "assets/library/pixel/technical-blueprint-specimen-matrix.field",
       "preview": "assets/library/previews/technical-blueprint-specimen-matrix.jpg",
       "bytes": 1856
+    },
+    {
+      "id": "retro-surreal-celestial-arch",
+      "name": "Retro-Surreal Celestial Arch",
+      "kind": "Generator",
+      "tags": [
+        "retro",
+        "surreal",
+        "collage",
+        "celestial",
+        "arch",
+        "drawing"
+      ],
+      "description": "Surrealist cutout composition on aged parchment with concentric celestial orbital rings, sage and terracotta archway portals, and midnight slate geometric plinths.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/retro-surreal-celestial-arch.js",
+      "preview": "assets/library/previews/retro-surreal-celestial-arch.jpg",
+      "bytes": 4813
+    },
+    {
+      "id": "retro-surreal-botanical-monolith",
+      "name": "Retro-Surreal Botanical Monolith",
+      "kind": "Generator",
+      "tags": [
+        "retro",
+        "surreal",
+        "botanical",
+        "monolith",
+        "collage",
+        "geometric"
+      ],
+      "description": "Constructed collage featuring floating slate monolith slabs, botanical specimen silhouettes in muted sage, and terracotta astrological disc alignments.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/retro-surreal-botanical-monolith.js",
+      "preview": "assets/library/previews/retro-surreal-botanical-monolith.jpg",
+      "bytes": 4121
+    },
+    {
+      "id": "liminal-void-floating-monolith-3d",
+      "name": "Liminal Void Floating Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "liminal",
+        "void",
+        "anime",
+        "monolith",
+        "atmosphere",
+        "3d"
+      ],
+      "description": "Atmospheric liminal anime landscape featuring floating geometric monolith blocks above an abyssal navy horizon plane with crimson dusk gradients.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/liminal-void-floating-monolith-3d.js",
+      "preview": "assets/library/previews/liminal-void-floating-monolith-3d.jpg",
+      "bytes": 2589
+    },
+    {
+      "id": "liminal-void-dusk-colonnade-3d",
+      "name": "Liminal Void Dusk Colonnade 3D",
+      "kind": "Generator",
+      "tags": [
+        "liminal",
+        "void",
+        "colonnade",
+        "architecture",
+        "dusk",
+        "3d"
+      ],
+      "description": "Minimalist infinite architectural colonnade receding into a crimson twilight sky, featuring warm amber structural pillars and abyssal foundation terraces.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/liminal-void-dusk-colonnade-3d.js",
+      "preview": "assets/library/previews/liminal-void-dusk-colonnade-3d.jpg",
+      "bytes": 2509
+    },
+    {
+      "id": "breakbeat-hardcore-sub-roller-synth",
+      "name": "Breakbeat Hardcore Sub Roller Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "breakbeat",
+        "hardcore",
+        "sub",
+        "roller",
+        "dsp"
+      ],
+      "description": "Heavy syncopated breakbeat sub-roller synthesizer with dual detuned saw-pulse oscillators, driven lowpass filter punch, and warm saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/breakbeat-hardcore-sub-roller-synth.inf",
+      "preview": "assets/library/previews/breakbeat-hardcore-sub-roller-synth.jpg",
+      "bytes": 2444
+    },
+    {
+      "id": "breakbeat-hoover-rave-stab-synth",
+      "name": "Breakbeat Hoover Rave Stab Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "breakbeat",
+        "hoover",
+        "rave",
+        "stab",
+        "dsp"
+      ],
+      "description": "Classic 90s rave hoover stab synthesizer with pitch-swept multi-pulse chorus width, biting resonant filter decay, and aggressive distortion.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/breakbeat-hoover-rave-stab-synth.inf",
+      "preview": "assets/library/previews/breakbeat-hoover-rave-stab-synth.jpg",
+      "bytes": 2333
+    },
+    {
+      "id": "dark-ambient-abyssal-drone-reverb-fx",
+      "name": "Dark Ambient Abyssal Drone Reverb FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "reverb",
+        "drone",
+        "abyssal",
+        "audio"
+      ],
+      "description": "Deep subterranean cavern reverberator with endless low-frequency resonance, pitch dispersion feedback, and dense spectral decay diffusion.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dark-ambient-abyssal-drone-reverb-fx.inf",
+      "preview": "assets/library/previews/dark-ambient-abyssal-drone-reverb-fx.jpg",
+      "bytes": 2132
+    },
+    {
+      "id": "dark-ambient-spectral-filter-fx",
+      "name": "Dark Ambient Spectral Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "ambient",
+        "filter",
+        "spectral",
+        "drone",
+        "audio"
+      ],
+      "description": "Atmospheric multi-pole morphing lowpass and notch filter with slow drifting LFO modulation, sub-harmonic exciter, and soft tape clipping.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dark-ambient-spectral-filter-fx.inf",
+      "preview": "assets/library/previews/dark-ambient-spectral-filter-fx.jpg",
+      "bytes": 2156
+    },
+    {
+      "id": "y2k-acid-chrome-starburst",
+      "name": "Y2K Acid Chrome Starburst",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "y2k",
+        "acid",
+        "chrome",
+        "starburst",
+        "shader"
+      ],
+      "description": "Y2K liquid chrome shader with multi-point specular starburst rays, iridescent chromatic fringes, and audio-reactive radial warp.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/y2k-acid-chrome-starburst.field",
+      "preview": "assets/library/previews/y2k-acid-chrome-starburst.jpg",
+      "bytes": 1667
+    },
+    {
+      "id": "y2k-acid-liquid-matrix",
+      "name": "Y2K Acid Liquid Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "y2k",
+        "acid",
+        "liquid",
+        "matrix",
+        "shader"
+      ],
+      "description": "Audio-reactive fluid chrome displacement grid with undulating iridescent ripples, acid magenta caustics, and specular metallic contours.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/y2k-acid-liquid-matrix.field",
+      "preview": "assets/library/previews/y2k-acid-liquid-matrix.jpg",
+      "bytes": 1752
     }
   ]
 }

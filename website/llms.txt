@@ -71,6 +71,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Full Documentation for Language Models](https://infinitedevices.org/llms-full.txt): complete uncompressed reference of all nodes, library catalog, and audio-reactive WebGL embeds
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
 - [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit
+- [Sample Studio](https://infinitedevices.org/samples/studio.html): shape and sculpt generative loops with tone, energy, mood and space parameters in real time in the browser
 - [Extensions](https://infinitedevices.org/extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated
@@ -193,6 +194,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Neurofunk Modulated Growl Synth](https://infinitedevices.org/library/neurofunk-modulated-growl-synth.html): Aggressive frequency-modulated growl bass synthesizer with carrier-modulator phase feedback, vowel formant notch shaping, and tube drive. (file: https://infinitedevices.org/assets/templates/neurofunk-modulated-growl-synth.inf)
 - [Dubstep Sub Drive Saturator FX](https://infinitedevices.org/library/dubstep-sub-drive-saturator-fx.html): Heavy dynamic asymmetric tube overdrive and multi-band sub-bass exciter with tape warmth, parallel clean blend, and output ceiling limiting. (file: https://infinitedevices.org/assets/templates/dubstep-sub-drive-saturator-fx.inf)
 - [Dubstep Formant Vowel Filter FX](https://infinitedevices.org/library/dubstep-formant-vowel-filter-fx.html): Dynamic vowel-morphing dual-peak formant filter with modulated resonance sweep, vocal frequency emphasis, and stereo width generation. (file: https://infinitedevices.org/assets/templates/dubstep-formant-vowel-filter-fx.inf)
+- [Breakbeat Hardcore Sub Roller Synth](https://infinitedevices.org/library/breakbeat-hardcore-sub-roller-synth.html): Heavy syncopated breakbeat sub-roller synthesizer with dual detuned saw-pulse oscillators, driven lowpass filter punch, and warm saturation. (file: https://infinitedevices.org/assets/templates/breakbeat-hardcore-sub-roller-synth.inf)
+- [Breakbeat Hoover Rave Stab Synth](https://infinitedevices.org/library/breakbeat-hoover-rave-stab-synth.html): Classic 90s rave hoover stab synthesizer with pitch-swept multi-pulse chorus width, biting resonant filter decay, and aggressive distortion. (file: https://infinitedevices.org/assets/templates/breakbeat-hoover-rave-stab-synth.inf)
+- [Dark Ambient Abyssal Drone Reverb FX](https://infinitedevices.org/library/dark-ambient-abyssal-drone-reverb-fx.html): Deep subterranean cavern reverberator with endless low-frequency resonance, pitch dispersion feedback, and dense spectral decay diffusion. (file: https://infinitedevices.org/assets/templates/dark-ambient-abyssal-drone-reverb-fx.inf)
+- [Dark Ambient Spectral Filter FX](https://infinitedevices.org/library/dark-ambient-spectral-filter-fx.html): Atmospheric multi-pole morphing lowpass and notch filter with slow drifting LFO modulation, sub-harmonic exciter, and soft tape clipping. (file: https://infinitedevices.org/assets/templates/dark-ambient-spectral-filter-fx.inf)
 
 ## Library: Community
 
@@ -553,7 +558,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 70 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 79 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -570,4 +575,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 55 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 64 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

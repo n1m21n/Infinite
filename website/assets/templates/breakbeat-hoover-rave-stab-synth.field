@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Breakbeat Hoover Rave Stab Synth",
+    "author": "Infinite",
+    "description": "Classic 90s rave hoover stab synthesizer with pitch-swept multi-pulse chorus width, biting resonant filter decay, and aggressive distortion.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detuneSpread = 0.65 [0.1, 1.5]\nparam float cutoff = 2400.0 [300.0, 6000.0]\nparam float pitchDrop = 0.45 [0.0, 1.0]\nparam float decay = 0.28 [0.08, 1.2]\nparam float drive = 1.4 [0.5, 3.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decay), 0.0001, 0.02)\nenv = if(target > env, env + (target - env) * 0.45, env - env * decayRate)\npEnv = if(target > pEnv, pEnv + (target - pEnv) * 0.65, pEnv - pEnv * 0.006)\n\nfBase = clamp(freq * (1.0 + pEnv * pitchDrop * 0.5), 40.0, 1600.0)\nd = detuneSpread * 0.018\nf1 = fBase * (1.0 + d)\nf2 = fBase * (1.0 - d)\n\np1 = (p1 + f1 / sr) % 1.0\nsaw1 = p1 * 2.0 - 1.0\n\np2 = (p2 + f2 / sr) % 1.0\nsaw2 = p2 * 2.0 - 1.0\n\nraw = (saw1 * 0.5 + saw2 * 0.5) * env\n\nu = raw * drive\nsat = clamp(u - 0.20 * u * u * u, -0.94, 0.94)\n\nfCut = clamp((cutoff + pEnv * 2000.0) / sr * 2.2, 0.015, 0.45)\nlp1 = lp1 + fCut * (sat - lp1 - 0.38 * lp2)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.36\n",
+    "params": {
+      "detuneSpread": 0.65,
+      "cutoff": 2400.0,
+      "pitchDrop": 0.45,
+      "decay": 0.28,
+      "drive": 1.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Y2K Acid Chrome Starburst",
+    "author": "Infinite",
+    "description": "Y2K liquid chrome shader with multi-point specular starburst rays, iridescent chromatic fringes, and audio-reactive radial warp.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float starburstPoints = 8.0 [4.0, 16.0]\nparam float chromeGloss = 1.4 [0.5, 3.0]\nparam float chromaticSpread = 0.35 [0.05, 1.0]\nparam float warpSpeed = 0.8 [0.1, 2.5]\nparam float rimGlow = 1.2 [0.2, 2.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * warpSpeed\n\nr = length(p)\nang = atan2(p.y, p.x)\n\nwarp = sin(r * 12.0 - time * 2.0) * 0.06\nangWarp = ang + warp\n\nrays = abs(cos(angWarp * starburstPoints * 0.5 + time * 0.5))\nstar = pow(rays, 6.0) * smoothstep(0.9, 0.1, r)\n\ncore = smoothstep(0.55, 0.15, r + warp * 0.5)\nrim = smoothstep(0.04, 0.005, abs(r - 0.52))\n\nspec = pow(max(0.0, 1.0 - abs(p.x * 0.7 + p.y * 0.7)), 8.0) * chromeGloss\n\ncDark = vec3(0.067, 0.067, 0.133)\ncMagenta = vec3(1.0, 0.0, 0.498)\ncCyan = vec3(0.0, 1.0, 1.0)\ncChrome = vec3(0.878, 0.878, 0.878)\n\nirid = sin(vec3(0.0, 2.0, 4.0) + angWarp * 2.0 + time) * 0.5 + 0.5\n\ncol = mix(cDark, cMagenta, star * 0.75)\ncol = mix(col, cCyan, rim * rimGlow + irid * chromaticSpread * star)\ncol = mix(col, cChrome, (core * 0.65 + spec * 0.8))\n\nout = clamp(col, 0.0, 1.0)\n",
+    "params": {
+      "starburstPoints": 8.0,
+      "chromeGloss": 1.4,
+      "chromaticSpread": 0.35,
+      "warpSpeed": 0.8,
+      "rimGlow": 1.2
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}
