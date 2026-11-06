@@ -36,7 +36,7 @@ If your show depends on that ecosystem, stay there. If you want sound and pictur
 2. Open the **Moves with the music** template from the [Library](https://infinitedevices.org/library.html).
 3. Press play, then replace the shape with something of your own.
 
-For numbers, the site has a [benchmarks page](https://infinitedevices.org/benchmarks.html) that states its method and its limits.
+You can also experiment directly inside the browser using the [Sample Studio](https://infinitedevices.org/samples/studio.html) or browse the [audio-reactive GLSL shader guide](https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html) to see how shader uniforms bind to audio bands. For numbers, the site has a [benchmarks page](https://infinitedevices.org/benchmarks.html) that states its method and its limits.
 
 ## Bringing a shader over
 

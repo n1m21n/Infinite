@@ -17,7 +17,13 @@
     {"q": "automatic visuals for dj set", "track": "B", "persona": "dj", "match": ["dj", "visuals", "set"]},
     {"q": "lorenz attractor interactive simulation", "track": "B", "persona": "science", "match": ["lorenz", "attractor", "simulation"]},
     {"q": "granular synthesis modular audio", "track": "B", "persona": "sound_design", "match": ["granular", "synthesis", "modular"]},
-    {"q": "l system procedural 3d branching", "track": "B", "persona": "creative_coding", "match": ["l-system", "procedural", "branching", "3d"]}
+    {"q": "l system procedural 3d branching", "track": "B", "persona": "creative_coding", "match": ["l-system", "procedural", "branching", "3d"]},
+    {"q": "touchdesigner vs infinite", "track": "A", "persona": "creative_coding", "match": ["touchdesigner", "alternative", "visual"]},
+    {"q": "free vj software mac windows linux", "track": "B", "persona": "vj", "match": ["vj", "software", "free"]},
+    {"q": "modular vst3 host lfo modulation", "track": "B", "persona": "engineering", "match": ["vst", "modular", "lfo"]},
+    {"q": "bitwig grid free alternative", "track": "B", "persona": "electronic_musicians", "match": ["bitwig", "grid", "modular"]},
+    {"q": "drum and bass reese bass sound design", "track": "B", "persona": "sound_design", "match": ["reese", "bass", "sound design"]},
+    {"q": "modular synth sub bass patch", "track": "B", "persona": "sound_design", "match": ["sub bass", "synth", "modular"]}
   ]
 }
 

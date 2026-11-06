@@ -45,7 +45,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Sound design in Infinite: sub bass, plucks, and pads", "description": "Guide to modular sound design in Infinite DAW: subtractive sub bass, Karplus-Strong plucks, and ambient pads with Field kernels.", "datePublished": "2026-10-19", "dateModified": "2026-10-19", "mainEntityOfPage": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html", "url": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html", "image": ["https://infinitedevices.org/assets/blog_sound_design_synth.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "sound design, synth, electronic music, sub bass, dsp", "wordCount": 620, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Sound design in Infinite: sub bass, plucks, and pads", "description": "Guide to modular sound design in Infinite DAW: subtractive sub bass, Karplus-Strong plucks, and ambient pads with Field kernels.", "datePublished": "2026-10-19", "dateModified": "2026-10-19", "mainEntityOfPage": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html", "url": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html", "image": ["https://infinitedevices.org/assets/blog_sound_design_synth.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "sound design, synth, electronic music, sub bass, dsp", "wordCount": 719, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Sound design in Infinite: sub bass, plucks, and pads", "item": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html"}]}</script>
   <link rel="stylesheet" href="../system.css?v=23625436">
   <link rel="stylesheet" href="../scale.css?v=f0c66d50">
@@ -137,16 +137,16 @@
           <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">19 October 2026 · 3 min read</span></span></p>
         </header>
         <figure class="post-hero"><img src="../assets/thumbs/blog_sound_design_synth-1200.webp" alt="3d audio spectrum and modular sound design synthesis in infinite" width="1200" height="675" decoding="async"></figure>
-        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#1-clean-punchy-sub-bass-with-harmonic-saturation">1. clean, punchy sub bass with harmonic saturation</a></li><li><a href="#2-snappy-acoustic-style-plucks-via-karplus-strong">2. snappy acoustic-style plucks via karplus-strong</a></li><li><a href="#3-shimmering-ambient-pads-with-detuned-supersaws-and-stereo-diffusion">3. shimmering ambient pads with detuned supersaws and stereo diffusion</a></li></ol></details>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#1-clean-punchy-sub-bass-with-harmonic-saturation">1. Clean, punchy sub bass with harmonic saturation</a></li><li><a href="#2-snappy-acoustic-style-plucks-via-karplus-strong">2. Snappy acoustic-style plucks via Karplus-Strong</a></li><li><a href="#3-shimmering-ambient-pads-with-detuned-supersaws-and-stereo-diffusion">3. Shimmering ambient pads with detuned supersaws and stereo diffusion</a></li></ol></details>
         <div class="prose">
-<p>most modern digital audio workstations treat sound design as an external plugin problem. you buy a third-party vst, open a floating gui, turn virtual skeuomorphic knobs, and send audio back into a linear timeline.</p>
-<p>infinite takes a fundamentally different path: sound design and synthesis live directly on the same canvas as your sequencers, modulation matrix, and visual engine. with field language nodes, every oscillator, envelope, filter, and wavefolder can be written as clean, per-sample dsp code running at 48khz with zero allocation overhead.</p>
-<p>here is how to construct three foundational electronic music sounds from first principles in infinite.</p>
-<h2 id="1-clean-punchy-sub-bass-with-harmonic-saturation">1. clean, punchy sub bass with harmonic saturation</h2>
-<p>a clean sub bass needs two things: rock-solid pitch stability in the 30hz to 80hz region and subtle odd harmonics so it remains audible on laptop speakers and mobile devices.</p>
-<h3 id="signal-flow">signal flow</h3>
-<ol><li><strong>midi in</strong> -&gt; pitch to frequency conversion: <code>f = 440.0 * pow(2.0, (note - 69.0) / 12.0)</code>.</li><li><strong>field synth</strong> -&gt; phase accumulator with soft-clipped sine wave and dynamic saturation.</li><li><strong>envelope</strong> -&gt; fast exponential attack (2ms), medium decay (350ms), sustained floor at -6db.</li></ol>
-<h3 id="the-field-kernel">the field kernel</h3>
+<p>Most modern digital audio workstations treat sound design as an external plugin problem. You buy a third-party VST, open a floating GUI, turn virtual skeuomorphic knobs, and send audio back into a linear timeline. If you want a dedicated sound design DAW, Infinite takes a fundamentally different path: sound design and synthesis live directly on the same canvas as your sequencers, modulation matrix, and visual engine.</p>
+<p>With Field language nodes, every oscillator, envelope, filter, and wavefolder can be written as clean, per-sample DSP code running at 48 kHz with zero allocation overhead. You can also <a href="https://infinitedevices.org/blog/modulate-vst3-plugins-with-visuals-and-lfos.html">modulate VST3 plugins with LFOs and visuals</a> whenever you wish to incorporate external instruments.</p>
+<p>Here is how to construct three foundational electronic music sounds from first principles in Infinite.</p>
+<h2 id="1-clean-punchy-sub-bass-with-harmonic-saturation">1. Clean, punchy sub bass with harmonic saturation</h2>
+<p>A clean sub bass needs two things: rock-solid pitch stability in the 30 Hz to 80 Hz region and subtle odd harmonics so it remains audible on laptop speakers and mobile devices.</p>
+<h3 id="signal-flow">Signal flow</h3>
+<ol><li><strong>MIDI In</strong> -&gt; pitch to frequency conversion: <code>f = 440.0 * pow(2.0, (note - 69.0) / 12.0)</code>.</li><li><strong>Field Synth</strong> -&gt; phase accumulator with soft-clipped sine wave and dynamic saturation.</li><li><strong>Envelope</strong> -&gt; fast exponential attack (2 ms), medium decay (350 ms), sustained floor at -6 dB.</li></ol>
+<h3 id="the-field-kernel">The Field kernel</h3>
 <pre><code class="language-field">// registers: r0 = phase, r1 = pitch_smooth
 let target_phase_inc = f * (6.28318530718 / 48000.0)
 r1 = r1 * 0.95 + target_phase_inc * 0.05
@@ -161,10 +161,10 @@ let sat = fundamental + 0.15 * sin(r0 * 3.0)
 
 // soft tanh-like saturation curve
 out = sat / (1.0 + abs(sat) * 0.3)</code></pre>
-<p>because the phase accumulator maintains exact 64-bit continuous phase, there is zero phase click even during rapid bassline glides or legato 808 note changes.</p>
-<h2 id="2-snappy-acoustic-style-plucks-via-karplus-strong">2. snappy acoustic-style plucks via karplus-strong</h2>
-<p>subtractive synths approximate plucks by sweeping a lowpass filter with a fast envelope. physical modeling plucks, however, sound organic and tactile because they simulate the energy dissipation of a real vibrating string.</p>
-<p>in infinite, you can build a physical modeling string resonator using a feedback delay line with a lowpass damping filter in an audio effect node:</p>
+<p>Because the phase accumulator maintains exact 64-bit continuous phase, there is zero phase click even during rapid bassline glides or legato 808 note changes. You can open an interactive version of this patch in the <a href="https://infinitedevices.org/library.html">Infinite Library</a>.</p>
+<h2 id="2-snappy-acoustic-style-plucks-via-karplus-strong">2. Snappy acoustic-style plucks via Karplus-Strong</h2>
+<p>Subtractive synths approximate plucks by sweeping a lowpass filter with a fast envelope. Physical modelling plucks, however, sound organic and tactile because they simulate the energy dissipation of a real vibrating string. You can test a ready-to-run <a href="https://infinitedevices.org/library/karplus-strong-synth.html">Karplus-Strong synthesiser patch</a> directly in the library.</p>
+<p>In Infinite, you can build a physical modelling string resonator using a feedback delay line with a lowpass damping filter in an audio effect node:</p>
 <pre><code class="language-field">// r0..r2048: circular delay buffer, r2049: write head index, r2050: previous sample
 let buffer_len = int(48000.0 / f)
 let read_idx = (r2049 - buffer_len + 2048) % 2048
@@ -181,15 +181,15 @@ write_reg(r2049, new_sample)
 r2049 = (r2049 + 1) % 2048
 
 out = new_sample</code></pre>
-<p>when you trigger this node with a 5-millisecond white noise burst from a <strong>noise</strong> node, you get an acoustic harp or guitar timbre that responds naturally to note velocity.</p>
-<h2 id="3-shimmering-ambient-pads-with-detuned-supersaws-and-stereo-diffusion">3. shimmering ambient pads with detuned supersaws and stereo diffusion</h2>
-<p>for deep atmospheric soundscapes, infinite lets you run multi-voice unison oscillators with randomized phase spreading and integrated stereo diffusion.</p>
-<h3 id="recipe">recipe</h3>
-<ol><li>generate 7 saw oscillators per voice, detuned exponentially across +/- 18 cents.</li><li>feed the summed output into a <strong>field effect</strong> stereo chorus and all-pass diffuser network.</li><li>connect the audio spectrum directly into a <strong>field pixel</strong> visualizer node so your pad's frequency harmonics modulate a real-time raymarched crystal or volumetric cloud on screen.</li></ol>
-<h3 id="modulating-sound-from-visuals-and-vice-versa">modulating sound from visuals and vice-versa</h3>
-<p>because infinite does not separate the audio thread from the modulation graph, you can route the brightness of your visual scene directly into the filter cutoff of your pad:</p>
-<ul><li><strong>audio analyze</strong> -&gt; measures pad high-frequency resonance.</li><li><strong>field pixel</strong> -&gt; visual bloom expands in response to pad brightness.</li><li><strong>lfo / motion tracker</strong> -&gt; webcam hand position controls pad stereo spread.</li></ul>
-<p>every parameter in infinite is accessible over python sdk and headless automation, allowing ai agents and artists alike to generate whole albums of sound design with verifiable precision.</p>
+<p>When you trigger this node with a 5-millisecond white noise burst from a <strong>Noise</strong> node, you get an acoustic harp or guitar timbre that responds naturally to note velocity.</p>
+<h2 id="3-shimmering-ambient-pads-with-detuned-supersaws-and-stereo-diffusion">3. Shimmering ambient pads with detuned supersaws and stereo diffusion</h2>
+<p>For deep atmospheric soundscapes, Infinite lets you run multi-voice unison oscillators with randomised phase spreading and integrated stereo diffusion, similar to the <a href="https://infinitedevices.org/library/pad-wash.html">pad wash library patch</a>.</p>
+<h3 id="recipe">Recipe</h3>
+<ol><li>Generate 7 saw oscillators per voice, detuned exponentially across +/- 18 cents.</li><li>Feed the summed output into a <strong>Field Effect</strong> stereo chorus and all-pass diffuser network.</li><li>Connect the audio spectrum directly into a <strong>Field Pixel</strong> visualiser node so your pad's frequency harmonics modulate a real-time raymarched crystal or volumetric cloud on screen.</li></ol>
+<h3 id="modulating-sound-from-visuals-and-vice-versa">Modulating sound from visuals and vice-versa</h3>
+<p>Because Infinite does not separate the audio thread from the modulation graph, you can route the brightness of your visual scene directly into the filter cutoff of your pad:</p>
+<ul><li><strong>Audio Analyze</strong> -&gt; measures pad high-frequency resonance.</li><li><strong>Field Pixel</strong> -&gt; visual bloom expands in response to pad brightness.</li><li><strong>LFO / Motion Tracker</strong> -&gt; webcam hand position controls pad stereo spread.</li></ul>
+<p>Every parameter in Infinite is accessible over the Python SDK and headless automation, allowing AI agents and artists alike to generate whole albums of sound design with verifiable precision.</p>
         </div>
         <aside class="post-cta" aria-label="Try Infinite">
           <p class="hand">your turn</p>

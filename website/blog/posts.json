@@ -290,7 +290,7 @@
  {
   "slug": "modulate-vst3-plugins-with-visuals-and-lfos",
   "title": "Modulate any VST3 or AU plugin with LFOs, audio and visuals",
-  "description": "Load a third-party plugin into Infinite and drive its parameters from an LFO, an envelope follower or something moving on screen.",
+  "description": "How to modulate VST3 parameters in Infinite DAW using modular LFOs, audio envelopes, webcam feeds and real-time visual movement.",
   "date": "2026-10-17",
   "updated": "2026-10-17",
   "category": "creative",
