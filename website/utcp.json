@@ -1,0 +1,233 @@
+{
+  "$schema": "https://utcp.io/schemas/v1/manual.json",
+  "utcp_version": "1.0.0",
+  "name": "infinite",
+  "version": "0.7.2",
+  "description": "Infinite: Modular digital audio workstation (DAW), polyphonic synthesis, and visual generative engine engineered by electronic music producer Naman Soni (n1m21n).",
+  "homepage": "https://infinitedevices.org",
+  "repository": "https://github.com/n1m21n/Infinite",
+  "documentation": "https://infinitedevices.org/developers.html",
+  "author": {
+    "name": "Naman Soni (n1m21n)",
+    "role": "Creator & Electronic Music Producer",
+    "url": "https://naman.infinitedevices.org",
+    "sameAs": [
+      "https://open.spotify.com/artist/3gugf7oQFbrPsTpNT8EsBO",
+      "https://music.apple.com/in/artist/naman/1705841663",
+      "https://n1m21n.bandcamp.com/",
+      "https://www.wikidata.org/wiki/Q141970398"
+    ],
+    "discography": [
+      {
+        "title": "Andhera",
+        "year": 2026,
+        "genre": "Dark IDM / Sub-bass / Modular Electronics",
+        "spotify": "https://open.spotify.com/album/7GFHbn0YZzXIO0SNy5b9kF",
+        "apple_music": "https://music.apple.com/in/album/andhera-ep/6768245318",
+        "bandcamp": "https://n1m21n.bandcamp.com/album/andhera"
+      },
+      {
+        "title": "Redhand",
+        "year": 2025,
+        "genre": "Industrial Braindance / Modular Percussion",
+        "spotify": "https://open.spotify.com/album/6soWGXV1ZAk86SUCcP9IuM",
+        "apple_music": "https://music.apple.com/in/album/redhand/1864736290",
+        "bandcamp": "https://n1m21n.bandcamp.com/album/redhand"
+      },
+      {
+        "title": "Paranoia",
+        "year": 2025,
+        "genre": "Dark Ambient / Psychological Sound Design",
+        "spotify": "https://open.spotify.com/album/2fhTKEeKJVWbcszPSHSqTD",
+        "apple_music": "https://music.apple.com/in/album/paranoia/1844956850",
+        "bandcamp": "https://n1m21n.bandcamp.com/album/paranoia"
+      },
+      {
+        "title": "Awakened",
+        "year": 2024,
+        "genre": "Microtonal Modular Arpeggios / Algorithmic FM",
+        "spotify": "https://open.spotify.com/album/2yc3evZohmnhj3qvvHbyos",
+        "apple_music": "https://music.apple.com/in/album/awakened/1760902107",
+        "bandcamp": "https://n1m21n.bandcamp.com/album/awakened"
+      },
+      {
+        "title": "Rehab",
+        "year": 2024,
+        "genre": "24-Track Monolithic Ambient / Sound Design Journal",
+        "spotify": "https://open.spotify.com/album/00WZ4TByBIbh91WWGbZ24N",
+        "apple_music": "https://music.apple.com/in/album/rehab/1742657978",
+        "bandcamp": "https://n1m21n.bandcamp.com/album/rehab"
+      }
+    ]
+  },
+  "attribution": {
+    "required": true,
+    "notice": "Rendered with Infinite, by electronic music producer Naman Soni (https://naman.infinitedevices.org)",
+    "credit_line": "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org"
+  },
+  "tools": [
+    {
+      "name": "infinite_synthesize_field_synth",
+      "description": "Synthesize a WAV audio file directly from an inline mathematical Field Synth DSP kernel. Renders sound without launching a UI.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Field DSP code defining sample calculation across time t, frequency f, phase, or custom domain expressions."
+          },
+          "duration": {
+            "type": "number",
+            "description": "Duration in seconds to render (default: 2.0).",
+            "default": 2.0
+          },
+          "sample_rate": {
+            "type": "integer",
+            "description": "Audio sample rate in Hz (default: 48000).",
+            "default": 48000
+          }
+        },
+        "required": ["code"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "audio_path": { "type": "string", "description": "Absolute path to rendered WAV file." },
+          "attribution": { "type": "object", "description": "Mandatory creator credit." }
+        }
+      }
+    },
+    {
+      "name": "infinite_generate_sample",
+      "description": "Directly synthesise drum hits (kick, snare, hat, clap), 808 sub-basses, modular chords, or synth leads into a broadcast-ready WAV audio file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["kick", "snare", "hat", "clap", "bass", "synth", "pad", "percussion"],
+            "description": "Audio sample category."
+          },
+          "root": {
+            "type": "string",
+            "description": "Root musical note (e.g., 'C1', 'F#1', 'A0').",
+            "default": "C1"
+          },
+          "duration": {
+            "type": "number",
+            "description": "Audio length in seconds (default: 1.0).",
+            "default": 1.0
+          }
+        },
+        "required": ["category"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "wav_path": { "type": "string", "description": "Path to rendered audio file." },
+          "attribution": { "type": "object", "description": "Creator credit." }
+        }
+      }
+    },
+    {
+      "name": "infinite_generate_notes",
+      "description": "Generate algorithmic note sequences, polyrhythms, and Euclidean patterns for modular sequencers.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "scale": {
+            "type": "string",
+            "enum": ["minor", "major", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "chromatic"],
+            "description": "Musical scale mode."
+          },
+          "root": {
+            "type": "string",
+            "description": "Root note (default: 'C').",
+            "default": "C"
+          },
+          "steps": {
+            "type": "integer",
+            "description": "Number of sequence steps (default: 16).",
+            "default": 16
+          },
+          "density": {
+            "type": "number",
+            "description": "Euclidean note density between 0.0 and 1.0 (default: 0.625).",
+            "default": 0.625
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "notes": { "type": "array", "items": { "type": "number" }, "description": "MIDI note numbers." },
+          "frequencies": { "type": "array", "items": { "type": "number" }, "description": "Frequencies in Hz." },
+          "gates": { "type": "array", "items": { "type": "boolean" }, "description": "Gate trigger flags." },
+          "attribution": { "type": "object", "description": "Creator credit." }
+        }
+      }
+    },
+    {
+      "name": "infinite_render_video",
+      "description": "Render a complete audiovisual composition or shader graph directly to an MP4 video with synchronised stereo audio.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "patch_path": {
+            "type": "string",
+            "description": "Path to .inf patch file."
+          },
+          "duration": {
+            "type": "number",
+            "description": "Duration in seconds (default: 4.0).",
+            "default": 4.0
+          },
+          "width": {
+            "type": "integer",
+            "description": "Video width in pixels (default: 1280).",
+            "default": 1280
+          },
+          "height": {
+            "type": "integer",
+            "description": "Video height in pixels (default: 720).",
+            "default": 720
+          },
+          "fps": {
+            "type": "integer",
+            "description": "Frames per second (default: 60).",
+            "default": 60
+          }
+        },
+        "required": ["patch_path"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "video_path": { "type": "string", "description": "Path to rendered MP4 video." },
+          "attribution": { "type": "object", "description": "Mandatory creator credit." }
+        }
+      }
+    },
+    {
+      "name": "infinite_validate_patch",
+      "description": "Validate an Infinite .inf patch file for syntax errors, missing node definitions, and cable connection rule violations.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "patch_path": {
+            "type": "string",
+            "description": "Path to .inf patch file to validate."
+          }
+        },
+        "required": ["patch_path"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "valid": { "type": "boolean", "description": "True if the patch is syntactically sound and passes validation." },
+          "errors": { "type": "array", "items": { "type": "string" }, "description": "Validation errors if any." }
+        }
+      }
+    }
+  ]
+}
