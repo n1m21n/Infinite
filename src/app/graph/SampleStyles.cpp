@@ -1373,6 +1373,23 @@ namespace
    };
    constexpr int kPadKitCount = (int)(sizeof(kPadKits) / sizeof(kPadKits[0]));
    constexpr int kPluckKitCount = (int)(sizeof(kPluckKits) / sizeof(kPluckKits[0]));
+   // Which pluck kits a family plays (indices into kPluckKits): one draw from the shape stream, as before, but a psytrance
+   // pluck is no longer a kalimba and an ambient one no longer a saw stab. A family not listed draws from every kit.
+   int PluckKitFor(const char* family, Rng& r)
+   {
+      struct Palette { const char* family; int kits[5]; int n; };
+      // 0 string, 1 harp, 2 mallet, 3 kalimba, 4 tine, 5 saw stab, 6 squelch, 7 fm pluck, 8 glass
+      static const Palette kPalettes[] = {
+         { "house", { 4, 5, 7, 2 }, 4 },        { "techno", { 7, 6, 2, 8 }, 4 },       { "trance", { 5, 7, 6, 8 }, 4 },
+         { "breaks", { 5, 6, 7 }, 3 },          { "ambient", { 1, 3, 8, 0 }, 4 },      { "experimental", { 7, 8, 2, 3, 6 }, 5 },
+         { "downtempo", { 0, 4, 3, 1 }, 4 },    { "retro", { 5, 4, 7 }, 3 },           { "hard", { 5, 6 }, 2 },
+         { "piano", { 1, 0, 3, 4 }, 4 },        { "drum_and_bass", { 7, 8, 4, 5 }, 4 }, { "bass_music", { 7, 2, 8, 4 }, 4 },
+      };
+      for (const Palette& p : kPalettes)
+         if (std::string(family) == p.family)
+            return p.kits[r.Range(p.n)];
+      return r.Range(kPluckKitCount);
+   }
 }
 
 namespace SampleStyles
@@ -1565,7 +1582,7 @@ Compiled Compile(const Recipe& recipe)
    {
       const bool analog = shapeRng.Range(2) == 0 && !plucks && !pads;
       shapedVoice = analog ? "Analog" : "Wavetable";
-      const PluckKit* kit = plucks ? &kPluckKits[shapeRng.Range(kPluckKitCount)] : nullptr;
+      const PluckKit* kit = plucks ? &kPluckKits[PluckKitFor(st.family, shapeRng)] : nullptr;
       const PadKit* pk = pads ? &kPadKits[shapeRng.Range(kPadKitCount)] : nullptr;
       if (pads)
          shapedVoice = "Wavetable";
