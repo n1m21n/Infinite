@@ -39,6 +39,7 @@ namespace
    bool gReady = false;
    // The studio panel's dots and edits, set before a run; all zero is the plain generator.
    float gTone = 0.0f, gEnergy = 0.0f, gSpace = 0.0f, gMood = 0.0f, gVariation = 0.5f, gBpmSet = 0.0f;
+   std::string gWhy, gLastPatch; // tools: why the last run's attempts were dropped, and the last attempt's compiled patch
    bool gPinned = false; // the seed is the one a first take landed on: no redraw to another seed
 
    // lenient: the studio's shaped renders keep the sample the player is shaping; only silence or
@@ -51,7 +52,11 @@ namespace
       const double rms = std::sqrt(0.5 * (s.rms[0] * s.rms[0] + s.rms[1] * s.rms[1]));
       const bool specOk = SampleCriticData::VerifyAudioSpectrum(part, s.bandPower, s.samplePeak, rms, s.silenceRatio, s.correlation);
       if (s.nonFiniteFrames != 0 || !(s.integratedLufs > kSilentLufs) || (!lenient && ((rms > 0.0 && s.samplePeak / rms < 1.2) || !specOk)))
+      {
+         gWhy += "(nonfinite " + std::to_string(s.nonFiniteFrames) + ", lufs " + std::to_string(s.integratedLufs) + ", crest " +
+                 std::to_string(rms > 0.0 ? s.samplePeak / rms : 0.0) + ", spec " + (specOk ? "ok" : "no") + ") ";
          return false;
+      }
       double gain = std::pow(10.0, (kTargetLufs - s.integratedLufs) / 20.0);
       const double ceiling = std::pow(10.0, kCeilingDb / 20.0);
       if (s.truePeak * gain > ceiling)
@@ -160,6 +165,7 @@ extern "C"
       rec.variation = gVariation;
       rec.bpm = gBpmSet;
       gPcm.clear();
+      gWhy.clear();
       float bestP = -1.0f;
       int bestFrames = 0;
       for (int attempt = 0; attempt <= (gPinned ? 0 : kMaxRedraws); attempt++)
@@ -169,23 +175,36 @@ extern "C"
          const SampleStyles::Compiled c = SampleStyles::Compile(r);
          if (!c.error.empty())
             return 0;
+         gLastPatch = c.patch;
          Patch::Data data;
          std::string err;
          app::OfflineGraph g;
          if (!Patch::ReadText(c.patch, data, err) || !g.Build(data, c.tap))
+         {
+            gWhy += "a" + std::to_string(attempt) + " build: " + err + "; ";
             continue;
+         }
          for (const app::OfflineGraph::Motion& m : c.motions)
             g.AddMotion(m);
          if (!g.Prepare(kRate))
+         {
+            gWhy += "a" + std::to_string(attempt) + " prepare; ";
             continue;
+         }
          const int bar = (int)std::lround(4.0 * 60.0 / std::max(20.0f, c.bpm) * kRate);
          const int pre = bar * GenerateSamplesNode::PrerollBars(r.bars);
          const int frames = bar * r.bars;
          std::vector<float> left, right, l, rr;
          if (!g.Render(pre + frames, left, right))
+         {
+            gWhy += "a" + std::to_string(attempt) + " render; ";
             continue;
+         }
          if (!Master((int)r.part, left.data() + pre, right.data() + pre, frames, l, rr, gPinned))
+         {
+            gWhy += "a" + std::to_string(attempt) + " master; ";
             continue;
+         }
          // The role critic: a take that does not sound enough like the part asked for is redrawn, and the best one heard is kept.
          float heard = -1.0f;
          const bool settled = gPinned || RoleCritic::Accept(SampleStyles::PartName(r.part), l.data(), rr.data(), frames, kRate, &heard);
@@ -211,6 +230,9 @@ extern "C"
 
    EMSCRIPTEN_KEEPALIVE const float* gen_pcm() { return gPcm.data(); }
    EMSCRIPTEN_KEEPALIVE const char* gen_label() { return gLabel.c_str(); }
+   // why the last run's attempts were dropped (build, prepare, render, master), for the tools
+   EMSCRIPTEN_KEEPALIVE const char* gen_why() { return gWhy.c_str(); }
+   EMSCRIPTEN_KEEPALIVE const char* gen_last_patch() { return gLastPatch.c_str(); }
    EMSCRIPTEN_KEEPALIVE const char* gen_patch() { return gPatch.c_str(); }
    EMSCRIPTEN_KEEPALIVE float gen_bpm() { return gBpm; }
    EMSCRIPTEN_KEEPALIVE int gen_attempt() { return gAttempt; }

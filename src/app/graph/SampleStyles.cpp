@@ -429,6 +429,17 @@ namespace
             if (it != out.end() && it->second.first == 'f' && std::stod(it->second.second) < 220.0)
                it->second.second = "420";
          }
+         // The file is a kit one-shot: a start past its first fifth lands in the tail, and a fade-in longer than a few ms
+         // outlasts the hit; either way the take comes out silent.
+         if (type == "Sampler")
+         {
+            auto st = out.find("start");
+            if (st != out.end() && st->second.first == 'f' && std::stod(st->second.second) > 0.2)
+               st->second.second = Num(0.2 * std::stod(st->second.second));
+            auto fi = out.find("fadeIn");
+            if (fi != out.end() && fi->second.first == 'f' && std::stod(fi->second.second) > 8.0)
+               fi->second.second = Num(0.05 * std::stod(fi->second.second));
+         }
          if (type == "Wavetable")
          {
             out["a.on"] = { 'b', "1" };
