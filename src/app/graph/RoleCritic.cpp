@@ -485,7 +485,12 @@ bool Accept(const char* partName, const float* l, const float* r, int frames, do
       *p = -1.0f;
    if (role < 0 || frames <= 0)
       return true;
-   const float pr = Probabilities(Measure(l, r, frames, fs))[role];
+   const std::vector<float> ps = Probabilities(Measure(l, r, frames, fs));
+   float pr = ps[role];
+   // The synths part plays the bass and the lead line on the card's voices: sounding like either is still the part.
+   if (std::string(RoleCriticData::kRoleNames[role]) == "synths")
+      for (const char* nested : { "bass", "leads" })
+         pr += ps[RoleIndex(nested)];
    if (p)
       *p = pr;
    return pr >= std::max(RoleCriticData::kCut[role], 0.5f); // better than a coin toss, or it is redrawn
