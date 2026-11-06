@@ -1,7 +1,0 @@
-GEOAUDIT DISP   scalar grey 0.5 = midlevel  : worst vertex off the expected offset 0.00000 | boundary edges 0 (was 0)
-GEOAUDIT DISP   scalar white                : worst vertex off the expected offset 0.00000 | boundary edges 0 (was 0)
-GEOAUDIT DISP   scalar black                : worst vertex off the expected offset 0.00000 | boundary edges 0 (was 0)
-GEOAUDIT DISP   scalar white, midlevel 0    : worst vertex off the expected offset 0.00000 | boundary edges 0 (was 0)
-GEOAUDIT DISP   vector (1, 0.5, 0.5)        : worst vertex off the expected offset 0.00000 | boundary edges 0 (was 0)
-GEOAUDIT DISP   no texture: positions moved by 0.00000
-GEOAUDIT PASS (0 flags)

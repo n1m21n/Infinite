@@ -17,6 +17,13 @@ imgui.ini
 # to be tracked, just kept out from underfoot in the repo root
 local-prompts/
 
+# Private internal housekeeping, plans, outreach sheets, and notes
+internal/
+tools/seo/OUTREACH_SHEET.md
+tools/seo/PLAN.md
+tools/seo/FACTS.md
+tools/universe/profile_personal.json
+
 # external/ is vendored on purpose: imgui, imgui-node-editor and stb are all
 # permissively licensed, and committing them means a fresh clone builds offline
 # with no version drift. GLFW is the exception - it is fetched by CMake.
