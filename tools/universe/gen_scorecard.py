@@ -15,6 +15,8 @@ take (take_measure.py) and scores the areas of internal/plans/generate-samples/s
 Seeds are fixed (wasm_render_parts: 9000 + style*1009 + part*101 + k), so two builds are compared take for take.
 --quick: every third style (12 of 34), all parts, 2 seeds (about 3 min). Full: 34 styles (about 8 min with 3 jobs).
 --against: a previous run's scorecard.json; rows that got worse are marked WORSE and the exit code is 1.
+References: internal/plans/generate-samples/refs/*.json (tools/universe/snapshot_refs.py, made once from the WD-Black drive) are read first,
+so no row needs the drive; without them the feel/ tables and scorecard_refs.json are used.
 --freeze: write the near-duplicate thresholds of this run (and the library refs, if the drive is mounted) to scorecard_refs.json;
           done once, on the baseline. Later runs read them, so the ruler never moves.
 Exit: 0 all rows ran and none is worse than --against, 1 a row got worse, 2 usage or render error."""
@@ -26,6 +28,12 @@ REPO = os.path.abspath(os.path.join(HERE, "../.."))
 sys.path.insert(0, HERE)
 FEEL = os.path.join(REPO, "internal/plans/data-universe/feel")
 REFS = os.path.join(REPO, "internal/plans/generate-samples/scorecard_refs.json")
+REFDIR = os.path.join(REPO, "internal/plans/generate-samples/refs")   # snapshot_refs.py: drive references as quantiles, read first
+
+
+def refdir(name):
+    p = os.path.join(REFDIR, name + ".json")
+    return json.load(open(p)) if os.path.exists(p) else None
 TD = os.path.expanduser("~/Infinite/training-data")
 LEARN = os.path.expanduser("~/Library/Application Support/Infinite/learning")
 PY = sys.executable
@@ -94,7 +102,11 @@ def cos(a, b):
 # ---------------------------------------------------------------- area 1: notes
 def area_notes(card, T):
     import role_spread
-    ref = json.load(open(os.path.join(FEEL, "role_spread.json")))
+    snap = refdir("corpus")
+    if snap:
+        ref = {k: {ax: {"corpus_p5": v[ax]["p5"], "corpus_p95": v[ax]["p95"]} for ax in ("register", "density")} for k, v in snap["per_channel"].items()}
+    else:
+        ref = json.load(open(os.path.join(FEEL, "role_spread.json")))
     L = []
     for r in T:
         if r["part"] == 0 and r.get("patch"):
@@ -114,7 +126,8 @@ def area_notes(card, T):
 
 # ---------------------------------------------------------------- area 2: library
 def area_library(card, T, refs):
-    lib = refs.get("library")
+    snap = refdir("library")
+    lib = {p: {k: (q["median"], q["q3"] - q["q1"], q["n"]) for k, q in d.items() if q} for p, d in snap.items()} if snap else refs.get("library")
     if not lib and os.path.exists(os.path.join(TD, "audio/features.jsonl")):
         import part_vs_library as pvl
         lib = {k: {kk: list(vv) for kk, vv in v.items()} for k, v in pvl.library().items()}
@@ -232,7 +245,12 @@ def area_cards(card, T, refs, freeze):
 
 # ---------------------------------------------------------------- area 6: mix
 def area_mix(card, T):
-    ref = json.load(open(os.path.join(FEEL, "mix_audio_table.json")))
+    snap = refdir("mix")
+    if snap:
+        a = snap["tracks"]["all"]; tri = lambda q: [q["q1"], q["median"], q["q3"]]
+        ref = {k: tri(a[k]) for k in ("side_mid", "crest_db", "lufs")}; ref["bands"] = {b: tri(q) for b, q in a["bands"].items()}
+    else:
+        ref = json.load(open(os.path.join(FEEL, "mix_audio_table.json")))
     F = [r for r in T if r["part"] == 0 and r.get("mix")]
     sm = [r["side_mid"] for r in F]
     q1, q2, q3 = ref["side_mid"]
@@ -387,7 +405,7 @@ def main():
         area_taste(card, T, gen, out)
     if a.freeze:
         fr = {"made": time.strftime("%Y-%m-%d"), "wasm": h, "neardup": newthr}
-        if os.path.exists(os.path.join(TD, "audio/features.jsonl")):
+        if not refdir("library") and os.path.exists(os.path.join(TD, "audio/features.jsonl")):
             import part_vs_library as pvl
             fr["library"] = {k: {kk: list(vv) for kk, vv in v.items()} for k, v in pvl.library().items()}
         json.dump(fr, open(REFS, "w"), indent=1); print("froze %s" % REFS, file=sys.stderr)
