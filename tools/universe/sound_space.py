@@ -28,14 +28,15 @@ def vec_from_row(r):
     return np.array([c["axes"].get(a, {}).get("mean", np.nan) for a in AX])
 
 
-def own_matrix(path, ids=None):
-    """C3 window axis means of an own_*.jsonl, with preset ids and design."""
+def own_matrix(path, ids=None, notes=("C3",)):
+    """Axis means of an own_*.jsonl's note windows (C3 only by default), with preset ids and design."""
     X, I, D = [], [], []
+    keys = ['"note":"%s"' % n for n in notes]
     for ln in open(path):
-        if '"note":"C3"' not in ln:
+        if not any(k in ln for k in keys):
             continue
         r = json.loads(ln)
-        if r["note"] != "C3" or (ids is not None and r["preset_id"] not in ids):
+        if r["note"] not in notes or (ids is not None and r["preset_id"] not in ids):
             continue
         v = vec_from_row(r)
         if v is not None:

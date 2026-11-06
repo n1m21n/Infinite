@@ -19,7 +19,7 @@ NESTED = {("drums", "kicks"), ("drums", "snares"), ("drums", "hats"), ("synths",
 
 def render(a):
     env = dict(os.environ, STYLE_FROM=str(a.style_from), STYLE_STEP=str(a.style_step))
-    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), GEN, str(a.first), str(a.seeds), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"] + (["shaped"] if a.shaped else []), stdout=subprocess.PIPE, env=env)
+    p = subprocess.Popen(["node", os.path.join(HERE, "wasm_render_parts.js"), a.gen, str(a.first), str(a.seeds), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"] + (["shaped"] if a.shaped else []), stdout=subprocess.PIPE, env=env)
     f, n = p.stdout, 0
     with open(a.rows, "a") as o:
         while True:
@@ -32,7 +32,7 @@ def render(a):
     p.wait(); print(n, "rows ->", a.rows)
 
 def train(a):
-    rows = [json.loads(l) for l in open(OUT)]
+    rows = [json.loads(l) for f in a.train_rows.split(",") for l in open(os.path.expanduser(f))]
     X = np.nan_to_num(np.array([ff.vector(r) for r in rows])); names = sorted({r["role"] for r in rows}); y = np.array([names.index(r["role"]) for r in rows])
     styles = sorted({r["id"] for r in rows}); g = np.array([styles.index(r["id"]) for r in rows])
     print(len(y), "renders;", len(styles), "styles;", len(names), "roles:", dict(collections.Counter(r["role"] for r in rows)))
@@ -94,6 +94,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["render", "train"]); ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--first", type=int, default=9000); ap.add_argument("--folds", type=int, default=5); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--out"); ap.add_argument("--shaped", action="store_true", help="render: random dots and variation per render")
     ap.add_argument("--style-from", type=int, default=0); ap.add_argument("--style-step", type=int, default=1); ap.add_argument("--rows", default=OUT, help="render: file to append rows to")
+    ap.add_argument("--train-rows", default=OUT, help="train: comma list of row files")
+    ap.add_argument("--gen", default=GEN, help="render: the wasm generator build to render with")
     ap.add_argument("--train-on", choices=["rest", "all"], default="all", help="train: rows used for training (the test always reports rest and shaped apart)")
     ap.add_argument("--calib", choices=["val", "oof"], default="oof"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--pct", type=float, default=3)
     ap.add_argument("--calib-on", choices=["all", "shaped"], default="all", help="train, oof: training rows whose out-of-fold scores set the cut-offs")

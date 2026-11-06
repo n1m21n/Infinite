@@ -2,7 +2,8 @@
 """Step 7: String vs the library's acoustic sounds. Per family (names only): distance of each library sample to the nearest String render
 (or Wind with --set wind) on the 11 shared axes (sound_space.AX, z-scored on the pooled rows), against the family's own inner distance (nearest other sample of
 the same family). Ratio < 1 means the String node already lands inside the family; > 1 means the family has regions the node misses.
-    string_families.py [--node String] [--set strings|wind]"""
+    string_families.py [--node String] [--set strings|wind] [--notes C3,C4,C1,C5,C6]   (default C3: the renders' other pitches
+    count only when named; a library sample at any pitch then meets renders at more than one pitch)"""
 import argparse, os, re, sys
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -14,8 +15,9 @@ WIND = {"clarinet": r"clarinet|clar\b", "sax": r"sax", "flute": r"flute|piccolo|
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--node", default="String"); ap.add_argument("--n", type=int, default=0, help="subsample renders to n (equal-size comparison)")
-    ap.add_argument("--set", default="strings", choices=["strings", "wind"]); a = ap.parse_args()
-    S, _, _ = ss.own_matrix(os.path.join(ss.AUDIO, "own_%s.jsonl" % a.node.lower()))
+    ap.add_argument("--set", default="strings", choices=["strings", "wind"]); ap.add_argument("--notes", default="C3")
+    a = ap.parse_args()
+    S, _, _ = ss.own_matrix(os.path.join(ss.AUDIO, "own_%s.jsonl" % a.node.lower()), notes=tuple(a.notes.split(",")))
     X, N = ss.sample_matrix(None, 200000)
     ok = np.isfinite(S).all(1); S = S[ok]
     if a.n and len(S) > a.n: S = S[np.random.default_rng(0).choice(len(S), a.n, replace=False)]

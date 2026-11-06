@@ -22,8 +22,9 @@ def arr(name, a):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--pct", type=float, default=3)
     ap.add_argument("--calib-on", choices=["shaped", "all"], default="shaped"); ap.add_argument("--inner", type=int, default=4); ap.add_argument("--out", default=INC)
+    ap.add_argument("--rows", default=ROWS, help="comma list of row files (role_critic_render.py render output)")
     ap.add_argument("--check", type=int, default=0); a = ap.parse_args()
-    rows = [json.loads(l) for l in open(ROWS)]
+    rows = [json.loads(l) for f in a.rows.split(",") for l in open(os.path.expanduser(f))]
     X = np.nan_to_num(np.array([ff.vector(r) for r in rows])); names = sorted({r["role"] for r in rows}); y = np.array([names.index(r["role"]) for r in rows])
     styles = sorted({r["id"] for r in rows}); g = np.array([styles.index(r["id"]) for r in rows]); shaped = np.array([bool(r.get("dots")) for r in rows])
     mu, sd = X.mean(0), X.std(0) + 1e-9; Z = (X - mu) / sd
