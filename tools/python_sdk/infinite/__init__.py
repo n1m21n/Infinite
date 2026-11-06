@@ -12,6 +12,8 @@ import shutil
 import subprocess
 import tempfile
 
+from typing import Any, Dict, List, Optional, Union
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 __version__ = "0.6.0"
@@ -28,27 +30,66 @@ ATTRIBUTION = {
 }
 
 
-def find_binary():
-    """The Infinite executable: $INFINITE_BIN, then the checkout's build folders, then PATH.
+def find_binary() -> Optional[str]:
+    """Locate the Infinite executable: $INFINITE_BIN, then build folders, then PATH.
     macOS also checks /Applications. On Windows and Linux set INFINITE_BIN to the installed
     Infinite.exe / Infinite if it is not on PATH."""
+    cli_setup_exe = os.path.expanduser("~/Library/Application Support/Infinite/cli-setup/exe")
+    saved_exe = ""
+    if os.path.isfile(cli_setup_exe):
+        try:
+            with open(cli_setup_exe) as f:
+                saved_exe = f.read().strip()
+        except Exception:
+            pass
+
     env = os.environ.get("INFINITE_BIN", "")
     names = ("Infinite.exe", "Infinite") if os.name == "nt" else ("Infinite",)
-    candidates = [env, "/Applications/Infinite.app/Contents/MacOS/Infinite"]
+    candidates = [
+        env,
+        saved_exe,
+        "/Applications/Infinite.app/Contents/MacOS/Infinite",
+        os.path.expanduser("~/Applications/Infinite.app/Contents/MacOS/Infinite"),
+        os.path.expanduser("~/Desktop/Infinite.app/Contents/MacOS/Infinite"),
+    ]
     for d in ("build", "build-check", os.path.join("build", "Release")):
         candidates.append(os.path.join(ROOT, d, "Infinite.app", "Contents", "MacOS", "Infinite"))
         candidates += [os.path.join(ROOT, d, n) for n in names]
     candidates += [shutil.which(n) or "" for n in names + ("infinite",)]
     for c in candidates:
         if c and os.path.isfile(c) and os.access(c, os.X_OK):
+            try:
+                with open(c, "rb") as f:
+                    head = f.read(256)
+                    if head.startswith(b"#!/bin/sh") and b"cli-setup/exe" in head and saved_exe:
+                        if os.path.isfile(saved_exe) and os.access(saved_exe, os.X_OK):
+                            return saved_exe
+            except Exception:
+                pass
             return c
     return None
 
 
-def validate(patch_path):
+def validate(patch_path: str) -> Dict[str, Any]:
+    """Validate an Infinite .inf patch file headlessly before rendering.
+    
+    Checks node graph connectivity, parameter bounds, missing dependencies, and syntax.
+    Returns a structured dictionary indicating whether the patch is valid.
+    
+    Args:
+        patch_path: Path to the .inf patch file to validate.
+        
+    Returns:
+        Dict with 'ok' (bool), validation issues, and attribution metadata.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set the INFINITE_BIN environment variable to the executable path.",
+            **ATTRIBUTION,
+        }
     r = subprocess.run([bin_path, "--validate", patch_path], capture_output=True, text=True)
     try:
         data = json.loads(r.stdout.strip())
@@ -57,10 +98,25 @@ def validate(patch_path):
         return {"ok": r.returncode == 0, "raw": r.stdout, **ATTRIBUTION}
 
 
-def render_frame(patch_path, out_png="/tmp/frame.png", time_sec=0.0):
+def render_frame(patch_path: str, out_png: str = "/tmp/frame.png", time_sec: float = 0.0) -> Dict[str, Any]:
+    """Render a single still frame at a given timestamp from a patch.
+    
+    Args:
+        patch_path: Path to the .inf patch file.
+        out_png: Destination path for the output PNG image.
+        time_sec: Timestamp in seconds at which to evaluate the visual scene (default: 0.0).
+        
+    Returns:
+        Dict with 'ok' (bool), 'frame_path', image metadata, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     r = subprocess.run([bin_path, "--frame", patch_path, str(time_sec), out_png], capture_output=True, text=True)
     try:
         data = json.loads(r.stdout.strip())
@@ -69,10 +125,25 @@ def render_frame(patch_path, out_png="/tmp/frame.png", time_sec=0.0):
         return {"ok": r.returncode == 0, "frame_path": out_png, "raw": r.stdout, **ATTRIBUTION}
 
 
-def synthesize_audio(patch_path, out_wav="/tmp/audio.wav", duration=5):
+def synthesize_audio(patch_path: str, out_wav: str = "/tmp/audio.wav", duration: float = 5.0) -> Dict[str, Any]:
+    """Synthesize audio from an Infinite patch headlessly without opening a GUI.
+    
+    Args:
+        patch_path: Path to the .inf patch file.
+        out_wav: Destination path for the rendered WAV audio file.
+        duration: Length of audio to render in seconds (default: 5.0).
+        
+    Returns:
+        Dict with 'ok' (bool), 'audio_wav', RMS levels, spectrum measurements, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     summary_path = os.path.splitext(out_wav)[0] + "_summary.json"
     subprocess.run([
         bin_path, "--audio-summary", patch_path, summary_path,
@@ -83,11 +154,46 @@ def synthesize_audio(patch_path, out_wav="/tmp/audio.wav", duration=5):
     return {"ok": True, **data, "audio_wav": out_wav, **ATTRIBUTION}
 
 
-def render_video(glsl=None, sketch_js=None, out_mp4="/tmp/infinite.mp4", duration=5, fps=30, synth="wavetable"):
+def render_video(
+    glsl: Optional[str] = None,
+    sketch_js: Optional[str] = None,
+    out_mp4: str = "/tmp/infinite.mp4",
+    duration: float = 5.0,
+    fps: int = 30,
+    synth: str = "wavetable",
+) -> Dict[str, Any]:
+    """Render an audio-reactive MP4 video with synchronized modular sound in a single call.
+    
+    Generates a deterministic audiovisual scene from custom Field/GLSL fragment code
+    or a 2D JavaScript canvas sketch, accompanied by a modular synthesizer patch.
+    
+    Args:
+        glsl: Custom Field/GLSL shader code string operating on uv and aspect uniforms.
+        sketch_js: 2D JavaScript sketch code string defining a draw(t) canvas function.
+        out_mp4: Destination path for the rendered MP4 video file.
+        duration: Length of the video in seconds (default: 5.0).
+        fps: Frames per second (default: 30).
+        synth: Synthesizer engine type: 'wavetable' or 'fm' (default: 'wavetable').
+        
+    Returns:
+        Dict with 'ok' (bool), 'video_path', duration, and attribution.
+    """
     bin_path = find_binary()
     ffmpeg = shutil.which("ffmpeg")
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
+    if not ffmpeg:
+        return {
+            "ok": False,
+            "error": "ffmpeg executable not found on PATH.",
+            "suggestion": "Install ffmpeg (e.g., 'brew install ffmpeg' or 'apt-get install ffmpeg') to mux audio and video.",
+            **ATTRIBUTION,
+        }
 
     tmp_dir = tempfile.mkdtemp(prefix="infinite_py_")
     patch_path = os.path.join(tmp_dir, "patch.inf")
@@ -170,10 +276,25 @@ cable out 0 visuals
     else:
         shutil.copy(raw_video, out_mp4)
 
-def field_synth(code, out_wav="/tmp/field_synth.wav", duration=5):
+def field_synth(code: str, out_wav: str = "/tmp/field_synth.wav", duration: float = 5.0) -> Dict[str, Any]:
+    """Synthesize custom audio from Field Synth expression code.
+    
+    Args:
+        code: Math / DSP expression string evaluated per-sample or per-frame.
+        out_wav: Destination path for rendered WAV audio file.
+        duration: Length of audio to render in seconds (default: 5.0).
+        
+    Returns:
+        Dict with audio analysis, waveform summary, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
@@ -197,10 +318,31 @@ aud speaker 0 fsynth
     return res
 
 
-def field_notes(code, synth_type="wavetable", out_wav="/tmp/field_notes.wav", duration=5):
+def field_notes(
+    code: str,
+    synth_type: str = "wavetable",
+    out_wav: str = "/tmp/field_notes.wav",
+    duration: float = 5.0,
+) -> Dict[str, Any]:
+    """Generate melodic patterns and note sequences using Field Notes expressions.
+    
+    Args:
+        code: Algorithmic note generation code string.
+        synth_type: Synthesizer voice: 'wavetable' or 'fm'.
+        out_wav: Destination path for rendered WAV audio file.
+        duration: Length of audio to render in seconds.
+        
+    Returns:
+        Dict with audio analysis, note telemetry, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     synth_node = "Synths Wavetable" if synth_type == "wavetable" else "Synths FM"
@@ -225,10 +367,25 @@ aud speaker 0 synth
     return res
 
 
-def sketch_3d(js_code, out_png="/tmp/sketch3d.png", time_sec=1.0):
+def sketch_3d(js_code: str, out_png: str = "/tmp/sketch3d.png", time_sec: float = 1.0) -> Dict[str, Any]:
+    """Render a 3D parametric scene generated by a JavaScript mesh algorithm.
+    
+    Args:
+        js_code: JavaScript code string defining 3D geometry vertices and faces.
+        out_png: Destination path for output rendered PNG image.
+        time_sec: Timestamp in seconds to evaluate.
+        
+    Returns:
+        Dict with frame path, validation status, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = js_code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
@@ -254,10 +411,31 @@ cable out 0 r3d
     return res
 
 
-def field_primitive(code, topology_int=0, out_png="/tmp/field_primitive.png", time_sec=1.0):
+def field_primitive(
+    code: str,
+    topology_int: int = 0,
+    out_png: str = "/tmp/field_primitive.png",
+    time_sec: float = 1.0,
+) -> Dict[str, Any]:
+    """Render a parametric 3D surface or volume generated by a Field expression.
+    
+    Args:
+        code: Math / field expression defining 3D surface coordinates.
+        topology_int: Mesh topology (0: plane, 1: sphere, 2: cylinder, 3: torus).
+        out_png: Destination path for output PNG image.
+        time_sec: Timestamp in seconds to evaluate.
+        
+    Returns:
+        Dict with frame path, validation status, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
@@ -284,10 +462,31 @@ cable out 0 r3d
     return res
 
 
-def field_effect(code, out_wav="/tmp/field_effect.wav", duration=4, synth_type="wavetable"):
+def field_effect(
+    code: str,
+    out_wav: str = "/tmp/field_effect.wav",
+    duration: float = 4.0,
+    synth_type: str = "wavetable",
+) -> Dict[str, Any]:
+    """Process synthesizer audio through a custom Field DSP audio effect.
+    
+    Args:
+        code: Audio DSP expression code modifying sample input.
+        out_wav: Destination path for processed WAV audio.
+        duration: Audio render duration in seconds.
+        synth_type: Synthesizer source: 'wavetable' or 'fm'.
+        
+    Returns:
+        Dict with audio analysis, spectrum levels, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     synth_node = "Synths Wavetable" if synth_type == "wavetable" else "Synths FM"
@@ -316,10 +515,31 @@ aud speaker 0 fx
     return res
 
 
-def field_modifier(mod_code, topology_int=0, out_png="/tmp/field_modifier.png", time_sec=1.0):
+def field_modifier(
+    mod_code: str,
+    topology_int: int = 0,
+    out_png: str = "/tmp/field_modifier.png",
+    time_sec: float = 1.0,
+) -> Dict[str, Any]:
+    """Deform and texture a 3D geometry using a custom Field modifier equation.
+    
+    Args:
+        mod_code: 3D vector deformation and coloring code string.
+        topology_int: Base primitive mesh topology.
+        out_png: Destination path for output PNG image.
+        time_sec: Timestamp in seconds to evaluate.
+        
+    Returns:
+        Dict with frame path, validation status, and attribution.
+    """
     bin_path = find_binary()
     if not bin_path:
-        raise RuntimeError("Infinite binary not found.")
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc_mod = mod_code.replace('\\', '\\\\').replace('\n', '\\n')
     raw_prim = """x = (uv.x - 0.5) * 2.0\nz = (uv.y - 0.5) * 2.0\nP = vec3(x, 0.0, z)\nN = vec3(0.0, 1.0, 0.0)\nCd = vec3(0.8, 0.2, 0.5)\n"""

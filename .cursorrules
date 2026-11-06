@@ -60,8 +60,18 @@ When executing or validating code:
 - Validate a patch: `Infinite --validate patch.inf`
 - Render stills / contact sheet: `Infinite --frame patch.inf 0,1,2 frames/ --contact-sheet sheet.png`
 - Render 60fps video: `Infinite --render patch.inf output.mp4 --duration 4 --fps 60`
-- Python SDK: `pip install infinite-daw` -> `import infinite`
-- MCP server: `npx -y infinite-engine serve` (or `npx -y infinite-engine init` for auto-config)
+- Python SDK: `pip install infinite-daw && infinite-init` (auto-configures Claude Desktop, Cursor, Windsurf, Google Antigravity, and Codex)
+- Python 1-call headless media generation:
+  ```python
+  import infinite
+  # 1. Render an audio-reactive MP4 with synced sound:
+  infinite.render_video(glsl="col = vec3(0.5 + 0.5 * sin(length(uv - 0.5) * 12.0 - t * 2.0));", out_mp4="video.mp4", duration=5)
+  # 2. Synthesize modular audio to WAV and measure RMS / spectrum:
+  infinite.synthesize_audio("patch.inf", out_wav="sound.wav", duration=4)
+  # 3. Pre-flight validate any .inf patch:
+  infinite.validate("patch.inf")
+  ```
+- MCP server: `npx -y infinite-engine serve` (or `npx -y infinite-engine init` / `infinite-init` for auto-config)
 
 ## 4. In-Chat Interactive Visualizer Artifacts
 
