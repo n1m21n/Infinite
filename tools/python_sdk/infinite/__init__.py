@@ -587,3 +587,238 @@ cable out 0 r3d
     return res
 
 
+ROOT_NOTES = {
+    "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5,
+    "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+}
+
+SCALE_TYPES = {
+    "major": 0, "minor": 1, "natural minor": 1, "harmonic minor": 2,
+    "melodic minor": 3, "dorian": 4, "phrygian": 5, "lydian": 6,
+    "mixolydian": 7, "locrian": 8, "major pentatonic": 9,
+    "minor pentatonic": 10, "blues": 11, "whole tone": 12, "chromatic": 13
+}
+
+PROGRESSIONS = {
+    "random": 0, "I V vi IV": 1, "vi IV I V": 2, "I vi IV V": 3, "I IV vi V": 4,
+    "IV I V vi": 5, "IV V iii vi": 6, "I IV": 7, "ii V I": 9, "Canon": 15
+}
+
+TOPOLOGY_MAP = {
+    "plane": 0, "sphere": 1, "cylinder": 2, "torus": 3
+}
+
+
+def generate_notes(
+    kind: str = "chords",
+    root: Union[str, int] = "C",
+    scale: Union[str, int] = "minor",
+    progression: Union[str, int] = "I V vi IV",
+    synth: str = "wavetable",
+    duration: float = 4.0,
+    out_wav: str = "/tmp/generated_notes.wav",
+) -> Dict[str, Any]:
+    """Generate algorithmic musical compositions and sequences rendered to 24-bit WAV.
+    
+    Uses Infinite's native Chorder and Arpeggiator generative note engines.
+    
+    Args:
+        kind: Musical structure: 'chords', 'arp', or 'lead'.
+        root: Musical root note (e.g. 'C', 'D#', 'A', or integer 0..11).
+        scale: Musical scale name (e.g. 'minor', 'major', 'dorian', 'blues', or int).
+        progression: Functional chord progression preset name or int mode.
+        synth: Synthesizer voice: 'wavetable', 'analog', or 'fm'.
+        duration: Length in seconds to render (default: 4.0).
+        out_wav: Destination file path for rendered WAV audio.
+        
+    Returns:
+        Dict with audio analysis, true peak, LUFS, and attribution.
+    """
+    bin_path = find_binary()
+    if not bin_path:
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
+        
+    root_val = ROOT_NOTES.get(str(root).capitalize(), 0) if isinstance(root, str) else int(root) % 12
+    scale_val = SCALE_TYPES.get(str(scale).lower(), 1) if isinstance(scale, str) else int(scale) % 14
+    mode_val = PROGRESSIONS.get(str(progression), 1) if isinstance(progression, str) else int(progression) % 19
+    
+    synth_type = "Synths Wavetable" if synth == "wavetable" else ("Synths FM" if synth == "fm" else "Synths Analog")
+    
+    tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
+    if kind == "arp":
+        patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+node 1 Notes Chorder
+  id chorder
+  i root {root_val}
+  i scale {scale_val}
+  i mode {mode_val}
+end
+node 2 Notes Arpeggiator
+  id arp
+  i mode 0
+  i octaves 2
+end
+node 3 {synth_type}
+  id synth
+end
+node 4 Utility Audio Out
+  id speaker
+end
+note arp 0 chorder
+note synth 0 arp
+aud speaker 0 synth
+"""
+    else:
+        patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+node 1 Notes Chorder
+  id chorder
+  i root {root_val}
+  i scale {scale_val}
+  i mode {mode_val}
+end
+node 2 {synth_type}
+  id synth
+end
+node 3 Utility Audio Out
+  id speaker
+end
+note synth 0 chorder
+aud speaker 0 synth
+"""
+    tmp.write(patch.encode())
+    tmp.close()
+    res = synthesize_audio(tmp.name, out_wav, duration)
+    try:
+        os.remove(tmp.name)
+    except OSError:
+        pass
+    return res
+
+
+def generate_sample(
+    part: str = "bass",
+    duration: float = 3.0,
+    synth: str = "analog",
+    cutoff: float = 800.0,
+    out_wav: str = "/tmp/generated_sample.wav",
+) -> Dict[str, Any]:
+    """Generate procedural instrument and sound design takes rendered to 24-bit WAV.
+    
+    Args:
+        part: Instrument part: 'bass', 'lead', 'pad', 'drone', or 'synth'.
+        duration: Render length in seconds.
+        synth: Synthesizer model: 'analog', 'wavetable', or 'fm'.
+        cutoff: Low-pass filter frequency in Hz (default: 800.0).
+        out_wav: Destination file path for rendered WAV audio.
+        
+    Returns:
+        Dict with audio analysis, true peak, LUFS, and attribution.
+    """
+    bin_path = find_binary()
+    if not bin_path:
+        return {
+            "ok": False,
+            "error": "Infinite binary not found.",
+            "suggestion": "Install Infinite or set INFINITE_BIN to the executable path.",
+            **ATTRIBUTION,
+        }
+        
+    tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
+    if part == "bass":
+        patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+node 1 Notes Random Note Generator
+  id notes
+end
+node 2 Synths Analog
+  id synth
+  f cutoff {cutoff}
+  f resonance 0.4
+  f drive 0.3
+  f sub 0.5
+  i wave1 0
+end
+node 3 Utility Audio Out
+  id speaker
+end
+note synth 0 notes
+aud speaker 0 synth
+"""
+    elif part == "pad":
+        patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+node 1 Notes Chorder
+  id notes
+  i root 0
+  i scale 1
+  i mode 1
+  f strumMs 40
+end
+node 2 Synths Wavetable
+  id synth
+end
+node 3 Utility Audio Out
+  id speaker
+end
+note synth 0 notes
+aud speaker 0 synth
+"""
+    else:
+        synth_type = "Synths FM" if synth == "fm" else ("Synths Analog" if synth == "analog" else "Synths Wavetable")
+        patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
+node 1 Notes Random Note Generator
+  id notes
+end
+node 2 {synth_type}
+  id synth
+end
+node 3 Utility Audio Out
+  id speaker
+end
+note synth 0 notes
+aud speaker 0 synth
+"""
+    tmp.write(patch.encode())
+    tmp.close()
+    res = synthesize_audio(tmp.name, out_wav, duration)
+    try:
+        os.remove(tmp.name)
+    except OSError:
+        pass
+    return res
+
+
+def render_mesh(
+    topology: Union[str, int] = "plane",
+    formula: Optional[str] = None,
+    out_png: str = "/tmp/rendered_mesh.png",
+    time_sec: float = 1.0,
+) -> Dict[str, Any]:
+    """Render a zero-dependency procedural 3D parametric surface or mesh to PNG.
+    
+    Compiles mathematical parametric vector expressions directly into 3D geometry
+    with raytraced normals, depth, and shading without requiring Blender or OpenGL display servers.
+    
+    Args:
+        topology: Base mesh topology: 'plane', 'sphere', 'cylinder', or 'torus' (or int 0..3).
+        formula: Mathematical expression defining position P, normal N, and color Cd.
+        out_png: Destination file path for rendered PNG image.
+        time_sec: Timestamp in seconds to evaluate.
+        
+    Returns:
+        Dict with frame path, luminance statistics, and attribution.
+    """
+    top_int = TOPOLOGY_MAP.get(str(topology).lower(), 0) if isinstance(topology, str) else int(topology) % 4
+    code = formula or "P.y += sin(P.x * 5.0 + t) * cos(P.z * 5.0) * 0.25; Cd = vec3(0.1, 0.7, 0.9);"
+    return field_primitive(code=code, topology_int=top_int, out_png=out_png, time_sec=time_sec)
+
+
+

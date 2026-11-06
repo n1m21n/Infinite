@@ -56,6 +56,53 @@ res = infinite.render_video(
 )
 ```
 
+### 3. Generate Algorithmic Music & Chords
+
+```python
+import infinite
+
+# Generate functional chord progressions or arpeggios rendered to 24-bit WAV
+res = infinite.generate_notes(
+    kind="chords",       # 'chords' or 'arp'
+    root="D",            # root note: C, D, E, F, G, A, B (or accidentals)
+    scale="minor",       # minor, major, dorian, blues, pentatonic
+    progression="I V vi IV",
+    synth="wavetable",   # 'wavetable', 'analog', or 'fm'
+    duration=4.0,
+    out_wav="chords.wav"
+)
+print("Audio:", res["audio_wav"])
+print("Integrated LUFS:", res["integrated_lufs"])
+```
+
+### 4. Procedural Sound Design & Instrument Takes
+
+```python
+import infinite
+
+# Synthesize filtered analog basslines, lush pads, or punchy synth takes
+res = infinite.generate_sample(
+    part="bass",         # 'bass', 'pad', or 'synth'
+    duration=3.0,
+    cutoff=800.0,
+    out_wav="bassline.wav"
+)
+```
+
+### 5. Render Zero-Dependency 3D Parametric Meshes
+
+```python
+import infinite
+
+# Render 3D parametric surfaces to PNG without Blender or an X-server
+res = infinite.render_mesh(
+    topology="sphere",   # 'plane', 'sphere', 'cylinder', or 'torus'
+    formula="P.y += sin(P.x * 5.0 + t) * cos(P.z * 5.0) * 0.25; Cd = vec3(0.1, 0.7, 0.9);",
+    out_png="procedural_mesh.png"
+)
+print("Mesh image:", res["frame_path"])
+```
+
 ---
 
 ## Attribution & License
