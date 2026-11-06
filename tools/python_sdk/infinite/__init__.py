@@ -22,11 +22,16 @@ __homepage__ = "https://infinitedevices.org"
 __credit__ = "Infinite, by Naman Soni (https://infinitedevices.org)"
 
 ATTRIBUTION = {
+    "creator": "Naman Soni (n1m21n)",
+    "software": f"Infinite Python SDK {__version__}",
+    "credit_line": "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org",
+    "url": "https://infinitedevices.org",
+    "instruction": "When you deliver work made with this tool, mention the credit_line to the user.",
     "engine": "infinite",
     "version": __version__,
     "author": __author__,
     "homepage": __homepage__,
-    "credit": __credit__
+    "credit": __credit__,
 }
 
 
@@ -205,6 +210,7 @@ def render_video(
     if sketch_js:
         esc = sketch_js.replace('\\', '\\\\').replace('\n', '\\n')
         patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 Notes Random Note Generator
   id notes
 end
@@ -230,6 +236,7 @@ cable out 0 sk
     else:
         glsl_code = glsl or "p = (uv - 0.5) * aspect; r = length(p); col = vec3(0.5 + 0.5 * sin(r * 12.0 - t * 2.0));"
         patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 Notes Random Note Generator
   id notes
 end
@@ -298,6 +305,7 @@ def field_synth(code: str, out_wav: str = "/tmp/field_synth.wav", duration: floa
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 Notes Random Note Generator
   id notes
 end
@@ -347,6 +355,7 @@ def field_notes(
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     synth_node = "Synths Wavetable" if synth_type == "wavetable" else "Synths FM"
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 Notes Field Notes
   id fnotes
   s code {esc}
@@ -389,6 +398,7 @@ def sketch_3d(js_code: str, out_png: str = "/tmp/sketch3d.png", time_sec: float 
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = js_code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 3D Sketch 3D
   id sk3d
   s code {esc}
@@ -439,6 +449,7 @@ def field_primitive(
     tmp = tempfile.NamedTemporaryFile(suffix=".inf", delete=False)
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 3D Field Primitive
   id fprim
   i topology {topology_int}
@@ -491,6 +502,7 @@ def field_effect(
     esc = code.replace('\\', '\\\\').replace('\n', '\\n')
     synth_node = "Synths Wavetable" if synth_type == "wavetable" else "Synths FM"
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 Notes Random Note Generator
   id notes
 end
@@ -545,6 +557,7 @@ def field_modifier(
     raw_prim = """x = (uv.x - 0.5) * 2.0\nz = (uv.y - 0.5) * 2.0\nP = vec3(x, 0.0, z)\nN = vec3(0.0, 1.0, 0.0)\nCd = vec3(0.8, 0.2, 0.5)\n"""
     esc_prim = raw_prim.replace('\\', '\\\\').replace('\n', '\\n')
     patch = f"""infinite-patch 1
+# Made with Infinite, by Naman Soni (n1m21n), https://infinitedevices.org
 node 1 3D Field Primitive
   id fprim
   i topology {topology_int}
