@@ -152,8 +152,11 @@ def unbounded_int(files, texts):
                     continue
                 seen.add(member)
                 names = member + "|m" + member[:1].upper() + member[1:]
-                bounded = re.search(r"(std::clamp|std::min|std::max|Clamp)\s*\([^;]*\b(" + names + r")\b", node_side) or \
-                    re.search(r"\b(" + names + r")\s*[<>]=?\s*[\w.:]+\s*\?", node_side)
+                # std::max alone is a floor, not a bound: Geometry's std::max(1, detail / 8)
+                # passed this rule while Plane(detail = 1e9) hung the app (B-L-001).
+                bounded = re.search(r"(std::clamp|std::min|Clamp)\s*\([^;]*\b(" + names + r")\b", node_side) or \
+                    re.search(r"\b(" + names + r")\s*>=?\s*[\w.:]+\s*\?", node_side) or \
+                    re.search(r"[\w.:]+\s*<=?\s*(" + names + r")\s*\?", node_side)
                 if not bounded:
                     hits.append(("unbounded-int", f"{rel(path)}:{i + 1}", f"{member} [{m.group(2).strip()},{m.group(3).strip()}] not bounded outside the UI"))
     return hits
@@ -261,7 +264,7 @@ def selftest():
    v.Int("free", freeInt);
 }
 void Push(const X& n) { mVoices.store(std::clamp(n.voices, 1, 16)); }
-int Steps() const { return steps < 1 ? 1 : steps; }
+int Steps() const { return steps > 64 ? 64 : steps; }
 void Build() { v.Int("generation", gen); for (int i = 0; i < gen; ++i) Mutate(); }
 float t[4]; float g() { return t[count]; }
 void Play(float& p) { p = std::clamp(p, start, end); p = std::clamp(p, 0.0f, end); p = std::clamp(p, (int)kLo, (int)kHi); }
