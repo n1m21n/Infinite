@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>English</string>
+	<key>CFBundleExecutable</key><string>Infinite Spike</string>
+	<key>CFBundleIdentifier</key><string>org.infinitedevices.spike.au</string>
+	<key>CFBundleName</key><string>Infinite Spike</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundlePackageType</key><string>BNDL</string>
+	<key>CFBundleSignature</key><string>????</string>
+	<key>CFBundleVersion</key><string>0.0.1</string>
+	<key>AudioComponents</key>
+	<array>
+		<dict>
+			<key>factoryFunction</key><string>AUWrapperFactory</string>
+			<key>description</key><string>Infinite Spike</string>
+			<key>manufacturer</key><string>Infn</string>
+			<key>name</key><string>Infinite: Spike</string>
+			<key>subtype</key><string>Ispk</string>
+			<key>type</key><string>aufx</string>
+			<key>version</key><integer>1</integer>
+		</dict>
+	</array>
+	<key>AudioUnit SupportedNumChannels</key>
+	<array>
+		<dict><key>Inputs</key><string>2</string><key>Outputs</key><string>2</string></dict>
+		<dict><key>Inputs</key><string>1</string><key>Outputs</key><string>2</string></dict>
+	</array>
+</dict>
+</plist>
