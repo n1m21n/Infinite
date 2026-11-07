@@ -1,6 +1,6 @@
 # Infinite as a VST3 + AU plugin: ship plan
 
-Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW trials), 1.1 licence. Next: 1.2. Waiting on owner: DAW trials (Reaper, Logic), 12.4 approvals. Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
+Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW runs), 1.1 licence, 1.2 `Ipc::` layer (mac proven by `ipc-check`; Linux/Windows compile in CI). Next: 1.3. Owner decisions 2026-11-07: **no plugin trial** (the free app is the way to try Infinite; the plugin needs a key), **every DAW on every OS** is the target, and existing nodes and settings change wherever the plugin needs it. Waiting on owner: DAWs to test in, spending (12.4). Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
 Read first: `docs/DECISIONS.md`, `infinite-lifecycle`. Skills that own the detail: `build-discipline`, `ci-preflight`, `windows-parity`, `linux-parity`, `tool-first`, `ship-infinite`, `plugin-host-hardening`, `audio-pipeline-sweep`, `av-sync-sweep`, `release-notes-audit`.
 Every decision below is settled. Items that need the owner's approval under the "new features need approval" rule are listed once, in 12.4, each with the recommended answer.
 
@@ -31,13 +31,15 @@ Note on location: private plans moved to `internal/plans/` in `458a1dd3`. This f
 
 | Item | Reason |
 |---|---|
-| VST3 on macOS, Windows, Linux | One SDK (bundled, MIT since 3.8), covers every DAW on the list except Logic/GarageBand |
+| VST3 on macOS, Windows, Linux | One SDK (bundled, MIT since 3.8), covers every VST3 host on every OS (8.8) |
 | AU (v2) on macOS | Logic and GarageBand load AU only. Built from the same VST3 code through the SDK's `auwrapper` |
 | Two builds: Instrument and FX | DAWs place instruments and effects in different slots; one binary pretending to be both breaks Logic and FL |
 | Audio in/out, MIDI in (notes, CC, pitch bend, channel and poly aftertouch) | The core of "Infinite in a DAW" |
 | Host transport and tempo follow | A plugin that ignores the host clock is useless in an arrangement |
 | 32 automatable host slots | Automation is the second thing every DAW user tries |
 | Full patch saved in the DAW project | Reopening a project must bring the patch back |
+| Every DAW that loads VST3 or AU, on every OS it runs on | Owner goal 2026-11-07: a working plugin in all hosts, not a short certified list (8.8) |
+| Changes to existing nodes and settings | Owner 2026-11-07: change nodes, settings and menus wherever the plugin needs it (Audio In host sources, Macro host slot, Settings > DAW plugin, plugin-mode menus) |
 | Live visual window inside the plugin, resizable, plus pop-out and projector outputs | Infinite is an audiovisual instrument (DECISIONS 2026-10-14: design and live, balanced) |
 | Many instances | Every DAW user will put two on two tracks |
 | Offline-safe audio: bounce, freeze, export = live | Users bounce; a different bounce is a bug report on day one |
@@ -46,14 +48,14 @@ Note on location: private plans moved to `internal/plans/` in `458a1dd3`. This f
 
 | Item | Later or never | Reason |
 |---|---|---|
-| AAX / Pro Tools | Later | Needs Avid developer agreement and PACE signing (paid). Revisit if income justifies |
-| CLAP | Later | Not needed for the five target DAWs; easy follow-up once the shell exists (the IPC engine is format-agnostic) |
+| AAX / Pro Tools | Chunk 4, after v1 ships | The one major DAW VST3/AU cannot reach. Needs the owner to sign the Avid developer agreement and a PACE (iLok) signing account; the shell is format-agnostic, so AAX is a new wrapper over the same IPC client |
+| CLAP | Chunk 4, after v1 ships | Every CLAP host also loads VST3, so it adds no DAW; easy follow-up once the shell exists |
 | AUv3 / iOS | Never (for now) | No paid Apple account (memory `no-apple-developer-account`); AUv3 needs an app extension in a signed container app |
 | Loading other plugins inside Infinite | Later | In-plugin hosting of plugins doubles the crash surface (`plugin-host-hardening` tier 3). The Audio Plugin node shows "not available in the plugin" and passes silence |
 | Video recording from inside the DAW | Later | Export/Render Take menus are hidden in plugin mode. Users who need a film open the patch in the free app |
 | MIDI out to the host | Later | Audit: `MidiOutNode` exists and drives hardware ports and the virtual port. It keeps working in the plugin (the engine is the app), but sending MIDI back to the DAW's track needs a VST3 event output bus and AU MIDI output callbacks: later |
 | Account or online activation | Never | The source is MIT; activation would only punish honest buyers (see 8.5) |
-| New nodes or modes | Never in this plan | AGENTS rule. Plugin mode reuses Audio In, Audio Out, MIDI Notes, MIDI CC, MIDI Trigger and the Macro nodes |
+| Brand-new node types | Not needed | Plugin mode reuses and extends Audio In, Audio Out, MIDI Notes, MIDI CC, MIDI Trigger and the Macro nodes; if a host need turns up that no existing node can carry, it is shown to the owner first |
 | Multi-out (more than one stereo out) | Later | Most users never route it; it multiplies bus-arrangement bugs in FL and Ableton |
 | Surround buses (5.1 and up) | Never in v1 | Infinite's audio graph is stereo |
 
@@ -87,7 +89,7 @@ Note on location: private plans moved to `internal/plans/` in `458a1dd3`. This f
 | Licence backend | Worker `worker/license/` (Paddle webhook, D1, Resend), `PUBLIC_KEY.txt`, `GET /api/license/revoked` (1 h cache), `POST /api/license/resend`, `RELEASED` and `DOWNLOAD_URL` vars | `worker/license/index.js` | Plugin verifies offline; ship day flips `RELEASED` |
 | Ship-day mail to pre-order buyers | **No tool exists.** The Worker emails at purchase time only; `emailed_at` is purchase mail | `worker/license/schema.sql` | New tool in chunk 3 (tool-first) |
 | App version | v1.1.0 latest (`gh release list`, 2026-11-05); `INFINITE_VERSION "1.1.0"` | `CMakeLists.txt:22` | Plugin version = app version; licence `major 1` covers 1.x |
-| DAWs on this Mac | **None installed**; `~/Library/Audio/Plug-Ins/` has `Components`, `VST`, `Digidesign` | | Trials needed (owner column: downloads, accounts) |
+| DAWs on this Mac | **None installed**; `~/Library/Audio/Plug-Ins/` has `Components`, `VST`, `Digidesign` | | DAW demo versions needed for testing (owner column: downloads, accounts) |
 | Machine | M2, 8 GB RAM, macOS 27.2 | `machine-is-m2-8gb` | Instance memory budget and one build at a time |
 
 ### 4.2 What a plugin needs that the app does today
@@ -383,14 +385,15 @@ The source is MIT. The VST3 SDK is MIT since 3.8 (`external/vst3sdk/LICENSE.txt`
 | Where it is stored | One per user, shared by both builds and all instances: macOS `~/Library/Application Support/Infinite/license.inflic`, Windows `%APPDATA%\Infinite\license.inflic`, Linux `$XDG_CONFIG_HOME/infinite/license.inflic` |
 | 2 seats without an account | Not enforced by code. The key shows "Licensed to <email> · INF-XXXX" in the plugin's About; the terms say two computers. Nothing counts machines |
 | Revoked list | `GET /api/license/revoked` from the engine main thread, at most once per 7 days, only while licensed, no identifiers sent (the list is downloaded, not a lookup). Cached on disk. Network failure, timeout or bad JSON = keep the last cached list (**fail open**). Off switch in the licence sheet |
-| Trial | 30 days of everything from first engine start, stored in `trial.json` beside the licence. Trivially reset; accepted |
-| Unlicensed after trial | Audio, saving, loading, automation all keep working. The plugin view shows a thin strip "Unlicensed · Enter key · Buy" and the licence sheet opens once per session when the view first opens (closable at once). Nothing in the audio ever changes, so bounce = live holds and nobody's project is damaged |
-| Revoked key | Treated as unlicensed after trial, with the text "This key was refunded" |
-| Wrong major (future 2.x with a 1.x key) | Unlicensed strip with "Your key covers 1.x" |
-| Projects on another machine | Always open and play (M-11) |
+| Trial | **None** (owner 2026-11-07). The free standalone app is the full instrument to try; the plugin is what people buy |
+| Unlicensed | The plugin loads, keeps and saves the patch (getState returns exactly what setState got, so no project is ever damaged), and its view shows only the licence sheet: "Enter key · Buy". Instrument outputs silence, FX passes its input through dry with the reported latency, so a track never jumps in time. The engine is not spawned until a key is valid |
+| Licensed | Everything; a valid key never expires (perpetual for its major), so bounce = live holds for every licensed user |
+| Revoked key | Unlicensed, with the text "This key was refunded" |
+| Wrong major (future 2.x with a 1.x key) | Unlicensed, with "Your key covers 1.x" |
+| Projects on another machine | Always open with the patch intact; play once that machine has a key (M-11 is tested licensed) |
 
-Decision: offline Ed25519 with Monocypher, key file in the user's config folder, revoked list weekly and fail-open, 30-day full trial, a strip and one sheet per session when unlicensed, no audio penalty ever.
-Open risk: a 30-day trial with no audio penalty converts fewer buyers than a nag noise. Accepted for v1: income comes from honest users, and a noise would break M-5 and anger pre-order buyers on day one. Revisit with sales data after 60 days.
+Decision: offline Ed25519 with Monocypher, key file in the user's config folder, revoked list weekly and fail-open, no trial: unlicensed = licence sheet only, Instrument silent, FX dry, patch kept.
+Open risk: people who want to try in their DAW first cannot. Accepted (owner): the free app is the trial and the refund window covers a host that does not work for them.
 Open risk: a sandboxed host (GarageBand) may not let the engine read the user's config folder; fallback is the host-container folder, found in the chunk 1 spike.
 
 ### 8.6 Packaging and distribution
@@ -427,7 +430,7 @@ Updates and pages:
 | Topic | Decision |
 |---|---|
 | Auto-update | **Through the app.** The app's `SelfUpdate` updates the app; the app re-copies the plugin on next launch (8.11). The engine only shows "Update in the Infinite app". No self-replacing binaries inside a running DAW |
-| Where binaries live | Inside the normal app release `vX.Y.Z` on `n1m21n/Infinite`, public (the binary is MIT; the trial is the demo; reach feeds income). No separate plugin release (8.11) |
+| Where binaries live | Inside the normal app release `vX.Y.Z` on `n1m21n/Infinite`, public (the binary is MIT; the free app is the demo; reach feeds income). No separate plugin release (8.11) |
 | `/download` page | `website/download.html`: per-OS buttons, the Terminal line for macOS, the first-run steps (drop the key), links to buy and support. Built from the site's tools (`tools/website/`), brand-linted (`tools/brand/brand_lint.py`) |
 | `/download` URL | Worker var `DOWNLOAD_URL = https://infinitedevices.org/download`; the purchase email already prints it when `RELEASED = "1"` |
 | Buy page | Stays; copy changes from "pre-order" to "buy" on ship day (`paddle.json` `released: true`) |
@@ -481,20 +484,29 @@ Open risk: the UTM Windows VM needs ~4 GB of the 8 GB Mac; Windows runs happen w
 
 ### 8.8 DAW matrix (scope item E)
 
-Tier: **v1** = certified, blocks release. **BE** = best effort, tested once, issues fixed if cheap, not advertised.
+Every host below is **v1**: a failure in any of them blocks release (owner 2026-11-07: all DAWs, all platforms). Depth: **full** = all common checks C1-C10 every release candidate; **core** = C1, C2, C3, C5, C7, C10 every release candidate, full checks once per major.
 
 | Host | Tier | Format used | Instrument / FX quirks | GUI / GPU quirks | What to test beyond the common list | Pass criteria |
 |---|---|---|---|---|---|---|
-| Logic Pro | v1 | AU only | Instrument = `aumu`; FX = `aumf` (music effect, so it gets MIDI); sidechain via Logic's sidechain menu | Logic may host AUs out of process (AUHostingService); the engine is then a grandchild. View is a Cocoa view | `auval` in Logic's Plug-in Manager, MIDI FX before the FX build, bounce in place, Track freeze | auval PASS in Logic; all common checks |
-| GarageBand | BE | AU only | Same AU types | Sandboxed App Store app: helper spawn and shm may be blocked (spike 1.0 decides) | Load, play, save | Loads and plays, or "not supported" is written on `/download` |
-| Ableton Live 12 | v1 | VST3 and AU (both tested) | Instrument on MIDI track; FX on audio track with MIDI routed from another track; freeze / flatten | Plugin window scaling on Windows (Ableton's "auto-scale plugin window" option); Ableton caches parameters per plugin ID | Freeze and flatten = live, Configure parameter mode with slots, window at 100 / 150 / 200 % on Windows | All common checks; freeze null M-5 |
-| Reaper 7 | v1 | VST3 and AU | Strict threading: calls from any thread; "run FX in separate process" option | Reaper's own bridge and sandbox modes; HiDPI on Windows | The automated rig runs here; also Reaper's "dedicated process" mode | Rig green; all common checks; works in "separate process" mode |
-| FL Studio 2025 | v1 | VST3 | Wrapper: parameter list fixed at load; Instrument in Channel rack, FX in Mixer; MIDI to FX through "MIDI out" plugin | Wrapper window frame; resizing through FL's own handle | Parameter learn through FL's "Link to controller", project save in the trial (FL's trial cannot reopen projects: use the owner's licence or skip M-11 here) | All common checks except M-11 if trial only |
-| Bitwig Studio 5 | v1 | VST3 | Plugin sandboxing: each plugin in a Bitwig host process; the engine is spawned from that process | View is embedded across Bitwig's process boundary by Bitwig; our view is a normal native view inside it | Sandbox modes "Within Bitwig", "Together", "By manufacturer", "Individually": all four | All common checks in all four sandbox modes |
-| Cubase / Nuendo 14 | v1 (reference host) | VST3 | Strictest on the spec: bus arrangements, `kIsBypass`, `IProcessContextRequirements`, latency restart | Content scale factor on Windows | Steinberg validator inside Cubase (Plug-in Manager), latency change while playing | All common checks; validator inside Cubase green |
-| Studio One 7 | BE | VST3 (AU on macOS) | Standard | Standard | Load, play, save, bounce | Common checks, no crash |
-| Ardour 8 (Linux) | BE | VST3 | Strict VST3 host | X11 embed | Load, play, save, export | Common checks on Linux |
-| Reason 13 | BE | VST3 | Rack wrapper ("Rack Extension" style VST3 shell) | Separate window | Load, play | Loads and plays |
+| Logic Pro | v1 full | AU only | Instrument = `aumu`; FX = `aumf` (music effect, so it gets MIDI); sidechain via Logic's sidechain menu | Logic may host AUs out of process (AUHostingService); the engine is then a grandchild. View is a Cocoa view | `auval` in Logic's Plug-in Manager, MIDI FX before the FX build, bounce in place, Track freeze | auval PASS in Logic; all common checks |
+| GarageBand | v1 core | AU only | Same AU types | Sandboxed; spike 1.0 proved the engine spawns and shm works from the sandboxed AUHostingService | Load, play, save, export | Common checks |
+| MainStage | v1 core | AU only | Instrument and FX in patches; live use, so C7 at 64 and C10 matter most | Cocoa view | Patch switch while playing, 1-hour concert soak | Common checks; no xrun on patch switch |
+| Ableton Live 12 (mac, Windows) | v1 full | VST3 and AU (both tested) | Instrument on MIDI track; FX on audio track with MIDI routed from another track; freeze / flatten | Plugin window scaling on Windows (Ableton's "auto-scale plugin window" option); Ableton caches parameters per plugin ID | Freeze and flatten = live, Configure parameter mode with slots, window at 100 / 150 / 200 % on Windows | All common checks; freeze null M-5 |
+| Reaper 7 (mac, Windows, Linux) | v1 full | VST3 and AU | Strict threading: calls from any thread; "run FX in separate process" option | Reaper's own bridge and sandbox modes; HiDPI on Windows | The automated rig runs here; also Reaper's "dedicated process" mode | Rig green; all common checks; works in "separate process" mode |
+| FL Studio 2025 (mac, Windows) | v1 full | VST3 | Wrapper: parameter list fixed at load; Instrument in Channel rack, FX in Mixer; MIDI to FX through "MIDI out" plugin | Wrapper window frame; resizing through FL's own handle | Parameter learn through FL's "Link to controller", project save and reopen (FL's own demo cannot reopen projects, so M-11 needs a licensed FL) | All common checks |
+| Bitwig Studio 5 (mac, Windows, Linux) | v1 full | VST3 | Plugin sandboxing: each plugin in a Bitwig host process; the engine is spawned from that process | View is embedded across Bitwig's process boundary by Bitwig; our view is a normal native view inside it | Sandbox modes "Within Bitwig", "Together", "By manufacturer", "Individually": all four | All common checks in all four sandbox modes |
+| Cubase / Nuendo 14 (mac, Windows) | v1 full (reference host) | VST3 | Strictest on the spec: bus arrangements, `kIsBypass`, `IProcessContextRequirements`, latency restart | Content scale factor on Windows | Steinberg validator inside Cubase (Plug-in Manager), latency change while playing | All common checks; validator inside Cubase green |
+| Studio One 7 (mac, Windows) | v1 full | VST3 (AU on macOS) | Instrument via Instruments panel; sidechain via its routing | Content scale on Windows | Bounce, transform to audio | Common checks |
+| Ardour 8 / Mixbus (mac, Windows, Linux) | v1 core | VST3 (AU on macOS) | Strict VST3 host, plugin latency compensation always on | X11 embed on Linux | Export, latency compensation with 2 instances | Common checks |
+| Reason 13 (mac, Windows) | v1 core | VST3 | Rack wrapper ("Rack Extension" style VST3 shell) | Separate window | Load, play, save, export | Common checks |
+| Tracktion Waveform 13 (mac, Windows, Linux) | v1 core | VST3 (AU on macOS) | Racks; freeze | Standard | Freeze = live | Common checks |
+| Cakewalk Sonar (Windows) | v1 core | VST3 | Per-plugin "upsample on render" option must stay off for M-5 | Content scale | Render, freeze | Common checks |
+| Digital Performer 11 (mac, Windows) | v1 core | AU on macOS, VST3 on Windows | Instrument tracks; chunks | Standard | Bounce | Common checks |
+| Renoise 3.5 (mac, Windows, Linux) | v1 core | VST3 (AU on macOS) | Tracker: MIDI from pattern, short blocks | Separate window | Render song, block sizes from Renoise's own scheduler | Common checks |
+| LUNA (mac, Windows) | v1 core | VST3 / AU | Standard | Standard | Bounce | Common checks |
+| Zrythm (Linux) | v1 core | VST3 | Strict host | X11 embed | Export | Common checks |
+| Audacity 3.7 (all OS) | v1 core, FX only | VST3 (AU on macOS) | Effects only, offline "apply" and realtime effects | Separate window | Apply effect offline = realtime | C1, C3, C5, C10 |
+| Pro Tools | chunk 4 | AAX | Not reachable by VST3/AU (3.2) | | | |
 
 Common checks for every host (one checklist file per DAW, `tests/plugin/daw/<host>.md`, filled by hand, date + version + result):
 
@@ -516,13 +528,13 @@ Which needs real hardware:
 | Host | Coverage |
 |---|---|
 | Reaper (mac, Linux, Windows VM) | Rig (automated) |
-| Logic, GarageBand, Ableton, Bitwig, FL, Cubase on macOS | Real hardware: this Mac, trial versions |
-| Ableton, FL, Bitwig, Cubase on Windows | Windows VM on this Mac (ARM64 Windows, x64 hosts under emulation); a real x64 PC test by the owner or a beta tester before ship |
-| Ardour, Bitwig Linux | Container + Xvfb (Ardour), Bitwig best effort |
+| Logic, GarageBand, MainStage, Ableton, Bitwig, FL, Cubase, Studio One, Reason, DP, Renoise, LUNA, Waveform, Audacity on macOS | Real hardware: this Mac, the DAWs' own demo versions for testing |
+| Ableton, FL, Bitwig, Cubase, Studio One, Sonar, Reason, Waveform, Renoise on Windows | Windows VM on this Mac (ARM64 Windows, x64 hosts under emulation); a real x64 PC test by the owner or a beta tester before ship |
+| Reaper, Bitwig, Ardour, Waveform, Renoise, Zrythm, Audacity on Linux | Container + Xvfb for the automated parts; one real Linux desktop run (owner's other laptop or a beta tester) before ship |
 
-Decision: v1 certification = Logic, Ableton, Reaper, FL, Bitwig, Cubase; GarageBand, Studio One, Ardour, Reason best effort.
-Decision: Reaper is the automated rig; the other v1 hosts are hand-tested with C1-C10 on trials.
-Open risk: DAW trials expire (30 days typical); trials are started only when chunk 2 reaches the matrix step, so they do not expire before the run.
+Decision: every VST3/AU host on every OS it runs on is v1; eight get full checks, the rest core checks. Pro Tools comes with AAX in chunk 4.
+Decision: Reaper is the automated rig; every other host is hand-tested with the checklist, using the DAWs' own demo versions.
+Open risk: DAW demos expire (30 days typical); each is installed only when its matrix step starts. The longer host list adds about 25 agent hours plus owner time to chunks 2 and 3.
 Open risk: Windows x64 hosts under ARM64 emulation can hide x64-only bugs; one real x64 PC run is required before ship (12.2).
 
 ### 8.9 What is shared with the app and what is plugin-only
@@ -710,7 +722,7 @@ Filled when each chunk ends; every row points back to section 6 and 7. Spike 1.0
 | The architecture | One block of latency is unusual for an instrument | At 128-sample buffers it is 2.7 ms; PDC hides it in playback; documented |
 | The architecture | The pixel pipe adds input lag to a canvas that needs precise dragging | M-10 gate; the pop-out window is full speed for heavy editing |
 | The GUI | Keyboard focus inside hosts (Ableton, Cubase) is unreliable; Field code editing needs typing | Click-to-focus in the view; the pop-out window is the recommended place for typing; documented |
-| Licensing | No enforcement means some people will never pay | Honest by design; MIT source makes enforcement theatre; trial converts, refund window protects buyers |
+| Licensing | No enforcement means some people will never pay | Honest by design; MIT source makes enforcement theatre; the free app converts, refund window protects buyers |
 | Packaging | A curl-to-bash line looks scary to some users | The script is short, readable on the site, checks a SHA-256; the zip route exists too |
 | Validation | The automated rig is Reaper only; other hosts rely on a hand checklist | The checklist is a file per DAW with dates; release blocks on all v1 rows |
 | Scope | MIDI out to the host and multi-out are common asks | Listed as later; the shell keeps bus slots for them |
@@ -720,13 +732,13 @@ Filled when each chunk ends; every row points back to section 6 and 7. Spike 1.0
 
 ### 12.1 Milestones: three chunks, one branch each, one commit per step
 
-Wall-clock budget assumes agent work in sessions plus owner time for trials and the real-card test. Builds only through `scripts/ibuild.py`, one at a time; release (universal) builds only in chunk 3.
+Wall-clock budget assumes agent work in sessions plus owner time for DAW demo installs and the real-card test. Builds only through `scripts/ibuild.py`, one at a time; release (universal) builds only in chunk 3.
 
 **Chunk 1: Engine in a shell (macOS, Reaper)** - branch `plugin/c1-engine-shell` - about 3 weeks, ~60 agent hours
 
 | Step | Commit | Hours |
 |---|---|---|
-| 1.0 | Spike: a 200-line VST3 + AU shell spawns a helper and passes audio over shm in Reaper and Logic/GarageBand trials; record B-1..B-8 with `tools/plugin/baseline.py`; freeze R1-R4 | 8 |
+| 1.0 | Spike: a 200-line VST3 + AU shell spawns a helper and passes audio over shm in Reaper and Logic/GarageBand (demo versions); record B-1..B-8 with `tools/plugin/baseline.py`; freeze R1-R4 | 8 |
 | 1.1 | `LICENSE` + CMake comments corrected (SDK is MIT); `THIRD_PARTY_NOTICES` adds AudioUnitSDK | 1 |
 | 1.2 | `Platform::` shm, spawn, watch-parent, RT priority (mac side + Windows and Linux stubs that compile) | 6 |
 | 1.3 | shm protocol + `ipc_bench` | 6 |
@@ -735,18 +747,18 @@ Wall-clock budget assumes agent work in sessions plus owner time for trials and 
 | 1.6 | AU via `auwrapper` + AudioUnitSDK fetch | 5 |
 | 1.7 | `validate.sh` + `reaper_rig.py`; M-1, M-3, M-4, M-5, M-6 on macOS | 10 |
 
-Stop condition S1: **go** when R1 and R2 play in Reaper (VST3) and in the Logic trial (AU), M-1, M-3, M-4, M-5, M-6 pass on macOS, and pluginval 5 passes. **Stop and re-plan** (switch Logic to option B, 9.1) if (a) spike 1.0 shows Logic refuses both spawn routes, (b) B-5 p99 round trip exceeds 25 % of a 128-sample block, or (c) B-2 means four instances cannot fit in 8 GB beside Reaper.
+Stop condition S1: **go** when R1 and R2 play in Reaper (VST3) and in Logic (AU), M-1, M-3, M-4, M-5, M-6 pass on macOS, and pluginval 5 passes. **Stop and re-plan** (switch Logic to option B, 9.1) if (a) spike 1.0 shows Logic refuses both spawn routes, (b) B-5 p99 round trip exceeds 25 % of a 128-sample block, or (c) B-2 means four instances cannot fit in 8 GB beside Reaper.
 
-**Chunk 2: The plugin as a product (macOS)** - branch `plugin/c2-product-mac` - about 3-4 weeks, ~70 agent hours + owner trial time
+**Chunk 2: The plugin as a product (macOS)** - branch `plugin/c2-product-mac` - about 3-4 weeks, ~80 agent hours + owner DAW-install time
 
 | Step | Commit | Hours |
 |---|---|---|
 | 2.1 | State save/load (header + JSON + miniz), lazy engine start, last-known-state fallback | 8 |
-| 2.2 | Host slots + Macro "Host slot" field + smoothing + edits back to host (after 12.4 approval) | 10 |
+| 2.2 | Host slots + Macro "Host slot" field + smoothing + edits back to host | 10 |
 | 2.3 | Pixel pipe: FBO, PBO readback, triple buffer, mac view blit, input injection, resize, backing scale | 16 |
 | 2.4 | Pop-out window, projector outputs in plugin mode, no-GPU fallback text | 6 |
 | 2.5 | Failure modes: heartbeat, crash restart, hang kill, suspend/resume; `crash_drill.py` | 8 |
-| 2.6 | Licence: Monocypher, `License.*`, sheet, drop + paste, trial, revoked cache, strip (after 12.4 approval) | 10 |
+| 2.6 | Licence: Monocypher, `License.*`, sheet, drop + paste, unlicensed mode (sheet only, Instrument silent, FX dry), revoked cache | 10 |
 | 2.7 | `soak.py`; M-7..M-12 on macOS | 6 |
 | 2.8 | DAW matrix on macOS: Logic, Ableton, Reaper, FL, Bitwig, Cubase (v1) + GarageBand, Studio One (BE); checklists filled; fixes | 12 |
 
@@ -813,7 +825,7 @@ Support plan:
 | R-9 | Bounce differs from live for wall-clock patches | Audio-time modulation clock; M-5 measured on synced patches; documented |
 | R-10 | Engine hang during `getState` loses the newest edit | Last-known-state fallback; heartbeat kills hung engines |
 | R-11 | Key leaks or is shared | Accepted: the key is a convenience; revocation only for refunds |
-| R-12 | DAW trials expire mid-test | Start trials at step 2.8 / 3.4, not before |
+| R-12 | DAW demos expire mid-test | Install each at step 2.8 / 3.4, not before |
 | R-13 | No Windows x64 hardware | UTM ARM VM for the bulk; one real x64 PC run before ship |
 | R-14 | Refund wave if first impressions are bad | Ship only at S3 go; daily triage for two weeks |
 | R-15 | `LICENSE` claims GPLv3 while the SDK is MIT | Corrected in 1.1; the honest licensing paragraph in 8.5 goes on `/download` |
@@ -825,13 +837,13 @@ Support plan:
 
 | Item | Step | Recommended |
 |---|---|---|
-| "Host slot" field on Macro nodes | 2.2 | Approve as described in 8.2 |
-| Licence sheet, unlicensed strip, 30-day trial with no audio penalty | 2.6 | Approve as described in 8.5 |
+| "Host slot" field on Macro nodes | 2.2 | **Approved 2026-11-07** (owner: change nodes and settings wherever required) |
+| Licence sheet; unlicensed = sheet only, Instrument silent, FX dry; no trial | 2.6 | **Decided by owner 2026-11-07** (8.5) |
 | Plugin view chrome: picture/canvas switch, pop-out button, slot map, xrun counter, "Engine stopped, Restart" | 2.3-2.5 | Approve; mock-up shown at the start of 2.3 |
-| `Audio In` sources "Host main" / "Host sidechain" in plugin mode | 1.4 | Approve |
+| `Audio In` sources "Host main" / "Host sidechain" in plugin mode | 1.4 | **Approved 2026-11-07** |
 | `/download` page and FAQ copy | 3.7 | Approve after brand lint |
-| Settings > DAW plugin section (Install button, folder paths, re-copy on update) in the app | 3.6 | Approve as described in 8.11 |
-| Spending: DAW licences beyond trials (Reaper $60 recommended), any Windows certificate | 2.8, 3.6 | Reaper licence yes; certificate after launch sales |
+| Settings > DAW plugin section (Install button, folder paths, re-copy on update) in the app | 3.6 | **Approved 2026-11-07** |
+| Spending: DAW licences beyond demos (Reaper $60, FL for M-11), any Windows certificate, Avid/PACE for AAX | 2.8, 3.6, chunk 4 | Reaper licence yes; FL when its matrix step starts; certificate after launch sales |
 
 ### 12.5 Ship / iterate / abandon
 
