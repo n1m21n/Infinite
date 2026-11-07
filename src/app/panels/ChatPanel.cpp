@@ -3878,7 +3878,7 @@ namespace app
          else if (!setting && !signingIn && connected && !in)
          {
             // Set up, signed out, nothing running: say what the sign-in needs, then one press.
-            CardText(c, chat::SignInNote(*a), Dim());
+            CardText(c, chat::SignInNote(*a, CurrentOs() == Os::kWindows), Dim());
             const int b = s.noAccount ? CardButtons(c, { { T("Sign in"), true }, { T("Make an account"), false }, { T("Pick again"), false } })
                                       : CardButtons(c, { { T("Sign in"), true }, { T("Pick again"), false } });
             const int k = (!s.noAccount && b == 1) ? 2 : b;   // without the account button, "Pick again" is index 1
@@ -5563,7 +5563,7 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
          if (v.act == Act::SetUp)
             info.hint = chat::SetUpNote(*a, CliSetup::CurrentOs() == CliSetup::Os::kWindows, it != sAgents.end() && it->second.ready.installed);
          else if (v.act == Act::SignIn || v.act == Act::SignInAgain)
-            info.hint = chat::SignInNote(*a);
+            info.hint = chat::SignInNote(*a, CliSetup::CurrentOs() == CliSetup::Os::kWindows);
       }
       if (it != sAgents.end() && it->second.failed && it->second.setup == nullptr && a != nullptr)
       {

@@ -838,7 +838,8 @@ namespace app
                      check(conn.find("nothing is downloaded") != std::string::npos && conn.find("download") == conn.find("nothing is downloaded") + 11, ("connect note: no download " + tag).c_str());
                      check(conn.find(cfg) != std::string::npos, ("connect note: config under home " + tag).c_str());
                      check(chat::SetUpNote(ag, win, true) == conn && chat::SetUpNote(ag, win, false) == inst, ("set-up note picks by installed " + tag).c_str());
-                     check(chat::SignInNote(ag).find("never sees your login") != std::string::npos, ("sign-in note: " + tag).c_str());
+                     check(chat::SignInNote(ag, win).find("never sees or stores your login or key") != std::string::npos, ("sign-in note: " + tag).c_str());
+                     check((std::string(ag.id) == "antigravity") == (chat::SignInNote(ag, win).find("API") == std::string::npos), ("sign-in note: key route only where the agent has one " + tag).c_str());
                   }
                check(chat::InstallNote(*CliSetup::FindAgent("claude"), false).find("usually ~/.local/bin") != std::string::npos, "install note: Claude usually ~/.local/bin");
                check(chat::InstallNote(*CliSetup::FindAgent("antigravity"), true).find("%LOCALAPPDATA%\\agy\\bin") != std::string::npos, "install note: Gemini on Windows goes to its own folder");
@@ -847,7 +848,10 @@ namespace app
                check(chat::InstallNote(*CliSetup::FindAgent("codex"), false).find("Node.js") != std::string::npos, "install note: ChatGPT says it may add Node");
                for (const CliSetup::Agent& ag : CliSetup::Agents())
                   check(!chat::PlanTag(ag.id).empty() && chat::PlanTag(ag.id).size() < 28, (std::string("plan tag: short and present ") + ag.id).c_str());
-               check(chat::SignInNote(*CliSetup::FindAgent("claude")).find("free plan") != std::string::npos, "sign-in note: Claude's free plan is named");
+               check(chat::SignInNote(*CliSetup::FindAgent("claude"), false).find("free plan") != std::string::npos, "sign-in note: Claude's free plan is named");
+               check(chat::SignInNote(*CliSetup::FindAgent("claude"), false).find("claude auth login --console") != std::string::npos, "sign-in note: Claude's API route is its own command");
+               check(chat::SignInNote(*CliSetup::FindAgent("codex"), false).find("printenv OPENAI_API_KEY | codex login --with-api-key") != std::string::npos &&
+                     chat::SignInNote(*CliSetup::FindAgent("codex"), true).find("$env:OPENAI_API_KEY | codex login --with-api-key") != std::string::npos, "sign-in note: ChatGPT key command per OS");
             }
             check(chat::FirstIdeas().size() == 3, "first ideas: three");
          }

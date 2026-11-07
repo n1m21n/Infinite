@@ -53,7 +53,9 @@ namespace chat
    std::string InstallNote(const CliSetup::Agent& agent, bool windows);
    std::string ConnectNote(const CliSetup::Agent& agent, bool windows);
    std::string SetUpNote(const CliSetup::Agent& agent, bool windows, bool installed);
-   std::string SignInNote(const CliSetup::Agent& agent);
+   // With an API key instead: Infinite never takes a key, so the note says what to run in the Terminal tab
+   // (the agent's own command; Gemini has none, so it names only the Google account).
+   std::string SignInNote(const CliSetup::Agent& agent, bool windows);
    // Two or three words on the agent's pick row, so what the account needs is known before anything starts.
    std::string PlanTag(const std::string& agentId);
 

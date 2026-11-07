@@ -133,23 +133,26 @@ namespace chat
       return installed ? ConnectNote(a, windows) : InstallNote(a, windows);
    }
 
-   std::string SignInNote(const CliSetup::Agent& a)
+   std::string SignInNote(const CliSetup::Agent& a, bool windows)
    {
       const std::string id = a.id, name = a.name;
+      const std::string never = " Infinite never sees or stores your login or key.";
       if (id == "claude")
-         return "Sign in opens your browser. Claude Code needs a paid Claude plan (Pro or Max) or an Anthropic API key; "
-                "the free plan does not include it. Infinite never sees your login.";
+         return "Sign in opens your browser. Claude Code needs a paid Claude plan (Pro or Max); the free plan does not include it. "
+                "To pay by API use instead, run `claude auth login --console` in the Terminal tab." + never;
       if (id == "codex")
-         return "Sign in opens your browser on this computer. " + name + " needs a ChatGPT plan that includes Codex, or an OpenAI API key. "
-                "Infinite never sees your login.";
-      return "Sign in opens your browser. " + name + " uses your Google account, and how much you can use depends on your plan. "
-             "Infinite never sees your login.";
+      {
+         const std::string key = windows ? "$env:OPENAI_API_KEY | codex login --with-api-key" : "printenv OPENAI_API_KEY | codex login --with-api-key";
+         return "Sign in opens your browser on this computer. " + name + " needs a ChatGPT plan that includes Codex. "
+                "To use an OpenAI API key instead, set OPENAI_API_KEY in the Terminal tab, then run `" + key + "`." + never;
+      }
+      return "Sign in opens your browser. " + name + " uses your Google account, and how much you can use depends on your plan." + never;
    }
 
    std::string PlanTag(const std::string& id)
    {
       if (id == "claude")
-         return "Paid plan or API key";
+         return "Paid plan or API";
       if (id == "codex")
          return "ChatGPT plan or API key";
       return "Google account";
