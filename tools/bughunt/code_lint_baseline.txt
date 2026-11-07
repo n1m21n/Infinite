@@ -41,6 +41,7 @@ loaded-index	src/nodes/ModulatorNodes.h	root -> [root] in src/app/bodies
 loaded-index	src/nodes/NoteNodes.cpp	root -> [root] in src/app/bodies
 loaded-index	src/nodes/OscillatorNode.cpp	filterType -> [filterType] in src/app/bodies
 loaded-index	src/nodes/OscillatorNode.cpp	waveform -> [waveform] in src/app/bodies
+loaded-index	src/nodes/PianoNode.cpp	model -> [model] in src/app/bodies
 loaded-index	src/nodes/PredictiveModulatorNode.h	rank -> [rank] in src/app/bodies
 loaded-index	src/nodes/PredictiveRhythmNode.cpp	root -> [root] in src/app/bodies
 loaded-index	src/nodes/WaveTerrainNode.cpp	filterType -> [filterType] in src/app/bodies
@@ -51,13 +52,17 @@ shader-loop	src/core/FilterDefs.cpp	x < n
 shader-loop	src/core/FilterDefs.cpp	y < n
 shader-loop	src/nodes/FormulaNode.cpp	i < N
 shader-loop	src/nodes/OpticalFlowNode.cpp	i < uR
+shader-loop	src/nodes/Render3DPathTrace.cpp	bounce < maxB
+shader-loop	src/nodes/Render3DPathTrace.cpp	k < w1
 shader-loop	src/nodes/Render3DPost.cpp	i < taps
 shader-loop	src/nodes/VolumeNode.cpp	i < uSteps
 shader-loop	src/nodes/VolumeNode.cpp	k < uLightSteps
-unbounded-int	src/app/bodies/GeometryParams.cpp	bevelSegments [1,3] not bounded outside the UI
 unbounded-int	src/app/bodies/GeometryParams.cpp	chladniM [1,12] not bounded outside the UI
 unbounded-int	src/app/bodies/GeometryParams.cpp	chladniN [1,12] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	lissajousA [1,9] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	lissajousB [1,9] not bounded outside the UI
 unbounded-int	src/app/bodies/GeometryParams.cpp	paletteOffset [0,32] not bounded outside the UI
 unbounded-int	src/app/bodies/GeometryParams.cpp	screwSteps [3,256] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	seed [0,999] not bounded outside the UI
 unbounded-int	src/app/bodies/GeometryParams.cpp	triangleBudget [2000,500000] not bounded outside the UI
-unbounded-int	src/app/bodies/SamplerBodies.cpp	seed [1,9999] not bounded outside the UI
+unbounded-int	src/app/bodies/NoteBodies.cpp	maxStep [1,12] not bounded outside the UI

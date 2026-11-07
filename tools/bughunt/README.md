@@ -13,7 +13,7 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 
    The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
-3. **Nodes:** `INFINITE_PARAMFUZZ=1` first (minutes, one process), then `param_fuzz.py` against a sanitizer build of the app (one launch per row, capped by `--budget`, default 20 min). Before a run, write down how many rows it will cost and what it could find that the last run did not. A kind the last run already covered is not worth another hour.
+3. **Nodes:** `INFINITE_PARAMFUZZ=1` first (minutes, one process) for audio, `frame_fuzz.py` for every picture/3D node (about 25 min for all types), then `param_fuzz.py` against a sanitizer build of the app (one launch per row, capped by `--budget`, default 20 min). Before a run, write down how many rows it will cost and what it could find that the last run did not. A kind the last run already covered is not worth another hour.
 4. **Before a clamp fix ships:** `clamp_check.py "Type.key=LO..HI" ...` (under a second). It lists every tracked patch the clamp would change. Any hit means look before clamping.
 5. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
 6. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
@@ -59,6 +59,12 @@ The sweep measures frames and audio, not note pairing. A note node that leaves n
 Float values are ±1e30, nan, inf, 1e9 and -1. 1e9 casts to int fine but can size a buffer. -1 is UB once it's cast to an unsigned seed.
 
 Resumable: re-running skips rows already written. `--values 1e9,-1` runs only those values (the float rows that still reach a node since B-K-026). `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
+
+## frame_fuzz.py — every picture / 3D node, in process
+
+`frame_fuzz.py BIN OUT.log [--only Type,Type] [--row-sec 30] [--rss-gb 3] [--budget MIN] [--home DIR]`
+
+Drives `INFINITE_FRAMEFUZZ`: one hostile value per param (±1e9, -1, 0) on a fresh node fed by Geometry or Noise, cooked twice, mesh checked. The app flags NANMESH, BIGMESH (>20M verts), BIGTEX (>16384), GLERR and SLOW. The driver adds HANG (row past `--row-sec`), OOM (RSS past `--rss-gb`; an 8 GB Mac swaps to a stop long before a kernel kill) and CRASH, then restarts with `INFINITE_FRAMEFUZZ_AFTER=<row>`. Use a Debug build; `--home` a scratch profile.
 
 ## INFINITE_PARAMFUZZ — every audio node, in process
 
@@ -120,6 +126,10 @@ OUT/fuzz_hap OUT/crash-<hash>          # replay
 - **A GPU hang shows as a plain abort.** dither 1e9 exited -6 with no sanitizer log; stderr had Metal's "Caused GPU Hang Error". When a row aborts without a report, re-run it with stderr kept (the sweep sends stderr to /dev/null).
 - **Change one param per row, on a node that plays.** The app float sweep logged `Audio File 1e9 ok` while volume 1e9 played 5e8 loud (B-K-036). It sets every param of a type at once, so a param that silences the node (pitch → NaN position) hides one that makes it hot. Its file players also never started. INFINITE_PARAMFUZZ changes one key per row on the `SweepPrepare` fixtures, so it finds both kinds.
 - **A hardened-library abort is a Mac blind spot.** `std::clamp(pos, start, end)` with a loaded start > end aborted under Linux's `_GLIBCXX_ASSERTIONS`, while macOS libc++ fast mode let it pass, so only Linux ASan CI saw it. `code_lint.py` rule `clamp-bounds` lists every clamp whose bounds are both runtime values; the 58 existing ones are in the baseline (release returns a bound, nothing user-visible). Order the bounds in new code.
+
+- **A floor is not a bound.** `std::max(1, n)` stops zero and negatives, not 1e9 (B-L-005). The `unbounded-int` rule no longer counts `std::max`; only clamp, min or a ternary cap counts.
+- **A swap stall is the 8 GB Mac's crash.** A huge allocation does not abort; it freezes the machine with no report (B-L-001). Any in-process sweep needs an outside watchdog on time and RSS — that is `frame_fuzz.py`.
+- **`ed::` outside the canvas pass needs the editor set.** Side-panel drains run after the canvas ended. Wrap any `ed::` call there in Get/SetCurrentEditor(gEditor) and restore (B-L-002).
 
 ## Lesson: a sweep without a budget eats the hour (2026-10-24)
 
