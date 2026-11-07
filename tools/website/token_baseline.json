@@ -448,6 +448,14 @@
   "embeds/data-landscape-bathymetric-elevation-grid.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/cymatics-sine-nodal-frequency-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatics-sine-harmonic-quadrupole-field.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

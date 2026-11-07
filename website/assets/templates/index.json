@@ -1839,6 +1839,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "tech-house-rolling-sub-groove-synth",
+      "name": "Tech House Rolling Sub Groove Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Punchy rolling tech house sub bass synth with snappy pitch envelope decay, warm saturated sine-triangle core, and tight low-pass cutoff filter.",
+      "price": 0,
+      "preview": "assets/templates/tech-house-rolling-sub-groove-synth.webp",
+      "file": "assets/templates/tech-house-rolling-sub-groove-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tech-house-percussive-chord-stab-synth",
+      "name": "Tech House Percussive Chord Stab Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Snappy tech house chord stab synthesizer with multi-oscillator minor triad tuning, crisp resonant bandpass envelope filter, and punchy transient drive.",
+      "price": 0,
+      "preview": "assets/templates/tech-house-percussive-chord-stab-synth.webp",
+      "file": "assets/templates/tech-house-percussive-chord-stab-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dub-techno-tape-delay-diffusion-fx",
+      "name": "Dub Techno Tape Delay Diffusion FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Endless dub techno tape delay with multi-tap cross-feedback loops, high-frequency tape damping, warm analog saturation, and deep spatial diffusion.",
+      "price": 0,
+      "preview": "assets/templates/dub-techno-tape-delay-diffusion-fx.webp",
+      "file": "assets/templates/dub-techno-tape-delay-diffusion-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dub-techno-resonant-space-reverb-fx",
+      "name": "Dub Techno Resonant Space Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Expansive dub techno resonant space wash with interlocking comb filter delays, lush high-frequency diffusion, and warm atmospheric tail resonance.",
+      "price": 0,
+      "preview": "assets/templates/dub-techno-resonant-space-reverb-fx.webp",
+      "file": "assets/templates/dub-techno-resonant-space-reverb-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

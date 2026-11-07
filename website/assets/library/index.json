@@ -6304,6 +6304,216 @@
       "file": "assets/library/pixel/data-landscape-bathymetric-elevation-grid.field",
       "preview": "assets/library/previews/data-landscape-bathymetric-elevation-grid.jpg",
       "bytes": 1684
+    },
+    {
+      "id": "generative-plotter-curved-flow-lines",
+      "name": "Generative Plotter Curved Flow Lines",
+      "kind": "Generator",
+      "tags": [
+        "generative",
+        "plotter",
+        "flowfield",
+        "lines",
+        "mathematical",
+        "drawing"
+      ],
+      "description": "Algorithmic pen plotter study of continuous vector streamlines deflected through a trigonometric vector force field in carbon ink with vermilion accents on archival paper.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-curved-flow-lines.js",
+      "preview": "assets/library/previews/generative-plotter-curved-flow-lines.jpg",
+      "bytes": 2450
+    },
+    {
+      "id": "generative-plotter-nested-polygon-spirals",
+      "name": "Generative Plotter Nested Polygon Spirals",
+      "kind": "Generator",
+      "tags": [
+        "generative",
+        "plotter",
+        "polygons",
+        "spiral",
+        "algorithmic",
+        "drawing"
+      ],
+      "description": "Mechanical plotter drawing featuring concentric nested polygon spirals, progressive angular rotation offsets, and precision vermilion geometric crosshairs on warm cream parchment.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/generative-plotter-nested-polygon-spirals.js",
+      "preview": "assets/library/previews/generative-plotter-nested-polygon-spirals.jpg",
+      "bytes": 2559
+    },
+    {
+      "id": "vector-wireframe-gyroscope-icosahedron-3d",
+      "name": "Vector Wireframe Gyroscope Icosahedron 3D",
+      "kind": "Generator",
+      "tags": [
+        "vector",
+        "wireframe",
+        "gyroscope",
+        "icosahedron",
+        "geometry",
+        "3d"
+      ],
+      "description": "Gimballed 3D vector wireframe gyroscope with concentric rotating orbital rings, nested icosahedral geometric cages, and high-luminance phosphor green vector beams.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vector-wireframe-gyroscope-icosahedron-3d.js",
+      "preview": "assets/library/previews/vector-wireframe-gyroscope-icosahedron-3d.jpg",
+      "bytes": 2377
+    },
+    {
+      "id": "vector-wireframe-topological-hypercube-3d",
+      "name": "Vector Wireframe Topological Hypercube 3D",
+      "kind": "Generator",
+      "tags": [
+        "vector",
+        "wireframe",
+        "hypercube",
+        "tesseract",
+        "topology",
+        "3d"
+      ],
+      "description": "Four-dimensional tesseract hypercube projection rotating in 3D vector space with inner and outer concentric vertex lattices, phosphor green connection struts, and bright beam junctions.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/vector-wireframe-topological-hypercube-3d.js",
+      "preview": "assets/library/previews/vector-wireframe-topological-hypercube-3d.jpg",
+      "bytes": 3630
+    },
+    {
+      "id": "tech-house-rolling-sub-groove-synth",
+      "name": "Tech House Rolling Sub Groove Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "tech-house",
+        "bass",
+        "sub",
+        "rolling",
+        "audio"
+      ],
+      "description": "Punchy rolling tech house sub bass synth with snappy pitch envelope decay, warm saturated sine-triangle core, and tight low-pass cutoff filter.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/tech-house-rolling-sub-groove-synth.inf",
+      "preview": "assets/library/previews/tech-house-rolling-sub-groove-synth.jpg",
+      "bytes": 2259
+    },
+    {
+      "id": "tech-house-percussive-chord-stab-synth",
+      "name": "Tech House Percussive Chord Stab Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "tech-house",
+        "stab",
+        "chord",
+        "percussive",
+        "audio"
+      ],
+      "description": "Snappy tech house chord stab synthesizer with multi-oscillator minor triad tuning, crisp resonant bandpass envelope filter, and punchy transient drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/tech-house-percussive-chord-stab-synth.inf",
+      "preview": "assets/library/previews/tech-house-percussive-chord-stab-synth.jpg",
+      "bytes": 2495
+    },
+    {
+      "id": "dub-techno-tape-delay-diffusion-fx",
+      "name": "Dub Techno Tape Delay Diffusion FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "dub-techno",
+        "delay",
+        "tape",
+        "diffusion",
+        "audio"
+      ],
+      "description": "Endless dub techno tape delay with multi-tap cross-feedback loops, high-frequency tape damping, warm analog saturation, and deep spatial diffusion.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dub-techno-tape-delay-diffusion-fx.inf",
+      "preview": "assets/library/previews/dub-techno-tape-delay-diffusion-fx.jpg",
+      "bytes": 2120
+    },
+    {
+      "id": "dub-techno-resonant-space-reverb-fx",
+      "name": "Dub Techno Resonant Space Reverb FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "dub-techno",
+        "reverb",
+        "space",
+        "resonance",
+        "audio"
+      ],
+      "description": "Expansive dub techno resonant space wash with interlocking comb filter delays, lush high-frequency diffusion, and warm atmospheric tail resonance.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dub-techno-resonant-space-reverb-fx.inf",
+      "preview": "assets/library/previews/dub-techno-resonant-space-reverb-fx.jpg",
+      "bytes": 2194
+    },
+    {
+      "id": "cymatics-sine-nodal-frequency-matrix",
+      "name": "Cymatics Sine Nodal Frequency Matrix",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cymatics",
+        "chladni",
+        "standingwave",
+        "shader",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive Chladni standing wave resonance matrix with high-frequency nodal lines, modal harmonic interference, and radiant electric cyan wave crests.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-nodal-frequency-matrix.field",
+      "preview": "assets/library/previews/cymatics-sine-nodal-frequency-matrix.jpg",
+      "bytes": 1578
+    },
+    {
+      "id": "cymatics-sine-harmonic-quadrupole-field",
+      "name": "Cymatics Sine Harmonic Quadrupole Field",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "cymatics",
+        "quadrupole",
+        "acoustic",
+        "shader",
+        "audioreactive"
+      ],
+      "description": "Acoustic quadrupole standing wave field visualizing polar interference lobes, acoustic levitation nodes, and concentric harmonic resonance ripples.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatics-sine-harmonic-quadrupole-field.field",
+      "preview": "assets/library/previews/cymatics-sine-harmonic-quadrupole-field.jpg",
+      "bytes": 1547
     }
   ]
 }

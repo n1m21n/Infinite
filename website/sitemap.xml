@@ -126,6 +126,8 @@
   <url><loc>https://infinitedevices.org/embeds/suprematist-forms-floating-black-quadrilateral.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/data-landscape-topographic-frequency-contour.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/data-landscape-bathymetric-elevation-grid.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-nodal-frequency-matrix.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cymatics-sine-harmonic-quadrupole-field.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/chat.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
@@ -253,6 +255,10 @@
   <url><loc>https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tech-house-rolling-sub-groove-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tech-house-percussive-chord-stab-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-tape-delay-diffusion-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-resonant-space-reverb-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
@@ -687,6 +693,16 @@
   <url><loc>https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-topographic-frequency-contour.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/data-landscape-bathymetric-elevation-grid.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/generative-plotter-curved-flow-lines.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/generative-plotter-nested-polygon-spirals.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vector-wireframe-gyroscope-icosahedron-3d.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vector-wireframe-topological-hypercube-3d.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tech-house-rolling-sub-groove-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/tech-house-percussive-chord-stab-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-tape-delay-diffusion-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dub-techno-resonant-space-reverb-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-nodal-frequency-matrix.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cymatics-sine-harmonic-quadrupole-field.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-07</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
