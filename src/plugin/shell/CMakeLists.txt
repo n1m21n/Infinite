@@ -77,6 +77,75 @@ endfunction()
 infinite_add_plugin(InfiniteInstrument_vst3 "Infinite Instrument" 0)
 infinite_add_plugin(InfiniteFX_vst3 "Infinite FX" 1)
 
+# ---- AU v2 (macOS) through the SDK's auwrapper (step 1.6) -------------------------
+# Apple's AudioUnitSDK (Apache-2.0), fetched at a pinned tag, never committed. Each .component
+# carries a real copy of its .vst3 at Contents/Resources/plugin.vst3 and loads it in-process.
+# auwrapper's base is MusicDeviceBase, so the FX build (type aumf) also gets MIDI.
+if(APPLE)
+    include(FetchContent)
+    FetchContent_Declare(AudioUnitSDK
+        GIT_REPOSITORY https://github.com/apple/AudioUnitSDK.git
+        GIT_TAG AudioUnitSDK-1.2.0
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(AudioUnitSDK)
+    file(GLOB AUSDK_SOURCES ${audiounitsdk_SOURCE_DIR}/src/AudioUnitSDK/*.cpp)
+    add_library(ausdk STATIC ${AUSDK_SOURCES})
+    target_include_directories(ausdk PUBLIC ${audiounitsdk_SOURCE_DIR}/include)
+    target_compile_features(ausdk PUBLIC cxx_std_20)   # AudioUnitSDK 1.2 uses std::erase_if
+
+    string(REPLACE "." ";" _vparts "${INFINITE_VERSION}")
+    list(GET _vparts 0 _vmaj)
+    list(GET _vparts 1 _vmin)
+    list(GET _vparts 2 _vpat)
+    math(EXPR AU_VERSION_INT "(${_vmaj} << 16) | (${_vmin} << 8) | ${_vpat}")
+
+    set(AUW ${VST3_SDK_DIR}/public.sdk/source/vst/auwrapper)
+    function(infinite_add_au target vst3 name id type subtype tag channels)
+        set(AU_NAME "${name}")
+        set(AU_ID "${id}")
+        set(AU_TYPE "${type}")
+        set(AU_SUBTYPE "${subtype}")
+        set(AU_TAG "${tag}")
+        set(AU_CHANNELS "${channels}")
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/au-info.plist.in ${CMAKE_BINARY_DIR}/${target}-Info.plist @ONLY)
+        add_library(${target} MODULE ${AUW}/auwrapper.mm ${AUW}/aucocoaview.mm ${AUW}/NSDataIBStream.mm)
+        target_compile_definitions(${target} PRIVATE
+            SMTG_AUWRAPPER_USES_AUSDK
+            SMTG_AUCocoaUIBase_CLASS_NAME=SMTG_AUCocoaUIBase_${target}
+            CA_USE_AUDIO_PLUGIN_ONLY=0)
+        target_link_libraries(${target} PRIVATE sdk_hosting ausdk
+            "-framework AudioUnit" "-framework CoreMIDI" "-framework AudioToolbox"
+            "-framework CoreFoundation" "-framework Carbon" "-framework Cocoa" "-framework CoreAudio")
+        set_target_properties(${target} PROPERTIES
+            BUNDLE TRUE
+            BUNDLE_EXTENSION component
+            OUTPUT_NAME "${name}"
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_BINARY_DIR}/${target}-Info.plist
+            LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/AU)
+        add_dependencies(${target} ${vst3})
+        # Runs on every build: a POST_BUILD step would skip it when only the VST3 changed.
+        add_custom_target(${target}_bundle ALL
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "$<TARGET_BUNDLE_CONTENT_DIR:${target}>/Resources/plugin.vst3"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${target}>/Resources"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:${vst3}>"
+                    "$<TARGET_BUNDLE_CONTENT_DIR:${target}>/Resources/plugin.vst3"
+            COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:${target}>"
+            VERBATIM)
+        add_dependencies(${target}_bundle ${target} ${vst3})
+    endfunction()
+
+    # The Instrument's (inactive) sidechain bus is AU input element 0, so it validates as 2->2.
+    set(_ch_inst "\t\t<dict><key>Inputs</key><string>0</string><key>Outputs</key><string>2</string></dict>\n\t\t<dict><key>Inputs</key><string>2</string><key>Outputs</key><string>2</string></dict>")
+    set(_ch_fx "\t\t<dict><key>Inputs</key><string>2</string><key>Outputs</key><string>2</string></dict>\n\t\t<dict><key>Inputs</key><string>1</string><key>Outputs</key><string>2</string></dict>")
+    infinite_add_au(InfiniteInstrument_au InfiniteInstrument_vst3 "Infinite Instrument" InfiniteInstrument_au aumu InIn Synthesizer "${_ch_inst}")
+    infinite_add_au(InfiniteFX_au InfiniteFX_vst3 "Infinite FX" InfiniteFX_au aumf InFx Effects "${_ch_fx}")
+
+    # Loads the installed AUs like Logic (in or out of process) against a real engine.
+    add_executable(au_check AuCheck.mm)
+    set_target_properties(au_check PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/Release)
+    target_link_libraries(au_check PRIVATE "-framework AudioToolbox" "-framework Foundation")
+endif()
+
 # Loads the bundles like a DAW and checks them against a real engine.
 if(APPLE)
     add_executable(plugin_shell_check ShellCheck.cpp ${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)

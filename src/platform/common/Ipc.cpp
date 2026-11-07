@@ -300,8 +300,9 @@ namespace Ipc
 #if defined(_WIN32)
       return c.handle && WaitForSingleObject((HANDLE)c.handle, 0) == WAIT_TIMEOUT;
 #else
-      // A zombie still answers kill(0); waitpid in ChildWait / ChildKill reaps it.
-      return kill((pid_t)c.pid, 0) == 0;
+      // A zombie still answers kill(0); waitpid in ChildWait / ChildKill reaps it. EPERM also means
+      // the process exists: the App Sandbox (out-of-process AU hosting) denies even the null signal.
+      return kill((pid_t)c.pid, 0) == 0 || errno == EPERM;
 #endif
    }
 
@@ -339,7 +340,14 @@ namespace Ipc
       WaitForSingleObject((HANDLE)c->handle, INFINITE);
       CloseHandle((HANDLE)c->handle);
 #else
-      kill((pid_t)c->pid, SIGKILL);
+      if (kill((pid_t)c->pid, SIGKILL) != 0 && errno == EPERM)
+      {
+         // Sandboxed (out-of-process AU hosting): the signal is denied. Never block on a child we
+         // cannot kill; it exits on its own when it sees its parent gone.
+         ChildWait(c, 2000);
+         *c = Child{};
+         return;
+      }
       int status = 0;
       waitpid((pid_t)c->pid, &status, 0);
 #endif

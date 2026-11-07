@@ -342,7 +342,9 @@ namespace InfinitePlugin
             }
          }
 
-         const bool offline = processSetup.processMode == kOffline;
+         // Either says offline: Steinberg's auwrapper re-runs setupProcessing(kRealtime) on AU
+         // Initialize and carries an earlier OfflineRender only in the per-block processMode.
+         const bool offline = processSetup.processMode == kOffline || data.processMode == kOffline;
          if (offline)
             link_.WaitReadyOffline();
 
