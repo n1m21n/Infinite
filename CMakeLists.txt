@@ -1100,6 +1100,11 @@ elseif(NOT WIN32)
 endif()
 add_executable(ipc-check src/platform/common/IpcCheck.cpp)
 target_link_libraries(ipc-check PRIVATE infinite_ipc)
+# Plugin shell <-> engine protocol (docs/plans/vst-au/README.md step 1.3) and its bench/check tool.
+add_library(infinite_plugin_ipc STATIC src/plugin/ipc/PluginIpc.cpp)
+target_link_libraries(infinite_plugin_ipc PUBLIC infinite_ipc)
+add_executable(ipc_bench src/plugin/ipc/IpcBench.cpp)
+target_link_libraries(ipc_bench PRIVATE infinite_plugin_ipc)
 
 # `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
 add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)

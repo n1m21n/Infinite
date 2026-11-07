@@ -1,6 +1,6 @@
 # Infinite as a VST3 + AU plugin: ship plan
 
-Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW runs), 1.1 licence, 1.2 `Ipc::` layer (mac proven by `ipc-check`; Linux/Windows compile in CI). Next: 1.3. Owner decisions 2026-11-07: **no plugin trial** (the free app is the way to try Infinite; the plugin needs a key), **every DAW on every OS** is the target, and existing nodes and settings change wherever the plugin needs it. Waiting on owner: DAWs to test in, spending (12.4). Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
+Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW runs), 1.1 licence, 1.2 `Ipc::` layer (mac proven by `ipc-check`; Linux/Windows compile in CI), 1.3 shm protocol `PluginIpc` (mac proven by `ipc_bench --check`: offline exact + bit-identical, MIDI/params/transport, 5 MB messages, stall resync with no stale audio, hang detect, kill, quit). Next: 1.4. Owner decisions 2026-11-07: **no plugin trial** (the free app is the way to try Infinite; the plugin needs a key), **every DAW on every OS** is the target, and existing nodes and settings change wherever the plugin needs it. Waiting on owner: DAWs to test in, spending (12.4). Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
 Read first: `docs/DECISIONS.md`, `infinite-lifecycle`. Skills that own the detail: `build-discipline`, `ci-preflight`, `windows-parity`, `linux-parity`, `tool-first`, `ship-infinite`, `plugin-host-hardening`, `audio-pipeline-sweep`, `av-sync-sweep`, `release-notes-audit`.
 Every decision below is settled. Items that need the owner's approval under the "new features need approval" rule are listed once, in 12.4, each with the recommended answer.
 
@@ -149,7 +149,7 @@ Recorded 2026-11-07 (M2 8 GB, app 1.1.0) in `tests/plugin/baseline.json` by `too
 | B-2 | 195 MB | peak RSS of headless 10 s render; true idle RSS waits for plugin mode (1.4). 4 instances fit in 8 GB, S1-c not hit |
 | B-3 | 0.34 s | headless start to 0.1 s rendered |
 | B-4 | 0.056 core | offline, stand-in patch `first-music-image.inf`; R1 value waits for 1.4 |
-| B-5 | p50 37 µs, p99 108 µs at 128 | 4.1 % of a 128 block, S1-b not hit; spike bench, `ipc_bench` replaces it in 1.3 |
+| B-5 | `ipc_bench` (1.3): p50 28 µs, p99 61 µs at 128 (2.3 % of the block); 32: 17/47 µs; 2048: 72/155 µs; 0 xruns at every size | S1-b not hit. Host thread pays p50 12 µs per `Process()` at 128 (0.45 % of a core, M-8 budget 3 %) |
 | B-6 | pending | readback bench is built with the pixel path (2.3) |
 | B-7 | identical | stand-in patch; known exception unchanged |
 | B-8 | validator 47/0, auval PASS | on the spike shell (stands in for "again"); pluginval waits for 1.7 |
@@ -343,7 +343,7 @@ Failure modes:
 | Host suspends (`setProcessing(false)`, `setActive(false)`) | Engine stays alive and idle; notes off; on resume re-prepare if rate or block size changed |
 | Host stops calling process (track disarmed, plugin sleep) | Engine idles after 2 s without blocks; visuals keep the last frame or free-run if the view is open |
 | Plugin removed mid-render | `terminate()` sends quit, waits 500 ms on the message thread, then kills the engine. The audio thread never waits for the engine to exit |
-| Host crashes or is force-quit | Engine watches the parent (kqueue `NOTE_EXIT` on macOS, process handle wait on Windows, `PR_SET_PDEATHSIG` on Linux) and exits |
+| Host crashes or is force-quit | Engine watches the parent (kqueue `NOTE_EXIT` on macOS, process handle wait on Windows, `pidfd_open` + poll on Linux with a `getppid` fallback; not `PR_SET_PDEATHSIG`, which fires when the spawning thread exits) and exits |
 | Engine crashes | Shell sees the dead pid / heartbeat stop, outputs silence, view shows "Engine stopped, Restart". Restart respawns with the last state. The host never crashes (M-12) |
 | Engine hangs | Heartbeat counter in shm stops for 3 s: same as a crash, the shell kills and offers Restart |
 | Two instances sharing one GPU | Separate processes, separate GL contexts; the GPU schedules them. Each engine caps its texture caches the same way the app does. Hidden plugin views render nothing |
