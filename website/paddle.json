@@ -1,7 +1,7 @@
 {
-  "environment": "sandbox",
-  "token": "test_0fc2a0a53c5253c3ed155e5f489",
-  "priceId": "pri_01m6tt9trawjphnqa83z5hz30f",
+  "environment": "live",
+  "token": "live_c4ef74c24d882b8308fe57a96ae",
+  "priceId": "pri_01m6tx5hh9r03f9cn6qpqpsy8z",
   "launchCode": "LAUNCH79",
   "regular": 99,
   "launch": 79,
