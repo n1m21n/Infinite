@@ -1,0 +1,23 @@
+name = "infinite-license"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+# More specific than the signup Worker's infinitedevices.org/api/*, so these win:
+routes = [
+  { pattern = "infinitedevices.org/api/paddle/*", zone_name = "infinitedevices.org" },
+  { pattern = "infinitedevices.org/api/license/*", zone_name = "infinitedevices.org" },
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "infinite_licenses"
+database_id = "d85e6ccb-9244-4d44-818f-af5898e3b787"
+
+[vars]
+PADDLE_API = "https://sandbox-api.paddle.com"      # live: https://api.paddle.com
+PRICE_IDS = "pri_01m6tt9trawjphnqa83z5hz30f"        # sandbox $99 price; live price id goes here at go-live
+FROM = "Infinite <hello@infinitedevices.org>"
+SEATS = "2"
+MAJOR = "1"
+RELEASED = "0"                                      # "1" once the download exists
+DOWNLOAD_URL = "https://infinitedevices.org/download"
