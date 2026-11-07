@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Suprematist Forms Floating Black Quadrilateral",
+    "author": "Infinite",
+    "description": "Zero-degree Suprematist spatial study featuring monumental floating carbon rectangles, tensioned diagonal intersecting bars, and vermilion accents on raw canvas.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float quadScale = 1.05 [0.5, 2.0]\nparam float rotationSpeed = 0.40 [0.1, 1.5]\nparam float diagonalAngle = 0.52 [0.1, 1.2]\nparam float contrast = 1.12 [0.6, 2.0]\nparam float accentSize = 0.22 [0.08, 0.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * rotationSpeed\n\nca = cos(time * 0.25)\nsa = sin(time * 0.25)\npRot = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca)\n\nr1P = pRot - vec2(-0.18, -0.05)\ndQuad1 = max(abs(r1P.x) - 0.55 * quadScale, abs(r1P.y) - 0.32 * quadScale)\nquad1Mask = 1.0 - smoothstep(0.0, 0.012, dQuad1)\n\ndBar = abs(pRot.x * sin(diagonalAngle) + pRot.y * cos(diagonalAngle) - 0.12) - 0.045\nbarMask = 1.0 - smoothstep(0.0, 0.012, dBar)\n\ndP2 = length(pRot - vec2(0.38, 0.32)) - accentSize\ndiskMask = 1.0 - smoothstep(0.0, 0.012, dP2)\n\nr3P = pRot - vec2(0.32, -0.38)\ndQuad3 = max(abs(r3P.x) - 0.22, abs(r3P.y) - 0.22)\nquad3Mask = 1.0 - smoothstep(0.0, 0.012, dQuad3)\n\ncLinen = vec3(0.957, 0.937, 0.902)\ncCarbon = vec3(0.067, 0.067, 0.071)\ncVermilion = vec3(0.851, 0.137, 0.122)\ncCobalt = vec3(0.169, 0.243, 0.549)\n\ncol = cLinen\ncol = mix(col, cCarbon, barMask)\ncol = mix(col, cCarbon, quad1Mask)\ncol = mix(col, cCobalt, quad3Mask)\ncol = mix(col, cVermilion, diskMask)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "quadScale": 1.05,
+      "rotationSpeed": 0.4,
+      "diagonalAngle": 0.52,
+      "contrast": 1.12,
+      "accentSize": 0.22
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

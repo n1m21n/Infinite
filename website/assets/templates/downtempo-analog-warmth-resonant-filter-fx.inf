@@ -1,0 +1,84 @@
+infinite-patch 1
+# Downtempo Analog Warmth Resonant Filter FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3400.0
+  f resonance 0.32
+  f decay 0.28
+  f volume 0.8
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float cutoff = 2600.0 [400.0, 7000.0]\nparam float resonance = 0.52 [0.05, 0.90]\nparam float warmth = 0.45 [0.0, 1.0]\nparam float envDepth = 0.38 [0.0, 1.0]\nparam float mix = 0.65 [0.0, 1.0]\nstate float envFollower = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\nabsIn = abs(in)\nenvFollower = envFollower + 0.05 * (absIn - envFollower)\n\nfEff = clamp((cutoff / sr) * (0.18 + envFollower * envDepth * 0.8), 0.02, 0.44)\nfb = clamp(resonance * 0.65, 0.0, 0.85)\n\nlp1 = lp1 + fEff * (in + lp1 * fb - lp1)\nlp2 = lp2 + fEff * (lp1 - lp2)\n\ndrv = lp2 * (1.0 + warmth * 1.6)\nsat = drv / (1.0 + abs(drv))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.65\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.05 0.15 0.35
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Downtempo Analog Warmth Resonant Filter FX. Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

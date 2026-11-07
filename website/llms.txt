@@ -229,6 +229,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Minimal Techno Transient Chirp Synth](https://infinitedevices.org/library/minimal-techno-transient-chirp-synth.html): Percussive minimal techno modulation synthesizer with snappy envelope pitch chirps, resonant bandpass click, and tight metallic body. (file: https://infinitedevices.org/assets/templates/minimal-techno-transient-chirp-synth.inf)
 - [IDM Algorithmic Comb Resonator FX](https://infinitedevices.org/library/idm-algorithmic-comb-resonator-fx.html): Intricate multi-tap comb resonator with tuned feedback damping, microtonal metallic resonances, and non-linear harmonic saturation. (file: https://infinitedevices.org/assets/templates/idm-algorithmic-comb-resonator-fx.inf)
 - [IDM Pitch Warp Granular Delay FX](https://infinitedevices.org/library/idm-pitch-warp-granular-delay-fx.html): Micro-modulated granular delay with pitch-warping buffer sweeps, asymmetric waveshaping distortion, and diffuse spatial feedback. (file: https://infinitedevices.org/assets/templates/idm-pitch-warp-granular-delay-fx.inf)
+- [French Filter House Pumping Saw Bass Synth](https://infinitedevices.org/library/french-filter-house-pumping-saw-bass-synth.html): Pumping multi-oscillator saw bass with 2-pole resonant diode ladder filter, sidechain ducking curve, and warm harmonic drive. (file: https://infinitedevices.org/assets/templates/french-filter-house-pumping-saw-bass-synth.inf)
+- [French Filter House Disco Stab Lead Synth](https://infinitedevices.org/library/french-filter-house-disco-stab-lead-synth.html): Euphoric filtered disco chord stab synthesizer with multi-saw unison spread, resonant sweep envelope, and analog saturation. (file: https://infinitedevices.org/assets/templates/french-filter-house-disco-stab-lead-synth.inf)
+- [Downtempo Tape Flutter Warm Delay FX](https://infinitedevices.org/library/downtempo-tape-flutter-warm-delay-fx.html): Vintage reel-to-reel tape delay with wow and flutter modulation, high-frequency tape head roll-off, and warm saturating feedback. (file: https://infinitedevices.org/assets/templates/downtempo-tape-flutter-warm-delay-fx.inf)
+- [Downtempo Analog Warmth Resonant Filter FX](https://infinitedevices.org/library/downtempo-analog-warmth-resonant-filter-fx.html): Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture. (file: https://infinitedevices.org/assets/templates/downtempo-analog-warmth-resonant-filter-fx.inf)
 
 ## Library: Community
 
@@ -589,7 +593,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 81 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 83 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -606,4 +610,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 66 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 68 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

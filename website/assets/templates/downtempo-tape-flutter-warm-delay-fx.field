@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Downtempo Tape Flutter Warm Delay FX",
+    "author": "Infinite",
+    "description": "Vintage reel-to-reel tape delay with wow and flutter modulation, high-frequency tape head roll-off, and warm saturating feedback.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float flutterRate = 1.8 [0.2, 5.0]\nparam float flutterDepth = 0.35 [0.0, 1.0]\nparam float damping = 3400.0 [800.0, 8000.0]\nparam float feedback = 0.52 [0.1, 0.85]\nparam float mix = 0.58 [0.0, 1.0]\nstate float ph = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float lp = 0\n\nph = ph + flutterRate / sr\nph = if(ph >= 1.0, ph - 1.0, ph)\nflutter = sin(ph * 6.2831853) * flutterDepth * 0.08\n\nfDamp = clamp(damping / sr * 2.0, 0.02, 0.44)\nlp = lp + fDamp * (in - lp)\n\nfb = clamp(feedback, 0.1, 0.85)\n\nd1 = d1 + (0.18 + flutter) * (lp + d2 * fb - d1)\nd2 = d2 + (0.13 - flutter) * (d1 * 0.85 - d2)\n\nwet = (d1 * 0.65 + d2 * 0.5) * 1.15\nsat = clamp(wet * 1.3, -0.85, 0.85)\n\nout = in * (1.0 - mix) + sat * mix\n",
+    "params": {
+      "flutterRate": 1.8,
+      "flutterDepth": 0.35,
+      "damping": 3400.0,
+      "feedback": 0.52,
+      "mix": 0.58
+    }
+  }
+}

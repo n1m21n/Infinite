@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "French Filter House Pumping Saw Bass Synth",
+    "author": "Infinite",
+    "description": "Pumping multi-oscillator saw bass with 2-pole resonant diode ladder filter, sidechain ducking curve, and warm harmonic drive.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float cutoff = 0.55 [0.1, 1.0]\nparam float resonance = 0.45 [0.0, 0.85]\nparam float subGain = 0.40 [0.0, 1.0]\nparam float drive = 0.35 [0.0, 1.0]\nparam float decayTime = 0.30 [0.05, 0.8]\nstate float p1 = 0\nstate float pSub = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.03)\nenv = if(target > env, env + (target - env) * 0.55, env - env * decayRate)\n\nfBase = clamp(freq, 35.0, 440.0)\n\ndp1 = fBase / sr\np1 = p1 + dp1\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsaw1 = p1 * 2.0 - 1.0\n\ndpSub = (fBase * 0.5) / sr\npSub = pSub + dpSub\npSub = if(pSub >= 1.0, pSub - 1.0, pSub)\nsubSquare = if(pSub < 0.5, 0.45, -0.45)\n\nraw = saw1 * 0.65 + subSquare * subGain\n\ndrv = raw * (1.0 + drive * 1.8)\nsat = (drv / (1.0 + abs(drv))) * env\n\nfCut = clamp(cutoff * (0.15 + env * 0.35), 0.01, 0.42)\nlp1 = lp1 + fCut * (sat + lp1 * resonance * 0.5 - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.58\n",
+    "params": {
+      "cutoff": 0.55,
+      "resonance": 0.45,
+      "subGain": 0.4,
+      "drive": 0.35,
+      "decayTime": 0.3
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
