@@ -113,6 +113,16 @@ bool RunGenSampleBatch(const std::string& dir)
             if (parity && (std::find(kParityStyles, kParityStyles + 5, i) == kParityStyles + 5 ||
                            std::find(kParityParts, kParityParts + 8, pi) == kParityParts + 8))
                continue;
+            // INFINITE_GENSAMPLEONLY=style,style:part,part narrows the batch (either side may be left out).
+            if (const char* only = getenv("INFINITE_GENSAMPLEONLY"))
+            {
+               const std::string spec = only;
+               const size_t colon = spec.find(':');
+               const std::string sty = spec.substr(0, colon), prt = colon == std::string::npos ? "" : spec.substr(colon + 1);
+               auto has = [](const std::string& list, const std::string& w) { return list.empty() || ("," + list + ",").find("," + w + ",") != std::string::npos; };
+               if (!has(sty, SampleStyles::At(i).id) || !has(prt, SampleStyles::PartName((SampleStyles::Part)pi)))
+                  continue;
+            }
             SampleStyles::Recipe rec;
             rec.style = SampleStyles::At(i).id;
             rec.part = (SampleStyles::Part)pi;
