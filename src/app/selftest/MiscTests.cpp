@@ -240,6 +240,36 @@ bool RunFormulaShadertoyTest()
    }
 
    {
+      // Pasted '#version' and '#extension' lines sit below our declarations; they are moved or dropped so the shader
+      // still compiles, and a later error keeps the pasted line number.
+      FormulaNode n;
+      n.mode = FormulaNode::kShadertoy;
+      n.width = 32;
+      n.height = 32;
+      n.animate = false;
+      n.passCode[FormulaNode::kImage] =
+         "#version 300 es\n"
+         "#extension GL_OES_standard_derivatives : enable\n"
+         "precision highp float;\n"
+         "void mainImage(out vec4 c, in vec2 p) { c = vec4(1.0); }\n";
+      const bool built = n.Apply();
+      printf("FORMULAST pasted directives %s (built %d, '%s')\n", built ? "OK" : "FAIL", built ? 1 : 0,
+             n.LastError().c_str());
+      ok &= built;
+
+      n.passCode[FormulaNode::kImage] =
+         "#version 300 es\n"
+         "#extension GL_OES_standard_derivatives : enable\n"
+         "void mainImage(out vec4 c, in vec2 p)\n"
+         "{\n"
+         "   c = vec4(undefinedThing);\n"
+         "}\n";
+      const bool failed = !n.Apply() && n.LastError().find("Image line 5") != std::string::npos;
+      printf("FORMULAST pasted directives line %s ('%s')\n", failed ? "OK" : "FAIL", n.LastError().c_str());
+      ok &= failed;
+   }
+
+   {
       // The Shadertoy node is this engine fixed in Shadertoy mode, with its four channel pins.
       ShadertoyNode st;
       FormulaNode expr;
