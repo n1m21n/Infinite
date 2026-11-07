@@ -7,6 +7,9 @@
 //         process(block)   -> host audio + MIDI + transport + slot points -> PluginIpc::ShellSide
 //                          <- engine output of the block before (latency = max block)
 //         terminate()      -> quit, wait 500 ms, kill
+//         getState()       -> header + the engine's patch (.inf text), compressed; the last known
+//                             patch when the engine is not running, not ready or not answering (2 s)
+//         setState()       -> stored; sent to the engine now, or as its first message when it starts
 //
 // Parameters (fixed forever: hosts cache them per plugin ID):
 //   0..31       Slot 01..Slot 32 (bound to Macro nodes in 2.2; already sent to the engine as points)
@@ -28,9 +31,14 @@
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 
+#include "miniz.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <map>
+#include <mutex>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -76,10 +84,130 @@ namespace InfinitePlugin
    constexpr ParamID kMidiLast = kMidiChannelPressure;
 
    constexpr uint32 kStateMagic = 0x53464E49; // "INFS"
-   constexpr uint32 kStateVersion = 1;
+   constexpr int kStateVersion = 1;           // header "v": bumped only when the header changes
 
-   // Engine -> shell message types (PluginEngine::MessageType in the engine).
+   // Message types (PluginEngine::MessageType in the engine).
    constexpr uint32_t kMsgReady = 1;
+   constexpr uint32_t kMsgState = 2;
+   constexpr uint32_t kMsgStateLoaded = 3;
+   constexpr uint32_t kMsgGetState = 101;
+   constexpr uint32_t kMsgSetState = 102;
+
+   // ---------------------------------------------------------------------------------------
+   // Plugin state (README 8.3): what a host project stores for one instance.
+   //
+   //   u32 "INFS" | u32 n | header JSON (n bytes) | u32 patch bytes | u32 compressed bytes | zlib
+   //
+   // header: {"format":"infinite-plugin-state","v":1,"appVersion":..,"build":"instrument"|"fx",
+   //          "latencyMode":"block","bypass":..,"slots":[32 values]}
+   // The patch is the .inf text the app saves; empty = the build's starting patch. The licence key
+   // is never in here (8.5).
+   struct State
+   {
+      bool bypass = false;
+      float slots[kSlotCount] = {};
+      std::string patch;
+   };
+
+   void PutU32(std::vector<uint8_t>& b, uint32_t v)
+   {
+      for (int i = 0; i < 4; i++)
+         b.push_back(uint8_t(v >> (8 * i)));
+   }
+
+   bool GetU32(const std::vector<uint8_t>& b, size_t& pos, uint32_t& v)
+   {
+      if (pos + 4 > b.size())
+         return false;
+      v = uint32_t(b[pos]) | uint32_t(b[pos + 1]) << 8 | uint32_t(b[pos + 2]) << 16 | uint32_t(b[pos + 3]) << 24;
+      pos += 4;
+      return true;
+   }
+
+   std::vector<uint8_t> EncodeState(const State& st)
+   {
+      std::string h = "{\"format\":\"infinite-plugin-state\",\"v\":" + std::to_string(kStateVersion) +
+                      ",\"appVersion\":\"" INFINITE_PLUGIN_VERSION "\",\"build\":\"" + std::string(kFx ? "fx" : "instrument") +
+                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"slots\":[";
+      for (int32 i = 0; i < kSlotCount; i++)
+      {
+         char num[32];
+         std::snprintf(num, sizeof num, "%s%.9g", i ? "," : "", double(st.slots[i]));
+         h += num;
+      }
+      h += "]}";
+      std::vector<uint8_t> z(mz_compressBound(mz_ulong(st.patch.size())));
+      mz_ulong zlen = mz_ulong(z.size());
+      if (st.patch.empty())
+         zlen = 0;
+      else if (mz_compress2(z.data(), &zlen, reinterpret_cast<const unsigned char*>(st.patch.data()), mz_ulong(st.patch.size()), 6) != MZ_OK)
+         zlen = 0;
+      std::vector<uint8_t> b;
+      b.reserve(16 + h.size() + zlen);
+      PutU32(b, kStateMagic);
+      PutU32(b, uint32_t(h.size()));
+      b.insert(b.end(), h.begin(), h.end());
+      PutU32(b, zlen ? uint32_t(st.patch.size()) : 0u);
+      PutU32(b, uint32_t(zlen));
+      b.insert(b.end(), z.begin(), z.begin() + zlen);
+      return b;
+   }
+
+   // False for anything that is not our state (other plugin's blob, truncated, corrupt).
+   bool DecodeState(const std::vector<uint8_t>& b, State& st)
+   {
+      size_t pos = 0;
+      uint32_t magic = 0, hlen = 0, raw = 0, zlen = 0;
+      if (!GetU32(b, pos, magic) || magic != kStateMagic || !GetU32(b, pos, hlen) || pos + hlen > b.size())
+         return false;
+      const std::string h(b.begin() + pos, b.begin() + pos + hlen);
+      pos += hlen;
+      if (h.find("\"format\":\"infinite-plugin-state\"") == std::string::npos)
+         return false;
+      State out;
+      const size_t by = h.find("\"bypass\":");
+      out.bypass = by != std::string::npos && h.compare(by + 9, 4, "true") == 0;
+      const size_t sl = h.find("\"slots\":[");
+      if (sl != std::string::npos)
+      {
+         const char* c = h.c_str() + sl + 9;
+         for (int32 i = 0; i < kSlotCount && *c && *c != ']'; i++)
+         {
+            char* end = nullptr;
+            const double v = std::strtod(c, &end);
+            if (end == c)
+               break;
+            out.slots[i] = float(std::max(0.0, std::min(1.0, v)));
+            c = end;
+            while (*c == ',' || *c == ' ')
+               c++;
+         }
+      }
+      if (!GetU32(b, pos, raw) || !GetU32(b, pos, zlen) || pos + zlen > b.size())
+         return false;
+      if (raw > 0)
+      {
+         out.patch.resize(raw);
+         mz_ulong got = raw;
+         if (mz_uncompress(reinterpret_cast<unsigned char*>(&out.patch[0]), &got, b.data() + pos, mz_ulong(zlen)) != MZ_OK || got != raw)
+            return false;
+      }
+      st = std::move(out);
+      return true;
+   }
+
+   bool ReadAll(IBStream* s, std::vector<uint8_t>& out)
+   {
+      uint8_t buf[65536];
+      for (;;)
+      {
+         int32 got = 0;
+         if (s->read(buf, sizeof buf, &got) != kResultOk || got <= 0)
+            break;
+         out.insert(out.end(), buf, buf + got);
+      }
+      return !out.empty();
+   }
 
    bool IsFile(const std::string& p)
    {
@@ -128,7 +256,9 @@ namespace InfinitePlugin
       bool Running() const { return shell_.Valid(); }
       bool Matches(double rate, uint32_t block) const { return Running() && rate_ == rate && block_ == block; }
 
-      void Start(double rate, uint32_t block)
+      // `patch` (the stored state, may be empty) becomes the engine's first message, so the engine
+      // starts on the project's patch instead of loading the starting patch first.
+      void Start(double rate, uint32_t block, const std::string& patch)
       {
          Stop();
          if (!shell_.Create(rate, block))
@@ -140,6 +270,8 @@ namespace InfinitePlugin
          std::vector<std::string> args { "--plugin-engine", shell_.Name(), std::to_string((long long)Ipc::SelfPid()) };
          if (kFx)
             args.push_back("--fx");
+         if (!patch.empty())
+            args.push_back("--state");
          // Development and tests (tools/plugin): start the engine on a given patch instead of the
          // build's starting patch. Like $INFINITE_PLUGIN_ENGINE, never set by a host.
          if (const char* patch = getenv("INFINITE_PLUGIN_PATCH"))
@@ -169,11 +301,51 @@ namespace InfinitePlugin
                         std::fprintf(stderr, "Infinite plugin: engine audio did not start: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                      ready_.store(true);
                   }
+                  else if (m.type == kMsgStateLoaded)
+                  {
+                     if (!m.data.empty())
+                        std::fprintf(stderr, "Infinite plugin: patch did not load: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
+                  }
+                  else if (m.type == kMsgState)
+                  {
+                     std::lock_guard<std::mutex> lock(replyMutex_);
+                     replies_[m.id] = std::string(m.data.begin(), m.data.end());
+                     replyCv_.notify_all();
+                  }
                }
                else if (!Ipc::ChildAlive(child_))
                   break;
             }
          });
+         if (!patch.empty())
+            shell_.Messages().Send(kMsgSetState, NextId(), patch.data(), patch.size(), 5000);
+      }
+
+      // Message thread. The engine's current patch; false when it is not running, not ready yet
+      // (then nothing has changed since the stored state), dead, or silent for timeoutMs.
+      bool RequestPatch(std::string& out, int timeoutMs)
+      {
+         if (!Running() || !ready_.load() || !Ipc::ChildAlive(child_))
+            return false;
+         const uint32_t id = NextId();
+         if (!shell_.Messages().Send(kMsgGetState, id, nullptr, 0, timeoutMs))
+            return false;
+         std::unique_lock<std::mutex> lock(replyMutex_);
+         if (!replyCv_.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return replies_.count(id) > 0; }))
+            return false;
+         out = std::move(replies_[id]);
+         replies_.erase(id);
+         return true;
+      }
+
+      // Message thread: replaces the running engine's patch. Offline renders wait for the ready
+      // that follows the load.
+      void SendPatch(const std::string& patch)
+      {
+         if (!Running() || !Ipc::ChildAlive(child_))
+            return;
+         ready_.store(false);
+         shell_.Messages().Send(kMsgSetState, NextId(), patch.data(), patch.size(), 5000);
       }
 
       void Stop()
@@ -189,6 +361,8 @@ namespace InfinitePlugin
          child_ = Ipc::Child {};
          shell_.Close();
          ready_.store(false);
+         std::lock_guard<std::mutex> lock(replyMutex_);
+         replies_.clear();
       }
 
       // Audio thread, offline only: an offline render must not depend on spawn timing, so wait for
@@ -206,7 +380,13 @@ namespace InfinitePlugin
       int64_t Pid() const { return child_.pid; }
 
    private:
+      uint32_t NextId() { return ++lastId_; }
+
       PluginIpc::ShellSide shell_;
+      std::mutex replyMutex_;
+      std::condition_variable replyCv_;
+      std::map<uint32_t, std::string> replies_;
+      uint32_t lastId_ = 0;
       Ipc::Child child_;
       std::thread reader_;
       std::atomic<bool> stopReader_ { false };
@@ -273,7 +453,13 @@ namespace InfinitePlugin
          // The engine is spawned on the first activation and kept across deactivation (host suspend);
          // a new rate or block size needs a fresh region, so it restarts.
          if (state && !link_.Matches(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock)))
-            link_.Start(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock));
+         {
+            // The restart keeps what the user built: take the patch from the old engine first.
+            std::string current;
+            if (link_.RequestPatch(current, 2000))
+               patch_ = std::move(current);
+            link_.Start(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock), patch_);
+         }
          return AudioEffect::setActive(state);
       }
 
@@ -281,32 +467,34 @@ namespace InfinitePlugin
       {
          if (!state)
             return kInvalidArgument;
-         uint32 magic = 0, version = 0;
-         int32 bypass = 0, read = 0;
-         if (state->read(&magic, sizeof magic, &read) != kResultOk || read != sizeof magic || magic != kStateMagic)
+         std::vector<uint8_t> bytes;
+         State st;
+         if (!ReadAll(state, bytes) || !DecodeState(bytes, st))
             return kResultFalse;
-         if (state->read(&version, sizeof version, &read) != kResultOk || read != sizeof version)
-            return kResultFalse;
-         if (state->read(&bypass, sizeof bypass, &read) == kResultOk && read == sizeof bypass)
-            bypass_ = bypass != 0;
-         float slots[kSlotCount] = {};
-         if (state->read(slots, sizeof slots, &read) == kResultOk && read == sizeof slots)
-            std::memcpy(slots_, slots, sizeof slots);
+         bypass_ = st.bypass;
+         std::memcpy(slots_, st.slots, sizeof slots_);
+         patch_ = std::move(st.patch);
+         // Not running yet: Start sends it. Running: the engine swaps to it now.
+         if (!patch_.empty())
+            link_.SendPatch(patch_);
          return kResultOk;
       }
 
       tresult PLUGIN_API getState(IBStream* state) override
       {
-         // 1.5 keeps bypass and the slot values; the patch itself joins in 2.1.
          if (!state)
             return kInvalidArgument;
-         const uint32 magic = kStateMagic, version = kStateVersion;
-         const int32 bypass = bypass_ ? 1 : 0;
+         std::string current;
+         if (link_.RequestPatch(current, 2000))
+            patch_ = std::move(current); // else the last known patch: a save never loses one
+         State st;
+         st.bypass = bypass_;
+         std::memcpy(st.slots, slots_, sizeof slots_);
+         st.patch = patch_;
+         const std::vector<uint8_t> bytes = EncodeState(st);
          int32 wrote = 0;
-         state->write(const_cast<uint32*>(&magic), sizeof magic, &wrote);
-         state->write(const_cast<uint32*>(&version), sizeof version, &wrote);
-         state->write(const_cast<int32*>(&bypass), sizeof bypass, &wrote);
-         state->write(slots_, sizeof slots_, &wrote);
+         if (state->write(const_cast<uint8_t*>(bytes.data()), int32(bytes.size()), &wrote) != kResultOk || wrote != int32(bytes.size()))
+            return kResultFalse;
          return kResultOk;
       }
 
@@ -539,6 +727,7 @@ namespace InfinitePlugin
       }
 
       EngineLink link_;
+      std::string patch_; // last known patch (.inf text); message thread only
       bool bypass_ = false;
       float slots_[kSlotCount] = {};
       PluginIpc::Event events_[PluginIpc::kMaxEvents] {};
@@ -584,17 +773,13 @@ namespace InfinitePlugin
       {
          if (!state)
             return kInvalidArgument;
-         uint32 magic = 0, version = 0;
-         int32 bypass = 0, read = 0;
-         if (state->read(&magic, sizeof magic, &read) != kResultOk || read != sizeof magic || magic != kStateMagic)
+         std::vector<uint8_t> bytes;
+         State st;
+         if (!ReadAll(state, bytes) || !DecodeState(bytes, st))
             return kResultFalse;
-         state->read(&version, sizeof version, &read);
-         if (state->read(&bypass, sizeof bypass, &read) == kResultOk && read == sizeof bypass)
-            setParamNormalized(kBypassId, bypass ? 1.0 : 0.0);
-         float slots[kSlotCount] = {};
-         if (state->read(slots, sizeof slots, &read) == kResultOk && read == sizeof slots)
-            for (int32 i = 0; i < kSlotCount; i++)
-               setParamNormalized(kSlotFirst + ParamID(i), slots[i]);
+         setParamNormalized(kBypassId, st.bypass ? 1.0 : 0.0);
+         for (int32 i = 0; i < kSlotCount; i++)
+            setParamNormalized(kSlotFirst + ParamID(i), st.slots[i]);
          return kResultOk;
       }
 

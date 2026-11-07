@@ -194,6 +194,8 @@ namespace PluginEngine
          {
             if (std::strcmp(argv[j], "--fx") == 0)
                o.fx = true;
+            else if (std::strcmp(argv[j], "--state") == 0)
+               o.initialState = true;
             else if (argv[j][0] != '-' && o.patchPath.empty())
                o.patchPath = argv[j];
          }
@@ -255,6 +257,56 @@ namespace PluginEngine
       bool gStarted = false;
       std::string gStartError;
       int gFramesSinceStart = 0;
+      SaveStateFn gSaveState = nullptr;
+      LoadStateFn gLoadState = nullptr;
+
+      void HandleMessage(const PluginIpc::Message& m)
+      {
+         if (m.type == kMsgGetState)
+         {
+            const std::string text = gSaveState ? gSaveState() : std::string();
+            gSide.Messages().Send(kMsgState, m.id, text.data(), text.size(), 2000);
+         }
+         else if (m.type == kMsgSetState)
+         {
+            std::string error;
+            const std::string text(m.data.begin(), m.data.end());
+            if (!gLoadState)
+               error = "no state handler";
+            else
+               gLoadState(text, error);
+            gSide.Messages().Send(kMsgStateLoaded, m.id, error.data(), error.size(), 2000);
+            // Ready again once the new graph has settled, so an offline render waits for it.
+            SetStarted(gStartError);
+         }
+      }
+   }
+
+   void SetStateHandlers(SaveStateFn save, LoadStateFn load)
+   {
+      gSaveState = save;
+      gLoadState = load;
+   }
+
+   bool TakeInitialState(std::string& text, int timeoutMs)
+   {
+      if (!gActive.load())
+         return false;
+      const uint64_t t0 = Ipc::MonotonicNs();
+      PluginIpc::Message m;
+      while (Ipc::MonotonicNs() - t0 < uint64_t(timeoutMs) * 1000000ull && !gSide.QuitRequested())
+      {
+         if (!gSide.Messages().Receive(&m, 50))
+            continue;
+         if (m.type == kMsgSetState)
+         {
+            text.assign(m.data.begin(), m.data.end());
+            gSide.Messages().Send(kMsgStateLoaded, m.id, nullptr, 0, 2000);
+            return true;
+         }
+         HandleMessage(m); // a get before the patch exists answers with the empty patch
+      }
+      return false;
    }
 
    void SetStarted(const std::string& error)
@@ -266,7 +318,12 @@ namespace PluginEngine
 
    void MainFrameTick()
    {
-      if (!gActive.load() || !gStarted || gFramesSinceStart > 3)
+      if (!gActive.load())
+         return;
+      PluginIpc::Message m;
+      while (gSide.Messages().Receive(&m, 0))
+         HandleMessage(m);
+      if (!gStarted || gFramesSinceStart > 3)
          return;
       if (++gFramesSinceStart == 3)
          gSide.Messages().Send(kMsgReady, 0, gStartError.data(), gStartError.size(), 1000);

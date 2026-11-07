@@ -13,7 +13,11 @@
 // latency = max block and an infinite tail, FX offline pass-through with random block sizes
 // (exact, delayed by L), two offline FX instances bit-identical, Instrument note-on -> sound and
 // bypass -> silence, FX realtime paced, a killed engine leaves the host alive and the plugin
-// silent, and no engine is left after terminate. PASS/FAIL per check; exit 0 only when all pass.
+// silent, and no engine is left after terminate. State (2.1, on R2): getState before any engine,
+// a restored instance sounds bit-identical and saves the same blob, setState while running swaps
+// the patch, a block-size restart keeps it, a dead engine still saves the last known patch,
+// garbage is refused. PASS/FAIL per check; exit 0 only when all pass.
+#include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/eventlist.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
@@ -103,9 +107,12 @@ namespace
          proc = FUnknownPtr<IAudioProcessor>(comp.get());
          if (!proc)
             return false;
-         if (!activate)
-            return true;
-         ProcessSetup setup { processMode, kSample32, block, kRate };
+         return !activate || Activate();
+      }
+
+      bool Activate()
+      {
+         ProcessSetup setup { mode, kSample32, block, kRate };
          if (proc->setupProcessing(setup) != kResultOk)
             return false;
          comp->activateBus(kAudio, kOutput, 0, true);
@@ -374,6 +381,149 @@ namespace
       return r;
    }
 
+
+   // ---- state (step 2.1) -------------------------------------------------------------------
+
+   std::vector<uint8_t> GetBlob(Instance& in)
+   {
+      MemoryStream ms;
+      std::vector<uint8_t> b;
+      if (in.comp->getState(&ms) == kResultOk)
+         b.assign(ms.getData(), ms.getData() + ms.getSize());
+      return b;
+   }
+
+   tresult SetBlob(Instance& in, const std::vector<uint8_t>& b)
+   {
+      MemoryStream ms(const_cast<uint8_t*>(b.data()), TSize(b.size()));
+      ms.seek(0, IBStream::kIBSeekSet, nullptr);
+      return in.comp->setState(&ms);
+   }
+
+   struct BlobInfo
+   {
+      bool ok = false;
+      std::string header;
+      uint32_t patchBytes = 0, zBytes = 0;
+   };
+
+   BlobInfo Inspect(const std::vector<uint8_t>& b)
+   {
+      BlobInfo i;
+      auto u32 = [&](size_t p) { return uint32_t(b[p]) | uint32_t(b[p + 1]) << 8 | uint32_t(b[p + 2]) << 16 | uint32_t(b[p + 3]) << 24; };
+      if (b.size() < 16 || u32(0) != 0x53464E49)
+         return i;
+      const uint32_t hl = u32(4);
+      if (8 + size_t(hl) + 8 > b.size())
+         return i;
+      i.header.assign(b.begin() + 8, b.begin() + 8 + hl);
+      i.patchBytes = u32(8 + hl);
+      i.zBytes = u32(12 + hl);
+      i.ok = 16 + size_t(hl) + i.zBytes == b.size();
+      return i;
+   }
+
+   double MaxErrVsDelayedSignal(const std::vector<float>& out, int64_t from, int32 L)
+   {
+      double e = 0.0;
+      for (int64_t t = std::max<int64_t>(from, L); t < int64_t(out.size()); t++)
+         e = std::max(e, double(std::fabs(out[size_t(t)] - Signal(t - L))));
+      return e;
+   }
+
+   void RunStateChecks(Plugin& fx, const std::string& r2)
+   {
+      char d[200];
+      Script sig;
+      sig.input = Signal;
+      const int64_t len = int64_t(kRate);
+
+      // Before any engine: a valid blob, header complete, no patch (= the starting patch).
+      {
+         Instance a;
+         a.Open(fx, true, kOffline, false);
+         const BlobInfo i = Inspect(GetBlob(a));
+         a.Close(false);
+         Check(i.ok && i.patchBytes == 0 && i.header.find("\"format\":\"infinite-plugin-state\"") != std::string::npos &&
+                  i.header.find("\"build\":\"fx\"") != std::string::npos && i.header.find("\"slots\":[") != std::string::npos,
+               "state: getState before any engine is a valid blob with no patch", i.header.substr(0, 80));
+      }
+
+      // A: the R2 patch, from the engine.
+      setenv("INFINITE_PLUGIN_PATCH", r2.c_str(), 1);
+      Instance a;
+      const bool aOk = a.Open(fx, true, kOffline);
+      unsetenv("INFINITE_PLUGIN_PATCH");
+      const auto ra = aOk ? Render(a, len, false, sig) : std::vector<float>();
+      const std::vector<uint8_t> blobA = aOk ? GetBlob(a) : std::vector<uint8_t>();
+      if (aOk)
+         a.Close();
+      const BlobInfo ia = Inspect(blobA);
+      std::snprintf(d, sizeof d, "patch %u bytes, stored %u bytes", ia.patchBytes, ia.zBytes);
+      Check(ia.ok && ia.patchBytes > 100 && ia.zBytes < ia.patchBytes, "state: getState carries the engine's patch, compressed", d);
+
+      // B: fresh instance, setState before activation (a host loading a project).
+      {
+         Instance b;
+         b.Open(fx, true, kOffline, false);
+         const tresult set = SetBlob(b, blobA);
+         const auto before = GetBlob(b);
+         Check(set == kResultOk && before == blobA, "state: before the engine runs, getState returns exactly what setState got");
+         const bool act = b.Activate();
+         const auto rb = act ? Render(b, len, false, sig) : std::vector<float>();
+         const auto blobB = act ? GetBlob(b) : std::vector<uint8_t>();
+         b.Close();
+         std::snprintf(d, sizeof d, "null %.1f dBFS", Db(NullRms(ra, rb)));
+         Check(!rb.empty() && rb == ra, "state: restored instance renders bit-identical to the original", d);
+         std::snprintf(d, sizeof d, "%zu vs %zu bytes", blobB.size(), blobA.size());
+         Check(blobB == blobA, "state: restored engine saves the same patch (round trip equal)", d);
+      }
+
+      // C: running on the starting patch, then setState swaps to R2; block change; engine killed.
+      {
+         Instance c;
+         c.Open(fx, true, kOffline);
+         const auto pass = Render(c, len / 2, false, sig);
+         const double passErr = MaxErrVsDelayedSignal(pass, 0, kBlock);
+         SetBlob(c, blobA);
+         const auto swapped = Render(c, len, false, sig);
+         const double swapErr = MaxErrVsDelayedSignal(swapped, kBlock, kBlock);
+         std::snprintf(d, sizeof d, "starting patch error %.2g, after setState %.2g", passErr, swapErr);
+         Check(passErr == 0.0 && swapErr > 1e-2, "state: setState while running swaps the engine's patch", d);
+
+         c.proc->setProcessing(false);
+         c.comp->setActive(false);
+         c.block = 256;
+         const auto pidsBefore = EnginePids();
+         const bool re = c.Activate();
+         const auto blobC = GetBlob(c);
+         const auto pidsAfter = EnginePids();
+         Check(re && pidsAfter != pidsBefore && blobC == blobA, "state: a block-size restart keeps the patch");
+
+         if (!pidsAfter.empty())
+            kill(pidsAfter.back(), SIGKILL);
+         std::this_thread::sleep_for(std::chrono::milliseconds(200));
+         const auto t0 = std::chrono::steady_clock::now();
+         const auto blobDead = GetBlob(c);
+         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+         std::snprintf(d, sizeof d, "getState took %.0f ms", ms);
+         Check(blobDead == blobA && ms < 2500.0, "state: engine gone, getState returns the last known patch", d);
+         c.Close();
+      }
+
+      {
+         Instance g;
+         g.Open(fx, true, kOffline, false);
+         const std::vector<uint8_t> junk { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
+         const tresult r = SetBlob(g, junk);
+         auto bad = blobA;
+         bad.resize(bad.size() - 7);
+         const tresult r2b = SetBlob(g, bad);
+         g.Close(false);
+         Check(r == kResultFalse && r2b == kResultFalse, "state: garbage and truncated blobs are refused");
+      }
+   }
+
    int RunMetrics(Plugin& inst, Plugin& fx, const std::string& r1, const std::string& r2)
    {
       Script notes;
@@ -562,6 +712,8 @@ int main(int argc, char** argv)
       std::snprintf(d, sizeof d, "peak after kill %.3g", tail);
       Check(!pids.empty() && tail == 0.0, "crash drill: engine killed, host alive, plugin silent", d);
    }
+
+   RunStateChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R2-fx.inf");
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");

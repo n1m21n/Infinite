@@ -4540,11 +4540,43 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    }
    else if (pluginEngine)
    {
-      // The plugin's engine: load the shell's patch, or the build's starting patch (FX: audio passes
-      // through; Instrument: MIDI Notes -> Analog), then run audio from the host.
-      if (!pluginOpt.patchPath.empty())
+      // The plugin's engine: load the shell's patch (the host project's state, sent as the first
+      // message), else a patch path, else the build's starting patch (FX: audio passes through;
+      // Instrument: MIDI Notes -> Analog), then run audio from the host.
+      PluginEngine::SetStateHandlers(
+         []() -> std::string
+         {
+            std::string text;
+            Patch::WriteText(BuildPatchData(), text);
+            return text;
+         },
+         [](const std::string& text, std::string& error) -> bool
+         {
+            Patch::Data data;
+            if (!Patch::ReadText(text, data, error))
+               return false;
+            if (!LoadPatchDataImpl(data, std::string(), true))
+            {
+               error = gPatchStatus;
+               return false;
+            }
+            return true;
+         });
+      bool fromState = false;
+      if (pluginOpt.initialState)
+      {
+         std::string text, error;
+         if (PluginEngine::TakeInitialState(text, 5000))
+         {
+            Patch::Data data;
+            fromState = Patch::ReadText(text, data, error) && LoadPatchDataImpl(data, std::string(), true);
+            if (!fromState)
+               fprintf(stderr, "plugin engine: stored state did not load: %s\n", error.empty() ? gPatchStatus.c_str() : error.c_str());
+         }
+      }
+      if (!fromState && !pluginOpt.patchPath.empty())
          LoadPatchFrom(pluginOpt.patchPath);
-      else
+      else if (!fromState)
       {
          const std::string start = BundledResourcePath(pluginOpt.fx ? "plugin/fx.inf" : "plugin/instrument.inf");
          std::error_code ec;

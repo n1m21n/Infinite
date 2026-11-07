@@ -52,8 +52,9 @@ smtg_enable_vst3_sdk()
 find_package(Threads REQUIRED)
 add_library(infinite_shell_ipc STATIC
     ${INFINITE_ROOT}/src/platform/common/Ipc.cpp
-    ${INFINITE_ROOT}/src/plugin/ipc/PluginIpc.cpp)
-target_include_directories(infinite_shell_ipc PUBLIC ${INFINITE_ROOT}/src)
+    ${INFINITE_ROOT}/src/plugin/ipc/PluginIpc.cpp
+    ${INFINITE_ROOT}/external/miniz.c)
+target_include_directories(infinite_shell_ipc PUBLIC ${INFINITE_ROOT}/src ${INFINITE_ROOT}/external)
 target_link_libraries(infinite_shell_ipc PUBLIC Threads::Threads)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(infinite_shell_ipc PUBLIC rt)
@@ -151,4 +152,6 @@ if(APPLE)
     add_executable(plugin_shell_check ShellCheck.cpp ${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)
     set_source_files_properties(${VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
     target_link_libraries(plugin_shell_check PRIVATE sdk_hosting "-framework Cocoa")
+    target_sources(plugin_shell_check PRIVATE ${VST3_SDK_DIR}/public.sdk/source/common/memorystream.cpp)
+    target_compile_definitions(plugin_shell_check PRIVATE INFINITE_SOURCE_ROOT="${INFINITE_ROOT}")
 endif()

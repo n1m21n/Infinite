@@ -20,9 +20,10 @@ namespace PluginEngine
       int64_t parentPid = 0;
       bool fx = false;          // FX build: bypass passes the main input through
       std::string patchPath;    // optional patch to load at start
+      bool initialState = false; // --state: the shell sends the patch as the first message
    };
 
-   // Parses `--plugin-engine <shm> <ppid> [--fx] [patch]` out of argv. False when absent.
+   // Parses `--plugin-engine <shm> <ppid> [--fx] [--state] [patch]` out of argv. False when absent.
    bool ParseArgs(int argc, char** argv, Options* out);
 
    // Opens the region, arms the parent watch and registers the host audio device with the
@@ -41,17 +42,31 @@ namespace PluginEngine
    // (0 = nothing: not inside a host render, or the bus is absent).
    int ReadHostInput(int bus, float* const* out, int frames, int channelOffset, bool mono);
 
-   // Engine -> shell message types (PluginIpc::Channel `type`).
+   // PluginIpc::Channel message types. Engine -> shell below 100, shell -> engine from 100.
    enum MessageType : uint32_t
    {
-      kMsgReady = 1, // patch loaded and audio running; payload: empty, or the start error text
+      kMsgReady = 1,       // patch loaded and audio running; payload: empty, or the start error text
+      kMsgState = 2,       // reply to kMsgGetState (same id); payload: the patch as .inf text
+      kMsgStateLoaded = 3, // reply to kMsgSetState (same id); payload: empty, or the load error
+      kMsgGetState = 101,  // payload: none
+      kMsgSetState = 102,  // payload: the patch as .inf text; kMsgReady follows once it settles
    };
+
+   // The app's patch <-> text (BuildPatchData + Patch::WriteText, Patch::ReadText + load), set by
+   // Startup so this file stays free of app globals. Main thread only.
+   using SaveStateFn = std::string (*)();
+   using LoadStateFn = bool (*)(const std::string& text, std::string& error);
+   void SetStateHandlers(SaveStateFn save, LoadStateFn load);
+
+   // Startup, with Options::initialState: waits up to timeoutMs for the shell's first kMsgSetState
+   // and returns its patch text (the shell's stored state, so the engine starts on it).
+   bool TakeInitialState(std::string& text, int timeoutMs);
 
    // Main thread, once the patch is loaded and audio started: remembers the start error (empty =
    // fine). The shell is told on the third main-loop frame (MainFrameTick), when the first frames
    // have settled the topology, so an offline render that starts right away hears the full patch.
    void SetStarted(const std::string& error);
-   // Main thread, once per main-loop frame.
+   // Main thread, once per main-loop frame: answers state requests, sends kMsgReady.
    void MainFrameTick();
 
    // Blocks handled and transport jumps seen (tests). With INFINITE_PLUGIN_STATS=<path> set, the
