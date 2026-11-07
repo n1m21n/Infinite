@@ -1157,6 +1157,14 @@ GeometryNode::~GeometryNode()
 
 void GeometryNode::RebuildIfNeeded()
 {
+   // A patch file, OSC or RPC stores any int; the sliders bind only the UI.
+   // Plane at detail 1e9 sized a 1e18-vertex grid and hung the main thread
+   // (B-L-001). The ceilings sit well past every knob and saved patch.
+   detail = std::clamp(detail, 1, 512);
+   sides = std::clamp(sides, 3, 512);
+   bevelSegments = std::clamp(bevelSegments, 1, 16);
+   knotP = std::clamp(knotP, 1, 64);
+   knotQ = std::clamp(knotQ, 1, 64);
    if (shape == mBuiltShape && detail == mBuiltDetail && sides == mBuiltSides &&
        knotP == mBuiltP && knotQ == mBuiltQ && tubeRadius == mBuiltTube &&
        bevel == mBuiltBevel && bevelSegments == mBuiltBevelSegments &&
