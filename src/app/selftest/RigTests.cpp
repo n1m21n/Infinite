@@ -33,6 +33,11 @@ bool RunRigTest()
    // The app's working directory is not the checkout, so the default is
    // found from this source file's own path.
    std::string path = env != nullptr ? env : "";
+#ifdef INFINITE_SOURCE_DIR
+   // __FILE__ is relative to the build dir under some generators ("../src/..."), so CMake passes the root.
+   if (path.empty())
+      path = std::string(INFINITE_SOURCE_DIR) + "/tests/render3d/skinned_two_bone.glb";
+#endif
    if (path.empty())
    {
       const std::string self = __FILE__;

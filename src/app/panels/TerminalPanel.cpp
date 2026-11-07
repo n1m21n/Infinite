@@ -868,7 +868,15 @@ namespace
          return;
       }
       if (snap == nullptr)
+      {
+         if (ImGui::GetTime() - sStart > 10.0)
+         {
+            std::printf("[TerminalTest] FAIL no shell output in 10 s\n");
+            std::fflush(stdout);
+            std::_Exit(1);
+         }
          return;
+      }
       if (!sSent)
       {
          tab.session->SendBytes("printf 'infinite-%s\\n' terminal-ok\n");

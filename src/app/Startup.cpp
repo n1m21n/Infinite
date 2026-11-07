@@ -353,8 +353,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          Platform::AppendLogLine("plugin crash: the last run ended inside " + crashed + "; it will not load in process again");
    }
 
-   if (getenv("INFINITE_TERMINALTEST") != nullptr)
-      gTerminalOpen = true;
    if (getenv("INFINITE_CRASHTEST") != nullptr)
    {
       SysInfo::CrashTest();
@@ -1534,6 +1532,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // block, so gUiScale is available in time for font baking.
    LoadGeneralSettings();
    LoadWorkspaceSettings();
+   // After the workspace load, or a saved closed terminal shuts the test's panel and it never runs.
+   // Shell face: the panel opens on Chat when the CLI setup picked it, and the test needs the shell.
+   if (getenv("INFINITE_TERMINALTEST") != nullptr)
+      gTerminalOpen = true, gTerminalFace = 1;
    LoadAudioSettings();
    // Startup never routes through NewPatch()'s fresh-document branch (the
    // graph just starts empty), so seed the default expression globals here
