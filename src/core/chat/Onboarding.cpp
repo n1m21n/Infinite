@@ -91,22 +91,31 @@ namespace chat
          return "~/" + std::string(rel);
       }
 
-      // Where the agent's installer puts it.
-      std::string InstallDir(const CliSetup::Agent& a, bool windows)
+      // Where the agent's installer puts it, read from the vendors' own scripts (Gemini's names its folder; Claude's
+      // leaves it to `claude install`, which uses ~/.local/bin). `usually` is set where the script does not say.
+      std::string InstallDir(const CliSetup::Agent& a, bool windows, bool* usually)
       {
          const std::string id = a.id;
+         *usually = false;
          if (id == "codex")
             return windows ? "%LOCALAPPDATA%\\Infinite\\node" : "~/.infinite/node";
-         return HomePath(".local/bin", windows);   // Claude's and Gemini's installers both use it
+         if (id == "antigravity" && windows)
+            return "%LOCALAPPDATA%\\agy\\bin";
+         *usually = id == "claude";
+         return HomePath(".local/bin", windows);
       }
    }
 
    std::string InstallNote(const CliSetup::Agent& a, bool windows)
    {
       const std::string name = a.name;
-      std::string t = "This downloads " + name + " from its maker and puts it in " + InstallDir(a, windows) + ". ";
+      bool usually = false;
+      const std::string dir = InstallDir(a, windows, &usually);
+      std::string t = "This downloads " + name + " from its maker and puts it in " + (usually ? "your user folder (usually " + dir + ")" : dir) + ". ";
       if (std::string(a.id) == "codex")
          t += "If this computer has no Node.js, it also adds a private copy there. ";
+      else
+         t += "Its installer may add that folder to your PATH. ";
       t += "It then connects " + name + " to Infinite (" + HomePath(a.configFile, windows) + " and " + HomePath(a.skillsDir, windows) + "). "
            "It needs no admin password, and nothing is signed in yet.";
       return t;
@@ -135,6 +144,15 @@ namespace chat
                 "Infinite never sees your login.";
       return "Sign in opens your browser. " + name + " uses your Google account, and how much you can use depends on your plan. "
              "Infinite never sees your login.";
+   }
+
+   std::string PlanTag(const std::string& id)
+   {
+      if (id == "claude")
+         return "Paid plan or API key";
+      if (id == "codex")
+         return "ChatGPT plan or API key";
+      return "Google account";
    }
 
    Friendly SetupProblem(const std::string& reason, const std::string& stepId, const std::string& agentName)

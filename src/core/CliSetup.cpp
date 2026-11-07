@@ -763,6 +763,9 @@ if ($Failed -gt 0) { exit 1 }
       {
          if (const char* appdata = getenv("APPDATA"))
             dirs.push_back(std::string(appdata) + "\\npm");
+         // Gemini's installer (install.ps1) puts agy.exe here and leaves PATH to its own `install` step.
+         if (const char* local = getenv("LOCALAPPDATA"))
+            dirs.push_back(std::string(local) + "\\agy\\bin");
       }
       else if (!home.empty())
          dirs.push_back(home + "/.npm-global/bin");

@@ -3713,10 +3713,10 @@ namespace app
             DrawAvatar(dl, ImVec2(c.x + 11.0f, p.y + rowH * 0.5f), 11.0f, a.id);
             const float ty = p.y + (rowH - ImGui::GetFontSize()) * 0.5f;
             dl->AddText(ImVec2(c.x + 30.0f, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
-            if (!usable)
             {
-               const char* why = T("Needs a browser");
-               dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(why).x, ty), Dim(), why);
+               // What the account needs, or why this row cannot be used here.
+               const std::string tag = usable ? chat::PlanTag(a.id) : std::string(T("Needs a browser"));
+               dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(tag.c_str()).x, ty), Dim(), tag.c_str());
             }
             ImGui::SetCursorScreenPos(ImVec2(c.x, p.y + rowH + 2.0f));
             ImGui::Dummy(ImVec2(1.0f, 0.0f));

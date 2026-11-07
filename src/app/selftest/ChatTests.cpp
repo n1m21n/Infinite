@@ -840,9 +840,13 @@ namespace app
                      check(chat::SetUpNote(ag, win, true) == conn && chat::SetUpNote(ag, win, false) == inst, ("set-up note picks by installed " + tag).c_str());
                      check(chat::SignInNote(ag).find("never sees your login") != std::string::npos, ("sign-in note: " + tag).c_str());
                   }
-               check(chat::InstallNote(*CliSetup::FindAgent("claude"), false).find("~/.local/bin") != std::string::npos, "install note: Claude goes to ~/.local/bin");
+               check(chat::InstallNote(*CliSetup::FindAgent("claude"), false).find("usually ~/.local/bin") != std::string::npos, "install note: Claude usually ~/.local/bin");
+               check(chat::InstallNote(*CliSetup::FindAgent("antigravity"), true).find("%LOCALAPPDATA%\\agy\\bin") != std::string::npos, "install note: Gemini on Windows goes to its own folder");
+               check(chat::InstallNote(*CliSetup::FindAgent("antigravity"), false).find("usually") == std::string::npos, "install note: Gemini's unix path is stated, not hedged");
                check(chat::InstallNote(*CliSetup::FindAgent("codex"), true).find("%LOCALAPPDATA%\\Infinite\\node") != std::string::npos, "install note: ChatGPT goes to Infinite's Node folder on Windows");
                check(chat::InstallNote(*CliSetup::FindAgent("codex"), false).find("Node.js") != std::string::npos, "install note: ChatGPT says it may add Node");
+               for (const CliSetup::Agent& ag : CliSetup::Agents())
+                  check(!chat::PlanTag(ag.id).empty() && chat::PlanTag(ag.id).size() < 28, (std::string("plan tag: short and present ") + ag.id).c_str());
                check(chat::SignInNote(*CliSetup::FindAgent("claude")).find("free plan") != std::string::npos, "sign-in note: Claude's free plan is named");
             }
             check(chat::FirstIdeas().size() == 3, "first ideas: three");

@@ -54,6 +54,8 @@ namespace chat
    std::string ConnectNote(const CliSetup::Agent& agent, bool windows);
    std::string SetUpNote(const CliSetup::Agent& agent, bool windows, bool installed);
    std::string SignInNote(const CliSetup::Agent& agent);
+   // Two or three words on the agent's pick row, so what the account needs is known before anything starts.
+   std::string PlanTag(const std::string& agentId);
 
    // A sign-in is given this long when the person is making a new account first.
    constexpr double kSignUpSeconds = 900.0;
