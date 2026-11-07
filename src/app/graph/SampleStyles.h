@@ -98,6 +98,9 @@ namespace SampleStyles
       // What the take drew, in order: "prog:<i>" and "line:<i>" (note bank rows), "voice:vital:<role>:<row>" and
       // "voice:designed:<voice>". A part whose voice is replaced lists both; the later one plays. For local learning.
       std::vector<std::string> picks;
+      // Kit coherence (SampleCompat.inc): the held-out model's mean pair score of the kit the prior drew and of the kit
+      // compat picked; -1 when no strong pair was live (the prior stands).
+      float compatOld = -1.0f, compatNew = -1.0f;
       std::string error;   // non-empty: unknown style
    };
    Compiled Compile(const Recipe& r);
@@ -109,6 +112,8 @@ namespace SampleStyles
    // style compiles every part of the arrangement (drums, chords, bass) and a take taps one, so the rest would only be
    // noise on a canvas. A ducker keyed from the drums is spliced out (it would drag the kit in through its key).
    std::string UpstreamOf(const std::string& patch, int tap, int& newTap);
+   // Largest gap between the engine's kit-coherence score and compat_model.py's on the reference lanes (self-test).
+   float CompatParityError();
 
    // The melody critic Generate Samples runs on its motifs, on a line of MIDI
    // notes: false when it fails the critic floor (too few notes, too wide,

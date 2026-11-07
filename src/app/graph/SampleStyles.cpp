@@ -97,6 +97,7 @@ namespace
 #include "app/graph/GenerateSamplesNotes.inc"
 #include "app/graph/GenerateSamplesChords.inc"
 #include "app/graph/GenerateSamplesKits.inc"
+#include "app/graph/SampleCompat.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -2590,6 +2591,94 @@ Compiled Compile(const Recipe& recipe)
             }
          }
       }
+      // Kit coherence: kick, snare and hat drawn as a set. The genre prior above proposes candidates per lane (its own
+      // formulas, its own stream), the compat models (SampleCompat.inc) score every pair, the best total wins. The prior's
+      // own draw is candidate 0, so a weak or absent pair leaves the kit exactly as it was. INFINITE_NOCOMPAT turns it off.
+      {
+         auto get = [&](int i, const char* k) { auto it = force.find("lane" + std::to_string(i) + k); return it == force.end() ? 0.0 : std::stod(it->second.second); };
+         const char* role[3] = { "kick", "snare", "hat" };
+         bool live[3];
+         int nLive = 0;
+         for (int i = 0; i < 3; i++)
+            nLive += (live[i] = lanes[i] != nullptr && *lanes[i] && get(i, "_volume") > 0.0);
+         struct Cand { double pitch, decay, transient; CompatSound s; };
+         std::vector<Cand> cand[3];
+         const GenKit* genKit = nullptr;
+         if (!std::getenv("INFINITE_NOGENREKIT"))
+            for (const GenKit& gk : kGenKits)
+               if (std::strcmp(gk.id, st.id) == 0)
+                  genKit = &gk;
+         Rng cp(std::string("compat:") + std::to_string(recipe.seed));
+         constexpr int kCand = 8;
+         for (int i = 0; i < 3; i++)
+         {
+            const double fine = get(i, "_finetune") / 100.0;
+            cand[i].push_back({ get(i, "_pitch"), get(i, "_decay"), get(i, "_transient"), {} });
+            static const double kLower[3] = { -1.0, -3.0, 0.0 };
+            for (int c = 1; c < kCand; c++)
+            {
+               const Character& ch = kChars[cp.Range(5)];
+               const bool low = i == 0;
+               double p = ch.pitch * (low ? 0.5 : 1.0) + cp.Uniform(-4.0, 4.0) * (low ? 0.6 : 1.0) + (subPart || part == Part::Drums ? kLower[i] : 0.0);
+               double d = std::clamp(ch.decay + cp.Uniform(-0.2, 0.3), 0.0, 0.85);
+               double t = std::clamp(ch.snap + cp.Uniform(-0.4, 0.4), -1.0, 1.0);
+               if (genKit != nullptr && i == 0)
+                  d = std::clamp(genKit->kickDecay * cp.Uniform(0.8, 1.25), 0.03, 0.85), p = genKit->kickSemis + cp.Uniform(-1.0, 1.0),
+                  t = std::clamp((double)genKit->kickTransient + cp.Uniform(-0.15, 0.15), -1.0, 1.0);
+               else if (genKit != nullptr && i == 1)
+                  d = std::clamp(genKit->snareDecay * cp.Uniform(0.8, 1.25), 0.03, 0.85);
+               cand[i].push_back({ std::round(p * 100.0) / 100.0, std::round(d * 100.0) / 100.0, std::round(t * 100.0) / 100.0, {} });
+            }
+            for (Cand& c : cand[i])
+               c.s = CompatLane(i, c.pitch + fine, c.decay, c.transient);
+         }
+         // the score of a set: mean P(together) over its strong live pairs, -1 when it has none
+         auto setScore = [&](const int* pick, bool check)
+         {
+            double sum = 0.0;
+            int n = 0;
+            for (int a = 0; a < 3; a++)
+               for (int b = a + 1; b < 3; b++)
+                  if (live[a] && live[b])
+                  {
+                     const double p = CompatScore(role[a], cand[a][(size_t)pick[a]].s, role[b], cand[b][(size_t)pick[b]].s, check);
+                     if (p >= 0.0)
+                        sum += p, n++;
+                  }
+            return n > 0 ? sum / n : -1.0;
+         };
+         const int zero[3] = { 0, 0, 0 };
+         // only the whole set was validated held out (kick-snare-hat 0.713; a pair alone is under 0.70): all three live or nothing
+         if (nLive == 3 && setScore(zero, false) >= 0.0)
+         {
+            int best[3] = { 0, 0, 0 };
+            double top = setScore(zero, false);
+            int pick[3];
+            for (pick[0] = 0; pick[0] < (live[0] ? kCand : 1); pick[0]++)
+               for (pick[1] = 0; pick[1] < (live[1] ? kCand : 1); pick[1]++)
+                  for (pick[2] = 0; pick[2] < (live[2] ? kCand : 1); pick[2]++)
+                  {
+                     const double s = setScore(pick, false);
+                     if (s > top + 1e-9)
+                        top = s, std::copy(pick, pick + 3, best);
+                  }
+            out.compatOld = (float)setScore(zero, true);
+            if (!std::getenv("INFINITE_NOCOMPAT"))
+            {
+               for (int i = 0; i < 3; i++)
+                  if (best[i] != 0)
+                  {
+                     const Cand& c = cand[i][(size_t)best[i]];
+                     force["lane" + std::to_string(i) + "_pitch"] = { 'f', Num(c.pitch) };
+                     force["lane" + std::to_string(i) + "_decay"] = { 'f', Num(c.decay) };
+                     force["lane" + std::to_string(i) + "_transient"] = { 'f', Num(c.transient) };
+                  }
+               out.compatNew = (float)setScore(best, true);
+            }
+            else
+               out.compatNew = out.compatOld;
+         }
+      }
       drums = g.Add("Drum Sequencer", seed(), force);
       for (const Replace& r : synthDrums)
          if (r.lane == 0)
@@ -4214,6 +4303,20 @@ Compiled Probe(const std::string& type)
    g.lines.insert(g.lines.begin() + 2, "transport 120 4 4 0 0");
    out.patch = g.Text();
    return out;
+}
+
+float CompatParityError()
+{
+   float worst = 0.0f;
+   for (int k = 0; k < (int)(sizeof(compat::kParityP) / sizeof(compat::kParityP[0])); k++)
+   {
+      const float* in = compat::kParityIn[k];
+      static const char* role[3] = { "kick", "snare", "hat" };
+      const CompatSound a = CompatLane((int)in[0], in[1], in[2], 0.0), b = CompatLane((int)in[3], in[4], in[5], 0.0);
+      const double p = CompatScore(role[(int)in[0]], a, role[(int)in[3]], b, false);
+      worst = std::max(worst, (float)std::abs(p - compat::kParityP[k]));
+   }
+   return worst;
 }
 
 std::string UpstreamOf(const std::string& patch, int tap, int& newTap)

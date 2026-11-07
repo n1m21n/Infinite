@@ -551,6 +551,57 @@ bool RunGenSampleTest()
          return false;
       }
    }
+   if (runs("compat"))
+   {
+      // Kit coherence, held out: 20 scored full-mix takes per style family, the kit the genre prior drew against the kit the
+      // compat models picked, both scored by the "check" model (fit on packs the "run" model that picked never saw).
+      // The picked kit must score higher overall, and no family may score lower.
+      const float parity = SampleStyles::CompatParityError();
+      printf("GENSAMPLE compat parity %.5f\n", parity);
+      if (parity > 2e-3f)
+      {
+         printf("GENSAMPLE compat FAIL (engine score differs from compat_model.py)\n");
+         return false;
+      }
+      std::map<std::string, std::vector<int>> fam;
+      for (int i = 0; i < SampleStyles::Count(); i++)
+         fam[SampleStyles::At(i).family].push_back(i);
+      double allOld = 0.0, allNew = 0.0;
+      int allN = 0, worse = 0;
+      printf("GENSAMPLE compat family        takes  old    new    diff\n");
+      for (const auto& [name, ids] : fam)
+      {
+         double so = 0.0, sn = 0.0;
+         int n = 0;
+         for (uint32_t s = 1; s <= 400 && n < 20; s++) // 20 takes whose kick, snare and hat are all sampled lanes (the set compat was validated on)
+         {
+            SampleStyles::Recipe rec;
+            rec.style = SampleStyles::At(ids[(size_t)(s % ids.size())]).id;
+            rec.seed = 1000 + s;
+            const SampleStyles::Compiled c = SampleStyles::Compile(rec);
+            if (c.compatOld < 0.0f || c.compatNew < 0.0f)
+               continue;
+            so += c.compatOld, sn += c.compatNew, n++;
+            if (getenv("INFINITE_COMPATVERBOSE"))
+               printf("GENSAMPLE compat take %-20s seed %u  %.3f -> %.3f\n", rec.style.c_str(), rec.seed, c.compatOld, c.compatNew);
+         }
+         if (n == 0)
+         {
+            printf("GENSAMPLE compat %-15s %5d  -      -      (no take with kick, snare and hat live)\n", name.c_str(), 0);
+            continue;
+         }
+         printf("GENSAMPLE compat %-15s %5d  %.3f  %.3f  %+.3f\n", name.c_str(), n, so / n, sn / n, (sn - so) / n);
+         worse += sn < so - 1e-6;
+         allOld += so, allNew += sn, allN += n;
+      }
+      if (allN > 0)
+         printf("GENSAMPLE compat all             %5d  %.3f  %.3f  %+.3f\n", allN, allOld / allN, allNew / allN, (allNew - allOld) / allN);
+      if (allN > 0 && (allNew <= allOld || worse > 0) && !getenv("INFINITE_NOCOMPAT"))
+      {
+         printf("GENSAMPLE compat FAIL (%d families worse)\n", worse);
+         return false;
+      }
+   }
    if (const char* dump = getenv("INFINITE_GENSAMPLEPATCH")) // "<style>:<part>:<seed>": print the compiled patch and stop
    {
       SampleStyles::Recipe rec;
