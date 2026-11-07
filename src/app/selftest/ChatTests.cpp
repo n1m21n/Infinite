@@ -825,6 +825,26 @@ namespace app
             }
             check(!chat::SignsInWithoutBrowser(chat::AgentKind::Codex) && chat::SignsInWithoutBrowser(chat::AgentKind::Claude) &&
                   chat::SignsInWithoutBrowser(chat::AgentKind::Antigravity), "no browser: only chatgpt cannot sign in");
+            {
+               // Every agent, both kinds of OS: a note names its own folder and files, and never promises what it will not do.
+               for (const CliSetup::Agent& ag : CliSetup::Agents())
+                  for (const bool win : { false, true })
+                  {
+                     const std::string tag = std::string(ag.id) + (win ? " win" : " unix");
+                     const std::string inst = chat::InstallNote(ag, win), conn = chat::ConnectNote(ag, win);
+                     const std::string cfg = win ? "%USERPROFILE%\\" : "~/";
+                     check(inst.find(ag.name) != std::string::npos && inst.find("nothing is signed in") != std::string::npos, ("install note: " + tag).c_str());
+                     check(inst.find(win ? "%" : "~/") != std::string::npos && inst.find(win ? "/" : "\\") == std::string::npos, ("install note: path style " + tag).c_str());
+                     check(conn.find("nothing is downloaded") != std::string::npos && conn.find("download") == conn.find("nothing is downloaded") + 11, ("connect note: no download " + tag).c_str());
+                     check(conn.find(cfg) != std::string::npos, ("connect note: config under home " + tag).c_str());
+                     check(chat::SetUpNote(ag, win, true) == conn && chat::SetUpNote(ag, win, false) == inst, ("set-up note picks by installed " + tag).c_str());
+                     check(chat::SignInNote(ag).find("never sees your login") != std::string::npos, ("sign-in note: " + tag).c_str());
+                  }
+               check(chat::InstallNote(*CliSetup::FindAgent("claude"), false).find("~/.local/bin") != std::string::npos, "install note: Claude goes to ~/.local/bin");
+               check(chat::InstallNote(*CliSetup::FindAgent("codex"), true).find("%LOCALAPPDATA%\\Infinite\\node") != std::string::npos, "install note: ChatGPT goes to Infinite's Node folder on Windows");
+               check(chat::InstallNote(*CliSetup::FindAgent("codex"), false).find("Node.js") != std::string::npos, "install note: ChatGPT says it may add Node");
+               check(chat::SignInNote(*CliSetup::FindAgent("claude")).find("free plan") != std::string::npos, "sign-in note: Claude's free plan is named");
+            }
             check(chat::FirstIdeas().size() == 3, "first ideas: three");
          }
          const std::vector<chat::Model> agy = chat::ParseAgyModels("ID\tLabel\nflash\tGemini Flash\nnot a row\n");

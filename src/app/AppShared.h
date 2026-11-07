@@ -5826,6 +5826,7 @@ struct ChatAgentInfo
    bool ready = false;
    bool busy = false;
    std::string problem;  // why setup did not finish, in one plain sentence; empty otherwise
+   std::string hint;     // what the button will do, before it is pressed (install location, what sign-in needs); empty when ready or busy
 };
 void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
 ChatAgentInfo ChatAgentStatus(const std::string& id);

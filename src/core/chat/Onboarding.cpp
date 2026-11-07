@@ -75,6 +75,68 @@ namespace chat
       return "https://claude.ai/login";
    }
 
+   namespace
+   {
+      // "~/.claude.json" as the person reads it on this OS.
+      std::string HomePath(const char* rel, bool windows)
+      {
+         std::string p = rel;
+         if (windows)
+         {
+            for (char& c : p)
+               if (c == '/')
+                  c = '\\';
+            return "%USERPROFILE%\\" + p;
+         }
+         return "~/" + std::string(rel);
+      }
+
+      // Where the agent's installer puts it.
+      std::string InstallDir(const CliSetup::Agent& a, bool windows)
+      {
+         const std::string id = a.id;
+         if (id == "codex")
+            return windows ? "%LOCALAPPDATA%\\Infinite\\node" : "~/.infinite/node";
+         return HomePath(".local/bin", windows);   // Claude's and Gemini's installers both use it
+      }
+   }
+
+   std::string InstallNote(const CliSetup::Agent& a, bool windows)
+   {
+      const std::string name = a.name;
+      std::string t = "This downloads " + name + " from its maker and puts it in " + InstallDir(a, windows) + ". ";
+      if (std::string(a.id) == "codex")
+         t += "If this computer has no Node.js, it also adds a private copy there. ";
+      t += "It then connects " + name + " to Infinite (" + HomePath(a.configFile, windows) + " and " + HomePath(a.skillsDir, windows) + "). "
+           "It needs no admin password, and nothing is signed in yet.";
+      return t;
+   }
+
+   std::string ConnectNote(const CliSetup::Agent& a, bool windows)
+   {
+      const std::string name = a.name;
+      return name + " is already installed, so nothing is downloaded. This connects it to Infinite by adding to " + HomePath(a.configFile, windows) +
+             " and copying Infinite's skill files into " + HomePath(a.skillsDir, windows) + ". It needs no admin password.";
+   }
+
+   std::string SetUpNote(const CliSetup::Agent& a, bool windows, bool installed)
+   {
+      return installed ? ConnectNote(a, windows) : InstallNote(a, windows);
+   }
+
+   std::string SignInNote(const CliSetup::Agent& a)
+   {
+      const std::string id = a.id, name = a.name;
+      if (id == "claude")
+         return "Sign in opens your browser. Claude Code needs a paid Claude plan (Pro or Max) or an Anthropic API key; "
+                "the free plan does not include it. Infinite never sees your login.";
+      if (id == "codex")
+         return "Sign in opens your browser on this computer. " + name + " needs a ChatGPT plan that includes Codex, or an OpenAI API key. "
+                "Infinite never sees your login.";
+      return "Sign in opens your browser. " + name + " uses your Google account, and how much you can use depends on your plan. "
+             "Infinite never sees your login.";
+   }
+
    Friendly SetupProblem(const std::string& reason, const std::string& stepId, const std::string& agentName)
    {
       using K = Friendly::Kind;
