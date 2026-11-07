@@ -462,6 +462,7 @@ set(COMMON_SOURCES
     src/app/bodies/SpatialMixerBody.cpp
     src/app/bodies/VmpcBody.cpp
     src/app/frame/CookFrame.cpp
+    src/app/frame/HostSlots.cpp
     src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
     src/app/frame/FrameTests2.cpp

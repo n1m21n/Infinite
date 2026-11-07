@@ -26,10 +26,11 @@ public:
 
    float value = 0.5f;
    std::string label = "Macro";
+   int hostSlot = 0; // plugin host parameter slot 1..32, 0 = none (README vst-au 8.2)
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Float("value", value); v.Text("label", label);
+      v.Float("value", value); v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -77,11 +78,14 @@ public:
    float padY = 0.5f;
    bool loopPath = true;
    float speed = 1.0f;
+   int hostSlot = 0;  // X axis host slot 1..32, 0 = none
+   int hostSlotY = 0; // Y axis host slot
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("padX", padX); v.Float("padY", padY);
       v.Bool("loopPath", loopPath); v.Float("speed", speed);
+      v.Int("hostSlot", hostSlot); v.Int("hostSlotY", hostSlotY);
       // Encoded the same way as ResynthNode's pad path - see there for why the
       // decode-on-save is a harmless no-op.
       std::string encoded = EncodePath(mPath);
@@ -128,10 +132,11 @@ public:
 
    float value = 0.5f;
    std::string label = "Slider";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Float("value", value); v.Text("label", label);
+      v.Float("value", value); v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -152,10 +157,11 @@ public:
 
    float value = 0.0f; // -1.0f .. +1.0f (center 0.0)
    std::string label = "Pan/Detent";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Float("value", value); v.Text("label", label);
+      v.Float("value", value); v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -174,10 +180,11 @@ public:
 
    bool state = false;
    std::string label = "Toggle";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Bool("state", state); v.Text("label", label);
+      v.Bool("state", state); v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -198,6 +205,7 @@ public:
    bool justTriggered = false;
    float flash = 0.0f;
    std::string label = "Trigger";
+   int hostSlot = 0;
 
    void Trigger()
    {
@@ -208,7 +216,7 @@ public:
 
    void VisitParams(ParamVisitor& v) override
    {
-      v.Bool("pressed", pressed); v.Text("label", label);
+      v.Bool("pressed", pressed); v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -233,12 +241,13 @@ public:
    float maxVal = 100.0f;
    float step = 1.0f;
    std::string label = "NumBox";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("value", value); v.Float("minVal", minVal);
       v.Float("maxVal", maxVal); v.Float("step", step);
-      v.Text("label", label);
+      v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -261,11 +270,12 @@ public:
    int selected = 0;
    int count = 8;
    std::string label = "Selector";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("selected", selected); v.Int("count", count);
-      v.Text("label", label);
+      v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 };
 
@@ -286,6 +296,7 @@ public:
    uint8_t pattern = 0b10011001; // default 8-step rhythm pattern
    float rateBeats = 0.25f;      // 16th note steps (4 per beat)
    std::string label = "Step Gate";
+   int hostSlot = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -293,7 +304,7 @@ public:
       v.Int("pattern", patInt);
       pattern = (uint8_t)patInt;
       v.Float("rateBeats", rateBeats);
-      v.Text("label", label);
+      v.Text("label", label); v.Int("hostSlot", hostSlot);
    }
 
 private:

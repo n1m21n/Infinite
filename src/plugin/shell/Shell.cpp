@@ -12,7 +12,12 @@
 //         setState()       -> stored; sent to the engine now, or as its first message when it starts
 //
 // Parameters (fixed forever: hosts cache them per plugin ID):
-//   0..31       Slot 01..Slot 32 (bound to Macro nodes in 2.2; already sent to the engine as points)
+//   0..31       Slot 01..Slot 32: drive the Macro nodes whose "Host slot" names them (2.2); a bound
+//               slot takes the Macro's name (kParamTitlesChanged), and turning the Macro in Infinite
+//               writes the slot back as a begin/perform/end edit (engine -> processor -> IMessage on
+//               the UI thread -> controller). Only slots the host has set (automation, an edit,
+//               a saved project: "slotsSet") are sent to the engine; a Macro bound to an unset slot
+//               gives the slot its own value instead (a sync: setParamNormalized, no automation write)
 //   1000        Bypass (the engine fades; FX passes the input, Instrument goes silent)
 //   2000..2127  MIDI CC 0..127   hidden, omni: VST3 hands CC to plugins only as parameters
 //   2128        Pitch bend       (IMidiMapping), turned back into MIDI for the engine here
@@ -27,6 +32,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vsttypes.h"
+#include "public.sdk/source/common/commonstringconvert.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
@@ -43,11 +49,24 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <sys/stat.h>
 #include <thread>
 #include <vector>
+
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#elif defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 #ifndef INFINITE_PLUGIN_FX
 #define INFINITE_PLUGIN_FX 0
@@ -90,6 +109,8 @@ namespace InfinitePlugin
    constexpr uint32_t kMsgReady = 1;
    constexpr uint32_t kMsgState = 2;
    constexpr uint32_t kMsgStateLoaded = 3;
+   constexpr uint32_t kMsgSlotEdit = 4;  // payload: SlotEdit
+   constexpr uint32_t kMsgSlotNames = 5; // payload: 32 '\0'-terminated UTF-8 names
    constexpr uint32_t kMsgGetState = 101;
    constexpr uint32_t kMsgSetState = 102;
 
@@ -99,12 +120,13 @@ namespace InfinitePlugin
    //   u32 "INFS" | u32 n | header JSON (n bytes) | u32 patch bytes | u32 compressed bytes | zlib
    //
    // header: {"format":"infinite-plugin-state","v":1,"appVersion":..,"build":"instrument"|"fx",
-   //          "latencyMode":"block","bypass":..,"slots":[32 values]}
+   //          "latencyMode":"block","bypass":..,"slotsSet":<bit mask>,"slots":[32 values]}
    // The patch is the .inf text the app saves; empty = the build's starting patch. The licence key
    // is never in here (8.5).
    struct State
    {
       bool bypass = false;
+      uint32_t slotsSet = 0; // slots the host has a value for
       float slots[kSlotCount] = {};
       std::string patch;
    };
@@ -128,7 +150,7 @@ namespace InfinitePlugin
    {
       std::string h = "{\"format\":\"infinite-plugin-state\",\"v\":" + std::to_string(kStateVersion) +
                       ",\"appVersion\":\"" INFINITE_PLUGIN_VERSION "\",\"build\":\"" + std::string(kFx ? "fx" : "instrument") +
-                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"slots\":[";
+                      "\",\"latencyMode\":\"block\",\"bypass\":" + (st.bypass ? "true" : "false") + ",\"slotsSet\":" + std::to_string(st.slotsSet) + ",\"slots\":[";
       for (int32 i = 0; i < kSlotCount; i++)
       {
          char num[32];
@@ -167,6 +189,9 @@ namespace InfinitePlugin
       State out;
       const size_t by = h.find("\"bypass\":");
       out.bypass = by != std::string::npos && h.compare(by + 9, 4, "true") == 0;
+      const size_t ss = h.find("\"slotsSet\":");
+      if (ss != std::string::npos)
+         out.slotsSet = uint32_t(std::strtoul(h.c_str() + ss + 11, nullptr, 10));
       const size_t sl = h.find("\"slots\":[");
       if (sl != std::string::npos)
       {
@@ -245,6 +270,135 @@ namespace InfinitePlugin
       return {};
    }
 
+   struct SlotEdit
+   {
+      uint32_t kind; // 0 begin, 1 perform, 2 end, 3 sync
+      uint32_t slot;
+      float value;
+   };
+
+   // ---------------------------------------------------------------------------------------
+   // Engine messages for the controller arrive on the reader thread; VST3 wants IMessage and edits
+   // on the UI thread. The relay queues them and hops: macOS a run loop source on the main run loop,
+   // Windows a message-only window made on the UI thread. Linux has no host run loop without an
+   // editor, so there the sink runs on the reader thread. Both hops are torn down in the destructor
+   // (UI thread), so nothing queued can call into the bundle after terminate and unload (a main-queue
+   // block could: auval crashed on exactly that).
+   class UiRelay
+   {
+   public:
+      struct Item
+      {
+         uint32_t type;
+         std::vector<uint8_t> data;
+      };
+      using Sink = std::function<void(const Item&)>;
+
+      // UI thread.
+      explicit UiRelay(Sink sink) : sink_(std::move(sink))
+      {
+#if defined(__APPLE__)
+         CFRunLoopSourceContext ctx {};
+         ctx.info = this;
+         ctx.perform = [](void* info) { static_cast<UiRelay*>(info)->Drain(); };
+         loop_ = CFRunLoopGetMain();
+         CFRetain(loop_);
+         source_ = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &ctx);
+         CFRunLoopAddSource(loop_, source_, kCFRunLoopCommonModes);
+#elif defined(_WIN32)
+         // The class's WndProc lives in this module: registered with its handle while any relay
+         // exists, unregistered with the last, so a reloaded bundle never meets a stale class.
+         HMODULE mod = nullptr;
+         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCWSTR>(&WndProc), &mod);
+         inst_ = mod;
+         if (sLive++ == 0)
+         {
+            WNDCLASSW wc {};
+            wc.lpfnWndProc = &WndProc;
+            wc.hInstance = inst_;
+            wc.lpszClassName = kClass;
+            RegisterClassW(&wc);
+         }
+         hwnd_ = CreateWindowExW(0, kClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, inst_, nullptr);
+         if (hwnd_)
+            SetWindowLongPtrW(hwnd_, GWLP_USERDATA, (LONG_PTR)this);
+#endif
+      }
+      // UI thread, after the reader thread has stopped.
+      ~UiRelay()
+      {
+#if defined(__APPLE__)
+         {
+            std::lock_guard<std::mutex> lock(mutex_);
+            CFRunLoopSourceInvalidate(source_);
+            CFRelease(source_);
+            source_ = nullptr;
+         }
+         CFRelease(loop_);
+#elif defined(_WIN32)
+         if (hwnd_)
+            DestroyWindow(hwnd_);
+         if (--sLive == 0)
+            UnregisterClassW(kClass, inst_);
+#endif
+      }
+
+      // Any thread.
+      void Post(Item item)
+      {
+         std::unique_lock<std::mutex> lock(mutex_);
+         queue_.push_back(std::move(item));
+#if defined(__APPLE__)
+         if (source_)
+         {
+            CFRunLoopSourceSignal(source_);
+            CFRunLoopWakeUp(loop_);
+         }
+#elif defined(_WIN32)
+         if (hwnd_)
+            PostMessageW(hwnd_, WM_APP + 1, 0, 0);
+#else
+         lock.unlock();
+         Drain();
+#endif
+      }
+
+   private:
+      void Drain()
+      {
+         std::vector<Item> items;
+         {
+            std::lock_guard<std::mutex> lock(mutex_);
+            items.swap(queue_);
+         }
+         for (const Item& it : items)
+            sink_(it);
+      }
+#if defined(__APPLE__)
+      CFRunLoopRef loop_ = nullptr;
+      CFRunLoopSourceRef source_ = nullptr;
+#elif defined(_WIN32)
+      static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l)
+      {
+         if (msg == WM_APP + 1)
+         {
+            if (auto* r = (UiRelay*)GetWindowLongPtrW(h, GWLP_USERDATA))
+               r->Drain();
+            return 0;
+         }
+         return DefWindowProcW(h, msg, w, l);
+      }
+      static constexpr const wchar_t* kClass = L"InfinitePluginUiRelay";
+      static inline int sLive = 0; // UI thread only
+      HINSTANCE inst_ = nullptr;
+      HWND hwnd_ = nullptr;
+#endif
+      Sink sink_;
+      std::mutex mutex_;
+      std::vector<Item> queue_;
+   };
+
    // ---------------------------------------------------------------------------------------
    // One engine process and its shared memory. Message thread only, except Process() and
    // the atomics, which the audio thread reads.
@@ -254,6 +408,10 @@ namespace InfinitePlugin
       ~EngineLink() { Stop(); }
 
       bool Running() const { return shell_.Valid(); }
+      // Message thread, before Start: where slot edits and names from the engine go.
+      void SetRelay(UiRelay* relay) { relay_ = relay; }
+      // The engine has loaded its patch (audio thread may read it).
+      bool Ready() const { return ready_.load(std::memory_order_acquire); }
       bool Matches(double rate, uint32_t block) const { return Running() && rate_ == rate && block_ == block; }
 
       // `patch` (the stored state, may be empty) becomes the engine's first message, so the engine
@@ -306,6 +464,8 @@ namespace InfinitePlugin
                      if (!m.data.empty())
                         std::fprintf(stderr, "Infinite plugin: patch did not load: %.*s\n", (int)m.data.size(), (const char*)m.data.data());
                   }
+                  else if ((m.type == kMsgSlotEdit || m.type == kMsgSlotNames) && relay_)
+                     relay_->Post(UiRelay::Item { m.type, m.data });
                   else if (m.type == kMsgState)
                   {
                      std::lock_guard<std::mutex> lock(replyMutex_);
@@ -388,6 +548,7 @@ namespace InfinitePlugin
       std::map<uint32_t, std::string> replies_;
       uint32_t lastId_ = 0;
       Ipc::Child child_;
+      UiRelay* relay_ = nullptr;
       std::thread reader_;
       std::atomic<bool> stopReader_ { false };
       std::atomic<bool> ready_ { false };
@@ -414,12 +575,16 @@ namespace InfinitePlugin
          addAudioInput(STR16("Sidechain"), SpeakerArr::kStereo, kAux, 0); // inactive until the host turns it on
          addAudioOutput(STR16("Output"), SpeakerArr::kStereo, kMain);
          addEventInput(STR16("MIDI In"), 16);
+         relay_ = std::make_shared<UiRelay>([this](const UiRelay::Item& it) { ToController(it); });
+         link_.SetRelay(relay_.get());
          return kResultOk;
       }
 
       tresult PLUGIN_API terminate() override
       {
          link_.Stop();
+         link_.SetRelay(nullptr);
+         relay_.reset(); // after the reader thread is gone: a hop still queued finds nothing
          return AudioEffect::terminate();
       }
 
@@ -459,6 +624,7 @@ namespace InfinitePlugin
             if (link_.RequestPatch(current, 2000))
                patch_ = std::move(current);
             link_.Start(processSetup.sampleRate, uint32_t(processSetup.maxSamplesPerBlock), patch_);
+            resendSlots_.store(true); // a fresh engine knows no slot values yet
          }
          return AudioEffect::setActive(state);
       }
@@ -473,7 +639,9 @@ namespace InfinitePlugin
             return kResultFalse;
          bypass_ = st.bypass;
          std::memcpy(slots_, st.slots, sizeof slots_);
+         slotsSet_.store(st.slotsSet);
          patch_ = std::move(st.patch);
+         resendSlots_.store(true);
          // Not running yet: Start sends it. Running: the engine swaps to it now.
          if (!patch_.empty())
             link_.SendPatch(patch_);
@@ -490,6 +658,7 @@ namespace InfinitePlugin
          State st;
          st.bypass = bypass_;
          std::memcpy(st.slots, slots_, sizeof slots_);
+         st.slotsSet = slotsSet_.load();
          st.patch = patch_;
          const std::vector<uint8_t> bytes = EncodeState(st);
          int32 wrote = 0;
@@ -565,6 +734,16 @@ namespace InfinitePlugin
    private:
       void ReadParameters(ProcessData& data)
       {
+         // Every slot at offset 0 once the engine is ready after a start or a state load (its Macros
+         // exist then); host points this block follow
+         // and win (the engine sorts by offset, stable).
+         if (link_.Ready() && resendSlots_.exchange(false))
+         {
+            const uint32_t set = slotsSet_.load();
+            for (int32 i = 0; i < kSlotCount; i++)
+               if (set & (1u << i))
+                  params_[numParams_++] = PluginIpc::ParamPoint { uint16_t(i), 0, slots_[i] };
+         }
          IParameterChanges* changes = data.inputParameterChanges;
          if (!changes)
             return;
@@ -588,6 +767,7 @@ namespace InfinitePlugin
                else if (id < ParamID(kSlotFirst + kSlotCount))
                {
                   slots_[id - kSlotFirst] = float(v);
+                  slotsSet_.fetch_or(1u << (id - kSlotFirst));
                   if (numParams_ < PluginIpc::kMaxParamPoints)
                      params_[numParams_++] = PluginIpc::ParamPoint { uint16_t(id - kSlotFirst), uint16_t(offset), float(v) };
                }
@@ -726,7 +906,55 @@ namespace InfinitePlugin
          return t;
       }
 
+      // UI thread: an engine message for the controller.
+      void ToController(const UiRelay::Item& it)
+      {
+         IMessage* msg = allocateMessage();
+         if (!msg)
+            return;
+         if (it.type == kMsgSlotEdit && it.data.size() >= sizeof(SlotEdit))
+         {
+            SlotEdit e;
+            std::memcpy(&e, it.data.data(), sizeof e);
+            if (e.slot >= uint32_t(kSlotCount))
+            {
+               msg->release();
+               return;
+            }
+            const uint32_t bit = 1u << e.slot;
+            if (e.kind == 3 && (slotsSet_.load() & bit))
+            {
+               msg->release(); // the host has its own value; the engine gets it with the resend
+               return;
+            }
+            if (e.kind == 1 || e.kind == 3)
+            {
+               slots_[e.slot] = std::max(0.0f, std::min(1.0f, e.value)); // a save before the host echoes it
+               slotsSet_.fetch_or(bit);
+            }
+            msg->setMessageID("slotEdit");
+            msg->getAttributes()->setInt("kind", e.kind);
+            msg->getAttributes()->setInt("slot", e.slot);
+            msg->getAttributes()->setFloat("value", e.value);
+         }
+         else if (it.type == kMsgSlotNames)
+         {
+            msg->setMessageID("slotNames");
+            msg->getAttributes()->setBinary("names", it.data.data(), uint32(it.data.size()));
+         }
+         else
+         {
+            msg->release();
+            return;
+         }
+         sendMessage(msg);
+         msg->release();
+      }
+
       EngineLink link_;
+      std::shared_ptr<UiRelay> relay_;
+      std::atomic<bool> resendSlots_ { true };
+      std::atomic<uint32_t> slotsSet_ { 0 };
       std::string patch_; // last known patch (.inf text); message thread only
       bool bypass_ = false;
       float slots_[kSlotCount] = {};
@@ -781,6 +1009,84 @@ namespace InfinitePlugin
          for (int32 i = 0; i < kSlotCount; i++)
             setParamNormalized(kSlotFirst + ParamID(i), st.slots[i]);
          return kResultOk;
+      }
+
+      // From the processor (UI thread): a bound Macro turned in Infinite, or the slot names changed.
+      tresult PLUGIN_API notify(IMessage* message) override
+      {
+         if (!message)
+            return kInvalidArgument;
+         IAttributeList* attr = message->getAttributes();
+         if (attr && std::strcmp(message->getMessageID(), "slotEdit") == 0)
+         {
+            int64 kind = 0, slot = -1;
+            double value = 0.0;
+            attr->getInt("kind", kind);
+            attr->getInt("slot", slot);
+            attr->getFloat("value", value);
+            if (slot < 0 || slot >= kSlotCount)
+               return kResultFalse;
+            const ParamID id = kSlotFirst + ParamID(slot);
+            value = std::max(0.0, std::min(1.0, value));
+            if (kind == 0)
+               beginEdit(id);
+            else if (kind == 1)
+            {
+               setParamNormalized(id, value);
+               performEdit(id, value);
+            }
+            else if (kind == 2)
+               endEdit(id);
+            else if (kind == 3)
+            {
+               setParamNormalized(id, value);
+               if (componentHandler)
+                  componentHandler->restartComponent(kParamValuesChanged);
+            }
+            return kResultOk;
+         }
+         if (attr && std::strcmp(message->getMessageID(), "slotNames") == 0)
+         {
+            const void* data = nullptr;
+            uint32 size = 0;
+            if (attr->getBinary("names", data, size) != kResultOk || !data)
+               return kResultFalse;
+            const char* p = static_cast<const char*>(data);
+            const char* end = p + size;
+            bool changed = false;
+            for (int32 i = 0; i < kSlotCount && p < end; i++)
+            {
+               const char* z = static_cast<const char*>(std::memchr(p, 0, size_t(end - p)));
+               if (!z)
+                  break;
+               std::string name(p, z);
+               p = z + 1;
+               if (name.empty())
+               {
+                  char def[16];
+                  std::snprintf(def, sizeof def, "Slot %02d", i + 1);
+                  name = def;
+               }
+               Parameter* param = parameters.getParameter(kSlotFirst + ParamID(i));
+               if (!param)
+                  continue;
+               const std::u16string u = Steinberg::StringConvert::convert(name);
+               ParameterInfo& info = param->getInfo();
+               String128 title {};
+               const size_t n = std::min(u.size(), size_t(127));
+               for (size_t c = 0; c < n; c++)
+                  title[c] = TChar(u[c]);
+               if (std::memcmp(title, info.title, sizeof title) != 0)
+               {
+                  std::memcpy(info.title, title, sizeof title);
+                  changed = true;
+               }
+            }
+            if (changed && componentHandler)
+               componentHandler->restartComponent(kParamTitlesChanged);
+            return kResultOk;
+         }
+         return EditController::notify(message);
       }
 
       // IMidiMapping: every channel of the one event bus maps to the same (omni) parameters.

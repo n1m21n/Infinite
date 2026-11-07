@@ -5770,6 +5770,11 @@ namespace Platform
       {
          // Inside a plugin the host is the only MIDI source (PluginEngine injects its events);
          // opening hardware ports would double every note the host also routes.
+         {
+            std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            gMidiState.deviceNames[kMidiHostDevice] = kMidiHostDeviceName;
+         }
+         gMidiDeviceSummary = kMidiHostDeviceName;
          gMidiRunning = true;
          return true;
       }

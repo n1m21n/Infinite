@@ -48,6 +48,8 @@ namespace PluginEngine
       kMsgReady = 1,       // patch loaded and audio running; payload: empty, or the start error text
       kMsgState = 2,       // reply to kMsgGetState (same id); payload: the patch as .inf text
       kMsgStateLoaded = 3, // reply to kMsgSetState (same id); payload: empty, or the load error
+      kMsgSlotEdit = 4,    // a bound Macro turned in Infinite; payload: SlotEdit
+      kMsgSlotNames = 5,   // payload: 32 slot names, each '\0'-terminated UTF-8 ("" = unbound)
       kMsgGetState = 101,  // payload: none
       kMsgSetState = 102,  // payload: the patch as .inf text; kMsgReady follows once it settles
    };
@@ -68,6 +70,42 @@ namespace PluginEngine
    void SetStarted(const std::string& error);
    // Main thread, once per main-loop frame: answers state requests, sends kMsgReady.
    void MainFrameTick();
+
+   // ---- host slots (README 8.2, step 2.2) ----------------------------------------------------
+   // The 32 host parameters drive Macro nodes whose "Host slot" field names them. The audio thread
+   // smooths each slot (one-pole 10 ms, stepped for switch-like macros) per 32-sample sub-block and
+   // publishes a snapshot on a frame grid (round(sr/60/32)*32 samples). Offline, while a bound slot
+   // moves, it parks at each grid point until the main thread has applied that snapshot and cooked
+   // (a "served" frame, whose clock is pinned to the grid point), so a bounce is repeatable.
+   constexpr int kSlotCount = 32;
+   // Sync: a newly bound Macro's value for a slot the host has no value for yet (no automation write).
+   enum SlotEditKind : uint32_t { kSlotEditBegin = 0, kSlotEditPerform = 1, kSlotEditEnd = 2, kSlotEditSync = 3 };
+   struct SlotEdit
+   {
+      uint32_t kind;
+      uint32_t slot; // 0..31
+      float value;   // normalised 0..1
+   };
+   struct SlotFrame
+   {
+      bool served = false;    // the audio thread is parked on this snapshot (offline lock)
+      uint32_t validMask = 0; // slots the host has set at least once
+      float values[kSlotCount] = {};
+   };
+   // Main thread, at the start of the modulation pass: the latest snapshot. Pins the frame clock
+   // when it serves a parked grid point; MainFrameTick of the next frame releases it.
+   void BeginSlotFrame(SlotFrame* out);
+   // Main thread: which slots have a Macro bound, and which of those are stepped (no smoothing).
+   void SetSlotBindings(uint32_t boundMask, uint32_t steppedMask);
+   // Main thread: Infinite -> host. The shell turns these into begin/perform/end edits.
+   void SendSlotEdit(SlotEditKind kind, int slot, float value);
+   void SendSlotNames(const std::string (&names)[kSlotCount]);
+   // Main thread: false on a frame that must not publish a new ramp stamp (offline lock running,
+   // this frame not served), so the served frame's stamp is the one the audio thread uses.
+   bool SlotFramePublishes();
+   // Grid points served / park timeouts (tests, stats file).
+   uint64_t SlotParks();
+   uint64_t SlotParkTimeouts();
 
    // Blocks handled and transport jumps seen (tests). With INFINITE_PLUGIN_STATS=<path> set, the
    // first QuitRequested() that returns true writes "blocks N jumps M" there.

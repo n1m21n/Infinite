@@ -1,0 +1,28 @@
+infinite-patch 1
+# S2 (step 2.2): host audio -> Gain -> out; the Gain's dB follows a MIDI CC node bound to CC7 on a
+# hardware device id that does not exist inside a plugin. Host CC7 must reattach it to the Host device.
+# low 1 / high 0: CC7 = 0 -> 0 dB; no CC seen -> -60 dB.
+node 1 Utility Audio In
+  id in
+  pos 0 0
+end
+node 2 Utility Gain
+  id amp
+  pos 400 0
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 800 0
+end
+node 4 Modulators MIDI CC
+  id cc
+  pos 400 300
+  i device 987654
+  i channel 0
+  i controller 7
+  f low 1
+  f high 0
+end
+aud amp 0 in
+aud speakers 0 amp
+mod amp gainDb cc 0 0 1 0 -60 0

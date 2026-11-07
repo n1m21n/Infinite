@@ -1,6 +1,8 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/FormParts.h"
+#include "plugin/engine/HostAudio.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/StepCell.h"
@@ -1633,9 +1635,36 @@ namespace app
    }
 
 
+   // Plugin mode only (docs/plans/vst-au/README.md 8.2): which of the host's 32 parameters drives
+   // this macro. The value names itself ("slot 7"), so it needs no label beside it.
+   void MacroHostSlotField(int& slot, float cellW, const char* id = "##hostslot", const char* prefix = "slot")
+   {
+      if (!Platform::PluginModeActive())
+         return;
+      static std::map<std::string, std::vector<std::string>> sItems;
+      std::vector<std::string>& names = sItems[prefix];
+      if (names.empty())
+      {
+         names.push_back(std::string("no ") + prefix);
+         for (int i = 1; i <= PluginEngine::kSlotCount; i++)
+            names.push_back(std::string(prefix) + " " + std::to_string(i));
+      }
+      std::vector<const char*> items;
+      for (const std::string& s : names)
+         items.push_back(s.c_str());
+      int cur = std::clamp(slot, 0, PluginEngine::kSlotCount);
+      if (FormParts::BareCombo(id, &cur, items.data(), (int)items.size(), cellW) && cur != slot)
+      {
+         PushUndoCheckpoint();
+         slot = cur;
+      }
+   }
+
+
    void DrawMacroKnobParams(MacroKnobNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
    }
 
 
@@ -1652,6 +1681,7 @@ namespace app
    void DrawMacroSliderParams(MacroSliderNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
    }
 
 
@@ -1665,6 +1695,7 @@ namespace app
    void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
    }
 
 
@@ -1691,6 +1722,7 @@ namespace app
    void DrawMacroToggleParams(MacroToggleNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
       ModCheckbox("state", &n->state);
    }
 
@@ -1728,6 +1760,7 @@ namespace app
    void DrawMacroTriggerParams(MacroTriggerNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
    }
 
 
@@ -1758,6 +1791,7 @@ namespace app
    void DrawMacroNumBoxParams(MacroNumBoxNode* n)
    {
       MacroNameField(n->label, kMacroCell);
+      MacroHostSlotField(n->hostSlot, kMacroCell);
       // No min/max: the number box takes any value the user types, and each
       // destination clamps it to its own declared range on the way in (see
       // the MacroNumBox case in the modulation apply loop).
@@ -1795,6 +1829,7 @@ namespace app
    void DrawMacroRadioSelectorParams(MacroRadioSelectorNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
+      MacroHostSlotField(n->hostSlot, kMacroWideCell);
       // Clamped to 8 because the body only ever draws 8 segments - a count of
       // 16 used to leave half the selector unreachable.
       ModSliderInt("count", &n->count, 2, 8);
@@ -1840,6 +1875,7 @@ namespace app
    void DrawMacroStepGateParams(MacroStepGateNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
+      MacroHostSlotField(n->hostSlot, kMacroWideCell);
       ModSlider("rate", &n->rateBeats, 0.05f, 4.0f, "%.2f beats");
    }
 
@@ -1985,5 +2021,11 @@ namespace app
          n->ClearPath();
       ModCheckbox("loop", &n->loopPath);
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
+      if (Platform::PluginModeActive())
+      {
+         MacroHostSlotField(n->hostSlot, kPreviewSize * 0.48f, "##hostslotx", "x slot");
+         ImGui::SameLine();
+         MacroHostSlotField(n->hostSlotY, kPreviewSize * 0.48f, "##hostsloty", "y slot");
+      }
    }
 }

@@ -16,7 +16,12 @@
 // silent, and no engine is left after terminate. State (2.1, on R2): getState before any engine,
 // a restored instance sounds bit-identical and saves the same blob, setState while running swaps
 // the patch, a block-size restart keeps it, a dead engine still saves the last known patch,
-// garbage is refused. PASS/FAIL per check; exit 0 only when all pass.
+// garbage is refused. Slots (2.2, on S1: a Macro Knob on slot 1 drives a Gain): a fresh instance
+// keeps the patch's value, slot automation moves the sound, two automated offline bounces are
+// bit-identical (and parked), offline vs realtime null, a saved slot value comes back with the
+// project, and with a controller connected: the slot takes the Macro's name and value, and turning
+// the Macro in Infinite reaches the host as begin / perform / end. CC (S2): host CC reaches a MIDI CC
+// binding saved with a hardware device id. PASS/FAIL per check; exit 0 only when all pass.
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/eventlist.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
@@ -27,12 +32,18 @@
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
+#include "pluginterfaces/vst/ivstmessage.h"
+
+#include <CoreFoundation/CoreFoundation.h>
 
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <functional>
 #include <signal.h>
+#include <unistd.h>
 #include <string>
 #include <thread>
 #include <vector>
@@ -143,6 +154,9 @@ namespace
       int64_t noteOnAt = -1, noteOffAt = -1, bypassAt = -1;
       float (*input)(int64_t) = Sine;
       std::vector<std::pair<int64_t, int64_t>> notes; // extra (on, off) pairs, pitch 48 + index % 24
+      float (*automation)(int64_t) = nullptr;         // points at each block's ends on automationId
+      ParamID automationId = 0;                       // 0 = Slot 01; 2007 = MIDI CC 7
+      std::function<void()> perBlock;                 // after each process() (a host's UI thread)
    };
 
    // Renders `total` frames in pseudo-random block sizes (1..max block); returns the left channel.
@@ -232,6 +246,16 @@ namespace
             if (IParamValueQueue* q = params.addParameterData(1000, qi))
                q->addPoint(int32(s.bypassAt - t), 1.0, pi);
          }
+         if (s.automation)
+         {
+            int32 qi = 0, pi = 0;
+            if (IParamValueQueue* q = params.addParameterData(s.automationId, qi))
+            {
+               q->addPoint(0, s.automation(t), pi);
+               if (n > 1)
+                  q->addPoint(n - 1, s.automation(t + n - 1), pi);
+            }
+         }
          ctx.state = ProcessContext::kPlaying | ProcessContext::kTempoValid | ProcessContext::kProjectTimeMusicValid;
          ctx.sampleRate = kRate;
          ctx.tempo = 120.0;
@@ -241,6 +265,8 @@ namespace
          in.proc->process(d);
          for (int32 i = 0; i < n; i++)
             out.push_back(ol[i]);
+         if (s.perBlock)
+            s.perBlock();
          t += n;
          if (killPid && *killPid > 0 && t > total / 2)
          {
@@ -524,6 +550,220 @@ namespace
       }
    }
 
+
+   // ---- slots (step 2.2) on S1 -------------------------------------------------------------
+
+   // The host's UI thread: the shell hops engine messages onto the main queue.
+   void Pump() { CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true); }
+
+   // Slot 01: 0 for 1 s, up to 1 over 2 s, then 1.
+   float SlotRamp(int64_t t)
+   {
+      const double s = double(t) / kRate;
+      return float(std::max(0.0, std::min(1.0, (s - 1.0) / 2.0)));
+   }
+   float SlotZero(int64_t) { return 0.0f; }
+
+   long long ReadStat(const std::string& path, const char* key)
+   {
+      long long v = -1;
+      if (FILE* f = std::fopen(path.c_str(), "r"))
+      {
+         char line[512] = {};
+         if (std::fgets(line, sizeof line, f))
+            if (const char* k = std::strstr(line, key))
+               std::sscanf(k + std::strlen(key), " %lld", &v);
+         std::fclose(f);
+      }
+      return v;
+   }
+
+   class TestHandler : public IComponentHandler
+   {
+   public:
+      int begins = 0, performs = 0, ends = 0, titles = 0, values = 0;
+      double lastValue = -1.0;
+      tresult PLUGIN_API beginEdit(ParamID id) override { begins += id == 0; return kResultOk; }
+      tresult PLUGIN_API performEdit(ParamID id, ParamValue v) override
+      {
+         if (id == 0)
+         {
+            performs++;
+            lastValue = v;
+         }
+         return kResultOk;
+      }
+      tresult PLUGIN_API endEdit(ParamID id) override { ends += id == 0; return kResultOk; }
+      tresult PLUGIN_API restartComponent(int32 flags) override
+      {
+         titles += (flags & kParamTitlesChanged) != 0;
+         values += (flags & kParamValuesChanged) != 0;
+         return kResultOk;
+      }
+      tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override
+      {
+         if (FUnknownPrivate::iidEqual(iid, IComponentHandler::iid) || FUnknownPrivate::iidEqual(iid, FUnknown::iid))
+         {
+            *obj = this;
+            return kResultOk;
+         }
+         *obj = nullptr;
+         return kNoInterface;
+      }
+      uint32 PLUGIN_API addRef() override { return 1000; }
+      uint32 PLUGIN_API release() override { return 1000; }
+   };
+
+   // Host CC (hidden params -> MIDI) reaches a MIDI CC binding saved with a hardware device id.
+   void RunCcCheck(Plugin& fx, const std::string& s2)
+   {
+      char d[200];
+      Case c { "S2", &fx, true, s2, Script(), int64_t(kRate) * 2 };
+      c.script.input = Signal;
+      const auto idle = RenderCase(c, kOffline, kBlock);
+      c.script.automation = SlotZero;
+      c.script.automationId = 2007;
+      const auto moved = RenderCase(c, kOffline, kBlock);
+      const double li = Db(Rms(idle, int64_t(kRate), int64_t(2 * kRate))), lm = Db(Rms(moved, int64_t(kRate), int64_t(2 * kRate)));
+      std::snprintf(d, sizeof d, "no CC %.1f dBFS, host CC7 = 0 %.1f dBFS", li, lm);
+      Check(!idle.empty() && lm - li > 40.0, "cc: host CC drives a MIDI CC binding learned on hardware (reattached to Host)", d);
+   }
+
+   void RunSlotChecks(Plugin& fx, const std::string& s1)
+   {
+      char d[240];
+      const int64_t len = int64_t(kRate) * 4;
+      const double inRms = [&] {
+         std::vector<float> x(static_cast<size_t>(kRate));
+         for (size_t i = 0; i < x.size(); i++)
+            x[i] = Signal(int64_t(i));
+         return Rms(x, 0, int64_t(x.size()));
+      }();
+      auto rel = [&](const std::vector<float>& r, double a, double b) { return Db(Rms(r, int64_t(a * kRate), int64_t(b * kRate))) - Db(inRms); };
+
+      Case plain { "S1", &fx, true, s1, Script(), len };
+      plain.script.input = Signal;
+      Case ramp = plain;
+      ramp.script.automation = SlotRamp;
+
+      // No host value: the patch's knob (1 = 0 dB) stays.
+      const auto r0 = RenderCase(plain, kOffline, kBlock);
+      std::snprintf(d, sizeof d, "level %.1f dB re input", rel(r0, 1.0, 4.0));
+      Check(!r0.empty() && std::fabs(rel(r0, 1.0, 4.0)) < 1.0, "slots: a fresh instance keeps the patch's Macro value", d);
+
+      // Automation moves the Macro: slot 0 -> -60 dB, slot 1 -> 0 dB.
+      const std::string stats = "/tmp/infinite-plugin-stats-" + std::to_string(getpid()) + ".txt";
+      setenv("INFINITE_PLUGIN_STATS", stats.c_str(), 1);
+      std::remove(stats.c_str());
+      const auto ra = RenderCase(ramp, kOffline, kBlock);
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      const long long parks = ReadStat(stats, "parks");
+      const long long timeouts = ReadStat(stats, "parkTimeouts");
+      unsetenv("INFINITE_PLUGIN_STATS");
+      std::remove(stats.c_str());
+      const double low = rel(ra, 0.3, 0.9), high = rel(ra, 3.3, 4.0);
+      std::snprintf(d, sizeof d, "slot 0: %.1f dB, slot 1: %.1f dB re input", low, high);
+      Check(low < -50.0 && std::fabs(high) < 1.0, "slots: automation drives the bound Macro", d);
+
+      const auto rb = RenderCase(ramp, kOffline, kBlock);
+      std::snprintf(d, sizeof d, "null %.1f dBFS, parks %lld, park timeouts %lld", Db(NullRms(ra, rb)), parks, timeouts);
+      Check(!rb.empty() && ra == rb && parks > 0 && timeouts == 0, "slots: two automated offline bounces bit-identical (parked)", d);
+
+      const auto rt = RenderCase(ramp, kRealtime, kBlock);
+      const double nul = Db(NullRms(ra, rt));
+      std::snprintf(d, sizeof d, "null %.1f dBFS", nul);
+      Check(ra.size() == rt.size() && nul <= -40.0, "slots: automated offline vs realtime null <= -40 dBFS", d);
+
+      // A saved slot value comes back with the project (resent to the engine at start).
+      {
+         setenv("INFINITE_PLUGIN_PATCH", s1.c_str(), 1);
+         Instance a;
+         const bool ok = a.Open(fx, true, kOffline);
+         unsetenv("INFINITE_PLUGIN_PATCH");
+         Script z = plain.script;
+         z.automation = SlotZero;
+         if (ok)
+            Render(a, int64_t(kRate), false, z);
+         const auto blob = ok ? GetBlob(a) : std::vector<uint8_t>();
+         if (ok)
+            a.Close();
+         const BlobInfo bi = Inspect(blob);
+         Instance b;
+         b.Open(fx, true, kOffline, false);
+         SetBlob(b, blob);
+         const auto rr = b.Activate() ? Render(b, len, false, plain.script) : std::vector<float>();
+         b.Close();
+         std::snprintf(d, sizeof d, "%s, level %.1f dB re input", bi.header.find("\"slotsSet\":1,") != std::string::npos ? "slotsSet 1" : "no slotsSet", rel(rr, 0.5, 4.0));
+         Check(bi.header.find("\"slotsSet\":1,") != std::string::npos && rel(rr, 0.5, 4.0) < -50.0,
+               "slots: a saved slot value comes back with the project", d);
+      }
+
+      // Controller connected: names, sync and an edit turned in Infinite.
+      {
+         setenv("INFINITE_PLUGIN_PATCH", s1.c_str(), 1);
+         setenv("INFINITE_PLUGIN_TEST_EDIT", "300:0.25", 1);
+         Instance a;
+         TestHandler handler;
+         IPtr<IEditController> ec;
+         bool ok = a.Open(fx, true, kRealtime, false);
+         TUID cid;
+         if (ok && a.comp->getControllerClassId(cid) == kResultOk)
+            ec = fx.mod->getFactory().createInstance<IEditController>(VST3::UID::fromTUID(cid));
+         ok = ok && ec && ec->initialize(&gHost) == kResultOk;
+         FUnknownPtr<IConnectionPoint> cpComp(a.comp), cpCtrl(ec);
+         if (ok && cpComp && cpCtrl)
+         {
+            ec->setComponentHandler(&handler);
+            cpComp->connect(cpCtrl);
+            cpCtrl->connect(cpComp);
+            ok = a.Activate();
+         }
+         else
+            ok = false;
+         unsetenv("INFINITE_PLUGIN_PATCH");
+         unsetenv("INFINITE_PLUGIN_TEST_EDIT");
+         std::vector<float> r;
+         if (ok)
+         {
+            for (int i = 0; i < 400; i++)
+            {
+               Pump();
+               std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            Script sc = plain.script;
+            sc.perBlock = Pump;
+            r = Render(a, int64_t(kRate) * 6, true, sc);
+            for (int i = 0; i < 50; i++)
+            {
+               Pump();
+               std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+         }
+         ParameterInfo pi {};
+         if (ec)
+            ec->getParameterInfo(0, pi);
+         const bool named = std::u16string(reinterpret_cast<const char16_t*>(pi.title)) == u"Level";
+         std::snprintf(d, sizeof d, "title %s, title restarts %d, value restarts %d", named ? "Level" : "not Level", handler.titles, handler.values);
+         Check(ok && named && handler.titles >= 1 && handler.values >= 1, "slots: a bound slot takes the Macro's name and value", d);
+         std::snprintf(d, sizeof d, "begin %d, perform %d (last %.3f), end %d, level after %.1f dB re input", handler.begins, handler.performs,
+                       handler.lastValue, handler.ends, r.empty() ? -999.0 : rel(r, 5.0, 6.0));
+         Check(ok && handler.begins >= 1 && handler.performs >= 1 && std::fabs(handler.lastValue - 0.25) < 1e-3 && handler.ends == handler.begins &&
+                  !r.empty() && std::fabs(rel(r, 5.0, 6.0) + 45.0) < 2.0,
+               "slots: turning the Macro in Infinite reaches the host as begin / perform / end", d);
+         if (ok)
+         {
+            cpComp->disconnect(cpCtrl);
+            cpCtrl->disconnect(cpComp);
+            a.Close();
+         }
+         if (ec)
+         {
+            ec->setComponentHandler(nullptr);
+            ec->terminate();
+         }
+      }
+   }
+
    int RunMetrics(Plugin& inst, Plugin& fx, const std::string& r1, const std::string& r2)
    {
       Script notes;
@@ -714,6 +954,8 @@ int main(int argc, char** argv)
    }
 
    RunStateChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/R2-fx.inf");
+   RunSlotChecks(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S1-slot.inf");
+   RunCcCheck(fx, std::string(INFINITE_SOURCE_ROOT) + "/tests/plugin/patches/S2-cc.inf");
 
    std::this_thread::sleep_for(std::chrono::milliseconds(300));
    Check(EnginePids().size() == baseline, "no engine left after terminate");

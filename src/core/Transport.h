@@ -197,6 +197,12 @@ public:
    // blocks ahead of the current video frame.
    void SetOfflineMode(bool active, double sampleRate = 0.0);
    bool IsOfflineMode() const { return mOfflineActive.load(std::memory_order_relaxed); }
+   // Plugin offline slot lock (docs/plans/vst-au/README.md 8.2): main thread only. While pinned
+   // the audio thread is parked on a grid point, so BeginFrameClock takes the exact engine
+   // position (as offline) and the frame's ramps last exactly delaySeconds.
+   void SetFramePinned(bool pinned, double delaySeconds = 0.0) { mFramePinned = pinned; mFramePinnedDelay = delaySeconds; }
+   bool FramePinned() const { return mFramePinned; }
+   double FramePinnedDelay() const { return mFramePinnedDelay; }
    double AudioSampleRate() const { return mAudioSampleRate.load(std::memory_order_relaxed); }
    void SetOfflineVideoTime(double seconds);
    void BeginOfflineAudioBlock(int numFrames);
@@ -323,6 +329,8 @@ private:
    void DropFrameClock();
 
    std::atomic<bool> mOfflineActive { false };
+   bool mFramePinned = false;       // main thread only
+   double mFramePinnedDelay = 0.0;
    std::atomic<bool> mOfflineInAudioBlock { false };
    std::atomic<double> mOfflineVideoSeconds { 0.0 };
 };

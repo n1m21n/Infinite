@@ -1036,6 +1036,11 @@ namespace Platform
    // every binding is now scoped to the device it was learned on, not just
    // its channel/controller number. 0 = no device / wildcard-unbound.
    using MidiDeviceId = unsigned int;
+   // Inside a plugin (PluginModeActive) the host is the only MIDI source: MidiStart lists it as this
+   // device and the engine injects host events under it, so MIDI learn and bindings work in a DAW.
+   // A binding learned on hardware in the app reattaches to it on first touch (MidiRebindStaleDevice).
+   constexpr MidiDeviceId kMidiHostDevice = 1;
+   constexpr const char* kMidiHostDeviceName = "Host";
 
    struct MidiCCValue
    {

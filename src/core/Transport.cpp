@@ -72,10 +72,11 @@ void Transport::BeginFrameClock()
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
    if (sr <= 0.0)
       return;
-   if (mOfflineActive.load(std::memory_order_relaxed))
+   if (mOfflineActive.load(std::memory_order_relaxed) || mFramePinned)
    {
       // Offline the engine clock only moves inside the pump's audio
-      // blocks, so "now" is exactly where the next block starts.
+      // blocks, so "now" is exactly where the next block starts (pinned:
+      // the plugin's audio thread is parked there).
       mEngineFrameSeconds = (double)mEngineSamples.load(std::memory_order_relaxed) / sr;
       return;
    }
