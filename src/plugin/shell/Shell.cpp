@@ -140,6 +140,14 @@ namespace InfinitePlugin
          std::vector<std::string> args { "--plugin-engine", shell_.Name(), std::to_string((long long)Ipc::SelfPid()) };
          if (kFx)
             args.push_back("--fx");
+         // Development and tests (tools/plugin): start the engine on a given patch instead of the
+         // build's starting patch. Like $INFINITE_PLUGIN_ENGINE, never set by a host.
+         if (const char* patch = getenv("INFINITE_PLUGIN_PATCH"))
+            if (FILE* f = std::fopen(patch, "rb"))
+            {
+               std::fclose(f);
+               args.push_back(patch);
+            }
          if (exe.empty() || !Ipc::Spawn(exe, args, &child_))
          {
             child_ = Ipc::Child {};

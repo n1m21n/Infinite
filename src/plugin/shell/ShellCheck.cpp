@@ -2,6 +2,11 @@
 // and runs them against the real engine (docs/plans/vst-au/README.md step 1.5).
 //
 //   INFINITE_PLUGIN_ENGINE=<Infinite binary> plugin_shell_check <Instrument.vst3> <FX.vst3>
+//   INFINITE_PLUGIN_ENGINE=<Infinite binary> plugin_shell_check --metrics <Instrument.vst3> <FX.vst3> <R1.inf> <R2.inf>
+//
+// --metrics measures README section 10's M-4 (offline render twice, bit-identical), M-5 (offline
+// vs paced realtime null <= -60 dBFS at max block 32/64/512/2048) and M-6 (impulse through R2,
+// measured offset == reported latency) on the R patches, via $INFINITE_PLUGIN_PATCH.
 //
 // Checks: class names and categories, a scan (initialize + terminate) spawns no engine, the
 // controller's 32 slots + bypass + 130 hidden MIDI-mapping parameters and their CC assignments,
@@ -85,11 +90,13 @@ namespace
       IPtr<IAudioProcessor> proc;
       bool fx = false;
       int32 mode = kOffline;
+      int32 block = kBlock;
 
-      bool Open(Plugin& p, bool isFx, int32 processMode, bool activate = true)
+      bool Open(Plugin& p, bool isFx, int32 processMode, bool activate = true, int32 maxBlock = kBlock)
       {
          fx = isFx;
          mode = processMode;
+         block = maxBlock;
          comp = p.mod->getFactory().createInstance<IComponent>(p.info.ID());
          if (!comp || comp->initialize(&gHost) != kResultOk)
             return false;
@@ -98,7 +105,7 @@ namespace
             return false;
          if (!activate)
             return true;
-         ProcessSetup setup { processMode, kSample32, kBlock, kRate };
+         ProcessSetup setup { processMode, kSample32, block, kRate };
          if (proc->setupProcessing(setup) != kResultOk)
             return false;
          comp->activateBus(kAudio, kOutput, 0, true);
@@ -127,13 +134,16 @@ namespace
    struct Script
    {
       int64_t noteOnAt = -1, noteOffAt = -1, bypassAt = -1;
+      float (*input)(int64_t) = Sine;
+      std::vector<std::pair<int64_t, int64_t>> notes; // extra (on, off) pairs, pitch 48 + index % 24
    };
 
-   // Renders `total` frames in pseudo-random block sizes (1..kBlock); returns the left channel.
+   // Renders `total` frames in pseudo-random block sizes (1..max block); returns the left channel.
    std::vector<float> Render(Instance& in, int64_t total, bool paced, const Script& s = Script(), int* killPid = nullptr)
    {
       std::vector<float> out;
       out.reserve(size_t(total));
+      const int32 kBlock = in.block;
       std::vector<float> il(kBlock), ir(kBlock), ol(kBlock), orr(kBlock);
       float* ins[2] = { il.data(), ir.data() };
       float* outs[2] = { ol.data(), orr.data() };
@@ -164,7 +174,7 @@ namespace
          if (t + n > total)
             n = int32(total - t);
          for (int32 i = 0; i < n; i++)
-            il[i] = ir[i] = Sine(t + i);
+            il[i] = ir[i] = s.input(t + i);
          events.clear();
          params.clearQueue();
          auto inBlock = [&](int64_t at) { return at >= t && at < t + n; };
@@ -187,6 +197,28 @@ namespace
             e.noteOff.noteId = -1;
             events.addEvent(e);
          }
+         for (size_t k = 0; k < s.notes.size(); k++)
+            for (int on = 0; on < 2; on++)
+            {
+               const int64_t at = on ? s.notes[k].first : s.notes[k].second;
+               if (!inBlock(at))
+                  continue;
+               Event e {};
+               e.type = on ? Event::kNoteOnEvent : Event::kNoteOffEvent;
+               e.sampleOffset = int32(at - t);
+               if (on)
+               {
+                  e.noteOn.pitch = int16(48 + k % 24);
+                  e.noteOn.velocity = 0.5f + 0.4f * float(k % 5) / 4.0f;
+                  e.noteOn.noteId = -1;
+               }
+               else
+               {
+                  e.noteOff.pitch = int16(48 + k % 24);
+                  e.noteOff.noteId = -1;
+               }
+               events.addEvent(e);
+            }
          if (inBlock(s.bypassAt))
          {
             int32 qi = 0, pi = 0;
@@ -282,13 +314,147 @@ namespace
       ec->terminate();
       in.Close(false);
    }
+
+   // ---- metrics (README section 10: M-4, M-5, M-6) on the R patches -------------------------
+
+   float Signal(int64_t t)
+   {
+      uint32_t h = uint32_t(t) * 2654435761u;
+      h ^= h >> 15;
+      h *= 2246822519u;
+      h ^= h >> 13;
+      const float noise = float(h & 0xffff) / 32768.0f - 1.0f;
+      return 0.35f * float(std::sin(2.0 * M_PI * 220.0 * double(t) / kRate)) + 0.1f * noise;
+   }
+
+   constexpr int64_t kImpulseAt = 4800;
+   float Impulse(int64_t t) { return t == kImpulseAt ? 1.0f : 0.0f; }
+
+   double Db(double x) { return x > 0.0 ? 20.0 * std::log10(x) : -999.0; }
+
+   double NullRms(const std::vector<float>& a, const std::vector<float>& b)
+   {
+      const size_t n = std::min(a.size(), b.size());
+      double s = 0.0;
+      for (size_t i = 0; i < n; i++)
+      {
+         const double d = double(a[i]) - double(b[i]);
+         s += d * d;
+      }
+      return n ? std::sqrt(s / double(n)) : 1.0;
+   }
+
+   struct Case
+   {
+      const char* name;
+      Plugin* plugin;
+      bool fx;
+      std::string patch;
+      Script script;
+      int64_t total;
+   };
+
+   // One render of a case. Realtime: the engine gets `warmMs` to load before the first block,
+   // then blocks are paced like a host's audio thread.
+   std::vector<float> RenderCase(const Case& c, int32 mode, int32 block, uint32* latency = nullptr, int warmMs = 4000)
+   {
+      setenv("INFINITE_PLUGIN_PATCH", c.patch.c_str(), 1);
+      Instance in;
+      std::vector<float> r;
+      if (in.Open(*c.plugin, c.fx, mode, true, block))
+      {
+         if (latency)
+            *latency = in.proc->getLatencySamples();
+         if (mode == kRealtime)
+            std::this_thread::sleep_for(std::chrono::milliseconds(warmMs));
+         r = Render(in, c.total, mode == kRealtime, c.script);
+         in.Close();
+      }
+      unsetenv("INFINITE_PLUGIN_PATCH");
+      return r;
+   }
+
+   int RunMetrics(Plugin& inst, Plugin& fx, const std::string& r1, const std::string& r2)
+   {
+      Script notes;
+      for (int k = 0; k < 24; k++)
+         notes.notes.push_back({ 2400 + int64_t(k) * 14000, 2400 + int64_t(k) * 14000 + 9000 });
+      Script sig;
+      sig.input = Signal;
+      Script imp;
+      imp.input = Impulse;
+      const int64_t len = int64_t(kRate) * 8;
+      Case cR1 { "R1", &inst, false, r1, notes, len };
+      Case cR2 { "R2", &fx, true, r2, sig, len };
+      Case cImp { "R2 impulse", &fx, true, r2, imp, int64_t(kRate) };
+
+      std::printf("metrics: R1 = %s\n         R2 = %s\n", r1.c_str(), r2.c_str());
+      char d[200];
+
+      // M-4: the same project rendered twice offline, fresh instances, is bit-identical.
+      for (const Case* c : { &cR1, &cR2 })
+      {
+         const auto a = RenderCase(*c, kOffline, kBlock);
+         const auto b = RenderCase(*c, kOffline, kBlock);
+         std::snprintf(d, sizeof d, "%zu samples, rms %.1f dBFS, null %.1f dBFS", a.size(), Db(Rms(a, 0, int64_t(a.size()))), Db(NullRms(a, b)));
+         Check(!a.empty() && Rms(a, 0, int64_t(a.size())) > 1e-3 && a == b, (std::string("M-4 ") + c->name + ": two offline renders bit-identical").c_str(), d);
+         // Guard: the R patch really loaded (it does not sound like the build's starting patch).
+         Case start = *c;
+         start.patch = "/nonexistent";
+         const auto s0 = RenderCase(start, kOffline, kBlock);
+         std::snprintf(d, sizeof d, "null vs starting patch %.1f dBFS", Db(NullRms(a, s0)));
+         Check(Db(NullRms(a, s0)) > -40.0, (std::string("patch loaded: ") + c->name + " differs from the starting patch").c_str(), d);
+      }
+
+      // M-5: offline vs realtime null <= -60 dBFS RMS at 32 / 64 / 512 / 2048.
+      for (int32 block : { 32, 64, 512, 2048 })
+         for (const Case* c : { &cR1, &cR2 })
+         {
+            const auto off = RenderCase(*c, kOffline, block);
+            const auto rt = RenderCase(*c, kRealtime, block);
+            const double nul = Db(NullRms(off, rt));
+            std::snprintf(d, sizeof d, "block %d: rms %.1f dBFS, null %.1f dBFS", block, Db(Rms(off, 0, int64_t(off.size()))), nul);
+            Check(!off.empty() && off.size() == rt.size() && nul <= -60.0, (std::string("M-5 ") + c->name + ": offline vs realtime null").c_str(), d);
+         }
+
+      // M-6: impulse through R2; the first output sample sits exactly at the reported latency.
+      for (int32 block : { 32, 64, 512, 2048 })
+         for (int32 mode : { int32(kOffline), int32(kRealtime) })
+         {
+            uint32 L = 0;
+            const auto r = RenderCase(cImp, mode, block, &L);
+            int64_t first = -1;
+            for (size_t i = 0; i < r.size() && first < 0; i++)
+               if (std::fabs(r[i]) > 1e-6f)
+                  first = int64_t(i);
+            const int64_t offset = first < 0 ? -1 : first - kImpulseAt;
+            std::snprintf(d, sizeof d, "%s block %d: reported %u, measured %lld", mode == kOffline ? "offline" : "realtime", block, L, (long long)offset);
+            Check(offset == int64_t(L), "M-6 R2 impulse: measured offset == reported latency", d);
+         }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+      Check(EnginePids().empty(), "no engine left");
+      std::printf("%s (%d failed)\n", gFails == 0 ? "METRICS PASS" : "METRICS FAIL", gFails);
+      return gFails == 0 ? 0 : 1;
+   }
 }
 
 int main(int argc, char** argv)
 {
+   if (argc >= 6 && std::string(argv[1]) == "--metrics")
+   {
+      Plugin inst, fx;
+      std::string err;
+      if (!inst.Load(argv[2], err) || !fx.Load(argv[3], err))
+      {
+         std::fprintf(stderr, "load failed: %s\n", err.c_str());
+         return 1;
+      }
+      return RunMetrics(inst, fx, argv[4], argv[5]);
+   }
    if (argc < 3)
    {
-      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s <Instrument.vst3> <FX.vst3>\n", argv[0]);
+      std::fprintf(stderr, "usage: INFINITE_PLUGIN_ENGINE=<Infinite binary> %s [--metrics] <Instrument.vst3> <FX.vst3> [<R1.inf> <R2.inf>]\n", argv[0]);
       return 2;
    }
    Plugin inst, fx;
