@@ -488,10 +488,10 @@ void FieldElementNode::LoadDeviceFile(const Field::DeviceFile& device)
    code = device.code;
    auto itMax = device.nodeSettings.find("maxElements");
    if (itMax != device.nodeSettings.end())
-      maxElements = (int)itMax->second;
+      maxElements = (int)std::clamp(itMax->second, 1.0, (double)kMaxFieldElements);
    auto itGen = device.nodeSettings.find("generateCount");
    if (itGen != device.nodeSettings.end())
-      generateCount = (int)itGen->second;
+      generateCount = (int)std::clamp(itGen->second, 1.0, (double)kMaxFieldElements);
    Apply();
    // Param values are matched by name against whatever the freshly-compiled
    // program actually declared - a name the target's code doesn't declare
@@ -624,7 +624,7 @@ bool FieldElementNode::Apply()
    {
       newState.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
    }
-   size_t allocCount = (mActualElementCount > 0) ? (size_t)mActualElementCount : (size_t)std::max(1, maxElements);
+   size_t allocCount = (mActualElementCount > 0) ? (size_t)mActualElementCount : (size_t)std::clamp(maxElements, 1, kMaxFieldElements);
    newState.Allocate(Field::Domain::Element, allocCount);
    newState.Transplant(mState);
    mState = std::move(newState);
@@ -733,7 +733,7 @@ void FieldElementNode::CookIfNeeded(int frameId)
    }
    else
    {
-      int n = std::max(1, generateCount);
+      int n = std::clamp(generateCount, 1, kMaxFieldElements);
       generatedMesh.vertices.resize((size_t)n);
       for (int i = 0; i < n; ++i)
       {
@@ -768,7 +768,7 @@ void FieldElementNode::CookIfNeeded(int frameId)
    }
 
    size_t inCount = inMesh.vertices.size();
-   size_t boundCount = std::min(inCount, (size_t)std::max(1, maxElements));
+   size_t boundCount = std::min(inCount, (size_t)std::clamp(maxElements, 1, kMaxFieldElements));
    mWasTruncated = (inCount > boundCount);
    mActualElementCount = (int)boundCount;
 

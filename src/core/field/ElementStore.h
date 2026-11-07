@@ -6,6 +6,11 @@
 #include <vector>
 #include <unordered_map>
 
+// Ceiling for a Field Element / Primitive element count (max elements, generate count).
+// The knob stops at 200000; a patch, OSC, RPC or device file stores any int, and
+// generateCount 1e9 resized a ~32 GB vertex array (B-L-005).
+constexpr int kMaxFieldElements = 1 << 21;
+
 namespace Field
 {
    struct MeshWriteMask
