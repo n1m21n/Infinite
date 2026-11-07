@@ -48,7 +48,9 @@ namespace
       { 0.88f, 0.32f, 1.9965f, 1.3f },  // flute: the jet table clips above ~1.3
       { 0.40f, 0.45f, 2.0f, 1.9f },     // brass
    };
-   constexpr float kSaxReedPos = 0.4f;   // reed's share of the conical bore
+   // Output trim: an ff 4-note chord at volume 0.8 peaks under -1 dBFS (it hard-clipped at +7).
+   constexpr float kHeadroom = 0.35f;
+   constexpr float kSaxReedPos = 0.4f;  // reed's share of the conical bore
    constexpr float kJetRatio = 0.32f;    // flute: jet delay over the bore delay
    constexpr float kTongueAmount = 0.4f; // onset overshoot of the breath pressure
    constexpr double kTongueMs = 40.0;    // its decay time constant
@@ -254,7 +256,7 @@ public:
 
          // Radiation from the bell passes the highs and not the lowest
          // rumble of the breath; then the usual DC guard.
-         float y = mDc.Process(mHighpass.Process(dry)) * volume;
+         float y = mDc.Process(mHighpass.Process(dry)) * kHeadroom * volume;
          if (!std::isfinite(y))
          {
             y = 0.0f;

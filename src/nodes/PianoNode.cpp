@@ -45,7 +45,7 @@ namespace
    constexpr double kTreble = 8.0;       // above C5, both again: contact well under a period
    constexpr double kStringZ = 4.0;      // string impedance, kg/s
    constexpr double kStrikePos = 0.125;  // hammer at 1/8 of the string
-   constexpr double kOutGain = 0.7;
+   constexpr double kOutGain = 0.2; // an ff 4-note chord at volume 0.8 peaks under -1 dBFS (0.7 hard-clipped at +9)
    constexpr double kTilt = 0.45; // dB per key: long bass strings put out far more velocity
 
    // Soundboard: a dense modal bank (DenseBody.h). A ribbed spruce plate has a
