@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <map>
 #include <atomic>
 #include <set>
@@ -95,6 +96,7 @@ namespace
 #include "app/graph/GenerateSamplesVoices.inc"
 #include "app/graph/GenerateSamplesNotes.inc"
 #include "app/graph/GenerateSamplesChords.inc"
+#include "app/graph/GenerateSamplesKits.inc"
 
    const char* kKitFiles[8] = { "01-kick", "02-snare", "03-closed-hat", "04-open-hat", "05-clap", "06-low-tom", "07-high-tom", "08-bell" };
    // styled.py's ban-free families that always get a chord layer.
@@ -2273,6 +2275,20 @@ Compiled Compile(const Recipe& recipe)
          const double pan = (i == 0 || i == 1) ? 0.0 : dr.Uniform(-cr.spread, cr.spread);
          force[lane + "_pan"] = { 'f', Num(std::round(pan * 100.0) / 100.0) };
       }
+      // The genre's own kick and snare: decay and kick body from the real packs of the style (GenerateSamplesKits.inc),
+      // each still a little different per take. Its own stream, so no other draw moves.
+      if (!std::getenv("INFINITE_NOGENREKIT"))
+         for (const GenKit& gk : kGenKits)
+            if (std::strcmp(gk.id, st.id) == 0)
+            {
+               Rng gr(std::string("genrekit:") + std::to_string(recipe.seed));
+               auto put = [&](int i, const char* k, double v) { force["lane" + std::to_string(i) + k] = { 'f', Num(std::round(v * 100.0) / 100.0) }; };
+               put(0, "_decay", std::clamp(gk.kickDecay * gr.Uniform(0.8, 1.25), 0.03, 0.85));
+               put(1, "_decay", std::clamp(gk.snareDecay * gr.Uniform(0.8, 1.25), 0.03, 0.85));
+               put(0, "_pitch", gk.kickSemis + gr.Uniform(-1.0, 1.0));
+               put(0, "_transient", std::clamp((double)gk.kickTransient + gr.Uniform(-0.15, 0.15), -1.0, 1.0));
+               break;
+            }
       // A kick or hat built from a synth, in place of the sample, two takes in five:
       // pitch-dropped sub kicks from tight to 808, and metallic hats.
       struct Replace { int lane; int node; float gain; };
