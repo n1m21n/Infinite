@@ -262,8 +262,8 @@ endif()
 #   OFF: the "-lgpl-shared" build, no --enable-gpl, no x264. Required to
 #       exist and to actually work (not just compile) for distros that
 #       cannot ship a bundled H.264 encoder (Fedora, RHEL, Flathub's main
-#       repo) - see LICENSE's promise about INFINITE_ENABLE_VST3=OFF, which
-#       this mirrors. RecorderStart's H.264 path is unavailable in this
+#       repo) - see LICENSE, which promises this configuration stays MIT.
+#       RecorderStart's H.264 path is unavailable in this
 #       configuration; video decode/playback (no libx264 needed for that)
 #       still works, since decoding H.264 needs no patent-encumbered encoder.
 #
@@ -373,11 +373,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Linux FFmpeg: ${FFMPEG_ARCHIVE_NAME} (INFINITE_ENABLE_GPL_CODECS=${INFINITE_ENABLE_GPL_CODECS})")
 endif()
 
-# VST3 plugin hosting backend. On by default: the Steinberg VST3 SDK is
-# GPLv3-or-proprietary, and linking it makes the distributed binary GPLv3
-# too (see LICENSE). Do not flip this default without the user's explicit
-# sign-off - it's a licensing decision, not a technical one.
-option(INFINITE_ENABLE_VST3 "Build the GPLv3 VST3 plugin backend" ON)
+# VST3 plugin hosting backend. On by default: the Steinberg VST3 SDK is MIT
+# licensed since 3.8 (external/vst3sdk/LICENSE.txt), so linking it adds no
+# copyleft terms (see LICENSE).
+option(INFINITE_ENABLE_VST3 "Build the VST3 plugin backend" ON)
 
 set(IMGUI_DIR external/imgui)
 set(NODE_EDITOR_DIR external/imgui-node-editor)

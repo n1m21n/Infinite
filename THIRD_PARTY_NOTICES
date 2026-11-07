@@ -2,7 +2,7 @@ Infinite - Third-Party Notices
 ===============================
 
 This file lists third-party components bundled with Infinite beyond what
-`LICENSE` already covers (the Steinberg VST3 SDK and, on Windows, ONNX
+`LICENSE` already covers (the Steinberg VST3 SDK, MIT since 3.8, and, on Windows, ONNX
 Runtime / DirectML / u2netp.onnx - see `LICENSE` and
 `assets/models/NOTICE.txt`). It will grow; this is the first entry, added
 alongside Linux Phase 3 (video/recorder/camera).
@@ -218,3 +218,15 @@ download.steinberg.net at configure time when `INFINITE_ENABLE_ASIO=ON`, and
 builds without ASIO if the download is unavailable or does not match. Use of
 the SDK is under Steinberg's own licence agreement, which the project owner
 has accepted; it is not relicensed under Infinite's licence.
+
+Apple AudioUnitSDK (macOS plugin builds)
+----------------------------------------
+
+Used by the AU v2 build of the Infinite plugin, through the VST3 SDK's AU
+wrapper (`public.sdk/source/vst/auwrapper`). CMake fetches AudioUnitSDK
+1.2.0 (tag `AudioUnitSDK-1.2.0`, https://github.com/apple/AudioUnitSDK) at
+configure time; it is not part of this repository.
+
+Copyright (c) Apple Inc. Licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). The shipped AU bundle carries
+the licence text in its Resources folder (added with the AU build, plan step 1.6).
