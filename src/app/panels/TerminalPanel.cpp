@@ -194,8 +194,14 @@ namespace
       sActive = std::clamp(sActive, 0, std::max(0, (int)sTabs.size() - 1));
       if (sTabs.empty())
       {
-         gTerminalOpen = false;
-         gTerminalFocus = false;
+         // Beside the chat, closing the last shell only closes the shell, not the chat's dock panel.
+         if (gChatSideTerminal)
+            gChatSideTerminal = false;
+         else
+         {
+            gTerminalOpen = false;
+            gTerminalFocus = false;
+         }
       }
    }
 
@@ -941,11 +947,6 @@ namespace
 
    void DrawTerminalBody()
    {
-      if (sTabs.empty() && !gChatSideTerminal && DrawTerminalWelcome())
-      {
-         DrawDockMenu(false, nullptr);
-         return;
-      }
       if (sTabs.empty())
       {
          sTabs.push_back(NewTab(80, 24));

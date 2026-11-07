@@ -1076,6 +1076,14 @@ namespace app
                         StartSignIn(*ag);
                   }
          }
+         // Onboarding finished: an agent is ready, so the shell opened beside the chat for the setup goes away.
+         {
+            static bool wasReady = false;
+            const bool nowReady = AnyReady();
+            if (!wasReady && nowReady && gChatSideTerminal && !sOnboard.chosen.empty())
+               gChatSideTerminal = false;
+            wasReady = nowReady;
+         }
          PollMachineCheck();
          PollLogins();
          PollVerifies();
@@ -3733,9 +3741,11 @@ namespace app
          for (const chat::Problem& p : chat::CheckMachine(o.facts))
             if (!p.blocks)
                CardText(c, T(p.text.c_str()), Dim());
-         const int b = CardButtons(c, { { T("I have an account"), true }, { T("I don't have one"), false } });
-         if (b >= 0)
-            Choose(o.pick, b == 0);
+         // One button: the provider's own sign-in page offers "Create account" to someone who has none.
+         const CliSetup::Agent* pickAgent = CliSetup::FindAgent(o.pick);
+         const std::string connect = Say("Connect %s", pickAgent != nullptr ? pickAgent->name : "");
+         if (CardButtons(c, { { connect.c_str(), true } }) >= 0)
+            Choose(o.pick, true);
          EndCard(c);
       }
 
@@ -3900,65 +3910,6 @@ namespace app
             DrawProgressCard(width);
          else if (!DrawMachineCard(width))
             DrawPickCard(width);
-         return true;
-      }
-
-      // Step 5, once: the folder agents work in and whether they may edit files there.
-      bool DrawFolderStep(float width)
-      {
-         CliSetup::Config& prefs = CliSetup::Prefs();
-         if (!AnyReady() || prefs.introduced)
-            return false;
-         const float pad = tok::space_3, rowH = 34.0f;
-         const float height = pad * 2.0f + 28.0f + rowH * 2.0f + 34.0f;
-         const ImVec2 at = ImGui::GetCursorScreenPos();
-         GlassCard(at, width, height);
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         {
-            Weight s(UiType::Weight::Semibold);
-            dl->AddText(ImVec2(at.x + pad, at.y + pad), ImGui::GetColorU32(ImGuiCol_Text), T("Your files"));
-         }
-         float y = at.y + pad + 28.0f;
-         // Folder
-         std::string folder = prefs.workspace;
-         if (folder.empty())
-            folder = T("The open patch's folder");
-         else if (const size_t sl = folder.find_last_of("/\\"); sl != std::string::npos && sl + 1 < folder.size())
-            folder = folder.substr(sl + 1);
-         dl->AddText(ImVec2(at.x + pad, y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), T("Folder"));
-         {
-            const float w = ImGui::CalcTextSize(T("Choose…")).x + 2.0f * tok::space_2;
-            ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - w, y + (rowH - 24.0f) * 0.5f));
-            if (ChipButton::Draw(T("Choose…"), false, 24.0f))
-            {
-               const std::string dir = Platform::OpenFolderDialog("Folder for agents", prefs.workspace);
-               if (!dir.empty())
-               {
-                  prefs.workspace = dir;
-                  SaveCliConfig();
-               }
-            }
-            const float fw = ImGui::CalcTextSize(folder.c_str()).x;
-            dl->AddText(ImVec2(at.x + width - pad - w - tok::space_2 - fw, y + (rowH - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), folder.c_str());
-         }
-         y += rowH;
-         // Access
-         dl->AddText(ImVec2(at.x + pad, y + (rowH - ImGui::GetFontSize()) * 0.5f), Dim(), T("Edit files in it"));
-         ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - 36.0f, y + (rowH - 20.0f) * 0.5f));
-         if (Switch::Box("##access", &prefs.folderAccess))
-            SaveCliConfig();
-         y += rowH + 4.0f;
-         {
-            const float w = ImGui::CalcTextSize(T("Continue")).x + 4.0f * tok::space_2;
-            ImGui::SetCursorScreenPos(ImVec2(at.x + width - pad - w, y));
-            if (ChipButton::Draw(T("Continue"), true, 26.0f, w))
-            {
-               prefs.introduced = true;
-               SaveCliConfig();
-            }
-         }
-         ImGui::SetCursorScreenPos(at);
-         ImGui::Dummy(ImVec2(width, height));
          return true;
       }
 
@@ -4252,7 +4203,7 @@ namespace app
          sPieces.clear();
          sEntryRects.clear();
          const float width = ImGui::GetContentRegionAvail().x;
-         const bool setup = DrawSetup(width) || DrawFolderStep(width);
+         const bool setup = DrawSetup(width);
          if (setup && !sThread.entries.empty())
             ImGui::Dummy(ImVec2(0.0f, tok::space_3));
          if (!setup && sThread.entries.empty())
