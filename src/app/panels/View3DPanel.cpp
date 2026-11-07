@@ -559,6 +559,8 @@ namespace
          sPreCam.roll = sRoll;
          sPreCam.ortho = sOrtho;
          sPreCam.set = true;
+         sCamZoom = 1.0f;   // a fresh camera view starts centred, not where the last one was panned
+         sCamPan = ImVec2(0, 0);
       }
       sCameraView = true;
    }
@@ -571,6 +573,11 @@ namespace
       const bool locked = sLockCam && !force;
       sLockDirty = locked;
       sCameraView = locked;
+      if (!locked)
+      {
+         sCamZoom = 1.0f;
+         sCamPan = ImVec2(0, 0);
+      }
       sOrtho = false;
       sEl = std::asin(std::clamp(-sCam.fwd[1], -1.0f, 1.0f));
       sAz = std::atan2(-sCam.fwd[2], -sCam.fwd[0]);
@@ -5216,8 +5223,11 @@ namespace
             dl->AddLine(c, mouse, Hex(kWire, 0.7f));
       }
 
-      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered) ||
-                                            DrawEdit(dl, scene, mouse, hovered));
+      // The nav ball and tool pad sit above Pose, Sculpt and Edit: a press on them is theirs, not a stroke or a box select.
+      const bool overUi = navBall >= 0 || onNav;
+      const bool toolHover = hovered && !overUi;
+      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, toolHover)) || DrawSculpt(dl, scene, mouse, toolHover) ||
+                                            DrawEdit(dl, scene, mouse, toolHover));
       gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sPose.stroking || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sRightOk = sOp.mode == 0 && !posing;
@@ -5241,7 +5251,15 @@ namespace
       if (!ImGui::IsAnyMouseDown())
          sLockUndo = false;
 
-      if (hovered && sOp.mode == 0 && !posing && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+      // Shift + double-click on empty space also works inside Pose, Sculpt and Edit (their own click handlers ran above).
+      if (hovered && sOp.mode == 0 && posing && !overUi && io.KeyShift && !io.KeyAlt && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+          Pick(scene, mouse, true) == 0)
+      {
+         GlideTo([] { std::copy(sSet->cursor, sSet->cursor + 3, sTarget); });
+         sBoxOn = false;
+         sLasso = false;
+      }
+      if (hovered && sOp.mode == 0 && (!posing || overUi) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
       {
          if (sZoomArmed)
          {
@@ -7220,7 +7238,8 @@ namespace
    void DrawRenderTab(Scene3DNode* scene)
    {
       Render3DNode& look = scene->Look();
-      ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
+      if (Card(T("Engine")))
+         ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
       if (look.engine == 1 && Card(T("Path Tracing")))
       {
          struct { const char* label; const char* id; int* v; int hi; } rows[] = {
