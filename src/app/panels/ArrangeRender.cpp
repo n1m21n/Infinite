@@ -25,6 +25,12 @@ namespace app
          return;
       if (n->IsRecording() || n->IsFinalizing())
          return;
+      // Inside the VST3/AU plugin the DAW renders: an offline take would detach the host's audio.
+      if (Platform::PluginModeActive())
+      {
+         n->SetRecordStatus("not available inside the plugin; bounce it in the DAW");
+         return;
+      }
 
       // A live source can't be pre-synthesized for an offline take, so refuse
       // rather than write a file full of one frozen frame. An arrangement
@@ -1513,6 +1519,11 @@ namespace app
    {
       if (ArrangeRenderBusy())
          return false;
+      if (Platform::PluginModeActive())
+      {
+         ArrangeRenderFailJob(job, "not available inside the plugin; bounce it in the DAW");
+         return false;
+      }
       job.oversAtStart = AudioEngine::Instance().MasterOverSamples();
       AudioEngine::Instance().ResetMasterOverPeakHold();
 

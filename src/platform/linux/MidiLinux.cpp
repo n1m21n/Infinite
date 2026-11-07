@@ -539,6 +539,12 @@ namespace Platform
       outError.clear();
       if (gSeq.running.load(std::memory_order_acquire))
          return true;
+      if (PluginModeActive())
+      {
+         // The host is the only MIDI source inside a plugin (see Platform.mm's MidiStart).
+         gSeq.running.store(true, std::memory_order_release);
+         return true;
+      }
 
       MidiStop(); // close anything stale first
 

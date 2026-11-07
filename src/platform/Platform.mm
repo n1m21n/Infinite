@@ -5766,6 +5766,13 @@ namespace Platform
    {
       if (gMidiRunning)
          return true;
+      if (PluginModeActive())
+      {
+         // Inside a plugin the host is the only MIDI source (PluginEngine injects its events);
+         // opening hardware ports would double every note the host also routes.
+         gMidiRunning = true;
+         return true;
+      }
 
       OSStatus st = MIDIClientCreateWithBlock(CFSTR("Infinite"), &gMidiClient,
          ^(const MIDINotification* message) {

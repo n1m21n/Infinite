@@ -71,8 +71,11 @@ bool AudioEngine::Start(std::string& outError)
    // AudioDeviceOpen returns, and SetTopology's retire drain must never treat
    // that window as "no audio thread exists".
    mDeviceOpen.store(true, std::memory_order_release);
-   if (!Platform::AudioDeviceOpen(&AudioEngine::RenderThunk, this, sampleRate, outError,
-                                  mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames))
+   const Platform::AudioDeviceOverride* host = Platform::AudioDeviceOverrideRef();
+   const bool opened = host ? host->open(&AudioEngine::RenderThunk, this, sampleRate, outError)
+                            : Platform::AudioDeviceOpen(&AudioEngine::RenderThunk, this, sampleRate, outError,
+                                                        mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames);
+   if (!opened)
    {
       mDeviceOpen.store(false, std::memory_order_release);
       return false;
@@ -90,7 +93,10 @@ void AudioEngine::Stop()
    static const bool sStall = getenv("INFINITE_QUITSTALLTEST") != nullptr;
    if (sStall)
       std::this_thread::sleep_for(std::chrono::seconds(30));
-   Platform::AudioDeviceClose();
+   if (const Platform::AudioDeviceOverride* host = Platform::AudioDeviceOverrideRef())
+      host->close();
+   else
+      Platform::AudioDeviceClose();
    mSampleRate.store(0.0, std::memory_order_relaxed);
    // AudioDeviceClose has returned, so no callback can still hold a list.
    mDeviceOpen.store(false, std::memory_order_release);

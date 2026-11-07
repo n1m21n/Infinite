@@ -374,6 +374,49 @@ void Transport::AdvanceAudioClock(int numFrames)
    AdvanceEngineClock(numFrames, mAudioSampleRate.load(std::memory_order_relaxed));
 }
 
+bool Transport::FollowHost(const HostTime& host)
+{
+   mLoopSuspended.store(true, std::memory_order_relaxed);
+   if (mPendingLaunch.load(std::memory_order_relaxed) != kLaunchNothing)
+      CancelLaunch(); // quantized launches belong to the app's own transport
+   if (host.sigNum > 0 && host.sigDen > 0 &&
+       (host.sigNum != TimeSigNumerator() || host.sigDen != TimeSigDenominator()))
+      SetTimeSignature(host.sigNum, host.sigDen);
+   if (host.playing != mPlaying.load(std::memory_order_relaxed))
+      SetPlaying(host.playing);
+
+   const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
+   double bpm = mBpm.load(std::memory_order_relaxed);
+   if (host.tempoValid && host.bpm > 0.0 && std::fabs(host.bpm - (double)Tempo()) > 1e-6)
+      SetTempo((float)host.bpm);
+   if (host.tempoValid && host.bpm > 0.0)
+      bpm = host.bpm;
+   if (!host.ppqValid || sr <= 0.0)
+      return false;
+
+   // Where the clock stands now is where the last block ended (a pending seek counts).
+   const double pendingSeek = mPendingSeekSeconds.load(std::memory_order_relaxed);
+   const double expected = pendingSeek >= 0.0 ? pendingSeek * (mBpm.load(std::memory_order_relaxed) / 60.0) : Beats();
+   const double oneSample = bpm / (60.0 * sr);
+   if (std::fabs(host.ppq - expected) <= oneSample + 1e-9)
+      return false;
+
+   // Jump: re-seat the clock at the host position. The pending tempo (if any) is applied
+   // here, since the offsets are re-seated anyway.
+   const double target = std::max(0.0, host.ppq);
+   const double pendingBpm = mPendingBpm.exchange(-1.0f, std::memory_order_relaxed);
+   if (pendingBpm > 0.0)
+      mBpm.store((float)pendingBpm, std::memory_order_relaxed);
+   const double useBpm = mBpm.load(std::memory_order_relaxed);
+   DropFrameClock();
+   mPendingSeekSeconds.store(-1.0, std::memory_order_relaxed);
+   mAudioBeatsOffset.store(target, std::memory_order_relaxed);
+   mAudioSecondsOffset.store(target * (60.0 / useBpm), std::memory_order_relaxed);
+   mAudioSampleCounter.store(0, std::memory_order_relaxed);
+   mResetEpoch.fetch_add(1, std::memory_order_relaxed);
+   return true;
+}
+
 Transport::LaunchAction Transport::RequestTogglePlay()
 {
    // A second press while one waits cancels it, whatever the grid is.

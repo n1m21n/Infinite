@@ -441,6 +441,30 @@ namespace Platform
                         int requestedBufferFrames = 0);
    void AudioDeviceClose();
 
+   // ---- plugin mode (docs/plans/vst-au/README.md 8.1) ----
+   // True when this process is the engine behind a VST3/AU plugin instance: the host's audio
+   // replaces the audio device, the host's MIDI replaces hardware MIDI, and Audio In reads the
+   // host's buses. Set once at startup, before any node or audio code runs.
+   inline std::atomic<bool>& PluginModeFlag()
+   {
+      static std::atomic<bool> on { false };
+      return on;
+   }
+   inline bool PluginModeActive() { return PluginModeFlag().load(std::memory_order_relaxed); }
+   // Plugin mode's stand-in for AudioDeviceOpen/Close. AudioEngine calls these instead of the
+   // real device when they are set (src/plugin/engine/HostAudio.cpp sets them).
+   struct AudioDeviceOverride
+   {
+      bool (*open)(AudioRenderCallback callback, void* userData, double& outSampleRate, std::string& outError);
+      void (*close)();
+      int (*bufferFrames)();
+   };
+   inline const AudioDeviceOverride*& AudioDeviceOverrideRef()
+   {
+      static const AudioDeviceOverride* o = nullptr;
+      return o;
+   }
+
    // Audio graph worker threads (AudioWorkerPool). Called ON the worker:
    // puts it in the same realtime class as the device's own IO thread -
    // macOS joins the open output device's os_workgroup (with a

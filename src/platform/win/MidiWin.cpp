@@ -347,6 +347,12 @@ namespace Platform
       outError.clear();
       if (gRunning.load(std::memory_order_acquire))
          return true;
+      if (PluginModeActive())
+      {
+         // The host is the only MIDI source inside a plugin (see Platform.mm's MidiStart).
+         gRunning.store(true, std::memory_order_release);
+         return true;
+      }
 
       MidiStop(); // close any stale handles first
 

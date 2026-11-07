@@ -555,6 +555,17 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    mPreparedBlock = 0;
    mStatus = "loading " + desc.name + "...";
 
+   // Inside Infinite's own VST3/AU plugin the DAW hosts the other plugins: loading one here
+   // would nest hosts (and their editors) inside the engine process. The node keeps its
+   // identity, mappings and state, so the patch still opens in the app as it was.
+   if (Platform::PluginModeActive())
+   {
+      mHandle = nullptr;
+      mLoadFailed = true;
+      mStatus = "not available inside the Infinite plugin; put it in the DAW instead";
+      return;
+   }
+
    // A plugin that took the app down in an earlier run (see PluginCrashGuard).
    Platform::PluginDesc create = desc;
    create.outOfProcess = false;

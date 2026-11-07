@@ -362,7 +362,9 @@ public:
       const unsigned int deviceFilter = mDevice.load(std::memory_order_relaxed);
       for (int i = 0; i < n; i++)
       {
-         if (deviceFilter != 0 && (unsigned int)msgs[i].device != deviceFilter)
+         // Inside a plugin every note comes from the host (device 0), whatever the patch was
+         // bound to in the app.
+         if (deviceFilter != 0 && !Platform::PluginModeActive() && (unsigned int)msgs[i].device != deviceFilter)
             continue;
          if (channelFilter >= 0 && msgs[i].channel != channelFilter)
             continue;

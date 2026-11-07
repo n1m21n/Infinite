@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "plugin/engine/HostAudio.h"
 #include "app/graph/LearningLog.h"
 #include "platform/PluginCrashGuard.h"
 #include "core/CliSetup.h"
@@ -995,6 +996,26 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   // Plugin engine mode: this process is the engine of one VST3/AU instance
+   // (src/plugin/engine/HostAudio.h). Must run before IsHeadlessProcess() is
+   // first read below, since plugin mode is a headless process.
+   PluginEngine::Options pluginOpt;
+   const bool pluginEngine = PluginEngine::ParseArgs(argc, argv, &pluginOpt);
+   if (pluginEngine)
+   {
+      std::string pluginErr;
+      if (!PluginEngine::Init(pluginOpt, pluginErr))
+      {
+         fprintf(stderr, "plugin engine: %s\n", pluginErr.c_str());
+         return 2;
+      }
+#if defined(_WIN32)
+      _putenv_s("INFINITE_NO_UPDATE_CHECK", "1");
+#else
+      setenv("INFINITE_NO_UPDATE_CHECK", "1", 1);
+#endif
+   }
+
    // Dev/test harness runs (INFINITE_EXITAFTER) and screenshot mode
    // (IMAGERESYNTH_SCREENSHOT) create the window off-screen: a hidden window
    // still has a real GL context and still produces real ImGui frames, real GL
@@ -1035,7 +1056,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // already open hands the file to it and exits (macOS does this through Launch
    // Services). Dev harnesses that set INFINITE_EXITAFTER, and headless jobs, are
    // exempt so a test run never talks to the app someone has open.
-   if (!HeadlessJobActive() && getenv("INFINITE_EXITAFTER") == nullptr && getenv("INFINITE_NO_SINGLE_INSTANCE") == nullptr)
+   if (!HeadlessJobActive() && !pluginEngine && getenv("INFINITE_EXITAFTER") == nullptr && getenv("INFINITE_NO_SINGLE_INSTANCE") == nullptr)
    {
       std::string openArg;
       if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-' &&
@@ -1577,9 +1598,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return std::string();
    });
    MovementLog::Start();
-   if (gHeadlessJob.mode == Headless::Mode::None)
+   if (gHeadlessJob.mode == Headless::Mode::None && !pluginEngine)
       LearningLog::Start(BundledResourcePath("starter-profile"));
-   if (gHeadlessJob.mode == Headless::Mode::None)
+   if (gHeadlessJob.mode == Headless::Mode::None && !pluginEngine)
       CliSetup::StartLaunchCheck();   // keeps the infinite launcher pointed at this app; no process spawned
    // Headless jobs neither read nor write the learned profiles: a render must not depend on (or change)
    // the user's accumulated data, or the same patch renders differently run to run.
@@ -4516,6 +4537,16 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          else
             LoadPatchFrom(gHeadlessJob.patch);
       }
+   }
+   else if (pluginEngine)
+   {
+      // The plugin's engine: load the shell's patch (if any), then run audio from the host.
+      if (!pluginOpt.patchPath.empty())
+         LoadPatchFrom(pluginOpt.patchPath);
+      AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+      if (!StartAudioEngine(gAudioStartError))
+         fprintf(stderr, "plugin engine: audio did not start: %s\n", gAudioStartError.c_str());
+      PluginEngine::SetStarted(AudioEngine::Instance().SampleRate() > 0.0 ? std::string() : gAudioStartError);
    }
    else if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {

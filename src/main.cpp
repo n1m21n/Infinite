@@ -5,6 +5,7 @@
 #include "core/SelfUpdate.h"
 #include "core/CoverageFlush.h"
 #include "core/InfiniteCli.h"
+#include "plugin/engine/HostAudio.h"
 
 #include <cstring>
 
@@ -44,6 +45,9 @@ int main(int argc, char** argv)
    auto& window = fc.window;
    while (!glfwWindowShouldClose(window))
    {
+      if (PluginEngine::QuitRequested())
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      PluginEngine::MainFrameTick();
       DrawFramePump(fc);
       DrawMenuBar(fc);
       DrawLayout(fc);
@@ -98,7 +102,7 @@ int main(int argc, char** argv)
    // only ever changed on this thread, so the audio engine can still be running.
    SetQuitStep("save prediction profiles");
    // Headless renders never write the learned profiles; nor does a run with learning off or after Forget me.
-   if (gHeadlessJob.mode == Headless::Mode::None && LearningLog::MaySaveProfiles())
+   if (gHeadlessJob.mode == Headless::Mode::None && !Platform::PluginModeActive() && LearningLog::MaySaveProfiles())
    {
       if (ColorStats::Engine::Instance().HasLearnedData())
          ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");

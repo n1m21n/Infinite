@@ -547,7 +547,9 @@ namespace app
 
    bool IsHeadlessProcess()
    {
-      return HeadlessJobActive() || getenv("INFINITE_EXITAFTER") != nullptr ||
+      // Plugin engine mode (src/plugin/engine/HostAudio.h) is headless too: hidden window, no
+      // splash, autosave, control port or update check.
+      return HeadlessJobActive() || Platform::PluginModeActive() || getenv("INFINITE_EXITAFTER") != nullptr ||
              getenv("INFINITE_COMPAUDIT") != nullptr || getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
    }
 

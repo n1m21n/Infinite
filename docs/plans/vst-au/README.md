@@ -1,6 +1,6 @@
 # Infinite as a VST3 + AU plugin: ship plan
 
-Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW runs), 1.1 licence, 1.2 `Ipc::` layer (mac proven by `ipc-check`; Linux/Windows compile in CI), 1.3 shm protocol `PluginIpc` (mac proven by `ipc_bench --check`: offline exact + bit-identical, MIDI/params/transport, 5 MB messages, stall resync with no stale audio, hang detect, kill, quit). Next: 1.4. Owner decisions 2026-11-07: **no plugin trial** (the free app is the way to try Infinite; the plugin needs a key), **every DAW on every OS** is the target, and existing nodes and settings change wherever the plugin needs it. Waiting on owner: DAWs to test in, spending (12.4). Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
+Status: chunk 1 started on branch `plugin/c1-engine-shell` (2026-11-07). Done: 1.0 spike (macOS, minus DAW runs), 1.1 licence, 1.2 `Ipc::` layer (mac proven by `ipc-check`; Linux/Windows compile in CI), 1.3 shm protocol `PluginIpc` (mac proven by `ipc_bench --check`: offline exact + bit-identical, MIDI/params/transport, 5 MB messages, stall resync with no stale audio, hang detect, kill, quit), 1.4 engine plugin mode (`--plugin-engine`, host audio backend, `Transport::FollowHost`, host MIDI on a 32-sample grid, Audio In host sources, Plugin node + Arrange render refused inside the plugin; mac proven by `plugin_engine_check`: FX pass-through exact, note on its grid point, one jump on relocate, repeat render bit-identical). Next: 1.5. Owner decisions 2026-11-07: **no plugin trial** (the free app is the way to try Infinite; the plugin needs a key), **every DAW on every OS** is the target, and existing nodes and settings change wherever the plugin needs it. Waiting on owner: DAWs to test in, spending (12.4). Lane 3 (Major: new platform surface, new process model, new file format inside DAW projects).
 Read first: `docs/DECISIONS.md`, `infinite-lifecycle`. Skills that own the detail: `build-discipline`, `ci-preflight`, `windows-parity`, `linux-parity`, `tool-first`, `ship-infinite`, `plugin-host-hardening`, `audio-pipeline-sweep`, `av-sync-sweep`, `release-notes-audit`.
 Every decision below is settled. Items that need the owner's approval under the "new features need approval" rule are listed once, in 12.4, each with the recommended answer.
 
@@ -146,7 +146,7 @@ Recorded 2026-11-07 (M2 8 GB, app 1.1.0) in `tests/plugin/baseline.json` by `too
 | # | Value | Note |
 |---|---|---|
 | B-1 | 62.8 MB | |
-| B-2 | 195 MB | peak RSS of headless 10 s render; true idle RSS waits for plugin mode (1.4). 4 instances fit in 8 GB, S1-c not hit |
+| B-2 | 195 MB headless, ~310 MB plugin mode | 195 MB = peak RSS of headless 10 s render; ~310 MB = peak RSS of the engine in plugin mode during `plugin_engine_check` (hidden window, GL context up). 4 instances fit in 8 GB, S1-c not hit; trimming the hidden-window cost is a 2.x item |
 | B-3 | 0.34 s | headless start to 0.1 s rendered |
 | B-4 | 0.056 core | offline, stand-in patch `first-music-image.inf`; R1 value waits for 1.4 |
 | B-5 | `ipc_bench` (1.3): p50 28 µs, p99 61 µs at 128 (2.3 % of the block); 32: 17/47 µs; 2048: 72/155 µs; 0 xruns at every size | S1-b not hit. Host thread pays p50 12 µs per `Process()` at 128 (0.45 % of a core, M-8 budget 3 %) |
@@ -154,7 +154,7 @@ Recorded 2026-11-07 (M2 8 GB, app 1.1.0) in `tests/plugin/baseline.json` by `too
 | B-7 | identical | stand-in patch; known exception unchanged |
 | B-8 | validator 47/0, auval PASS | on the spike shell (stands in for "again"); pluginval waits for 1.7 |
 
-R1-R4 are not frozen yet: headless refuses patches with live MIDI or audio input, so they freeze with plugin mode in 1.4. Spike details: `tools/plugin/spike/README.md`.
+R1 and R2 are frozen in `tests/plugin/patches/` (1.4): `R1-instrument.inf` (MIDI Notes -> Analog -> Delay -> Reverb -> out, Audio Analyze -> Shape -> Output) and `R2-fx.inf` (Audio In -> Audio Filter -> Delay -> out). R3 and R4 freeze with the view work in chunk 2. Deferred from 1.4 to 2.2: CC device bindings in plugin mode and 32-sample parameter sub-blocks (events already split audio on that grid). Spike details: `tools/plugin/spike/README.md`.
 
 Reference patches R1-R4 are picked in 1.0 from `patch-universe-library` and frozen in `tests/plugin/patches/`: R1 instrument (synth, notes from host), R2 FX (Audio In -> filter -> delay -> Audio Out), R3 audio-reactive visual (Audio In -> analysis -> Field Pixel), R4 heavy (Field Synth + 3D).
 

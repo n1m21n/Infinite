@@ -442,6 +442,8 @@ endif()
 
 set(COMMON_SOURCES
     src/main.cpp
+    # Plugin engine mode (docs/plans/vst-au/README.md 8.1): host-driven audio for one plugin instance
+    src/plugin/engine/HostAudio.cpp
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
     src/app/Startup.cpp
@@ -1105,6 +1107,8 @@ add_library(infinite_plugin_ipc STATIC src/plugin/ipc/PluginIpc.cpp)
 target_link_libraries(infinite_plugin_ipc PUBLIC infinite_ipc)
 add_executable(ipc_bench src/plugin/ipc/IpcBench.cpp)
 target_link_libraries(ipc_bench PRIVATE infinite_plugin_ipc)
+add_executable(plugin_engine_check src/plugin/engine/PluginEngineCheck.cpp)
+target_link_libraries(plugin_engine_check PRIVATE infinite_plugin_ipc)
 
 # `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
 add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
@@ -1315,6 +1319,7 @@ target_include_directories(Infinite PRIVATE
 )
 
 target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib vterm_lib)
+target_link_libraries(Infinite PRIVATE infinite_plugin_ipc)
 target_sources(Infinite PRIVATE ${TERMINAL_CORE_SOURCES})
 if(UNIX AND NOT APPLE)
     target_link_libraries(Infinite PRIVATE util)

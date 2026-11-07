@@ -164,6 +164,24 @@ public:
    // frame-driven one.
    void AdvanceAudioClock(int numFrames);
 
+   // Plugin mode (docs/plans/vst-au/README.md 8.1): the host owns time. Called on the audio
+   // thread before each host block, before AdvanceAudioClock. Tempo, time signature and
+   // play state follow the host; a host position that differs from where the clock expects to
+   // be by more than one sample is a jump (locate, scrub, loop wrap) and relocates the clock
+   // (reset epoch bumped; DSP state is kept). Infinite's own loop wrap is suspended, since the
+   // host loops itself. Values the host does not provide (valid flags false) are left alone.
+   struct HostTime
+   {
+      bool playing = false;
+      bool tempoValid = false;
+      double bpm = 120.0;
+      bool ppqValid = false;
+      double ppq = 0.0;
+      int sigNum = 0, sigDen = 0; // 0 = not provided
+   };
+   // Returns true when the block was a jump.
+   bool FollowHost(const HostTime& host);
+
    // The musical position at the START of the block the clock owner most
    // recently advanced over - captured before the advance, so it is the real
    // start even when that block crossed a loop end and Beats() has already
