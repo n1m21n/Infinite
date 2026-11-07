@@ -285,6 +285,9 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("countX", countX); v.Int("countY", countY);
+      // A patch, OSC or RPC stores any int: countX 1e9 looped 1e18 points (B-L-003).
+      countX = std::clamp(countX, 1, 1024);
+      countY = std::clamp(countY, 1, 1024);
       v.Float("spacingX", spacingX); v.Float("spacingY", spacingY);
       v.Float("jitter", jitter); v.Float("pointSize", pointSize);
       v.Float("seed", seed); v.Color("tint", tint);
