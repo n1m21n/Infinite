@@ -581,8 +581,28 @@ namespace
       sOrtho = false;
       sEl = std::asin(std::clamp(-sCam.fwd[1], -1.0f, 1.0f));
       sAz = std::atan2(-sCam.fwd[2], -sCam.fwd[0]);
+      // Like Blender: leaving a camera keeps what you see. The pivot stays where it was and the eye backs off or closes
+      // in until the pivot is drawn at the size the camera frame showed it (the free view fills the panel at the
+      // viewport lens, the frame was 92% of it at the camera's lens), and the camera's roll carries over.
+      float dist = sDist;
+      if (!locked && !sCam.ortho)
+      {
+         const float camScale = sCam.proj.m[5];
+         const float viewScale = 1.0f / std::tan(ViewFov() * 0.5f * kPi / 180.0f);
+         if (camScale > 1e-4f)
+            dist = std::clamp(sDist * viewScale / camScale, 0.1f, 500.0f);
+      }
       for (int k = 0; k < 3; k++)
          sTarget[k] = sCam.eye[k] + sCam.fwd[k] * sDist;
+      sDist = dist;
+      if (!locked)
+      {
+         const float up0[3] = { -std::sin(sEl) * std::cos(sAz), std::cos(sEl), -std::sin(sEl) * std::sin(sAz) };
+         const float* f = sCam.fwd;
+         const float r[3] = { f[1] * up0[2] - f[2] * up0[1], f[2] * up0[0] - f[0] * up0[2], f[0] * up0[1] - f[1] * up0[0] };
+         sRoll = std::atan2(sCam.up[0] * r[0] + sCam.up[1] * r[1] + sCam.up[2] * r[2],
+                            sCam.up[0] * up0[0] + sCam.up[1] * up0[1] + sCam.up[2] * up0[2]);
+      }
    }
 
    // Any free rotation ends an axis view.
@@ -756,8 +776,10 @@ namespace
    // A turn of the view. With a selection the view swings round it, so it stays where it was on screen.
    void OrbitBy(Scene3DNode* scene, float dAz, float dEl)
    {
+      const bool fromCamera = sCameraView;
       Orbited();
-      sRoll = 0.0f;
+      if (!fromCamera)
+         sRoll = 0.0f;   // the turn that leaves a camera keeps its roll, so nothing snaps; the next one levels it
       float p[3];
       const bool around = sSet->orbitSelection && SelectionCenter(scene, p);
       float eye[3], local[3] = { 0, 0, 0 };
@@ -2501,11 +2523,10 @@ namespace
    enum class WheelUse { Orbit, Pan, Zoom };
    struct WheelNav { WheelUse use; float dx, dy; };
 
-   // What one frame of wheel / two-finger scroll asks of the camera. Plain scroll orbits, Shift pans, Ctrl or Cmd zooms
-   // (everywhere but macOS the plain wheel zooms, as a mouse wheel does). macOS turns Shift + vertical scroll into a
-   // horizontal one before GLFW sees it (imgui.h, MouseWheelRequestAxisSwap: "on a Mac this is already enforced by the
-   // system"), so a Shift swipe up and down reached Pan as a sideways move only. A Shift scroll with no vertical part is
-   // that swap, and is turned back; a diagonal swipe arrives whole and is left alone.
+   // What one frame of wheel / two-finger scroll asks of the camera. Scroll orbits, Ctrl or Cmd zooms (everywhere but
+   // macOS the wheel zooms, as a mouse wheel does). Shift does nothing here: Shift + two-finger pan was removed as
+   // annoying (Shift + middle drag still pans). macOS turns Shift + vertical scroll into a horizontal one before GLFW sees
+   // it (imgui.h, MouseWheelRequestAxisSwap), so a Shift scroll with no vertical part is that swap, and is turned back.
    WheelNav ClassifyWheel(float wheelH, float wheel, bool shift, bool ctrl, bool super_)
    {
 #ifdef __APPLE__
@@ -2513,12 +2534,12 @@ namespace
       if (shift && wheel == 0.0f)
          std::swap(wheelH, wheel);
 #else
-      const bool zoom = !shift;
-      (void)ctrl; (void)super_;
+      const bool zoom = true;
+      (void)ctrl; (void)super_; (void)shift;
 #endif
       if (zoom)
          return { WheelUse::Zoom, wheelH, wheel };
-      return { shift ? WheelUse::Pan : WheelUse::Orbit, wheelH, wheel };
+      return { WheelUse::Orbit, wheelH, wheel };
    }
 
    // For the self-test: what the last drawn viewport saw.
