@@ -470,7 +470,23 @@ namespace GLUtil
          "out vec4 fragColor;\n"
          "uniform sampler2D uTex;\n") +
          kOutputDitherGlsl +
-         "void main() { vec4 c = texture(uTex, vUv); fragColor = vec4(OutputDither(c.rgb * c.a), c.a); }\n";
+         // Bilinear in premultiplied space: filtering straight alpha mixes the black RGB under transparent
+         // texels into the edge and draws a dark fringe; premultiplying each tap first keeps the edge colour.
+         "void main()\n"
+         "{\n"
+         "   ivec2 sz = textureSize(uTex, 0);\n"
+         "   vec2 p = vUv * vec2(sz) - 0.5;\n"
+         "   ivec2 i0 = ivec2(floor(p));\n"
+         "   vec2 f = p - vec2(i0);\n"
+         "   ivec2 hi = sz - ivec2(1);\n"
+         "   vec4 a = texelFetch(uTex, clamp(i0, ivec2(0), hi), 0);\n"
+         "   vec4 b = texelFetch(uTex, clamp(i0 + ivec2(1, 0), ivec2(0), hi), 0);\n"
+         "   vec4 c = texelFetch(uTex, clamp(i0 + ivec2(0, 1), ivec2(0), hi), 0);\n"
+         "   vec4 d = texelFetch(uTex, clamp(i0 + ivec2(1, 1), ivec2(0), hi), 0);\n"
+         "   a.rgb *= a.a; b.rgb *= b.a; c.rgb *= c.a; d.rgb *= d.a;\n"
+         "   vec4 m = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);\n"
+         "   fragColor = vec4(OutputDither(m.rgb), m.a);\n"
+         "}\n";
 
       static unsigned int sPremulProgram = 0;
       static int sLocTexPremul = -1;

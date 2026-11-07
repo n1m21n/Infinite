@@ -531,7 +531,7 @@ namespace app
       glfwMakeContextCurrent(gProjectorWindows[i].window);
       int pw = 0, ph = 0;
       glfwGetFramebufferSize(gProjectorWindows[i].window, &pw, &ph);
-      GLUtil::DrawTextureToScreen(h.fbo.tex, pw, ph, h.fbo.w, h.fbo.h, /*checkerBg=*/false);
+      GLUtil::DrawTextureToScreen(h.fbo.tex, pw, ph, h.fbo.w, h.fbo.h, /*checkerBg=*/false, gProjectorWindows[i].transparent);
       ShowSetProbeProjector(i);
       glFlush();
       return true;

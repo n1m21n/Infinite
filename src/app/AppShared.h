@@ -1250,6 +1250,7 @@ extern bool gMinimapEnabled;
       GLFWwindow* window = nullptr;
       int nodeIndex = -1; // GraphNode::index this window shows
       bool fullscreen = false;
+      bool transparent = false; // made with a transparent framebuffer (OBS window capture); opaque + checkerboard otherwise
       int monitorIndex = -1;   // display it was last placed on by us
       std::string monitorName; // that display's name, to find it again after a hot-plug
       std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
@@ -6224,7 +6225,7 @@ void ToggleProjectorFullscreen(ProjectorWindow& pw);
 
 void UpdateProjectorsForMonitors();
 
-void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn);
+void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn, bool transparent = false);
 
 
 // ================================================== Audio node sweep discovery

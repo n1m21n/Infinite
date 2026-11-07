@@ -841,12 +841,15 @@ int DrawTestsB(FrameCtx& fc)
                if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
                   GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
                else
-                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true, gProjectorWindows[i].transparent);
             }
             else
             {
                glViewport(0, 0, pw, ph);
-               glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+               if (gProjectorWindows[i].transparent)
+                  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+               else
+                  glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
                glClear(GL_COLOR_BUFFER_BIT);
             }
             ShowSetProbeProjector(i); // SHOWSETTEST only
