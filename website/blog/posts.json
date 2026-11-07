@@ -1,5 +1,14 @@
 [
  {
+  "slug": "audio-reactive-particle-systems-in-real-time",
+  "title": "Audio-reactive 3D particle systems in real time",
+  "description": "How to build audio-reactive 3D particle systems: Euler physics, turbulent 3D noise force fields, spectral transient triggers, and GPU point rendering on a modular canvas.",
+  "date": "2026-11-07",
+  "updated": "2026-11-07",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/audio-reactive-particle-systems-in-real-time.html"
+ },
+ {
   "slug": "drum-and-bass-reese-bass-sound-design",
   "title": "Drum and bass Reese bass sound design in modular synthesisers",
   "description": "Master drum and bass Reese bass sound design in modular synthesisers: detuned saw phase movement, multi-band filter splits, distortion, and audio-reactive visuals.",
