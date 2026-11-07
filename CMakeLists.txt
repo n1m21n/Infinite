@@ -1088,6 +1088,19 @@ endif()
 add_executable(pianoroll-check src/arrange/PianoRollCheck.cpp src/arrange/ArrangeModel.cpp src/arrange/NoteSchedule.cpp src/arrange/MidiImport.cpp)
 target_include_directories(pianoroll-check PRIVATE src/arrange)
 
+# Plugin build process plumbing (docs/plans/vst-au/README.md step 1.2): shared memory, spawn,
+# parent watch, realtime priority. A small library so the plugin shell links only this.
+find_package(Threads REQUIRED)
+add_library(infinite_ipc STATIC src/platform/common/Ipc.cpp)
+target_include_directories(infinite_ipc PUBLIC src)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(infinite_ipc PUBLIC rt Threads::Threads)
+elseif(NOT WIN32)
+    target_link_libraries(infinite_ipc PUBLIC Threads::Threads)
+endif()
+add_executable(ipc-check src/platform/common/IpcCheck.cpp)
+target_link_libraries(ipc-check PRIVATE infinite_ipc)
+
 # `infinite find` ranking: top-3 hits over real asks (tests/chat/find_*.tsv; scores in src/core/chat/FindEval.cpp).
 add_executable(find-eval src/core/chat/FindEval.cpp src/core/chat/NodeFinder.cpp)
 target_include_directories(find-eval PRIVATE src src/core)
