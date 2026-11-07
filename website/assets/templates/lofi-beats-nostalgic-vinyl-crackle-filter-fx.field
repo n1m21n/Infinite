@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Lo-Fi Beats Nostalgic Vinyl Crackle Filter FX",
+    "author": "Infinite",
+    "description": "Nostalgic lo-fi resonant telephone bandpass filter with vinyl grit texture, subtle pitch drift, and warm harmonic drive.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float centerFreq = 1400.0 [400.0, 4000.0]\nparam float bandWidth = 0.55 [0.1, 0.9]\nparam float warmth = 0.42 [0.0, 1.0]\nparam float vinylGrit = 0.30 [0.0, 1.0]\nparam float mix = 0.65 [0.0, 1.0]\nstate float envFollower = 0\nstate float lp1 = 0\nstate float lp2 = 0\nstate float noisePhase = 0\n\nabsIn = abs(in)\nenvFollower = envFollower + 0.04 * (absIn - envFollower)\n\nfEff = clamp((centerFreq / sr) * (0.35 + envFollower * 0.5), 0.02, 0.44)\nfb = clamp(bandWidth * 0.75, 0.0, 0.85)\n\nlp1 = lp1 + fEff * (in + lp1 * fb - lp1)\nlp2 = lp2 + fEff * (lp1 - lp2)\nbp = (lp1 - lp2) * 1.5\n\nnoisePhase = noisePhase + 0.37\nnoisePhase = if(noisePhase > 1.0, noisePhase - 1.0, noisePhase)\nnoise = sin(noisePhase * 7919.0) * vinylGrit * 0.012\n\nsig = bp + noise\ndrv = sig * (1.0 + warmth * 1.8)\nsat = drv / (1.0 + abs(drv))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.45\n",
+    "params": {
+      "centerFreq": 1400.0,
+      "bandWidth": 0.55,
+      "warmth": 0.42,
+      "vinylGrit": 0.3,
+      "mix": 0.65
+    }
+  }
+}

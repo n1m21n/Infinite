@@ -1773,6 +1773,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "progressive-house-euphoric-pluck-lead-synth",
+      "name": "Progressive House Euphoric Pluck Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Euphoric progressive house pluck lead with multi-saw unison detune, snappy resonant filter envelope sweep, and analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/progressive-house-euphoric-pluck-lead-synth.webp",
+      "file": "assets/templates/progressive-house-euphoric-pluck-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "progressive-house-driving-sub-bass-synth",
+      "name": "Progressive House Driving Sub Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Driving rolling progressive house bass with layered saw core, sub-octave square reinforcement, and punchy resonant low-pass filter envelope.",
+      "price": 0,
+      "preview": "assets/templates/progressive-house-driving-sub-bass-synth.webp",
+      "file": "assets/templates/progressive-house-driving-sub-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "lofi-beats-tape-flutter-cassette-warmth-fx",
+      "name": "Lo-Fi Beats Tape Flutter Cassette Warmth FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage lo-fi cassette tape emulation with gentle wow and flutter pitch modulation, magnetic head high-frequency damping, and soft asymmetric tape saturation.",
+      "price": 0,
+      "preview": "assets/templates/lofi-beats-tape-flutter-cassette-warmth-fx.webp",
+      "file": "assets/templates/lofi-beats-tape-flutter-cassette-warmth-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "lofi-beats-nostalgic-vinyl-crackle-filter-fx",
+      "name": "Lo-Fi Beats Nostalgic Vinyl Crackle Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Nostalgic lo-fi resonant telephone bandpass filter with vinyl grit texture, subtle pitch drift, and warm harmonic drive.",
+      "price": 0,
+      "preview": "assets/templates/lofi-beats-nostalgic-vinyl-crackle-filter-fx.webp",
+      "file": "assets/templates/lofi-beats-nostalgic-vinyl-crackle-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

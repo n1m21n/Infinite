@@ -124,6 +124,8 @@
   <url><loc>https://infinitedevices.org/embeds/ditherpunk-cyber-glyph-lattice.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/suprematist-forms-kinetic-red-wedge.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/suprematist-forms-floating-black-quadrilateral.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/data-landscape-topographic-frequency-contour.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/data-landscape-bathymetric-elevation-grid.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/chat.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-11-07</lastmod><priority>0.7</priority></url>
@@ -248,6 +250,10 @@
   <url><loc>https://infinitedevices.org/library/french-filter-house-disco-stab-lead-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/downtempo-tape-flutter-warm-delay-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/downtempo-analog-warmth-resonant-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/progressive-house-euphoric-pluck-lead-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
@@ -672,6 +678,16 @@
   <url><loc>https://infinitedevices.org/library/downtempo-analog-warmth-resonant-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-forms-kinetic-red-wedge.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/suprematist-forms-floating-black-quadrilateral.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/demoscene-plasma-rotozoom-raster-bars.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/demoscene-plasma-sine-wave-interference.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/holographic-iridescent-faceted-polytope-3d.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/holographic-iridescent-prismatic-gem-3d.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/progressive-house-euphoric-pluck-lead-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/data-landscape-topographic-frequency-contour.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/data-landscape-bathymetric-elevation-grid.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-11-07</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-11-07</lastmod><priority>0.5</priority></url>

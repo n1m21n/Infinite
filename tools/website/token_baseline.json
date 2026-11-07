@@ -440,6 +440,14 @@
   "embeds/suprematist-forms-floating-black-quadrilateral.html": {
    "font-size": 2,
    "hex": 6
+  },
+  "embeds/data-landscape-topographic-frequency-contour.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/data-landscape-bathymetric-elevation-grid.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

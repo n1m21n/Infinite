@@ -233,6 +233,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [French Filter House Disco Stab Lead Synth](https://infinitedevices.org/library/french-filter-house-disco-stab-lead-synth.html): Euphoric filtered disco chord stab synthesizer with multi-saw unison spread, resonant sweep envelope, and analog saturation. (file: https://infinitedevices.org/assets/templates/french-filter-house-disco-stab-lead-synth.inf)
 - [Downtempo Tape Flutter Warm Delay FX](https://infinitedevices.org/library/downtempo-tape-flutter-warm-delay-fx.html): Vintage reel-to-reel tape delay with wow and flutter modulation, high-frequency tape head roll-off, and warm saturating feedback. (file: https://infinitedevices.org/assets/templates/downtempo-tape-flutter-warm-delay-fx.inf)
 - [Downtempo Analog Warmth Resonant Filter FX](https://infinitedevices.org/library/downtempo-analog-warmth-resonant-filter-fx.html): Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture. (file: https://infinitedevices.org/assets/templates/downtempo-analog-warmth-resonant-filter-fx.inf)
+- [Progressive House Euphoric Pluck Lead Synth](https://infinitedevices.org/library/progressive-house-euphoric-pluck-lead-synth.html): Euphoric progressive house pluck lead with multi-saw unison detune, snappy resonant filter envelope sweep, and analog saturation. (file: https://infinitedevices.org/assets/templates/progressive-house-euphoric-pluck-lead-synth.inf)
+- [Progressive House Driving Sub Bass Synth](https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html): Driving rolling progressive house bass with layered saw core, sub-octave square reinforcement, and punchy resonant low-pass filter envelope. (file: https://infinitedevices.org/assets/templates/progressive-house-driving-sub-bass-synth.inf)
+- [Lo-Fi Beats Tape Flutter Cassette Warmth FX](https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html): Vintage lo-fi cassette tape emulation with gentle wow and flutter pitch modulation, magnetic head high-frequency damping, and soft asymmetric tape saturation. (file: https://infinitedevices.org/assets/templates/lofi-beats-tape-flutter-cassette-warmth-fx.inf)
+- [Lo-Fi Beats Nostalgic Vinyl Crackle Filter FX](https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html): Nostalgic lo-fi resonant telephone bandpass filter with vinyl grit texture, subtle pitch drift, and warm harmonic drive. (file: https://infinitedevices.org/assets/templates/lofi-beats-nostalgic-vinyl-crackle-filter-fx.inf)
 
 ## Library: Community
 
@@ -593,7 +597,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 83 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 85 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -610,4 +614,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 68 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 70 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

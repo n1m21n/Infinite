@@ -46,7 +46,7 @@ SHELL_HEAD = """<!DOCTYPE html>
   <meta property="og:title" content="@@OG_TITLE@@">
   <meta property="og:description" content="@@OG_DESC@@">
   <meta property="og:url" content="@@URL@@">
-  <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
+  <meta property="og:image" content="@@OG_IMAGE@@">
   <meta name="twitter:card" content="summary_large_image">
   <script type="application/ld+json">@@LD@@</script>
   <style>
@@ -157,6 +157,8 @@ def build_widget(it):
     og_title = it["title"] + ": audio-reactive visual"
     if len(og_title) > 65:
         og_title = it["title"]
+    og_path = os.path.join(chrome.ROOT, "website", "assets", "og", f"embed-{it['slug']}.jpg")
+    og_img = f"https://infinitedevices.org/assets/og/embed-{it['slug']}.jpg" if os.path.exists(og_path) else "https://infinitedevices.org/assets/og-image.jpg"
     head = (SHELL_HEAD
             .replace("@@PAGE_TITLE@@", e(p_title))
             .replace("@@META_DESC@@", e(m_desc))
@@ -164,6 +166,7 @@ def build_widget(it):
             .replace("@@OG_DESC@@", e(m_desc))
             .replace("@@TITLE@@", e(it["title"]))
             .replace("@@URL@@", f"{BASE}embeds/{it['slug']}.html")
+            .replace("@@OG_IMAGE@@", og_img)
             .replace("@@LD@@", ld(it, m_desc)))
     return head + body
 
@@ -225,7 +228,7 @@ def build_gallery(items):
   <link rel="canonical" href="{BASE}embeds/">
   <meta property="og:title" content="Infinite embeds: audio-reactive visuals for any page">
   <meta property="og:description" content="Copy one iframe into any page. Free, made in Infinite.">
-  <meta property="og:image" content="{BASE}assets/og-image.jpg">
+  <meta property="og:image" content="{BASE}assets/og/embeds.jpg">
   <meta property="og:url" content="{BASE}embeds/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Infinite">

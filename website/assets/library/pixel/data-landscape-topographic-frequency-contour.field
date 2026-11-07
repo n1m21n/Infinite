@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Data Landscape Topographic Frequency Contour",
+    "author": "Infinite",
+    "description": "Audio-reactive topological landscape with dense horizontal elevation contours, audio-displaced frequency ridges, and glowing cyan signal peaks on midnight obsidian.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float ridgeScale = 1.05 [0.5, 2.0]\nparam float flowSpeed = 0.40 [0.1, 1.5]\nparam float contourDensity = 16.0 [8.0, 32.0]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float peakElevation = 0.55 [0.2, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.0\ntime = t * flowSpeed\n\ndistX = abs(p.x)\nridgeEnvelope = exp(-distX * distX * 3.5)\n\nwave1 = sin(distX * 18.0 - time * 3.2) * 0.08\nwave2 = sin(distX * 32.0 + time * 2.1) * 0.04\nelevation = (wave1 + wave2 + 0.12) * ridgeEnvelope * ridgeScale * peakElevation\n\nelevP = p.y - elevation + 0.1\n\ncontourVal = elevP * contourDensity\ncontourFrac = abs(fract(contourVal) - 0.5)\ncontourMask = 1.0 - smoothstep(0.04, 0.12, contourFrac)\n\npeakMask = smoothstep(0.18, 0.42, elevation) * contourMask\n\ncAbyss = vec3(0.043, 0.075, 0.169)\ncNavy = vec3(0.110, 0.145, 0.255)\ncCyan = vec3(0.357, 0.753, 0.745)\ncWhite = vec3(0.96, 0.98, 1.0)\n\nbaseCol = mix(cAbyss, cNavy, clamp((p.y + 1.0) * 0.5, 0.0, 1.0))\ncol = mix(baseCol, cCyan, contourMask * 0.85)\ncol = mix(col, cWhite, peakMask)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "ridgeScale": 1.05,
+      "flowSpeed": 0.4,
+      "contourDensity": 16.0,
+      "contrast": 1.15,
+      "peakElevation": 0.55
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

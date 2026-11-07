@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Data Landscape Bathymetric Elevation Grid",
+    "author": "Infinite",
+    "description": "Isometric bathymetric data grid with pulsating harmonic contour lines, deep navy oceanic terrain troughs, and luminescent white elevation peaks.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float gridScale = 1.10 [0.5, 2.0]\nparam float flowSpeed = 0.38 [0.1, 1.5]\nparam float bathymetryTiers = 14.0 [6.0, 28.0]\nparam float contrast = 1.12 [0.6, 2.0]\nparam float waveAmplitude = 0.45 [0.1, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * flowSpeed\n\nrotP = vec2(p.x * 0.866 - p.y * 0.5, p.x * 0.5 + p.y * 0.866)\n\nshelf = sin(rotP.x * 5.0 + time * 2.0) * cos(rotP.y * 4.0 - time * 1.5) * waveAmplitude * 0.25\ndepthVal = length(rotP) * 1.2 - shelf\n\ntierCount = floor(bathymetryTiers)\nsteppedDepth = floor(depthVal * tierCount) / tierCount\ntierFrac = abs(fract(depthVal * tierCount) - 0.5)\ntierLine = 1.0 - smoothstep(0.03, 0.10, tierFrac)\n\ncAbyss = vec3(0.043, 0.075, 0.169)\ncNavy = vec3(0.110, 0.145, 0.255)\ncCyan = vec3(0.357, 0.753, 0.745)\ncWhite = vec3(0.96, 0.98, 1.0)\n\ncol = mix(cAbyss, cNavy, clamp(depthVal * 0.7, 0.0, 1.0))\ncol = mix(col, cCyan, tierLine * 0.85)\n\ncrestMask = tierLine * step(0.65, 1.0 - depthVal * 0.4)\ncol = mix(col, cWhite, crestMask * 0.9)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "gridScale": 1.1,
+      "flowSpeed": 0.38,
+      "bathymetryTiers": 14.0,
+      "contrast": 1.12,
+      "waveAmplitude": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

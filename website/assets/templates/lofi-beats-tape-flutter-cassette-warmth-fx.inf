@@ -1,0 +1,84 @@
+infinite-patch 1
+# Lo-Fi Beats Tape Flutter Cassette Warmth FX
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 48
+  i note1 48
+  i note2 60
+  i note3 55
+  i note4 48
+  i note5 60
+  i note6 53
+  i note7 55
+  i note8 48
+  i note9 48
+  i note10 60
+  i note11 55
+  i note12 48
+  i note13 60
+  i note14 53
+  i note15 58
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Analog
+  id osc
+  pos 400 1024
+  f cutoff 3200.0
+  f resonance 0.30
+  f decay 0.26
+  f volume 0.75
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 800 1024
+  s code param float flutterSpeed = 1.4 [0.2, 5.0]\nparam float flutterDepth = 0.32 [0.0, 1.0]\nparam float tapeDamping = 3200.0 [800.0, 8000.0]\nparam float drive = 0.40 [0.0, 1.0]\nparam float mix = 0.60 [0.0, 1.0]\nstate float ph = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float lp = 0\n\nph = ph + flutterSpeed / sr\nph = if(ph >= 1.0, ph - 1.0, ph)\nflutter = sin(ph * 6.2831853) * flutterDepth * 0.06\n\nfDamp = clamp(tapeDamping / sr * 2.0, 0.02, 0.44)\nlp = lp + fDamp * (in - lp)\n\nfb = 0.45\n\nd1 = d1 + (0.16 + flutter) * (lp + d2 * fb - d1)\nd2 = d2 + (0.12 - flutter) * (d1 * 0.85 - d2)\n\nwet = (d1 * 0.65 + d2 * 0.5) * 1.15\ndrv = wet * (1.0 + drive * 1.4)\nsat = clamp(drv / (1.0 + abs(drv * 0.5)), -0.85, 0.85)\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 0.58\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1200 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.12 0.18 0.28
+  f size 0.24
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Lo-Fi Beats Tape Flutter Cassette Warmth FX. Vintage lo-fi cassette tape emulation with gentle wow and flutter pitch modulation, magnetic head high-frequency damping, and soft asymmetric tape saturation.
+  f width 340
+  f height 120
+end
+note osc 0 notes
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

@@ -6094,6 +6094,216 @@
       "file": "assets/library/pixel/suprematist-forms-floating-black-quadrilateral.field",
       "preview": "assets/library/previews/suprematist-forms-floating-black-quadrilateral.jpg",
       "bytes": 1915
+    },
+    {
+      "id": "demoscene-plasma-rotozoom-raster-bars",
+      "name": "Demoscene Plasma Rotozoom Raster Bars",
+      "kind": "Generator",
+      "tags": [
+        "demoscene",
+        "plasma",
+        "rotozoom",
+        "copperbars",
+        "mathematical",
+        "drawing"
+      ],
+      "description": "Amiga demoscene study featuring interlocking sinusoidal copper raster bars, rotating geometric rosettes, and electric cyan and flame orange palettes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/demoscene-plasma-rotozoom-raster-bars.js",
+      "preview": "assets/library/previews/demoscene-plasma-rotozoom-raster-bars.jpg",
+      "bytes": 2816
+    },
+    {
+      "id": "demoscene-plasma-sine-wave-interference",
+      "name": "Demoscene Plasma Sine Wave Interference",
+      "kind": "Generator",
+      "tags": [
+        "demoscene",
+        "plasma",
+        "interference",
+        "moire",
+        "generative",
+        "drawing"
+      ],
+      "description": "Mathematical wave interference study with concentric interference rings, dynamic polar rosettes, and vivid Amiga demoscene copper gradient bars on pitch black ground.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/demoscene-plasma-sine-wave-interference.js",
+      "preview": "assets/library/previews/demoscene-plasma-sine-wave-interference.jpg",
+      "bytes": 2599
+    },
+    {
+      "id": "holographic-iridescent-faceted-polytope-3d",
+      "name": "Holographic Iridescent Faceted Polytope 3D",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "iridescent",
+        "polytope",
+        "crystal",
+        "geometry",
+        "3d"
+      ],
+      "description": "Complex rotating 3D polytope with crystalline multifaceted geometry, chromatic spectral dispersion facets, and iridescent pastel gradient layers on deep obsidian.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-faceted-polytope-3d.js",
+      "preview": "assets/library/previews/holographic-iridescent-faceted-polytope-3d.jpg",
+      "bytes": 2367
+    },
+    {
+      "id": "holographic-iridescent-prismatic-gem-3d",
+      "name": "Holographic Iridescent Prismatic Gem 3D",
+      "kind": "Generator",
+      "tags": [
+        "holographic",
+        "prismatic",
+        "gem",
+        "crystal",
+        "sculpture",
+        "3d"
+      ],
+      "description": "Floating prismatic crystal cluster with interlocking geometric pyramids, radiant chromatic dispersion planes, and luminescent pastel edge boundaries.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/holographic-iridescent-prismatic-gem-3d.js",
+      "preview": "assets/library/previews/holographic-iridescent-prismatic-gem-3d.jpg",
+      "bytes": 1791
+    },
+    {
+      "id": "progressive-house-euphoric-pluck-lead-synth",
+      "name": "Progressive House Euphoric Pluck Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "progressive-house",
+        "pluck",
+        "lead",
+        "saw",
+        "audio"
+      ],
+      "description": "Euphoric progressive house pluck lead with multi-saw unison detune, snappy resonant filter envelope sweep, and analog saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/progressive-house-euphoric-pluck-lead-synth.inf",
+      "preview": "assets/library/previews/progressive-house-euphoric-pluck-lead-synth.jpg",
+      "bytes": 2408
+    },
+    {
+      "id": "progressive-house-driving-sub-bass-synth",
+      "name": "Progressive House Driving Sub Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "progressive-house",
+        "bass",
+        "sub",
+        "rolling",
+        "audio"
+      ],
+      "description": "Driving rolling progressive house bass with layered saw core, sub-octave square reinforcement, and punchy resonant low-pass filter envelope.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/progressive-house-driving-sub-bass-synth.inf",
+      "preview": "assets/library/previews/progressive-house-driving-sub-bass-synth.jpg",
+      "bytes": 2276
+    },
+    {
+      "id": "lofi-beats-tape-flutter-cassette-warmth-fx",
+      "name": "Lo-Fi Beats Tape Flutter Cassette Warmth FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "lofi",
+        "tape",
+        "flutter",
+        "cassette",
+        "audio"
+      ],
+      "description": "Vintage lo-fi cassette tape emulation with gentle wow and flutter pitch modulation, magnetic head high-frequency damping, and soft asymmetric tape saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/lofi-beats-tape-flutter-cassette-warmth-fx.inf",
+      "preview": "assets/library/previews/lofi-beats-tape-flutter-cassette-warmth-fx.jpg",
+      "bytes": 2205
+    },
+    {
+      "id": "lofi-beats-nostalgic-vinyl-crackle-filter-fx",
+      "name": "Lo-Fi Beats Nostalgic Vinyl Crackle Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "lofi",
+        "filter",
+        "vinyl",
+        "warmth",
+        "audio"
+      ],
+      "description": "Nostalgic lo-fi resonant telephone bandpass filter with vinyl grit texture, subtle pitch drift, and warm harmonic drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/lofi-beats-nostalgic-vinyl-crackle-filter-fx.inf",
+      "preview": "assets/library/previews/lofi-beats-nostalgic-vinyl-crackle-filter-fx.jpg",
+      "bytes": 2276
+    },
+    {
+      "id": "data-landscape-topographic-frequency-contour",
+      "name": "Data Landscape Topographic Frequency Contour",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "datalandscape",
+        "topography",
+        "contour",
+        "shader",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive topological landscape with dense horizontal elevation contours, audio-displaced frequency ridges, and glowing cyan signal peaks on midnight obsidian.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/data-landscape-topographic-frequency-contour.field",
+      "preview": "assets/library/previews/data-landscape-topographic-frequency-contour.jpg",
+      "bytes": 1732
+    },
+    {
+      "id": "data-landscape-bathymetric-elevation-grid",
+      "name": "Data Landscape Bathymetric Elevation Grid",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "bathymetric",
+        "elevation",
+        "grid",
+        "shader",
+        "audioreactive"
+      ],
+      "description": "Isometric bathymetric data grid with pulsating harmonic contour lines, deep navy oceanic terrain troughs, and luminescent white elevation peaks.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/data-landscape-bathymetric-elevation-grid.field",
+      "preview": "assets/library/previews/data-landscape-bathymetric-elevation-grid.jpg",
+      "bytes": 1684
     }
   ]
 }

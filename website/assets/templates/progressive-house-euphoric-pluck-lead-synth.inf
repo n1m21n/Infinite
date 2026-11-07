@@ -1,0 +1,75 @@
+infinite-patch 1
+# Progressive House Euphoric Pluck Lead Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 58
+  i note1 58
+  i note2 65
+  i note3 70
+  i note4 58
+  i note5 61
+  i note6 65
+  i note7 68
+  i note8 58
+  i note9 58
+  i note10 65
+  i note11 70
+  i note12 61
+  i note13 63
+  i note14 65
+  i note15 68
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 0.58 [0.1, 1.0]\nparam float resonance = 0.42 [0.0, 0.85]\nparam float detuneSpread = 0.35 [0.0, 1.0]\nparam float pluckDecay = 0.22 [0.05, 0.8]\nparam float drive = 0.28 [0.0, 1.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * pluckDecay), 0.0001, 0.04)\nenv = if(target > env, env + (target - env) * 0.75, env - env * decayRate)\n\nfBase = clamp(freq, 110.0, 1200.0)\n\ndp1 = fBase / sr\np1 = p1 + dp1\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\ns1 = p1 * 2.0 - 1.0\n\ndp2 = (fBase * (1.0 + detuneSpread * 0.007)) / sr\np2 = p2 + dp2\np2 = if(p2 >= 1.0, p2 - 1.0, p2)\ns2 = p2 * 2.0 - 1.0\n\ndp3 = (fBase * (1.0 - detuneSpread * 0.007)) / sr\np3 = p3 + dp3\np3 = if(p3 >= 1.0, p3 - 1.0, p3)\ns3 = p3 * 2.0 - 1.0\n\nraw = (s1 + s2 * 0.8 + s3 * 0.8) * 0.40\n\ndrv = raw * (1.0 + drive * 1.5)\nsat = (drv / (1.0 + abs(drv))) * env\n\nfCut = clamp(cutoff * (0.10 + env * 0.55), 0.015, 0.44)\nlp1 = lp1 + fCut * (sat + lp1 * resonance * 0.45 - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.50\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.15 0.22 0.38
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Progressive House Euphoric Pluck Lead Synth. Euphoric progressive house pluck lead with multi-saw unison detune, snappy resonant filter envelope sweep, and analog saturation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38
