@@ -3,6 +3,92 @@
 
 namespace app
 {
+namespace
+{
+   // Whether `src`'s output `out` could be dropped on `pin`, an input, param or colour pin of another node. The same
+   // rules the live link check in DrawLinks applies, minus the cycle checks: a just-spawned node has no cables yet.
+   bool OutputFitsPin(GraphNode* src, int out, int pin)
+   {
+      GraphNode* dst = FindNodeByIndex(GraphNode::NodeIndexFromPin(pin));
+      if (src == nullptr || dst == nullptr || src == dst)
+         return false;
+      INode* n = src->node.get();
+      const bool srcIsModulator = dynamic_cast<IModulator*>(n) != nullptr || ModulatorForOutput(n, out) != nullptr;
+      auto* srcPalette = dynamic_cast<IPaletteSource*>(n);
+      auto* srcGeometry = dynamic_cast<IGeometrySource*>(n);
+      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(out))
+         srcGeometry = nullptr;
+      auto* srcCamera = dynamic_cast<CameraNode*>(n);
+      auto* srcLight = dynamic_cast<LightNode*>(n);
+      const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(n) != nullptr;
+      auto* srcAudioSource = dynamic_cast<IAudioSource*>(n);
+      const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(out);
+      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(n) != nullptr;
+      const bool srcIsPredictor = dynamic_cast<IPredictor*>(n) != nullptr;
+      if (GraphNode::IsParamPin(pin))
+      {
+         const int param = GraphNode::ParamIndexFromPin(pin);
+         return srcIsModulator && !IsKernelDrivenParam(dst->index, param) &&
+                PredictorBindRefusal(n, dst->index, param) == nullptr;
+      }
+      if (GraphNode::IsColorPin(pin))
+         return srcPalette != nullptr;
+      if (GraphNode::IsInputPin(pin))
+         return IsInputSlotCompatible(dst, GraphNode::InputSlotFromPin(pin), srcIsModulator, srcPalette, srcGeometry,
+                                       srcCamera, srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource,
+                                       srcIsPredictor);
+      return false;
+   }
+
+   int FirstOutputFitting(GraphNode* src, int pin)
+   {
+      const int outputs = src->node->OutputCount();
+      for (int o = 0; o < outputs; ++o)
+         if (OutputFitsPin(src, o, pin))
+            return o;
+      return -1;
+   }
+}
+
+std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForPin(int dragPin)
+{
+   std::vector<std::pair<std::string, std::string>> result;
+   for (const std::string& category : NodeFactory::Instance().GetCategories())
+      for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+      {
+         if (!IsUserSpawnable(name))
+            continue;
+         GraphNode probe;
+         probe.node.reset(NodeFactory::Instance().MakeNode(name));
+         if (probe.node && FirstOutputFitting(&probe, dragPin) >= 0)
+            result.emplace_back(name, category);
+      }
+   return result;
+}
+
+bool WireSpawnedNodeToPin(GraphNode& spawned, int dragPin)
+{
+   GraphNode* dst = FindNodeByIndex(GraphNode::NodeIndexFromPin(dragPin));
+   const int out = FirstOutputFitting(&spawned, dragPin);
+   if (dst == nullptr || out < 0)
+      return false;
+   // No PushUndoCheckpoint(): SpawnNode() already pushed one, so one Undo removes the node and its cable together.
+   if (GraphNode::IsParamPin(dragPin))
+      Modulation::Instance().Bind(dst->index, GraphNode::ParamIndexFromPin(dragPin), spawned.index, out);
+   else if (GraphNode::IsColorPin(dragPin))
+      PaletteBinding::Instance().Bind(dst->index, GraphNode::ColorIndexFromPin(dragPin), spawned.index, 0);
+   else
+   {
+      const int slot = GraphNode::InputSlotFromPin(dragPin);
+      WireInputSlot(spawned, *dst, slot, out);
+      auto* audio = dynamic_cast<IAudioSource*>(spawned.node.get());
+      if ((audio != nullptr && audio->IsAudioOutputIndex(out)) || dynamic_cast<INoteSource*>(spawned.node.get()) != nullptr ||
+          dst->node->AudioInputSlot(slot) != nullptr || dst->node->NoteInputSlot(slot) != nullptr)
+         RebuildAudioTopology();
+   }
+   return true;
+}
+
 void DrawLinks(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -541,6 +627,8 @@ void DrawLinks(FrameCtx& fc)
                   gLinkDragSuggestions = RecommendedNodeTypesForOutput(
                      dragSrc, GraphNode::OutputIndexFromPin(gLinkDragSourcePin));
             }
+            else
+               gLinkDragSuggestions = RecommendedNodeTypesForPin(gLinkDragSourcePin);
             gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
             searchBuf[0] = '\0';
             searchJustOpened = true;

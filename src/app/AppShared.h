@@ -2711,6 +2711,12 @@ void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const Cluster
 std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode,
                                                                                     int srcOutputIndex = 0);
 
+// A cable dragged from an INPUT, param or colour pin and dropped on empty canvas (the reverse of the output drag
+// above): the node types that have an output which fits that pin, and the wiring of a just-spawned node to it.
+std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForPin(int dragPin);
+
+bool WireSpawnedNodeToPin(GraphNode& spawned, int dragPin);
+
 ImVec2 FindFreeSpawnPosition(const ImVec2& center);
 
 int HearNode(int srcIndex);
