@@ -316,6 +316,13 @@ def rows_for(node, sw, fixed, tags, wav, tmp, meta):
         seg = x[:2, a:a + int(round(WIN * rate))]
         if seg.shape[1] >= 2048:
             wins[lab] = seg
+    keep = os.environ.get("INF_KEEP_WIN")  # judge clips: each window as a 16-bit stereo wav, <dir>/<node>/<preset>_<note>.wav
+    if keep:
+        import wave
+        kd = os.path.join(keep, node); os.makedirs(kd, exist_ok=True)
+        for lab, seg in wins.items():
+            w = wave.open(os.path.join(kd, "%s_%s.wav" % (meta["id"], lab)), "wb"); w.setnchannels(2); w.setsampwidth(2); w.setframerate(int(rate))
+            w.writeframes((np.clip(seg.T, -1, 1) * 32767).astype("<i2").tobytes()); w.close()
     rows = []
     for i, (m, v, lab) in enumerate(STIM):
         base = {"schema": SCHEMA, "route": 3, "src": meta["src"], "preset_id": meta["id"], "label": meta["label"], "plugin": node,
