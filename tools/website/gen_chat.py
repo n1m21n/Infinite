@@ -16,7 +16,7 @@ import sync_chrome as chrome
 
 W = chrome.W
 BASE = "https://infinitedevices.org/"
-TITLE = "Infinite chat: talk to your patch with Claude, ChatGPT or Gemini"
+TITLE = "Infinite agents & terminal: talk to your patch with Claude, ChatGPT or Gemini"
 DESC = ("Type what you want in plain words and your own Claude, ChatGPT or Gemini changes your Infinite project for you. "
         "Every change can be undone.")
 e = html.escape
@@ -26,9 +26,8 @@ def icon(name):
     return chrome._svg(name)
 
 
-SECTIONS = [("what", "What is it?", "chat"), ("see", "What you will see", "eye"), ("try", "Things you can say", "play"), ("how", "How it works", "bolt"),
-            ("accounts", "Connect an assistant", "lock"), ("control", "You stay in control", "settings"), ("faq", "Questions", "chat"),
-            ("start", "Start in 4 steps", "terminal")]
+SECTIONS = [("try", "Things you can say", "play"), ("accounts", "Connect an assistant", "lock"), ("control", "You stay in control", "settings"),
+            ("start", "Start in 3 steps", "terminal")]
 
 
 def chip(kind, text):
@@ -63,18 +62,17 @@ def shot(src, alt, w, h, cap, cls=""):
 
 def main_html():
     toc = "".join(f'<a href="#{i}">{icon(ic)}<span>{e(t)}</span></a>' for i, t, ic in SECTIONS)
-    agents = [("Claude", "Anthropic", "A browser page opens, you sign in, done."),
-              ("ChatGPT", "OpenAI", "A browser page opens, you sign in, done."),
-              ("Gemini", "Google", "A browser page opens, then you paste the short code it shows into the chat.")]
+    agents = [("Claude", "Anthropic", "Sign in on the page that opens."),
+              ("ChatGPT", "OpenAI", "Sign in on the page that opens."),
+              ("Gemini", "Google", "Sign in, then paste the short code into the chat.")]
     arows = "".join(f"<tr><td><strong>{n}</strong></td><td>{v}</td><td>{s}</td></tr>" for n, v, s in agents)
     return f'''<main class="dv">
     <section class="dv-hero">
       <div class="container">
-        <span class="blog-hand hand">chat</span>
-        <h1 class="slab">Talk to your patch</h1>
-        <p class="lead">Type what you want in plain words, like "make the notes brighter". An AI assistant you already use (Claude, ChatGPT or Gemini) changes your project for you. Every change can be undone.</p>
-        <ul class="facts"><li>No coding needed</li><li>Uses your own account</li><li>One click to undo</li></ul>
-        <div class="aud-cta"><a href="index.html#download" class="btn btn-primary">Download Infinite</a><a href="#start" class="btn btn-ghost">Start in 4 steps</a></div>
+        <span class="blog-hand hand">agents</span>
+        <h1 class="slab">Agents &amp; terminal</h1>
+        <p class="lead">Say what you want in plain words. Claude, ChatGPT or Gemini, on your own account, changes your project. Every change has an Undo.</p>
+        <div class="aud-cta"><a href="index.html#download" class="btn btn-primary">Download Infinite</a><a href="#start" class="btn btn-ghost">Start in 3 steps</a></div>
       </div>
     </section>
     <div class="container dv-grid">
@@ -82,101 +80,45 @@ def main_html():
       <div class="dv-main">
         <section class="dv-sec cx-stage" aria-label="The chat panel in Infinite">
           {shot("chat-window.webp", "The Infinite window: the node canvas on the left and the chat panel on the right, showing a reply with the changes it made", 1800, 1125,
-                "The real app. The canvas is on the left. The chat is the panel on the right.")}
-        </section>
-
-        <section class="dv-sec" id="what"><h2>What is it?</h2>
-          <p>Infinite is a program where you build music and visuals by connecting boxes called <strong>nodes</strong>. The chat is a panel inside it where you can simply <em>write</em> what you want, instead of finding the right box or knob yourself.</p>
-          <p>Think of it as a helper sitting next to you. You say "slow the notes down", and it turns the right knob. You can always see what it did, and take it back.</p>
-          <div class="dv-cards">
-            <article class="dv-card"><h2>You ask</h2><p>Write a sentence in the box at the bottom of the chat.</p></article>
-            <article class="dv-card"><h2>It changes your project</h2><p>The knobs and cables move on your canvas, live.</p></article>
-            <article class="dv-card"><h2>You check, or undo</h2><p>Every reply lists what changed, with an Undo button.</p></article>
-          </div>
-        </section>
-
-        <section class="dv-sec" id="see"><h2>What you will see</h2>
-          <div class="cx-split">
-            {shot("chat-panel.webp", "A chat reply in Infinite: the sentence 'make wavetable brighter and slow the notes', a Changed card with two small knobs, and a list of old and new values", 760, 1335,
-                  "A reply. Your sentence, then the exact knobs it turned.", "cx-tall")}
-            <ol class="cx-legend">
-              <li><strong>Your message.</strong> The grey bubble is what you wrote. Here: "make wavetable brighter and slow the notes".</li>
-              <li><strong>The Changed card.</strong> Small live knobs for every value that moved. You can turn them yourself right there.</li>
-              <li><strong>The short list.</strong> Each line reads <em>old value → new value</em>, for example <code>cutoff 2000 → 8000</code>.</li>
-              <li><strong>Coloured names.</strong> A node's name in the reply is a link. Click it and the canvas jumps to that node.</li>
-              <li><strong>The box at the bottom.</strong> Type here. Press <code>@</code> to pick a node by name. Press <strong>+</strong> to attach a file or picture.</li>
-            </ol>
-          </div>
+                "Canvas on the left, chat on the right.")}
         </section>
 
         <section class="dv-sec" id="try"><h2>Things you can say</h2>
-          <p>Start with any of these. Words that start with <code>@</code> are node names from your own project.</p>
           <div class="table-wrap"><table>
             <thead><tr><th>You type</th><th>What happens</th></tr></thead>
             <tbody>
-              <tr><td><code>make @wavetable brighter</code></td><td>The assistant opens the filter on that node.</td></tr>
-              <tr><td><code>@cube set size to 2</code></td><td>Runs instantly. This exact kind of sentence needs no AI.</td></tr>
-              <tr><td><code>connect @a to @b</code></td><td>Draws a cable between the two nodes, instantly.</td></tr>
-              <tr><td><code>make the rings feel like they are breathing</code></td><td>The assistant decides how, and shows you what it changed.</td></tr>
-              <tr><td><code>/explain</code></td><td>Describes your project in plain words.</td></tr>
+              <tr><td><code>@cube set size to 2</code></td><td>Runs instantly, no AI needed. <code>@</code> picks a node.</td></tr>
+              <tr><td><code>connect @a to @b</code></td><td>Draws the cable, instantly.</td></tr>
+              <tr><td><code>make the rings feel like they are breathing</code></td><td>Your assistant decides how, then lists what it changed.</td></tr>
               <tr><td><code>/undo</code></td><td>Takes back the last change.</td></tr>
-              <tr><td><code>/help</code></td><td>Lists every command.</td></tr>
             </tbody>
           </table></div>
         </section>
 
-        <section class="dv-sec" id="how"><h2>How it works</h2>
-          <ol class="cx-flow">
-            <li><span>1</span><div><h3>You type a sentence</h3><p>The box helps as you go. After <code>@</code> it suggests node names, then that node's knobs, then sensible values.</p></div></li>
-            <li><span>2</span><div><h3>Infinite checks it first</h3><p>If your sentence is an exact instruction, like <code>set</code>, <code>connect</code> or <code>add</code>, Infinite does it straight away. A small lightning bolt marks these.</p></div></li>
-            <li><span>3</span><div><h3>Anything else goes to your assistant</h3><p>An open-ended request such as "make it calmer" is handed to Claude, ChatGPT or Gemini, running on your own computer with your own account. A small spark marks these.</p></div></li>
-            <li><span>4</span><div><h3>It edits your open project</h3><p>The assistant uses the same commands as the <code>infinite</code> command line. If it makes a mistake, Infinite refuses that step instead of half-applying it.</p></div></li>
-            <li><span>5</span><div><h3>You get a list of what changed</h3><p>Each reply shows the changes and an Undo button.</p></div></li>
-          </ol>
-        </section>
-
         <section class="dv-sec" id="accounts"><h2>Connect an assistant</h2>
-          <p>The thinking is done by an assistant you already use. Infinite connects it to your project. It is not a new service, and Infinite has no login of its own.</p>
           <div class="table-wrap"><table>
             <thead><tr><th>Assistant</th><th>Made by</th><th>Signing in</th></tr></thead>
             <tbody>{arows}</tbody>
           </table></div>
-          {shot("chat-settings.webp", "Infinite Settings, Agents and Terminal page: a row for Claude, ChatGPT and Gemini each with a Set up button, plus the model, folder and saved chats", 1100, 837,
-                "Settings, Agents &amp; Terminal. One row per assistant, with a Set up button.")}
-          <ul class="dev-list">
-            <li><strong>You sign in on the provider's own page.</strong> Infinite never sees or stores your password.</li>
-            <li><strong>It uses your plan.</strong> Usage counts against your own subscription, the same as using the assistant anywhere else.</li>
-            <li><strong>No account yet?</strong> Press <em>I don't have one</em> and create it on the provider's page.</li>
-            <li><strong>Setup is one button.</strong> Press <em>Set up</em> and Infinite installs what is missing and walks you through sign-in. If a step fails, it says why in one sentence.</li>
-          </ul>
+          <p>You sign in on the provider's own page, so Infinite never sees your password. Usage counts against your own plan.</p>
         </section>
 
         <section class="dv-sec" id="control"><h2>You stay in control</h2>
           <ul class="dev-list">
-            <li><strong>Undo.</strong> Every change card has an Undo button, and <code>/undo</code> does the same.</li>
-            <li><strong>Nothing hidden.</strong> If the assistant is not allowed to do something, the chat tells you in plain words.</li>
-            <li><strong>It works in one folder.</strong> You choose it in Settings. By default it is the folder of your open project.</li>
-            <li><strong>Your chats stay on your computer.</strong> Settings shows how many are saved, with a Clear all button.</li>
+            <li><strong>Undo.</strong> Every change card has an Undo button.</li>
+            <li><strong>One folder.</strong> The assistant only works in the folder you choose in Settings.</li>
+            <li><strong>Local chats.</strong> Your chats stay on your computer.</li>
+            <li><strong>Optional.</strong> Everything also works with the mouse and keyboard.</li>
           </ul>
         </section>
 
-        <section class="dv-sec" id="faq"><h2>Common questions</h2>
-          <ul class="dev-list">
-            <li><strong>Do I have to pay for Infinite or the chat?</strong> Infinite is free. The assistant is your own Claude, ChatGPT or Gemini account, so its normal plan applies.</li>
-            <li><strong>Can I use Infinite without the chat?</strong> Yes. The chat is optional. Everything works with the mouse and keyboard.</li>
-            <li><strong>Will it break my project?</strong> Every change can be undone, and bad steps are refused before they land.</li>
-            <li><strong>Why is it sometimes slow?</strong> Exact instructions (the lightning bolt) are instant. Open-ended ones wait for your assistant's model, which depends on the provider.</li>
-          </ul>
-        </section>
-
-        <section class="dv-sec" id="start"><h2>Start in 4 steps</h2>
+        <section class="dv-sec" id="start"><h2>Start in 3 steps</h2>
           <ol class="dev-list">
             <li><a href="index.html#download">Download Infinite</a> and open any project.</li>
-            <li>Open the chat panel on the right and press <em>Set up</em> next to Claude, ChatGPT or Gemini.</li>
-            <li>Finish signing in on the page that opens in your browser.</li>
+            <li>In the chat panel, press <em>Set up</em> next to your assistant and sign in.</li>
             <li>Type <code>@</code>, pick a node, and say what you want.</li>
           </ol>
-          <p>Building your own tools? The <a href="developers.html">developers page</a> covers the command line, Python SDK and MCP server the chat is built on.</p>
+          <p>Building your own tools? See the <a href="developers.html">developers page</a>.</p>
         </section>
       </div>
     </div>

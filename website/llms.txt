@@ -99,7 +99,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [UTCP Protocol Manual](https://infinitedevices.org/utcp.json): Universal Tool Calling Protocol specification for autonomous AI agents without MCP daemons
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
 - [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit
-- [Extensions](https://infinitedevices.org/extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
+- [Extensions](https://infinitedevices.org/library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated
 - [Benchmark Report (PDF)](https://infinitedevices.org/assets/Infinite_Benchmark_Report.pdf): the same report as a branded PDF
@@ -279,7 +279,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Library: Extensions
 
-- [Tracking pack](https://infinitedevices.org/library/ext-tracking.html): Turn a camera or a picture into controls: hands, face and body landmarks become modulators. (file: https://infinitedevices.org/extensions.html#tracking)
+- [Tracking pack](https://infinitedevices.org/library/ext-tracking.html): Turn a camera or a picture into controls: hands, face and body landmarks become modulators. (file: https://infinitedevices.org/library.html#extensions)
 
 ## Generated & Procedural Library
 

@@ -35,17 +35,15 @@ GROUPS = [
     ]),
     ("explore", "Explore", [
         ("library.html", "Library", "Templates, patches and Field devices"),
-        ("samples/", "Samples", "Sounds and clips to download"),
+        ("samples/", "Sample generator", "Sounds and clips to download"),
         ("artworks.html", "Art gallery", "Made with Infinite"),
         ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
-        ("chat.html", "Chat", "Talk to your patch with an agent"),
-        ("extensions.html", "Extensions", "Hand, face and pose tracking"),
-        ("benchmarks.html", "Benchmarks", "Measured against other tools"),
     ]),
     ("learn", "Learn", [
         ("index.html#learn", "Get started", "Make a first sound and picture"),
         ("philosophy.html", "Philosophy", "Why Infinite is built this way"),
+        ("chat.html", "Agents &amp; terminal", "Talk to your patch with an agent"),
         ("blog/", "Blog", "Guides and how things work"),
     ]),
 ]
@@ -56,16 +54,16 @@ FOOTER_COLS = [
         ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
     ]),
     ("Explore", [
-        ("library.html", "Library"), ("samples/", "Samples"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("chat.html", "Chat"), ("extensions.html", "Extensions"),
-        ("benchmarks.html", "Benchmarks"),
+        ("library.html", "Library"), ("samples/", "Sample generator"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"),
     ]),
     ("Learn", [
-        ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("blog/", "Blog"),
+        ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
     ]),
     ("Docs", [   # PDFs in website/assets
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
         ("assets/Field_Language_Manual.pdf", "Field language"),
         ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide"),
+        ("benchmarks.html", "Benchmarks"),
         ("assets/Infinite_Benchmark_Report.pdf", "Benchmark report"),
     ]),
     ("Open source", [
