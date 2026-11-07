@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Downtempo Analog Warmth Resonant Filter FX",
+    "author": "Infinite",
+    "description": "Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float cutoff = 2600.0 [400.0, 7000.0]\nparam float resonance = 0.52 [0.05, 0.90]\nparam float warmth = 0.45 [0.0, 1.0]\nparam float envDepth = 0.38 [0.0, 1.0]\nparam float mix = 0.65 [0.0, 1.0]\nstate float envFollower = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\nabsIn = abs(in)\nenvFollower = envFollower + 0.05 * (absIn - envFollower)\n\nfEff = clamp((cutoff / sr) * (0.18 + envFollower * envDepth * 0.8), 0.02, 0.44)\nfb = clamp(resonance * 0.65, 0.0, 0.85)\n\nlp1 = lp1 + fEff * (in + lp1 * fb - lp1)\nlp2 = lp2 + fEff * (lp1 - lp2)\n\ndrv = lp2 * (1.0 + warmth * 1.6)\nsat = drv / (1.0 + abs(drv))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.65\n",
+    "params": {
+      "cutoff": 2600.0,
+      "resonance": 0.52,
+      "warmth": 0.45,
+      "envDepth": 0.38,
+      "mix": 0.65
+    }
+  }
+}

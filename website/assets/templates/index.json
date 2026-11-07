@@ -1707,6 +1707,72 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "french-filter-house-pumping-saw-bass-synth",
+      "name": "French Filter House Pumping Saw Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Pumping multi-oscillator saw bass with 2-pole resonant diode ladder filter, sidechain ducking curve, and warm harmonic drive.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-pumping-saw-bass-synth.webp",
+      "file": "assets/templates/french-filter-house-pumping-saw-bass-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "french-filter-house-disco-stab-lead-synth",
+      "name": "French Filter House Disco Stab Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Euphoric filtered disco chord stab synthesizer with multi-saw unison spread, resonant sweep envelope, and analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/french-filter-house-disco-stab-lead-synth.webp",
+      "file": "assets/templates/french-filter-house-disco-stab-lead-synth.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "downtempo-tape-flutter-warm-delay-fx",
+      "name": "Downtempo Tape Flutter Warm Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Vintage reel-to-reel tape delay with wow and flutter modulation, high-frequency tape head roll-off, and warm saturating feedback.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-tape-flutter-warm-delay-fx.webp",
+      "file": "assets/templates/downtempo-tape-flutter-warm-delay-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "downtempo-analog-warmth-resonant-filter-fx",
+      "name": "Downtempo Analog Warmth Resonant Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture.",
+      "price": 0,
+      "preview": "assets/templates/downtempo-analog-warmth-resonant-filter-fx.webp",
+      "file": "assets/templates/downtempo-analog-warmth-resonant-filter-fx.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

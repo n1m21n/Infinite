@@ -432,6 +432,14 @@
    "font-size": 47,
    "hex": 18,
    "radius": 12
+  },
+  "embeds/suprematist-forms-kinetic-red-wedge.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/suprematist-forms-floating-black-quadrilateral.html": {
+   "font-size": 2,
+   "hex": 6
   }
  },
  "embeds/cyberpunk-neon-rain-reflections.html": {

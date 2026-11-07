@@ -5886,6 +5886,214 @@
       "file": "assets/library/pixel/ditherpunk-cyber-glyph-lattice.field",
       "preview": "assets/library/previews/ditherpunk-cyber-glyph-lattice.jpg",
       "bytes": 1533
+    },
+    {
+      "id": "bauhaus-geometry-constructivist-lattice",
+      "name": "Bauhaus Geometry Constructivist Lattice",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "constructivist",
+        "lattice",
+        "geometric",
+        "drawing",
+        "vector"
+      ],
+      "description": "Constructivist geometric lattice featuring primary-colored concentric arcs, diagonal structural rules, and balanced asymmetrical quadrant divisions on warm parchment.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-geometry-constructivist-lattice.js",
+      "preview": "assets/library/previews/bauhaus-geometry-constructivist-lattice.jpg",
+      "bytes": 2835
+    },
+    {
+      "id": "bauhaus-geometry-asymmetric-rotary-composition",
+      "name": "Bauhaus Geometry Asymmetric Rotary Composition",
+      "kind": "Generator",
+      "tags": [
+        "bauhaus",
+        "composition",
+        "rotary",
+        "constructivism",
+        "geometric",
+        "drawing"
+      ],
+      "description": "Asymmetric constructivist study with interlocking rotational discs, tensioned diagonal intersecting planes, and primary Bauhaus accents on ivory gesso.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/bauhaus-geometry-asymmetric-rotary-composition.js",
+      "preview": "assets/library/previews/bauhaus-geometry-asymmetric-rotary-composition.jpg",
+      "bytes": 2339
+    },
+    {
+      "id": "brutalist-architecture-monolithic-facade-3d",
+      "name": "Brutalist Architecture Monolithic Facade 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "architecture",
+        "concrete",
+        "monolith",
+        "facade",
+        "3d"
+      ],
+      "description": "Monumental raw concrete facade with deep recessed fenestrations, fluted monolithic pilasters, and industrial red primer datum lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/brutalist-architecture-monolithic-facade-3d.js",
+      "preview": "assets/library/previews/brutalist-architecture-monolithic-facade-3d.jpg",
+      "bytes": 2215
+    },
+    {
+      "id": "brutalist-architecture-stepped-cantilever-monument-3d",
+      "name": "Brutalist Architecture Stepped Cantilever Monument 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalist",
+        "cantilever",
+        "monument",
+        "concrete",
+        "sculpture",
+        "3d"
+      ],
+      "description": "Spomenik-inspired civic monument of interlocking cantilevered concrete slabs with angular shadow recesses and monumental stepped plinths.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/brutalist-architecture-stepped-cantilever-monument-3d.js",
+      "preview": "assets/library/previews/brutalist-architecture-stepped-cantilever-monument-3d.jpg",
+      "bytes": 2268
+    },
+    {
+      "id": "french-filter-house-pumping-saw-bass-synth",
+      "name": "French Filter House Pumping Saw Bass Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "french-house",
+        "bass",
+        "filter",
+        "saw",
+        "audio"
+      ],
+      "description": "Pumping multi-oscillator saw bass with 2-pole resonant diode ladder filter, sidechain ducking curve, and warm harmonic drive.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/french-filter-house-pumping-saw-bass-synth.inf",
+      "preview": "assets/library/previews/french-filter-house-pumping-saw-bass-synth.jpg",
+      "bytes": 2263
+    },
+    {
+      "id": "french-filter-house-disco-stab-lead-synth",
+      "name": "French Filter House Disco Stab Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "french-house",
+        "lead",
+        "disco",
+        "stab",
+        "audio"
+      ],
+      "description": "Euphoric filtered disco chord stab synthesizer with multi-saw unison spread, resonant sweep envelope, and analog saturation.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/french-filter-house-disco-stab-lead-synth.inf",
+      "preview": "assets/library/previews/french-filter-house-disco-stab-lead-synth.jpg",
+      "bytes": 2406
+    },
+    {
+      "id": "downtempo-tape-flutter-warm-delay-fx",
+      "name": "Downtempo Tape Flutter Warm Delay FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "downtempo",
+        "tape",
+        "delay",
+        "flutter",
+        "audio"
+      ],
+      "description": "Vintage reel-to-reel tape delay with wow and flutter modulation, high-frequency tape head roll-off, and warm saturating feedback.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/downtempo-tape-flutter-warm-delay-fx.inf",
+      "preview": "assets/library/previews/downtempo-tape-flutter-warm-delay-fx.jpg",
+      "bytes": 2095
+    },
+    {
+      "id": "downtempo-analog-warmth-resonant-filter-fx",
+      "name": "Downtempo Analog Warmth Resonant Filter FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "downtempo",
+        "filter",
+        "analog",
+        "warmth",
+        "audio"
+      ],
+      "description": "Organic resonant state filter with dynamic envelope follower modulation, asymmetric tube warmth, and subtle vinyl dust texture.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/downtempo-analog-warmth-resonant-filter-fx.inf",
+      "preview": "assets/library/previews/downtempo-analog-warmth-resonant-filter-fx.jpg",
+      "bytes": 2057
+    },
+    {
+      "id": "suprematist-forms-kinetic-red-wedge",
+      "name": "Suprematist Forms Kinetic Red Wedge",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "suprematist",
+        "constructivism",
+        "malevich",
+        "shader"
+      ],
+      "description": "Dynamic Suprematist constructivist composition with audio-reactive vermilion wedge thrust, floating carbon black quadrilaterals, and linen ground.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/suprematist-forms-kinetic-red-wedge.field",
+      "preview": "assets/library/previews/suprematist-forms-kinetic-red-wedge.jpg",
+      "bytes": 1948
+    },
+    {
+      "id": "suprematist-forms-floating-black-quadrilateral",
+      "name": "Suprematist Forms Floating Black Quadrilateral",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "suprematist",
+        "abstract",
+        "geometric",
+        "shader"
+      ],
+      "description": "Zero-degree Suprematist spatial study featuring monumental floating carbon rectangles, tensioned diagonal intersecting bars, and vermilion accents on raw canvas.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/suprematist-forms-floating-black-quadrilateral.field",
+      "preview": "assets/library/previews/suprematist-forms-floating-black-quadrilateral.jpg",
+      "bytes": 1915
     }
   ]
 }

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Suprematist Forms Kinetic Red Wedge",
+    "author": "Infinite",
+    "description": "Dynamic Suprematist constructivist composition with audio-reactive vermilion wedge thrust, floating carbon black quadrilaterals, and linen ground.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float wedgeScale = 1.0 [0.5, 2.0]\nparam float rotationSpeed = 0.45 [0.1, 1.5]\nparam float tensionGap = 0.08 [0.01, 0.25]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float barWidth = 0.22 [0.08, 0.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * rotationSpeed\n\nca = cos(time * 0.3)\nsa = sin(time * 0.3)\npRot = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca)\n\nwP = pRot - vec2(-0.15, 0.1)\ndWedge = max(abs(wP.y + wP.x * 0.7) - 0.45 * wedgeScale, abs(wP.x) - 0.65 * wedgeScale)\nwedgeMask = 1.0 - smoothstep(0.0, 0.012, dWedge)\n\nr1P = pRot - vec2(0.28, -0.22)\ndRect1 = max(abs(r1P.x) - 0.42, abs(r1P.y) - 0.18)\nrect1Mask = 1.0 - smoothstep(0.0, 0.012, dRect1)\n\nr2P = vec2(p.x * 0.866 - p.y * 0.5, p.x * 0.5 + p.y * 0.866) - vec2(-0.25, 0.3)\ndRect2 = max(abs(r2P.x) - 0.95, abs(r2P.y) - barWidth * 0.25)\nrect2Mask = 1.0 - smoothstep(0.0, 0.012, dRect2)\n\ndP3 = length(pRot - vec2(0.48, 0.42)) - 0.16\ndiskMask = 1.0 - smoothstep(0.0, 0.012, dP3)\n\ncLinen = vec3(0.957, 0.937, 0.902)\ncCarbon = vec3(0.067, 0.067, 0.071)\ncVermilion = vec3(0.851, 0.137, 0.122)\ncCobalt = vec3(0.169, 0.243, 0.549)\n\ncol = cLinen\ncol = mix(col, cCarbon, rect2Mask)\ncol = mix(col, cCarbon, rect1Mask)\ncol = mix(col, cVermilion, wedgeMask)\ncol = mix(col, cCobalt, diskMask)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "wedgeScale": 1.0,
+      "rotationSpeed": 0.45,
+      "tensionGap": 0.08,
+      "contrast": 1.15,
+      "barWidth": 0.22
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}
