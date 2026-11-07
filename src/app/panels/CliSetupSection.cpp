@@ -126,9 +126,8 @@ namespace app
          if (!info.hint.empty() && info.problem.empty())
          {
             FormParts::Label("");
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped("%s", info.hint.c_str());
-            ImGui::PopStyleColor();
+            FormParts::TintedText(ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                                  [&] { ImGui::TextWrapped("%s", info.hint.c_str()); });
          }
          if (!info.problem.empty())
          {
