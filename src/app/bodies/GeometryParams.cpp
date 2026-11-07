@@ -693,12 +693,17 @@ namespace app
    {
       int matIndex = -1;
       ImVec2 pos;
+      // The "load map" pick drains after the canvas pass (RunPendingMapLoad), where no
+      // editor is current: GetNodePosition dereferenced a null context (B-L-002, a 1.1.0 crash).
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
       for (GraphNode& gn : gNodes)
          if (gn.node.get() == material)
          {
             matIndex = gn.index;
             pos = ed::GetNodePosition(gn.NodeId());
          }
+      ed::SetCurrentEditor(prevEditor);
       if (matIndex < 0)
          return;
       if (checkpoint)
