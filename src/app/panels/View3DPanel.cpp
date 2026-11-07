@@ -559,6 +559,8 @@ namespace
          sPreCam.roll = sRoll;
          sPreCam.ortho = sOrtho;
          sPreCam.set = true;
+         sCamZoom = 1.0f;   // a fresh camera view starts centred, not where the last one was panned
+         sCamPan = ImVec2(0, 0);
       }
       sCameraView = true;
    }
@@ -571,11 +573,36 @@ namespace
       const bool locked = sLockCam && !force;
       sLockDirty = locked;
       sCameraView = locked;
+      if (!locked)
+      {
+         sCamZoom = 1.0f;
+         sCamPan = ImVec2(0, 0);
+      }
       sOrtho = false;
       sEl = std::asin(std::clamp(-sCam.fwd[1], -1.0f, 1.0f));
       sAz = std::atan2(-sCam.fwd[2], -sCam.fwd[0]);
+      // Like Blender: leaving a camera keeps what you see. The pivot stays where it was and the eye backs off or closes
+      // in until the pivot is drawn at the size the camera frame showed it (the free view fills the panel at the
+      // viewport lens, the frame was 92% of it at the camera's lens), and the camera's roll carries over.
+      float dist = sDist;
+      if (!locked && !sCam.ortho)
+      {
+         const float camScale = sCam.proj.m[5];
+         const float viewScale = 1.0f / std::tan(ViewFov() * 0.5f * kPi / 180.0f);
+         if (camScale > 1e-4f)
+            dist = std::clamp(sDist * viewScale / camScale, 0.1f, 500.0f);
+      }
       for (int k = 0; k < 3; k++)
          sTarget[k] = sCam.eye[k] + sCam.fwd[k] * sDist;
+      sDist = dist;
+      if (!locked)
+      {
+         const float up0[3] = { -std::sin(sEl) * std::cos(sAz), std::cos(sEl), -std::sin(sEl) * std::sin(sAz) };
+         const float* f = sCam.fwd;
+         const float r[3] = { f[1] * up0[2] - f[2] * up0[1], f[2] * up0[0] - f[0] * up0[2], f[0] * up0[1] - f[1] * up0[0] };
+         sRoll = std::atan2(sCam.up[0] * r[0] + sCam.up[1] * r[1] + sCam.up[2] * r[2],
+                            sCam.up[0] * up0[0] + sCam.up[1] * up0[1] + sCam.up[2] * up0[2]);
+      }
    }
 
    // Any free rotation ends an axis view.
@@ -749,8 +776,10 @@ namespace
    // A turn of the view. With a selection the view swings round it, so it stays where it was on screen.
    void OrbitBy(Scene3DNode* scene, float dAz, float dEl)
    {
+      const bool fromCamera = sCameraView;
       Orbited();
-      sRoll = 0.0f;
+      if (!fromCamera)
+         sRoll = 0.0f;   // the turn that leaves a camera keeps its roll, so nothing snaps; the next one levels it
       float p[3];
       const bool around = sSet->orbitSelection && SelectionCenter(scene, p);
       float eye[3], local[3] = { 0, 0, 0 };
@@ -2494,11 +2523,10 @@ namespace
    enum class WheelUse { Orbit, Pan, Zoom };
    struct WheelNav { WheelUse use; float dx, dy; };
 
-   // What one frame of wheel / two-finger scroll asks of the camera. Plain scroll orbits, Shift pans, Ctrl or Cmd zooms
-   // (everywhere but macOS the plain wheel zooms, as a mouse wheel does). macOS turns Shift + vertical scroll into a
-   // horizontal one before GLFW sees it (imgui.h, MouseWheelRequestAxisSwap: "on a Mac this is already enforced by the
-   // system"), so a Shift swipe up and down reached Pan as a sideways move only. A Shift scroll with no vertical part is
-   // that swap, and is turned back; a diagonal swipe arrives whole and is left alone.
+   // What one frame of wheel / two-finger scroll asks of the camera. Scroll orbits, Ctrl or Cmd zooms (everywhere but
+   // macOS the wheel zooms, as a mouse wheel does). Shift does nothing here: Shift + two-finger pan was removed as
+   // annoying (Shift + middle drag still pans). macOS turns Shift + vertical scroll into a horizontal one before GLFW sees
+   // it (imgui.h, MouseWheelRequestAxisSwap), so a Shift scroll with no vertical part is that swap, and is turned back.
    WheelNav ClassifyWheel(float wheelH, float wheel, bool shift, bool ctrl, bool super_)
    {
 #ifdef __APPLE__
@@ -2506,12 +2534,12 @@ namespace
       if (shift && wheel == 0.0f)
          std::swap(wheelH, wheel);
 #else
-      const bool zoom = !shift;
-      (void)ctrl; (void)super_;
+      const bool zoom = true;
+      (void)ctrl; (void)super_; (void)shift;
 #endif
       if (zoom)
          return { WheelUse::Zoom, wheelH, wheel };
-      return { shift ? WheelUse::Pan : WheelUse::Orbit, wheelH, wheel };
+      return { WheelUse::Orbit, wheelH, wheel };
    }
 
    // For the self-test: what the last drawn viewport saw.
@@ -5216,8 +5244,11 @@ namespace
             dl->AddLine(c, mouse, Hex(kWire, 0.7f));
       }
 
-      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, hovered)) || DrawSculpt(dl, scene, mouse, hovered) ||
-                                            DrawEdit(dl, scene, mouse, hovered));
+      // The nav ball and tool pad sit above Pose, Sculpt and Edit: a press on them is theirs, not a stroke or a box select.
+      const bool overUi = navBall >= 0 || onNav;
+      const bool toolHover = hovered && !overUi;
+      const bool posing = sOp.mode == 0 && ((sOverlays && DrawPose(dl, scene, mouse, toolHover)) || DrawSculpt(dl, scene, mouse, toolHover) ||
+                                            DrawEdit(dl, scene, mouse, toolHover));
       gView3DClaimedKeys = hovered || sOp.mode != 0 || sPose.turning || sPose.stroking || sSculpt.stroking || sSculpt.adjust != 0 || sEdit.op != 0 || sEdit.pressed;
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          sRightOk = sOp.mode == 0 && !posing;
@@ -5241,7 +5272,15 @@ namespace
       if (!ImGui::IsAnyMouseDown())
          sLockUndo = false;
 
-      if (hovered && sOp.mode == 0 && !posing && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+      // Shift + double-click on empty space also works inside Pose, Sculpt and Edit (their own click handlers ran above).
+      if (hovered && sOp.mode == 0 && posing && !overUi && io.KeyShift && !io.KeyAlt && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+          Pick(scene, mouse, true) == 0)
+      {
+         GlideTo([] { std::copy(sSet->cursor, sSet->cursor + 3, sTarget); });
+         sBoxOn = false;
+         sLasso = false;
+      }
+      if (hovered && sOp.mode == 0 && (!posing || overUi) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
       {
          if (sZoomArmed)
          {
@@ -7220,7 +7259,8 @@ namespace
    void DrawRenderTab(Scene3DNode* scene)
    {
       Render3DNode& look = scene->Look();
-      ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
+      if (Card(T("Engine")))
+         ComboRow(T("Engine"), &look.engine, Render3DNode::EngineNames());
       if (look.engine == 1 && Card(T("Path Tracing")))
       {
          struct { const char* label; const char* id; int* v; int hi; } rows[] = {

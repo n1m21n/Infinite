@@ -1897,3 +1897,7 @@ if(APPLE)
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()
 
+# RIGTEST finds its fixture from the checkout root (__FILE__ can be build-dir relative).
+set_source_files_properties(src/app/selftest/RigTests.cpp PROPERTIES
+    COMPILE_DEFINITIONS "INFINITE_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+

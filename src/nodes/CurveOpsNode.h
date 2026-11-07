@@ -67,6 +67,7 @@ public:
       v.Int("mode", mode); v.Int("count", count); v.Float("tolerance", tolerance);
       v.Int("iterations", iterations); v.Float("strength", strength);
       v.Float("distance", distance); v.Int("arcSteps", arcSteps);
+      arcSteps = std::clamp(arcSteps, 1, 64); // B-L-004: 1e9 points per round join
       v.Float("radius", radius); v.Int("sides", sides);
    }
 

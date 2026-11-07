@@ -1,5 +1,5 @@
 // 3D View navigation self-test (INFINITE_VIEW3DNAVTEST): synthetic wheel and key events through ImGui, so the real
-// viewport (hover, active id, scroll) is in the loop. Orbit, Shift pan, Ctrl zoom, in an empty scene and after an
+// viewport (hover, active id, scroll) is in the loop. Orbit, Shift (no pan), Ctrl zoom, in an empty scene and after an
 // object was added and selected.
 #include "app/AppShared.h"
 #include "nodes/Scene3DNode.h"
@@ -121,11 +121,7 @@ void RunView3DNavTest(int f)
       Delta(before, now, d);
       const float up = std::abs(Dot(d, now.v + 9)), right = std::abs(Dot(d, now.v + 6));
       printf("  shift swipe (OS-swapped): pan along up %.4f, along right %.4f\n", up, right);
-#ifdef __APPLE__
-      Check("Shift + vertical swipe (arrives horizontal on macOS) pans up and down", up > 1e-4f && up > 5.0f * right);
-#else
-      Check("Shift + wheel pans", up + right > 1e-4f);
-#endif
+      Check("Shift + swipe no longer pans", up + right < 1e-4f);
       before = now;
       break;
    }
@@ -138,7 +134,7 @@ void RunView3DNavTest(int f)
       float d[3];
       Delta(before, now, d);
       const float up = std::abs(Dot(d, now.v + 9)), right = std::abs(Dot(d, now.v + 6));
-      Check("Shift + vertical scroll pans up and down", up > 1e-4f && up > 5.0f * right);
+      Check("Shift + vertical scroll no longer pans", up + right < 1e-4f);
       io.AddKeyEvent(ImGuiMod_Shift, false);
       before = now;
       break;
@@ -327,7 +323,7 @@ void RunView3DEditTest(int f)
 
 // ============================================================ INFINITE_VIEW3DPIVOTTEST
 //
-// Shift + two-finger scroll pans the pivot away; Shift + double-click on empty space glides it back onto the 3D
+// Shift + middle-drag pans the pivot away (Shift + two-finger scroll no longer does); Shift + double-click on empty space glides it back onto the 3D
 // cursor (the origin in a new scene) and keeps the distance and the turn.
 void RunView3DPivotTest(int f)
 {
@@ -358,15 +354,16 @@ void RunView3DPivotTest(int f)
    case 12:
       io.AddKeyEvent(ImGuiMod_Shift, true);
       break;
-   case 14:
-      io.AddMouseWheelEvent(4.0f, 0.0f);   // Shift + vertical scroll arrives as horizontal on macOS
-      io.AddMouseWheelEvent(0.0f, 4.0f);
-      io.AddMouseWheelEvent(0.0f, 4.0f);
-      break;
+   case 14: io.AddMouseButtonEvent(2, true); break;
+   case 15: io.AddMousePosEvent(mid[0] + 60.0f, mid[1] + 30.0f); break;
+   case 16: io.AddMousePosEvent(mid[0] + 120.0f, mid[1] + 60.0f); break;
+   case 17: io.AddMouseButtonEvent(2, false); break;
+   case 19: io.AddMousePosEvent(mid[0], mid[1]); break;
    case 18:
    {
       View3DNavProbe(panned);
-      check("Shift + scroll moved the pivot off the cursor", len3(panned + 3) > 0.01f);
+      printf("  pivot after drag: %.4f %.4f %.4f  (probe hovered %.0f active %.0f)\n", panned[3], panned[4], panned[5], panned[15], panned[16]);
+      check("Shift + middle-drag moved the pivot off the cursor", len3(panned + 3) > 0.01f);
       break;
    }
    case 20: io.AddMouseButtonEvent(0, true); break;

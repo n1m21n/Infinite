@@ -978,8 +978,7 @@ if ($Failed -gt 0) { exit 1 }
       // 4 the agent: installed, and its own config still names the launcher
       if (in.agent == nullptr)
          set(4, Health::kUnknown);
-      else if (!OnPath(in.os, win ? std::vector<std::string>{ std::string(in.agent->binary) + ".exe", std::string(in.agent->binary) + ".cmd" } : std::vector<std::string>{ in.agent->binary }, in.home, in.pathEnv) &&
-               !IsFile(in.home + "/.claude/local/" + in.agent->binary))
+      else if (!AgentInstalled(in.os, *in.agent, in.home, in.pathEnv) && !IsFile(in.home + "/.claude/local/" + in.agent->binary))
          set(4, Health::kBroken, "the coding agent was uninstalled");
       else if (ReadAll(in.home + "/" + in.agent->configFile).find("infinite-app") == std::string::npos)
          set(4, Health::kBroken, "the MCP registration is gone from the agent's config");
@@ -1029,6 +1028,29 @@ if ($Failed -gt 0) { exit 1 }
       }).detach();
    }
 
+   namespace
+   {
+      // On a Mac `agy` keeps its login in the Keychain, not in a file. Asked at most every 2 s, and only for the
+      // real HOME, so a test's fake home never reads the person's Keychain.
+      bool AntigravityInKeychain(const std::string& home)
+      {
+         const char* real = getenv("HOME");
+         if (real == nullptr || home != real)
+            return false;
+         static std::mutex m;
+         static double at = -1e9;
+         static bool found = false;
+         std::lock_guard<std::mutex> lock(m);
+         const double now = (double)std::time(nullptr);
+         if (now - at >= 2.0)
+         {
+            at = now;
+            found = std::system("/usr/bin/security find-generic-password -s gemini -a antigravity >/dev/null 2>&1") == 0;
+         }
+         return found;
+      }
+   }
+
    Readiness AgentReadiness(const Agent& agent)
    {
       const Os os = CurrentOs();
@@ -1061,7 +1083,7 @@ if ($Failed -gt 0) { exit 1 }
       else if (id == "codex")
          r.signedIn = IsFile(in.home + "/.codex/auth.json") || env("OPENAI_API_KEY");
       else if (id == "antigravity")
-         r.signedIn = IsFile(in.home + "/.gemini/jetski-standalone-oauth-token") || env("GEMINI_API_KEY");
+         r.signedIn = IsFile(in.home + "/.gemini/jetski-standalone-oauth-token") || env("GEMINI_API_KEY") || (os == Os::kMac && AntigravityInKeychain(in.home));
       return r;
    }
 

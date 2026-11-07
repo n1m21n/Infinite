@@ -714,7 +714,7 @@ void FieldPrimitiveNode::LoadDeviceFile(const Field::DeviceFile& device)
    code = device.code;
    auto itMax = device.nodeSettings.find("maxElements");
    if (itMax != device.nodeSettings.end())
-      maxElements = (int)itMax->second;
+      maxElements = (int)std::clamp(itMax->second, 1.0, (double)kMaxFieldElements);
    auto itCount = device.nodeSettings.find("count");
    if (itCount != device.nodeSettings.end())
       count = (int)itCount->second;
@@ -810,7 +810,7 @@ bool FieldPrimitiveNode::Apply()
    {
       newState.DeclareCell(ds.name, ds.typeName, ds.type, ds.lanes, ds.initialValues, ds.domain);
    }
-   size_t allocCount = (mActualElementCount > 0) ? (size_t)mActualElementCount : (size_t)std::max(1, maxElements);
+   size_t allocCount = (mActualElementCount > 0) ? (size_t)mActualElementCount : (size_t)std::clamp(maxElements, 1, kMaxFieldElements);
    newState.Allocate(Field::Domain::Element, allocCount);
    newState.Transplant(mState);
    mState = std::move(newState);
@@ -848,7 +848,7 @@ void FieldPrimitiveNode::CookIfNeeded(int frameId)
    }
 
    int n = std::max(1, count);
-   size_t boundCount = std::min((size_t)n, (size_t)std::max(1, maxElements));
+   size_t boundCount = std::min((size_t)n, (size_t)std::clamp(maxElements, 1, kMaxFieldElements));
    mWasTruncated = ((size_t)n > boundCount);
    mActualElementCount = (int)boundCount;
 

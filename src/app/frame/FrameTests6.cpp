@@ -1079,4 +1079,189 @@ void FrameTest_RENDER3DFOLDTEST(int frameId, GLFWwindow* window)
       printf("%s\n", ok ? "RENDER3DFOLDTEST OK" : "RENDER3DFOLDTEST FAIL");
    }
 }
+
+// INFINITE_FRAMEFUZZ: the frame-side twin of INFINITE_PARAMFUZZ. Every float
+// and int param of every picture / 3D node is loaded at a hostile value
+// through Patch::LoadParams (the route a patch file, OSC, RPC and presets
+// share), on a fresh node fed a Geometry mesh or a Noise picture on every
+// input it takes. Flags, all failing:
+//   CRASH    the process dies; the last "FRAMEFUZZ try" line names the row
+//   NANMESH  a non-finite vertex position in GetMesh()
+//   BIGMESH  more than kMaxVerts vertices (a count sized by the value)
+//   BIGTEX   an output texture side past 16384
+//   GLERR    a GL error raised by the cook
+//   SLOW     one load + cook past kSlowSec
+// INFINITE_FRAMEFUZZ=Type,Type limits it; INFINITE_FRAMEFUZZ_AFTER=row resumes.
+void FrameTest_FRAMEFUZZTEST(int frameId, GLFWwindow* window)
+{
+   const char* env = getenv("INFINITE_FRAMEFUZZ");
+   if (env == nullptr)
+      return;
+   struct Item { std::string name, category; };
+   static std::vector<Item> sItems;
+   static size_t sNext = 0, sKey = 0, sVal = 0;
+   static bool sListed = false, sSkipping = false;
+   static std::string sAfter;
+   static std::vector<std::pair<std::string, std::string>> sBase;
+   static int sRows = 0, sFlagged = 0, sTypes = 0, sMeshRows = 0, sCookId = 3000000;
+   static int sGeoIdx = -1, sNoiseIdx = -1;
+   static const char* kFloatValues[] = { "1e9", "-1e9", "-1", "0" };
+   static const char* kIntValues[] = { "1000000000", "-1000000000", "-1", "0" };
+   const size_t kMaxVerts = 20000000;
+   const double kSlowSec = 5.0;
+   if (frameId < 3)
+      return;
+
+   if (!sListed)
+   {
+      sListed = true;
+      std::vector<std::string> only;
+      {
+         const std::string list = env;
+         size_t a = 0;
+         while (a <= list.size())
+         {
+            const size_t b = std::min(list.find(',', a), list.size());
+            if (b > a && list.substr(a, b - a) != "1")
+               only.push_back(list.substr(a, b - a));
+            a = b + 1;
+         }
+      }
+      if (const char* after = getenv("INFINITE_FRAMEFUZZ_AFTER"))
+      {
+         sAfter = after;
+         sSkipping = !sAfter.empty();
+      }
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            if (only.empty() || std::find(only.begin(), only.end(), name) != only.end())
+               sItems.push_back({ name, category });
+      while (!gNodes.empty())
+         RemoveNodeByIndex(gNodes.back().index);
+      if (GraphNode* g = SpawnNode("Geometry", "3D", -400.0f, 20.0f))
+         sGeoIdx = g->index;
+      if (GraphNode* nz = SpawnNode("Noise", "Generate", -400.0f, 400.0f))
+         sNoiseIdx = nz->index;
+      printf("FRAMEFUZZ %zu node type(s), feeds geo %d noise %d\n", sItems.size(), sGeoIdx, sNoiseIdx);
+      fflush(stdout);
+      return;
+   }
+
+   static const char* kSkipNames[] = { "Plugin", "Projection", "NDI Out", "Syphon Out", "OSC Send", "OSC Receive",
+                                       "MIDI Out", "Audio Out", "Output", "Comment", "Geometry", "Noise",
+                                       "Video", "Webcam", "Screen Capture", "Audio In" };
+   const auto frameStart = std::chrono::steady_clock::now();
+   while (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart).count() < 60.0)
+   {
+      if (sNext >= sItems.size())
+      {
+         printf("FRAMEFUZZ %d types, %d rows (%d with a mesh), %d flagged  %s\n", sTypes, sRows, sMeshRows, sFlagged,
+                sFlagged == 0 && sRows > 0 ? "OK" : "FAIL");
+         fflush(stdout);
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+         return;
+      }
+      const Item& it = sItems[sNext];
+      if (sKey == 0 && sVal == 0)
+      {
+         bool skip = false;
+         for (const char* s : kSkipNames)
+            skip = skip || it.name == s;
+         std::unique_ptr<INode> probe(skip ? nullptr : NodeFactory::Instance().MakeNode(it.name));
+         if (probe != nullptr)
+         {
+            auto* audio = dynamic_cast<IAudioSource*>(probe.get());
+            if (probe->IsHardwareDriven() || (audio != nullptr && audio->IsHardwareDriven()) ||
+                (audio != nullptr && dynamic_cast<IGeometrySource*>(probe.get()) == nullptr))
+               skip = true;
+         }
+         if (probe == nullptr || skip)
+         {
+            sNext++;
+            continue;
+         }
+         sBase.clear();
+         Patch::SaveParams(probe.get(), sBase);
+         sTypes++;
+      }
+      if (sKey >= sBase.size())
+      {
+         sNext++;
+         sKey = sVal = 0;
+         continue;
+      }
+      const bool isFloat = sBase[sKey].first.rfind("f ", 0) == 0;
+      const bool isInt = sBase[sKey].first.rfind("i ", 0) == 0;
+      if ((!isFloat && !isInt) || sVal >= 4)
+      {
+         sKey++;
+         sVal = 0;
+         continue;
+      }
+      const char* value = isFloat ? kFloatValues[sVal] : kIntValues[sVal];
+      sVal++;
+      const std::string row = it.name + "." + (sBase[sKey].first.c_str() + 2) + "=" + value;
+      if (sSkipping)
+      {
+         sSkipping = row != sAfter;
+         continue;
+      }
+      printf("FRAMEFUZZ try %s\n", row.c_str());
+      fflush(stdout);
+      const auto t0 = std::chrono::steady_clock::now();
+      GraphNode* gn = SpawnNode(it.name, it.category, 20.0f, 20.0f);
+      if (gn == nullptr)
+         continue;
+      const int idx = gn->index;
+      for (int slot = 0; slot < InputCountFor(*gn); slot++)
+      {
+         std::string err;
+         if (sGeoIdx < 0 || !ConnectNodes(sGeoIdx, 0, idx, slot, err))
+            if (sNoiseIdx >= 0)
+               ConnectNodes(sNoiseIdx, 0, idx, slot, err);
+      }
+      gn = nullptr;
+      for (GraphNode& g : gNodes)
+         if (g.index == idx)
+            gn = &g;
+      if (gn == nullptr)
+         continue;
+      INode* node = gn->node.get();
+      std::vector<std::pair<std::string, std::string>> hostile = sBase;
+      hostile[sKey].second = value;
+      while (glGetError() != GL_NO_ERROR) {}
+      Patch::LoadParams(node, hostile);
+      size_t verts = 0;
+      bool nanMesh = false;
+      for (int pass = 0; pass < 2; pass++)
+      {
+         node->CookIfNeeded(sCookId++);
+         if (auto* geo = dynamic_cast<IGeometrySource*>(node))
+         {
+            const Mesh& m = geo->GetMesh();
+            verts = m.vertices.size();
+            for (size_t i = 0; i < verts && !nanMesh; i++)
+               nanMesh = !std::isfinite(m.vertices[i].px) || !std::isfinite(m.vertices[i].py) ||
+                         !std::isfinite(m.vertices[i].pz);
+         }
+      }
+      glFinish();
+      const GLenum glErr = glGetError();
+      const int tw = node->GetOutputWidth(), th = node->GetOutputHeight();
+      RemoveNodeByIndex(idx);
+      const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      sRows++;
+      if (verts > 0)
+         sMeshRows++;
+      const char* flag = nanMesh ? "NANMESH" : verts > kMaxVerts ? "BIGMESH" : (tw > 16384 || th > 16384) ? "BIGTEX"
+                         : glErr != GL_NO_ERROR ? "GLERR" : sec > kSlowSec ? "SLOW" : nullptr;
+      if (flag != nullptr)
+      {
+         sFlagged++;
+         printf("FRAMEFUZZ %s %s  verts %zu, tex %dx%d, gl 0x%x, %.1f s\n", flag, row.c_str(), verts, tw, th,
+                (unsigned)glErr, sec);
+         fflush(stdout);
+      }
+   }
+}
 }

@@ -227,6 +227,85 @@ namespace
       return true;
    }
 
+
+   // The path tracer's GLSL BLAS walk (Render3DPathTrace.cpp intersectBlas)
+   // replayed on the CPU, with its two hard caps: kGpuIters node visits and a
+   // kGpuStack-deep stack. Either cap silently drops part of the tree, so a ray
+   // that runs out reports a miss where there is a surface: holes and light
+   // leaks on a dense mesh. Returns hit t (tMax when none) and the cost seen.
+   constexpr int kGpuIters = 512;
+   constexpr int kGpuStack = 32;
+   struct GpuWalk { float t; int iters; int depth; bool overflow; };
+   GpuWalk GpuStyleWalk(const Bvh::Blas& blas, const Bvh::Ray& ray, const std::vector<PrecompTri>& tris)
+   {
+      (void)tris;
+      GpuWalk w { ray.tMax, 0, 0, false };
+      const float* nodes = blas.nodeTexels.data();
+      const float* tt = blas.triTexels.data();
+      float inv[3];
+      for (int a = 0; a < 3; a++)
+         inv[a] = 1.0f / (std::fabs(ray.d[a]) > 1e-20f ? ray.d[a] : (ray.d[a] >= 0.0f ? 1e-20f : -1e-20f));
+      auto box = [&](const float* n, float tMax, float& tNear) -> bool
+      {
+         float t0 = ray.tMin, t1 = tMax;
+         for (int a = 0; a < 3; a++)
+         {
+            float ta = (n[a] - ray.o[a]) * inv[a], tb = (n[4 + a] - ray.o[a]) * inv[a];
+            if (ta > tb) std::swap(ta, tb);
+            t0 = std::max(t0, ta);
+            t1 = std::min(t1, tb);
+         }
+         tNear = t0;
+         return t0 <= t1;
+      };
+      float rn = 0.0f;
+      if (!box(&nodes[0], w.t, rn))
+         return w;
+      std::vector<int> stack;
+      int cur = 0;
+      for (;;)
+      {
+         w.iters++;
+         const float* n = &nodes[(size_t)cur * 8];
+         const int32_t w0 = Bvh::FloatAsInt(n[3]), w1 = Bvh::FloatAsInt(n[7]);
+         if (w1 > 0)
+         {
+            for (int k = 0; k < w1; k++)
+            {
+               const float* tri = &tt[(size_t)(w0 + k) * 12];
+               float t, u, v;
+               if (Bvh::IntersectTriangle(ray.o, ray.d, ray.tMin, w.t, &tri[0], &tri[4], &tri[8], t, u, v))
+                  w.t = t;
+            }
+            if (stack.empty()) break;
+            cur = stack.back();
+            stack.pop_back();
+         }
+         else
+         {
+            const int l = w0, r = -w1;
+            float tl = 0, tr = 0;
+            const bool hl = box(&nodes[(size_t)l * 8], w.t, tl), hr = box(&nodes[(size_t)r * 8], w.t, tr);
+            if (hl && hr)
+            {
+               stack.push_back(tl <= tr ? r : l);
+               cur = tl <= tr ? l : r;
+            }
+            else if (hl) cur = l;
+            else if (hr) cur = r;
+            else
+            {
+               if (stack.empty()) break;
+               cur = stack.back();
+               stack.pop_back();
+            }
+         }
+         w.depth = std::max(w.depth, (int)stack.size());
+      }
+      w.overflow = w.iters > kGpuIters || w.depth > kGpuStack;
+      return w;
+   }
+
    int VerifyMeshRays(const Mesh& mesh, int numRays, uint32_t seed, const Bvh::Blas& blas)
    {
       float lo[3], hi[3];
@@ -322,6 +401,60 @@ bool RunBvhTest()
 
    const int sphereBad = VerifyMeshRays(uvSphere, 10000, 0x1001u, sphereBlas);
    check(sphereBad == 0, "UV sphere: 10,000 random rays match brute force", (double)sphereBad, 0.0);
+
+
+   // 1b. The GPU walk's caps on dense meshes: a sculpted / subdivided object
+   // (~1M triangles) and a wide floor seen at a grazing angle.
+   {
+      struct Case { const char* name; Mesh mesh; bool grazing; };
+      std::vector<Case> cases;
+      cases.push_back({ "dense sphere 720k tris", Primitives::Sphere(600, 600), false });
+      {
+         Mesh floor = Primitives::Sphere(600, 600);
+         for (Vertex& v : floor.vertices)
+         {
+            v.px *= 50.0f;
+            v.pz *= 50.0f;
+            v.py *= 0.02f;
+         }
+         cases.push_back({ "flat 100 m floor, grazing rays", floor, true });
+      }
+      for (Case& c : cases)
+      {
+         Bvh::Blas b;
+         b.Build(c.mesh, 0);
+         float lo[3], hi[3];
+         MeshBounds(c.mesh, lo, hi);
+         std::vector<Bvh::Ray> rays = MakeRandomRays(4000, lo, hi, 0x7007u);
+         if (c.grazing)
+         {
+            Rng rng(0x7117u);
+            for (Bvh::Ray& r : rays)
+            {
+               r.o[0] = rng.Range(lo[0], hi[0]) * 0.2f;
+               r.o[1] = 1.7f;
+               r.o[2] = rng.Range(lo[2], hi[2]) * 0.2f;
+               const float a = rng.Range(0.0f, 6.2831853f), drop = rng.Range(0.01f, 0.08f);
+               float d[3] = { std::cos(a), -drop, std::sin(a) };
+               const float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+               for (int k = 0; k < 3; k++) r.d[k] = d[k] / len;
+               r.tMin = 1e-4f;
+               r.tMax = 1e30f;
+            }
+         }
+         int maxIters = 0, maxDepth = 0, over = 0;
+         for (const Bvh::Ray& r : rays)
+         {
+            const GpuWalk w = GpuStyleWalk(b, r, {});
+            maxIters = std::max(maxIters, w.iters);
+            maxDepth = std::max(maxDepth, w.depth);
+            over += w.overflow ? 1 : 0;
+         }
+         printf("  gpu walk %s: max visits %d (cap %d), max stack %d (cap %d), %d/4000 rays over\n", c.name, maxIters,
+                kGpuIters, maxDepth, kGpuStack, over);
+         check(over == 0, "GPU BLAS walk stays inside its 512-visit / 32-deep caps", (double)over, 0.0);
+      }
+   }
 
    // 2. Fox glTF (10,000 rays)
    Mesh foxMesh;

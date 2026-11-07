@@ -2470,6 +2470,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // Cook cost of every node type: cold, idle and while animated.
       FrameTest_COOKSWEEPTEST(frameId, window);
 
+      // Hostile param values on every picture / 3D node (twin of INFINITE_PARAMFUZZ).
+      FrameTest_FRAMEFUZZTEST(frameId, window);
+
       FrameTest_BYPASSRULETEST(frameId, window);
 
       FrameTest_BYPASSSWEEPTEST(frameId, window);
