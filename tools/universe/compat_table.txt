@@ -1,0 +1,27 @@
+role pair      AUC    LR     n_pos  heldout_pos  groups  status
+-------------  -----  -----  -----  -----------  ------  ------
+kick-snare     0.621  0.554  24807        24807     325  ok in set
+kick-hat       0.611  0.541  22642        22642     310  ok in set
+snare-hat      0.660  0.621  24180        24180     316  ok in set
+kick-bass      0.572  0.562  17645        17645      97  weak
+snare-bass     0.553  0.538  18350        18350     103  weak
+hat-bass       0.572  0.548  18630        18630     104  weak
+kick-pad       0.544  0.526   9547         9547      47  weak
+bass-pad       0.568  0.558  24760        24760     102  weak
+hat-pad        0.534  0.564  10921        10921      52  weak
+kick-keys      0.528  0.511   9545         9545      65  weak
+bass-keys      0.589  0.584  23828        23828     112  weak
+snare-keys     0.542  0.498  10045        10045      65  weak
+kick-lead      0.581  0.544  16413        16413      64  weak
+bass-lead      0.590  0.568  31313        31313     122  weak
+hat-lead       0.556  0.529  17546        17546      73  weak
+pad-keys       0.566  0.571  18704        18704      97  weak
+keys-lead      0.610  0.609  25183        25183     106  weak
+pad-lead       0.557  0.546  25891        25891     104  weak
+
+kit set (held out)       AUC    sets  status
+-----------------------  -----  ----  ------
+kick-snare-hat           0.713  2970  ok
+kick-snare-hat-bass      0.611   870  weak
+kick-bass-keys-pad       0.601   330  weak
+bass-keys-lead           0.637   900  weak
