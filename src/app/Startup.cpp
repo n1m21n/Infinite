@@ -4540,9 +4540,17 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    }
    else if (pluginEngine)
    {
-      // The plugin's engine: load the shell's patch (if any), then run audio from the host.
+      // The plugin's engine: load the shell's patch, or the build's starting patch (FX: audio passes
+      // through; Instrument: MIDI Notes -> Analog), then run audio from the host.
       if (!pluginOpt.patchPath.empty())
          LoadPatchFrom(pluginOpt.patchPath);
+      else
+      {
+         const std::string start = BundledResourcePath(pluginOpt.fx ? "plugin/fx.inf" : "plugin/instrument.inf");
+         std::error_code ec;
+         if (std::filesystem::exists(AppPaths::FsPath(start), ec))
+            LoadPatchFrom(start);
+      }
       AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
       if (!StartAudioEngine(gAudioStartError))
          fprintf(stderr, "plugin engine: audio did not start: %s\n", gAudioStartError.c_str());

@@ -1525,6 +1525,9 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/plugin"
         COMMENT "Copying bundled fonts and drum kit next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
@@ -1603,6 +1606,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/plugin"
         COMMENT "Copying bundled fonts, icon, drum kit, ONNX Runtime libraries and model next to Infinite")
     # THIRD_PARTY_NOTICES condition 3 / GPL source-offer condition 2: the
     # FFmpeg and x264 licence texts ship inside the bundle wherever the
@@ -1915,6 +1921,10 @@ if(APPLE)
     set_source_files_properties(${INFINITE_TEMPLATE_MEDIA} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/media")
     set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
     set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
+    # Starting patches for the plugin builds (docs/plans/vst-au/README.md step 1.5).
+    file(GLOB INFINITE_PLUGIN_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/assets/plugin/*.inf")
+    target_sources(Infinite PRIVATE ${INFINITE_PLUGIN_PATCHES})
+    set_source_files_properties(${INFINITE_PLUGIN_PATCHES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/plugin")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()
