@@ -7,6 +7,9 @@
   if (cfg.launchCode) { $("buy-now").textContent = "$" + cfg.launch; $("buy-was").textContent = "$" + cfg.regular; $("buy-was").hidden = false; $("buy-tag").hidden = false; }
   else $("buy-now").textContent = "$" + cfg.regular;
   const btn = $("buy-btn");
+  // /buy.html?code=XXXX swaps the discount code (used for private test and partner codes).
+  const q = (new URLSearchParams(location.search).get("code") || "").trim();
+  const code = /^[A-Za-z0-9_-]{3,24}$/.test(q) ? q : cfg.launchCode;
   btn.textContent = cfg.released ? "Buy now" : "Pre-order";
   if (cfg.released) $("buy-ship").hidden = true;
   window.Paddle.Initialize({
@@ -16,7 +19,7 @@
   btn.disabled = false;
   btn.addEventListener("click", () => window.Paddle.Checkout.open({
     items: [{ priceId: cfg.priceId, quantity: 1 }],
-    ...(cfg.launchCode ? { discountCode: cfg.launchCode } : {}),
+    ...(code ? { discountCode: code } : {}),
     settings: { displayMode: "overlay", theme: document.documentElement.dataset.mode === "paper" ? "light" : "dark" },
   }));
   $("resend-form").addEventListener("submit", async (ev) => {
