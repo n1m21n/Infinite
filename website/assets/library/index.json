@@ -6514,6 +6514,216 @@
       "file": "assets/library/pixel/cymatics-sine-harmonic-quadrupole-field.field",
       "preview": "assets/library/previews/cymatics-sine-harmonic-quadrupole-field.jpg",
       "bytes": 1547
+    },
+    {
+      "id": "analog-crt-raster-beam-oscilloscope",
+      "name": "Analog CRT Raster Beam Oscilloscope",
+      "kind": "Generator",
+      "tags": [
+        "analog",
+        "crt",
+        "oscilloscope",
+        "lissajous",
+        "raster",
+        "drawing"
+      ],
+      "description": "Cathode ray tube oscilloscope visualizer with dual-trace Lissajous beam deflection, high-frequency harmonic waveforms, horizontal sync pulse blanking, and calibrated green phosphor graticule grid.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/analog-crt-raster-beam-oscilloscope.js",
+      "preview": "assets/library/previews/analog-crt-raster-beam-oscilloscope.jpg",
+      "bytes": 3099
+    },
+    {
+      "id": "analog-crt-magnetic-deflection-lattice",
+      "name": "Analog CRT Magnetic Deflection Lattice",
+      "kind": "Generator",
+      "tags": [
+        "analog",
+        "crt",
+        "raster",
+        "scanline",
+        "deflection",
+        "drawing"
+      ],
+      "description": "Electromagnetic yoke deflection raster study featuring orthogonal interlaced scanlines, RGB phosphor triad registration pips, sinusoidal beam flutter, and high-voltage anode calibration reticles.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/analog-crt-magnetic-deflection-lattice.js",
+      "preview": "assets/library/previews/analog-crt-magnetic-deflection-lattice.jpg",
+      "bytes": 2891
+    },
+    {
+      "id": "technical-blueprint-armillary-sphere-3d",
+      "name": "Technical Blueprint Armillary Sphere 3D",
+      "kind": "Generator",
+      "tags": [
+        "technical",
+        "blueprint",
+        "armillary",
+        "mechanism",
+        "geometry",
+        "3d"
+      ],
+      "description": "Precision axonometric 3D armillary sphere mechanism with nested concentric equatorial rings, polar declination calipers, stepped azimuth pivots, and a central brass terrestrial core.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/technical-blueprint-armillary-sphere-3d.js",
+      "preview": "assets/library/previews/technical-blueprint-armillary-sphere-3d.jpg",
+      "bytes": 2784
+    },
+    {
+      "id": "technical-blueprint-planetary-gear-lattice-3d",
+      "name": "Technical Blueprint Planetary Gear Lattice 3D",
+      "kind": "Generator",
+      "tags": [
+        "technical",
+        "blueprint",
+        "gears",
+        "mechanical",
+        "engineering",
+        "3d"
+      ],
+      "description": "Axonometric epicyclic planetary gear train assembly with rotating sun gear, orbiting planet pinions, precision annular ring teeth, and mechanical drafting reference plinths.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 4,
+      "file": "assets/library/sketch/technical-blueprint-planetary-gear-lattice-3d.js",
+      "preview": "assets/library/previews/technical-blueprint-planetary-gear-lattice-3d.jpg",
+      "bytes": 2905
+    },
+    {
+      "id": "footwork-syncopated-808-sub-roller-synth",
+      "name": "Footwork Syncopated 808 Sub Roller Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "footwork",
+        "808",
+        "sub",
+        "bass",
+        "audio"
+      ],
+      "description": "Deep syncopated 808 sub bass synthesizer with rapid exponential pitch envelope drop, saturated sine core, sub-octave drive, and fast transient click for 160 BPM footwork.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/footwork-syncopated-808-sub-roller-synth.inf",
+      "preview": "assets/library/previews/footwork-syncopated-808-sub-roller-synth.jpg",
+      "bytes": 2421
+    },
+    {
+      "id": "footwork-rapid-fire-percussive-stab-synth",
+      "name": "Footwork Rapid Fire Percussive Stab Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "footwork",
+        "stab",
+        "percussive",
+        "fm",
+        "audio"
+      ],
+      "description": "Aggressive Chicago footwork FM percussive chord stab synthesizer with punchy exponential decay, resonant bandpass formant contour, and crisp saturated transient bite.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/footwork-rapid-fire-percussive-stab-synth.inf",
+      "preview": "assets/library/previews/footwork-rapid-fire-percussive-stab-synth.jpg",
+      "bytes": 2341
+    },
+    {
+      "id": "amapiano-log-drum-warm-saturator-fx",
+      "name": "Amapiano Log Drum Warm Saturator FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "amapiano",
+        "saturator",
+        "logdrum",
+        "drive",
+        "audio"
+      ],
+      "description": "Warm analog low-end saturator and transient contour filter tailored for amapiano log drum basslines, with asymmetric polynomial drive, harmonic warmth, and smooth top-end roll-off.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/amapiano-log-drum-warm-saturator-fx.inf",
+      "preview": "assets/library/previews/amapiano-log-drum-warm-saturator-fx.jpg",
+      "bytes": 2069
+    },
+    {
+      "id": "amapiano-lush-spatial-reverb-diffusion-fx",
+      "name": "Amapiano Lush Spatial Reverb Diffusion FX",
+      "kind": "Effect",
+      "tags": [
+        "effect",
+        "amapiano",
+        "reverb",
+        "diffusion",
+        "spatial",
+        "audio"
+      ],
+      "description": "Expansive warm spatial reverb and early reflection diffusion network designed for amapiano jazz chord progressions and shaker grooves, with high-frequency damping and rich acoustic depth.",
+      "price": 0,
+      "domain": "audio",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/amapiano-lush-spatial-reverb-diffusion-fx.inf",
+      "preview": "assets/library/previews/amapiano-lush-spatial-reverb-diffusion-fx.jpg",
+      "bytes": 2245
+    },
+    {
+      "id": "vaporwave-collage-retro-sunset-grid",
+      "name": "Vaporwave Collage Retro Sunset Grid",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "vaporwave",
+        "sunset",
+        "perspective",
+        "grid",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive retro-futuristic horizon perspective neon grid receding towards a segmented neon sunset disc, with chromatic aberration scanlines and twilight violet sky.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/vaporwave-collage-retro-sunset-grid.field",
+      "preview": "assets/library/previews/vaporwave-collage-retro-sunset-grid.jpg",
+      "bytes": 1941
+    },
+    {
+      "id": "vaporwave-collage-prismatic-chroma-wave",
+      "name": "Vaporwave Collage Prismatic Chroma Wave",
+      "kind": "Generator",
+      "tags": [
+        "pixel",
+        "vaporwave",
+        "prismatic",
+        "chromatic",
+        "waves",
+        "audioreactive"
+      ],
+      "description": "Audio-reactive liquid chromatic dispersion ripples and iridescent pastel gradients undulating across an ethereal 90s aesthetic reflective horizon.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/vaporwave-collage-prismatic-chroma-wave.field",
+      "preview": "assets/library/previews/vaporwave-collage-prismatic-chroma-wave.jpg",
+      "bytes": 1659
     }
   ]
 }

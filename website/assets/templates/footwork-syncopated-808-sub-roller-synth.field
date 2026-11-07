@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Footwork Syncopated 808 Sub Roller Synth",
+    "author": "Infinite",
+    "description": "Deep syncopated 808 sub bass synthesizer with rapid exponential pitch envelope drop, saturated sine core, sub-octave drive, and fast transient click for 160 BPM footwork.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pitchDecay = 0.08 [0.02, 0.4]\nparam float subDrive = 0.45 [0.0, 1.0]\nparam float clickLevel = 0.25 [0.0, 0.8]\nparam float decayTime = 0.28 [0.05, 0.9]\nparam float cutoff = 0.65 [0.1, 1.0]\nstate float p1 = 0\nstate float pClick = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.90, env - env * decayRate)\n\npRate = clamp(1.0 / (sr * pitchDecay), 0.0005, 0.08)\npEnv = if(target > pEnv, target, pEnv - pEnv * pRate)\n\nfBase = clamp(freq * (1.0 + pEnv * 2.8), 30.0, 480.0)\n\ndp = fBase / sr\np1 = p1 + dp\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsine1 = sin(p1 * 6.2831853)\n\ndpC = 1200.0 / sr\npClick = pClick + dpC\npClick = if(pClick >= 1.0, pClick - 1.0, pClick)\nclick = sin(pClick * 6.2831853) * pEnv * clickLevel\n\nraw = sine1 * (1.0 + subDrive * 1.4) + click\nsat = (raw / (1.0 + abs(raw * 0.7))) * env\n\nfCut = clamp(cutoff * 0.38, 0.02, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.44\n",
+    "params": {
+      "pitchDecay": 0.08,
+      "subDrive": 0.45,
+      "clickLevel": 0.25,
+      "decayTime": 0.28,
+      "cutoff": 0.65
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -435,6 +435,16 @@
       "slug": "cymatics-sine-harmonic-quadrupole-field",
       "title": "Cymatics Sine Harmonic Quadrupole Field",
       "description": "Audio-reactive acoustic quadrupole field simulation featuring rotating quadrupolar wave interference lobes and concentric acoustic trap nodes. Bass pulses quadrupole amplitude and radial antinodes, mids modulate multipole harmonic deformation, and highs spark electric cyan phase boundaries."
+    },
+    {
+      "slug": "vaporwave-collage-retro-sunset-grid",
+      "title": "Vaporwave Collage Retro Sunset Grid",
+      "description": "Audio-reactive vaporwave landscape simulation featuring a perspective grid terrain receding towards an undulating sunset orb. Bass frequencies warp and pulse the horizon grid plane, mid frequencies modulate concentric solar segmentation bands, and high frequencies ignite luminous cyan-pink chromatic dispersion scanlines over twilight violet."
+    },
+    {
+      "slug": "vaporwave-collage-prismatic-chroma-wave",
+      "title": "Vaporwave Collage Prismatic Chroma Wave",
+      "description": "Audio-reactive vaporwave liquid refraction surface modeling chromatic wave dispersion. Bass frequencies drive deep tidal ripple swells, mids induce complex interference patterns across pastel pink and cyan gradients, and highs shimmer with radiant mint-green caustic highlights."
     }
   ]
 }

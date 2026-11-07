@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Collage Retro Sunset Grid",
+    "author": "Infinite",
+    "description": "Audio-reactive retro-futuristic horizon perspective neon grid receding towards a segmented neon sunset disc, with chromatic aberration scanlines and twilight violet sky.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.42 [0.1, 1.5]\nparam float gridScale = 14.0 [6.0, 30.0]\nparam float sunRadius = 0.35 [0.1, 0.7]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float glow = 0.55 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5)\ntime = t * speed\n\ncSky = vec3(0.141, 0.090, 0.204)\ncPink = vec3(1.0, 0.443, 0.808)\ncCyan = vec3(0.004, 0.804, 0.996)\ncYellow = vec3(1.0, 0.984, 0.588)\n\nhorizon = 0.02\nisTerrain = if(p.y < horizon, 1.0, 0.0)\n\nperspY = max(horizon - p.y, 0.002)\npz = 0.4 / perspY\npx = p.x * pz\n\ngx = 1.0 - smoothstep(0.0, 0.12, abs(fract(px * gridScale * 0.08) - 0.5))\ngz = 1.0 - smoothstep(0.0, 0.12, abs(fract(pz * 0.45 - time * 1.5) - 0.5))\ngridLine = max(gx, gz)\ngridFade = smoothstep(horizon, -0.4, p.y)\ngridCol = mix(cCyan, cPink, clamp(pz * 0.12, 0.0, 1.0))\n\nsunP = vec2(p.x, p.y - horizon - 0.08)\nsunD = length(sunP)\nsunMask = 1.0 - smoothstep(sunRadius * 0.96, sunRadius, sunD)\nsunBlind = abs(sin(sunP.y * 55.0))\nsunSegments = step(0.25, sunBlind)\nsunCol = mix(cPink, cYellow, clamp((sunP.y / sunRadius) + 0.5, 0.0, 1.0)) * sunSegments\n\ncol = cSky\ncol = mix(col, sunCol, sunMask)\ncol = mix(col, gridCol, gridLine * gridFade * isTerrain)\n\nglowDist = exp(-sunD * (3.5 - glow * 1.5))\ncol = col + cPink * (glowDist * 0.35)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.42,
+      "gridScale": 14.0,
+      "sunRadius": 0.35,
+      "contrast": 1.15,
+      "glow": 0.55
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

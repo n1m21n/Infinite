@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Amapiano Log Drum Warm Saturator FX",
+    "author": "Infinite",
+    "description": "Warm analog low-end saturator and transient contour filter tailored for amapiano log drum basslines, with asymmetric polynomial drive, harmonic warmth, and smooth top-end roll-off.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float drive = 0.42 [0.0, 1.0]\nparam float warmth = 0.35 [0.0, 1.0]\nparam float bassBoost = 0.40 [0.0, 1.0]\nparam float damping = 3400.0 [800.0, 8000.0]\nparam float mix = 0.65 [0.0, 1.0]\nstate float lp = 0\nstate float lpBass = 0\n\nfDamp = clamp(damping / sr * 2.0, 0.02, 0.45)\nlp = lp + fDamp * (in - lp)\n\nfBass = clamp(180.0 / sr * 2.0, 0.005, 0.15)\nlpBass = lpBass + fBass * (in - lpBass)\n\nshaped = lp + lpBass * bassBoost * 1.5\n\ndrv = shaped * (1.0 + drive * 2.0)\nasym = drv + drv * drv * warmth * 0.35\nsat = clamp(asym / (1.0 + abs(asym * 0.65)), -0.90, 0.90)\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 0.78\n",
+    "params": {
+      "drive": 0.42,
+      "warmth": 0.35,
+      "bassBoost": 0.4,
+      "damping": 3400.0,
+      "mix": 0.65
+    }
+  }
+}

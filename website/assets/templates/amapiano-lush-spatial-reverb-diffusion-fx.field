@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Amapiano Lush Spatial Reverb Diffusion FX",
+    "author": "Infinite",
+    "description": "Expansive warm spatial reverb and early reflection diffusion network designed for amapiano jazz chord progressions and shaker grooves, with high-frequency damping and rich acoustic depth.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float roomSize = 0.58 [0.1, 0.9]\nparam float decayTime = 0.45 [0.1, 0.8]\nparam float damping = 3600.0 [800.0, 8000.0]\nparam float diffusion = 0.42 [0.0, 0.85]\nparam float mix = 0.52 [0.0, 1.0]\nstate float c1 = 0\nstate float c2 = 0\nstate float c3 = 0\nstate float lp = 0\n\nfDamp = clamp(damping / sr * 2.0, 0.03, 0.45)\nlp = lp + fDamp * (in - lp)\n\nfb = clamp(roomSize * 0.82, 0.1, 0.82)\ndRate = clamp(decayTime * 0.32, 0.03, 0.32)\n\nc1 = c1 + dRate * 1.02 * (lp + c3 * fb * 0.50 - c1)\nc2 = c2 + dRate * 0.75 * (c1 * fb * 0.72 - c2)\nc3 = c3 + dRate * 0.52 * (c2 * fb * 0.68 - c3)\n\ndiff = (c1 - c2) * diffusion * 1.6\nwet = (c1 * 0.38 + c2 * 0.32 + c3 * 0.28 + diff)\nsat = clamp(wet / (1.0 + abs(wet * 0.5)), -0.85, 0.85)\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.45\n",
+    "params": {
+      "roomSize": 0.58,
+      "decayTime": 0.45,
+      "damping": 3600.0,
+      "diffusion": 0.42,
+      "mix": 0.52
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vaporwave Collage Prismatic Chroma Wave",
+    "author": "Infinite",
+    "description": "Audio-reactive liquid chromatic dispersion ripples and iridescent pastel gradients undulating across an ethereal 90s aesthetic reflective horizon.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.38 [0.1, 1.5]\nparam float waveScale = 12.0 [4.0, 24.0]\nparam float contrast = 1.12 [0.6, 2.0]\nparam float dispersion = 0.45 [0.1, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\n\nw1 = sin(p.x * waveScale * 0.8 + time * 2.2) * cos(p.y * waveScale * 0.6 - time * 1.5)\nw2 = sin(r * waveScale * 1.2 - time * 2.8 + theta * 2.0)\nwave = (w1 + w2) * 0.5\n\nrDisp = wave * dispersion * 0.08\ndispUv = p + vec2(rDisp, -rDisp)\nwaveDisp = sin(length(dispUv) * waveScale - time * 2.5)\n\ncTwilight = vec3(0.141, 0.090, 0.204)\ncPink = vec3(1.0, 0.443, 0.808)\ncCyan = vec3(0.004, 0.804, 0.996)\ncMint = vec3(0.020, 1.0, 0.631)\ncGold = vec3(1.0, 0.984, 0.588)\n\nbase = mix(cTwilight, cCyan, clamp(wave * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(base, cPink, clamp(waveDisp * 0.6 + 0.4, 0.0, 1.0))\n\ncrest = 1.0 - smoothstep(0.35, 0.75, abs(wave))\ncol = mix(col, cMint, crest * 0.55)\n\nspec = exp(-abs(wave - 0.6) * 12.0)\ncol = mix(col, cGold, spec * 0.65)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.38,
+      "waveScale": 12.0,
+      "contrast": 1.12,
+      "dispersion": 0.45
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

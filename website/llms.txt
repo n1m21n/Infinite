@@ -241,6 +241,10 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Tech House Percussive Chord Stab Synth](https://infinitedevices.org/library/tech-house-percussive-chord-stab-synth.html): Snappy tech house chord stab synthesizer with multi-oscillator minor triad tuning, crisp resonant bandpass envelope filter, and punchy transient drive. (file: https://infinitedevices.org/assets/templates/tech-house-percussive-chord-stab-synth.inf)
 - [Dub Techno Tape Delay Diffusion FX](https://infinitedevices.org/library/dub-techno-tape-delay-diffusion-fx.html): Endless dub techno tape delay with multi-tap cross-feedback loops, high-frequency tape damping, warm analog saturation, and deep spatial diffusion. (file: https://infinitedevices.org/assets/templates/dub-techno-tape-delay-diffusion-fx.inf)
 - [Dub Techno Resonant Space Reverb FX](https://infinitedevices.org/library/dub-techno-resonant-space-reverb-fx.html): Expansive dub techno resonant space wash with interlocking comb filter delays, lush high-frequency diffusion, and warm atmospheric tail resonance. (file: https://infinitedevices.org/assets/templates/dub-techno-resonant-space-reverb-fx.inf)
+- [Footwork Syncopated 808 Sub Roller Synth](https://infinitedevices.org/library/footwork-syncopated-808-sub-roller-synth.html): Deep syncopated 808 sub bass synthesizer with rapid exponential pitch envelope drop, saturated sine core, sub-octave drive, and fast transient click for 160 BPM footwork. (file: https://infinitedevices.org/assets/templates/footwork-syncopated-808-sub-roller-synth.inf)
+- [Footwork Rapid Fire Percussive Stab Synth](https://infinitedevices.org/library/footwork-rapid-fire-percussive-stab-synth.html): Aggressive Chicago footwork FM percussive chord stab synthesizer with punchy exponential decay, resonant bandpass formant contour, and crisp saturated transient bite. (file: https://infinitedevices.org/assets/templates/footwork-rapid-fire-percussive-stab-synth.inf)
+- [Amapiano Log Drum Warm Saturator FX](https://infinitedevices.org/library/amapiano-log-drum-warm-saturator-fx.html): Warm analog low-end saturator and transient contour filter tailored for amapiano log drum basslines, with asymmetric polynomial drive, harmonic warmth, and smooth top-end roll-off. (file: https://infinitedevices.org/assets/templates/amapiano-log-drum-warm-saturator-fx.inf)
+- [Amapiano Lush Spatial Reverb Diffusion FX](https://infinitedevices.org/library/amapiano-lush-spatial-reverb-diffusion-fx.html): Expansive warm spatial reverb and early reflection diffusion network designed for amapiano jazz chord progressions and shaker grooves, with high-frequency damping and rich acoustic depth. (file: https://infinitedevices.org/assets/templates/amapiano-lush-spatial-reverb-diffusion-fx.inf)
 
 ## Library: Community
 
@@ -601,7 +605,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 87 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 89 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -618,4 +622,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 72 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 74 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
