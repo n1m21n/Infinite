@@ -2,7 +2,10 @@
 //   POST /api/paddle/webhook   Paddle notification. transaction.completed issues a license; a refund adjustment revokes it.
 //   GET  /api/license/revoked  {"revoked":[ids]}  optional online check for the plugin
 //   POST /api/license/resend   {email} -> re-emails every active key on file for that address (always answers ok)
-// Secrets: PADDLE_WEBHOOK_SECRET, PADDLE_API_KEY, LICENSE_PRIVATE_KEY (Ed25519, PKCS8 base64), RESEND_API_KEY (optional)
+//   POST /api/license/notify-preorders  Bearer ADMIN_TOKEN, {send?} -> launch-day download mail to every pre-order buyer
+//                              not yet told (dry run unless send; 40 per call, answers {pending, sent, left}).
+//                              tools/license/notify_preorders.mjs drives it.
+// Secrets: PADDLE_WEBHOOK_SECRET, PADDLE_API_KEY, LICENSE_PRIVATE_KEY (Ed25519, PKCS8 base64), RESEND_API_KEY (optional), ADMIN_TOKEN
 // Binding: DB (D1). Vars: PADDLE_API, PRICE_IDS (comma list), FROM, SEATS, MAJOR, RELEASED ("1" once downloads exist), DOWNLOAD_URL
 
 const enc = new TextEncoder();
@@ -38,21 +41,22 @@ async function paddleGet(env, path) {
   return (await r.json()).data;
 }
 
-async function sendKeyEmail(env, lic) {
+async function sendKeyEmail(env, lic, shipped = false) {
   if (!env.RESEND_API_KEY) return false;
   const released = env.RELEASED === "1";
   const text = [
-    `Thank you for buying Infinite${lic.name ? ", " + lic.name.split(" ")[0] : ""}.`, "",
+    shipped ? `The Infinite DAW plugin is out${lic.name ? ", " + lic.name.split(" ")[0] : ""}. Thank you for pre-ordering.`
+            : `Thank you for buying Infinite${lic.name ? ", " + lic.name.split(" ")[0] : ""}.`, "",
     `Your license ID: ${lic.id}`,
     `Seats: ${lic.seats} computers · Updates: all of version ${lic.major}.x`, "",
     "Your license file is attached (license.inflic). In the plugin, open Settings > License and drop the file in, or paste this key:", "",
     lic.token, "",
-    released ? `Download: ${env.DOWNLOAD_URL}` : "The plugin is still being finished. Your key already works and is saved; we will email the download link the day it ships.", "",
+    released ? `Download: ${env.DOWNLOAD_URL}\nInstall: https://infinitedevices.org/plugin` : "The plugin is still being finished. Your key already works and is saved; we will email the download link the day it ships.", "",
     "Lost this email? Ask for it again at https://infinitedevices.org/buy#resend", "Questions: reply to this email.",
   ].join("\n");
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.FROM, to: [lic.email], subject: released ? "Your Infinite license" : "Your Infinite license (pre-order)", text,
+    body: JSON.stringify({ from: env.FROM, to: [lic.email], subject: shipped ? "Infinite is ready to download" : released ? "Your Infinite license" : "Your Infinite license (pre-order)", text,
       attachments: [{ filename: "license.inflic", content: btoa(lic.token) }] }),
   });
   return r.ok;
@@ -99,12 +103,33 @@ async function resend(request, env) {
   return json(200, { ok: true });   // same answer whether or not the address has a license
 }
 
+const BATCH = 40;   // stays under the Worker's subrequest cap (one mail = one fetch)
+async function notifyPreorders(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  if (!env.ADMIN_TOKEN || auth !== `Bearer ${env.ADMIN_TOKEN}`) return json(401, { ok: false });
+  let b = {}; try { b = await request.json(); } catch {}
+  const pending = "FROM licenses WHERE status = 'active' AND env = 'live' AND download_emailed_at IS NULL";
+  const count = async () => (await env.DB.prepare(`SELECT COUNT(*) AS n ${pending}`).first()).n;
+  if (!b.send) return json(200, { ok: true, dryRun: true, pending: await count(), released: env.RELEASED === "1" });
+  if (env.RELEASED !== "1" || !env.DOWNLOAD_URL) return json(409, { ok: false, error: "set RELEASED=1 and DOWNLOAD_URL first" });
+  const { results } = await env.DB.prepare(`SELECT * ${pending} ORDER BY created_at LIMIT ?`).bind(BATCH).all();
+  const sent = [], failed = [];
+  for (const lic of results || []) {
+    if (await sendKeyEmail(env, lic, true)) {
+      await env.DB.prepare("UPDATE licenses SET download_emailed_at = ? WHERE id = ?").bind(new Date().toISOString(), lic.id).run();
+      sent.push(lic.id);
+    } else failed.push(lic.id);
+  }
+  return json(200, { ok: true, sent, failed, left: await count() });
+}
+
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     try {
       if (request.method === "POST" && pathname === "/api/paddle/webhook") return await webhook(request, env);
       if (request.method === "POST" && pathname === "/api/license/resend") return await resend(request, env);
+      if (request.method === "POST" && pathname === "/api/license/notify-preorders") return await notifyPreorders(request, env);
       if (request.method === "GET" && pathname === "/api/license/revoked") {
         const { results } = await env.DB.prepare("SELECT id FROM licenses WHERE status = 'revoked'").all();
         return new Response(JSON.stringify({ revoked: (results || []).map((r) => r.id) }), { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" } });

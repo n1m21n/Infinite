@@ -164,7 +164,10 @@ namespace DawPlugin
    Env CurrentEnv(const std::string& exe, const std::string& version)
    {
       Env e;
-      e.exe = exe;
+      // Through a symlink (Homebrew's `infinite`) the bundle is where the link points.
+      std::error_code ec;
+      const fs::path real = exe.empty() ? fs::path() : fs::weakly_canonical(P(exe), ec);
+      e.exe = (ec || real.empty()) ? exe : S(real);
       e.version = version;
       e.home = Env_("HOME");
 #if defined(_WIN32)
@@ -173,7 +176,7 @@ namespace DawPlugin
 #endif
       e.appDir = Env_("APPDIR");
       const std::string appImage = Env_("APPIMAGE");
-      e.engine = (!appImage.empty() && !e.appDir.empty()) ? appImage : exe;
+      e.engine = (!appImage.empty() && !e.appDir.empty()) ? appImage : e.exe;
       return e;
    }
 

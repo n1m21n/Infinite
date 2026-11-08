@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS licenses (
   created_at  TEXT NOT NULL,
   emailed_at  TEXT,
   resent_at   TEXT,
-  revoked_at  TEXT
+  revoked_at  TEXT,
+  download_emailed_at TEXT                 -- launch-day download mail sent (notify-preorders)
 );
+-- Existing table: npx wrangler d1 execute infinite_licenses --remote --command "ALTER TABLE licenses ADD COLUMN download_emailed_at TEXT"
 CREATE INDEX IF NOT EXISTS licenses_email ON licenses (email);
