@@ -305,7 +305,8 @@
   "panels/TerminalPanel.cpp:Close Terminal": "panel terminal close",
   "panels/TerminalPanel.cpp:Dock Position": "panel terminal <side>",
   "panels/ViewportPanel.cpp:Clear all cards": "view clearcards",
-  "panels/ViewportPanel.cpp:Close panel": "panel viewport close"
+  "panels/ViewportPanel.cpp:Close panel": "panel viewport close",
+  "panels/DawPluginSection.cpp": "`Infinite --install-plugins` / `--uninstall-plugins` copies, updates or removes the plugins and prints where they went"
  },
  "skip": {
   "frame/StagePopupsA.cpp:Reference in chat": "puts the node in the chat box as an @ reference; an agent already names nodes with @",
@@ -389,6 +390,7 @@
   "panels/SettingsWindow.cpp:Swizzling: Components .x .y .z .w and .r .g .b .a. Multi-component swizzles like P.xz or col.bgr are supported.": "Field language reference text; `code docs field` prints it",
   "panels/SettingsWindow.cpp:Types: float, int, bool, vec2, vec3, vec4.": "Field language reference text; `code docs field` prints it",
   "panels/SettingsWindow.cpp:reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).": "Field language reference text; `code docs field` prints it",
-  "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app"
+  "panels/CliSetupSection.cpp": "sets up the Terminal tab and the user's coding agent from inside the app",
+  "frame/HostSlots.cpp": "plugin mode only, where the Terminal is hidden; the DAW automates the bound knob from its own lanes"
  }
 }

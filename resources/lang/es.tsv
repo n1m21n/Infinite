@@ -2796,3 +2796,20 @@ You're in	Ya estás dentro
 Your files	Tus archivos
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	A este ordenador le falta curl, que descarga la instalación. Instala curl y pulsa Reintentar.
 Send	Enviar
+Back to the plugin	Volver al plugin
+Canvas	Lienzo
+Copy path	Copiar ruta
+DAW plugin	Plugin para DAW
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	Doble clic en un espacio vacío con Mayús: el pivote de órbita vuelve al cursor 3D (la distancia y el ángulo se mantienen); Mayús + arrastre con el botón central lo desplaza
+Host slots	Ranuras del host
+Installed (%s)	Instalado (%s)
+Installed (%s), update ready	Instalado (%s), actualización lista
+Installed. Rescan plugins in your DAW.	Instalado. Vuelve a escanear los plugins en tu DAW.
+Late blocks the host played as silence	Bloques tardíos que el host reprodujo como silencio
+No Macro is on a host slot	Ningún Macro está en una ranura del host
+No Output	Sin salida
+Not in this build	No incluido en esta versión
+Reinstall	Reinstalar
+Reveal	Mostrar
+Set by the DAW	Lo define la DAW
+Uninstall	Desinstalar

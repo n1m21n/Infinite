@@ -2796,3 +2796,20 @@ You're in	準備完了
 Your files	あなたのファイル
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	このコンピューターにはセットアップをダウンロードする curl がありません。curl をインストールしてから、再試行を押してください。
 Send	送信
+Back to the plugin	プラグインに戻る
+Canvas	キャンバス
+Copy path	パスをコピー
+DAW plugin	DAW プラグイン
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	Shift を押しながら空いている所をダブルクリック：オービットの中心が 3D カーソルへ戻ります（距離と角度はそのまま）。Shift + 中ボタンドラッグで移動
+Host slots	ホストスロット
+Installed (%s)	インストール済み (%s)
+Installed (%s), update ready	インストール済み (%s)、アップデートあり
+Installed. Rescan plugins in your DAW.	インストールしました。DAW でプラグインを再スキャンしてください。
+Late blocks the host played as silence	ホストが無音で再生した遅延ブロック
+No Macro is on a host slot	ホストスロットに割り当てた Macro はありません
+No Output	出力なし
+Not in this build	このビルドには含まれていません
+Reinstall	再インストール
+Reveal	表示
+Set by the DAW	DAW が設定
+Uninstall	アンインストール

@@ -2796,3 +2796,20 @@ You're in	已就绪
 Your files	你的文件
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	这台电脑缺少 curl（用来下载安装）。请安装 curl，然后按重试。
 Send	发送
+Back to the plugin	返回插件
+Canvas	画布
+Copy path	复制路径
+DAW plugin	DAW 插件
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	按住 Shift 双击空白处：轨道枢轴平滑回到 3D 光标（距离和角度不变）；Shift + 中键拖动可将其移开
+Host slots	宿主插槽
+Installed (%s)	已安装 (%s)
+Installed (%s), update ready	已安装 (%s)，可更新
+Installed. Rescan plugins in your DAW.	已安装。请在 DAW 中重新扫描插件。
+Late blocks the host played as silence	宿主以静音播放的迟到音频块
+No Macro is on a host slot	没有 Macro 分配到宿主插槽
+No Output	无输出
+Not in this build	此版本不包含
+Reinstall	重新安装
+Reveal	显示
+Set by the DAW	由 DAW 设置
+Uninstall	卸载

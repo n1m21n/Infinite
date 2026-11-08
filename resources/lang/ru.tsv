@@ -2796,3 +2796,20 @@ You're in	Готово
 Your files	Ваши файлы
 This computer is missing curl, which downloads the setup. Install curl, then press Try again.	На компьютере нет curl, который скачивает установку. Установите curl и нажмите «Повторить».
 Send	Отправить
+Back to the plugin	Назад в плагин
+Canvas	Холст
+Copy path	Копировать путь
+DAW plugin	Плагин для DAW
+Double-click empty space with Shift held: the orbit pivot glides back to the 3D cursor (distance and angle stay); Shift + middle-drag pans it away	Двойной щелчок по пустому месту с Shift: центр орбиты плавно возвращается к 3D-курсору (расстояние и угол сохраняются); Shift + перетаскивание средней кнопкой сдвигает его
+Host slots	Слоты хоста
+Installed (%s)	Установлено (%s)
+Installed (%s), update ready	Установлено (%s), есть обновление
+Installed. Rescan plugins in your DAW.	Установлено. Пересканируйте плагины в DAW.
+Late blocks the host played as silence	Опоздавшие блоки, которые хост проиграл как тишину
+No Macro is on a host slot	Ни один Macro не назначен на слот хоста
+No Output	Нет выхода
+Not in this build	Нет в этой сборке
+Reinstall	Переустановить
+Reveal	Показать
+Set by the DAW	Задаёт DAW
+Uninstall	Удалить
