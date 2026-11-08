@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <windowsx.h>
+#include <commctrl.h>   // EM_SETCUEBANNER
 
 #include <algorithm>
 #include <cstring>

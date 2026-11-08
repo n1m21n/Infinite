@@ -383,7 +383,7 @@ namespace InfinitePlugin
    bool IsFile(const std::string& p)
    {
       struct stat st {};
-      return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+      return !p.empty() && stat(p.c_str(), &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG;
    }
 
    // Where the engine is, first hit wins:
