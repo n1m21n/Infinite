@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Indie Psychedelic Kaleido Prism Flower",
+    "author": "Infinite",
+    "description": "Breathing kaleidoscopic mandala unfolding radiating fractal petal rings, audio-reactive radial expansion, chromatic prism dispersion, and pulsating harmonic energy.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.36 [0.1, 1.5]\nparam float petals = 8.0 [4.0, 16.0]\nparam float rippleScale = 14.0 [6.0, 28.0]\nparam float contrast = 1.16 [0.6, 2.0]\nparam float glow = 0.60 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\nsector = 6.2831853 / petals\nmodTheta = abs(mod(theta + time * 0.22, sector) - sector * 0.5)\n\nkp = vec2(cos(modTheta), sin(modTheta)) * r\n\nw = sin(kp.x * rippleScale - time * 2.0) * cos(kp.y * rippleScale + time * 1.6)\nring = sin(r * 18.0 - time * 2.8)\nsig = (w + ring) * 0.5\n\ncDark = vec3(0.04, 0.02, 0.07)\ncMagenta = vec3(0.88, 0.10, 0.46)\ncMarigold = vec3(0.98, 0.64, 0.07)\ncCyan = vec3(0.0, 0.88, 0.95)\n\ncol = mix(cDark, cMagenta, clamp(sig * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(col, cMarigold, clamp(w * 0.7 + 0.3, 0.0, 1.0))\n\nstar = exp(-abs(sig) * (5.2 - glow * 2.0))\ncol = mix(col, cCyan, star * 0.75)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.36,
+      "petals": 8.0,
+      "rippleScale": 14.0,
+      "contrast": 1.16,
+      "glow": 0.6
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

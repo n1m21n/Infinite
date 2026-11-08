@@ -10,7 +10,7 @@
    "description": "Turn a camera or a picture into controls: hands, face and body landmarks become modulators.",
    "price": 0,
    "preview": "assets/extensions/tracking.webp",
-   "file": "extensions.html#tracking"
+   "file": "library.html#extensions"
   }
  ]
 }

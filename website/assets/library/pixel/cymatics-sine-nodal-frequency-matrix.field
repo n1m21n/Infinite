@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Nodal Frequency Matrix",
+    "author": "Infinite",
+    "description": "Audio-reactive Chladni standing wave resonance matrix with high-frequency nodal lines, modal harmonic interference, and radiant electric cyan wave crests.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float frequency = 5.0 [2.0, 16.0]\nparam float speed = 0.45 [0.1, 1.5]\nparam float modalScale = 1.35 [0.5, 2.5]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float resonance = 0.65 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\n\nn = frequency\nm = frequency * 1.6\n\nk1 = cos(p.x * n * modalScale + time * 1.5) * cos(p.y * m * modalScale - time * 0.8)\nk2 = cos(p.x * m * modalScale - time * 1.2) * cos(p.y * n * modalScale + time * 1.1)\nchladni = abs(k1 - k2)\n\nnodalMask = 1.0 - smoothstep(0.04, 0.22, chladni)\nripple = sin(r * 22.0 - time * 3.5) * 0.08\n\nradialVibe = cos(r * 12.0 - time * 2.0) * resonance * 0.2\n\ncVoid = vec3(0.015, 0.031, 0.063)\ncCyan = vec3(0.490, 0.976, 1.0)\ncWhite = vec3(1.0, 1.0, 1.0)\n\ncol = mix(cVoid, cCyan, clamp(nodalMask * 0.85 + ripple + radialVibe, 0.0, 1.0))\ncol = mix(col, cWhite, clamp(nodalMask * nodalMask, 0.0, 1.0))\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "frequency": 5.0,
+      "speed": 0.45,
+      "modalScale": 1.35,
+      "contrast": 1.15,
+      "resonance": 0.65
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

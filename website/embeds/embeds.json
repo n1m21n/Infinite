@@ -425,6 +425,46 @@
       "slug": "data-landscape-bathymetric-elevation-grid",
       "title": "Data Landscape Bathymetric Elevation Grid",
       "description": "Isometric bathymetric elevation grid visualizing subterranean data topographies with audio-reactive contour fields. Bass pulses the terrain amplitude and deep trench depths, mids ripple undulating wave currents along the grid, and highs ignite crisp topographic contour markers on deep navy."
+    },
+    {
+      "slug": "cymatics-sine-nodal-frequency-matrix",
+      "title": "Cymatics Sine Nodal Frequency Matrix",
+      "description": "Audio-reactive Chladni cymatics visualization modeling two-dimensional acoustic plate vibrations. Bass frequencies flex modal vibration antinodes, mid frequencies modulate secondary harmonic nodal geometry, and high frequencies ignite luminous white standing-wave grain boundaries over deep oceanic obsidian."
+    },
+    {
+      "slug": "cymatics-sine-harmonic-quadrupole-field",
+      "title": "Cymatics Sine Harmonic Quadrupole Field",
+      "description": "Audio-reactive acoustic quadrupole field simulation featuring rotating quadrupolar wave interference lobes and concentric acoustic trap nodes. Bass pulses quadrupole amplitude and radial antinodes, mids modulate multipole harmonic deformation, and highs spark electric cyan phase boundaries."
+    },
+    {
+      "slug": "vaporwave-collage-retro-sunset-grid",
+      "title": "Vaporwave Collage Retro Sunset Grid",
+      "description": "Audio-reactive vaporwave landscape simulation featuring a perspective grid terrain receding towards an undulating sunset orb. Bass frequencies warp and pulse the horizon grid plane, mid frequencies modulate concentric solar segmentation bands, and high frequencies ignite luminous cyan-pink chromatic dispersion scanlines over twilight violet."
+    },
+    {
+      "slug": "vaporwave-collage-prismatic-chroma-wave",
+      "title": "Vaporwave Collage Prismatic Chroma Wave",
+      "description": "Audio-reactive vaporwave liquid refraction surface modeling chromatic wave dispersion. Bass frequencies drive deep tidal ripple swells, mids induce complex interference patterns across pastel pink and cyan gradients, and highs shimmer with radiant mint-green caustic highlights."
+    },
+    {
+      "slug": "acid-graphics-iridescent-liquid-twirl",
+      "title": "Acid Graphics Iridescent Liquid Twirl",
+      "description": "Audio-reactive acid graphics liquid simulation featuring a logarithmic spiral chrome vortex. Bass pulses expand and contract the central vortex aperture, mid frequencies modulate concentric liquid interference ripples, and high frequencies trigger vibrant chromatic aberration flares across electric lime and ultraviolet gradients."
+    },
+    {
+      "slug": "acid-graphics-kaleido-chroma-warp",
+      "title": "Acid Graphics Kaleido Chroma Warp",
+      "description": "Audio-reactive kaleidoscopic acid graphics visualizer featuring an 8-fold symmetric starburst field. Bass frequencies distort and swell the central radial lattice, mid frequencies ripple recursive polygonal contours across electric lime and neon magenta bands, and high frequencies ignite luminous iridescent perimeter caustics."
+    },
+    {
+      "slug": "indie-psychedelic-liquid-oil-wheel",
+      "title": "Indie Psychedelic Liquid Oil Wheel",
+      "description": "Audio-reactive psychedelic liquid oil wheel projection inspired by 1960s Joshua Light Show liquid experiments. Bass frequencies swell viscous oil droplet boundaries, mid frequencies modulate liquid shear turbulence across marigold and magenta pigments, and high frequencies illuminate iridescent emerald edges."
+    },
+    {
+      "slug": "indie-psychedelic-kaleido-prism-flower",
+      "title": "Indie Psychedelic Kaleido Prism Flower",
+      "description": "Audio-reactive psychedelic mandala visualizer featuring an 8-fold symmetric petal flower. Bass pulses inflate radial petal contours, mid frequencies drive chromatic prism refraction across electric magenta and marigold bands, and high frequencies ignite cyan perimeter highlights."
     }
   ]
 }

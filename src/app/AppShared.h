@@ -1262,6 +1262,7 @@ extern bool gMinimapEnabled;
       GLFWwindow* window = nullptr;
       int nodeIndex = -1; // GraphNode::index this window shows
       bool fullscreen = false;
+      bool transparent = false; // made with a transparent framebuffer (OBS window capture); opaque + checkerboard otherwise
       int monitorIndex = -1;   // display it was last placed on by us
       std::string monitorName; // that display's name, to find it again after a hot-plug
       std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
@@ -2721,6 +2722,12 @@ void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const Cluster
 
 std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode,
                                                                                     int srcOutputIndex = 0);
+
+// A cable dragged from an INPUT, param or colour pin and dropped on empty canvas (the reverse of the output drag
+// above): the node types that have an output which fits that pin, and the wiring of a just-spawned node to it.
+std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForPin(int dragPin);
+
+bool WireSpawnedNodeToPin(GraphNode& spawned, int dragPin);
 
 ImVec2 FindFreeSpawnPosition(const ImVec2& center);
 
@@ -5838,6 +5845,7 @@ struct ChatAgentInfo
    bool ready = false;
    bool busy = false;
    std::string problem;  // why setup did not finish, in one plain sentence; empty otherwise
+   std::string hint;     // what the button will do, before it is pressed (install location, what sign-in needs); empty when ready or busy
 };
 void ChatAgentsTick();                                      // keeps the agents' status fresh while Settings shows them
 ChatAgentInfo ChatAgentStatus(const std::string& id);
@@ -6235,7 +6243,7 @@ void ToggleProjectorFullscreen(ProjectorWindow& pw);
 
 void UpdateProjectorsForMonitors();
 
-void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn);
+void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn, bool transparent = false);
 
 
 // ================================================== Audio node sweep discovery

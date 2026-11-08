@@ -483,7 +483,7 @@ namespace app
    // these can be open at once, one per node. `mainWindow` is passed in as
    // the GL share context so the projector window sees the exact same
    // textures/FBOs the editor already produced - no cross-context copy.
-   void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn)
+   void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn, bool transparent)
    {
       // Already have one open for this node - nothing to do (the context menu
       // offers "Close window" instead once one exists).
@@ -525,9 +525,10 @@ namespace app
       // an earlier window that went fullscreen (which sets FLOATING TRUE)
       // would leak that attribute into every later window created.
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
-      // Opaque window: a transparent background shows the checkerboard, as the node's own preview does,
-      // never the canvas or desktop through the window (which read as a broken, frameless window).
-      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
+      // Opaque by default: a transparent background shows the checkerboard, as the node's own preview does.
+      // "Transparent window" (Output window menu) asks for an alpha framebuffer so OBS window capture can key it.
+      // The hint is sticky global state, so it is set explicitly every time.
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, transparent ? GLFW_TRUE : GLFW_FALSE);
       // Plugin engine: the main window was made hidden and the hint is sticky; a projector is a
       // real window on a real display, as in the app (README 8.2, step 2.4).
       if (Platform::PluginModeActive())
@@ -538,6 +539,7 @@ namespace app
          glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
       }
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
@@ -571,6 +573,7 @@ namespace app
       pw.windowedW = w;
       pw.windowedH = h;
       pw.monitorIndex = ProjectorMonitorIndex(projWindow);
+      pw.transparent = transparent;
       gProjectorWindows.push_back(pw);
    }
 }

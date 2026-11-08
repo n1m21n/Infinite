@@ -71,6 +71,28 @@ void StutterKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
          outR = audible ? mGrainR[(size_t)idx] : 0.0f;
       }
 
+      // Short fades on every repeat edge. Each repeat is cut out of the signal, so a hard edge is a step in the
+      // waveform, and it clicks hardest on dense material such as a reverb tail. The live record-phase repeat keeps
+      // its attack (no fade-in) and, when the grain is the whole cycle, there is no edge to fade at all.
+      {
+         const int chunk = mCurrentChunkSamples;
+         const int fade = std::min((int)(0.002 * mSampleRate), chunk / 4);
+         if (fade > 0)
+         {
+            const int pos = mCyclePos % chunk;
+            float gain = 1.0f;
+            if (mCyclePos >= chunk && pos < fade)
+               gain *= (float)(pos + 1) / (float)fade;
+            if ((mCyclePos >= chunk || chunk < periodSamples) && pos >= chunk - fade)
+               gain *= (float)(chunk - pos) / (float)fade;
+            const int toCycleEnd = periodSamples - mCyclePos;
+            if (toCycleEnd <= fade)
+               gain *= (float)toCycleEnd / (float)fade;
+            outL *= gain;
+            outR *= gain;
+         }
+      }
+
       out.channels[0][i] = outL;
       if (numChannels >= 2)
          out.channels[1][i] = outR;

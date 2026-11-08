@@ -81,6 +81,7 @@
   "frame/StagePopupsA.cpp:Enter Value": "set <node> <key> <value>",
   "frame/StagePopupsA.cpp:Font Size": "set <comment> fontSize",
   "frame/StagePopupsA.cpp:Fullscreen": "node <node> window fullscreen",
+  "frame/StagePopupsA.cpp:Transparent window": "node <node> window transparent",
   "frame/StagePopupsA.cpp:Help": "describe <type>",
   "frame/StagePopupsA.cpp:Hide params": "node <node> params off",
   "frame/StagePopupsA.cpp:Hide viewport": "node <node> viewport off",

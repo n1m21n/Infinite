@@ -372,7 +372,9 @@ void DrawPopupsB(FrameCtx& fc)
          if (!spawnName.empty())
          {
             GraphNode* spawned = SpawnNode(spawnName, spawnCategory, gSpawnPos.x, gSpawnPos.y);
-            if (gLinkDragSourcePin >= 0 && spawned != nullptr)
+            if (gLinkDragSourcePin >= 0 && spawned != nullptr && !GraphNode::IsOutputPin(gLinkDragSourcePin))
+               WireSpawnedNodeToPin(*spawned, gLinkDragSourcePin);
+            else if (gLinkDragSourcePin >= 0 && spawned != nullptr)
             {
                GraphNode* dragSrcNode = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));
                if (dragSrcNode != nullptr)

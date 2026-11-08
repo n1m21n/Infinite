@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid DnB Rhodes Lush Chorus FX",
+    "author": "Infinite",
+    "description": "Velvety multi-voice stereo chorus and spatial shimmer effect tailored for liquid drum & bass electric piano chords and pad textures, with dual quadrature LFOs and soft top-end roll-off.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float rate = 0.45 [0.1, 2.5]\nparam float depth = 0.55 [0.1, 1.0]\nparam float warmth = 0.40 [0.0, 1.0]\nparam float feedback = 0.25 [0.0, 0.6]\nparam float mix = 0.55 [0.0, 1.0]\nstate float pLfo = 0\nstate float c1 = 0\nstate float c2 = 0\nstate float lp = 0\n\ndp = rate / sr\npLfo = pLfo + dp\npLfo = if(pLfo >= 1.0, pLfo - 1.0, pLfo)\nlfo = sin(pLfo * 6.2831853)\n\nfDamp = clamp(3800.0 / sr * 2.0, 0.02, 0.45)\nlp = lp + fDamp * (in - lp)\n\nmodRate = clamp(0.12 + depth * 0.08 * lfo, 0.02, 0.35)\nc1 = c1 + modRate * (lp + c2 * feedback * 0.4 - c1)\nc2 = c2 + modRate * 0.85 * (c1 - c2)\n\nchorusSig = (c1 - c2) * 1.6\nsat = (chorusSig / (1.0 + abs(chorusSig * warmth * 0.6)))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.65\n",
+    "params": {
+      "rate": 0.45,
+      "depth": 0.55,
+      "warmth": 0.4,
+      "feedback": 0.25,
+      "mix": 0.55
+    }
+  }
+}

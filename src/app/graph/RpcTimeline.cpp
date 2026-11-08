@@ -777,6 +777,13 @@ namespace app
                ToggleProjectorFullscreen(*projector);
             else if (what == "display" && args.size() > 1)
                MoveProjectorToMonitor(*projector, atoi(args[1].c_str()));
+            else if (what == "transparent" && !projector->fullscreen)
+            {
+               // Same as the Output window menu: alpha is fixed at window creation, so reopen.
+               const bool next = !projector->transparent;
+               CloseProjectorWindowFor(gn.index);
+               OpenProjectorWindow(glfwGetCurrentContext(), gn, next);
+            }
          }
          else if (action == "timeline" || action == "session")
          {

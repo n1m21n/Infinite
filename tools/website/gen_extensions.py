@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Extensions page: website/extensions.html, built from the app's own extension catalog.
+"""Extensions section of website/library.html (id="extensions"), built from the app's own extension catalog.
 
 What: one card per pack in the release catalog (the same extensions.json the app reads in
 Settings > Extensions). Each card has an Install button that opens the live-install steps (the app
 downloads, verifies and installs the pack while it runs, no restart) and offline links to the
 release assets. Also writes website/assets/extensions/extensions.json (the tracked list), index.json + a preview per pack
-(the packs as Library items, category Extensions) and adds the
-nav link to index.html and library.html.
+(the packs as Library items, category Extensions) and rewrites the section between the
+extensions:start / extensions:end markers in library.html. There is no separate Extensions page.
 Why: packs never ship inside the app and never live on the website; the release is the one host.
 The page only tracks them, so a new pack in the catalog is a new card with no page edit.
 
@@ -62,57 +62,32 @@ def card(p):
 '''
 
 
-def page(packs):
-    t = open(os.path.join(W, "library.html")).read()
-    head = t[:t.index("<body>")]
-    head = re.sub(r"<title>.*?</title>", "<title>Infinite Extensions: optional packs, installed live</title>", head)
-    desc = "Optional packs for Infinite, the open-source audiovisual workstation. Install from Settings, Extensions while the app runs; nothing extra ships in the app."
-    head = re.sub(r'(<meta name="description" content=")[^"]*', r"\g<1>" + desc, head)
-    head = re.sub(r'(<meta (?:property|name)="(?:og|twitter):description" content=")[^"]*', r"\g<1>" + desc, head)
-    head = re.sub(r'(<meta (?:property|name)="(?:og|twitter):title" content=")[^"]*', r"\g<1>Infinite Extensions", head)
-    head = head.replace("library.html", "extensions.html")
-    head = "\n".join(l for l in head.splitlines() if "assets/library/catalog.json" not in l)
-    item_list = {"@context": "https://schema.org", "@type": "ItemList", "name": "Infinite Extensions",
-                 "url": "https://infinitedevices.org/extensions.html", "numberOfItems": len(packs),
-                 "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": p.get("name", p["id"]),
-                                      "url": f"https://infinitedevices.org/extensions.html#{p['id']}"} for i, p in enumerate(packs)]}
-    ld = json.dumps({"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Extensions", "description": desc,
-                     "url": "https://infinitedevices.org/extensions.html",
-                     "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"},
-                     "mainEntity": item_list})
-    head = head.replace("</head>", f'  <script type="application/ld+json">{ld}</script>\n'
-                                   f'  <script type="application/ld+json">{json.dumps(item_list)}</script>\n'
-                                   '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
-                                   '  <link rel="stylesheet" href="extensions.css?v=4f22d1ae">\n</head>')
-    header = t[t.index("  <header"):t.index("  <main>")].replace(' aria-current="page"', "")
-    header = header.replace('<a href="extensions.html">', '<a href="extensions.html" aria-current="page">')
-    return head + '<body class="extensions-page">\n' + header + f'''  <main>
-    <section class="section lib-hero">
+def section(packs):
+    return f'''<!-- extensions:start -->
+    <section class="section ext-section" id="extensions" aria-labelledby="extensions-title">
       <div class="container">
         <div class="section-head">
-          <p class="lib-hand hand">more</p>
-          <h1 class="slab">Extensions</h1>
-          <p class="section-sub">Optional packs for the heavy things. Nothing extra ships in the app: install a pack from Settings while Infinite runs, only if you want it.</p>
+          <h2 class="slab" id="extensions-title">Extensions</h2>
         </div>
         <div class="ext-list">
 {"".join(card(p) for p in packs)}        </div>
       </div>
     </section>
-  </main>
-  <script src="site.js?v=4" defer></script>
-</body>
-</html>
-'''
+    <!-- extensions:end -->'''
 
 
-def add_nav(name):
-    p = os.path.join(W, name)
-    s = open(p).read()
-    if 'href="extensions.html"' in s:
-        return
-    m = re.search(r'\n(\s*)<a href="library.html"[^>]*>Library</a>', s)
-    s = s[:m.end()] + "\n" + m.group(1) + '<a href="extensions.html">Extensions</a>' + s[m.end():]
-    open(p, "w").write(s)
+def inject(packs):
+    p = os.path.join(W, "library.html")
+    t = open(p).read()
+    new = section(packs)
+    if "<!-- extensions:start -->" in t:
+        t = re.sub(r"<!-- extensions:start -->.*?<!-- extensions:end -->", lambda m: new, t, flags=re.S)
+    else:
+        i = t.index('<div class="container"><nav class="page-cta"')
+        t = t[:i] + new + "\n    " + t[i:]
+    if "extensions.css" not in t:
+        t = t.replace('<link rel="stylesheet" href="library.css', '<link rel="stylesheet" href="extensions.css?v=4f22d1ae">\n  <link rel="stylesheet" href="library.css', 1)
+    open(p, "w").write(t)
 
 
 def preview(p, path):
@@ -145,7 +120,7 @@ def library_index(packs):
         preview(p, os.path.join(W, rel))
         items.append({"id": "ext-" + p["id"], "name": p["name"] + " pack", "category": "Extensions", "kind": "Extension",
                       "author": "n1m21n", "description": meta.get("blurb", p.get("purpose", "")), "price": 0,
-                      "preview": rel, "file": "extensions.html#" + p["id"]})
+                      "preview": rel, "file": "library.html#extensions"})
     json.dump({"version": 1, "items": items}, open(os.path.join(W, "assets/extensions/index.json"), "w"), indent=1, ensure_ascii=False)
 
 
@@ -162,10 +137,8 @@ def main():
                "packs": [dict(p, **{k: v for k, v in PACKS.get(p["id"], {}).items()}) for p in packs]}
     json.dump(tracked, open(os.path.join(W, "assets/extensions/extensions.json"), "w"), indent=1, ensure_ascii=False)
     library_index(packs)
-    for n in ("index.html", "library.html"):
-        add_nav(n)
-    open(os.path.join(W, "extensions.html"), "w").write(page(packs))
-    print(len(packs), "packs; extensions.html, assets/extensions/{extensions,index}.json, Library previews, nav links written")
+    inject(packs)
+    print(len(packs), "packs; library.html#extensions, assets/extensions/{extensions,index}.json, Library previews written")
 
 
 if __name__ == "__main__":

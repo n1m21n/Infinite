@@ -99,7 +99,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [UTCP Protocol Manual](https://infinitedevices.org/utcp.json): Universal Tool Calling Protocol specification for autonomous AI agents without MCP daemons
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
 - [Free unlimited samples](https://infinitedevices.org/samples/): generate drum loops, kicks, snares, hats, bass, keys, pads and textures in the browser in any key and scale, and download them as wav and inf, free for commercial use with credit
-- [Extensions](https://infinitedevices.org/extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
+- [Extensions](https://infinitedevices.org/library.html#extensions): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
 - [Benchmarks](https://infinitedevices.org/benchmarks.html): measured CPU, latency, memory and video quality for Infinite against Ableton Live, Bitwig, Logic, Vital, VCV Rack, Blender, TouchDesigner and more, with method and limits stated
 - [Benchmark Report (PDF)](https://infinitedevices.org/assets/Infinite_Benchmark_Report.pdf): the same report as a branded PDF
@@ -237,6 +237,22 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Progressive House Driving Sub Bass Synth](https://infinitedevices.org/library/progressive-house-driving-sub-bass-synth.html): Driving rolling progressive house bass with layered saw core, sub-octave square reinforcement, and punchy resonant low-pass filter envelope. (file: https://infinitedevices.org/assets/templates/progressive-house-driving-sub-bass-synth.inf)
 - [Lo-Fi Beats Tape Flutter Cassette Warmth FX](https://infinitedevices.org/library/lofi-beats-tape-flutter-cassette-warmth-fx.html): Vintage lo-fi cassette tape emulation with gentle wow and flutter pitch modulation, magnetic head high-frequency damping, and soft asymmetric tape saturation. (file: https://infinitedevices.org/assets/templates/lofi-beats-tape-flutter-cassette-warmth-fx.inf)
 - [Lo-Fi Beats Nostalgic Vinyl Crackle Filter FX](https://infinitedevices.org/library/lofi-beats-nostalgic-vinyl-crackle-filter-fx.html): Nostalgic lo-fi resonant telephone bandpass filter with vinyl grit texture, subtle pitch drift, and warm harmonic drive. (file: https://infinitedevices.org/assets/templates/lofi-beats-nostalgic-vinyl-crackle-filter-fx.inf)
+- [Tech House Rolling Sub Groove Synth](https://infinitedevices.org/library/tech-house-rolling-sub-groove-synth.html): Punchy rolling tech house sub bass synth with snappy pitch envelope decay, warm saturated sine-triangle core, and tight low-pass cutoff filter. (file: https://infinitedevices.org/assets/templates/tech-house-rolling-sub-groove-synth.inf)
+- [Tech House Percussive Chord Stab Synth](https://infinitedevices.org/library/tech-house-percussive-chord-stab-synth.html): Snappy tech house chord stab synthesizer with multi-oscillator minor triad tuning, crisp resonant bandpass envelope filter, and punchy transient drive. (file: https://infinitedevices.org/assets/templates/tech-house-percussive-chord-stab-synth.inf)
+- [Dub Techno Tape Delay Diffusion FX](https://infinitedevices.org/library/dub-techno-tape-delay-diffusion-fx.html): Endless dub techno tape delay with multi-tap cross-feedback loops, high-frequency tape damping, warm analog saturation, and deep spatial diffusion. (file: https://infinitedevices.org/assets/templates/dub-techno-tape-delay-diffusion-fx.inf)
+- [Dub Techno Resonant Space Reverb FX](https://infinitedevices.org/library/dub-techno-resonant-space-reverb-fx.html): Expansive dub techno resonant space wash with interlocking comb filter delays, lush high-frequency diffusion, and warm atmospheric tail resonance. (file: https://infinitedevices.org/assets/templates/dub-techno-resonant-space-reverb-fx.inf)
+- [Footwork Syncopated 808 Sub Roller Synth](https://infinitedevices.org/library/footwork-syncopated-808-sub-roller-synth.html): Deep syncopated 808 sub bass synthesizer with rapid exponential pitch envelope drop, saturated sine core, sub-octave drive, and fast transient click for 160 BPM footwork. (file: https://infinitedevices.org/assets/templates/footwork-syncopated-808-sub-roller-synth.inf)
+- [Footwork Rapid Fire Percussive Stab Synth](https://infinitedevices.org/library/footwork-rapid-fire-percussive-stab-synth.html): Aggressive Chicago footwork FM percussive chord stab synthesizer with punchy exponential decay, resonant bandpass formant contour, and crisp saturated transient bite. (file: https://infinitedevices.org/assets/templates/footwork-rapid-fire-percussive-stab-synth.inf)
+- [Amapiano Log Drum Warm Saturator FX](https://infinitedevices.org/library/amapiano-log-drum-warm-saturator-fx.html): Warm analog low-end saturator and transient contour filter tailored for amapiano log drum basslines, with asymmetric polynomial drive, harmonic warmth, and smooth top-end roll-off. (file: https://infinitedevices.org/assets/templates/amapiano-log-drum-warm-saturator-fx.inf)
+- [Amapiano Lush Spatial Reverb Diffusion FX](https://infinitedevices.org/library/amapiano-lush-spatial-reverb-diffusion-fx.html): Expansive warm spatial reverb and early reflection diffusion network designed for amapiano jazz chord progressions and shaker grooves, with high-frequency damping and rich acoustic depth. (file: https://infinitedevices.org/assets/templates/amapiano-lush-spatial-reverb-diffusion-fx.inf)
+- [Gabber Distorted 909 Kick Synth](https://infinitedevices.org/library/gabber-distorted-909-kick-synth.html): Rotterdam hardcore 909 kick drum synthesizer with steep exponential pitch drop, heavy wavefolded tanh saturation, punchy transient click, and tuned sub-harmonic body. (file: https://infinitedevices.org/assets/templates/gabber-distorted-909-kick-synth.inf)
+- [Gabber Hoover Rave Stab Synth](https://infinitedevices.org/library/gabber-hoover-rave-stab-synth.html): Iconic rave hoover chord stab synthesizer featuring multi-phase detuned pulse-saw oscillators, aggressive pitch glide envelope, resonant lowpass sweep, and saturated harmonic bite. (file: https://infinitedevices.org/assets/templates/gabber-hoover-rave-stab-synth.inf)
+- [Liquid DnB Rhodes Lush Chorus FX](https://infinitedevices.org/library/liquid-dnb-rhodes-lush-chorus-fx.html): Velvety multi-voice stereo chorus and spatial shimmer effect tailored for liquid drum & bass electric piano chords and pad textures, with dual quadrature LFOs and soft top-end roll-off. (file: https://infinitedevices.org/assets/templates/liquid-dnb-rhodes-lush-chorus-fx.inf)
+- [Liquid DnB Sub Warmth Ladder Filter FX](https://infinitedevices.org/library/liquid-dnb-sub-warmth-ladder-filter-fx.html): Resonant 4-pole ladder lowpass filter with low-end resonance compensation, analog saturation warmth, and envelope following designed for warm rolling drum & bass sub-lines. (file: https://infinitedevices.org/assets/templates/liquid-dnb-sub-warmth-ladder-filter-fx.inf)
+- [Acid House 303 Saw Squelch Synth](https://infinitedevices.org/library/acid-house-303-saw-squelch-synth.html): Authentic Chicago acid house bassline synthesizer featuring a band-limited sawtooth oscillator, cascading 4-pole diode ladder filter with screaming 18dB resonance, punchy accent decay, and tanh drive. (file: https://infinitedevices.org/assets/templates/acid-house-303-saw-squelch-synth.inf)
+- [Acid House Accented Square Bass Synth](https://infinitedevices.org/library/acid-house-accented-square-bass-synth.html): Hollow, punchy Roland TB-303 square wave bass synthesizer with asymmetric pulse shaping, aggressive non-linear diode resonance sweep, fast accent decay envelope, and warm analog saturation. (file: https://infinitedevices.org/assets/templates/acid-house-accented-square-bass-synth.inf)
+- [Future Garage Dusk Tape Delay FX](https://infinitedevices.org/library/future-garage-dusk-tape-delay-fx.html): Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping. (file: https://infinitedevices.org/assets/templates/future-garage-dusk-tape-delay-fx.inf)
+- [Future Garage Vinyl Dust Reverb FX](https://infinitedevices.org/library/future-garage-vinyl-dust-reverb-fx.html): Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering. (file: https://infinitedevices.org/assets/templates/future-garage-vinyl-dust-reverb-fx.inf)
 
 ## Library: Community
 
@@ -279,7 +295,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Library: Extensions
 
-- [Tracking pack](https://infinitedevices.org/library/ext-tracking.html): Turn a camera or a picture into controls: hands, face and body landmarks become modulators. (file: https://infinitedevices.org/extensions.html#tracking)
+- [Tracking pack](https://infinitedevices.org/library/ext-tracking.html): Turn a camera or a picture into controls: hands, face and body landmarks become modulators. (file: https://infinitedevices.org/library.html#extensions)
 
 ## Generated & Procedural Library
 
@@ -597,7 +613,7 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 
 ## Audio-Reactive Visual Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 85 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 93 live audio-reactive WebGL visuals, each with a copy-paste iframe
 
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
@@ -614,4 +630,4 @@ When an agent builds a page that needs an audio-reactive visual, use this snippe
 - [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
 - [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
 - [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
-- ... and 70 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).
+- ... and 78 more in [Embed gallery](https://infinitedevices.org/embeds/) and [Full LLM Documentation](https://infinitedevices.org/llms-full.txt).

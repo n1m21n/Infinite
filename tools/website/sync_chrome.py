@@ -35,17 +35,15 @@ GROUPS = [
     ]),
     ("explore", "Explore", [
         ("library.html", "Library", "Templates, patches and Field devices"),
-        ("samples/", "Samples", "Sounds and clips to download"),
+        ("samples/", "Sample generator", "Sounds and clips to download"),
         ("artworks.html", "Art gallery", "Made with Infinite"),
         ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
-        ("chat.html", "Chat", "Talk to your patch with an agent"),
-        ("extensions.html", "Extensions", "Hand, face and pose tracking"),
-        ("benchmarks.html", "Benchmarks", "Measured against other tools"),
     ]),
     ("learn", "Learn", [
         ("index.html#learn", "Get started", "Make a first sound and picture"),
         ("philosophy.html", "Philosophy", "Why Infinite is built this way"),
+        ("chat.html", "Agents &amp; terminal", "Talk to your patch with an agent"),
         ("blog/", "Blog", "Guides and how things work"),
     ]),
 ]
@@ -56,16 +54,17 @@ FOOTER_COLS = [
         ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
     ]),
     ("Explore", [
-        ("library.html", "Library"), ("samples/", "Samples"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("chat.html", "Chat"), ("extensions.html", "Extensions"),
-        ("benchmarks.html", "Benchmarks"),
+        ("library.html", "Library"), ("samples/", "Sample generator"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"),
     ]),
     ("Learn", [
-        ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("blog/", "Blog"),
+        ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("chat.html", "Agents &amp; terminal"), ("blog/", "Blog"),
+        ("plugin.html", "Plugin"), ("buy.html", "Buy the plugin"),
     ]),
     ("Docs", [   # PDFs in website/assets
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
         ("assets/Field_Language_Manual.pdf", "Field language"),
         ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide"),
+        ("benchmarks.html", "Benchmarks"),
         ("assets/Infinite_Benchmark_Report.pdf", "Benchmark report"),
     ]),
     ("Open source", [
@@ -144,6 +143,8 @@ def nav_html(rel):
             out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{nav_icon(path)}<span>{text}</span></a>')
         out.append("        </div>")
         out.append("      </div>")
+    pc = ' aria-current="page"' if is_current("plugin.html", rel) else ""
+    out.append(f'      <a href="{p}plugin.html"{pc}>Plugin</a>')
     out.append(f'      <a class="btn btn-primary nav-sheet-cta" href="{p}index.html#setup">Download Infinite</a>')
     out.append('      <div class="nav-sheet-social">')
     out.append(icon_links("        ", "{n}"))
@@ -152,6 +153,8 @@ def nav_html(rel):
     return "\n".join(out)
 
 
+# The paid plugin is its own stop, not a group: one tap to its page.
+PLUGIN_SVG = '<svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v4M13 3v4M5 7h10v3a5 5 0 0 1-10 0ZM10 15v2.5"/></svg>'
 DOCK_STOPS = [("for", "For you", "family-compositing"), ("explore", "Explore", "grid-dots"), ("learn", "Learn", "play")]
 
 
@@ -169,6 +172,8 @@ def dock_html(rel):
     for gid, label, ic in DOCK_STOPS:
         cur = " data-current" if any(is_current(i[0], rel) for g in GROUPS if g[0] == gid for i in g[2]) else ""
         out.append(f'    <button type="button" class="dock-stop" data-group="{gid}"{cur} aria-expanded="false" aria-controls="dock-sheet-{gid}">{_svg(ic)}<span>{label}</span></button>')
+    pc = ' aria-current="page"' if is_current("plugin.html", rel) else ""
+    out.append(f'    <a class="dock-stop" href="{p}plugin.html"{pc}>{PLUGIN_SVG}<span>Plugin</span></a>')
     out.append('    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog">' + _svg("search") + '<span>Search</span></button>')
     out.append("  </div>")
     for gid, label, ic in DOCK_STOPS:

@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gabber Distorted 909 Kick Synth",
+    "author": "Infinite",
+    "description": "Rotterdam hardcore 909 kick drum synthesizer with steep exponential pitch drop, heavy wavefolded tanh saturation, punchy transient click, and tuned sub-harmonic body.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pitchDecay = 0.045 [0.015, 0.15]\nparam float drive = 0.65 [0.1, 1.0]\nparam float punch = 0.45 [0.0, 1.0]\nparam float decayTime = 0.28 [0.08, 0.8]\nparam float fold = 0.35 [0.0, 0.8]\nstate float p1 = 0\nstate float pClick = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.06)\nenv = if(target > env, env + (target - env) * 0.95, env - env * decayRate)\n\npRate = clamp(1.0 / (sr * pitchDecay), 0.0005, 0.12)\npEnv = if(target > pEnv, target, pEnv - pEnv * pRate)\n\nfBase = clamp(freq * 0.5 * (1.0 + pEnv * 5.5), 35.0, 650.0)\n\ndp = fBase / sr\np1 = p1 + dp\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsineCore = sin(p1 * 6.2831853)\n\ndpC = 2200.0 / sr\npClick = pClick + dpC\npClick = if(pClick >= 1.0, pClick - 1.0, pClick)\nclick = sin(pClick * 6.2831853) * pEnv * punch * 0.6\n\nraw = (sineCore + click) * (1.0 + drive * 2.8)\nsat = sin(raw * (1.0 + fold * 0.8)) * env\n\nfCut = clamp(0.18 + pEnv * 0.25, 0.03, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.42\n",
+    "params": {
+      "pitchDecay": 0.045,
+      "drive": 0.65,
+      "punch": 0.45,
+      "decayTime": 0.28,
+      "fold": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

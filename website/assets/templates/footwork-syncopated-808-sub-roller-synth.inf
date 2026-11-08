@@ -1,0 +1,75 @@
+infinite-patch 1
+# Footwork Syncopated 808 Sub Roller Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 40
+  i note1 40
+  i note2 45
+  i note3 47
+  i note4 40
+  i note5 43
+  i note6 47
+  i note7 50
+  i note8 40
+  i note9 40
+  i note10 45
+  i note11 52
+  i note12 43
+  i note13 45
+  i note14 47
+  i note15 50
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pitchDecay = 0.08 [0.02, 0.4]\nparam float subDrive = 0.45 [0.0, 1.0]\nparam float clickLevel = 0.25 [0.0, 0.8]\nparam float decayTime = 0.28 [0.05, 0.9]\nparam float cutoff = 0.65 [0.1, 1.0]\nstate float p1 = 0\nstate float pClick = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.05)\nenv = if(target > env, env + (target - env) * 0.90, env - env * decayRate)\n\npRate = clamp(1.0 / (sr * pitchDecay), 0.0005, 0.08)\npEnv = if(target > pEnv, target, pEnv - pEnv * pRate)\n\nfBase = clamp(freq * (1.0 + pEnv * 2.8), 30.0, 480.0)\n\ndp = fBase / sr\np1 = p1 + dp\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsine1 = sin(p1 * 6.2831853)\n\ndpC = 1200.0 / sr\npClick = pClick + dpC\npClick = if(pClick >= 1.0, pClick - 1.0, pClick)\nclick = sin(pClick * 6.2831853) * pEnv * clickLevel\n\nraw = sine1 * (1.0 + subDrive * 1.4) + click\nsat = (raw / (1.0 + abs(raw * 0.7))) * env\n\nfCut = clamp(cutoff * 0.38, 0.02, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.44\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.24 0.35
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Footwork Syncopated 808 Sub Roller Synth. Deep syncopated 808 sub bass synthesizer with rapid exponential pitch envelope drop, saturated sine core, sub-octave drive, and fast transient click for 160 BPM footwork.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

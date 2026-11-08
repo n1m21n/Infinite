@@ -29,8 +29,18 @@ namespace Platform
       std::string mSavedLdLibPath;
       bool mHadLdLibPath = false;
 
+      bool mSetGskRenderer = false;
+
       ScopedHostEnvironment()
       {
+         // GTK4 zenity can hang or crash on NVIDIA + Wayland when it picks the GPU
+         // renderer (issue #45). A file picker needs no GPU, so force the cairo one.
+         if (!std::getenv("GSK_RENDERER"))
+         {
+            setenv("GSK_RENDERER", "cairo", 1);
+            mSetGskRenderer = true;
+         }
+
          const char* cur = std::getenv("LD_LIBRARY_PATH");
          if (!cur)
             return;
@@ -85,6 +95,8 @@ namespace Platform
 
       ~ScopedHostEnvironment()
       {
+         if (mSetGskRenderer)
+            unsetenv("GSK_RENDERER");
          if (mHadLdLibPath)
             setenv("LD_LIBRARY_PATH", mSavedLdLibPath.c_str(), 1);
          else

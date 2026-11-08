@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gabber Hoover Rave Stab Synth",
+    "author": "Infinite",
+    "description": "Iconic rave hoover chord stab synthesizer featuring multi-phase detuned pulse-saw oscillators, aggressive pitch glide envelope, resonant lowpass sweep, and saturated harmonic bite.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float detune = 0.35 [0.05, 0.8]\nparam float stabDecay = 0.22 [0.05, 0.7]\nparam float cutoff = 0.70 [0.1, 1.0]\nparam float drive = 0.40 [0.0, 1.0]\nparam float pitchGlide = 0.25 [0.0, 0.8]\nstate float p1 = 0\nstate float p2 = 0\nstate float env = 0\nstate float pEnv = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * stabDecay), 0.0001, 0.06)\nenv = if(target > env, env + (target - env) * 0.92, env - env * decayRate)\n\npRate = clamp(1.0 / (sr * 0.08), 0.0005, 0.10)\npEnv = if(target > pEnv, target, pEnv - pEnv * pRate)\n\nfBase = clamp(freq * (1.0 + pEnv * pitchGlide * 0.8), 50.0, 1800.0)\n\ndp1 = fBase / sr\np1 = p1 + dp1\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsaw1 = p1 * 2.0 - 1.0\n\ndp2 = (fBase * (1.0 + detune * 0.03)) / sr\np2 = p2 + dp2\np2 = if(p2 >= 1.0, p2 - 1.0, p2)\nsaw2 = p2 * 2.0 - 1.0\n\nsig = (saw1 + saw2) * (0.5 + drive * 0.8)\nsat = (sig / (1.0 + abs(sig * 0.5))) * env\n\nfCut = clamp(cutoff * 0.35 + env * 0.25, 0.03, 0.45)\nlp1 = lp1 + fCut * (sat - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.42\n",
+    "params": {
+      "detune": 0.35,
+      "stabDecay": 0.22,
+      "cutoff": 0.7,
+      "drive": 0.4,
+      "pitchGlide": 0.25
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

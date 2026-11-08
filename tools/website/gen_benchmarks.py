@@ -625,7 +625,7 @@ def visual_html():
 
 
 def page(body, n):
-    tpl = open(os.path.join(W, "extensions.html")).read()
+    tpl = open(os.path.join(W, "benchmarks.html")).read()
     head, rest = tpl.split("</head>", 1)
     head = re.sub(r"<title>.*?</title>", "<title>Infinite benchmarks: audio, video and speed</title>", head, flags=re.S)
     desc = "Open, reproducible benchmarks of Infinite against Vital, Serum 2, Blender, Ableton and TouchDesigner on a MacBook Air M2, including where it is slower."

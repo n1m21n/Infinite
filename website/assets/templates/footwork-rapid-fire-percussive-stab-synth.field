@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Footwork Rapid Fire Percussive Stab Synth",
+    "author": "Infinite",
+    "description": "Aggressive Chicago footwork FM percussive chord stab synthesizer with punchy exponential decay, resonant bandpass formant contour, and crisp saturated transient bite.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmDepth = 0.45 [0.0, 1.0]\nparam float modRatio = 2.0 [0.5, 6.0]\nparam float stabDecay = 0.16 [0.03, 0.6]\nparam float resonance = 0.35 [0.0, 0.85]\nparam float drive = 0.30 [0.0, 1.0]\nstate float pCarrier = 0\nstate float pMod = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * stabDecay), 0.0001, 0.06)\nenv = if(target > env, env + (target - env) * 0.90, env - env * decayRate)\n\nfBase = clamp(freq, 60.0, 1200.0)\n\ndpM = (fBase * modRatio) / sr\npMod = pMod + dpM\npMod = if(pMod >= 1.0, pMod - 1.0, pMod)\nmodSig = sin(pMod * 6.2831853) * fmDepth * env\n\ndpC = fBase / sr\npCarrier = pCarrier + dpC + modSig * 0.08\npCarrier = if(pCarrier >= 1.0, pCarrier - 1.0, pCarrier)\ncarrier = sin(pCarrier * 6.2831853)\n\nraw = carrier * (1.0 + drive * 1.5)\nsat = (raw / (1.0 + abs(raw * 0.6))) * env\n\nfCut = clamp(0.12 + env * 0.40, 0.02, 0.45)\nlp1 = lp1 + fCut * (sat + lp1 * resonance * 0.40 - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.42\n",
+    "params": {
+      "fmDepth": 0.45,
+      "modRatio": 2.0,
+      "stabDecay": 0.16,
+      "resonance": 0.35,
+      "drive": 0.3
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

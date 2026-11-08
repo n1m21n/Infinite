@@ -134,7 +134,9 @@ namespace app
          std::string loginUrl;                   // the page to open by hand when the CLI could not
          std::string loginError;                 // plain words after a failed sign-in
          std::string loginLog;                   // raw output, behind Details
-         bool chain = false;                     // Connect pressed: after setup, sign in without another click
+         bool chain = false;                     // legacy: never set now; each stage waits for its own press
+         bool asked = false;                     // the install check-in is showing: nothing runs until Install is pressed
+         bool noAccount = false;                 // "I don't have one": the sign-in check-in offers the sign-up page
          bool authBroken = false;                // a turn said "sign in": overrides the file probe
          double loginAt = 0.0;
          bool needsCode = false;                 // the sign-in page shows a code to paste back (Gemini)
@@ -919,7 +921,7 @@ namespace app
             case Act::TryAgain:
                s.failed = false;
                s.loginError.clear();
-               s.chain = true;  // sign in right after, without another click
+               // No chained sign-in: setup ends, then the sign-in check-in asks on its own.
                SetUpInBackground(*a);
                break;
             case Act::SignIn:
@@ -3675,28 +3677,17 @@ namespace app
       }
 
       // Steps 1-2: who to talk to, and whether there is an account.
+      // Picking an agent only starts a check-in: nothing is installed, opened or signed in until the person
+      // presses that stage's own button (the install card, then the sign-in card).
       void Choose(const std::string& id, bool hasAccount)
       {
          AgentState& s = sAgents[id];
          sOnboard.chosen = id;
          sOnboard.details = false;
-         s.signUp = !hasAccount;
+         s.signUp = false;
+         s.noAccount = !hasAccount;
          const AgentView v = ViewOf(id);
-         if (!hasAccount)
-         {
-            sOnboard.signUpAt = ImGui::GetTime();
-            sOnboard.leftSinceSignUp = false;
-            Platform::OpenExternalUrl(chat::SignUpUrl(id));
-         }
-         if (v.act == Act::SetUp || v.act == Act::TryAgain)
-            Do(id, v.act);
-         else if (v.act == Act::SignIn || v.act == Act::SignInAgain)
-         {
-            if (hasAccount)
-               Do(id, v.act);
-            else
-               s.signInOnFocus = true;  // after the sign-up page, not over it
-         }
+         s.asked = v.act == Act::SetUp || v.act == Act::TryAgain;
       }
 
       void DrawPickCard(float width)
@@ -3730,10 +3721,10 @@ namespace app
             DrawAvatar(dl, ImVec2(c.x + 11.0f, p.y + rowH * 0.5f), 11.0f, a.id);
             const float ty = p.y + (rowH - ImGui::GetFontSize()) * 0.5f;
             dl->AddText(ImVec2(c.x + 30.0f, ty), usable ? ImGui::GetColorU32(ImGuiCol_Text) : Dim(), a.name);
-            if (!usable)
             {
-               const char* why = T("Needs a browser");
-               dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(why).x, ty), Dim(), why);
+               // What the account needs, or why this row cannot be used here.
+               const std::string tag = usable ? chat::PlanTag(a.id) : std::string(T("Needs a browser"));
+               dl->AddText(ImVec2(c.x + c.inner - ImGui::CalcTextSize(tag.c_str()).x, ty), Dim(), tag.c_str());
             }
             ImGui::SetCursorScreenPos(ImVec2(c.x, p.y + rowH + 2.0f));
             ImGui::Dummy(ImVec2(1.0f, 0.0f));
@@ -3768,6 +3759,25 @@ namespace app
          const bool signingIn = s.login != nullptr || s.signingIn || s.signInOnFocus;
          Card c;
          BeginCard(c, width);
+         if (s.asked && !setting && !s.failed)
+         {
+            CardTitle(c, Say(s.ready.installed ? "Connect %s to Infinite?" : "Install %s?", a->name));
+            CardText(c, chat::SetUpNote(*a, CurrentOs() == Os::kWindows, s.ready.installed), Dim());
+            const int b = CardButtons(c, { { s.ready.installed ? T("Connect") : T("Install"), true }, { T("Not now"), false } });
+            EndCard(c);
+            if (b == 0)
+            {
+               s.asked = false;
+               Do(a->id, Act::SetUp);
+            }
+            else if (b == 1)
+            {
+               s.asked = false;
+               s.noAccount = false;
+               o.chosen.clear();
+            }
+            return;
+         }
          CardTitle(c, Say("Setting up %s", a->name));
          // Rows: [account], ready, install, sign in. The setup script's five steps fold into two.
          if (s.signUp || s.signInOnFocus)
@@ -3877,17 +3887,22 @@ namespace app
          }
          else if (!setting && !signingIn && connected && !in)
          {
-            // Set up, signed out, nothing running (a sign-in was cancelled): one button.
-            const int b = CardButtons(c, { { T("Sign in"), true }, { T("Pick again"), false } });
-            if (b == 0)
+            // Set up, signed out, nothing running: say what the sign-in needs, then one press.
+            CardText(c, chat::SignInNote(*a, CurrentOs() == Os::kWindows), Dim());
+            const int b = s.noAccount ? CardButtons(c, { { T("Sign in"), true }, { T("Make an account"), false }, { T("Pick again"), false } })
+                                      : CardButtons(c, { { T("Sign in"), true }, { T("Pick again"), false } });
+            const int k = (!s.noAccount && b == 1) ? 2 : b;   // without the account button, "Pick again" is index 1
+            if (k == 0)
                Do(a->id, Act::SignIn);
-            else if (b == 1)
+            else if (k == 1)
+               Platform::OpenExternalUrl(chat::SignUpUrl(a->id));
+            else if (k == 2)
                back = true;
          }
          EndCard(c);
          if (back)
          {
-            s.signUp = s.signInOnFocus = false;
+            s.signUp = s.signInOnFocus = s.noAccount = s.asked = false;
             s.loginError.clear();
             s.failed = false;
             o.chosen.clear();
@@ -5494,6 +5509,13 @@ ChatAgentInfo ChatAgentStatus(const std::string& id)
       info.busy = v.busy;
       const auto it = sAgents.find(id);
       const CliSetup::Agent* a = CliSetup::FindAgent(id);
+      if (a != nullptr && !v.ready && !v.busy)
+      {
+         if (v.act == Act::SetUp)
+            info.hint = chat::SetUpNote(*a, CliSetup::CurrentOs() == CliSetup::Os::kWindows, it != sAgents.end() && it->second.ready.installed);
+         else if (v.act == Act::SignIn || v.act == Act::SignInAgain)
+            info.hint = chat::SignInNote(*a, CliSetup::CurrentOs() == CliSetup::Os::kWindows);
+      }
       if (it != sAgents.end() && it->second.failed && it->second.setup == nullptr && a != nullptr)
       {
          using namespace CliSetup;

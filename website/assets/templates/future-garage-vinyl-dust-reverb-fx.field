@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Future Garage Vinyl Dust Reverb FX",
+    "author": "Infinite",
+    "description": "Atmospheric Burial-inspired space processor combining procedural vinyl surface crackle, diffuse multi-tap reverb diffusion, warm low-mid resonance, and dusk lowpass filtering.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float decay = 0.65 [0.1, 1.0]\nparam float dust = 0.25 [0.0, 0.8]\nparam float tone = 0.45 [0.1, 1.0]\nparam float warmth = 0.50 [0.0, 1.0]\nparam float mix = 0.55 [0.0, 1.0]\nstate float noiseState = 0.12345\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float lp = 0\n\nnoiseState = (noiseState * 196314.165 + 90763.3) % 1.0\nrandNoise = noiseState * 2.0 - 1.0\ncrackle = if(abs(randNoise) > 0.992, randNoise * 0.35 * dust, 0.0)\n\nfCut = clamp(0.08 + tone * 0.32, 0.02, 0.45)\nlp = lp + fCut * ((in + crackle) - lp)\n\nkDiff = clamp(0.12 * (1.0 + decay * 0.8), 0.04, 0.38)\nd1 = d1 + kDiff * (lp + d4 * 0.28 * decay - d1)\nd2 = d2 + kDiff * 0.91 * (d1 - d2)\nd3 = d3 + kDiff * 0.82 * (d2 - d3)\nd4 = d4 + kDiff * 0.74 * (d3 - d4)\n\ndiffuse = (d2 - d3 + d4) * 0.95\nsat = (diffuse / (1.0 + abs(diffuse * warmth * 0.5)))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.60\n",
+    "params": {
+      "decay": 0.65,
+      "dust": 0.25,
+      "tone": 0.45,
+      "warmth": 0.5,
+      "mix": 0.55
+    }
+  }
+}

@@ -15,6 +15,7 @@
 #include "app/ui/design/components/FormParts.h"
 #include "core/CliSetup.h"
 #include "core/chat/ChatThread.h"
+#include "core/chat/Onboarding.h"
 #include "platform/AppPaths.h"
 
 #include <ctime>
@@ -122,6 +123,12 @@ namespace app
             if (button(info.action.c_str(), !info.ready))
                ChatAgentAct(a.id, false);
          ChatAgentCodeEntry(a.id, rowW);
+         if (!info.hint.empty() && info.problem.empty())
+         {
+            FormParts::Label("");
+            FormParts::TintedText(ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                                  [&] { ImGui::TextWrapped("%s", info.hint.c_str()); });
+         }
          if (!info.problem.empty())
          {
             FormParts::Label("");
@@ -391,9 +398,12 @@ namespace app
          Perform(a, os, *agent, exe, paths, [](const std::string&, const std::string& line) { TerminalRunInNewTab(line); }, &sError, std::string(), nullptr);
          finish();
       };
-      const std::string connect = std::string(T("Connect")) + " " + agent->name;
+      // What the button does, said first and in plain words; the agent starts only when the person starts it.
+      centred(UiType::Size::Caption, UiType::Weight::Regular, dim, chat::SetUpNote(*agent, os == Os::kWindows, AgentInstalledHere(*agent)).c_str());
+      y += tok::space_2;
+      const std::string connect = std::string(AgentInstalledHere(*agent) ? T("Connect") : T("Install")) + " " + agent->name;
       if (TextButton::Draw("welcome.connect", UiLayout::Rect{ x, y, colW, rowH }, connect.c_str(), TextButton::Kind::Primary))
-         perform(Action::kConnectAll);
+         perform(Action::kSetupAgent);
       y += rowH + tok::space_2;
       if (TextButton::Draw("welcome.skip", UiLayout::Rect{ x, y, colW, rowH }, T("Skip, just a terminal"), TextButton::Kind::Quiet))
          finish();

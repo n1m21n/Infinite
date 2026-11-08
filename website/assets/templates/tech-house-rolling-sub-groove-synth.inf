@@ -1,0 +1,75 @@
+infinite-patch 1
+# Tech House Rolling Sub Groove Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 43
+  i note1 43
+  i note2 50
+  i note3 55
+  i note4 43
+  i note5 46
+  i note6 50
+  i note7 53
+  i note8 43
+  i note9 43
+  i note10 50
+  i note11 55
+  i note12 46
+  i note13 48
+  i note14 50
+  i note15 53
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float cutoff = 0.52 [0.1, 1.0]\nparam float resonance = 0.40 [0.0, 0.85]\nparam float subGain = 0.48 [0.0, 1.0]\nparam float decayTime = 0.22 [0.05, 0.8]\nparam float drive = 0.30 [0.0, 1.0]\nstate float p1 = 0\nstate float pSub = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * decayTime), 0.0001, 0.04)\nenv = if(target > env, env + (target - env) * 0.70, env - env * decayRate)\n\nfBase = clamp(freq, 35.0, 350.0)\n\ndp1 = fBase / sr\np1 = p1 + dp1\np1 = if(p1 >= 1.0, p1 - 1.0, p1)\nsaw1 = p1 * 2.0 - 1.0\n\ndpSub = (fBase * 0.5) / sr\npSub = pSub + dpSub\npSub = if(pSub >= 1.0, pSub - 1.0, pSub)\nsubSine = sin(pSub * 6.2831853)\n\nraw = saw1 * 0.55 + subSine * subGain\n\ndrv = raw * (1.0 + drive * 1.5)\nsat = (drv / (1.0 + abs(drv))) * env\n\nfCut = clamp(cutoff * (0.10 + env * 0.45), 0.015, 0.44)\nlp1 = lp1 + fCut * (sat + lp1 * resonance * 0.45 - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.52\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.24 0.35
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Tech House Rolling Sub Groove Synth. Punchy rolling tech house sub bass synth with snappy pitch envelope decay, warm saturated sine-triangle core, and tight low-pass cutoff filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

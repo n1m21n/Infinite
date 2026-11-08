@@ -94,6 +94,41 @@ namespace
       "    fragColor = vec4(col,1.0);\n"
       "}\n";
 
+   // Shadertoy code is pasted below our declarations, where a driver refuses '#extension' (it must come before any
+   // other token) and '#version' (it must be the first line). The first is moved up under our own '#version'; both
+   // are blanked where they stood, so every other line keeps its number for the error messages.
+   std::string HoistDirectives(const std::string& code, std::string& extensions)
+   {
+      std::string out;
+      out.reserve(code.size());
+      size_t at = 0;
+      while (at <= code.size())
+      {
+         size_t end = code.find('\n', at);
+         const bool last = end == std::string::npos;
+         if (last)
+            end = code.size();
+         const std::string line = code.substr(at, end - at);
+         const size_t first = line.find_first_not_of(" \t");
+         const bool hash = first != std::string::npos && line[first] == '#';
+         const size_t word = hash ? line.find_first_not_of(" \t", first + 1) : std::string::npos;
+         if (word != std::string::npos && line.compare(word, 9, "extension") == 0)
+         {
+            std::string clean = line;
+            if (!clean.empty() && clean.back() == '\r')
+               clean.pop_back();
+            extensions += clean + "\n";
+         }
+         else if (!(word != std::string::npos && line.compare(word, 7, "version") == 0))
+            out += line;
+         if (last)
+            break;
+         out += '\n';
+         at = end + 1;
+      }
+      return out;
+   }
+
    int CountLines(const char* text)
    {
       int n = 0;
@@ -642,7 +677,6 @@ bool FormulaNode::ApplyShadertoy()
    }
 
    unsigned int built[kBufD + 1] = {};
-   const int preambleLines = CountLines(kShadertoyPreamble);
    for (int pass = 0; pass <= kBufD; pass++)
    {
       if (pass != kImage && pass > BufferCount())
@@ -650,7 +684,13 @@ bool FormulaNode::ApplyShadertoy()
       // A buffer tab left empty stays black instead of failing the whole shader.
       if (pass != kImage && passCode[pass].find_first_not_of(" \t\r\n") == std::string::npos)
          continue;
-      const std::string src = std::string(kShadertoyPreamble) + passCode[kCommon] + "\n" + passCode[pass] +
+      std::string extensions;
+      const std::string common = HoistDirectives(passCode[kCommon], extensions);
+      const std::string body = HoistDirectives(passCode[pass], extensions);
+      std::string preamble = kShadertoyPreamble;
+      preamble.insert(preamble.find('\n') + 1, extensions);
+      const int preambleLines = CountLines(preamble.c_str());
+      const std::string src = preamble + common + "\n" + body +
                               (pass == kImage ? kShadertoyMainImage : kShadertoyMainBuffer);
       std::string error;
       built[pass] = GLUtil::CompileProgram(src.c_str(), &error);

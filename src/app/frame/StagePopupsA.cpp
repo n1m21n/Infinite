@@ -341,6 +341,14 @@ void DrawPopupsA(FrameCtx& fc)
                      }
                      ImGui::EndMenu();
                   }
+                  // Reopens the window: a framebuffer's alpha is fixed when its window is created.
+                  if (!projector->fullscreen && MenuParts::Item(L("Transparent window"), nullptr, projector->transparent))
+                  {
+                     const bool next = !projector->transparent;
+                     CloseProjectorWindowFor(gn->index);
+                     OpenProjectorWindow(window, *gn, next);
+                     ImGui::CloseCurrentPopup();
+                  }
                   MenuParts::Separator();
                   if (MenuParts::Item(L("Close window")))
                      CloseProjectorWindowFor(gn->index);

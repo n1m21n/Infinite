@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Indie Psychedelic Liquid Oil Wheel",
+    "author": "Infinite",
+    "description": "1960s Joshua Light Show liquid projector simulation with swirling immiscible colored oils, audio-reactive viscosity shear, undulating color separation, and warm psychedelic chromatic fringes.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.40 [0.1, 1.5]\nparam float viscosity = 1.20 [0.4, 2.5]\nparam float swirl = 1.40 [0.2, 3.0]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float glow = 0.55 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x) + (swirl / (r + 0.25))\n\nw1 = sin(r * 12.0 - time * 2.4 + theta * 3.0)\nw2 = cos(p.x * 10.0 * viscosity + time * 1.6) * sin(p.y * 10.0 * viscosity - time * 1.3)\nwave = (w1 + w2) * 0.5\n\nrDisp = wave * 0.08\ndispP = p + vec2(rDisp, -rDisp)\nwaveDisp = sin(length(dispP) * 14.0 - time * 2.0 + theta * 2.0)\n\ncDark = vec3(0.05, 0.02, 0.08)\ncMarigold = vec3(0.98, 0.64, 0.07)\ncMagenta = vec3(0.88, 0.10, 0.46)\ncMint = vec3(0.02, 0.84, 0.63)\n\nbase = mix(cDark, cMagenta, clamp(wave * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(base, cMarigold, clamp(waveDisp * 0.6 + 0.4, 0.0, 1.0))\n\nrim = 1.0 - smoothstep(0.28, 0.65, abs(wave))\ncol = mix(col, cMint, rim * glow)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.4,
+      "viscosity": 1.2,
+      "swirl": 1.4,
+      "contrast": 1.15,
+      "glow": 0.55
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

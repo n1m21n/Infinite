@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid Graphics Iridescent Liquid Twirl",
+    "author": "Infinite",
+    "description": "Audio-reactive liquid chrome vortex with logarithmic polar spiral coordinates, iridescent thin-film chromatic interference, and razor-sharp acid green and ultraviolet contours.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.40 [0.1, 1.5]\nparam float twirl = 2.4 [0.5, 5.0]\nparam float scale = 14.0 [5.0, 30.0]\nparam float contrast = 1.15 [0.6, 2.0]\nparam float dispersion = 0.50 [0.1, 1.0]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x) + (twirl / (r + 0.18))\n\nw1 = sin(r * scale - time * 2.8 + theta * 3.0)\nw2 = cos(p.x * scale * 0.7 + time * 1.8) * sin(p.y * scale * 0.7 - time * 1.4)\nwave = (w1 + w2) * 0.5\n\nrDisp = wave * dispersion * 0.08\ndispP = p + vec2(rDisp, -rDisp)\nwaveDisp = sin(length(dispP) * scale - time * 2.5 + theta * 2.0)\n\ncVoid = vec3(0.04, 0.01, 0.08)\ncLime = vec3(0.80, 1.0, 0.0)\ncMagenta = vec3(1.0, 0.0, 0.95)\ncCyan = vec3(0.0, 0.90, 1.0)\n\nbase = mix(cVoid, cMagenta, clamp(wave * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(base, cLime, clamp(waveDisp * 0.6 + 0.4, 0.0, 1.0))\n\nrim = 1.0 - smoothstep(0.35, 0.70, abs(wave))\ncol = mix(col, cCyan, rim * 0.65)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.4,
+      "twirl": 2.4,
+      "scale": 14.0,
+      "contrast": 1.15,
+      "dispersion": 0.5
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Future Garage Dusk Tape Delay FX",
+    "author": "Infinite",
+    "description": "Nocturnal UK future garage tape delay effect featuring dual stereo delay taps, subtle wow and flutter pitch modulation, warm feedback saturation, and gentle high-frequency tape damping.",
+    "domain": "effect"
+  },
+  "device": {
+    "code": "param float time = 0.35 [0.05, 0.8]\nparam float flutter = 0.35 [0.0, 1.0]\nparam float feedback = 0.45 [0.0, 0.85]\nparam float damping = 0.50 [0.1, 1.0]\nparam float mix = 0.50 [0.0, 1.0]\nstate float pLfo1 = 0\nstate float pLfo2 = 0\nstate float tap1 = 0\nstate float tap2 = 0\nstate float tap3 = 0\nstate float lp = 0\n\ndp1 = 1.2 / sr\npLfo1 = pLfo1 + dp1\npLfo1 = if(pLfo1 >= 1.0, pLfo1 - 1.0, pLfo1)\nlfo1 = sin(pLfo1 * 6.2831853)\n\ndp2 = 0.35 / sr\npLfo2 = pLfo2 + dp2\npLfo2 = if(pLfo2 >= 1.0, pLfo2 - 1.0, pLfo2)\nlfo2 = sin(pLfo2 * 6.2831853)\n\nfCut = clamp(0.15 + (1.0 - damping) * 0.25, 0.02, 0.45)\nlp = lp + fCut * (in - lp)\n\nmodRate = clamp(0.08 + flutter * 0.03 * (lfo1 + lfo2 * 0.5), 0.02, 0.35)\ntap1 = tap1 + modRate * (lp + tap3 * feedback * 0.45 - tap1)\ntap2 = tap2 + modRate * 0.88 * (tap1 - tap2)\ntap3 = tap3 + modRate * 0.76 * (tap2 - tap3)\n\ndelayed = (tap2 + tap3) * 0.85\nsat = (delayed / (1.0 + abs(delayed * 0.4)))\n\nprocessed = in * (1.0 - mix) + sat * mix\nout = processed * 1.55\n",
+    "params": {
+      "time": 0.35,
+      "flutter": 0.35,
+      "feedback": 0.45,
+      "damping": 0.5,
+      "mix": 0.5
+    }
+  }
+}

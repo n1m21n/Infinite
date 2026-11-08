@@ -1,0 +1,75 @@
+infinite-patch 1
+# Footwork Rapid Fire Percussive Stab Synth
+node 1 Notes Note Sequencer
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i steps 16
+  i note0 55
+  i note1 55
+  i note2 60
+  i note3 62
+  i note4 55
+  i note5 58
+  i note6 62
+  i note7 65
+  i note8 55
+  i note9 55
+  i note10 60
+  i note11 67
+  i note12 58
+  i note13 60
+  i note14 62
+  i note15 65
+  b en0 1
+  b en1 1
+  b en2 1
+  b en3 1
+  b en4 1
+  b en5 1
+  b en6 1
+  b en7 1
+  b en8 1
+  b en9 1
+  b en10 1
+  b en11 1
+  b en12 1
+  b en13 1
+  b en14 1
+  b en15 1
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float fmDepth = 0.45 [0.0, 1.0]\nparam float modRatio = 2.0 [0.5, 6.0]\nparam float stabDecay = 0.16 [0.03, 0.6]\nparam float resonance = 0.35 [0.0, 0.85]\nparam float drive = 0.30 [0.0, 1.0]\nstate float pCarrier = 0\nstate float pMod = 0\nstate float env = 0\nstate float lp1 = 0\nstate float lp2 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * stabDecay), 0.0001, 0.06)\nenv = if(target > env, env + (target - env) * 0.90, env - env * decayRate)\n\nfBase = clamp(freq, 60.0, 1200.0)\n\ndpM = (fBase * modRatio) / sr\npMod = pMod + dpM\npMod = if(pMod >= 1.0, pMod - 1.0, pMod)\nmodSig = sin(pMod * 6.2831853) * fmDepth * env\n\ndpC = fBase / sr\npCarrier = pCarrier + dpC + modSig * 0.08\npCarrier = if(pCarrier >= 1.0, pCarrier - 1.0, pCarrier)\ncarrier = sin(pCarrier * 6.2831853)\n\nraw = carrier * (1.0 + drive * 1.5)\nsat = (raw / (1.0 + abs(raw * 0.6))) * env\n\nfCut = clamp(0.12 + env * 0.40, 0.02, 0.45)\nlp1 = lp1 + fCut * (sat + lp1 * resonance * 0.40 - lp1)\nlp2 = lp2 + fCut * (lp1 - lp2)\n\nout = lp2 * 0.42\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 900 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.16 0.24 0.35
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Footwork Rapid Fire Percussive Stab Synth. Aggressive Chicago footwork FM percussive chord stab synthesizer with punchy exponential decay, resonant bandpass formant contour, and crisp saturated transient bite.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.14 0.38
+mod pic sizeY ana 0 0 1 0.5 0.14 0.38

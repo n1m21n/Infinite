@@ -2587,8 +2587,31 @@ namespace app
       const bool isLight = IsThemeLight();
       const float value = mod->Value01();
       std::vector<float>& history = gModHistory[nodeIndex];
-      history.push_back(value);
-      if (history.size() > 160)
+      // Sampled on wall-clock time, not once per draw. A node scrolled off-screen is
+      // skipped by the cull (redrawn only every ~30 frames), so a per-draw history
+      // froze while away and then spliced the old window onto new samples - the
+      // curve of a steady sine visibly jumped when it came back into view. After a
+      // gap longer than a few frames the stale window is dropped and the trace
+      // restarts, instead of stitching two unrelated moments together.
+      static std::map<int, double> lastSampleAt;
+      const double now = ImGui::GetTime();
+      double& last = lastSampleAt[nodeIndex];
+      constexpr double kStep = 1.0 / 60.0;
+      if (history.empty() || now - last > 0.25 || now < last)
+      {
+         history.clear();
+         history.push_back(value);
+         last = now;
+      }
+      else
+      {
+         int n = 0;
+         for (; last + kStep <= now && n < 4; last += kStep, ++n)
+            history.push_back(value);
+         if (n == 4)
+            last = now;
+      }
+      while (history.size() > 160)
          history.erase(history.begin());
 
       // Fixed 0..1 axis: the box's bottom is 0 and its top is 1, always, so

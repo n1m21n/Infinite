@@ -3311,6 +3311,13 @@ static int zenityPresent ( )
 	if ( lZenityPresent < 0 )
 	{
 		lZenityPresent = detectPresence("zenity") ;
+		/* Infinite: on a KDE session prefer kdialog (Qt, native look) over GTK4 zenity,
+		   which can hang under Wayland + NVIDIA (issue #45). */
+		if ( lZenityPresent && getenv("XDG_CURRENT_DESKTOP") && strstr(getenv("XDG_CURRENT_DESKTOP"), "KDE")
+			&& detectPresence("kdialog") )
+		{
+			lZenityPresent = 0 ;
+		}
 	}
 	return lZenityPresent && graphicMode ( ) ;
 }

@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Acid Graphics Kaleido Chroma Warp",
+    "author": "Infinite",
+    "description": "Audio-reactive 8-fold kaleidoscopic chromatic warp featuring undulating starburst lattices, acid typography contours, and high-voltage neon edge glow.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.38 [0.1, 1.5]\nparam float folds = 8.0 [4.0, 16.0]\nparam float rippleScale = 16.0 [6.0, 32.0]\nparam float contrast = 1.18 [0.6, 2.0]\nparam float glow = 0.60 [0.1, 1.2]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.4\ntime = t * speed\n\nr = length(p)\ntheta = atan2(p.y, p.x)\nsector = 6.2831853 / folds\nmodTheta = abs(mod(theta + time * 0.25, sector) - sector * 0.5)\n\nkp = vec2(cos(modTheta), sin(modTheta)) * r\n\nw = sin(kp.x * rippleScale - time * 2.2) * cos(kp.y * rippleScale + time * 1.8)\nring = sin(r * 20.0 - time * 3.2)\nsig = (w + ring) * 0.5\n\ncDark = vec3(0.03, 0.02, 0.06)\ncLime = vec3(0.80, 1.0, 0.0)\ncPink = vec3(1.0, 0.10, 0.70)\ncWhite = vec3(0.95, 0.98, 1.0)\n\ncol = mix(cDark, cPink, clamp(sig * 0.5 + 0.5, 0.0, 1.0))\ncol = mix(col, cLime, clamp(w * 0.7 + 0.3, 0.0, 1.0))\n\nstar = exp(-abs(sig) * (5.0 - glow * 2.0))\ncol = mix(col, cWhite, star * 0.75)\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.38,
+      "folds": 8.0,
+      "rippleScale": 16.0,
+      "contrast": 1.18,
+      "glow": 0.6
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatics Sine Harmonic Quadrupole Field",
+    "author": "Infinite",
+    "description": "Acoustic quadrupole standing wave field visualizing polar interference lobes, acoustic levitation nodes, and concentric harmonic resonance ripples.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.40 [0.1, 1.5]\nparam float acousticScale = 1.25 [0.5, 2.0]\nparam float contrast = 1.12 [0.6, 2.0]\nparam float harmonicDecay = 0.85 [0.2, 1.5]\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2\ntime = t * speed\n\nr = length(p)\nrSafe = max(r, 0.001)\n\nquad = (p.x * p.x - p.y * p.y) / (rSafe * rSafe)\nwave = sin(r * 14.0 * acousticScale - time * 2.6)\nquadLobe = quad * wave\n\nharmonicRing = cos(r * 24.0 * acousticScale + time * 1.6) * 0.5 + 0.5\n\ntrap = abs(quadLobe) * exp(-r * harmonicDecay)\nnodalLobe = 1.0 - smoothstep(0.05, 0.28, trap)\n\ncVoid = vec3(0.020, 0.035, 0.071)\ncDeepBlue = vec3(0.08, 0.16, 0.35)\ncCyan = vec3(0.490, 0.976, 1.0)\ncWhite = vec3(0.96, 0.98, 1.0)\n\nbase = mix(cVoid, cDeepBlue, clamp(harmonicRing * 0.6, 0.0, 1.0))\ncol = mix(base, cCyan, clamp(trap * 1.5, 0.0, 1.0))\ncol = mix(col, cWhite, clamp(nodalLobe * (1.0 - smoothstep(0.0, 0.7, r)), 0.0, 1.0))\n\nout = clamp(col * contrast, 0.0, 1.0)\n",
+    "params": {
+      "speed": 0.4,
+      "acousticScale": 1.25,
+      "contrast": 1.12,
+      "harmonicDecay": 0.85
+    },
+    "nodeSettings": {
+      "width": 1080.0,
+      "height": 1080.0,
+      "animate": 1.0
+    }
+  }
+}

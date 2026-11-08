@@ -2,6 +2,7 @@
 // The Chat panel's first run, for someone who has never used a terminal (docs/CHAT.md, First run).
 // Pure functions: facts about the machine in, plain sentences out, so a test checks every case with strings.
 #include "AgentAuth.h"
+#include "core/CliSetup.h"
 
 #include <string>
 #include <vector>
@@ -43,6 +44,21 @@ namespace chat
    // ---- 1-2. who to talk to, and an account ----
    // The provider's own sign-up page. Infinite never sees what is typed there.
    std::string SignUpUrl(const std::string& agentId);
+   // Plain words for each check-in, shown before anything is installed or opened (never run on its own).
+   // They come from the agent's own row (CliSetup::Agent), so each agent and OS says its own paths.
+   //  InstallNote: the agent is missing: what is downloaded, where it goes, what else is added.
+   //  ConnectNote: the agent is installed: nothing is downloaded; what is written to connect it to Infinite.
+   //  SetUpNote: picks between the two from `installed`.
+   //  SignInNote: what the sign-in opens and what the account needs (Claude Code is not in Claude's free plan).
+   std::string InstallNote(const CliSetup::Agent& agent, bool windows);
+   std::string ConnectNote(const CliSetup::Agent& agent, bool windows);
+   std::string SetUpNote(const CliSetup::Agent& agent, bool windows, bool installed);
+   // With an API key instead: Infinite never takes a key, so the note says what to run in the Terminal tab
+   // (the agent's own command; Gemini has none, so it names only the Google account).
+   std::string SignInNote(const CliSetup::Agent& agent, bool windows);
+   // Two or three words on the agent's pick row, so what the account needs is known before anything starts.
+   std::string PlanTag(const std::string& agentId);
+
    // A sign-in is given this long when the person is making a new account first.
    constexpr double kSignUpSeconds = 900.0;
 
